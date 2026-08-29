@@ -409,14 +409,9 @@
 
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
-    const recent = latestUserMessages(doc).slice(-5);
-    if (recent.some((el) => textOf(el).trim() === request.promptText.trim())) {
-      return resultBase(request, start, {
-        status: STATUS.SENT_VERIFIED,
-        submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
-        safeDiagnosticCode: 'RECOVERY_MESSAGE_FOUND'
-      });
-    }
+
+    // Composer state is operation-local evidence and therefore outranks history.
+    // If the exact prompt is still pending, this operation is not safely proven sent.
     if (found.element && editorText(found.element).trim() === request.promptText.trim()) {
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
@@ -424,10 +419,17 @@
         safeDiagnosticCode: 'RECOVERY_PROMPT_PENDING'
       });
     }
+
+    // Plain historical text equality is not operation identity. In recurring workflows
+    // an older user message can be byte-for-byte identical to the current prompt.
+    // Until Core/Interaction persist a baseline or operation-bound message marker,
+    // history-only matches must fail closed rather than produce SENT_VERIFIED.
+    const recent = latestUserMessages(doc).slice(-5);
+    const repeatedPromptSeen = recent.some((el) => textOf(el).trim() === request.promptText.trim());
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
-      submissionEvidence: 'UNCERTAIN',
-      safeDiagnosticCode: 'RECOVERY_UNCERTAIN'
+      submissionEvidence: repeatedPromptSeen ? 'HISTORY_MATCH_NOT_OPERATION_BOUND' : 'UNCERTAIN',
+      safeDiagnosticCode: repeatedPromptSeen ? 'RECOVERY_STALE_MATCH_UNPROVEN' : 'RECOVERY_UNCERTAIN'
     });
   }
 
