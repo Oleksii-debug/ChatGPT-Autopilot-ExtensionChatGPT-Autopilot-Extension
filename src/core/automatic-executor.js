@@ -221,10 +221,11 @@ export class AutomaticSessionExecutor {
       taskId: operation.taskId,
       promptFingerprint: operation.promptFingerprint,
     };
-    if ((operation.preSendDeadline || 0) > this.now()) {
-      return { kind: 'WAIT_PRE_SEND', wakeAt: operation.preSendDeadline };
-    }
     const task = session.tasksById[operation.taskId];
+    const wakeAt = Math.max(operation.preSendDeadline || 0, task?.retryAfterAt || 0);
+    if (wakeAt > this.now()) {
+      return { kind: 'WAIT_PRE_SEND', wakeAt };
+    }
     const tab = await this.bindTaskTab(sessionId, task.id);
     const prepare = await this.transport.execute(tab.id, this.request(
       session,
