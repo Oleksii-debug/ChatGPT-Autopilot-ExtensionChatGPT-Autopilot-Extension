@@ -101,12 +101,13 @@ function stopButton() {
   };
 }
 
-test('uncertain recovery recognizes an already submitted matching user message and never resends', async () => {
+test('uncertain recovery does not treat plain matching history as operation proof', async () => {
   const { adapter } = loadAdapter();
   const fx = fixture({ userMessages: ['older', 'exact recovery prompt'] });
   const result = await adapter.execute(request('VERIFY_AFTER_UNCERTAIN_SUBMIT'), { document: fx.document });
-  assert.equal(result.status, adapter.STATUS.SENT_VERIFIED);
-  assert.equal(result.safeDiagnosticCode, 'RECOVERY_MESSAGE_FOUND');
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(result.safeDiagnosticCode, 'RECOVERY_STALE_MATCH_UNPROVEN');
+  assert.equal(result.submissionEvidence, 'HISTORY_MATCH_NOT_OPERATION_BOUND');
   assert.equal(fx.clicks(), 0);
 });
 
