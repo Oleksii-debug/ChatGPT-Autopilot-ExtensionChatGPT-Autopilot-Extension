@@ -160,3 +160,33 @@ test('stop during ambiguous verification preserves STOPPED while retaining pendi
   assert.equal(after.sessionsById.s1.runState, RunState.STOPPED);
   assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
 });
+
+test('stale ambiguous verification cannot reconcile a replacement operation', async () => {
+  const repo = new Repo(setupAmbiguous());
+  const transport = { async execute(_tab, request) {
+    assert.equal(request.mode, 'VERIFY_AFTER_UNCERTAIN_SUBMIT');
+    assert.equal(request.requestId, 'op1');
+    await repo.update(draft => {
+      const live = draft.sessionsById.s1;
+      live.operation = {
+        ...live.operation,
+        operationId: 'op2',
+        promptFingerprint: 'fp2',
+        promptText: 'hello again',
+        phase: OperationPhase.AMBIGUOUS,
+        updatedAt: 50,
+      };
+      live.tasksById.t1.status = 'SUBMISSION_UNCERTAIN';
+      return draft;
+    });
+    return { status: InteractionResult.SENT_VERIFIED };
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const result = await executor.runSessionOnce('s1');
+  const after = await repo.load();
+  assert.equal(result.kind, 'OPERATION_CHANGED');
+  assert.equal(after.sessionsById.s1.operation.operationId, 'op2');
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(after.sessionsById.s1.tasksById.t1.status, 'SUBMISSION_UNCERTAIN');
+  assert.equal(after.sendArbiter.lease.operationId, 'op1');
+});

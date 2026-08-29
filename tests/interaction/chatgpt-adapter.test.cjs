@@ -76,11 +76,22 @@ test('malformed request fails closed before DOM mutation', async () => {
   assert.equal(queried, 0);
 });
 
-test('rate limit is classified without recovery clicks', () => {
-  const { adapter } = loadAdapter();
+test('rate limit is classified from a visible accessibility alert without recovery clicks', () => {
+  const rateAlert = {
+    isConnected: true,
+    hidden: false,
+    disabled: false,
+    innerText: 'Too many requests. Try again later.',
+    getAttribute(name) { return name === 'role' ? 'alert' : null; },
+    getBoundingClientRect() { return { width: 100, height: 20 }; }
+  };
+  const { adapter } = loadAdapter({ getComputedStyle: () => ({ display: 'block', visibility: 'visible' }) });
   const fakeDocument = {
-    body: { innerText: 'Too many requests. Try again later.' },
-    querySelectorAll() { return []; }
+    body: { innerText: 'Conversation transcript may contain arbitrary text.' },
+    querySelectorAll(selector) {
+      if (selector === '[role="alert"], [role="status"], [aria-live="assertive"]') return [rateAlert];
+      return [];
+    }
   };
   const block = adapter.detectBlockingState(fakeDocument);
   assert.equal(block.status, adapter.STATUS.RATE_LIMITED);
