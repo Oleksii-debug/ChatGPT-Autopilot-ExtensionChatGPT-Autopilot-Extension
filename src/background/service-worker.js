@@ -54,5 +54,3 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 chrome.action?.onClicked.addListener(() => { runSafely(chrome.runtime.openOptionsPage()); });
-
-runSafely(runExecutionCycle({ startup: true }));
