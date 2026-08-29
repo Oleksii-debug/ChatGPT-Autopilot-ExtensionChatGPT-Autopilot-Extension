@@ -83,3 +83,18 @@ test('session-list refresh restores the same control by stable id when list DOM 
   assert.match(js, /const activeId = preserveFocus \? active\?\.id \|\| null : null/);
   assert.match(js, /else if \(activeId\) \$\(activeId\)\?\.focus\(\)/);
 });
+
+test('delete dialog names its target and successful deletion restores focus deterministically', () => {
+  has(/id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading" aria-describedby="delete-dialog-description"/);
+  assert.match(js, /Rename session \$\{sessionName\}/);
+  assert.match(js, /Duplicate session \$\{sessionName\}/);
+  assert.match(js, /Delete session \$\{sessionName\}/);
+  assert.match(js, /delete-dialog-description'\)\.textContent = `Delete session \$\{sessionName\}\./);
+  assert.match(js, /confirm-delete-button'\)\.setAttribute\('aria-label', `Delete session \$\{sessionName\}`\)/);
+  assert.match(js, /function deleteFocusTargetId\(sessionId\)/);
+  assert.match(js, /ui\.sessions\[index \+ 1\] \|\| ui\.sessions\[index - 1\]/);
+  assert.match(js, /closeDeleteDialog\(\{ restoreFocus: false \}\)/);
+  assert.match(js, /await loadSessions\(\{ preserveFocus: false \}\)/);
+  assert.match(js, /\(\$\(focusTargetId\) \|\| \$\('create-session-button'\)\)\.focus\(\)/);
+  assert.match(js, /catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/);
+});
