@@ -26,7 +26,7 @@ function visibleElement(text, options = {}) {
   };
 }
 
-function install({ document, execute, setTimeoutImpl }) {
+function install({ document, execute }) {
   const sourcePath = path.resolve(__dirname, '../../src/interaction/content-script.js');
   const source = fs.readFileSync(sourcePath, 'utf8');
   let listener;
@@ -36,7 +36,6 @@ function install({ document, execute, setTimeoutImpl }) {
     document,
     Promise,
     getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
-    setTimeout: setTimeoutImpl || ((callback) => { callback(); return 1; }),
   };
   vm.runInNewContext(source, sandbox, { filename: sourcePath });
   return listener;
@@ -49,9 +48,10 @@ async function send(listener, request = { requestId: 'op-1' }) {
   });
 }
 
-test('exact Ukrainian too-many-requests notice is acknowledged before automation continues', async () => {
+test('exact Ukrainian notice is acknowledged, returns RATE_LIMITED, then continues only on a later request', async () => {
   let clicked = 0;
   let dialogVisible = true;
+  let adapterCalls = 0;
   const button = visibleElement('Зрозуміло', {
     click() {
       clicked += 1;
@@ -76,16 +76,26 @@ test('exact Ukrainian too-many-requests notice is acknowledged before automation
   const listener = install({
     document,
     async execute(request) {
-      assert.equal(clicked, 1, 'acknowledgement must happen before adapter execution');
+      adapterCalls += 1;
       assert.equal(dialogVisible, false);
       return { status: 'READY', requestId: request.requestId };
     },
   });
 
-  const response = await send(listener);
-  assert.equal(response.ok, true);
-  assert.equal(response.data.status, 'READY');
+  const held = await send(listener, { requestId: 'op-1', taskId: 'task-1' });
+  assert.equal(held.ok, true);
+  assert.equal(held.data.status, 'RATE_LIMITED');
+  assert.equal(held.data.safeDiagnosticCode, 'RATE_LIMIT_DIALOG_ACKNOWLEDGED');
+  assert.equal(held.data.requestId, 'op-1');
+  assert.equal(held.data.taskId, 'task-1');
   assert.equal(clicked, 1);
+  assert.equal(adapterCalls, 0, 'the acknowledged request must not continue into adapter/Send');
+
+  const resumed = await send(listener, { requestId: 'op-2', taskId: 'task-1' });
+  assert.equal(resumed.ok, true);
+  assert.equal(resumed.data.status, 'READY');
+  assert.equal(clicked, 1, 'acknowledgement must not repeat after the dialog disappears');
+  assert.equal(adapterCalls, 1, 'a later Core-scheduled request may continue normally');
 });
 
 test('unknown confirmation dialog is never auto-accepted', async () => {
@@ -137,5 +147,58 @@ test('rate-limit notice with a non-whitelisted action button is not clicked', as
 
   const response = await send(listener);
   assert.equal(response.ok, true);
+  assert.equal(clicked, 0);
+});
+
+test('incomplete lookalike notice is not whitelisted', async () => {
+  let clicked = 0;
+  const button = visibleElement('Зрозуміло', { click() { clicked += 1; } });
+  const dialog = visibleElement(
+    'Забагато запитів Ви надсилаєте запити надто швидко. Зачекайте кілька хвилин. Зрозуміло',
+    { buttons: [button] },
+  );
+  const document = {
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog, [role="alertdialog"], [aria-modal="true"]') return [dialog];
+      return [];
+    },
+  };
+
+  const listener = install({
+    document,
+    async execute(request) { return { status: 'MANUAL_REVIEW_REQUIRED', requestId: request.requestId }; },
+  });
+  const response = await send(listener);
+  assert.equal(response.ok, true);
+  assert.equal(response.data.status, 'MANUAL_REVIEW_REQUIRED');
+  assert.equal(clicked, 0);
+});
+
+test('a second simultaneous modal disables automatic acknowledgement', async () => {
+  let clicked = 0;
+  const rateButton = visibleElement('Зрозуміло', { click() { clicked += 1; } });
+  const rateDialog = visibleElement(
+    'Забагато запитів Ви надсилаєте запити надто швидко. '
+      + 'Ми тимчасово обмежили доступ до ваших розмов. '
+      + 'Зачекайте кілька хвилин, перш ніж спробувати знову. Зрозуміло',
+    { buttons: [rateButton] },
+  );
+  const securityDialog = visibleElement('Security verification required');
+  const document = {
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog, [role="alertdialog"], [aria-modal="true"]') {
+        return [rateDialog, securityDialog];
+      }
+      return [];
+    },
+  };
+
+  const listener = install({
+    document,
+    async execute(request) { return { status: 'MANUAL_REVIEW_REQUIRED', requestId: request.requestId }; },
+  });
+  const response = await send(listener);
+  assert.equal(response.ok, true);
+  assert.equal(response.data.status, 'MANUAL_REVIEW_REQUIRED');
   assert.equal(clicked, 0);
 });

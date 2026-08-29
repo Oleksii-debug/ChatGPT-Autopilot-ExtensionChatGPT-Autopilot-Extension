@@ -130,6 +130,34 @@ test('startup converts persisted RUNNING to RECOVERING before executor sees it',
   assert.equal((await repo.load()).sessionsById.s1.runState, RunState.RECOVERING);
 });
 
+test('Chrome startup preserves a configured retry deadline and automatically re-arms the active Session', async () => {
+  const value = session('s1', RunState.RUNNING);
+  value.retryBackoffMs = 5 * 60 * 1000;
+  value.tasksById['s1-t1'].status = 'RATE_LIMITED';
+  value.tasksById['s1-t1'].retryAfterAt = 301000;
+  const repo = new Repo(stateWith(value));
+  const chromeApi = fakeChrome();
+  const seen = [];
+  const executor = { async runSessionOnce(id) {
+    const live = (await repo.load()).sessionsById[id];
+    seen.push([id, live.runState, live.tasksById['s1-t1'].retryAfterAt]);
+    return { kind: 'WAIT', wakeAt: live.tasksById['s1-t1'].retryAfterAt };
+  } };
+
+  const result = await runRuntimeCycle({
+    repository: repo,
+    chromeApi,
+    executor,
+    startup: true,
+    executionAvailable: true,
+    now: () => 1000,
+  });
+
+  assert.deepEqual(seen, [['s1', RunState.RECOVERING, 301000]]);
+  assert.equal(result.wakeAt, 301000);
+  assert.deepEqual(chromeApi.calls, [['create', 'autopilot-core-wake', 301000]]);
+});
+
 test('execution-disabled startup remains fail closed and never calls executor', async () => {
   const repo = new Repo(stateWith(session('s1', RunState.RUNNING)));
   let calls = 0;

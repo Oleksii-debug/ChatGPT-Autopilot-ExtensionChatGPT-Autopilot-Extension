@@ -13,6 +13,8 @@
 - Release tests proving manifest-resource completeness, minimal package contents, canonical root naming, and byte-for-byte ZIP reproducibility.
 - GitHub Actions release-candidate artifact generation.
 - Keyboard-only Windows 11/NVDA installation and unpacked-upgrade instructions.
+- Configurable Seconds/Minutes presentation for the per-Session retry/backoff used after the exact acknowledgement and temporary failures.
+- In-product keyboard/startup help documenting standard controls, no extension-specific global shortcuts, and automatic recovery of RUNNING/RECOVERING Sessions when Chrome starts.
 
 ### Changed
 
@@ -21,6 +23,7 @@
 - Preserved unresolved operation checkpoints when a session is stopped.
 - Production automatic execution is now enabled after exact integrated deterministic acceptance; explicit injected disabled-mode coverage remains for fail-closed recovery tests.
 - Release packaging now replaces the same canonical candidate name instead of creating ambiguous `final`/`fixed`/`new` variants.
+- Exact rate-limit acknowledgement now returns `RATE_LIMITED` without adapter/Send work and resumes only through the configured durable scheduler deadline.
 - The interaction message bridge now auto-acknowledges only the explicitly whitelisted benign ChatGPT “Too many requests” informational dialog (`Зрозуміло` / `Got it`) before continuing the normal interaction request; unknown, security, payment, and non-whitelisted dialogs remain fail-closed and are never auto-accepted.
 
 ### Known incomplete work

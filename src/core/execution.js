@@ -40,7 +40,9 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       return { action: 'RETRY_LATER', retryAt: task.retryAfterAt };
     case InteractionResult.RATE_LIMITED:
       task.status = 'RATE_LIMITED';
-      task.retryAfterAt = now + Math.max(session.retryBackoffMs, 60000);
+      // Acknowledgement only dismisses the exact informational modal. The Session's
+      // user-configured durable retry/backoff remains authoritative before any recheck.
+      task.retryAfterAt = now + Math.max(5000, session.retryBackoffMs || 30000);
       return { action: 'BACKOFF', retryAt: task.retryAfterAt };
     case InteractionResult.AUTH_REQUIRED:
     case InteractionResult.UNKNOWN_UI:

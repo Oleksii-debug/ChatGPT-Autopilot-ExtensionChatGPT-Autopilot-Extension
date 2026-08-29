@@ -13,6 +13,9 @@ test('page exposes semantic landmarks and primary accessible names', () => {
   has(/<main id="main" tabindex="-1">/, 'missing main landmark');
   has(/id="session-status-region"/, 'missing readable status region');
   has(/id="session-log-region" tabindex="0" aria-label="Session log"/, 'missing readable log');
+  has(/<h2 id="keyboard-startup-heading">Keyboard and startup behavior<\/h2>/, 'keyboard/startup help heading missing');
+  has(/No extension-specific global keyboard shortcuts are assigned\./, 'shortcut truth missing');
+  has(/Sessions left RUNNING or RECOVERING resume automatically when Chrome starts\. PAUSED and STOPPED Sessions do not auto-resume\./, 'startup truth missing');
 });
 
 test('all static controls use native elements and persistent labels/legends', () => {
@@ -24,9 +27,31 @@ test('all static controls use native elements and persistent labels/legends', ()
   has(/<fieldset id="tab-strategy">\s*<legend>Tab strategy<\/legend>/s, 'tab strategy fieldset missing');
 });
 
+test('static keyboard controls follow a stable logical DOM order with no accesskey overrides', () => {
+  const orderedIds = [
+    'master-pause-button', 'master-resume-button', 'create-session-button',
+    'session-name', 'prompt-mode-shared', 'prompt-mode-unique', 'shared-prompt',
+    'run-mode-one-pass', 'run-mode-continuous', 'add-task-button',
+    'minimum-send-interval', 'pre-send-delay', 'busy-check-delay',
+    'retry-backoff', 'retry-backoff-unit', 'busy-chat-behavior',
+    'tab-strategy-keep-open', 'tab-strategy-worker', 'tab-strategy-open-close',
+    'save-session-button', 'start-session-button', 'pause-session-button',
+    'resume-session-button', 'stop-session-button', 'clear-log-button'
+  ];
+  let previous = -1;
+  for (const id of orderedIds) {
+    const position = html.indexOf(`id="${id}"`);
+    assert.ok(position > previous, `${id} is missing or out of keyboard order`);
+    previous = position;
+  }
+  assert.doesNotMatch(html, /\saccesskey=/i);
+});
+
 test('visible help text is programmatically associated with its controls', () => {
   has(/<button id="add-task-button" type="button" aria-describedby="task-limit-help">Add task<\/button>/, 'task-limit help association missing');
   has(/<input id="minimum-send-interval"[^>]*aria-describedby="minimum-send-interval-help"/, 'minimum send interval help association missing');
+  has(/<input id="retry-backoff"[^>]*aria-describedby="retry-backoff-help"/, 'retry-backoff help association missing');
+  has(/<select id="retry-backoff-unit" aria-describedby="retry-backoff-help">/, 'retry-backoff unit help association missing');
   assert.match(js, /const existing = field\.getAttribute\('aria-describedby'\); field\.setAttribute\('aria-describedby', \[existing, error\.id\]/, 'validation must append error descriptions to static help');
   assert.match(js, /filter\(\(x\) => x && !x\.endsWith\('-error'\)\)/, 'clearing validation must preserve static help descriptions');
 });
@@ -35,6 +60,11 @@ test('timing controls expose required limits and units', () => {
   has(/Minimum interval between actual sends, minutes<\/label>\s*<input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric" aria-describedby="minimum-send-interval-help"/s);
   has(/Delay after prompt insertion before Send, seconds<\/label>\s*<input id="pre-send-delay" type="number" min="1" max="30"/s);
   has(/Busy-chat checks do not consume this interval\./);
+  has(/<label for="retry-backoff">Retry\/backoff wait<\/label>/);
+  has(/<label for="retry-backoff-unit">Retry\/backoff unit<\/label>/);
+  has(/<option value="seconds">Seconds<\/option>/);
+  has(/<option value="minutes">Minutes<\/option>/);
+  has(/Used after temporary failures and after the exact Too many requests acknowledgement\./);
 });
 
 test('timing bounds are enforced by the JS Save validation path', () => {
@@ -42,6 +72,9 @@ test('timing bounds are enforced by the JS Save validation path', () => {
   has(/id="retry-backoff"[^>]*min="5"[^>]*max="3600"/s, 'retry-backoff markup bounds missing');
   assert.match(js, /session\.busyCheckDelaySeconds\s*>=\s*1\s*&&\s*session\.busyCheckDelaySeconds\s*<=\s*30/);
   assert.match(js, /session\.retryBackoffSeconds\s*>=\s*5\s*&&\s*session\.retryBackoffSeconds\s*<=\s*3600/);
+  assert.match(js, /retryBackoffAmount \* \(retryBackoffUnit === 'minutes' \? 60 : 1\)/);
+  assert.match(js, /input\.min = minutes \? '1' : '5'/);
+  assert.match(js, /input\.max = minutes \? '60' : '3600'/);
 });
 
 test('session and master runtime controls are present', () => {

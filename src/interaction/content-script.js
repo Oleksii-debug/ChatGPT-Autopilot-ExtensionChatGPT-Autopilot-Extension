@@ -35,9 +35,11 @@
   function isWhitelistedRateLimitNotice(text) {
     const ukrainian = text.includes('забагато запитів')
       && text.includes('надсилаєте запити надто швидко')
+      && text.includes('тимчасово обмежили доступ до ваших розмов')
       && text.includes('зачекайте кілька хвилин');
     const english = text.includes('too many requests')
       && text.includes('requests too quickly')
+      && text.includes('temporarily limited access to your conversations')
       && text.includes('wait a few minutes');
     return ukrainian || english;
   }
@@ -59,7 +61,7 @@
       '[role="dialog"], dialog, [role="alertdialog"], [aria-modal="true"]'
     )).filter(isVisibleControl);
     const matches = dialogs.filter((dialog) => isWhitelistedRateLimitNotice(elementText(dialog)));
-    if (matches.length !== 1) return false;
+    if (dialogs.length !== 1 || matches.length !== 1) return false;
 
     const dialog = matches[0];
     const buttons = Array.from(dialog.querySelectorAll?.('button, [role="button"]') || [])
@@ -76,11 +78,18 @@
 
     Promise.resolve()
       .then(() => {
+        const request = message.request || {};
         const dismissed = dismissWhitelistedRateLimitNotice(root.document);
-        if (!dismissed || typeof root.setTimeout !== 'function') return undefined;
-        return new Promise((resolve) => root.setTimeout(resolve, 50));
+        if (dismissed) {
+          return {
+            status: 'RATE_LIMITED',
+            requestId: request.requestId || null,
+            taskId: request.taskId || null,
+            safeDiagnosticCode: 'RATE_LIMIT_DIALOG_ACKNOWLEDGED',
+          };
+        }
+        return adapter.execute(request);
       })
-      .then(() => adapter.execute(message.request || {}))
       .then((result) => sendResponse({ ok: true, data: result }))
       .catch(() => sendResponse({
         ok: false,

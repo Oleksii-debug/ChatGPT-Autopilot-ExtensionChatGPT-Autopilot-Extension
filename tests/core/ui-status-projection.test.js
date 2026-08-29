@@ -71,3 +71,16 @@ test('Core UI action availability exposes Start for every state accepted by STAR
     assert.equal(sessionToUi(session, state).actionAvailability.start, false, `${runState} must not expose Start`);
   }
 });
+
+test('Core UI preserves the configured retry duration and exposes an exact readable unit', () => {
+  const { state, session } = makeState('RATE_LIMITED');
+  session.retryBackoffMs = 5 * 60 * 1000;
+  let view = sessionToUi(session, state);
+  assert.equal(view.retryBackoffSeconds, 300);
+  assert.equal(view.retryBackoffUnit, 'minutes');
+
+  session.retryBackoffMs = 45 * 1000;
+  view = sessionToUi(session, state);
+  assert.equal(view.retryBackoffSeconds, 45);
+  assert.equal(view.retryBackoffUnit, 'seconds');
+});

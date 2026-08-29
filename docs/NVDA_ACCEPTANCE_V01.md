@@ -18,8 +18,9 @@ Keyboard only:
 2. Press `H`/heading navigation in NVDA and confirm the page exposes the `ChatGPT Autopilot` heading, `Sessions`, and the selected Session headings in logical order.
 3. Press `D`/landmark navigation and confirm Session navigation and main content are distinguishable.
 4. Tab through the first controls. NVDA must announce meaningful names such as `Master pause`, `Create session`, and existing Session buttons.
-5. With at least two Sessions, open one, then review Session navigation without activating another Session. NVDA must expose exactly the opened Session as the current item; the exact spoken wording may vary by NVDA/Chrome.
-6. Open a different Session and review Session navigation again. The current marker must move to the newly opened Session and be absent from the previous Session. Rename/Duplicate/Delete controls must not be presented as the current item or as toggle controls.
+5. Confirm the `Keyboard and startup behavior` section states that there are no extension-specific global shortcuts. Navigation must use standard `Tab`, `Shift+Tab`, `Enter`, and `Space` behavior without a keyboard trap.
+6. With at least two Sessions, open one, then review Session navigation without activating another Session. NVDA must expose exactly the opened Session as the current item; the exact spoken wording may vary by NVDA/Chrome.
+7. Open a different Session and review Session navigation again. The current marker must move to the newly opened Session and be absent from the previous Session. Rename/Duplicate/Delete controls must not be presented as the current item or as toggle controls.
 
 Pass criteria: no unlabeled focusable control; no mouse-only operation; focus order follows the page structure; exactly one `Open session …` control is exposed as current when a Session is selected, and that state follows the opened Session without inventing toggle semantics.
 
@@ -45,7 +46,7 @@ Pass criteria: dynamic controls have stable accessible names, ordinal Task conte
 3. Confirm focusing the summary does not cause a duplicate assertive/alert announcement in addition to the normal validation announcement.
 4. Confirm invalid fields expose `aria-invalid` and the error text through `aria-describedby`.
 5. Enter busy-check delay below 1 or above 30 seconds and confirm Save is rejected with an understandable error.
-6. Enter retry-backoff below 5 or above 3600 seconds and confirm Save is rejected with an understandable error.
+6. Test `Retry/backoff unit` with both `Seconds` and `Minutes`. Confirm values below 5 seconds or above 60 minutes are rejected with an understandable error, and that reopening the Session preserves the exact duration.
 7. Correct all values and Save; NVDA should announce `Session saved.` without unexpected focus loss.
 
 Pass criteria: bounds are enforced by the Save path, not only by browser-native number input behavior, and error focus always lands on an identifiable target.
@@ -140,6 +141,7 @@ With multiple active test Sessions:
 3. Confirm the formerly running Session is represented as `RECOVERING`/`RUNNING` according to Core reconciliation and the manually paused Session remains `PAUSED`.
 4. Confirm the dashboard exposes the recovered state without requiring mouse interaction.
 5. Repeat around temporary network loss if the candidate can safely do so.
+6. Confirm the options page accurately states that only `RUNNING`/`RECOVERING` Sessions auto-resume and that `PAUSED`/`STOPPED` Sessions do not.
 
 ## J. Final acceptance record
 

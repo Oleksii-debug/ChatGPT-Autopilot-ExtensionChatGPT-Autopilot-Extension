@@ -38,6 +38,7 @@ function blankSession() {
     preSendDelaySeconds: 5,
     busyCheckDelaySeconds: 2,
     retryBackoffSeconds: 30,
+    retryBackoffUnit: 'seconds',
     retryPolicy: 'safe',
     busyChatBehavior: 'skip-next',
     tabStrategy: 'keep-open',
@@ -157,7 +158,12 @@ function renderEditor() {
   $('minimum-send-interval').value = ui.selected.minimumSendIntervalMinutes ?? 2;
   $('pre-send-delay').value = ui.selected.preSendDelaySeconds ?? 5;
   $('busy-check-delay').value = ui.selected.busyCheckDelaySeconds ?? 2;
-  $('retry-backoff').value = ui.selected.retryBackoffSeconds ?? 30;
+  const retryBackoffSeconds = ui.selected.retryBackoffSeconds ?? 30;
+  const retryBackoffUnit = ui.selected.retryBackoffUnit
+    || (retryBackoffSeconds >= 60 && retryBackoffSeconds % 60 === 0 ? 'minutes' : 'seconds');
+  $('retry-backoff-unit').value = retryBackoffUnit;
+  $('retry-backoff').value = retryBackoffUnit === 'minutes' ? retryBackoffSeconds / 60 : retryBackoffSeconds;
+  syncRetryBackoffBounds();
   document.querySelector(`input[name="retryPolicy"][value="${CSS.escape(ui.selected.retryPolicy || 'safe')}"]`)?.click();
   $('busy-chat-behavior').value = ui.selected.busyChatBehavior || 'skip-next';
   document.querySelector(`input[name="tabStrategy"][value="${CSS.escape(ui.selected.tabStrategy || 'keep-open')}"]`)?.click();
@@ -228,7 +234,10 @@ function collectEditor() {
   s.minimumSendIntervalMinutes = Number($('minimum-send-interval').value);
   s.preSendDelaySeconds = Number($('pre-send-delay').value);
   s.busyCheckDelaySeconds = Number($('busy-check-delay').value);
-  s.retryBackoffSeconds = Number($('retry-backoff').value);
+  const retryBackoffUnit = $('retry-backoff-unit').value === 'minutes' ? 'minutes' : 'seconds';
+  const retryBackoffAmount = Number($('retry-backoff').value);
+  s.retryBackoffSeconds = retryBackoffAmount * (retryBackoffUnit === 'minutes' ? 60 : 1);
+  s.retryBackoffUnit = retryBackoffUnit;
   s.retryPolicy = document.querySelector('input[name="retryPolicy"]:checked')?.value || 'safe';
   s.busyChatBehavior = $('busy-chat-behavior').value;
   s.tabStrategy = document.querySelector('input[name="tabStrategy"]:checked')?.value || 'keep-open';
@@ -250,7 +259,7 @@ function validate(session) {
   if (!(session.minimumSendIntervalMinutes >= 1)) errors.push(['minimum-send-interval', 'Minimum send interval must be at least 1 minute.']);
   if (!(session.preSendDelaySeconds >= 1 && session.preSendDelaySeconds <= 30)) errors.push(['pre-send-delay', 'Pre-send delay must be between 1 and 30 seconds.']);
   if (!(session.busyCheckDelaySeconds >= 1 && session.busyCheckDelaySeconds <= 30)) errors.push(['busy-check-delay', 'Busy-check delay must be between 1 and 30 seconds.']);
-  if (!(session.retryBackoffSeconds >= 5 && session.retryBackoffSeconds <= 3600)) errors.push(['retry-backoff', 'Retry backoff must be between 5 and 3600 seconds.']);
+  if (!(session.retryBackoffSeconds >= 5 && session.retryBackoffSeconds <= 3600)) errors.push(['retry-backoff', 'Retry backoff must be between 5 seconds and 60 minutes.']);
   errors.forEach(([id, message]) => markError(id, message));
   if (errors.length > 1) {
     const summary = $('form-error-summary'); summary.hidden = false; summary.className = 'error-summary';
@@ -395,6 +404,27 @@ function renderLog() {
 function onPromptModeChange() {
   const value = document.querySelector('input[name="promptMode"]:checked')?.value || 'shared'; ui.selected.promptMode = value; $('shared-prompt-container').hidden = value !== 'shared'; $('unique-default-container').hidden = value !== 'unique'; renderTasks(); announce(value === 'shared' ? 'Shared prompt mode selected.' : 'Unique prompt mode selected.');
 }
+function syncRetryBackoffBounds() {
+  const minutes = $('retry-backoff-unit').value === 'minutes';
+  const input = $('retry-backoff');
+  input.min = minutes ? '1' : '5';
+  input.max = minutes ? '60' : '3600';
+  input.step = '1';
+}
+function onRetryBackoffUnitChange() {
+  const previousUnit = ui.selected?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
+  const nextUnit = $('retry-backoff-unit').value === 'minutes' ? 'minutes' : 'seconds';
+  const amount = Number($('retry-backoff').value);
+  const seconds = Number.isFinite(amount) ? amount * (previousUnit === 'minutes' ? 60 : 1) : 30;
+  const nextAmount = nextUnit === 'minutes' ? Math.max(1, Math.ceil(seconds / 60)) : Math.max(5, seconds);
+  $('retry-backoff').value = String(nextAmount);
+  if (ui.selected) {
+    ui.selected.retryBackoffUnit = nextUnit;
+    ui.selected.retryBackoffSeconds = nextAmount * (nextUnit === 'minutes' ? 60 : 1);
+  }
+  syncRetryBackoffBounds();
+  announce(`Retry/backoff unit changed to ${nextUnit}. Current wait is ${nextAmount} ${nextUnit}.`);
+}
 function applyDefaultPrompt() { const value = $('default-unique-prompt').value; let changed = 0; ui.selected.tasks.forEach((task) => { if (!task.promptOverride.trim()) { task.promptOverride = value; changed++; } }); renderTasks(); announce(`Default prompt applied to ${changed} empty task${changed === 1 ? '' : 's'}.`); }
 
 $('create-session-button').addEventListener('click', createSession);
@@ -403,6 +433,7 @@ $('master-resume-button').addEventListener('click', () => masterAction('MASTER_R
 $('add-task-button').addEventListener('click', addTask);
 $('prompt-mode-shared').addEventListener('change', onPromptModeChange);
 $('prompt-mode-unique').addEventListener('change', onPromptModeChange);
+$('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
 $('save-session-button').addEventListener('click', saveSession);
 $('start-session-button').addEventListener('click', () => action('START_SESSION', 'Start'));

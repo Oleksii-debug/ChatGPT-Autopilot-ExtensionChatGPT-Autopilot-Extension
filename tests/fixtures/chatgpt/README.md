@@ -17,7 +17,7 @@ P0 scenarios to preserve as the DOM harness expands:
 - F13 uncertain recovery finds matching recent user message -> `SENT_VERIFIED`, never resend.
 - F14 uncertain recovery finds prompt still pending -> `INSERTED_NOT_SENT`.
 - F15 sign-in/auth surface -> `AUTH_REQUIRED`.
-- F16 too-many-requests/rate-limit surface -> `RATE_LIMITED`, no retry click.
+- F16 too-many-requests/rate-limit surface -> `RATE_LIMITED`; the exact informational acknowledgement may be dismissed once, but no retry or Send control is clicked and Core waits for the Session's configured retry/backoff.
 - F17 unknown confirmation/security dialog -> `MANUAL_REVIEW_REQUIRED`.
 - F20 tab URL changed to another conversation -> fail closed before composer action.
 - F22 composer detached/replaced around action -> bounded re-resolution only; never stale click.
