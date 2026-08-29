@@ -40,7 +40,7 @@ test('one-pass completion is not delayed by the cooldown created by its final ve
     create: async (name, options) => calls.push(['create', name, options.when]),
   } };
   await reconcileAlarm(chrome, stateWith(session), 1001);
-  assert.deepEqual(calls[1], ['create', 'autopilot-core-wake', 1501]);
+  assert.deepEqual(calls, [['create', 'autopilot-core-wake', 1501]]);
 });
 
 test('one-pass cooldown still blocks an unfinished eligible task', () => {
