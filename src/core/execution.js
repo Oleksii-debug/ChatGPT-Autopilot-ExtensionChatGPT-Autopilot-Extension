@@ -31,7 +31,7 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
     case InteractionResult.SUBMISSION_UNCERTAIN:
       task.status = 'SUBMISSION_UNCERTAIN';
       task.retryAfterAt = now + Math.max(1000, session.retryBackoffMs || 30000);
-      session.runState = RunState.RECOVERING;
+      if (![RunState.PAUSED, RunState.STOPPED].includes(session.runState)) session.runState = RunState.RECOVERING;
       if (session.operation) { session.operation.phase = OperationPhase.AMBIGUOUS; session.operation.updatedAt = now; }
       return { action: 'RECOVER_BEFORE_RESEND', retryAt: task.retryAfterAt };
     case InteractionResult.TEMPORARY_ERROR:
