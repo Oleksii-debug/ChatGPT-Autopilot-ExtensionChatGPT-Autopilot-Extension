@@ -4,6 +4,30 @@ import { selectNextTask } from './scheduler.js';
 export const ALARM_NAME = 'autopilot-core-wake';
 export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not available until the durable send runner is installed.';
 
+const INTERRUPTED_PRE_SUBMIT_PHASES = new Set([
+  OperationPhase.CHECKING,
+  OperationPhase.READY,
+  OperationPhase.INSERTING,
+]);
+
+export function resetInterruptedPreSubmitOperation(session, now = Date.now()) {
+  const operation = session?.operation;
+  if (!operation || !INTERRUPTED_PRE_SUBMIT_PHASES.has(operation.phase)) return false;
+
+  const retryAt = now + Math.max(1000, session.retryBackoffMs || 30000);
+  const task = session.tasksById?.[operation.taskId];
+  if (task) task.retryAfterAt = Math.max(task.retryAfterAt || 0, retryAt);
+
+  // These phases are all strictly before durable SUBMITTING. Clearing only this
+  // transient checkpoint cannot authorize a Send. The next normal cycle repeats
+  // CHECK_ONLY and idempotent INSERT_ONLY; an already-present exact prompt is
+  // re-proven by Interaction, while unrelated composer content still fails closed.
+  session.operation = null;
+  session.lastActionAt = now;
+  session.updatedAt = now;
+  return true;
+}
+
 export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
     if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
@@ -20,6 +44,9 @@ export function reconcileStateForStartup(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
     const wasActive = session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING;
     if (session.runState === RunState.RUNNING) session.runState = RunState.RECOVERING;
+
+    if (resetInterruptedPreSubmitOperation(session, now)) continue;
+
     if (session.operation?.phase === OperationPhase.SUBMITTING) {
       session.operation.phase = OperationPhase.AMBIGUOUS;
       if (wasActive) session.runState = RunState.RECOVERING;
