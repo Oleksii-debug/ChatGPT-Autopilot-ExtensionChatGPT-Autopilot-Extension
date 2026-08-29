@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CoreCommandDispatcher } from '../../src/core/commands.js';
 import { CoreCommand } from '../../src/shared/protocol.js';
-import { createEmptyState, createSession, createTask, OperationPhase, RunState } from '../../src/core/schema.js';
+import { createEmptyState, createSession, createTask, OperationPhase, RunState, validateState } from '../../src/core/schema.js';
 
 class Repo {
   constructor(state) { this.state = structuredClone(state); }
@@ -51,6 +51,35 @@ function pausedState(phase) {
   return state;
 }
 
+function addUnresolvedOwner(state, url = 'https://chatgpt.com/c/resume-recovery') {
+  const task = createTask({ id: 'owner-task', url });
+  const owner = createSession({
+    id: 'owner',
+    name: 'owner',
+    tasks: [task],
+    sharedPrompt: 'continue',
+    now: 0,
+  });
+  owner.runState = RunState.STOPPED;
+  owner.operation = {
+    operationId: 'owner-op',
+    sessionId: owner.id,
+    taskId: task.id,
+    promptFingerprint: 'owner-fp',
+    promptText: 'continue',
+    phase: OperationPhase.AMBIGUOUS,
+    targetUrl: task.normalizedUrl,
+    createdAt: 10,
+    updatedAt: 20,
+    preSendDeadline: 0,
+    submitStartedAt: 0,
+    verificationDeadline: 0,
+  };
+  state.sessionsById[owner.id] = owner;
+  state.sessionOrder.unshift(owner.id);
+  return owner;
+}
+
 for (const phase of [OperationPhase.AMBIGUOUS, OperationPhase.PRE_SEND_WAIT]) {
   test(`explicit Resume preserves ${phase} evidence and enters RECOVERING`, async () => {
     const repo = new Repo(pausedState(phase));
@@ -78,4 +107,24 @@ test('explicit Resume cannot bypass MANUAL_REVIEW', async () => {
   const after = await repo.load();
   assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
   assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.MANUAL_REVIEW);
+});
+
+test('explicit Resume reserves an unresolved operation target even when its bound Task is disabled', async () => {
+  const state = pausedState(OperationPhase.AMBIGUOUS);
+  state.sessionsById.s1.tasksById.t1.enabled = false;
+  addUnresolvedOwner(state);
+  assert.doesNotThrow(() => validateState(state));
+
+  const repo = new Repo(state);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 100, { executionAvailable: true });
+
+  await assert.rejects(
+    () => dispatcher.execute(CoreCommand.RESUME_SESSION, { sessionId: 's1' }),
+    /Another active or unresolved session already owns/i,
+  );
+  const after = await repo.load();
+  assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
+  assert.equal(after.sessionsById.s1.operation.operationId, 'op1');
+  assert.equal(after.sessionsById.s1.operation.promptFingerprint, 'fp1');
+  assert.equal(after.sessionsById.s1.operation.targetUrl, 'https://chatgpt.com/c/resume-recovery');
 });

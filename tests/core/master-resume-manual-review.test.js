@@ -179,3 +179,46 @@ test('MASTER_RESUME isolates a legacy URL conflict and still resumes an unrelate
   assert.equal(safe.operation.operationId, 'safe-op');
   assert.equal(safe.operation.phase, OperationPhase.CHECKING);
 });
+
+test('MASTER_RESUME reserves a disabled Task unresolved operation target', async () => {
+  const { repo, core } = harness();
+  const sharedUrl = 'https://chatgpt.com/c/disabled-unresolved-target';
+  await repo.update(state => {
+    const owner = sessionWithOperation({
+      sessionId: 'owner',
+      taskId: 'owner-task',
+      url: sharedUrl,
+      operationId: 'owner-op',
+      fingerprint: 'owner-fp',
+      phase: OperationPhase.AMBIGUOUS,
+      runState: RunState.STOPPED
+    });
+    const candidate = sessionWithOperation({
+      sessionId: 'candidate',
+      taskId: 'candidate-task',
+      url: sharedUrl,
+      operationId: 'candidate-op',
+      fingerprint: 'candidate-fp',
+      phase: OperationPhase.CHECKING,
+      runState: RunState.PAUSED,
+      pausedByMaster: true
+    });
+    candidate.tasksById['candidate-task'].enabled = false;
+    state.profile.masterPaused = true;
+    state.sessionsById[owner.id] = owner;
+    state.sessionsById[candidate.id] = candidate;
+    state.sessionOrder = [owner.id, candidate.id];
+    return state;
+  });
+
+  await core.execute(CoreCommand.MASTER_RESUME);
+  const { session } = await core.execute(CoreCommand.GET_SESSION, { sessionId: 'candidate' });
+
+  assert.equal(session.runState, RunState.PAUSED);
+  assert.equal(session.pausedByMaster, false);
+  assert.equal(session.tasksById['candidate-task'].enabled, false);
+  assert.equal(session.operation.operationId, 'candidate-op');
+  assert.equal(session.operation.promptFingerprint, 'candidate-fp');
+  assert.equal(session.operation.targetUrl, sharedUrl);
+  assert.match(session.lastError, /another active or unresolved session/i);
+});
