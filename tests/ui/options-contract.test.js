@@ -89,6 +89,12 @@ test('structured background status is readable without becoming a repeated live 
   has(/id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"/, 'dedicated concise live announcer must remain available');
 });
 
+test('app status avoids duplicate live-region mutations on background refresh', () => {
+  has(/id="app-status" role="status"/, 'app status must remain a status live region');
+  assert.match(js, /function setAppStatus\(text\) \{\s*const status = \$\('app-status'\);\s*if \(status\.textContent === text\) return;\s*status\.textContent = text;\s*\}/s);
+  assert.match(js, /setAppStatus\('Connected to Core\.'\)/);
+});
+
 test('session-list refresh restores the same control by stable id when list DOM is replaced', () => {
   assert.match(js, /const activeId = preserveFocus \? active\?\.id \|\| null : null/);
   assert.match(js, /else if \(activeId\) \$\(activeId\)\?\.focus\(\)/);
