@@ -1,4 +1,9 @@
-import { reconcileAlarm, reconcileStateForStartup, suspendActiveSessionsWhenExecutionUnavailable } from './recovery.js';
+import {
+  reconcileAlarm,
+  reconcileStateForStartup,
+  resetInterruptedPreSubmitOperation,
+  suspendActiveSessionsWhenExecutionUnavailable,
+} from './recovery.js';
 import { RunState } from './schema.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
@@ -44,16 +49,24 @@ async function persistRuntimeFailure(repository, sessionId, now) {
   await repository.update(draft => {
     const session = draft.sessionsById?.[sessionId];
     if (!session || !ACTIVE_STATES.has(session.runState)) return draft;
-    const retryAt = now + Math.max(1000, session.retryBackoffMs || 30000);
-    const taskId = session.operation?.taskId;
-    if (taskId && session.tasksById?.[taskId]) {
-      session.tasksById[taskId].retryAfterAt = Math.max(
-        session.tasksById[taskId].retryAfterAt || 0,
-        retryAt,
-      );
-    } else {
-      session.nextAllowedSendAt = Math.max(session.nextAllowedSendAt || 0, retryAt);
+
+    // A thrown transport/runtime error while CHECKING/READY/INSERTING has no Send
+    // side effect. Drop only that transient pre-submit checkpoint and let the task
+    // retry after its normal bounded backoff. This prevents a durable INSERTING
+    // zombie while preserving SUBMITTING/AMBIGUOUS uncertainty semantics intact.
+    if (!resetInterruptedPreSubmitOperation(session, now)) {
+      const retryAt = now + Math.max(1000, session.retryBackoffMs || 30000);
+      const taskId = session.operation?.taskId;
+      if (taskId && session.tasksById?.[taskId]) {
+        session.tasksById[taskId].retryAfterAt = Math.max(
+          session.tasksById[taskId].retryAfterAt || 0,
+          retryAt,
+        );
+      } else {
+        session.nextAllowedSendAt = Math.max(session.nextAllowedSendAt || 0, retryAt);
+      }
     }
+
     session.lastError = RUNTIME_RETRY_MESSAGE;
     session.lastActionAt = now;
     session.updatedAt = now;
