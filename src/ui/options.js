@@ -267,7 +267,7 @@ async function createSession() {
   } catch (error) { setAppStatus(error.message); announce(error.message); }
 }
 async function renameSession(id) { await openSession(id); $('session-name').focus(); $('session-name').select(); announce('Edit the session name, then save.'); }
-async function duplicateSession(id) { try { const data = await core('DUPLICATE_SESSION', { sessionId: id }); await loadSessions({ preserveFocus: false }); await openSession(data.session.id); announce('Session duplicated.'); } catch (e) { announce(e.message); } }
+async function duplicateSession(id) { try { const data = await core('DUPLICATE_SESSION', { sessionId: id }); await loadSessions({ preserveFocus: false }); await openSession(data.session.id); announce('Session duplicated.'); } catch (e) { setAppStatus(e.message); announce(e.message); } }
 
 function openDeleteDialog(sessionId, returnFocus) {
   const session = ui.sessions.find((candidate) => candidate.id === sessionId);
@@ -315,7 +315,7 @@ function trapDialog(event) {
 
 async function action(command, spoken) {
   if (!ui.selectedSessionId) return;
-  try { const data = await core(command, { sessionId: ui.selectedSessionId }); ui.selected = clone(data.session); renderEditor(); announce(spoken); } catch (e) { announce(e.message); }
+  try { const data = await core(command, { sessionId: ui.selectedSessionId }); ui.selected = clone(data.session); renderEditor(); announce(spoken); } catch (e) { setAppStatus(e.message); announce(e.message); }
 }
 
 function renderActions() {
@@ -338,7 +338,7 @@ function onPromptModeChange() {
 function applyDefaultPrompt() { const value = $('default-unique-prompt').value; let changed = 0; ui.selected.tasks.forEach((task) => { if (!task.promptOverride.trim()) { task.promptOverride = value; changed++; } }); renderTasks(); announce(`Default prompt applied to ${changed} empty task${changed === 1 ? '' : 's'}.`); }
 
 $('create-session-button').addEventListener('click', createSession);
-$('master-pause-button').addEventListener('click', () => core('MASTER_PAUSE').then(() => announce('All sessions paused.')).catch((e) => announce(e.message)));
+$('master-pause-button').addEventListener('click', () => core('MASTER_PAUSE').then(() => announce('All sessions paused.')).catch((e) => { setAppStatus(e.message); announce(e.message); }));
 $('add-task-button').addEventListener('click', addTask);
 $('prompt-mode-shared').addEventListener('change', onPromptModeChange);
 $('prompt-mode-unique').addEventListener('change', onPromptModeChange);
