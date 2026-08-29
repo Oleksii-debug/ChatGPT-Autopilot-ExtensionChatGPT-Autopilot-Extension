@@ -154,6 +154,7 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.DUPLICATE_SESSION) {
       const state=await this.repo.update(d=>{
         const old=requireSession(d,payload.sessionId);
+        if(hasUnresolvedOperation(old)) throw new Error('Resolve the uncertain send operation before duplicating');
         const copy=structuredClone(old);
         const now=this.now();
         copy.id=crypto.randomUUID();
