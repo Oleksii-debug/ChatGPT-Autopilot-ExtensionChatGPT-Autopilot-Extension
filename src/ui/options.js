@@ -228,6 +228,8 @@ function validate(session) {
   if (session.promptMode === 'shared' && !session.sharedPrompt.trim()) errors.push(['shared-prompt', 'Shared prompt is required.']);
   if (!(session.minimumSendIntervalMinutes >= 1)) errors.push(['minimum-send-interval', 'Minimum send interval must be at least 1 minute.']);
   if (!(session.preSendDelaySeconds >= 1 && session.preSendDelaySeconds <= 30)) errors.push(['pre-send-delay', 'Pre-send delay must be between 1 and 30 seconds.']);
+  if (!(session.busyCheckDelaySeconds >= 1 && session.busyCheckDelaySeconds <= 30)) errors.push(['busy-check-delay', 'Busy-check delay must be between 1 and 30 seconds.']);
+  if (!(session.retryBackoffSeconds >= 5 && session.retryBackoffSeconds <= 3600)) errors.push(['retry-backoff', 'Retry backoff must be between 5 and 3600 seconds.']);
   errors.forEach(([id, message]) => markError(id, message));
   if (errors.length > 1) {
     const summary = $('form-error-summary'); summary.hidden = false; summary.className = 'error-summary';
