@@ -41,9 +41,18 @@ test('session controls and delete dialog are present', () => {
   for (const id of ['create-session-button','save-session-button','start-session-button','pause-session-button','resume-session-button','stop-session-button','clear-log-button']) {
     assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
   }
-  has(/id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading"/);
+  has(/id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading" aria-describedby="delete-dialog-description"/);
   assert.match(js, /function trapDialog\(event\)/);
   assert.match(js, /ui\.deleteReturnFocus/);
+});
+
+test('successful session deletion restores focus to a surviving navigation control', () => {
+  assert.match(js, /const deletedIndex = Math\.max\(0, ui\.sessions\.findIndex\(\(session\) => session\.id === id\)\)/);
+  assert.match(js, /closeDeleteDialog\(\{ restoreFocus: false \}\)/);
+  assert.match(js, /await loadSessions\(\{ preserveFocus: false \}\)/);
+  assert.match(js, /const next = ui\.sessions\[deletedIndex\] \|\| ui\.sessions\[deletedIndex - 1\]/);
+  assert.match(js, /\$\(`session-select-\$\{next\.id\}`\)\?\.focus\(\)/);
+  assert.match(js, /else \$\('create-session-button'\)\.focus\(\)/);
 });
 
 test('dynamic tasks are capped, ordered, labelled and focus-managed in implementation', () => {
