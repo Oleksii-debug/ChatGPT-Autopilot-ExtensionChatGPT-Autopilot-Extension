@@ -30,7 +30,11 @@ export function computeNextWake(state, now = Date.now()) {
     const phase = s.operation?.phase;
     if (phase === OperationPhase.MANUAL_REVIEW) continue;
     if (phase === OperationPhase.PRE_SEND_WAIT) {
-      earliest = Math.min(earliest, Math.max(now, s.operation.preSendDeadline || now));
+      const taskRetryAfter = s.tasksById?.[s.operation?.taskId]?.retryAfterAt || 0;
+      earliest = Math.min(
+        earliest,
+        Math.max(now, s.operation.preSendDeadline || now, taskRetryAfter),
+      );
       continue;
     }
     if (phase === OperationPhase.AMBIGUOUS) {
