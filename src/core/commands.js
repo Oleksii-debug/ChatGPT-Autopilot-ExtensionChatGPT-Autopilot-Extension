@@ -150,6 +150,14 @@ export class CoreCommandDispatcher {
         replacement.createdAt=old.createdAt;
         replacement.onePassCompletedTaskIds=(old.onePassCompletedTaskIds||[]).filter(id=>replacement.tasksById[id]);
         for(const id of replacement.taskOrder){const previous=old.tasksById[id];const current=replacement.tasksById[id];if(previous&&previous.normalizedUrl===current.normalizedUrl){for(const field of ['status','lastCheckedAt','lastVerifiedSendAt','lastVerifiedFingerprint','retryAfterAt','manualReviewReason']) current[field]=previous[field];}}
+        for (const removedTaskId of old.taskOrder) {
+          if (replacement.tasksById[removedTaskId]) continue;
+          const hint = draft.tabHintsByTaskId[removedTaskId];
+          if (!hint) continue;
+          if (hint.sessionId != null && hint.sessionId !== old.id) continue;
+          if (hint.kind != null && hint.kind !== 'TASK') continue;
+          delete draft.tabHintsByTaskId[removedTaskId];
+        }
         draft.sessionsById[old.id]=replacement;
         appendLog(draft,old.id,'Session configuration saved',{at:this.now()});
         return draft;
