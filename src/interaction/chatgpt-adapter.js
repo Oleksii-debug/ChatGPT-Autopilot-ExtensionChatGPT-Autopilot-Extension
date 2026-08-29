@@ -208,17 +208,31 @@
     return null;
   }
 
+  function sendControlScore(button) {
+    const testId = String(button?.getAttribute?.('data-testid') || '').trim().toLowerCase();
+    const aria = String(button?.getAttribute?.('aria-label') || '').trim().toLowerCase();
+    const title = String(button?.title || '').trim().toLowerCase();
+    const text = textOf(button).trim().toLowerCase();
+    let score = 0;
+
+    if (/(^|[-_])send-button($|[-_])/.test(testId)) score += 100;
+    if (/^(send|send message|send prompt)$/.test(aria)) score += 50;
+    if (/^(send|send message|send prompt)$/.test(title)) score += 30;
+    if (/^(send|send message|send prompt)$/.test(text)) score += 20;
+    return score;
+  }
+
   function findSendButton(doc, composer) {
     const form = composer?.closest?.('form') || doc;
-    const buttons = Array.from(form.querySelectorAll?.('button, [role="button"]') || [])
+    const ranked = Array.from(form.querySelectorAll?.('button, [role="button"]') || [])
       .filter(isVisible)
-      .filter((b) => /send|submit/.test(accessibleName(b) + ' ' + textOf(b).toLowerCase()));
-    if (buttons.length === 1) return buttons[0];
-    if (buttons.length > 1) {
-      const enabled = buttons.filter((b) => !b.disabled && b.getAttribute?.('aria-disabled') !== 'true');
-      if (enabled.length === 1) return enabled[0];
-    }
-    return null;
+      .map((button) => ({ button, score: sendControlScore(button) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    if (ranked.length === 0) return null;
+    if (ranked.length > 1 && ranked[0].score === ranked[1].score) return null;
+    return ranked[0].button;
   }
 
   function editorText(el) {
@@ -265,13 +279,28 @@
     )).filter(isVisible);
   }
 
-  function latestUserMessages(doc) {
+  function semanticUserMessages(doc) {
     return Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
-      .filter(isVisible)
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         return role === 'user' || /you said|user/.test(accessibleName(el));
       });
+  }
+
+  function latestUserMessages(doc) {
+    return semanticUserMessages(doc).filter(isVisible);
+  }
+
+  function userMessageHistorySnapshot(doc) {
+    return semanticUserMessages(doc).map((el) => textOf(el).trim());
+  }
+
+  function hasStrictAppendedPrompt(before, after, promptText) {
+    if (after.length !== before.length + 1) return false;
+    for (let i = 0; i < before.length; i += 1) {
+      if (after[i] !== before[i]) return false;
+    }
+    return after[after.length - 1] === String(promptText).trim();
   }
 
   function resultBase(request, start, extra) {
@@ -414,22 +443,44 @@
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
-    const beforeMessages = latestUserMessages(doc).length;
+    const beforeMessages = userMessageHistorySnapshot(doc);
     send.click();
     const verifyDeadline = nowMs() + 5000;
     while (nowMs() < verifyDeadline) {
       await (deps.wait || wait)(100);
-      const messages = latestUserMessages(doc);
-      if (messages.length > beforeMessages) {
-        const latest = messages[messages.length - 1];
-        if (textOf(latest).trim() === request.promptText.trim()) {
-          return resultBase(request, start, {
-            status: STATUS.SENT_VERIFIED,
-            submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
-            safeDiagnosticCode: 'SEND_VERIFIED_MESSAGE'
-          });
-        }
+
+      if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'UNCERTAIN',
+          safeDiagnosticCode: 'URL_CHANGED_AFTER_SEND_CLICK'
+        });
       }
+
+      const messages = userMessageHistorySnapshot(doc);
+      if (!hasStrictAppendedPrompt(beforeMessages, messages, request.promptText)) continue;
+
+      const postFound = findVisibleComposer(doc);
+      if (postFound.ambiguous) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'UNCERTAIN',
+          safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
+        });
+      }
+      if (postFound.element && editorText(postFound.element).trim() === request.promptText.trim()) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'PROMPT_STILL_PENDING',
+          safeDiagnosticCode: 'POST_CLICK_PROMPT_STILL_PENDING'
+        });
+      }
+
+      return resultBase(request, start, {
+        status: STATUS.SENT_VERIFIED,
+        submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
+        safeDiagnosticCode: 'SEND_VERIFIED_OPERATION_LOCAL_APPEND'
+      });
     }
 
     return resultBase(request, start, {
