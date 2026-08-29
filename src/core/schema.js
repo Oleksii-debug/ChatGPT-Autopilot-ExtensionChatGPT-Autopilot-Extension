@@ -98,10 +98,14 @@ function validateOperation(operation, session) {
   if (!operation.operationId) throw new Error(`Invalid session ${session.id} operationId`);
   if (operation.sessionId !== session.id) throw new Error(`Invalid session ${session.id} operation sessionId`);
   requireString(operation.taskId, `session ${session.id} operation taskId`);
-  if (!session.tasksById[operation.taskId]) throw new Error(`Invalid session ${session.id} operation taskId`);
+  const task = session.tasksById[operation.taskId];
+  if (!task) throw new Error(`Invalid session ${session.id} operation taskId`);
   requireString(operation.promptFingerprint, `session ${session.id} operation promptFingerprint`);
   requireEnum(operation.phase, OPERATION_PHASES, `session ${session.id} operation phase`);
   requireString(operation.targetUrl, `session ${session.id} operation targetUrl`);
+  if (!task.normalizedUrl || operation.targetUrl !== task.normalizedUrl) {
+    throw new Error(`Invalid session ${session.id} operation targetUrl binding`);
+  }
   for (const field of ['createdAt', 'updatedAt', 'preSendDeadline', 'submitStartedAt', 'verificationDeadline']) {
     requireNonNegativeNumber(operation[field], `session ${session.id} operation ${field}`);
   }
