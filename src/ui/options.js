@@ -51,12 +51,14 @@ function clone(value) { return structuredClone(value); }
 
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
+  const activeId = preserveFocus ? active?.id || null : null;
   try {
     const data = await core('LIST_SESSIONS');
     ui.sessions = Array.isArray(data?.sessions) ? data.sessions : [];
     renderSessionList();
     setAppStatus('Connected to Core.');
     if (active?.isConnected) active.focus();
+    else if (activeId) $(activeId)?.focus();
   } catch (error) {
     setAppStatus(error.message);
     renderSessionList();
@@ -97,6 +99,26 @@ async function openSession(sessionId) {
     renderEditor();
     $('session-heading').focus();
   } catch (error) { setAppStatus(error.message); announce(error.message); }
+}
+
+async function refreshSelectedSessionStatus(sessionId) {
+  if (!sessionId || sessionId !== ui.selectedSessionId || !ui.selected) return;
+  try {
+    const data = await core('GET_SESSION', { sessionId });
+    if (sessionId !== ui.selectedSessionId || !data?.session) return;
+    const latest = clone(data.session);
+    ui.selected.version = latest.version;
+    ui.selected.runState = latest.runState;
+    ui.selected.actionAvailability = latest.actionAvailability;
+    ui.selected.status = latest.status;
+    ui.selected.log = latest.log;
+    renderStatus();
+    renderLog();
+    renderActions();
+  } catch (error) {
+    setAppStatus(error.message);
+    announce(error.message);
+  }
 }
 
 function renderEditor() {
@@ -297,8 +319,8 @@ document.addEventListener('keydown', trapDialog);
 
 if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener((message) => {
   if (message?.channel !== 'autopilot-core' || message?.type !== 'STATUS_CHANGED') return;
-  loadSessions();
-  if (message.sessionId === ui.selectedSessionId) openSession(ui.selectedSessionId);
+  void loadSessions();
+  if (message.sessionId === ui.selectedSessionId) void refreshSelectedSessionStatus(ui.selectedSessionId);
 });
 
 loadSessions();
