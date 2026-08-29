@@ -6,15 +6,15 @@ Local Chrome Manifest V3 extension for durable, keyboard-first multi-session Cha
 
 `ACTIVE_DEVELOPMENT`
 
-The current integration branch contains the versioned Session/Task state model, deterministic scheduler primitives, restart protection, accessible options UI, semantic ChatGPT interaction adapter, reliability tests, and live runtime wiring between the UI, service worker, and content script.
+The current integration line contains the versioned Session/Task state model, deterministic scheduler, restart recovery, accessible options UI, semantic ChatGPT interaction adapter, durable phased executor, and service-worker startup/alarm wiring.
 
-The automatic Core execution loop that advances from a due task through durable insert, pre-send, submit, and verification phases is not connected yet. Installing this branch is useful for development verification only; it must not be treated as a finished automatic sender.
-
-Until that runner is integrated, production Start and Resume commands fail closed with an understandable error. Persisted development state found as RUNNING or RECOVERING is moved to PAUSED on cold start, preventing a useless repeated-alarm loop.
+Automatic execution is intentionally still release-gated with `EXECUTION_AVAILABLE=false`. The executor is present, but Start/Resume must remain fail closed until the exact integrated production candidate passes the remaining release gates. Packaging a candidate does not enable automatic Send and does not make v0.1 ready.
 
 `HUMAN_TESTED=false`
 
 `NVDA_VERIFIED=false`
+
+`V01_READY=false`
 
 ## Automated verification
 
@@ -26,29 +26,59 @@ Run all deterministic tests:
 node --test
 ```
 
-The suite covers Core scheduling/storage/recovery, the UI contract, Interaction safety, content-script/runtime wiring, stale UI writes, active URL ownership, unresolved-operation preservation, and concurrent storage updates.
+The suite covers Core scheduling/storage/recovery, runtime startup/alarm behavior, the UI contract, Interaction safety, content-script/runtime wiring, stale UI writes, active URL ownership, unresolved-operation preservation, concurrent storage updates, and release-package validation.
 
-## Load the unpacked development build in Chrome
+## Build the canonical v0.1 candidate package
 
-These keyboard steps are intended for Windows 11 with NVDA:
+Run:
 
-1. Extract or clone the repository to a permanent folder. Do not load it from a temporary ZIP preview.
+```powershell
+npm run package:release
+```
+
+The command creates exactly these reusable outputs under `dist`:
+
+- `ChatGPT-Autopilot-Extension-v0.1` — unpacked extension folder.
+- `ChatGPT-Autopilot-Extension-v0.1.zip` — canonical ZIP with the same folder as its single root.
+
+The release allowlist includes only `manifest.json` and `src/**`. Tests, GitHub metadata, package-manager files, browser profiles, cookies, credentials, storage dumps, and other development files are not copied into the extension package. Manifest-referenced resources are validated before packaging. ZIP entry order and timestamps are fixed so identical source produces an identical ZIP SHA-256.
+
+Run the focused packaging gate with:
+
+```powershell
+npm run test:release
+```
+
+GitHub Actions also builds the same canonical ZIP as the `ChatGPT-Autopilot-Extension-v0.1` workflow artifact for release-candidate verification. Use the `SHA256:` line printed by `npm run package:release` to verify the canonical inner ZIP; GitHub also reports a separate digest for its downloadable artifact wrapper, and the two hashes are not expected to match.
+
+## Load the unpacked candidate in Chrome on Windows 11 with NVDA
+
+1. Extract `ChatGPT-Autopilot-Extension-v0.1.zip` to a permanent folder. Do not load it from the ZIP preview.
 2. In Chrome press `Ctrl+L`, type `chrome://extensions`, and press `Enter`.
-3. Use `Tab` to reach `Developer mode`, then press `Space` if it is off.
+3. Use `Tab` to reach `Developer mode`. Press `Space` only if it is off.
 4. Use `Tab` to reach `Load unpacked`, then press `Enter`.
-5. In the folder picker, type or navigate to the repository root containing `manifest.json`, then activate `Select Folder`.
-6. Return to `chrome://extensions` and confirm that Chrome reports no extension error.
-7. Open the extension's `Details`, then activate `Extension options` to open the semantic dashboard.
+5. In the folder picker, choose the extracted `ChatGPT-Autopilot-Extension-v0.1` folder containing `manifest.json`, then activate `Select Folder`.
+6. Return to `chrome://extensions` and verify that Chrome reports `ChatGPT Autopilot Extension` version `0.1.0` with no extension error.
+7. Open the extension's `Details`, then activate `Extension options` to open the semantic dashboard. The toolbar action also opens the options page.
 
-The toolbar action also opens the options page when the extension is loaded successfully.
+These steps are installation instructions, not an NVDA verification claim. `NVDA_VERIFIED` remains false until a real Windows 11 + Chrome + NVDA acceptance run is completed against an exact candidate SHA.
+
+## Upgrade an unpacked candidate
+
+1. Keep only one canonical folder named `ChatGPT-Autopilot-Extension-v0.1`.
+2. Replace the old folder contents with a freshly extracted candidate; do not layer new files over an older `src` tree.
+3. Open `chrome://extensions` and activate `Reload` for ChatGPT Autopilot Extension.
+4. Verify version `0.1.0`, no extension error, and that `Extension options` opens.
+5. If the candidate SHA changed, treat the previous ZIP as superseded rather than creating `final`, `fixed`, or `new` variants.
 
 ## Safety boundaries
 
 - Only `https://chatgpt.com/*` is permitted.
 - No server, Python backend, cloud runner, external AI planner, CAPTCHA bypass, account-warning bypass, or rate-limit bypass is included.
-- Cookies, ChatGPT sessions, browser profiles, credentials, private prompts, and private chat URLs must never be committed.
+- Cookies, ChatGPT sessions, browser profiles, credentials, private prompts, and private chat URLs must never be committed or packaged.
 - A BUSY, error, unknown UI, rate limit, or uncertain submission is never recorded as a verified send.
 - An unresolved submission checkpoint is preserved for reconciliation and cannot silently authorize a new Start.
+- A generated ZIP is only a candidate artifact. `V01_READY=true` requires integrated production gates plus human Chrome/Windows/NVDA acceptance.
 
 ## Project coordination
 

@@ -46,6 +46,10 @@ test('session controls and delete dialog are present', () => {
   assert.match(js, /ui\.deleteReturnFocus/);
 });
 
+test('Create Session explicitly focuses and selects the Session name field', () => {
+  assert.match(js, /async function createSession\(\)[\s\S]*?await openSession\(data\.session\.id\);\s*\$\('session-name'\)\.focus\(\);\s*\$\('session-name'\)\.select\(\);/);
+});
+
 test('dynamic tasks are capped, ordered, labelled and focus-managed in implementation', () => {
   assert.match(js, /const MAX_TASKS = 50/);
   assert.match(js, /task-url-\$\{task\.id\}/);
