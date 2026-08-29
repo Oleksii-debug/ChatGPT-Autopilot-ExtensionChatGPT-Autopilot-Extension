@@ -4,8 +4,17 @@ function eligibleTask(session, task, now) {
   return task.enabled && !task.manualReviewReason && (task.retryAfterAt || 0) <= now && !(session.runMode === RunMode.ONE_PASS && session.onePassCompletedTaskIds.includes(task.id));
 }
 
+function onePassComplete(session) {
+  if (session.runMode !== RunMode.ONE_PASS) return false;
+  return session.taskOrder.every(taskId => {
+    const task = session.tasksById[taskId];
+    return !task.enabled || Boolean(task.manualReviewReason) || session.onePassCompletedTaskIds.includes(taskId);
+  });
+}
+
 export function selectNextTask(session, now = Date.now()) {
   if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) return { kind: 'IDLE' };
+  if (onePassComplete(session)) return { kind: 'COMPLETE' };
   if (session.nextAllowedSendAt > now) return { kind: 'COOLDOWN', wakeAt: session.nextAllowedSendAt };
   const n = session.taskOrder.length;
   let earliestRetry = Infinity;
