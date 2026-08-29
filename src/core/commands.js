@@ -72,12 +72,17 @@ function assertNoActiveUrlCollision(state, session) {
     .filter(task => task.enabled)
     .map(task => task.normalizedUrl));
   for (const other of Object.values(state.sessionsById)) {
-    if (other.id === session.id || !ACTIVE_STATES.has(other.runState)) continue;
-    const collision = other.taskOrder
-      .map(id => other.tasksById[id])
-      .filter(task => task.enabled)
-      .some(task => targetUrls.has(task.normalizedUrl));
-    if (collision) throw new Error('Another active session already owns one of these ChatGPT conversations');
+    if (other.id === session.id) continue;
+    let collision = false;
+    if (ACTIVE_STATES.has(other.runState)) {
+      collision = other.taskOrder
+        .map(id => other.tasksById[id])
+        .filter(task => task.enabled)
+        .some(task => targetUrls.has(task.normalizedUrl));
+    } else if (hasUnresolvedOperation(other)) {
+      collision = targetUrls.has(other.operation?.targetUrl || '');
+    }
+    if (collision) throw new Error('Another active or unresolved session already owns one of these ChatGPT conversations');
   }
 }
 
@@ -154,6 +159,7 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.DUPLICATE_SESSION) {
       const state=await this.repo.update(d=>{
         const old=requireSession(d,payload.sessionId);
+        if(hasUnresolvedOperation(old)) throw new Error('Resolve the uncertain send operation before duplicating');
         const copy=structuredClone(old);
         const now=this.now();
         copy.id=crypto.randomUUID();

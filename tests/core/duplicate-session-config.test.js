@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { StorageRepository } from '../../src/core/storage.js';
 import { CoreCommandDispatcher } from '../../src/core/commands.js';
 import { CoreCommand } from '../../src/shared/protocol.js';
+import { OperationPhase } from '../../src/core/schema.js';
 
 function memoryChrome() {
   const db = {};
@@ -104,4 +105,63 @@ test('duplicate session preserves configuration but starts with fresh runtime pr
   assert.deepEqual(source.onePassCompletedTaskIds, ['t1']);
   assert.equal(source.currentTaskIndex, 1);
   assert.equal(source.lastSuccessfulSendAt, 2500);
+});
+
+test('duplicate session cannot erase unresolved uncertain-send evidence', async () => {
+  const { chrome } = memoryChrome();
+  const repo = new StorageRepository(chrome);
+  const core = new CoreCommandDispatcher(repo, () => 5000);
+
+  await core.execute(CoreCommand.CREATE_SESSION, {
+    config: {
+      id: 'source',
+      name: 'Uncertain source',
+      promptMode: 'shared',
+      sharedPrompt: 'continue',
+      tasks: [
+        { id: 't1', enabled: true, label: 'Only', url: 'https://chatgpt.com/c/uncertain-copy' },
+      ],
+    },
+  });
+
+  await repo.update(draft => {
+    const source = draft.sessionsById.source;
+    const task = source.tasksById.t1;
+    source.operation = {
+      operationId: 'op-uncertain',
+      sessionId: 'source',
+      taskId: 't1',
+      promptFingerprint: 'fp-uncertain',
+      promptText: 'continue',
+      phase: OperationPhase.AMBIGUOUS,
+      targetUrl: task.normalizedUrl,
+      createdAt: 2000,
+      updatedAt: 3000,
+      preSendDeadline: 0,
+      submitStartedAt: 2500,
+      verificationDeadline: 0,
+    };
+    task.status = 'SUBMISSION_UNCERTAIN';
+    task.retryAfterAt = 30000;
+    draft.sendArbiter.lease = {
+      ownerSessionId: 'source',
+      operationId: 'op-uncertain',
+      acquiredAt: 2500,
+      expiresAt: 60000,
+    };
+    return draft;
+  });
+
+  await assert.rejects(
+    () => core.execute(CoreCommand.DUPLICATE_SESSION, { sessionId: 'source' }),
+    /Resolve the uncertain send operation before duplicating/,
+  );
+
+  const after = await repo.load();
+  assert.deepEqual(after.sessionOrder, ['source'], 'no fresh Session may be created by discarding unresolved evidence');
+  assert.equal(after.sessionsById.source.operation.operationId, 'op-uncertain');
+  assert.equal(after.sessionsById.source.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(after.sessionsById.source.tasksById.t1.status, 'SUBMISSION_UNCERTAIN');
+  assert.equal(after.sessionsById.source.tasksById.t1.retryAfterAt, 30000);
+  assert.equal(after.sendArbiter.lease.operationId, 'op-uncertain');
 });

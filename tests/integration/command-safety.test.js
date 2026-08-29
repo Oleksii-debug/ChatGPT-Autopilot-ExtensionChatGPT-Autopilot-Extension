@@ -100,6 +100,41 @@ test('active sessions cannot own the same normalized conversation URL', async ()
   await assert.rejects(() => command('START_SESSION', { sessionId: second.id }), /already owns/);
 });
 
+test('stopped unresolved operation reserves its exact conversation across Session identities', async () => {
+  const { command, repository } = harness();
+  const first = await createRunnable(command, 'session-1', 'task-1', 'https://chatgpt.com/c/uncertain-owner');
+  const second = await createRunnable(command, 'session-2', 'task-2', 'https://www.chatgpt.com/c/uncertain-owner?copy=1');
+  const unrelated = await createRunnable(command, 'session-3', 'task-3', 'https://chatgpt.com/c/unrelated');
+
+  await repository.update((state) => {
+    const live = state.sessionsById[first.id];
+    const taskId = live.taskOrder[0];
+    const task = live.tasksById[taskId];
+    beginOperation(live, {
+      operationId: 'operation-reserved',
+      taskId,
+      promptFingerprint: 'fingerprint-reserved',
+      targetUrl: task.normalizedUrl,
+      now: 10_100,
+    });
+    live.operation.generation = state.revision + 1;
+    live.operation.promptText = 'Continue safely.';
+    markSubmitting(live, 10_101);
+    live.operation.phase = OperationPhase.AMBIGUOUS;
+    task.status = 'SUBMISSION_UNCERTAIN';
+    task.retryAfterAt = 40_000;
+  });
+
+  await assert.rejects(
+    () => command('START_SESSION', { sessionId: second.id }),
+    /active or unresolved session already owns/,
+  );
+  assert.equal((await command('GET_SESSION', { sessionId: second.id })).session.runState, RunState.STOPPED);
+
+  const started = await command('START_SESSION', { sessionId: unrelated.id });
+  assert.equal(started.session.runState, RunState.RUNNING, 'only the exact unresolved operation conversation is reserved');
+});
+
 test('master pause and resume affect only sessions that were active', async () => {
   const { command } = harness();
   const first = await createRunnable(command, 'session-1', 'task-1', 'https://chatgpt.com/c/one');
