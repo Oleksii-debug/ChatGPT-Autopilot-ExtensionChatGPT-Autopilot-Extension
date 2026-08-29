@@ -168,6 +168,10 @@
       if (/captcha|verify|security|confirm|account/.test(t)) {
         return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNKNOWN_OR_SECURITY_DIALOG' };
       }
+      // Any unexpected visible modal is operation-blocking. This deliberately does not
+      // rely on English dialog text: localized confirmation/warning surfaces must fail
+      // closed instead of letting automation interact with the page underneath them.
+      return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNRECOGNIZED_DIALOG' };
     }
     return null;
   }
