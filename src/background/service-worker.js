@@ -1,16 +1,21 @@
 import { StorageRepository } from '../core/storage.js';
-import { reconcileAlarm, reconcileStateForStartup } from '../core/recovery.js';
+import { reconcileAlarm, reconcileStateForStartup, suspendActiveSessionsWhenExecutionUnavailable } from '../core/recovery.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
 
+const EXECUTION_AVAILABLE = false;
 const repo = new StorageRepository(chrome);
-const dispatcher = new CoreCommandDispatcher(repo);
+const dispatcher = new CoreCommandDispatcher(repo, undefined, { executionAvailable: EXECUTION_AVAILABLE });
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
 
 export async function reconcileRuntime({ startup = false } = {}) {
   const state = startup
-    ? await repo.update(draft => reconcileStateForStartup(draft))
+    ? await repo.update(draft => {
+      reconcileStateForStartup(draft);
+      if (!EXECUTION_AVAILABLE) suspendActiveSessionsWhenExecutionUnavailable(draft);
+      return draft;
+    })
     : await repo.load();
   await reconcileAlarm(chrome, state);
   return state;
