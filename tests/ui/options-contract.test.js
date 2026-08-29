@@ -11,7 +11,7 @@ test('page exposes semantic landmarks and primary accessible names', () => {
   has(/<h1 id="page-title">ChatGPT Autopilot<\/h1>/, 'missing H1');
   has(/<nav aria-label="Session navigation">/, 'missing labelled nav');
   has(/<main id="main" tabindex="-1">/, 'missing main landmark');
-  has(/id="session-status-region" aria-live="polite"/, 'missing status live region');
+  has(/id="session-status-region"/, 'missing readable status region');
   has(/id="session-log-region" tabindex="0" aria-label="Session log"/, 'missing readable log');
 });
 
@@ -81,6 +81,12 @@ test('background status refresh does not reopen the selected session or steal ed
   assert.match(js, /renderStatus\(\);\s*renderLog\(\);\s*renderActions\(\);/s);
   assert.match(js, /if \(message\.sessionId === ui\.selectedSessionId\) void refreshSelectedSessionStatus\(ui\.selectedSessionId\)/);
   assert.doesNotMatch(js, /if \(message\.sessionId === ui\.selectedSessionId\) openSession\(ui\.selectedSessionId\)/);
+});
+
+test('structured background status is readable without becoming a repeated live announcement', () => {
+  has(/<div id="session-status-region"><\/div>/, 'status region must remain in normal document flow');
+  assert.doesNotMatch(html, /id="session-status-region"[^>]*aria-live/i, 'background status container must not announce every rerender');
+  has(/id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"/, 'dedicated concise live announcer must remain available');
 });
 
 test('session-list refresh restores the same control by stable id when list DOM is replaced', () => {
