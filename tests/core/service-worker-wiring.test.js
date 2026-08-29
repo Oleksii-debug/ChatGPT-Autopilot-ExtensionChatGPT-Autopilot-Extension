@@ -20,6 +20,16 @@ test('startup and canonical alarm invoke the execution cycle', () => {
   assert.match(source, /alarm\.name === 'autopilot-core-wake'\) runSafely\(runExecutionCycle\(\)\)/);
 });
 
+test('cold worker module evaluation does not start a second runtime cycle', () => {
+  const startupCalls = source.match(/runExecutionCycle\(\{ startup: true \}\)/g) || [];
+  assert.equal(startupCalls.length, 2, 'only onInstalled and onStartup may request startup reconciliation');
+  assert.doesNotMatch(
+    source,
+    /\nrunSafely\(runExecutionCycle\(\{ startup: true \}\)\);\s*$/,
+    'module evaluation must stay side-effect free so an alarm/startup wake cannot race a second executor cycle',
+  );
+});
+
 test('production automatic execution remains fail closed until composed safety gates pass', () => {
   assert.match(source, /const EXECUTION_AVAILABLE = false;/);
   assert.doesNotMatch(source, /const EXECUTION_AVAILABLE = true;/);
