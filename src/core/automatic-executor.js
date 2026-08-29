@@ -246,9 +246,13 @@ export class AutomaticSessionExecutor {
       identity.operationId,
       promptText,
     ));
-    const insertionProven = inserted.status === InteractionResult.INSERTED_NOT_SENT
-      && inserted.composerState === 'VISIBLE_NONEMPTY'
+    const textInsertionProven = inserted.composerState === 'VISIBLE_NONEMPTY'
       && ['INSERTION_TEXT_PROVEN', 'PROMPT_ALREADY_INSERTED_MATCH'].includes(inserted.safeDiagnosticCode);
+    const acceptedRepresentationProven = inserted.composerState === 'ACCEPTED_ATTACHMENT_LIKE'
+      && inserted.insertionEvidence === 'OPERATION_BOUND_ACCEPTED_REPRESENTATION'
+      && inserted.safeDiagnosticCode === 'INSERTION_ATTACHMENT_OPERATION_BOUND';
+    const insertionProven = inserted.status === InteractionResult.INSERTED_NOT_SENT
+      && (textInsertionProven || acceptedRepresentationProven);
 
     if (!insertionProven) {
       const safeResult = inserted.status === InteractionResult.INSERTED_NOT_SENT
