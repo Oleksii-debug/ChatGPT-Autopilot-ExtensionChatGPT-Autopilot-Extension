@@ -29,6 +29,13 @@ function resumeUnlessQuiesced(session, priorRunState) {
   session.runState = QUIESCENT_STATES.has(priorRunState) ? priorRunState : RunState.RUNNING;
 }
 
+function matchesAmbiguousOperation(operation, expected) {
+  return operation?.phase === OperationPhase.AMBIGUOUS
+    && operation.operationId === expected.operationId
+    && operation.taskId === expected.taskId
+    && operation.promptFingerprint === expected.promptFingerprint;
+}
+
 export class AutomaticSessionExecutor {
   constructor(repository, chromeApi, transport, {
     now = () => Date.now(),
@@ -75,6 +82,11 @@ export class AutomaticSessionExecutor {
 
   async recoverAmbiguous(sessionId, session) {
     const operation = session.operation;
+    const expectedOperation = {
+      operationId: operation.operationId,
+      taskId: operation.taskId,
+      promptFingerprint: operation.promptFingerprint,
+    };
     const task = session.tasksById[operation.taskId];
     const tab = await this.bindTaskTab(sessionId, task.id);
     const result = await this.transport.execute(tab.id, this.request(
@@ -85,26 +97,29 @@ export class AutomaticSessionExecutor {
       operation.promptText,
     ));
     const now = this.now();
+    let reconciled = false;
 
     if (result.status === InteractionResult.SENT_VERIFIED) {
       await this.repo.update(draft => {
         const live = requireSession(draft, sessionId);
         const priorRunState = live.runState;
         const liveOperation = live.operation;
-        applyInteractionResult(live, taskIndex(live, liveOperation.taskId), result, {
+        if (!matchesAmbiguousOperation(liveOperation, expectedOperation)) return draft;
+        applyInteractionResult(live, taskIndex(live, expectedOperation.taskId), result, {
           now,
-          promptFingerprint: liveOperation.promptFingerprint,
+          promptFingerprint: expectedOperation.promptFingerprint,
         });
         releaseSendLease(draft, {
           sessionId,
-          operationId: liveOperation.operationId,
+          operationId: expectedOperation.operationId,
           now,
           profileGapMs: 1000,
         });
         resumeUnlessQuiesced(live, priorRunState);
+        reconciled = true;
         return draft;
       });
-      return { kind: 'RECOVERED_SENT', result };
+      return reconciled ? { kind: 'RECOVERED_SENT', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
     if (result.status === InteractionResult.INSERTED_NOT_SENT) {
@@ -112,23 +127,34 @@ export class AutomaticSessionExecutor {
         const live = requireSession(draft, sessionId);
         const priorRunState = live.runState;
         const liveOperation = live.operation;
+        if (!matchesAmbiguousOperation(liveOperation, expectedOperation)) return draft;
         liveOperation.phase = OperationPhase.PRE_SEND_WAIT;
         liveOperation.preSendDeadline = now + live.preSendDelayMs;
         liveOperation.updatedAt = now;
         resumeUnlessQuiesced(live, priorRunState);
         releaseSendLease(draft, {
           sessionId,
-          operationId: liveOperation.operationId,
+          operationId: expectedOperation.operationId,
           now,
           profileGapMs: 0,
         });
+        reconciled = true;
         return draft;
       });
-      return { kind: 'RECOVERED_PENDING', result };
+      return reconciled ? { kind: 'RECOVERED_PENDING', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
-    await this.applyResult(sessionId, task.id, result, operation.promptFingerprint);
-    return { kind: 'RECOVERY_HELD', result };
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      if (!matchesAmbiguousOperation(live.operation, expectedOperation)) return draft;
+      applyInteractionResult(live, taskIndex(live, expectedOperation.taskId), result, {
+        now,
+        promptFingerprint: expectedOperation.promptFingerprint,
+      });
+      reconciled = true;
+      return draft;
+    });
+    return reconciled ? { kind: 'RECOVERY_HELD', result } : { kind: 'OPERATION_CHANGED', result };
   }
 
   async continuePreSend(sessionId, session) {
