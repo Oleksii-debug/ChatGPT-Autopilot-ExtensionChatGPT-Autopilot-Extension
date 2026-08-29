@@ -163,11 +163,20 @@
       .join('\n');
   }
 
+  function visibleModalSurfaces(doc) {
+    const candidates = [
+      ...Array.from(doc.querySelectorAll('[role="dialog"], dialog')),
+      ...Array.from(doc.querySelectorAll('[role="alertdialog"]')),
+      ...Array.from(doc.querySelectorAll('[aria-modal="true"]'))
+    ];
+    return Array.from(new Set(candidates)).filter(isVisible);
+  }
+
   function detectBlockingState(doc) {
-    // A visible modal always outranks page-underlay evidence. We do not auto-click any
-    // dialog here: CAPTCHA/security/account/payment/confirmation and localized/unknown
-    // dialogs all require manual review unless a future control is explicitly whitelisted.
-    const dialogs = Array.from(doc.querySelectorAll('[role="dialog"], dialog')).filter(isVisible);
+    // Any visible semantic modal outranks page-underlay evidence. We do not auto-click
+    // dialogs here: CAPTCHA/security/account/payment/confirmation and localized/unknown
+    // modal surfaces all require manual review unless a future control is explicitly whitelisted.
+    const dialogs = visibleModalSurfaces(doc);
     if (dialogs.length) {
       const dialogText = dialogs.map((dialog) => (accessibleName(dialog) + ' ' + textOf(dialog)).toLowerCase()).join('\n');
       if (/captcha|verify|verification|security|confirm|account|payment|billing|purchase|subscribe/.test(dialogText)) {
