@@ -47,7 +47,12 @@ test('overlapping wake events share one in-flight execution cycle', () => {
   assert.match(source, /executionCycleInFlight = cycle\.then\(/);
 });
 
-test('production automatic execution remains fail closed until composed safety gates pass', () => {
-  assert.match(source, /const EXECUTION_AVAILABLE = false;/);
-  assert.doesNotMatch(source, /const EXECUTION_AVAILABLE = true;/);
+test('production automatic execution is explicitly enabled while UI reconciliation remains execution-free', () => {
+  assert.match(source, /const EXECUTION_AVAILABLE = true;/);
+  assert.doesNotMatch(source, /const EXECUTION_AVAILABLE = false;/);
+  assert.match(
+    source,
+    /export async function reconcileRuntime\(\) \{[\s\S]*?runRuntimeCycle\(\{[\s\S]*?executionAvailable: false,[\s\S]*?\}\);/,
+    'UI-triggered reconciliation must remain unable to launch automatic execution',
+  );
 });

@@ -4,7 +4,7 @@ import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
 import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 
-const EXECUTION_AVAILABLE = false;
+const EXECUTION_AVAILABLE = true;
 const repo = new StorageRepository(chrome);
 const transport = new ChromeInteractionTransport(chrome);
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
