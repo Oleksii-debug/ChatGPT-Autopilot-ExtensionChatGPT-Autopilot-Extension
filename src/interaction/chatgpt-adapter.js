@@ -46,6 +46,10 @@
   ]);
   const CHATGPT_HOSTS = new Set(['chatgpt.com', 'www.chatgpt.com']);
 
+  // Operation-local evidence only. Core remains the sole durable state owner. If this
+  // content-script context is lost, long-prompt representation recovery fails closed.
+  const acceptedRepresentationEvidence = new Map();
+
   function nowMs() { return Date.now(); }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
@@ -241,42 +245,144 @@
     return String(el?.innerText ?? el?.textContent ?? '');
   }
 
+  function eventConstructor(doc, preferred) {
+    const view = doc?.defaultView;
+    if (preferred === 'input' && typeof view?.InputEvent === 'function') return view.InputEvent;
+    if (preferred === 'input' && typeof globalThis.InputEvent === 'function') return globalThis.InputEvent;
+    if (typeof view?.Event === 'function') return view.Event;
+    if (typeof globalThis.Event === 'function') return globalThis.Event;
+    return null;
+  }
+
+  function dispatchEditorEvent(el, type, init) {
+    const doc = el?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const EventCtor = eventConstructor(doc, type === 'input' || type === 'beforeinput' ? 'input' : 'event');
+    if (!EventCtor || typeof el?.dispatchEvent !== 'function') return true;
+    try {
+      return el.dispatchEvent(new EventCtor(type, init));
+    } catch (_) {
+      try {
+        const BasicCtor = eventConstructor(doc, 'event');
+        return BasicCtor ? el.dispatchEvent(new BasicCtor(type, { bubbles: true })) : true;
+      } catch (_) {
+        return true;
+      }
+    }
+  }
+
   function setNativeValue(el, value) {
     const tag = String(el.tagName || '').toLowerCase();
+    const doc = el?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const view = doc?.defaultView || globalThis;
     if (tag === 'textarea' || tag === 'input') {
-      const proto = tag === 'textarea' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+      const NativeCtor = tag === 'textarea'
+        ? (view?.HTMLTextAreaElement || globalThis.HTMLTextAreaElement)
+        : (view?.HTMLInputElement || globalThis.HTMLInputElement);
+      const descriptor = NativeCtor?.prototype
+        ? Object.getOwnPropertyDescriptor(NativeCtor.prototype, 'value')
+        : null;
       if (descriptor?.set) descriptor.set.call(el, value);
       else el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+      dispatchEditorEvent(el, 'input', { bubbles: true, composed: true, inputType: 'insertText', data: value });
+      dispatchEditorEvent(el, 'change', { bubbles: true });
       return;
     }
 
     el.focus?.();
-    const selection = globalThis.getSelection?.();
-    if (selection && typeof document !== 'undefined') {
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      selection.removeAllRanges();
-      selection.addRange(range);
+    const selection = view?.getSelection?.() || globalThis.getSelection?.();
+    if (selection && typeof doc?.createRange === 'function') {
+      try {
+        const range = doc.createRange();
+        range.selectNodeContents(el);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } catch (_) {}
     }
+
     let inserted = false;
     try {
-      if (document.queryCommandSupported?.('insertText')) inserted = document.execCommand('insertText', false, value);
+      if (typeof doc?.execCommand === 'function') {
+        inserted = doc.execCommand('insertText', false, value) === true;
+      }
     } catch (_) {}
+
     if (!inserted) {
+      const allowed = dispatchEditorEvent(el, 'beforeinput', {
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: value
+      });
+      if (allowed === false) return;
       el.textContent = value;
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: value }));
+      dispatchEditorEvent(el, 'input', {
+        bubbles: true,
+        composed: true,
+        inputType: 'insertText',
+        data: value
+      });
     }
   }
 
-  function attachmentNodes(composer) {
-    const root = composer?.closest?.('form') || composer?.parentElement;
+  function fileLikeNodes(root) {
     if (!root?.querySelectorAll) return [];
     return Array.from(root.querySelectorAll(
       '[data-testid*="attachment"], [aria-label*="attachment" i], [class*="attachment" i]'
     )).filter(isVisible);
+  }
+
+  function attachmentNodes(composer) {
+    const root = composer?.closest?.('form') || composer?.parentElement;
+    return fileLikeNodes(root);
+  }
+
+  function normalizedRepresentationSignature(node) {
+    const value = `${accessibleName(node)} ${textOf(node)}`.replace(/\s+/g, ' ').trim().toLowerCase();
+    return value || null;
+  }
+
+  function evidenceKey(request) {
+    return `${request.requestId}\u0000${request.taskId}`;
+  }
+
+  function getAcceptedRepresentationEvidence(request) {
+    const key = evidenceKey(request);
+    const evidence = acceptedRepresentationEvidence.get(key);
+    if (!evidence) return null;
+    if (evidence.promptText !== request.promptText
+      || evidence.expectedUrl !== normalizeUrl(request.expectedUrl)) {
+      acceptedRepresentationEvidence.delete(key);
+      return null;
+    }
+    return evidence;
+  }
+
+  function bindAcceptedRepresentation(request, node) {
+    const signature = normalizedRepresentationSignature(node);
+    if (!signature) return null;
+    const evidence = {
+      requestId: request.requestId,
+      taskId: request.taskId,
+      promptText: request.promptText,
+      expectedUrl: normalizeUrl(request.expectedUrl),
+      node,
+      signature,
+      submitAttempted: false,
+      beforeMessages: null
+    };
+    acceptedRepresentationEvidence.set(evidenceKey(request), evidence);
+    return evidence;
+  }
+
+  function isBoundRepresentationPending(composer, request) {
+    const evidence = getAcceptedRepresentationEvidence(request);
+    if (!evidence) return false;
+    const attachments = attachmentNodes(composer);
+    return attachments.length === 1
+      && attachments[0] === evidence.node
+      && normalizedRepresentationSignature(attachments[0]) === evidence.signature
+      && editorText(composer).trim() === '';
   }
 
   function semanticUserMessages(doc) {
@@ -295,12 +401,36 @@
     return semanticUserMessages(doc).map((el) => textOf(el).trim());
   }
 
+  function userMessageRepresentationSnapshot(doc) {
+    return semanticUserMessages(doc).map((el) => ({
+      text: textOf(el).trim(),
+      representations: fileLikeNodes(el)
+        .map(normalizedRepresentationSignature)
+        .filter(Boolean)
+    }));
+  }
+
   function hasStrictAppendedPrompt(before, after, promptText) {
     if (after.length !== before.length + 1) return false;
     for (let i = 0; i < before.length; i += 1) {
       if (after[i] !== before[i]) return false;
     }
     return after[after.length - 1] === String(promptText).trim();
+  }
+
+  function sameRepresentationMessage(a, b) {
+    if (!a || !b || a.text !== b.text) return false;
+    if (a.representations.length !== b.representations.length) return false;
+    return a.representations.every((value, index) => value === b.representations[index]);
+  }
+
+  function hasStrictAppendedRepresentation(before, after, signature) {
+    if (!Array.isArray(before) || after.length !== before.length + 1) return false;
+    for (let i = 0; i < before.length; i += 1) {
+      if (!sameRepresentationMessage(before[i], after[i])) return false;
+    }
+    const appended = after[after.length - 1];
+    return appended.representations.length === 1 && appended.representations[0] === signature;
   }
 
   function resultBase(request, start, extra) {
@@ -350,6 +480,13 @@
 
     const existing = editorText(found.element);
     if (existing === request.promptText) {
+      if (attachmentNodes(found.element).length) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'VISIBLE_NONEMPTY',
+          safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_WITH_EXISTING_PROMPT'
+        });
+      }
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
@@ -364,7 +501,15 @@
       });
     }
 
-    const beforeAttachments = attachmentNodes(found.element).length;
+    const beforeAttachments = attachmentNodes(found.element);
+    if (beforeAttachments.length) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'VISIBLE_EMPTY',
+        safeDiagnosticCode: 'PREEXISTING_ATTACHMENT_BLOCKS_AUTOMATION'
+      });
+    }
+
     found.element.focus?.();
     setNativeValue(found.element, request.promptText);
     await (deps.wait || wait)(50);
@@ -374,7 +519,9 @@
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT' });
     }
 
-    if (editorText(found.element) === request.promptText) {
+    const afterAttachments = attachmentNodes(found.element);
+    if (editorText(found.element) === request.promptText && afterAttachments.length === 0) {
+      acceptedRepresentationEvidence.delete(evidenceKey(request));
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
@@ -382,11 +529,28 @@
       });
     }
 
-    if (attachmentNodes(found.element).length > beforeAttachments) {
+    if (editorText(found.element).trim() === '' && afterAttachments.length === 1) {
+      const evidence = bindAcceptedRepresentation(request, afterAttachments[0]);
+      if (evidence) {
+        return resultBase(request, start, {
+          status: STATUS.INSERTED_NOT_SENT,
+          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+          insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
+          safeDiagnosticCode: 'INSERTION_ATTACHMENT_OPERATION_BOUND'
+        });
+      }
       return resultBase(request, start, {
-        status: STATUS.INSERTED_NOT_SENT,
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
         composerState: 'ACCEPTED_ATTACHMENT_LIKE',
-        safeDiagnosticCode: 'INSERTION_ATTACHMENT_LIKE_PROVEN'
+        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_HAS_NO_SEMANTIC_SIGNATURE'
+      });
+    }
+
+    if (afterAttachments.length > 1) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'UNKNOWN',
+        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_AMBIGUOUS'
       });
     }
 
@@ -405,11 +569,22 @@
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_PRE_SEND' });
     if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY_PRE_SEND' });
 
-    if (editorText(found.element) !== request.promptText) {
+    const exactTextPending = editorText(found.element) === request.promptText;
+    const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
+    if (exactTextPending && attachmentNodes(found.element).length) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'VISIBLE_NONEMPTY',
+        safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_PRE_SEND'
+      });
+    }
+    if (!exactTextPending && !boundRepresentationPending) {
       return resultBase(request, start, {
         status: STATUS.MANUAL_REVIEW_REQUIRED,
         composerState: editorText(found.element) ? 'VISIBLE_NONEMPTY' : 'VISIBLE_EMPTY',
-        safeDiagnosticCode: 'PENDING_PROMPT_MISMATCH_PRE_SEND'
+        safeDiagnosticCode: attachmentNodes(found.element).length
+          ? 'PENDING_REPRESENTATION_NOT_OPERATION_BOUND_PRE_SEND'
+          : 'PENDING_PROMPT_MISMATCH_PRE_SEND'
       });
     }
 
@@ -417,6 +592,7 @@
     if (!send || send.disabled || send.getAttribute?.('aria-disabled') === 'true') {
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
+        composerState: boundRepresentationPending ? 'ACCEPTED_ATTACHMENT_LIKE' : 'VISIBLE_NONEMPTY',
         sendEvidence: send ? 'SEND_VISIBLE_DISABLED' : 'SEND_ABSENT',
         safeDiagnosticCode: 'SEND_NOT_ENABLED_PRE_SEND'
       });
@@ -424,9 +600,12 @@
 
     return resultBase(request, start, {
       status: STATUS.READY,
-      composerState: 'VISIBLE_NONEMPTY',
+      composerState: boundRepresentationPending ? 'ACCEPTED_ATTACHMENT_LIKE' : 'VISIBLE_NONEMPTY',
+      insertionEvidence: boundRepresentationPending ? 'OPERATION_BOUND_ACCEPTED_REPRESENTATION' : undefined,
       sendEvidence: 'SEND_VISIBLE_ENABLED',
-      safeDiagnosticCode: 'PENDING_PROMPT_READY_TO_SUBMIT'
+      safeDiagnosticCode: boundRepresentationPending
+        ? 'PENDING_ATTACHMENT_OPERATION_BOUND_READY'
+        : 'PENDING_PROMPT_READY_TO_SUBMIT'
     });
   }
 
@@ -435,15 +614,28 @@
     if (ready.status !== STATUS.READY) return ready;
 
     const found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous || editorText(found.element) !== request.promptText) {
+    if (!found.element || found.ambiguous) {
       return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
+    const exactTextPending = editorText(found.element) === request.promptText
+      && attachmentNodes(found.element).length === 0;
+    const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
+    if (!exactTextPending && !boundRepresentationPending) {
+      return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
+    }
+
     const send = findSendButton(doc, found.element);
     if (!send || send.disabled || send.getAttribute?.('aria-disabled') === 'true') {
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
-    const beforeMessages = userMessageHistorySnapshot(doc);
+    const beforeTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
+    const evidence = boundRepresentationPending ? getAcceptedRepresentationEvidence(request) : null;
+    if (evidence) {
+      evidence.submitAttempted = true;
+      evidence.beforeMessages = userMessageRepresentationSnapshot(doc);
+    }
+
     send.click();
     const verifyDeadline = nowMs() + 5000;
     while (nowMs() < verifyDeadline) {
@@ -452,27 +644,46 @@
       if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
-          submissionEvidence: 'UNCERTAIN',
+          submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_UNCERTAIN' : 'UNCERTAIN',
           safeDiagnosticCode: 'URL_CHANGED_AFTER_SEND_CLICK'
         });
       }
 
-      const messages = userMessageHistorySnapshot(doc);
-      if (!hasStrictAppendedPrompt(beforeMessages, messages, request.promptText)) continue;
+      const textVerified = exactTextPending
+        && hasStrictAppendedPrompt(beforeTextMessages, userMessageHistorySnapshot(doc), request.promptText);
+      const representationVerified = evidence
+        && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature);
+      if (!textVerified && !representationVerified) continue;
 
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
-          submissionEvidence: 'UNCERTAIN',
+          submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_UNCERTAIN' : 'UNCERTAIN',
           safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
         });
       }
-      if (postFound.element && editorText(postFound.element).trim() === request.promptText.trim()) {
+      if (exactTextPending && postFound.element && editorText(postFound.element).trim() === request.promptText.trim()) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
           submissionEvidence: 'PROMPT_STILL_PENDING',
           safeDiagnosticCode: 'POST_CLICK_PROMPT_STILL_PENDING'
+        });
+      }
+      if (evidence && postFound.element && isBoundRepresentationPending(postFound.element, request)) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'OPERATION_BOUND_REPRESENTATION_STILL_PENDING',
+          safeDiagnosticCode: 'POST_CLICK_REPRESENTATION_STILL_PENDING'
+        });
+      }
+
+      if (representationVerified) {
+        acceptedRepresentationEvidence.delete(evidenceKey(request));
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
+          safeDiagnosticCode: 'SEND_VERIFIED_BOUND_REPRESENTATION'
         });
       }
 
@@ -485,7 +696,7 @@
 
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
-      submissionEvidence: 'UNCERTAIN',
+      submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_CLICK_UNCERTAIN' : 'UNCERTAIN',
       safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN'
     });
   }
@@ -498,8 +709,8 @@
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
     // Composer state is operation-local evidence and therefore outranks history.
-    // If the exact prompt is still pending, this operation is not safely proven sent.
-    if (found.element && editorText(found.element).trim() === request.promptText.trim()) {
+    if (found.element && editorText(found.element).trim() === request.promptText.trim()
+      && attachmentNodes(found.element).length === 0) {
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         submissionEvidence: 'NONE',
@@ -507,10 +718,39 @@
       });
     }
 
+    const evidence = getAcceptedRepresentationEvidence(request);
+    if (evidence) {
+      if (found.element && isBoundRepresentationPending(found.element, request)) {
+        return resultBase(request, start, {
+          status: STATUS.INSERTED_NOT_SENT,
+          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+          insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
+          submissionEvidence: 'NONE',
+          safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_PENDING'
+        });
+      }
+      if (evidence.submitAttempted && Array.isArray(evidence.beforeMessages)
+        && hasStrictAppendedRepresentation(
+          evidence.beforeMessages,
+          userMessageRepresentationSnapshot(doc),
+          evidence.signature
+        )) {
+        acceptedRepresentationEvidence.delete(evidenceKey(request));
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
+          safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_VERIFIED'
+        });
+      }
+      return resultBase(request, start, {
+        status: STATUS.SUBMISSION_UNCERTAIN,
+        submissionEvidence: 'OPERATION_BOUND_REPRESENTATION_UNCERTAIN',
+        safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_UNCERTAIN'
+      });
+    }
+
     // Plain historical text equality is not operation identity. In recurring workflows
     // an older user message can be byte-for-byte identical to the current prompt.
-    // Until Core/Interaction persist a baseline or operation-bound message marker,
-    // history-only matches must fail closed rather than produce SENT_VERIFIED.
     const recent = latestUserMessages(doc).slice(-5);
     const repeatedPromptSeen = recent.some((el) => textOf(el).trim() === request.promptText.trim());
     return resultBase(request, start, {
@@ -522,7 +762,8 @@
 
   async function insertAndSend(doc, request, start, deps) {
     const inserted = await insertOnly(doc, request, start, deps);
-    if (inserted.status !== STATUS.INSERTED_NOT_SENT || inserted.composerState !== 'VISIBLE_NONEMPTY') return inserted;
+    if (inserted.status !== STATUS.INSERTED_NOT_SENT
+      || !['VISIBLE_NONEMPTY', 'ACCEPTED_ATTACHMENT_LIKE'].includes(inserted.composerState)) return inserted;
     await (deps.wait || wait)(request.preSendDelayMs);
     return submitExisting(doc, request, start, deps);
   }
