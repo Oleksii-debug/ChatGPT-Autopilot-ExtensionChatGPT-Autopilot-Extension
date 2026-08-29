@@ -11,6 +11,7 @@ export function createEmptyState(now = Date.now()) {
 }
 
 export function normalizeChatUrl(url) {
+  if (!url) return '';
   const parsed = new URL(url);
   if (parsed.origin !== 'https://chatgpt.com') throw new Error('Only https://chatgpt.com URLs are allowed');
   parsed.hash = '';
