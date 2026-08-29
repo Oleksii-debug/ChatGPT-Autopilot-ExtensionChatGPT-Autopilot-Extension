@@ -54,14 +54,14 @@
       <section aria-labelledby="tasks-heading">
         <h3 id="tasks-heading">Tasks</h3>
         <ol id="task-list"></ol>
-        <button id="add-task-button" type="button">Add task</button>
+        <button id="add-task-button" type="button" aria-describedby="task-limit-help">Add task</button>
         <p id="task-limit-help">Up to 50 tasks per session.</p>
       </section>
 
       <section aria-labelledby="timing-heading">
         <h3 id="timing-heading">Timing and behavior</h3>
         <label for="minimum-send-interval">Minimum interval between actual sends, minutes</label>
-        <input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric">
+        <input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric" aria-describedby="minimum-send-interval-help">
         <p id="minimum-send-interval-help">Busy-chat checks do not consume this interval.</p>
 
         <label for="pre-send-delay">Delay after prompt insertion before Send, seconds</label>
