@@ -51,7 +51,7 @@ test('one-pass waits for an unfinished task retry instead of completing the sess
 test('temporary and rate-limited one-pass failures remain retryable rather than becoming COMPLETE', () => {
   for (const [status, expectedRetry] of [
     [InteractionResult.TEMPORARY_ERROR, 30100],
-    [InteractionResult.RATE_LIMITED, 60100],
+    [InteractionResult.RATE_LIMITED, 30100],
   ]) {
     const session = onePassSession(1);
     const result = applyInteractionResult(session, 0, { status }, { now: 100 });

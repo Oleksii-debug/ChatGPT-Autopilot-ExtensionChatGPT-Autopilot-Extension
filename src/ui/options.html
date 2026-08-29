@@ -20,6 +20,11 @@
     <ul id="session-list"></ul>
   </nav>
   <main id="main" tabindex="-1">
+    <section aria-labelledby="keyboard-startup-heading">
+      <h2 id="keyboard-startup-heading">Keyboard and startup behavior</h2>
+      <p>Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons. No extension-specific global keyboard shortcuts are assigned.</p>
+      <p>Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.</p>
+    </section>
     <section id="session-editor" aria-labelledby="session-heading" hidden>
       <h2 id="session-heading" tabindex="-1">Session</h2>
       <div id="form-error-summary" tabindex="-1" role="region" aria-label="Configuration errors" hidden></div>
@@ -71,8 +76,14 @@
         <label for="busy-check-delay">Delay before checking the next task when current chat is busy, seconds</label>
         <input id="busy-check-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
 
-        <label for="retry-backoff">Retry delay for temporary navigation or network errors, seconds</label>
-        <input id="retry-backoff" type="number" min="5" max="3600" step="5" inputmode="numeric">
+        <label for="retry-backoff">Retry/backoff wait</label>
+        <input id="retry-backoff" type="number" min="5" max="3600" step="1" inputmode="numeric" aria-describedby="retry-backoff-help">
+        <label for="retry-backoff-unit">Retry/backoff unit</label>
+        <select id="retry-backoff-unit" aria-describedby="retry-backoff-help">
+          <option value="seconds">Seconds</option>
+          <option value="minutes">Minutes</option>
+        </select>
+        <p id="retry-backoff-help">Used after temporary failures and after the exact Too many requests acknowledgement. The Session resumes automatically when the saved wait expires.</p>
 
         <fieldset id="retry-policy">
           <legend>Retry policy</legend>

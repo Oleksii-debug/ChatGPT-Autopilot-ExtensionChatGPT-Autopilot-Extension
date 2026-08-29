@@ -51,7 +51,7 @@ test('submission-uncertain recovery backs off instead of scheduling a 500ms veri
 test('temporary and rate-limited ambiguous verification honor their task retry deadline', () => {
   for (const [status, expectedWake] of [
     [InteractionResult.TEMPORARY_ERROR, 32000],
-    [InteractionResult.RATE_LIMITED, 62000],
+    [InteractionResult.RATE_LIMITED, 32000],
   ]) {
     const { state, session } = fixture();
     applyInteractionResult(session, 0, { status }, { now: 2000 });

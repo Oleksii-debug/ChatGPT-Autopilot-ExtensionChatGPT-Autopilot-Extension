@@ -16,6 +16,7 @@ test('manifest wires the options UI and ChatGPT content scripts with bounded per
     js: ['src/interaction/chatgpt-adapter.js', 'src/interaction/content-script.js'],
     run_at: 'document_idle',
   }]);
+  assert.equal(manifest.commands, undefined, 'no extension-specific global shortcuts are assigned');
 });
 
 test('content script ignores unrelated messages and returns structured adapter results', async () => {

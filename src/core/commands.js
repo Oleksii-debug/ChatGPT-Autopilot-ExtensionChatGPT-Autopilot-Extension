@@ -124,6 +124,7 @@ export function sessionToUi(session, state) {
     tabStrategy: session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? 'worker' : session.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK ? 'open-close' : 'keep-open',
     tasks, minimumSendIntervalMinutes: session.minimumSendIntervalMs / 60000, preSendDelaySeconds: session.preSendDelayMs / 1000,
     busyCheckDelaySeconds: session.busyCheckDelayMs / 1000, retryBackoffSeconds: session.retryBackoffMs / 1000,
+    retryBackoffUnit: session.retryBackoffMs >= 60000 && session.retryBackoffMs % 60000 === 0 ? 'minutes' : 'seconds',
     actionAvailability: { start: STARTABLE_STATES.has(session.runState), pause: session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING, resume: session.runState === RunState.PAUSED, stop: session.runState !== RunState.STOPPED },
     status: {
       currentTaskLabel: currentTask?.label || '',

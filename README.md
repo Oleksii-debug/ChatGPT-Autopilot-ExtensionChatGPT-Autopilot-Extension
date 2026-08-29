@@ -75,6 +75,7 @@ These steps are installation instructions, not an NVDA verification claim. `NVDA
 
 - Only `https://chatgpt.com/*` is permitted.
 - No server, Python backend, cloud runner, external AI planner, CAPTCHA bypass, account-warning bypass, or rate-limit bypass is included.
+- The exact informational “Too many requests” acknowledgement returns `RATE_LIMITED`; Core waits for the Session's configured retry/backoff before any later check.
 - Cookies, ChatGPT sessions, browser profiles, credentials, private prompts, and private chat URLs must never be committed or packaged.
 - A BUSY, error, unknown UI, rate limit, or uncertain submission is never recorded as a verified send.
 - An unresolved submission checkpoint is preserved for reconciliation and cannot silently authorize a new Start.
