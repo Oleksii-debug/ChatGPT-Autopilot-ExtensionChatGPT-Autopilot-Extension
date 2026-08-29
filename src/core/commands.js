@@ -1,6 +1,7 @@
 import { CoreCommand } from '../shared/protocol.js';
 import { PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, normalizeChatUrl } from './schema.js';
 import { pauseSession, resumeSession, startSession, stopSession } from './state-machine.js';
+import { appendLog } from './logger.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -61,6 +62,7 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       return { sessions: state.sessionOrder.map(id => { const s=state.sessionsById[id]; return { id, name:s.name, runState:s.runState, enabledTaskCount:s.taskOrder.filter(t=>s.tasksById[t].enabled).length }; }) };
     }
+    if (command === CoreCommand.GET_SNAPSHOT) { const state=await this.repo.load(); return { snapshot: structuredClone(state) }; }
     if (command === CoreCommand.GET_SESSION) { const state=await this.repo.load(); const s=state.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); return { session: sessionToUi(s,state) }; }
     if (command === CoreCommand.CREATE_SESSION) {
       const state = await this.repo.update(draft => { const s=sessionFromUi(payload.config || {}, this.now()); draft.sessionsById[s.id]=s; draft.sessionOrder.push(s.id); return draft; });
@@ -75,7 +77,7 @@ export class CoreCommandDispatcher {
       const state=await this.repo.update(d=>{ const old=d.sessionsById[payload.sessionId]; if(!old) throw new Error('Session not found'); const copy=structuredClone(old); copy.id=crypto.randomUUID(); copy.name=`${old.name} copy`; copy.runState=RunState.STOPPED; copy.operation=null; copy.nextAllowedSendAt=0; const nextTasks={}; copy.taskOrder=old.taskOrder.map(id=>{const nid=crypto.randomUUID(); nextTasks[nid]={...structuredClone(old.tasksById[id]),id:nid}; return nid;}); copy.tasksById=nextTasks; d.sessionsById[copy.id]=copy; d.sessionOrder.push(copy.id); return d;}); const id=state.sessionOrder.at(-1); return {session:sessionToUi(state.sessionsById[id],state)};
     }
     if ([CoreCommand.START_SESSION,CoreCommand.PAUSE_SESSION,CoreCommand.RESUME_SESSION,CoreCommand.STOP_SESSION].includes(command)) {
-      const state=await this.repo.update(d=>{ const s=d.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); if(command===CoreCommand.START_SESSION){validateRunnableSession(s);startSession(s,this.now());} if(command===CoreCommand.PAUSE_SESSION) pauseSession(s,this.now()); if(command===CoreCommand.RESUME_SESSION){validateRunnableSession(s);resumeSession(s,this.now());} if(command===CoreCommand.STOP_SESSION) stopSession(s,this.now()); return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
+      const state=await this.repo.update(d=>{ const s=d.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); if(command===CoreCommand.START_SESSION){validateRunnableSession(s);startSession(s,this.now());appendLog(d,s.id,'Session started',{at:this.now()});} if(command===CoreCommand.PAUSE_SESSION){pauseSession(s,this.now());appendLog(d,s.id,'Session paused',{at:this.now()});} if(command===CoreCommand.RESUME_SESSION){validateRunnableSession(s);resumeSession(s,this.now());appendLog(d,s.id,'Session resumed',{at:this.now()});} if(command===CoreCommand.STOP_SESSION){stopSession(s,this.now());appendLog(d,s.id,'Session stopped',{at:this.now()});} return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
     }
     if (command === CoreCommand.CLEAR_LOG) { const state=await this.repo.update(d=>{d.logs[payload.sessionId]=[];return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)}; }
     if (command === CoreCommand.MASTER_PAUSE) { await this.repo.update(d=>{d.profile.masterPaused=true; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.RUNNING||s.runState===RunState.RECOVERING) pauseSession(s,this.now()); return d;}); return {}; }
