@@ -1,6 +1,18 @@
 name: Release package candidate
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - manifest.json
+      - src/**
+      - scripts/package-release.mjs
+      - tests/release/**
+      - package.json
+      - README.md
+      - CHANGELOG.md
+      - .github/workflows/release-package.yml
   pull_request:
     paths:
       - manifest.json
