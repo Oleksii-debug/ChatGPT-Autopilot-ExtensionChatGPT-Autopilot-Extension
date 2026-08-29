@@ -1,5 +1,19 @@
 import { OperationPhase, RunState } from './schema.js';
 export const ALARM_NAME = 'autopilot-core-wake';
+export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not available until the durable send runner is installed.';
+
+export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.now()) {
+  for (const session of Object.values(state.sessionsById)) {
+    if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
+    session.runState = RunState.PAUSED;
+    session.pausedByRuntimeGate = true;
+    session.lastError = EXECUTION_UNAVAILABLE_MESSAGE;
+    session.lastActionAt = now;
+    session.updatedAt = now;
+  }
+  return state;
+}
+
 export function reconcileStateForStartup(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
     if (session.runState === RunState.RUNNING) session.runState = RunState.RECOVERING;

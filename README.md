@@ -10,6 +10,8 @@ The current integration branch contains the versioned Session/Task state model, 
 
 The automatic Core execution loop that advances from a due task through durable insert, pre-send, submit, and verification phases is not connected yet. Installing this branch is useful for development verification only; it must not be treated as a finished automatic sender.
 
+Until that runner is integrated, production Start and Resume commands fail closed with an understandable error. Persisted development state found as RUNNING or RECOVERING is moved to PAUSED on cold start, preventing a useless repeated-alarm loop.
+
 `HUMAN_TESTED=false`
 
 `NVDA_VERIFIED=false`

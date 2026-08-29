@@ -2,6 +2,7 @@ import { CoreCommand } from '../shared/protocol.js';
 import { OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, normalizeChatUrl } from './schema.js';
 import { pauseSession, resumeSession, startSession, stopSession } from './state-machine.js';
 import { appendLog } from './logger.js';
+import { EXECUTION_UNAVAILABLE_MESSAGE } from './recovery.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -96,7 +97,11 @@ export function sessionToUi(session, state) {
 }
 
 export class CoreCommandDispatcher {
-  constructor(repository, now = () => Date.now()) { this.repo = repository; this.now = now; }
+  constructor(repository, now = () => Date.now(), { executionAvailable = true } = {}) {
+    this.repo = repository;
+    this.now = now;
+    this.executionAvailable = executionAvailable;
+  }
   async execute(command, payload = {}) {
     if (command === CoreCommand.LIST_SESSIONS) {
       const state = await this.repo.load();
@@ -134,11 +139,11 @@ export class CoreCommandDispatcher {
       const state=await this.repo.update(d=>{ const old=requireSession(d,payload.sessionId); const copy=structuredClone(old); copy.id=crypto.randomUUID(); copy.version=1; copy.name=`${old.name} copy`; copy.runState=RunState.STOPPED; copy.operation=null; copy.nextAllowedSendAt=0; copy.pausedByMaster=false; const nextTasks={}; copy.taskOrder=old.taskOrder.map(id=>{const nid=crypto.randomUUID(); nextTasks[nid]={...structuredClone(old.tasksById[id]),id:nid,status:'IDLE',lastCheckedAt:0,lastVerifiedSendAt:0,lastVerifiedFingerprint:'',retryAfterAt:0,manualReviewReason:''}; return nid;}); copy.tasksById=nextTasks; d.sessionsById[copy.id]=copy; d.sessionOrder.push(copy.id); appendLog(d,copy.id,'Session duplicated',{at:this.now()}); return d;}); const id=state.sessionOrder.at(-1); return {session:sessionToUi(state.sessionsById[id],state)};
     }
     if ([CoreCommand.START_SESSION,CoreCommand.PAUSE_SESSION,CoreCommand.RESUME_SESSION,CoreCommand.STOP_SESSION].includes(command)) {
-      const state=await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(command===CoreCommand.START_SESSION){if(d.profile.masterPaused) throw new Error('Resume the extension before starting a session');if(![RunState.STOPPED,RunState.ERROR].includes(s.runState)) throw new Error('Session is already active');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);startSession(s,this.now());s.pausedByMaster=false;appendLog(d,s.id,'Session started',{at:this.now()});} if(command===CoreCommand.PAUSE_SESSION){if(!ACTIVE_STATES.has(s.runState)) throw new Error('Only an active session can be paused');pauseSession(s,this.now());appendLog(d,s.id,'Session paused',{at:this.now()});} if(command===CoreCommand.RESUME_SESSION){if(d.profile.masterPaused) throw new Error('Resume the extension before resuming a session');if(s.runState!==RunState.PAUSED) throw new Error('Only a paused session can be resumed');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);resumeSession(s,this.now());if(hasUnresolvedOperation(s))s.runState=RunState.RECOVERING;s.pausedByMaster=false;appendLog(d,s.id,'Session resumed',{at:this.now()});} if(command===CoreCommand.STOP_SESSION){stopSession(s,this.now());appendLog(d,s.id,hasUnresolvedOperation(s)?'Session stopped; unresolved operation preserved':'Session stopped',{at:this.now()});} return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
+      const state=await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(command===CoreCommand.START_SESSION){if(!this.executionAvailable) throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);if(d.profile.masterPaused) throw new Error('Resume the extension before starting a session');if(![RunState.STOPPED,RunState.ERROR].includes(s.runState)) throw new Error('Session is already active');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);startSession(s,this.now());s.pausedByMaster=false;appendLog(d,s.id,'Session started',{at:this.now()});} if(command===CoreCommand.PAUSE_SESSION){if(!ACTIVE_STATES.has(s.runState)) throw new Error('Only an active session can be paused');pauseSession(s,this.now());appendLog(d,s.id,'Session paused',{at:this.now()});} if(command===CoreCommand.RESUME_SESSION){if(!this.executionAvailable) throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);if(d.profile.masterPaused) throw new Error('Resume the extension before resuming a session');if(s.runState!==RunState.PAUSED) throw new Error('Only a paused session can be resumed');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);resumeSession(s,this.now());if(hasUnresolvedOperation(s))s.runState=RunState.RECOVERING;s.pausedByMaster=false;appendLog(d,s.id,'Session resumed',{at:this.now()});} if(command===CoreCommand.STOP_SESSION){stopSession(s,this.now());appendLog(d,s.id,hasUnresolvedOperation(s)?'Session stopped; unresolved operation preserved':'Session stopped',{at:this.now()});} return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
     }
     if (command === CoreCommand.CLEAR_LOG) { const state=await this.repo.update(d=>{requireSession(d,payload.sessionId);d.logs[payload.sessionId]=[];return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)}; }
     if (command === CoreCommand.MASTER_PAUSE) { await this.repo.update(d=>{d.profile.masterPaused=true; for(const s of Object.values(d.sessionsById)) if(ACTIVE_STATES.has(s.runState)){pauseSession(s,this.now());s.pausedByMaster=true;appendLog(d,s.id,'Session paused by master pause',{at:this.now()});} return d;}); return {masterPaused:true}; }
-    if (command === CoreCommand.MASTER_RESUME) { await this.repo.update(d=>{d.profile.masterPaused=false; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.PAUSED&&s.pausedByMaster){s.runState=hasUnresolvedOperation(s)?RunState.RECOVERING:RunState.RUNNING;s.pausedByMaster=false;s.lastActionAt=this.now();appendLog(d,s.id,'Session resumed after master pause',{at:this.now()});} return d;}); return {masterPaused:false}; }
+    if (command === CoreCommand.MASTER_RESUME) { await this.repo.update(d=>{d.profile.masterPaused=false; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.PAUSED&&s.pausedByMaster){if(this.executionAvailable){s.runState=hasUnresolvedOperation(s)?RunState.RECOVERING:RunState.RUNNING;s.pausedByMaster=false;s.lastActionAt=this.now();appendLog(d,s.id,'Session resumed after master pause',{at:this.now()});}else{s.lastError=EXECUTION_UNAVAILABLE_MESSAGE;appendLog(d,s.id,'Session remains paused because automatic execution is unavailable',{at:this.now()});}} return d;}); return {masterPaused:false}; }
     throw new Error(`Unknown Core command: ${command}`);
   }
 }

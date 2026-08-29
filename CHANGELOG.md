@@ -15,6 +15,7 @@
 - Serialized storage repository updates to prevent lost concurrent revisions.
 - Normalized `www.chatgpt.com` conversation URLs to the canonical `chatgpt.com` origin.
 - Preserved unresolved operation checkpoints when a session is stopped.
+- Added a fail-closed runtime gate that rejects Start/Resume and pauses persisted active state until the durable automatic runner is installed.
 
 ### Known incomplete work
 
