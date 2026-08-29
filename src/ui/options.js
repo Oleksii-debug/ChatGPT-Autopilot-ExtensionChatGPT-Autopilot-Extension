@@ -79,9 +79,13 @@ function renderSessionList() {
     state.id = `session-state-${session.id}`; state.textContent = ` State: ${session.runState || 'STOPPED'}.`;
     const count = document.createElement('span');
     count.id = `session-enabled-count-${session.id}`; count.textContent = ` ${session.enabledTaskCount ?? 0} enabled tasks.`;
+    const sessionName = session.name || 'Unnamed session';
     const rename = button(`session-rename-${session.id}`, 'Rename', () => renameSession(session.id));
+    rename.setAttribute('aria-label', `Rename session ${sessionName}`);
     const duplicate = button(`session-duplicate-${session.id}`, 'Duplicate', () => duplicateSession(session.id));
+    duplicate.setAttribute('aria-label', `Duplicate session ${sessionName}`);
     const del = button(`session-delete-${session.id}`, 'Delete', (event) => openDeleteDialog(session.id, event.currentTarget));
+    del.setAttribute('aria-label', `Delete session ${sessionName}`);
     li.append(open, state, count, rename, duplicate, del);
     list.append(li);
   }
@@ -265,10 +269,39 @@ async function renameSession(id) { await openSession(id); $('session-name').focu
 async function duplicateSession(id) { try { const data = await core('DUPLICATE_SESSION', { sessionId: id }); await loadSessions({ preserveFocus: false }); await openSession(data.session.id); announce('Session duplicated.'); } catch (e) { announce(e.message); } }
 
 function openDeleteDialog(sessionId, returnFocus) {
-  ui.pendingDeleteSessionId = sessionId; ui.deleteReturnFocus = returnFocus; const d = $('delete-dialog'); d.hidden = false; $('confirm-delete-button').focus();
+  const session = ui.sessions.find((candidate) => candidate.id === sessionId);
+  const sessionName = session?.name || 'Unnamed session';
+  ui.pendingDeleteSessionId = sessionId;
+  ui.deleteReturnFocus = returnFocus;
+  $('delete-dialog-description').textContent = `Delete session ${sessionName}. This removes the selected session configuration.`;
+  $('confirm-delete-button').setAttribute('aria-label', `Delete session ${sessionName}`);
+  const d = $('delete-dialog'); d.hidden = false; $('confirm-delete-button').focus();
 }
-function closeDeleteDialog() { $('delete-dialog').hidden = true; const target = ui.deleteReturnFocus; ui.pendingDeleteSessionId = null; ui.deleteReturnFocus = null; if (target?.isConnected) target.focus(); }
-async function confirmDelete() { const id = ui.pendingDeleteSessionId; try { await core('DELETE_SESSION', { sessionId: id }); closeDeleteDialog(); if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; $('session-editor').hidden = true; $('empty-state').hidden = false; } await loadSessions(); announce('Session deleted.'); } catch (e) { announce(e.message); } }
+function closeDeleteDialog({ restoreFocus = true } = {}) {
+  $('delete-dialog').hidden = true;
+  $('confirm-delete-button').removeAttribute('aria-label');
+  const target = ui.deleteReturnFocus;
+  ui.pendingDeleteSessionId = null;
+  ui.deleteReturnFocus = null;
+  if (restoreFocus && target?.isConnected) target.focus();
+}
+function deleteFocusTargetId(sessionId) {
+  const index = ui.sessions.findIndex((session) => session.id === sessionId);
+  const next = index >= 0 ? ui.sessions[index + 1] || ui.sessions[index - 1] : null;
+  return next ? `session-select-${next.id}` : 'create-session-button';
+}
+async function confirmDelete() {
+  const id = ui.pendingDeleteSessionId;
+  const focusTargetId = deleteFocusTargetId(id);
+  try {
+    await core('DELETE_SESSION', { sessionId: id });
+    closeDeleteDialog({ restoreFocus: false });
+    if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; $('session-editor').hidden = true; $('empty-state').hidden = false; }
+    await loadSessions({ preserveFocus: false });
+    ($(focusTargetId) || $('create-session-button')).focus();
+    announce('Session deleted.');
+  } catch (e) { setAppStatus(e.message); announce(e.message); }
+}
 
 function trapDialog(event) {
   if ($('delete-dialog').hidden) return;
