@@ -267,8 +267,30 @@ async function duplicateSession(id) { try { const data = await core('DUPLICATE_S
 function openDeleteDialog(sessionId, returnFocus) {
   ui.pendingDeleteSessionId = sessionId; ui.deleteReturnFocus = returnFocus; const d = $('delete-dialog'); d.hidden = false; $('confirm-delete-button').focus();
 }
-function closeDeleteDialog() { $('delete-dialog').hidden = true; const target = ui.deleteReturnFocus; ui.pendingDeleteSessionId = null; ui.deleteReturnFocus = null; if (target?.isConnected) target.focus(); }
-async function confirmDelete() { const id = ui.pendingDeleteSessionId; try { await core('DELETE_SESSION', { sessionId: id }); closeDeleteDialog(); if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; $('session-editor').hidden = true; $('empty-state').hidden = false; } await loadSessions(); announce('Session deleted.'); } catch (e) { announce(e.message); } }
+function closeDeleteDialog({ restoreFocus = true } = {}) {
+  $('delete-dialog').hidden = true;
+  const target = ui.deleteReturnFocus;
+  ui.pendingDeleteSessionId = null;
+  ui.deleteReturnFocus = null;
+  if (restoreFocus && target?.isConnected) target.focus();
+}
+function focusAfterDeletedSession(deletedIndex) {
+  const next = ui.sessions[deletedIndex] || ui.sessions[deletedIndex - 1];
+  if (next) $(`session-select-${next.id}`)?.focus();
+  else $('create-session-button').focus();
+}
+async function confirmDelete() {
+  const id = ui.pendingDeleteSessionId;
+  const deletedIndex = Math.max(0, ui.sessions.findIndex((session) => session.id === id));
+  try {
+    await core('DELETE_SESSION', { sessionId: id });
+    closeDeleteDialog({ restoreFocus: false });
+    if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; $('session-editor').hidden = true; $('empty-state').hidden = false; }
+    await loadSessions({ preserveFocus: false });
+    focusAfterDeletedSession(deletedIndex);
+    announce('Session deleted.');
+  } catch (e) { announce(e.message); }
+}
 
 function trapDialog(event) {
   if ($('delete-dialog').hidden) return;
@@ -316,7 +338,7 @@ $('resume-session-button').addEventListener('click', () => action('RESUME_SESSIO
 $('stop-session-button').addEventListener('click', () => action('STOP_SESSION', 'Session stopped.'));
 $('clear-log-button').addEventListener('click', () => action('CLEAR_LOG', 'Session log cleared.'));
 $('confirm-delete-button').addEventListener('click', confirmDelete);
-$('cancel-delete-button').addEventListener('click', closeDeleteDialog);
+$('cancel-delete-button').addEventListener('click', () => closeDeleteDialog());
 document.addEventListener('keydown', trapDialog);
 
 if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener((message) => {
