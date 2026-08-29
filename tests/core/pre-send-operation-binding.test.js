@@ -70,24 +70,35 @@ const chromeApi = { tabs: {
   async create({ url }) { return { id: 8, url }; },
 } };
 
-test('stale non-ready PREPARE_SEND response cannot mutate replacement operation', async () => {
+async function runStalePrepare(status) {
   const repo = new Repo(setupPreSend());
   const transport = { async execute(_tab, request) {
     assert.equal(request.mode, 'PREPARE_SEND');
     assert.equal(request.requestId, 'op1');
-    return { status: InteractionResult.AUTH_REQUIRED };
+    return { status };
   } };
   const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, {
     now: () => 1000,
     cryptoApi: webcrypto,
   });
+  return { result: await executor.runSessionOnce('s1'), after: await repo.load() };
+}
 
-  const result = await executor.runSessionOnce('s1');
-  const after = await repo.load();
-
+function assertReplacementUntouched(result, after) {
   assert.equal(result.kind, 'OPERATION_CHANGED');
   assert.equal(after.sessionsById.s1.operation.operationId, 'op2');
   assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
   assert.equal(after.sessionsById.s1.tasksById.t1.status, 'SUBMISSION_UNCERTAIN');
   assert.equal(after.sessionsById.s1.tasksById.t1.manualReviewReason, null);
+}
+
+test('stale non-ready PREPARE_SEND response cannot mutate replacement operation', async () => {
+  const { result, after } = await runStalePrepare(InteractionResult.AUTH_REQUIRED);
+  assertReplacementUntouched(result, after);
+});
+
+test('stale INSERTED_NOT_SENT PREPARE_SEND response cannot delay replacement operation', async () => {
+  const { result, after } = await runStalePrepare(InteractionResult.INSERTED_NOT_SENT);
+  assertReplacementUntouched(result, after);
+  assert.equal(after.sessionsById.s1.operation.preSendDeadline, 999);
 });
