@@ -8,7 +8,7 @@
 - Options-page and content-script manifest wiring.
 - Durable UI command controller with version checks, bounded logs, session lifecycle commands, master pause/resume, and active ChatGPT URL ownership protection.
 - Content-script message bridge with fail-closed error sanitization.
-- Durable phased automatic executor plus service-worker startup/alarm runtime wiring, still protected by the release gate.
+- Durable phased automatic executor plus service-worker startup/alarm runtime wiring.
 - Deterministic release packager producing the canonical unpacked folder and `ChatGPT-Autopilot-Extension-v0.1.zip` from an explicit product allowlist.
 - Release tests proving manifest-resource completeness, minimal package contents, canonical root naming, and byte-for-byte ZIP reproducibility.
 - GitHub Actions release-candidate artifact generation.
@@ -19,15 +19,14 @@
 - Serialized storage repository updates to prevent lost concurrent revisions.
 - Normalized `www.chatgpt.com` conversation URLs to the canonical `chatgpt.com` origin.
 - Preserved unresolved operation checkpoints when a session is stopped.
-- Runtime safety remains fail closed while `EXECUTION_AVAILABLE=false`; the executor is wired but automatic Send is not released until integrated gates are green.
+- Production automatic execution is now enabled after exact integrated deterministic acceptance; explicit injected disabled-mode coverage remains for fail-closed recovery tests.
 - Release packaging now replaces the same canonical candidate name instead of creating ambiguous `final`/`fixed`/`new` variants.
 
 ### Known incomplete work
 
-- `EXECUTION_AVAILABLE` remains false pending exact integrated production acceptance.
-- Current production PRs and composed release gates must converge before v0.1 can be declared ready.
-- No human Chrome/Windows 11/NVDA acceptance run has occurred.
-- A generated ZIP is a candidate artifact only until the exact candidate SHA passes the release and human acceptance gates.
+- Real Chrome/live ChatGPT smoke has not yet been completed against the exact enabled packaged candidate.
+- No human Windows 11/NVDA acceptance run has occurred.
+- A generated ZIP remains a release candidate until the exact candidate passes the remaining human Chrome/Windows/NVDA acceptance gates.
 
 `HUMAN_TESTED=false`
 
