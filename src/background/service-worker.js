@@ -28,19 +28,39 @@ async function notifyStatusChanged(state) {
   }
 }
 
-let coldStartError = null;
-const coldStartBarrier = reconcileRuntimeColdStart({
-  repository: repo,
-  chromeApi: chrome,
-  executionAvailable: EXECUTION_AVAILABLE,
-}).catch(error => {
-  coldStartError = error;
-  console.error('ChatGPT Autopilot cold-start reconciliation failed safely.');
-});
+let coldStartReconciled = false;
+let coldStartBarrier = null;
+function beginColdStartReconciliation() {
+  if (coldStartReconciled) return Promise.resolve();
+  if (coldStartBarrier) return coldStartBarrier;
+
+  coldStartBarrier = reconcileRuntimeColdStart({
+    repository: repo,
+    chromeApi: chrome,
+    executionAvailable: EXECUTION_AVAILABLE,
+  }).then(
+    () => {
+      coldStartReconciled = true;
+      coldStartBarrier = null;
+    },
+    error => {
+      coldStartBarrier = null;
+      console.error('ChatGPT Autopilot cold-start reconciliation failed safely.');
+      throw error;
+    },
+  );
+  return coldStartBarrier;
+}
+
+// Module evaluation may repair durable state and alarms, but never launches an
+// executor cycle. A transient reconciliation failure is swallowed here so the
+// event that woke this worker (or a later event) can retry through the same
+// single-flight barrier instead of inheriting a permanently poisoned worker.
+void beginColdStartReconciliation().catch(() => undefined);
 
 async function ensureColdStartReconciled() {
-  await coldStartBarrier;
-  if (coldStartError) throw coldStartError;
+  if (coldStartReconciled) return;
+  await beginColdStartReconciliation();
 }
 
 let executionCycleInFlight = null;
