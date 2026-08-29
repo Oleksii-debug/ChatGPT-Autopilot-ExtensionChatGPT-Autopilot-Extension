@@ -30,6 +30,13 @@ test('timing controls expose required limits and units', () => {
   has(/Busy-chat checks do not consume this interval\./);
 });
 
+test('timing bounds are enforced by the JS Save validation path', () => {
+  has(/id="busy-check-delay"[^>]*min="1"[^>]*max="30"/s, 'busy-check markup bounds missing');
+  has(/id="retry-backoff"[^>]*min="5"[^>]*max="3600"/s, 'retry-backoff markup bounds missing');
+  assert.match(js, /session\.busyCheckDelaySeconds\s*>=\s*1\s*&&\s*session\.busyCheckDelaySeconds\s*<=\s*30/);
+  assert.match(js, /session\.retryBackoffSeconds\s*>=\s*5\s*&&\s*session\.retryBackoffSeconds\s*<=\s*3600/);
+});
+
 test('session controls and delete dialog are present', () => {
   for (const id of ['create-session-button','save-session-button','start-session-button','pause-session-button','resume-session-button','stop-session-button','clear-log-button']) {
     assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
