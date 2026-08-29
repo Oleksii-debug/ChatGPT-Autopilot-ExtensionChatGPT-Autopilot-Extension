@@ -82,7 +82,8 @@ function hasReservedUrlCollision(state, session) {
         .filter(task => task.enabled)
         .some(task => targetUrls.has(task.normalizedUrl));
       if (collision) return true;
-    } else if (hasUnresolvedOperation(other) && targetUrls.has(other.operation?.targetUrl || '')) {
+    }
+    if (hasUnresolvedOperation(other) && targetUrls.has(other.operation?.targetUrl || '')) {
       return true;
     }
   }
