@@ -1,0 +1,1 @@
+v0.1 change note: explicitly whitelisted acknowledgement of the benign ChatGPT “Too many requests” informational modal before an autopilot interaction request continues. No rate-limit bypass, retry bypass, security-confirmation auto-accept, or payment/account confirmation auto-accept is added.
