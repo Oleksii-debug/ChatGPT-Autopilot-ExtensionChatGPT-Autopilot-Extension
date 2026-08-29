@@ -22,6 +22,7 @@ export function selectNextTask(session, now = Date.now()) {
 
   const cooldownAt = session.nextAllowedSendAt > now ? session.nextAllowedSendAt : 0;
   const n = session.taskOrder.length;
+  let schedulableCount = 0;
   let earliestRetry = Infinity;
   let eligibleSelection = null;
 
@@ -29,6 +30,7 @@ export function selectNextTask(session, now = Date.now()) {
     const index = (session.currentTaskIndex + offset) % n;
     const task = session.tasksById[session.taskOrder[index]];
     if (!schedulableTask(session, task)) continue;
+    schedulableCount += 1;
     if ((task.retryAfterAt || 0) > now) {
       earliestRetry = Math.min(earliestRetry, task.retryAfterAt);
       continue;
@@ -36,6 +38,7 @@ export function selectNextTask(session, now = Date.now()) {
     if (!eligibleSelection && eligibleTask(session, task, now)) eligibleSelection = { kind: 'TASK', index, task };
   }
 
+  if (schedulableCount === 0) return { kind: 'IDLE' };
   if (cooldownAt) {
     if (eligibleSelection) return { kind: 'COOLDOWN', wakeAt: cooldownAt };
     if (earliestRetry < Infinity) return { kind: 'COOLDOWN', wakeAt: Math.max(cooldownAt, earliestRetry) };
