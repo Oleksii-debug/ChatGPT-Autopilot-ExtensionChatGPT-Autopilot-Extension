@@ -61,10 +61,8 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
 }
 
 export async function resolveTaskTab(chromeApi, state, sessionId, task) {
-  const session = state.sessionsById[sessionId];
-  if (!session) throw new Error('Session not found');
-
-  if (session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) {
+  const session = state.sessionsById?.[sessionId];
+  if (session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) {
     return resolveWorkerTab(chromeApi, state, sessionId, task);
   }
 
