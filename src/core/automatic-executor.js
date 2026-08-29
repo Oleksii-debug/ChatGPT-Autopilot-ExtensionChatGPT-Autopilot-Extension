@@ -88,6 +88,10 @@ export class AutomaticSessionExecutor {
       promptFingerprint: operation.promptFingerprint,
     };
     const task = session.tasksById[operation.taskId];
+    const retryAfterAt = task?.retryAfterAt || 0;
+    if (retryAfterAt > this.now()) {
+      return { kind: 'WAIT_RECOVERY', wakeAt: retryAfterAt };
+    }
     const tab = await this.bindTaskTab(sessionId, task.id);
     const result = await this.transport.execute(tab.id, this.request(
       session,
