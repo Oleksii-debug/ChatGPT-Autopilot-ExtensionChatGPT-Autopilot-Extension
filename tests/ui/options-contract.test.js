@@ -104,3 +104,12 @@ test('delete dialog names its target and successful deletion restores focus dete
   assert.match(js, /\(\$\(focusTargetId\) \|\| \$\('create-session-button'\)\)\.focus\(\)/);
   assert.match(js, /catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/);
 });
+
+test('Core command failures remain readable in normal status text as well as live announcements', () => {
+  assert.match(js, /async function duplicateSession\(id\).*?catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/s);
+  assert.match(js, /async function action\(command, spoken\).*?catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/s);
+  assert.match(js, /master-pause-button'\)\.addEventListener\('click'.*?catch\(\(e\) => \{ setAppStatus\(e\.message\); announce\(e\.message\); \}\)\)/s);
+  for (const command of ['START_SESSION','PAUSE_SESSION','RESUME_SESSION','STOP_SESSION','CLEAR_LOG']) {
+    assert.ok(js.includes(`action('${command}'`), `missing persistent-error action path for ${command}`);
+  }
+});
