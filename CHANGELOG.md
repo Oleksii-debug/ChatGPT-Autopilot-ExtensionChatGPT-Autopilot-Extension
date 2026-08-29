@@ -21,6 +21,7 @@
 - Preserved unresolved operation checkpoints when a session is stopped.
 - Production automatic execution is now enabled after exact integrated deterministic acceptance; explicit injected disabled-mode coverage remains for fail-closed recovery tests.
 - Release packaging now replaces the same canonical candidate name instead of creating ambiguous `final`/`fixed`/`new` variants.
+- The interaction message bridge now auto-acknowledges only the explicitly whitelisted benign ChatGPT “Too many requests” informational dialog (`Зрозуміло` / `Got it`) before continuing the normal interaction request; unknown, security, payment, and non-whitelisted dialogs remain fail-closed and are never auto-accepted.
 
 ### Known incomplete work
 
