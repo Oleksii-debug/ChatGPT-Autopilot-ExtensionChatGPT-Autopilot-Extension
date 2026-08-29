@@ -15,11 +15,13 @@ test('service worker owns a real runtime-cycle wiring behind the release gate', 
   assert.match(source, /executionAvailable: EXECUTION_AVAILABLE/);
 });
 
-test('cold worker load reconciles durable state without executing a Session', () => {
+test('cold worker load applies authorized bootstrap before recovery without executing a Session', () => {
+  assert.match(source, /import \{ applyBundledBootstrapProfile \} from '\.\.\/core\/bootstrap\.js';/);
+  assert.match(source, /import \{ BUNDLED_BOOTSTRAP_PROFILE \} from '\.\.\/config\/bootstrap-profile\.js';/);
   assert.match(source, /let coldStartReconciled = false;/);
   assert.match(source, /let coldStartBarrier = null;/);
   assert.match(source, /function beginColdStartReconciliation\(\) \{/);
-  assert.match(source, /coldStartBarrier = reconcileRuntimeColdStart\(\{/);
+  assert.match(source, /await ensureBundledBootstrapApplied\(\);[\s\S]*?await reconcileRuntimeColdStart\(\{/s);
   assert.match(source, /void beginColdStartReconciliation\(\)\.catch\(\(\) => undefined\);/);
   assert.match(source, /await ensureColdStartReconciled\(\);/);
   assert.doesNotMatch(
@@ -30,7 +32,7 @@ test('cold worker load reconciles durable state without executing a Session', ()
 });
 
 test('failed cold-start reconciliation releases its single-flight barrier for a later retry', () => {
-  assert.match(source, /error => \{\s*coldStartBarrier = null;\s*console\.error\('ChatGPT Autopilot cold-start reconciliation failed safely\.'\);\s*throw error;/s);
+  assert.match(source, /catch\(error => \{\s*coldStartBarrier = null;\s*console\.error\('ChatGPT Autopilot cold-start reconciliation failed safely\.'\);\s*throw error;/s);
   assert.match(source, /if \(coldStartBarrier\) return coldStartBarrier;/);
   assert.match(source, /if \(coldStartReconciled\) return;/);
 });
