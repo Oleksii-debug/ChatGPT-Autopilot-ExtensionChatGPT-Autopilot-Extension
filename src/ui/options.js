@@ -46,17 +46,20 @@ function blankSession() {
   };
 }
 
-function setAppStatus(text) { $('app-status').textContent = text; }
+function setAppStatus(text) {
+  const status = $('app-status');
+  if (status.textContent !== text) status.textContent = text;
+}
 function clone(value) { return structuredClone(value); }
 
-async function loadSessions({ preserveFocus = true } = {}) {
+async function loadSessions({ preserveFocus = true, reportConnected = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
   const activeId = preserveFocus ? active?.id || null : null;
   try {
     const data = await core('LIST_SESSIONS');
     ui.sessions = Array.isArray(data?.sessions) ? data.sessions : [];
     renderSessionList();
-    setAppStatus('Connected to Core.');
+    if (reportConnected) setAppStatus('Connected to Core.');
     if (active?.isConnected) active.focus();
     else if (activeId) $(activeId)?.focus();
   } catch (error) {
@@ -355,7 +358,7 @@ document.addEventListener('keydown', trapDialog);
 
 if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener((message) => {
   if (message?.channel !== 'autopilot-core' || message?.type !== 'STATUS_CHANGED') return;
-  void loadSessions();
+  void loadSessions({ reportConnected: false });
   if (message.sessionId === ui.selectedSessionId) void refreshSelectedSessionStatus(ui.selectedSessionId);
 });
 
