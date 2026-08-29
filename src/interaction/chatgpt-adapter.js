@@ -109,8 +109,10 @@
     return [
       el?.getAttribute?.('aria-label'),
       el?.getAttribute?.('placeholder'),
+      el?.getAttribute?.('data-placeholder'),
       el?.getAttribute?.('data-testid'),
       el?.getAttribute?.('name'),
+      el?.id,
       el?.title
     ].filter(Boolean).join(' ').toLowerCase();
   }
@@ -119,13 +121,16 @@
     const candidates = Array.from(doc.querySelectorAll(
       'textarea, [contenteditable="true"], [role="textbox"], input[type="text"]'
     )).filter(isVisible).filter((el) => {
+      if (el.getAttribute?.('aria-disabled') === 'true') return false;
       const name = accessibleName(el);
       const form = el.closest?.('form');
-      const formText = String(form?.getAttribute?.('data-type') || form?.getAttribute?.('aria-label') || '').toLowerCase();
-      const semanticallyPromptLike = /prompt|message|chat|ask|composer/.test(name + ' ' + formText);
-      const contentEditable = el.getAttribute?.('contenteditable') === 'true';
-      const textarea = String(el.tagName || '').toLowerCase() === 'textarea';
-      return semanticallyPromptLike || contentEditable || textarea;
+      const formText = [
+        form?.getAttribute?.('data-type'),
+        form?.getAttribute?.('aria-label'),
+        form?.getAttribute?.('data-testid'),
+        form?.id
+      ].filter(Boolean).join(' ').toLowerCase();
+      return /prompt|message|chat|ask|composer/.test(name + ' ' + formText);
     });
 
     if (candidates.length === 1) return { element: candidates[0], ambiguous: false };
