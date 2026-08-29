@@ -50,12 +50,12 @@ function stateWithOperation(phase, retryAfterAt = 0) {
 
 function executorFor(repo, now) {
   const chromeApi = { tabs: {
-    async get() { throw new Error('tab lookup must not run during pre-submit fail-safe recovery'); },
-    async query() { throw new Error('tab query must not run during pre-submit fail-safe recovery'); },
-    async create() { throw new Error('tab creation must not run during pre-submit fail-safe recovery'); },
+    async get() { throw new Error('tab lookup must not run during executor fail-safe recovery'); },
+    async query() { throw new Error('tab query must not run during executor fail-safe recovery'); },
+    async create() { throw new Error('tab creation must not run during executor fail-safe recovery'); },
   } };
   const transport = {
-    async execute() { throw new Error('Interaction transport must not run during pre-submit fail-safe recovery'); },
+    async execute() { throw new Error('Interaction transport must not run during executor fail-safe recovery'); },
   };
   return new AutomaticSessionExecutor(repo, chromeApi, transport, {
     now: () => now,
@@ -63,8 +63,8 @@ function executorFor(repo, now) {
   });
 }
 
-test('interrupted READY remains durable until its existing retry deadline', async () => {
-  const repo = new Repo(stateWithOperation(OperationPhase.READY, 5000));
+test('interrupted INSERTED remains durable until its existing retry deadline', async () => {
+  const repo = new Repo(stateWithOperation(OperationPhase.INSERTED, 5000));
   const executor = executorFor(repo, 1000);
 
   const result = await executor.runSessionOnce('s1');
@@ -72,46 +72,46 @@ test('interrupted READY remains durable until its existing retry deadline', asyn
 
   assert.deepEqual(result, {
     kind: 'WAIT_PRE_SUBMIT_RECOVERY',
-    phase: OperationPhase.READY,
+    phase: OperationPhase.INSERTED,
     wakeAt: 5000,
   });
-  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.READY);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.INSERTED);
   assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 5000);
+});
+
+test('expired interrupted INSERTED fails safe without Interaction or Send', async () => {
+  const repo = new Repo(stateWithOperation(OperationPhase.INSERTED, 5000));
+  const executor = executorFor(repo, 5000);
+
+  const result = await executor.runSessionOnce('s1');
+  const after = await repo.load();
+
+  assert.deepEqual(result, { kind: 'PRE_SUBMIT_RECOVERY_HELD', wakeAt: 35000 });
+  assert.equal(after.sessionsById.s1.operation.operationId, 'op1');
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.FAILED_SAFE);
+  assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 35000);
+  assert.equal(after.sessionsById.s1.runState, RunState.RECOVERING);
 });
 
 for (const phase of [
   OperationPhase.CHECKING,
   OperationPhase.READY,
-  OperationPhase.INSERTED,
+  OperationPhase.INSERTING,
 ]) {
-  test(`expired interrupted ${phase} fails safe without Interaction or Send`, async () => {
+  test(`${phase} remains delegated to the canonical runtime recovery owner`, async () => {
     const repo = new Repo(stateWithOperation(phase, 5000));
     const executor = executorFor(repo, 5000);
 
     const result = await executor.runSessionOnce('s1');
     const after = await repo.load();
 
-    assert.deepEqual(result, { kind: 'PRE_SUBMIT_RECOVERY_HELD', wakeAt: 35000 });
-    assert.equal(after.sessionsById.s1.operation.operationId, 'op1');
-    assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.FAILED_SAFE);
-    assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 35000);
-    assert.equal(after.sessionsById.s1.runState, RunState.RECOVERING);
+    assert.deepEqual(result, { kind: 'OPERATION_IN_PROGRESS', phase });
+    assert.equal(after.sessionsById.s1.operation.phase, phase);
+    assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 5000);
   });
 }
 
-test('INSERTING remains delegated to the canonical runtime recovery owner', async () => {
-  const repo = new Repo(stateWithOperation(OperationPhase.INSERTING, 5000));
-  const executor = executorFor(repo, 5000);
-
-  const result = await executor.runSessionOnce('s1');
-  const after = await repo.load();
-
-  assert.deepEqual(result, { kind: 'OPERATION_IN_PROGRESS', phase: OperationPhase.INSERTING });
-  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.INSERTING);
-  assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 5000);
-});
-
-test('SUBMITTING is never downgraded by pre-submit recovery', async () => {
+test('SUBMITTING is never downgraded by executor pre-submit recovery', async () => {
   const repo = new Repo(stateWithOperation(OperationPhase.SUBMITTING, 0));
   const executor = executorFor(repo, 5000);
 
