@@ -13,8 +13,9 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       return { action: 'READY' };
     case InteractionResult.BUSY:
       task.status = 'BUSY';
+      task.retryAfterAt = now + Math.max(1000, session.busyCheckDelayMs || 5000);
       advanceAfterBusy(session, taskIndex, now);
-      return { action: 'ADVANCE_NO_COOLDOWN' };
+      return { action: 'ADVANCE_NO_COOLDOWN', retryAt: task.retryAfterAt };
     case InteractionResult.SENT_VERIFIED:
       task.status = 'IDLE';
       task.lastVerifiedSendAt = now;
