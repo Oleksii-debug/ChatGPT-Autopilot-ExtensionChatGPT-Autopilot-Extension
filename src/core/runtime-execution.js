@@ -5,6 +5,12 @@ const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
 const RUNTIME_RETRY_MESSAGE = 'Automatic execution temporarily unavailable; retry scheduled.';
 const INSERTION_RECOVERY_MESSAGE = 'Insertion outcome was not confirmed; a safe retry was scheduled.';
+const PRE_SUBMIT_RECOVERY_MESSAGE = 'Pre-submit operation was interrupted; a safe retry was scheduled.';
+const INTERRUPTED_PRE_SUBMIT_PHASES = new Set([
+  OperationPhase.CHECKING,
+  OperationPhase.READY,
+  OperationPhase.INSERTING,
+]);
 
 function orderedSessionIds(state) {
   const seen = new Set();
@@ -62,10 +68,11 @@ async function persistRuntimeFailure(repository, sessionId, now) {
   });
 }
 
-async function failSafeExpiredInsertion(repository, sessionId, result, expectedOperationId, now) {
+async function failSafeExpiredPreSubmit(repository, sessionId, result, expectedOperation, now) {
   if (result?.kind !== 'OPERATION_IN_PROGRESS'
-      || result.phase !== OperationPhase.INSERTING
-      || !expectedOperationId) {
+      || !INTERRUPTED_PRE_SUBMIT_PHASES.has(result.phase)
+      || !expectedOperation
+      || result.phase !== expectedOperation.phase) {
     return result;
   }
 
@@ -76,8 +83,8 @@ async function failSafeExpiredInsertion(repository, sessionId, result, expectedO
     const operation = session?.operation;
     if (!session
         || !ACTIVE_STATES.has(session.runState)
-        || operation?.phase !== OperationPhase.INSERTING
-        || operation.operationId !== expectedOperationId) {
+        || operation?.phase !== expectedOperation.phase
+        || operation.operationId !== expectedOperation.operationId) {
       return draft;
     }
 
@@ -89,16 +96,19 @@ async function failSafeExpiredInsertion(repository, sessionId, result, expectedO
     task.status = 'RETRY_WAIT';
     operation.phase = OperationPhase.FAILED_SAFE;
     operation.updatedAt = now;
-    session.lastError = INSERTION_RECOVERY_MESSAGE;
+    session.lastError = expectedOperation.phase === OperationPhase.INSERTING
+      ? INSERTION_RECOVERY_MESSAGE
+      : PRE_SUBMIT_RECOVERY_MESSAGE;
     session.lastActionAt = now;
     session.updatedAt = now;
     reconciled = true;
     return draft;
   });
 
-  return reconciled
+  if (!reconciled) return result;
+  return expectedOperation.phase === OperationPhase.INSERTING
     ? { kind: 'INSERTION_RECOVERY_RETRY', wakeAt: retryAt }
-    : result;
+    : { kind: 'PRE_SUBMIT_RECOVERY_RETRY', phase: expectedOperation.phase, wakeAt: retryAt };
 }
 
 export async function runRuntimeCycle({
@@ -121,16 +131,16 @@ export async function runRuntimeCycle({
       const live = await repository.load();
       const session = live.sessionsById?.[sessionId];
       if (!session || !ACTIVE_STATES.has(session.runState)) continue;
-      const expectedInsertingOperationId = session.operation?.phase === OperationPhase.INSERTING
-        ? session.operation.operationId
+      const expectedPreSubmitOperation = INTERRUPTED_PRE_SUBMIT_PHASES.has(session.operation?.phase)
+        ? { operationId: session.operation.operationId, phase: session.operation.phase }
         : null;
       try {
         const rawResult = await executor.runSessionOnce(sessionId);
-        const result = await failSafeExpiredInsertion(
+        const result = await failSafeExpiredPreSubmit(
           repository,
           sessionId,
           rawResult,
-          expectedInsertingOperationId,
+          expectedPreSubmitOperation,
           now(),
         );
         outcomes.push({ sessionId, result });
@@ -154,4 +164,5 @@ export async function runRuntimeCycle({
 export const RuntimeExecutionConstants = Object.freeze({
   RUNTIME_RETRY_MESSAGE,
   INSERTION_RECOVERY_MESSAGE,
+  PRE_SUBMIT_RECOVERY_MESSAGE,
 });
