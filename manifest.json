@@ -1,17 +1,36 @@
 {
   "manifest_version": 3,
-  "name": "ChatGPT Autopilot Extension",
+  "name": "ChatGPT Автопілот",
   "version": "0.1.0",
-  "description": "Local multi-session ChatGPT workflow automation with durable recovery.",
-  "permissions": ["storage", "alarms", "tabs"],
-  "host_permissions": ["https://chatgpt.com/*"],
-  "background": {"service_worker": "src/background/service-worker.js", "type": "module"},
-  "action": {"default_title": "Open ChatGPT Autopilot"},
-  "options_ui": {"page": "src/ui/options.html", "open_in_tab": true},
+  "description": "Локальна автоматизація роботи з ChatGPT із кількома сеансами та надійним відновленням.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Відкрити ChatGPT Автопілот"
+  },
+  "options_ui": {
+    "page": "src/ui/options.html",
+    "open_in_tab": true
+  },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["src/interaction/chatgpt-adapter.js", "src/interaction/content-script.js"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "src/interaction/chatgpt-adapter.js",
+        "src/interaction/content-script.js"
+      ],
       "run_at": "document_idle"
     }
   ]
