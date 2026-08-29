@@ -55,7 +55,7 @@ function fakeChrome() {
   };
 }
 
-test('removing a Task prunes only its tab hint so another Session can reuse the open exact URL', async () => {
+test('removing a Task releases stale tab ownership so another Session can reuse the open exact URL', async () => {
   const chrome = fakeChrome();
   const repo = new StorageRepository(chrome.api);
   const core = new CoreCommandDispatcher(repo, () => 1_000);
@@ -123,7 +123,7 @@ test('removing a Task prunes only its tab hint so another Session can reuse the 
   let state = await repo.load();
   assert.equal(state.tabHintsByTaskId.removed, undefined, 'removed Task must release its tab ownership hint');
   assert.equal(state.tabHintsByTaskId.retained.tabId, 42, 'retained Task hint must remain');
-  assert.equal(state.tabHintsByTaskId['__session_worker__:s1'].tabId, 43, 'Session worker hint must not be mistaken for a removed Task hint');
+  assert.equal(state.tabHintsByTaskId['__session_worker__:s1'], undefined, 'keep-open Session must release a stale worker-tab hint');
 
   const secondTask = createTask({ id: 's2-task', url: removed.url });
   const second = createSession({
