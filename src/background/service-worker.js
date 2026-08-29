@@ -3,6 +3,8 @@ import { CoreCommandDispatcher } from '../core/commands.js';
 import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
 import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
+import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
+import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 
 const EXECUTION_AVAILABLE = true;
 const repo = new StorageRepository(chrome);
@@ -28,34 +30,48 @@ async function notifyStatusChanged(state) {
   }
 }
 
+let bootstrapBarrier = null;
+function ensureBundledBootstrapApplied() {
+  if (bootstrapBarrier) return bootstrapBarrier;
+  bootstrapBarrier = applyBundledBootstrapProfile({
+    repository: repo,
+    chromeApi: chrome,
+    profile: BUNDLED_BOOTSTRAP_PROFILE,
+  }).catch(error => {
+    bootstrapBarrier = null;
+    console.error('ChatGPT Autopilot bundled bootstrap failed safely.');
+    throw error;
+  });
+  return bootstrapBarrier;
+}
+
 let coldStartReconciled = false;
 let coldStartBarrier = null;
 function beginColdStartReconciliation() {
   if (coldStartReconciled) return Promise.resolve();
   if (coldStartBarrier) return coldStartBarrier;
 
-  coldStartBarrier = reconcileRuntimeColdStart({
-    repository: repo,
-    chromeApi: chrome,
-    executionAvailable: EXECUTION_AVAILABLE,
-  }).then(
-    () => {
-      coldStartReconciled = true;
-      coldStartBarrier = null;
-    },
-    error => {
-      coldStartBarrier = null;
-      console.error('ChatGPT Autopilot cold-start reconciliation failed safely.');
-      throw error;
-    },
-  );
+  coldStartBarrier = (async () => {
+    await ensureBundledBootstrapApplied();
+    await reconcileRuntimeColdStart({
+      repository: repo,
+      chromeApi: chrome,
+      executionAvailable: EXECUTION_AVAILABLE,
+    });
+    coldStartReconciled = true;
+    coldStartBarrier = null;
+  })().catch(error => {
+    coldStartBarrier = null;
+    console.error('ChatGPT Autopilot cold-start reconciliation failed safely.');
+    throw error;
+  });
   return coldStartBarrier;
 }
 
-// Module evaluation may repair durable state and alarms, but never launches an
-// executor cycle. A transient reconciliation failure is swallowed here so the
-// event that woke this worker (or a later event) can retry through the same
-// single-flight barrier instead of inheriting a permanently poisoned worker.
+// Module evaluation may install an explicitly bundled first-run profile and
+// repair durable state/alarms, but never launches an executor cycle. A transient
+// reconciliation failure is swallowed here so the event that woke this worker
+// (or a later event) can retry through the same single-flight barrier.
 void beginColdStartReconciliation().catch(() => undefined);
 
 async function ensureColdStartReconciled() {
