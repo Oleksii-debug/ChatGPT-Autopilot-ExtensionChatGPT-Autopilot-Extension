@@ -107,6 +107,15 @@ test('valid active SUBMITTING state, lease, tab hint and bounded log shape reloa
   assert.equal(loaded.logs.s1[0].message, 'checkpoint');
 });
 
+test('persisted operation target URL must remain bound to its durable task identity', async () => {
+  const initial = validActiveState();
+  initial.sessionsById.s1.operation.targetUrl = 'https://chatgpt.com/c/different-conversation';
+  const { chrome, writes } = fakeChrome(initial);
+  const repo = new StorageRepository(chrome);
+  await assert.rejects(() => repo.load(), /operation targetUrl binding/);
+  assert.equal(writes(), 0);
+});
+
 test('orphan send lease is rejected instead of authorizing a later send', async () => {
   const initial = validActiveState();
   initial.sendArbiter.lease.operationId = 'different-operation';
