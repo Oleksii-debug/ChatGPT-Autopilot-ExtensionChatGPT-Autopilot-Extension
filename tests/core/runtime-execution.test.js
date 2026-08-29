@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runRuntimeCycle, RuntimeExecutionConstants } from '../../src/core/runtime-execution.js';
+import { reconcileRuntimeColdStart, runRuntimeCycle, RuntimeExecutionConstants } from '../../src/core/runtime-execution.js';
 import { computeNextWake } from '../../src/core/recovery.js';
 import { createEmptyState, createSession, createTask, OperationPhase, RunState } from '../../src/core/schema.js';
 
@@ -72,6 +72,42 @@ test('runtime cycle executes RUNNING/RECOVERING sessions in stable order and ski
   assert.deepEqual(result.outcomes.map(item => item.sessionId), ['s1', 's3']);
   assert.equal(chromeApi.calls[0][0], 'clear');
   assert.equal(chromeApi.calls.at(-1)[0], 'create');
+});
+
+test('cold-start reconciliation repairs SUBMITTING and re-arms without running an executor', async () => {
+  const value = session('s1', RunState.RUNNING);
+  value.operation = {
+    operationId: 'op1',
+    sessionId: 's1',
+    taskId: 's1-t1',
+    promptFingerprint: 'fp',
+    promptText: 'continue',
+    phase: OperationPhase.SUBMITTING,
+    targetUrl: 'https://chatgpt.com/c/s1',
+    createdAt: 1,
+    updatedAt: 1,
+    preSendDeadline: 0,
+    submitStartedAt: 4000,
+    verificationDeadline: 0,
+  };
+  const repo = new Repo(stateWith(value));
+  const chromeApi = fakeChrome();
+
+  const result = await reconcileRuntimeColdStart({
+    repository: repo,
+    chromeApi,
+    executionAvailable: true,
+    now: () => 5000,
+  });
+
+  const after = await repo.load();
+  assert.equal(after.sessionsById.s1.runState, RunState.RECOVERING);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(result.wakeAt, 5000);
+  assert.deepEqual(chromeApi.calls, [
+    ['clear', 'autopilot-core-wake'],
+    ['create', 'autopilot-core-wake', 5500],
+  ]);
 });
 
 test('startup converts persisted RUNNING to RECOVERING before executor sees it', async () => {
