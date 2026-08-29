@@ -1,3 +1,5 @@
+import { focusAfterLifecycleSuccess } from './focus-policy.js';
+
 const MAX_TASKS = 50;
 const ui = {
   sessions: [],
@@ -331,6 +333,7 @@ async function action(command, label) {
     renderEditor();
     const state = ui.selected?.runState || 'UNKNOWN';
     reportCommandResult(`Core acknowledged ${label}. Current state: ${state}.`);
+    focusAfterLifecycleSuccess(command, $);
   } catch (error) {
     setAppStatus(error.message);
     reportCommandResult(`Command failed: ${error.message}`);
