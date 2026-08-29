@@ -62,6 +62,28 @@ function setupExpiredPreSendWait(now) {
   return state;
 }
 
+function setupAmbiguous() {
+  const state = setupRunning();
+  const session = state.sessionsById.s1;
+  const task = session.tasksById.t1;
+  session.runState = RunState.RECOVERING;
+  session.operation = {
+    operationId: 'op-ambiguous',
+    sessionId: 's1',
+    taskId: 't1',
+    promptFingerprint: 'fp-ambiguous',
+    promptText: 'hello',
+    phase: OperationPhase.AMBIGUOUS,
+    targetUrl: task.normalizedUrl,
+    createdAt: 1,
+    updatedAt: 2,
+    preSendDeadline: 0,
+    submitStartedAt: 2,
+    verificationDeadline: 5000,
+  };
+  return state;
+}
+
 test('PAUSE committed during CHECK_ONLY is a quiescent barrier before INSERT_ONLY', async () => {
   const repo = new Repo(setupRunning());
   const modes = [];
@@ -129,4 +151,66 @@ test('STOP committed during PREPARE_SEND prevents SUBMITTING, send lease, and SU
   assert.equal(after.sessionsById.s1.runState, RunState.STOPPED);
   assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT, 'STOP barrier must not persist SUBMITTING');
   assert.equal(after.sendArbiter.lease, null, 'STOP barrier must not acquire a new profile send lease');
+});
+
+test('PAUSE committed during ambiguous-send verification must not be overwritten by recovery success', async () => {
+  const repo = new Repo(setupAmbiguous());
+  const modes = [];
+  const transport = { async execute(_tabId, request) {
+    modes.push(request.mode);
+    assert.equal(request.mode, 'VERIFY_AFTER_UNCERTAIN_SUBMIT');
+    await repo.update(draft => {
+      draft.sessionsById.s1.runState = RunState.PAUSED;
+      return draft;
+    });
+    return { status: InteractionResult.SENT_VERIFIED };
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, {
+    now: () => 100,
+    cryptoApi: webcrypto,
+  });
+
+  await executor.runSessionOnce('s1');
+
+  const after = await repo.load();
+  assert.deepEqual(modes, ['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
+  assert.equal(
+    after.sessionsById.s1.runState,
+    RunState.PAUSED,
+    'recovery may reconcile verified-send evidence but must preserve a user PAUSE committed while verification was in flight',
+  );
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.SENT_VERIFIED);
+});
+
+test('STOP committed during ambiguous-send verification must not be resurrected to RUNNING when prompt is still pending', async () => {
+  const repo = new Repo(setupAmbiguous());
+  const modes = [];
+  const transport = { async execute(_tabId, request) {
+    modes.push(request.mode);
+    assert.equal(request.mode, 'VERIFY_AFTER_UNCERTAIN_SUBMIT');
+    await repo.update(draft => {
+      draft.sessionsById.s1.runState = RunState.STOPPED;
+      return draft;
+    });
+    return { status: InteractionResult.INSERTED_NOT_SENT };
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, {
+    now: () => 100,
+    cryptoApi: webcrypto,
+  });
+
+  await executor.runSessionOnce('s1');
+
+  const after = await repo.load();
+  assert.deepEqual(modes, ['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
+  assert.equal(
+    after.sessionsById.s1.runState,
+    RunState.STOPPED,
+    'recovery must not turn a user STOP into RUNNING after an in-flight verification returns',
+  );
+  assert.equal(
+    after.sessionsById.s1.operation.phase,
+    OperationPhase.PRE_SEND_WAIT,
+    'pending prompt evidence may be durably retained, but STOP must remain authoritative and prevent automatic continuation',
+  );
 });
