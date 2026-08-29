@@ -45,6 +45,9 @@
     'VERIFY_AFTER_UNCERTAIN_SUBMIT'
   ]);
   const CHATGPT_HOSTS = new Set(['chatgpt.com', 'www.chatgpt.com']);
+  // Ephemeral evidence only. Core owns durable operation state. Losing this map because
+  // the content script/page reloads intentionally degrades to MANUAL_REVIEW/UNCERTAIN.
+  const acceptedRepresentationEvidence = new Map();
 
   function nowMs() { return Date.now(); }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
@@ -173,9 +176,6 @@
       if (/captcha|verify|security|confirm|account/.test(t)) {
         return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNKNOWN_OR_SECURITY_DIALOG' };
       }
-      // Any unexpected visible modal is operation-blocking. This deliberately does not
-      // rely on English dialog text: localized confirmation/warning surfaces must fail
-      // closed instead of letting automation interact with the page underneath them.
       return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNRECOGNIZED_DIALOG' };
     }
     return null;
@@ -230,12 +230,72 @@
     }
   }
 
-  function attachmentNodes(composer) {
-    const root = composer?.closest?.('form') || composer?.parentElement;
+  function fileLikeNodes(root) {
     if (!root?.querySelectorAll) return [];
     return Array.from(root.querySelectorAll(
       '[data-testid*="attachment"], [aria-label*="attachment" i], [class*="attachment" i]'
     )).filter(isVisible);
+  }
+
+  function attachmentNodes(composer) {
+    const root = composer?.closest?.('form') || composer?.parentElement;
+    return fileLikeNodes(root);
+  }
+
+  function normalizedRepresentationSignature(node) {
+    const value = `${accessibleName(node)} ${textOf(node)}`.replace(/\s+/g, ' ').trim().toLowerCase();
+    return value || null;
+  }
+
+  function evidenceKey(request) {
+    return `${request.requestId}\u0000${request.taskId}`;
+  }
+
+  function getAcceptedRepresentationEvidence(request) {
+    const key = evidenceKey(request);
+    const evidence = acceptedRepresentationEvidence.get(key);
+    if (!evidence) return null;
+    if (evidence.promptText !== request.promptText
+      || evidence.expectedUrl !== normalizeUrl(request.expectedUrl)) {
+      acceptedRepresentationEvidence.delete(key);
+      return null;
+    }
+    return evidence;
+  }
+
+  function bindAcceptedRepresentation(request, node) {
+    const signature = normalizedRepresentationSignature(node);
+    if (!signature) return null;
+    const evidence = {
+      requestId: request.requestId,
+      taskId: request.taskId,
+      promptText: request.promptText,
+      expectedUrl: normalizeUrl(request.expectedUrl),
+      node,
+      signature,
+      submitAttempted: false,
+      beforeMessages: null
+    };
+    acceptedRepresentationEvidence.set(evidenceKey(request), evidence);
+    return evidence;
+  }
+
+  function isBoundRepresentationPending(composer, request) {
+    const evidence = getAcceptedRepresentationEvidence(request);
+    if (!evidence) return false;
+    const attachments = attachmentNodes(composer);
+    return attachments.length === 1
+      && attachments[0] === evidence.node
+      && normalizedRepresentationSignature(attachments[0]) === evidence.signature
+      && editorText(composer).trim() === '';
+  }
+
+  function messageCarriesBoundRepresentation(message, evidence) {
+    if (!message || !evidence) return false;
+    const nodes = fileLikeNodes(message);
+    if (nodes.length !== 1) return false;
+    return nodes[0] === evidence.node
+      || normalizedRepresentationSignature(nodes[0]) === evidence.signature;
   }
 
   function latestUserMessages(doc) {
@@ -294,6 +354,13 @@
 
     const existing = editorText(found.element);
     if (existing === request.promptText) {
+      if (attachmentNodes(found.element).length) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'VISIBLE_NONEMPTY',
+          safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_WITH_EXISTING_PROMPT'
+        });
+      }
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
@@ -308,7 +375,15 @@
       });
     }
 
-    const beforeAttachments = attachmentNodes(found.element).length;
+    const beforeAttachments = attachmentNodes(found.element);
+    if (beforeAttachments.length) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'VISIBLE_EMPTY',
+        safeDiagnosticCode: 'PREEXISTING_ATTACHMENT_BLOCKS_AUTOMATION'
+      });
+    }
+
     found.element.focus?.();
     setNativeValue(found.element, request.promptText);
     await (deps.wait || wait)(50);
@@ -318,7 +393,9 @@
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT' });
     }
 
-    if (editorText(found.element) === request.promptText) {
+    const afterAttachments = attachmentNodes(found.element);
+    if (editorText(found.element) === request.promptText && afterAttachments.length === 0) {
+      acceptedRepresentationEvidence.delete(evidenceKey(request));
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
@@ -326,11 +403,28 @@
       });
     }
 
-    if (attachmentNodes(found.element).length > beforeAttachments) {
+    if (editorText(found.element).trim() === '' && afterAttachments.length === 1) {
+      const evidence = bindAcceptedRepresentation(request, afterAttachments[0]);
+      if (evidence) {
+        return resultBase(request, start, {
+          status: STATUS.INSERTED_NOT_SENT,
+          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+          insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
+          safeDiagnosticCode: 'INSERTION_ATTACHMENT_OPERATION_BOUND'
+        });
+      }
       return resultBase(request, start, {
-        status: STATUS.INSERTED_NOT_SENT,
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
         composerState: 'ACCEPTED_ATTACHMENT_LIKE',
-        safeDiagnosticCode: 'INSERTION_ATTACHMENT_LIKE_PROVEN'
+        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_HAS_NO_SEMANTIC_SIGNATURE'
+      });
+    }
+
+    if (afterAttachments.length > 1) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'UNKNOWN',
+        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_AMBIGUOUS'
       });
     }
 
@@ -349,11 +443,22 @@
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_PRE_SEND' });
     if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY_PRE_SEND' });
 
-    if (editorText(found.element) !== request.promptText) {
+    const exactTextPending = editorText(found.element) === request.promptText;
+    const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
+    if (exactTextPending && attachmentNodes(found.element).length) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'VISIBLE_NONEMPTY',
+        safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_PRE_SEND'
+      });
+    }
+    if (!exactTextPending && !boundRepresentationPending) {
       return resultBase(request, start, {
         status: STATUS.MANUAL_REVIEW_REQUIRED,
         composerState: editorText(found.element) ? 'VISIBLE_NONEMPTY' : 'VISIBLE_EMPTY',
-        safeDiagnosticCode: 'PENDING_PROMPT_MISMATCH_PRE_SEND'
+        safeDiagnosticCode: attachmentNodes(found.element).length
+          ? 'PENDING_REPRESENTATION_NOT_OPERATION_BOUND_PRE_SEND'
+          : 'PENDING_PROMPT_MISMATCH_PRE_SEND'
       });
     }
 
@@ -361,6 +466,7 @@
     if (!send || send.disabled || send.getAttribute?.('aria-disabled') === 'true') {
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
+        composerState: boundRepresentationPending ? 'ACCEPTED_ATTACHMENT_LIKE' : 'VISIBLE_NONEMPTY',
         sendEvidence: send ? 'SEND_VISIBLE_DISABLED' : 'SEND_ABSENT',
         safeDiagnosticCode: 'SEND_NOT_ENABLED_PRE_SEND'
       });
@@ -368,9 +474,12 @@
 
     return resultBase(request, start, {
       status: STATUS.READY,
-      composerState: 'VISIBLE_NONEMPTY',
+      composerState: boundRepresentationPending ? 'ACCEPTED_ATTACHMENT_LIKE' : 'VISIBLE_NONEMPTY',
+      insertionEvidence: boundRepresentationPending ? 'OPERATION_BOUND_ACCEPTED_REPRESENTATION' : undefined,
       sendEvidence: 'SEND_VISIBLE_ENABLED',
-      safeDiagnosticCode: 'PENDING_PROMPT_READY_TO_SUBMIT'
+      safeDiagnosticCode: boundRepresentationPending
+        ? 'PENDING_ATTACHMENT_OPERATION_BOUND_READY'
+        : 'PENDING_PROMPT_READY_TO_SUBMIT'
     });
   }
 
@@ -379,15 +488,27 @@
     if (ready.status !== STATUS.READY) return ready;
 
     const found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous || editorText(found.element) !== request.promptText) {
+    if (!found.element || found.ambiguous) {
       return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
+    const exactTextPending = editorText(found.element) === request.promptText
+      && attachmentNodes(found.element).length === 0;
+    const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
+    if (!exactTextPending && !boundRepresentationPending) {
+      return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
+    }
+
     const send = findSendButton(doc, found.element);
     if (!send || send.disabled || send.getAttribute?.('aria-disabled') === 'true') {
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
     const beforeMessages = latestUserMessages(doc).length;
+    const evidence = boundRepresentationPending ? getAcceptedRepresentationEvidence(request) : null;
+    if (evidence) {
+      evidence.submitAttempted = true;
+      evidence.beforeMessages = beforeMessages;
+    }
     send.click();
     const verifyDeadline = nowMs() + 5000;
     while (nowMs() < verifyDeadline) {
@@ -395,11 +516,19 @@
       const messages = latestUserMessages(doc);
       if (messages.length > beforeMessages) {
         const latest = messages[messages.length - 1];
-        if (textOf(latest).trim() === request.promptText.trim()) {
+        if (exactTextPending && textOf(latest).trim() === request.promptText.trim()) {
           return resultBase(request, start, {
             status: STATUS.SENT_VERIFIED,
             submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
             safeDiagnosticCode: 'SEND_VERIFIED_MESSAGE'
+          });
+        }
+        if (evidence && messageCarriesBoundRepresentation(latest, evidence)) {
+          acceptedRepresentationEvidence.delete(evidenceKey(request));
+          return resultBase(request, start, {
+            status: STATUS.SENT_VERIFIED,
+            submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
+            safeDiagnosticCode: 'SEND_VERIFIED_BOUND_REPRESENTATION'
           });
         }
       }
@@ -407,7 +536,7 @@
 
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
-      submissionEvidence: 'UNCERTAIN',
+      submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_CLICK_UNCERTAIN' : 'UNCERTAIN',
       safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN'
     });
   }
@@ -419,9 +548,8 @@
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
-    // Composer state is operation-local evidence and therefore outranks history.
-    // If the exact prompt is still pending, this operation is not safely proven sent.
-    if (found.element && editorText(found.element).trim() === request.promptText.trim()) {
+    if (found.element && editorText(found.element).trim() === request.promptText.trim()
+      && attachmentNodes(found.element).length === 0) {
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         submissionEvidence: 'NONE',
@@ -429,10 +557,38 @@
       });
     }
 
-    // Plain historical text equality is not operation identity. In recurring workflows
-    // an older user message can be byte-for-byte identical to the current prompt.
-    // Until Core/Interaction persist a baseline or operation-bound message marker,
-    // history-only matches must fail closed rather than produce SENT_VERIFIED.
+    const evidence = getAcceptedRepresentationEvidence(request);
+    if (evidence) {
+      if (found.element && isBoundRepresentationPending(found.element, request)) {
+        return resultBase(request, start, {
+          status: STATUS.INSERTED_NOT_SENT,
+          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+          insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
+          submissionEvidence: 'NONE',
+          safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_PENDING'
+        });
+      }
+      if (evidence.submitAttempted && Number.isInteger(evidence.beforeMessages)) {
+        const messages = latestUserMessages(doc);
+        if (messages.length > evidence.beforeMessages) {
+          const latest = messages[messages.length - 1];
+          if (messageCarriesBoundRepresentation(latest, evidence)) {
+            acceptedRepresentationEvidence.delete(evidenceKey(request));
+            return resultBase(request, start, {
+              status: STATUS.SENT_VERIFIED,
+              submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
+              safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_VERIFIED'
+            });
+          }
+        }
+      }
+      return resultBase(request, start, {
+        status: STATUS.SUBMISSION_UNCERTAIN,
+        submissionEvidence: 'OPERATION_BOUND_REPRESENTATION_UNCERTAIN',
+        safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_UNCERTAIN'
+      });
+    }
+
     const recent = latestUserMessages(doc).slice(-5);
     const repeatedPromptSeen = recent.some((el) => textOf(el).trim() === request.promptText.trim());
     return resultBase(request, start, {
@@ -444,7 +600,8 @@
 
   async function insertAndSend(doc, request, start, deps) {
     const inserted = await insertOnly(doc, request, start, deps);
-    if (inserted.status !== STATUS.INSERTED_NOT_SENT || inserted.composerState !== 'VISIBLE_NONEMPTY') return inserted;
+    if (inserted.status !== STATUS.INSERTED_NOT_SENT
+      || !['VISIBLE_NONEMPTY', 'ACCEPTED_ATTACHMENT_LIKE'].includes(inserted.composerState)) return inserted;
     await (deps.wait || wait)(request.preSendDelayMs);
     return submitExisting(doc, request, start, deps);
   }
