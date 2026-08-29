@@ -228,13 +228,14 @@ function validate(session) {
   clearErrors(); const errors = [];
   if (!session.name) errors.push(['session-name', 'Session name is required.']);
   if (!session.tasks.length) errors.push(['add-task-button', 'Add at least one task.']);
+  const hasEnabledTasks = session.tasks.some((task) => task.enabled);
   session.tasks.forEach((task, i) => {
     if (!task.enabled) return;
     if (!task.url) errors.push([`task-url-${task.id}`, `Task ${i + 1} URL is required.`]);
     else { try { const u = new URL(task.url); if (u.protocol !== 'https:' || !['chatgpt.com','www.chatgpt.com'].includes(u.hostname)) throw new Error(); } catch { errors.push([`task-url-${task.id}`, `Task ${i + 1} must use a valid https://chatgpt.com URL.`]); } }
     if (session.promptMode === 'unique' && !task.promptOverride.trim()) errors.push([`task-prompt-${task.id}`, `Prompt for Task ${i + 1} is required in unique mode.`]);
   });
-  if (session.promptMode === 'shared' && !session.sharedPrompt.trim()) errors.push(['shared-prompt', 'Shared prompt is required.']);
+  if (hasEnabledTasks && session.promptMode === 'shared' && !session.sharedPrompt.trim()) errors.push(['shared-prompt', 'Shared prompt is required.']);
   if (!(session.minimumSendIntervalMinutes >= 1)) errors.push(['minimum-send-interval', 'Minimum send interval must be at least 1 minute.']);
   if (!(session.preSendDelaySeconds >= 1 && session.preSendDelaySeconds <= 30)) errors.push(['pre-send-delay', 'Pre-send delay must be between 1 and 30 seconds.']);
   if (!(session.busyCheckDelaySeconds >= 1 && session.busyCheckDelaySeconds <= 30)) errors.push(['busy-check-delay', 'Busy-check delay must be between 1 and 30 seconds.']);
