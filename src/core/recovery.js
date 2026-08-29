@@ -73,7 +73,8 @@ export function computeNextWake(state, now = Date.now()) {
     }
 
     if (phase === OperationPhase.AMBIGUOUS) {
-      earliest = Math.min(earliest, now);
+      const taskRetryAfter = session.tasksById?.[session.operation?.taskId]?.retryAfterAt || 0;
+      earliest = Math.min(earliest, Math.max(now, taskRetryAfter));
       continue;
     }
 
