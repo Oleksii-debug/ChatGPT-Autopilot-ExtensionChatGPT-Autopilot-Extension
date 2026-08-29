@@ -63,8 +63,8 @@ function executorFor(repo, now) {
   });
 }
 
-test('interrupted INSERTING remains durable until its existing retry deadline', async () => {
-  const repo = new Repo(stateWithOperation(OperationPhase.INSERTING, 5000));
+test('interrupted READY remains durable until its existing retry deadline', async () => {
+  const repo = new Repo(stateWithOperation(OperationPhase.READY, 5000));
   const executor = executorFor(repo, 1000);
 
   const result = await executor.runSessionOnce('s1');
@@ -72,17 +72,16 @@ test('interrupted INSERTING remains durable until its existing retry deadline', 
 
   assert.deepEqual(result, {
     kind: 'WAIT_PRE_SUBMIT_RECOVERY',
-    phase: OperationPhase.INSERTING,
+    phase: OperationPhase.READY,
     wakeAt: 5000,
   });
-  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.INSERTING);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.READY);
   assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 5000);
 });
 
 for (const phase of [
   OperationPhase.CHECKING,
   OperationPhase.READY,
-  OperationPhase.INSERTING,
   OperationPhase.INSERTED,
 ]) {
   test(`expired interrupted ${phase} fails safe without Interaction or Send`, async () => {
@@ -99,6 +98,18 @@ for (const phase of [
     assert.equal(after.sessionsById.s1.runState, RunState.RECOVERING);
   });
 }
+
+test('INSERTING remains delegated to the canonical runtime recovery owner', async () => {
+  const repo = new Repo(stateWithOperation(OperationPhase.INSERTING, 5000));
+  const executor = executorFor(repo, 5000);
+
+  const result = await executor.runSessionOnce('s1');
+  const after = await repo.load();
+
+  assert.deepEqual(result, { kind: 'OPERATION_IN_PROGRESS', phase: OperationPhase.INSERTING });
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.INSERTING);
+  assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 5000);
+});
 
 test('SUBMITTING is never downgraded by pre-submit recovery', async () => {
   const repo = new Repo(stateWithOperation(OperationPhase.SUBMITTING, 0));
