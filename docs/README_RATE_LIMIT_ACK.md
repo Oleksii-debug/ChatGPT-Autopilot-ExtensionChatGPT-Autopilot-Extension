@@ -1,1 +1,0 @@
-This file records the v0.1 Interaction change for the whitelisted informational rate-limit acknowledgement. Canonical behavior and safety boundaries are documented in `docs/interaction-rate-limit-acknowledgement.md`.
