@@ -7,6 +7,7 @@ import { resolveTaskTab } from './tabs.js';
 import { InteractionResult } from '../shared/protocol.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
+const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
 
 function requireSession(state, sessionId) {
   const session = state.sessionsById[sessionId];
@@ -22,6 +23,10 @@ function taskIndex(session, taskId) {
 
 function promptFor(session, task) {
   return session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
+}
+
+function resumeUnlessQuiesced(session, priorRunState) {
+  session.runState = QUIESCENT_STATES.has(priorRunState) ? priorRunState : RunState.RUNNING;
 }
 
 export class AutomaticSessionExecutor {
@@ -84,6 +89,7 @@ export class AutomaticSessionExecutor {
     if (result.status === InteractionResult.SENT_VERIFIED) {
       await this.repo.update(draft => {
         const live = requireSession(draft, sessionId);
+        const priorRunState = live.runState;
         const liveOperation = live.operation;
         applyInteractionResult(live, taskIndex(live, liveOperation.taskId), result, {
           now,
@@ -95,7 +101,7 @@ export class AutomaticSessionExecutor {
           now,
           profileGapMs: 1000,
         });
-        live.runState = RunState.RUNNING;
+        resumeUnlessQuiesced(live, priorRunState);
         return draft;
       });
       return { kind: 'RECOVERED_SENT', result };
@@ -104,11 +110,12 @@ export class AutomaticSessionExecutor {
     if (result.status === InteractionResult.INSERTED_NOT_SENT) {
       await this.repo.update(draft => {
         const live = requireSession(draft, sessionId);
+        const priorRunState = live.runState;
         const liveOperation = live.operation;
         liveOperation.phase = OperationPhase.PRE_SEND_WAIT;
         liveOperation.preSendDeadline = now + live.preSendDelayMs;
         liveOperation.updatedAt = now;
-        live.runState = RunState.RUNNING;
+        resumeUnlessQuiesced(live, priorRunState);
         releaseSendLease(draft, {
           sessionId,
           operationId: liveOperation.operationId,
@@ -138,6 +145,16 @@ export class AutomaticSessionExecutor {
       operation.operationId,
       operation.promptText,
     ));
+
+    const postPrepare = await this.repo.load();
+    const postPrepareSession = requireSession(postPrepare, sessionId);
+    if (!ACTIVE_STATES.has(postPrepareSession.runState)) {
+      return { kind: 'QUIESCED', runState: postPrepareSession.runState };
+    }
+    if (postPrepareSession.operation?.operationId !== operation.operationId
+      || postPrepareSession.operation?.phase !== OperationPhase.PRE_SEND_WAIT) {
+      return { kind: 'OPERATION_CHANGED', phase: postPrepareSession.operation?.phase || OperationPhase.NONE };
+    }
 
     if (prepare.status !== InteractionResult.READY) {
       if (prepare.status === InteractionResult.INSERTED_NOT_SENT) {
@@ -198,6 +215,13 @@ export class AutomaticSessionExecutor {
     const tab = await this.bindTaskTab(sessionId, task.id);
     const checkId = `${sessionId}:${task.id}:check:${this.now()}`;
     const check = await this.transport.execute(tab.id, this.request(session, task, 'CHECK_ONLY', checkId, ''));
+
+    const postCheck = await this.repo.load();
+    const postCheckSession = requireSession(postCheck, sessionId);
+    if (!ACTIVE_STATES.has(postCheckSession.runState)) {
+      return { kind: 'QUIESCED', runState: postCheckSession.runState };
+    }
+
     if (check.status !== InteractionResult.READY) {
       await this.applyResult(sessionId, task.id, check);
       return { kind: check.status, result: check };
@@ -205,6 +229,9 @@ export class AutomaticSessionExecutor {
 
     const fresh = await this.repo.load();
     const liveSession = requireSession(fresh, sessionId);
+    if (!ACTIVE_STATES.has(liveSession.runState)) {
+      return { kind: 'QUIESCED', runState: liveSession.runState };
+    }
     const liveTask = liveSession.tasksById[task.id];
     const promptText = promptFor(liveSession, liveTask);
     const generation = fresh.revision + 1;
