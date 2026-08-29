@@ -2,7 +2,7 @@ import { StorageRepository } from '../core/storage.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
 import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
 import { ChromeInteractionTransport } from '../core/interaction-transport.js';
-import { runRuntimeCycle } from '../core/runtime-execution.js';
+import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 
 const EXECUTION_AVAILABLE = false;
 const repo = new StorageRepository(chrome);
@@ -13,17 +13,51 @@ const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
 
-export async function runExecutionCycle({ startup = false } = {}) {
-  return runRuntimeCycle({
-    repository: repo,
-    chromeApi: chrome,
-    executor,
-    startup,
-    executionAvailable: EXECUTION_AVAILABLE,
-  });
+let coldStartError = null;
+const coldStartBarrier = reconcileRuntimeColdStart({
+  repository: repo,
+  chromeApi: chrome,
+  executionAvailable: EXECUTION_AVAILABLE,
+}).catch(error => {
+  coldStartError = error;
+  console.error('ChatGPT Autopilot cold-start reconciliation failed safely.');
+});
+
+async function ensureColdStartReconciled() {
+  await coldStartBarrier;
+  if (coldStartError) throw coldStartError;
+}
+
+let executionCycleInFlight = null;
+export function runExecutionCycle() {
+  if (executionCycleInFlight) return executionCycleInFlight;
+
+  const cycle = (async () => {
+    await ensureColdStartReconciled();
+    return runRuntimeCycle({
+      repository: repo,
+      chromeApi: chrome,
+      executor,
+      startup: false,
+      executionAvailable: EXECUTION_AVAILABLE,
+    });
+  })();
+
+  executionCycleInFlight = cycle.then(
+    result => {
+      executionCycleInFlight = null;
+      return result;
+    },
+    error => {
+      executionCycleInFlight = null;
+      throw error;
+    },
+  );
+  return executionCycleInFlight;
 }
 
 export async function reconcileRuntime() {
+  await ensureColdStartReconciled();
   const cycle = await runRuntimeCycle({
     repository: repo,
     chromeApi: chrome,
@@ -36,13 +70,14 @@ export async function reconcileRuntime() {
 
 export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
+  await ensureColdStartReconciled();
   const result = await dispatcher.execute(message.command, message.payload || {});
   await reconcileRuntime();
   return result;
 }
 
-chrome.runtime.onInstalled.addListener(() => { runSafely(runExecutionCycle({ startup: true })); });
-chrome.runtime.onStartup.addListener(() => { runSafely(runExecutionCycle({ startup: true })); });
+chrome.runtime.onInstalled.addListener(() => { runSafely(runExecutionCycle()); });
+chrome.runtime.onStartup.addListener(() => { runSafely(runExecutionCycle()); });
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'autopilot-core-wake') runSafely(runExecutionCycle());
 });
@@ -54,5 +89,3 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 chrome.action?.onClicked.addListener(() => { runSafely(chrome.runtime.openOptionsPage()); });
-
-runSafely(runExecutionCycle({ startup: true }));

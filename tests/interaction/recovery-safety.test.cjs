@@ -42,7 +42,7 @@ function request(mode, overrides = {}) {
   }, overrides);
 }
 
-function fixture({ composerText = '', userMessages = [], bodyText = '', buttons = [] } = {}) {
+function fixture({ composerText = '', userMessages = [], bodyText = '', buttons = [], statusTexts = [] } = {}) {
   let clicks = 0;
   const form = {
     querySelectorAll(selector) {
@@ -71,6 +71,14 @@ function fixture({ composerText = '', userMessages = [], bodyText = '', buttons 
     getAttribute(name) { return name === 'data-message-author-role' ? 'user' : null; },
     getBoundingClientRect() { return { width: 100, height: 20 }; }
   }));
+  const statuses = statusTexts.map((text) => ({
+    isConnected: true,
+    hidden: false,
+    disabled: false,
+    innerText: text,
+    getAttribute(name) { return name === 'role' ? 'alert' : null; },
+    getBoundingClientRect() { return { width: 100, height: 20 }; }
+  }));
   for (const button of buttons) {
     const original = button.click;
     button.click = () => { clicks += 1; original?.(); };
@@ -81,6 +89,7 @@ function fixture({ composerText = '', userMessages = [], bodyText = '', buttons 
       if (selector === 'textarea, [contenteditable="true"], [role="textbox"], input[type="text"]') return [composer];
       if (selector === 'button, [role="button"]') return buttons;
       if (selector === '[role="dialog"], dialog') return [];
+      if (selector === '[role="alert"], [role="status"], [aria-live="assertive"]') return statuses;
       if (selector === '[data-message-author-role="user"], [data-author="user"], article') return messages;
       return [];
     }
@@ -141,7 +150,11 @@ test('PREPARE_SEND reports BUSY and never activates the Stop control', async () 
 
 test('rate-limit surface blocks SUBMIT_EXISTING before any Send effect', async () => {
   const { adapter } = loadAdapter();
-  const fx = fixture({ composerText: 'exact recovery prompt', bodyText: 'Too many requests. Try again later.' });
+  const fx = fixture({
+    composerText: 'exact recovery prompt',
+    bodyText: 'conversation text is not error evidence',
+    statusTexts: ['Too many requests. Try again later.']
+  });
   const result = await adapter.execute(request('SUBMIT_EXISTING'), { document: fx.document });
   assert.equal(result.status, adapter.STATUS.RATE_LIMITED);
   assert.match(result.safeDiagnosticCode, /^RATE_LIMIT_SURFACE_VISIBLE/);

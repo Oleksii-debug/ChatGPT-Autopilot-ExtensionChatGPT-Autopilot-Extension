@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import { CoreCommandDispatcher } from '../../src/core/commands.js';
 import { OperationPhase, RunState } from '../../src/core/schema.js';
+import { beginOperation, markSubmitting } from '../../src/core/state-machine.js';
 import { StorageRepository } from '../../src/core/storage.js';
 
 function harness() {
@@ -117,7 +118,19 @@ test('Stop preserves unresolved submission evidence and prevents a new Start', a
   const session = await createRunnable(command);
   await command('START_SESSION', { sessionId: session.id });
   await repository.update((state) => {
-    state.sessionsById[session.id].operation = { operationId: 'operation-1', phase: OperationPhase.SUBMITTING };
+    const live = state.sessionsById[session.id];
+    const taskId = live.taskOrder[live.currentTaskIndex];
+    const task = live.tasksById[taskId];
+    beginOperation(live, {
+      operationId: 'operation-1',
+      taskId,
+      promptFingerprint: 'fingerprint-1',
+      targetUrl: task.normalizedUrl,
+      now: 10_100,
+    });
+    live.operation.generation = state.revision + 1;
+    live.operation.promptText = 'Continue safely.';
+    markSubmitting(live, 10_101);
   });
   await command('STOP_SESSION', { sessionId: session.id });
   const state = await repository.load();
