@@ -10,6 +10,7 @@ const tabStrategyFromUi = value => ({ worker: TabStrategy.ONE_WORKER_TAB_PER_SES
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const STARTABLE_STATES = new Set([RunState.STOPPED, RunState.ERROR]);
 const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
+const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns one of these ChatGPT conversations';
 
 function hasUnresolvedOperation(session) {
   return Boolean(session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase));
@@ -67,24 +68,28 @@ export function validateRunnableSession(session) {
   return session;
 }
 
-function assertNoActiveUrlCollision(state, session) {
+function hasReservedUrlCollision(state, session) {
   const targetUrls = new Set(session.taskOrder
     .map(id => session.tasksById[id])
     .filter(task => task.enabled)
     .map(task => task.normalizedUrl));
   for (const other of Object.values(state.sessionsById)) {
     if (other.id === session.id) continue;
-    let collision = false;
     if (ACTIVE_STATES.has(other.runState)) {
-      collision = other.taskOrder
+      const collision = other.taskOrder
         .map(id => other.tasksById[id])
         .filter(task => task.enabled)
         .some(task => targetUrls.has(task.normalizedUrl));
-    } else if (hasUnresolvedOperation(other)) {
-      collision = targetUrls.has(other.operation?.targetUrl || '');
+      if (collision) return true;
+    } else if (hasUnresolvedOperation(other) && targetUrls.has(other.operation?.targetUrl || '')) {
+      return true;
     }
-    if (collision) throw new Error('Another active or unresolved session already owns one of these ChatGPT conversations');
   }
+  return false;
+}
+
+function assertNoActiveUrlCollision(state, session) {
+  if (hasReservedUrlCollision(state, session)) throw new Error(URL_OWNERSHIP_ERROR);
 }
 
 export function sessionToUi(session, state) {
@@ -205,7 +210,7 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.CLEAR_LOG) { const state=await this.repo.update(d=>{requireSession(d,payload.sessionId);d.logs[payload.sessionId]=[];return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)}; }
     if (command === CoreCommand.MASTER_PAUSE) { await this.repo.update(d=>{d.profile.masterPaused=true; for(const s of Object.values(d.sessionsById)) if(ACTIVE_STATES.has(s.runState)){pauseSession(s,this.now());s.pausedByMaster=true;appendLog(d,s.id,'Session paused by master pause',{at:this.now()});} return d;}); return {masterPaused:true}; }
-    if (command === CoreCommand.MASTER_RESUME) { await this.repo.update(d=>{d.profile.masterPaused=false; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.PAUSED&&s.pausedByMaster){if(this.executionAvailable){const unresolved=hasUnresolvedOperation(s);s.pausedByMaster=false;s.lastActionAt=this.now();if(unresolved&&s.operation?.phase===OperationPhase.MANUAL_REVIEW){appendLog(d,s.id,'Session remains paused for manual review after master resume',{at:this.now()});}else{s.runState=unresolved?RunState.RECOVERING:RunState.RUNNING;appendLog(d,s.id,'Session resumed after master pause',{at:this.now()});}}else{s.lastError=EXECUTION_UNAVAILABLE_MESSAGE;appendLog(d,s.id,'Session remains paused because automatic execution is unavailable',{at:this.now()});}} return d;}); return {masterPaused:false}; }
+    if (command === CoreCommand.MASTER_RESUME) { await this.repo.update(d=>{d.profile.masterPaused=false; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.PAUSED&&s.pausedByMaster){if(this.executionAvailable){const unresolved=hasUnresolvedOperation(s);s.pausedByMaster=false;s.lastActionAt=this.now();if(unresolved&&s.operation?.phase===OperationPhase.MANUAL_REVIEW){appendLog(d,s.id,'Session remains paused for manual review after master resume',{at:this.now()});}else if(hasReservedUrlCollision(d,s)){s.lastError=URL_OWNERSHIP_ERROR;appendLog(d,s.id,'Session remains paused because another active or unresolved session owns a ChatGPT conversation',{at:this.now()});}else{s.runState=unresolved?RunState.RECOVERING:RunState.RUNNING;appendLog(d,s.id,'Session resumed after master pause',{at:this.now()});}}else{s.lastError=EXECUTION_UNAVAILABLE_MESSAGE;appendLog(d,s.id,'Session remains paused because automatic execution is unavailable',{at:this.now()});}} return d;}); return {masterPaused:false}; }
     throw new Error(`Unknown Core command: ${command}`);
   }
 }
