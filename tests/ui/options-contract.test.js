@@ -83,6 +83,12 @@ test('validation uses aria-invalid, aria-describedby and deterministic focus', (
   assert.match(js, /\$\(errors\[0\]\[0\]\)\?\.focus\(\)/);
 });
 
+test('multi-error validation summary is a named programmatic focus region', () => {
+  has(/id="form-error-summary" tabindex="-1" role="region" aria-label="Configuration errors" hidden/, 'focused error summary must expose a stable accessible name');
+  assert.doesNotMatch(html, /id="form-error-summary"[^>]*(?:role="alert"|aria-live)/i, 'focused error summary must not add a second assertive announcement path');
+  assert.match(js, /summary\.focus\(\)/);
+});
+
 test('background status refresh does not reopen the selected session or steal editor focus', () => {
   assert.match(js, /async function refreshSelectedSessionStatus\(sessionId\)/);
   assert.match(js, /renderStatus\(\);\s*renderLog\(\);\s*renderActions\(\);/s);
