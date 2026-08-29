@@ -143,8 +143,10 @@ test('transient cold-start failure is retried once a wake event reaches the same
   }
 });
 
-test('cold wake reconciles durable submission state and coalesces simultaneous startup/alarm cycles', async () => {
+test('enabled cold wake reconciles durable submission state and coalesces simultaneous startup/alarm cycles', async () => {
+  const retryAt = Date.now() + 60_000;
   const task = createTask({ id: 't1', url: 'https://chatgpt.com/c/cold-wake' });
+  task.retryAfterAt = retryAt;
   const session = createSession({ id: 's1', name: 'Cold wake', tasks: [task], sharedPrompt: 'continue', now: 1 });
   session.runState = RunState.RUNNING;
   session.operation = {
@@ -167,6 +169,7 @@ test('cold wake reconciles durable submission state and coalesces simultaneous s
 
   const listeners = {};
   const alarmCalls = [];
+  const statusMessages = [];
   const db = { [STORAGE_KEY]: structuredClone(initial) };
   const event = (name) => ({ addListener(listener) { listeners[name] = listener; } });
   globalThis.chrome = {
@@ -185,30 +188,43 @@ test('cold wake reconciles durable submission state and coalesces simultaneous s
       onInstalled: event('installed'),
       onStartup: event('startup'),
       onMessage: event('message'),
+      async sendMessage(message) { statusMessages.push(message); },
       async openOptionsPage() {},
     },
     action: { onClicked: event('action') },
   };
 
   try {
-    await import('../../src/background/service-worker.js?cold-wake-composed-proof');
+    const worker = await import(`../../src/background/service-worker.js?cold-wake-enabled=${Date.now()}`);
     await new Promise((resolve) => setImmediate(resolve));
 
     const recovered = db[STORAGE_KEY].sessionsById.s1;
     assert.equal(recovered.operation.phase, OperationPhase.AMBIGUOUS);
-    assert.equal(recovered.runState, RunState.PAUSED);
-    assert.equal(recovered.pausedByRuntimeGate, true);
+    assert.equal(recovered.runState, RunState.RECOVERING);
+    assert.notEqual(recovered.pausedByRuntimeGate, true);
+
+    const direct = await worker.runExecutionCycle();
+    assert.equal(direct.outcomes.length, 1);
+    assert.equal(direct.outcomes[0].sessionId, 's1');
+    assert.equal(direct.outcomes[0].result.kind, 'WAIT_RECOVERY');
 
     alarmCalls.length = 0;
+    statusMessages.length = 0;
     listeners.startup();
     listeners.alarm({ name: 'autopilot-core-wake' });
+    await new Promise((resolve) => setImmediate(resolve));
     await new Promise((resolve) => setImmediate(resolve));
 
     assert.deepEqual(
       alarmCalls,
-      [['clear', 'autopilot-core-wake']],
-      'simultaneous startup/alarm wake events must share one in-flight runtime cycle',
+      [['create', 'autopilot-core-wake', retryAt]],
+      'simultaneous startup/alarm wake events must share one enabled in-flight runtime cycle',
     );
+    assert.deepEqual(statusMessages, [{
+      channel: 'autopilot-core',
+      type: 'STATUS_CHANGED',
+      sessionId: 's1',
+    }]);
   } finally {
     delete globalThis.chrome;
   }

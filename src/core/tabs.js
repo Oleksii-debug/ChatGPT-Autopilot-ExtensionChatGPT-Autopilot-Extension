@@ -38,11 +38,28 @@ async function getValidHintedTab(chromeApi, hint, expected) {
   }
 }
 
+function hintStillRepresentsCurrentOwnership(state, hintKey, hint) {
+  if (!hint?.sessionId) return false;
+  const owner = state.sessionsById?.[hint.sessionId];
+  if (!owner) return false;
+
+  if (hint.kind === 'SESSION_WORKER') {
+    return owner.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
+      && hintKey === workerHintKey(owner.id);
+  }
+
+  if (hint.kind != null && hint.kind !== 'TASK') return false;
+  if (owner.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) return false;
+  const task = owner.tasksById?.[hintKey];
+  if (!task) return false;
+  return Boolean(hint.normalizedUrl) && hint.normalizedUrl === task.normalizedUrl;
+}
+
 function claimedTabIdsByOtherSessions(state, sessionId) {
   const claimed = new Set();
-  for (const hint of Object.values(state.tabHintsByTaskId || {})) {
-    if (hint?.tabId == null) continue;
-    if (hint.sessionId && hint.sessionId !== sessionId) claimed.add(hint.tabId);
+  for (const [hintKey, hint] of Object.entries(state.tabHintsByTaskId || {})) {
+    if (hint?.tabId == null || hint.sessionId === sessionId) continue;
+    if (hintStillRepresentsCurrentOwnership(state, hintKey, hint)) claimed.add(hint.tabId);
   }
   return claimed;
 }
