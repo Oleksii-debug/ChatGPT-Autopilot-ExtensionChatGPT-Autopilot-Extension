@@ -1,5 +1,7 @@
 export const SCHEMA_VERSION = 1;
 export const STORAGE_KEY = 'autopilotState';
+export const MAX_LOG_ENTRIES = 500;
+export const MAX_LOG_MESSAGE_LENGTH = 2000;
 export const RunState = Object.freeze({ STOPPED:'STOPPED', RUNNING:'RUNNING', PAUSED:'PAUSED', RECOVERING:'RECOVERING', ERROR:'ERROR' });
 export const PromptMode = Object.freeze({ SHARED:'SHARED', UNIQUE:'UNIQUE' });
 export const RunMode = Object.freeze({ ONE_PASS:'ONE_PASS', CONTINUOUS:'CONTINUOUS' });
@@ -177,12 +179,13 @@ export function validateState(state) {
 
   for (const [sessionId, entries] of Object.entries(state.logs)) {
     if (!state.sessionsById[sessionId]) throw new Error(`Invalid log owner ${sessionId}`);
-    if (!Array.isArray(entries)) throw new Error(`Invalid logs for ${sessionId}`);
+    if (!Array.isArray(entries) || entries.length > MAX_LOG_ENTRIES) throw new Error(`Invalid logs for ${sessionId}`);
     for (const entry of entries) {
       requireRecord(entry, `log entry for ${sessionId}`);
       requireNonNegativeNumber(entry.at, `log entry for ${sessionId} at`);
       requireString(entry.level, `log entry for ${sessionId} level`);
       requireString(entry.message, `log entry for ${sessionId} message`);
+      if (entry.message.length > MAX_LOG_MESSAGE_LENGTH) throw new Error(`Invalid log entry for ${sessionId} message length`);
     }
   }
 
