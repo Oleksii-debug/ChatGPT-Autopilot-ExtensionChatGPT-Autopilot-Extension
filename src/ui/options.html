@@ -11,6 +11,7 @@
   <h1 id="page-title">ChatGPT Autopilot</h1>
   <p id="app-status" role="status">Ready.</p>
   <button id="master-pause-button" type="button">Master pause</button>
+  <button id="master-resume-button" type="button">Resume after master pause</button>
 </header>
 <div class="layout">
   <nav aria-label="Session navigation">
@@ -99,6 +100,7 @@
         <button id="pause-session-button" type="button">Pause</button>
         <button id="resume-session-button" type="button">Resume</button>
         <button id="stop-session-button" type="button">Stop</button>
+        <p id="command-result" tabindex="0">No runtime command has been issued.</p>
       </section>
 
       <section aria-labelledby="status-heading">
@@ -108,6 +110,8 @@
 
       <section aria-labelledby="log-heading">
         <h3 id="log-heading">Log</h3>
+        <p id="session-log-bound">Core retains a bounded session log.</p>
+        <p id="session-log-count">0 Core log entries shown.</p>
         <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
         <button id="clear-log-button" type="button">Clear log</button>
       </section>

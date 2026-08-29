@@ -51,6 +51,8 @@ function setAppStatus(text) {
   if (status.textContent === text) return;
   status.textContent = text;
 }
+function setCommandResult(text) { $('command-result').textContent = text; }
+function reportCommandResult(text) { setCommandResult(text); announce(text); }
 function clone(value) { return structuredClone(value); }
 
 async function loadSessions({ preserveFocus = true } = {}) {
@@ -321,9 +323,31 @@ function trapDialog(event) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 }
 
-async function action(command, spoken) {
+async function action(command, label) {
   if (!ui.selectedSessionId) return;
-  try { const data = await core(command, { sessionId: ui.selectedSessionId }); ui.selected = clone(data.session); renderEditor(); announce(spoken); } catch (e) { setAppStatus(e.message); announce(e.message); }
+  try {
+    const data = await core(command, { sessionId: ui.selectedSessionId });
+    ui.selected = clone(data.session);
+    renderEditor();
+    const state = ui.selected?.runState || 'UNKNOWN';
+    reportCommandResult(`Core acknowledged ${label}. Current state: ${state}.`);
+  } catch (error) {
+    setAppStatus(error.message);
+    reportCommandResult(`Command failed: ${error.message}`);
+  }
+}
+
+async function masterAction(command, label, expectedMasterPaused) {
+  try {
+    const data = await core(command);
+    if (data?.masterPaused !== expectedMasterPaused) throw new Error('Core returned an unexpected master-pause state.');
+    await loadSessions();
+    if (ui.selectedSessionId) await refreshSelectedSessionStatus(ui.selectedSessionId);
+    reportCommandResult(`Core acknowledged ${label}.`);
+  } catch (error) {
+    setAppStatus(error.message);
+    reportCommandResult(`Command failed: ${error.message}`);
+  }
 }
 
 function renderActions() {
@@ -335,10 +359,27 @@ function renderActions() {
 }
 function renderStatus() {
   const s = ui.selected.status || {}; const dl = document.createElement('dl');
-  [['State', ui.selected.runState || 'STOPPED'], ['Current task', s.currentTaskLabel || s.currentTaskUrl || 'None'], ['Last action', s.lastAction || 'None'], ['Last successful send', formatTime(s.lastSuccessfulSendAt)], ['Next eligible send', formatTime(s.nextAllowedSendAt)], ['Enabled tasks', String(s.enabledTaskCount ?? ui.selected.tasks.filter((t) => t.enabled).length)], ['Most recent error', s.lastError || 'None']].forEach(([k,v]) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); });
+  [
+    ['Session state', ui.selected.runState || 'STOPPED'],
+    ['Current task', s.currentTaskLabel || s.currentTaskUrl || 'None'],
+    ['Current task status', s.currentTaskStatus || 'IDLE'],
+    ['Operation phase', s.operationPhase || 'NONE'],
+    ['Last action', s.lastAction || 'None'],
+    ['Last action time', formatTime(s.lastActionAt)],
+    ['Last successful send', formatTime(s.lastSuccessfulSendAt)],
+    ['Next allowed Send', formatTime(s.nextAllowedSendAt)],
+    ['Retry or backoff until', formatTime(s.currentTaskRetryAt)],
+    ['Manual review reason', s.currentTaskManualReviewReason || 'None'],
+    ['Enabled tasks', String(s.enabledTaskCount ?? ui.selected.tasks.filter((t) => t.enabled).length)],
+    ['Last error', s.lastError || 'None']
+  ].forEach(([k,v]) => { const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); });
   $('session-status-region').replaceChildren(dl);
 }
-function renderLog() { $('session-log-region').textContent = (ui.selected.log || []).map((entry) => typeof entry === 'string' ? entry : `${formatTime(entry.at)} — ${entry.message}`).join('\n'); }
+function renderLog() {
+  const entries = ui.selected.log || [];
+  $('session-log-count').textContent = `${entries.length} Core log entr${entries.length === 1 ? 'y' : 'ies'} shown.`;
+  $('session-log-region').textContent = entries.map((entry) => typeof entry === 'string' ? entry : `${formatTime(entry.at)} — ${entry.message}`).join('\n');
+}
 
 function onPromptModeChange() {
   const value = document.querySelector('input[name="promptMode"]:checked')?.value || 'shared'; ui.selected.promptMode = value; $('shared-prompt-container').hidden = value !== 'shared'; $('unique-default-container').hidden = value !== 'unique'; renderTasks(); announce(value === 'shared' ? 'Shared prompt mode selected.' : 'Unique prompt mode selected.');
@@ -346,17 +387,18 @@ function onPromptModeChange() {
 function applyDefaultPrompt() { const value = $('default-unique-prompt').value; let changed = 0; ui.selected.tasks.forEach((task) => { if (!task.promptOverride.trim()) { task.promptOverride = value; changed++; } }); renderTasks(); announce(`Default prompt applied to ${changed} empty task${changed === 1 ? '' : 's'}.`); }
 
 $('create-session-button').addEventListener('click', createSession);
-$('master-pause-button').addEventListener('click', () => core('MASTER_PAUSE').then(() => announce('All sessions paused.')).catch((e) => { setAppStatus(e.message); announce(e.message); }));
+$('master-pause-button').addEventListener('click', () => masterAction('MASTER_PAUSE', 'master pause', true));
+$('master-resume-button').addEventListener('click', () => masterAction('MASTER_RESUME', 'master resume', false));
 $('add-task-button').addEventListener('click', addTask);
 $('prompt-mode-shared').addEventListener('change', onPromptModeChange);
 $('prompt-mode-unique').addEventListener('change', onPromptModeChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
 $('save-session-button').addEventListener('click', saveSession);
-$('start-session-button').addEventListener('click', () => action('START_SESSION', 'Session started.'));
-$('pause-session-button').addEventListener('click', () => action('PAUSE_SESSION', 'Session paused.'));
-$('resume-session-button').addEventListener('click', () => action('RESUME_SESSION', 'Session resumed.'));
-$('stop-session-button').addEventListener('click', () => action('STOP_SESSION', 'Session stopped.'));
-$('clear-log-button').addEventListener('click', () => action('CLEAR_LOG', 'Session log cleared.'));
+$('start-session-button').addEventListener('click', () => action('START_SESSION', 'Start'));
+$('pause-session-button').addEventListener('click', () => action('PAUSE_SESSION', 'Pause'));
+$('resume-session-button').addEventListener('click', () => action('RESUME_SESSION', 'Resume'));
+$('stop-session-button').addEventListener('click', () => action('STOP_SESSION', 'Stop'));
+$('clear-log-button').addEventListener('click', () => action('CLEAR_LOG', 'Clear log'));
 $('confirm-delete-button').addEventListener('click', confirmDelete);
 $('cancel-delete-button').addEventListener('click', closeDeleteDialog);
 document.addEventListener('keydown', trapDialog);

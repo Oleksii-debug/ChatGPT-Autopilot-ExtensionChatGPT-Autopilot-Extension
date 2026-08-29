@@ -37,8 +37,8 @@ test('timing bounds are enforced by the JS Save validation path', () => {
   assert.match(js, /session\.retryBackoffSeconds\s*>=\s*5\s*&&\s*session\.retryBackoffSeconds\s*<=\s*3600/);
 });
 
-test('session controls and delete dialog are present', () => {
-  for (const id of ['create-session-button','save-session-button','start-session-button','pause-session-button','resume-session-button','stop-session-button','clear-log-button']) {
+test('session and master runtime controls are present', () => {
+  for (const id of ['create-session-button','save-session-button','start-session-button','pause-session-button','resume-session-button','stop-session-button','master-pause-button','master-resume-button','clear-log-button']) {
     assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
   }
   has(/id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading"/);
@@ -48,6 +48,31 @@ test('session controls and delete dialog are present', () => {
 
 test('Create Session explicitly focuses and selects the Session name field', () => {
   assert.match(js, /async function createSession\(\)[\s\S]*?await openSession\(data\.session\.id\);\s*\$\('session-name'\)\.focus\(\);\s*\$\('session-name'\)\.select\(\);/);
+});
+
+test('runtime command outcome remains in persistent normal text', () => {
+  has(/<p id="command-result" tabindex="0">No runtime command has been issued\.<\/p>/, 'persistent command result missing');
+  assert.match(js, /function setCommandResult\(text\) \{ \$\('command-result'\)\.textContent = text; \}/);
+  assert.match(js, /reportCommandResult\(`Command failed: \$\{error\.message\}`\)/);
+  assert.match(js, /const data = await core\(command, \{ sessionId: ui\.selectedSessionId \}\);[\s\S]*reportCommandResult\(`Core acknowledged \$\{label\}/, 'session command success must follow Core acknowledgement');
+  assert.match(js, /const data = await core\(command\);[\s\S]*data\?\.masterPaused !== expectedMasterPaused[\s\S]*reportCommandResult\(`Core acknowledged \$\{label\}/, 'master command success must follow Core acknowledgement');
+});
+
+test('runtime status renders Core read-model fields without a UI state machine', () => {
+  for (const field of ['currentTaskStatus','operationPhase','lastAction','lastActionAt','nextAllowedSendAt','currentTaskRetryAt','currentTaskManualReviewReason','lastError']) {
+    assert.ok(js.includes(`s.${field}`), `missing Core status field ${field}`);
+  }
+  assert.match(js, /\['Session state', ui\.selected\.runState \|\| 'STOPPED'\]/);
+  assert.doesNotMatch(js, /switch\s*\(\s*ui\.selected\.runState/);
+  assert.doesNotMatch(js, /case\s+'RATE_LIMITED'/);
+  assert.doesNotMatch(js, /case\s+'RETRY_WAIT'/);
+});
+
+test('bounded Core log remains keyboard-readable and reports its visible entry count', () => {
+  has(/id="session-log-bound">Core retains a bounded session log\.<\/p>/);
+  has(/id="session-log-count">0 Core log entries shown\.<\/p>/);
+  assert.match(js, /const entries = ui\.selected\.log \|\| \[\]/);
+  assert.match(js, /\$\('session-log-count'\)\.textContent/);
 });
 
 test('dynamic tasks are capped, ordered, labelled and focus-managed in implementation', () => {
@@ -61,7 +86,7 @@ test('dynamic tasks are capped, ordered, labelled and focus-managed in implement
 
 test('UI talks to Core by message protocol rather than owning scheduler/storage', () => {
   assert.match(js, /chrome\.runtime\.sendMessage/);
-  for (const command of ['LIST_SESSIONS','GET_SESSION','CREATE_SESSION','UPDATE_SESSION','START_SESSION','PAUSE_SESSION','RESUME_SESSION','STOP_SESSION','DELETE_SESSION']) {
+  for (const command of ['LIST_SESSIONS','GET_SESSION','CREATE_SESSION','UPDATE_SESSION','START_SESSION','PAUSE_SESSION','RESUME_SESSION','STOP_SESSION','DELETE_SESSION','MASTER_PAUSE','MASTER_RESUME']) {
     assert.ok(js.includes(`'${command}'`), `missing Core command ${command}`);
   }
   assert.doesNotMatch(js, /chrome\.storage/);
@@ -121,10 +146,10 @@ test('delete dialog names its target and successful deletion restores focus dete
   assert.match(js, /catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/);
 });
 
-test('Core command failures remain readable in normal status text as well as live announcements', () => {
+test('Core command failures remain readable in normal status text and command-result text', () => {
   assert.match(js, /async function duplicateSession\(id\).*?catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/s);
-  assert.match(js, /async function action\(command, spoken\).*?catch \(e\) \{ setAppStatus\(e\.message\); announce\(e\.message\); \}/s);
-  assert.match(js, /master-pause-button'\)\.addEventListener\('click'.*?catch\(\(e\) => \{ setAppStatus\(e\.message\); announce\(e\.message\); \}\)\)/s);
+  assert.match(js, /async function action\(command, label\).*?catch \(error\) \{\s*setAppStatus\(error\.message\);\s*reportCommandResult\(`Command failed: \$\{error\.message\}`\);\s*\}/s);
+  assert.match(js, /async function masterAction\(command, label, expectedMasterPaused\).*?catch \(error\) \{\s*setAppStatus\(error\.message\);\s*reportCommandResult\(`Command failed: \$\{error\.message\}`\);\s*\}/s);
   for (const command of ['START_SESSION','PAUSE_SESSION','RESUME_SESSION','STOP_SESSION','CLEAR_LOG']) {
     assert.ok(js.includes(`action('${command}'`), `missing persistent-error action path for ${command}`);
   }
