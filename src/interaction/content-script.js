@@ -43,7 +43,12 @@
   }
 
   function isWhitelistedAcknowledgeButton(button) {
-    const label = elementText(button);
+    const label = normalizeText(
+      button?.getAttribute?.('aria-label')
+      || button?.innerText
+      || button?.textContent
+      || button?.value
+    );
     return label === 'зрозуміло' || label === 'got it';
   }
 
