@@ -96,7 +96,7 @@
     if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
     if (typeof el.getBoundingClientRect === 'function') {
       const r = el.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0) return false;
+      if (r.width <= 0 || r.height <= 0) return false;
     }
     return true;
   }
