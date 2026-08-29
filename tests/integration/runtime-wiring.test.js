@@ -93,6 +93,56 @@ test('service worker registers UI, lifecycle, alarm and action listeners', async
   }
 });
 
+test('transient cold-start failure is retried once a wake event reaches the same live worker', async () => {
+  const listeners = {};
+  const db = {};
+  let clearAttempts = 0;
+  const event = (name) => ({ addListener(listener) { listeners[name] = listener; } });
+  globalThis.chrome = {
+    storage: {
+      local: {
+        async get(key) { return { [key]: structuredClone(db[key]) }; },
+        async set(record) { Object.assign(db, structuredClone(record)); },
+      },
+    },
+    alarms: {
+      async clear() {
+        clearAttempts += 1;
+        if (clearAttempts === 1) throw new Error('synthetic transient alarm failure');
+        return true;
+      },
+      async create() {},
+      onAlarm: event('alarm'),
+    },
+    runtime: {
+      onInstalled: event('installed'),
+      onStartup: event('startup'),
+      onMessage: event('message'),
+      async openOptionsPage() {},
+    },
+    action: { onClicked: event('action') },
+  };
+
+  try {
+    await import(`../../src/background/service-worker.js?cold-start-retry=${Date.now()}`);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(clearAttempts, 1, 'module-load reconciliation should fail exactly once in this fixture');
+
+    listeners.startup();
+    listeners.alarm({ name: 'autopilot-core-wake' });
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.equal(
+      clearAttempts,
+      3,
+      'simultaneous wake events must share one retry reconciliation, then one normal runtime alarm reconciliation',
+    );
+  } finally {
+    delete globalThis.chrome;
+  }
+});
+
 test('cold wake reconciles durable submission state and coalesces simultaneous startup/alarm cycles', async () => {
   const task = createTask({ id: 't1', url: 'https://chatgpt.com/c/cold-wake' });
   const session = createSession({ id: 's1', name: 'Cold wake', tasks: [task], sharedPrompt: 'continue', now: 1 });
