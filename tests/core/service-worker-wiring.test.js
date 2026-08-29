@@ -16,13 +16,23 @@ test('service worker owns a real runtime-cycle wiring behind the release gate', 
 });
 
 test('cold worker load reconciles durable state without executing a Session', () => {
-  assert.match(source, /const coldStartBarrier = reconcileRuntimeColdStart\(\{/);
+  assert.match(source, /let coldStartReconciled = false;/);
+  assert.match(source, /let coldStartBarrier = null;/);
+  assert.match(source, /function beginColdStartReconciliation\(\) \{/);
+  assert.match(source, /coldStartBarrier = reconcileRuntimeColdStart\(\{/);
+  assert.match(source, /void beginColdStartReconciliation\(\)\.catch\(\(\) => undefined\);/);
   assert.match(source, /await ensureColdStartReconciled\(\);/);
   assert.doesNotMatch(
     source,
     /\nrunSafely\(runExecutionCycle\(\)\);\s*$/,
     'module evaluation must not launch an executor cycle',
   );
+});
+
+test('failed cold-start reconciliation releases its single-flight barrier for a later retry', () => {
+  assert.match(source, /error => \{\s*coldStartBarrier = null;\s*console\.error\('ChatGPT Autopilot cold-start reconciliation failed safely\.'\);\s*throw error;/s);
+  assert.match(source, /if \(coldStartBarrier\) return coldStartBarrier;/);
+  assert.match(source, /if \(coldStartReconciled\) return;/);
 });
 
 test('startup and canonical alarm invoke the event-driven execution cycle', () => {
