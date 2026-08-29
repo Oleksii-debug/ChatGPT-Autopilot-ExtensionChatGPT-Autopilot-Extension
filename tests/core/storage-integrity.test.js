@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { acquireSendLease } from '../../src/core/arbiter.js';
-import { createEmptyState, createSession, createTask, RunState } from '../../src/core/schema.js';
+import { createEmptyState, createSession, createTask, MAX_LOG_ENTRIES, MAX_LOG_MESSAGE_LENGTH, RunState } from '../../src/core/schema.js';
 import { beginOperation, markSubmitting } from '../../src/core/state-machine.js';
 import { StorageRepository } from '../../src/core/storage.js';
 
@@ -114,4 +114,36 @@ test('orphan send lease is rejected instead of authorizing a later send', async 
   const repo = new StorageRepository(chrome);
   await assert.rejects(() => repo.load(), /Invalid sendArbiter lease owner/);
   assert.equal(writes(), 0);
+});
+
+test('persisted log arrays cannot bypass the bounded-log entry limit', async () => {
+  const initial = validActiveState();
+  initial.logs.s1 = Array.from({ length: MAX_LOG_ENTRIES + 1 }, (_, index) => ({ at: index, level: 'INFO', message: 'entry' }));
+  const { chrome, writes } = fakeChrome(initial);
+  const repo = new StorageRepository(chrome);
+  await assert.rejects(() => repo.load(), /Invalid logs for s1/);
+  assert.equal(writes(), 0);
+});
+
+test('persisted log messages cannot bypass the bounded-log message limit', async () => {
+  const initial = validActiveState();
+  initial.logs.s1 = [{ at: 120, level: 'INFO', message: 'x'.repeat(MAX_LOG_MESSAGE_LENGTH + 1) }];
+  const { chrome, writes } = fakeChrome(initial);
+  const repo = new StorageRepository(chrome);
+  await assert.rejects(() => repo.load(), /message length/);
+  assert.equal(writes(), 0);
+});
+
+test('persisted log values exactly at the schema bounds remain valid', async () => {
+  const initial = validActiveState();
+  initial.logs.s1 = Array.from({ length: MAX_LOG_ENTRIES }, (_, index) => ({
+    at: index,
+    level: 'INFO',
+    message: index === 0 ? 'x'.repeat(MAX_LOG_MESSAGE_LENGTH) : 'entry',
+  }));
+  const { chrome } = fakeChrome(initial);
+  const repo = new StorageRepository(chrome);
+  const loaded = await repo.load();
+  assert.equal(loaded.logs.s1.length, MAX_LOG_ENTRIES);
+  assert.equal(loaded.logs.s1[0].message.length, MAX_LOG_MESSAGE_LENGTH);
 });
