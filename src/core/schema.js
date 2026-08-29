@@ -13,7 +13,10 @@ export function createEmptyState(now = Date.now()) {
 export function normalizeChatUrl(url) {
   if (!url) return '';
   const parsed = new URL(url);
-  if (parsed.origin !== 'https://chatgpt.com') throw new Error('Only https://chatgpt.com URLs are allowed');
+  if (parsed.protocol !== 'https:' || !['chatgpt.com', 'www.chatgpt.com'].includes(parsed.hostname.toLowerCase())) {
+    throw new Error('Only https://chatgpt.com URLs are allowed');
+  }
+  parsed.hostname = 'chatgpt.com';
   parsed.hash = '';
   parsed.search = '';
   parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';

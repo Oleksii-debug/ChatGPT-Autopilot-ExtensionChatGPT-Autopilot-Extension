@@ -8,7 +8,10 @@ export function migrateState(raw, now = Date.now()) {
 }
 
 export class StorageRepository {
-  constructor(chromeApi) { this.chrome = chromeApi; }
+  constructor(chromeApi) {
+    this.chrome = chromeApi;
+    this.updateQueue = Promise.resolve();
+  }
   async load() {
     const record = await this.chrome.storage.local.get(STORAGE_KEY);
     return migrateState(record[STORAGE_KEY]);
@@ -18,11 +21,15 @@ export class StorageRepository {
     await this.chrome.storage.local.set({ [STORAGE_KEY]: state });
     return state;
   }
-  async update(mutator) {
-    const current = await this.load();
-    const draft = structuredClone(current);
-    const next = await mutator(draft) || draft;
-    next.revision = current.revision + 1;
-    return this.save(next);
+  update(mutator) {
+    const operation = this.updateQueue.then(async () => {
+      const current = await this.load();
+      const draft = structuredClone(current);
+      const next = await mutator(draft) || draft;
+      next.revision = current.revision + 1;
+      return this.save(next);
+    });
+    this.updateQueue = operation.catch(() => undefined);
+    return operation;
   }
 }

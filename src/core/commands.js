@@ -1,11 +1,23 @@
 import { CoreCommand } from '../shared/protocol.js';
-import { PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, normalizeChatUrl } from './schema.js';
+import { OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, normalizeChatUrl } from './schema.js';
 import { pauseSession, resumeSession, startSession, stopSession } from './state-machine.js';
 import { appendLog } from './logger.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
 const tabStrategyFromUi = value => ({ worker: TabStrategy.ONE_WORKER_TAB_PER_SESSION, 'open-close': TabStrategy.OPEN_CLOSE_PER_TASK }[String(value).toLowerCase()] || TabStrategy.KEEP_TASK_TABS_OPEN);
+const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
+const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
+
+function hasUnresolvedOperation(session) {
+  return Boolean(session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase));
+}
+
+function requireSession(state, sessionId) {
+  const session = state.sessionsById[sessionId];
+  if (!session) throw new Error('Session not found');
+  return session;
+}
 
 function taskFromUi(raw) {
   const id = raw?.id || crypto.randomUUID();
@@ -15,7 +27,7 @@ function taskFromUi(raw) {
 
 export function sessionFromUi(config, now = Date.now()) {
   const tasks = (config.tasks?.length ? config.tasks : [{ id: crypto.randomUUID(), url: '' }]).slice(0, 50).map(taskFromUi);
-  return createSession({
+  const session = createSession({
     id: config.id || crypto.randomUUID(), name: config.name || 'New session', tasks,
     promptMode: promptModeFromUi(config.promptMode), sharedPrompt: config.sharedPrompt || '', runMode: runModeFromUi(config.runMode),
     minimumSendIntervalMs: Math.max(1, Number(config.minimumSendIntervalMinutes || 2)) * 60000,
@@ -24,26 +36,54 @@ export function sessionFromUi(config, now = Date.now()) {
     retryBackoffMs: Math.max(5000, Number(config.retryBackoffSeconds || 30) * 1000),
     tabStrategy: tabStrategyFromUi(config.tabStrategy), now
   });
+  session.version = Math.max(1, Number(config.version) || 1);
+  session.defaultUniquePrompt = config.defaultUniquePrompt || '';
+  session.retryPolicy = config.retryPolicy === 'manual' ? 'manual' : 'safe';
+  session.busyChatBehavior = 'skip-next';
+  session.pausedByMaster = false;
+  return session;
 }
 
 export function validateRunnableSession(session) {
+  if (hasUnresolvedOperation(session)) throw new Error('Resolve the uncertain send operation before starting');
   if (!session.name.trim()) throw new Error('Session name is required');
   if (session.taskOrder.length < 1 || session.taskOrder.length > 50) throw new Error('Session requires 1-50 tasks');
+  const normalizedUrls = [];
+  let enabledCount = 0;
   for (const id of session.taskOrder) {
     const task = session.tasksById[id];
     if (!task.enabled) continue;
+    enabledCount += 1;
     if (!task.url) throw new Error(`Task ${id} URL is required`);
     task.normalizedUrl = normalizeChatUrl(task.url);
+    normalizedUrls.push(task.normalizedUrl);
     const prompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
     if (!prompt?.trim()) throw new Error(`Prompt is required for task ${id}`);
   }
+  if (enabledCount === 0) throw new Error('Enable at least one task before starting');
+  if (new Set(normalizedUrls).size !== normalizedUrls.length) throw new Error('The same ChatGPT conversation cannot appear twice in one active session');
   return session;
+}
+
+function assertNoActiveUrlCollision(state, session) {
+  const targetUrls = new Set(session.taskOrder
+    .map(id => session.tasksById[id])
+    .filter(task => task.enabled)
+    .map(task => task.normalizedUrl));
+  for (const other of Object.values(state.sessionsById)) {
+    if (other.id === session.id || !ACTIVE_STATES.has(other.runState)) continue;
+    const collision = other.taskOrder
+      .map(id => other.tasksById[id])
+      .filter(task => task.enabled)
+      .some(task => targetUrls.has(task.normalizedUrl));
+    if (collision) throw new Error('Another active session already owns one of these ChatGPT conversations');
+  }
 }
 
 export function sessionToUi(session, state) {
   const tasks = session.taskOrder.map(id => session.tasksById[id]);
   return {
-    ...structuredClone(session), version: state.revision,
+    ...structuredClone(session), version: session.version || 0,
     promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared',
     runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
     tabStrategy: session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? 'worker' : session.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK ? 'open-close' : 'keep-open',
@@ -65,23 +105,40 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.GET_SNAPSHOT) { const state=await this.repo.load(); return { snapshot: structuredClone(state) }; }
     if (command === CoreCommand.GET_SESSION) { const state=await this.repo.load(); const s=state.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); return { session: sessionToUi(s,state) }; }
     if (command === CoreCommand.CREATE_SESSION) {
-      const state = await this.repo.update(draft => { const s=sessionFromUi(payload.config || {}, this.now()); draft.sessionsById[s.id]=s; draft.sessionOrder.push(s.id); return draft; });
+      const state = await this.repo.update(draft => { const s=sessionFromUi(payload.config || {}, this.now()); if(draft.sessionsById[s.id]) throw new Error('Session id already exists'); draft.sessionsById[s.id]=s; draft.sessionOrder.push(s.id); appendLog(draft,s.id,'Session created',{at:this.now()}); return draft; });
       const id=state.sessionOrder.at(-1); return { session: sessionToUi(state.sessionsById[id],state) };
     }
     if (command === CoreCommand.UPDATE_SESSION) {
-      const state = await this.repo.update(draft => { const old=draft.sessionsById[payload.sessionId]; if(!old) throw new Error('Session not found'); const replacement=sessionFromUi({...payload.config,id:old.id},this.now()); replacement.runState=old.runState; replacement.currentTaskIndex=Math.min(old.currentTaskIndex,replacement.taskOrder.length-1); replacement.nextAllowedSendAt=old.nextAllowedSendAt; replacement.operation=old.operation; replacement.lastSuccessfulSendAt=old.lastSuccessfulSendAt; draft.sessionsById[old.id]=replacement; return draft; });
+      const state = await this.repo.update(draft => {
+        const old=requireSession(draft,payload.sessionId);
+        if(ACTIVE_STATES.has(old.runState)||hasUnresolvedOperation(old)) throw new Error('Pause or stop the session and resolve uncertain work before editing');
+        if(Number(payload.expectedVersion)!==Number(old.version||0)) throw new Error('This session changed in another view. Reload before saving');
+        const replacement=sessionFromUi({...payload.config,id:old.id,version:(old.version||0)+1},this.now());
+        replacement.runState=old.runState;
+        const oldTaskId=old.taskOrder[old.currentTaskIndex];
+        replacement.currentTaskIndex=Math.max(0,replacement.taskOrder.indexOf(oldTaskId));
+        replacement.nextAllowedSendAt=old.nextAllowedSendAt;
+        replacement.operation=old.operation;
+        replacement.lastSuccessfulSendAt=old.lastSuccessfulSendAt;
+        replacement.createdAt=old.createdAt;
+        replacement.onePassCompletedTaskIds=(old.onePassCompletedTaskIds||[]).filter(id=>replacement.tasksById[id]);
+        for(const id of replacement.taskOrder){const previous=old.tasksById[id];const current=replacement.tasksById[id];if(previous&&previous.normalizedUrl===current.normalizedUrl){for(const field of ['status','lastCheckedAt','lastVerifiedSendAt','lastVerifiedFingerprint','retryAfterAt','manualReviewReason']) current[field]=previous[field];}}
+        draft.sessionsById[old.id]=replacement;
+        appendLog(draft,old.id,'Session configuration saved',{at:this.now()});
+        return draft;
+      });
       return { session: sessionToUi(state.sessionsById[payload.sessionId],state) };
     }
-    if (command === CoreCommand.DELETE_SESSION) { await this.repo.update(d=>{ delete d.sessionsById[payload.sessionId]; d.sessionOrder=d.sessionOrder.filter(id=>id!==payload.sessionId); delete d.logs[payload.sessionId]; return d;}); return {}; }
+    if (command === CoreCommand.DELETE_SESSION) { await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(s.runState!==RunState.STOPPED||hasUnresolvedOperation(s)) throw new Error('Stop the session and resolve uncertain work before deleting'); delete d.sessionsById[payload.sessionId]; d.sessionOrder=d.sessionOrder.filter(id=>id!==payload.sessionId); delete d.logs[payload.sessionId]; for(const [taskId,hint] of Object.entries(d.tabHintsByTaskId)) if(hint?.sessionId===payload.sessionId) delete d.tabHintsByTaskId[taskId]; return d;}); return {}; }
     if (command === CoreCommand.DUPLICATE_SESSION) {
-      const state=await this.repo.update(d=>{ const old=d.sessionsById[payload.sessionId]; if(!old) throw new Error('Session not found'); const copy=structuredClone(old); copy.id=crypto.randomUUID(); copy.name=`${old.name} copy`; copy.runState=RunState.STOPPED; copy.operation=null; copy.nextAllowedSendAt=0; const nextTasks={}; copy.taskOrder=old.taskOrder.map(id=>{const nid=crypto.randomUUID(); nextTasks[nid]={...structuredClone(old.tasksById[id]),id:nid}; return nid;}); copy.tasksById=nextTasks; d.sessionsById[copy.id]=copy; d.sessionOrder.push(copy.id); return d;}); const id=state.sessionOrder.at(-1); return {session:sessionToUi(state.sessionsById[id],state)};
+      const state=await this.repo.update(d=>{ const old=requireSession(d,payload.sessionId); const copy=structuredClone(old); copy.id=crypto.randomUUID(); copy.version=1; copy.name=`${old.name} copy`; copy.runState=RunState.STOPPED; copy.operation=null; copy.nextAllowedSendAt=0; copy.pausedByMaster=false; const nextTasks={}; copy.taskOrder=old.taskOrder.map(id=>{const nid=crypto.randomUUID(); nextTasks[nid]={...structuredClone(old.tasksById[id]),id:nid,status:'IDLE',lastCheckedAt:0,lastVerifiedSendAt:0,lastVerifiedFingerprint:'',retryAfterAt:0,manualReviewReason:''}; return nid;}); copy.tasksById=nextTasks; d.sessionsById[copy.id]=copy; d.sessionOrder.push(copy.id); appendLog(d,copy.id,'Session duplicated',{at:this.now()}); return d;}); const id=state.sessionOrder.at(-1); return {session:sessionToUi(state.sessionsById[id],state)};
     }
     if ([CoreCommand.START_SESSION,CoreCommand.PAUSE_SESSION,CoreCommand.RESUME_SESSION,CoreCommand.STOP_SESSION].includes(command)) {
-      const state=await this.repo.update(d=>{ const s=d.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); if(command===CoreCommand.START_SESSION){validateRunnableSession(s);startSession(s,this.now());appendLog(d,s.id,'Session started',{at:this.now()});} if(command===CoreCommand.PAUSE_SESSION){pauseSession(s,this.now());appendLog(d,s.id,'Session paused',{at:this.now()});} if(command===CoreCommand.RESUME_SESSION){validateRunnableSession(s);resumeSession(s,this.now());appendLog(d,s.id,'Session resumed',{at:this.now()});} if(command===CoreCommand.STOP_SESSION){stopSession(s,this.now());appendLog(d,s.id,'Session stopped',{at:this.now()});} return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
+      const state=await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(command===CoreCommand.START_SESSION){if(d.profile.masterPaused) throw new Error('Resume the extension before starting a session');if(![RunState.STOPPED,RunState.ERROR].includes(s.runState)) throw new Error('Session is already active');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);startSession(s,this.now());s.pausedByMaster=false;appendLog(d,s.id,'Session started',{at:this.now()});} if(command===CoreCommand.PAUSE_SESSION){if(!ACTIVE_STATES.has(s.runState)) throw new Error('Only an active session can be paused');pauseSession(s,this.now());appendLog(d,s.id,'Session paused',{at:this.now()});} if(command===CoreCommand.RESUME_SESSION){if(d.profile.masterPaused) throw new Error('Resume the extension before resuming a session');if(s.runState!==RunState.PAUSED) throw new Error('Only a paused session can be resumed');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);resumeSession(s,this.now());if(hasUnresolvedOperation(s))s.runState=RunState.RECOVERING;s.pausedByMaster=false;appendLog(d,s.id,'Session resumed',{at:this.now()});} if(command===CoreCommand.STOP_SESSION){stopSession(s,this.now());appendLog(d,s.id,hasUnresolvedOperation(s)?'Session stopped; unresolved operation preserved':'Session stopped',{at:this.now()});} return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
     }
-    if (command === CoreCommand.CLEAR_LOG) { const state=await this.repo.update(d=>{d.logs[payload.sessionId]=[];return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)}; }
-    if (command === CoreCommand.MASTER_PAUSE) { await this.repo.update(d=>{d.profile.masterPaused=true; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.RUNNING||s.runState===RunState.RECOVERING) pauseSession(s,this.now()); return d;}); return {}; }
-    if (command === CoreCommand.MASTER_RESUME) { await this.repo.update(d=>{d.profile.masterPaused=false; return d;}); return {}; }
+    if (command === CoreCommand.CLEAR_LOG) { const state=await this.repo.update(d=>{requireSession(d,payload.sessionId);d.logs[payload.sessionId]=[];return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)}; }
+    if (command === CoreCommand.MASTER_PAUSE) { await this.repo.update(d=>{d.profile.masterPaused=true; for(const s of Object.values(d.sessionsById)) if(ACTIVE_STATES.has(s.runState)){pauseSession(s,this.now());s.pausedByMaster=true;appendLog(d,s.id,'Session paused by master pause',{at:this.now()});} return d;}); return {masterPaused:true}; }
+    if (command === CoreCommand.MASTER_RESUME) { await this.repo.update(d=>{d.profile.masterPaused=false; for(const s of Object.values(d.sessionsById)) if(s.runState===RunState.PAUSED&&s.pausedByMaster){s.runState=hasUnresolvedOperation(s)?RunState.RECOVERING:RunState.RUNNING;s.pausedByMaster=false;s.lastActionAt=this.now();appendLog(d,s.id,'Session resumed after master pause',{at:this.now()});} return d;}); return {masterPaused:false}; }
     throw new Error(`Unknown Core command: ${command}`);
   }
 }

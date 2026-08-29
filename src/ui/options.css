@@ -1,0 +1,28 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; line-height: 1.5; }
+header, nav, main { padding: 1rem; }
+.layout { display: grid; grid-template-columns: minmax(16rem, 22rem) 1fr; gap: 1rem; }
+nav { border-right: 1px solid CanvasText; }
+section { margin-block: 1rem 1.5rem; }
+label, input, textarea, select, button { display: block; }
+label { margin-top: .75rem; font-weight: 600; }
+input[type="radio"], input[type="checkbox"] { display: inline-block; margin-inline-end: .5rem; }
+fieldset label { font-weight: 400; }
+input[type="text"], input[type="url"], input[type="number"], textarea, select { box-sizing: border-box; width: min(100%, 52rem); padding: .5rem; }
+button { margin-block: .4rem; padding: .5rem .75rem; }
+#session-list { padding-left: 1.25rem; }
+#session-list li { margin-block: .75rem; }
+#task-list { padding-left: 1.5rem; }
+#task-list > li { margin-block: 1rem; }
+.task-card { border: 1px solid CanvasText; padding: .75rem; }
+#session-status-region dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem .75rem; }
+#session-status-region dt { font-weight: 700; }
+#session-status-region dd { margin: 0; overflow-wrap: anywhere; }
+#session-log-region { max-height: 20rem; overflow: auto; border: 1px solid CanvasText; padding: .75rem; white-space: pre-wrap; }
+[hidden] { display: none !important; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+#delete-dialog { position: fixed; inset: 15% 10% auto; max-width: 36rem; margin: auto; padding: 1rem; border: 2px solid CanvasText; background: Canvas; color: CanvasText; }
+.error-summary, .field-error { border-left: .25rem solid CanvasText; padding-left: .75rem; }
+@media (max-width: 800px) { .layout { grid-template-columns: 1fr; } nav { border-right: 0; border-bottom: 1px solid CanvasText; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
