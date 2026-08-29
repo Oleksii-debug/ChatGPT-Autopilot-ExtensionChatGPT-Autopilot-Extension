@@ -13,6 +13,21 @@ const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
 
+async function notifyStatusChanged(state) {
+  if (!chrome.runtime?.sendMessage) return;
+  for (const sessionId of Object.keys(state?.sessionsById || {})) {
+    try {
+      await chrome.runtime.sendMessage({
+        channel: 'autopilot-core',
+        type: 'STATUS_CHANGED',
+        sessionId,
+      });
+    } catch {
+      // The options page is normally closed. Lack of a UI receiver must never fail a runtime cycle.
+    }
+  }
+}
+
 let coldStartError = null;
 const coldStartBarrier = reconcileRuntimeColdStart({
   repository: repo,
@@ -34,13 +49,15 @@ export function runExecutionCycle() {
 
   const cycle = (async () => {
     await ensureColdStartReconciled();
-    return runRuntimeCycle({
+    const result = await runRuntimeCycle({
       repository: repo,
       chromeApi: chrome,
       executor,
       startup: false,
       executionAvailable: EXECUTION_AVAILABLE,
     });
+    await notifyStatusChanged(result.state);
+    return result;
   })();
 
   executionCycleInFlight = cycle.then(
@@ -65,6 +82,7 @@ export async function reconcileRuntime() {
     startup: false,
     executionAvailable: false,
   });
+  await notifyStatusChanged(cycle.state);
   return cycle.state;
 }
 
