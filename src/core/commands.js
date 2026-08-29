@@ -73,6 +73,7 @@ function hasReservedUrlCollision(state, session) {
     .map(id => session.tasksById[id])
     .filter(task => task.enabled)
     .map(task => task.normalizedUrl));
+  if (hasUnresolvedOperation(session) && session.operation?.targetUrl) targetUrls.add(session.operation.targetUrl);
   for (const other of Object.values(state.sessionsById)) {
     if (other.id === session.id) continue;
     if (ACTIVE_STATES.has(other.runState)) {
