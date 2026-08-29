@@ -4,6 +4,12 @@
  * ChatGPT interaction seam for the local Manifest V3 extension.
  * This module deliberately owns no scheduling, persistence, tab creation, or retry loops.
  * Core supplies one bounded request; this adapter inspects/mutates only the current page.
+ *
+ * Durable automatic execution MUST use the phased modes:
+ * CHECK_ONLY -> INSERT_ONLY -> PREPARE_SEND -> (Core persists SUBMITTING) ->
+ * SUBMIT_EXISTING -> VERIFY_AFTER_UNCERTAIN_SUBMIT when required.
+ *
+ * INSERT_AND_SEND remains only as a compatibility mode for non-durable/manual callers.
  */
 (function (root, factory) {
   const api = factory();
@@ -23,7 +29,21 @@
     SUBMISSION_UNCERTAIN: 'SUBMISSION_UNCERTAIN'
   });
 
-  const MODES = new Set(['CHECK_ONLY', 'INSERT_AND_SEND', 'VERIFY_AFTER_UNCERTAIN_SUBMIT']);
+  const MODES = new Set([
+    'CHECK_ONLY',
+    'INSERT_ONLY',
+    'PREPARE_SEND',
+    'SUBMIT_EXISTING',
+    'INSERT_AND_SEND',
+    'VERIFY_AFTER_UNCERTAIN_SUBMIT'
+  ]);
+  const PROMPT_REQUIRED_MODES = new Set([
+    'INSERT_ONLY',
+    'PREPARE_SEND',
+    'SUBMIT_EXISTING',
+    'INSERT_AND_SEND',
+    'VERIFY_AFTER_UNCERTAIN_SUBMIT'
+  ]);
   const CHATGPT_HOSTS = new Set(['chatgpt.com', 'www.chatgpt.com']);
 
   function nowMs() { return Date.now(); }
@@ -61,7 +81,7 @@
     if (!request.requestId || !request.taskId) return 'REQUEST_ID_OR_TASK_ID_MISSING';
     if (!MODES.has(request.mode)) return 'MODE_INVALID';
     if (!normalizeUrl(request.expectedUrl)) return 'EXPECTED_URL_INVALID';
-    if (request.mode === 'INSERT_AND_SEND' && typeof request.promptText !== 'string') return 'PROMPT_MISSING';
+    if (PROMPT_REQUIRED_MODES.has(request.mode) && typeof request.promptText !== 'string') return 'PROMPT_MISSING';
     if (request.mode === 'INSERT_AND_SEND') {
       const delay = Number(request.preSendDelayMs);
       if (!Number.isInteger(delay) || delay < 1000 || delay > 30000) return 'PRE_SEND_DELAY_INVALID';
@@ -193,9 +213,7 @@
     }
     let inserted = false;
     try {
-      if (document.queryCommandSupported?.('insertText')) {
-        inserted = document.execCommand('insertText', false, value);
-      }
+      if (document.queryCommandSupported?.('insertText')) inserted = document.execCommand('insertText', false, value);
     } catch (_) {}
     if (!inserted) {
       el.textContent = value;
@@ -203,17 +221,12 @@
     }
   }
 
-  function hasAttachmentLikeAcceptance(composer, beforeCount) {
+  function attachmentNodes(composer) {
     const root = composer?.closest?.('form') || composer?.parentElement;
-    if (!root?.querySelectorAll) return false;
-    const nodes = Array.from(root.querySelectorAll('[data-testid*="attachment"], [aria-label*="attachment" i], [class*="attachment" i]')).filter(isVisible);
-    return nodes.length > beforeCount;
-  }
-
-  function countAttachmentLike(composer) {
-    const root = composer?.closest?.('form') || composer?.parentElement;
-    if (!root?.querySelectorAll) return 0;
-    return Array.from(root.querySelectorAll('[data-testid*="attachment"], [aria-label*="attachment" i], [class*="attachment" i]')).filter(isVisible).length;
+    if (!root?.querySelectorAll) return [];
+    return Array.from(root.querySelectorAll(
+      '[data-testid*="attachment"], [aria-label*="attachment" i], [class*="attachment" i]'
+    )).filter(isVisible);
   }
 
   function latestUserMessages(doc) {
@@ -253,53 +266,116 @@
     });
   }
 
-  async function verifyAfterUncertain(doc, request, start) {
-    const found = findVisibleComposer(doc);
-    if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
-    const prompt = typeof request.promptText === 'string' ? request.promptText : '';
-    const recent = latestUserMessages(doc).slice(-5);
-    if (prompt && recent.some((el) => textOf(el).trim() === prompt.trim())) {
-      return resultBase(request, start, { status: STATUS.SENT_VERIFIED, submissionEvidence: 'NEW_USER_MESSAGE_MATCH', safeDiagnosticCode: 'RECOVERY_MESSAGE_FOUND' });
+  function requireExpectedPage(doc, request, start, suffix) {
+    if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_MISMATCH' + (suffix || '') });
     }
-    if (found.element && prompt && editorText(found.element).trim() === prompt.trim()) {
-      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, submissionEvidence: 'NONE', safeDiagnosticCode: 'RECOVERY_PROMPT_PENDING' });
-    }
-    return resultBase(request, start, { status: STATUS.SUBMISSION_UNCERTAIN, submissionEvidence: 'UNCERTAIN', safeDiagnosticCode: 'RECOVERY_UNCERTAIN' });
+    const blocking = detectBlockingState(doc);
+    if (blocking) return resultBase(request, start, { status: blocking.status, safeDiagnosticCode: blocking.code + (suffix || '') });
+    return null;
   }
 
-  async function insertAndSend(doc, request, start, deps) {
-    let state = inspect(doc, request, start);
-    if (state.status !== STATUS.READY) return state;
+  async function insertOnly(doc, request, start, deps) {
+    const blocked = requireExpectedPage(doc, request, start, '_BEFORE_INSERT');
+    if (blocked) return blocked;
 
     let found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_LOST_BEFORE_INSERT' });
-    const composer = found.element;
-    const beforeAttachments = countAttachmentLike(composer);
-    composer.focus?.();
-    setNativeValue(composer, request.promptText);
+    if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
+    if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY' });
+
+    const existing = editorText(found.element);
+    if (existing === request.promptText) {
+      return resultBase(request, start, {
+        status: STATUS.INSERTED_NOT_SENT,
+        composerState: 'VISIBLE_NONEMPTY',
+        safeDiagnosticCode: 'PROMPT_ALREADY_INSERTED_MATCH'
+      });
+    }
+    if (existing) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: 'VISIBLE_NONEMPTY',
+        safeDiagnosticCode: 'COMPOSER_CONTAINS_OTHER_CONTENT'
+      });
+    }
+
+    const beforeAttachments = attachmentNodes(found.element).length;
+    found.element.focus?.();
+    setNativeValue(found.element, request.promptText);
     await (deps.wait || wait)(50);
 
     found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous) return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT' });
-
-    const textAccepted = editorText(found.element) === request.promptText;
-    const attachmentAccepted = !textAccepted && hasAttachmentLikeAcceptance(found.element, beforeAttachments);
-    if (!textAccepted && !attachmentAccepted) {
-      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, composerState: 'UNKNOWN', safeDiagnosticCode: 'INSERTION_NOT_PROVEN' });
+    if (!found.element || found.ambiguous) {
+      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT' });
     }
 
-    await (deps.wait || wait)(request.preSendDelayMs);
-    if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
-      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_CHANGED_DURING_DELAY' });
+    if (editorText(found.element) === request.promptText) {
+      return resultBase(request, start, {
+        status: STATUS.INSERTED_NOT_SENT,
+        composerState: 'VISIBLE_NONEMPTY',
+        safeDiagnosticCode: 'INSERTION_TEXT_PROVEN'
+      });
     }
-    const blocking = detectBlockingState(doc);
-    if (blocking) return resultBase(request, start, { status: blocking.status, safeDiagnosticCode: blocking.code + '_DURING_DELAY' });
 
-    found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_PRE_SEND' });
+    if (attachmentNodes(found.element).length > beforeAttachments) {
+      return resultBase(request, start, {
+        status: STATUS.INSERTED_NOT_SENT,
+        composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+        safeDiagnosticCode: 'INSERTION_ATTACHMENT_LIKE_PROVEN'
+      });
+    }
+
+    return resultBase(request, start, {
+      status: STATUS.INSERTED_NOT_SENT,
+      composerState: 'UNKNOWN',
+      safeDiagnosticCode: 'INSERTION_NOT_PROVEN'
+    });
+  }
+
+  function prepareSend(doc, request, start) {
+    const blocked = requireExpectedPage(doc, request, start, '_PRE_SEND');
+    if (blocked) return blocked;
+
+    const found = findVisibleComposer(doc);
+    if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_PRE_SEND' });
+    if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY_PRE_SEND' });
+
+    if (editorText(found.element) !== request.promptText) {
+      return resultBase(request, start, {
+        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        composerState: editorText(found.element) ? 'VISIBLE_NONEMPTY' : 'VISIBLE_EMPTY',
+        safeDiagnosticCode: 'PENDING_PROMPT_MISMATCH_PRE_SEND'
+      });
+    }
+
     const send = findSendButton(doc, found.element);
     if (!send || send.disabled || send.getAttribute?.('aria-disabled') === 'true') {
-      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, sendEvidence: send ? 'SEND_VISIBLE_DISABLED' : 'SEND_ABSENT', safeDiagnosticCode: 'SEND_NOT_ENABLED' });
+      return resultBase(request, start, {
+        status: STATUS.INSERTED_NOT_SENT,
+        sendEvidence: send ? 'SEND_VISIBLE_DISABLED' : 'SEND_ABSENT',
+        safeDiagnosticCode: 'SEND_NOT_ENABLED_PRE_SEND'
+      });
+    }
+
+    return resultBase(request, start, {
+      status: STATUS.READY,
+      composerState: 'VISIBLE_NONEMPTY',
+      sendEvidence: 'SEND_VISIBLE_ENABLED',
+      safeDiagnosticCode: 'PENDING_PROMPT_READY_TO_SUBMIT'
+    });
+  }
+
+  async function submitExisting(doc, request, start, deps) {
+    const ready = prepareSend(doc, request, start);
+    if (ready.status !== STATUS.READY) return ready;
+
+    const found = findVisibleComposer(doc);
+    if (!found.element || found.ambiguous || editorText(found.element) !== request.promptText) {
+      return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
+    }
+    const send = findSendButton(doc, found.element);
+    if (!send || send.disabled || send.getAttribute?.('aria-disabled') === 'true') {
+      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
     const beforeMessages = latestUserMessages(doc).length;
@@ -311,12 +387,55 @@
       if (messages.length > beforeMessages) {
         const latest = messages[messages.length - 1];
         if (textOf(latest).trim() === request.promptText.trim()) {
-          return resultBase(request, start, { status: STATUS.SENT_VERIFIED, submissionEvidence: 'NEW_USER_MESSAGE_MATCH', safeDiagnosticCode: 'SEND_VERIFIED_MESSAGE' });
+          return resultBase(request, start, {
+            status: STATUS.SENT_VERIFIED,
+            submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
+            safeDiagnosticCode: 'SEND_VERIFIED_MESSAGE'
+          });
         }
       }
     }
 
-    return resultBase(request, start, { status: STATUS.SUBMISSION_UNCERTAIN, submissionEvidence: 'UNCERTAIN', safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN' });
+    return resultBase(request, start, {
+      status: STATUS.SUBMISSION_UNCERTAIN,
+      submissionEvidence: 'UNCERTAIN',
+      safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN'
+    });
+  }
+
+  async function verifyAfterUncertain(doc, request, start) {
+    const blocked = requireExpectedPage(doc, request, start, '_RECOVERY');
+    if (blocked && blocked.status !== STATUS.BUSY) return blocked;
+
+    const found = findVisibleComposer(doc);
+    if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
+    const recent = latestUserMessages(doc).slice(-5);
+    if (recent.some((el) => textOf(el).trim() === request.promptText.trim())) {
+      return resultBase(request, start, {
+        status: STATUS.SENT_VERIFIED,
+        submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
+        safeDiagnosticCode: 'RECOVERY_MESSAGE_FOUND'
+      });
+    }
+    if (found.element && editorText(found.element).trim() === request.promptText.trim()) {
+      return resultBase(request, start, {
+        status: STATUS.INSERTED_NOT_SENT,
+        submissionEvidence: 'NONE',
+        safeDiagnosticCode: 'RECOVERY_PROMPT_PENDING'
+      });
+    }
+    return resultBase(request, start, {
+      status: STATUS.SUBMISSION_UNCERTAIN,
+      submissionEvidence: 'UNCERTAIN',
+      safeDiagnosticCode: 'RECOVERY_UNCERTAIN'
+    });
+  }
+
+  async function insertAndSend(doc, request, start, deps) {
+    const inserted = await insertOnly(doc, request, start, deps);
+    if (inserted.status !== STATUS.INSERTED_NOT_SENT || inserted.composerState !== 'VISIBLE_NONEMPTY') return inserted;
+    await (deps.wait || wait)(request.preSendDelayMs);
+    return submitExisting(doc, request, start, deps);
   }
 
   async function execute(request, deps) {
@@ -325,7 +444,11 @@
     if (validation) return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: validation });
     const doc = deps?.document || globalThis.document;
     if (!doc?.querySelectorAll) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'DOCUMENT_UNAVAILABLE' });
+
     if (request.mode === 'CHECK_ONLY') return inspect(doc, request, start);
+    if (request.mode === 'INSERT_ONLY') return insertOnly(doc, request, start, deps || {});
+    if (request.mode === 'PREPARE_SEND') return prepareSend(doc, request, start);
+    if (request.mode === 'SUBMIT_EXISTING') return submitExisting(doc, request, start, deps || {});
     if (request.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT') return verifyAfterUncertain(doc, request, start);
     return insertAndSend(doc, request, start, deps || {});
   }
