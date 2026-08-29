@@ -70,8 +70,8 @@ test('runtime cycle executes RUNNING/RECOVERING sessions in stable order and ski
 
   assert.deepEqual(seen, ['s1', 's3']);
   assert.deepEqual(result.outcomes.map(item => item.sessionId), ['s1', 's3']);
-  assert.equal(chromeApi.calls[0][0], 'clear');
-  assert.equal(chromeApi.calls.at(-1)[0], 'create');
+  assert.equal(chromeApi.calls.length, 1);
+  assert.equal(chromeApi.calls[0][0], 'create');
 });
 
 test('cold-start reconciliation repairs SUBMITTING and re-arms without running an executor', async () => {
@@ -105,7 +105,6 @@ test('cold-start reconciliation repairs SUBMITTING and re-arms without running a
   assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
   assert.equal(result.wakeAt, 5000);
   assert.deepEqual(chromeApi.calls, [
-    ['clear', 'autopilot-core-wake'],
     ['create', 'autopilot-core-wake', 5500],
   ]);
 });

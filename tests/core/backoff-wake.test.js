@@ -42,7 +42,7 @@ test('expired session cooldown cannot defeat task retry backoff', () => {
   assert.equal(computeNextWake(state, now), now + 30_000);
 });
 
-test('canonical alarm follows scheduler retry authority instead of the 500ms floor', async () => {
+test('canonical alarm replaces same-name wake without clearing it first', async () => {
   const now = 300_000;
   const state = stateWithSession(runningSession(now));
   const calls = [];
@@ -56,9 +56,46 @@ test('canonical alarm follows scheduler retry authority instead of the 500ms flo
   const wakeAt = await reconcileAlarm(chromeApi, state, now);
   assert.equal(wakeAt, now + 30_000);
   assert.deepEqual(calls, [
-    ['clear', ALARM_NAME],
     ['create', ALARM_NAME, now + 30_000],
   ]);
+});
+
+test('failed alarm replacement never clears the previous canonical wake first', async () => {
+  const now = 350_000;
+  const state = stateWithSession(runningSession(now));
+  const calls = [];
+  const chromeApi = {
+    alarms: {
+      async clear(name) { calls.push(['clear', name]); return true; },
+      async create(name, options) {
+        calls.push(['create', name, options.when]);
+        throw new Error('synthetic alarm create failure');
+      },
+    },
+  };
+
+  await assert.rejects(
+    reconcileAlarm(chromeApi, state, now),
+    /synthetic alarm create failure/,
+  );
+  assert.deepEqual(calls, [
+    ['create', ALARM_NAME, now + 30_000],
+  ]);
+});
+
+test('quiescent durable state clears the canonical alarm', async () => {
+  const now = 375_000;
+  const calls = [];
+  const chromeApi = {
+    alarms: {
+      async clear(name) { calls.push(['clear', name]); return true; },
+      async create(name, options) { calls.push(['create', name, options.when]); },
+    },
+  };
+
+  const wakeAt = await reconcileAlarm(chromeApi, createEmptyState(1), now);
+  assert.equal(wakeAt, null);
+  assert.deepEqual(calls, [['clear', ALARM_NAME]]);
 });
 
 test('a currently eligible task still requests an immediate runtime cycle', () => {
