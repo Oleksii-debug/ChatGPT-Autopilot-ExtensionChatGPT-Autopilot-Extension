@@ -200,33 +200,88 @@
     return String(el?.innerText ?? el?.textContent ?? '');
   }
 
+  function eventConstructor(doc, preferred) {
+    const view = doc?.defaultView;
+    if (preferred === 'input' && typeof view?.InputEvent === 'function') return view.InputEvent;
+    if (preferred === 'input' && typeof globalThis.InputEvent === 'function') return globalThis.InputEvent;
+    if (typeof view?.Event === 'function') return view.Event;
+    if (typeof globalThis.Event === 'function') return globalThis.Event;
+    return null;
+  }
+
+  function dispatchEditorEvent(el, type, init) {
+    const doc = el?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const EventCtor = eventConstructor(doc, type === 'input' || type === 'beforeinput' ? 'input' : 'event');
+    if (!EventCtor || typeof el?.dispatchEvent !== 'function') return true;
+    try {
+      return el.dispatchEvent(new EventCtor(type, init));
+    } catch (_) {
+      try {
+        const BasicCtor = eventConstructor(doc, 'event');
+        return BasicCtor ? el.dispatchEvent(new BasicCtor(type, { bubbles: true })) : true;
+      } catch (_) {
+        return true;
+      }
+    }
+  }
+
   function setNativeValue(el, value) {
     const tag = String(el.tagName || '').toLowerCase();
+    const doc = el?.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const view = doc?.defaultView || globalThis;
     if (tag === 'textarea' || tag === 'input') {
-      const proto = tag === 'textarea' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-      const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+      const NativeCtor = tag === 'textarea'
+        ? (view?.HTMLTextAreaElement || globalThis.HTMLTextAreaElement)
+        : (view?.HTMLInputElement || globalThis.HTMLInputElement);
+      const descriptor = NativeCtor?.prototype
+        ? Object.getOwnPropertyDescriptor(NativeCtor.prototype, 'value')
+        : null;
       if (descriptor?.set) descriptor.set.call(el, value);
       else el.value = value;
-      el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
+      dispatchEditorEvent(el, 'input', { bubbles: true, composed: true, inputType: 'insertText', data: value });
+      dispatchEditorEvent(el, 'change', { bubbles: true });
       return;
     }
 
     el.focus?.();
-    const selection = globalThis.getSelection?.();
-    if (selection && typeof document !== 'undefined') {
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      selection.removeAllRanges();
-      selection.addRange(range);
+    const selection = view?.getSelection?.() || globalThis.getSelection?.();
+    if (selection && typeof doc?.createRange === 'function') {
+      try {
+        const range = doc.createRange();
+        range.selectNodeContents(el);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } catch (_) {}
     }
+
+    // The live ChatGPT composer is contenteditable/ProseMirror-like. Prefer its own
+    // document editing transaction when available. queryCommandSupported() is advisory
+    // and can report false even when insertText is usable, so do not gate on it.
     let inserted = false;
     try {
-      if (document.queryCommandSupported?.('insertText')) inserted = document.execCommand('insertText', false, value);
+      if (typeof doc?.execCommand === 'function') {
+        inserted = doc.execCommand('insertText', false, value) === true;
+      }
     } catch (_) {}
+
     if (!inserted) {
+      // Fallback remains fail-closed at the caller: INSERT_ONLY must re-observe the exact
+      // editor text (or reviewed attachment evidence) before reporting insertion proof.
+      const allowed = dispatchEditorEvent(el, 'beforeinput', {
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: value
+      });
+      if (allowed === false) return;
       el.textContent = value;
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: value }));
+      dispatchEditorEvent(el, 'input', {
+        bubbles: true,
+        composed: true,
+        inputType: 'insertText',
+        data: value
+      });
     }
   }
 
