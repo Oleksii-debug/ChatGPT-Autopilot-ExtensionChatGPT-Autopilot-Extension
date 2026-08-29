@@ -1,0 +1,36 @@
+import { RunMode, RunState } from './schema.js';
+
+function eligibleTask(session, task, now) {
+  return task.enabled && !task.manualReviewReason && (task.retryAfterAt || 0) <= now && !(session.runMode === RunMode.ONE_PASS && session.onePassCompletedTaskIds.includes(task.id));
+}
+
+export function selectNextTask(session, now = Date.now()) {
+  if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) return { kind: 'IDLE' };
+  if (session.nextAllowedSendAt > now) return { kind: 'COOLDOWN', wakeAt: session.nextAllowedSendAt };
+  const n = session.taskOrder.length;
+  let earliestRetry = Infinity;
+  for (let offset = 0; offset < n; offset++) {
+    const index = (session.currentTaskIndex + offset) % n;
+    const task = session.tasksById[session.taskOrder[index]];
+    if ((task.retryAfterAt || 0) > now) earliestRetry = Math.min(earliestRetry, task.retryAfterAt);
+    if (eligibleTask(session, task, now)) return { kind: 'TASK', index, task };
+  }
+  if (session.runMode === RunMode.ONE_PASS) return { kind: 'COMPLETE' };
+  return earliestRetry < Infinity ? { kind: 'WAIT', wakeAt: earliestRetry } : { kind: 'WAIT', wakeAt: now + session.busyCheckDelayMs };
+}
+
+export function advanceAfterBusy(session, taskIndex, now = Date.now()) {
+  session.currentTaskIndex = (taskIndex + 1) % session.taskOrder.length;
+  session.lastActionAt = now;
+  return session;
+}
+
+export function advanceAfterVerifiedSend(session, taskIndex, verifiedSendTime) {
+  const taskId = session.taskOrder[taskIndex];
+  session.currentTaskIndex = (taskIndex + 1) % session.taskOrder.length;
+  session.lastSuccessfulSendAt = verifiedSendTime;
+  session.lastActionAt = verifiedSendTime;
+  session.nextAllowedSendAt = verifiedSendTime + session.minimumSendIntervalMs;
+  if (session.runMode === RunMode.ONE_PASS && !session.onePassCompletedTaskIds.includes(taskId)) session.onePassCompletedTaskIds.push(taskId);
+  return session;
+}
