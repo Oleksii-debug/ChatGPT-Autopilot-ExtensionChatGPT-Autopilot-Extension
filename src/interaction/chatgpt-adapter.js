@@ -233,13 +233,28 @@
     )).filter(isVisible);
   }
 
-  function latestUserMessages(doc) {
+  function semanticUserMessages(doc) {
     return Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
-      .filter(isVisible)
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         return role === 'user' || /you said|user/.test(accessibleName(el));
       });
+  }
+
+  function latestUserMessages(doc) {
+    return semanticUserMessages(doc).filter(isVisible);
+  }
+
+  function userMessageHistorySnapshot(doc) {
+    return semanticUserMessages(doc).map((el) => textOf(el).trim());
+  }
+
+  function hasStrictAppendedPrompt(before, after, promptText) {
+    if (after.length !== before.length + 1) return false;
+    for (let i = 0; i < before.length; i += 1) {
+      if (after[i] !== before[i]) return false;
+    }
+    return after[after.length - 1] === String(promptText).trim();
   }
 
   function resultBase(request, start, extra) {
@@ -382,22 +397,47 @@
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
-    const beforeMessages = latestUserMessages(doc).length;
+    // Snapshot semantic history before the only effectful Interaction call. Hidden or
+    // temporarily non-visible existing user messages are part of the baseline so they
+    // cannot later masquerade as a new operation-local submission merely by becoming visible.
+    const beforeMessages = userMessageHistorySnapshot(doc);
     send.click();
     const verifyDeadline = nowMs() + 5000;
     while (nowMs() < verifyDeadline) {
       await (deps.wait || wait)(100);
-      const messages = latestUserMessages(doc);
-      if (messages.length > beforeMessages) {
-        const latest = messages[messages.length - 1];
-        if (textOf(latest).trim() === request.promptText.trim()) {
-          return resultBase(request, start, {
-            status: STATUS.SENT_VERIFIED,
-            submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
-            safeDiagnosticCode: 'SEND_VERIFIED_MESSAGE'
-          });
-        }
+
+      if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'UNCERTAIN',
+          safeDiagnosticCode: 'URL_CHANGED_AFTER_SEND_CLICK'
+        });
       }
+
+      const messages = userMessageHistorySnapshot(doc);
+      if (!hasStrictAppendedPrompt(beforeMessages, messages, request.promptText)) continue;
+
+      const postFound = findVisibleComposer(doc);
+      if (postFound.ambiguous) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'UNCERTAIN',
+          safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
+        });
+      }
+      if (postFound.element && editorText(postFound.element).trim() === request.promptText.trim()) {
+        return resultBase(request, start, {
+          status: STATUS.SUBMISSION_UNCERTAIN,
+          submissionEvidence: 'PROMPT_STILL_PENDING',
+          safeDiagnosticCode: 'POST_CLICK_PROMPT_STILL_PENDING'
+        });
+      }
+
+      return resultBase(request, start, {
+        status: STATUS.SENT_VERIFIED,
+        submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
+        safeDiagnosticCode: 'SEND_VERIFIED_OPERATION_LOCAL_APPEND'
+      });
     }
 
     return resultBase(request, start, {
