@@ -20,6 +20,26 @@ function orderedSessionIds(state) {
   return ids;
 }
 
+async function prepareStartupState(repository, executionAvailable, now) {
+  return repository.update(draft => {
+    reconcileStateForStartup(draft, now());
+    if (!executionAvailable) suspendActiveSessionsWhenExecutionUnavailable(draft, now());
+    return draft;
+  });
+}
+
+export async function reconcileRuntimeColdStart({
+  repository,
+  chromeApi,
+  executionAvailable = false,
+  now = () => Date.now(),
+}) {
+  if (!repository || !chromeApi) throw new Error('Runtime cold-start dependencies are required');
+  const state = await prepareStartupState(repository, executionAvailable, now);
+  const wakeAt = await reconcileAlarm(chromeApi, state, now());
+  return { state, wakeAt };
+}
+
 async function persistRuntimeFailure(repository, sessionId, now) {
   await repository.update(draft => {
     const session = draft.sessionsById?.[sessionId];
@@ -51,16 +71,9 @@ export async function runRuntimeCycle({
 }) {
   if (!repository || !chromeApi || !executor) throw new Error('Runtime dependencies are required');
 
-  let state;
-  if (startup) {
-    state = await repository.update(draft => {
-      reconcileStateForStartup(draft, now());
-      if (!executionAvailable) suspendActiveSessionsWhenExecutionUnavailable(draft, now());
-      return draft;
-    });
-  } else {
-    state = await repository.load();
-  }
+  const state = startup
+    ? await prepareStartupState(repository, executionAvailable, now)
+    : await repository.load();
 
   const outcomes = [];
   if (executionAvailable) {
