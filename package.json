@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "test:ui": "node --test tests/ui/options-contract.test.js"
+    "test:ui": "node --test tests/ui/options-contract.test.js",
+    "test:release": "node --test tests/release/*.test.js",
+    "package:release": "node scripts/package-release.mjs"
   }
 }
