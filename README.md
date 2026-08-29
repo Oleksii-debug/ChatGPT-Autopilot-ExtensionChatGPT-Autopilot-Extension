@@ -49,7 +49,7 @@ Run the focused packaging gate with:
 npm run test:release
 ```
 
-GitHub Actions also builds the same canonical ZIP as the `ChatGPT-Autopilot-Extension-v0.1` workflow artifact for release-candidate verification.
+GitHub Actions also builds the same canonical ZIP as the `ChatGPT-Autopilot-Extension-v0.1` workflow artifact for release-candidate verification. Use the `SHA256:` line printed by `npm run package:release` to verify the canonical inner ZIP; GitHub also reports a separate digest for its downloadable artifact wrapper, and the two hashes are not expected to match.
 
 ## Load the unpacked candidate in Chrome on Windows 11 with NVDA
 
