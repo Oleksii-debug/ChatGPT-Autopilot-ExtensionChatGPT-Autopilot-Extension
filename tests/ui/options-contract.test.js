@@ -65,7 +65,14 @@ test('validation uses aria-invalid, aria-describedby and deterministic focus', (
   assert.match(js, /\$\(errors\[0\]\[0\]\)\?\.focus\(\)/);
 });
 
-test('cross-session status listener does not intentionally move focus to an unrelated session', () => {
-  assert.match(js, /if \(message\.sessionId === ui\.selectedSessionId\) openSession\(ui\.selectedSessionId\)/);
-  assert.match(js, /loadSessions\(\)/);
+test('background status refresh does not reopen the selected session or steal editor focus', () => {
+  assert.match(js, /async function refreshSelectedSessionStatus\(sessionId\)/);
+  assert.match(js, /renderStatus\(\);\s*renderLog\(\);\s*renderActions\(\);/s);
+  assert.match(js, /if \(message\.sessionId === ui\.selectedSessionId\) void refreshSelectedSessionStatus\(ui\.selectedSessionId\)/);
+  assert.doesNotMatch(js, /if \(message\.sessionId === ui\.selectedSessionId\) openSession\(ui\.selectedSessionId\)/);
+});
+
+test('session-list refresh restores the same control by stable id when list DOM is replaced', () => {
+  assert.match(js, /const activeId = preserveFocus \? active\?\.id \|\| null : null/);
+  assert.match(js, /else if \(activeId\) \$\(activeId\)\?\.focus\(\)/);
 });
