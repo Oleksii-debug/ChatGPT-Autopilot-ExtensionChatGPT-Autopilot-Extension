@@ -263,7 +263,11 @@ async function saveSession() {
 async function createSession() {
   try {
     const data = await core('CREATE_SESSION', { config: blankSession() });
-    await loadSessions({ preserveFocus: false }); await openSession(data.session.id); $('session-name').select(); announce('Session created.');
+    await loadSessions({ preserveFocus: false });
+    await openSession(data.session.id);
+    $('session-name').focus();
+    $('session-name').select();
+    announce('Session created.');
   } catch (error) { setAppStatus(error.message); announce(error.message); }
 }
 async function renameSession(id) { await openSession(id); $('session-name').focus(); $('session-name').select(); announce('Edit the session name, then save.'); }
