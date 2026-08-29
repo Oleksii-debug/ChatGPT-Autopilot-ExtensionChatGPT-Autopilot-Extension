@@ -1,1 +1,0 @@
-Implementation intentionally remains narrow: only the exact informational “Too many requests” modal with the expected acknowledgement label may be dismissed. All other dialogs remain untouched.
