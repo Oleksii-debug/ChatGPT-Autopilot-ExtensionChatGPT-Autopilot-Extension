@@ -1,0 +1,34 @@
+name: Core deterministic tests
+
+on:
+  push:
+    branches: ["core/v01-bootstrap-state-scheduler"]
+    paths:
+      - "src/core/**"
+      - "src/shared/**"
+      - "src/background/**"
+      - "tests/core/**"
+      - "manifest.json"
+      - "package.json"
+      - ".github/workflows/core-tests.yml"
+  pull_request:
+    paths:
+      - "src/core/**"
+      - "src/shared/**"
+      - "src/background/**"
+      - "tests/core/**"
+      - "manifest.json"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test
