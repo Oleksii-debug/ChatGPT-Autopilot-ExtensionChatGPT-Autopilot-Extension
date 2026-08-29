@@ -1,0 +1,1 @@
+Scope: content-script interaction bridge only. No Core scheduler, storage schema, tab strategy, execution gate, or ChatGPT adapter send semantics changed.
