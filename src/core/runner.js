@@ -2,8 +2,10 @@ import { acquireSendLease, releaseSendLease } from './arbiter.js';
 import { applyInteractionResult } from './execution.js';
 import { createOperationId, createPromptFingerprint } from './fingerprint.js';
 import { InteractionResult } from '../shared/protocol.js';
-import { OperationPhase } from './schema.js';
+import { OperationPhase, RunState } from './schema.js';
 import { beginOperation, markSubmitting } from './state-machine.js';
+
+const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 
 function requireSession(state, sessionId) {
   const session = state.sessionsById[sessionId];
@@ -114,6 +116,7 @@ export class DurableSubmissionCoordinator {
     await this.repo.update(draft => {
       const session = requireSession(draft, sessionId);
       const operation = requireOperation(session, operationId);
+      if (!ACTIVE_STATES.has(session.runState)) throw new Error('Session is not active for submit');
       if (operation.phase !== OperationPhase.PRE_SEND_WAIT) throw new Error('Operation is not waiting to submit');
       if (operation.preSendDeadline > submitStartedAt) throw new Error('Pre-send delay has not elapsed');
       if (!acquireSendLease(draft, { sessionId, operationId, now: submitStartedAt })) {
