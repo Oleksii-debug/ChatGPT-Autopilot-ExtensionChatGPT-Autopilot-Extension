@@ -4,11 +4,11 @@ Local Chrome Manifest V3 extension for durable, keyboard-first multi-session Cha
 
 ## Current status
 
-`ACTIVE_DEVELOPMENT`
+`RELEASE_CANDIDATE / HUMAN_ACCEPTANCE_PENDING`
 
 The current integration line contains the versioned Session/Task state model, deterministic scheduler, restart recovery, accessible options UI, semantic ChatGPT interaction adapter, durable phased executor, and service-worker startup/alarm wiring.
 
-Automatic execution is intentionally still release-gated with `EXECUTION_AVAILABLE=false`. The executor is present, but Start/Resume must remain fail closed until the exact integrated production candidate passes the remaining release gates. Packaging a candidate does not enable automatic Send and does not make v0.1 ready.
+Automatic production execution is enabled in the canonical service worker after the integrated deterministic release gates passed on the enabled runtime line. This does not by itself make v0.1 ready: the exact candidate still requires bounded real-Chrome smoke plus real Windows 11 + NVDA human acceptance before `V01_READY=true` may be claimed.
 
 `HUMAN_TESTED=false`
 
