@@ -21,6 +21,31 @@ function setup() {
   return state;
 }
 
+function setupPreSend(now = 100000) {
+  const state = setup();
+  const session = state.sessionsById.s1;
+  const task = session.tasksById.t1;
+  session.operation = {
+    operationId: 'op1', sessionId: 's1', taskId: 't1', promptFingerprint: 'fp', promptText: 'hello',
+    phase: OperationPhase.PRE_SEND_WAIT, targetUrl: task.normalizedUrl, createdAt: 1, updatedAt: 2,
+    preSendDeadline: now - 1, submitStartedAt: 0, verificationDeadline: 0,
+  };
+  return state;
+}
+
+function setupAmbiguous() {
+  const state = setup();
+  const session = state.sessionsById.s1;
+  session.runState = RunState.RECOVERING;
+  session.operation = {
+    operationId:'op1', sessionId:'s1', taskId:'t1', promptFingerprint:'fp', promptText:'hello',
+    phase:OperationPhase.AMBIGUOUS, targetUrl:'https://chatgpt.com/c/example', createdAt:1, updatedAt:2,
+    preSendDeadline:0, submitStartedAt:2, verificationDeadline:0,
+  };
+  state.sendArbiter.lease = { ownerSessionId:'s1', operationId:'op1', acquiredAt:2, expiresAt:9999 };
+  return state;
+}
+
 const chromeApi = { tabs: {
   async get() { return { id: 7, url: 'https://chatgpt.com/c/example' }; },
   async query() { return [{ id: 7, url: 'https://chatgpt.com/c/example' }]; },
@@ -44,11 +69,7 @@ test('executor persists pre-send wait after verified insertion', async () => {
 });
 
 test('executor verifies ambiguous operation before any new insertion', async () => {
-  const state = setup();
-  state.sessionsById.s1.runState = RunState.RECOVERING;
-  state.sessionsById.s1.operation = { operationId:'op1', sessionId:'s1', taskId:'t1', promptFingerprint:'fp', promptText:'hello', phase:OperationPhase.AMBIGUOUS, targetUrl:'https://chatgpt.com/c/example', createdAt:1, updatedAt:2, preSendDeadline:0, submitStartedAt:2, verificationDeadline:0 };
-  state.sendArbiter.lease = { ownerSessionId:'s1', operationId:'op1', acquiredAt:2, expiresAt:9999 };
-  const repo = new Repo(state);
+  const repo = new Repo(setupAmbiguous());
   const modes = [];
   const transport = { async execute(_tab, request) { modes.push(request.mode); return { status: InteractionResult.SENT_VERIFIED }; } };
   const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
@@ -56,4 +77,86 @@ test('executor verifies ambiguous operation before any new insertion', async () 
   assert.equal(result.kind, 'RECOVERED_SENT');
   assert.deepEqual(modes, ['VERIFY_AFTER_UNCERTAIN_SUBMIT']);
   assert.equal((await repo.load()).sendArbiter.lease, null);
+});
+
+test('pause committed during CHECK_ONLY prevents INSERT_ONLY and new operation creation', async () => {
+  const repo = new Repo(setup());
+  const modes = [];
+  const transport = { async execute(_tab, request) {
+    modes.push(request.mode);
+    if (request.mode === 'CHECK_ONLY') {
+      await repo.update(draft => {
+        draft.sessionsById.s1.runState = RunState.PAUSED;
+        return draft;
+      });
+      return { status: InteractionResult.READY };
+    }
+    throw new Error('INSERT_ONLY must not run after pause');
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  const result = await executor.runSessionOnce('s1');
+  const after = await repo.load();
+  assert.equal(result.kind, 'QUIESCED');
+  assert.deepEqual(modes, ['CHECK_ONLY']);
+  assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
+  assert.ok(!after.sessionsById.s1.operation || [OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE].includes(after.sessionsById.s1.operation.phase));
+});
+
+test('stop committed during PREPARE_SEND prevents SUBMITTING lease and SUBMIT_EXISTING', async () => {
+  const now = 100000;
+  const repo = new Repo(setupPreSend(now));
+  const modes = [];
+  const transport = { async execute(_tab, request) {
+    modes.push(request.mode);
+    if (request.mode === 'PREPARE_SEND') {
+      await repo.update(draft => {
+        draft.sessionsById.s1.runState = RunState.STOPPED;
+        return draft;
+      });
+      return { status: InteractionResult.READY };
+    }
+    throw new Error('SUBMIT_EXISTING must not run after stop');
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => now, cryptoApi: webcrypto });
+  const result = await executor.runSessionOnce('s1');
+  const after = await repo.load();
+  assert.equal(result.kind, 'QUIESCED');
+  assert.deepEqual(modes, ['PREPARE_SEND']);
+  assert.equal(after.sessionsById.s1.runState, RunState.STOPPED);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
+  assert.equal(after.sendArbiter.lease, null);
+});
+
+test('pause during ambiguous verification preserves PAUSED while reconciling SENT_VERIFIED', async () => {
+  const repo = new Repo(setupAmbiguous());
+  const transport = { async execute(_tab, request) {
+    assert.equal(request.mode, 'VERIFY_AFTER_UNCERTAIN_SUBMIT');
+    await repo.update(draft => {
+      draft.sessionsById.s1.runState = RunState.PAUSED;
+      return draft;
+    });
+    return { status: InteractionResult.SENT_VERIFIED };
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  await executor.runSessionOnce('s1');
+  const after = await repo.load();
+  assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.SENT_VERIFIED);
+});
+
+test('stop during ambiguous verification preserves STOPPED while retaining pending prompt evidence', async () => {
+  const repo = new Repo(setupAmbiguous());
+  const transport = { async execute(_tab, request) {
+    assert.equal(request.mode, 'VERIFY_AFTER_UNCERTAIN_SUBMIT');
+    await repo.update(draft => {
+      draft.sessionsById.s1.runState = RunState.STOPPED;
+      return draft;
+    });
+    return { status: InteractionResult.INSERTED_NOT_SENT };
+  } };
+  const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
+  await executor.runSessionOnce('s1');
+  const after = await repo.load();
+  assert.equal(after.sessionsById.s1.runState, RunState.STOPPED);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
 });
