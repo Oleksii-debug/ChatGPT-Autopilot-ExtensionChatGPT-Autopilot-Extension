@@ -46,7 +46,11 @@ function blankSession() {
   };
 }
 
-function setAppStatus(text) { $('app-status').textContent = text; }
+function setAppStatus(text) {
+  const status = $('app-status');
+  if (status.textContent === text) return;
+  status.textContent = text;
+}
 function clone(value) { return structuredClone(value); }
 
 async function loadSessions({ preserveFocus = true } = {}) {
