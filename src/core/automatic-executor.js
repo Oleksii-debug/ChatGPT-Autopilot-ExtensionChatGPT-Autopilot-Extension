@@ -8,6 +8,7 @@ import { InteractionResult } from '../shared/protocol.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
+const INSERTION_RECOVERY_MESSAGE = 'Insertion was interrupted before proof; safe retry scheduled.';
 
 function requireSession(state, sessionId) {
   const session = state.sessionsById[sessionId];
@@ -78,6 +79,51 @@ export class AutomaticSessionExecutor {
       applyInteractionResult(session, taskIndex(session, taskId), result, { now, promptFingerprint });
       return draft;
     });
+  }
+
+  async recoverInterruptedInsertion(sessionId, session) {
+    const operation = session.operation;
+    const expectedOperation = {
+      operationId: operation.operationId,
+      taskId: operation.taskId,
+      promptFingerprint: operation.promptFingerprint,
+    };
+    const task = session.tasksById[operation.taskId];
+    const retryAfterAt = task?.retryAfterAt || 0;
+    const now = this.now();
+    if (retryAfterAt > now) {
+      return { kind: 'WAIT_INSERTION_RECOVERY', wakeAt: retryAfterAt };
+    }
+
+    let recovered = false;
+    let wakeAt = null;
+    let quiescedState = null;
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      if (!ACTIVE_STATES.has(live.runState)) {
+        quiescedState = live.runState;
+        return draft;
+      }
+      if (!matchesOperation(live.operation, expectedOperation, OperationPhase.INSERTING)) return draft;
+      const liveTask = live.tasksById[expectedOperation.taskId];
+      if (!liveTask) return draft;
+
+      wakeAt = now + Math.max(1000, live.retryBackoffMs || 30000);
+      live.operation.phase = OperationPhase.FAILED_SAFE;
+      live.operation.updatedAt = now;
+      liveTask.status = 'RETRY_WAIT';
+      liveTask.retryAfterAt = Math.max(liveTask.retryAfterAt || 0, wakeAt);
+      live.lastError = INSERTION_RECOVERY_MESSAGE;
+      live.lastActionAt = now;
+      live.updatedAt = now;
+      resumeUnlessQuiesced(live, live.runState);
+      recovered = true;
+      return draft;
+    });
+
+    if (quiescedState) return { kind: 'QUIESCED', runState: quiescedState };
+    if (!recovered) return { kind: 'OPERATION_CHANGED' };
+    return { kind: 'INSERTION_RECOVERY_SCHEDULED', wakeAt };
   }
 
   async recoverAmbiguous(sessionId, session) {
@@ -238,6 +284,9 @@ export class AutomaticSessionExecutor {
 
     if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
       return this.recoverAmbiguous(sessionId, session);
+    }
+    if (session.operation?.phase === OperationPhase.INSERTING) {
+      return this.recoverInterruptedInsertion(sessionId, session);
     }
     if (session.operation?.phase === OperationPhase.PRE_SEND_WAIT) {
       return this.continuePreSend(sessionId, session);
