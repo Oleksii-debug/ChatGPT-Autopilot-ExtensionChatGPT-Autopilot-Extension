@@ -37,13 +37,38 @@ test('timing bounds are enforced by the JS Save validation path', () => {
   assert.match(js, /session\.retryBackoffSeconds\s*>=\s*5\s*&&\s*session\.retryBackoffSeconds\s*<=\s*3600/);
 });
 
-test('session controls and delete dialog are present', () => {
-  for (const id of ['create-session-button','save-session-button','start-session-button','pause-session-button','resume-session-button','stop-session-button','clear-log-button']) {
+test('session and master runtime controls are present', () => {
+  for (const id of ['create-session-button','save-session-button','start-session-button','pause-session-button','resume-session-button','stop-session-button','master-pause-button','master-resume-button','clear-log-button']) {
     assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
   }
   has(/id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading"/);
   assert.match(js, /function trapDialog\(event\)/);
   assert.match(js, /ui\.deleteReturnFocus/);
+});
+
+test('runtime command outcome remains in persistent normal text', () => {
+  has(/<p id="command-result" tabindex="0">No runtime command has been issued\.<\/p>/, 'persistent command result missing');
+  assert.match(js, /function setCommandResult\(text\) \{ \$\('command-result'\)\.textContent = text; \}/);
+  assert.match(js, /reportCommandResult\(`Command failed: \$\{error\.message\}`\)/);
+  assert.match(js, /const data = await core\(command, \{ sessionId: ui\.selectedSessionId \}\);[\s\S]*reportCommandResult\(`Core acknowledged \$\{label\}/, 'session command success must follow Core acknowledgement');
+  assert.match(js, /const data = await core\(command\);[\s\S]*data\?\.masterPaused !== expectedMasterPaused[\s\S]*reportCommandResult\(`Core acknowledged \$\{label\}/, 'master command success must follow Core acknowledgement');
+});
+
+test('runtime status renders Core read-model fields without a UI state machine', () => {
+  for (const field of ['currentTaskStatus','operationPhase','lastAction','lastActionAt','nextAllowedSendAt','currentTaskRetryAt','currentTaskManualReviewReason','lastError']) {
+    assert.ok(js.includes(`s.${field}`), `missing Core status field ${field}`);
+  }
+  assert.match(js, /\['Session state', ui\.selected\.runState \|\| 'STOPPED'\]/);
+  assert.doesNotMatch(js, /switch\s*\(\s*ui\.selected\.runState/);
+  assert.doesNotMatch(js, /case\s+'RATE_LIMITED'/);
+  assert.doesNotMatch(js, /case\s+'RETRY_WAIT'/);
+});
+
+test('bounded Core log remains keyboard-readable and reports its visible entry count', () => {
+  has(/id="session-log-bound">Core retains a bounded session log\.<\/p>/);
+  has(/id="session-log-count">0 Core log entries shown\.<\/p>/);
+  assert.match(js, /const entries = ui\.selected\.log \|\| \[\]/);
+  assert.match(js, /\$\('session-log-count'\)\.textContent/);
 });
 
 test('dynamic tasks are capped, ordered, labelled and focus-managed in implementation', () => {
@@ -57,7 +82,7 @@ test('dynamic tasks are capped, ordered, labelled and focus-managed in implement
 
 test('UI talks to Core by message protocol rather than owning scheduler/storage', () => {
   assert.match(js, /chrome\.runtime\.sendMessage/);
-  for (const command of ['LIST_SESSIONS','GET_SESSION','CREATE_SESSION','UPDATE_SESSION','START_SESSION','PAUSE_SESSION','RESUME_SESSION','STOP_SESSION','DELETE_SESSION']) {
+  for (const command of ['LIST_SESSIONS','GET_SESSION','CREATE_SESSION','UPDATE_SESSION','START_SESSION','PAUSE_SESSION','RESUME_SESSION','STOP_SESSION','DELETE_SESSION','MASTER_PAUSE','MASTER_RESUME']) {
     assert.ok(js.includes(`'${command}'`), `missing Core command ${command}`);
   }
   assert.doesNotMatch(js, /chrome\.storage/);
