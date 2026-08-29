@@ -265,3 +265,54 @@ test('uncertain submit can recover only from the same operation baseline and rep
   assert.equal(recovered.status, adapter.STATUS.SENT_VERIFIED);
   assert.equal(recovered.safeDiagnosticCode, 'RECOVERY_BOUND_REPRESENTATION_VERIFIED');
 });
+
+test('content-script restart before Send discards attachment proof and fails closed', async () => {
+  const beforeRestart = loadAdapter();
+  const fx = fixture({ transform({ composer, attachments }) {
+    composer._value = '';
+    attachments.push(attachment());
+  } });
+  let sendClicks = 0;
+  fx.send.click = () => { sendClicks += 1; };
+
+  const inserted = await beforeRestart.execute(request('INSERT_ONLY'), { document: fx.document, wait: async () => {} });
+  assert.equal(inserted.status, beforeRestart.STATUS.INSERTED_NOT_SENT);
+  assert.equal(inserted.composerState, 'ACCEPTED_ATTACHMENT_LIKE');
+
+  const afterRestart = loadAdapter();
+  const result = await afterRestart.execute(request('PREPARE_SEND'), { document: fx.document });
+
+  assert.equal(result.status, afterRestart.STATUS.MANUAL_REVIEW_REQUIRED);
+  assert.equal(result.safeDiagnosticCode, 'PENDING_REPRESENTATION_NOT_OPERATION_BOUND_PRE_SEND');
+  assert.equal(sendClicks, 0);
+});
+
+test('content-script restart after uncertain attachment Send cannot invent success or resend', async () => {
+  let clock = 0;
+  class FakeDate extends Date { static now() { clock += 1000; return clock; } }
+  const beforeRestart = loadAdapter(FakeDate);
+  const fx = fixture({ transform({ composer, attachments }) {
+    composer._value = '';
+    attachments.push(attachment());
+  } });
+  let sendClicks = 0;
+  await beforeRestart.execute(request('INSERT_ONLY'), { document: fx.document, wait: async () => {} });
+  fx.send.click = () => {
+    sendClicks += 1;
+    fx.attachments.splice(0, fx.attachments.length);
+  };
+
+  const uncertain = await beforeRestart.execute(request('SUBMIT_EXISTING'), { document: fx.document, wait: async () => {} });
+  assert.equal(uncertain.status, beforeRestart.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(sendClicks, 1);
+
+  // A same-looking representation may now be visible in history, but the operation-local
+  // baseline lived only in the previous content-script context and must not be reconstructed.
+  fx.messages.push(userMessage([attachment()]));
+  const afterRestart = loadAdapter(FakeDate);
+  const recovered = await afterRestart.execute(request('VERIFY_AFTER_UNCERTAIN_SUBMIT'), { document: fx.document });
+
+  assert.equal(recovered.status, afterRestart.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(recovered.safeDiagnosticCode, 'RECOVERY_UNCERTAIN');
+  assert.equal(sendClicks, 1);
+});
