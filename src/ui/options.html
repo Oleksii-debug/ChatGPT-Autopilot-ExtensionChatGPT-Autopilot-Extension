@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ChatGPT Autopilot</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+<header>
+  <h1 id="page-title">ChatGPT Autopilot</h1>
+  <p id="app-status" role="status">Ready.</p>
+  <button id="master-pause-button" type="button">Master pause</button>
+</header>
+<div class="layout">
+  <nav aria-label="Session navigation">
+    <h2>Sessions</h2>
+    <button id="create-session-button" type="button">Create session</button>
+    <ul id="session-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section id="session-editor" aria-labelledby="session-heading" hidden>
+      <h2 id="session-heading" tabindex="-1">Session</h2>
+      <div id="form-error-summary" tabindex="-1" hidden></div>
+
+      <section aria-labelledby="configuration-heading">
+        <h3 id="configuration-heading">Configuration</h3>
+        <label for="session-name">Session name</label>
+        <input id="session-name" type="text" autocomplete="off">
+
+        <fieldset id="prompt-mode">
+          <legend>Prompt mode</legend>
+          <label><input id="prompt-mode-shared" type="radio" name="promptMode" value="shared"> One shared prompt for all tasks</label>
+          <label><input id="prompt-mode-unique" type="radio" name="promptMode" value="unique"> Unique prompt for each task</label>
+        </fieldset>
+
+        <div id="shared-prompt-container">
+          <label for="shared-prompt">Shared prompt for all enabled tasks</label>
+          <textarea id="shared-prompt" rows="8"></textarea>
+        </div>
+        <div id="unique-default-container" hidden>
+          <label for="default-unique-prompt">Default prompt for empty task prompts</label>
+          <textarea id="default-unique-prompt" rows="5"></textarea>
+          <button id="apply-default-prompt-button" type="button">Apply default prompt to empty tasks</button>
+        </div>
+
+        <fieldset id="run-mode">
+          <legend>Run mode</legend>
+          <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
+          <label><input id="run-mode-continuous" type="radio" name="runMode" value="continuous"> Continuous monitor</label>
+        </fieldset>
+      </section>
+
+      <section aria-labelledby="tasks-heading">
+        <h3 id="tasks-heading">Tasks</h3>
+        <ol id="task-list"></ol>
+        <button id="add-task-button" type="button">Add task</button>
+        <p id="task-limit-help">Up to 50 tasks per session.</p>
+      </section>
+
+      <section aria-labelledby="timing-heading">
+        <h3 id="timing-heading">Timing and behavior</h3>
+        <label for="minimum-send-interval">Minimum interval between actual sends, minutes</label>
+        <input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric">
+        <p id="minimum-send-interval-help">Busy-chat checks do not consume this interval.</p>
+
+        <label for="pre-send-delay">Delay after prompt insertion before Send, seconds</label>
+        <input id="pre-send-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
+
+        <label for="busy-check-delay">Delay before checking the next task when current chat is busy, seconds</label>
+        <input id="busy-check-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
+
+        <label for="retry-backoff">Retry delay for temporary navigation or network errors, seconds</label>
+        <input id="retry-backoff" type="number" min="5" max="3600" step="5" inputmode="numeric">
+
+        <fieldset id="retry-policy">
+          <legend>Retry policy</legend>
+          <label><input type="radio" name="retryPolicy" value="safe" checked> Bounded safe retries</label>
+          <label><input type="radio" name="retryPolicy" value="manual"> Manual review after temporary failure</label>
+        </fieldset>
+
+        <label for="busy-chat-behavior">Busy chat behavior</label>
+        <select id="busy-chat-behavior">
+          <option value="skip-next">Skip immediately to next enabled task</option>
+        </select>
+
+        <fieldset id="tab-strategy">
+          <legend>Tab strategy</legend>
+          <label><input id="tab-strategy-keep-open" type="radio" name="tabStrategy" value="keep-open"> Keep task tabs open</label>
+          <label><input id="tab-strategy-worker" type="radio" name="tabStrategy" value="worker"> Use one worker tab for this session</label>
+          <label><input id="tab-strategy-open-close" type="radio" name="tabStrategy" value="open-close"> Open and close per task</label>
+        </fieldset>
+      </section>
+
+      <section aria-labelledby="controls-heading">
+        <h3 id="controls-heading">Controls</h3>
+        <button id="save-session-button" type="button">Save session</button>
+        <button id="start-session-button" type="button">Start</button>
+        <button id="pause-session-button" type="button">Pause</button>
+        <button id="resume-session-button" type="button">Resume</button>
+        <button id="stop-session-button" type="button">Stop</button>
+      </section>
+
+      <section aria-labelledby="status-heading">
+        <h3 id="status-heading">Status</h3>
+        <div id="session-status-region" aria-live="polite" aria-atomic="false"></div>
+      </section>
+
+      <section aria-labelledby="log-heading">
+        <h3 id="log-heading">Log</h3>
+        <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
+        <button id="clear-log-button" type="button">Clear log</button>
+      </section>
+    </section>
+
+    <section id="empty-state" aria-labelledby="empty-heading">
+      <h2 id="empty-heading">No session selected</h2>
+      <p>Create or open a session to configure automation.</p>
+    </section>
+  </main>
+</div>
+<div id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading" hidden>
+  <h2 id="delete-dialog-heading">Delete session?</h2>
+  <p id="delete-dialog-description">This removes the selected session configuration.</p>
+  <button id="confirm-delete-button" type="button">Delete session</button>
+  <button id="cancel-delete-button" type="button">Cancel</button>
+</div>
+<div id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="options.js"></script>
+</body>
+</html>
