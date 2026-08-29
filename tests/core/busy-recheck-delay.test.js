@@ -46,7 +46,7 @@ test('single BUSY task sleeps until configured recheck deadline without consumin
     create: async (name, options) => calls.push(['create', name, options.when]),
   } };
   await reconcileAlarm(chrome, stateWith(session), 100);
-  assert.deepEqual(calls[1], ['create', 'autopilot-core-wake', 5100]);
+  assert.deepEqual(calls, [['create', 'autopilot-core-wake', 5100]]);
 });
 
 test('round-robin skips each BUSY task immediately, then waits for the earliest per-task recheck', () => {

@@ -42,7 +42,7 @@ test('cooldown ending before every task retry sleeps directly until the earliest
     create: async (name, options) => calls.push(['create', name, options.when]),
   } };
   await reconcileAlarm(chrome, stateWith(session), now);
-  assert.deepEqual(calls[1], ['create', 'autopilot-core-wake', now + 30000]);
+  assert.deepEqual(calls, [['create', 'autopilot-core-wake', now + 30000]]);
 });
 
 test('cooldown remains authoritative when a task retry expires earlier', () => {

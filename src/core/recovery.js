@@ -88,7 +88,14 @@ export function computeNextWake(state, now = Date.now()) {
 
 export async function reconcileAlarm(chromeApi, state, now = Date.now()) {
   const wakeAt = computeNextWake(state, now);
-  await chromeApi.alarms.clear(ALARM_NAME);
-  if (wakeAt != null) await chromeApi.alarms.create(ALARM_NAME, { when: Math.max(now + 500, wakeAt) });
+  if (wakeAt == null) {
+    await chromeApi.alarms.clear(ALARM_NAME);
+    return null;
+  }
+
+  // Chrome replaces an existing alarm with the same name. Do not clear the
+  // canonical wake first: if replacement creation rejects, the previous wake
+  // remains available as a conservative fallback and durable state stays truth.
+  await chromeApi.alarms.create(ALARM_NAME, { when: Math.max(now + 500, wakeAt) });
   return wakeAt;
 }
