@@ -58,3 +58,16 @@ test('Core read model keeps canonical session states separate from task runtime 
     assert.equal(sessionToUi(session, state).runState, runState);
   }
 });
+
+test('Core UI action availability exposes Start for every state accepted by START_SESSION', () => {
+  for (const runState of [RunState.STOPPED, RunState.ERROR]) {
+    const { state, session } = makeState('IDLE');
+    session.runState = runState;
+    assert.equal(sessionToUi(session, state).actionAvailability.start, true, `${runState} must expose Start`);
+  }
+  for (const runState of [RunState.RUNNING, RunState.RECOVERING, RunState.PAUSED]) {
+    const { state, session } = makeState('IDLE');
+    session.runState = runState;
+    assert.equal(sessionToUi(session, state).actionAvailability.start, false, `${runState} must not expose Start`);
+  }
+});
