@@ -155,29 +155,47 @@
       .find(predicate) || null;
   }
 
+  function visibleStatusText(doc) {
+    return Array.from(doc.querySelectorAll('[role="alert"], [role="status"], [aria-live="assertive"]'))
+      .filter(isVisible)
+      .map((el) => (accessibleName(el) + ' ' + textOf(el)).trim().toLowerCase())
+      .filter(Boolean)
+      .join('\n');
+  }
+
   function detectBlockingState(doc) {
-    const bodyText = String(doc.body?.innerText || doc.body?.textContent || '').toLowerCase();
-    const signIn = findVisibleButton(doc, (b) => /log in|sign in/.test(accessibleName(b) + ' ' + textOf(b).toLowerCase()));
-    if (signIn && !findVisibleComposer(doc).element) return { status: STATUS.AUTH_REQUIRED, code: 'AUTH_SURFACE_VISIBLE' };
-
-    if (/too many requests|rate limit|try again later/.test(bodyText)) {
-      return { status: STATUS.RATE_LIMITED, code: 'RATE_LIMIT_SURFACE_VISIBLE' };
-    }
-
-    const stop = findVisibleButton(doc, (b) => /stop generating|stop response|stop/.test(accessibleName(b) + ' ' + textOf(b).toLowerCase()));
-    if (stop) return { status: STATUS.BUSY, code: 'STOP_CONTROL_VISIBLE' };
-
-    const dialog = Array.from(doc.querySelectorAll('[role="dialog"], dialog')).filter(isVisible)[0];
-    if (dialog) {
-      const t = textOf(dialog).toLowerCase();
-      if (/captcha|verify|security|confirm|account/.test(t)) {
+    // A visible modal always outranks page-underlay evidence. We do not auto-click any
+    // dialog here: CAPTCHA/security/account/payment/confirmation and localized/unknown
+    // dialogs all require manual review unless a future control is explicitly whitelisted.
+    const dialogs = Array.from(doc.querySelectorAll('[role="dialog"], dialog')).filter(isVisible);
+    if (dialogs.length) {
+      const dialogText = dialogs.map((dialog) => (accessibleName(dialog) + ' ' + textOf(dialog)).toLowerCase()).join('\n');
+      if (/captcha|verify|verification|security|confirm|account|payment|billing|purchase|subscribe/.test(dialogText)) {
         return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNKNOWN_OR_SECURITY_DIALOG' };
       }
-      // Any unexpected visible modal is operation-blocking. This deliberately does not
-      // rely on English dialog text: localized confirmation/warning surfaces must fail
-      // closed instead of letting automation interact with the page underneath them.
       return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNRECOGNIZED_DIALOG' };
     }
+
+    const signIn = findVisibleButton(doc, (b) => /log[ -]?in|sign[ -]?in|login/.test(accessibleName(b) + ' ' + textOf(b).toLowerCase()));
+    if (signIn && !findVisibleComposer(doc).element) return { status: STATUS.AUTH_REQUIRED, code: 'AUTH_SURFACE_VISIBLE' };
+
+    // Error classification is based on dedicated accessibility status surfaces rather
+    // than the entire page body. Conversation text can legitimately contain phrases
+    // such as "try again later" and must never manufacture a retry/rate-limit state.
+    const statusText = visibleStatusText(doc);
+    if (/too many requests|rate limit|rate limited|try again later/.test(statusText)) {
+      return { status: STATUS.RATE_LIMITED, code: 'RATE_LIMIT_SURFACE_VISIBLE' };
+    }
+    if (/something went wrong|network error|temporary error|error generating|failed to (?:load|generate)|please try again/.test(statusText)) {
+      return { status: STATUS.TEMPORARY_ERROR, code: 'TEMPORARY_ERROR_SURFACE_VISIBLE' };
+    }
+
+    const stop = findVisibleButton(doc, (b) => {
+      const label = (accessibleName(b) + ' ' + textOf(b)).trim().toLowerCase();
+      return /stop generating|stop response|stop streaming|stop generation|stop-button/.test(label) || label === 'stop';
+    });
+    if (stop) return { status: STATUS.BUSY, code: 'STOP_CONTROL_VISIBLE' };
+
     return null;
   }
 

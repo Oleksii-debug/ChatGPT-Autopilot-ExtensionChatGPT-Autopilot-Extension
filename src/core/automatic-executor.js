@@ -29,6 +29,13 @@ function resumeUnlessQuiesced(session, priorRunState) {
   session.runState = QUIESCENT_STATES.has(priorRunState) ? priorRunState : RunState.RUNNING;
 }
 
+function matchesOperation(operation, expected, phase) {
+  return operation?.phase === phase
+    && operation.operationId === expected.operationId
+    && operation.taskId === expected.taskId
+    && operation.promptFingerprint === expected.promptFingerprint;
+}
+
 export class AutomaticSessionExecutor {
   constructor(repository, chromeApi, transport, {
     now = () => Date.now(),
@@ -75,7 +82,16 @@ export class AutomaticSessionExecutor {
 
   async recoverAmbiguous(sessionId, session) {
     const operation = session.operation;
+    const expectedOperation = {
+      operationId: operation.operationId,
+      taskId: operation.taskId,
+      promptFingerprint: operation.promptFingerprint,
+    };
     const task = session.tasksById[operation.taskId];
+    const retryAfterAt = task?.retryAfterAt || 0;
+    if (retryAfterAt > this.now()) {
+      return { kind: 'WAIT_RECOVERY', wakeAt: retryAfterAt };
+    }
     const tab = await this.bindTaskTab(sessionId, task.id);
     const result = await this.transport.execute(tab.id, this.request(
       session,
@@ -85,26 +101,29 @@ export class AutomaticSessionExecutor {
       operation.promptText,
     ));
     const now = this.now();
+    let reconciled = false;
 
     if (result.status === InteractionResult.SENT_VERIFIED) {
       await this.repo.update(draft => {
         const live = requireSession(draft, sessionId);
         const priorRunState = live.runState;
         const liveOperation = live.operation;
-        applyInteractionResult(live, taskIndex(live, liveOperation.taskId), result, {
+        if (!matchesOperation(liveOperation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
+        applyInteractionResult(live, taskIndex(live, expectedOperation.taskId), result, {
           now,
-          promptFingerprint: liveOperation.promptFingerprint,
+          promptFingerprint: expectedOperation.promptFingerprint,
         });
         releaseSendLease(draft, {
           sessionId,
-          operationId: liveOperation.operationId,
+          operationId: expectedOperation.operationId,
           now,
           profileGapMs: 1000,
         });
         resumeUnlessQuiesced(live, priorRunState);
+        reconciled = true;
         return draft;
       });
-      return { kind: 'RECOVERED_SENT', result };
+      return reconciled ? { kind: 'RECOVERED_SENT', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
     if (result.status === InteractionResult.INSERTED_NOT_SENT) {
@@ -112,27 +131,43 @@ export class AutomaticSessionExecutor {
         const live = requireSession(draft, sessionId);
         const priorRunState = live.runState;
         const liveOperation = live.operation;
+        if (!matchesOperation(liveOperation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
         liveOperation.phase = OperationPhase.PRE_SEND_WAIT;
         liveOperation.preSendDeadline = now + live.preSendDelayMs;
         liveOperation.updatedAt = now;
         resumeUnlessQuiesced(live, priorRunState);
         releaseSendLease(draft, {
           sessionId,
-          operationId: liveOperation.operationId,
+          operationId: expectedOperation.operationId,
           now,
           profileGapMs: 0,
         });
+        reconciled = true;
         return draft;
       });
-      return { kind: 'RECOVERED_PENDING', result };
+      return reconciled ? { kind: 'RECOVERED_PENDING', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
-    await this.applyResult(sessionId, task.id, result, operation.promptFingerprint);
-    return { kind: 'RECOVERY_HELD', result };
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      if (!matchesOperation(live.operation, expectedOperation, OperationPhase.AMBIGUOUS)) return draft;
+      applyInteractionResult(live, taskIndex(live, expectedOperation.taskId), result, {
+        now,
+        promptFingerprint: expectedOperation.promptFingerprint,
+      });
+      reconciled = true;
+      return draft;
+    });
+    return reconciled ? { kind: 'RECOVERY_HELD', result } : { kind: 'OPERATION_CHANGED', result };
   }
 
   async continuePreSend(sessionId, session) {
     const operation = session.operation;
+    const expectedOperation = {
+      operationId: operation.operationId,
+      taskId: operation.taskId,
+      promptFingerprint: operation.promptFingerprint,
+    };
     if ((operation.preSendDeadline || 0) > this.now()) {
       return { kind: 'WAIT_PRE_SEND', wakeAt: operation.preSendDeadline };
     }
@@ -151,24 +186,35 @@ export class AutomaticSessionExecutor {
     if (!ACTIVE_STATES.has(postPrepareSession.runState)) {
       return { kind: 'QUIESCED', runState: postPrepareSession.runState };
     }
-    if (postPrepareSession.operation?.operationId !== operation.operationId
-      || postPrepareSession.operation?.phase !== OperationPhase.PRE_SEND_WAIT) {
+    if (!matchesOperation(postPrepareSession.operation, expectedOperation, OperationPhase.PRE_SEND_WAIT)) {
       return { kind: 'OPERATION_CHANGED', phase: postPrepareSession.operation?.phase || OperationPhase.NONE };
     }
 
     if (prepare.status !== InteractionResult.READY) {
+      const now = this.now();
+      let reconciled = false;
       if (prepare.status === InteractionResult.INSERTED_NOT_SENT) {
-        const now = this.now();
         await this.repo.update(draft => {
           const live = requireSession(draft, sessionId);
+          if (!matchesOperation(live.operation, expectedOperation, OperationPhase.PRE_SEND_WAIT)) return draft;
           live.operation.preSendDeadline = now + Math.max(500, live.busyCheckDelayMs);
           live.operation.updatedAt = now;
+          reconciled = true;
           return draft;
         });
-        return { kind: 'WAIT_SEND_READY', result: prepare };
+        return reconciled ? { kind: 'WAIT_SEND_READY', result: prepare } : { kind: 'OPERATION_CHANGED', result: prepare };
       }
-      await this.applyResult(sessionId, task.id, prepare, operation.promptFingerprint);
-      return { kind: 'PREPARE_HELD', result: prepare };
+      await this.repo.update(draft => {
+        const live = requireSession(draft, sessionId);
+        if (!matchesOperation(live.operation, expectedOperation, OperationPhase.PRE_SEND_WAIT)) return draft;
+        applyInteractionResult(live, taskIndex(live, expectedOperation.taskId), prepare, {
+          now,
+          promptFingerprint: expectedOperation.promptFingerprint,
+        });
+        reconciled = true;
+        return draft;
+      });
+      return reconciled ? { kind: 'PREPARE_HELD', result: prepare } : { kind: 'OPERATION_CHANGED', result: prepare };
     }
 
     const result = await this.coordinator.submitWithDurableCheckpoint({

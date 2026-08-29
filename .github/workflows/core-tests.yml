@@ -8,6 +8,7 @@ on:
       - "src/shared/**"
       - "src/background/**"
       - "tests/core/**"
+      - "tests/integration/**"
       - "manifest.json"
       - "package.json"
       - ".github/workflows/core-tests.yml"
@@ -17,6 +18,7 @@ on:
       - "src/shared/**"
       - "src/background/**"
       - "tests/core/**"
+      - "tests/integration/**"
       - "manifest.json"
       - "package.json"
 
