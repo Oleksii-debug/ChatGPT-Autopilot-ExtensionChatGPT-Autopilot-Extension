@@ -16,7 +16,6 @@ const TERMINAL_OPERATION_PHASES = new Set([
 const INTERRUPTED_PRE_SUBMIT_PHASES = new Set([
   OperationPhase.CHECKING,
   OperationPhase.READY,
-  OperationPhase.INSERTING,
   OperationPhase.INSERTED,
 ]);
 
