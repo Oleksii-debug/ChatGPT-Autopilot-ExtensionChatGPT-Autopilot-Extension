@@ -113,3 +113,11 @@ test('Core command failures remain readable in normal status text as well as liv
     assert.ok(js.includes(`action('${command}'`), `missing persistent-error action path for ${command}`);
   }
 });
+
+test('background refresh preserves persistent errors and avoids repeated connection announcements', () => {
+  assert.match(js, /function setAppStatus\(text\) \{\s*const status = \$\('app-status'\);\s*if \(status\.textContent !== text\) status\.textContent = text;\s*\}/s);
+  assert.match(js, /async function loadSessions\(\{ preserveFocus = true, reportConnected = true \} = \{\}\)/);
+  assert.match(js, /if \(reportConnected\) setAppStatus\('Connected to Core\.'\)/);
+  assert.match(js, /catch \(error\) \{\s*setAppStatus\(error\.message\);\s*renderSessionList\(\);\s*\}/s, 'background LIST_SESSIONS failures must still remain visible');
+  assert.match(js, /void loadSessions\(\{ reportConnected: false \}\)/, 'STATUS_CHANGED must not overwrite a readable command error with connection success');
+});
