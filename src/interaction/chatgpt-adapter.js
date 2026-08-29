@@ -93,9 +93,20 @@
     return null;
   }
 
+  function isSemanticallyUnavailable(el) {
+    let node = el;
+    while (node) {
+      if (node.hidden || node.getAttribute?.('aria-hidden') === 'true') return true;
+      const inertAttribute = node.getAttribute?.('inert');
+      if (node.inert === true || (inertAttribute !== null && inertAttribute !== undefined)) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
   function isVisible(el) {
     if (!el || !el.isConnected) return false;
-    if (el.hidden || el.disabled || el.getAttribute?.('aria-hidden') === 'true') return false;
+    if (el.disabled || el.matches?.(':disabled') || isSemanticallyUnavailable(el)) return false;
     const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
     if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
     if (typeof el.getBoundingClientRect === 'function') {
