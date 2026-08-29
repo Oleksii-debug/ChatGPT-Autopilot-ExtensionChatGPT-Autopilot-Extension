@@ -86,6 +86,24 @@ function assertNoActiveUrlCollision(state, session) {
   }
 }
 
+function cleanTabHintsForUpdatedSession(state, oldSession, replacement) {
+  const workerHintKey = `__session_worker__:${oldSession.id}`;
+  const workerMode = replacement.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION;
+  for (const [key, hint] of Object.entries(state.tabHintsByTaskId || {})) {
+    if (hint?.sessionId !== oldSession.id) continue;
+    if (key === workerHintKey) {
+      if (!workerMode) delete state.tabHintsByTaskId[key];
+      continue;
+    }
+    if (workerMode) {
+      delete state.tabHintsByTaskId[key];
+      continue;
+    }
+    const nextTask = replacement.tasksById[key];
+    if (!nextTask || hint.normalizedUrl !== nextTask.normalizedUrl) delete state.tabHintsByTaskId[key];
+  }
+}
+
 export function sessionToUi(session, state) {
   const tasks = session.taskOrder.map(id => session.tasksById[id]);
   const currentTask = tasks[session.currentTaskIndex] || null;
@@ -149,6 +167,7 @@ export class CoreCommandDispatcher {
         replacement.createdAt=old.createdAt;
         replacement.onePassCompletedTaskIds=(old.onePassCompletedTaskIds||[]).filter(id=>replacement.tasksById[id]);
         for(const id of replacement.taskOrder){const previous=old.tasksById[id];const current=replacement.tasksById[id];if(previous&&previous.normalizedUrl===current.normalizedUrl){for(const field of ['status','lastCheckedAt','lastVerifiedSendAt','lastVerifiedFingerprint','retryAfterAt','manualReviewReason']) current[field]=previous[field];}}
+        cleanTabHintsForUpdatedSession(draft, old, replacement);
         draft.sessionsById[old.id]=replacement;
         appendLog(draft,old.id,'Session configuration saved',{at:this.now()});
         return draft;
