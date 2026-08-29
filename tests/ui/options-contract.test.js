@@ -138,6 +138,15 @@ test('session-list refresh restores the same control by stable id when list DOM 
   assert.match(js, /else if \(activeId\) \$\(activeId\)\?\.focus\(\)/);
 });
 
+test('Session navigation marks exactly the opened Session as current without toggle semantics', () => {
+  assert.match(js, /function syncCurrentSessionMarker\(\)/);
+  assert.match(js, /querySelectorAll\('#session-list \[aria-current=\"page\"\]'\)\.forEach\(\(element\) => element\.removeAttribute\('aria-current'\)\)/);
+  assert.match(js, /if \(ui\.selectedSessionId\) \$\(`session-select-\$\{ui\.selectedSessionId\}`\)\?\.setAttribute\('aria-current', 'page'\)/);
+  assert.match(js, /function renderSessionList\(\)[\s\S]*syncCurrentSessionMarker\(\);/);
+  assert.match(js, /ui\.selectedSessionId = sessionId;\s*syncCurrentSessionMarker\(\);/);
+  assert.doesNotMatch(js, /aria-pressed/);
+});
+
 test('delete dialog names its target and successful deletion restores focus deterministically', () => {
   has(/id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading" aria-describedby="delete-dialog-description"/);
   assert.match(js, /Rename session \$\{sessionName\}/);

@@ -97,6 +97,12 @@ function renderSessionList() {
     li.append(open, state, count, rename, duplicate, del);
     list.append(li);
   }
+  syncCurrentSessionMarker();
+}
+
+function syncCurrentSessionMarker() {
+  document.querySelectorAll('#session-list [aria-current="page"]').forEach((element) => element.removeAttribute('aria-current'));
+  if (ui.selectedSessionId) $(`session-select-${ui.selectedSessionId}`)?.setAttribute('aria-current', 'page');
 }
 
 function button(id, text, handler) {
@@ -107,6 +113,7 @@ async function openSession(sessionId) {
   try {
     const data = await core('GET_SESSION', { sessionId });
     ui.selectedSessionId = sessionId;
+    syncCurrentSessionMarker();
     ui.selected = clone(data.session);
     renderEditor();
     $('session-heading').focus();
