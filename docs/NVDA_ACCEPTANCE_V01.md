@@ -18,8 +18,10 @@ Keyboard only:
 2. Press `H`/heading navigation in NVDA and confirm the page exposes the `ChatGPT Autopilot` heading, `Sessions`, and the selected Session headings in logical order.
 3. Press `D`/landmark navigation and confirm Session navigation and main content are distinguishable.
 4. Tab through the first controls. NVDA must announce meaningful names such as `Master pause`, `Create session`, and existing Session buttons.
+5. With at least two Sessions, open one, then review Session navigation without activating another Session. NVDA must expose exactly the opened Session as the current item; the exact spoken wording may vary by NVDA/Chrome.
+6. Open a different Session and review Session navigation again. The current marker must move to the newly opened Session and be absent from the previous Session. Rename/Duplicate/Delete controls must not be presented as the current item or as toggle controls.
 
-Pass criteria: no unlabeled focusable control; no mouse-only operation; focus order follows the page structure.
+Pass criteria: no unlabeled focusable control; no mouse-only operation; focus order follows the page structure; exactly one `Open session …` control is exposed as current when a Session is selected, and that state follows the opened Session without inventing toggle semantics.
 
 ## B. Create and configure a Session
 
@@ -107,6 +109,7 @@ Pass criteria:
 3. Background status refresh does not jump to the Session heading or command result.
 4. Status changes remain discoverable by normal review/navigation without continuous NVDA chatter.
 5. Repeated identical connection/status text does not generate repeated `role=status` speech solely because of a background refresh.
+6. If the Session list is rebuilt, the current-item marker remains on exactly the opened Session and the refresh does not move keyboard focus to that marker or to another Session.
 
 ## G. Delete dialog
 
@@ -146,6 +149,7 @@ Record the exact candidate SHA/ZIP and fill this table only after real execution
 | --- | --- | --- |
 | Keyboard-only navigation | NOT RUN | |
 | NVDA control names/roles | NOT RUN | |
+| Current Session navigation state | NOT RUN | |
 | Dynamic Task focus | NOT RUN | |
 | Validation/error summary | NOT RUN | |
 | Timing-bound validation | NOT RUN | |
