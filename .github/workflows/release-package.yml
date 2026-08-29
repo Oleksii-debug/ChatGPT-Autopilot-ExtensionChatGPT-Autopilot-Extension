@@ -1,0 +1,41 @@
+name: Release package candidate
+
+on:
+  pull_request:
+    paths:
+      - manifest.json
+      - src/**
+      - scripts/package-release.mjs
+      - tests/release/**
+      - package.json
+      - README.md
+      - CHANGELOG.md
+      - .github/workflows/release-package.yml
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run deterministic test suite
+        run: npm test
+
+      - name: Build canonical candidate package
+        run: npm run package:release
+
+      - name: Upload canonical ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatGPT-Autopilot-Extension-v0.1
+          path: dist/ChatGPT-Autopilot-Extension-v0.1.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
