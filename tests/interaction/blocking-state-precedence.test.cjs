@@ -35,11 +35,21 @@ function visibleElement(text = '', attrs = {}) {
   };
 }
 
-function fixture({ bodyText = '', dialogs = [], statuses = [], buttons = [], composers = [] } = {}) {
+function fixture({
+  bodyText = '',
+  dialogs = [],
+  alertDialogs = [],
+  ariaModals = [],
+  statuses = [],
+  buttons = [],
+  composers = []
+} = {}) {
   return {
     body: { innerText: bodyText },
     querySelectorAll(selector) {
       if (selector === '[role="dialog"], dialog') return dialogs;
+      if (selector === '[role="alertdialog"]') return alertDialogs;
+      if (selector === '[aria-modal="true"]') return ariaModals;
       if (selector === '[role="alert"], [role="status"], [aria-live="assertive"]') return statuses;
       if (selector === 'button, [role="button"]') return buttons;
       if (selector === 'textarea, [contenteditable="true"], [role="textbox"], input[type="text"]') return composers;
@@ -57,6 +67,28 @@ test('unknown visible dialog outranks stale BUSY and rate-limit text underneath'
     dialogs: [dialog],
     buttons: [stop]
   }));
+
+  assert.equal(result.status, adapter.STATUS.MANUAL_REVIEW_REQUIRED);
+  assert.equal(result.code, 'UNRECOGNIZED_DIALOG');
+});
+
+test('ARIA alertdialog is a fail-closed modal even when its localized text is unknown', () => {
+  const adapter = loadAdapter();
+  const alertDialog = visibleElement('Продовжити цю дію?', { role: 'alertdialog' });
+  const stop = visibleElement('Stop generating', { 'aria-label': 'Stop generating' });
+  const result = adapter.detectBlockingState(fixture({ alertDialogs: [alertDialog], buttons: [stop] }));
+
+  assert.equal(result.status, adapter.STATUS.MANUAL_REVIEW_REQUIRED);
+  assert.equal(result.code, 'UNRECOGNIZED_DIALOG');
+});
+
+test('aria-modal true surface is fail closed and a duplicate role dialog node is processed once', () => {
+  const adapter = loadAdapter();
+  const modal = visibleElement('Платіж потребує підтвердження', {
+    role: 'dialog',
+    'aria-modal': 'true'
+  });
+  const result = adapter.detectBlockingState(fixture({ dialogs: [modal], ariaModals: [modal] }));
 
   assert.equal(result.status, adapter.STATUS.MANUAL_REVIEW_REQUIRED);
   assert.equal(result.code, 'UNRECOGNIZED_DIALOG');
