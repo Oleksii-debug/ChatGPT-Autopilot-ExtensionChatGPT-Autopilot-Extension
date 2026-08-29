@@ -18,10 +18,11 @@ export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.
 
 export function reconcileStateForStartup(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
+    const wasActive = session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING;
     if (session.runState === RunState.RUNNING) session.runState = RunState.RECOVERING;
     if (session.operation?.phase === OperationPhase.SUBMITTING) {
       session.operation.phase = OperationPhase.AMBIGUOUS;
-      session.runState = RunState.RECOVERING;
+      if (wasActive) session.runState = RunState.RECOVERING;
     }
   }
   const lease = state.sendArbiter.lease;
