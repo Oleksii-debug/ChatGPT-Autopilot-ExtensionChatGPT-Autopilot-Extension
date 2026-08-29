@@ -177,3 +177,35 @@ test('MASTER_RESUME keeps a conflicting Session paused when a RECOVERING owner r
   assert.equal(after.sessionsById.owner.operation.operationId, 'owner-op');
   assert.equal(after.sessionsById.owner.operation.targetUrl, 'https://chatgpt.com/c/resume-recovery');
 });
+
+test('fresh Start cannot take a URL reserved by a RECOVERING unresolved owner whose bound Task is disabled', async () => {
+  const state = createEmptyState(0);
+  const candidateTask = createTask({ id: 'candidate-task', url: 'https://chatgpt.com/c/resume-recovery' });
+  const candidate = createSession({
+    id: 'candidate',
+    name: 'candidate',
+    tasks: [candidateTask],
+    sharedPrompt: 'continue',
+    now: 0,
+  });
+  const owner = addUnresolvedOwner(state);
+  owner.runState = RunState.RECOVERING;
+  owner.tasksById['owner-task'].enabled = false;
+  state.sessionsById[candidate.id] = candidate;
+  state.sessionOrder.push(candidate.id);
+  assert.doesNotThrow(() => validateState(state));
+
+  const repo = new Repo(state);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 100, { executionAvailable: true });
+
+  await assert.rejects(
+    () => dispatcher.execute(CoreCommand.START_SESSION, { sessionId: candidate.id }),
+    /Another active or unresolved session already owns/i,
+  );
+  const after = await repo.load();
+  assert.equal(after.sessionsById.candidate.runState, RunState.STOPPED);
+  assert.equal(after.sessionsById.owner.runState, RunState.RECOVERING);
+  assert.equal(after.sessionsById.owner.tasksById['owner-task'].enabled, false);
+  assert.equal(after.sessionsById.owner.operation.operationId, 'owner-op');
+  assert.equal(after.sessionsById.owner.operation.targetUrl, 'https://chatgpt.com/c/resume-recovery');
+});
