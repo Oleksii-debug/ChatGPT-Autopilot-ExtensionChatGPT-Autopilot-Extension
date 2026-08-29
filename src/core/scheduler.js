@@ -1,7 +1,11 @@
 import { RunMode, RunState } from './schema.js';
 
+function schedulableTask(session, task) {
+  return task.enabled && !task.manualReviewReason && !(session.runMode === RunMode.ONE_PASS && session.onePassCompletedTaskIds.includes(task.id));
+}
+
 function eligibleTask(session, task, now) {
-  return task.enabled && !task.manualReviewReason && (task.retryAfterAt || 0) <= now && !(session.runMode === RunMode.ONE_PASS && session.onePassCompletedTaskIds.includes(task.id));
+  return schedulableTask(session, task) && (task.retryAfterAt || 0) <= now;
 }
 
 function onePassComplete(session) {
@@ -15,15 +19,29 @@ function onePassComplete(session) {
 export function selectNextTask(session, now = Date.now()) {
   if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) return { kind: 'IDLE' };
   if (onePassComplete(session)) return { kind: 'COMPLETE' };
-  if (session.nextAllowedSendAt > now) return { kind: 'COOLDOWN', wakeAt: session.nextAllowedSendAt };
+
+  const cooldownAt = session.nextAllowedSendAt > now ? session.nextAllowedSendAt : 0;
   const n = session.taskOrder.length;
   let earliestRetry = Infinity;
+  let eligibleSelection = null;
+
   for (let offset = 0; offset < n; offset++) {
     const index = (session.currentTaskIndex + offset) % n;
     const task = session.tasksById[session.taskOrder[index]];
-    if ((task.retryAfterAt || 0) > now) earliestRetry = Math.min(earliestRetry, task.retryAfterAt);
-    if (eligibleTask(session, task, now)) return { kind: 'TASK', index, task };
+    if (!schedulableTask(session, task)) continue;
+    if ((task.retryAfterAt || 0) > now) {
+      earliestRetry = Math.min(earliestRetry, task.retryAfterAt);
+      continue;
+    }
+    if (!eligibleSelection && eligibleTask(session, task, now)) eligibleSelection = { kind: 'TASK', index, task };
   }
+
+  if (cooldownAt) {
+    if (eligibleSelection) return { kind: 'COOLDOWN', wakeAt: cooldownAt };
+    if (earliestRetry < Infinity) return { kind: 'COOLDOWN', wakeAt: Math.max(cooldownAt, earliestRetry) };
+    return { kind: 'COOLDOWN', wakeAt: cooldownAt };
+  }
+  if (eligibleSelection) return eligibleSelection;
   if (earliestRetry < Infinity) return { kind: 'WAIT', wakeAt: earliestRetry };
   if (session.runMode === RunMode.ONE_PASS) return { kind: 'COMPLETE' };
   return { kind: 'WAIT', wakeAt: now + session.busyCheckDelayMs };
