@@ -45,7 +45,7 @@ test('submission-uncertain recovery backs off instead of scheduling a 500ms veri
     create: async (name, options) => calls.push(['create', name, options.when]),
   } };
   await reconcileAlarm(chrome, state, 1000);
-  assert.deepEqual(calls[1], ['create', 'autopilot-core-wake', 31000]);
+  assert.deepEqual(calls, [['create', 'autopilot-core-wake', 31000]]);
 });
 
 test('temporary and rate-limited ambiguous verification honor their task retry deadline', () => {
