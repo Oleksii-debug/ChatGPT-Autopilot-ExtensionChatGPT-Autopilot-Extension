@@ -128,3 +128,52 @@ test('explicit Resume reserves an unresolved operation target even when its boun
   assert.equal(after.sessionsById.s1.operation.promptFingerprint, 'fp1');
   assert.equal(after.sessionsById.s1.operation.targetUrl, 'https://chatgpt.com/c/resume-recovery');
 });
+
+test('explicit Resume treats a RECOVERING unresolved owner target as reserved when its bound Task is disabled', async () => {
+  const state = pausedState(OperationPhase.AMBIGUOUS);
+  state.sessionsById.s1.tasksById.t1.enabled = false;
+  const owner = addUnresolvedOwner(state);
+  owner.runState = RunState.RECOVERING;
+  owner.tasksById['owner-task'].enabled = false;
+  assert.doesNotThrow(() => validateState(state));
+
+  const repo = new Repo(state);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 100, { executionAvailable: true });
+
+  await assert.rejects(
+    () => dispatcher.execute(CoreCommand.RESUME_SESSION, { sessionId: 's1' }),
+    /Another active or unresolved session already owns/i,
+  );
+  const after = await repo.load();
+  assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
+  assert.equal(after.sessionsById.s1.operation.operationId, 'op1');
+  assert.equal(after.sessionsById.owner.runState, RunState.RECOVERING);
+  assert.equal(after.sessionsById.owner.tasksById['owner-task'].enabled, false);
+  assert.equal(after.sessionsById.owner.operation.operationId, 'owner-op');
+  assert.equal(after.sessionsById.owner.operation.targetUrl, 'https://chatgpt.com/c/resume-recovery');
+});
+
+test('MASTER_RESUME keeps a conflicting Session paused when a RECOVERING owner reserves the same unresolved disabled-Task target', async () => {
+  const state = pausedState(OperationPhase.AMBIGUOUS);
+  const candidate = state.sessionsById.s1;
+  candidate.tasksById.t1.enabled = false;
+  candidate.pausedByMaster = true;
+  state.profile.masterPaused = true;
+  const owner = addUnresolvedOwner(state);
+  owner.runState = RunState.RECOVERING;
+  owner.tasksById['owner-task'].enabled = false;
+  assert.doesNotThrow(() => validateState(state));
+
+  const repo = new Repo(state);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 100, { executionAvailable: true });
+
+  assert.deepEqual(await dispatcher.execute(CoreCommand.MASTER_RESUME), { masterPaused: false });
+  const after = await repo.load();
+  assert.equal(after.profile.masterPaused, false);
+  assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);
+  assert.equal(after.sessionsById.s1.pausedByMaster, false);
+  assert.equal(after.sessionsById.s1.operation.operationId, 'op1');
+  assert.equal(after.sessionsById.owner.runState, RunState.RECOVERING);
+  assert.equal(after.sessionsById.owner.operation.operationId, 'owner-op');
+  assert.equal(after.sessionsById.owner.operation.targetUrl, 'https://chatgpt.com/c/resume-recovery');
+});
