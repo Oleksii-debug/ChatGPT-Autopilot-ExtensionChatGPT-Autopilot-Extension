@@ -1,0 +1,1 @@
+CI target: full `node --test` plus release package workflow on the pull-request merge ref.
