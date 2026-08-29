@@ -8,6 +8,14 @@ import { InteractionResult } from '../shared/protocol.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
+const TERMINAL_OPERATION_PHASES = new Set([
+  OperationPhase.NONE,
+  OperationPhase.SENT_VERIFIED,
+  OperationPhase.FAILED_SAFE,
+]);
+const INTERRUPTED_PRE_SUBMIT_PHASES = new Set([
+  OperationPhase.INSERTED,
+]);
 
 function requireSession(state, sessionId) {
   const session = state.sessionsById[sessionId];
@@ -161,6 +169,51 @@ export class AutomaticSessionExecutor {
     return reconciled ? { kind: 'RECOVERY_HELD', result } : { kind: 'OPERATION_CHANGED', result };
   }
 
+  async recoverInterruptedPreSubmit(sessionId, session) {
+    const operation = session.operation;
+    const expectedOperation = {
+      operationId: operation.operationId,
+      taskId: operation.taskId,
+      promptFingerprint: operation.promptFingerprint,
+      phase: operation.phase,
+    };
+    const task = session.tasksById[operation.taskId];
+    const now = this.now();
+    const retryAfterAt = task?.retryAfterAt || 0;
+    if (retryAfterAt > now) {
+      return {
+        kind: 'WAIT_PRE_SUBMIT_RECOVERY',
+        phase: operation.phase,
+        wakeAt: retryAfterAt,
+      };
+    }
+
+    let reconciled = false;
+    let wakeAt = now + Math.max(1000, session.retryBackoffMs || 30000);
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      const liveOperation = live.operation;
+      if (!matchesOperation(liveOperation, expectedOperation, expectedOperation.phase)) return draft;
+      if (!INTERRUPTED_PRE_SUBMIT_PHASES.has(liveOperation.phase)) return draft;
+      const liveTask = live.tasksById[expectedOperation.taskId];
+      if (!liveTask) return draft;
+
+      wakeAt = now + Math.max(1000, live.retryBackoffMs || 30000);
+      liveOperation.phase = OperationPhase.FAILED_SAFE;
+      liveOperation.updatedAt = now;
+      liveTask.retryAfterAt = Math.max(liveTask.retryAfterAt || 0, wakeAt);
+      live.lastError = 'Interrupted pre-submit operation failed safe; retry scheduled.';
+      live.lastActionAt = now;
+      live.updatedAt = now;
+      reconciled = true;
+      return draft;
+    });
+
+    return reconciled
+      ? { kind: 'PRE_SUBMIT_RECOVERY_HELD', wakeAt }
+      : { kind: 'OPERATION_CHANGED' };
+  }
+
   async continuePreSend(sessionId, session) {
     const operation = session.operation;
     const expectedOperation = {
@@ -242,7 +295,10 @@ export class AutomaticSessionExecutor {
     if (session.operation?.phase === OperationPhase.PRE_SEND_WAIT) {
       return this.continuePreSend(sessionId, session);
     }
-    if (session.operation && ![OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE].includes(session.operation.phase)) {
+    if (INTERRUPTED_PRE_SUBMIT_PHASES.has(session.operation?.phase)) {
+      return this.recoverInterruptedPreSubmit(sessionId, session);
+    }
+    if (session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase)) {
       return { kind: 'OPERATION_IN_PROGRESS', phase: session.operation.phase };
     }
 
