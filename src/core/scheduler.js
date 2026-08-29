@@ -15,8 +15,9 @@ export function selectNextTask(session, now = Date.now()) {
     if ((task.retryAfterAt || 0) > now) earliestRetry = Math.min(earliestRetry, task.retryAfterAt);
     if (eligibleTask(session, task, now)) return { kind: 'TASK', index, task };
   }
+  if (earliestRetry < Infinity) return { kind: 'WAIT', wakeAt: earliestRetry };
   if (session.runMode === RunMode.ONE_PASS) return { kind: 'COMPLETE' };
-  return earliestRetry < Infinity ? { kind: 'WAIT', wakeAt: earliestRetry } : { kind: 'WAIT', wakeAt: now + session.busyCheckDelayMs };
+  return { kind: 'WAIT', wakeAt: now + session.busyCheckDelayMs };
 }
 
 export function advanceAfterBusy(session, taskIndex, now = Date.now()) {
