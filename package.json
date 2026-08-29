@@ -1,0 +1,9 @@
+{
+  "name": "chatgpt-autopilot-extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test:ui": "node --test tests/ui/options-contract.test.js"
+  }
+}
