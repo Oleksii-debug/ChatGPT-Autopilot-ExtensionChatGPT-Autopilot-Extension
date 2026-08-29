@@ -109,8 +109,10 @@
     return [
       el?.getAttribute?.('aria-label'),
       el?.getAttribute?.('placeholder'),
+      el?.getAttribute?.('data-placeholder'),
       el?.getAttribute?.('data-testid'),
       el?.getAttribute?.('name'),
+      el?.id,
       el?.title
     ].filter(Boolean).join(' ').toLowerCase();
   }
@@ -119,13 +121,16 @@
     const candidates = Array.from(doc.querySelectorAll(
       'textarea, [contenteditable="true"], [role="textbox"], input[type="text"]'
     )).filter(isVisible).filter((el) => {
+      if (el.getAttribute?.('aria-disabled') === 'true') return false;
       const name = accessibleName(el);
       const form = el.closest?.('form');
-      const formText = String(form?.getAttribute?.('data-type') || form?.getAttribute?.('aria-label') || '').toLowerCase();
-      const semanticallyPromptLike = /prompt|message|chat|ask|composer/.test(name + ' ' + formText);
-      const contentEditable = el.getAttribute?.('contenteditable') === 'true';
-      const textarea = String(el.tagName || '').toLowerCase() === 'textarea';
-      return semanticallyPromptLike || contentEditable || textarea;
+      const formText = [
+        form?.getAttribute?.('data-type'),
+        form?.getAttribute?.('aria-label'),
+        form?.getAttribute?.('data-testid'),
+        form?.id
+      ].filter(Boolean).join(' ').toLowerCase();
+      return /prompt|message|chat|ask|composer/.test(name + ' ' + formText);
     });
 
     if (candidates.length === 1) return { element: candidates[0], ambiguous: false };
@@ -168,9 +173,6 @@
       if (/captcha|verify|security|confirm|account/.test(t)) {
         return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNKNOWN_OR_SECURITY_DIALOG' };
       }
-      // Any unexpected visible modal is operation-blocking. This deliberately does not
-      // rely on English dialog text: localized confirmation/warning surfaces must fail
-      // closed instead of letting automation interact with the page underneath them.
       return { status: STATUS.MANUAL_REVIEW_REQUIRED, code: 'UNRECOGNIZED_DIALOG' };
     }
     return null;
@@ -397,9 +399,6 @@
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
-    // Snapshot semantic history before the only effectful Interaction call. Hidden or
-    // temporarily non-visible existing user messages are part of the baseline so they
-    // cannot later masquerade as a new operation-local submission merely by becoming visible.
     const beforeMessages = userMessageHistorySnapshot(doc);
     send.click();
     const verifyDeadline = nowMs() + 5000;
@@ -454,8 +453,6 @@
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
-    // Composer state is operation-local evidence and therefore outranks history.
-    // If the exact prompt is still pending, this operation is not safely proven sent.
     if (found.element && editorText(found.element).trim() === request.promptText.trim()) {
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
@@ -464,10 +461,6 @@
       });
     }
 
-    // Plain historical text equality is not operation identity. In recurring workflows
-    // an older user message can be byte-for-byte identical to the current prompt.
-    // Until Core/Interaction persist a baseline or operation-bound message marker,
-    // history-only matches must fail closed rather than produce SENT_VERIFIED.
     const recent = latestUserMessages(doc).slice(-5);
     const repeatedPromptSeen = recent.some((el) => textOf(el).trim() === request.promptText.trim());
     return resultBase(request, start, {
