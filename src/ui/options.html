@@ -1,144 +1,144 @@
 <!doctype html>
-<html lang="en">
+<html lang="uk">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ChatGPT Autopilot</title>
+  <title>ChatGPT Автопілот</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
 <header>
-  <h1 id="page-title">ChatGPT Autopilot</h1>
-  <p id="app-status" role="status">Ready.</p>
-  <button id="master-pause-button" type="button">Master pause</button>
-  <button id="master-resume-button" type="button">Resume after master pause</button>
+  <h1 id="page-title">ChatGPT Автопілот</h1>
+  <p id="app-status" role="status">Готово.</p>
+  <button id="master-pause-button" type="button">Призупинити все</button>
+  <button id="master-resume-button" type="button">Продовжити все</button>
 </header>
 <div class="layout">
-  <nav aria-label="Session navigation">
-    <h2>Sessions</h2>
-    <button id="create-session-button" type="button">Create session</button>
+  <nav aria-label="Навігація сеансами">
+    <h2>Сеанси</h2>
+    <button id="create-session-button" type="button">Створити сеанс</button>
     <ul id="session-list"></ul>
   </nav>
   <main id="main" tabindex="-1">
     <section aria-labelledby="keyboard-startup-heading">
-      <h2 id="keyboard-startup-heading">Keyboard and startup behavior</h2>
-      <p>Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons. No extension-specific global keyboard shortcuts are assigned.</p>
-      <p>Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.</p>
+      <h2 id="keyboard-startup-heading">Клавіатура та поведінка після запуску</h2>
+      <p>Для переходу між елементами використовуйте Tab і Shift+Tab. Для натискання кнопок — Enter або Пробіл, для прапорців і перемикачів — Пробіл. Окремих глобальних гарячих клавіш розширення не призначено.</p>
+      <p>Сеанси, що були запущені або відновлювалися, автоматично продовжують роботу після запуску Chrome. Призупинені та зупинені сеанси автоматично не запускаються.</p>
     </section>
     <section id="session-editor" aria-labelledby="session-heading" hidden>
-      <h2 id="session-heading" tabindex="-1">Session</h2>
-      <div id="form-error-summary" tabindex="-1" role="region" aria-label="Configuration errors" hidden></div>
+      <h2 id="session-heading" tabindex="-1">Сеанс</h2>
+      <div id="form-error-summary" tabindex="-1" role="region" aria-label="Помилки налаштування" hidden></div>
 
       <section aria-labelledby="configuration-heading">
-        <h3 id="configuration-heading">Configuration</h3>
-        <label for="session-name">Session name</label>
+        <h3 id="configuration-heading">Налаштування</h3>
+        <label for="session-name">Назва сеансу</label>
         <input id="session-name" type="text" autocomplete="off">
 
         <fieldset id="prompt-mode">
-          <legend>Prompt mode</legend>
-          <label><input id="prompt-mode-shared" type="radio" name="promptMode" value="shared"> One shared prompt for all tasks</label>
-          <label><input id="prompt-mode-unique" type="radio" name="promptMode" value="unique"> Unique prompt for each task</label>
+          <legend>Режим промптів</legend>
+          <label><input id="prompt-mode-shared" type="radio" name="promptMode" value="shared"> Один спільний промпт для всіх завдань</label>
+          <label><input id="prompt-mode-unique" type="radio" name="promptMode" value="unique"> Окремий промпт для кожного завдання</label>
         </fieldset>
 
         <div id="shared-prompt-container">
-          <label for="shared-prompt">Shared prompt for all enabled tasks</label>
+          <label for="shared-prompt">Спільний промпт для всіх увімкнених завдань</label>
           <textarea id="shared-prompt" rows="8"></textarea>
         </div>
         <div id="unique-default-container" hidden>
-          <label for="default-unique-prompt">Default prompt for empty task prompts</label>
+          <label for="default-unique-prompt">Промпт за замовчуванням для порожніх завдань</label>
           <textarea id="default-unique-prompt" rows="5"></textarea>
-          <button id="apply-default-prompt-button" type="button">Apply default prompt to empty tasks</button>
+          <button id="apply-default-prompt-button" type="button">Застосувати промпт за замовчуванням до порожніх завдань</button>
         </div>
 
         <fieldset id="run-mode">
-          <legend>Run mode</legend>
-          <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
-          <label><input id="run-mode-continuous" type="radio" name="runMode" value="continuous"> Continuous monitor</label>
+          <legend>Режим роботи</legend>
+          <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> Один прохід</label>
+          <label><input id="run-mode-continuous" type="radio" name="runMode" value="continuous"> Постійна робота по колу</label>
         </fieldset>
       </section>
 
       <section aria-labelledby="tasks-heading">
-        <h3 id="tasks-heading">Tasks</h3>
+        <h3 id="tasks-heading">Завдання</h3>
         <ol id="task-list"></ol>
-        <button id="add-task-button" type="button" aria-describedby="task-limit-help">Add task</button>
-        <p id="task-limit-help">Up to 50 tasks per session.</p>
+        <button id="add-task-button" type="button" aria-describedby="task-limit-help">Додати завдання</button>
+        <p id="task-limit-help">До 50 завдань у кожному сеансі.</p>
       </section>
 
       <section aria-labelledby="timing-heading">
-        <h3 id="timing-heading">Timing and behavior</h3>
-        <label for="minimum-send-interval">Minimum interval between actual sends, minutes</label>
+        <h3 id="timing-heading">Час і поведінка</h3>
+        <label for="minimum-send-interval">Мінімальний інтервал між фактичними відправленнями, хвилини</label>
         <input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric" aria-describedby="minimum-send-interval-help">
-        <p id="minimum-send-interval-help">Busy-chat checks do not consume this interval.</p>
+        <p id="minimum-send-interval-help">Перевірка зайнятого чату не використовує цей інтервал.</p>
 
-        <label for="pre-send-delay">Delay after prompt insertion before Send, seconds</label>
+        <label for="pre-send-delay">Затримка після вставлення промпту перед відправленням, секунди</label>
         <input id="pre-send-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
 
-        <label for="busy-check-delay">Delay before checking the next task when current chat is busy, seconds</label>
+        <label for="busy-check-delay">Затримка перед перевіркою наступного завдання, якщо поточний чат зайнятий, секунди</label>
         <input id="busy-check-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
 
-        <label for="retry-backoff">Retry/backoff wait</label>
+        <label for="retry-backoff">Очікування перед повторною спробою</label>
         <input id="retry-backoff" type="number" min="5" max="3600" step="1" inputmode="numeric" aria-describedby="retry-backoff-help">
-        <label for="retry-backoff-unit">Retry/backoff unit</label>
+        <label for="retry-backoff-unit">Одиниця часу очікування</label>
         <select id="retry-backoff-unit" aria-describedby="retry-backoff-help">
-          <option value="seconds">Seconds</option>
-          <option value="minutes">Minutes</option>
+          <option value="seconds">Секунди</option>
+          <option value="minutes">Хвилини</option>
         </select>
-        <p id="retry-backoff-help">Used after temporary failures and after the exact Too many requests acknowledgement. The Session resumes automatically when the saved wait expires.</p>
+        <p id="retry-backoff-help">Використовується після тимчасових помилок і після підтвердження повідомлення «Забагато запитів». Коли заданий час очікування мине, сеанс автоматично продовжить роботу.</p>
 
         <fieldset id="retry-policy">
-          <legend>Retry policy</legend>
-          <label><input type="radio" name="retryPolicy" value="safe" checked> Bounded safe retries</label>
-          <label><input type="radio" name="retryPolicy" value="manual"> Manual review after temporary failure</label>
+          <legend>Політика повторних спроб</legend>
+          <label><input type="radio" name="retryPolicy" value="safe" checked> Безпечні повторні спроби з обмеженням</label>
+          <label><input type="radio" name="retryPolicy" value="manual"> Ручна перевірка після тимчасової помилки</label>
         </fieldset>
 
-        <label for="busy-chat-behavior">Busy chat behavior</label>
+        <label for="busy-chat-behavior">Поведінка, коли чат зайнятий</label>
         <select id="busy-chat-behavior">
-          <option value="skip-next">Skip immediately to next enabled task</option>
+          <option value="skip-next">Одразу перейти до наступного увімкненого завдання</option>
         </select>
 
         <fieldset id="tab-strategy">
-          <legend>Tab strategy</legend>
-          <label><input id="tab-strategy-keep-open" type="radio" name="tabStrategy" value="keep-open"> Keep task tabs open</label>
-          <label><input id="tab-strategy-worker" type="radio" name="tabStrategy" value="worker"> Use one worker tab for this session</label>
-          <label><input id="tab-strategy-open-close" type="radio" name="tabStrategy" value="open-close"> Open and close per task</label>
+          <legend>Режим вкладок</legend>
+          <label><input id="tab-strategy-keep-open" type="radio" name="tabStrategy" value="keep-open"> Тримати вкладки завдань відкритими</label>
+          <label><input id="tab-strategy-worker" type="radio" name="tabStrategy" value="worker"> Використовувати одну робочу вкладку для цього сеансу</label>
+          <label><input id="tab-strategy-open-close" type="radio" name="tabStrategy" value="open-close"> Відкривати й закривати вкладку для кожного завдання</label>
         </fieldset>
       </section>
 
       <section aria-labelledby="controls-heading">
-        <h3 id="controls-heading">Controls</h3>
-        <button id="save-session-button" type="button">Save session</button>
-        <button id="start-session-button" type="button">Start</button>
-        <button id="pause-session-button" type="button">Pause</button>
-        <button id="resume-session-button" type="button">Resume</button>
-        <button id="stop-session-button" type="button">Stop</button>
-        <p id="command-result" tabindex="0">No runtime command has been issued.</p>
+        <h3 id="controls-heading">Керування</h3>
+        <button id="save-session-button" type="button">Зберегти сеанс</button>
+        <button id="start-session-button" type="button">Запустити</button>
+        <button id="pause-session-button" type="button">Призупинити</button>
+        <button id="resume-session-button" type="button">Продовжити</button>
+        <button id="stop-session-button" type="button">Зупинити</button>
+        <p id="command-result" tabindex="0">Команди керування ще не виконувалися.</p>
       </section>
 
       <section aria-labelledby="status-heading">
-        <h3 id="status-heading">Status</h3>
+        <h3 id="status-heading">Стан</h3>
         <div id="session-status-region"></div>
       </section>
 
       <section aria-labelledby="log-heading">
-        <h3 id="log-heading">Log</h3>
-        <p id="session-log-bound">Core retains a bounded session log.</p>
-        <p id="session-log-count">0 Core log entries shown.</p>
-        <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
-        <button id="clear-log-button" type="button">Clear log</button>
+        <h3 id="log-heading">Журнал</h3>
+        <p id="session-log-bound">Програма зберігає обмежений журнал подій сеансу.</p>
+        <p id="session-log-count">Показано 0 записів журналу.</p>
+        <pre id="session-log-region" tabindex="0" aria-label="Журнал сеансу"></pre>
+        <button id="clear-log-button" type="button">Очистити журнал</button>
       </section>
     </section>
 
     <section id="empty-state" aria-labelledby="empty-heading">
-      <h2 id="empty-heading">No session selected</h2>
-      <p>Create or open a session to configure automation.</p>
+      <h2 id="empty-heading">Сеанс не вибрано</h2>
+      <p>Створіть або відкрийте сеанс, щоб налаштувати автоматизацію.</p>
     </section>
   </main>
 </div>
 <div id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading" aria-describedby="delete-dialog-description" hidden>
-  <h2 id="delete-dialog-heading">Delete session?</h2>
-  <p id="delete-dialog-description">This removes the selected session configuration.</p>
-  <button id="confirm-delete-button" type="button">Delete session</button>
-  <button id="cancel-delete-button" type="button">Cancel</button>
+  <h2 id="delete-dialog-heading">Видалити сеанс?</h2>
+  <p id="delete-dialog-description">Буде видалено налаштування вибраного сеансу.</p>
+  <button id="confirm-delete-button" type="button">Видалити сеанс</button>
+  <button id="cancel-delete-button" type="button">Скасувати</button>
 </div>
 <div id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 <script type="module" src="options.js"></script>
