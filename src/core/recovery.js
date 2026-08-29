@@ -25,6 +25,13 @@ export function reconcileStateForStartup(state, now = Date.now()) {
 }
 export function computeNextWake(state, now = Date.now()) {
   let earliest = Infinity;
+  const activeLeaseUntil = state.sendArbiter?.lease?.expiresAt > now
+    ? state.sendArbiter.lease.expiresAt
+    : 0;
+  const profileSendBarrier = Math.max(
+    state.sendArbiter?.profileNextAllowedSendAt || 0,
+    activeLeaseUntil,
+  );
   for (const s of Object.values(state.sessionsById)) {
     if (s.runState !== RunState.RUNNING && s.runState !== RunState.RECOVERING) continue;
     const phase = s.operation?.phase;
@@ -33,7 +40,12 @@ export function computeNextWake(state, now = Date.now()) {
       const taskRetryAfter = s.tasksById?.[s.operation?.taskId]?.retryAfterAt || 0;
       earliest = Math.min(
         earliest,
-        Math.max(now, s.operation.preSendDeadline || now, taskRetryAfter),
+        Math.max(
+          now,
+          s.operation.preSendDeadline || now,
+          taskRetryAfter,
+          profileSendBarrier,
+        ),
       );
       continue;
     }
