@@ -83,6 +83,9 @@ function assertNoActiveUrlCollision(state, session) {
 
 export function sessionToUi(session, state) {
   const tasks = session.taskOrder.map(id => session.tasksById[id]);
+  const currentTask = tasks[session.currentTaskIndex] || null;
+  const log = state.logs[session.id] || [];
+  const lastLog = log.at(-1);
   return {
     ...structuredClone(session), version: session.version || 0,
     promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared',
@@ -91,8 +94,21 @@ export function sessionToUi(session, state) {
     tasks, minimumSendIntervalMinutes: session.minimumSendIntervalMs / 60000, preSendDelaySeconds: session.preSendDelayMs / 1000,
     busyCheckDelaySeconds: session.busyCheckDelayMs / 1000, retryBackoffSeconds: session.retryBackoffMs / 1000,
     actionAvailability: { start: session.runState === RunState.STOPPED, pause: session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING, resume: session.runState === RunState.PAUSED, stop: session.runState !== RunState.STOPPED },
-    status: { currentTaskUrl: tasks[session.currentTaskIndex]?.url || '', lastAction: '', lastSuccessfulSendAt: session.lastSuccessfulSendAt, nextAllowedSendAt: session.nextAllowedSendAt, enabledTaskCount: tasks.filter(t=>t.enabled).length, lastError: session.lastError },
-    log: state.logs[session.id] || []
+    status: {
+      currentTaskLabel: currentTask?.label || '',
+      currentTaskUrl: currentTask?.url || '',
+      currentTaskStatus: currentTask?.status || 'IDLE',
+      currentTaskRetryAt: currentTask?.retryAfterAt || 0,
+      currentTaskManualReviewReason: currentTask?.manualReviewReason || '',
+      operationPhase: session.operation?.phase || OperationPhase.NONE,
+      lastAction: lastLog?.message || '',
+      lastActionAt: lastLog?.at || session.lastActionAt || 0,
+      lastSuccessfulSendAt: session.lastSuccessfulSendAt,
+      nextAllowedSendAt: session.nextAllowedSendAt,
+      enabledTaskCount: tasks.filter(t=>t.enabled).length,
+      lastError: session.lastError
+    },
+    log
   };
 }
 
