@@ -24,8 +24,15 @@ test('all static controls use native elements and persistent labels/legends', ()
   has(/<fieldset id="tab-strategy">\s*<legend>Tab strategy<\/legend>/s, 'tab strategy fieldset missing');
 });
 
+test('visible help text is programmatically associated with its controls', () => {
+  has(/<button id="add-task-button" type="button" aria-describedby="task-limit-help">Add task<\/button>/, 'task-limit help association missing');
+  has(/<input id="minimum-send-interval"[^>]*aria-describedby="minimum-send-interval-help"/, 'minimum send interval help association missing');
+  assert.match(js, /const existing = field\.getAttribute\('aria-describedby'\); field\.setAttribute\('aria-describedby', \[existing, error\.id\]/, 'validation must append error descriptions to static help');
+  assert.match(js, /filter\(\(x\) => x && !x\.endsWith\('-error'\)\)/, 'clearing validation must preserve static help descriptions');
+});
+
 test('timing controls expose required limits and units', () => {
-  has(/Minimum interval between actual sends, minutes<\/label>\s*<input id="minimum-send-interval" type="number" min="1" step="1"/s);
+  has(/Minimum interval between actual sends, minutes<\/label>\s*<input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric" aria-describedby="minimum-send-interval-help"/s);
   has(/Delay after prompt insertion before Send, seconds<\/label>\s*<input id="pre-send-delay" type="number" min="1" max="30"/s);
   has(/Busy-chat checks do not consume this interval\./);
 });
