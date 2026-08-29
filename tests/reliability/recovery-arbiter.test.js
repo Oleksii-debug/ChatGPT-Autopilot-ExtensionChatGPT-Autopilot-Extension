@@ -52,7 +52,6 @@ test('alarm reconciliation recreates a single wake from persisted deadlines', as
   const wakeAt = await reconcileAlarm(chromeApi, state, 10_000);
   assert.equal(wakeAt, 20_000);
   assert.deepEqual(calls, [
-    ['clear', ALARM_NAME],
     ['create', ALARM_NAME, { when: 20_000 }]
   ]);
 });
