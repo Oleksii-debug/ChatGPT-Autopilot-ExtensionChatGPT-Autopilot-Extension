@@ -143,3 +143,34 @@ test('pre-send deadline prevents premature submit before any side effect', async
   assert.equal(state.sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
   assert.equal(state.sendArbiter.lease, null);
 });
+
+for (const quiescentState of [RunState.PAUSED, RunState.STOPPED]) {
+  test(`${quiescentState} committed before durable submit transaction prevents lease and send`, async () => {
+    const repo = new FakeRepository(fixture());
+    const clock = { value: 0 };
+    const coordinator = new DurableSubmissionCoordinator(repo, { now: () => clock.value, cryptoApi: webcrypto });
+    const identity = await prepareForSubmit(coordinator, clock);
+    clock.value = 1040;
+
+    await repo.update(draft => {
+      draft.sessionsById.s1.runState = quiescentState;
+      return draft;
+    });
+
+    let called = false;
+    await assert.rejects(() => coordinator.submitWithDurableCheckpoint({
+      sessionId: 's1',
+      operationId: identity.operationId,
+      submit: async () => {
+        called = true;
+        return { status: InteractionResult.SENT_VERIFIED };
+      },
+    }), /Session is not active for submit/);
+
+    const state = await repo.load();
+    assert.equal(called, false);
+    assert.equal(state.sessionsById.s1.runState, quiescentState);
+    assert.equal(state.sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
+    assert.equal(state.sendArbiter.lease, null);
+  });
+}
