@@ -37,6 +37,7 @@ test('portable profile preview validates format and reports counts without state
   assert.equal(preview.sessionCount, 1);
   assert.equal(preview.taskCount, 1);
   assert.equal(preview.autoStartSessionCount, 0);
+  assert.equal(previewPortableProfile(profile({ autoStart: true }), 100).autoStartSessionCount, 1);
   assert.throws(() => previewPortableProfile({ ...input, version: 2 }, 100), /Unsupported profile version/);
 });
 
