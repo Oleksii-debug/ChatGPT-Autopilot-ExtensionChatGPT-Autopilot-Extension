@@ -5,6 +5,7 @@ import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
+import { importConfigurationDocument, exportConfigurationDocument } from '../core/configuration-file.js';
 
 const EXECUTION_AVAILABLE = true;
 const repo = new StorageRepository(chrome);
@@ -15,9 +16,44 @@ const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
 
-async function notifyStatusChanged(state) {
+const lastUiStatusSignatureBySession = new Map();
+
+function uiStatusSignature(state, sessionId) {
+  const session = state?.sessionsById?.[sessionId];
+  if (!session) return '';
+  const tasks = session.taskOrder.map(taskId => session.tasksById[taskId]).filter(Boolean);
+  const currentTask = tasks[session.currentTaskIndex] || null;
+  const log = state.logs?.[sessionId] || [];
+  const lastLog = log.at(-1) || null;
+  return JSON.stringify([
+    session.name,
+    session.runState,
+    session.currentTaskIndex,
+    session.nextAllowedSendAt,
+    session.lastSuccessfulSendAt,
+    session.lastError,
+    session.operation?.phase || 'NONE',
+    currentTask?.status || 'IDLE',
+    currentTask?.retryAfterAt || 0,
+    currentTask?.manualReviewReason || '',
+    tasks.filter(task => task.enabled).length,
+    log.length,
+    lastLog?.at || 0,
+    lastLog?.message || '',
+  ]);
+}
+
+async function notifyStatusChanged(state, { forceSessionIds = [] } = {}) {
   if (!chrome.runtime?.sendMessage) return;
-  for (const sessionId of Object.keys(state?.sessionsById || {})) {
+  const liveSessionIds = new Set(Object.keys(state?.sessionsById || {}));
+  for (const knownSessionId of lastUiStatusSignatureBySession.keys()) {
+    if (!liveSessionIds.has(knownSessionId)) lastUiStatusSignatureBySession.delete(knownSessionId);
+  }
+  const forced = new Set(forceSessionIds);
+  for (const sessionId of liveSessionIds) {
+    const signature = uiStatusSignature(state, sessionId);
+    if (!forced.has(sessionId) && lastUiStatusSignatureBySession.get(sessionId) === signature) continue;
+    lastUiStatusSignatureBySession.set(sessionId, signature);
     try {
       await chrome.runtime.sendMessage({
         channel: 'autopilot-core',
@@ -25,7 +61,7 @@ async function notifyStatusChanged(state) {
         sessionId,
       });
     } catch {
-      // The options page is normally closed. Lack of a UI receiver must never fail a runtime cycle.
+      // The options page is normally closed. Initial UI load reads canonical truth directly.
     }
   }
 }
@@ -130,16 +166,46 @@ export async function dispatchUiMessage(message) {
   return result;
 }
 
+export async function dispatchConfigurationMessage(message) {
+  if (message?.channel !== 'autopilot-config' || typeof message.type !== 'string') return null;
+  await ensureColdStartReconciled();
+  if (message.type === 'EXPORT_CONFIGURATION') {
+    return { document: await exportConfigurationDocument({ repository: repo }) };
+  }
+  if (message.type === 'IMPORT_CONFIGURATION') {
+    const result = await importConfigurationDocument({
+      repository: repo,
+      document: message.payload?.document,
+    });
+    if (result.sessionsAutoStarted > 0) {
+      await runExecutionCycle();
+    } else {
+      const state = await repo.load();
+      await notifyStatusChanged(state, { forceSessionIds: result.sessionIds });
+    }
+    return result;
+  }
+  throw new Error('Unsupported configuration-file command');
+}
+
 chrome.runtime.onInstalled.addListener(() => { runSafely(runExecutionCycle()); });
 chrome.runtime.onStartup.addListener(() => { runSafely(runExecutionCycle()); });
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'autopilot-core-wake') runSafely(runExecutionCycle());
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.channel !== 'autopilot-ui') return false;
-  dispatchUiMessage(message)
-    .then(data => sendResponse({ ok: true, data }))
-    .catch(error => sendResponse({ ok: false, error: { message: error?.message || 'Core command failed' } }));
-  return true;
+  if (message?.channel === 'autopilot-ui') {
+    dispatchUiMessage(message)
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(error => sendResponse({ ok: false, error: { message: error?.message || 'Core command failed' } }));
+    return true;
+  }
+  if (message?.channel === 'autopilot-config') {
+    dispatchConfigurationMessage(message)
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(error => sendResponse({ ok: false, error: { message: error?.message || 'Configuration import failed' } }));
+    return true;
+  }
+  return false;
 });
 chrome.action?.onClicked.addListener(() => { runSafely(chrome.runtime.openOptionsPage()); });
