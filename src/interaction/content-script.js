@@ -15,6 +15,7 @@
     'надіслати запит',
     'відправити',
     'відправити повідомлення',
+    'відправити запит',
     'отправить',
     'отправить сообщение',
     'odoslať',
@@ -36,6 +37,10 @@
 
   function normalizeText(value) {
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function includesAny(text, values) {
+    return values.some((value) => text.includes(value));
   }
 
   function elementText(element) {
@@ -62,10 +67,15 @@
   }
 
   function isWhitelistedRateLimitNotice(text) {
-    const ukrainian = text.includes('забагато запитів')
-      && text.includes('надсилаєте запити надто швидко')
-      && text.includes('тимчасово обмежили доступ до ваших розмов')
-      && text.includes('зачекайте кілька хвилин');
+    const ukrainian = includesAny(text, ['забагато запитів', 'занадто багато запитів'])
+      && includesAny(text, [
+        'надсилаєте запити надто швидко',
+        'надсилаєте запити занадто швидко',
+        'запити надсилаються надто швидко',
+        'запити надсилаються занадто швидко',
+      ])
+      && includesAny(text, ['тимчасово обмежили доступ', 'тимчасово обмежено доступ'])
+      && includesAny(text, ['зачекайте кілька хвилин', 'спробуйте ще раз через кілька хвилин']);
     const english = text.includes('too many requests')
       && text.includes('requests too quickly')
       && text.includes('temporarily limited access to your conversations')
@@ -80,7 +90,7 @@
       || button?.textContent
       || button?.value
     );
-    return label === 'зрозуміло' || label === 'got it';
+    return label === 'зрозуміло' || label === 'підтвердити' || label === 'got it';
   }
 
   function dismissWhitelistedRateLimitNotice(doc) {

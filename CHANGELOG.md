@@ -24,7 +24,8 @@
 - Production automatic execution is now enabled after exact integrated deterministic acceptance; explicit injected disabled-mode coverage remains for fail-closed recovery tests.
 - Release packaging now replaces the same canonical candidate name instead of creating ambiguous `final`/`fixed`/`new` variants.
 - Exact rate-limit acknowledgement now returns `RATE_LIMITED` without adapter/Send work and resumes only through the configured durable scheduler deadline.
-- The interaction message bridge now auto-acknowledges only the explicitly whitelisted benign ChatGPT “Too many requests” informational dialog (`Зрозуміло` / `Got it`) before continuing the normal interaction request; unknown, security, payment, and non-whitelisted dialogs remain fail-closed and are never auto-accepted.
+- The interaction message bridge now auto-acknowledges only the explicitly whitelisted benign ChatGPT “Too many requests” informational dialog (`Зрозуміло` / `Підтвердити` / `Got it`) before continuing on a later scheduled request; Ukrainian wording variants remain gated by a strong rate-limit signature, while unknown, security, payment, and non-whitelisted dialogs remain fail-closed and are never auto-accepted.
+- Send-control compatibility now includes Ukrainian `Надіслати`, `Надіслати повідомлення`, `Надіслати запит`, `Відправити`, `Відправити повідомлення`, and `Відправити запит` labels, plus the existing unique composer-submit fallback.
 
 ### Known incomplete work
 
