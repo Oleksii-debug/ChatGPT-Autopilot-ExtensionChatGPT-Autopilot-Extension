@@ -25,6 +25,19 @@
       <p>Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons. No extension-specific global keyboard shortcuts are assigned.</p>
       <p>Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.</p>
     </section>
+
+    <section aria-labelledby="portable-profile-heading">
+      <h2 id="portable-profile-heading">Configuration file</h2>
+      <p id="portable-profile-help">Keep the extension installed. Give the JSON template to an AI or edit it elsewhere, then import the completed file here. Import changes only Sessions named by stable ids in the file; unrelated Sessions remain untouched.</p>
+      <a id="download-profile-template" href="../config/portable-profile-template.json" download="ChatGPT-Autopilot-profile-template.json">Download blank configuration template</a>
+      <label for="portable-profile-file">Choose configuration JSON file</label>
+      <input id="portable-profile-file" type="file" accept="application/json,.json" aria-describedby="portable-profile-help portable-profile-preview">
+      <p id="portable-profile-preview" tabindex="0">No configuration file selected.</p>
+      <button id="import-profile-button" type="button" disabled>Import without starting</button>
+      <button id="import-profile-start-button" type="button" disabled>Import and start requested Sessions</button>
+      <button id="export-profile-button" type="button">Export current Sessions to JSON</button>
+    </section>
+
     <section id="session-editor" aria-labelledby="session-heading" hidden>
       <h2 id="session-heading" tabindex="-1">Session</h2>
       <div id="form-error-summary" tabindex="-1" role="region" aria-label="Configuration errors" hidden></div>
@@ -59,6 +72,14 @@
 
       <section aria-labelledby="tasks-heading">
         <h3 id="tasks-heading">Tasks</h3>
+        <div id="bulk-url-region">
+          <label for="bulk-task-urls">Bulk ChatGPT links</label>
+          <textarea id="bulk-task-urls" rows="6" aria-describedby="bulk-task-urls-help"></textarea>
+          <p id="bulk-task-urls-help">Paste up to 50 ChatGPT links. One link per line is recommended; numbered lists and whitespace-separated links are also recognized. Duplicates are ignored.</p>
+          <button id="bulk-add-urls-button" type="button">Add recognized links</button>
+          <button id="bulk-replace-urls-button" type="button">Replace task links with recognized links</button>
+          <p id="bulk-task-result" tabindex="0">No bulk link operation has been run.</p>
+        </div>
         <ol id="task-list"></ol>
         <button id="add-task-button" type="button" aria-describedby="task-limit-help">Add task</button>
         <p id="task-limit-help">Up to 50 tasks per session.</p>
@@ -111,6 +132,7 @@
         <button id="pause-session-button" type="button">Pause</button>
         <button id="resume-session-button" type="button">Resume</button>
         <button id="stop-session-button" type="button">Stop</button>
+        <p id="draft-status" tabindex="0">No unsaved draft changes.</p>
         <p id="command-result" tabindex="0">No runtime command has been issued.</p>
       </section>
 
@@ -121,7 +143,7 @@
 
       <section aria-labelledby="log-heading">
         <h3 id="log-heading">Log</h3>
-        <p id="session-log-bound">Core retains a bounded session log.</p>
+        <p id="session-log-bound">Core retains a bounded session log. The options page shows only the newest 100 entries to stay responsive.</p>
         <p id="session-log-count">0 Core log entries shown.</p>
         <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
         <button id="clear-log-button" type="button">Clear log</button>
