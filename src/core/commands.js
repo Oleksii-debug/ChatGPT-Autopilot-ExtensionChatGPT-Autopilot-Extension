@@ -3,6 +3,7 @@ import { OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSessi
 import { pauseSession, resumeSession, startSession, stopSession } from './state-machine.js';
 import { appendLog } from './logger.js';
 import { EXECUTION_UNAVAILABLE_MESSAGE } from './recovery.js';
+import { applyPortableProfile, exportPortableProfile, previewPortableProfile } from './portable-profile.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -157,6 +158,28 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.GET_SNAPSHOT) { const state=await this.repo.load(); return { snapshot: structuredClone(state) }; }
     if (command === CoreCommand.GET_SESSION) { const state=await this.repo.load(); const s=state.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); return { session: sessionToUi(s,state) }; }
+    if (command === CoreCommand.PREVIEW_PORTABLE_PROFILE) {
+      return { preview: previewPortableProfile(payload.profile, this.now()) };
+    }
+    if (command === CoreCommand.EXPORT_PORTABLE_PROFILE) {
+      const state = await this.repo.load();
+      return { profile: exportPortableProfile(state, { sessionIds: payload.sessionIds, profileName: payload.profileName }) };
+    }
+    if (command === CoreCommand.IMPORT_PORTABLE_PROFILE) {
+      let summary = null;
+      const state = await this.repo.update(draft => {
+        summary = applyPortableProfile(draft, payload.profile, {
+          now: this.now(),
+          confirmAutoStart: payload.confirmAutoStart === true,
+          executionAvailable: this.executionAvailable,
+        });
+        return draft;
+      });
+      return {
+        summary,
+        sessions: summary.importedSessionIds.map(id => sessionToUi(state.sessionsById[id], state)),
+      };
+    }
     if (command === CoreCommand.CREATE_SESSION) {
       const state = await this.repo.update(draft => { const s=sessionFromUi(payload.config || {}, this.now()); if(draft.sessionsById[s.id]) throw new Error('Session id already exists'); draft.sessionsById[s.id]=s; draft.sessionOrder.push(s.id); appendLog(draft,s.id,'Session created',{at:this.now()}); return draft; });
       const id=state.sessionOrder.at(-1); return { session: sessionToUi(state.sessionsById[id],state) };
