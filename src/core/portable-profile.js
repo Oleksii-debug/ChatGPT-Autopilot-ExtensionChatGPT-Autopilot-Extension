@@ -132,10 +132,11 @@ function parseProfile(profile, now = Date.now()) {
     throw new Error(`Profile must contain 1-${MAX_PORTABLE_SESSIONS} sessions`);
   }
   const profileName = requireString(profile.profileName ?? 'ChatGPT Autopilot profile', 'profileName', { allowEmpty: false, maxLength: 500 }).trim();
+  const profileAutoStartRequested = profile.autoStart === true;
   const sessionConfigs = profile.sessions.map((raw, index) => ({
     raw,
     session: buildSession(raw, index, now, 1),
-    autoStartRequested: raw.autoStart === true || (raw.autoStart === undefined && profile.autoStart === true),
+    autoStartRequested: profileAutoStartRequested || raw.autoStart === true,
   }));
   const sessionIds = sessionConfigs.map(item => item.session.id);
   if (new Set(sessionIds).size !== sessionIds.length) throw new Error('Profile contains duplicate Session ids');
