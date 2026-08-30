@@ -147,10 +147,12 @@ test('multi-error validation summary is a named programmatic focus region', () =
   assert.match(js, /summary\.focus\(\)/);
 });
 
-test('background status refresh does not reopen the selected session or steal editor focus', () => {
+test('background status refresh is coalesced without reopening the selected session or stealing editor focus', () => {
   assert.match(js, /async function refreshSelectedSessionStatus\(sessionId\)/);
-  assert.match(js, /renderStatus\(\);\s*renderLog\(\);\s*renderActions\(\);/s);
-  assert.match(js, /if \(message\.sessionId === ui\.selectedSessionId\) void refreshSelectedSessionStatus\(ui\.selectedSessionId\)/);
+  assert.match(js, /function queueStatusRefresh\(sessionId\)/);
+  assert.match(js, /statusRefreshTimer = setTimeout\(flushStatusRefresh, STATUS_REFRESH_DELAY_MS\)/);
+  assert.match(js, /async function flushStatusRefresh\(\)[\s\S]*if \(ui\.selectedSessionId && dirty\.has\(ui\.selectedSessionId\)\) \{\s*await refreshSelectedSessionStatus\(ui\.selectedSessionId\);\s*\}/s);
+  assert.match(js, /queueStatusRefresh\(message\.sessionId\)/);
   assert.doesNotMatch(js, /if \(message\.sessionId === ui\.selectedSessionId\) openSession\(ui\.selectedSessionId\)/);
 });
 
