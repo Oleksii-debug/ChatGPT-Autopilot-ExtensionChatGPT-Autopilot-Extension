@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "test:ui": "node --test tests/ui/options-contract.test.js tests/ui/lifecycle-focus.test.js tests/ui/task-enabled-validation.test.js",
+    "test:ui": "node --test tests/ui/options-contract.test.js tests/ui/lifecycle-focus.test.js tests/ui/task-enabled-validation.test.js tests/ui/config-tools.test.js tests/ui/ukrainian-localization.test.js",
     "test:release": "node --test tests/release/*.test.js",
     "package:release": "node scripts/package-release.mjs"
   }

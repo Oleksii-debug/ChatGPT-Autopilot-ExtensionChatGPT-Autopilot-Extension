@@ -109,9 +109,11 @@ test('runtime status renders Core read-model fields without a UI state machine',
 });
 
 test('bounded Core log remains keyboard-readable and reports its visible entry count', () => {
-  has(/id="session-log-bound">Core retains a bounded session log\.<\/p>/);
+  has(/id="session-log-bound">Core retains a bounded session log\. The options page shows only the newest 100 entries to stay responsive\.<\/p>/);
   has(/id="session-log-count">0 Core log entries shown\.<\/p>/);
+  assert.match(js, /const VISIBLE_LOG_LIMIT = 100/);
   assert.match(js, /const entries = ui\.selected\.log \|\| \[\]/);
+  assert.match(js, /const visible = entries\.slice\(-VISIBLE_LOG_LIMIT\)/);
   assert.match(js, /\$\('session-log-count'\)\.textContent/);
 });
 
@@ -147,10 +149,12 @@ test('multi-error validation summary is a named programmatic focus region', () =
   assert.match(js, /summary\.focus\(\)/);
 });
 
-test('background status refresh does not reopen the selected session or steal editor focus', () => {
+test('background status refresh is coalesced without reopening the selected session or stealing editor focus', () => {
   assert.match(js, /async function refreshSelectedSessionStatus\(sessionId\)/);
-  assert.match(js, /renderStatus\(\);\s*renderLog\(\);\s*renderActions\(\);/s);
-  assert.match(js, /if \(message\.sessionId === ui\.selectedSessionId\) void refreshSelectedSessionStatus\(ui\.selectedSessionId\)/);
+  assert.match(js, /function queueStatusRefresh\(sessionId\)/);
+  assert.match(js, /statusRefreshTimer = setTimeout\(flushStatusRefresh, STATUS_REFRESH_DELAY_MS\)/);
+  assert.match(js, /async function flushStatusRefresh\(\)[\s\S]*if \(ui\.selectedSessionId && dirty\.has\(ui\.selectedSessionId\)\) \{\s*await refreshSelectedSessionStatus\(ui\.selectedSessionId\);\s*\}/s);
+  assert.match(js, /queueStatusRefresh\(message\.sessionId\)/);
   assert.doesNotMatch(js, /if \(message\.sessionId === ui\.selectedSessionId\) openSession\(ui\.selectedSessionId\)/);
 });
 
@@ -176,7 +180,7 @@ test('Session navigation marks exactly the opened Session as current without tog
   assert.match(js, /querySelectorAll\('#session-list \[aria-current=\"page\"\]'\)\.forEach\(\(element\) => element\.removeAttribute\('aria-current'\)\)/);
   assert.match(js, /if \(ui\.selectedSessionId\) \$\(`session-select-\$\{ui\.selectedSessionId\}`\)\?\.setAttribute\('aria-current', 'page'\)/);
   assert.match(js, /function renderSessionList\(\)[\s\S]*syncCurrentSessionMarker\(\);/);
-  assert.match(js, /ui\.selectedSessionId = sessionId;\s*syncCurrentSessionMarker\(\);/);
+  assert.match(js, /ui\.selectedSessionId = sessionId;\s*storageSet\(LAST_SESSION_KEY, sessionId\);\s*syncCurrentSessionMarker\(\);/);
   assert.doesNotMatch(js, /aria-pressed/);
 });
 

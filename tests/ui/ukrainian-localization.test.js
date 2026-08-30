@@ -12,6 +12,27 @@ test('Ukrainian UI localization translates static labels and runtime states', ()
   assert.equal(translateText('Task 2 must use a valid https://chatgpt.com URL.'), 'Для завдання 2 потрібно вказати коректне посилання https://chatgpt.com.');
 });
 
+test('Ukrainian UI localization covers portable configuration, bulk links, drafts and bounded log output', () => {
+  assert.equal(translateText('Configuration file'), 'Файл налаштувань');
+  assert.equal(translateText('Download blank configuration template'), 'Завантажити порожній шаблон налаштувань');
+  assert.equal(translateText('Import and start requested Sessions'), 'Імпортувати й запустити запитані сеанси');
+  assert.equal(translateText('Bulk ChatGPT links'), 'Масове додавання посилань ChatGPT');
+  assert.equal(translateText('Unsaved changes are protected locally in this browser.'), 'Незбережені зміни локально захищено в цьому браузері.');
+  assert.equal(translateText('3 of 25 Core log entries shown.'), 'Показано 3 із 25 записів журналу.');
+  assert.equal(
+    translateText('7 unique ChatGPT link(s) recognized; 5 new task(s) created. 2 link(s) did not fit the 50-task limit.'),
+    'Розпізнано унікальних посилань ChatGPT: 7; створено нових завдань: 5. Не вмістилося через обмеження у 50 завдань: 2.'
+  );
+  assert.equal(
+    translateText('Profile Робота: 2 Session(s), 10 Task(s), 2 marked for automatic start.'),
+    'Профіль Робота: сеансів — 2, завдань — 10, позначено для автоматичного запуску — 2.'
+  );
+  assert.equal(
+    translateText('Portable configuration imported: 2 Session(s). 2 Session(s) started.'),
+    'Переносні налаштування імпортовано: сеансів — 2. Запущено сеансів — 2.'
+  );
+});
+
 test('Ukrainian UI localization translates command and Core status output', () => {
   assert.equal(translateText('Core acknowledged Start. Current state: RUNNING.'), 'Команду «Запуск» виконано. Поточний стан: ПРАЦЮЄ.');
   assert.equal(translateText('Command failed: Session not found'), 'Не вдалося виконати команду: Сеанс не знайдено');

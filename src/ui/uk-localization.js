@@ -37,6 +37,14 @@ const EXACT = new Map([
   ['Keyboard and startup behavior', 'Клавіатура та поведінка після запуску'],
   ['Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons. No extension-specific global keyboard shortcuts are assigned.', 'Для переходу між елементами використовуйте Tab і Shift+Tab. Для натискання кнопок — Enter або Пробіл, для прапорців і перемикачів — Пробіл. Окремих глобальних гарячих клавіш розширення не призначено.'],
   ['Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.', 'Запущені сеанси та сеанси у відновленні автоматично продовжують роботу після запуску Chrome. Призупинені та зупинені сеанси автоматично не запускаються.'],
+  ['Configuration file', 'Файл налаштувань'],
+  ['Keep the extension installed. Give the JSON template to an AI or edit it elsewhere, then import the completed file here. Import changes only Sessions named by stable ids in the file; unrelated Sessions remain untouched.', 'Залиште розширення встановленим. Передайте шаблон JSON штучному інтелекту або заповніть його в іншому місці, а потім імпортуйте готовий файл тут. Імпорт змінює лише сеанси зі стабільними ідентифікаторами, указаними у файлі; інші сеанси не змінюються.'],
+  ['Download blank configuration template', 'Завантажити порожній шаблон налаштувань'],
+  ['Choose configuration JSON file', 'Вибрати JSON-файл налаштувань'],
+  ['No configuration file selected.', 'Файл налаштувань не вибрано.'],
+  ['Import without starting', 'Імпортувати без запуску'],
+  ['Import and start requested Sessions', 'Імпортувати й запустити запитані сеанси'],
+  ['Export current Sessions to JSON', 'Експортувати поточні сеанси у JSON'],
   ['Session', 'Сеанс'],
   ['Configuration errors', 'Помилки налаштування'],
   ['Configuration', 'Налаштування'],
@@ -51,6 +59,11 @@ const EXACT = new Map([
   ['One pass', 'Один прохід'],
   ['Continuous monitor', 'Постійна робота по колу'],
   ['Tasks', 'Завдання'],
+  ['Bulk ChatGPT links', 'Масове додавання посилань ChatGPT'],
+  ['Paste up to 50 ChatGPT links. One link per line is recommended; numbered lists and whitespace-separated links are also recognized. Duplicates are ignored.', 'Вставте до 50 посилань ChatGPT. Рекомендовано одне посилання в кожному рядку; також розпізнаються нумеровані списки та посилання, розділені пробілами. Дублікати ігноруються.'],
+  ['Add recognized links', 'Додати розпізнані посилання'],
+  ['Replace task links with recognized links', 'Замінити посилання завдань розпізнаними'],
+  ['No bulk link operation has been run.', 'Масову операцію з посиланнями ще не виконували.'],
   ['Add task', 'Додати завдання'],
   ['Up to 50 tasks per session.', 'До 50 завдань у кожному сеансі.'],
   ['Timing and behavior', 'Час і поведінка'],
@@ -78,10 +91,14 @@ const EXACT = new Map([
   ['Pause', 'Призупинити'],
   ['Resume', 'Продовжити'],
   ['Stop', 'Зупинити'],
+  ['No unsaved draft changes.', 'Незбережених змін немає.'],
+  ['Unsaved draft restored from this browser.', 'Незбережену чернетку відновлено з цього браузера.'],
+  ['Unsaved changes are protected locally in this browser.', 'Незбережені зміни локально захищено в цьому браузері.'],
   ['No runtime command has been issued.', 'Команди керування ще не виконувалися.'],
   ['Status', 'Стан'],
   ['Log', 'Журнал'],
   ['Core retains a bounded session log.', 'Програма зберігає обмежений журнал подій сеансу.'],
+  ['Core retains a bounded session log. The options page shows only the newest 100 entries to stay responsive.', 'Програма зберігає обмежений журнал подій сеансу. На сторінці налаштувань показано лише 100 найновіших записів для стабільної роботи.'],
   ['0 Core log entries shown.', 'Показано 0 записів журналу.'],
   ['Session log', 'Журнал сеансу'],
   ['Clear log', 'Очистити журнал'],
@@ -99,6 +116,8 @@ const EXACT = new Map([
   ['Duplicate', 'Дублювати'],
   ['Delete', 'Видалити'],
   ['Task removed.', 'Завдання видалено.'],
+  ['No valid ChatGPT links were recognized.', 'Не розпізнано жодного коректного посилання ChatGPT.'],
+  ['Configuration file is larger than 2 MB.', 'Файл налаштувань перевищує 2 МБ.'],
   ['Session name is required.', 'Вкажіть назву сеансу.'],
   ['Add at least one task.', 'Додайте щонайменше одне завдання.'],
   ['Shared prompt is required.', 'Вкажіть спільний промпт.'],
@@ -134,6 +153,8 @@ const EXACT = new Map([
 
 const RUNTIME = [
   ['Session configuration saved', 'Налаштування сеансу збережено'],
+  ['Session configuration imported from portable profile', 'Налаштування сеансу імпортовано з переносного профілю'],
+  ['Session started after confirmed portable profile import', 'Сеанс запущено після підтвердженого імпорту переносного профілю'],
   ['Session created', 'Сеанс створено'],
   ['Session duplicated', 'Сеанс продубльовано'],
   ['Session started', 'Сеанс запущено'],
@@ -155,6 +176,8 @@ const RUNTIME = [
   ['Only an active session can be paused', 'Призупинити можна лише активний сеанс'],
   ['Only a paused session can be resumed', 'Продовжити можна лише призупинений сеанс'],
   ['Profile send arbiter is busy', 'Механізм черги відправлень профілю зайнятий'],
+  ['Automatic execution is unavailable', 'Автоматичне виконання недоступне'],
+  ['Resume the extension before importing with automatic start', 'Перед імпортом з автоматичним запуском продовжте роботу розширення'],
   ['Automatic execution temporarily unavailable; retry scheduled.', 'Автоматичне виконання тимчасово недоступне; повторну спробу заплановано.'],
   ['Insertion outcome was not confirmed; a safe retry was scheduled.', 'Результат вставлення не підтверджено; заплановано безпечну повторну спробу.'],
   ['Pre-submit operation was interrupted; a safe retry was scheduled.', 'Операцію перед відправленням перервано; заплановано безпечну повторну спробу.'],
@@ -205,7 +228,6 @@ export function translateText(value) {
   if ((m = text.match(/^State: ([A-Z_]+)\.$/))) return `${leading}Стан: ${STATE[m[1]] || m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) enabled tasks\.$/))) return `${leading}Увімкнених завдань: ${m[1]}.${trailing}`;
 
-  // Спочатку специфічні повідомлення про завдання, щоб загальна назва Task N їх не перехоплювала.
   if ((m = text.match(/^Task (\d+) URL is required\.$/))) return `${leading}Для завдання ${m[1]} потрібно вказати посилання.${trailing}`;
   if ((m = text.match(/^Task (\d+) must use a valid https:\/\/chatgpt\.com URL\.$/))) return `${leading}Для завдання ${m[1]} потрібно вказати коректне посилання https://chatgpt.com.${trailing}`;
   if ((m = text.match(/^Prompt for Task (\d+) is required in unique mode\.$/))) return `${leading}У режимі окремих промптів для завдання ${m[1]} потрібно вказати промпт.${trailing}`;
@@ -221,6 +243,17 @@ export function translateText(value) {
   if ((m = text.match(/^Up to 50 tasks per session\. (\d+) configured\.$/))) return `${leading}До 50 завдань у сеансі. Налаштовано: ${m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) configuration errors?\.$/))) return `${leading}Помилок налаштування: ${m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) Core log entr(?:y|ies) shown\.$/))) return `${leading}Показано записів журналу: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^(\d+) of (\d+) Core log entr(?:y|ies) shown\.$/))) return `${leading}Показано ${m[1]} із ${m[2]} записів журналу.${trailing}`;
+  if ((m = text.match(/^(\d+) unique ChatGPT link\(s\) recognized; (\d+) new task\(s\) created\.(?: (\d+) link\(s\) did not fit the 50-task limit\.)?$/))) {
+    const truncated = m[3] ? ` Не вмістилося через обмеження у 50 завдань: ${m[3]}.` : '';
+    return `${leading}Розпізнано унікальних посилань ChatGPT: ${m[1]}; створено нових завдань: ${m[2]}.${truncated}${trailing}`;
+  }
+  if ((m = text.match(/^Profile (.+): (\d+) Session\(s\), (\d+) Task\(s\), (\d+) marked for automatic start\.$/))) return `${leading}Профіль ${m[1]}: сеансів — ${m[2]}, завдань — ${m[3]}, позначено для автоматичного запуску — ${m[4]}.${trailing}`;
+  if ((m = text.match(/^Portable configuration imported: (\d+) Session\(s\)\. (\d+) Session\(s\) started\.$/))) return `${leading}Переносні налаштування імпортовано: сеансів — ${m[1]}. Запущено сеансів — ${m[2]}.${trailing}`;
+  if ((m = text.match(/^Exported (\d+) Session\(s\) to JSON\.$/))) return `${leading}Експортовано сеансів у JSON: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^Configuration file error: (.+)$/))) return `${leading}Помилка файла налаштувань: ${runtimeText(m[1])}${trailing}`;
+  if ((m = text.match(/^Import failed: (.+)$/))) return `${leading}Імпорт не виконано: ${runtimeText(m[1])}${trailing}`;
+  if ((m = text.match(/^Export failed: (.+)$/))) return `${leading}Експорт не виконано: ${runtimeText(m[1])}${trailing}`;
   if ((m = text.match(/^Core acknowledged (.+)\. Current state: ([A-Z_]+)\.$/))) return `${leading}Команду «${actionLabel(m[1])}» виконано. Поточний стан: ${STATE[m[2]] || m[2]}.${trailing}`;
   if ((m = text.match(/^Core acknowledged (.+)\.$/))) return `${leading}Команду «${actionLabel(m[1])}» виконано.${trailing}`;
   if ((m = text.match(/^Command failed: (.+)$/))) return `${leading}Не вдалося виконати команду: ${runtimeText(m[1])}${trailing}`;

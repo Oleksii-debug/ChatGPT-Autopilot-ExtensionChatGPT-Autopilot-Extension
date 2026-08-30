@@ -7,6 +7,13 @@ import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 
 const EXECUTION_AVAILABLE = true;
+const READ_ONLY_UI_COMMANDS = new Set([
+  'LIST_SESSIONS',
+  'GET_SESSION',
+  'GET_SNAPSHOT',
+  'PREVIEW_PORTABLE_PROFILE',
+  'EXPORT_PORTABLE_PROFILE',
+]);
 const repo = new StorageRepository(chrome);
 const transport = new ChromeInteractionTransport(chrome);
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
@@ -126,7 +133,10 @@ export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
   const result = await dispatcher.execute(message.command, message.payload || {});
-  await reconcileRuntime();
+  // Read-only status/configuration queries must not create a STATUS_CHANGED
+  // feedback loop with the options page. Only state-changing UI commands need
+  // alarm reconciliation and a status broadcast.
+  if (!READ_ONLY_UI_COMMANDS.has(message.command)) await reconcileRuntime();
   return result;
 }
 

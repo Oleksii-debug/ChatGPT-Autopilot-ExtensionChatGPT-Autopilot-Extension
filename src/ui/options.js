@@ -1,11 +1,21 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
+import { translateText } from './uk-localization.js';
+import { MAX_PORTABLE_FILE_BYTES, extractChatGptUrls, mergeBulkUrls, parsePortableJson } from './config-tools.js';
 
 const MAX_TASKS = 50;
+const VISIBLE_LOG_LIMIT = 100;
+const STATUS_REFRESH_DELAY_MS = 750;
+const DRAFT_SAVE_DELAY_MS = 250;
+const DRAFT_KEY_PREFIX = 'chatgpt-autopilot-draft:';
+const LAST_SESSION_KEY = 'chatgpt-autopilot-last-session';
 const ui = {
   sessions: [],
+  sessionListSignature: '',
   selectedSessionId: null,
   selected: null,
   deleteReturnFocus: null,
+  pendingPortableProfile: null,
+  pendingPortablePreview: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -58,19 +68,38 @@ function setCommandResult(text) { $('command-result').textContent = text; }
 function reportCommandResult(text) { setCommandResult(text); announce(text); }
 function clone(value) { return structuredClone(value); }
 
+function storageGet(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
+}
+function storageRemove(key) {
+  try { localStorage.removeItem(key); } catch { /* unavailable local draft storage */ }
+}
+
+function sessionListSignature(sessions) {
+  return JSON.stringify((sessions || []).map(session => [session.id, session.name, session.runState, session.enabledTaskCount]));
+}
+
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
   const activeId = preserveFocus ? active?.id || null : null;
   try {
     const data = await core('LIST_SESSIONS');
-    ui.sessions = Array.isArray(data?.sessions) ? data.sessions : [];
-    renderSessionList();
+    const nextSessions = Array.isArray(data?.sessions) ? data.sessions : [];
+    const nextSignature = sessionListSignature(nextSessions);
+    ui.sessions = nextSessions;
+    if (nextSignature !== ui.sessionListSignature) {
+      ui.sessionListSignature = nextSignature;
+      renderSessionList();
+    }
     setAppStatus('Connected to Core.');
     if (active?.isConnected) active.focus();
     else if (activeId) $(activeId)?.focus();
   } catch (error) {
     setAppStatus(error.message);
-    renderSessionList();
+    if (!ui.sessionListSignature) renderSessionList();
   }
 }
 
@@ -110,17 +139,92 @@ function button(id, text, handler) {
   const b = document.createElement('button'); b.id = id; b.type = 'button'; b.textContent = text; b.addEventListener('click', handler); return b;
 }
 
+function portableDraftConfig(session) {
+  return {
+    id: session.id,
+    version: session.version,
+    name: session.name,
+    promptMode: session.promptMode,
+    sharedPrompt: session.sharedPrompt,
+    defaultUniquePrompt: session.defaultUniquePrompt,
+    runMode: session.runMode,
+    tasks: clone(session.tasks || []),
+    minimumSendIntervalMinutes: session.minimumSendIntervalMinutes,
+    preSendDelaySeconds: session.preSendDelaySeconds,
+    busyCheckDelaySeconds: session.busyCheckDelaySeconds,
+    retryBackoffSeconds: session.retryBackoffSeconds,
+    retryBackoffUnit: session.retryBackoffUnit,
+    retryPolicy: session.retryPolicy,
+    busyChatBehavior: session.busyChatBehavior,
+    tabStrategy: session.tabStrategy,
+  };
+}
+
+function restoreDraft(canonical) {
+  const raw = storageGet(`${DRAFT_KEY_PREFIX}${canonical.id}`);
+  if (!raw) return canonical;
+  try {
+    const saved = JSON.parse(raw);
+    if (saved?.baseVersion !== canonical.version || saved?.config?.id !== canonical.id) {
+      storageRemove(`${DRAFT_KEY_PREFIX}${canonical.id}`);
+      return canonical;
+    }
+    const config = saved.config;
+    $('draft-status').textContent = 'Unsaved draft restored from this browser.';
+    return {
+      ...canonical,
+      ...clone(config),
+      version: canonical.version,
+      runState: canonical.runState,
+      actionAvailability: canonical.actionAvailability,
+      status: canonical.status,
+      log: canonical.log,
+    };
+  } catch {
+    storageRemove(`${DRAFT_KEY_PREFIX}${canonical.id}`);
+    return canonical;
+  }
+}
+
+function clearDraft(sessionId) {
+  if (!sessionId) return;
+  storageRemove(`${DRAFT_KEY_PREFIX}${sessionId}`);
+  if (ui.selectedSessionId === sessionId) $('draft-status').textContent = 'No unsaved draft changes.';
+}
+
+let draftSaveTimer = null;
+function persistCurrentDraft() {
+  if (!ui.selected || $('session-editor').hidden) return;
+  const selected = collectEditor();
+  const saved = {
+    baseVersion: selected.version,
+    savedAt: Date.now(),
+    config: portableDraftConfig(selected),
+  };
+  if (storageSet(`${DRAFT_KEY_PREFIX}${selected.id}`, JSON.stringify(saved))) {
+    $('draft-status').textContent = 'Unsaved changes are protected locally in this browser.';
+  }
+}
+function scheduleDraftPersistence() {
+  if (!ui.selected) return;
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(persistCurrentDraft, DRAFT_SAVE_DELAY_MS);
+}
+
 async function openSession(sessionId) {
   try {
     const data = await core('GET_SESSION', { sessionId });
     ui.selectedSessionId = sessionId;
+    storageSet(LAST_SESSION_KEY, sessionId);
     syncCurrentSessionMarker();
-    ui.selected = clone(data.session);
+    const canonical = clone(data.session);
+    ui.selected = restoreDraft(canonical);
     renderEditor();
     $('session-heading').focus();
   } catch (error) { setAppStatus(error.message); announce(error.message); }
 }
 
+let lastRuntimeSignature = '';
 async function refreshSelectedSessionStatus(sessionId) {
   if (!sessionId || sessionId !== ui.selectedSessionId || !ui.selected) return;
   try {
@@ -132,9 +236,21 @@ async function refreshSelectedSessionStatus(sessionId) {
     ui.selected.actionAvailability = latest.actionAvailability;
     ui.selected.status = latest.status;
     ui.selected.log = latest.log;
-    renderStatus();
-    renderLog();
-    renderActions();
+    const signature = JSON.stringify([
+      latest.version,
+      latest.runState,
+      latest.actionAvailability,
+      latest.status,
+      latest.log?.length || 0,
+      latest.log?.at?.(-1)?.at || 0,
+      latest.log?.at?.(-1)?.message || '',
+    ]);
+    if (signature !== lastRuntimeSignature) {
+      lastRuntimeSignature = signature;
+      renderStatus();
+      renderLog();
+      renderActions();
+    }
   } catch (error) {
     setAppStatus(error.message);
     announce(error.message);
@@ -214,14 +330,37 @@ function labeledCheckbox(id, labelText, checked, onChange) {
 
 function addTask() {
   if (!ui.selected || ui.selected.tasks.length >= MAX_TASKS) return;
-  const task = blankTask(); ui.selected.tasks.push(task); renderTasks(task.id); announce(`Task ${ui.selected.tasks.length} added.`);
+  const task = blankTask(); ui.selected.tasks.push(task); renderTasks(task.id); scheduleDraftPersistence(); announce(`Task ${ui.selected.tasks.length} added.`);
 }
 function removeTask(taskId) {
   const index = ui.selected.tasks.findIndex((t) => t.id === taskId); if (index < 0) return;
-  ui.selected.tasks.splice(index, 1); renderTasks();
+  ui.selected.tasks.splice(index, 1); renderTasks(); scheduleDraftPersistence();
   const next = ui.selected.tasks[index] || ui.selected.tasks[index - 1];
   if (next) $(`task-url-${next.id}`)?.focus(); else $('add-task-button').focus();
   announce('Task removed.');
+}
+
+function runBulkUrlImport(replace) {
+  if (!ui.selected) return;
+  const urls = extractChatGptUrls($('bulk-task-urls').value);
+  if (!urls.length) {
+    $('bulk-task-result').textContent = 'No valid ChatGPT links were recognized.';
+    $('bulk-task-result').focus();
+    return;
+  }
+  const hasOnlyBlankDefault = ui.selected.tasks.length === 1
+    && !ui.selected.tasks[0].url
+    && !ui.selected.tasks[0].label
+    && !ui.selected.tasks[0].promptOverride;
+  const existing = !replace && hasOnlyBlankDefault ? [] : ui.selected.tasks;
+  const result = mergeBulkUrls(existing, urls, { replace, maxTasks: MAX_TASKS });
+  if (!result.tasks.length) return;
+  ui.selected.tasks = result.tasks;
+  renderTasks();
+  scheduleDraftPersistence();
+  const truncated = result.truncated ? ` ${result.truncated} link(s) did not fit the 50-task limit.` : '';
+  $('bulk-task-result').textContent = `${result.recognized} unique ChatGPT link(s) recognized; ${result.added} new task(s) created.${truncated}`;
+  $('bulk-task-result').focus();
 }
 
 function collectEditor() {
@@ -278,11 +417,13 @@ function clearErrors() {
 }
 
 async function saveSession() {
-  const session = collectEditor(); const errors = validate(session); if (errors.length) { announce(`${errors.length} configuration error${errors.length === 1 ? '' : 's'}.`); return; }
+  clearTimeout(draftSaveTimer);
+  const session = collectEditor(); const errors = validate(session); if (errors.length) { persistCurrentDraft(); announce(`${errors.length} configuration error${errors.length === 1 ? '' : 's'}.`); return; }
   try {
     const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session });
+    clearDraft(session.id);
     ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor();
-  } catch (error) { setAppStatus(error.message); announce(error.message); }
+  } catch (error) { persistCurrentDraft(); setAppStatus(error.message); announce(error.message); }
 }
 
 async function createSession() {
@@ -325,8 +466,9 @@ async function confirmDelete() {
   const focusTargetId = deleteFocusTargetId(id);
   try {
     await core('DELETE_SESSION', { sessionId: id });
+    clearDraft(id);
     closeDeleteDialog({ restoreFocus: false });
-    if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; $('session-editor').hidden = true; $('empty-state').hidden = false; }
+    if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; storageRemove(LAST_SESSION_KEY); $('session-editor').hidden = true; $('empty-state').hidden = false; }
     await loadSessions({ preserveFocus: false });
     ($(focusTargetId) || $('create-session-button')).focus();
     announce('Session deleted.');
@@ -397,12 +539,13 @@ function renderStatus() {
 }
 function renderLog() {
   const entries = ui.selected.log || [];
-  $('session-log-count').textContent = `${entries.length} Core log entr${entries.length === 1 ? 'y' : 'ies'} shown.`;
-  $('session-log-region').textContent = entries.map((entry) => typeof entry === 'string' ? entry : `${formatTime(entry.at)} — ${entry.message}`).join('\n');
+  const visible = entries.slice(-VISIBLE_LOG_LIMIT);
+  $('session-log-count').textContent = `${visible.length} of ${entries.length} Core log entr${entries.length === 1 ? 'y' : 'ies'} shown.`;
+  $('session-log-region').textContent = visible.map((entry) => typeof entry === 'string' ? translateText(entry) : `${formatTime(entry.at)} — ${translateText(entry.message)}`).join('\n');
 }
 
 function onPromptModeChange() {
-  const value = document.querySelector('input[name="promptMode"]:checked')?.value || 'shared'; ui.selected.promptMode = value; $('shared-prompt-container').hidden = value !== 'shared'; $('unique-default-container').hidden = value !== 'unique'; renderTasks(); announce(value === 'shared' ? 'Shared prompt mode selected.' : 'Unique prompt mode selected.');
+  const value = document.querySelector('input[name="promptMode"]:checked')?.value || 'shared'; ui.selected.promptMode = value; $('shared-prompt-container').hidden = value !== 'shared'; $('unique-default-container').hidden = value !== 'unique'; renderTasks(); scheduleDraftPersistence(); announce(value === 'shared' ? 'Shared prompt mode selected.' : 'Unique prompt mode selected.');
 }
 function syncRetryBackoffBounds() {
   const minutes = $('retry-backoff-unit').value === 'minutes';
@@ -423,14 +566,126 @@ function onRetryBackoffUnitChange() {
     ui.selected.retryBackoffSeconds = nextAmount * (nextUnit === 'minutes' ? 60 : 1);
   }
   syncRetryBackoffBounds();
+  scheduleDraftPersistence();
   announce(`Retry/backoff unit changed to ${nextUnit}. Current wait is ${nextAmount} ${nextUnit}.`);
 }
-function applyDefaultPrompt() { const value = $('default-unique-prompt').value; let changed = 0; ui.selected.tasks.forEach((task) => { if (!task.promptOverride.trim()) { task.promptOverride = value; changed++; } }); renderTasks(); announce(`Default prompt applied to ${changed} empty task${changed === 1 ? '' : 's'}.`); }
+function applyDefaultPrompt() { const value = $('default-unique-prompt').value; let changed = 0; ui.selected.tasks.forEach((task) => { if (!task.promptOverride.trim()) { task.promptOverride = value; changed++; } }); renderTasks(); scheduleDraftPersistence(); announce(`Default prompt applied to ${changed} empty task${changed === 1 ? '' : 's'}.`); }
+
+function setPortableImportEnabled(enabled, allowStart = false) {
+  $('import-profile-button').disabled = !enabled;
+  $('import-profile-start-button').disabled = !enabled || !allowStart;
+}
+
+async function onPortableProfileFileChange() {
+  ui.pendingPortableProfile = null;
+  ui.pendingPortablePreview = null;
+  setPortableImportEnabled(false);
+  const file = $('portable-profile-file').files?.[0];
+  if (!file) {
+    $('portable-profile-preview').textContent = 'No configuration file selected.';
+    return;
+  }
+  if (file.size > MAX_PORTABLE_FILE_BYTES) {
+    $('portable-profile-preview').textContent = 'Configuration file is larger than 2 MB.';
+    $('portable-profile-preview').focus();
+    return;
+  }
+  try {
+    const profile = parsePortableJson(await file.text());
+    const data = await core('PREVIEW_PORTABLE_PROFILE', { profile });
+    ui.pendingPortableProfile = profile;
+    ui.pendingPortablePreview = data.preview;
+    const preview = data.preview;
+    $('portable-profile-preview').textContent = `Profile ${preview.profileName}: ${preview.sessionCount} Session(s), ${preview.taskCount} Task(s), ${preview.autoStartSessionCount} marked for automatic start.`;
+    setPortableImportEnabled(true, preview.autoStartSessionCount > 0);
+    $('portable-profile-preview').focus();
+  } catch (error) {
+    $('portable-profile-preview').textContent = `Configuration file error: ${error.message}`;
+    $('portable-profile-preview').focus();
+  }
+}
+
+async function importPortableProfile(confirmAutoStart) {
+  if (!ui.pendingPortableProfile) return;
+  try {
+    const data = await core('IMPORT_PORTABLE_PROFILE', {
+      profile: ui.pendingPortableProfile,
+      confirmAutoStart,
+    });
+    const importedIds = data?.summary?.importedSessionIds || [];
+    for (const id of importedIds) clearDraft(id);
+    ui.sessionListSignature = '';
+    await loadSessions({ preserveFocus: false });
+    if (importedIds[0]) await openSession(importedIds[0]);
+    const started = data?.summary?.startedSessionIds?.length || 0;
+    reportCommandResult(`Portable configuration imported: ${importedIds.length} Session(s). ${started} Session(s) started.`);
+  } catch (error) {
+    setAppStatus(error.message);
+    reportCommandResult(`Import failed: ${error.message}`);
+  }
+}
+
+function safeFileName(value) {
+  return String(value || 'ChatGPT-Autopilot-profile').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 100) || 'ChatGPT-Autopilot-profile';
+}
+function downloadJson(data, fileName) {
+  const blob = new Blob([`${JSON.stringify(data, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+async function exportPortableProfile() {
+  try {
+    const data = await core('EXPORT_PORTABLE_PROFILE', { profileName: 'ChatGPT Автопілот — експорт' });
+    downloadJson(data.profile, `${safeFileName(data.profile.profileName)}.json`);
+    reportCommandResult(`Exported ${data.profile.sessions.length} Session(s) to JSON.`);
+  } catch (error) {
+    setAppStatus(error.message);
+    reportCommandResult(`Export failed: ${error.message}`);
+  }
+}
+
+let statusRefreshTimer = null;
+let statusRefreshInFlight = false;
+let statusRefreshQueued = false;
+const dirtyStatusSessionIds = new Set();
+function queueStatusRefresh(sessionId) {
+  if (sessionId) dirtyStatusSessionIds.add(sessionId);
+  if (statusRefreshTimer || statusRefreshInFlight) {
+    statusRefreshQueued = true;
+    return;
+  }
+  statusRefreshTimer = setTimeout(flushStatusRefresh, STATUS_REFRESH_DELAY_MS);
+}
+async function flushStatusRefresh() {
+  statusRefreshTimer = null;
+  if (statusRefreshInFlight) { statusRefreshQueued = true; return; }
+  statusRefreshInFlight = true;
+  const dirty = new Set(dirtyStatusSessionIds);
+  dirtyStatusSessionIds.clear();
+  statusRefreshQueued = false;
+  try {
+    await loadSessions();
+    if (ui.selectedSessionId && dirty.has(ui.selectedSessionId)) {
+      await refreshSelectedSessionStatus(ui.selectedSessionId);
+    }
+  } finally {
+    statusRefreshInFlight = false;
+    if (statusRefreshQueued || dirtyStatusSessionIds.size) queueStatusRefresh();
+  }
+}
 
 $('create-session-button').addEventListener('click', createSession);
 $('master-pause-button').addEventListener('click', () => masterAction('MASTER_PAUSE', 'master pause', true));
 $('master-resume-button').addEventListener('click', () => masterAction('MASTER_RESUME', 'master resume', false));
 $('add-task-button').addEventListener('click', addTask);
+$('bulk-add-urls-button').addEventListener('click', () => runBulkUrlImport(false));
+$('bulk-replace-urls-button').addEventListener('click', () => runBulkUrlImport(true));
 $('prompt-mode-shared').addEventListener('change', onPromptModeChange);
 $('prompt-mode-unique').addEventListener('change', onPromptModeChange);
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
@@ -443,14 +698,28 @@ $('stop-session-button').addEventListener('click', () => action('STOP_SESSION', 
 $('clear-log-button').addEventListener('click', () => action('CLEAR_LOG', 'Clear log'));
 $('confirm-delete-button').addEventListener('click', confirmDelete);
 $('cancel-delete-button').addEventListener('click', closeDeleteDialog);
+$('portable-profile-file').addEventListener('change', onPortableProfileFileChange);
+$('import-profile-button').addEventListener('click', () => importPortableProfile(false));
+$('import-profile-start-button').addEventListener('click', () => importPortableProfile(true));
+$('export-profile-button').addEventListener('click', exportPortableProfile);
 document.addEventListener('keydown', trapDialog);
+document.addEventListener('input', (event) => {
+  if (ui.selected && event.target?.closest?.('#session-editor') && event.target.id !== 'bulk-task-urls') scheduleDraftPersistence();
+});
+document.addEventListener('change', (event) => {
+  if (ui.selected && event.target?.closest?.('#session-editor')) scheduleDraftPersistence();
+});
 
 if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener((message) => {
   if (message?.channel !== 'autopilot-core' || message?.type !== 'STATUS_CHANGED') return;
-  void loadSessions();
-  if (message.sessionId === ui.selectedSessionId) void refreshSelectedSessionStatus(ui.selectedSessionId);
+  queueStatusRefresh(message.sessionId);
 });
 
-loadSessions();
+async function initialLoad() {
+  await loadSessions({ preserveFocus: false });
+  const lastSessionId = storageGet(LAST_SESSION_KEY);
+  if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
+}
+void initialLoad();
 
 export { MAX_TASKS, blankSession, blankTask, validate };
