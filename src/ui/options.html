@@ -10,6 +10,8 @@
 <header>
   <h1 id="page-title">ChatGPT Autopilot</h1>
   <p id="app-status" role="status">Ready.</p>
+  <button id="reload-extension-button" type="button" aria-describedby="reload-extension-help">Перезавантажити розширення</button>
+  <p id="reload-extension-help">Використовуйте після оновлення файлів розширення. Якщо Chrome залишив стару фонову частину, розширення також перезавантажиться автоматично після виявлення несумісної команди.</p>
   <button id="master-pause-button" type="button">Master pause</button>
   <button id="master-resume-button" type="button">Resume after master pause</button>
 </header>
@@ -164,6 +166,7 @@
 </div>
 <div id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 <script type="module" src="uk-localization.js"></script>
+<script type="module" src="runtime-reload-guard.js"></script>
 <script type="module" src="options.js"></script>
 </body>
 </html>
