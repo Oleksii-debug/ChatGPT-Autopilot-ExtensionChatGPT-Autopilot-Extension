@@ -1,0 +1,52 @@
+{
+  "_instructions": {
+    "purpose": "Це переносний файл налаштувань ChatGPT Автопілота. Його можна дати будь-якому ШІ та попросити заповнити без зміни структури format/version.",
+    "privacy": "Не публікуйте заповнений файл, якщо він містить приватні URL чатів або промпти.",
+    "mode": {
+      "replace-safe": "Безпечно замінити всі поточні сеанси; активні або невизначені операції блокують імпорт.",
+      "add": "Додати сеанси до наявних; загалом підтримується до 5 сеансів."
+    },
+    "autoStart": "Верхній autoStart є типовим значенням. session.autoStart може явно перевизначити його. true означає запуск після успішного імпорту.",
+    "promptMode": ["shared", "unique"],
+    "runMode": ["one-pass", "continuous"],
+    "tabStrategy": ["keep-open", "worker", "open-close"],
+    "retryPolicy": ["safe", "manual"],
+    "limits": {
+      "sessions": 5,
+      "tasksPerSession": 50,
+      "minimumSendIntervalMinutesMin": 1,
+      "preSendDelaySeconds": "1..30",
+      "busyCheckDelaySeconds": "1..30",
+      "retryBackoffSeconds": "5..3600"
+    },
+    "tasks": "Кожне посилання ChatGPT — окремий task. id можна пропустити. У shared режимі promptOverride не потрібен; у unique режимі promptOverride потрібен для кожного увімкненого task."
+  },
+  "format": "chatgpt-autopilot-config",
+  "version": 1,
+  "mode": "replace-safe",
+  "autoStart": false,
+  "sessions": [
+    {
+      "name": "Назва сеансу",
+      "autoStart": false,
+      "promptMode": "shared",
+      "sharedPrompt": "Вставте спільний промпт",
+      "defaultUniquePrompt": "",
+      "runMode": "continuous",
+      "minimumSendIntervalMinutes": 2,
+      "preSendDelaySeconds": 5,
+      "busyCheckDelaySeconds": 2,
+      "retryBackoffSeconds": 30,
+      "retryPolicy": "safe",
+      "tabStrategy": "worker",
+      "tasks": [
+        {
+          "enabled": true,
+          "label": "Завдання 1",
+          "url": "https://chatgpt.com/c/REPLACE-WITH-REAL-CONVERSATION",
+          "promptOverride": ""
+        }
+      ]
+    }
+  ]
+}
