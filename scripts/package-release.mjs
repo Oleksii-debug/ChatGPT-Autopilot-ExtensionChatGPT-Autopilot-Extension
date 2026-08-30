@@ -65,18 +65,21 @@ function manifestResourcePaths(manifest) {
 
 export async function collectProductFiles(root = REPOSITORY_ROOT) {
   const manifestPath = path.join(root, 'manifest.json');
+  const readmePath = path.join(root, 'README.txt');
   const srcPath = path.join(root, 'src');
-  const [manifestText, srcStat] = await Promise.all([
+  const [manifestText, readmeStat, srcStat] = await Promise.all([
     fs.readFile(manifestPath, 'utf8'),
+    fs.stat(readmePath),
     fs.stat(srcPath),
   ]);
+  if (!readmeStat.isFile()) throw new Error('README.txt must be a file');
   if (!srcStat.isDirectory()) throw new Error('src must be a directory');
 
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
   if (manifest.version !== '0.1.0') throw new Error(`v0.1 package requires manifest version 0.1.0, found ${manifest.version || 'missing'}`);
 
-  const files = ['manifest.json', ...await walkFiles(root, 'src')].sort();
+  const files = ['README.txt', 'manifest.json', ...await walkFiles(root, 'src')].sort();
   const fileSet = new Set(files);
   for (const resource of manifestResourcePaths(manifest)) {
     if (!fileSet.has(resource)) {
