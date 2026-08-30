@@ -109,9 +109,11 @@ test('runtime status renders Core read-model fields without a UI state machine',
 });
 
 test('bounded Core log remains keyboard-readable and reports its visible entry count', () => {
-  has(/id="session-log-bound">Core retains a bounded session log\.<\/p>/);
+  has(/id="session-log-bound">Core retains a bounded session log\. The options page shows only the newest 100 entries to stay responsive\.<\/p>/);
   has(/id="session-log-count">0 Core log entries shown\.<\/p>/);
+  assert.match(js, /const VISIBLE_LOG_LIMIT = 100/);
   assert.match(js, /const entries = ui\.selected\.log \|\| \[\]/);
+  assert.match(js, /const visible = entries\.slice\(-VISIBLE_LOG_LIMIT\)/);
   assert.match(js, /\$\('session-log-count'\)\.textContent/);
 });
 
