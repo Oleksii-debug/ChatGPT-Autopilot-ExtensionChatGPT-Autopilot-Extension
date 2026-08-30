@@ -12,6 +12,12 @@ Format:
 - run/timing/tab settings
 - optional `autoStart`
 
+`autoStart` semantics:
+- top-level `autoStart: true` requests automatic start for every Session in the imported profile;
+- Session-level `autoStart: true` requests automatic start for that Session when the top-level flag is false;
+- neither flag starts anything by itself: the user must explicitly activate `Import and start requested Sessions`;
+- imports performed without that explicit confirmation leave imported Sessions STOPPED.
+
 Safety:
 - import is one atomic Core storage transaction;
 - only Sessions whose ids occur in the imported file are created/replaced;
