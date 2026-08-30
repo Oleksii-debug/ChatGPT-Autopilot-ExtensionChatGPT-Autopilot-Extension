@@ -25,6 +25,18 @@
       <p>Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons. No extension-specific global keyboard shortcuts are assigned.</p>
       <p>Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.</p>
     </section>
+    <section id="configuration-file-panel" aria-labelledby="configuration-file-heading">
+      <h2 id="configuration-file-heading">Файл налаштувань</h2>
+      <p id="configuration-file-help">Можна завантажити готовий JSON-файл із сеансами, посиланнями, промптами та параметрами. Файл спочатку перевіряється і показується у попередньому перегляді. Застосування виконується тільки після окремого підтвердження.</p>
+      <button id="download-config-template-button" type="button">Завантажити порожній шаблон</button>
+      <button id="export-configuration-button" type="button">Експортувати поточні налаштування</button>
+      <label for="import-configuration-file">Вибрати файл налаштувань JSON</label>
+      <input id="import-configuration-file" type="file" accept="application/json,.json" aria-describedby="configuration-file-help configuration-import-status">
+      <p id="configuration-import-status" tabindex="0">Файл не вибрано.</p>
+      <div id="configuration-import-preview" role="region" aria-label="Попередній перегляд файла налаштувань" hidden></div>
+      <button id="apply-configuration-file-button" type="button" disabled>Застосувати файл налаштувань</button>
+    </section>
+
     <section id="session-editor" aria-labelledby="session-heading" hidden>
       <h2 id="session-heading" tabindex="-1">Session</h2>
       <div id="form-error-summary" tabindex="-1" role="region" aria-label="Configuration errors" hidden></div>
@@ -59,6 +71,14 @@
 
       <section aria-labelledby="tasks-heading">
         <h3 id="tasks-heading">Tasks</h3>
+        <section aria-labelledby="bulk-task-links-heading">
+          <h4 id="bulk-task-links-heading">Швидке додавання посилань</h4>
+          <label for="bulk-task-links">Вставте одне або багато посилань ChatGPT</label>
+          <textarea id="bulk-task-links" rows="6" aria-describedby="bulk-task-links-help bulk-task-links-result"></textarea>
+          <p id="bulk-task-links-help">Можна вставити посилання кожне з нового рядка, через пробіли або разом із нумерацією. Програма знайде посилання ChatGPT, прибере дублікати і створить окреме завдання для кожного.</p>
+          <button id="bulk-add-task-links-button" type="button">Додати всі знайдені посилання</button>
+          <p id="bulk-task-links-result" tabindex="0"></p>
+        </section>
         <ol id="task-list"></ol>
         <button id="add-task-button" type="button" aria-describedby="task-limit-help">Add task</button>
         <p id="task-limit-help">Up to 50 tasks per session.</p>
@@ -143,5 +163,6 @@
 <div id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
 <script type="module" src="uk-localization.js"></script>
 <script type="module" src="options.js"></script>
+<script type="module" src="configuration-panel.js"></script>
 </body>
 </html>
