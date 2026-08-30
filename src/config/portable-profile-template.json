@@ -23,7 +23,7 @@
           "id": "task-1",
           "enabled": true,
           "label": "",
-          "url": "https://chatgpt.com/c/PASTE-CONVERSATION-ID-HERE",
+          "url": "",
           "promptOverride": ""
         }
       ]
