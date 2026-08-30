@@ -180,7 +180,7 @@ test('Session navigation marks exactly the opened Session as current without tog
   assert.match(js, /querySelectorAll\('#session-list \[aria-current=\"page\"\]'\)\.forEach\(\(element\) => element\.removeAttribute\('aria-current'\)\)/);
   assert.match(js, /if \(ui\.selectedSessionId\) \$\(`session-select-\$\{ui\.selectedSessionId\}`\)\?\.setAttribute\('aria-current', 'page'\)/);
   assert.match(js, /function renderSessionList\(\)[\s\S]*syncCurrentSessionMarker\(\);/);
-  assert.match(js, /ui\.selectedSessionId = sessionId;\s*syncCurrentSessionMarker\(\);/);
+  assert.match(js, /ui\.selectedSessionId = sessionId;\s*storageSet\(LAST_SESSION_KEY, sessionId\);\s*syncCurrentSessionMarker\(\);/);
   assert.doesNotMatch(js, /aria-pressed/);
 });
 
