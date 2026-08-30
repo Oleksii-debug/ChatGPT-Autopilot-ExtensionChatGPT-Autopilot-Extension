@@ -17,15 +17,16 @@ function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
-test('release allowlist contains only manifest.json and product src files', async () => {
+test('release allowlist contains README, manifest.json and product src files only', async () => {
   const { manifest, files } = await collectProductFiles(root);
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.version, '0.1.0');
+  assert.ok(files.includes('README.txt'));
   assert.ok(files.includes('manifest.json'));
   assert.ok(files.includes('src/background/service-worker.js'));
   assert.ok(files.includes('src/ui/options.html'));
   assert.ok(files.includes('src/interaction/content-script.js'));
-  assert.ok(files.every(file => file === 'manifest.json' || file.startsWith('src/')));
+  assert.ok(files.every(file => file === 'README.txt' || file === 'manifest.json' || file.startsWith('src/')));
   assert.ok(!files.includes('package.json'));
   assert.ok(!files.some(file => file.startsWith('tests/')));
   assert.ok(!files.some(file => file.startsWith('.github/')));
@@ -44,10 +45,11 @@ test('release ZIP is byte-for-byte reproducible and has one canonical root folde
   assert.equal(second.sha256, sha256(secondZip));
   assert.equal(first.sha256, second.sha256);
   assert.deepEqual(first.files, second.files);
+  assert.ok(firstZip.includes(Buffer.from(`${RELEASE_NAME}/README.txt`, 'utf8')));
   assert.ok(firstZip.includes(Buffer.from(`${RELEASE_NAME}/manifest.json`, 'utf8')));
   assert.ok(firstZip.includes(Buffer.from(`${RELEASE_NAME}/src/background/service-worker.js`, 'utf8')));
   assert.ok(!firstZip.includes(Buffer.from(`${RELEASE_NAME}/package.json`, 'utf8')));
 
   const unpackedRootEntries = (await fs.readdir(first.unpackedDir)).sort();
-  assert.deepEqual(unpackedRootEntries, ['manifest.json', 'src']);
+  assert.deepEqual(unpackedRootEntries, ['README.txt', 'manifest.json', 'src']);
 });
