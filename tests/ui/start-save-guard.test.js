@@ -12,6 +12,7 @@ function makeHarness({ saveSucceeds = true } = {}) {
   let normalStartCount = 0;
   let saveClickCount = 0;
   let guardHandler = null;
+  let now = 0;
 
   const makeEvent = () => ({
     defaultPrevented: false,
@@ -76,7 +77,7 @@ function makeHarness({ saveSucceeds = true } = {}) {
     document,
     chrome,
     Promise,
-    Date,
+    Date: { now: () => { now += 100; return now; } },
     Number,
     Error,
     setTimeout: (fn) => { fn(); return 1; },
