@@ -98,6 +98,39 @@ test('exact Ukrainian notice is acknowledged, returns RATE_LIMITED, then continu
   assert.equal(adapterCalls, 1, 'a later Core-scheduled request may continue normally');
 });
 
+test('Ukrainian rate-limit wording variant with Підтвердити is acknowledged safely', async () => {
+  let clicked = 0;
+  let adapterCalls = 0;
+  const button = visibleElement('Підтвердити', { click() { clicked += 1; } });
+  const dialog = visibleElement(
+    'Занадто багато запитів Ви надсилаєте запити занадто швидко. '
+      + 'Ми тимчасово обмежили доступ до ваших розмов. '
+      + 'Спробуйте ще раз через кілька хвилин. Підтвердити',
+    { buttons: [button] },
+  );
+  const document = {
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog, [role="alertdialog"], [aria-modal="true"]') return [dialog];
+      return [];
+    },
+  };
+
+  const listener = install({
+    document,
+    async execute(request) {
+      adapterCalls += 1;
+      return { status: 'READY', requestId: request.requestId };
+    },
+  });
+
+  const response = await send(listener, { requestId: 'op-confirm', taskId: 'task-1' });
+  assert.equal(response.ok, true);
+  assert.equal(response.data.status, 'RATE_LIMITED');
+  assert.equal(response.data.safeDiagnosticCode, 'RATE_LIMIT_DIALOG_ACKNOWLEDGED');
+  assert.equal(clicked, 1);
+  assert.equal(adapterCalls, 0, 'acknowledgement request must not continue into adapter/Send');
+});
+
 test('unknown confirmation dialog is never auto-accepted', async () => {
   let clicked = 0;
   const button = visibleElement('Зрозуміло', { click() { clicked += 1; } });
@@ -118,6 +151,31 @@ test('unknown confirmation dialog is never auto-accepted', async () => {
   });
 
   const response = await send(listener);
+  assert.equal(response.ok, true);
+  assert.equal(response.data.status, 'MANUAL_REVIEW_REQUIRED');
+  assert.equal(clicked, 0);
+});
+
+test('generic Підтвердити outside the whitelisted rate-limit dialog is never auto-clicked', async () => {
+  let clicked = 0;
+  const button = visibleElement('Підтвердити', { click() { clicked += 1; } });
+  const dialog = visibleElement('Підтвердьте зміну облікового запису, щоб продовжити', { buttons: [button] });
+  const document = {
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog, [role="alertdialog"], [aria-modal="true"]') return [dialog];
+      return [];
+    },
+  };
+
+  const listener = install({
+    document,
+    async execute(request) {
+      assert.equal(clicked, 0);
+      return { status: 'MANUAL_REVIEW_REQUIRED', requestId: request.requestId };
+    },
+  });
+
+  const response = await send(listener, { requestId: 'op-unsafe-confirm' });
   assert.equal(response.ok, true);
   assert.equal(response.data.status, 'MANUAL_REVIEW_REQUIRED');
   assert.equal(clicked, 0);
