@@ -1,0 +1,32 @@
+{
+  "format": "chatgpt-autopilot-profile",
+  "version": 1,
+  "profileName": "Мій профіль",
+  "autoStart": false,
+  "sessions": [
+    {
+      "id": "session-1",
+      "name": "Сеанс 1",
+      "autoStart": false,
+      "promptMode": "shared",
+      "sharedPrompt": "",
+      "defaultUniquePrompt": "",
+      "runMode": "continuous",
+      "minimumSendIntervalMinutes": 2,
+      "preSendDelaySeconds": 5,
+      "busyCheckDelaySeconds": 2,
+      "retryBackoffSeconds": 30,
+      "retryPolicy": "safe",
+      "tabStrategy": "worker",
+      "tasks": [
+        {
+          "id": "task-1",
+          "enabled": true,
+          "label": "",
+          "url": "https://chatgpt.com/c/PASTE-CONVERSATION-ID-HERE",
+          "promptOverride": ""
+        }
+      ]
+    }
+  ]
+}
