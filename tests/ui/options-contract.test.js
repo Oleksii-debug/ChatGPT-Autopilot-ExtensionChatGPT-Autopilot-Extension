@@ -14,7 +14,10 @@ test('page exposes semantic landmarks and primary accessible names', () => {
   has(/id="session-status-region"/, 'missing readable status region');
   has(/id="session-log-region" tabindex="0" aria-label="Session log"/, 'missing readable log');
   has(/<h2 id="keyboard-startup-heading">Keyboard and startup behavior<\/h2>/, 'keyboard/startup help heading missing');
-  has(/No extension-specific global keyboard shortcuts are assigned\./, 'shortcut truth missing');
+  has(/<p id="open-shortcut-status">Checking the Open dashboard shortcut\.<\/p>/, 'shortcut status missing');
+  has(/open chrome:\/\/extensions\/shortcuts\./, 'shortcut remapping help missing');
+  assert.match(js, /chrome\.commands\.getAll\(\)/, 'UI must read Chrome\'s actual shortcut assignment');
+  assert.match(js, /command\.name === '_execute_action'/, 'UI must inspect the dashboard action command');
   has(/Sessions left RUNNING or RECOVERING resume automatically when Chrome starts\. PAUSED and STOPPED Sessions do not auto-resume\./, 'startup truth missing');
 });
 

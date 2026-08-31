@@ -16,7 +16,12 @@ test('manifest wires the options UI and ChatGPT content scripts with bounded per
     js: ['src/interaction/chatgpt-adapter.js', 'src/interaction/content-script.js'],
     run_at: 'document_idle',
   }]);
-  assert.equal(manifest.commands, undefined, 'no extension-specific global shortcuts are assigned');
+  assert.deepEqual(manifest.commands, {
+    _execute_action: {
+      suggested_key: { default: 'Ctrl+Shift+Y' },
+      description: 'Відкрити панель ChatGPT Автопілот',
+    },
+  });
 });
 
 test('content script ignores unrelated messages and returns structured adapter results', async () => {

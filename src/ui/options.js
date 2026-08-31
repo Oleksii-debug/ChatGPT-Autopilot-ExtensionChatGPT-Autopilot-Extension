@@ -23,6 +23,23 @@ const announce = (text) => { $('live-announcer').textContent = ''; requestAnimat
 const formatTime = (value) => value ? new Date(value).toLocaleString() : 'Not available';
 const runtimeAvailable = () => Boolean(globalThis.chrome?.runtime?.sendMessage);
 
+async function loadOpenShortcutStatus() {
+  const status = $('open-shortcut-status');
+  if (!globalThis.chrome?.commands?.getAll) {
+    status.textContent = 'The Open dashboard shortcut is unavailable in this browser.';
+    return;
+  }
+  try {
+    const commands = await chrome.commands.getAll();
+    const shortcut = commands.find((command) => command.name === '_execute_action')?.shortcut?.trim();
+    status.textContent = shortcut
+      ? `Open dashboard shortcut: ${shortcut}.`
+      : 'The Open dashboard shortcut is not assigned. Assign it in chrome://extensions/shortcuts.';
+  } catch {
+    status.textContent = 'Could not read the Open dashboard shortcut. Check chrome://extensions/shortcuts.';
+  }
+}
+
 async function core(command, payload = {}) {
   if (!runtimeAvailable()) throw new Error('Core runtime is not available yet.');
   const response = await chrome.runtime.sendMessage({ channel: 'autopilot-ui', command, payload });
@@ -716,6 +733,7 @@ if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener(
 });
 
 async function initialLoad() {
+  await loadOpenShortcutStatus();
   await loadSessions({ preserveFocus: false });
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);

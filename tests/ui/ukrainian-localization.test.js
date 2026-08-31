@@ -10,6 +10,7 @@ test('Ukrainian UI localization translates static labels and runtime states', ()
   assert.equal(translateText('Task 2 ChatGPT URL'), 'Завдання 2: посилання ChatGPT');
   assert.equal(translateText('Prompt for Task 2'), 'Промпт для завдання 2');
   assert.equal(translateText('Task 2 must use a valid https://chatgpt.com URL.'), 'Для завдання 2 потрібно вказати коректне посилання https://chatgpt.com.');
+  assert.equal(translateText('Open dashboard shortcut: Ctrl+Shift+Y.'), 'Комбінація для відкриття панелі: Ctrl+Shift+Y.');
 });
 
 test('Ukrainian UI localization covers portable configuration, bulk links, drafts and bounded log output', () => {

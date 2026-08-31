@@ -41,7 +41,7 @@ The command creates exactly these reusable outputs under `dist`:
 - `ChatGPT-Autopilot-Extension-v0.1` — unpacked extension folder.
 - `ChatGPT-Autopilot-Extension-v0.1.zip` — canonical ZIP with the same folder as its single root.
 
-The release allowlist includes only `manifest.json` and `src/**`. Tests, GitHub metadata, package-manager files, browser profiles, cookies, credentials, storage dumps, and other development files are not copied into the extension package. Manifest-referenced resources are validated before packaging. ZIP entry order and timestamps are fixed so identical source produces an identical ZIP SHA-256.
+The release allowlist includes only `README.txt`, `manifest.json`, and `src/**`. Tests, GitHub metadata, package-manager files, browser profiles, cookies, credentials, storage dumps, and other development files are not copied into the extension package. Manifest-referenced resources are validated before packaging. ZIP entry order and timestamps are fixed so identical source produces an identical ZIP SHA-256.
 
 Run the focused packaging gate with:
 
@@ -59,7 +59,8 @@ GitHub Actions also builds the same canonical ZIP as the `ChatGPT-Autopilot-Exte
 4. Use `Tab` to reach `Load unpacked`, then press `Enter`.
 5. In the folder picker, choose the extracted `ChatGPT-Autopilot-Extension-v0.1` folder containing `manifest.json`, then activate `Select Folder`.
 6. Return to `chrome://extensions` and verify that Chrome reports `ChatGPT Автопілот` version `0.1.0` with no extension error.
-7. Open the extension's `Details`, then activate `Extension options` to open the semantic dashboard. The toolbar action also opens the options page.
+7. Press `Ctrl+Shift+Y` to open the semantic dashboard directly. The toolbar action and `Details` → `Extension options` also open it.
+8. The dashboard reports Chrome's actual assigned shortcut. If Chrome could not assign it because of a conflict, or if you want another combination, open `chrome://extensions/shortcuts`.
 
 These steps are installation instructions, not an NVDA verification claim. `NVDA_VERIFIED` remains false until a real Windows 11 + Chrome + NVDA acceptance run is completed against an exact candidate SHA.
 

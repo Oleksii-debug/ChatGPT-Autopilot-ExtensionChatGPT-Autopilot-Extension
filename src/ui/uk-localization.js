@@ -35,7 +35,12 @@ const EXACT = new Map([
   ['Sessions', 'Сеанси'],
   ['Create session', 'Створити сеанс'],
   ['Keyboard and startup behavior', 'Клавіатура та поведінка після запуску'],
-  ['Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons. No extension-specific global keyboard shortcuts are assigned.', 'Для переходу між елементами використовуйте Tab і Shift+Tab. Для натискання кнопок — Enter або Пробіл, для прапорців і перемикачів — Пробіл. Окремих глобальних гарячих клавіш розширення не призначено.'],
+  ['Use Tab and Shift+Tab to move, Enter or Space to activate buttons, and Space to change checkboxes or radio buttons.', 'Для переходу між елементами використовуйте Tab і Shift+Tab. Для натискання кнопок — Enter або Пробіл, для прапорців і перемикачів — Пробіл.'],
+  ['Checking the Open dashboard shortcut.', 'Перевірка комбінації для відкриття панелі.'],
+  ['If the shortcut is not assigned or you want to change it, open chrome://extensions/shortcuts.', 'Якщо комбінацію не призначено або ви хочете її змінити, відкрийте chrome://extensions/shortcuts.'],
+  ['The Open dashboard shortcut is unavailable in this browser.', 'У цьому браузері комбінація для відкриття панелі недоступна.'],
+  ['The Open dashboard shortcut is not assigned. Assign it in chrome://extensions/shortcuts.', 'Комбінацію для відкриття панелі не призначено. Призначте її на сторінці chrome://extensions/shortcuts.'],
+  ['Could not read the Open dashboard shortcut. Check chrome://extensions/shortcuts.', 'Не вдалося прочитати комбінацію для відкриття панелі. Перевірте chrome://extensions/shortcuts.'],
   ['Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.', 'Запущені сеанси та сеанси у відновленні автоматично продовжують роботу після запуску Chrome. Призупинені та зупинені сеанси автоматично не запускаються.'],
   ['Configuration file', 'Файл налаштувань'],
   ['Keep the extension installed. Give the JSON template to an AI or edit it elsewhere, then import the completed file here. Import changes only Sessions named by stable ids in the file; unrelated Sessions remain untouched.', 'Залиште розширення встановленим. Передайте шаблон JSON штучному інтелекту або заповніть його в іншому місці, а потім імпортуйте готовий файл тут. Імпорт змінює лише сеанси зі стабільними ідентифікаторами, указаними у файлі; інші сеанси не змінюються.'],
@@ -229,6 +234,7 @@ export function translateText(value) {
   if ((m = text.match(/^Session: (.+)$/))) return `${leading}Сеанс: ${m[1]}${trailing}`;
   if ((m = text.match(/^State: ([A-Z_]+)\.$/))) return `${leading}Стан: ${STATE[m[1]] || m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) enabled tasks\.$/))) return `${leading}Увімкнених завдань: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^Open dashboard shortcut: (.+)\.$/))) return `${leading}Комбінація для відкриття панелі: ${m[1]}.${trailing}`;
 
   if ((m = text.match(/^Task (\d+) URL is required\.$/))) return `${leading}Для завдання ${m[1]} потрібно вказати посилання.${trailing}`;
   if ((m = text.match(/^Task (\d+) must use a valid https:\/\/chatgpt\.com URL\.$/))) return `${leading}Для завдання ${m[1]} потрібно вказати коректне посилання https://chatgpt.com.${trailing}`;
