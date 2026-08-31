@@ -9,7 +9,7 @@ const manifest = JSON.parse(fs.readFileSync(new URL('../../manifest.json', impor
 test('manifest wires the options UI and ChatGPT content scripts with bounded permissions', () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.options_ui.page, 'src/ui/options.html');
-  assert.deepEqual(manifest.permissions.sort(), ['alarms', 'storage', 'tabs']);
+  assert.deepEqual(manifest.permissions.sort(), ['alarms', 'scripting', 'storage', 'tabs']);
   assert.deepEqual(manifest.host_permissions, ['https://chatgpt.com/*']);
   assert.deepEqual(manifest.content_scripts, [{
     matches: ['https://chatgpt.com/*'],
