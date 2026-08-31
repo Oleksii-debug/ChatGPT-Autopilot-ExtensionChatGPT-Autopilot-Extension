@@ -66,7 +66,9 @@ test('prompt fingerprint is deterministic and binds generation', async () => {
 });
 
 test('durable phases reach PRE_SEND_WAIT with persisted deadline', async () => {
-  const repo = new FakeRepository(fixture());
+  const initial = fixture();
+  initial.sessionsById.s1.lastError = 'Automatic execution temporarily unavailable; retry scheduled. Diagnostic: TAB_NAVIGATION_TIMEOUT.';
+  const repo = new FakeRepository(initial);
   const clock = { value: 0 };
   const coordinator = new DurableSubmissionCoordinator(repo, { now: () => clock.value, cryptoApi: webcrypto });
   const identity = await prepareForSubmit(coordinator, clock);
@@ -77,6 +79,7 @@ test('durable phases reach PRE_SEND_WAIT with persisted deadline', async () => {
   assert.equal(operation.preSendDeadline, 1040);
   assert.equal(operation.promptText, 'hello');
   assert.equal(operation.generation, 1);
+  assert.equal(state.sessionsById.s1.lastError, '', 'verified CHECK_ONLY progress must clear stale runtime diagnostics');
 });
 
 test('submit effect observes SUBMITTING and lease already persisted', async () => {
@@ -126,6 +129,11 @@ test('submit exception becomes ambiguous recovery without cooldown or lease rele
   assert.equal(state.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
   assert.equal(state.sessionsById.s1.nextAllowedSendAt, 0);
   assert.equal(state.sendArbiter.lease.operationId, identity.operationId);
+  assert.equal(
+    state.sessionsById.s1.lastError,
+    'Submission outcome uncertain; no resend scheduled. Diagnostic: SUBMIT_EFFECT_EXCEPTION.',
+  );
+  assert.equal(state.logs.s1.at(-1).message, 'Submission held uncertain [SUBMIT_EFFECT_EXCEPTION]');
 });
 
 test('pre-send deadline prevents premature submit before any side effect', async () => {

@@ -1,5 +1,6 @@
 import { reconcileAlarm, reconcileStateForStartup, suspendActiveSessionsWhenExecutionUnavailable } from './recovery.js';
 import { OperationPhase, RunState } from './schema.js';
+import { appendLog } from './logger.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
@@ -11,6 +12,20 @@ const INTERRUPTED_PRE_SUBMIT_PHASES = new Set([
   OperationPhase.READY,
   OperationPhase.INSERTING,
 ]);
+
+function runtimeDiagnosticCode(error) {
+  const explicit = String(error?.safeDiagnosticCode || '');
+  if (/^[A-Z][A-Z0-9_]{2,79}$/.test(explicit)) return explicit;
+
+  const message = String(error?.message || error || '');
+  if (/frame with id .* was removed/i.test(message)) return 'INTERACTION_DOCUMENT_CHANGED';
+  if (/receiving end does not exist|could not establish connection/i.test(message)) {
+    return 'INTERACTION_RECEIVER_MISSING';
+  }
+  if (/no tab with id|tab .* not found/i.test(message)) return 'TAB_NOT_FOUND';
+  if (/extension context invalidated/i.test(message)) return 'EXTENSION_CONTEXT_INVALIDATED';
+  return 'RUNTIME_FAILURE_UNCLASSIFIED';
+}
 
 function orderedSessionIds(state) {
   const seen = new Set();
@@ -47,25 +62,32 @@ export async function reconcileRuntimeColdStart({
   return { state, wakeAt };
 }
 
-async function persistRuntimeFailure(repository, sessionId, now) {
+async function persistRuntimeFailure(repository, sessionId, error, now) {
+  const diagnosticCode = runtimeDiagnosticCode(error);
   await repository.update(draft => {
     const session = draft.sessionsById?.[sessionId];
     if (!session || !ACTIVE_STATES.has(session.runState)) return draft;
     const retryAt = now + Math.max(1000, session.retryBackoffMs || 30000);
-    const taskId = session.operation?.taskId;
+    const taskId = error?.autopilotTaskId
+      || session.operation?.taskId
+      || session.taskOrder?.[session.currentTaskIndex];
     if (taskId && session.tasksById?.[taskId]) {
+      session.tasksById[taskId].status = 'RETRY_WAIT';
       session.tasksById[taskId].retryAfterAt = Math.max(
         session.tasksById[taskId].retryAfterAt || 0,
         retryAt,
       );
-    } else {
-      session.nextAllowedSendAt = Math.max(session.nextAllowedSendAt || 0, retryAt);
     }
-    session.lastError = RUNTIME_RETRY_MESSAGE;
+    session.lastError = `${RUNTIME_RETRY_MESSAGE} Diagnostic: ${diagnosticCode}.`;
     session.lastActionAt = now;
     session.updatedAt = now;
+    appendLog(draft, sessionId, `Runtime retry scheduled [${diagnosticCode}]`, {
+      at: now,
+      level: 'WARN',
+    });
     return draft;
   });
+  return diagnosticCode;
 }
 
 async function failSafeExpiredPreSubmit(repository, sessionId, result, expectedOperation, now) {
@@ -150,8 +172,8 @@ export async function runRuntimeCycle({
           outcomes.push({ sessionId, result: { kind: 'PROFILE_BUSY' } });
           continue;
         }
-        await persistRuntimeFailure(repository, sessionId, now());
-        outcomes.push({ sessionId, result: { kind: 'TEMPORARY_RUNTIME_ERROR' } });
+        const diagnosticCode = await persistRuntimeFailure(repository, sessionId, error, now());
+        outcomes.push({ sessionId, result: { kind: 'TEMPORARY_RUNTIME_ERROR', diagnosticCode } });
       }
     }
   }

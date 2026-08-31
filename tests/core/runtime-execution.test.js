@@ -179,8 +179,15 @@ test('execution-disabled startup remains fail closed and never calls executor', 
 });
 
 test('temporary runtime failure persists bounded retry instead of hot-looping', async () => {
-  const repo = new Repo(stateWith(session('s1', RunState.RUNNING)));
-  const executor = { async runSessionOnce() { throw new Error('No receiver'); } };
+  const value = session('s1', RunState.RUNNING);
+  value.retryBackoffMs = 3 * 60 * 1000;
+  const repo = new Repo(stateWith(value));
+  const executor = { async runSessionOnce() {
+    const error = new Error('Selected ChatGPT tab did not finish navigation before CHECK_ONLY');
+    error.safeDiagnosticCode = 'TAB_NAVIGATION_TIMEOUT';
+    error.autopilotTaskId = 's1-t1';
+    throw error;
+  } };
   const chromeApi = fakeChrome();
 
   const result = await runRuntimeCycle({
@@ -193,9 +200,16 @@ test('temporary runtime failure persists bounded retry instead of hot-looping', 
 
   const after = await repo.load();
   assert.equal(result.outcomes[0].result.kind, 'TEMPORARY_RUNTIME_ERROR');
-  assert.equal(after.sessionsById.s1.nextAllowedSendAt, 40000);
-  assert.equal(after.sessionsById.s1.lastError, RuntimeExecutionConstants.RUNTIME_RETRY_MESSAGE);
-  assert.equal(result.wakeAt, 40000);
+  assert.equal(result.outcomes[0].result.diagnosticCode, 'TAB_NAVIGATION_TIMEOUT');
+  assert.equal(after.sessionsById.s1.nextAllowedSendAt, 0, 'runtime failure must not manufacture a Send cooldown');
+  assert.equal(after.sessionsById.s1.tasksById['s1-t1'].status, 'RETRY_WAIT');
+  assert.equal(after.sessionsById.s1.tasksById['s1-t1'].retryAfterAt, 190000);
+  assert.equal(
+    after.sessionsById.s1.lastError,
+    `${RuntimeExecutionConstants.RUNTIME_RETRY_MESSAGE} Diagnostic: TAB_NAVIGATION_TIMEOUT.`,
+  );
+  assert.equal(after.logs.s1.at(-1).message, 'Runtime retry scheduled [TAB_NAVIGATION_TIMEOUT]');
+  assert.equal(result.wakeAt, 190000);
 });
 
 test('profile arbiter busy is treated as a scheduling condition, not a runtime failure', async () => {

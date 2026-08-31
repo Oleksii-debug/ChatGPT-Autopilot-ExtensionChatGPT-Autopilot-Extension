@@ -4,8 +4,14 @@ import { createOperationId, createPromptFingerprint } from './fingerprint.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { OperationPhase, RunState } from './schema.js';
 import { beginOperation, markSubmitting } from './state-machine.js';
+import { appendLog } from './logger.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
+
+function safeSubmitDiagnosticCode(error) {
+  const explicit = String(error?.safeDiagnosticCode || '');
+  return /^[A-Z][A-Z0-9_]{2,79}$/.test(explicit) ? explicit : 'SUBMIT_EFFECT_EXCEPTION';
+}
 
 function requireSession(state, sessionId) {
   const session = state.sessionsById[sessionId];
@@ -127,9 +133,11 @@ export class DurableSubmissionCoordinator {
     });
 
     let result;
+    let submitDiagnosticCode = '';
     try {
       result = await submit();
-    } catch (_) {
+    } catch (error) {
+      submitDiagnosticCode = safeSubmitDiagnosticCode(error);
       result = { status: InteractionResult.SUBMISSION_UNCERTAIN };
     }
 
@@ -143,6 +151,13 @@ export class DurableSubmissionCoordinator {
           now: finishedAt,
           promptFingerprint: operation.promptFingerprint,
         });
+        if (submitDiagnosticCode) {
+          session.lastError = `Submission outcome uncertain; no resend scheduled. Diagnostic: ${submitDiagnosticCode}.`;
+          appendLog(draft, sessionId, `Submission held uncertain [${submitDiagnosticCode}]`, {
+            at: finishedAt,
+            level: 'WARN',
+          });
+        }
         return draft;
       });
       return { status: InteractionResult.SUBMISSION_UNCERTAIN };

@@ -38,6 +38,14 @@ test('Ukrainian UI localization translates command and Core status output', () =
   assert.equal(translateText('Command failed: Session not found'), 'Не вдалося виконати команду: Сеанс не знайдено');
   assert.equal(translateText('Session paused'), 'Сеанс призупинено');
   assert.equal(translateText('SUBMISSION_UNCERTAIN'), 'РЕЗУЛЬТАТ ВІДПРАВЛЕННЯ НЕВИЗНАЧЕНИЙ');
+  assert.equal(
+    translateText('Automatic execution temporarily unavailable; retry scheduled. Diagnostic: TAB_NAVIGATION_TIMEOUT.'),
+    'Автоматичне виконання тимчасово недоступне; повторну спробу заплановано. Діагностика: TAB_NAVIGATION_TIMEOUT.',
+  );
+  assert.equal(
+    translateText('Submission outcome uncertain; no resend scheduled. Diagnostic: INTERACTION_RECEIVER_MISSING_EFFECTFUL.'),
+    'Результат відправлення невизначений; повторне відправлення не заплановано. Діагностика: INTERACTION_RECEIVER_MISSING_EFFECTFUL.',
+  );
 });
 
 test('Ukrainian UI localization preserves user-provided text that is not a known interface phrase', () => {

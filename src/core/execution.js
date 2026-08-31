@@ -21,6 +21,7 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       task.lastVerifiedSendAt = now;
       task.lastVerifiedFingerprint = promptFingerprint;
       task.retryAfterAt = 0;
+      session.lastError = '';
       if (session.operation) { session.operation.phase = OperationPhase.SENT_VERIFIED; session.operation.updatedAt = now; }
       advanceAfterVerifiedSend(session, taskIndex, now);
       return { action: 'SENT_VERIFIED' };

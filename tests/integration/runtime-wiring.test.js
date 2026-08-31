@@ -57,6 +57,7 @@ test('content script sanitizes adapter failures', async () => {
   });
   assert.equal(response.ok, false);
   assert.equal(response.error.code, 'INTERACTION_FAILED_SAFE');
+  assert.equal(response.error.safeDiagnosticCode, 'CONTENT_SCRIPT_EXCEPTION');
   assert.equal(JSON.stringify(response).includes('synthetic-secret'), false);
 });
 
