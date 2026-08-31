@@ -148,11 +148,10 @@
     )).filter(isVisibleControl).filter((element) => element.getAttribute?.('aria-disabled') !== 'true');
   }
 
-  function findComposerForm(doc) {
+  function findComposerScope(doc) {
     const candidates = visibleComposerCandidates(doc)
       .map((element) => {
-        const form = element.closest?.('form');
-        if (!form) return null;
+        const form = element.closest?.('form') || null;
         let score = 0;
         if (element.id === 'prompt-textarea') score += 100;
         const testId = normalizeText(element.getAttribute?.('data-testid'));
@@ -160,34 +159,39 @@
           element.getAttribute?.('aria-label'),
           element.getAttribute?.('placeholder'),
           testId,
-          form.getAttribute?.('data-testid'),
-          form.getAttribute?.('aria-label'),
+          form?.getAttribute?.('data-testid'),
+          form?.getAttribute?.('aria-label'),
         ].filter(Boolean).join(' '));
         if (/prompt|message|composer|chat|ask/.test(name)) score += 20;
         if (testId.includes('composer')) score += 10;
-        return { form, score };
+        return {
+          element,
+          scope: form || doc,
+          allowStructuralFallback: Boolean(form),
+          score,
+        };
       })
-      .filter(Boolean)
       .sort((a, b) => b.score - a.score);
 
     if (!candidates.length) return null;
-    if (candidates.length > 1 && candidates[0].score === candidates[1].score && candidates[0].form !== candidates[1].form) {
-      return null;
-    }
-    return candidates[0].form;
+    if (candidates.length > 1 && candidates[0].score === candidates[1].score) return null;
+    return candidates[0];
   }
 
   function compatibleSendCandidate(doc) {
-    const form = findComposerForm(doc);
-    if (!form?.querySelectorAll) return null;
-    const buttons = Array.from(form.querySelectorAll('button, [role="button"]')).filter(isVisibleControl);
+    const selected = findComposerScope(doc);
+    const scope = selected?.scope;
+    if (!scope?.querySelectorAll) return null;
+    const buttons = Array.from(scope.querySelectorAll('button, [role="button"]')).filter(isVisibleControl);
 
     const strong = buttons.filter((button) => isStrongSendControl(button) && !isUnsafeControl(button));
     if (strong.length === 1) return strong[0];
     if (strong.length > 1) return null;
 
-    // Last-resort structural compatibility: only a unique, visible, enabled submit button
-    // inside the exact composer form. Never choose among multiple submit controls.
+    // Structural fallback is intentionally restricted to a real composer <form>.
+    // When the current ChatGPT layout has no form wrapper, only one exact semantic
+    // Send identity may be bridged from the document; generic submit buttons remain untouched.
+    if (!selected.allowStructuralFallback) return null;
     const submit = buttons.filter((button) => {
       const type = normalizeText(button.getAttribute?.('type') || button.type);
       return type === 'submit' && !isUnsafeControl(button);
