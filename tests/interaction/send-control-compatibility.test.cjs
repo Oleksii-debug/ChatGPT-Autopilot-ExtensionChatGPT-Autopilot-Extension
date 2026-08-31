@@ -119,6 +119,38 @@ test('Ukrainian accessible Send label is exposed to the existing fail-closed ada
   assert.equal(h.button.getAttribute('data-autopilot-send-compat'), null);
 });
 
+test('current Ukrainian ChatGPT label Надіслати запит is recognized as Send', async () => {
+  const h = harness({
+    buttonAttributes: {
+      id: 'composer-submit-button',
+      'aria-label': 'Надіслати запит',
+    },
+  });
+  const response = await h.invoke();
+
+  assert.equal(response.ok, true);
+  assert.equal(response.data.status, 'SENT_VERIFIED');
+  assert.match(h.observedTestId, /autopilot-send-button/);
+  assert.equal(h.clicks, 1);
+  assert.equal(h.button.getAttribute('data-testid'), null);
+});
+
+test('same composer-submit-button id is never treated as Send while it is the Ukrainian Stop control', async () => {
+  const h = harness({
+    buttonAttributes: {
+      id: 'composer-submit-button',
+      'aria-label': 'Зупинити відповідь',
+      'data-testid': 'stop-button',
+    },
+  });
+  const response = await h.invoke();
+
+  assert.equal(response.ok, true);
+  assert.equal(response.data.status, 'UNKNOWN_UI');
+  assert.equal(h.clicks, 0);
+  assert.equal(h.button.getAttribute('data-testid'), 'stop-button');
+});
+
 test('a unique submit button inside the exact composer form is accepted as a structural Send fallback', async () => {
   const h = harness({ buttonAttributes: { type: 'submit', 'aria-label': 'Submit' } });
   const response = await h.invoke();
