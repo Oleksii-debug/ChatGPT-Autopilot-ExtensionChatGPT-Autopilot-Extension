@@ -12,6 +12,7 @@ export function stopSession(session, now = Date.now()) {
 }
 export function beginOperation(session, { operationId, taskId, promptFingerprint, targetUrl, now = Date.now() }) {
   if (session.operation && ![OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE, OperationPhase.NONE].includes(session.operation.phase)) throw new Error('Outstanding operation exists');
+  session.lastError = '';
   session.operation = { operationId, sessionId: session.id, taskId, promptFingerprint, phase: OperationPhase.CHECKING, targetUrl, createdAt: now, updatedAt: now, preSendDeadline: 0, submitStartedAt: 0, verificationDeadline: 0 };
   return session.operation;
 }

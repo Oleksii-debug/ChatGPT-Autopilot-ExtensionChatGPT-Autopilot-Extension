@@ -1,0 +1,13 @@
+# Dependencies and deterministic release outputs
+node_modules/
+dist/
+
+# Local Chrome binaries and isolated test profiles may contain session data.
+chrome-for-testing/
+chrome-test-profile*/
+
+# Local logs, environment files, and common credential exports
+*.log
+.env
+.env.*
+token.json

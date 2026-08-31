@@ -1,12 +1,86 @@
 import { normalizeChatUrl, TabStrategy } from './schema.js';
 
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
+const DEFAULT_TAB_READY_TIMEOUT_MS = 30000;
+const DEFAULT_TAB_READY_POLL_MS = 100;
+
+export class TabReadinessError extends Error {
+  constructor(safeDiagnosticCode, message, cause = null) {
+    super(message);
+    this.name = 'TabReadinessError';
+    this.safeDiagnosticCode = safeDiagnosticCode;
+    if (cause) this.cause = cause;
+  }
+}
 
 function normalizedTabUrl(tab) {
   try {
     return tab?.url ? normalizeChatUrl(tab.url) : null;
   } catch {
     return null;
+  }
+}
+
+function waitMs(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
+  timeoutMs = DEFAULT_TAB_READY_TIMEOUT_MS,
+  pollIntervalMs = DEFAULT_TAB_READY_POLL_MS,
+  now = () => Date.now(),
+  wait = waitMs,
+} = {}) {
+  if (!chromeApi?.tabs?.get) {
+    throw new TabReadinessError(
+      'TAB_READINESS_API_UNAVAILABLE',
+      'Chrome tab readiness API is unavailable before CHECK_ONLY',
+    );
+  }
+
+  let normalizedExpected;
+  try {
+    normalizedExpected = normalizeChatUrl(expectedUrl);
+  } catch (error) {
+    throw new TabReadinessError(
+      'TAB_EXPECTED_URL_INVALID',
+      'Selected task has an invalid ChatGPT URL before CHECK_ONLY',
+      error,
+    );
+  }
+
+  const startedAt = now();
+  const deadline = startedAt + Math.max(0, timeoutMs);
+  let lastTab = null;
+
+  while (true) {
+    try {
+      lastTab = await chromeApi.tabs.get(tabId);
+    } catch (error) {
+      throw new TabReadinessError(
+        'TAB_UNAVAILABLE_DURING_READINESS_CHECK',
+        'Selected ChatGPT tab became unavailable before CHECK_ONLY',
+        error,
+      );
+    }
+
+    const observedUrl = normalizedTabUrl(lastTab);
+    const documentReady = lastTab.status === 'complete' || lastTab.status == null;
+    if (documentReady && observedUrl === normalizedExpected) return lastTab;
+
+    if (now() >= deadline) {
+      const code = documentReady && observedUrl && observedUrl !== normalizedExpected
+        ? 'TAB_NAVIGATION_URL_MISMATCH'
+        : 'TAB_NAVIGATION_TIMEOUT';
+      throw new TabReadinessError(
+        code,
+        code === 'TAB_NAVIGATION_URL_MISMATCH'
+          ? 'Selected ChatGPT tab completed at a different URL before CHECK_ONLY'
+          : 'Selected ChatGPT tab did not finish navigation before CHECK_ONLY',
+      );
+    }
+
+    await wait(Math.max(1, Math.min(pollIntervalMs, deadline - now())));
   }
 }
 

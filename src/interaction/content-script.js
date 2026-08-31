@@ -39,6 +39,15 @@
     return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  function safeInteractionExceptionCode(error) {
+    const explicit = String(error?.safeDiagnosticCode || '');
+    if (/^[A-Z][A-Z0-9_]{2,79}$/.test(explicit)) return explicit;
+    const name = String(error?.name || '');
+    if (name === 'TypeError') return 'CONTENT_SCRIPT_TYPE_ERROR';
+    if (name === 'RangeError') return 'CONTENT_SCRIPT_RANGE_ERROR';
+    return 'CONTENT_SCRIPT_EXCEPTION';
+  }
+
   function includesAny(text, values) {
     return values.some((value) => text.includes(value));
   }
@@ -258,10 +267,11 @@
         }
       })
       .then((result) => sendResponse({ ok: true, data: result }))
-      .catch(() => sendResponse({
+      .catch((error) => sendResponse({
         ok: false,
         error: {
           code: 'INTERACTION_FAILED_SAFE',
+          safeDiagnosticCode: safeInteractionExceptionCode(error),
           message: 'Chat interaction failed safely. No result was recorded as sent.',
         },
       }));

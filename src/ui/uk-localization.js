@@ -179,6 +179,8 @@ const RUNTIME = [
   ['Automatic execution is unavailable', 'Автоматичне виконання недоступне'],
   ['Resume the extension before importing with automatic start', 'Перед імпортом з автоматичним запуском продовжте роботу розширення'],
   ['Automatic execution temporarily unavailable; retry scheduled.', 'Автоматичне виконання тимчасово недоступне; повторну спробу заплановано.'],
+  ['Diagnostic:', 'Діагностика:'],
+  ['Submission outcome uncertain; no resend scheduled.', 'Результат відправлення невизначений; повторне відправлення не заплановано.'],
   ['Insertion outcome was not confirmed; a safe retry was scheduled.', 'Результат вставлення не підтверджено; заплановано безпечну повторну спробу.'],
   ['Pre-submit operation was interrupted; a safe retry was scheduled.', 'Операцію перед відправленням перервано; заплановано безпечну повторну спробу.'],
   ['Interrupted pre-submit operation failed safe; retry scheduled.', 'Перервану операцію перед відправленням безпечно зупинено; повторну спробу заплановано.'],

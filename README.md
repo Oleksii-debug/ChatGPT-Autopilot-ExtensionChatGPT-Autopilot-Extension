@@ -8,7 +8,7 @@ Local Chrome Manifest V3 extension for durable, keyboard-first multi-session Cha
 
 The current integration line contains the versioned Session/Task state model, deterministic scheduler, restart recovery, accessible options UI, semantic ChatGPT interaction adapter, durable phased executor, and service-worker startup/alarm wiring.
 
-Automatic production execution is enabled in the canonical service worker after the integrated deterministic release gates passed on the enabled runtime line. This does not by itself make v0.1 ready: the exact candidate still requires bounded real-Chrome smoke plus real Windows 11 + NVDA human acceptance before `V01_READY=true` may be claimed.
+Automatic production execution is enabled in the canonical service worker after the integrated deterministic release gates passed on the enabled runtime line. A bounded programmatic smoke on this Windows host also completed in official Google Chrome for Testing against live ChatGPT: the candidate performed one verified physical Send with no duplicate, classified the live Stop control as BUSY without clicking it, survived extension/service-worker reload, and recovered a newly navigated worker tab. This is machine-collected browser evidence, not human or screen-reader acceptance. Real Windows 11 + Chrome + NVDA human acceptance is still required before `V01_READY=true` may be claimed.
 
 `HUMAN_TESTED=false`
 
@@ -58,7 +58,7 @@ GitHub Actions also builds the same canonical ZIP as the `ChatGPT-Autopilot-Exte
 3. Use `Tab` to reach `Developer mode`. Press `Space` only if it is off.
 4. Use `Tab` to reach `Load unpacked`, then press `Enter`.
 5. In the folder picker, choose the extracted `ChatGPT-Autopilot-Extension-v0.1` folder containing `manifest.json`, then activate `Select Folder`.
-6. Return to `chrome://extensions` and verify that Chrome reports `ChatGPT Autopilot Extension` version `0.1.0` with no extension error.
+6. Return to `chrome://extensions` and verify that Chrome reports `ChatGPT Автопілот` version `0.1.0` with no extension error.
 7. Open the extension's `Details`, then activate `Extension options` to open the semantic dashboard. The toolbar action also opens the options page.
 
 These steps are installation instructions, not an NVDA verification claim. `NVDA_VERIFIED` remains false until a real Windows 11 + Chrome + NVDA acceptance run is completed against an exact candidate SHA.

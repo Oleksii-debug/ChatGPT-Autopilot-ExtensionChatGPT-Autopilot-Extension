@@ -44,6 +44,13 @@ function matchesOperation(operation, expected, phase) {
     && operation.promptFingerprint === expected.promptFingerprint;
 }
 
+function attachTaskContext(error, taskId, fallbackDiagnosticCode) {
+  const value = error instanceof Error ? error : new Error(String(error || 'Task execution failed'));
+  if (!value.safeDiagnosticCode) value.safeDiagnosticCode = fallbackDiagnosticCode;
+  if (!value.autopilotTaskId) value.autopilotTaskId = taskId;
+  return value;
+}
+
 export class AutomaticSessionExecutor {
   constructor(repository, chromeApi, transport, {
     now = () => Date.now(),
@@ -59,14 +66,18 @@ export class AutomaticSessionExecutor {
 
   async bindTaskTab(sessionId, taskId) {
     let tab;
-    await this.repo.update(async draft => {
-      const session = requireSession(draft, sessionId);
-      const task = session.tasksById[taskId];
-      if (!task) throw new Error('Task not found');
-      tab = await resolveTaskTab(this.chrome, draft, sessionId, task);
-      return draft;
-    });
-    return tab;
+    try {
+      await this.repo.update(async draft => {
+        const session = requireSession(draft, sessionId);
+        const task = session.tasksById[taskId];
+        if (!task) throw new Error('Task not found');
+        tab = await resolveTaskTab(this.chrome, draft, sessionId, task);
+        return draft;
+      });
+      return tab;
+    } catch (error) {
+      throw attachTaskContext(error, taskId, 'TASK_TAB_BIND_FAILED');
+    }
   }
 
   request(session, task, mode, requestId, promptText) {
