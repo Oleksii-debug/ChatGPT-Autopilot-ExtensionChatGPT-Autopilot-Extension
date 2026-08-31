@@ -29,7 +29,8 @@
 
 ### Known incomplete work
 
-- Real Chrome/live ChatGPT smoke has not yet been completed against the exact enabled packaged candidate.
+- Programmatic live ChatGPT smoke passed in official Google Chrome for Testing on Windows, including exactly one verified Send, BUSY/Stop safety, extension/service-worker reload, worker-tab navigation, and bounded retry diagnostics. This is not a human acceptance claim; see `docs/CODEX_LIVE_ACCEPTANCE_2026-08-31.md`.
+- The exact candidate has not yet completed the user-operated branded-Chrome installation and keyboard workflow.
 - No human Windows 11/NVDA acceptance run has occurred.
 - A generated ZIP remains a release candidate until the exact candidate passes the remaining human Chrome/Windows/NVDA acceptance gates.
 
