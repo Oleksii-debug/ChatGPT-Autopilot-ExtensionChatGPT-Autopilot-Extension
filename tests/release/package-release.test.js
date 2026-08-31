@@ -17,6 +17,21 @@ function sha256(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
+async function writeLineEndingVariant(targetRoot, files, lineEnding) {
+  const textExtensions = new Set(['.css', '.html', '.js', '.json', '.md', '.mjs', '.txt']);
+  for (const relativePath of files) {
+    const source = await fs.readFile(path.join(root, relativePath));
+    const destination = path.join(targetRoot, relativePath);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    if (!textExtensions.has(path.extname(relativePath).toLowerCase())) {
+      await fs.writeFile(destination, source);
+      continue;
+    }
+    const lf = source.toString('utf8').replace(/\r\n?/g, '\n');
+    await fs.writeFile(destination, lineEnding === '\n' ? lf : lf.replaceAll('\n', lineEnding), 'utf8');
+  }
+}
+
 test('release allowlist contains README, manifest.json and product src files only', async () => {
   const { manifest, files } = await collectProductFiles(root);
   assert.equal(manifest.manifest_version, 3);
@@ -52,4 +67,28 @@ test('release ZIP is byte-for-byte reproducible and has one canonical root folde
 
   const unpackedRootEntries = (await fs.readdir(first.unpackedDir)).sort();
   assert.deepEqual(unpackedRootEntries, ['README.txt', 'manifest.json', 'src']);
+});
+
+test('release ZIP and unpacked files are identical across LF and Windows CRLF checkouts', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-eol-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const lfRoot = path.join(temp, 'source-lf');
+  const crlfRoot = path.join(temp, 'source-crlf');
+  await writeLineEndingVariant(lfRoot, files, '\n');
+  await writeLineEndingVariant(crlfRoot, files, '\r\n');
+
+  const lf = await buildReleasePackage({ root: lfRoot, outDir: path.join(temp, 'out-lf') });
+  const crlf = await buildReleasePackage({ root: crlfRoot, outDir: path.join(temp, 'out-crlf') });
+  const lfZip = await fs.readFile(lf.zipPath);
+  const crlfZip = await fs.readFile(crlf.zipPath);
+
+  assert.equal(lf.sha256, crlf.sha256);
+  assert.deepEqual(lfZip, crlfZip);
+  for (const relativePath of ['README.txt', 'manifest.json', 'src/ui/options.js']) {
+    const lfFile = await fs.readFile(path.join(lf.unpackedDir, relativePath));
+    const crlfFile = await fs.readFile(path.join(crlf.unpackedDir, relativePath));
+    assert.deepEqual(lfFile, crlfFile);
+    assert.equal(lfFile.includes(Buffer.from('\r', 'utf8')), false, `${relativePath} must use canonical LF bytes`);
+  }
 });

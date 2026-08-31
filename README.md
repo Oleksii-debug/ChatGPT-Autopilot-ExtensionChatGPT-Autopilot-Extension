@@ -41,7 +41,7 @@ The command creates exactly these reusable outputs under `dist`:
 - `ChatGPT-Autopilot-Extension-v0.1` — unpacked extension folder.
 - `ChatGPT-Autopilot-Extension-v0.1.zip` — canonical ZIP with the same folder as its single root.
 
-The release allowlist includes only `README.txt`, `manifest.json`, and `src/**`. Tests, GitHub metadata, package-manager files, browser profiles, cookies, credentials, storage dumps, and other development files are not copied into the extension package. Manifest-referenced resources are validated before packaging. ZIP entry order and timestamps are fixed so identical source produces an identical ZIP SHA-256.
+The release allowlist includes only `README.txt`, `manifest.json`, and `src/**`. Tests, GitHub metadata, package-manager files, browser profiles, cookies, credentials, storage dumps, and other development files are not copied into the extension package. Manifest-referenced resources are validated before packaging. Packaged text is normalized to LF, and ZIP entry order and timestamps are fixed, so the same Git source produces the same ZIP SHA-256 from Windows and GitHub Actions.
 
 Run the focused packaging gate with:
 

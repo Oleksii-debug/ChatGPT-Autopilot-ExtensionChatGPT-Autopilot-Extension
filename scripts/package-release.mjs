@@ -8,6 +8,7 @@ const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
 const UTF8_FLAG = 0x0800;
 const ZIP_STORE = 0;
+const NORMALIZED_TEXT_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.md', '.mjs', '.txt']);
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FORBIDDEN_PATH_PATTERNS = [
@@ -24,6 +25,12 @@ const FORBIDDEN_TEXT_PATTERNS = [
 
 function toPosix(relativePath) {
   return relativePath.split(path.sep).join('/');
+}
+
+async function readPackagedBytes(root, relativePath) {
+  const data = await fs.readFile(path.join(root, relativePath));
+  if (!NORMALIZED_TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) return data;
+  return Buffer.from(data.toString('utf8').replace(/\r\n?/g, '\n'), 'utf8');
 }
 
 async function walkFiles(root, relativeDirectory) {
@@ -180,7 +187,7 @@ export async function createDeterministicZip(root, files) {
   let offset = 0;
 
   for (const relativePath of [...files].sort()) {
-    const data = await fs.readFile(path.join(root, relativePath));
+    const data = await readPackagedBytes(root, relativePath);
     const zipPath = `${RELEASE_NAME}/${toPosix(relativePath)}`;
     const local = localHeader(zipPath, data);
     localParts.push(local);
@@ -211,7 +218,7 @@ export async function buildReleasePackage({
   for (const relativePath of files) {
     const destination = path.join(unpackedDir, relativePath);
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.copyFile(path.join(root, relativePath), destination);
+    await fs.writeFile(destination, await readPackagedBytes(root, relativePath));
   }
 
   const zip = await createDeterministicZip(root, files);
