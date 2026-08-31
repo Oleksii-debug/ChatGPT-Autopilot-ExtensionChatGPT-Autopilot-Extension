@@ -19,6 +19,14 @@
   "action": {
     "default_title": "Відкрити ChatGPT Автопілот"
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Y"
+      },
+      "description": "Відкрити панель ChatGPT Автопілот"
+    }
+  },
   "options_ui": {
     "page": "src/ui/options.html",
     "open_in_tab": true
