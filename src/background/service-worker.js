@@ -5,12 +5,15 @@ import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
+import { performNativeInput } from '../core/native-input.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_SESSIONS',
   'GET_SESSION',
   'GET_SNAPSHOT',
+  'GET_DIAGNOSTIC_REPORT',
+  'RECORD_DIAGNOSTIC_SNAPSHOT',
   'PREVIEW_PORTABLE_PROFILE',
   'EXPORT_PORTABLE_PROFILE',
 ]);
@@ -146,6 +149,14 @@ chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'autopilot-core-wake') runSafely(runExecutionCycle());
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.channel === 'autopilot-native-input') {
+    performNativeInput(chrome, repo, message, _sender)
+      .then(() => sendResponse({ ok: true }))
+      .catch(error => sendResponse({ ok: false, error: {
+        safeDiagnosticCode: error?.safeDiagnosticCode || 'NATIVE_INPUT_FAILED',
+      } }));
+    return true;
+  }
   if (message?.channel !== 'autopilot-ui') return false;
   dispatchUiMessage(message)
     .then(data => sendResponse({ ok: true, data }))

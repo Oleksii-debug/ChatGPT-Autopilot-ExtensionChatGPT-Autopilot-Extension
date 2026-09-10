@@ -1,6 +1,7 @@
 import { reconcileAlarm, reconcileStateForStartup, suspendActiveSessionsWhenExecutionUnavailable } from './recovery.js';
 import { OperationPhase, RunState } from './schema.js';
 import { appendLog } from './logger.js';
+import { appendDiagnostic } from './diagnostics.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
@@ -85,9 +86,46 @@ async function persistRuntimeFailure(repository, sessionId, error, now) {
       at: now,
       level: 'WARN',
     });
+    appendDiagnostic(draft, {
+      event: 'ПОВТОРНУ_СПРОБУ_ЗАПЛАНОВАНО',
+      sessionId,
+      taskId,
+      mode: error?.autopilotMode,
+      phase: session.operation?.phase,
+      code: diagnosticCode,
+      message: session.lastError,
+      promptFingerprint: session.operation?.promptFingerprint,
+    }, { at: now });
     return draft;
   });
   return diagnosticCode;
+}
+
+async function persistRuntimeOutcome(repository, sessionId, result, now) {
+  await repository.update(draft => {
+    const session = draft.sessionsById?.[sessionId];
+    if (!session) return draft;
+    const taskId = session.operation?.taskId
+      || session.taskOrder?.[session.currentTaskIndex]
+      || null;
+    const wakeDescription = Number.isFinite(result?.wakeAt)
+      ? ` Наступна перевірка не раніше ${new Date(result.wakeAt).toISOString()}.`
+      : '';
+    appendDiagnostic(draft, {
+      event: 'ЦИКЛ_ВИКОНАННЯ_ЗАВЕРШЕНО',
+      sessionId,
+      taskId,
+      phase: session.operation?.phase,
+      runState: session.runState,
+      status: result?.status,
+      code: result?.diagnosticCode || result?.kind,
+      message: result?.kind
+        ? `Результат циклу: ${result.kind}.${wakeDescription}`
+        : 'Цикл завершено без деталізованого результату.',
+      promptFingerprint: session.operation?.promptFingerprint,
+    }, { at: now });
+    return draft;
+  });
 }
 
 async function failSafeExpiredPreSubmit(repository, sessionId, result, expectedOperation, now) {
@@ -166,14 +204,19 @@ export async function runRuntimeCycle({
           now(),
         );
         outcomes.push({ sessionId, result });
+        await persistRuntimeOutcome(repository, sessionId, result, now());
       } catch (error) {
         const message = error?.message || '';
         if (message === PROFILE_BUSY_MESSAGE) {
-          outcomes.push({ sessionId, result: { kind: 'PROFILE_BUSY' } });
+          const result = { kind: 'PROFILE_BUSY' };
+          outcomes.push({ sessionId, result });
+          await persistRuntimeOutcome(repository, sessionId, result, now());
           continue;
         }
         const diagnosticCode = await persistRuntimeFailure(repository, sessionId, error, now());
-        outcomes.push({ sessionId, result: { kind: 'TEMPORARY_RUNTIME_ERROR', diagnosticCode } });
+        const result = { kind: 'TEMPORARY_RUNTIME_ERROR', diagnosticCode };
+        outcomes.push({ sessionId, result });
+        await persistRuntimeOutcome(repository, sessionId, result, now());
       }
     }
   }

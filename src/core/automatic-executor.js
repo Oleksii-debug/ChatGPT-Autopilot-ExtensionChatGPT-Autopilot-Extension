@@ -2,9 +2,10 @@ import { releaseSendLease } from './arbiter.js';
 import { applyInteractionResult } from './execution.js';
 import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
-import { OperationPhase, PromptMode, RunMode, RunState } from './schema.js';
+import { OperationPhase, PromptMode, RunMode, RunState, TabStrategy } from './schema.js';
 import { resolveTaskTab } from './tabs.js';
 import { InteractionResult } from '../shared/protocol.js';
+import { appendDiagnostic } from './diagnostics.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
@@ -15,6 +16,18 @@ const TERMINAL_OPERATION_PHASES = new Set([
 ]);
 const INTERRUPTED_PRE_SUBMIT_PHASES = new Set([
   OperationPhase.INSERTED,
+]);
+const OPEN_CLOSE_TERMINAL_RESULTS = new Set([
+  InteractionResult.BUSY,
+  InteractionResult.SENT_VERIFIED,
+  InteractionResult.TEMPORARY_ERROR,
+  InteractionResult.RATE_LIMITED,
+]);
+const NORMAL_WORK_CONFIRMED_RESULTS = new Set([
+  InteractionResult.READY,
+  InteractionResult.BUSY,
+  InteractionResult.TEMPORARY_ERROR,
+  InteractionResult.RATE_LIMITED,
 ]);
 
 function requireSession(state, sessionId) {
@@ -72,6 +85,14 @@ export class AutomaticSessionExecutor {
         const task = session.tasksById[taskId];
         if (!task) throw new Error('Task not found');
         tab = await resolveTaskTab(this.chrome, draft, sessionId, task);
+        appendDiagnostic(draft, {
+          event: 'ВКЛАДКУ_ПІДГОТОВЛЕНО',
+          sessionId,
+          taskId,
+          tabId: tab.id,
+          target: task.normalizedUrl || task.url,
+          phase: session.operation?.phase,
+        }, { at: this.now() });
         return draft;
       });
       return tab;
@@ -90,6 +111,138 @@ export class AutomaticSessionExecutor {
     };
   }
 
+  async executeInteraction(sessionId, session, task, tabId, mode, requestId, promptText) {
+    const request = this.request(session, task, mode, requestId, promptText);
+    await this.repo.update(draft => {
+      appendDiagnostic(draft, {
+        event: 'ЗАПИТ_ДО_СТОРІНКИ',
+        sessionId,
+        taskId: task.id,
+        tabId,
+        mode,
+        phase: session.operation?.phase,
+        target: request.expectedUrl,
+      }, { at: this.now() });
+      return draft;
+    });
+    try {
+      const result = await this.transport.execute(tabId, request);
+      await this.repo.update(draft => {
+        appendDiagnostic(draft, {
+          event: 'ВІДПОВІДЬ_ВІД_СТОРІНКИ',
+          sessionId,
+          taskId: task.id,
+          tabId,
+          mode,
+          phase: session.operation?.phase,
+          status: result.status,
+          code: result.safeDiagnosticCode,
+          message: result.safeDiagnosticMessage,
+          observed: result.normalizedObservedUrl,
+          target: request.expectedUrl,
+          promptFingerprint: session.operation?.promptFingerprint,
+        }, { at: this.now() });
+        return draft;
+      });
+      return result;
+    } catch (error) {
+      await this.repo.update(draft => {
+        appendDiagnostic(draft, {
+          event: 'ПОМІЛКА_ВЗАЄМОДІЇ_ЗІ_СТОРІНКОЮ',
+          sessionId,
+          taskId: task.id,
+          tabId,
+          mode,
+          phase: session.operation?.phase,
+          code: error?.safeDiagnosticCode || 'INTERACTION_FAILURE',
+          message: error?.message || error,
+          target: request.expectedUrl,
+          promptFingerprint: session.operation?.promptFingerprint,
+        }, { at: this.now() });
+        return draft;
+      });
+      throw error;
+    }
+  }
+
+  async closeOpenCloseTabAfterTerminalResult(sessionId, taskId, result) {
+    if (!OPEN_CLOSE_TERMINAL_RESULTS.has(result?.status)) return false;
+    let tabId = null;
+    let target = '';
+    await this.repo.update(draft => {
+      const session = requireSession(draft, sessionId);
+      if (session.tabStrategy !== TabStrategy.OPEN_CLOSE_PER_TASK) return draft;
+      const task = session.tasksById[taskId];
+      const hint = draft.tabHintsByTaskId?.[taskId];
+      if (!task || !hint || hint.sessionId !== sessionId
+          || hint.kind !== 'TASK' || hint.tabId == null) return draft;
+      const operation = session.operation;
+      const unresolvedForTask = operation?.taskId === taskId
+        && !TERMINAL_OPERATION_PHASES.has(operation.phase);
+      if (unresolvedForTask && result.status !== InteractionResult.SENT_VERIFIED) {
+        appendDiagnostic(draft, {
+          event: 'ВКЛАДКУ_ЗБЕРЕЖЕНО_ДЛЯ_ВІДНОВЛЕННЯ',
+          sessionId,
+          taskId,
+          tabId: hint.tabId,
+          status: result.status,
+          phase: operation.phase,
+          target: task.normalizedUrl || task.url,
+        }, { at: this.now() });
+        return draft;
+      }
+      tabId = hint.tabId;
+      target = task.normalizedUrl || task.url;
+      appendDiagnostic(draft, {
+        event: 'ЗАКРИТТЯ_ВКЛАДКИ_ЗАПЛАНОВАНО',
+        sessionId,
+        taskId,
+        tabId,
+        status: result.status,
+        target,
+      }, { at: this.now() });
+      return draft;
+    });
+    if (tabId == null) return false;
+    try {
+      await this.chrome.tabs.remove(tabId);
+      await this.repo.update(draft => {
+        const hint = draft.tabHintsByTaskId?.[taskId];
+        if (hint?.sessionId === sessionId && hint?.kind === 'TASK' && hint?.tabId === tabId) {
+          delete draft.tabHintsByTaskId[taskId];
+        }
+        appendDiagnostic(draft, {
+          event: 'ВКЛАДКУ_ЗАКРИТО',
+          sessionId,
+          taskId,
+          tabId,
+          status: result.status,
+          target,
+        }, { at: this.now() });
+        return draft;
+      });
+      return true;
+    } catch (error) {
+      await this.repo.update(draft => {
+        // Keep the ownership hint after a failed close. A later cycle can
+        // safely reuse or invalidate this exact extension-owned tab instead
+        // of opening duplicates on every retry.
+        appendDiagnostic(draft, {
+          event: 'НЕ_ВДАЛОСЯ_ЗАКРИТИ_ВКЛАДКУ',
+          sessionId,
+          taskId,
+          tabId,
+          status: result.status,
+          target,
+          code: 'TAB_CLOSE_FAILED',
+          message: error?.message || error,
+        }, { at: this.now() });
+        return draft;
+      });
+      return false;
+    }
+  }
+
   async applyResult(sessionId, taskId, result, promptFingerprint = '') {
     const now = this.now();
     return this.repo.update(draft => {
@@ -97,6 +250,30 @@ export class AutomaticSessionExecutor {
       applyInteractionResult(session, taskIndex(session, taskId), result, { now, promptFingerprint });
       return draft;
     });
+  }
+
+  async markNormalWorkResumed(sessionId, taskId) {
+    let changed = false;
+    await this.repo.update(draft => {
+      const session = requireSession(draft, sessionId);
+      const phase = session.operation?.phase || OperationPhase.NONE;
+      if (session.runState !== RunState.RECOVERING || !TERMINAL_OPERATION_PHASES.has(phase)) {
+        return draft;
+      }
+      session.runState = RunState.RUNNING;
+      session.updatedAt = this.now();
+      appendDiagnostic(draft, {
+        event: 'ВІДНОВЛЕННЯ_ЗАВЕРШЕНО',
+        sessionId,
+        taskId,
+        runState: RunState.RUNNING,
+        phase,
+        message: 'Зв’язок із розмовою підтверджено; сеанс повернувся до звичайної роботи.',
+      }, { at: this.now() });
+      changed = true;
+      return draft;
+    });
+    return changed;
   }
 
   async recoverAmbiguous(sessionId, session) {
@@ -112,14 +289,28 @@ export class AutomaticSessionExecutor {
       return { kind: 'WAIT_RECOVERY', wakeAt: retryAfterAt };
     }
     const tab = await this.bindTaskTab(sessionId, task.id);
-    const result = await this.transport.execute(tab.id, this.request(
+    let result = await this.executeInteraction(
+      sessionId,
       session,
       task,
+      tab.id,
       'VERIFY_AFTER_UNCERTAIN_SUBMIT',
       operation.operationId,
       operation.promptText,
-    ));
+    );
     const now = this.now();
+    // Give late UI acknowledgement a bounded window. Preserve the unresolved
+    // operation and expose an explicit recovery action instead of polling forever.
+    const deadline = operation.verificationDeadline
+      || ((operation.submitStartedAt || operation.createdAt || now) + 120000);
+    if (now >= deadline && result.status !== InteractionResult.SENT_VERIFIED) {
+      result = {
+        ...result,
+        status: InteractionResult.MANUAL_REVIEW_REQUIRED,
+        safeDiagnosticCode: 'SEND_ACK_TIMEOUT',
+        safeDiagnosticMessage: 'За дві хвилини надсилання не підтверджено. Скористайтеся діями відновлення під станом сеансу.',
+      };
+    }
     let reconciled = false;
 
     if (result.status === InteractionResult.SENT_VERIFIED) {
@@ -142,6 +333,7 @@ export class AutomaticSessionExecutor {
         reconciled = true;
         return draft;
       });
+      if (reconciled) await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
       return reconciled ? { kind: 'RECOVERED_SENT', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
@@ -177,6 +369,7 @@ export class AutomaticSessionExecutor {
       reconciled = true;
       return draft;
     });
+    if (reconciled) await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
     return reconciled ? { kind: 'RECOVERY_HELD', result } : { kind: 'OPERATION_CHANGED', result };
   }
 
@@ -238,13 +431,15 @@ export class AutomaticSessionExecutor {
       return { kind: 'WAIT_PRE_SEND', wakeAt };
     }
     const tab = await this.bindTaskTab(sessionId, task.id);
-    const prepare = await this.transport.execute(tab.id, this.request(
+    const prepare = await this.executeInteraction(
+      sessionId,
       session,
       task,
+      tab.id,
       'PREPARE_SEND',
       operation.operationId,
       operation.promptText,
-    ));
+    );
 
     const postPrepare = await this.repo.load();
     const postPrepareSession = requireSession(postPrepare, sessionId);
@@ -279,20 +474,27 @@ export class AutomaticSessionExecutor {
         reconciled = true;
         return draft;
       });
+      if (reconciled) await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, prepare);
       return reconciled ? { kind: 'PREPARE_HELD', result: prepare } : { kind: 'OPERATION_CHANGED', result: prepare };
     }
 
     const result = await this.coordinator.submitWithDurableCheckpoint({
       sessionId,
       operationId: operation.operationId,
-      submit: () => this.transport.execute(tab.id, this.request(
+      submit: () => this.executeInteraction(
+        sessionId,
         session,
         task,
+        tab.id,
         'SUBMIT_EXISTING',
         operation.operationId,
         operation.promptText,
-      )),
+      ),
     });
+    if (result.status === InteractionResult.SENT_VERIFIED) {
+      await this.markNormalWorkResumed(sessionId, task.id);
+    }
+    await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
     return { kind: result.status === InteractionResult.SENT_VERIFIED ? 'SENT' : 'SUBMISSION_UNCERTAIN', result };
   }
 
@@ -328,7 +530,15 @@ export class AutomaticSessionExecutor {
     const task = selection.task;
     const tab = await this.bindTaskTab(sessionId, task.id);
     const checkId = `${sessionId}:${task.id}:check:${this.now()}`;
-    const check = await this.transport.execute(tab.id, this.request(session, task, 'CHECK_ONLY', checkId, ''));
+    const check = await this.executeInteraction(
+      sessionId,
+      session,
+      task,
+      tab.id,
+      'CHECK_ONLY',
+      checkId,
+      '',
+    );
 
     const postCheck = await this.repo.load();
     const postCheckSession = requireSession(postCheck, sessionId);
@@ -336,8 +546,14 @@ export class AutomaticSessionExecutor {
       return { kind: 'QUIESCED', runState: postCheckSession.runState };
     }
 
+    if (postCheckSession.runState === RunState.RECOVERING
+        && NORMAL_WORK_CONFIRMED_RESULTS.has(check.status)) {
+      await this.markNormalWorkResumed(sessionId, task.id);
+    }
+
     if (check.status !== InteractionResult.READY) {
       await this.applyResult(sessionId, task.id, check);
+      await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, check);
       return { kind: check.status, result: check };
     }
 
@@ -353,13 +569,15 @@ export class AutomaticSessionExecutor {
     await this.coordinator.markReady({ sessionId, operationId: identity.operationId });
     await this.coordinator.markInserting({ sessionId, operationId: identity.operationId });
 
-    const inserted = await this.transport.execute(tab.id, this.request(
+    const inserted = await this.executeInteraction(
+      sessionId,
       liveSession,
       liveTask,
+      tab.id,
       'INSERT_ONLY',
       identity.operationId,
       promptText,
-    ));
+    );
     const textInsertionProven = inserted.composerState === 'VISIBLE_NONEMPTY'
       && ['INSERTION_TEXT_PROVEN', 'PROMPT_ALREADY_INSERTED_MATCH'].includes(inserted.safeDiagnosticCode);
     const acceptedRepresentationProven = inserted.composerState === 'ACCEPTED_ATTACHMENT_LIKE'
@@ -373,6 +591,7 @@ export class AutomaticSessionExecutor {
         ? { ...inserted, status: InteractionResult.MANUAL_REVIEW_REQUIRED }
         : inserted;
       await this.applyResult(sessionId, task.id, safeResult, identity.promptFingerprint);
+      await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, safeResult);
       return { kind: 'INSERTION_HELD', result: safeResult };
     }
 

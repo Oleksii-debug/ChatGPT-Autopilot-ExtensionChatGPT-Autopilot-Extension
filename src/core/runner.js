@@ -143,6 +143,7 @@ export class DurableSubmissionCoordinator {
 
     const finishedAt = this.now();
     if (result?.status !== InteractionResult.SENT_VERIFIED) {
+      submitDiagnosticCode ||= result?.safeDiagnosticCode || '';
       await this.repo.update(draft => {
         const session = requireSession(draft, sessionId);
         const operation = requireOperation(session, operationId);
@@ -152,7 +153,7 @@ export class DurableSubmissionCoordinator {
           promptFingerprint: operation.promptFingerprint,
         });
         if (submitDiagnosticCode) {
-          session.lastError = `Submission outcome uncertain; no resend scheduled. Diagnostic: ${submitDiagnosticCode}.`;
+          session.lastError = `Надсилання не підтверджено. Автоматичного повтору немає. Код: ${submitDiagnosticCode}.`;
           appendLog(draft, sessionId, `Submission held uncertain [${submitDiagnosticCode}]`, {
             at: finishedAt,
             level: 'WARN',

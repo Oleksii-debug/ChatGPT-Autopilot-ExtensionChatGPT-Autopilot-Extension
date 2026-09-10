@@ -35,7 +35,7 @@ async function writeLineEndingVariant(targetRoot, files, lineEnding) {
 test('release allowlist contains README, manifest.json and product src files only', async () => {
   const { manifest, files } = await collectProductFiles(root);
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, '0.1.0');
+  assert.equal(manifest.version, '0.1.6');
   assert.ok(files.includes('README.txt'));
   assert.ok(files.includes('manifest.json'));
   assert.ok(files.includes('src/background/service-worker.js'));

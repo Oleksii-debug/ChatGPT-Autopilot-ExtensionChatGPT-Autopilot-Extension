@@ -4,6 +4,8 @@ import { pauseSession, resumeSession, startSession, stopSession } from './state-
 import { appendLog } from './logger.js';
 import { EXECUTION_UNAVAILABLE_MESSAGE } from './recovery.js';
 import { applyPortableProfile, exportPortableProfile, previewPortableProfile } from './portable-profile.js';
+import { appendDiagnostic, createDiagnosticReport } from './diagnostics.js';
+import { releaseSendLease } from './arbiter.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -15,6 +17,28 @@ const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns o
 
 function hasUnresolvedOperation(session) {
   return Boolean(session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase));
+}
+
+function acknowledgeSafePreSubmitManualReview(session) {
+  const currentTaskId = session.taskOrder?.[session.currentTaskIndex];
+  const task = currentTaskId ? session.tasksById?.[currentTaskId] : null;
+  const manualOperation = session.operation?.phase === OperationPhase.MANUAL_REVIEW;
+  const taskHeld = Boolean(task?.manualReviewReason || task?.status === 'MANUAL_REVIEW');
+  if (!manualOperation && !taskHeld) return false;
+
+  // Once SUBMITTING ever began, clearing the operation could authorize a duplicate.
+  // Such cases remain held for the uncertainty/recovery path.
+  if (manualOperation && Number(session.operation?.submitStartedAt || 0) > 0) {
+    throw new Error('Resolve the uncertain send operation before retrying');
+  }
+
+  if (task) {
+    task.manualReviewReason = '';
+    task.status = 'IDLE';
+    task.retryAfterAt = 0;
+  }
+  if (manualOperation) session.operation = null;
+  return true;
 }
 
 function requireSession(state, sessionId) {
@@ -134,6 +158,9 @@ export function sessionToUi(session, state) {
       currentTaskRetryAt: currentTask?.retryAfterAt || 0,
       currentTaskManualReviewReason: currentTask?.manualReviewReason || '',
       operationPhase: session.operation?.phase || OperationPhase.NONE,
+      uncertainOperationId: session.operation &&
+        [OperationPhase.AMBIGUOUS, OperationPhase.MANUAL_REVIEW].includes(session.operation.phase)
+        && session.operation.submitStartedAt > 0 ? session.operation.operationId : null,
       lastAction: lastLog?.message || '',
       lastActionAt: lastLog?.at || session.lastActionAt || 0,
       lastSuccessfulSendAt: session.lastSuccessfulSendAt,
@@ -152,12 +179,96 @@ export class CoreCommandDispatcher {
     this.executionAvailable = executionAvailable;
   }
   async execute(command, payload = {}) {
+    if (command === CoreCommand.RESOLVE_UNCERTAIN) {
+      const state = await this.repo.update(draft => {
+        const session = requireSession(draft, payload.sessionId);
+        const operation = session.operation;
+        if (!operation || operation.operationId !== payload.operationId
+          || ![OperationPhase.AMBIGUOUS, OperationPhase.MANUAL_REVIEW].includes(operation.phase)
+          || !(operation.submitStartedAt > 0)) throw new Error('Стан операції змінився. Оновіть панель.');
+        if (!['check', 'retry', 'skip'].includes(payload.resolution)) throw new Error('Невідома дія відновлення.');
+        if (payload.resolution !== 'check' && payload.confirmed !== true) {
+          throw new Error('Спочатку позначте підтвердження під станом сеансу.');
+        }
+        const task = session.tasksById[operation.taskId];
+        const now = this.now();
+        task.manualReviewReason = '';
+        task.retryAfterAt = 0;
+        if (payload.resolution === 'check') {
+          if (!this.executionAvailable || draft.profile.masterPaused) throw new Error('Спочатку відновіть роботу розширення.');
+          operation.phase = OperationPhase.AMBIGUOUS;
+          operation.verificationDeadline = now + 120000;
+          task.status = 'SUBMISSION_UNCERTAIN';
+          session.runState = RunState.RECOVERING;
+          session.lastError = 'Повторна перевірка без натискання Надіслати.';
+        } else {
+          releaseSendLease(draft, { sessionId: session.id, operationId: operation.operationId, now, profileGapMs: 1000 });
+          // Do not report an uncertain send as success or discard the user's draft.
+          if (payload.resolution === 'skip') {
+            task.enabled = false;
+            task.status = 'IDLE';
+            session.currentTaskIndex = (session.taskOrder.indexOf(task.id) + 1) % session.taskOrder.length;
+          } else {
+            task.status = 'IDLE';
+            session.currentTaskIndex = session.taskOrder.indexOf(task.id);
+          }
+          session.operation = null;
+          session.runState = RunState.PAUSED;
+          session.lastError = '';
+          session.version = (session.version || 0) + 1;
+        }
+        session.updatedAt = now;
+        session.lastActionAt = now;
+        appendLog(draft, session.id, {
+          check: 'Запущено повторну перевірку без надсилання',
+          retry: 'Користувач дозволив повтор невизначеного завдання. Натисніть Продовжити',
+          skip: 'Невизначене завдання вимкнено без позначки успіху. Натисніть Продовжити для решти',
+        }[payload.resolution], { at: now });
+        return draft;
+      });
+      return { session: sessionToUi(state.sessionsById[payload.sessionId], state) };
+    }
     if (command === CoreCommand.LIST_SESSIONS) {
       const state = await this.repo.load();
       return { sessions: state.sessionOrder.map(id => { const s=state.sessionsById[id]; return { id, name:s.name, runState:s.runState, enabledTaskCount:s.taskOrder.filter(t=>s.tasksById[t].enabled).length }; }) };
     }
     if (command === CoreCommand.GET_SNAPSHOT) { const state=await this.repo.load(); return { snapshot: structuredClone(state) }; }
     if (command === CoreCommand.GET_SESSION) { const state=await this.repo.load(); const s=state.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); return { session: sessionToUi(s,state) }; }
+    if (command === CoreCommand.GET_DIAGNOSTIC_REPORT) {
+      const state = await this.repo.load();
+      return {
+        report: createDiagnosticReport(state, {
+          now: this.now(),
+          extensionVersion: payload.extensionVersion,
+        }),
+      };
+    }
+    if (command === CoreCommand.RECORD_DIAGNOSTIC_SNAPSHOT) {
+      if (!payload.sessionId) return { recorded: false };
+      let recorded = false;
+      await this.repo.update(draft => {
+        const session = draft.sessionsById[payload.sessionId];
+        if (!session || !ACTIVE_STATES.has(session.runState)) return draft;
+        const taskId = session.operation?.taskId
+          || session.taskOrder[session.currentTaskIndex]
+          || null;
+        appendDiagnostic(draft, {
+          event: 'ЗРІЗ_СТАНУ_ПАНЕЛІ',
+          sessionId: session.id,
+          taskId,
+          phase: session.operation?.phase,
+          runState: session.runState,
+          code: session.lastError
+            ? 'Є_ПОВІДОМЛЕННЯ_ПРО_ПОМИЛКУ'
+            : 'СТАН_БЕЗ_НОВОЇ_ПОМИЛКИ',
+          message: session.lastError
+            || 'Сеанс активний; панель отримала контрольний знімок стану.',
+        }, { at: this.now() });
+        recorded = true;
+        return draft;
+      });
+      return { recorded };
+    }
     if (command === CoreCommand.PREVIEW_PORTABLE_PROFILE) {
       return { preview: previewPortableProfile(payload.profile, this.now()) };
     }
@@ -243,7 +354,45 @@ export class CoreCommandDispatcher {
       return {session:sessionToUi(state.sessionsById[id],state)};
     }
     if ([CoreCommand.START_SESSION,CoreCommand.PAUSE_SESSION,CoreCommand.RESUME_SESSION,CoreCommand.STOP_SESSION].includes(command)) {
-      const state=await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(command===CoreCommand.START_SESSION){if(!this.executionAvailable) throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);if(d.profile.masterPaused) throw new Error('Resume the extension before starting a session');if(!STARTABLE_STATES.has(s.runState)) throw new Error('Session is already active');validateRunnableSession(s);assertNoActiveUrlCollision(d,s);if(s.runMode===RunMode.ONE_PASS)s.onePassCompletedTaskIds=[];startSession(s,this.now());s.pausedByMaster=false;appendLog(d,s.id,'Session started',{at:this.now()});} if(command===CoreCommand.PAUSE_SESSION){if(!ACTIVE_STATES.has(s.runState)) throw new Error('Only an active session can be paused');pauseSession(s,this.now());appendLog(d,s.id,'Session paused',{at:this.now()});} if(command===CoreCommand.RESUME_SESSION){if(!this.executionAvailable) throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);if(d.profile.masterPaused) throw new Error('Resume the extension before resuming a session');if(s.runState!==RunState.PAUSED) throw new Error('Only a paused session can be resumed');const unresolved=hasUnresolvedOperation(s);if(unresolved&&s.operation?.phase===OperationPhase.MANUAL_REVIEW)throw new Error('Resolve manual review before resuming');if(!unresolved)validateRunnableSession(s);assertNoActiveUrlCollision(d,s);resumeSession(s,this.now());if(unresolved)s.runState=RunState.RECOVERING;s.pausedByMaster=false;appendLog(d,s.id,unresolved?'Session resumed into recovery':'Session resumed',{at:this.now()});} if(command===CoreCommand.STOP_SESSION){stopSession(s,this.now());appendLog(d,s.id,hasUnresolvedOperation(s)?'Session stopped; unresolved operation preserved':'Session stopped',{at:this.now()});} return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
+      const state=await this.repo.update(d=>{
+        const s=requireSession(d,payload.sessionId);
+        if(command===CoreCommand.START_SESSION){
+          if(!this.executionAvailable) throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);
+          if(d.profile.masterPaused) throw new Error('Resume the extension before starting a session');
+          if(!STARTABLE_STATES.has(s.runState)) throw new Error('Session is already active');
+          const retriedManualReview=acknowledgeSafePreSubmitManualReview(s);
+          validateRunnableSession(s);
+          assertNoActiveUrlCollision(d,s);
+          if(s.runMode===RunMode.ONE_PASS)s.onePassCompletedTaskIds=[];
+          startSession(s,this.now());
+          s.pausedByMaster=false;
+          appendLog(d,s.id,retriedManualReview?'Session started; pre-send manual review cleared for retry':'Session started',{at:this.now()});
+        }
+        if(command===CoreCommand.PAUSE_SESSION){
+          if(!ACTIVE_STATES.has(s.runState)) throw new Error('Only an active session can be paused');
+          pauseSession(s,this.now());
+          appendLog(d,s.id,'Session paused',{at:this.now()});
+        }
+        if(command===CoreCommand.RESUME_SESSION){
+          if(!this.executionAvailable) throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);
+          if(d.profile.masterPaused) throw new Error('Resume the extension before resuming a session');
+          if(s.runState!==RunState.PAUSED) throw new Error('Only a paused session can be resumed');
+          const retriedManualReview=acknowledgeSafePreSubmitManualReview(s);
+          const unresolved=hasUnresolvedOperation(s);
+          if(!unresolved)validateRunnableSession(s);
+          assertNoActiveUrlCollision(d,s);
+          resumeSession(s,this.now());
+          if(unresolved)s.runState=RunState.RECOVERING;
+          s.pausedByMaster=false;
+          appendLog(d,s.id,retriedManualReview?'Session resumed; pre-send manual review cleared for retry':(unresolved?'Session resumed into recovery':'Session resumed'),{at:this.now()});
+        }
+        if(command===CoreCommand.STOP_SESSION){
+          stopSession(s,this.now());
+          appendLog(d,s.id,hasUnresolvedOperation(s)?'Session stopped; unresolved operation preserved':'Session stopped',{at:this.now()});
+        }
+        return d;
+      });
+      return {session:sessionToUi(state.sessionsById[payload.sessionId],state)};
     }
     if (command === CoreCommand.CLEAR_LOG) { const state=await this.repo.update(d=>{requireSession(d,payload.sessionId);d.logs[payload.sessionId]=[];return d;}); return {session:sessionToUi(state.sessionsById[payload.sessionId],state)}; }
     if (command === CoreCommand.MASTER_PAUSE) { await this.repo.update(d=>{d.profile.masterPaused=true; for(const s of Object.values(d.sessionsById)) if(ACTIVE_STATES.has(s.runState)){pauseSession(s,this.now());s.pausedByMaster=true;appendLog(d,s.id,'Session paused by master pause',{at:this.now()});} return d;}); return {masterPaused:true}; }

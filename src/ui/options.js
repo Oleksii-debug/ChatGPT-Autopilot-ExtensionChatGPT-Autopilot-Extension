@@ -6,6 +6,7 @@ const MAX_TASKS = 50;
 const VISIBLE_LOG_LIMIT = 100;
 const STATUS_REFRESH_DELAY_MS = 750;
 const DRAFT_SAVE_DELAY_MS = 250;
+const DIAGNOSTIC_SNAPSHOT_DELAY_MS = 10000;
 const DRAFT_KEY_PREFIX = 'chatgpt-autopilot-draft:';
 const LAST_SESSION_KEY = 'chatgpt-autopilot-last-session';
 const ui = {
@@ -538,6 +539,15 @@ function renderActions() {
 }
 function renderStatus() {
   const s = ui.selected.status || {}; const dl = document.createElement('dl');
+  const recovery = $('uncertain-recovery');
+  const operationId = s.uncertainOperationId || '';
+  if (recovery.dataset.operationId !== operationId) {
+    recovery.dataset.operationId = operationId;
+    $('uncertain-confirm').checked = false;
+    $('uncertain-retry').disabled = true;
+    $('uncertain-skip').disabled = true;
+  }
+  recovery.hidden = !operationId;
   [
     ['Session state', ui.selected.runState || 'STOPPED'],
     ['Current task', s.currentTaskLabel || s.currentTaskUrl || 'None'],
@@ -667,6 +677,53 @@ async function exportPortableProfile() {
   }
 }
 
+function downloadText(data, fileName) {
+  const blob = new Blob([String(data || '')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function diagnosticFileName() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return `ChatGPT-Автопілот-діагностика-${stamp}.txt`;
+}
+
+async function downloadDiagnosticReport() {
+  try {
+    const extensionVersion = globalThis.chrome?.runtime?.getManifest?.().version || 'невідомо';
+    const data = await core('GET_DIAGNOSTIC_REPORT', { extensionVersion });
+    downloadText(data.report, diagnosticFileName());
+    const message = 'Діагностичний звіт завантажено.';
+    $('diagnostic-report-status').textContent = message;
+    reportCommandResult(message);
+  } catch (error) {
+    const message = `Не вдалося завантажити діагностичний звіт: ${error.message}`;
+    $('diagnostic-report-status').textContent = message;
+    setAppStatus(error.message);
+    announce(message);
+  }
+}
+
+let diagnosticSnapshotInFlight = false;
+async function recordDashboardDiagnosticSnapshot() {
+  if (diagnosticSnapshotInFlight || !ui.selectedSessionId || !ui.selected) return;
+  if (!['RUNNING', 'RECOVERING'].includes(ui.selected.runState)) return;
+  diagnosticSnapshotInFlight = true;
+  try {
+    await core('RECORD_DIAGNOSTIC_SNAPSHOT', { sessionId: ui.selectedSessionId });
+  } catch {
+    // Diagnostics must never steal focus, announce repeatedly, or block execution.
+  } finally {
+    diagnosticSnapshotInFlight = false;
+  }
+}
+
 let statusRefreshTimer = null;
 let statusRefreshInFlight = false;
 let statusRefreshQueued = false;
@@ -719,12 +776,39 @@ $('portable-profile-file').addEventListener('change', onPortableProfileFileChang
 $('import-profile-button').addEventListener('click', () => importPortableProfile(false));
 $('import-profile-start-button').addEventListener('click', () => importPortableProfile(true));
 $('export-profile-button').addEventListener('click', exportPortableProfile);
+$('download-diagnostic-report-button').addEventListener('click', downloadDiagnosticReport);
+$('uncertain-confirm').addEventListener('change', () => {
+  $('uncertain-retry').disabled = !$('uncertain-confirm').checked;
+  $('uncertain-skip').disabled = !$('uncertain-confirm').checked;
+});
+async function resolveUncertain(resolution) {
+  try {
+    const data = await core('RESOLVE_UNCERTAIN', {
+      sessionId: ui.selectedSessionId,
+      operationId: ui.selected?.status?.uncertainOperationId,
+      resolution,
+      confirmed: $('uncertain-confirm').checked,
+    });
+    ui.selected = data.session;
+    clearDraft(ui.selectedSessionId);
+    await openSession(ui.selectedSessionId);
+    reportCommandResult(resolution === 'check'
+      ? 'Перевіряю попереднє надсилання. Нового натискання немає.'
+      : 'Рішення збережено. Натисніть Продовжити для продовження.');
+    if (resolution !== 'check') $('resume-session-button').focus();
+  } catch (error) {
+    reportCommandResult(error.message);
+  }
+}
+$('uncertain-check').addEventListener('click', () => resolveUncertain('check'));
+$('uncertain-retry').addEventListener('click', () => resolveUncertain('retry'));
+$('uncertain-skip').addEventListener('click', () => resolveUncertain('skip'));
 document.addEventListener('keydown', trapDialog);
 document.addEventListener('input', (event) => {
-  if (ui.selected && event.target?.closest?.('#session-editor') && event.target.id !== 'bulk-task-urls') scheduleDraftPersistence();
+  if (ui.selected && event.target?.closest?.('#session-editor') && event.target.id !== 'bulk-task-urls' && !event.target.closest?.('#uncertain-recovery')) scheduleDraftPersistence();
 });
 document.addEventListener('change', (event) => {
-  if (ui.selected && event.target?.closest?.('#session-editor')) scheduleDraftPersistence();
+  if (ui.selected && event.target?.closest?.('#session-editor') && !event.target.closest?.('#uncertain-recovery')) scheduleDraftPersistence();
 });
 
 if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener((message) => {
@@ -739,5 +823,6 @@ async function initialLoad() {
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
 }
 void initialLoad();
+window.setInterval(() => { void recordDashboardDiagnosticSnapshot(); }, DIAGNOSTIC_SNAPSHOT_DELAY_MS);
 
-export { MAX_TASKS, blankSession, blankTask, validate };
+export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };

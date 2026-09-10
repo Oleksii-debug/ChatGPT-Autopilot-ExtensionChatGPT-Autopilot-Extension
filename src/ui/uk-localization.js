@@ -23,7 +23,17 @@ const STATE = Object.freeze({
   UNKNOWN: 'НЕВІДОМО',
   TEMPORARY_ERROR: 'ТИМЧАСОВА ПОМИЛКА',
   AUTH_REQUIRED: 'ПОТРІБЕН ВХІД',
-  UNKNOWN_UI: 'НЕВІДОМИЙ СТАН ІНТЕРФЕЙСУ'
+  UNKNOWN_UI: 'НЕВІДОМИЙ СТАН ІНТЕРФЕЙСУ',
+  MANUAL_REVIEW_REQUIRED: 'ПОТРІБНА РУЧНА ПЕРЕВІРКА',
+  INSERTION_NOT_PROVEN: 'НЕ ВДАЛОСЯ ПІДТВЕРДИТИ ВСТАВЛЕННЯ ПРОМПТУ',
+  COMPOSER_CONTAINS_OTHER_CONTENT: 'У ПОЛІ ВВЕДЕННЯ Є ІНШИЙ ТЕКСТ',
+  COMPOSER_AMBIGUOUS: 'ЗНАЙДЕНО КІЛЬКА МОЖЛИВИХ ПОЛІВ ВВЕДЕННЯ',
+  PENDING_PROMPT_MISMATCH_PRE_SEND: 'ТЕКСТ У ПОЛІ ВВЕДЕННЯ ЗМІНИВСЯ ПЕРЕД ВІДПРАВЛЕННЯМ',
+  PROMPT_CHANGED_AT_SUBMIT_BOUNDARY: 'ТЕКСТ У ПОЛІ ВВЕДЕННЯ ЗМІНИВСЯ БЕЗПОСЕРЕДНЬО ПЕРЕД ВІДПРАВЛЕННЯМ',
+  UNKNOWN_OR_SECURITY_DIALOG: 'ВІДКРИТО НЕВІДОМЕ АБО БЕЗПЕКОВЕ ДІАЛОГОВЕ ВІКНО',
+  SEND_ACK_TIMEOUT: 'НАДСИЛАННЯ НЕ ПІДТВЕРДЖЕНО; ДОСТУПНІ ДІЇ ВІДНОВЛЕННЯ',
+  EXISTING_DRAFT_SYNC_NOT_PROVEN: 'НЕ ВДАЛОСЯ СИНХРОНІЗУВАТИ НАЯВНИЙ ПРОМПТ ІЗ РЕДАКТОРОМ',
+  UNRECOGNIZED_DIALOG: 'ВІДКРИТО НЕРОЗПІЗНАНЕ ДІАЛОГОВЕ ВІКНО'
 });
 
 const EXACT = new Map([

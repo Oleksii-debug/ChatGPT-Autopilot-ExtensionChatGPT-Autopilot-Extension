@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const RELEASE_NAME = 'ChatGPT-Autopilot-Extension-v0.1';
+export const RELEASE_NAME = 'ChatGPT-Autopilot-0.1.6';
 const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
 const UTF8_FLAG = 0x0800;
@@ -84,7 +84,7 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
 
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
-  if (manifest.version !== '0.1.0') throw new Error(`v0.1 package requires manifest version 0.1.0, found ${manifest.version || 'missing'}`);
+  if (manifest.version !== '0.1.6') throw new Error(`v0.1.6 package requires manifest version 0.1.6, found ${manifest.version || 'missing'}`);
 
   const files = ['README.txt', 'manifest.json', ...await walkFiles(root, 'src')].sort();
   const fileSet = new Set(files);

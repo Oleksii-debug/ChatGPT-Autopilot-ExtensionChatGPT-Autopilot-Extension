@@ -1,7 +1,9 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
 export const MAX_LOG_MESSAGE_LENGTH = 2000;
+export const MAX_DIAGNOSTIC_ENTRIES = 1000;
+export const MAX_DIAGNOSTIC_MESSAGE_LENGTH = 600;
 export const RunState = Object.freeze({ STOPPED:'STOPPED', RUNNING:'RUNNING', PAUSED:'PAUSED', RECOVERING:'RECOVERING', ERROR:'ERROR' });
 export const PromptMode = Object.freeze({ SHARED:'SHARED', UNIQUE:'UNIQUE' });
 export const RunMode = Object.freeze({ ONE_PASS:'ONE_PASS', CONTINUOUS:'CONTINUOUS' });
@@ -45,7 +47,18 @@ function requireUniqueStringArray(value, label, { min = 0, max = Infinity } = {}
 }
 
 export function createEmptyState(now = Date.now()) {
-  return { schemaVersion: SCHEMA_VERSION, revision: 0, profile: { masterPaused: false, createdAt: now }, sessionsById: {}, sessionOrder: [], tabHintsByTaskId: {}, sendArbiter: { lease: null, profileNextAllowedSendAt: 0 }, logs: {}, migrationHistory: [] };
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    revision: 0,
+    profile: { masterPaused: false, createdAt: now },
+    sessionsById: {},
+    sessionOrder: [],
+    tabHintsByTaskId: {},
+    sendArbiter: { lease: null, profileNextAllowedSendAt: 0 },
+    logs: {},
+    diagnostics: [],
+    migrationHistory: [],
+  };
 }
 
 export function normalizeChatUrl(url) {
@@ -161,6 +174,9 @@ export function validateState(state) {
   requireRecord(state.sendArbiter, 'sendArbiter');
   requireNonNegativeNumber(state.sendArbiter.profileNextAllowedSendAt, 'sendArbiter profileNextAllowedSendAt');
   requireRecord(state.logs, 'logs');
+  if (!Array.isArray(state.diagnostics) || state.diagnostics.length > MAX_DIAGNOSTIC_ENTRIES) {
+    throw new Error('Invalid diagnostics');
+  }
   if (!Array.isArray(state.migrationHistory)) throw new Error('Invalid migrationHistory');
 
   const sessionIds = Object.keys(state.sessionsById);
@@ -190,6 +206,29 @@ export function validateState(state) {
       requireString(entry.level, `log entry for ${sessionId} level`);
       requireString(entry.message, `log entry for ${sessionId} message`);
       if (entry.message.length > MAX_LOG_MESSAGE_LENGTH) throw new Error(`Invalid log entry for ${sessionId} message length`);
+    }
+  }
+
+  for (const entry of state.diagnostics) {
+    requireRecord(entry, 'diagnostic entry');
+    requireNonNegativeNumber(entry.at, 'diagnostic entry at');
+    requireString(entry.event, 'diagnostic entry event');
+    if (entry.event.length > 80) throw new Error('Invalid diagnostic event');
+    for (const field of [
+      'sessionId', 'sessionName', 'taskId', 'taskLabel', 'mode', 'phase',
+      'runState', 'status', 'code', 'message', 'target', 'observed',
+      'promptFingerprint', 'operationIdSuffix',
+    ]) {
+      if (entry[field] !== undefined && entry[field] !== null) {
+        requireString(entry[field], `diagnostic entry ${field}`);
+        if (entry[field].length > MAX_DIAGNOSTIC_MESSAGE_LENGTH) {
+          throw new Error(`Invalid diagnostic entry ${field}`);
+        }
+      }
+    }
+    if (entry.tabId !== undefined && entry.tabId !== null
+        && (!Number.isInteger(entry.tabId) || entry.tabId < 0)) {
+      throw new Error('Invalid diagnostic entry tabId');
     }
   }
 

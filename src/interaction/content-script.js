@@ -5,6 +5,17 @@
   const adapter = root.ChatGPTInteractionAdapter;
   if (!runtime?.onMessage || !adapter?.execute) return;
 
+  const listenerKey = '__CHATGPT_AUTOPILOT_INTERACTION_LISTENER__';
+  const existing = root[listenerKey];
+  if (existing?.runtime === runtime) {
+    try {
+      if (!runtime.onMessage.hasListener || runtime.onMessage.hasListener(existing.listener)) return;
+    } catch (_) {
+      // A stale extension runtime can throw after an unpacked extension reload.
+      // Continue and install one listener through the current runtime object.
+    }
+  }
+
   const SEND_COMPAT_MODES = new Set(['PREPARE_SEND', 'SUBMIT_EXISTING', 'INSERT_AND_SEND']);
   const SEND_LABELS = new Set([
     'send',
@@ -243,7 +254,7 @@
     return () => {};
   }
 
-  runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  const listener = (message, _sender, sendResponse) => {
     if (message?.channel !== 'autopilot-interaction') return false;
 
     Promise.resolve()
@@ -261,7 +272,24 @@
 
         const restoreSendIdentity = await prepareSendControlCompatibility(root.document, request.mode);
         try {
-          return await adapter.execute(request);
+          const nativeInput = async (kind, point = {}) => {
+            const response = await runtime.sendMessage({
+              channel: 'autopilot-native-input',
+              kind,
+              requestId: request.requestId,
+              taskId: request.taskId,
+              ...point,
+            });
+            if (!response?.ok) {
+              const error = new Error('Chrome native input failed');
+              error.safeDiagnosticCode = response?.error?.safeDiagnosticCode || 'NATIVE_INPUT_FAILED';
+              throw error;
+            }
+          };
+          return await adapter.execute(request, {
+            insert: () => nativeInput('insert'),
+            submit: point => nativeInput('submit', point),
+          });
         } finally {
           restoreSendIdentity();
         }
@@ -276,5 +304,8 @@
         },
       }));
     return true;
-  });
+  };
+
+  runtime.onMessage.addListener(listener);
+  root[listenerKey] = { runtime, listener };
 })(globalThis);

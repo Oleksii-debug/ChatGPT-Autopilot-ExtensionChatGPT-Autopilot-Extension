@@ -131,7 +131,7 @@ test('submit exception becomes ambiguous recovery without cooldown or lease rele
   assert.equal(state.sendArbiter.lease.operationId, identity.operationId);
   assert.equal(
     state.sessionsById.s1.lastError,
-    'Submission outcome uncertain; no resend scheduled. Diagnostic: SUBMIT_EFFECT_EXCEPTION.',
+    'Надсилання не підтверджено. Автоматичного повтору немає. Код: SUBMIT_EFFECT_EXCEPTION.',
   );
   assert.equal(state.logs.s1.at(-1).message, 'Submission held uncertain [SUBMIT_EFFECT_EXCEPTION]');
 });

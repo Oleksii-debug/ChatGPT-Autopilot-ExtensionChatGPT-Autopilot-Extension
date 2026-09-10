@@ -31,7 +31,14 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       return { action: 'HOLD_INSERTED' };
     case InteractionResult.SUBMISSION_UNCERTAIN:
       task.status = 'SUBMISSION_UNCERTAIN';
-      task.retryAfterAt = now + Math.max(1000, session.retryBackoffMs || 30000);
+      session.lastError = 'Спроба надсилання ще не підтверджена. Автоматичного повтору немає.';
+      if (session.operation && !session.operation.verificationDeadline) {
+        session.operation.verificationDeadline = now + 120000;
+      }
+      task.retryAfterAt = Math.min(
+        now + Math.max(1000, session.retryBackoffMs || 30000),
+        session.operation?.verificationDeadline || Infinity,
+      );
       if (![RunState.PAUSED, RunState.STOPPED].includes(session.runState)) session.runState = RunState.RECOVERING;
       if (session.operation) { session.operation.phase = OperationPhase.AMBIGUOUS; session.operation.updatedAt = now; }
       return { action: 'RECOVER_BEFORE_RESEND', retryAt: task.retryAfterAt };
@@ -49,7 +56,12 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
     case InteractionResult.UNKNOWN_UI:
     case InteractionResult.MANUAL_REVIEW_REQUIRED:
       task.status = 'MANUAL_REVIEW';
-      task.manualReviewReason = result.status;
+      task.manualReviewReason = result.safeDiagnosticCode || result.status;
+      session.lastError = result.safeDiagnosticMessage || `Потрібна перевірка: ${task.manualReviewReason}`;
+      // A Session that needs a person is not meaningfully RUNNING. Pause it so the
+      // UI does not claim work is progressing while the scheduler intentionally skips
+      // this Task. A later explicit Start/Resume can safely retry only pre-submit cases.
+      if (session.runState !== RunState.STOPPED) session.runState = RunState.PAUSED;
       if (session.operation) { session.operation.phase = OperationPhase.MANUAL_REVIEW; session.operation.updatedAt = now; }
       return { action: 'MANUAL_REVIEW' };
     default:

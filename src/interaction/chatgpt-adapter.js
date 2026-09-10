@@ -49,6 +49,15 @@
   // Operation-local evidence only. Core remains the sole durable state owner. If this
   // content-script context is lost, long-prompt representation recovery fails closed.
   const acceptedRepresentationEvidence = new Map();
+  // Retain the pre-send baseline for late acknowledgement and worker restarts.
+  // A page reload intentionally loses this evidence: history equality alone is unsafe.
+  const textSubmissionEvidence = new Map();
+
+  function textEvidenceFor(request) {
+    const evidence = textSubmissionEvidence.get(evidenceKey(request));
+    return evidence?.promptText === request.promptText
+      && evidence.expectedUrl === normalizeUrl(request.expectedUrl) ? evidence : null;
+  }
 
   function nowMs() { return Date.now(); }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
@@ -74,7 +83,16 @@
       const au = new URL(a);
       const bu = new URL(b);
       if (!CHATGPT_HOSTS.has(au.hostname) || !CHATGPT_HOSTS.has(bu.hostname)) return false;
-      return au.hostname === bu.hostname && au.pathname === bu.pathname;
+      if (au.hostname !== bu.hostname) return false;
+      if (au.pathname === bu.pathname) return true;
+
+      // ChatGPT commonly canonicalizes an existing Custom GPT conversation
+      // from /g/<gpt-slug>/c/<conversation-id> to /c/<conversation-id>.
+      // The conversation id, not the presentation path, is the stable target.
+      const observedConversationId = au.pathname.match(/\/c\/([^/]+)/)?.[1] || '';
+      const expectedConversationId = bu.pathname.match(/\/c\/([^/]+)/)?.[1] || '';
+      return Boolean(observedConversationId)
+        && observedConversationId === expectedConversationId;
     } catch (_) {
       return false;
     }
@@ -256,6 +274,51 @@
     return String(el?.innerText ?? el?.textContent ?? '');
   }
 
+  // ChatGPT's contenteditable/ProseMirror composer may reflow the same inserted
+  // prompt into paragraphs/BR nodes and may normalize NBSP/line endings. Durable
+  // safety still requires exact non-whitespace content; only presentation-level
+  // whitespace differences are ignored here. This prevents a real prompt swap
+  // from being accepted while allowing semantically identical editor rendering.
+  function normalizePromptText(value) {
+    let text = String(value ?? '');
+    try { text = text.normalize('NFC'); } catch (_) {}
+    return text
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/gu, ' ')
+      .replace(/[\u200b-\u200d\u2060\ufeff]/gu, '')
+      .replace(/\n{2,}/g, '\n')
+      .replace(/[ \t]+$/gm, '')
+      .trim();
+  }
+
+  function compactPromptText(value) {
+    return normalizePromptText(value).replace(/\s+/gu, ' ').trim();
+  }
+
+  function promptTextMatches(observed, expected) {
+    const a = normalizePromptText(observed);
+    const b = normalizePromptText(expected);
+    return a === b;
+  }
+
+  function composerKind(el) {
+    const tag = String(el?.tagName || 'unknown').toLowerCase();
+    const editable = String(el?.getAttribute?.('contenteditable') || '').toLowerCase();
+    const role = String(el?.getAttribute?.('role') || '').toLowerCase();
+    return [tag, editable === 'true' ? 'contenteditable' : '', role].filter(Boolean).join('/');
+  }
+
+  function safeTextProofMessage(observed, expected, el) {
+    return [
+      `editor=${composerKind(el) || 'unknown'}`,
+      `expectedLength=${String(expected ?? '').length}`,
+      `observedLength=${String(observed ?? '').length}`,
+      `expectedNormalizedLength=${normalizePromptText(expected).length}`,
+      `observedNormalizedLength=${normalizePromptText(observed).length}`,
+      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`
+    ].join('; ');
+  }
+
   function eventConstructor(doc, preferred) {
     const view = doc?.defaultView;
     if (preferred === 'input' && typeof view?.InputEvent === 'function') return view.InputEvent;
@@ -278,6 +341,31 @@
       } catch (_) {
         return true;
       }
+    }
+  }
+
+  function replaceContentEditableText(el, value, doc) {
+    const normalized = String(value ?? '').replace(/\r\n?/g, '\n');
+    if (typeof el?.replaceChildren === 'function' && typeof doc?.createElement === 'function' && typeof doc?.createTextNode === 'function') {
+      try {
+        const fragment = typeof doc.createDocumentFragment === 'function' ? doc.createDocumentFragment() : null;
+        const target = fragment || el;
+        const lines = normalized.split('\n');
+        for (const line of lines) {
+          const paragraph = doc.createElement('p');
+          if (line) paragraph.appendChild(doc.createTextNode(line));
+          else paragraph.appendChild(doc.createElement('br'));
+          target.appendChild(paragraph);
+        }
+        if (fragment) el.replaceChildren(fragment);
+        return true;
+      } catch (_) {}
+    }
+    try {
+      el.textContent = normalized;
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -326,7 +414,7 @@
         data: value
       });
       if (allowed === false) return;
-      el.textContent = value;
+      if (!replaceContentEditableText(el, value, doc)) return;
       dispatchEditorEvent(el, 'input', {
         bubbles: true,
         composed: true,
@@ -393,15 +481,24 @@
     return attachments.length === 1
       && attachments[0] === evidence.node
       && normalizedRepresentationSignature(attachments[0]) === evidence.signature
-      && editorText(composer).trim() === '';
+      && compactPromptText(editorText(composer)) === '';
   }
 
   function semanticUserMessages(doc) {
-    return Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'user' || /you said|user/.test(accessibleName(el));
+        return role === 'user' || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
+    // A turn article and its author-role child are ONE message, not two.
+    return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
+  }
+
+  function userMessageText(el) {
+    // Read the message body without the turn heading, copy/edit buttons or footer.
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []);
+    const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
+    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
 
   function latestUserMessages(doc) {
@@ -409,7 +506,7 @@
   }
 
   function userMessageHistorySnapshot(doc) {
-    return semanticUserMessages(doc).map((el) => textOf(el).trim());
+    return semanticUserMessages(doc).map(userMessageText);
   }
 
   function userMessageRepresentationSnapshot(doc) {
@@ -424,9 +521,9 @@
   function hasStrictAppendedPrompt(before, after, promptText) {
     if (after.length !== before.length + 1) return false;
     for (let i = 0; i < before.length; i += 1) {
-      if (after[i] !== before[i]) return false;
+      if (!promptTextMatches(after[i], before[i])) return false;
     }
-    return after[after.length - 1] === String(promptText).trim();
+    return promptTextMatches(after[after.length - 1], promptText);
   }
 
   function sameRepresentationMessage(a, b) {
@@ -490,7 +587,7 @@
     if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY' });
 
     const existing = editorText(found.element);
-    if (existing === request.promptText) {
+    if (promptTextMatches(existing, request.promptText)) {
       if (attachmentNodes(found.element).length) {
         return resultBase(request, start, {
           status: STATUS.MANUAL_REVIEW_REQUIRED,
@@ -498,13 +595,28 @@
           safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_WITH_EXISTING_PROMPT'
         });
       }
+      // A draft left by an older extension can look correct in the DOM while
+      // the editor model has not consumed it. Re-enter the SAME prompt through
+      // the existing native input path and allow the editor to settle.
+      await writePrompt(found.element, request, deps);
+      await (deps.wait || wait)(100);
+      found = findVisibleComposer(doc);
+      if (!found.element || found.ambiguous
+        || !promptTextMatches(editorText(found.element), request.promptText)
+        || attachmentNodes(found.element).length) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          safeDiagnosticCode: 'EXISTING_DRAFT_SYNC_NOT_PROVEN'
+        });
+      }
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
-        safeDiagnosticCode: 'PROMPT_ALREADY_INSERTED_MATCH'
+        safeDiagnosticCode: 'PROMPT_ALREADY_INSERTED_MATCH',
+        safeDiagnosticMessage: 'Existing matching draft refreshed through native editor input.'
       });
     }
-    if (existing) {
+    if (compactPromptText(existing)) {
       return resultBase(request, start, {
         status: STATUS.MANUAL_REVIEW_REQUIRED,
         composerState: 'VISIBLE_NONEMPTY',
@@ -522,54 +634,92 @@
     }
 
     found.element.focus?.();
-    setNativeValue(found.element, request.promptText);
-    await (deps.wait || wait)(50);
+    await writePrompt(found.element, request, deps);
 
-    found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous) {
-      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT' });
-    }
+    // React/ProseMirror can commit a long multi-paragraph insertion asynchronously.
+    // Poll the same semantic proof for a bounded period instead of sampling once at 50 ms.
+    const insertionDeadline = nowMs() + 2500;
+    let lastFound = found;
+    do {
+      await (deps.wait || wait)(75);
+      found = findVisibleComposer(doc);
+      if (!found.element || found.ambiguous) {
+        if (nowMs() >= insertionDeadline) {
+          return resultBase(request, start, {
+            status: STATUS.INSERTED_NOT_SENT,
+            safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT'
+          });
+        }
+        continue;
+      }
+      lastFound = found;
 
-    const afterAttachments = attachmentNodes(found.element);
-    if (editorText(found.element) === request.promptText && afterAttachments.length === 0) {
-      acceptedRepresentationEvidence.delete(evidenceKey(request));
-      return resultBase(request, start, {
-        status: STATUS.INSERTED_NOT_SENT,
-        composerState: 'VISIBLE_NONEMPTY',
-        safeDiagnosticCode: 'INSERTION_TEXT_PROVEN'
-      });
-    }
-
-    if (editorText(found.element).trim() === '' && afterAttachments.length === 1) {
-      const evidence = bindAcceptedRepresentation(request, afterAttachments[0]);
-      if (evidence) {
+      const observedText = editorText(found.element);
+      const afterAttachments = attachmentNodes(found.element);
+      if (promptTextMatches(observedText, request.promptText) && afterAttachments.length === 0) {
+        acceptedRepresentationEvidence.delete(evidenceKey(request));
         return resultBase(request, start, {
           status: STATUS.INSERTED_NOT_SENT,
-          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
-          insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
-          safeDiagnosticCode: 'INSERTION_ATTACHMENT_OPERATION_BOUND'
+          composerState: 'VISIBLE_NONEMPTY',
+          safeDiagnosticCode: 'INSERTION_TEXT_PROVEN',
+          safeDiagnosticMessage: safeTextProofMessage(observedText, request.promptText, found.element)
         });
       }
-      return resultBase(request, start, {
-        status: STATUS.MANUAL_REVIEW_REQUIRED,
-        composerState: 'ACCEPTED_ATTACHMENT_LIKE',
-        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_HAS_NO_SEMANTIC_SIGNATURE'
-      });
-    }
 
-    if (afterAttachments.length > 1) {
-      return resultBase(request, start, {
-        status: STATUS.MANUAL_REVIEW_REQUIRED,
-        composerState: 'UNKNOWN',
-        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_AMBIGUOUS'
-      });
-    }
+      if (compactPromptText(observedText) === '' && afterAttachments.length === 1) {
+        const evidence = bindAcceptedRepresentation(request, afterAttachments[0]);
+        if (evidence) {
+          return resultBase(request, start, {
+            status: STATUS.INSERTED_NOT_SENT,
+            composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+            insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
+            safeDiagnosticCode: 'INSERTION_ATTACHMENT_OPERATION_BOUND'
+          });
+        }
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+          safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_HAS_NO_SEMANTIC_SIGNATURE'
+        });
+      }
 
+      if (afterAttachments.length > 1) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'UNKNOWN',
+          safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_AMBIGUOUS'
+        });
+      }
+    } while (nowMs() < insertionDeadline);
+
+    const finalElement = lastFound?.element || found?.element;
+    const finalText = finalElement ? editorText(finalElement) : '';
     return resultBase(request, start, {
       status: STATUS.INSERTED_NOT_SENT,
-      composerState: 'UNKNOWN',
-      safeDiagnosticCode: 'INSERTION_NOT_PROVEN'
+      composerState: compactPromptText(finalText) ? 'VISIBLE_NONEMPTY' : 'UNKNOWN',
+      safeDiagnosticCode: 'INSERTION_NOT_PROVEN',
+      safeDiagnosticMessage: safeTextProofMessage(finalText, request.promptText, finalElement)
     });
+  }
+
+  async function writePrompt(element, request, deps) {
+    if (typeof deps.insert !== 'function') {
+      setNativeValue(element, request.promptText);
+      return;
+    }
+    const doc = element.ownerDocument;
+    element.focus();
+    if (typeof element.select === 'function') element.select();
+    else {
+      const range = doc.createRange();
+      range.selectNodeContents(element);
+      const selection = doc.defaultView.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    element.setAttribute('data-autopilot-native-target', request.requestId);
+    try { await deps.insert(); }
+    finally { element.removeAttribute('data-autopilot-native-target'); }
   }
 
   function prepareSend(doc, request, start) {
@@ -580,7 +730,7 @@
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_PRE_SEND' });
     if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY_PRE_SEND' });
 
-    const exactTextPending = editorText(found.element) === request.promptText;
+    const exactTextPending = promptTextMatches(editorText(found.element), request.promptText);
     const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
     if (exactTextPending && attachmentNodes(found.element).length) {
       return resultBase(request, start, {
@@ -621,6 +771,10 @@
   }
 
   async function submitExisting(doc, request, start, deps) {
+    // Duplicate delivery of the same operation may inspect, never click again.
+    if (textEvidenceFor(request) || getAcceptedRepresentationEvidence(request)?.submitAttempted) {
+      return verifyAfterUncertain(doc, request, start);
+    }
     const ready = prepareSend(doc, request, start);
     if (ready.status !== STATUS.READY) return ready;
 
@@ -628,7 +782,7 @@
     if (!found.element || found.ambiguous) {
       return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
-    const exactTextPending = editorText(found.element) === request.promptText
+    const exactTextPending = promptTextMatches(editorText(found.element), request.promptText)
       && attachmentNodes(found.element).length === 0;
     const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
     if (!exactTextPending && !boundRepresentationPending) {
@@ -641,14 +795,53 @@
     }
 
     const beforeTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
+    if (exactTextPending) {
+      if (textSubmissionEvidence.size >= 100) {
+        textSubmissionEvidence.delete(textSubmissionEvidence.keys().next().value);
+      }
+      textSubmissionEvidence.set(evidenceKey(request), {
+        promptText: request.promptText,
+        expectedUrl: normalizeUrl(request.expectedUrl),
+        beforeMessages: beforeTextMessages,
+      });
+    }
     const evidence = boundRepresentationPending ? getAcceptedRepresentationEvidence(request) : null;
     if (evidence) {
       evidence.submitAttempted = true;
       evidence.beforeMessages = userMessageRepresentationSnapshot(doc);
     }
 
-    send.click();
-    const verifyDeadline = nowMs() + 5000;
+    // Use the native submit path when this is a genuine submit button in its
+    // composer form. This invokes validation and the form's submit handler once.
+    // Non-submit controls still use their own click handler. Never do both.
+    const form = found.element.closest?.('form');
+    const isFormSubmitter = form && send.form === form
+      && String(send.type || '').toLowerCase() === 'submit';
+    const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
+    let submitMethod = 'CLICK';
+    if (typeof deps.submit === 'function') {
+      submitMethod = 'CHROME_NATIVE_CLICK';
+      send.scrollIntoView({ block: 'center', inline: 'center' });
+      const rect = send.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const hit = doc.elementFromPoint(x, y);
+      if (hit !== send && !send.contains(hit)) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          safeDiagnosticCode: 'NATIVE_SEND_TARGET_OBSCURED'
+        });
+      }
+      send.setAttribute('data-autopilot-native-target', request.requestId);
+      try { await deps.submit({ x, y }); }
+      finally { send.removeAttribute('data-autopilot-native-target'); }
+    } else if (isFormSubmitter && typeof nativeSubmit === 'function') {
+      submitMethod = 'FORM_REQUEST_SUBMIT';
+      nativeSubmit.call(form, send);
+    } else {
+      send.click();
+    }
+    const verifyDeadline = nowMs() + 15000;
     while (nowMs() < verifyDeadline) {
       await (deps.wait || wait)(100);
 
@@ -674,7 +867,7 @@
           safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
         });
       }
-      if (exactTextPending && postFound.element && editorText(postFound.element).trim() === request.promptText.trim()) {
+      if (exactTextPending && postFound.element && promptTextMatches(editorText(postFound.element), request.promptText)) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
           submissionEvidence: 'PROMPT_STILL_PENDING',
@@ -708,8 +901,24 @@
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
       submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_CLICK_UNCERTAIN' : 'UNCERTAIN',
-      safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN'
+      safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN',
+      safeDiagnosticMessage: submissionDiagnostic(doc, request, beforeTextMessages, submitMethod)
     });
+  }
+
+  function submissionDiagnostic(doc, request, before, method = 'RECOVERY') {
+    const found = findVisibleComposer(doc);
+    const composer = found.element;
+    const blocking = detectBlockingState(doc);
+    return [
+      `method=${method}`,
+      `composer=${found.ambiguous ? 'ambiguous' : !composer ? 'absent' : compactPromptText(editorText(composer)) ? 'nonempty' : 'empty'}`,
+      `pendingMatch=${composer && promptTextMatches(editorText(composer), request.promptText) ? 'yes' : 'no'}`,
+      `messagesBefore=${before?.length ?? 'unknown'}`,
+      `messagesAfter=${userMessageHistorySnapshot(doc).length}`,
+      `block=${blocking?.code || 'none'}`,
+      `visibility=${doc.visibilityState || 'unknown'}`
+    ].join('; ');
   }
 
   async function verifyAfterUncertain(doc, request, start) {
@@ -719,13 +928,34 @@
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
+    const textEvidence = textEvidenceFor(request);
+    if (textEvidence) {
+      const pending = found.element && promptTextMatches(editorText(found.element), request.promptText);
+      const appended = hasStrictAppendedPrompt(textEvidence.beforeMessages, userMessageHistorySnapshot(doc), request.promptText);
+      if (appended && !pending) {
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
+          safeDiagnosticCode: 'RECOVERY_TEXT_OPERATION_VERIFIED'
+        });
+      }
+      // Unchanged draft text does not prove that a request was never dispatched.
+      return resultBase(request, start, {
+        status: STATUS.SUBMISSION_UNCERTAIN,
+        submissionEvidence: pending ? 'PROMPT_STILL_PENDING' : 'UNCERTAIN',
+        safeDiagnosticCode: pending ? 'RECOVERY_SEND_NOT_ACKNOWLEDGED' : 'RECOVERY_TEXT_ACK_PENDING',
+        safeDiagnosticMessage: submissionDiagnostic(doc, request, textEvidence.beforeMessages)
+      });
+    }
+
     // Composer state is operation-local evidence and therefore outranks history.
-    if (found.element && editorText(found.element).trim() === request.promptText.trim()
+    if (found.element && promptTextMatches(editorText(found.element), request.promptText)
       && attachmentNodes(found.element).length === 0) {
       return resultBase(request, start, {
-        status: STATUS.INSERTED_NOT_SENT,
-        submissionEvidence: 'NONE',
-        safeDiagnosticCode: 'RECOVERY_PROMPT_PENDING'
+        status: STATUS.SUBMISSION_UNCERTAIN,
+        submissionEvidence: 'PROMPT_STILL_PENDING',
+        safeDiagnosticCode: 'RECOVERY_BASELINE_MISSING',
+        safeDiagnosticMessage: submissionDiagnostic(doc, request, null)
       });
     }
 
@@ -733,7 +963,7 @@
     if (evidence) {
       if (found.element && isBoundRepresentationPending(found.element, request)) {
         return resultBase(request, start, {
-          status: STATUS.INSERTED_NOT_SENT,
+          status: evidence.submitAttempted ? STATUS.SUBMISSION_UNCERTAIN : STATUS.INSERTED_NOT_SENT,
           composerState: 'ACCEPTED_ATTACHMENT_LIKE',
           insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
           submissionEvidence: 'NONE',
@@ -763,11 +993,12 @@
     // Plain historical text equality is not operation identity. In recurring workflows
     // an older user message can be byte-for-byte identical to the current prompt.
     const recent = latestUserMessages(doc).slice(-5);
-    const repeatedPromptSeen = recent.some((el) => textOf(el).trim() === request.promptText.trim());
+    const repeatedPromptSeen = recent.some((el) => promptTextMatches(userMessageText(el), request.promptText));
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
       submissionEvidence: repeatedPromptSeen ? 'HISTORY_MATCH_NOT_OPERATION_BOUND' : 'UNCERTAIN',
-      safeDiagnosticCode: repeatedPromptSeen ? 'RECOVERY_STALE_MATCH_UNPROVEN' : 'RECOVERY_UNCERTAIN'
+      safeDiagnosticCode: repeatedPromptSeen ? 'RECOVERY_STALE_MATCH_UNPROVEN' : 'RECOVERY_UNCERTAIN',
+      safeDiagnosticMessage: submissionDiagnostic(doc, request, null)
     });
   }
 
@@ -799,6 +1030,8 @@
     normalizeUrl,
     sameExpectedChat,
     validateRequest,
+    normalizePromptText,
+    promptTextMatches,
     findVisibleComposer,
     detectBlockingState,
     execute

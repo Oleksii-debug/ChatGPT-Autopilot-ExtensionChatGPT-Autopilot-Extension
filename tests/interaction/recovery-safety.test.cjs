@@ -124,8 +124,8 @@ test('uncertain recovery recognizes the exact prompt still pending in composer',
   const { adapter } = loadAdapter();
   const fx = fixture({ composerText: 'exact recovery prompt' });
   const result = await adapter.execute(request('VERIFY_AFTER_UNCERTAIN_SUBMIT'), { document: fx.document });
-  assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
-  assert.equal(result.safeDiagnosticCode, 'RECOVERY_PROMPT_PENDING');
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(result.safeDiagnosticCode, 'RECOVERY_BASELINE_MISSING');
   assert.equal(fx.clicks(), 0);
 });
 

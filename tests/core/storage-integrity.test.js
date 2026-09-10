@@ -55,11 +55,11 @@ function validActiveState() {
   return state;
 }
 
-test('missing storage key is the only condition that bootstraps a new v1 envelope', async () => {
+test('missing storage key is the only condition that bootstraps a new v2 envelope', async () => {
   const { chrome, writes } = fakeChrome();
   const repo = new StorageRepository(chrome);
   const state = await repo.load();
-  assert.equal(state.schemaVersion, 1);
+  assert.equal(state.schemaVersion, 2);
   assert.equal(state.revision, 0);
   assert.equal(writes(), 0);
 });

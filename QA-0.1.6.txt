@@ -1,0 +1,65 @@
+ChatGPT Autopilot 0.1.6 — engineering verification, 2026-09-10
+
+BASE
+Uploaded complete v0.1.5 archive. Public upstream inspected at:
+https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
+main SHA d03def77cd025278105bec4407945b3fc43b1130.
+Upstream is older than the uploaded archive. No GitHub writes were performed.
+The user's supplied Chess profile is byte-for-byte unchanged.
+
+DIAGNOSTIC EVIDENCE
+The supplied report records PREPARE_SEND READY, one SEND_CLICK_UNCERTAIN,
+then 27 RECOVERY_UNCERTAIN / RECOVERY_HELD pairs. It does not include the
+post-click composer and history details necessary to establish the precise
+failure of the user's actual ChatGPT page. Trusted-event rejection is a
+reproduced failure scenario, not a claimed observation of their account.
+
+PRODUCTION CHANGES
+- content-script calls background native-input for insertion and submission.
+- Chrome Input.insertText enters the canonical durable operation prompt.
+- Chrome Input.dispatchMouseEvent presses/releases the verified Send target.
+- Background authenticates extension sender, main frame, operation id, task,
+  session phase, active state, owned tab and conversation URL.
+- Target marker, enabled state and hit testing are verified after debugger
+  attachment; coordinates are recomputed to handle Chrome infobar layout shifts.
+- nativeSubmitDispatched is durably stored before the native effect and prevents
+  replay, including after a lost response. No blind fallback after native failure.
+- Debugger is detached after the operation; attachment failure never detaches
+  somebody else's debugger or bypasses its ownership.
+- A post-send text baseline survives worker restart while the page context lives.
+- Nested turn wrappers are deduplicated; message body excludes UI text.
+- Pending draft is not sufficient proof that a previous submit never occurred.
+- Acknowledgement recovery has a fixed deadline; unresolved state is preserved.
+- Explicit recovery controls are bound to the current operation; retry/skip
+  requires acknowledgment, remains paused for Resume, and never fabricates success.
+
+AUTOMATED TESTS
+npm test: 351 passed, 0 failed, 0 skipped (unit/integration/release).
+Inherited upstream tests were aligned with the already-shipped v2 storage
+schema and v0.1.5 safe pre-submit Resume behavior. Recovery tests now explicitly
+reject automatic repeat merely because the prompt remains in the composer.
+The original uploaded regression tests were retained and passed.
+
+REAL BROWSER TEST
+scripts/native-browser-smoke.cjs exercises the shipped adapter, content-script,
+transport, AutomaticSessionExecutor, StorageRepository and native-input module
+on actual Chromium DOM with real CDP Input commands. Test Chrome APIs are bridged
+to CDP; loading/installing the extension and Chrome debugger permission prompts
+are NOT covered by this harness. Full Chrome launch was blocked by a local socket
+restriction; the supported remote browser does not expose extension test APIs.
+No live ChatGPT requests are made. All network routes are intercepted or aborted.
+A 119-line prompt is sent exactly once on each of three separate fixture tabs.
+Input and click events have isTrusted=true. Restoring the executor after
+insertion still reaches SENT_VERIFIED. The fixture deliberately ignores
+untrusted clicks; the v0.1.5 adapter returns SUBMISSION_UNCERTAIN and sends zero
+messages in the same scenario. Result details: native-browser-result.json.
+
+LIMITS
+No claim of live ChatGPT account validation, Windows installation validation,
+NVDA validation, or universal compatibility with future ChatGPT DOM changes.
+A real page navigation loses in-page text baselines and leaves an unresolved
+send held for explicit recovery; historical equal prompts cannot prove identity.
+
+References for native input design:
+https://developer.chrome.com/docs/extensions/reference/api/debugger
+https://chromedevtools.github.io/devtools-protocol/tot/Input/

@@ -95,8 +95,8 @@ test('pending exact composer text outranks stale identical history', async () =>
     previousMessages: ['same recurring prompt']
   });
   const result = await adapter.execute(request(), { document: fx.document });
-  assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
-  assert.equal(result.safeDiagnosticCode, 'RECOVERY_PROMPT_PENDING');
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(result.safeDiagnosticCode, 'RECOVERY_BASELINE_MISSING');
 });
 
 test('no matching composer/history remains uncertain rather than inventing proof', async () => {

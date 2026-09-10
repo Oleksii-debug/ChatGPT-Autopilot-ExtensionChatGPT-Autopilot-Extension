@@ -96,13 +96,15 @@ for (const phase of [OperationPhase.AMBIGUOUS, OperationPhase.PRE_SEND_WAIT]) {
   });
 }
 
-test('explicit Resume cannot bypass MANUAL_REVIEW', async () => {
-  const repo = new Repo(pausedState(OperationPhase.MANUAL_REVIEW));
+test('explicit Resume cannot bypass post-submit MANUAL_REVIEW', async () => {
+  const state = pausedState(OperationPhase.MANUAL_REVIEW);
+  state.sessionsById.s1.operation.submitStartedAt = 20;
+  const repo = new Repo(state);
   const dispatcher = new CoreCommandDispatcher(repo, () => 100, { executionAvailable: true });
 
   await assert.rejects(
     () => dispatcher.execute(CoreCommand.RESUME_SESSION, { sessionId: 's1' }),
-    /Resolve manual review before resuming/,
+    /Resolve the uncertain send operation before retrying/,
   );
   const after = await repo.load();
   assert.equal(after.sessionsById.s1.runState, RunState.PAUSED);

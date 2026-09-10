@@ -21,6 +21,34 @@ function normalizedTabUrl(tab) {
   }
 }
 
+function conversationId(url) {
+  try {
+    return new URL(url).pathname.match(/\/c\/([^/]+)/u)?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+// ChatGPT can canonicalize a Custom GPT conversation from
+// /g/<gpt-slug>/c/<conversation-id> to /c/<conversation-id>.  The stable
+// conversation id is the authority; treating the canonical redirect as a
+// different Task causes an endless navigation/retry loop.
+export function sameChatConversationUrl(observed, expected) {
+  if (!observed || !expected) return false;
+  if (observed === expected) return true;
+  try {
+    const observedUrl = new URL(observed);
+    const expectedUrl = new URL(expected);
+    const observedId = conversationId(observedUrl.href);
+    const expectedId = conversationId(expectedUrl.href);
+    return observedUrl.hostname === expectedUrl.hostname
+      && Boolean(observedId)
+      && observedId === expectedId;
+  } catch {
+    return false;
+  }
+}
+
 function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -66,10 +94,10 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
 
     const observedUrl = normalizedTabUrl(lastTab);
     const documentReady = lastTab.status === 'complete' || lastTab.status == null;
-    if (documentReady && observedUrl === normalizedExpected) return lastTab;
+    if (documentReady && sameChatConversationUrl(observedUrl, normalizedExpected)) return lastTab;
 
     if (now() >= deadline) {
-      const code = documentReady && observedUrl && observedUrl !== normalizedExpected
+      const code = documentReady && observedUrl && !sameChatConversationUrl(observedUrl, normalizedExpected)
         ? 'TAB_NAVIGATION_URL_MISMATCH'
         : 'TAB_NAVIGATION_TIMEOUT';
       throw new TabReadinessError(
@@ -106,7 +134,7 @@ async function getValidHintedTab(chromeApi, hint, expected) {
   const identityUrl = hint.normalizedUrl || expected.normalizedUrl;
   try {
     const tab = await chromeApi.tabs.get(hint.tabId);
-    return normalizedTabUrl(tab) === identityUrl ? tab : null;
+    return sameChatConversationUrl(normalizedTabUrl(tab), identityUrl) ? tab : null;
   } catch {
     return null;
   }
@@ -142,7 +170,7 @@ async function findMatchingChatTab(chromeApi, normalizedUrl, excludedTabIds = ne
   const tabs = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
   return tabs.find(tab => {
     if (excludedTabIds.has(tab.id)) return false;
-    return normalizedTabUrl(tab) === normalizedUrl;
+    return sameChatConversationUrl(normalizedTabUrl(tab), normalizedUrl);
   }) || null;
 }
 
@@ -156,7 +184,7 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
 
   if (hintedTab) {
     const currentUrl = normalizedTabUrl(hintedTab);
-    if (currentUrl === task.normalizedUrl) return hintedTab;
+    if (sameChatConversationUrl(currentUrl, task.normalizedUrl)) return hintedTab;
 
     const navigated = await chromeApi.tabs.update(hintedTab.id, {
       url: task.normalizedUrl,
@@ -201,6 +229,20 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
     });
     if (tab) return tab;
     delete state.tabHintsByTaskId[task.id];
+  }
+
+  // Open-and-close mode owns only tabs it creates.  It must never adopt a
+  // manually opened conversation tab and then close the user's tab later.
+  if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK) {
+    const tab = await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+    state.tabHintsByTaskId[task.id] = {
+      tabId: tab.id,
+      sessionId,
+      normalizedUrl: task.normalizedUrl,
+      kind: 'TASK',
+      boundAt: Date.now(),
+    };
+    return tab;
   }
 
   const excluded = claimedTabIdsByOtherSessions(state, sessionId);

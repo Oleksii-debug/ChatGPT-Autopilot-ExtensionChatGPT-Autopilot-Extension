@@ -143,6 +143,14 @@
       <section aria-labelledby="status-heading">
         <h3 id="status-heading">Status</h3>
         <div id="session-status-region"></div>
+        <div id="uncertain-recovery" hidden>
+          <h4>Відновлення непідтвердженого надсилання</h4>
+          <p id="uncertain-help">Перевірити ще раз — лише перевірка, без нового надсилання. Якщо обираєте повтор, перевірте останні повідомлення розмови: повтор може створити дублікат. Пропуск вимикає це завдання; інші залишаються увімкненими.</p>
+          <button id="uncertain-check" type="button" aria-describedby="uncertain-help">Перевірити ще раз без надсилання</button>
+          <label><input id="uncertain-confirm" type="checkbox">Я розумію: повтор може створити дублікат, а пропуск вимкне поточне завдання.</label>
+          <button id="uncertain-retry" type="button" disabled>Дозволити повтор поточного завдання</button>
+          <button id="uncertain-skip" type="button" disabled>Пропустити й вимкнути поточне завдання</button>
+        </div>
       </section>
 
       <section aria-labelledby="log-heading">
@@ -151,6 +159,13 @@
         <p id="session-log-count">0 Core log entries shown.</p>
         <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
         <button id="clear-log-button" type="button">Clear log</button>
+      </section>
+
+      <section aria-labelledby="diagnostics-heading">
+        <h3 id="diagnostics-heading">Діагностика</h3>
+        <p id="diagnostics-help">Поки цю сторінку відкрито й сеанс активний, кожні 10 секунд додається контрольний запис. Події виконання зберігаються також без відкритої сторінки. Звіт не містить текстів промптів, повних приватних посилань, даних сеансу браузера або ключів доступу.</p>
+        <button id="download-diagnostic-report-button" type="button" aria-describedby="diagnostics-help diagnostic-report-status">Завантажити діагностичний звіт</button>
+        <p id="diagnostic-report-status" tabindex="0">Діагностичний звіт ще не завантажували.</p>
       </section>
     </section>
 

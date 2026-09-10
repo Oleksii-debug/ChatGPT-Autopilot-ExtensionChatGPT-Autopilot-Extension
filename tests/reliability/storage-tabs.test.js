@@ -19,7 +19,7 @@ test('empty storage bootstraps a versioned state without losing validation invar
   const chromeApi = fakeStorageChrome();
   const repo = new StorageRepository(chromeApi);
   const state = await repo.load();
-  assert.equal(state.schemaVersion, 1);
+  assert.equal(state.schemaVersion, 2);
   assert.equal(state.revision, 0);
   assert.deepEqual(state.sessionOrder, []);
 });
