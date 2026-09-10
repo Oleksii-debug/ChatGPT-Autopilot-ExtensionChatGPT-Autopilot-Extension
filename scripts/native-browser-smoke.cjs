@@ -91,7 +91,7 @@ document.querySelector('button').addEventListener('click',event=>{
    const sent=await executor.runSessionOnce(session.id);
    const current=(await repo.load()).sessionsById[session.id];
    assert.equal(current.operation.phase,'SENT_VERIFIED',JSON.stringify({sent,error:current.lastError,diagnostics:db.autopilotState.diagnostics.slice(-3)}));
-   observations.push({url:scenario.url,pauseBeforeSendMs:Date.now()-waitStart,requestedPauseMs:scenario.pauseMs,ackDelayMs:scenario.ackDelayMs,phase:current.operation.phase});
+   observations.push({url:scenario.url,timeThroughVerificationMs:Date.now()-waitStart,requestedPauseMs:scenario.pauseMs,ackDelayMs:scenario.ackDelayMs,phase:current.operation.phase});
    await new Promise(resolve=>setTimeout(resolve,2100));clock=Date.now();
  }
  const results=[];
@@ -100,6 +100,7 @@ document.querySelector('button').addEventListener('click',event=>{
    assert.equal(receipts.count,1);assert.equal(receipts.text,scenarios[id-1].prompt);assert.deepEqual(receipts.clickTrust,[true]);assert.ok(receipts.inputTrust.every(Boolean));assert.equal(receipts.composerEmpty,true);
    results.push({tabId:id,receiptCount:receipts.count,allInputTrusted:true,clickTrusted:receipts.clickTrust[0],receiptTime:receipts.receiptTime});
  }
+ for(let i=1;i<results.length;i++) assert.ok(results[i].receiptTime-results[i-1].receiptTime>=2000,'real send gap must respect minimum interval');
  assert.equal(nativeCommands.filter(x=>x.type==='mousePressed').length,scenarios.length);assert.equal(nativeCommands.filter(x=>x.type==='mouseReleased').length,scenarios.length);
  console.log(JSON.stringify({status:'PASS',browser:browser.version(),scope:'Real Chromium DOM and CDP; Chrome extension APIs bridged in test, no live ChatGPT account',baselineResult,verifiedTasks:scenarios.length,realTimePauses:true,observations,restartedExecutorAfterInsertion:true,nativeCommands,results},null,2));
  }finally{await browser.close();}

@@ -4,7 +4,8 @@ BASE
 Uploaded complete v0.1.5 archive. Public upstream inspected at:
 https://github.com/Oleksii-debug/ChatGPT-Autopilot-ExtensionChatGPT-Autopilot-Extension
 main SHA d03def77cd025278105bec4407945b3fc43b1130.
-Upstream is older than the uploaded archive. No GitHub writes were performed.
+Upstream is older than the uploaded archive. Code and handoff are preserved on
+branch fix/native-send-0.1.6-handoff; progress is in GitHub issue #119.
 The user's supplied Chess profile is byte-for-byte unchanged.
 
 DIAGNOSTIC EVIDENCE
@@ -48,9 +49,13 @@ to CDP; loading/installing the extension and Chrome debugger permission prompts
 are NOT covered by this harness. Full Chrome launch was blocked by a local socket
 restriction; the supported remote browser does not expose extension test APIs.
 No live ChatGPT requests are made. All network routes are intercepted or aborted.
-A 119-line prompt is sent exactly once on each of three separate fixture tabs.
+Six distinct fixture URLs include normal chats, query/hash variants and a project
+conversation path. Short, multiline and 119-line prompts are sent, including
+identical text in two different chats. Real pre-send waits: 2/3/5/2/4/3 seconds.
+Acknowledgement delays: 0/2/6.5/0/9/0.3 seconds. Each task receives exactly one
+message. Actual measured send gaps (ms): 5403, 9307, 10814, 6474, 14340.
 Input and click events have isTrusted=true. Restoring the executor after
-insertion still reaches SENT_VERIFIED. The fixture deliberately ignores
+insertion in three scenarios still reaches SENT_VERIFIED. The fixture deliberately ignores
 untrusted clicks; the v0.1.5 adapter returns SUBMISSION_UNCERTAIN and sends zero
 messages in the same scenario. Result details: native-browser-result.json.
 

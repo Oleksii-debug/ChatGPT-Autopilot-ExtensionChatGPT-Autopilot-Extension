@@ -1,0 +1,194 @@
+{
+  "status": "PASS",
+  "browser": "152.0.7977.0",
+  "scope": "Real Chromium DOM and CDP; Chrome extension APIs bridged in test, no live ChatGPT account",
+  "baselineResult": {
+    "status": "SUBMISSION_UNCERTAIN",
+    "receiptCount": 0,
+    "clickTrusted": false
+  },
+  "verifiedTasks": 6,
+  "realTimePauses": true,
+  "observations": [
+    {
+      "url": "https://chatgpt.com/c/fixture-1",
+      "requestedPauseMs": 2000,
+      "ackDelayMs": 0,
+      "phase": "SENT_VERIFIED",
+      "timeThroughVerificationMs": 2126
+    },
+    {
+      "url": "https://chatgpt.com/c/fixture-2?test=two",
+      "requestedPauseMs": 3000,
+      "ackDelayMs": 2000,
+      "phase": "SENT_VERIFIED",
+      "timeThroughVerificationMs": 5031
+    },
+    {
+      "url": "https://chatgpt.com/g/fixture-project/c/fixture-3",
+      "requestedPauseMs": 5000,
+      "ackDelayMs": 6500,
+      "phase": "SENT_VERIFIED",
+      "timeThroughVerificationMs": 11546
+    },
+    {
+      "url": "https://chatgpt.com/c/fixture-4#test",
+      "requestedPauseMs": 2000,
+      "ackDelayMs": 0,
+      "phase": "SENT_VERIFIED",
+      "timeThroughVerificationMs": 2126
+    },
+    {
+      "url": "https://chatgpt.com/c/fixture-5",
+      "requestedPauseMs": 4000,
+      "ackDelayMs": 9000,
+      "phase": "SENT_VERIFIED",
+      "timeThroughVerificationMs": 13069
+    },
+    {
+      "url": "https://chatgpt.com/c/fixture-6",
+      "requestedPauseMs": 3000,
+      "ackDelayMs": 300,
+      "phase": "SENT_VERIFIED",
+      "timeThroughVerificationMs": 3337
+    }
+  ],
+  "restartedExecutorAfterInsertion": true,
+  "nativeCommands": [
+    {
+      "tabId": 1,
+      "method": "Input.insertText"
+    },
+    {
+      "tabId": 1,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mousePressed"
+    },
+    {
+      "tabId": 1,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mouseReleased"
+    },
+    {
+      "tabId": 2,
+      "method": "Input.insertText"
+    },
+    {
+      "tabId": 2,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mousePressed"
+    },
+    {
+      "tabId": 2,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mouseReleased"
+    },
+    {
+      "tabId": 3,
+      "method": "Input.insertText"
+    },
+    {
+      "tabId": 3,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mousePressed"
+    },
+    {
+      "tabId": 3,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mouseReleased"
+    },
+    {
+      "tabId": 4,
+      "method": "Input.insertText"
+    },
+    {
+      "tabId": 4,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mousePressed"
+    },
+    {
+      "tabId": 4,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mouseReleased"
+    },
+    {
+      "tabId": 5,
+      "method": "Input.insertText"
+    },
+    {
+      "tabId": 5,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mousePressed"
+    },
+    {
+      "tabId": 5,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mouseReleased"
+    },
+    {
+      "tabId": 6,
+      "method": "Input.insertText"
+    },
+    {
+      "tabId": 6,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mousePressed"
+    },
+    {
+      "tabId": 6,
+      "method": "Input.dispatchMouseEvent",
+      "type": "mouseReleased"
+    }
+  ],
+  "results": [
+    {
+      "tabId": 1,
+      "receiptCount": 1,
+      "allInputTrusted": true,
+      "clickTrusted": true,
+      "receiptTime": 1789043429541
+    },
+    {
+      "tabId": 2,
+      "receiptCount": 1,
+      "allInputTrusted": true,
+      "clickTrusted": true,
+      "receiptTime": 1789043434944
+    },
+    {
+      "tabId": 3,
+      "receiptCount": 1,
+      "allInputTrusted": true,
+      "clickTrusted": true,
+      "receiptTime": 1789043444251
+    },
+    {
+      "tabId": 4,
+      "receiptCount": 1,
+      "allInputTrusted": true,
+      "clickTrusted": true,
+      "receiptTime": 1789043455065
+    },
+    {
+      "tabId": 5,
+      "receiptCount": 1,
+      "allInputTrusted": true,
+      "clickTrusted": true,
+      "receiptTime": 1789043461539
+    },
+    {
+      "tabId": 6,
+      "receiptCount": 1,
+      "allInputTrusted": true,
+      "clickTrusted": true,
+      "receiptTime": 1789043475879
+    }
+  ],
+  "actualSendGapsMs": [
+    5403,
+    9307,
+    10814,
+    6474,
+    14340
+  ]
+}
