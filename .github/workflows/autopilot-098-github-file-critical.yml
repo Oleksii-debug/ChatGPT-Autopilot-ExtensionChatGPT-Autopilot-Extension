@@ -1,0 +1,37 @@
+name: Autopilot 0.9.8 GitHub File Critical
+
+on:
+  push:
+    branches:
+      - autopilot-0.9.8-github-file-ci
+    paths:
+      - '.ci-snapshots/github-file-098.tar.gz.b64'
+      - '.github/workflows/autopilot-098-github-file-critical.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  critical:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Decode and verify exact critical snapshot
+        shell: bash
+        run: |
+          python -c "import base64,hashlib,pathlib; src=pathlib.Path('.ci-snapshots/github-file-098.tar.gz.b64').read_text().strip(); data=base64.b64decode(src); got=hashlib.sha256(data).hexdigest(); assert got=='fea4efba13126e16747147e31c79c93da0da9031edc21ad53a906bb83dc58ff3', got; pathlib.Path('github-file-098.tar.gz').write_bytes(data)"
+          mkdir ci-work
+          tar -xzf github-file-098.tar.gz -C ci-work
+      - name: Run GitHub-file transport and owner acceptance tests
+        shell: bash
+        working-directory: ci-work
+        run: |
+          node --test tests/orchestration-v2-github-file.test.mjs tests/orchestration-v2-github-file-user-acceptance.test.mjs
