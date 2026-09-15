@@ -1,0 +1,33 @@
+name: Emergency 0.9.18.4 Scheduler Regression
+
+on:
+  push:
+    branches:
+      - emergency/0.9.18.4-owner-runtime-hotfix-ci
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scheduler-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout quarantine branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run emergency scheduler regression
+        run: node --test .ci/emergency-09184-regression.test.mjs
+      - name: Record quarantine boundary
+        shell: bash
+        run: |
+          echo 'NONCANONICAL_EMERGENCY_HOTFIX=true'
+          echo 'CANONICAL_0_9_19_SOURCE_RECOVERED=false'
+          echo 'DO_NOT_MERGE_AS_SOURCE_CONVERGENCE=true'
