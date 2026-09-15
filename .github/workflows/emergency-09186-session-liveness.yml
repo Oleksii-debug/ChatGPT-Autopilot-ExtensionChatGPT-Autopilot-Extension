@@ -1,0 +1,29 @@
+name: Emergency 0.9.18.6 Session Liveness Regression
+
+on:
+  push:
+    branches:
+      - emergency/0.9.18.6-session-liveness-ci
+  workflow_dispatch:
+
+jobs:
+  owner-incident-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout quarantine branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run 37/55/58 liveness contract
+        run: node --test tests-quarantine/emergency-09186-session-liveness.mjs
+      - name: Record quarantine boundary
+        shell: bash
+        run: |
+          echo 'NONCANONICAL emergency regression only.'
+          echo 'This branch does not satisfy #123 and is not canonical 0.9.19 source convergence.'
