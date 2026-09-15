@@ -10,7 +10,9 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://drive.google.com/*",
+    "https://docs.google.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
