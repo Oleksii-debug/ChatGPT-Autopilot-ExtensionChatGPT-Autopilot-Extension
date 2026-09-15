@@ -5,6 +5,7 @@ import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
+import { CadencedRepository, getPromptCadenceConfig, setPromptCadenceConfig } from '../core/prompt-cadence.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
@@ -13,10 +14,12 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_SNAPSHOT',
   'PREVIEW_PORTABLE_PROFILE',
   'EXPORT_PORTABLE_PROFILE',
+  'GET_PROMPT_CADENCE',
 ]);
 const repo = new StorageRepository(chrome);
+const executorRepo = new CadencedRepository(repo);
 const transport = new ChromeInteractionTransport(chrome);
-const executor = new AutomaticSessionExecutor(repo, chrome, transport);
+const executor = new AutomaticSessionExecutor(executorRepo, chrome, transport);
 const dispatcher = new CoreCommandDispatcher(repo, undefined, { executionAvailable: EXECUTION_AVAILABLE });
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
@@ -129,10 +132,39 @@ export async function reconcileRuntime() {
   return cycle.state;
 }
 
+async function dispatchPromptCadenceCommand(command, payload) {
+  if (command === 'GET_PROMPT_CADENCE') {
+    const state = await repo.load();
+    const session = state.sessionsById[payload.sessionId];
+    if (!session) throw new Error('Session not found');
+    return {
+      config: getPromptCadenceConfig(state, payload.sessionId),
+      verifiedSendCount: Number.isInteger(session.cadenceVerifiedSendCount) ? session.cadenceVerifiedSendCount : 0,
+    };
+  }
+  if (command === 'SET_PROMPT_CADENCE') {
+    let config;
+    const state = await repo.update(draft => {
+      config = setPromptCadenceConfig(draft, payload.sessionId, payload.config || {});
+      return draft;
+    });
+    return {
+      config,
+      verifiedSendCount: Number.isInteger(state.sessionsById[payload.sessionId]?.cadenceVerifiedSendCount)
+        ? state.sessionsById[payload.sessionId].cadenceVerifiedSendCount
+        : 0,
+    };
+  }
+  return null;
+}
+
 export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
-  const result = await dispatcher.execute(message.command, message.payload || {});
+  const special = await dispatchPromptCadenceCommand(message.command, message.payload || {});
+  const result = special === null
+    ? await dispatcher.execute(message.command, message.payload || {})
+    : special;
   // Read-only status/configuration queries must not create a STATUS_CHANGED
   // feedback loop with the options page. Only state-changing UI commands need
   // alarm reconciliation and a status broadcast.
