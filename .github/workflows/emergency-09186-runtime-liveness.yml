@@ -1,0 +1,27 @@
+name: Emergency 0.9.18.6 Runtime Liveness Regression
+on:
+  push:
+    branches:
+      - emergency/0.9.18.6-runtime-liveness-ci
+  workflow_dispatch:
+jobs:
+  runtime-liveness:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout quarantine branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run 0.9.18.6 owner-incident regression
+        run: node --test .ci-snapshots/09186/runtime-liveness-regression.mjs
+      - name: Record quarantine boundary
+        shell: bash
+        run: |
+          echo 'NONCANONICAL emergency regression only.'
+          echo 'Canonical 0.9.19 source convergence remains governed by issue #123.'
