@@ -1,0 +1,34 @@
+name: Emergency 0.9.18.5 Agent M6 Regression
+
+on:
+  push:
+    branches:
+      - emergency/0.9.18.5-agent-m6-ci
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-m6-regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout quarantine branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Agent M6 deterministic recipe regression
+        run: node --test .ci-snapshots/agent-m6-09185-regression.mjs
+      - name: Record quarantine boundary
+        shell: bash
+        run: |
+          echo 'NONCANONICAL_EMERGENCY_LINEAGE=0.9.18.5'
+          echo 'CANONICAL_0_9_19_SOURCE_RECOVERED=false'
+          echo 'M6_SOURCE_BINDING_BROWSER_AGENT=21d798c7d953689953d48cd105d25c12c26bc01f6adfe179506dbd1c14ec813e'
+          echo 'M6_SOURCE_BINDING_MANAGER=38d6f97d75052840a79d2858732a1a870810e762949e642a35475f963b151af5'
