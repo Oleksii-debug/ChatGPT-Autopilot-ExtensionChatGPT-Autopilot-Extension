@@ -1,0 +1,28 @@
+name: Emergency 0.9.18.10 Drive Alternate Regression
+on:
+  push:
+    branches:
+      - emergency/0.9.18.10-drive-alternate-ci
+  workflow_dispatch:
+jobs:
+  drive-alternate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout quarantine branch
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run 0.9.18.10 Drive and alternate-prompt contract
+        run: node --test .ci-snapshots/091810/drive-alternate-regression.mjs
+      - name: Record quarantine boundary
+        shell: bash
+        run: |
+          echo 'NONCANONICAL focused cross-platform regression only.'
+          echo 'Full exact-source qualification is recorded separately from this GitHub quarantine snapshot.'
+          echo 'Canonical 0.9.19 source convergence remains governed by issue #123.'
