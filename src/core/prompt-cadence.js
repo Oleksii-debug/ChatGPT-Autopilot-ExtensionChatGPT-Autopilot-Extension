@@ -1,3 +1,5 @@
+import { isSessionFunctionEnabled, SessionFunctionId } from './session-functions.js';
+
 const PROFILE_KEY = 'promptCadenceBySessionId';
 const MAX_PROMPTS = 3;
 const MAX_EVERY_N = 1000000;
@@ -34,25 +36,12 @@ function normalizeChatFlow(raw = {}) {
 }
 
 export function normalizePromptCadenceConfig(raw = {}) {
-  const legacySecondary = normalizePromptRule({
-    enabled: raw.enabled === true,
-    prompt: raw.secondaryPrompt,
-    everyN: raw.everyN,
-  });
+  const legacySecondary = normalizePromptRule({ enabled: raw.enabled === true, prompt: raw.secondaryPrompt, everyN: raw.everyN });
   const prompts = Array.isArray(raw.prompts)
     ? raw.prompts.slice(0, MAX_PROMPTS).map(normalizePromptRule)
-    : [
-      { enabled: false, prompt: '', everyN: 10 },
-      legacySecondary,
-      { enabled: false, prompt: '', everyN: 20 },
-    ];
+    : [{ enabled: false, prompt: '', everyN: 10 }, legacySecondary, { enabled: false, prompt: '', everyN: 20 }];
   while (prompts.length < MAX_PROMPTS) prompts.push({ enabled: false, prompt: '', everyN: 10 });
-
-  return {
-    enabled: prompts.some(rule => rule.enabled),
-    prompts,
-    chatFlow: normalizeChatFlow(raw.chatFlow),
-  };
+  return { enabled: prompts.some(rule => rule.enabled), prompts, chatFlow: normalizeChatFlow(raw.chatFlow) };
 }
 
 export function getPromptCadenceConfig(state, sessionId) {
@@ -64,12 +53,8 @@ export function setPromptCadenceConfig(state, sessionId, rawConfig) {
   if (!state.profile[PROFILE_KEY] || typeof state.profile[PROFILE_KEY] !== 'object') state.profile[PROFILE_KEY] = {};
   const config = normalizePromptCadenceConfig(rawConfig);
   if (rawConfig && rawConfig.chatFlow) config.chatFlow.enabled = rawConfig.chatFlow.enabled === true || rawConfig.chatFlow.enabled === undefined;
-  for (const [index, rule] of config.prompts.entries()) {
-    if (rule.enabled && !rule.prompt.trim()) throw new Error(`Промт ${index + 1} не може бути порожнім.`);
-  }
-  if (config.chatFlow.enabled && config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) {
-    throw new Error('Для етапного режиму потрібно вказати другий промт.');
-  }
+  for (const [index, rule] of config.prompts.entries()) if (rule.enabled && !rule.prompt.trim()) throw new Error(`Промт ${index + 1} не може бути порожнім.`);
+  if (config.chatFlow.enabled && config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) throw new Error('Для етапного режиму потрібно вказати другий промт.');
   state.profile[PROFILE_KEY][sessionId] = config;
   return config;
 }
@@ -87,26 +72,23 @@ function cadencePrompt(config, verifiedCount, primaryPrompt) {
   if (staged !== null) return staged;
   const ordinal = verifiedCount + 1;
   const enabled = config.prompts.filter(rule => rule.enabled && rule.prompt.trim());
-  for (let index = enabled.length - 1; index >= 0; index -= 1) {
-    const rule = enabled[index];
-    if (ordinal % rule.everyN === 0) return rule.prompt;
-  }
+  for (let index = enabled.length - 1; index >= 0; index -= 1) if (ordinal % enabled[index].everyN === 0) return enabled[index].prompt;
   return primaryPrompt;
 }
 
+function cadenceEnabled(session) {
+  return isSessionFunctionEnabled(session?.activeFunctions, SessionFunctionId.PROMPT_CADENCE);
+}
+
 export function projectPromptForSession(state, session) {
+  if (!cadenceEnabled(session)) return session;
   const config = getPromptCadenceConfig(state, session.id);
-  const verifiedCount = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
-    ? session.cadenceVerifiedSendCount
-    : 0;
+  const verifiedCount = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0 ? session.cadenceVerifiedSendCount : 0;
   const primaryPrompt = session.sharedPrompt || '';
   const prompt = cadencePrompt(config, verifiedCount, primaryPrompt);
   if (!prompt) return session;
-  if (session.promptMode === 'UNIQUE') {
-    for (const task of Object.values(session.tasksById || {})) task.promptOverride = prompt;
-  } else {
-    session.sharedPrompt = prompt;
-  }
+  if (session.promptMode === 'UNIQUE') for (const task of Object.values(session.tasksById || {})) task.promptOverride = prompt;
+  else session.sharedPrompt = prompt;
   return session;
 }
 
@@ -116,6 +98,7 @@ function snapshotVerifiedTimes(state) {
 
 function accountVerifiedTransitions(state, beforeTimes) {
   for (const [id, session] of Object.entries(state?.sessionsById || {})) {
+    if (!cadenceEnabled(session)) continue;
     const before = beforeTimes[id] || 0;
     const after = session.lastSuccessfulSendAt || 0;
     if (after > before) {
@@ -124,8 +107,7 @@ function accountVerifiedTransitions(state, beforeTimes) {
       const config = getPromptCadenceConfig(state, id);
       if (config.chatFlow.enabled && config.chatFlow.mode === 'staged') {
         const stageOneTotal = 1 + config.chatFlow.continueCount;
-        const stageTwoTotal = config.chatFlow.stage2Count;
-        if (session.cadenceVerifiedSendCount >= stageOneTotal + stageTwoTotal) session.runState = 'STOPPED';
+        if (session.cadenceVerifiedSendCount >= stageOneTotal + config.chatFlow.stage2Count) session.runState = 'STOPPED';
       }
     }
   }
@@ -134,21 +116,8 @@ function accountVerifiedTransitions(state, beforeTimes) {
 
 export class CadencedRepository {
   constructor(baseRepository) { this.base = baseRepository; }
-
-  async load() {
-    const state = await this.base.load();
-    for (const session of Object.values(state?.sessionsById || {})) projectPromptForSession(state, session);
-    return state;
-  }
-
-  async update(mutator) {
-    return this.base.update(async draft => {
-      const beforeTimes = snapshotVerifiedTimes(draft);
-      const result = await mutator(draft);
-      const next = result || draft;
-      return accountVerifiedTransitions(next, beforeTimes);
-    });
-  }
+  async load() { const state = await this.base.load(); for (const session of Object.values(state?.sessionsById || {})) projectPromptForSession(state, session); return state; }
+  async update(mutator) { return this.base.update(async draft => { const beforeTimes = snapshotVerifiedTimes(draft); const result = await mutator(draft); return accountVerifiedTransitions(result || draft, beforeTimes); }); }
 }
 
 export const PROMPT_CADENCE_MAX_PROMPTS = MAX_PROMPTS;
