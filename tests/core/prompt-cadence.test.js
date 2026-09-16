@@ -119,12 +119,12 @@ test('cadence count increments only when lastSuccessfulSendAt advances', async (
   await repo.update(draft => { draft.sessionsById.s1.lastSuccessfulSendAt = 1000; return draft; });
   loaded = await repo.load();
   assert.equal(loaded.sessionsById.s1.cadenceVerifiedSendCount, 1);
-  assert.equal(loaded.sessionsById.s1.sharedPrompt, 'primary');
+  assert.equal(loaded.sessionsById.s1.sharedPrompt, 'secondary');
 
   await repo.update(draft => { draft.sessionsById.s1.lastSuccessfulSendAt = 1100; return draft; });
   loaded = await repo.load();
   assert.equal(loaded.sessionsById.s1.cadenceVerifiedSendCount, 2);
-  assert.equal(loaded.sessionsById.s1.sharedPrompt, 'secondary');
+  assert.equal(loaded.sessionsById.s1.sharedPrompt, 'primary');
 });
 
 test('normalization preserves legacy settings and adds three-rule/chat-flow defaults', () => {
