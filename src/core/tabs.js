@@ -225,19 +225,6 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
   if (hintedTab) {
     const currentUrl = normalizedTabUrl(hintedTab);
     if (currentUrl === task.normalizedUrl) return hintedTab;
-
-    const navigated = await chromeApi.tabs.update(hintedTab.id, {
-      url: task.normalizedUrl,
-      active: false,
-    });
-    state.tabHintsByTaskId[key] = {
-      tabId: navigated.id,
-      sessionId,
-      normalizedUrl: task.normalizedUrl,
-      kind: 'SESSION_WORKER',
-      boundAt: Date.now(),
-    };
-    return navigated;
   }
 
   delete state.tabHintsByTaskId[key];
