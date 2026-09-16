@@ -6,9 +6,17 @@ const OLD_URL = 'https://chatgpt.com/c/old-chat';
 const NEW_URL = 'https://chatgpt.com/c/new-chat';
 const ROOT_URL = 'https://chatgpt.com/';
 
-function makeState({ mode, count, everyN = 2, continueCount = 2 } = {}) {
+function makeState({ mode, count, everyN = 2, continueCount = 2, taskCount = 1 } = {}) {
   const sessionId = 's1';
-  const taskId = 't1';
+  const tasksById = {};
+  for (let index = 1; index <= taskCount; index += 1) {
+    const taskId = `t${index}`;
+    tasksById[taskId] = {
+      id: taskId,
+      url: index === 1 ? OLD_URL : `https://chatgpt.com/c/task-${index}`,
+      normalizedUrl: index === 1 ? OLD_URL : `https://chatgpt.com/c/task-${index}`,
+    };
+  }
   return {
     profile: {
       promptCadenceBySessionId: {
@@ -35,13 +43,7 @@ function makeState({ mode, count, everyN = 2, continueCount = 2 } = {}) {
         id: sessionId,
         tabStrategy: 'KEEP_TASK_TABS_OPEN',
         cadenceVerifiedSendCount: count,
-        tasksById: {
-          [taskId]: {
-            id: taskId,
-            url: OLD_URL,
-            normalizedUrl: OLD_URL,
-          },
-        },
+        tasksById,
       },
     },
     tabHintsByTaskId: {},
@@ -76,7 +78,7 @@ function fakeChrome(initialUrl = OLD_URL) {
 
 test('chat-flow remembers the same conversation and adopts its current URL', async () => {
   const state = makeState({ mode: 'new-chat-after', count: 1 });
-  state.tabHintsByTaskId.t1 = {
+  state.tabHintsByTaskId.__chat_flow__s1 = {
     tabId: 1,
     sessionId: 's1',
     normalizedUrl: OLD_URL,
@@ -90,9 +92,30 @@ test('chat-flow remembers the same conversation and adopts its current URL', asy
   assert.equal(chrome.calls.length, 0);
 });
 
+test('chat-flow uses one remembered Session chat across different tasks', async () => {
+  const state = makeState({ mode: 'new-chat-after', count: 1, taskCount: 2 });
+  state.tabHintsByTaskId.__chat_flow__s1 = {
+    tabId: 1,
+    sessionId: 's1',
+    normalizedUrl: OLD_URL,
+    kind: 'CHAT_FLOW',
+  };
+  const chrome = fakeChrome(OLD_URL);
+  const firstTask = state.sessionsById.s1.tasksById.t1;
+  const secondTask = state.sessionsById.s1.tasksById.t2;
+  const firstTab = await resolveTaskTab(chrome, state, 's1', firstTask);
+  const secondTab = await resolveTaskTab(chrome, state, 's1', secondTask);
+  assert.equal(firstTab.id, 1);
+  assert.equal(secondTab.id, 1);
+  assert.equal(firstTask.normalizedUrl, OLD_URL);
+  assert.equal(secondTask.normalizedUrl, OLD_URL);
+  assert.deepEqual(chrome.calls, []);
+  assert.ok(state.tabHintsByTaskId.__chat_flow__s1);
+});
+
 test('new-chat mode rotates to a fresh conversation at the configured send boundary', async () => {
   const state = makeState({ mode: 'new-chat-after', count: 2, everyN: 2 });
-  state.tabHintsByTaskId.t1 = {
+  state.tabHintsByTaskId.__chat_flow__s1 = {
     tabId: 1,
     sessionId: 's1',
     normalizedUrl: OLD_URL,
@@ -108,7 +131,7 @@ test('new-chat mode rotates to a fresh conversation at the configured send bound
 
 test('staged mode rotates exactly after the initial prompt plus configured continue prompts', async () => {
   const state = makeState({ mode: 'staged', count: 3, continueCount: 2 });
-  state.tabHintsByTaskId.t1 = {
+  state.tabHintsByTaskId.__chat_flow__s1 = {
     tabId: 1,
     sessionId: 's1',
     normalizedUrl: OLD_URL,
