@@ -19,6 +19,7 @@ function normalizePromptRule(raw = {}) {
 function normalizeChatFlow(raw = {}) {
   const mode = ['same-chat', 'new-chat-after', 'staged'].includes(raw.mode) ? raw.mode : 'same-chat';
   return {
+    enabled: raw.enabled === true,
     mode,
     newChatEveryN: normalizeEveryN(raw.newChatEveryN),
     continuePrompt: typeof raw.continuePrompt === 'string' ? raw.continuePrompt : 'продовжуй',
@@ -62,10 +63,11 @@ export function setPromptCadenceConfig(state, sessionId, rawConfig) {
   if (!state?.sessionsById?.[sessionId]) throw new Error('Session not found');
   if (!state.profile[PROFILE_KEY] || typeof state.profile[PROFILE_KEY] !== 'object') state.profile[PROFILE_KEY] = {};
   const config = normalizePromptCadenceConfig(rawConfig);
+  if (rawConfig && rawConfig.chatFlow) config.chatFlow.enabled = rawConfig.chatFlow.enabled === true || rawConfig.chatFlow.enabled === undefined;
   for (const [index, rule] of config.prompts.entries()) {
     if (rule.enabled && !rule.prompt.trim()) throw new Error(`Промт ${index + 1} не може бути порожнім.`);
   }
-  if (config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) {
+  if (config.chatFlow.enabled && config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) {
     throw new Error('Для етапного режиму потрібно вказати другий промт.');
   }
   state.profile[PROFILE_KEY][sessionId] = config;
@@ -74,7 +76,7 @@ export function setPromptCadenceConfig(state, sessionId, rawConfig) {
 
 function stagedPrompt(config, verifiedCount, primaryPrompt) {
   const flow = config.chatFlow;
-  if (flow.mode !== 'staged') return null;
+  if (!flow.enabled || flow.mode !== 'staged') return null;
   const stageOneTotal = 1 + flow.continueCount;
   if (verifiedCount < stageOneTotal) return verifiedCount === 0 ? primaryPrompt : flow.continuePrompt;
   return flow.stage2Prompt;
@@ -120,7 +122,7 @@ function accountVerifiedTransitions(state, beforeTimes) {
       const prior = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0 ? session.cadenceVerifiedSendCount : 0;
       session.cadenceVerifiedSendCount = prior + 1;
       const config = getPromptCadenceConfig(state, id);
-      if (config.chatFlow.mode === 'staged') {
+      if (config.chatFlow.enabled && config.chatFlow.mode === 'staged') {
         const stageOneTotal = 1 + config.chatFlow.continueCount;
         const stageTwoTotal = config.chatFlow.stage2Count;
         if (session.cadenceVerifiedSendCount >= stageOneTotal + stageTwoTotal) session.runState = 'STOPPED';
