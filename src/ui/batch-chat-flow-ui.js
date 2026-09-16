@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const runtimeAvailable = () => Boolean(globalThis.chrome?.runtime?.sendMessage);
-async function core(command, payload = {}) { if (!runtimeAvailable()) throw new Error('Core runtime is not available yet.'); const response = await chrome.runtime.sendMessage({ channel: 'autopilot-ui', command, payload }); if (!response || response.ok !== true) throw new Error(response?.error?.message || 'Core command failed.'); return response.data; }
+async function core(command, payload = {}) { if (!runtimeAvailable()) throw new Error('Core runtime is not available yet.'); const response = await globalThis.chrome.runtime.sendMessage({ channel: 'autopilot-ui', command, payload }); if (!response || response.ok !== true) throw new Error(response?.error?.message || 'Core command failed.'); return response.data; }
 function currentSessionId() { return document.querySelector('#session-list button[aria-current="page"]')?.id?.replace(/^session-select-/, '') || null; }
 function makeField(labelText, id, type = 'text', value = '') { const wrapper = document.createElement('div'); const label = document.createElement('label'); label.htmlFor = id; label.textContent = labelText; const input = document.createElement(type === 'textarea' ? 'textarea' : 'input'); input.id = id; if (type !== 'textarea') { input.type = type; if (type === 'number') input.inputMode = 'numeric'; } input.value = value; wrapper.append(label, input); return { wrapper, input }; }
 function buildPanel() {
