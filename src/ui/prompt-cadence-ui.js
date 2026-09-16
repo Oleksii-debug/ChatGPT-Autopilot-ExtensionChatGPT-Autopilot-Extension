@@ -148,6 +148,7 @@ async function saveCurrent() {
     }
     const mode = $('chat-flow-mode').value;
     const chatFlow = {
+      enabled: true,
       mode,
       newChatEveryN: integerField('new-chat-every', 10, 2),
       continuePrompt: $('continue-prompt').value.trim() || 'продовжуй',
