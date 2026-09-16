@@ -6,6 +6,9 @@ import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-exec
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { CadencedRepository, getPromptCadenceConfig, setPromptCadenceConfig } from '../core/prompt-cadence.js';
+import { getDriveAccessToken, inspectDriveOAuthConfig } from '../core/drive-auth.js';
+import { extractDriveFileId, listAuthorizedDriveFiles, readAuthorizedDriveSnapshot } from '../core/drive-api.js';
+import { acceptDriveSnapshot, getDriveSourceConfig, setDriveSourceConfig } from '../core/drive-source.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
@@ -15,6 +18,9 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'PREVIEW_PORTABLE_PROFILE',
   'EXPORT_PORTABLE_PROFILE',
   'GET_PROMPT_CADENCE',
+  'GET_DRIVE_AUTH_STATUS',
+  'GET_DRIVE_SOURCE',
+  'LIST_DRIVE_FILES',
 ]);
 const repo = new StorageRepository(chrome);
 const executorRepo = new CadencedRepository(repo);
@@ -60,7 +66,6 @@ let coldStartBarrier = null;
 function beginColdStartReconciliation() {
   if (coldStartReconciled) return Promise.resolve();
   if (coldStartBarrier) return coldStartBarrier;
-
   coldStartBarrier = (async () => {
     await ensureBundledBootstrapApplied();
     await reconcileRuntimeColdStart({
@@ -78,10 +83,6 @@ function beginColdStartReconciliation() {
   return coldStartBarrier;
 }
 
-// Module evaluation may install an explicitly bundled first-run profile and
-// repair durable state/alarms, but never launches an executor cycle. A transient
-// reconciliation failure is swallowed here so the event that woke this worker
-// (or a later event) can retry through the same single-flight barrier.
 void beginColdStartReconciliation().catch(() => undefined);
 
 async function ensureColdStartReconciled() {
@@ -92,7 +93,6 @@ async function ensureColdStartReconciled() {
 let executionCycleInFlight = null;
 export function runExecutionCycle() {
   if (executionCycleInFlight) return executionCycleInFlight;
-
   const cycle = (async () => {
     await ensureColdStartReconciled();
     const result = await runRuntimeCycle({
@@ -105,16 +105,9 @@ export function runExecutionCycle() {
     await notifyStatusChanged(result.state);
     return result;
   })();
-
   executionCycleInFlight = cycle.then(
-    result => {
-      executionCycleInFlight = null;
-      return result;
-    },
-    error => {
-      executionCycleInFlight = null;
-      throw error;
-    },
+    result => { executionCycleInFlight = null; return result; },
+    error => { executionCycleInFlight = null; throw error; },
   );
   return executionCycleInFlight;
 }
@@ -158,16 +151,58 @@ async function dispatchPromptCadenceCommand(command, payload) {
   return null;
 }
 
+async function dispatchDriveCommand(command, payload) {
+  if (command === 'GET_DRIVE_AUTH_STATUS') {
+    return { ...inspectDriveOAuthConfig(chrome.runtime.getManifest()), scope: 'https://www.googleapis.com/auth/drive.file' };
+  }
+  if (command === 'GET_DRIVE_SOURCE') {
+    const state = await repo.load();
+    return { source: getDriveSourceConfig(state, payload.sessionId) };
+  }
+  if (command === 'SET_DRIVE_SOURCE') {
+    let source;
+    const state = await repo.update(draft => {
+      const parsed = extractDriveFileId(payload.sourceUrl);
+      source = setDriveSourceConfig(draft, payload.sessionId, {
+        fileId: parsed.fileId,
+        sourceUrl: payload.sourceUrl,
+        target: payload.target,
+      });
+      return draft;
+    });
+    return { source, session: state.sessionsById[payload.sessionId] };
+  }
+  if (command === 'LIST_DRIVE_FILES') {
+    const token = await getDriveAccessToken(chrome, { interactive: true });
+    const files = await listAuthorizedDriveFiles({ accessToken: token });
+    return { files };
+  }
+  if (command === 'SYNC_DRIVE_SOURCE') {
+    const before = await repo.load();
+    const source = getDriveSourceConfig(before, payload.sessionId);
+    if (!source.fileId) throw new Error('Спочатку прив’яжіть файл Google Drive до Session.');
+    const token = await getDriveAccessToken(chrome, { interactive: true });
+    const snapshot = await readAuthorizedDriveSnapshot({ fileId: source.fileId, accessToken: token });
+    let acceptance;
+    const state = await repo.update(draft => {
+      acceptance = acceptDriveSnapshot(draft, payload.sessionId, snapshot);
+      return draft;
+    });
+    return { acceptance, source: getDriveSourceConfig(state, payload.sessionId) };
+  }
+  return null;
+}
+
 export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
-  const special = await dispatchPromptCadenceCommand(message.command, message.payload || {});
-  const result = special === null
-    ? await dispatcher.execute(message.command, message.payload || {})
-    : special;
-  // Read-only status/configuration queries must not create a STATUS_CHANGED
-  // feedback loop with the options page. Only state-changing UI commands need
-  // alarm reconciliation and a status broadcast.
+  const specialPrompt = await dispatchPromptCadenceCommand(message.command, message.payload || {});
+  const specialDrive = specialPrompt === null ? await dispatchDriveCommand(message.command, message.payload || {}) : null;
+  const result = specialPrompt !== null
+    ? specialPrompt
+    : specialDrive !== null
+      ? specialDrive
+      : await dispatcher.execute(message.command, message.payload || {});
   if (!READ_ONLY_UI_COMMANDS.has(message.command)) await reconcileRuntime();
   return result;
 }
