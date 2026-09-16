@@ -29,5 +29,5 @@ test('session template keeps JSON import format stable', () => {
   assert.equal(parsed.version, 1);
   assert.equal(parsed.sessions.length, 6);
   assert.equal(parsed.sessions[0].tasks[0].enabled, false);
-  assert.match(parsed.sessions[5].tasks[0].url, /^https:\/\/chatgpt\.com\/c\/template-session-6$/);
+  assert.equal(parsed.sessions[5].tasks[0].url, '');
 });

@@ -27,8 +27,8 @@ function templateSession(index) {
     tasks: [{
       id: `template-session-${ordinal}-task-1`,
       enabled: false,
-      label: 'Замініть це посилання на потрібну розмову ChatGPT',
-      url: `https://chatgpt.com/c/template-session-${ordinal}`,
+      label: 'Вкажіть посилання на потрібну розмову ChatGPT',
+      url: '',
       promptOverride: '',
     }],
   };
