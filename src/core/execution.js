@@ -1,6 +1,7 @@
 import { InteractionResult } from '../shared/protocol.js';
 import { OperationPhase, RunState } from './schema.js';
 import { advanceAfterBusy, advanceAfterVerifiedSend } from './scheduler.js';
+import { markBatchVerifiedSend, isBatchSessionComplete } from './batch-chat-flow.js';
 
 export function applyInteractionResult(session, taskIndex, result, { now = Date.now(), promptFingerprint = '' } = {}) {
   const taskId = session.taskOrder[taskIndex];
@@ -24,6 +25,18 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       session.lastError = '';
       if (session.operation) { session.operation.phase = OperationPhase.SENT_VERIFIED; session.operation.updatedAt = now; }
       advanceAfterVerifiedSend(session, taskIndex, now);
+      if (session.batchChatFlow?.enabled) {
+        const lifecycle = markBatchVerifiedSend(task, now, session.batchChatFlow);
+        if (lifecycle.completed) {
+          task.status = 'BATCH_COMPLETE';
+          if (isBatchSessionComplete(session)) session.runState = RunState.STOPPED;
+        } else {
+          task.status = 'BATCH_WAITING_NEXT';
+          task.retryAfterAt = now;
+          session.nextAllowedSendAt = 0;
+        }
+        return { action: lifecycle.completed ? 'BATCH_TASK_COMPLETE' : 'BATCH_PROMPT_ADVANCED', nextPrompt: lifecycle.nextPrompt };
+      }
       return { action: 'SENT_VERIFIED' };
     case InteractionResult.INSERTED_NOT_SENT:
       task.status = 'INSERTED_NOT_SENT';
@@ -41,8 +54,6 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       return { action: 'RETRY_LATER', retryAt: task.retryAfterAt };
     case InteractionResult.RATE_LIMITED:
       task.status = 'RATE_LIMITED';
-      // Acknowledgement only dismisses the exact informational modal. The Session's
-      // user-configured durable retry/backoff remains authoritative before any recheck.
       task.retryAfterAt = now + Math.max(5000, session.retryBackoffMs || 30000);
       return { action: 'BACKOFF', retryAt: task.retryAfterAt };
     case InteractionResult.AUTH_REQUIRED:
