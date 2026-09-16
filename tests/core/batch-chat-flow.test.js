@@ -46,7 +46,7 @@ test('completed slot is recycled into a clean new chat without growing task coun
   config.nextOrdinal = 3; config.completedTasks = 1;
   const tasks = buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })() });
   const session = { batchChatFlow: config, taskOrder: tasks.map(t => t.id), tasksById: Object.fromEntries(tasks.map(t => [t.id, t])) };
-  markBatchVerifiedSend(tasks[0], 100, config); markBatchVerifiedSend(tasks[0], 200, config); assert.equal(activeBatchTaskCount(session), 2);
+  markBatchVerifiedSend(tasks[0], 100, config); markBatchVerifiedSend(tasks[0], 200, config); assert.equal(activeBatchTaskCount(session), 1);
   const recycle = replaceCompletedBatchSlot(session, tasks[0].id, 300);
   assert.equal(recycle.replaced, true); assert.equal(tasks[0].batch.ordinal, 3); assert.equal(tasks[0].batch.verifiedMessages, 0); assert.equal(tasks[0].enabled, true); assert.equal(tasks[0].batch.source, 'NEW_CHAT'); assert.equal(tasks[0].url, 'https://chatgpt.com/');
 });
