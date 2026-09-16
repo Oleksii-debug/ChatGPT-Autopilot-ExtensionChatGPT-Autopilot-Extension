@@ -1,4 +1,4 @@
-export const MAX_TEMPLATE_SESSIONS = 50;
+export const MAX_TEMPLATE_SESSIONS = 200;
 
 function assertSessionCount(value) {
   const count = Number(value);
