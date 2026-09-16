@@ -13,7 +13,7 @@ import { startSession } from './state-machine.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
 export const PORTABLE_PROFILE_VERSION = 1;
-export const MAX_PORTABLE_SESSIONS = 5;
+export const MAX_PORTABLE_SESSIONS = 50;
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const TERMINAL_OPERATION_PHASES = new Set([

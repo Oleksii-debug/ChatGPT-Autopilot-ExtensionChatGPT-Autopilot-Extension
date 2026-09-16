@@ -33,7 +33,14 @@
     <section aria-labelledby="portable-profile-heading">
       <h2 id="portable-profile-heading">Configuration file</h2>
       <p id="portable-profile-help">Keep the extension installed. Give the JSON template to an AI or edit it elsewhere, then import the completed file here. Import changes only Sessions named by stable ids in the file; unrelated Sessions remain untouched.</p>
-      <a id="download-profile-template" href="../config/portable-profile-template.json" download="ChatGPT-Autopilot-profile-template.json">Download blank configuration template</a>
+      <fieldset id="session-template-generator">
+        <legend>Шаблон профілю</legend>
+        <label for="template-session-count">Кількість Session</label>
+        <input id="template-session-count" type="number" min="1" max="50" step="1" value="1" inputmode="numeric" aria-describedby="template-download-status">
+        <button id="download-session-template-button" type="button">Скачати шаблон</button>
+        <p id="template-download-status" role="status" tabindex="0">Виберіть кількість Session і натисніть «Скачати шаблон».</p>
+      </fieldset>
+      <a id="download-profile-template" href="../config/portable-profile-template.json" download="ChatGPT-Autopilot-profile-template.json">Download blank configuration template (1 Session)</a>
       <label for="portable-profile-file">Choose configuration JSON file</label>
       <input id="portable-profile-file" type="file" accept="application/json,.json" aria-describedby="portable-profile-help portable-profile-preview">
       <p id="portable-profile-preview" tabindex="0">No configuration file selected.</p>
@@ -173,5 +180,6 @@
 <script type="module" src="options.js"></script>
 <script type="module" src="prompt-cadence-ui.js"></script>
 <script type="module" src="drive-prompt-import.js"></script>
+<script type="module" src="template-download-ui.js"></script>
 </body>
 </html>
