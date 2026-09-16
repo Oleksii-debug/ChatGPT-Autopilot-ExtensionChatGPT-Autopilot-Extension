@@ -1,16 +1,56 @@
 const PROFILE_KEY = 'promptCadenceBySessionId';
+const MAX_PROMPTS = 3;
+const MAX_EVERY_N = 1000000;
 
 function normalizeEveryN(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 2) return 10;
-  return Math.min(parsed, 1000000);
+  return Math.min(parsed, MAX_EVERY_N);
+}
+
+function normalizePromptRule(raw = {}) {
+  return {
+    enabled: raw.enabled === true,
+    prompt: typeof raw.prompt === 'string' ? raw.prompt : '',
+    everyN: normalizeEveryN(raw.everyN),
+  };
+}
+
+function normalizeChatFlow(raw = {}) {
+  const mode = ['same-chat', 'new-chat-after', 'staged'].includes(raw.mode) ? raw.mode : 'same-chat';
+  return {
+    mode,
+    newChatEveryN: normalizeEveryN(raw.newChatEveryN),
+    continuePrompt: typeof raw.continuePrompt === 'string' ? raw.continuePrompt : 'продовжуй',
+    continueCount: Number.isInteger(Number(raw.continueCount)) && Number(raw.continueCount) >= 0
+      ? Math.min(Number(raw.continueCount), MAX_EVERY_N)
+      : 10,
+    stage2Prompt: typeof raw.stage2Prompt === 'string' ? raw.stage2Prompt : '',
+    stage2Count: Number.isInteger(Number(raw.stage2Count)) && Number(raw.stage2Count) >= 1
+      ? Math.min(Number(raw.stage2Count), MAX_EVERY_N)
+      : 10,
+  };
 }
 
 export function normalizePromptCadenceConfig(raw = {}) {
-  return {
+  const legacySecondary = normalizePromptRule({
     enabled: raw.enabled === true,
-    secondaryPrompt: typeof raw.secondaryPrompt === 'string' ? raw.secondaryPrompt : '',
-    everyN: normalizeEveryN(raw.everyN),
+    prompt: raw.secondaryPrompt,
+    everyN: raw.everyN,
+  });
+  const prompts = Array.isArray(raw.prompts)
+    ? raw.prompts.slice(0, MAX_PROMPTS).map(normalizePromptRule)
+    : [
+      { enabled: false, prompt: '', everyN: 10 },
+      legacySecondary,
+      { enabled: false, prompt: '', everyN: 20 },
+    ];
+  while (prompts.length < MAX_PROMPTS) prompts.push({ enabled: false, prompt: '', everyN: 10 });
+
+  return {
+    enabled: prompts.some(rule => rule.enabled),
+    prompts,
+    chatFlow: normalizeChatFlow(raw.chatFlow),
   };
 }
 
@@ -24,31 +64,54 @@ export function setPromptCadenceConfig(state, sessionId, rawConfig) {
     state.profile[PROFILE_KEY] = {};
   }
   const config = normalizePromptCadenceConfig(rawConfig);
-  if (config.enabled && !config.secondaryPrompt.trim()) throw new Error('Alternate prompt is required when cadence is enabled');
+  for (const [index, rule] of config.prompts.entries()) {
+    if (rule.enabled && !rule.prompt.trim()) throw new Error(`Промт ${index + 1} не може бути порожнім.`);
+    if (rule.enabled && !Number.isInteger(rule.everyN)) throw new Error(`Лічильник промту ${index + 1} має бути цілим числом.`);
+  }
+  if (config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) {
+    throw new Error('Для етапного режиму потрібно вказати другий промт.');
+  }
   state.profile[PROFILE_KEY][sessionId] = config;
   return config;
 }
 
-function cadenceDue(state, session) {
+function stagedPrompt(config, verifiedCount, primaryPrompt) {
+  const flow = config.chatFlow;
+  if (flow.mode !== 'staged') return null;
+  const stageOneTotal = 1 + flow.continueCount;
+  if (verifiedCount < stageOneTotal) {
+    return verifiedCount === 0 ? primaryPrompt : flow.continuePrompt;
+  }
+  return flow.stage2Prompt;
+}
+
+function cadencePrompt(config, verifiedCount, primaryPrompt) {
+  const staged = stagedPrompt(config, verifiedCount, primaryPrompt);
+  if (staged !== null) return staged;
+
+  const ordinal = verifiedCount + 1;
+  const enabled = config.prompts.filter(rule => rule.enabled && rule.prompt.trim());
+  for (let index = enabled.length - 1; index >= 0; index -= 1) {
+    const rule = enabled[index];
+    if (ordinal % rule.everyN === 0) return rule.prompt;
+  }
+  return primaryPrompt;
+}
+
+export function projectPromptForSession(state, session) {
   const config = getPromptCadenceConfig(state, session.id);
-  if (!config.enabled || !config.secondaryPrompt.trim()) return null;
   const verifiedCount = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
     ? session.cadenceVerifiedSendCount
     : 0;
-  const nextOrdinal = verifiedCount + 1;
-  return nextOrdinal % config.everyN === 0 ? config : null;
-}
-
-function applyCadenceProjection(state) {
-  for (const session of Object.values(state?.sessionsById || {})) {
-    const due = cadenceDue(state, session);
-    if (!due) continue;
-    session.sharedPrompt = due.secondaryPrompt;
-    for (const task of Object.values(session.tasksById || {})) {
-      task.promptOverride = due.secondaryPrompt;
-    }
+  const primaryPrompt = session.sharedPrompt || '';
+  const prompt = cadencePrompt(config, verifiedCount, primaryPrompt);
+  if (!prompt) return session;
+  if (session.promptMode === 'UNIQUE') {
+    for (const task of Object.values(session.tasksById || {})) task.promptOverride = prompt;
+  } else {
+    session.sharedPrompt = prompt;
   }
-  return state;
+  return session;
 }
 
 function snapshotVerifiedTimes(state) {
@@ -64,6 +127,15 @@ function accountVerifiedTransitions(state, beforeTimes) {
         ? session.cadenceVerifiedSendCount
         : 0;
       session.cadenceVerifiedSendCount = prior + 1;
+
+      const config = getPromptCadenceConfig(state, id);
+      if (config.chatFlow.mode === 'staged') {
+        const stageOneTotal = 1 + config.chatFlow.continueCount;
+        const stageTwoTotal = config.chatFlow.stage2Count;
+        if (session.cadenceVerifiedSendCount >= stageOneTotal + stageTwoTotal) {
+          session.runState = 'STOPPED';
+        }
+      }
     }
   }
   return state;
@@ -76,7 +148,8 @@ export class CadencedRepository {
 
   async load() {
     const state = await this.base.load();
-    return applyCadenceProjection(state);
+    for (const session of Object.values(state?.sessionsById || {})) projectPromptForSession(state, session);
+    return state;
   }
 
   async update(mutator) {
@@ -84,7 +157,12 @@ export class CadencedRepository {
       const beforeTimes = snapshotVerifiedTimes(draft);
       const result = await mutator(draft);
       const next = result || draft;
-      return accountVerifiedTransitions(next, beforeTimes);
+      accountVerifiedTransitions(next, beforeTimes);
+      for (const session of Object.values(next?.sessionsById || {})) projectPromptForSession(next, session);
+      return next;
     });
   }
 }
+
+export const PROMPT_CADENCE_MAX_PROMPTS = MAX_PROMPTS;
+export const PROMPT_CADENCE_MAX_EVERY_N = MAX_EVERY_N;
