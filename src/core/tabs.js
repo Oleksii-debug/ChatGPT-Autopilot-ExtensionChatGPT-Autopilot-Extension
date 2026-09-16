@@ -2,6 +2,7 @@ import { normalizeChatUrl, TabStrategy } from './schema.js';
 import { getPromptCadenceConfig } from './prompt-cadence.js';
 
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
+const chatFlowHintKey = sessionId => `__chat_flow__:${sessionId}`;
 const DEFAULT_TAB_READY_TIMEOUT_MS = 30000;
 const DEFAULT_TAB_READY_POLL_MS = 100;
 const CHAT_FLOW_ROOT_URL = 'https://chatgpt.com/';
@@ -117,7 +118,8 @@ function hintStillRepresentsCurrentOwnership(state, hintKey, hint) {
   }
 
   if (hint.kind === 'CHAT_FLOW') {
-    return owner.tabStrategy !== TabStrategy.ONE_WORKER_TAB_PER_SESSION;
+    return owner.tabStrategy !== TabStrategy.ONE_WORKER_TAB_PER_SESSION
+      && hintKey === chatFlowHintKey(owner.id);
   }
 
   if (hint.kind != null && hint.kind !== 'TASK') return false;
@@ -160,7 +162,7 @@ function chatFlowNeedsNewChat(session, config) {
 
 async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
   const config = getPromptCadenceConfig(state, sessionId);
-  const key = task.id;
+  const key = chatFlowHintKey(sessionId);
   const hint = state.tabHintsByTaskId[key];
   const shouldCreateNew = chatFlowNeedsNewChat(session, config);
 
