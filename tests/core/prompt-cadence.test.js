@@ -137,6 +137,7 @@ test('normalization preserves legacy settings and adds three-rule/chat-flow defa
       { enabled: false, prompt: '', everyN: 20 },
     ],
     chatFlow: {
+      enabled: false,
       mode: 'same-chat',
       newChatEveryN: 10,
       continuePrompt: 'продовжуй',
