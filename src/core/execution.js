@@ -1,7 +1,7 @@
 import { InteractionResult } from '../shared/protocol.js';
 import { OperationPhase, RunState } from './schema.js';
 import { advanceAfterBusy, advanceAfterVerifiedSend } from './scheduler.js';
-import { markBatchVerifiedSend, isBatchSessionComplete } from './batch-chat-flow.js';
+import { markBatchVerifiedSend, replaceCompletedBatchSlot, isBatchSessionComplete } from './batch-chat-flow.js';
 
 export function applyInteractionResult(session, taskIndex, result, { now = Date.now(), promptFingerprint = '' } = {}) {
   const taskId = session.taskOrder[taskIndex];
@@ -28,14 +28,13 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       if (session.batchChatFlow?.enabled) {
         const lifecycle = markBatchVerifiedSend(task, now, session.batchChatFlow);
         if (lifecycle.completed) {
-          task.status = 'BATCH_COMPLETE';
-          if (isBatchSessionComplete(session)) session.runState = RunState.STOPPED;
-        } else {
-          task.status = 'BATCH_WAITING_NEXT';
-          task.retryAfterAt = now;
-          session.nextAllowedSendAt = 0;
+          const recycle = replaceCompletedBatchSlot(session, taskId, now);
+          if (recycle.completed || isBatchSessionComplete(session)) session.runState = RunState.STOPPED;
+          return { action: recycle.replaced ? 'BATCH_TASK_COMPLETED_SLOT_REUSED' : 'BATCH_TASK_COMPLETE', ordinal: recycle.ordinal || task.batch?.ordinal || 0 };
         }
-        return { action: lifecycle.completed ? 'BATCH_TASK_COMPLETE' : 'BATCH_PROMPT_ADVANCED', nextPrompt: lifecycle.nextPrompt };
+        task.retryAfterAt = now;
+        session.nextAllowedSendAt = 0;
+        return { action: 'BATCH_PROMPT_ADVANCED', nextPrompt: lifecycle.nextPrompt };
       }
       return { action: 'SENT_VERIFIED' };
     case InteractionResult.INSERTED_NOT_SENT:
