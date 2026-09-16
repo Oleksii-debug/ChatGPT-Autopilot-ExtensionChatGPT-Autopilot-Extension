@@ -60,13 +60,10 @@ export function getPromptCadenceConfig(state, sessionId) {
 
 export function setPromptCadenceConfig(state, sessionId, rawConfig) {
   if (!state?.sessionsById?.[sessionId]) throw new Error('Session not found');
-  if (!state.profile[PROFILE_KEY] || typeof state.profile[PROFILE_KEY] !== 'object') {
-    state.profile[PROFILE_KEY] = {};
-  }
+  if (!state.profile[PROFILE_KEY] || typeof state.profile[PROFILE_KEY] !== 'object') state.profile[PROFILE_KEY] = {};
   const config = normalizePromptCadenceConfig(rawConfig);
   for (const [index, rule] of config.prompts.entries()) {
     if (rule.enabled && !rule.prompt.trim()) throw new Error(`Промт ${index + 1} не може бути порожнім.`);
-    if (rule.enabled && !Number.isInteger(rule.everyN)) throw new Error(`Лічильник промту ${index + 1} має бути цілим числом.`);
   }
   if (config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) {
     throw new Error('Для етапного режиму потрібно вказати другий промт.');
@@ -79,16 +76,13 @@ function stagedPrompt(config, verifiedCount, primaryPrompt) {
   const flow = config.chatFlow;
   if (flow.mode !== 'staged') return null;
   const stageOneTotal = 1 + flow.continueCount;
-  if (verifiedCount < stageOneTotal) {
-    return verifiedCount === 0 ? primaryPrompt : flow.continuePrompt;
-  }
+  if (verifiedCount < stageOneTotal) return verifiedCount === 0 ? primaryPrompt : flow.continuePrompt;
   return flow.stage2Prompt;
 }
 
 function cadencePrompt(config, verifiedCount, primaryPrompt) {
   const staged = stagedPrompt(config, verifiedCount, primaryPrompt);
   if (staged !== null) return staged;
-
   const ordinal = verifiedCount + 1;
   const enabled = config.prompts.filter(rule => rule.enabled && rule.prompt.trim());
   for (let index = enabled.length - 1; index >= 0; index -= 1) {
@@ -123,18 +117,13 @@ function accountVerifiedTransitions(state, beforeTimes) {
     const before = beforeTimes[id] || 0;
     const after = session.lastSuccessfulSendAt || 0;
     if (after > before) {
-      const prior = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
-        ? session.cadenceVerifiedSendCount
-        : 0;
+      const prior = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0 ? session.cadenceVerifiedSendCount : 0;
       session.cadenceVerifiedSendCount = prior + 1;
-
       const config = getPromptCadenceConfig(state, id);
       if (config.chatFlow.mode === 'staged') {
         const stageOneTotal = 1 + config.chatFlow.continueCount;
         const stageTwoTotal = config.chatFlow.stage2Count;
-        if (session.cadenceVerifiedSendCount >= stageOneTotal + stageTwoTotal) {
-          session.runState = 'STOPPED';
-        }
+        if (session.cadenceVerifiedSendCount >= stageOneTotal + stageTwoTotal) session.runState = 'STOPPED';
       }
     }
   }
@@ -142,9 +131,7 @@ function accountVerifiedTransitions(state, beforeTimes) {
 }
 
 export class CadencedRepository {
-  constructor(baseRepository) {
-    this.base = baseRepository;
-  }
+  constructor(baseRepository) { this.base = baseRepository; }
 
   async load() {
     const state = await this.base.load();
@@ -157,9 +144,7 @@ export class CadencedRepository {
       const beforeTimes = snapshotVerifiedTimes(draft);
       const result = await mutator(draft);
       const next = result || draft;
-      accountVerifiedTransitions(next, beforeTimes);
-      for (const session of Object.values(next?.sessionsById || {})) projectPromptForSession(next, session);
-      return next;
+      return accountVerifiedTransitions(next, beforeTimes);
     });
   }
 }
