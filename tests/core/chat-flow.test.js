@@ -76,6 +76,21 @@ function fakeChrome(initialUrl = OLD_URL) {
   };
 }
 
+test('same-chat mode remembers one conversation for the whole Session', async () => {
+  const state = makeState({ mode: 'same-chat', count: 0, taskCount: 2 });
+  const chrome = fakeChrome(OLD_URL);
+  const firstTask = state.sessionsById.s1.tasksById.t1;
+  const secondTask = state.sessionsById.s1.tasksById.t2;
+  const firstTab = await resolveTaskTab(chrome, state, 's1', firstTask);
+  const secondTab = await resolveTaskTab(chrome, state, 's1', secondTask);
+  assert.equal(firstTab.id, 1);
+  assert.equal(secondTab.id, 1);
+  assert.equal(firstTask.normalizedUrl, OLD_URL);
+  assert.equal(secondTask.normalizedUrl, OLD_URL);
+  assert.deepEqual(chrome.calls, []);
+  assert.equal(state.tabHintsByTaskId.__chat_flow__s1.tabId, 1);
+});
+
 test('chat-flow remembers the same conversation and adopts its current URL', async () => {
   const state = makeState({ mode: 'new-chat-after', count: 1 });
   state.tabHintsByTaskId.__chat_flow__s1 = {
