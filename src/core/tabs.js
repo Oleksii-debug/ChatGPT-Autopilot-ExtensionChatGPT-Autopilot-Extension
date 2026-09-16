@@ -2,6 +2,7 @@ import { normalizeChatUrl, TabStrategy } from './schema.js';
 import { getPromptCadenceConfig } from './prompt-cadence.js';
 
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
+const chatFlowHintKey = sessionId => `__chat_flow__:${sessionId}`;
 const DEFAULT_TAB_READY_TIMEOUT_MS = 30000;
 const DEFAULT_TAB_READY_POLL_MS = 100;
 const CHAT_FLOW_ROOT_URL = 'https://chatgpt.com/';
@@ -162,7 +163,7 @@ async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
   const config = getPromptCadenceConfig(state, sessionId);
   const key = task.id;
   const hint = state.tabHintsByTaskId[key];
-  const sessionHint = state.tabHintsByTaskId[workerHintKey(sessionId)];
+  const sessionHint = state.tabHintsByTaskId[chatFlowHintKey(sessionId)];
   const shouldCreateNew = chatFlowNeedsNewChat(session, config);
 
   if (!shouldCreateNew) {
@@ -172,20 +173,15 @@ async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
       const currentUrl = normalizedTabUrl(hinted) || CHAT_FLOW_ROOT_URL;
       task.url = currentUrl;
       task.normalizedUrl = currentUrl;
-      state.tabHintsByTaskId[workerHintKey(sessionId)] = {
+      const sharedHint = {
         tabId: hinted.id,
         sessionId,
         normalizedUrl: currentUrl,
         kind: 'CHAT_FLOW',
         boundAt: Date.now(),
       };
-      state.tabHintsByTaskId[key] = {
-        tabId: hinted.id,
-        sessionId,
-        normalizedUrl: currentUrl,
-        kind: 'CHAT_FLOW',
-        boundAt: Date.now(),
-      };
+      state.tabHintsByTaskId[chatFlowHintKey(sessionId)] = { ...sharedHint };
+      state.tabHintsByTaskId[key] = { ...sharedHint };
       return hinted;
     }
   }
@@ -221,7 +217,7 @@ async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
     kind: 'CHAT_FLOW',
     boundAt: Date.now(),
   };
-  state.tabHintsByTaskId[workerHintKey(sessionId)] = { ...sharedHint };
+  state.tabHintsByTaskId[chatFlowHintKey(sessionId)] = { ...sharedHint };
   state.tabHintsByTaskId[key] = { ...sharedHint };
   return tab;
 }
