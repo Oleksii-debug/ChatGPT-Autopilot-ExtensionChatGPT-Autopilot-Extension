@@ -31,12 +31,12 @@ test('cold worker load applies authorized bootstrap before recovery without exec
 test('failed cold-start reconciliation releases its single-flight barrier for a later retry', () => {
   assert.match(source, /catch\(error => \{\s*coldStartBarrier = null;\s*console\.error\('ChatGPT Autopilot cold-start reconciliation failed safely\.'\);\s*throw error;/s);
   assert.match(source, /if \(coldStartBarrier\) return coldStartBarrier;/);
-  assert.match(source, /if \(coldStartReconciled\) return;/);
+  assert.match(source, /if \(coldStartReconciled\) return Promise\.resolve\(\);/);
 });
 
 test('startup and canonical alarm invoke the event-driven execution cycle', () => {
-  assert.match(source, /onInstalled\.addListener\(\(\) => \{ runSafely\(runExecutionCycle\(\)\); \}\);/);
-  assert.match(source, /onStartup\.addListener\(\(\) => \{ runSafely\(runExecutionCycle\(\)\); \}\);/);
+  assert.match(source, /onInstalled\.addListener\(\(\) => \{\s*runSafely\(runExecutionCycle\(\)\);\s*\}\);/s);
+  assert.match(source, /onStartup\.addListener\(\(\) => \{\s*runSafely\(runExecutionCycle\(\)\);\s*\}\);/s);
   assert.match(source, /alarm\.name === 'autopilot-core-wake'\) runSafely\(runExecutionCycle\(\)\)/);
 });
 
@@ -49,5 +49,5 @@ test('overlapping wake events share one in-flight execution cycle', () => {
 test('production automatic execution is explicitly enabled while UI reconciliation remains execution-free', () => {
   assert.match(source, /const EXECUTION_AVAILABLE = true;/);
   assert.doesNotMatch(source, /const EXECUTION_AVAILABLE = false;/);
-  assert.match(source, /export async function reconcileRuntime\(\) \{[\s\S]*?runRuntimeCycle\(\{[\s\S]*?executionAvailable: false,[\s\S]*?\}\);/);
+  assert.match(source, /export async function reconcileRuntime\(\) \{[\s\S]*?runRuntimeCycle\(\{[\s\S]*?executionAvailable: false[\s\S]*?\}\);/s);
 });
