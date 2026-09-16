@@ -10,11 +10,12 @@ import { getDriveAccessToken, inspectDriveOAuthConfig } from '../core/drive-auth
 import { extractDriveFileId, listAuthorizedDriveFiles, readAuthorizedDriveSnapshot } from '../core/drive-api.js';
 import { acceptDriveSnapshot, getDriveSourceConfig, setDriveSourceConfig } from '../core/drive-source.js';
 import { batchChatFlowSnapshot, configureBatchChatFlow, startBatchChatFlow } from '../core/batch-chat-flow-service.js';
+import { SessionFunctionId, setSessionFunctionEnabled, validateSessionFunctions } from '../core/session-functions.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_SESSIONS', 'GET_SESSION', 'GET_SNAPSHOT', 'PREVIEW_PORTABLE_PROFILE', 'EXPORT_PORTABLE_PROFILE',
-  'GET_PROMPT_CADENCE', 'GET_DRIVE_AUTH_STATUS', 'GET_DRIVE_SOURCE', 'LIST_DRIVE_FILES', 'GET_BATCH_CHAT_FLOW',
+  'GET_PROMPT_CADENCE', 'GET_DRIVE_AUTH_STATUS', 'GET_DRIVE_SOURCE', 'LIST_DRIVE_FILES', 'GET_BATCH_CHAT_FLOW', 'GET_SESSION_FUNCTIONS',
 ]);
 const repo = new StorageRepository(chrome);
 const executorRepo = new CadencedRepository(repo);
@@ -100,6 +101,8 @@ async function dispatchPromptCadenceCommand(command, payload) {
     let config;
     const state = await repo.update(draft => {
       config = setPromptCadenceConfig(draft, payload.sessionId, payload.config || {});
+      const session = draft.sessionsById[payload.sessionId];
+      if (session) session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.PROMPT_CADENCE, true);
       return draft;
     });
     return { config, verifiedSendCount: Number.isInteger(state.sessionsById[payload.sessionId]?.cadenceVerifiedSendCount) ? state.sessionsById[payload.sessionId].cadenceVerifiedSendCount : 0 };
@@ -116,6 +119,7 @@ async function dispatchBatchCommand(command, payload) {
     let session;
     const state = await repo.update(draft => {
       session = configureBatchChatFlow(draft, payload.sessionId, payload.config || {}, Date.now());
+      session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT, true);
       return draft;
     });
     return batchChatFlowSnapshot(state, payload.sessionId);
@@ -124,9 +128,33 @@ async function dispatchBatchCommand(command, payload) {
     let session;
     const state = await repo.update(draft => {
       session = startBatchChatFlow(draft, payload.sessionId, Date.now());
+      session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT, true);
       return draft;
     });
     return { ...batchChatFlowSnapshot(state, payload.sessionId), sessionId: session.id };
+  }
+  return null;
+}
+
+async function dispatchSessionFunctionCommand(command, payload) {
+  if (command === 'GET_SESSION_FUNCTIONS') {
+    const state = await repo.load();
+    const session = state.sessionsById[payload.sessionId];
+    if (!session) throw new Error('Session not found');
+    return { activeFunctions: validateSessionFunctions(session.activeFunctions) };
+  }
+  if (command === 'SET_SESSION_FUNCTIONS') {
+    const state = await repo.update(draft => {
+      const session = draft.sessionsById[payload.sessionId];
+      if (!session) throw new Error('Session not found');
+      if (session.runState !== 'STOPPED' && session.runState !== 'ERROR') throw new Error('Зупиніть Session перед зміною функцій.');
+      let next = validateSessionFunctions(session.activeFunctions);
+      for (const [id, enabled] of Object.entries(payload.enabled || {})) next = setSessionFunctionEnabled(next, id, enabled);
+      session.activeFunctions = next;
+      session.updatedAt = Date.now();
+      return draft;
+    });
+    return { activeFunctions: validateSessionFunctions(state.sessionsById[payload.sessionId].activeFunctions) };
   }
   return null;
 }
@@ -142,6 +170,8 @@ async function dispatchDriveCommand(command, payload) {
     const state = await repo.update(draft => {
       const parsed = extractDriveFileId(payload.sourceUrl);
       source = setDriveSourceConfig(draft, payload.sessionId, { fileId: parsed.fileId, sourceUrl: payload.sourceUrl, target: payload.target });
+      const session = draft.sessionsById[payload.sessionId];
+      if (session) session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.DRIVE_SOURCE, true);
       return draft;
     });
     return { source, session: state.sessionsById[payload.sessionId] };
@@ -171,8 +201,17 @@ export async function dispatchUiMessage(message) {
   await ensureColdStartReconciled();
   const specialPrompt = await dispatchPromptCadenceCommand(message.command, message.payload || {});
   const specialBatch = specialPrompt === null ? await dispatchBatchCommand(message.command, message.payload || {}) : null;
-  const specialDrive = specialPrompt === null && specialBatch === null ? await dispatchDriveCommand(message.command, message.payload || {}) : null;
-  const result = specialPrompt !== null ? specialPrompt : specialBatch !== null ? specialBatch : specialDrive !== null ? specialDrive : await dispatcher.execute(message.command, message.payload || {});
+  const specialFunctions = specialPrompt === null && specialBatch === null ? await dispatchSessionFunctionCommand(message.command, message.payload || {}) : null;
+  const specialDrive = specialPrompt === null && specialBatch === null && specialFunctions === null ? await dispatchDriveCommand(message.command, message.payload || {}) : null;
+  const result = specialPrompt !== null
+    ? specialPrompt
+    : specialBatch !== null
+      ? specialBatch
+      : specialFunctions !== null
+        ? specialFunctions
+        : specialDrive !== null
+          ? specialDrive
+          : await dispatcher.execute(message.command, message.payload || {});
   if (!READ_ONLY_UI_COMMANDS.has(message.command)) await reconcileRuntime();
   return result;
 }
