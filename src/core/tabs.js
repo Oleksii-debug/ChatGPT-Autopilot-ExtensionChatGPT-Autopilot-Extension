@@ -185,7 +185,7 @@ async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
   if (hint?.tabId != null) {
     try {
       if (shouldCreateNew) {
-        tab = await chromeApi.tabs.update(hint.tabId, { url: CHAT_FLOW_ROOT_URL, active: false });
+        tab = await chromeApi.tabs.update(hint.tabId, { url: CHATGPT_ROOT_URL, active: false });
       } else {
         tab = await chromeApi.tabs.get(hint.tabId);
       }
@@ -195,13 +195,13 @@ async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
   }
 
   if (!tab) {
-    const initialUrl = shouldCreateNew ? CHAT_FLOW_ROOT_URL : (task.normalizedUrl || task.url);
+    const initialUrl = shouldCreateNew ? CHATGPT_ROOT_URL : (task.normalizedUrl || task.url);
     const excluded = claimedTabIdsByOtherSessions(state, sessionId);
     const match = await findMatchingChatTab(chromeApi, initialUrl, excluded);
     tab = match || await chromeApi.tabs.create({ url: initialUrl, active: false });
   }
 
-  const currentUrl = normalizedTabUrl(tab) || CHAT_FLOW_ROOT_URL;
+  const currentUrl = normalizedTabUrl(tab) || CHATGPT_ROOT_URL;
   task.url = currentUrl;
   task.normalizedUrl = currentUrl;
   state.tabHintsByTaskId[key] = {
@@ -225,19 +225,6 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
   if (hintedTab) {
     const currentUrl = normalizedTabUrl(hintedTab);
     if (currentUrl === task.normalizedUrl) return hintedTab;
-
-    const navigated = await chromeApi.tabs.update(hintedTab.id, {
-      url: task.normalizedUrl,
-      active: false,
-    });
-    state.tabHintsByTaskId[key] = {
-      tabId: navigated.id,
-      sessionId,
-      normalizedUrl: task.normalizedUrl,
-      kind: 'SESSION_WORKER',
-      boundAt: Date.now(),
-    };
-    return navigated;
   }
 
   delete state.tabHintsByTaskId[key];
