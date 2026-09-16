@@ -1,3 +1,5 @@
+import { createDefaultSessionFunctions, validateSessionFunctions } from './session-functions.js';
+
 export const SCHEMA_VERSION = 1;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -66,11 +68,11 @@ export function createTask({ id, url, promptOverride = '', enabled = true, label
   return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '' };
 }
 
-export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, minimumSendIntervalMs = 120000, preSendDelayMs = 5000, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
+export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, minimumSendIntervalMs = 120000, preSendDelayMs = 5000, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now(), activeFunctions = undefined }) {
   if (!id || !name) throw new Error('Session id and name required');
   if (tasks.length < 1 || tasks.length > 50) throw new Error('Session requires 1-50 tasks');
   const tasksById = Object.fromEntries(tasks.map(t => [t.id, t]));
-  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, lastError: '', onePassCompletedTaskIds: [], createdAt: now, updatedAt: now };
+  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, lastError: '', onePassCompletedTaskIds: [], activeFunctions: activeFunctions === undefined ? createDefaultSessionFunctions() : validateSessionFunctions(activeFunctions), createdAt: now, updatedAt: now };
 }
 
 function validateTask(task, taskId) {
@@ -135,6 +137,7 @@ function validateSession(session, id) {
   requireEnum(session.tabStrategy, TAB_STRATEGIES, `session ${id} tabStrategy`);
   requireString(session.lastError, `session ${id} lastError`);
   requireUniqueStringArray(session.onePassCompletedTaskIds, `session ${id} onePassCompletedTaskIds`);
+  if (session.activeFunctions !== undefined) validateSessionFunctions(session.activeFunctions);
   if (session.version !== undefined && (!Number.isInteger(session.version) || session.version < 0)) throw new Error(`Invalid session ${id} version`);
   if (session.pausedByMaster !== undefined) requireBoolean(session.pausedByMaster, `session ${id} pausedByMaster`);
 
