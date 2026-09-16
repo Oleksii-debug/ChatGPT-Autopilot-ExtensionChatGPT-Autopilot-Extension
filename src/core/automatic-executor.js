@@ -2,7 +2,8 @@ import { releaseSendLease } from './arbiter.js';
 import { applyInteractionResult } from './execution.js';
 import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
-import { OperationPhase, PromptMode, RunMode, RunState } from './schema.js';
+import { OperationPhase, PromptMode, RunMode, RunState, normalizeChatUrl } from './schema.js';
+import { batchPromptFor, isBatchSessionComplete } from './batch-chat-flow.js';
 import { resolveTaskTab } from './tabs.js';
 import { InteractionResult } from '../shared/protocol.js';
 
@@ -30,6 +31,10 @@ function taskIndex(session, taskId) {
 }
 
 function promptFor(session, task) {
+  if (session.batchChatFlow?.enabled) {
+    const prompt = batchPromptFor(session.batchChatFlow, task);
+    if (prompt) return prompt;
+  }
   return session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
 }
 
@@ -49,6 +54,24 @@ function attachTaskContext(error, taskId, fallbackDiagnosticCode) {
   if (!value.safeDiagnosticCode) value.safeDiagnosticCode = fallbackDiagnosticCode;
   if (!value.autopilotTaskId) value.autopilotTaskId = taskId;
   return value;
+}
+
+async function persistLiveBatchTabUrl(repository, chromeApi, sessionId, taskId, tabId) {
+  try {
+    const tab = await chromeApi.tabs.get(tabId);
+    const normalized = normalizeChatUrl(tab?.url || '');
+    if (!normalized) return;
+    await repository.update(draft => {
+      const session = requireSession(draft, sessionId);
+      const task = session.tasksById[taskId];
+      if (!session.batchChatFlow?.enabled || !task?.batch) return draft;
+      task.url = tab.url;
+      task.normalizedUrl = normalized;
+      return draft;
+    });
+  } catch {
+    // URL persistence is recoverable; the durable operation state remains authoritative.
+  }
 }
 
 export class AutomaticSessionExecutor {
@@ -142,6 +165,7 @@ export class AutomaticSessionExecutor {
         reconciled = true;
         return draft;
       });
+      if (reconciled && session.batchChatFlow?.enabled) await persistLiveBatchTabUrl(this.repo, this.chrome, sessionId, task.id, tab.id);
       return reconciled ? { kind: 'RECOVERED_SENT', result } : { kind: 'OPERATION_CHANGED', result };
     }
 
@@ -293,6 +317,9 @@ export class AutomaticSessionExecutor {
         operation.promptText,
       )),
     });
+    if (result.status === InteractionResult.SENT_VERIFIED && session.batchChatFlow?.enabled) {
+      await persistLiveBatchTabUrl(this.repo, this.chrome, sessionId, task.id, tab.id);
+    }
     return { kind: result.status === InteractionResult.SENT_VERIFIED ? 'SENT' : 'SUBMISSION_UNCERTAIN', result };
   }
 
@@ -300,6 +327,15 @@ export class AutomaticSessionExecutor {
     const state = await this.repo.load();
     const session = requireSession(state, sessionId);
     if (!ACTIVE_STATES.has(session.runState)) return { kind: 'IDLE' };
+
+    if (session.batchChatFlow?.enabled && isBatchSessionComplete(session)) {
+      await this.repo.update(draft => {
+        const live = requireSession(draft, sessionId);
+        live.runState = RunState.STOPPED;
+        return draft;
+      });
+      return { kind: 'COMPLETE_BATCH' };
+    }
 
     if (session.operation?.phase === OperationPhase.AMBIGUOUS) {
       return this.recoverAmbiguous(sessionId, session);
@@ -319,7 +355,7 @@ export class AutomaticSessionExecutor {
     if (selection.kind === 'COMPLETE') {
       await this.repo.update(draft => {
         const live = requireSession(draft, sessionId);
-        if (live.runMode === RunMode.ONE_PASS) live.runState = RunState.STOPPED;
+        if (live.runMode === RunMode.ONE_PASS || live.batchChatFlow?.enabled) live.runState = RunState.STOPPED;
         return draft;
       });
       return { kind: 'COMPLETE' };
@@ -348,6 +384,12 @@ export class AutomaticSessionExecutor {
     }
     const liveTask = liveSession.tasksById[task.id];
     const promptText = promptFor(liveSession, liveTask);
+    if (!promptText?.trim()) {
+      await this.applyResult(sessionId, task.id, {
+        status: InteractionResult.MANUAL_REVIEW_REQUIRED,
+      });
+      return { kind: 'MISSING_PROMPT' };
+    }
     const generation = fresh.revision + 1;
     const identity = await this.coordinator.begin({ sessionId, taskId: task.id, promptText, generation });
     await this.coordinator.markReady({ sessionId, operationId: identity.operationId });
