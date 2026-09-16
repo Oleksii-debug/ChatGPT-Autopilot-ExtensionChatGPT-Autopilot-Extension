@@ -1,3 +1,5 @@
+import { normalizeChatUrl } from './schema.js';
+
 const MAX_CONCURRENCY = 50;
 const MAX_TOTAL_TASKS = 100000;
 const MAX_CONTINUE_COUNT = 1000000;
@@ -37,9 +39,8 @@ export function validateBatchChatFlow(raw = {}) {
   requirePrompt(config.primaryPrompt, 'Стартовий промт');
   requirePrompt(config.continuePrompt, 'Постійний промт');
   requirePrompt(config.finalPrompt, 'Завершальний промт');
-  if (config.concurrency > config.totalTasks) {
-    throw new Error('Кількість одночасних чатів не може перевищувати загальну кількість завдань.');
-  }
+  normalizeChatUrl(config.seedUrl);
+  if (config.concurrency > config.totalTasks) throw new Error('Кількість одночасних чатів не може перевищувати загальну кількість завдань.');
   if (config.nextOrdinal > config.totalTasks + 1) throw new Error('Неправильний наступний номер batch-завдання.');
   return config;
 }
@@ -51,27 +52,12 @@ export function batchMessageCount(config) {
 export function createBatchTask({ id, ordinal, seedUrl, startAt = 0 }) {
   if (!id) throw new Error('Batch task id required');
   if (!Number.isInteger(ordinal) || ordinal < 1) throw new Error('Batch task ordinal must be positive');
+  const normalized = normalizeChatUrl(seedUrl);
   return {
-    id,
-    enabled: true,
-    label: `Завдання ${ordinal}`,
-    url: seedUrl,
-    normalizedUrl: '',
-    promptOverride: '',
-    status: 'BATCH_PENDING',
-    lastCheckedAt: 0,
-    lastVerifiedSendAt: 0,
-    lastVerifiedFingerprint: '',
-    retryAfterAt: Math.max(0, startAt),
-    manualReviewReason: '',
-    batch: {
-      ordinal,
-      verifiedMessages: 0,
-      phase: 'PRIMARY',
-      startedAt: 0,
-      completedAt: 0,
-      seedUrl,
-    },
+    id, enabled: true, label: `Завдання ${ordinal}`, url: seedUrl, normalizedUrl: normalized,
+    promptOverride: '', status: 'BATCH_PENDING', lastCheckedAt: 0, lastVerifiedSendAt: 0,
+    lastVerifiedFingerprint: '', retryAfterAt: Math.max(0, startAt), manualReviewReason: '',
+    batch: { ordinal, verifiedMessages: 0, phase: 'PRIMARY', startedAt: 0, completedAt: 0, seedUrl },
   };
 }
 
@@ -103,10 +89,11 @@ export function batchPromptFor(config, task) {
 
 export function resetBatchTaskForOrdinal(task, ordinal, config, startAt = 0) {
   if (!Number.isInteger(ordinal) || ordinal < 1 || ordinal > config.totalTasks) throw new Error('Invalid next batch ordinal');
+  const normalized = normalizeChatUrl(config.seedUrl);
   task.enabled = true;
   task.label = `Завдання ${ordinal}`;
   task.url = config.seedUrl;
-  task.normalizedUrl = '';
+  task.normalizedUrl = normalized;
   task.promptOverride = '';
   task.status = 'BATCH_PENDING';
   task.lastCheckedAt = 0;
@@ -114,14 +101,7 @@ export function resetBatchTaskForOrdinal(task, ordinal, config, startAt = 0) {
   task.lastVerifiedFingerprint = '';
   task.retryAfterAt = Math.max(0, startAt);
   task.manualReviewReason = '';
-  task.batch = {
-    ordinal,
-    verifiedMessages: 0,
-    phase: 'PRIMARY',
-    startedAt: 0,
-    completedAt: 0,
-    seedUrl: config.seedUrl,
-  };
+  task.batch = { ordinal, verifiedMessages: 0, phase: 'PRIMARY', startedAt: 0, completedAt: 0, seedUrl: config.seedUrl };
   return task;
 }
 
@@ -146,20 +126,13 @@ export function buildBatchTasks(config, { idFactory = () => crypto.randomUUID() 
   const normalized = validateBatchChatFlow(config);
   if (!normalized.enabled) return [];
   const slotCount = Math.min(normalized.concurrency, normalized.totalTasks);
-  return Array.from({ length: slotCount }, (_, index) => createBatchTask({
-    id: idFactory(),
-    ordinal: index + 1,
-    seedUrl: normalized.seedUrl,
-    startAt: index * normalized.startIntervalMs,
-  }));
+  return Array.from({ length: slotCount }, (_, index) => createBatchTask({ id: idFactory(), ordinal: index + 1, seedUrl: normalized.seedUrl, startAt: index * normalized.startIntervalMs }));
 }
 
 export function replaceCompletedBatchSlot(session, taskId, now = Date.now()) {
   const config = session.batchChatFlow;
   const task = session.tasksById[taskId];
-  if (!config?.enabled || !task?.batch || !isBatchTaskComplete(task)) {
-    return { replaced: false, completed: isBatchSessionComplete(session) };
-  }
+  if (!config?.enabled || !task?.batch || !isBatchTaskComplete(task)) return { replaced: false, completed: isBatchSessionComplete(session) };
   config.completedTasks = Math.min(config.totalTasks, config.completedTasks + 1);
   const nextOrdinal = config.nextOrdinal;
   if (nextOrdinal > config.totalTasks) {
@@ -171,9 +144,4 @@ export function replaceCompletedBatchSlot(session, taskId, now = Date.now()) {
   return { replaced: true, completed: false, ordinal: nextOrdinal };
 }
 
-export const BATCH_CHAT_FLOW_LIMITS = Object.freeze({
-  maxConcurrency: MAX_CONCURRENCY,
-  maxTotalTasks: MAX_TOTAL_TASKS,
-  maxContinueCount: MAX_CONTINUE_COUNT,
-  maxStartIntervalMs: MAX_START_INTERVAL_MS,
-});
+export const BATCH_CHAT_FLOW_LIMITS = Object.freeze({ maxConcurrency: MAX_CONCURRENCY, maxTotalTasks: MAX_TOTAL_TASKS, maxContinueCount: MAX_CONTINUE_COUNT, maxStartIntervalMs: MAX_START_INTERVAL_MS });
