@@ -9,20 +9,14 @@ import {
   isBatchSessionComplete,
   markBatchVerifiedSend,
   normalizeBatchChatFlow,
+  replaceCompletedBatchSlot,
   validateBatchChatFlow,
 } from '../../src/core/batch-chat-flow.js';
 
 test('normalizes batch flow with explicit concurrency and cadence', () => {
   const config = validateBatchChatFlow({
-    enabled: true,
-    seedUrl: 'https://chatgpt.com/',
-    concurrency: 5,
-    totalTasks: 100,
-    startIntervalMs: 10_000,
-    primaryPrompt: 'Старт',
-    continuePrompt: 'продовжуй',
-    continueCount: 12,
-    finalPrompt: 'Завершуй',
+    enabled: true, seedUrl: 'https://chatgpt.com/', concurrency: 5, totalTasks: 100,
+    startIntervalMs: 10_000, primaryPrompt: 'Старт', continuePrompt: 'продовжуй', continueCount: 12, finalPrompt: 'Завершуй',
   });
   assert.equal(config.concurrency, 5);
   assert.equal(config.totalTasks, 100);
@@ -32,45 +26,27 @@ test('normalizes batch flow with explicit concurrency and cadence', () => {
 
 test('rejects concurrency above total task count', () => {
   assert.throws(() => validateBatchChatFlow({
-    enabled: true,
-    seedUrl: 'https://chatgpt.com/',
-    concurrency: 5,
-    totalTasks: 2,
-    primaryPrompt: 'Старт',
-    continuePrompt: 'продовжуй',
-    continueCount: 2,
-    finalPrompt: 'Готово',
+    enabled: true, seedUrl: 'https://chatgpt.com/', concurrency: 5, totalTasks: 2,
+    primaryPrompt: 'Старт', continuePrompt: 'продовжуй', continueCount: 2, finalPrompt: 'Готово',
   }), /Кількість одночасних чатів/);
 });
 
-test('builds one task per requested job and uses equal launch spacing', () => {
+test('creates only the concurrent slot count for a large batch', () => {
   const config = normalizeBatchChatFlow({
-    enabled: true,
-    seedUrl: 'https://chatgpt.com/',
-    concurrency: 3,
-    totalTasks: 4,
-    startIntervalMs: 10_000,
-    primaryPrompt: 'Старт',
-    continuePrompt: 'продовжуй',
-    continueCount: 1,
-    finalPrompt: 'Завершуй',
+    enabled: true, seedUrl: 'https://chatgpt.com/', concurrency: 3, totalTasks: 1000,
+    startIntervalMs: 10_000, primaryPrompt: 'Старт', continuePrompt: 'продовжуй', continueCount: 1, finalPrompt: 'Завершуй',
   });
   const tasks = buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })() });
-  assert.deepEqual(tasks.map(task => task.batch.ordinal), [1, 2, 3, 4]);
-  assert.deepEqual(tasks.map(task => task.retryAfterAt), [0, 10_000, 20_000, 30_000]);
-  assert.equal(new Set(tasks.map(task => task.id)).size, 4);
+  assert.equal(tasks.length, 3);
+  assert.deepEqual(tasks.map(task => task.batch.ordinal), [1, 2, 3]);
+  assert.deepEqual(tasks.map(task => task.retryAfterAt), [0, 10_000, 20_000]);
+  assert.equal(new Set(tasks.map(task => task.id)).size, 3);
 });
 
 test('prompt lifecycle is primary, continue N times, then final once', () => {
   const config = normalizeBatchChatFlow({
-    enabled: true,
-    seedUrl: 'https://chatgpt.com/',
-    concurrency: 1,
-    totalTasks: 1,
-    primaryPrompt: 'START',
-    continuePrompt: 'CONTINUE',
-    continueCount: 2,
-    finalPrompt: 'FINAL',
+    enabled: true, seedUrl: 'https://chatgpt.com/', concurrency: 1, totalTasks: 1,
+    primaryPrompt: 'START', continuePrompt: 'CONTINUE', continueCount: 2, finalPrompt: 'FINAL',
   });
   const task = createBatchTask({ id: 't1', ordinal: 1, seedUrl: config.seedUrl });
   assert.equal(batchPromptFor(config, task), 'START');
@@ -80,27 +56,36 @@ test('prompt lifecycle is primary, continue N times, then final once', () => {
   const result = markBatchVerifiedSend(task, 400, config);
   assert.equal(result.completed, true);
   assert.equal(task.batch.phase, 'DONE');
-  assert.equal(task.enabled, false);
 });
 
-test('active slot count ignores completed jobs and completion is durable', () => {
+test('completed slot is recycled into the next job without growing task count', () => {
   const config = normalizeBatchChatFlow({
-    enabled: true,
-    seedUrl: 'https://chatgpt.com/',
-    concurrency: 2,
-    totalTasks: 2,
-    primaryPrompt: 'START',
-    continuePrompt: 'CONTINUE',
-    continueCount: 0,
-    finalPrompt: 'FINAL',
+    enabled: true, seedUrl: 'https://chatgpt.com/', concurrency: 2, totalTasks: 4,
+    primaryPrompt: 'START', continuePrompt: 'CONTINUE', continueCount: 0, finalPrompt: 'FINAL',
   });
-  const tasks = buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })() });
+  config.nextOrdinal = 3;
+  config.completedTasks = 1;
+  const tasks = buildBatchTasks({ ...config, nextOrdinal: 1, completedTasks: 0 }, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })() });
   const session = { batchChatFlow: config, taskOrder: tasks.map(t => t.id), tasksById: Object.fromEntries(tasks.map(t => [t.id, t])) };
-  assert.equal(activeBatchTaskCount(session), 2);
   markBatchVerifiedSend(tasks[0], 100, config);
   markBatchVerifiedSend(tasks[0], 200, config);
-  assert.equal(activeBatchTaskCount(session), 1);
-  markBatchVerifiedSend(tasks[1], 300, config);
-  markBatchVerifiedSend(tasks[1], 400, config);
+  assert.equal(activeBatchTaskCount(session), 2);
+  const recycle = replaceCompletedBatchSlot(session, tasks[0].id, 300);
+  assert.equal(recycle.replaced, true);
+  assert.equal(tasks[0].batch.ordinal, 3);
+  assert.equal(tasks[0].batch.verifiedMessages, 0);
+  assert.equal(tasks[0].enabled, true);
+  assert.equal(tasks[0].url, config.seedUrl);
+});
+
+test('batch completes after the final set of slots is finished', () => {
+  const config = normalizeBatchChatFlow({
+    enabled: true, seedUrl: 'https://chatgpt.com/', concurrency: 2, totalTasks: 2,
+    primaryPrompt: 'START', continuePrompt: 'CONTINUE', continueCount: 0, finalPrompt: 'FINAL',
+  });
+  config.nextOrdinal = 3;
+  const tasks = buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })() });
+  const session = { batchChatFlow: config, taskOrder: tasks.map(t => t.id), tasksById: Object.fromEntries(tasks.map(t => [t.id, t])) };
+  for (const task of tasks) { markBatchVerifiedSend(task, 100, config); markBatchVerifiedSend(task, 200, config); replaceCompletedBatchSlot(session, task.id, 300); }
   assert.equal(isBatchSessionComplete(session), true);
 });
