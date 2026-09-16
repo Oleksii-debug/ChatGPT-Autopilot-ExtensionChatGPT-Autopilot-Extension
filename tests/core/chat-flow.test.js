@@ -89,12 +89,12 @@ test('same-chat mode remembers one conversation for the whole Session', async ()
   assert.equal(firstTask.normalizedUrl, OLD_URL);
   assert.equal(secondTask.normalizedUrl, OLD_URL);
   assert.deepEqual(chrome.calls, []);
-  assert.equal(state.tabHintsByTaskId.__chat_flow__:s1.tabId, 1);
+  assert.equal(state.tabHintsByTaskId['__chat_flow__:s1'].tabId, 1);
 });
 
 test('chat-flow remembers the same conversation and adopts its current URL', async () => {
   const state = makeState({ mode: 'new-chat-after', count: 1 });
-  state.tabHintsByTaskId.__chat_flow__:s1 = {
+  state.tabHintsByTaskId['__chat_flow__:s1'] = {
     tabId: 1,
     sessionId: 's1',
     normalizedUrl: OLD_URL,
@@ -110,7 +110,7 @@ test('chat-flow remembers the same conversation and adopts its current URL', asy
 
 test('chat-flow uses one remembered Session chat across different tasks', async () => {
   const state = makeState({ mode: 'new-chat-after', count: 1, taskCount: 2 });
-  state.tabHintsByTaskId.__chat_flow__:s1 = {
+  state.tabHintsByTaskId['__chat_flow__:s1'] = {
     tabId: 1,
     sessionId: 's1',
     normalizedUrl: OLD_URL,
