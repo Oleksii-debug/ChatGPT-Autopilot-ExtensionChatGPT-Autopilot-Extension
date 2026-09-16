@@ -118,8 +118,7 @@ function hintStillRepresentsCurrentOwnership(state, hintKey, hint) {
   }
 
   if (hint.kind === 'CHAT_FLOW') {
-    return owner.tabStrategy !== TabStrategy.ONE_WORKER_TAB_PER_SESSION
-      && hintKey === chatFlowHintKey(owner.id);
+    return hintKey === chatFlowHintKey(owner.id);
   }
 
   if (hint.kind != null && hint.kind !== 'TASK') return false;
@@ -246,7 +245,7 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
 export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   const session = state.sessionsById?.[sessionId];
   const chatFlow = getPromptCadenceConfig(state, sessionId).chatFlow;
-  if (session && chatFlow.mode !== 'same-chat') {
+  if (session && ['same-chat', 'new-chat-after', 'staged'].includes(chatFlow.mode)) {
     return bindChatFlowTaskTab(chromeApi, state, sessionId, task, session);
   }
   if (session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) {
