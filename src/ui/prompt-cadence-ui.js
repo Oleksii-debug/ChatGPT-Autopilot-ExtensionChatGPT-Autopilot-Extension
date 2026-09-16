@@ -1,3 +1,5 @@
+import './batch-chat-flow-ui.js';
+
 const LAST_SESSION_KEY = 'chatgpt-autopilot-last-session';
 const REGION_ID = 'prompt-cadence-region';
 const $ = id => document.getElementById(id);
