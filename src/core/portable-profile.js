@@ -78,12 +78,13 @@ function tabStrategy(value) {
 function buildTask(raw, index) {
   requireRecord(raw, `Task ${index + 1}`);
   const id = requireId(raw.id, `Task ${index + 1} id`);
-  const url = requireString(raw.url, `Task ${index + 1} URL`, { allowEmpty: false, maxLength: 4096 });
-  const normalizedUrl = normalizeChatUrl(url);
+  const enabled = raw.enabled !== false;
+  const url = requireString(raw.url ?? '', `Task ${index + 1} URL`, { allowEmpty: !enabled, maxLength: 4096 });
+  const normalizedUrl = url ? normalizeChatUrl(url) : '';
   return createTask({
     id,
     url: normalizedUrl,
-    enabled: raw.enabled !== false,
+    enabled,
     label: requireString(raw.label ?? '', `Task ${index + 1} label`, { maxLength: 500 }),
     promptOverride: requireString(raw.promptOverride ?? '', `Task ${index + 1} prompt`, { maxLength: 200000 }),
   });
@@ -99,7 +100,7 @@ function buildSession(raw, index, now, version = 1) {
   const tasks = raw.tasks.map(buildTask);
   const taskIds = tasks.map(task => task.id);
   if (new Set(taskIds).size !== taskIds.length) throw new Error(`Session ${name} contains duplicate Task ids`);
-  const taskUrls = tasks.map(task => task.normalizedUrl);
+  const taskUrls = tasks.filter(task => task.normalizedUrl).map(task => task.normalizedUrl);
   if (new Set(taskUrls).size !== taskUrls.length) throw new Error(`Session ${name} contains the same ChatGPT URL more than once`);
 
   const session = createSession({
