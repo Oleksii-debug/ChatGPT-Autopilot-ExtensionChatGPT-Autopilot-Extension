@@ -11,7 +11,8 @@ test('service worker owns a real runtime-cycle wiring behind the release gate', 
   assert.match(source, /import \{ AutomaticSessionExecutor \} from '\.\.\/core\/automatic-executor\.js';/);
   assert.match(source, /import \{ ChromeInteractionTransport \} from '\.\.\/core\/interaction-transport\.js';/);
   assert.match(source, /import \{ reconcileRuntimeColdStart, runRuntimeCycle \} from '\.\.\/core\/runtime-execution\.js';/);
-  assert.match(source, /const executor = new AutomaticSessionExecutor\(repo, chrome, transport\);/);
+  assert.match(source, /const executorRepo = new CadencedRepository\(repo\);/);
+  assert.match(source, /const executor = new AutomaticSessionExecutor\(executorRepo, chrome, transport\);/);
   assert.match(source, /executionAvailable: EXECUTION_AVAILABLE/);
 });
 
@@ -24,11 +25,7 @@ test('cold worker load applies authorized bootstrap before recovery without exec
   assert.match(source, /await ensureBundledBootstrapApplied\(\);[\s\S]*?await reconcileRuntimeColdStart\(\{/s);
   assert.match(source, /void beginColdStartReconciliation\(\)\.catch\(\(\) => undefined\);/);
   assert.match(source, /await ensureColdStartReconciled\(\);/);
-  assert.doesNotMatch(
-    source,
-    /\nrunSafely\(runExecutionCycle\(\)\);\s*$/,
-    'module evaluation must not launch an executor cycle',
-  );
+  assert.doesNotMatch(source, /\nrunSafely\(runExecutionCycle\(\)\);\s*$/);
 });
 
 test('failed cold-start reconciliation releases its single-flight barrier for a later retry', () => {
@@ -52,9 +49,5 @@ test('overlapping wake events share one in-flight execution cycle', () => {
 test('production automatic execution is explicitly enabled while UI reconciliation remains execution-free', () => {
   assert.match(source, /const EXECUTION_AVAILABLE = true;/);
   assert.doesNotMatch(source, /const EXECUTION_AVAILABLE = false;/);
-  assert.match(
-    source,
-    /export async function reconcileRuntime\(\) \{[\s\S]*?runRuntimeCycle\(\{[\s\S]*?executionAvailable: false,[\s\S]*?\}\);/,
-    'UI-triggered reconciliation must remain unable to launch automatic execution',
-  );
+  assert.match(source, /export async function reconcileRuntime\(\) \{[\s\S]*?runRuntimeCycle\(\{[\s\S]*?executionAvailable: false,[\s\S]*?\}\);/);
 });
