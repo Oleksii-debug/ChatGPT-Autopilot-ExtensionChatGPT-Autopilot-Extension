@@ -160,3 +160,45 @@ test('projected prompt selection is deterministic for a chosen send number', () 
   s.sessionsById.s1.cadenceVerifiedSendCount = 7;
   assert.equal(projectPromptForSession(s, s.sessionsById.s1).sharedPrompt, 'third');
 });
+
+test('cadence write rejects invalid explicit N values instead of silently defaulting', () => {
+  const s = state();
+  assert.throws(
+    () => setPromptCadenceConfig(s, 's1', {
+      prompts: [
+        { enabled: false, prompt: '', everyN: 10 },
+        { enabled: true, prompt: 'p2', everyN: 2.5 },
+        { enabled: false, prompt: '', everyN: 40 },
+      ],
+    }),
+    /must be an integer/,
+  );
+  assert.throws(
+    () => setPromptCadenceConfig(s, 's1', {
+      prompts: [
+        { enabled: false, prompt: '', everyN: 10 },
+        { enabled: false, prompt: '', everyN: 30 },
+        { enabled: true, prompt: 'p3', everyN: 'bad' },
+      ],
+    }),
+    /must be an integer/,
+  );
+});
+
+test('chat-flow explicit counters are validated rather than normalized behind the user', () => {
+  const s = state();
+  assert.throws(
+    () => setPromptCadenceConfig(s, 's1', {
+      prompts: [],
+      chatFlow: { enabled: true, mode: 'new-chat-after', newChatEveryN: 1 },
+    }),
+    /New-chat cadence must be an integer/,
+  );
+  assert.throws(
+    () => setPromptCadenceConfig(s, 's1', {
+      prompts: [],
+      chatFlow: { enabled: true, mode: 'staged', continueCount: 1.2, stage2Prompt: 'next', stage2Count: 2 },
+    }),
+    /Continue count must be an integer/,
+  );
+});
