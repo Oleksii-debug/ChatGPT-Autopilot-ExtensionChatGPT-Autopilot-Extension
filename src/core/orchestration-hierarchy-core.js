@@ -304,6 +304,54 @@ export function preparedHierarchyActions(graphRaw, runtimeRaw) {
   return actions;
 }
 
+
+export function syncHierarchyScopeStatesIntoCore(coreState, graphRaw, runtimeRaw) {
+  const graph = validateOrchestrationGraphV1(graphRaw);
+  const runtime = validateOrchestrationHierarchyRuntimeV1(graph, runtimeRaw);
+  if (!isObject(coreState?.sessionsById)) throw new Error('Invalid Core state');
+
+  const transitions = [];
+  for (const nodeId of graph.nodeOrder) {
+    const sessionId = hierarchyCoreSessionId(graph.graphId, nodeId);
+    const session = coreState.sessionsById[sessionId];
+    const binding = session?.orchestrationHierarchy;
+    if (!binding?.managed || binding.graphId !== graph.graphId || binding.nodeId !== nodeId) continue;
+
+    const nodeRuntime = runtime.nodesById[nodeId];
+    const nextScope = nodeRuntime.scopeState;
+    const previousScope = binding.scopeState || 'RUNNING';
+    binding.scopeState = nextScope;
+
+    if (nextScope === 'STOPPED') {
+      session.enabled = false;
+      if (!isUnresolvedOperation(session)) session.runState = RunState.STOPPED;
+    } else if (nextScope === 'PAUSED') {
+      if (session.runState !== RunState.STOPPED) session.runState = RunState.PAUSED;
+    } else if (
+      nextScope === 'RUNNING'
+      && previousScope === 'PAUSED'
+      && session.enabled
+      && session.runState === RunState.PAUSED
+      && coreState.profile?.masterPaused !== true
+    ) {
+      session.runState = RunState.RUNNING;
+    }
+
+    if (previousScope !== nextScope) {
+      transitions.push({
+        nodeId,
+        sessionId,
+        from: previousScope,
+        to: nextScope,
+        runState: session.runState,
+        enabled: session.enabled,
+      });
+    }
+  }
+
+  return { state: coreState, transitions };
+}
+
 export function hierarchyCompletionProbesFromCore(graphRaw, runtimeRaw, coreState) {
   const graph = validateOrchestrationGraphV1(graphRaw);
   const runtime = validateOrchestrationHierarchyRuntimeV1(graph, runtimeRaw);
