@@ -180,6 +180,7 @@ export function materializeHierarchyActionsIntoCore(
     if (!session) {
       const created = createManagedSession({ graph, node, action, prompt, targetUrl, nowMs, timings });
       session = created.session;
+      if (coreState.profile?.masterPaused) session.runState = RunState.PAUSED;
       coreState.sessionsById[sid] = session;
       if (!coreState.sessionOrder.includes(sid)) coreState.sessionOrder.push(sid);
     } else {
