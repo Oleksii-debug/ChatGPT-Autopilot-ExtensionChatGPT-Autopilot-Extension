@@ -8,7 +8,8 @@ import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { CadencedRepository, getPromptCadenceConfig, setPromptCadenceConfig } from '../core/prompt-cadence.js';
 import { getDriveAccessToken, inspectDriveOAuthConfig } from '../core/drive-auth.js';
 import { extractDriveFileId, listAuthorizedDriveFiles, readAuthorizedDriveSnapshot } from '../core/drive-api.js';
-import { acceptDriveSnapshot, getDriveSourceConfig, setDriveSourceConfig } from '../core/drive-source.js';
+import { acceptDriveSnapshot, getDriveSourceConfig, recordDriveSyncOutcome, setDriveSourceConfig } from '../core/drive-source.js';
+import { syncDueDriveSources } from '../core/drive-sync.js';
 import { batchChatFlowSnapshot, configureBatchChatFlow, startBatchChatFlow } from '../core/batch-chat-flow-service.js';
 import { SessionFunctionId, setSessionFunctionEnabled, validateSessionFunctions } from '../core/session-functions.js';
 
@@ -72,9 +73,10 @@ export function runExecutionCycle() {
   if (executionCycleInFlight) return executionCycleInFlight;
   const cycle = (async () => {
     await ensureColdStartReconciled();
+    const driveSync = await syncDueDriveSources({ repository: repo, chromeApi: chrome });
     const result = await runRuntimeCycle({ repository: repo, chromeApi: chrome, executor, startup: false, executionAvailable: EXECUTION_AVAILABLE });
     await notifyStatusChanged(result.state);
-    return result;
+    return { ...result, driveSync };
   })();
   executionCycleInFlight = cycle.then(
     result => { executionCycleInFlight = null; return result; },
@@ -169,7 +171,14 @@ async function dispatchDriveCommand(command, payload) {
     let source;
     const state = await repo.update(draft => {
       const parsed = extractDriveFileId(payload.sourceUrl);
-      source = setDriveSourceConfig(draft, payload.sessionId, { fileId: parsed.fileId, sourceUrl: payload.sourceUrl, target: payload.target });
+      source = setDriveSourceConfig(draft, payload.sessionId, {
+        fileId: parsed.fileId,
+        sourceUrl: payload.sourceUrl,
+        target: payload.target,
+        autoSync: payload.autoSync === true,
+        syncIntervalMs: Number(payload.syncIntervalMinutes) * 60 * 1000,
+        minimumCharacters: Number(payload.minimumCharacters),
+      });
       const session = draft.sessionsById[payload.sessionId];
       if (session) session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.DRIVE_SOURCE, true);
       return draft;
@@ -184,14 +193,27 @@ async function dispatchDriveCommand(command, payload) {
     const before = await repo.load();
     const source = getDriveSourceConfig(before, payload.sessionId);
     if (!source.fileId) throw new Error('Спочатку прив’яжіть файл Google Drive до Session.');
-    const token = await getDriveAccessToken(chrome, { interactive: true });
-    const snapshot = await readAuthorizedDriveSnapshot({ fileId: source.fileId, accessToken: token });
-    let acceptance;
-    const state = await repo.update(draft => {
-      acceptance = acceptDriveSnapshot(draft, payload.sessionId, snapshot);
-      return draft;
-    });
-    return { acceptance, source: getDriveSourceConfig(state, payload.sessionId) };
+    const at = Date.now();
+    try {
+      const token = await getDriveAccessToken(chrome, { interactive: true });
+      const snapshot = await readAuthorizedDriveSnapshot({ fileId: source.fileId, accessToken: token });
+      let acceptance;
+      const state = await repo.update(draft => {
+        acceptance = acceptDriveSnapshot(draft, payload.sessionId, snapshot, { now: at });
+        recordDriveSyncOutcome(draft, payload.sessionId, { now: at });
+        return draft;
+      });
+      return { acceptance, source: getDriveSourceConfig(state, payload.sessionId) };
+    } catch (error) {
+      await repo.update(draft => {
+        recordDriveSyncOutcome(draft, payload.sessionId, {
+          now: at,
+          error: String(error?.code || error?.name || 'DRIVE_SYNC_FAILED'),
+        });
+        return draft;
+      });
+      throw error;
+    }
   }
   return null;
 }
