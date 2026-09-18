@@ -108,11 +108,11 @@ export function markBatchVerifiedSend(task, verifiedAt, config) {
   return { completed: false, nextPrompt: batchPromptFor(config, task) };
 }
 
-export function buildBatchTasks(config, { idFactory = () => crypto.randomUUID() } = {}) {
+export function buildBatchTasks(config, { idFactory = () => crypto.randomUUID(), now = Date.now() } = {}) {
   const normalized = validateBatchChatFlow(config); if (!normalized.enabled) return [];
   const slotCount = Math.min(normalized.concurrency, normalized.totalTasks);
   return Array.from({ length: slotCount }, (_, index) => createBatchTask({
-    id: idFactory(), ordinal: index + 1, initialUrl: normalized.seedUrls[index] || NEW_CHAT_URL, startAt: index * normalized.startIntervalMs,
+    id: idFactory(), ordinal: index + 1, initialUrl: normalized.seedUrls[index] || NEW_CHAT_URL, startAt: now + index * normalized.startIntervalMs,
   }));
 }
 
