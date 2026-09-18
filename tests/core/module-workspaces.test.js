@@ -11,6 +11,8 @@ import {
 import { ModuleWorkspaceRepository } from '../../src/core/module-repository.js';
 import { SessionFunctionId, isSessionFunctionEnabled, setSessionFunctionEnabled } from '../../src/core/session-functions.js';
 import { startSession } from '../../src/core/state-machine.js';
+import { applyInteractionResult } from '../../src/core/execution.js';
+import { InteractionResult } from '../../src/shared/protocol.js';
 
 function makeState() {
   const state = createEmptyState(100);
@@ -131,6 +133,18 @@ test('legacy root-owned batch state migrates once into batch workspace and disab
   assert.equal(isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.ORDINARY_SEND), false);
   assert.deepEqual(session.moduleWorkspaces.batch_chat.taskOrder, ['legacy-batch-1']);
   assert.equal(session.moduleWorkspaces.batch_chat.runState, RunState.RUNNING);
+});
+
+test('batch verified sends do not consume the standard prompt cadence counter', () => {
+  const state = makeState();
+  configureBatchChatFlow(state, 's1', batchConfig({ concurrency: 1, totalTasks: 1, continueCount: 0 }), 200);
+  const session = state.sessionsById.s1;
+  session.cadenceVerifiedSendCount = 7;
+  const batch = createModuleSessionView(session, ExecutionModuleId.BATCH_CHAT);
+  const taskId = batch.taskOrder[0];
+  applyInteractionResult(batch, 0, { status: InteractionResult.SENT_VERIFIED }, { now: 300, promptFingerprint: 'batch-fp' });
+  assert.equal(session.cadenceVerifiedSendCount, 7);
+  assert.equal(batch.tasksById[taskId].lastVerifiedFingerprint, 'batch-fp');
 });
 
 test('starting one container activates both enabled execution modules without sharing their task queues', () => {
