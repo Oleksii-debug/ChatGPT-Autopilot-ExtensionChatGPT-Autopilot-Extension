@@ -28,7 +28,7 @@ export function configureBatchChatFlow(state, sessionId, rawConfig, now = Date.n
     throw new Error('Зупиніть Session перед зміною пакетної роботи.');
   }
   const config = validateBatchChatFlow({ ...rawConfig, enabled: true, nextOrdinal: 1, completedTasks: 0 });
-  const tasks = buildBatchTasks(config);
+  const tasks = buildBatchTasks(config, { now });
   session.batchChatFlow = { ...normalizeBatchChatFlow(config), nextOrdinal: tasks.length + 1, completedTasks: 0 };
   session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT] = createBatchModuleWorkspace(tasks, {
     now,
