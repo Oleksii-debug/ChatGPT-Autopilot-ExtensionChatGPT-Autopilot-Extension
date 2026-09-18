@@ -5,6 +5,7 @@ import {
   ensureSessionModuleState,
   listExecutionModuleIds,
 } from './module-workspaces.js';
+import { nextDriveSyncWake } from './drive-source.js';
 
 export const ALARM_NAME = 'autopilot-core-wake';
 export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not available until the durable send runner is installed.';
@@ -12,6 +13,9 @@ export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not availab
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 
 export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.now()) {
+  const driveWake = nextDriveSyncWake(state, now);
+  if (driveWake != null) earliest = Math.min(earliest, driveWake);
+
   for (const session of Object.values(state.sessionsById)) {
     if (!ACTIVE_STATES.has(session.runState)) continue;
     session.runState = RunState.PAUSED;
