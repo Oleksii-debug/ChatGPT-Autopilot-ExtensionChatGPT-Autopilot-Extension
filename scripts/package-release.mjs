@@ -3,7 +3,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const RELEASE_NAME = 'ChatGPT-Autopilot-Extension-v0.1';
+export const RELEASE_VERSION = '0.9.19';
+export const RELEASE_NAME = `ChatGPT-Autopilot-${RELEASE_VERSION}`;
 const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
 const UTF8_FLAG = 0x0800;
@@ -73,20 +74,29 @@ function manifestResourcePaths(manifest) {
 export async function collectProductFiles(root = REPOSITORY_ROOT) {
   const manifestPath = path.join(root, 'manifest.json');
   const readmePath = path.join(root, 'README.txt');
+  const changesPath = path.join(root, `CHANGES-${RELEASE_VERSION}.txt`);
+  const qaPath = path.join(root, `QA-${RELEASE_VERSION}.txt`);
   const srcPath = path.join(root, 'src');
-  const [manifestText, readmeStat, srcStat] = await Promise.all([
+  const iconsPath = path.join(root, 'icons');
+  const [manifestText, readmeStat, changesStat, qaStat, srcStat, iconsStat] = await Promise.all([
     fs.readFile(manifestPath, 'utf8'),
     fs.stat(readmePath),
+    fs.stat(changesPath),
+    fs.stat(qaPath),
     fs.stat(srcPath),
+    fs.stat(iconsPath),
   ]);
   if (!readmeStat.isFile()) throw new Error('README.txt must be a file');
+  if (!changesStat.isFile()) throw new Error(`CHANGES-${RELEASE_VERSION}.txt must be a file`);
+  if (!qaStat.isFile()) throw new Error(`QA-${RELEASE_VERSION}.txt must be a file`);
   if (!srcStat.isDirectory()) throw new Error('src must be a directory');
+  if (!iconsStat.isDirectory()) throw new Error('icons must be a directory');
 
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
-  if (manifest.version !== '0.1.0') throw new Error(`v0.1 package requires manifest version 0.1.0, found ${manifest.version || 'missing'}`);
+  if (manifest.version !== RELEASE_VERSION) throw new Error(`v${RELEASE_VERSION} package requires manifest version ${RELEASE_VERSION}, found ${manifest.version || 'missing'}`);
 
-  const files = ['README.txt', 'manifest.json', ...await walkFiles(root, 'src')].sort();
+  const files = [`CHANGES-${RELEASE_VERSION}.txt`, `QA-${RELEASE_VERSION}.txt`, 'README.txt', 'manifest.json', ...await walkFiles(root, 'icons'), ...await walkFiles(root, 'src')].sort();
   const fileSet = new Set(files);
   for (const resource of manifestResourcePaths(manifest)) {
     if (!fileSet.has(resource)) {
@@ -181,14 +191,15 @@ function endOfCentralDirectory(entryCount, centralSize, centralOffset) {
   return end;
 }
 
-export async function createDeterministicZip(root, files) {
+export async function createDeterministicZip(root, files, { prefix = RELEASE_NAME } = {}) {
   const localParts = [];
   const centralParts = [];
   let offset = 0;
 
   for (const relativePath of [...files].sort()) {
     const data = await readPackagedBytes(root, relativePath);
-    const zipPath = `${RELEASE_NAME}/${toPosix(relativePath)}`;
+    const normalized = toPosix(relativePath);
+    const zipPath = prefix ? `${prefix}/${normalized}` : normalized;
     const local = localHeader(zipPath, data);
     localParts.push(local);
     centralParts.push(centralHeader(zipPath, data, offset));

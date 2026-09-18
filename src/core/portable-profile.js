@@ -4,8 +4,11 @@ import {
   RunMode,
   RunState,
   TabStrategy,
+  MAX_PHYSICAL_TASKS,
+  MAX_LOGICAL_TASKS,
   createSession,
   createTask,
+  isExclusiveConversationUrl,
   normalizeChatUrl,
 } from './schema.js';
 import { appendLog } from './logger.js';
@@ -13,7 +16,6 @@ import { startSession } from './state-machine.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
 export const PORTABLE_PROFILE_VERSION = 1;
-export const MAX_PORTABLE_SESSIONS = 5;
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const TERMINAL_OPERATION_PHASES = new Set([
@@ -41,7 +43,7 @@ function requireId(value, label) {
   return value;
 }
 
-function requireString(value, label, { allowEmpty = true, maxLength = 200000 } = {}) {
+function requireString(value, label, { allowEmpty = true, maxLength = Infinity } = {}) {
   if (typeof value !== 'string' || (!allowEmpty && !value.trim()) || value.length > maxLength) {
     throw new Error(`Invalid ${label}`);
   }
@@ -75,6 +77,19 @@ function tabStrategy(value) {
   throw new Error('tabStrategy must be worker, keep-open or open-close');
 }
 
+
+function portableMinimumSendIntervalMs(raw, name) {
+  if (raw.minimumSendIntervalValue !== undefined || raw.minimumSendIntervalUnit !== undefined) {
+    const unit = raw.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
+    const max = unit === 'seconds' ? 86400 : 1440;
+    return boundedNumber(raw.minimumSendIntervalValue, `Session ${name} minimumSendIntervalValue`, 1, max, unit === 'seconds' ? 120 : 2) * (unit === 'seconds' ? 1000 : 60000);
+  }
+  if (raw.minimumSendIntervalSeconds !== undefined) {
+    return boundedNumber(raw.minimumSendIntervalSeconds, `Session ${name} minimumSendIntervalSeconds`, 1, 86400, 120) * 1000;
+  }
+  return boundedNumber(raw.minimumSendIntervalMinutes, `Session ${name} minimumSendIntervalMinutes`, 0.0166666667, 1440, 2) * 60000;
+}
+
 function buildTask(raw, index) {
   requireRecord(raw, `Task ${index + 1}`);
   const id = requireId(raw.id, `Task ${index + 1} id`);
@@ -85,7 +100,7 @@ function buildTask(raw, index) {
     url: normalizedUrl,
     enabled: raw.enabled !== false,
     label: requireString(raw.label ?? '', `Task ${index + 1} label`, { maxLength: 500 }),
-    promptOverride: requireString(raw.promptOverride ?? '', `Task ${index + 1} prompt`, { maxLength: 200000 }),
+    promptOverride: requireString(raw.promptOverride ?? '', `Task ${index + 1} prompt`),
   });
 }
 
@@ -93,33 +108,41 @@ function buildSession(raw, index, now, version = 1) {
   requireRecord(raw, `Session ${index + 1}`);
   const id = requireId(raw.id, `Session ${index + 1} id`);
   const name = requireString(raw.name, `Session ${index + 1} name`, { allowEmpty: false, maxLength: 500 }).trim();
-  if (!Array.isArray(raw.tasks) || raw.tasks.length < 1 || raw.tasks.length > 50) {
-    throw new Error(`Session ${name} must contain 1-50 tasks`);
+  if (!Array.isArray(raw.tasks) || raw.tasks.length < 1 || raw.tasks.length > MAX_PHYSICAL_TASKS) {
+    throw new Error(`Session ${name} must contain 1-${MAX_PHYSICAL_TASKS} physical tasks`);
   }
   const tasks = raw.tasks.map(buildTask);
   const taskIds = tasks.map(task => task.id);
   if (new Set(taskIds).size !== taskIds.length) throw new Error(`Session ${name} contains duplicate Task ids`);
-  const taskUrls = tasks.map(task => task.normalizedUrl);
-  if (new Set(taskUrls).size !== taskUrls.length) throw new Error(`Session ${name} contains the same ChatGPT URL more than once`);
-
+  const configuredTaskCount = raw.configuredTaskCount === undefined ? tasks.length : Number(raw.configuredTaskCount);
+  if (!Number.isInteger(configuredTaskCount) || configuredTaskCount < tasks.length || configuredTaskCount > MAX_LOGICAL_TASKS) throw new Error(`Session ${name} configuredTaskCount must be ${tasks.length}-${MAX_LOGICAL_TASKS}`);
+  const normalizedPromptMode = promptMode(raw.promptMode);
+  const normalizedUrlMode = raw.urlMode === 'shared' || raw.urlMode === 'unique'
+    ? raw.urlMode
+    : new Set(tasks.map(task => task.normalizedUrl)).size <= 1 ? 'shared' : 'unique';
+  if (configuredTaskCount > tasks.length && (tasks.length !== 1 || normalizedPromptMode !== PromptMode.SHARED || normalizedUrlMode !== 'shared')) {
+    throw new Error(`Session ${name} can exceed ${MAX_PHYSICAL_TASKS} only with one shared URL and one shared prompt`);
+  }
   const session = createSession({
     id,
     name,
     tasks,
-    promptMode: promptMode(raw.promptMode),
-    sharedPrompt: requireString(raw.sharedPrompt ?? '', `Session ${name} sharedPrompt`, { maxLength: 200000 }),
+    promptMode: normalizedPromptMode,
+    sharedPrompt: requireString(raw.sharedPrompt ?? '', `Session ${name} sharedPrompt`),
     runMode: runMode(raw.runMode),
-    minimumSendIntervalMs: boundedNumber(raw.minimumSendIntervalMinutes, `Session ${name} minimumSendIntervalMinutes`, 1, 1440, 2) * 60000,
-    preSendDelayMs: boundedNumber(raw.preSendDelaySeconds, `Session ${name} preSendDelaySeconds`, 1, 30, 5) * 1000,
+    configuredTaskCount,
+    minimumSendIntervalMs: portableMinimumSendIntervalMs(raw, name),
+    preSendDelayMs: boundedNumber(raw.preSendDelaySeconds, `Session ${name} preSendDelaySeconds`, 1, 30, 20) * 1000,
     busyCheckDelayMs: boundedNumber(raw.busyCheckDelaySeconds, `Session ${name} busyCheckDelaySeconds`, 1, 30, 2) * 1000,
     retryBackoffMs: boundedNumber(raw.retryBackoffSeconds, `Session ${name} retryBackoffSeconds`, 5, 3600, 30) * 1000,
     tabStrategy: tabStrategy(raw.tabStrategy),
     now,
   });
   session.version = Math.max(1, Number(version) || 1);
-  session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`, { maxLength: 200000 });
+  session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`);
   session.retryPolicy = raw.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
+  session.urlMode = normalizedUrlMode;
   session.pausedByMaster = false;
   return session;
 }
@@ -128,8 +151,8 @@ function parseProfile(profile, now = Date.now()) {
   requireRecord(profile, 'Profile');
   if (profile.format !== PORTABLE_PROFILE_FORMAT) throw new Error(`Unsupported profile format: ${profile.format || 'missing'}`);
   if (profile.version !== PORTABLE_PROFILE_VERSION) throw new Error(`Unsupported profile version: ${profile.version}`);
-  if (!Array.isArray(profile.sessions) || profile.sessions.length < 1 || profile.sessions.length > MAX_PORTABLE_SESSIONS) {
-    throw new Error(`Profile must contain 1-${MAX_PORTABLE_SESSIONS} sessions`);
+  if (!Array.isArray(profile.sessions) || profile.sessions.length < 1) {
+    throw new Error('Profile must contain at least 1 session');
   }
   const profileName = requireString(profile.profileName ?? 'ChatGPT Autopilot profile', 'profileName', { allowEmpty: false, maxLength: 500 }).trim();
   const profileAutoStartRequested = profile.autoStart === true;
@@ -159,10 +182,10 @@ function reservedUrls(state, excludedSessionIds = new Set()) {
     if (ACTIVE_STATES.has(session.runState)) {
       for (const taskId of session.taskOrder) {
         const task = session.tasksById[taskId];
-        if (task.enabled && task.normalizedUrl) urls.add(task.normalizedUrl);
+        if (task.enabled && isExclusiveConversationUrl(task.normalizedUrl)) urls.add(task.normalizedUrl);
       }
     }
-    if (hasUnresolvedOperation(session) && session.operation?.targetUrl) urls.add(session.operation.targetUrl);
+    if (hasUnresolvedOperation(session) && isExclusiveConversationUrl(session.operation?.targetUrl)) urls.add(session.operation.targetUrl);
   }
   return urls;
 }
@@ -180,7 +203,7 @@ export function previewPortableProfile(profile, now = Date.now()) {
     version: PORTABLE_PROFILE_VERSION,
     profileName: parsed.profileName,
     sessionCount: parsed.sessionConfigs.length,
-    taskCount: parsed.sessionConfigs.reduce((sum, item) => sum + item.session.taskOrder.length, 0),
+    taskCount: parsed.sessionConfigs.reduce((sum, item) => sum + Number(item.session.configuredTaskCount || item.session.taskOrder.length), 0),
     autoStartSessionCount: parsed.sessionConfigs.filter(item => item.autoStartRequested).length,
     sessionNames: parsed.sessionConfigs.map(item => item.session.name),
   };
@@ -211,14 +234,17 @@ export function applyPortableProfile(state, profile, {
     for (const item of parsed.sessionConfigs) {
       if (!item.autoStartRequested) continue;
       validateRunnable(item.session);
-      for (const taskId of item.session.taskOrder) {
-        const task = item.session.tasksById[taskId];
-        if (!task.enabled) continue;
-        if (reserved.has(task.normalizedUrl)) {
+      const sessionUrls = new Set(item.session.taskOrder
+        .map(taskId => item.session.tasksById[taskId])
+        .filter(task => task.enabled)
+        .map(task => task.normalizedUrl)
+        .filter(isExclusiveConversationUrl));
+      for (const normalizedUrl of sessionUrls) {
+        if (reserved.has(normalizedUrl)) {
           throw new Error(`Cannot auto-start Session ${item.session.name}: a ChatGPT conversation is already owned by another active or unresolved Session`);
         }
-        reserved.add(task.normalizedUrl);
       }
+      for (const normalizedUrl of sessionUrls) reserved.add(normalizedUrl);
     }
   }
 
@@ -238,6 +264,8 @@ export function applyPortableProfile(state, profile, {
     replacement.operation = null;
     replacement.lastActionAt = 0;
     replacement.lastSuccessfulSendAt = 0;
+    replacement.successfulSendCount = 0;
+    replacement.completedAt = 0;
     replacement.lastError = '';
     replacement.onePassCompletedTaskIds = [];
     replacement.pausedByMaster = false;
@@ -272,9 +300,13 @@ function sessionToPortable(session) {
     name: session.name,
     autoStart: false,
     promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared',
+    urlMode: session.urlMode === 'unique' ? 'unique' : 'shared',
     sharedPrompt: session.sharedPrompt || '',
     defaultUniquePrompt: session.defaultUniquePrompt || '',
     runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
+    configuredTaskCount: Number(session.configuredTaskCount || session.taskOrder.length),
+    minimumSendIntervalValue: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? session.minimumSendIntervalMs / 60000 : session.minimumSendIntervalMs / 1000,
+    minimumSendIntervalUnit: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? 'minutes' : 'seconds',
     minimumSendIntervalMinutes: session.minimumSendIntervalMs / 60000,
     preSendDelaySeconds: session.preSendDelayMs / 1000,
     busyCheckDelaySeconds: session.busyCheckDelayMs / 1000,

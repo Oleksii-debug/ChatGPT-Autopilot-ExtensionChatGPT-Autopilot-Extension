@@ -1,0 +1,15 @@
+ChatGPT Автопілот 0.9.18 — TRUSTED SCRIPT APPROVAL / NETWORK-GUARDED DOM FALLBACK
+
+FROZEN CHANGELOG — 2026-09-14
+
+- Додано Browser Agent tool `trusted_script` як opt-in fallback після звичайних DOM/ARIA/native/vision capabilities.
+- `trustedScriptEnabled` є явною owner policy і за замовчуванням false.
+- Кожен Trusted Script завжди проходить explicit owner approval, незалежно від загального approvalMode.
+- Approval TOCTOU-safe: exact live URL/origin перевіряється перед execution і повторно після chrome.debugger.attach.
+- Trusted Script виконується через CDP Runtime.evaluate лише після approval.
+- Під час approved script execution Network.setBlockedURLs('*') тимчасово блокує network requests; guard знімається після execution. Якщо network guard не може бути встановлений, script fail-closed і не виконується.
+- Parser блокує cookies, browser storage, network APIs, clipboard/credentials, dynamic code, secondary workers/messaging, extension APIs, script navigation та persistent/asynchronous callbacks.
+- Pending approval показує повний script для owner/NVDA review; durable history redacts raw `code` і зберігає лише purpose/origin/audit evidence.
+- Виправлено WIP defect: normalized Agent config раніше губив trustedScriptEnabled.
+- Виправлено WIP audit defect: successful approved script event спочатку писався лише в transient job clone і губився після durable update.
+- Ordinary Session cadence/recovery, Scenario Work та Orchestration V2 semantics цим шаром не змінюються.

@@ -1,5 +1,6 @@
 const STATE = Object.freeze({
   RUNNING: 'ПРАЦЮЄ',
+  COMPLETED: 'ЗАВЕРШЕНО',
   RECOVERING: 'ВІДНОВЛЮЄТЬСЯ',
   PAUSED: 'ПРИЗУПИНЕНО',
   STOPPED: 'ЗУПИНЕНО',
@@ -23,7 +24,17 @@ const STATE = Object.freeze({
   UNKNOWN: 'НЕВІДОМО',
   TEMPORARY_ERROR: 'ТИМЧАСОВА ПОМИЛКА',
   AUTH_REQUIRED: 'ПОТРІБЕН ВХІД',
-  UNKNOWN_UI: 'НЕВІДОМИЙ СТАН ІНТЕРФЕЙСУ'
+  UNKNOWN_UI: 'НЕВІДОМИЙ СТАН ІНТЕРФЕЙСУ',
+  MANUAL_REVIEW_REQUIRED: 'ПОТРІБНА РУЧНА ПЕРЕВІРКА',
+  INSERTION_NOT_PROVEN: 'НЕ ВДАЛОСЯ ПІДТВЕРДИТИ ВСТАВЛЕННЯ ПРОМПТУ',
+  COMPOSER_CONTAINS_OTHER_CONTENT: 'У ПОЛІ ВВЕДЕННЯ Є ІНШИЙ ТЕКСТ',
+  COMPOSER_AMBIGUOUS: 'ЗНАЙДЕНО КІЛЬКА МОЖЛИВИХ ПОЛІВ ВВЕДЕННЯ',
+  PENDING_PROMPT_MISMATCH_PRE_SEND: 'ТЕКСТ У ПОЛІ ВВЕДЕННЯ ЗМІНИВСЯ ПЕРЕД ВІДПРАВЛЕННЯМ',
+  PROMPT_CHANGED_AT_SUBMIT_BOUNDARY: 'ТЕКСТ У ПОЛІ ВВЕДЕННЯ ЗМІНИВСЯ БЕЗПОСЕРЕДНЬО ПЕРЕД ВІДПРАВЛЕННЯМ',
+  UNKNOWN_OR_SECURITY_DIALOG: 'ВІДКРИТО НЕВІДОМЕ АБО БЕЗПЕКОВЕ ДІАЛОГОВЕ ВІКНО',
+  SEND_ACK_TIMEOUT: 'НАДСИЛАННЯ НЕ ПІДТВЕРДЖЕНО; ДОСТУПНІ ДІЇ ВІДНОВЛЕННЯ',
+  EXISTING_DRAFT_SYNC_NOT_PROVEN: 'НЕ ВДАЛОСЯ СИНХРОНІЗУВАТИ НАЯВНИЙ ПРОМПТ ІЗ РЕДАКТОРОМ',
+  UNRECOGNIZED_DIALOG: 'ВІДКРИТО НЕРОЗПІЗНАНЕ ДІАЛОГОВЕ ВІКНО'
 });
 
 const EXACT = new Map([
@@ -42,18 +53,36 @@ const EXACT = new Map([
   ['The Open dashboard shortcut is not assigned. Assign it in chrome://extensions/shortcuts.', 'Комбінацію для відкриття панелі не призначено. Призначте її на сторінці chrome://extensions/shortcuts.'],
   ['Could not read the Open dashboard shortcut. Check chrome://extensions/shortcuts.', 'Не вдалося прочитати комбінацію для відкриття панелі. Перевірте chrome://extensions/shortcuts.'],
   ['Sessions left RUNNING or RECOVERING resume automatically when Chrome starts. PAUSED and STOPPED Sessions do not auto-resume.', 'Запущені сеанси та сеанси у відновленні автоматично продовжують роботу після запуску Chrome. Призупинені та зупинені сеанси автоматично не запускаються.'],
+  ['Rate-limit recovery', 'Відновлення після обмеження запитів'],
+  ['Fallback pause if “Too many requests” remains, minutes', 'Резервна пауза, якщо «Забагато запитів» не зникло, хвилини'],
+  ['The extension first presses “Understood” and immediately continues the same task in the same tab. This pause is used only if the blocking notice remains or returns after acknowledgement.', 'Спочатку розширення натискає «Зрозуміло» й одразу продовжує те саме завдання в тій самій вкладці. Ця пауза застосовується лише якщо повідомлення не зникло або знову повернулося після підтвердження.'],
+  ['Save fallback pause', 'Зберегти резервну паузу'],
+  ['Loading fallback pause.', 'Завантаження резервної паузи.'],
   ['Configuration file', 'Файл налаштувань'],
   ['Keep the extension installed. Give the JSON template to an AI or edit it elsewhere, then import the completed file here. Import changes only Sessions named by stable ids in the file; unrelated Sessions remain untouched.', 'Залиште розширення встановленим. Передайте шаблон JSON штучному інтелекту або заповніть його в іншому місці, а потім імпортуйте готовий файл тут. Імпорт змінює лише сеанси зі стабільними ідентифікаторами, указаними у файлі; інші сеанси не змінюються.'],
   ['Download blank configuration template', 'Завантажити порожній шаблон налаштувань'],
   ['Choose configuration JSON file', 'Вибрати JSON-файл налаштувань'],
   ['No configuration file selected.', 'Файл налаштувань не вибрано.'],
-  ['Import without starting', 'Імпортувати без запуску'],
-  ['Import and start requested Sessions', 'Імпортувати й запустити запитані сеанси'],
+  ['Import without starting (setup only)', 'Імпортувати БЕЗ ЗАПУСКУ (лише налаштувати)'],
+  ['Import and START ALL requested Sessions', 'Імпортувати + ЗАПУСТИТИ ВСІ позначені сеанси'],
   ['Export current Sessions to JSON', 'Експортувати поточні сеанси у JSON'],
   ['Session', 'Сеанс'],
   ['Configuration errors', 'Помилки налаштування'],
   ['Configuration', 'Налаштування'],
   ['Session name', 'Назва сеансу'],
+  ['Task configuration mode', 'Режим налаштування завдань'],
+  ['One ChatGPT link + one shared prompt', 'Одне посилання ChatGPT + один спільний промпт'],
+  ['One ChatGPT link + different prompts', 'Одне посилання ChatGPT + різні промпти'],
+  ['Different ChatGPT links + one shared prompt', 'Різні посилання ChatGPT + один спільний промпт'],
+  ['Different ChatGPT links + different prompts', 'Різні посилання ChatGPT + різні промпти'],
+  ['ChatGPT link used for every task', 'Посилання ChatGPT для всіх завдань'],
+  ['Shared prompt for every task', 'Спільний промпт для всіх завдань'],
+  ['Optional default for empty prompt editors', 'Необов’язковий промпт за замовчуванням для порожніх редакторів'],
+  ['Fill empty prompt editors with this text', 'Заповнити порожні редактори цим текстом'],
+  ['Tasks / cycles', 'Завдання / цикли'],
+  ['Number of tasks / cycles', 'Кількість завдань / циклів'],
+  ['Use the number spinner or type a value from 1 to 1000. Editors below are added or removed automatically.', 'Виберіть стрілками або введіть число від 1 до 1000. Редактори нижче додаються або прибираються автоматично.'],
+  ['Optional shortcut for modes with different links. Paste up to 1000 ChatGPT links; recognized links resize the task list automatically.', 'Необов’язкове масове вставлення для режимів із різними посиланнями. Можна вставити до 1000 посилань ChatGPT; список завдань змінить розмір автоматично.'],
   ['Prompt mode', 'Режим промптів'],
   ['One shared prompt for all tasks', 'Один спільний промпт для всіх завдань'],
   ['Unique prompt for each task', 'Окремий промпт для кожного завдання'],
@@ -80,9 +109,9 @@ const EXACT = new Map([
   ['Retry/backoff unit', 'Одиниця часу очікування'],
   ['Seconds', 'Секунди'],
   ['Minutes', 'Хвилини'],
-  ['Used after temporary failures and after the exact Too many requests acknowledgement. The Session resumes automatically when the saved wait expires.', 'Використовується після тимчасових помилок і після підтвердження повідомлення «Забагато запитів». Коли заданий час очікування мине, сеанс автоматично продовжить роботу.'],
+  ['Used only when the exact Too many requests notice remains or returns after acknowledgement. The Session retries automatically when the saved wait expires.', 'Використовується лише якщо точне повідомлення «Забагато запитів» не зникло або повернулося після підтвердження. Коли заданий час мине, сеанс автоматично повторить спробу.'],
   ['Retry policy', 'Політика повторних спроб'],
-  ['Bounded safe retries', 'Безпечні повторні спроби з обмеженням'],
+  ['Unattended automatic retries (recommended)', 'Безнаглядні автоматичні повтори (рекомендовано)'],
   ['Manual review after temporary failure', 'Ручна перевірка після тимчасової помилки'],
   ['Busy chat behavior', 'Поведінка, коли чат зайнятий'],
   ['Skip immediately to next enabled task', 'Одразу перейти до наступного увімкненого завдання'],
@@ -122,7 +151,6 @@ const EXACT = new Map([
   ['Delete', 'Видалити'],
   ['Task removed.', 'Завдання видалено.'],
   ['No valid ChatGPT links were recognized.', 'Не розпізнано жодного коректного посилання ChatGPT.'],
-  ['Configuration file is larger than 2 MB.', 'Файл налаштувань перевищує 2 МБ.'],
   ['Session name is required.', 'Вкажіть назву сеансу.'],
   ['Add at least one task.', 'Додайте щонайменше одне завдання.'],
   ['Shared prompt is required.', 'Вкажіть спільний промпт.'],
@@ -139,6 +167,10 @@ const EXACT = new Map([
   ['Shared prompt mode selected.', 'Вибрано режим спільного промпту.'],
   ['Unique prompt mode selected.', 'Вибрано режим окремих промптів.'],
   ['Session state', 'Стан сеансу'],
+  ['Successfully sent', 'Успішно надіслано'],
+  ['Completed tasks', 'Виконано завдань'],
+  ['Remaining tasks', 'Залишилось завдань'],
+  ['Completed time', 'Час завершення'],
   ['Current task', 'Поточне завдання'],
   ['Current task status', 'Стан поточного завдання'],
   ['Operation phase', 'Етап операції'],
@@ -162,6 +194,9 @@ const RUNTIME = [
   ['Session started after confirmed portable profile import', 'Сеанс запущено після підтвердженого імпорту переносного профілю'],
   ['Session created', 'Сеанс створено'],
   ['Session duplicated', 'Сеанс продубльовано'],
+  ['Session started; global pause cleared by explicit Start', 'Сеанс запущено; загальну паузу скасовано явною командою запуску'],
+  ['Session resumed; global pause cleared by explicit Resume', 'Сеанс продовжено; загальну паузу скасовано явною командою продовження'],
+  ['Master pause cleared by explicit session action; session remains paused unless explicitly started or resumed', 'Загальну паузу скасовано явною дією з сеансом; цей сеанс залишається призупиненим, доки його явно не запустять або не продовжать'],
   ['Session started', 'Сеанс запущено'],
   ['Session paused by master pause', 'Сеанс призупинено загальною паузою'],
   ['Session paused', 'Сеанс призупинено'],
@@ -170,6 +205,7 @@ const RUNTIME = [
   ['Session resumed', 'Сеанс продовжено'],
   ['Session stopped; unresolved operation preserved', 'Сеанс зупинено; дані незавершеної операції збережено'],
   ['Session stopped', 'Сеанс зупинено'],
+  ['Session completed all enabled one-pass tasks', 'Сеанс завершено: усі увімкнені завдання одного проходу виконано'],
   ['Session remains paused for manual review after master resume', 'Сеанс залишається призупиненим: потрібна ручна перевірка'],
   ['Another active or unresolved session already owns one of these ChatGPT conversations', 'Інший активний або незавершений сеанс уже використовує один із цих чатів ChatGPT'],
   ['Resolve the uncertain send operation before starting', 'Спочатку розв’яжіть невизначений результат попереднього відправлення'],
@@ -180,6 +216,7 @@ const RUNTIME = [
   ['Session is already active', 'Сеанс уже активний'],
   ['Only an active session can be paused', 'Призупинити можна лише активний сеанс'],
   ['Only a paused session can be resumed', 'Продовжити можна лише призупинений сеанс'],
+  ['Pause or stop the session and resolve uncertain work before deleting', 'Перед видаленням призупиніть або зупиніть активний сеанс і розв’яжіть невизначене надсилання'],
   ['Profile send arbiter is busy', 'Механізм черги відправлень профілю зайнятий'],
   ['Automatic execution is unavailable', 'Автоматичне виконання недоступне'],
   ['Resume the extension before importing with automatic start', 'Перед імпортом з автоматичним запуском продовжте роботу розширення'],
@@ -234,11 +271,17 @@ export function translateText(value) {
   if ((m = text.match(/^Session: (.+)$/))) return `${leading}Сеанс: ${m[1]}${trailing}`;
   if ((m = text.match(/^State: ([A-Z_]+)\.$/))) return `${leading}Стан: ${STATE[m[1]] || m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) enabled tasks\.$/))) return `${leading}Увімкнених завдань: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^Successfully sent: (\d+)\. Completed: (\d+)\/(\d+)\. Remaining: (\d+)\.$/))) return `${leading}Успішно надіслано: ${m[1]}. Виконано: ${m[2]}/${m[3]}. Залишилось: ${m[4]}.${trailing}`;
+  if ((m = text.match(/^Sessions: (\d+)\. Running: (\d+)\. Completed: (\d+)\. Paused: (\d+)\. Errors: (\d+)\. Successfully sent total: (\d+)\.$/))) return `${leading}Сеансів: ${m[1]}. Працює: ${m[2]}. Завершено: ${m[3]}. Призупинено: ${m[4]}. Помилок: ${m[5]}. Успішно надіслано загалом: ${m[6]}.${trailing}`;
   if ((m = text.match(/^Open dashboard shortcut: (.+)\.$/))) return `${leading}Комбінація для відкриття панелі: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^Current fallback rate-limit pause: (\d+) minutes?\.$/))) return `${leading}Поточна резервна пауза після обмеження: ${m[1]} хв.${trailing}`;
+  if ((m = text.match(/^Saved fallback: if “Too many requests” remains after acknowledgement, this Chrome profile waits (\d+) minutes? and then retries automatically\.$/))) return `${leading}Збережено резервну паузу: якщо «Забагато запитів» лишається після підтвердження, цей Chrome-профіль чекає ${m[1]} хв і автоматично повторює спробу.${trailing}`;
+  if ((m = text.match(/^Could not load fallback rate-limit pause: (.+)$/))) return `${leading}Не вдалося завантажити паузу після обмеження: ${runtimeText(m[1])}${trailing}`;
+  if ((m = text.match(/^Could not save fallback rate-limit pause: (.+)$/))) return `${leading}Не вдалося зберегти паузу після обмеження: ${runtimeText(m[1])}${trailing}`;
 
   if ((m = text.match(/^Task (\d+) URL is required\.$/))) return `${leading}Для завдання ${m[1]} потрібно вказати посилання.${trailing}`;
   if ((m = text.match(/^Task (\d+) must use a valid https:\/\/chatgpt\.com URL\.$/))) return `${leading}Для завдання ${m[1]} потрібно вказати коректне посилання https://chatgpt.com.${trailing}`;
-  if ((m = text.match(/^Prompt for Task (\d+) is required in unique mode\.$/))) return `${leading}У режимі окремих промптів для завдання ${m[1]} потрібно вказати промпт.${trailing}`;
+  if ((m = text.match(/^Prompt for Task (\d+) is required(?: in unique mode)?\.$/))) return `${leading}У режимі окремих промптів для завдання ${m[1]} потрібно вказати промпт.${trailing}`;
   if ((m = text.match(/^Prompt for Task (\d+)$/))) return `${leading}Промпт для завдання ${m[1]}${trailing}`;
   if ((m = text.match(/^Remove Task (\d+)$/))) return `${leading}Видалити завдання ${m[1]}${trailing}`;
   if ((m = text.match(/^Task (\d+) added\.$/))) return `${leading}Додано завдання ${m[1]}.${trailing}`;
@@ -249,11 +292,14 @@ export function translateText(value) {
 
   if ((m = text.match(/^Task limit reached: 50\.$/))) return `${leading}Досягнуто межі: 50 завдань.${trailing}`;
   if ((m = text.match(/^Up to 50 tasks per session\. (\d+) configured\.$/))) return `${leading}До 50 завдань у сеансі. Налаштовано: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^(\d+) task\(s\) will use the same ChatGPT link and the same prompt\. No per-task editors are needed\.$/))) return `${leading}${m[1]} завдань/циклів використовуватимуть одне посилання ChatGPT і один промпт. Окремі редактори не потрібні.${trailing}`;
+  if ((m = text.match(/^(\d+) task editor(?:s)? configured automatically\.$/))) return `${leading}Автоматично налаштовано редакторів завдань: ${m[1]}.${trailing}`;
+  if ((m = text.match(/^(\d+) tasks? configured\.$/))) return `${leading}Налаштовано завдань/циклів: ${m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) configuration errors?\.$/))) return `${leading}Помилок налаштування: ${m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) Core log entr(?:y|ies) shown\.$/))) return `${leading}Показано записів журналу: ${m[1]}.${trailing}`;
   if ((m = text.match(/^(\d+) of (\d+) Core log entr(?:y|ies) shown\.$/))) return `${leading}Показано ${m[1]} із ${m[2]} записів журналу.${trailing}`;
-  if ((m = text.match(/^(\d+) unique ChatGPT link\(s\) recognized; (\d+) new task\(s\) created\.(?: (\d+) link\(s\) did not fit the 50-task limit\.)?$/))) {
-    const truncated = m[3] ? ` Не вмістилося через обмеження у 50 завдань: ${m[3]}.` : '';
+  if ((m = text.match(/^(\d+) unique ChatGPT link\(s\) recognized; (\d+) new task\(s\) created\.(?: (\d+) link\(s\) did not fit the (?:50|1000)-task limit\.)?$/))) {
+    const truncated = m[3] ? ` Не вмістилося через обмеження у 1000 завдань: ${m[3]}.` : '';
     return `${leading}Розпізнано унікальних посилань ChatGPT: ${m[1]}; створено нових завдань: ${m[2]}.${truncated}${trailing}`;
   }
   if ((m = text.match(/^Profile (.+): (\d+) Session\(s\), (\d+) Task\(s\), (\d+) marked for automatic start\.$/))) return `${leading}Профіль ${m[1]}: сеансів — ${m[2]}, завдань — ${m[3]}, позначено для автоматичного запуску — ${m[4]}.${trailing}`;

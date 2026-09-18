@@ -5,6 +5,17 @@
   const adapter = root.ChatGPTInteractionAdapter;
   if (!runtime?.onMessage || !adapter?.execute) return;
 
+  const listenerKey = '__CHATGPT_AUTOPILOT_INTERACTION_LISTENER__';
+  const existing = root[listenerKey];
+  if (existing?.runtime === runtime) {
+    try {
+      if (!runtime.onMessage.hasListener || runtime.onMessage.hasListener(existing.listener)) return;
+    } catch (_) {
+      // A stale extension runtime can throw after an unpacked extension reload.
+      // Continue and install one listener through the current runtime object.
+    }
+  }
+
   const SEND_COMPAT_MODES = new Set(['PREPARE_SEND', 'SUBMIT_EXISTING', 'INSERT_AND_SEND']);
   const SEND_LABELS = new Set([
     'send',
@@ -77,18 +88,11 @@
 
   function isWhitelistedRateLimitNotice(text) {
     const ukrainian = includesAny(text, ['забагато запитів', 'занадто багато запитів'])
-      && includesAny(text, [
-        'надсилаєте запити надто швидко',
-        'надсилаєте запити занадто швидко',
-        'запити надсилаються надто швидко',
-        'запити надсилаються занадто швидко',
-      ])
-      && includesAny(text, ['тимчасово обмежили доступ', 'тимчасово обмежено доступ'])
-      && includesAny(text, ['зачекайте кілька хвилин', 'спробуйте ще раз через кілька хвилин']);
+      && includesAny(text, ['зачекайте кілька хвилин', 'спробуйте ще раз через кілька хвилин'])
+      && includesAny(text, ['тимчасово обмежили доступ', 'тимчасово обмежено доступ']);
     const english = text.includes('too many requests')
-      && text.includes('requests too quickly')
-      && text.includes('temporarily limited access to your conversations')
-      && text.includes('wait a few minutes');
+      && includesAny(text, ['wait a few minutes', 'try again in a few minutes'])
+      && includesAny(text, ['temporarily limited access', 'temporarily limited']);
     return ukrainian || english;
   }
 
@@ -112,11 +116,21 @@
     if (dialogs.length !== 1 || matches.length !== 1) return false;
 
     const dialog = matches[0];
-    const buttons = Array.from(dialog.querySelectorAll?.('button, [role="button"]') || [])
+    let buttons = Array.from(dialog.querySelectorAll?.('button, [role="button"]') || [])
       .filter(isVisibleControl)
       .filter(isWhitelistedAcknowledgeButton);
+
+    // Some ChatGPT builds render the acknowledgement control in a portal adjacent
+    // to the dialog rather than as a DOM child. Accept it only when there is one
+    // exact visible acknowledgement control on the page and one verified rate-limit dialog.
+    if (buttons.length === 0) {
+      buttons = Array.from(doc.querySelectorAll('button, [role="button"]') || [])
+        .filter(isVisibleControl)
+        .filter(isWhitelistedAcknowledgeButton);
+    }
     if (buttons.length !== 1) return false;
 
+    try { buttons[0].focus?.(); } catch (_) {}
     buttons[0].click();
     return true;
   }
@@ -243,7 +257,7 @@
     return () => {};
   }
 
-  runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  const listener = (message, _sender, sendResponse) => {
     if (message?.channel !== 'autopilot-interaction') return false;
 
     Promise.resolve()
@@ -251,17 +265,52 @@
         const request = message.request || {};
         const dismissed = dismissWhitelistedRateLimitNotice(root.document);
         if (dismissed) {
-          return {
-            status: 'RATE_LIMITED',
-            requestId: request.requestId || null,
-            taskId: request.taskId || null,
-            safeDiagnosticCode: 'RATE_LIMIT_DIALOG_ACKNOWLEDGED',
-          };
+          // The exact ChatGPT informational notice is an acknowledgement gate, not
+          // automatically a failed task. Keep the current extension-owned tab and
+          // continue the SAME interaction request as soon as the dialog disappears.
+          // Only fall back to Core's configurable account-wide cooldown when the
+          // notice stubbornly remains visible after acknowledgement.
+          const deadline = Date.now() + 2000;
+          let stillBlocked = false;
+          do {
+            const dialogs = Array.from(root.document?.querySelectorAll?.(
+              '[role="dialog"], dialog, [role="alertdialog"], [aria-modal="true"]'
+            ) || []).filter(isVisibleControl);
+            stillBlocked = dialogs.some((dialog) => isWhitelistedRateLimitNotice(elementText(dialog)));
+            if (!stillBlocked || Date.now() >= deadline) break;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          } while (true);
+
+          if (stillBlocked) {
+            return {
+              status: 'RATE_LIMITED',
+              requestId: request.requestId || null,
+              taskId: request.taskId || null,
+              safeDiagnosticCode: 'RATE_LIMIT_DIALOG_ACKNOWLEDGED_BUT_STILL_VISIBLE',
+            };
+          }
         }
 
         const restoreSendIdentity = await prepareSendControlCompatibility(root.document, request.mode);
         try {
-          return await adapter.execute(request);
+          const nativeInput = async (kind, point = {}) => {
+            const response = await runtime.sendMessage({
+              channel: 'autopilot-native-input',
+              kind,
+              requestId: request.requestId,
+              taskId: request.taskId,
+              ...point,
+            });
+            if (!response?.ok) {
+              const error = new Error('Chrome native input failed');
+              error.safeDiagnosticCode = response?.error?.safeDiagnosticCode || 'NATIVE_INPUT_FAILED';
+              throw error;
+            }
+          };
+          return await adapter.execute(request, {
+            insert: () => nativeInput('insert'),
+            submit: point => nativeInput('submit', point),
+          });
         } finally {
           restoreSendIdentity();
         }
@@ -276,5 +325,8 @@
         },
       }));
     return true;
-  });
+  };
+
+  runtime.onMessage.addListener(listener);
+  root[listenerKey] = { runtime, listener };
 })(globalThis);

@@ -2,17 +2,18 @@ name: UI accessibility contract tests
 
 on:
   push:
-    branches: ["a3/ui-nvda-v0.1"]
+    branches: ["main", "source/0.9.19-canonical-convergence"]
     paths:
       - "src/ui/**"
-      - "tests/ui/**"
+      - "tests-regression/ui/**"
       - "package.json"
       - ".github/workflows/ui-tests.yml"
   pull_request:
     paths:
       - "src/ui/**"
-      - "tests/ui/**"
+      - "tests-regression/ui/**"
       - "package.json"
+      - ".github/workflows/ui-tests.yml"
 
 permissions:
   contents: read

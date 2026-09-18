@@ -1,0 +1,544 @@
+import { OrchestrationV2Controller, ORCHESTRATION_V2_ALARM } from './orchestration-v2-controller.js';
+import {
+  ORCHESTRATION_CONFIG_STORAGE_KEY,
+  ORCHESTRATION_RUNTIME_STORAGE_KEY,
+  OrchestrationConfigRepository,
+  OrchestrationRuntimeRepository,
+} from './orchestration-v2-storage.js';
+import { validateOrchestrationConfig } from './orchestration-v2.js';
+import { OperationPhase, RunState } from './schema.js';
+import { importOrchestrationProfile, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+
+export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
+export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
+const MANAGER_SCHEMA_VERSION = 1;
+const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
+const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
+
+function clone(value) { return structuredClone(value); }
+function text(value) { return typeof value === 'string' ? value.trim() : ''; }
+function safeName(value, fallback = 'Оркестр') { return text(value).slice(0, 120) || fallback; }
+function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
+function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
+function alarmName(id) { return `${ORCHESTRATION_V2_ALARM_PREFIX}${id}`; }
+function isUnresolvedOperation(session) { return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase)); }
+function isManagedSession(session, projectId) {
+  return (session?.orchestrationWorker?.managed && session.orchestrationWorker.projectId === projectId)
+    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId);
+}
+function identityChanged(a, b) {
+  return a.projectId !== b.projectId
+    || a.targetRepository !== b.targetRepository
+    || a.controlRepository !== b.controlRepository
+    || a.controlIssueNumber !== b.controlIssueNumber
+    || a.controlCommentId !== b.controlCommentId
+    || a.coordinatorAgentProviderId !== b.coordinatorAgentProviderId
+    || a.workerAgentProviderId !== b.workerAgentProviderId
+    || a.coordinatorLaunchUrl !== b.coordinatorLaunchUrl;
+}
+function freshMeta() { return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
+function normalizeMeta(raw) {
+  if (!raw || raw.schemaVersion !== MANAGER_SCHEMA_VERSION || !Array.isArray(raw.order) || typeof raw.byId !== 'object') return freshMeta();
+  const byId = {};
+  const order = [];
+  for (const id of raw.order) {
+    if (typeof id !== 'string' || !id || !raw.byId[id] || byId[id]) continue;
+    const item = raw.byId[id];
+    byId[id] = {
+      id,
+      name: safeName(item.name, 'Оркестр'),
+      ownerPaused: item.ownerPaused === true,
+      pausedSessionIds: Array.isArray(item.pausedSessionIds) ? [...new Set(item.pausedSessionIds.filter(v => typeof v === 'string'))] : [],
+      createdAt: Math.max(0, Number(item.createdAt || 0)),
+      updatedAt: Math.max(0, Number(item.updatedAt || 0)),
+    };
+    order.push(id);
+  }
+  return { schemaVersion: MANAGER_SCHEMA_VERSION, selectedId: byId[raw.selectedId] ? raw.selectedId : (order[0] || ''), order, byId };
+}
+
+export class OrchestrationV2Manager {
+  constructor({ coreRepository, chromeApi, fetchFn = globalThis.fetch, collectAssistantReport = null, now = () => Date.now(), createId = null } = {}) {
+    if (!coreRepository || !chromeApi?.storage?.local) throw new Error('Orchestration V2 manager dependencies are required');
+    this.coreRepository = coreRepository;
+    this.chrome = chromeApi;
+    this.fetchFn = fetchFn;
+    this.collectAssistantReport = collectAssistantReport;
+    this.now = now;
+    this.createId = createId || (() => `orch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+    this.controllers = new Map();
+    this.updateChain = Promise.resolve();
+    this.migrationBarrier = null;
+  }
+
+  async loadMeta({ migrate = true } = {}) {
+    if (migrate) await this.ensureMigrated();
+    const result = await this.chrome.storage.local.get(ORCHESTRATION_V2_MANAGER_STORAGE_KEY);
+    return normalizeMeta(result?.[ORCHESTRATION_V2_MANAGER_STORAGE_KEY]);
+  }
+
+  async saveMeta(meta) {
+    const normalized = normalizeMeta(meta);
+    await this.chrome.storage.local.set({ [ORCHESTRATION_V2_MANAGER_STORAGE_KEY]: normalized });
+    return normalized;
+  }
+
+  updateMeta(mutator) {
+    const operation = this.updateChain.then(async () => {
+      await this.ensureMigrated();
+      const meta = await this.loadMeta({ migrate: false });
+      const updated = await mutator(meta) || meta;
+      return this.saveMeta(updated);
+    });
+    this.updateChain = operation.catch(() => undefined);
+    return operation;
+  }
+
+  ensureMigrated() {
+    if (this.migrationBarrier) return this.migrationBarrier;
+    this.migrationBarrier = (async () => {
+      const current = await this.chrome.storage.local.get([ORCHESTRATION_V2_MANAGER_STORAGE_KEY, ORCHESTRATION_CONFIG_STORAGE_KEY, ORCHESTRATION_RUNTIME_STORAGE_KEY]);
+      if (current?.[ORCHESTRATION_V2_MANAGER_STORAGE_KEY]) return;
+      const legacyConfig = current?.[ORCHESTRATION_CONFIG_STORAGE_KEY];
+      const legacyRuntime = current?.[ORCHESTRATION_RUNTIME_STORAGE_KEY];
+      if (!legacyConfig && !legacyRuntime) {
+        await this.saveMeta(freshMeta());
+        return;
+      }
+      const id = 'legacy-default';
+      const nowMs = this.now();
+      const meta = freshMeta();
+      meta.order = [id];
+      meta.selectedId = id;
+      meta.byId[id] = { id, name: safeName(legacyConfig?.projectId, 'Оркестр 1'), ownerPaused: false, pausedSessionIds: [], createdAt: nowMs, updatedAt: nowMs };
+      const payload = { [ORCHESTRATION_V2_MANAGER_STORAGE_KEY]: meta };
+      if (legacyConfig) payload[configKey(id)] = legacyConfig;
+      if (legacyRuntime) payload[runtimeKey(id)] = legacyRuntime;
+      await this.chrome.storage.local.set(payload);
+    })().finally(() => { this.migrationBarrier = null; });
+    return this.migrationBarrier;
+  }
+
+  controllerFor(id) {
+    if (!id) throw new Error('No orchestra selected.');
+    if (this.controllers.has(id)) return this.controllers.get(id);
+    const configRepository = new OrchestrationConfigRepository(this.chrome, { storageKey: configKey(id) });
+    const runtimeRepository = new OrchestrationRuntimeRepository(this.chrome, configRepository, { now: this.now, storageKey: runtimeKey(id) });
+    const controller = new OrchestrationV2Controller({
+      coreRepository: this.coreRepository,
+      chromeApi: this.chrome,
+      fetchFn: this.fetchFn,
+      collectAssistantReport: this.collectAssistantReport,
+      now: this.now,
+      configRepository,
+      runtimeRepository,
+      alarmName: alarmName(id),
+    });
+    this.controllers.set(id, controller);
+    return controller;
+  }
+
+  async selectedRecord() {
+    const meta = await this.loadMeta();
+    return meta.selectedId ? meta.byId[meta.selectedId] : null;
+  }
+
+  async list() {
+    const meta = await this.loadMeta();
+    const out = [];
+    for (const id of meta.order) {
+      const record = meta.byId[id];
+      const status = await this.controllerFor(id).getStatus();
+      out.push({ id, name: record.name, ownerPaused: record.ownerPaused, selected: id === meta.selectedId, config: status.config, runtime: status.runtime });
+    }
+    return { selectedId: meta.selectedId, orchestras: out };
+  }
+
+  async getStatus(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) {
+      return { selectedId: '', orchestra: null, orchestras: [], config: validateOrchestrationConfig({}), runtime: null, ownerPaused: false };
+    }
+    const status = await this.controllerFor(orchestraId).getStatus();
+    return {
+      selectedId: orchestraId,
+      orchestra: { ...clone(meta.byId[orchestraId]), selected: orchestraId === meta.selectedId },
+      orchestras: meta.order.map(itemId => ({ ...clone(meta.byId[itemId]), selected: itemId === meta.selectedId })),
+      ...status,
+      ownerPaused: meta.byId[orchestraId].ownerPaused,
+    };
+  }
+
+  async create({ name = 'Новий оркестр', config = null, select = true } = {}) {
+    const id = this.createId();
+    if (!/^[A-Za-z0-9._-]+$/u.test(id)) throw new Error('Invalid orchestra id');
+    const nowMs = this.now();
+    await this.updateMeta(meta => {
+      if (meta.byId[id]) throw new Error('Orchestra id already exists');
+      meta.byId[id] = { id, name: safeName(name), ownerPaused: false, pausedSessionIds: [], createdAt: nowMs, updatedAt: nowMs };
+      meta.order.push(id);
+      if (select || !meta.selectedId) meta.selectedId = id;
+      return meta;
+    });
+    if (config) {
+      try {
+        await this.updateConfig({ ...config, enabled: false }, id);
+      } catch (error) {
+        await this.chrome.storage.local.remove?.([configKey(id), runtimeKey(id)]);
+        this.controllers.delete(id);
+        await this.updateMeta(meta => {
+          delete meta.byId[id];
+          meta.order = meta.order.filter(value => value !== id);
+          if (meta.selectedId === id) meta.selectedId = meta.order[0] || '';
+          return meta;
+        });
+        throw error;
+      }
+    }
+    return this.getStatus(id);
+  }
+
+  async select(id) {
+    await this.updateMeta(meta => {
+      if (!meta.byId[id]) throw new Error('Orchestra not found');
+      meta.selectedId = id;
+      return meta;
+    });
+    return this.getStatus(id);
+  }
+
+  async rename(id, name) {
+    await this.updateMeta(meta => {
+      if (!meta.byId[id]) throw new Error('Orchestra not found');
+      meta.byId[id].name = safeName(name);
+      meta.byId[id].updatedAt = this.now();
+      return meta;
+    });
+    return this.getStatus(id);
+  }
+
+  async managedCoreSafety(projectId) {
+    const state = await this.coreRepository.load();
+    const managed = Object.values(state.sessionsById || {}).filter(session => isManagedSession(session, projectId));
+    return {
+      managed,
+      unresolved: managed.filter(isUnresolvedOperation),
+      live: managed.filter(session => [RunState.RUNNING, RunState.RECOVERING].includes(session.runState)),
+    };
+  }
+
+  async pause(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
+    const controller = this.controllerFor(orchestraId);
+    const { config } = await controller.getStatus();
+    const pausedSessionIds = [];
+    await this.coreRepository.update(state => {
+      for (const session of Object.values(state.sessionsById || {})) {
+        if (!isManagedSession(session, config.projectId)) continue;
+        if ([RunState.RUNNING, RunState.RECOVERING].includes(session.runState)) {
+          session.enabled = false;
+          session.runState = RunState.PAUSED;
+          pausedSessionIds.push(session.id);
+        }
+      }
+      return state;
+    });
+    await this.updateMeta(draft => {
+      const item = draft.byId[orchestraId];
+      item.ownerPaused = true;
+      item.pausedSessionIds = [...new Set([...(item.pausedSessionIds || []), ...pausedSessionIds])];
+      item.updatedAt = this.now();
+      return draft;
+    });
+    await this.chrome.alarms?.clear?.(alarmName(orchestraId));
+    return this.getStatus(orchestraId);
+  }
+
+  async resume(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    const item = meta.byId[orchestraId];
+    if (!item) throw new Error('Orchestra not found');
+    const controller = this.controllerFor(orchestraId);
+    const { config } = await controller.getStatus();
+    const resumeIds = new Set(item.pausedSessionIds || []);
+    await this.coreRepository.update(state => {
+      for (const session of Object.values(state.sessionsById || {})) {
+        if (!resumeIds.has(session.id) || !isManagedSession(session, config.projectId)) continue;
+        session.enabled = true;
+        if (session.runState === RunState.PAUSED) session.runState = RunState.RECOVERING;
+      }
+      return state;
+    });
+    await this.updateMeta(draft => {
+      const current = draft.byId[orchestraId];
+      current.ownerPaused = false;
+      current.pausedSessionIds = [];
+      current.updatedAt = this.now();
+      return draft;
+    });
+    if (config.enabled) {
+      await controller.enqueueRecoveryEvent({ detail: 'Owner-local pause ended; reconcile live external truth.' });
+      await controller.cycle({ nowMs: this.now() });
+    }
+    await controller.reconcileAlarm();
+    return this.getStatus(orchestraId);
+  }
+
+  async assertSafeIdentityChange(id, currentConfig) {
+    const controller = this.controllerFor(id);
+    const runtime = await controller.runtimeRepository.load();
+    const safety = await this.managedCoreSafety(currentConfig.projectId);
+    const liveWorker = (runtime.workerOrder || []).some(workerId => LIVE_WORKER_STATES.has(runtime.workersById?.[workerId]?.state));
+    if (safety.unresolved.length || runtime.coordinator?.lease || liveWorker || safety.live.length) {
+      throw new Error('Pause is active, but identity cannot change while unresolved Send, active Coordinator or live worker state remains.');
+    }
+  }
+
+  async assertUniqueProjectId(meta, orchestraId, projectId) {
+    const normalized = text(projectId);
+    if (!normalized) return;
+    for (const otherId of meta.order || []) {
+      if (otherId === orchestraId) continue;
+      const otherConfig = await this.controllerFor(otherId).configRepository.load();
+      if (text(otherConfig.projectId) === normalized) {
+        throw new Error(`Project ID ${normalized} is already used by orchestra ${meta.byId[otherId]?.name || otherId}.`);
+      }
+    }
+  }
+
+  async updateConfig(raw, id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    const item = meta.byId[orchestraId];
+    if (!item) throw new Error('Create or select an orchestra first.');
+    const controller = this.controllerFor(orchestraId);
+    const current = await controller.configRepository.load();
+    const next = validateOrchestrationConfig(raw);
+    await this.assertUniqueProjectId(meta, orchestraId, next.projectId);
+    const changed = identityChanged(current, next);
+    if (changed && current.enabled && !item.ownerPaused) {
+      throw new Error('Pause the orchestra before changing project/repository/provider/Coordinator identity.');
+    }
+    if (changed && item.ownerPaused) {
+      await this.assertSafeIdentityChange(orchestraId, current);
+      if (current.projectId && current.projectId !== next.projectId) {
+        await this.coreRepository.update(state => {
+          for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
+            if (!isManagedSession(session, current.projectId)) continue;
+            if (isUnresolvedOperation(session)) throw new Error('Unresolved Send prevents project identity change.');
+            delete state.sessionsById[sessionId];
+            state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
+          }
+          return state;
+        });
+      }
+      await controller.configRepository.save(next);
+      await controller.runtimeRepository.reset();
+      await this.chrome.alarms?.clear?.(alarmName(orchestraId));
+    } else {
+      await controller.updateConfig(next);
+    }
+    return this.getStatus(orchestraId);
+  }
+
+  async start(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    const item = meta.byId[orchestraId];
+    if (!item) throw new Error('Orchestra not found');
+    if (item.ownerPaused) throw new Error('Orchestra is locally paused. Use Resume instead of Start.');
+    const controller = this.controllerFor(orchestraId);
+    const current = await controller.configRepository.load();
+    if (!current.enabled) await controller.updateConfig({ ...current, enabled: true });
+    const cycle = await controller.cycle({ nowMs: this.now() });
+    return { ...(await this.getStatus(orchestraId)), startCycle: cycle };
+  }
+
+  async delete(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    const item = meta.byId[orchestraId];
+    if (!item) throw new Error('Orchestra not found');
+    const controller = this.controllerFor(orchestraId);
+    const { config } = await controller.getStatus();
+    const runtime = await controller.runtimeRepository.load();
+    const safety = await this.managedCoreSafety(config.projectId);
+    const liveWorker = (runtime.workerOrder || []).some(workerId => LIVE_WORKER_STATES.has(runtime.workersById?.[workerId]?.state));
+    if (safety.unresolved.length || runtime.coordinator?.lease || liveWorker || safety.live.length) {
+      throw new Error('Cannot delete orchestra while unresolved Send, active Coordinator or live worker state remains. Pause/stop and reconcile first.');
+    }
+    await this.coreRepository.update(state => {
+      for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
+        if (!isManagedSession(session, config.projectId)) continue;
+        delete state.sessionsById[sessionId];
+        state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
+      }
+      return state;
+    });
+    await this.chrome.alarms?.clear?.(alarmName(orchestraId));
+    await this.chrome.storage.local.remove?.([configKey(orchestraId), runtimeKey(orchestraId)]);
+    this.controllers.delete(orchestraId);
+    await this.updateMeta(draft => {
+      delete draft.byId[orchestraId];
+      draft.order = draft.order.filter(value => value !== orchestraId);
+      if (draft.selectedId === orchestraId) draft.selectedId = draft.order[0] || '';
+      return draft;
+    });
+    return this.getStatus();
+  }
+
+  async selectedController() {
+    const meta = await this.loadMeta();
+    if (!meta.selectedId || !meta.byId[meta.selectedId]) throw new Error('Create or select an orchestra first.');
+    return { id: meta.selectedId, item: meta.byId[meta.selectedId], controller: this.controllerFor(meta.selectedId) };
+  }
+
+  async previewProfile(profile) { return previewOrchestrationProfile(profile); }
+  async exportProfile(name = 'Orchestration') { return this.selectedController().then(({ controller }) => controller.exportProfile(name)); }
+  async importProfile(profile) {
+    const imported = importOrchestrationProfile(profile);
+    let selected;
+
+    // 0.9.7 invariant: importing a profile for an already-known project selects
+    // that orchestra instead of mutating/creating a different selected one.
+    if (imported.projectId) {
+      const meta = await this.loadMeta();
+      for (const id of meta.order) {
+        const candidate = this.controllerFor(id);
+        const candidateConfig = await candidate.configRepository.load();
+        if (candidateConfig.projectId === imported.projectId) {
+          await this.select(id);
+          selected = await this.selectedController();
+          break;
+        }
+      }
+    }
+
+    if (!selected) {
+      try {
+        selected = await this.selectedController();
+      } catch {
+        await this.create({ name: profile?.name || 'Імпортований оркестр' });
+        selected = await this.selectedController();
+      }
+    }
+    let current = await selected.controller.configRepository.load();
+
+    // A profile for a different project is normally a new orchestra, not an
+    // in-place mutation of a live/legacy runtime. This is especially important
+    // for clean-control migrations: old coordinator leases, control revisions,
+    // exact-once indexes and unresolved Send evidence must not leak into the
+    // newly imported project. An explicit owner-paused orchestra still permits
+    // deliberate in-place identity rebind through the existing safe path.
+    if (!selected.item.ownerPaused
+        && current.projectId
+        && imported.projectId
+        && current.projectId !== imported.projectId) {
+      await this.create({ name: profile?.name || 'Імпортований оркестр' });
+      selected = await this.selectedController();
+      current = await selected.controller.configRepository.load();
+    }
+
+    if (current.enabled && !selected.item.ownerPaused) {
+      throw new Error('Pause the orchestra before importing configuration.');
+    }
+    const status = await this.updateConfig({ ...imported, enabled: false }, selected.id);
+    return { config: status.config, preview: previewOrchestrationProfile(profile), status };
+  }
+  async testControl(settings = null) { return this.selectedController().then(({ controller }) => controller.testControl(settings)); }
+
+  async cycleSelected() {
+    const { id, item, controller } = await this.selectedController();
+    if (item.ownerPaused) return { kind: 'OWNER_PAUSED', orchestraId: id };
+    return controller.cycle();
+  }
+
+  async cycleAll() {
+    const meta = await this.loadMeta();
+    const results = [];
+    for (const id of meta.order) {
+      if (meta.byId[id].ownerPaused) { results.push({ id, kind: 'OWNER_PAUSED' }); continue; }
+      results.push({ id, result: await this.controllerFor(id).cycle() });
+    }
+    return { kind: 'MANAGER_CYCLE', results };
+  }
+
+  async syncAfterCoreCycle() {
+    const meta = await this.loadMeta();
+    const results = [];
+    for (const id of meta.order) {
+      if (meta.byId[id].ownerPaused) { results.push({ id, kind: 'OWNER_PAUSED' }); continue; }
+      results.push({ id, result: await this.controllerFor(id).syncAfterCoreCycle() });
+    }
+    return { kind: 'MANAGER_SYNC', results };
+  }
+
+  async reconcileAlarm() {
+    const meta = await this.loadMeta();
+    const results = [];
+    for (const id of meta.order) {
+      if (meta.byId[id].ownerPaused) { await this.chrome.alarms?.clear?.(alarmName(id)); results.push({ id, wakeAt: 0 }); continue; }
+      results.push({ id, wakeAt: await this.controllerFor(id).reconcileAlarm() });
+    }
+    return results;
+  }
+
+  isAlarm(name) { return typeof name === 'string' && name.startsWith(ORCHESTRATION_V2_ALARM_PREFIX); }
+  async cycleAlarm(name) {
+    if (!this.isAlarm(name)) return { kind: 'IGNORED' };
+    const id = name.slice(ORCHESTRATION_V2_ALARM_PREFIX.length);
+    const meta = await this.loadMeta();
+    if (!meta.byId[id]) { await this.chrome.alarms?.clear?.(name); return { kind: 'ORPHAN_ALARM' }; }
+    if (meta.byId[id].ownerPaused) return { kind: 'OWNER_PAUSED', orchestraId: id };
+    return this.controllerFor(id).cycle();
+  }
+
+  async emergencyStop(id = '') {
+    const meta = await this.loadMeta();
+    const orchestraId = id || meta.selectedId;
+    if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
+
+    // STOP is a safety boundary and must not depend on successfully normalizing a
+    // possibly-corrupt runtime. Revoke future authority in raw durable storage
+    // first, then best-effort repair/read status. Preserve every other runtime
+    // field so unresolved exact-once Send evidence is never erased by STOP.
+    const keys = [configKey(orchestraId), runtimeKey(orchestraId)];
+    const raw = await this.chrome.storage.local.get(keys);
+    const rawConfig = raw?.[configKey(orchestraId)] && typeof raw[configKey(orchestraId)] === 'object'
+      ? clone(raw[configKey(orchestraId)]) : {};
+    const disabledConfig = { ...rawConfig, enabled: false };
+    const payload = { [configKey(orchestraId)]: disabledConfig };
+    const rawRuntime = raw?.[runtimeKey(orchestraId)];
+    if (rawRuntime && typeof rawRuntime === 'object') {
+      const stoppedRuntime = clone(rawRuntime);
+      stoppedRuntime.mode = 'PAUSE';
+      stoppedRuntime.desiredActiveWorkers = 0;
+      if (stoppedRuntime.coordinator && typeof stoppedRuntime.coordinator === 'object') {
+        stoppedRuntime.coordinator.rotationRequested = false;
+      }
+      payload[runtimeKey(orchestraId)] = stoppedRuntime;
+    }
+    await this.chrome.storage.local.set(payload);
+
+    const projectId = text(rawConfig.projectId);
+    if (projectId) {
+      await this.coreRepository.update(state => {
+        for (const session of Object.values(state.sessionsById || {})) {
+          if (!isManagedSession(session, projectId)) continue;
+          session.enabled = false;
+          if (!isUnresolvedOperation(session)) session.runState = RunState.STOPPED;
+        }
+        return state;
+      });
+    }
+    await this.chrome.alarms?.clear?.(alarmName(orchestraId));
+
+    let status = null;
+    try { status = await this.getStatus(orchestraId); } catch (_) { /* safety action already persisted */ }
+    return { config: status?.config || disabledConfig, status, emergencyStopped: true };
+  }
+}
