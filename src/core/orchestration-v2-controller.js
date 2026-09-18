@@ -49,6 +49,7 @@ import {
   materializeHierarchyActionsIntoCore,
   preparedHierarchyActions,
   projectHierarchyDeliveryEventsFromCore,
+  syncHierarchyScopeStatesIntoCore,
 } from './orchestration-hierarchy-core.js';
 
 export const ORCHESTRATION_V2_ALARM = 'autopilot-orchestration-v2-wake';
@@ -61,9 +62,12 @@ function isUnresolvedOperation(session) {
   return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase));
 }
 
-function isManagedOrchestrationSession(session, projectId) {
+function isManagedOrchestrationSession(session, projectId, hierarchyGraphId = '') {
   return (session?.orchestrationWorker?.managed && session.orchestrationWorker.projectId === projectId)
-    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId);
+    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId)
+    || (Boolean(hierarchyGraphId)
+      && session?.orchestrationHierarchy?.managed
+      && session.orchestrationHierarchy.graphId === hierarchyGraphId);
 }
 
 function isTabAlreadyGoneError(error) {
@@ -157,6 +161,7 @@ export class OrchestrationV2Controller {
         ...preparedHierarchyActions(hierarchy.graph, reduced.runtime),
       ]);
       let materialization = { materialized: [], reused: [], blocked: [] };
+      let scopeSync = { transitions: [] };
       await this.coreRepository.update(coreState => {
         materialization = materializeHierarchyActionsIntoCore(
           coreState,
@@ -173,7 +178,12 @@ export class OrchestrationV2Controller {
             },
           },
         );
-        return materialization.state;
+        scopeSync = syncHierarchyScopeStatesIntoCore(
+          materialization.state,
+          hierarchy.graph,
+          reduced.runtime,
+        );
+        return scopeSync.state;
       });
       runtime.hierarchy = {
         ...runtime.hierarchy,
@@ -189,6 +199,7 @@ export class OrchestrationV2Controller {
         materialized: materialization.materialized || [],
         reused: materialization.reused || [],
         blocked: materialization.blocked || [],
+        scopeTransitions: scopeSync.transitions || [],
       };
       return runtime;
     });
@@ -253,6 +264,7 @@ export class OrchestrationV2Controller {
         ...preparedHierarchyActions(hierarchy.graph, state),
       ]);
       let materialization = { materialized: [], reused: [], blocked: [] };
+      let scopeSync = { transitions: [] };
       await this.coreRepository.update(coreState => {
         materialization = materializeHierarchyActionsIntoCore(
           coreState,
@@ -269,7 +281,12 @@ export class OrchestrationV2Controller {
             },
           },
         );
-        return materialization.state;
+        scopeSync = syncHierarchyScopeStatesIntoCore(
+          materialization.state,
+          hierarchy.graph,
+          state,
+        );
+        return scopeSync.state;
       });
       runtime.hierarchy = { ...runtime.hierarchy, schemaVersion: 1, graph: hierarchy.graph, state };
       summary = {
@@ -279,6 +296,7 @@ export class OrchestrationV2Controller {
         materialized: materialization.materialized || [],
         reused: materialization.reused || [],
         blocked: materialization.blocked || [],
+        scopeTransitions: scopeSync.transitions || [],
       };
       return runtime;
     });
@@ -322,7 +340,9 @@ export class OrchestrationV2Controller {
   }
 
   async revokeFutureAuthority(projectId, nowMs = this.now()) {
+    let hierarchyGraphId = '';
     await this.runtimeRepository.update(runtime => {
+      hierarchyGraphId = runtime?.hierarchy?.graph?.graphId || '';
       runtime.mode = 'PAUSE';
       runtime.desiredActiveWorkers = 0;
       runtime.pendingCoordinatorEvents = [];
@@ -331,7 +351,7 @@ export class OrchestrationV2Controller {
     });
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
-        if (!isManagedOrchestrationSession(session, projectId)) continue;
+        if (!isManagedOrchestrationSession(session, projectId, hierarchyGraphId)) continue;
         session.enabled = false;
         if (!isUnresolvedOperation(session)) session.runState = RunState.STOPPED;
       }
