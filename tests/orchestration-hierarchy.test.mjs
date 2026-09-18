@@ -136,6 +136,17 @@ test('L1-A rejects unknown prompt profiles', () => {
   assert.throws(() => validateOrchestrationGraphV1(g), /Unknown prompt profile/);
 });
 
+test('L1-A validates an optional recovery prompt profile independently', () => {
+  const g = graph();
+  g.promptProfiles.push({ id: 'recovery-v1', role: 'RECOVERY', version: 1 });
+  g.nodes.find(node => node.id === 'manager').recoveryPromptProfileId = 'recovery-v1';
+  const normalized = validateOrchestrationGraphV1(g);
+  assert.equal(normalized.nodesById.manager.recoveryPromptProfileId, 'recovery-v1');
+
+  g.nodes.find(node => node.id === 'manager').recoveryPromptProfileId = 'missing-recovery';
+  assert.throws(() => validateOrchestrationGraphV1(g), /Unknown recovery prompt profile/);
+});
+
 test('L1-A rejects barriers that address nodes outside direct children', () => {
   const g = graph();
   g.nodes.find(node => node.id === 'manager').barrier = {
@@ -368,6 +379,117 @@ test('L1-B Stop is sticky and Resume cannot reauthorize a stopped subtree', () =
   }), 3);
   assert.deepEqual(result.actions, []);
   assert.equal(result.reason, 'SCOPE_STOPPED');
+});
+
+test('L1-E generation recovery atomically supersedes the old generation and prepares one recovery activation', () => {
+  const g = graph();
+  g.promptProfiles.push({ id: 'recovery-v1', role: 'RECOVERY', version: 1 });
+  g.nodes.find(node => node.id === 'manager').recoveryPromptProfileId = 'recovery-v1';
+
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'manager-g1-request', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'manager-g1',
+    purpose: OrchestrationActivationPurpose.DELEGATE,
+  }), 1).runtime;
+
+  const recovered = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+    'manager-recover-g2',
+    {
+      nodeId: 'manager',
+      generation: 1,
+      newGeneration: 2,
+      activationId: 'recovery:manager:g2:r2',
+    },
+  ), 2);
+
+  assert.equal(recovered.reason, 'GENERATION_RECOVERY_PREPARED');
+  assert.equal(recovered.actions.length, 1);
+  assert.equal(recovered.actions[0].purpose, OrchestrationActivationPurpose.RECOVERY);
+  assert.equal(recovered.actions[0].promptProfileId, 'recovery-v1');
+  assert.equal(recovered.runtime.nodesById.manager.generation, 2);
+  assert.equal(recovered.runtime.nodesById.manager.currentActivationId, 'recovery:manager:g2:r2');
+  assert.equal(
+    recovered.runtime.nodesById.manager.activationLedger['manager-g1'].phase,
+    OrchestrationActivationPhase.SUPERSEDED,
+  );
+
+  const replay = reduce(g, recovered.runtime, event(
+    OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+    'manager-recover-g2',
+    {
+      nodeId: 'manager',
+      generation: 1,
+      newGeneration: 2,
+      activationId: 'recovery:manager:g2:r2',
+    },
+  ), 3);
+  assert.equal(replay.deduplicated, true);
+  assert.deepEqual(replay.actions, []);
+
+  const staleRetry = reduce(g, recovered.runtime, event(
+    OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+    'manager-recover-g2-retry',
+    {
+      nodeId: 'manager',
+      generation: 1,
+      newGeneration: 2,
+      activationId: 'recovery:manager:g2:r2',
+    },
+  ), 4);
+  assert.equal(staleRetry.reason, 'STALE_GENERATION');
+  assert.deepEqual(staleRetry.actions, []);
+  assert.equal(staleRetry.runtime.nodesById.manager.generation, 2);
+});
+
+test('L1-E recovery generation can continue the logical Manager role but old generation cannot launch descendants', () => {
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'manager-g1-request-recovery-flow', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'manager-g1-flow',
+    purpose: OrchestrationActivationPurpose.DELEGATE,
+  }), 1).runtime;
+
+  let result = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+    'manager-recover-flow',
+    {
+      nodeId: 'manager',
+      generation: 1,
+      newGeneration: 2,
+      activationId: 'manager-g2-recovery',
+    },
+  ), 2);
+  runtime = result.runtime;
+
+  const lateOld = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'manager-g1-late-terminal', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'manager-g1-flow',
+    status: 'COMPLETED',
+  }), 3);
+  assert.equal(lateOld.reason, 'STALE_GENERATION');
+  assert.deepEqual(lateOld.actions, []);
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, 'manager-g2-effect', {
+    nodeId: 'manager',
+    generation: 2,
+    activationId: 'manager-g2-recovery',
+  }), 4).runtime;
+  result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'manager-g2-terminal', {
+    nodeId: 'manager',
+    generation: 2,
+    activationId: 'manager-g2-recovery',
+    status: 'COMPLETED',
+  }), 5);
+
+  assert.equal(result.actions.length, 2);
+  assert.deepEqual(result.actions.map(action => action.nodeId).sort(), ['worker-1', 'worker-2']);
+  assert.equal(result.runtime.nodesById.manager.generation, 2);
 });
 
 test('L1-B old generation terminal event cannot wake descendants after role recovery', () => {
