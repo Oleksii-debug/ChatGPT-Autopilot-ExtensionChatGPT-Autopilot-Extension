@@ -2,6 +2,37 @@ const PROFILE_KEY = 'promptCadenceBySessionId';
 const MAX_PROMPTS = 3;
 const MAX_EVERY_N = 1000000;
 
+function requireIntegerIfPresent(value, label, min, max) {
+  if (value === undefined) return;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${label} must be an integer from ${min} to ${max}`);
+  }
+}
+
+function validatePromptCadenceWrite(raw = {}) {
+  if (raw.everyN !== undefined) requireIntegerIfPresent(raw.everyN, 'Prompt 2 cadence', 2, MAX_EVERY_N);
+  if (Array.isArray(raw.prompts)) {
+    if (raw.prompts.length > MAX_PROMPTS) throw new Error(`At most ${MAX_PROMPTS} prompt rules are supported`);
+    raw.prompts.forEach((rule, index) => {
+      if (rule && typeof rule === 'object') {
+        requireIntegerIfPresent(rule.everyN, `Prompt ${index + 1} cadence`, 2, MAX_EVERY_N);
+      }
+    });
+  }
+  if (raw.chatFlow !== undefined) {
+    if (!raw.chatFlow || typeof raw.chatFlow !== 'object' || Array.isArray(raw.chatFlow)) {
+      throw new Error('Chat flow must be an object');
+    }
+    if (raw.chatFlow.mode !== undefined && !['same-chat', 'new-chat-after', 'staged'].includes(raw.chatFlow.mode)) {
+      throw new Error('Unsupported chat flow mode');
+    }
+    requireIntegerIfPresent(raw.chatFlow.newChatEveryN, 'New-chat cadence', 2, MAX_EVERY_N);
+    requireIntegerIfPresent(raw.chatFlow.continueCount, 'Continue count', 0, MAX_EVERY_N);
+    requireIntegerIfPresent(raw.chatFlow.stage2Count, 'Stage 2 count', 1, MAX_EVERY_N);
+  }
+}
+
 function normalizeEveryN(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 2) return 10;
@@ -61,6 +92,7 @@ export function getPromptCadenceConfig(state, sessionId) {
 
 export function setPromptCadenceConfig(state, sessionId, rawConfig) {
   if (!state?.sessionsById?.[sessionId]) throw new Error('Session not found');
+  validatePromptCadenceWrite(rawConfig || {});
   if (!state.profile[PROFILE_KEY] || typeof state.profile[PROFILE_KEY] !== 'object') state.profile[PROFILE_KEY] = {};
   const config = normalizePromptCadenceConfig(rawConfig);
   if (rawConfig && rawConfig.chatFlow) config.chatFlow.enabled = rawConfig.chatFlow.enabled === true || rawConfig.chatFlow.enabled === undefined;
