@@ -13,9 +13,6 @@ export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not availab
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 
 export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.now()) {
-  const driveWake = nextDriveSyncWake(state, now);
-  if (driveWake != null) earliest = Math.min(earliest, driveWake);
-
   for (const session of Object.values(state.sessionsById)) {
     if (!ACTIVE_STATES.has(session.runState)) continue;
     session.runState = RunState.PAUSED;
@@ -89,6 +86,8 @@ export function computeNextWake(state, now = Date.now()) {
     state.sendArbiter?.profileNextAllowedSendAt || 0,
     activeLeaseUntil,
   );
+  const driveWake = nextDriveSyncWake(state, now);
+  if (driveWake != null) earliest = Math.min(earliest, driveWake);
 
   for (const session of Object.values(state.sessionsById)) {
     if (!ACTIVE_STATES.has(session.runState)) continue;
