@@ -115,7 +115,8 @@ async function persistRuntimeFailure(repository, sessionId, error, now) {
     view.lastError = `${RUNTIME_RETRY_MESSAGE} Diagnostic: ${diagnosticCode}.`;
     view.lastActionAt = now;
     session.updatedAt = now;
-    appendLog(draft, sessionId, `Runtime retry scheduled [${diagnosticCode}] [${moduleId}]`, {
+    const moduleSuffix = moduleId === ExecutionModuleId.STANDARD_SENDS ? '' : ` [${moduleId}]`;
+    appendLog(draft, sessionId, `Runtime retry scheduled [${diagnosticCode}]${moduleSuffix}`, {
       at: now,
       level: 'WARN',
     });
