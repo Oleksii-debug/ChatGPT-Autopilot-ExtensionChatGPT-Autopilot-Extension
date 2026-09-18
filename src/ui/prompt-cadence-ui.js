@@ -47,6 +47,8 @@ function ensureRegion() {
 
     <fieldset>
       <legend>Робота з чатом</legend>
+      <label><input id="chat-flow-enabled" type="checkbox"> Увімкнути окрему логіку роботи з чатом</label>
+      <div id="chat-flow-fields" hidden>
       <label for="chat-flow-mode">Режим роботи з чатом</label>
       <select id="chat-flow-mode">
         <option value="same-chat">Залишатися в одному чаті</option>
@@ -68,6 +70,7 @@ function ensureRegion() {
         <input id="stage2-count" type="number" min="1" max="1000000" step="1" value="10">
         <p>Логіка: основний промт один раз → «продовжуй» задану кількість разів → новий чат → другий промт задану кількість разів.</p>
       </div>
+      </div>
     </fieldset>
 
     <button id="prompt-cadence-save" type="button">Зберегти налаштування промтів і чату</button>
@@ -78,15 +81,18 @@ function ensureRegion() {
   const toggle = (checkId, fieldsId) => $(checkId).addEventListener('change', () => { $(fieldsId).hidden = !$(checkId).checked; });
   toggle('prompt2-enabled', 'prompt2-fields');
   toggle('prompt3-enabled', 'prompt3-fields');
+  $('chat-flow-enabled').addEventListener('change', syncChatFlowFields);
   $('chat-flow-mode').addEventListener('change', syncChatFlowFields);
   $('prompt-cadence-save').addEventListener('click', saveCurrent);
   return section;
 }
 
 function syncChatFlowFields() {
+  const enabled = $('chat-flow-enabled')?.checked === true;
   const mode = $('chat-flow-mode')?.value || 'same-chat';
-  if ($('new-chat-after-fields')) $('new-chat-after-fields').hidden = mode !== 'new-chat-after';
-  if ($('staged-chat-fields')) $('staged-chat-fields').hidden = mode !== 'staged';
+  if ($('chat-flow-fields')) $('chat-flow-fields').hidden = !enabled;
+  if ($('new-chat-after-fields')) $('new-chat-after-fields').hidden = !enabled || mode !== 'new-chat-after';
+  if ($('staged-chat-fields')) $('staged-chat-fields').hidden = !enabled || mode !== 'staged';
 }
 
 async function loadCurrent() {
@@ -111,6 +117,7 @@ async function loadCurrent() {
     $('prompt3-fields').hidden = !p3.enabled;
     $('prompt3-text').value = p3.prompt || '';
     $('prompt3-every').value = Number(p3.everyN) || 40;
+    $('chat-flow-enabled').checked = config.chatFlow?.enabled === true;
     $('chat-flow-mode').value = config.chatFlow?.mode || 'same-chat';
     $('new-chat-every').value = Number(config.chatFlow?.newChatEveryN) || 10;
     $('continue-prompt').value = config.chatFlow?.continuePrompt || 'продовжуй';
@@ -148,7 +155,7 @@ async function saveCurrent() {
     }
     const mode = $('chat-flow-mode').value;
     const chatFlow = {
-      enabled: true,
+      enabled: $('chat-flow-enabled').checked,
       mode,
       newChatEveryN: integerField('new-chat-every', 10, 2),
       continuePrompt: $('continue-prompt').value.trim() || 'продовжуй',
@@ -156,7 +163,7 @@ async function saveCurrent() {
       stage2Prompt: $('stage2-prompt').value,
       stage2Count: integerField('stage2-count', 10, 1),
     };
-    if (mode === 'staged' && !chatFlow.stage2Prompt.trim()) {
+    if (chatFlow.enabled && mode === 'staged' && !chatFlow.stage2Prompt.trim()) {
       $('stage2-prompt').focus();
       throw new Error('Вкажіть другий промт для другого етапу.');
     }
