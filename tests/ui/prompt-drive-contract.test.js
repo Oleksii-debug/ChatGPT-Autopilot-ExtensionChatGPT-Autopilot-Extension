@@ -33,9 +33,9 @@ test('Drive source exposes direct link, explicit prompt target and visible autos
   ]) {
     assert.match(drive, new RegExp(`id=["']${id}["']`), `missing ${id}`);
   }
-  assert.match(drive, /<option value="primary">Основний prompt</option>/);
-  assert.match(drive, /<option value="prompt2">Другий prompt</option>/);
-  assert.match(drive, /<option value="prompt3">Третій prompt</option>/);
+  assert.ok(drive.includes('<option value="primary">Основний prompt</option>'));
+  assert.ok(drive.includes('<option value="prompt2">Другий prompt</option>'));
+  assert.ok(drive.includes('<option value="prompt3">Третій prompt</option>'));
   assert.match(drive, /id="drive-source-interval" type="number" min="1" max="1440"[^>]*value="3"/);
   assert.match(drive, /id="drive-source-min-chars" type="number" min="1" max="1000000"[^>]*value="1000"/);
   assert.match(drive, /autoSyncEnabled: $('drive-source-auto').checked/);
