@@ -159,3 +159,40 @@ test('staged mode rotates exactly after the initial prompt plus configured conti
   assert.equal(task.normalizedUrl, ROOT_URL);
   assert.equal(chrome.calls[0][0], 'update');
 });
+
+test('repeated resolve at the same new-chat boundary does not navigate the tab twice', async () => {
+  const state = makeState({ mode: 'new-chat-after', count: 2, everyN: 2 });
+  state.tabHintsByTaskId['__chat_flow__:s1'] = {
+    tabId: 1,
+    sessionId: 's1',
+    normalizedUrl: OLD_URL,
+    kind: 'CHAT_FLOW',
+  };
+  const chrome = fakeChrome(OLD_URL);
+  const task = state.sessionsById.s1.tasksById.t1;
+
+  await resolveTaskTab(chrome, state, 's1', task);
+  await resolveTaskTab(chrome, state, 's1', task);
+
+  const rotations = chrome.calls.filter(([kind, _id, change]) => kind === 'update' && change?.url === ROOT_URL);
+  assert.equal(rotations.length, 1);
+  assert.equal(task.normalizedUrl, ROOT_URL);
+});
+
+test('repeated resolve at the staged boundary is also idempotent', async () => {
+  const state = makeState({ mode: 'staged', count: 3, continueCount: 2 });
+  state.tabHintsByTaskId['__chat_flow__:s1'] = {
+    tabId: 1,
+    sessionId: 's1',
+    normalizedUrl: OLD_URL,
+    kind: 'CHAT_FLOW',
+  };
+  const chrome = fakeChrome(OLD_URL);
+  const task = state.sessionsById.s1.tasksById.t1;
+
+  await resolveTaskTab(chrome, state, 's1', task);
+  await resolveTaskTab(chrome, state, 's1', task);
+
+  const rotations = chrome.calls.filter(([kind, _id, change]) => kind === 'update' && change?.url === ROOT_URL);
+  assert.equal(rotations.length, 1);
+});
