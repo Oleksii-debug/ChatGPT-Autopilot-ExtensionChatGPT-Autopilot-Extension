@@ -5,6 +5,8 @@ import { applyPortableProfile, exportPortableProfile, previewPortableProfile } f
 import { StorageRepository } from '../../src/core/storage.js';
 import { CoreCommandDispatcher } from '../../src/core/commands.js';
 import { CoreCommand } from '../../src/shared/protocol.js';
+import { getPromptCadenceConfig } from '../../src/core/prompt-cadence.js';
+import { getDriveSourceConfig } from '../../src/core/drive-source.js';
 
 function profile(overrides = {}) {
   return {
@@ -97,4 +99,93 @@ test('Core dispatcher previews imports and exports portable profile through cano
   assert.deepEqual(imported.summary.importedSessionIds, ['session-1']);
   const exported = await core.execute(CoreCommand.EXPORT_PORTABLE_PROFILE, { profileName: 'Export' });
   assert.equal(exported.profile.sessions[0].id, 'session-1');
+});
+
+
+test('portable profile imports prompt2, prompt3 and Drive binding without runtime identity', () => {
+  const state = createEmptyState(0);
+  const input = profile();
+  input.sessions[0].promptCadence = {
+    prompt2: { enabled: true, prompt: 'audit', everyN: 30 },
+    prompt3: { enabled: true, prompt: 'strategy', everyN: 40 },
+    chatFlow: {
+      enabled: false,
+      mode: 'same-chat',
+      newChatEveryN: 10,
+      continuePrompt: 'продовжуй',
+      continueCount: 10,
+      stage2Prompt: '',
+      stage2Count: 10,
+    },
+  };
+  input.sessions[0].driveSource = {
+    sourceUrl: 'https://drive.google.com/file/d/file-123/view',
+    target: 'prompt3',
+  };
+
+  applyPortableProfile(state, input, { now: 100 });
+
+  const cadence = getPromptCadenceConfig(state, 'session-1');
+  assert.equal(cadence.prompts[1].prompt, 'audit');
+  assert.equal(cadence.prompts[1].everyN, 30);
+  assert.equal(cadence.prompts[2].prompt, 'strategy');
+  assert.equal(cadence.prompts[2].everyN, 40);
+  const drive = getDriveSourceConfig(state, 'session-1');
+  assert.equal(drive.fileId, 'file-123');
+  assert.equal(drive.target, 'prompt3');
+  assert.equal(drive.lastAcceptedVersion, '');
+  assert.equal(drive.lastAcceptedHash, '');
+});
+
+test('portable profile export round-trips cadence and Drive configuration but omits Drive runtime state', () => {
+  const state = createEmptyState(0);
+  const input = profile();
+  input.sessions[0].promptCadence = {
+    prompt2: { enabled: true, prompt: 'p2', everyN: 3 },
+    prompt3: { enabled: true, prompt: 'p3', everyN: 4 },
+    chatFlow: {
+      enabled: true,
+      mode: 'new-chat-after',
+      newChatEveryN: 12,
+      continuePrompt: 'продовжуй',
+      continueCount: 5,
+      stage2Prompt: '',
+      stage2Count: 6,
+    },
+  };
+  input.sessions[0].driveSource = {
+    sourceUrl: 'https://docs.google.com/document/d/doc-123/edit',
+    target: 'prompt2',
+  };
+  applyPortableProfile(state, input, { now: 100 });
+  state.profile.driveSourceBySessionId['session-1'].lastAcceptedVersion = '99';
+  state.profile.driveSourceBySessionId['session-1'].lastAcceptedHash = 'secretish-runtime-hash';
+  state.profile.driveSourceBySessionId['session-1'].lastSyncedAt = 1234;
+
+  const exported = exportPortableProfile(state, { profileName: 'Round trip extras' });
+  const session = exported.sessions[0];
+  assert.deepEqual(session.promptCadence.prompt2, { enabled: true, prompt: 'p2', everyN: 3 });
+  assert.deepEqual(session.promptCadence.prompt3, { enabled: true, prompt: 'p3', everyN: 4 });
+  assert.equal(session.promptCadence.chatFlow.newChatEveryN, 12);
+  assert.deepEqual(session.driveSource, {
+    sourceUrl: 'https://docs.google.com/document/d/doc-123/edit',
+    target: 'prompt2',
+  });
+  assert.equal(JSON.stringify(exported).includes('lastAcceptedVersion'), false);
+  assert.equal(JSON.stringify(exported).includes('secretish-runtime-hash'), false);
+});
+
+test('portable profile preview rejects malformed Drive URL before any state mutation', () => {
+  const input = profile();
+  input.sessions[0].driveSource = { sourceUrl: 'https://example.com/not-drive', target: 'primary' };
+  assert.throws(() => previewPortableProfile(input, 100), /Google Docs|Google Drive/);
+});
+
+test('legacy portable profiles without cadence or Drive fields remain valid', () => {
+  const state = createEmptyState(0);
+  const input = profile();
+  assert.equal(input.sessions[0].promptCadence, undefined);
+  assert.equal(input.sessions[0].driveSource, undefined);
+  applyPortableProfile(state, input, { now: 100 });
+  assert.equal(state.sessionsById['session-1'].sharedPrompt, 'continue');
 });
