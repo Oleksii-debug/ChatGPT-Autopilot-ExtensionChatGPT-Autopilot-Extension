@@ -1,5 +1,6 @@
 import { createDefaultSessionFunctions, validateSessionFunctions } from './session-functions.js';
 import { ExecutionModuleId, ensureSessionModuleState } from './module-workspaces.js';
+import { SESSION_DEFAULTS } from '../shared/session-defaults.js';
 
 export const SCHEMA_VERSION = 1;
 export const STORAGE_KEY = 'autopilotState';
@@ -69,7 +70,7 @@ export function createTask({ id, url, promptOverride = '', enabled = true, label
   return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '' };
 }
 
-export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, minimumSendIntervalMs = 120000, preSendDelayMs = 5000, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now(), activeFunctions = undefined }) {
+export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, minimumSendIntervalMs = SESSION_DEFAULTS.minimumSendIntervalMs, preSendDelayMs = SESSION_DEFAULTS.preSendDelayMs, busyCheckDelayMs = SESSION_DEFAULTS.busyCheckDelayMs, retryBackoffMs = SESSION_DEFAULTS.retryBackoffMs, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now(), activeFunctions = undefined }) {
   if (!id || !name) throw new Error('Session id and name required');
   if (tasks.length < 1 || tasks.length > 50) throw new Error('Session requires 1-50 tasks');
   const tasksById = Object.fromEntries(tasks.map(t => [t.id, t]));
