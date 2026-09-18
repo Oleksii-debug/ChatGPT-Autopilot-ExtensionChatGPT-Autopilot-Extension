@@ -272,11 +272,29 @@ export class OrchestrationV2Controller {
     }, { nowMs });
 
     await this.reconcileAlarm({ nowMs });
+    const latestRuntime = await this.runtimeRepository.load();
+    const latestHierarchy = hierarchyContainer(latestRuntime);
+    const latestNodeRuntime = latestHierarchy?.state?.nodesById?.[nodeId];
+    const accepted = latestNodeRuntime?.generation === newGeneration
+      && latestNodeRuntime?.activationLedger?.[activationId];
+
+    if (!accepted) {
+      return {
+        kind: result.reason || 'GENERATION_RECOVERY_BLOCKED',
+        nodeId,
+        previousGeneration: currentGeneration,
+        requestedGeneration: newGeneration,
+        currentGeneration: latestNodeRuntime?.generation ?? currentGeneration,
+        activationId,
+        result,
+      };
+    }
+
     return {
       kind: 'HIERARCHY_GENERATION_RECOVERY',
       nodeId,
       previousGeneration: currentGeneration,
-      generation: newGeneration,
+      generation: latestNodeRuntime.generation,
       activationId,
       result,
     };
