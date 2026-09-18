@@ -31,8 +31,8 @@ test('rejects duplicate initial chat URLs so two workers cannot own one chat', (
 
 test('creates only the concurrent slot count for a large batch and opens new chats for empty slots', () => {
   const config = normalizeBatchChatFlow({ enabled: true, seedUrls: ['https://chatgpt.com/c/one'], concurrency: 3, totalTasks: 1000, startIntervalMs: 10_000, primaryPrompt: 'Старт', continuePrompt: 'продовжуй', continueCount: 1, finalPrompt: 'Завершуй' });
-  const tasks = buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })() });
-  assert.equal(tasks.length, 3); assert.deepEqual(tasks.map(task => task.batch.ordinal), [1, 2, 3]); assert.equal(tasks[0].batch.source, 'INITIAL_LINK'); assert.equal(tasks[1].batch.source, 'NEW_CHAT'); assert.equal(tasks[2].url, 'https://chatgpt.com/'); assert.deepEqual(tasks.map(task => task.retryAfterAt), [0, 10_000, 20_000]);
+  const tasks = buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `task-${++i}`; })(), now: 5_000 });
+  assert.equal(tasks.length, 3); assert.deepEqual(tasks.map(task => task.batch.ordinal), [1, 2, 3]); assert.equal(tasks[0].batch.source, 'INITIAL_LINK'); assert.equal(tasks[1].batch.source, 'NEW_CHAT'); assert.equal(tasks[2].url, 'https://chatgpt.com/'); assert.deepEqual(tasks.map(task => task.retryAfterAt), [5_000, 15_000, 25_000]);
 });
 
 test('prompt lifecycle is primary, continue N times, then final once', () => {
