@@ -1,0 +1,33 @@
+ChatGPT Автопілот 0.3.0 — AUTONOMOUS AI MANAGER
+
+НОВЕ В 0.3.0
+- AI Router: primary / strong / hybrid-auto / hybrid-rules.
+- Окремий provider/model для primary і strong.
+- Rule-based strong review кожні N AI-запитів та/або N хвилин.
+- Primary -> strong handoff та optional strong -> primary context carry.
+- Localhost AI Gateway для Ollama, OpenAI-compatible та OpenAI API.
+- OpenAI API key залишається у Gateway process, не в Chrome state.
+
+EVENT-DRIVEN AI MANAGER
+- Durable capture SENT / COMPLETE / ERROR / RECOVERY.
+- Durable web-worker report jobs після verified Send.
+- Report correlation прив'язана до assistant-message baseline конкретного Send; стара відповідь не приймається як новий report.
+- Trigger після N Send, N хвилин, COMPLETE, error threshold або нового web report.
+- Allowlisted safe actions: CONTINUE, HANDOFF_NEXT, RETRY_NOW, PAUSE_SESSION, RESUME_SESSION, RESTART_COMPLETED_SESSION.
+- RESTART_COMPLETED_SESSION opt-in і тільки після normal one-pass COMPLETE; manual Stop не перезапускається.
+- Single-use handoff додається до наступного web prompt і очищається лише після verified Send.
+
+RELIABILITY
+- AI Manager failure queue не губиться при Gateway/model error.
+- Configurable failureRetrySeconds + bounded exponential retry backoff.
+- Router disabled також не створює hot-loop wake.
+- Manager scheduler reconciliation не дублює core alarm для pure handoff/summary рішень.
+- Restart recovery зберігає pending events та pending web-report jobs.
+
+ЗБЕРЕЖЕНО З 0.1.15
+- benign rate-limit acknowledgement continues SAME request in SAME tab immediately;
+- configurable fallback cooldown;
+- dead receiver reset/recreate;
+- stale composer clearing;
+- multi-session/send gap/restart/network recovery;
+- exact verified-send progress/status.

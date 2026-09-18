@@ -1,4 +1,4 @@
-import { acquireSendLease, releaseSendLease } from './arbiter.js';
+import { recordVerifiedSend, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { applyInteractionResult } from './execution.js';
 import { createOperationId, createPromptFingerprint } from './fingerprint.js';
 import { InteractionResult } from '../shared/protocol.js';
@@ -35,7 +35,7 @@ export class DurableSubmissionCoordinator {
   constructor(repository, {
     now = () => Date.now(),
     cryptoApi = globalThis.crypto,
-    profileGapMs = 1000,
+    profileGapMs = DEFAULT_PROFILE_SEND_GAP_MS,
   } = {}) {
     this.repo = repository;
     this.now = now;
@@ -125,9 +125,8 @@ export class DurableSubmissionCoordinator {
       if (!ACTIVE_STATES.has(session.runState)) throw new Error('Session is not active for submit');
       if (operation.phase !== OperationPhase.PRE_SEND_WAIT) throw new Error('Operation is not waiting to submit');
       if (operation.preSendDeadline > submitStartedAt) throw new Error('Pre-send delay has not elapsed');
-      if (!acquireSendLease(draft, { sessionId, operationId, now: submitStartedAt })) {
-        throw new Error('Profile send arbiter is busy');
-      }
+      // Per-Session durable operation state is the exact-once guard. Distinct
+      // Sessions may submit concurrently because each owns an isolated tab.
       markSubmitting(session, submitStartedAt);
       return draft;
     });
@@ -143,24 +142,30 @@ export class DurableSubmissionCoordinator {
 
     const finishedAt = this.now();
     if (result?.status !== InteractionResult.SENT_VERIFIED) {
+      submitDiagnosticCode ||= result?.safeDiagnosticCode || '';
       await this.repo.update(draft => {
         const session = requireSession(draft, sessionId);
         const operation = requireOperation(session, operationId);
         const taskIndex = taskIndexForOperation(session, operation);
-        applyInteractionResult(session, taskIndex, { status: InteractionResult.SUBMISSION_UNCERTAIN }, {
+        applyInteractionResult(session, taskIndex, { ...result, status: InteractionResult.SUBMISSION_UNCERTAIN }, {
           now: finishedAt,
           promptFingerprint: operation.promptFingerprint,
         });
         if (submitDiagnosticCode) {
-          session.lastError = `Submission outcome uncertain; no resend scheduled. Diagnostic: ${submitDiagnosticCode}.`;
-          appendLog(draft, sessionId, `Submission held uncertain [${submitDiagnosticCode}]`, {
+          const unattended = session.retryPolicy !== 'manual';
+          session.lastError = unattended
+            ? `Надсилання не підтверджено. Автоматичне відновлення триває. Код: ${submitDiagnosticCode}.`
+            : `Надсилання не підтверджено. Очікується ручне рішення. Код: ${submitDiagnosticCode}.`;
+          appendLog(draft, sessionId, unattended
+            ? `Submission uncertain; unattended recovery active [${submitDiagnosticCode}]`
+            : `Submission held uncertain [${submitDiagnosticCode}]`, {
             at: finishedAt,
             level: 'WARN',
           });
         }
         return draft;
       });
-      return { status: InteractionResult.SUBMISSION_UNCERTAIN };
+      return { ...result, status: InteractionResult.SUBMISSION_UNCERTAIN };
     }
 
     await this.repo.update(draft => {
@@ -171,12 +176,7 @@ export class DurableSubmissionCoordinator {
         now: finishedAt,
         promptFingerprint: operation.promptFingerprint,
       });
-      releaseSendLease(draft, {
-        sessionId,
-        operationId,
-        now: finishedAt,
-        profileGapMs: this.profileGapMs,
-      });
+      recordVerifiedSend(draft, { sessionId, now: finishedAt });
       return draft;
     });
     return result;

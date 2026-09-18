@@ -35,7 +35,8 @@
     'PREPARE_SEND',
     'SUBMIT_EXISTING',
     'INSERT_AND_SEND',
-    'VERIFY_AFTER_UNCERTAIN_SUBMIT'
+    'VERIFY_AFTER_UNCERTAIN_SUBMIT',
+    'READ_ASSISTANT_REPORT'
   ]);
   const PROMPT_REQUIRED_MODES = new Set([
     'INSERT_ONLY',
@@ -49,6 +50,33 @@
   // Operation-local evidence only. Core remains the sole durable state owner. If this
   // content-script context is lost, long-prompt representation recovery fails closed.
   const acceptedRepresentationEvidence = new Map();
+  // Retain the pre-send baseline for late acknowledgement and worker restarts.
+  // A page reload intentionally loses this evidence: history equality alone is unsafe.
+  const textSubmissionEvidence = new Map();
+
+  function evidenceUrlMatches(storedExpected, requestExpected) {
+    const stored = normalizeUrl(storedExpected);
+    const current = normalizeUrl(requestExpected);
+    if (!stored || !current) return false;
+    if (stored === current) return true;
+    // After an uncertain first Send, Core may durably adopt the newly-created
+    // exclusive /c/<id> URL as the recovery identity. Keep the operation-local
+    // pre-send evidence bound across that one legitimate root -> conversation
+    // transition; never broaden this to an unrelated conversation.
+    return expectedPostSendLocation(current, stored);
+  }
+
+  function textEvidenceFor(request) {
+    const evidence = textSubmissionEvidence.get(evidenceKey(request));
+    return evidence?.promptText === request.promptText
+      && evidenceUrlMatches(evidence.expectedUrl, request.expectedUrl) ? evidence : null;
+  }
+
+  function pendingPromptText(observed, expected) {
+    if (promptTextMatches(observed, expected)) return { accepted: true, repeated: false, submittedText: String(observed ?? '') };
+    if (repeatedExpectedPrompt(observed, expected)) return { accepted: true, repeated: true, submittedText: String(observed ?? '') };
+    return { accepted: false, repeated: false, submittedText: String(observed ?? '') };
+  }
 
   function nowMs() { return Date.now(); }
   function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
@@ -74,10 +102,65 @@
       const au = new URL(a);
       const bu = new URL(b);
       if (!CHATGPT_HOSTS.has(au.hostname) || !CHATGPT_HOSTS.has(bu.hostname)) return false;
-      return au.hostname === bu.hostname && au.pathname === bu.pathname;
+      if (au.hostname !== bu.hostname) return false;
+      if (au.pathname === bu.pathname) return true;
+
+      // ChatGPT commonly canonicalizes an existing Custom GPT conversation
+      // from /g/<gpt-slug>/c/<conversation-id> to /c/<conversation-id>.
+      // The conversation id, not the presentation path, is the stable target.
+      const observedConversationId = au.pathname.match(/\/c\/([^/]+)/)?.[1] || '';
+      const expectedConversationId = bu.pathname.match(/\/c\/([^/]+)/)?.[1] || '';
+      return Boolean(observedConversationId)
+        && observedConversationId === expectedConversationId;
     } catch (_) {
       return false;
     }
+  }
+
+
+  // Sending the first message from a launch surface such as https://chatgpt.com/
+  // legitimately changes the SPA URL to /c/<new-id>. This transition is allowed
+  // only AFTER Send; SENT_VERIFIED still requires operation-local appended-message
+  // evidence and never relies on the URL change itself.
+  function expectedPostSendLocation(observed, expected) {
+    if (sameExpectedChat(observed, expected)) return true;
+    const a = normalizeUrl(observed);
+    const b = normalizeUrl(expected);
+    if (!a || !b) return false;
+    try {
+      const au = new URL(a);
+      const bu = new URL(b);
+      if (!CHATGPT_HOSTS.has(au.hostname) || !CHATGPT_HOSTS.has(bu.hostname) || au.hostname !== bu.hostname) return false;
+      const observedConversationId = au.pathname.match(/\/c\/([^/]+)/)?.[1] || '';
+      const expectedConversationId = bu.pathname.match(/\/c\/([^/]+)/)?.[1] || '';
+      if (!observedConversationId || expectedConversationId) return false;
+      if (bu.pathname === '/') return true;
+      const expectedGpt = bu.pathname.match(/^\/g\/([^/]+)$/)?.[1] || '';
+      if (!expectedGpt) return false;
+      const observedGpt = au.pathname.match(/^\/g\/([^/]+)\/c\/[^/]+$/)?.[1] || '';
+      return au.pathname === `/c/${observedConversationId}` || observedGpt === expectedGpt;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isFreshLaunchSurface(value) {
+    const normalized = normalizeUrl(value);
+    if (!normalized) return false;
+    try {
+      const url = new URL(normalized);
+      return CHATGPT_HOSTS.has(url.hostname)
+        && (url.pathname === '/' || /^\/g\/[^/]+$/u.test(url.pathname));
+    } catch (_) { return false; }
+  }
+
+  function isExclusiveConversationLocation(value) {
+    const normalized = normalizeUrl(value);
+    if (!normalized) return false;
+    try {
+      const url = new URL(normalized);
+      return CHATGPT_HOSTS.has(url.hostname) && /\/c\/[^/]+$/u.test(url.pathname);
+    } catch (_) { return false; }
   }
 
   function validateRequest(request) {
@@ -256,6 +339,83 @@
     return String(el?.innerText ?? el?.textContent ?? '');
   }
 
+  // ChatGPT's contenteditable/ProseMirror composer may reflow the same inserted
+  // prompt into paragraphs/BR nodes and may normalize NBSP/line endings. Durable
+  // safety still requires exact non-whitespace content; only presentation-level
+  // whitespace differences are ignored here. This prevents a real prompt swap
+  // from being accepted while allowing semantically identical editor rendering.
+  function normalizePromptText(value) {
+    let text = String(value ?? '');
+    try { text = text.normalize('NFC'); } catch (_) {}
+    return text
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/gu, ' ')
+      .replace(/[\u200b-\u200d\u2060\ufeff]/gu, '')
+      .replace(/\n{2,}/g, '\n')
+      .replace(/[ \t]+$/gm, '')
+      .trim();
+  }
+
+  function compactPromptText(value) {
+    return normalizePromptText(value).replace(/\s+/gu, ' ').trim();
+  }
+
+  function promptTextMatches(observed, expected) {
+    const a = normalizePromptText(observed);
+    const b = normalizePromptText(expected);
+    return a === b;
+  }
+
+  function repeatedUnit(value, unit, separator = '') {
+    if (!value || !unit || value === unit) return false;
+    let offset = 0;
+    let copies = 0;
+    while (offset < value.length) {
+      if (!value.startsWith(unit, offset)) return false;
+      offset += unit.length;
+      copies += 1;
+      if (offset === value.length) return copies >= 2;
+      if (separator) {
+        if (!value.startsWith(separator, offset)) return false;
+        offset += separator.length;
+        if (offset === value.length) return false;
+      }
+    }
+    return false;
+  }
+
+  function repeatedExpectedPrompt(observed, expected) {
+    const a = normalizePromptText(observed);
+    const b = normalizePromptText(expected);
+    if (!a || !b || a === b) return false;
+    if (repeatedUnit(a, b)) return true;
+
+    // ProseMirror may place a whitespace boundary between copies even when the
+    // same text was inserted more than once. Repetition is diagnostic only;
+    // there is deliberately no copy-count ceiling and no prompt-length limit.
+    const compactObserved = compactPromptText(observed);
+    const compactExpected = compactPromptText(expected);
+    return repeatedUnit(compactObserved, compactExpected, ' ');
+  }
+
+  function composerKind(el) {
+    const tag = String(el?.tagName || 'unknown').toLowerCase();
+    const editable = String(el?.getAttribute?.('contenteditable') || '').toLowerCase();
+    const role = String(el?.getAttribute?.('role') || '').toLowerCase();
+    return [tag, editable === 'true' ? 'contenteditable' : '', role].filter(Boolean).join('/');
+  }
+
+  function safeTextProofMessage(observed, expected, el) {
+    return [
+      `editor=${composerKind(el) || 'unknown'}`,
+      `expectedLength=${String(expected ?? '').length}`,
+      `observedLength=${String(observed ?? '').length}`,
+      `expectedNormalizedLength=${normalizePromptText(expected).length}`,
+      `observedNormalizedLength=${normalizePromptText(observed).length}`,
+      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`
+    ].join('; ');
+  }
+
   function eventConstructor(doc, preferred) {
     const view = doc?.defaultView;
     if (preferred === 'input' && typeof view?.InputEvent === 'function') return view.InputEvent;
@@ -278,6 +438,31 @@
       } catch (_) {
         return true;
       }
+    }
+  }
+
+  function replaceContentEditableText(el, value, doc) {
+    const normalized = String(value ?? '').replace(/\r\n?/g, '\n');
+    if (typeof el?.replaceChildren === 'function' && typeof doc?.createElement === 'function' && typeof doc?.createTextNode === 'function') {
+      try {
+        const fragment = typeof doc.createDocumentFragment === 'function' ? doc.createDocumentFragment() : null;
+        const target = fragment || el;
+        const lines = normalized.split('\n');
+        for (const line of lines) {
+          const paragraph = doc.createElement('p');
+          if (line) paragraph.appendChild(doc.createTextNode(line));
+          else paragraph.appendChild(doc.createElement('br'));
+          target.appendChild(paragraph);
+        }
+        if (fragment) el.replaceChildren(fragment);
+        return true;
+      } catch (_) {}
+    }
+    try {
+      el.textContent = normalized;
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -326,7 +511,7 @@
         data: value
       });
       if (allowed === false) return;
-      el.textContent = value;
+      if (!replaceContentEditableText(el, value, doc)) return;
       dispatchEditorEvent(el, 'input', {
         bubbles: true,
         composed: true,
@@ -362,7 +547,7 @@
     const evidence = acceptedRepresentationEvidence.get(key);
     if (!evidence) return null;
     if (evidence.promptText !== request.promptText
-      || evidence.expectedUrl !== normalizeUrl(request.expectedUrl)) {
+      || !evidenceUrlMatches(evidence.expectedUrl, request.expectedUrl)) {
       acceptedRepresentationEvidence.delete(key);
       return null;
     }
@@ -393,23 +578,53 @@
     return attachments.length === 1
       && attachments[0] === evidence.node
       && normalizedRepresentationSignature(attachments[0]) === evidence.signature
-      && editorText(composer).trim() === '';
+      && compactPromptText(editorText(composer)) === '';
   }
 
   function semanticUserMessages(doc) {
-    return Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'user' || /you said|user/.test(accessibleName(el));
+        return role === 'user' || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
+    // A turn article and its author-role child are ONE message, not two.
+    return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
+  }
+
+  function userMessageText(el) {
+    // Read the message body without the turn heading, copy/edit buttons or footer.
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []);
+    const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
+    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
 
   function latestUserMessages(doc) {
     return semanticUserMessages(doc).filter(isVisible);
   }
 
+  function semanticAssistantMessages(doc) {
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'))
+      .filter((el) => {
+        const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
+        return role === 'assistant' || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
+      });
+    return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
+  }
+
+  function assistantMessageText(el) {
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"]') || []);
+    const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
+    return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
+  }
+
+  function latestAssistantText(doc) {
+    const messages = semanticAssistantMessages(doc);
+    const latest = messages[messages.length - 1];
+    return latest ? assistantMessageText(latest) : '';
+  }
+
   function userMessageHistorySnapshot(doc) {
-    return semanticUserMessages(doc).map((el) => textOf(el).trim());
+    return semanticUserMessages(doc).map(userMessageText);
   }
 
   function userMessageRepresentationSnapshot(doc) {
@@ -424,9 +639,9 @@
   function hasStrictAppendedPrompt(before, after, promptText) {
     if (after.length !== before.length + 1) return false;
     for (let i = 0; i < before.length; i += 1) {
-      if (after[i] !== before[i]) return false;
+      if (!promptTextMatches(after[i], before[i])) return false;
     }
-    return after[after.length - 1] === String(promptText).trim();
+    return promptTextMatches(after[after.length - 1], promptText);
   }
 
   function sameRepresentationMessage(a, b) {
@@ -490,7 +705,7 @@
     if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY' });
 
     const existing = editorText(found.element);
-    if (existing === request.promptText) {
+    if (promptTextMatches(existing, request.promptText)) {
       if (attachmentNodes(found.element).length) {
         return resultBase(request, start, {
           status: STATUS.MANUAL_REVIEW_REQUIRED,
@@ -498,18 +713,56 @@
           safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_WITH_EXISTING_PROMPT'
         });
       }
+      // Do not reinsert a draft that already matches. On a background
+      // contenteditable, native Select-All is not guaranteed to replace the
+      // editor model and can append a second copy. Exact existing text is
+      // already sufficient to proceed to the configured pre-send delay.
       return resultBase(request, start, {
         status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
-        safeDiagnosticCode: 'PROMPT_ALREADY_INSERTED_MATCH'
+        safeDiagnosticCode: 'PROMPT_ALREADY_INSERTED_MATCH',
+        safeDiagnosticMessage: 'Existing matching draft accepted without reinsertion.'
       });
     }
-    if (existing) {
+    if (repeatedExpectedPrompt(existing, request.promptText)) {
+      if (attachmentNodes(found.element).length) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'VISIBLE_NONEMPTY',
+          safeDiagnosticCode: 'UNEXPECTED_ATTACHMENT_WITH_EXISTING_PROMPT'
+        });
+      }
+      // Repeated copies of the configured prompt are acceptable in unattended
+      // mode by product contract. Do not append yet another copy while trying
+      // to prove insertion; proceed to the configured pre-send delay as-is.
       return resultBase(request, start, {
-        status: STATUS.MANUAL_REVIEW_REQUIRED,
+        status: STATUS.INSERTED_NOT_SENT,
         composerState: 'VISIBLE_NONEMPTY',
-        safeDiagnosticCode: 'COMPOSER_CONTAINS_OTHER_CONTENT'
+        safeDiagnosticCode: 'INSERTION_REPEATED_PROMPT_ACCEPTED',
+        safeDiagnosticMessage: safeTextProofMessage(existing, request.promptText, found.element)
       });
+    }
+    if (compactPromptText(existing)) {
+      // ChatGPT can restore an old draft into a brand-new root chat. In this
+      // product the INSERT_ONLY phase owns the composer for the current task:
+      // clear any stale/restored text, prove it is empty, then insert ours.
+      setNativeValue(found.element, '');
+      await (deps.wait || wait)(100);
+      found = findVisibleComposer(doc);
+      if (!found.element || found.ambiguous) {
+        return resultBase(request, start, {
+          status: STATUS.TEMPORARY_ERROR,
+          composerState: 'UNKNOWN',
+          safeDiagnosticCode: 'COMPOSER_NOT_READY_AFTER_CLEAR'
+        });
+      }
+      if (compactPromptText(editorText(found.element))) {
+        return resultBase(request, start, {
+          status: STATUS.TEMPORARY_ERROR,
+          composerState: 'VISIBLE_NONEMPTY',
+          safeDiagnosticCode: 'COMPOSER_CLEAR_NOT_PROVEN'
+        });
+      }
     }
 
     const beforeAttachments = attachmentNodes(found.element);
@@ -522,54 +775,97 @@
     }
 
     found.element.focus?.();
-    setNativeValue(found.element, request.promptText);
-    await (deps.wait || wait)(50);
+    await writePrompt(found.element, request, deps);
 
-    found = findVisibleComposer(doc);
-    if (!found.element || found.ambiguous) {
-      return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT' });
-    }
+    // React/ProseMirror can commit a long multi-paragraph insertion asynchronously.
+    // Poll the same semantic proof for a bounded period instead of sampling once at 50 ms.
+    const insertionDeadline = nowMs() + 2500;
+    let lastFound = found;
+    do {
+      await (deps.wait || wait)(75);
+      found = findVisibleComposer(doc);
+      if (!found.element || found.ambiguous) {
+        if (nowMs() >= insertionDeadline) {
+          return resultBase(request, start, {
+            status: STATUS.INSERTED_NOT_SENT,
+            safeDiagnosticCode: 'COMPOSER_LOST_AFTER_INSERT'
+          });
+        }
+        continue;
+      }
+      lastFound = found;
 
-    const afterAttachments = attachmentNodes(found.element);
-    if (editorText(found.element) === request.promptText && afterAttachments.length === 0) {
-      acceptedRepresentationEvidence.delete(evidenceKey(request));
-      return resultBase(request, start, {
-        status: STATUS.INSERTED_NOT_SENT,
-        composerState: 'VISIBLE_NONEMPTY',
-        safeDiagnosticCode: 'INSERTION_TEXT_PROVEN'
-      });
-    }
-
-    if (editorText(found.element).trim() === '' && afterAttachments.length === 1) {
-      const evidence = bindAcceptedRepresentation(request, afterAttachments[0]);
-      if (evidence) {
+      const observedText = editorText(found.element);
+      const afterAttachments = attachmentNodes(found.element);
+      const pending = pendingPromptText(observedText, request.promptText);
+      if (pending.accepted && afterAttachments.length === 0) {
+        acceptedRepresentationEvidence.delete(evidenceKey(request));
         return resultBase(request, start, {
           status: STATUS.INSERTED_NOT_SENT,
-          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
-          insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
-          safeDiagnosticCode: 'INSERTION_ATTACHMENT_OPERATION_BOUND'
+          composerState: 'VISIBLE_NONEMPTY',
+          safeDiagnosticCode: pending.repeated ? 'INSERTION_REPEATED_PROMPT_ACCEPTED' : 'INSERTION_TEXT_PROVEN',
+          safeDiagnosticMessage: safeTextProofMessage(observedText, request.promptText, found.element)
         });
       }
-      return resultBase(request, start, {
-        status: STATUS.MANUAL_REVIEW_REQUIRED,
-        composerState: 'ACCEPTED_ATTACHMENT_LIKE',
-        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_HAS_NO_SEMANTIC_SIGNATURE'
-      });
-    }
 
-    if (afterAttachments.length > 1) {
-      return resultBase(request, start, {
-        status: STATUS.MANUAL_REVIEW_REQUIRED,
-        composerState: 'UNKNOWN',
-        safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_AMBIGUOUS'
-      });
-    }
+      if (compactPromptText(observedText) === '' && afterAttachments.length === 1) {
+        const evidence = bindAcceptedRepresentation(request, afterAttachments[0]);
+        if (evidence) {
+          return resultBase(request, start, {
+            status: STATUS.INSERTED_NOT_SENT,
+            composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+            insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
+            safeDiagnosticCode: 'INSERTION_ATTACHMENT_OPERATION_BOUND'
+          });
+        }
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'ACCEPTED_ATTACHMENT_LIKE',
+          safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_HAS_NO_SEMANTIC_SIGNATURE'
+        });
+      }
 
+      if (afterAttachments.length > 1) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          composerState: 'UNKNOWN',
+          safeDiagnosticCode: 'ATTACHMENT_REPRESENTATION_AMBIGUOUS'
+        });
+      }
+    } while (nowMs() < insertionDeadline);
+
+    const finalElement = lastFound?.element || found?.element;
+    const finalText = finalElement ? editorText(finalElement) : '';
     return resultBase(request, start, {
       status: STATUS.INSERTED_NOT_SENT,
-      composerState: 'UNKNOWN',
-      safeDiagnosticCode: 'INSERTION_NOT_PROVEN'
+      composerState: compactPromptText(finalText) ? 'VISIBLE_NONEMPTY' : 'UNKNOWN',
+      safeDiagnosticCode: 'INSERTION_NOT_PROVEN',
+      safeDiagnosticMessage: safeTextProofMessage(finalText, request.promptText, finalElement)
     });
+  }
+
+  async function writePrompt(element, request, deps) {
+    const doc = element.ownerDocument;
+    // Background tabs are the normal unattended operating mode. CDP Ctrl+A
+    // is not reliable there for ProseMirror/contenteditable and can append
+    // instead of replace. Use the editor's DOM/input-event path in hidden tabs;
+    // keep Chrome native input for visible tabs where it is useful.
+    if (typeof deps.insert !== 'function' || doc?.visibilityState === 'hidden' || doc?.visibilityState === 'prerender') {
+      setNativeValue(element, request.promptText);
+      return;
+    }
+    element.focus();
+    if (typeof element.select === 'function') element.select();
+    else {
+      const range = doc.createRange();
+      range.selectNodeContents(element);
+      const selection = doc.defaultView.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    element.setAttribute('data-autopilot-native-target', request.requestId);
+    try { await deps.insert(); }
+    finally { element.removeAttribute('data-autopilot-native-target'); }
   }
 
   function prepareSend(doc, request, start) {
@@ -580,7 +876,9 @@
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_PRE_SEND' });
     if (!found.element) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'COMPOSER_NOT_READY_PRE_SEND' });
 
-    const exactTextPending = editorText(found.element) === request.promptText;
+    const observedPendingText = editorText(found.element);
+    const pendingText = pendingPromptText(observedPendingText, request.promptText);
+    const exactTextPending = pendingText.accepted;
     const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
     if (exactTextPending && attachmentNodes(found.element).length) {
       return resultBase(request, start, {
@@ -621,6 +919,10 @@
   }
 
   async function submitExisting(doc, request, start, deps) {
+    // Duplicate delivery of the same operation may inspect, never click again.
+    if (textEvidenceFor(request) || getAcceptedRepresentationEvidence(request)?.submitAttempted) {
+      return verifyAfterUncertain(doc, request, start);
+    }
     const ready = prepareSend(doc, request, start);
     if (ready.status !== STATUS.READY) return ready;
 
@@ -628,8 +930,9 @@
     if (!found.element || found.ambiguous) {
       return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
-    const exactTextPending = editorText(found.element) === request.promptText
-      && attachmentNodes(found.element).length === 0;
+    const observedPendingText = editorText(found.element);
+    const pendingText = pendingPromptText(observedPendingText, request.promptText);
+    const exactTextPending = pendingText.accepted && attachmentNodes(found.element).length === 0;
     const boundRepresentationPending = isBoundRepresentationPending(found.element, request);
     if (!exactTextPending && !boundRepresentationPending) {
       return resultBase(request, start, { status: STATUS.MANUAL_REVIEW_REQUIRED, safeDiagnosticCode: 'PROMPT_CHANGED_AT_SUBMIT_BOUNDARY' });
@@ -640,19 +943,73 @@
       return resultBase(request, start, { status: STATUS.INSERTED_NOT_SENT, safeDiagnosticCode: 'SEND_CHANGED_AT_SUBMIT_BOUNDARY' });
     }
 
+    const submittedText = exactTextPending ? observedPendingText : '';
     const beforeTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
+    const assistantBaselineCount = semanticAssistantMessages(doc).length;
+    if (exactTextPending) {
+      if (textSubmissionEvidence.size >= 100) {
+        textSubmissionEvidence.delete(textSubmissionEvidence.keys().next().value);
+      }
+      textSubmissionEvidence.set(evidenceKey(request), {
+        promptText: request.promptText,
+        submittedText,
+        expectedUrl: normalizeUrl(request.expectedUrl),
+        beforeMessages: beforeTextMessages,
+        assistantBaselineCount,
+      });
+    }
     const evidence = boundRepresentationPending ? getAcceptedRepresentationEvidence(request) : null;
     if (evidence) {
       evidence.submitAttempted = true;
       evidence.beforeMessages = userMessageRepresentationSnapshot(doc);
+      evidence.assistantBaselineCount = assistantBaselineCount;
     }
 
-    send.click();
-    const verifyDeadline = nowMs() + 5000;
+    // Use the native submit path when this is a genuine submit button in its
+    // composer form. This invokes validation and the form's submit handler once.
+    // Non-submit controls still use their own click handler. Never do both.
+    const form = found.element.closest?.('form');
+    const isFormSubmitter = form && send.form === form
+      && String(send.type || '').toLowerCase() === 'submit';
+    const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
+    let submitMethod = 'CLICK';
+    const backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    if (backgroundDocument && isFormSubmitter && typeof nativeSubmit === 'function') {
+      // CDP mouse events are unreliable in a hidden background tab. A genuine
+      // form submitter can be invoked through the page's own form semantics
+      // without activating the tab.
+      submitMethod = 'BACKGROUND_FORM_REQUEST_SUBMIT';
+      nativeSubmit.call(form, send);
+    } else if (backgroundDocument) {
+      submitMethod = 'BACKGROUND_DOM_CLICK';
+      send.click();
+    } else if (typeof deps.submit === 'function') {
+      submitMethod = 'CHROME_NATIVE_CLICK';
+      send.scrollIntoView({ block: 'center', inline: 'center' });
+      const rect = send.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const hit = doc.elementFromPoint(x, y);
+      if (hit !== send && !send.contains(hit)) {
+        return resultBase(request, start, {
+          status: STATUS.MANUAL_REVIEW_REQUIRED,
+          safeDiagnosticCode: 'NATIVE_SEND_TARGET_OBSCURED'
+        });
+      }
+      send.setAttribute('data-autopilot-native-target', request.requestId);
+      try { await deps.submit({ x, y }); }
+      finally { send.removeAttribute('data-autopilot-native-target'); }
+    } else if (isFormSubmitter && typeof nativeSubmit === 'function') {
+      submitMethod = 'FORM_REQUEST_SUBMIT';
+      nativeSubmit.call(form, send);
+    } else {
+      send.click();
+    }
+    const verifyDeadline = nowMs() + 15000;
     while (nowMs() < verifyDeadline) {
       await (deps.wait || wait)(100);
 
-      if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
+      if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
           submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_UNCERTAIN' : 'UNCERTAIN',
@@ -660,11 +1017,39 @@
         });
       }
 
+      const afterTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
       const textVerified = exactTextPending
-        && hasStrictAppendedPrompt(beforeTextMessages, userMessageHistorySnapshot(doc), request.promptText);
+        && hasStrictAppendedPrompt(beforeTextMessages, afterTextMessages, submittedText);
       const representationVerified = evidence
         && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature);
-      if (!textVerified && !representationVerified) continue;
+
+      let freshStructuralVerified = false;
+      let freshGenerationVerified = false;
+      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
+        const observedUrl = globalThis.location?.href || '';
+        const structuralFound = findVisibleComposer(doc);
+        const composerEmpty = !structuralFound.element || !compactPromptText(editorText(structuralFound.element));
+        const postBlocking = detectBlockingState(doc);
+        const generationStarted = postBlocking?.status === STATUS.BUSY
+          || semanticAssistantMessages(doc).length > assistantBaselineCount;
+        const appendedOneOrMore = Array.isArray(beforeTextMessages)
+          && Array.isArray(afterTextMessages)
+          && afterTextMessages.length > beforeTextMessages.length;
+        // A fresh launch has no pre-existing conversation identity. If the exact
+        // extension-owned launch surface becomes a concrete conversation, the
+        // composer is consumed, and ChatGPT has positively entered generation,
+        // that combination is operation-bound proof that this Send was accepted.
+        // Do not require the user-message semantic tree to have rendered yet:
+        // real ChatGPT runs can expose the Stop control before the message history
+        // observer sees the newly appended user turn.
+        freshGenerationVerified = !structuralFound.ambiguous
+          && isExclusiveConversationLocation(observedUrl)
+          && composerEmpty
+          && generationStarted;
+        freshStructuralVerified = freshGenerationVerified && appendedOneOrMore;
+      }
+
+      if (!textVerified && !representationVerified && !freshGenerationVerified) continue;
 
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
@@ -674,7 +1059,7 @@
           safeDiagnosticCode: 'COMPOSER_AMBIGUOUS_AFTER_SEND_CLICK'
         });
       }
-      if (exactTextPending && postFound.element && editorText(postFound.element).trim() === request.promptText.trim()) {
+      if (exactTextPending && postFound.element && promptTextMatches(editorText(postFound.element), submittedText)) {
         return resultBase(request, start, {
           status: STATUS.SUBMISSION_UNCERTAIN,
           submissionEvidence: 'PROMPT_STILL_PENDING',
@@ -689,43 +1074,174 @@
         });
       }
 
+      // A first Send from a fresh launch surface is physically special: ChatGPT
+      // creates the conversation at the same boundary as the Send. Do not call
+      // this SENT_VERIFIED merely because a matching user message appeared in the
+      // DOM. Require the concrete exclusive conversation URL, an empty composer,
+      // and independent evidence that generation/assistant progress started.
+      if (isFreshLaunchSurface(request.expectedUrl)) {
+        const observedUrl = globalThis.location?.href || '';
+        const composerEmpty = !postFound.element || !compactPromptText(editorText(postFound.element));
+        const postBlocking = detectBlockingState(doc);
+        const generationStarted = postBlocking?.status === STATUS.BUSY
+          || semanticAssistantMessages(doc).length > assistantBaselineCount;
+        if (!isExclusiveConversationLocation(observedUrl) || !composerEmpty || !generationStarted) continue;
+      }
+
       if (representationVerified) {
         acceptedRepresentationEvidence.delete(evidenceKey(request));
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
-          safeDiagnosticCode: 'SEND_VERIFIED_BOUND_REPRESENTATION'
+          safeDiagnosticCode: 'SEND_VERIFIED_BOUND_REPRESENTATION',
+          assistantBaselineCount
         });
       }
 
+      const freshGenerationOnly = freshGenerationVerified && !freshStructuralVerified && !textVerified;
       return resultBase(request, start, {
         status: STATUS.SENT_VERIFIED,
-        submissionEvidence: 'NEW_USER_MESSAGE_MATCH',
-        safeDiagnosticCode: 'SEND_VERIFIED_OPERATION_LOCAL_APPEND'
+        submissionEvidence: freshGenerationOnly
+          ? 'FRESH_CONVERSATION_GENERATION_STARTED'
+          : freshStructuralVerified && !textVerified
+            ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
+            : 'NEW_USER_MESSAGE_MATCH',
+        safeDiagnosticCode: freshGenerationOnly
+          ? 'SEND_VERIFIED_FRESH_GENERATION_STARTED'
+          : freshStructuralVerified && !textVerified
+            ? 'SEND_VERIFIED_FRESH_STRUCTURAL_APPEND'
+            : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
+        assistantBaselineCount
       });
     }
 
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
       submissionEvidence: evidence ? 'OPERATION_BOUND_REPRESENTATION_CLICK_UNCERTAIN' : 'UNCERTAIN',
-      safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN'
+      safeDiagnosticCode: 'SEND_CLICK_UNCERTAIN',
+      safeDiagnosticMessage: submissionDiagnostic(doc, request, beforeTextMessages, submitMethod)
     });
   }
 
+  function submissionDiagnostic(doc, request, before, method = 'RECOVERY') {
+    const found = findVisibleComposer(doc);
+    const composer = found.element;
+    const blocking = detectBlockingState(doc);
+    return [
+      `method=${method}`,
+      `composer=${found.ambiguous ? 'ambiguous' : !composer ? 'absent' : compactPromptText(editorText(composer)) ? 'nonempty' : 'empty'}`,
+      `pendingMatch=${composer && promptTextMatches(editorText(composer), request.promptText) ? 'yes' : 'no'}`,
+      `messagesBefore=${before?.length ?? 'unknown'}`,
+      `messagesAfter=${userMessageHistorySnapshot(doc).length}`,
+      `block=${blocking?.code || 'none'}`,
+      `visibility=${doc.visibilityState || 'unknown'}`
+    ].join('; ');
+  }
+
   async function verifyAfterUncertain(doc, request, start) {
-    const blocked = requireExpectedPage(doc, request, start, '_RECOVERY');
-    if (blocked && blocked.status !== STATUS.BUSY) return blocked;
+    if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_MISMATCH_RECOVERY' });
+    }
+    const blocking = detectBlockingState(doc);
+    if (blocking && blocking.status !== STATUS.BUSY) {
+      return resultBase(request, start, { status: blocking.status, safeDiagnosticCode: blocking.code + '_RECOVERY' });
+    }
 
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
+    // Durable fresh-launch recovery: a Send from / (or /g/<slug>) may
+    // navigate to a new /c/<id> and reload the document, which erases the
+    // in-memory pre-click evidence map. The operation carries its original
+    // launch surface durably. On that exact newly-created conversation, one
+    // matching user turn plus an empty composer is sufficient operation-bound
+    // evidence; a fresh launch had no prior user turns.
+    const recoveryLaunchUrl = request.recoveryLaunchUrl || '';
+    if (recoveryLaunchUrl && isFreshLaunchSurface(recoveryLaunchUrl)) {
+      const afterMessages = userMessageHistorySnapshot(doc);
+      const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
+      const singleMatchingTurn = afterMessages.length === 1
+        && promptTextMatches(afterMessages[0], request.promptText);
+      const generationStarted = blocking?.status === STATUS.BUSY
+        || semanticAssistantMessages(doc).length > 0;
+      if (!found.ambiguous
+          && isExclusiveConversationLocation(globalThis.location?.href || '')
+          && composerEmpty
+          && generationStarted) {
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: singleMatchingTurn
+            ? 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN'
+            : 'FRESH_LAUNCH_DURABLE_GENERATION_STARTED',
+          safeDiagnosticCode: singleMatchingTurn
+            ? 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED'
+            : 'RECOVERY_FRESH_GENERATION_STARTED',
+          assistantBaselineCount: 0
+        });
+      }
+      if (!found.ambiguous
+          && isExclusiveConversationLocation(globalThis.location?.href || '')
+          && composerEmpty
+          && singleMatchingTurn) {
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN',
+          safeDiagnosticCode: 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED',
+          assistantBaselineCount: 0
+        });
+      }
+    }
+
+    const textEvidence = textEvidenceFor(request);
+    if (textEvidence) {
+      const submittedText = textEvidence.submittedText || textEvidence.promptText;
+      const pending = found.element && promptTextMatches(editorText(found.element), submittedText);
+      const afterMessages = userMessageHistorySnapshot(doc);
+      const appended = hasStrictAppendedPrompt(textEvidence.beforeMessages, afterMessages, submittedText);
+      const baselineCount = Number.isInteger(Number(textEvidence.assistantBaselineCount))
+        ? Number(textEvidence.assistantBaselineCount)
+        : 0;
+      const storedWasFreshLaunch = isFreshLaunchSurface(textEvidence.expectedUrl);
+      const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
+      const blockingNow = detectBlockingState(doc);
+      const generationOrAnswerObserved = blockingNow?.status === STATUS.BUSY
+        || semanticAssistantMessages(doc).length > baselineCount;
+      const structuralFreshRecovery = storedWasFreshLaunch
+        && !found.ambiguous
+        && isExclusiveConversationLocation(globalThis.location?.href || '')
+        && composerEmpty
+        && Array.isArray(textEvidence.beforeMessages)
+        && afterMessages.length > textEvidence.beforeMessages.length
+        && generationOrAnswerObserved;
+      if ((appended || structuralFreshRecovery) && !pending) {
+        return resultBase(request, start, {
+          status: STATUS.SENT_VERIFIED,
+          submissionEvidence: structuralFreshRecovery && !appended
+            ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
+            : 'NEW_USER_MESSAGE_MATCH',
+          safeDiagnosticCode: structuralFreshRecovery && !appended
+            ? 'RECOVERY_FRESH_STRUCTURAL_VERIFIED'
+            : 'RECOVERY_TEXT_OPERATION_VERIFIED',
+          assistantBaselineCount: baselineCount
+        });
+      }
+      // Unchanged draft text does not prove that a request was never dispatched.
+      return resultBase(request, start, {
+        status: STATUS.SUBMISSION_UNCERTAIN,
+        submissionEvidence: pending ? 'PROMPT_STILL_PENDING' : 'UNCERTAIN',
+        safeDiagnosticCode: pending ? 'RECOVERY_SEND_NOT_ACKNOWLEDGED' : 'RECOVERY_TEXT_ACK_PENDING',
+        safeDiagnosticMessage: submissionDiagnostic(doc, request, textEvidence.beforeMessages)
+      });
+    }
+
     // Composer state is operation-local evidence and therefore outranks history.
-    if (found.element && editorText(found.element).trim() === request.promptText.trim()
+    if (found.element && promptTextMatches(editorText(found.element), request.promptText)
       && attachmentNodes(found.element).length === 0) {
       return resultBase(request, start, {
-        status: STATUS.INSERTED_NOT_SENT,
-        submissionEvidence: 'NONE',
-        safeDiagnosticCode: 'RECOVERY_PROMPT_PENDING'
+        status: STATUS.SUBMISSION_UNCERTAIN,
+        submissionEvidence: 'PROMPT_STILL_PENDING',
+        safeDiagnosticCode: 'RECOVERY_BASELINE_MISSING',
+        safeDiagnosticMessage: submissionDiagnostic(doc, request, null)
       });
     }
 
@@ -733,7 +1249,7 @@
     if (evidence) {
       if (found.element && isBoundRepresentationPending(found.element, request)) {
         return resultBase(request, start, {
-          status: STATUS.INSERTED_NOT_SENT,
+          status: evidence.submitAttempted ? STATUS.SUBMISSION_UNCERTAIN : STATUS.INSERTED_NOT_SENT,
           composerState: 'ACCEPTED_ATTACHMENT_LIKE',
           insertionEvidence: 'OPERATION_BOUND_ACCEPTED_REPRESENTATION',
           submissionEvidence: 'NONE',
@@ -750,7 +1266,8 @@
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
           submissionEvidence: 'NEW_USER_MESSAGE_WITH_OPERATION_BOUND_REPRESENTATION',
-          safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_VERIFIED'
+          safeDiagnosticCode: 'RECOVERY_BOUND_REPRESENTATION_VERIFIED',
+          assistantBaselineCount: Number.isInteger(Number(evidence.assistantBaselineCount)) ? Number(evidence.assistantBaselineCount) : undefined
         });
       }
       return resultBase(request, start, {
@@ -763,11 +1280,62 @@
     // Plain historical text equality is not operation identity. In recurring workflows
     // an older user message can be byte-for-byte identical to the current prompt.
     const recent = latestUserMessages(doc).slice(-5);
-    const repeatedPromptSeen = recent.some((el) => textOf(el).trim() === request.promptText.trim());
+    const repeatedPromptSeen = recent.some((el) => promptTextMatches(userMessageText(el), request.promptText));
     return resultBase(request, start, {
       status: STATUS.SUBMISSION_UNCERTAIN,
       submissionEvidence: repeatedPromptSeen ? 'HISTORY_MATCH_NOT_OPERATION_BOUND' : 'UNCERTAIN',
-      safeDiagnosticCode: repeatedPromptSeen ? 'RECOVERY_STALE_MATCH_UNPROVEN' : 'RECOVERY_UNCERTAIN'
+      safeDiagnosticCode: repeatedPromptSeen ? 'RECOVERY_STALE_MATCH_UNPROVEN' : 'RECOVERY_UNCERTAIN',
+      safeDiagnosticMessage: submissionDiagnostic(doc, request, null)
+    });
+  }
+
+  function readAssistantReport(doc, request, start) {
+    if (!expectedPostSendLocation(globalThis.location?.href || '', request.expectedUrl)) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'REPORT_URL_MISMATCH' });
+    }
+    const blocking = detectBlockingState(doc);
+    const assistantMessages = semanticAssistantMessages(doc);
+    const text = latestAssistantText(doc);
+    const baselineKnown = request.assistantBaselineKnown === true;
+    const baselineCount = Math.max(0, Math.floor(Number(request.assistantBaselineCount || 0)));
+    const hasNewAssistantTurn = baselineKnown && assistantMessages.length > baselineCount;
+    if (blocking?.status === STATUS.BUSY) {
+      return resultBase(request, start, {
+        status: STATUS.BUSY,
+        assistantText: hasNewAssistantTurn ? text : '',
+        assistantComplete: false,
+        safeDiagnosticCode: 'ASSISTANT_RESPONSE_STREAMING'
+      });
+    }
+    if (blocking) {
+      return resultBase(request, start, {
+        status: blocking.status,
+        assistantText: hasNewAssistantTurn ? text : '',
+        assistantComplete: false,
+        safeDiagnosticCode: `${blocking.code}_REPORT`
+      });
+    }
+    if (!baselineKnown) {
+      return resultBase(request, start, {
+        status: STATUS.TEMPORARY_ERROR,
+        assistantText: '',
+        assistantComplete: false,
+        safeDiagnosticCode: 'ASSISTANT_BASELINE_UNKNOWN'
+      });
+    }
+    if (!hasNewAssistantTurn || !text) {
+      return resultBase(request, start, {
+        status: STATUS.TEMPORARY_ERROR,
+        assistantText: '',
+        assistantComplete: false,
+        safeDiagnosticCode: hasNewAssistantTurn ? 'ASSISTANT_RESPONSE_NOT_READY' : 'ASSISTANT_NEW_RESPONSE_NOT_STARTED'
+      });
+    }
+    return resultBase(request, start, {
+      status: STATUS.READY,
+      assistantText: text,
+      assistantComplete: true,
+      safeDiagnosticCode: 'ASSISTANT_RESPONSE_READY'
     });
   }
 
@@ -786,6 +1354,7 @@
     const doc = deps?.document || globalThis.document;
     if (!doc?.querySelectorAll) return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'DOCUMENT_UNAVAILABLE' });
 
+    if (request.mode === 'READ_ASSISTANT_REPORT') return readAssistantReport(doc, request, start);
     if (request.mode === 'CHECK_ONLY') return inspect(doc, request, start);
     if (request.mode === 'INSERT_ONLY') return insertOnly(doc, request, start, deps || {});
     if (request.mode === 'PREPARE_SEND') return prepareSend(doc, request, start);
@@ -799,6 +1368,8 @@
     normalizeUrl,
     sameExpectedChat,
     validateRequest,
+    normalizePromptText,
+    promptTextMatches,
     findVisibleComposer,
     detectBlockingState,
     execute

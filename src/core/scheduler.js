@@ -1,15 +1,33 @@
 import { RunMode, RunState } from './schema.js';
 
+export function configuredTaskCount(session) {
+  const configured = Number(session?.configuredTaskCount);
+  return Number.isInteger(configured) && configured > 0 ? configured : (session?.taskOrder?.length || 0);
+}
+
+export function isCompactLogicalSession(session) {
+  return configuredTaskCount(session) > (session?.taskOrder?.length || 0);
+}
+
+export function onePassCompletedCount(session) {
+  if (Number.isInteger(session?.onePassCompletedCount) && session.onePassCompletedCount >= 0) return session.onePassCompletedCount;
+  return Array.isArray(session?.onePassCompletedTaskIds) ? session.onePassCompletedTaskIds.length : 0;
+}
+
 function schedulableTask(session, task) {
-  return task.enabled && !task.manualReviewReason && !(session.runMode === RunMode.ONE_PASS && session.onePassCompletedTaskIds.includes(task.id));
+  if (!task.enabled || task.manualReviewReason) return false;
+  if (session.runMode !== RunMode.ONE_PASS) return true;
+  if (isCompactLogicalSession(session)) return onePassCompletedCount(session) < configuredTaskCount(session);
+  return !session.onePassCompletedTaskIds.includes(task.id);
 }
 
 function eligibleTask(session, task, now) {
   return schedulableTask(session, task) && (task.retryAfterAt || 0) <= now;
 }
 
-function onePassComplete(session) {
+export function onePassComplete(session) {
   if (session.runMode !== RunMode.ONE_PASS) return false;
+  if (isCompactLogicalSession(session)) return onePassCompletedCount(session) >= configuredTaskCount(session);
   return session.taskOrder.every(taskId => {
     const task = session.tasksById[taskId];
     return !task.enabled || Boolean(task.manualReviewReason) || session.onePassCompletedTaskIds.includes(taskId);
@@ -60,8 +78,15 @@ export function advanceAfterVerifiedSend(session, taskIndex, verifiedSendTime) {
   const taskId = session.taskOrder[taskIndex];
   session.currentTaskIndex = (taskIndex + 1) % session.taskOrder.length;
   session.lastSuccessfulSendAt = verifiedSendTime;
+  session.successfulSendCount = Math.max(0, Number(session.successfulSendCount || 0)) + 1;
+  if (session.runMode === RunMode.ONE_PASS) {
+    const priorOnePass = onePassCompletedCount(session);
+    session.onePassCompletedCount = Math.min(configuredTaskCount(session), priorOnePass + 1);
+  }
+  session.completedAt = 0;
   session.lastActionAt = verifiedSendTime;
   session.nextAllowedSendAt = verifiedSendTime + session.minimumSendIntervalMs;
-  if (session.runMode === RunMode.ONE_PASS && !session.onePassCompletedTaskIds.includes(taskId)) session.onePassCompletedTaskIds.push(taskId);
+  if (session.runMode === RunMode.ONE_PASS && !isCompactLogicalSession(session) && !session.onePassCompletedTaskIds.includes(taskId)) session.onePassCompletedTaskIds.push(taskId);
+  if (session.runMode === RunMode.ONE_PASS && isCompactLogicalSession(session) && session.onePassCompletedCount >= configuredTaskCount(session) && !session.onePassCompletedTaskIds.includes(taskId)) session.onePassCompletedTaskIds.push(taskId);
   return session;
 }

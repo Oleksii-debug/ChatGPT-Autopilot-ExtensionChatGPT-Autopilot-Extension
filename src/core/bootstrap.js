@@ -39,8 +39,8 @@ function normalizeTabStrategy(value) {
 function buildSession(config, autoStart, now) {
   requireString(config?.id, 'bootstrap session id');
   requireString(config?.name, 'bootstrap session name');
-  if (!Array.isArray(config?.tasks) || config.tasks.length < 1 || config.tasks.length > 50) {
-    throw new Error('Bootstrap Session requires 1-50 tasks');
+  if (!Array.isArray(config?.tasks) || config.tasks.length < 1 || config.tasks.length > 1000) {
+    throw new Error('Bootstrap Session requires 1-1000 tasks');
   }
 
   const promptMode = normalizePromptMode(config.promptMode ?? PromptMode.SHARED);
@@ -64,7 +64,7 @@ function buildSession(config, autoStart, now) {
     sharedPrompt: typeof config.sharedPrompt === 'string' ? config.sharedPrompt : '',
     runMode: normalizeRunMode(config.runMode ?? RunMode.CONTINUOUS),
     minimumSendIntervalMs: Number.isFinite(config.minimumSendIntervalMs) ? config.minimumSendIntervalMs : 120000,
-    preSendDelayMs: Number.isFinite(config.preSendDelayMs) ? config.preSendDelayMs : 5000,
+    preSendDelayMs: Number.isFinite(config.preSendDelayMs) ? config.preSendDelayMs : 20000,
     busyCheckDelayMs: Number.isFinite(config.busyCheckDelayMs) ? config.busyCheckDelayMs : 2000,
     retryBackoffMs: Number.isFinite(config.retryBackoffMs) ? config.retryBackoffMs : 30000,
     tabStrategy: normalizeTabStrategy(config.tabStrategy ?? TabStrategy.KEEP_TASK_TABS_OPEN),

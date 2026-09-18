@@ -1,23 +1,35 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Автопілот",
-  "version": "0.1.0",
-  "description": "Локальна автоматизація роботи з ChatGPT із кількома сеансами та надійним відновленням.",
+  "version": "0.9.19",
+  "description": "Керує ChatGPT-сеансами та multi-agent оркестрацією з відновленням, GitHub control і локальними лімітами.",
   "permissions": [
     "storage",
+    "unlimitedStorage",
     "alarms",
     "tabs",
-    "scripting"
+    "scripting",
+    "debugger"
   ],
   "host_permissions": [
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://localhost/*",
+    "https://127.0.0.1/*",
+    "https://api.github.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
     "type": "module"
   },
   "action": {
-    "default_title": "Відкрити ChatGPT Автопілот"
+    "default_title": "Відкрити ChatGPT Автопілот",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
   },
   "commands": {
     "_execute_action": {
@@ -42,5 +54,23 @@
       ],
       "run_at": "document_idle"
     }
+  ],
+  "short_name": "Autopilot",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "optional_permissions": [
+    "downloads",
+    "notifications"
   ]
 }

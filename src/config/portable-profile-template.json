@@ -9,15 +9,16 @@
       "name": "Сеанс 1",
       "autoStart": false,
       "promptMode": "shared",
+      "urlMode": "shared",
       "sharedPrompt": "",
       "defaultUniquePrompt": "",
       "runMode": "continuous",
       "minimumSendIntervalMinutes": 2,
-      "preSendDelaySeconds": 5,
+      "preSendDelaySeconds": 20,
       "busyCheckDelaySeconds": 2,
       "retryBackoffSeconds": 30,
       "retryPolicy": "safe",
-      "tabStrategy": "worker",
+      "tabStrategy": "open-close",
       "tasks": [
         {
           "id": "task-1",

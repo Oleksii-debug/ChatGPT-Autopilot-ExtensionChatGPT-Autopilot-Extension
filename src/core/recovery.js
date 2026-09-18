@@ -16,8 +16,65 @@ export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.
   return state;
 }
 
+
+export function healUnattendedManualHolds(session, now = Date.now(), { resumeMachinePause = true } = {}) {
+  if (!session || session.retryPolicy === 'manual') return false;
+
+  let changed = false;
+  const operation = session.operation;
+  const operationTask = operation?.taskId ? session.tasksById?.[operation.taskId] : null;
+  const hadMachineHold = operation?.phase === OperationPhase.MANUAL_REVIEW
+    || Object.values(session.tasksById || {}).some(task => task?.manualReviewReason || task?.status === 'MANUAL_REVIEW');
+  if (!hadMachineHold) return false;
+
+  const retryDelay = Math.max(1000, session.retryBackoffMs || 30000);
+  for (const task of Object.values(session.tasksById || {})) {
+    if (!task) continue;
+    if (task.manualReviewReason) {
+      task.manualReviewReason = '';
+      changed = true;
+    }
+    if (task.status === 'MANUAL_REVIEW') {
+      task.status = 'RETRY_WAIT';
+      task.retryAfterAt = Math.max(task.retryAfterAt || 0, now + retryDelay);
+      changed = true;
+    }
+  }
+
+  if (operation?.phase === OperationPhase.MANUAL_REVIEW) {
+    if (Number(operation.submitStartedAt || 0) > 0) {
+      operation.phase = OperationPhase.AMBIGUOUS;
+      if (operationTask) {
+        operationTask.status = 'SUBMISSION_UNCERTAIN';
+        operationTask.retryAfterAt = Math.max(operationTask.retryAfterAt || 0, now);
+      }
+    } else {
+      operation.phase = OperationPhase.FAILED_SAFE;
+      if (operationTask) {
+        operationTask.status = 'RETRY_WAIT';
+        operationTask.retryAfterAt = Math.max(operationTask.retryAfterAt || 0, now + retryDelay);
+      }
+    }
+    operation.updatedAt = now;
+    changed = true;
+  }
+
+  if (changed) {
+    if (resumeMachinePause && session.runState === RunState.PAUSED && !session.pausedByMaster) {
+      session.runState = operation?.phase === OperationPhase.AMBIGUOUS ? RunState.RECOVERING : RunState.RUNNING;
+    } else if (session.runState === RunState.RUNNING && operation?.phase === OperationPhase.AMBIGUOUS) {
+      session.runState = RunState.RECOVERING;
+    }
+    session.lastError = 'Legacy manual hold converted to unattended automatic recovery.';
+    session.lastActionAt = now;
+    session.updatedAt = now;
+  }
+  return changed;
+}
+
 export function reconcileStateForStartup(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
+    healUnattendedManualHolds(session, now, { resumeMachinePause: !state.profile?.masterPaused });
     const wasActive = session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING;
     if (session.runState === RunState.RUNNING) session.runState = RunState.RECOVERING;
     if (session.operation?.phase === OperationPhase.SUBMITTING) {
@@ -25,8 +82,11 @@ export function reconcileStateForStartup(state, now = Date.now()) {
       if (wasActive) session.runState = RunState.RECOVERING;
     }
   }
-  const lease = state.sendArbiter.lease;
-  if (lease && lease.expiresAt <= now) state.sendArbiter.lease = null;
+  // 0.9.8 removed the profile-wide Send lease/gap. Durable per-Session
+  // SUBMITTING -> AMBIGUOUS recovery is sufficient and permits independent
+  // tabs to progress concurrently after restart.
+  state.sendArbiter.lease = null;
+  state.sendArbiter.profileNextAllowedSendAt = 0;
   return state;
 }
 
@@ -46,13 +106,18 @@ function schedulerWakeForSession(session, now) {
 
 export function computeNextWake(state, now = Date.now()) {
   let earliest = Infinity;
-  const activeLeaseUntil = state.sendArbiter?.lease?.expiresAt > now
-    ? state.sendArbiter.lease.expiresAt
-    : 0;
-  const profileSendBarrier = Math.max(
-    state.sendArbiter?.profileNextAllowedSendAt || 0,
-    activeLeaseUntil,
-  );
+  let retirementEarliest = Infinity;
+
+  // Physical tab retirement is durable work even when its owning Session has
+  // already been explicitly stopped. Without a wake for retirePending hints, a
+  // transient chrome.tabs.remove failure during Stop could preserve ownership
+  // correctly but never receive another cleanup attempt when no active Session
+  // remained. Keep retirement inside the canonical core alarm instead of
+  // inventing a second scheduler.
+  for (const hint of Object.values(state.tabHintsByTaskId || {})) {
+    if (hint?.retirePending !== true || hint?.ownedByExtension !== true || !Number.isInteger(hint?.tabId)) continue;
+    retirementEarliest = Math.min(retirementEarliest, Math.max(now, Number(hint.retireRetryAt || 0) || now));
+  }
 
   for (const session of Object.values(state.sessionsById)) {
     if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
@@ -67,7 +132,6 @@ export function computeNextWake(state, now = Date.now()) {
           now,
           session.operation.preSendDeadline || now,
           taskRetryAfter,
-          profileSendBarrier,
         ),
       );
       continue;
@@ -83,7 +147,12 @@ export function computeNextWake(state, now = Date.now()) {
     if (schedulerWake != null) earliest = Math.min(earliest, schedulerWake);
   }
 
-  return earliest < Infinity ? earliest : null;
+  const profileRateLimitUntil = Number(state.profile?.rateLimitUntil || 0);
+  if (earliest < Infinity && profileRateLimitUntil > now) {
+    earliest = Math.max(earliest, profileRateLimitUntil);
+  }
+  const wakeAt = Math.min(earliest, retirementEarliest);
+  return wakeAt < Infinity ? wakeAt : null;
 }
 
 export async function reconcileAlarm(chromeApi, state, now = Date.now()) {

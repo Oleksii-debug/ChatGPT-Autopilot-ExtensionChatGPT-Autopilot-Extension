@@ -1,5 +1,4 @@
-export const MAX_BULK_TASKS = 50;
-export const MAX_PORTABLE_FILE_BYTES = 2 * 1024 * 1024;
+export const MAX_BULK_TASKS = 1000;
 
 function normalizeForDedupe(url) {
   const parsed = new URL(url);
@@ -84,10 +83,18 @@ export function mergeBulkUrls(existingTasks, urls, {
   };
 }
 
+
+export function parseStrictBoundedInteger(raw, { min, max, label = 'Значення' } = {}) {
+  const text = typeof raw === 'string' ? raw.trim() : String(raw ?? '').trim();
+  if (!text || !/^-?\d+$/u.test(text)) throw new Error(`${label}: введіть ціле число ${min}-${max}.`);
+  const value = Number(text);
+  if (!Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label}: ${min}-${max}.`);
+  return value;
+}
+
 export function parsePortableJson(text) {
   const raw = String(text || '');
   if (!raw.trim()) throw new Error('Файл порожній.');
-  if (new Blob([raw]).size > MAX_PORTABLE_FILE_BYTES) throw new Error('Файл більший за 2 МБ.');
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error();

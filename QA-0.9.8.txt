@@ -1,0 +1,59 @@
+QA 0.9.8 — СЦЕНАРНА РОБОТА / ПРЯМЕ КЕРУВАННЯ / ПАРАЛЕЛЬНІ СЕСІЇ
+
+Обсяг перевірки:
+- нова машина станів сценарної роботи та інтеграція з canonical Core;
+- цикли промптів, покоління чатів, двійки, аудитор + група, бар’єр усіх працівників;
+- тайм-аут, заміна одного учасника, повний перезапуск групи, аварійні/початкові промпти;
+- відновлення після перезапуску;
+- паралельність Ordinary/Managed без profile-wide Send lock/barrier;
+- відновлений transport 0.9.7: Direct Chat primary, GitHub fallback, pinned bootstrap, джерело control, same-project import selection;
+- регресія Core/AI/interaction/UI/release/reliability;
+- два Chromium browser gates.
+
+ФІНАЛЬНА АВТОМАТИЗОВАНА КВАЛІФІКАЦІЯ ПЕРЕД ПАКУВАННЯМ
+- AI / Orchestration / Scenario / Parallelism: 306/306 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 246/246 PASS
+- ChatGPT interaction: 112/112 PASS
+- UI: 60/60 PASS
+- Release: 14/14 PASS
+- Reliability: 22/22 PASS
+- TOTAL deterministic tests: 778/778 PASS
+- Native Chromium phased interaction: PASS
+- Chromium keyboard/mode/accessibility: PASS
+- 12 mode × tab-strategy exhaustive matrix: PASS
+- 20,000 randomized unattended states: PASS
+
+Окремі нові перевірки охоплюють:
+- довільні prompt cycles та repeat;
+- pair affinity;
+- all-workers barrier;
+- worker timeout -> special auditor turn -> replacement bootstrap;
+- restart-group policy;
+- minimum launch gap;
+- direct control без GitHub читання при валідному фінальному блоці;
+- malformed/trailing direct block fail-closed;
+- довга відповідь координатора не обрізає фінальний direct block;
+- pinned bootstrap матеріалізує worker до першого coordinator reasoning;
+- same-project profile import selects existing orchestra;
+- 5 ordinary + 5 scenario-managed одночасно: max in-flight=10, без starvation;
+- 10 Session submits одночасно без PROFILE_BUSY/profile-wide lock;
+- 10 distinct owned tabs для однакової launch-поверхні;
+- restart із 10 SUBMITTING -> 10 незалежних AMBIGUOUS recovery;
+- 10 Sessions × 3 хв × 4 години -> 80 внутрішньо доступних send opportunities кожній;
+- legacy 90s profile barrier/lease очищається і не впливає на 0.9.8;
+- повторна паралельна детекція того самого ChatGPT rate limit не продовжує перший profile.rateLimitUntil;
+- під час profile.rateLimitUntil новий tab/page I/O не стартує, після дедлайну 10 смуг відновлюються паралельно;
+- Chrome tab create/query/update не виконується всередині серіалізованого StorageRepository.update;
+- 10 одночасних stale snapshots для launch URL не можуть присвоїти одну вручну відкриту root-вкладку;
+- одна смуга з COMPOSER_LOST_AFTER_INSERT не блокує 9 healthy lanes;
+- одна смуга з TAB_NAVIGATION_TIMEOUT не блокує 9 healthy lanes;
+- full 5 ordinary + 5 scenario browser pipeline: 10 isolated tabs → CHECK → INSERT → PREPARE → 10 verified Send;
+- reliability стенди використовують серіалізовані update(), як реальний StorageRepository.
+
+RELEASE FLAGS
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+
+Автоматизовані Chromium перевірки не є фізичною перевіркою NVDA. Точний 0.9.8 пакет потребує окремого owner acceptance на Windows/Chrome/NVDA.

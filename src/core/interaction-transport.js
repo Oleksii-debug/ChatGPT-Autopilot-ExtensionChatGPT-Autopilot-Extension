@@ -1,12 +1,17 @@
 import { InteractionResult } from '../shared/protocol.js';
 import { waitForTaskTabReady } from './tabs.js';
-
-const INTERACTION_SCRIPT_FILES = Object.freeze([
-  'src/interaction/chatgpt-adapter.js',
-  'src/interaction/content-script.js',
+import { SiteAdapterId, getSiteAdapter, requireSiteAdapterUrl } from './site-adapter-registry.js';
+// These phases only inspect state. They neither change the composer nor click
+// Send, so one receiver restoration and one retry are safe after an extension
+// update or a ChatGPT navigation. Effectful phases remain non-replayable.
+const SAFE_RECEIVER_RECOVERY_MODES = new Set([
+  'CHECK_ONLY',
+  'PREPARE_SEND',
+  'VERIFY_AFTER_UNCERTAIN_SUBMIT',
+  'READ_ASSISTANT_REPORT',
 ]);
-const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 15000;
-const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 100;
+const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 45000;
+const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 250;
 
 function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -15,6 +20,21 @@ function waitMs(ms) {
 function isMissingReceiverError(error) {
   const message = String(error?.message || error || '');
   return /could not establish connection|receiving end does not exist/i.test(message);
+}
+
+function isChromeNetworkErrorPageAccessError(error) {
+  const message = String(error?.message || error || '');
+  return /chrome-error:\/\/|ERR_CONNECTION_|ERR_INTERNET_|ERR_NETWORK_|cannot access contents of url.*chrome-error|cannot access a chrome:\/\/ url/i.test(message);
+}
+
+async function reloadAfterNetworkErrorPage(chromeApi, tabId) {
+  if (!chromeApi?.tabs?.reload) return false;
+  try {
+    await chromeApi.tabs.reload(tabId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function diagnosticError(code, message, cause, request) {
@@ -37,10 +57,12 @@ function attachRequestContext(error, request) {
 
 export class ChromeInteractionTransport {
   constructor(chromeApi, {
+    siteAdapterId = SiteAdapterId.CHATGPT_WEB,
     tabReadinessOptions = {},
     checkOnlyUiReadinessOptions = {},
   } = {}) {
     this.chrome = chromeApi;
+    this.siteAdapter = getSiteAdapter(siteAdapterId);
     this.tabReadinessOptions = tabReadinessOptions;
     this.checkOnlyUiReadinessOptions = checkOnlyUiReadinessOptions;
   }
@@ -52,14 +74,21 @@ export class ChromeInteractionTransport {
     });
   }
 
-  async restoreMissingCheckOnlyReceiver(tabId) {
+  async restoreMissingSafeReceiver(tabId) {
     if (!this.chrome.scripting?.executeScript) {
       throw new Error('Interaction receiver is missing and scripting recovery is unavailable');
     }
     await this.chrome.scripting.executeScript({
       target: { tabId },
-      files: [...INTERACTION_SCRIPT_FILES],
+      files: [...this.siteAdapter.recoveryScriptFiles],
     });
+  }
+
+  readinessOptions(request) {
+    return {
+      ...this.tabReadinessOptions,
+      allowPostSendNavigation: request?.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT',
+    };
   }
 
   async waitForCheckOnlyUiReady(tabId, request, initialResponse) {
@@ -83,7 +112,7 @@ export class ChromeInteractionTransport {
         this.chrome,
         tabId,
         request.expectedUrl,
-        this.tabReadinessOptions,
+        this.readinessOptions(request),
       );
       try {
         response = await this.send(tabId, request);
@@ -106,12 +135,13 @@ export class ChromeInteractionTransport {
     if (tabId == null) throw new Error('Interaction tab id is required');
 
     try {
-      if (request?.mode === 'CHECK_ONLY') {
+      if (request?.expectedUrl) requireSiteAdapterUrl(this.siteAdapter.id, request.expectedUrl);
+      if (SAFE_RECEIVER_RECOVERY_MODES.has(request?.mode)) {
         await waitForTaskTabReady(
           this.chrome,
           tabId,
           request.expectedUrl,
-          this.tabReadinessOptions,
+          this.readinessOptions(request),
         );
       }
 
@@ -120,10 +150,9 @@ export class ChromeInteractionTransport {
         response = await this.send(tabId, request);
       } catch (error) {
         // An unpacked-extension update/reload can leave an already-open ChatGPT tab
-        // without the newly registered content-script receiver. CHECK_ONLY has zero
-        // page mutations, so it is safe to restore the two interaction scripts and
-        // retry exactly once. Effectful/prompt-bearing phases are never replayed here.
-        if (request?.mode !== 'CHECK_ONLY' || !isMissingReceiverError(error)) {
+        // without the newly registered content-script receiver. Only the read-only
+        // allow-list above may be restored and retried once.
+        if (!SAFE_RECEIVER_RECOVERY_MODES.has(request?.mode) || !isMissingReceiverError(error)) {
           const code = isMissingReceiverError(error)
             ? 'INTERACTION_RECEIVER_MISSING_EFFECTFUL'
             : 'INTERACTION_SEND_FAILED';
@@ -142,14 +171,23 @@ export class ChromeInteractionTransport {
           this.chrome,
           tabId,
           request.expectedUrl,
-          this.tabReadinessOptions,
+          this.readinessOptions(request),
         );
         try {
-          await this.restoreMissingCheckOnlyReceiver(tabId);
+          await this.restoreMissingSafeReceiver(tabId);
         } catch (restoreError) {
+          if (isChromeNetworkErrorPageAccessError(restoreError)) {
+            await reloadAfterNetworkErrorPage(this.chrome, tabId);
+            throw diagnosticError(
+              'CHATGPT_PAGE_UNAVAILABLE',
+              'ChatGPT page is temporarily unavailable; navigation will be retried after the configured backoff',
+              restoreError,
+              request,
+            );
+          }
           throw diagnosticError(
             'INTERACTION_RECEIVER_RESTORE_FAILED',
-            'CHECK_ONLY receiver restoration failed after the receiving end was missing',
+            'Safe receiver restoration failed after the receiving end was missing',
             restoreError,
             request,
           );
@@ -160,8 +198,8 @@ export class ChromeInteractionTransport {
           throw diagnosticError(
             isMissingReceiverError(retryError)
               ? 'INTERACTION_RECEIVER_STILL_MISSING'
-              : 'INTERACTION_CHECK_ONLY_RETRY_FAILED',
-            'CHECK_ONLY failed after one bounded receiver restoration attempt',
+              : 'INTERACTION_SAFE_PHASE_RETRY_FAILED',
+            'A safe interaction phase failed after one bounded receiver restoration attempt',
             retryError,
             request,
           );

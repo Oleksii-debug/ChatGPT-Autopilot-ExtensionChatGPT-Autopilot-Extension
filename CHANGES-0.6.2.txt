@@ -1,0 +1,12 @@
+ChatGPT Автопілот 0.6.2 — AI ROUTER READINESS GATE
+
+НОВЕ
+- Увімкнений AI-координатор більше не зберігає конфігурацію, яка гарантовано впаде через порожнє поле моделі.
+- Режим primary вимагає primary model; strong — strong model; hybrid-auto/hybrid-rules — обидві моделі.
+- Вимкнений AI-координатор як і раніше дозволяє зберегти неповну чернетку.
+- UI називає OpenAI-compatible коректно: LM Studio/local або remote HTTPS, а не localhost-only.
+
+БАЗА 0.6.1 ЗБЕРЕЖЕНА
+- безпечна діагностика compatible endpoint/credential presence без видачі ключа;
+- remote compatible HTTPS guard + loopback HTTP;
+- DPAPI credentials; FIFO; hybrid routing; AI Manager; opt-in TUNE_SESSION.

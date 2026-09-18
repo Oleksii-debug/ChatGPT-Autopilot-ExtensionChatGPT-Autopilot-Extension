@@ -1,8 +1,8 @@
-import { normalizeChatUrl, TabStrategy } from './schema.js';
+import { normalizeChatUrl, OperationPhase, TabStrategy } from './schema.js';
 
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
-const DEFAULT_TAB_READY_TIMEOUT_MS = 30000;
-const DEFAULT_TAB_READY_POLL_MS = 100;
+const DEFAULT_TAB_READY_TIMEOUT_MS = 90000;
+const DEFAULT_TAB_READY_POLL_MS = 250;
 
 export class TabReadinessError extends Error {
   constructor(safeDiagnosticCode, message, cause = null) {
@@ -21,6 +21,64 @@ function normalizedTabUrl(tab) {
   }
 }
 
+function conversationId(url) {
+  try {
+    return new URL(url).pathname.match(/\/c\/([^/]+)/u)?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+// ChatGPT can canonicalize a Custom GPT conversation from
+// /g/<gpt-slug>/c/<conversation-id> to /c/<conversation-id>.  The stable
+// conversation id is the authority; treating the canonical redirect as a
+// different Task causes an endless navigation/retry loop.
+export function sameChatConversationUrl(observed, expected) {
+  if (!observed || !expected) return false;
+  if (observed === expected) return true;
+  try {
+    const observedUrl = new URL(observed);
+    const expectedUrl = new URL(expected);
+    const observedId = conversationId(observedUrl.href);
+    const expectedId = conversationId(expectedUrl.href);
+    return observedUrl.hostname === expectedUrl.hostname
+      && Boolean(observedId)
+      && observedId === expectedId;
+  } catch {
+    return false;
+  }
+}
+
+
+// A launch surface (/ or /g/<slug>) legitimately becomes a newly-created
+// conversation after Send. During an unresolved post-submit operation the
+// extension must keep ownership of that same tab instead of discarding the
+// hint and opening another root ChatGPT tab.
+export function expectedPostSendConversationUrl(observed, expected) {
+  if (!observed || !expected) return false;
+  try {
+    const observedUrl = new URL(observed);
+    const expectedUrl = new URL(expected);
+    if (observedUrl.hostname !== expectedUrl.hostname) return false;
+    const observedId = conversationId(observedUrl.href);
+    if (!observedId || conversationId(expectedUrl.href)) return false;
+    if (expectedUrl.pathname === '/') return /^\/c\/[^/]+(?:\/)?$/u.test(observedUrl.pathname);
+    const expectedGpt = expectedUrl.pathname.match(/^\/g\/([^/]+)\/?$/u)?.[1] || '';
+    if (!expectedGpt) return false;
+    const observedGpt = observedUrl.pathname.match(/^\/g\/([^/]+)\/c\/[^/]+(?:\/)?$/u)?.[1] || '';
+    return observedGpt === expectedGpt || /^\/c\/[^/]+(?:\/)?$/u.test(observedUrl.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function operationAllowsPostSendTab(session, task) {
+  const operation = session?.operation;
+  return operation?.taskId === task?.id
+    && [OperationPhase.SUBMITTING, OperationPhase.AMBIGUOUS].includes(operation.phase)
+    && Number(operation.submitStartedAt || 0) > 0;
+}
+
 function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -30,6 +88,7 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   pollIntervalMs = DEFAULT_TAB_READY_POLL_MS,
   now = () => Date.now(),
   wait = waitMs,
+  allowPostSendNavigation = false,
 } = {}) {
   if (!chromeApi?.tabs?.get) {
     throw new TabReadinessError(
@@ -66,10 +125,13 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
 
     const observedUrl = normalizedTabUrl(lastTab);
     const documentReady = lastTab.status === 'complete' || lastTab.status == null;
-    if (documentReady && observedUrl === normalizedExpected) return lastTab;
+    if (documentReady && (sameChatConversationUrl(observedUrl, normalizedExpected)
+      || (allowPostSendNavigation && expectedPostSendConversationUrl(observedUrl, normalizedExpected)))) return lastTab;
 
     if (now() >= deadline) {
-      const code = documentReady && observedUrl && observedUrl !== normalizedExpected
+      const expectedLocation = sameChatConversationUrl(observedUrl, normalizedExpected)
+        || (allowPostSendNavigation && expectedPostSendConversationUrl(observedUrl, normalizedExpected));
+      const code = documentReady && observedUrl && !expectedLocation
         ? 'TAB_NAVIGATION_URL_MISMATCH'
         : 'TAB_NAVIGATION_TIMEOUT';
       throw new TabReadinessError(
@@ -101,16 +163,68 @@ function hintHasExpectedOwnership(hint, { sessionId, kind, normalizedUrl = null 
   return true;
 }
 
+
+async function retireOwnedHintBeforeReuse(chromeApi, state, hintKey, hint) {
+  if (!hint?.retirePending || hint?.ownedByExtension !== true || hint.tabId == null) return false;
+  try {
+    await chromeApi.tabs.remove(hint.tabId);
+  } catch (error) {
+    try {
+      await chromeApi.tabs.get(hint.tabId);
+    } catch {
+      delete state.tabHintsByTaskId[hintKey];
+      return true;
+    }
+    throw new TabReadinessError(
+      'TAB_RETIRE_PENDING',
+      'Extension-owned ChatGPT tab is pending retirement before reuse',
+      error,
+    );
+  }
+  delete state.tabHintsByTaskId[hintKey];
+  return true;
+}
+
+async function retireStaleOwnedOpenCloseHint(chromeApi, state, hintKey, hint) {
+  if (!hint || hint.tabId == null || hint.ownedByExtension === false) {
+    delete state.tabHintsByTaskId[hintKey];
+    return;
+  }
+  try {
+    await chromeApi.tabs.remove(hint.tabId);
+    delete state.tabHintsByTaskId[hintKey];
+  } catch (error) {
+    try {
+      await chromeApi.tabs.get(hint.tabId);
+    } catch {
+      delete state.tabHintsByTaskId[hintKey];
+      return;
+    }
+    hint.ownedByExtension = true;
+    hint.retirePending = true;
+    state.tabHintsByTaskId[hintKey] = hint;
+    throw new TabReadinessError(
+      'TAB_RETIRE_PENDING',
+      'Stale extension-owned ChatGPT tab could not be retired safely',
+      error,
+    );
+  }
+}
+
 async function getValidHintedTab(chromeApi, hint, expected) {
   if (!hintHasExpectedOwnership(hint, expected)) return null;
   const identityUrl = hint.normalizedUrl || expected.normalizedUrl;
   try {
     const tab = await chromeApi.tabs.get(hint.tabId);
-    return normalizedTabUrl(tab) === identityUrl ? tab : null;
+    const observed = normalizedTabUrl(tab);
+    if (sameChatConversationUrl(observed, identityUrl)) return tab;
+    if (expected.allowPostSendNavigation && expectedPostSendConversationUrl(observed, identityUrl)) return tab;
+    return null;
   } catch {
     return null;
   }
 }
+
 
 function hintStillRepresentsCurrentOwnership(state, hintKey, hint) {
   if (!hint?.sessionId) return false;
@@ -125,8 +239,16 @@ function hintStillRepresentsCurrentOwnership(state, hintKey, hint) {
   if (hint.kind != null && hint.kind !== 'TASK') return false;
   if (owner.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) return false;
   const task = owner.tasksById?.[hintKey];
-  if (!task) return false;
-  return Boolean(hint.normalizedUrl) && hint.normalizedUrl === task.normalizedUrl;
+  if (!task || !hint.normalizedUrl) return false;
+  if (hint.normalizedUrl === task.normalizedUrl) return true;
+
+  // A fresh-launch Task is rebound to its concrete /c/<id> while an attempted
+  // Send is unresolved. The ownership hint deliberately retains the original
+  // launch surface so recovery can prove that this is the exact extension-owned
+  // tab instead of adopting another user's tab. Treat that root→conversation
+  // transition as live ownership until the operation becomes terminal.
+  return operationAllowsPostSendTab(owner, task)
+    && expectedPostSendConversationUrl(task.normalizedUrl, hint.normalizedUrl);
 }
 
 function claimedTabIdsByOtherSessions(state, sessionId) {
@@ -142,21 +264,35 @@ async function findMatchingChatTab(chromeApi, normalizedUrl, excludedTabIds = ne
   const tabs = await chromeApi.tabs.query({ url: 'https://chatgpt.com/*' });
   return tabs.find(tab => {
     if (excludedTabIds.has(tab.id)) return false;
-    return normalizedTabUrl(tab) === normalizedUrl;
+    return sameChatConversationUrl(normalizedTabUrl(tab), normalizedUrl);
   }) || null;
 }
 
 async function resolveWorkerTab(chromeApi, state, sessionId, task) {
   const key = workerHintKey(sessionId);
-  const hint = state.tabHintsByTaskId[key];
+  let hint = state.tabHintsByTaskId[key];
+  const session = state.sessionsById?.[sessionId];
+  if (hint?.retirePending && hint?.ownedByExtension === true) {
+    await retireOwnedHintBeforeReuse(chromeApi, state, key, hint);
+    hint = state.tabHintsByTaskId[key];
+  }
+  const preserveCurrentPostSend = operationAllowsPostSendTab(session, task);
+  const terminalOperationOwnsGeneratedChat = Boolean(
+    session?.operation?.phase === OperationPhase.SENT_VERIFIED
+    && Number(session.operation.submitStartedAt || 0) > 0
+    && session.operation.targetUrl
+    && hint?.normalizedUrl === session.operation.targetUrl
+  );
   const hintedTab = await getValidHintedTab(chromeApi, hint, {
     sessionId,
     kind: 'SESSION_WORKER',
+    allowPostSendNavigation: preserveCurrentPostSend || terminalOperationOwnsGeneratedChat,
   });
 
   if (hintedTab) {
     const currentUrl = normalizedTabUrl(hintedTab);
-    if (currentUrl === task.normalizedUrl) return hintedTab;
+    if (sameChatConversationUrl(currentUrl, task.normalizedUrl)
+        || (preserveCurrentPostSend && expectedPostSendConversationUrl(currentUrl, task.normalizedUrl))) return hintedTab;
 
     const navigated = await chromeApi.tabs.update(hintedTab.id, {
       url: task.normalizedUrl,
@@ -167,6 +303,8 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
       sessionId,
       normalizedUrl: task.normalizedUrl,
       kind: 'SESSION_WORKER',
+      ownedByExtension: hint?.ownedByExtension === true,
+      retirePending: false,
       boundAt: Date.now(),
     };
     return navigated;
@@ -174,13 +312,21 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
 
   delete state.tabHintsByTaskId[key];
   const excluded = claimedTabIdsByOtherSessions(state, sessionId);
-  const match = await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded);
+  // A launch surface (/ or /g/<slug>) has no durable conversation identity.
+  // Never adopt an arbitrary existing launch tab: concurrent Sessions could
+  // otherwise race on the same composer. Concrete /c/<id> targets may reuse
+  // an unclaimed matching tab because the conversation identity is exclusive.
+  const match = conversationId(task.normalizedUrl)
+    ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
+    : null;
   const tab = match || await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
   state.tabHintsByTaskId[key] = {
     tabId: tab.id,
     sessionId,
     normalizedUrl: task.normalizedUrl,
     kind: 'SESSION_WORKER',
+    ownedByExtension: !match,
+    retirePending: false,
     boundAt: Date.now(),
   };
   return tab;
@@ -192,25 +338,72 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
     return resolveWorkerTab(chromeApi, state, sessionId, task);
   }
 
-  const hint = state.tabHintsByTaskId[task.id];
+  let hint = state.tabHintsByTaskId[task.id];
+  if (hint?.retirePending && hint?.ownedByExtension === true) {
+    await retireOwnedHintBeforeReuse(chromeApi, state, task.id, hint);
+    hint = state.tabHintsByTaskId[task.id];
+  }
   if (hint?.tabId != null) {
+    const postSendRecovery = operationAllowsPostSendTab(session, task);
+    // During a fresh-launch ambiguous Send, applyInteractionResult binds the
+    // Task to the observed concrete /c/<id>, while the tab hint still records
+    // the root launch surface that this extension created. Validate against the
+    // hint identity in that one proven transition so we reuse the same physical
+    // tab. Otherwise the root hint would look stale, a second tab would be
+    // opened, and the original extension-owned tab would become orphaned.
+    const preservesFreshLaunchOwnership = postSendRecovery
+      && hint.normalizedUrl
+      && expectedPostSendConversationUrl(task.normalizedUrl, hint.normalizedUrl);
     const tab = await getValidHintedTab(chromeApi, hint, {
       sessionId,
       kind: 'TASK',
-      normalizedUrl: task.normalizedUrl,
+      normalizedUrl: preservesFreshLaunchOwnership ? hint.normalizedUrl : task.normalizedUrl,
+      allowPostSendNavigation: postSendRecovery,
     });
     if (tab) return tab;
-    delete state.tabHintsByTaskId[task.id];
+    if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
+        || hint?.ownedByExtension === true) {
+      // OPEN_CLOSE is always extension-owned. KEEP_TASK can also be safely
+      // retired when provenance explicitly proves this extension created the
+      // stale tab. Adopted/user tabs are only unbound, never physically closed.
+      await retireStaleOwnedOpenCloseHint(chromeApi, state, task.id, hint);
+    } else {
+      delete state.tabHintsByTaskId[task.id];
+    }
+  }
+
+  // Open-and-close mode owns only tabs it creates.  It must never adopt a
+  // manually opened conversation tab and then close the user's tab later.
+  if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK) {
+    const tab = await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+    state.tabHintsByTaskId[task.id] = {
+      tabId: tab.id,
+      sessionId,
+      normalizedUrl: task.normalizedUrl,
+      kind: 'TASK',
+      ownedByExtension: true,
+      retirePending: false,
+      boundAt: Date.now(),
+    };
+    return tab;
   }
 
   const excluded = claimedTabIdsByOtherSessions(state, sessionId);
-  const match = await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded);
+  // A launch surface (/ or /g/<slug>) has no durable conversation identity.
+  // Never adopt an arbitrary existing launch tab: concurrent Sessions could
+  // otherwise race on the same composer. Concrete /c/<id> targets may reuse
+  // an unclaimed matching tab because the conversation identity is exclusive.
+  const match = conversationId(task.normalizedUrl)
+    ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
+    : null;
   const tab = match || await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
   state.tabHintsByTaskId[task.id] = {
     tabId: tab.id,
     sessionId,
     normalizedUrl: task.normalizedUrl,
     kind: 'TASK',
+    ownedByExtension: !match,
+    retirePending: false,
     boundAt: Date.now(),
   };
   return tab;
