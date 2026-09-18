@@ -111,10 +111,9 @@ function applyPromptTarget(state, session, target, content) {
     return;
   }
   if (session.promptMode === 'UNIQUE') {
-    session.defaultUniquePrompt = content;
-  } else {
-    session.sharedPrompt = content;
+    throw new Error('Drive primary prompt target requires shared prompt mode');
   }
+  session.sharedPrompt = content;
 }
 
 export function acceptDriveSnapshot(state, sessionId, snapshot, { now = Date.now() } = {}) {
