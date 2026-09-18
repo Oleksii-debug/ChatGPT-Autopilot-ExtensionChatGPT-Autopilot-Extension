@@ -38,7 +38,7 @@ function buildSession(raw, index, now, version = 1) {
   requireRecord(raw, `Session ${index + 1}`); const id = requireId(raw.id, `Session ${index + 1} id`); const name = requireString(raw.name, `Session ${index + 1} name`, { allowEmpty: false, maxLength: 500 }).trim();
   const rawBatch = raw.batchChatFlow;
   const config = rawBatch ? validateBatchChatFlow({ ...rawBatch, enabled: true }) : null;
-  const tasks = config ? buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `${id}:batch:${++i}`; })() }) : (() => {
+  const tasks = config ? buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `${id}:batch:${++i}`; })(), now }) : (() => {
     if (!Array.isArray(raw.tasks) || raw.tasks.length < 1 || raw.tasks.length > 50) throw new Error(`Session ${name} must contain 1-50 tasks`);
     return raw.tasks.map(buildTask);
   })();
