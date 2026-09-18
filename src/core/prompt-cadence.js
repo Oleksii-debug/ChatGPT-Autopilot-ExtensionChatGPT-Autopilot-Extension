@@ -93,34 +93,38 @@ export function projectPromptForSession(state, session) {
   return session;
 }
 
-function snapshotVerifiedTimes(state) {
-  return Object.fromEntries(Object.entries(state?.sessionsById || {}).map(([id, session]) => [id, session.lastSuccessfulSendAt || 0]));
+function snapshotVerifiedCounts(state) {
+  return Object.fromEntries(Object.entries(state?.sessionsById || {}).map(([id, session]) => [
+    id,
+    Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
+      ? session.cadenceVerifiedSendCount
+      : 0,
+  ]));
 }
 
-function accountVerifiedTransitions(state, beforeTimes) {
+function finalizeCadenceTransitions(state, beforeCounts) {
   for (const [id, session] of Object.entries(state?.sessionsById || {})) {
     if (!cadenceEnabled(session)) continue;
-    const before = beforeTimes[id] || 0;
-    const after = session.lastSuccessfulSendAt || 0;
-    if (after > before) {
-      const prior = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0 ? session.cadenceVerifiedSendCount : 0;
-      session.cadenceVerifiedSendCount = prior + 1;
-      const config = getPromptCadenceConfig(state, id);
-      if (config.chatFlow.enabled && config.chatFlow.mode === 'staged') {
-        const stageOneTotal = 1 + config.chatFlow.continueCount;
-        if (session.cadenceVerifiedSendCount >= stageOneTotal + config.chatFlow.stage2Count) {
-          ensureSessionModuleState(session);
-          const standard = session.moduleWorkspaces[ExecutionModuleId.STANDARD_SENDS];
-          standard.runState = 'STOPPED';
-          standard.moduleCompleted = true;
-          const batch = session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT];
-          const batchActive = isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT)
-            && session.batchChatFlow?.enabled === true
-            && batch
-            && batch.moduleCompleted !== true
-            && ['RUNNING', 'RECOVERING'].includes(batch.runState);
-          if (!batchActive) session.runState = 'STOPPED';
-        }
+    const before = beforeCounts[id] || 0;
+    const after = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
+      ? session.cadenceVerifiedSendCount
+      : 0;
+    if (after <= before) continue;
+    const config = getPromptCadenceConfig(state, id);
+    if (config.chatFlow.enabled && config.chatFlow.mode === 'staged') {
+      const stageOneTotal = 1 + config.chatFlow.continueCount;
+      if (after >= stageOneTotal + config.chatFlow.stage2Count) {
+        ensureSessionModuleState(session);
+        const standard = session.moduleWorkspaces[ExecutionModuleId.STANDARD_SENDS];
+        standard.runState = 'STOPPED';
+        standard.moduleCompleted = true;
+        const batch = session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT];
+        const batchActive = isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT)
+          && session.batchChatFlow?.enabled === true
+          && batch
+          && batch.moduleCompleted !== true
+          && ['RUNNING', 'RECOVERING'].includes(batch.runState);
+        if (!batchActive) session.runState = 'STOPPED';
       }
     }
   }
@@ -130,7 +134,7 @@ function accountVerifiedTransitions(state, beforeTimes) {
 export class CadencedRepository {
   constructor(baseRepository) { this.base = baseRepository; }
   async load() { const state = await this.base.load(); for (const session of Object.values(state?.sessionsById || {})) projectPromptForSession(state, session); return state; }
-  async update(mutator) { return this.base.update(async draft => { const beforeTimes = snapshotVerifiedTimes(draft); const result = await mutator(draft); return accountVerifiedTransitions(result || draft, beforeTimes); }); }
+  async update(mutator) { return this.base.update(async draft => { const beforeCounts = snapshotVerifiedCounts(draft); const result = await mutator(draft); return finalizeCadenceTransitions(result || draft, beforeCounts); }); }
 }
 
 export const PROMPT_CADENCE_MAX_PROMPTS = MAX_PROMPTS;
