@@ -1,3 +1,5 @@
+import { SESSION_DEFAULT_PROFILE_VALUES } from '../shared/session-defaults.js';
+
 export const MAX_TEMPLATE_SESSIONS = 200;
 
 function assertSessionCount(value) {
@@ -18,12 +20,12 @@ function templateSession(index) {
     sharedPrompt: '',
     defaultUniquePrompt: '',
     runMode: 'continuous',
-    minimumSendIntervalMinutes: 2,
-    preSendDelaySeconds: 5,
-    busyCheckDelaySeconds: 2,
-    retryBackoffSeconds: 30,
-    retryPolicy: 'safe',
-    tabStrategy: 'worker',
+    minimumSendIntervalMinutes: SESSION_DEFAULT_PROFILE_VALUES.minimumSendIntervalMinutes,
+    preSendDelaySeconds: SESSION_DEFAULT_PROFILE_VALUES.preSendDelaySeconds,
+    busyCheckDelaySeconds: SESSION_DEFAULT_PROFILE_VALUES.busyCheckDelaySeconds,
+    retryBackoffSeconds: SESSION_DEFAULT_PROFILE_VALUES.retryBackoffSeconds,
+    retryPolicy: SESSION_DEFAULT_PROFILE_VALUES.retryPolicy,
+    tabStrategy: SESSION_DEFAULT_PROFILE_VALUES.tabStrategy,
     tasks: [{
       id: `template-session-${ordinal}-task-1`,
       enabled: false,
