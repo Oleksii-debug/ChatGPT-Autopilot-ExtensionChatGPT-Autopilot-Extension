@@ -56,6 +56,7 @@ export const OrchestrationHierarchyEventType = Object.freeze({
   RESUME_SCOPE: 'RESUME_SCOPE',
   STOP_SCOPE: 'STOP_SCOPE',
   GENERATION_SUPERSEDED: 'GENERATION_SUPERSEDED',
+  GENERATION_RECOVERY_REQUESTED: 'GENERATION_RECOVERY_REQUESTED',
   RUNTIME_RECONCILE: 'RUNTIME_RECONCILE',
 });
 
@@ -170,6 +171,10 @@ function normalizeNode(raw, index) {
   const chatMode = text(raw.chatMode || OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION).toUpperCase();
   if (!CHAT_MODES.has(chatMode)) throw new Error(`Invalid chatMode for ${id}`);
   const promptProfileId = requireId(raw.promptProfileId, `nodes[${index}].promptProfileId`);
+  const recoveryPromptProfileId = requireId(
+    raw.recoveryPromptProfileId ?? raw.recovery_prompt_profile_id ?? promptProfileId,
+    `nodes[${index}].recoveryPromptProfileId`,
+  );
   const maxActiveChildren = requireInteger(
     raw.maxActiveChildren ?? childIds.length,
     `nodes[${index}].maxActiveChildren`,
@@ -184,6 +189,7 @@ function normalizeNode(raw, index) {
     childIds,
     chatMode,
     promptProfileId,
+    recoveryPromptProfileId,
     maxActiveChildren,
     barrier,
     providerBinding,
@@ -242,6 +248,7 @@ export function validateOrchestrationGraphV1(raw) {
 
   for (const node of nodes) {
     if (!promptProfileIds.has(node.promptProfileId)) throw new Error(`Unknown prompt profile for ${node.id}`);
+    if (!promptProfileIds.has(node.recoveryPromptProfileId)) throw new Error(`Unknown recovery prompt profile for ${node.id}`);
     if (node.parentId && !nodesById[node.parentId]) throw new Error(`Orphan node ${node.id}`);
     for (const childId of node.childIds) {
       const child = nodesById[childId];
@@ -396,6 +403,9 @@ function prepareActivation(graph, runtime, {
   const actionType = normalizedPurpose === OrchestrationActivationPurpose.RECONCILE
     ? OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
     : OrchestrationHierarchyActionType.ACTIVATE_NODE;
+  const promptProfileId = normalizedPurpose === OrchestrationActivationPurpose.RECOVERY
+    ? node.recoveryPromptProfileId
+    : node.promptProfileId;
   return {
     action: {
       type: actionType,
@@ -405,7 +415,7 @@ function prepareActivation(graph, runtime, {
       round: nodeRuntime.round,
       purpose: normalizedPurpose,
       chatMode: node.chatMode,
-      promptProfileId: node.promptProfileId,
+      promptProfileId,
       authority: 'EXISTING_CORE_SESSION_TASK_PATH',
     },
     reason: 'PREPARED',
@@ -513,6 +523,51 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       }
     }
     return { runtime, actions, deduplicated: false, reason: nextScope };
+  }
+
+  if (event.type === OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED) {
+    const { nodeId, generation } = nodeEventIdentity(event);
+    const nodeRuntime = runtime.nodesById[nodeId];
+    if (!graph.nodesById[nodeId] || !nodeRuntime) throw new Error(`Unknown node ${nodeId}`);
+    if (generation !== nodeRuntime.generation) {
+      return { runtime, actions, deduplicated: false, reason: 'STALE_GENERATION' };
+    }
+    const newGeneration = requireInteger(
+      event.newGeneration ?? event.new_generation ?? generation + 1,
+      'event.newGeneration',
+      generation + 1,
+      Number.MAX_SAFE_INTEGER,
+    );
+    const activationId = requireId(
+      event.activationId ?? event.activation_id ?? `recovery:${nodeId}:g${newGeneration}:r${nodeRuntime.round + 1}`,
+      'event.activationId',
+    );
+
+    for (const entry of Object.values(nodeRuntime.activationLedger)) {
+      if (entry.generation < newGeneration && entry.phase !== OrchestrationActivationPhase.TERMINAL) {
+        entry.phase = OrchestrationActivationPhase.SUPERSEDED;
+      }
+    }
+    nodeRuntime.generation = newGeneration;
+    nodeRuntime.lifecycle = OrchestrationNodeLifecycle.IDLE;
+    nodeRuntime.currentActivationId = '';
+    nodeRuntime.lastTerminalStatus = '';
+    nodeRuntime.round += 1;
+
+    const prepared = prepareActivation(graph, runtime, {
+      nodeId,
+      activationId,
+      generation: newGeneration,
+      purpose: OrchestrationActivationPurpose.RECOVERY,
+      nowMs,
+    });
+    if (prepared.action) actions.push(prepared.action);
+    return {
+      runtime,
+      actions,
+      deduplicated: false,
+      reason: prepared.action ? 'GENERATION_RECOVERY_PREPARED' : prepared.reason,
+    };
   }
 
   if (event.type === OrchestrationHierarchyEventType.GENERATION_SUPERSEDED) {
@@ -637,7 +692,8 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     nodeRuntime.lifecycle = OrchestrationNodeLifecycle.TERMINAL;
     nodeRuntime.lastTerminalStatus = status;
 
-    if (ledger.purpose === OrchestrationActivationPurpose.DELEGATE && node.childIds.length) {
+    if ([OrchestrationActivationPurpose.DELEGATE, OrchestrationActivationPurpose.RECOVERY].includes(ledger.purpose)
+        && node.childIds.length) {
       for (const childId of node.childIds.slice(0, node.maxActiveChildren || node.childIds.length)) {
         const childRuntime = runtime.nodesById[childId];
         const childActivationId = activationIdForChild(activationId, childId, childRuntime.generation, nodeRuntime.round);
