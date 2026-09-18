@@ -9,8 +9,11 @@ const manifest = JSON.parse(fs.readFileSync(new URL('../../manifest.json', impor
 test('manifest wires the options UI and ChatGPT content scripts with bounded permissions', () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.options_ui.page, 'src/ui/options.html');
-  assert.deepEqual(manifest.permissions.sort(), ['alarms', 'scripting', 'storage', 'tabs']);
-  assert.deepEqual(manifest.host_permissions, ['https://chatgpt.com/*']);
+  assert.deepEqual(manifest.permissions.sort(), ['alarms', 'identity', 'scripting', 'storage', 'tabs']);
+  assert.deepEqual(manifest.host_permissions, [
+    'https://chatgpt.com/*',
+    'https://www.googleapis.com/*',
+  ]);
   assert.deepEqual(manifest.content_scripts, [{
     matches: ['https://chatgpt.com/*'],
     js: ['src/interaction/chatgpt-adapter.js', 'src/interaction/content-script.js'],
@@ -142,8 +145,8 @@ test('transient cold-start failure is retried once a wake event reaches the same
 
     assert.equal(
       clearAttempts,
-      3,
-      'simultaneous wake events must share one retry reconciliation, then one normal runtime alarm reconciliation',
+      4,
+      'simultaneous wake events share the active pass and then drain one remembered follow-up cycle',
     );
   } finally {
     delete globalThis.chrome;
@@ -224,14 +227,16 @@ test('enabled cold wake reconciles durable submission state and coalesces simult
 
     assert.deepEqual(
       alarmCalls,
-      [['create', 'autopilot-core-wake', retryAt]],
-      'simultaneous startup/alarm wake events must share one enabled in-flight runtime cycle',
+      [
+        ['create', 'autopilot-core-wake', retryAt],
+        ['create', 'autopilot-core-wake', retryAt],
+      ],
+      'simultaneous startup/alarm wake events must share the active pass and drain one remembered follow-up',
     );
-    assert.deepEqual(statusMessages, [{
-      channel: 'autopilot-core',
-      type: 'STATUS_CHANGED',
-      sessionId: 's1',
-    }]);
+    assert.deepEqual(statusMessages, [
+      { channel: 'autopilot-core', type: 'STATUS_CHANGED', sessionId: 's1' },
+      { channel: 'autopilot-core', type: 'STATUS_CHANGED', sessionId: 's1' },
+    ]);
   } finally {
     delete globalThis.chrome;
   }

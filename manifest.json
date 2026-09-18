@@ -7,10 +7,12 @@
     "storage",
     "alarms",
     "tabs",
-    "scripting"
+    "scripting",
+    "identity"
   ],
   "host_permissions": [
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://www.googleapis.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",

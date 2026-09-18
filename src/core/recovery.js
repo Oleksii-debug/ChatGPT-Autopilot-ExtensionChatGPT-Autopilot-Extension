@@ -1,5 +1,6 @@
 import { OperationPhase, RunState } from './schema.js';
 import { selectNextTask } from './scheduler.js';
+import { computeNextDriveWake } from './drive-sync.js';
 
 export const ALARM_NAME = 'autopilot-core-wake';
 export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not available until the durable send runner is installed.';
@@ -82,6 +83,9 @@ export function computeNextWake(state, now = Date.now()) {
     const schedulerWake = schedulerWakeForSession(session, now);
     if (schedulerWake != null) earliest = Math.min(earliest, schedulerWake);
   }
+
+  const driveWake = computeNextDriveWake(state, now);
+  if (driveWake != null) earliest = Math.min(earliest, driveWake);
 
   return earliest < Infinity ? earliest : null;
 }

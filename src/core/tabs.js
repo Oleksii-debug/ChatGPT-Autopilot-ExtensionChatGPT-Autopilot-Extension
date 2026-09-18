@@ -1,8 +1,11 @@
 import { normalizeChatUrl, TabStrategy } from './schema.js';
+import { getPromptCadenceConfig } from './prompt-cadence.js';
 
 const workerHintKey = sessionId => `__session_worker__:${sessionId}`;
+const chatFlowHintKey = sessionId => `__chat_flow__:${sessionId}`;
 const DEFAULT_TAB_READY_TIMEOUT_MS = 30000;
 const DEFAULT_TAB_READY_POLL_MS = 100;
+const CHAT_FLOW_ROOT_URL = 'https://chatgpt.com/';
 
 export class TabReadinessError extends Error {
   constructor(safeDiagnosticCode, message, cause = null) {
@@ -32,21 +35,14 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   wait = waitMs,
 } = {}) {
   if (!chromeApi?.tabs?.get) {
-    throw new TabReadinessError(
-      'TAB_READINESS_API_UNAVAILABLE',
-      'Chrome tab readiness API is unavailable before CHECK_ONLY',
-    );
+    throw new TabReadinessError('TAB_READINESS_API_UNAVAILABLE', 'Chrome tab readiness API is unavailable before CHECK_ONLY');
   }
 
   let normalizedExpected;
   try {
     normalizedExpected = normalizeChatUrl(expectedUrl);
   } catch (error) {
-    throw new TabReadinessError(
-      'TAB_EXPECTED_URL_INVALID',
-      'Selected task has an invalid ChatGPT URL before CHECK_ONLY',
-      error,
-    );
+    throw new TabReadinessError('TAB_EXPECTED_URL_INVALID', 'Selected task has an invalid ChatGPT URL before CHECK_ONLY', error);
   }
 
   const startedAt = now();
@@ -57,11 +53,7 @@ export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
     try {
       lastTab = await chromeApi.tabs.get(tabId);
     } catch (error) {
-      throw new TabReadinessError(
-        'TAB_UNAVAILABLE_DURING_READINESS_CHECK',
-        'Selected ChatGPT tab became unavailable before CHECK_ONLY',
-        error,
-      );
+      throw new TabReadinessError('TAB_UNAVAILABLE_DURING_READINESS_CHECK', 'Selected ChatGPT tab became unavailable before CHECK_ONLY', error);
     }
 
     const observedUrl = normalizedTabUrl(lastTab);
@@ -93,6 +85,11 @@ function hintHasExpectedOwnership(hint, { sessionId, kind, normalizedUrl = null 
     return Boolean(hint.normalizedUrl);
   }
 
+  if (kind === 'CHAT_FLOW') {
+    if (hint.sessionId !== sessionId) return false;
+    return hint.kind === 'CHAT_FLOW';
+  }
+
   if (hint.sessionId != null && hint.sessionId !== sessionId) return false;
   if (hint.kind != null && hint.kind !== 'TASK') return false;
   const identityUrl = hint.normalizedUrl || normalizedUrl;
@@ -103,10 +100,8 @@ function hintHasExpectedOwnership(hint, { sessionId, kind, normalizedUrl = null 
 
 async function getValidHintedTab(chromeApi, hint, expected) {
   if (!hintHasExpectedOwnership(hint, expected)) return null;
-  const identityUrl = hint.normalizedUrl || expected.normalizedUrl;
   try {
-    const tab = await chromeApi.tabs.get(hint.tabId);
-    return normalizedTabUrl(tab) === identityUrl ? tab : null;
+    return await chromeApi.tabs.get(hint.tabId);
   } catch {
     return null;
   }
@@ -120,6 +115,10 @@ function hintStillRepresentsCurrentOwnership(state, hintKey, hint) {
   if (hint.kind === 'SESSION_WORKER') {
     return owner.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
       && hintKey === workerHintKey(owner.id);
+  }
+
+  if (hint.kind === 'CHAT_FLOW') {
+    return owner.tabStrategy !== TabStrategy.ONE_WORKER_TAB_PER_SESSION;
   }
 
   if (hint.kind != null && hint.kind !== 'TASK') return false;
@@ -146,30 +145,91 @@ async function findMatchingChatTab(chromeApi, normalizedUrl, excludedTabIds = ne
   }) || null;
 }
 
+function chatFlowNeedsNewChat(session, config) {
+  const count = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
+    ? session.cadenceVerifiedSendCount
+    : 0;
+  if (config.chatFlow.mode === 'new-chat-after') return count > 0 && count % config.chatFlow.newChatEveryN === 0;
+  if (config.chatFlow.mode === 'staged') return count === (1 + config.chatFlow.continueCount);
+  return false;
+}
+
+async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
+  const config = getPromptCadenceConfig(state, sessionId);
+  const key = task.id;
+  const hint = state.tabHintsByTaskId[key];
+  const sessionHint = state.tabHintsByTaskId[chatFlowHintKey(sessionId)];
+  const shouldCreateNew = chatFlowNeedsNewChat(session, config);
+
+  const hinted = await getValidHintedTab(chromeApi, hint, { sessionId, kind: 'CHAT_FLOW' })
+    || await getValidHintedTab(chromeApi, sessionHint, { sessionId, kind: 'CHAT_FLOW' });
+
+  if (hinted) {
+    const currentUrl = normalizedTabUrl(hinted) || CHAT_FLOW_ROOT_URL;
+    const boundaryAlreadyApplied = shouldCreateNew && currentUrl === CHAT_FLOW_ROOT_URL;
+    if (!shouldCreateNew || boundaryAlreadyApplied) {
+      task.url = currentUrl;
+      task.normalizedUrl = currentUrl;
+      const sharedHint = { tabId: hinted.id, sessionId, normalizedUrl: currentUrl, kind: 'CHAT_FLOW', boundAt: Date.now() };
+      state.tabHintsByTaskId[chatFlowHintKey(sessionId)] = { ...sharedHint };
+      state.tabHintsByTaskId[key] = { ...sharedHint };
+      return hinted;
+    }
+  }
+
+  let tab = null;
+  const rotationHint = sessionHint || hint;
+  if (rotationHint?.tabId != null) {
+    try {
+      if (shouldCreateNew) tab = await chromeApi.tabs.update(rotationHint.tabId, { url: CHAT_FLOW_ROOT_URL, active: false });
+      else tab = await chromeApi.tabs.get(rotationHint.tabId);
+    } catch {
+      tab = null;
+    }
+  }
+
+  if (!tab) {
+    const initialUrl = shouldCreateNew ? CHAT_FLOW_ROOT_URL : (sessionHint?.normalizedUrl || task.normalizedUrl || task.url);
+    const excluded = claimedTabIdsByOtherSessions(state, sessionId);
+    const match = await findMatchingChatTab(chromeApi, initialUrl, excluded);
+    tab = match || await chromeApi.tabs.create({ url: initialUrl, active: false });
+  }
+
+  const currentUrl = normalizedTabUrl(tab) || CHAT_FLOW_ROOT_URL;
+  task.url = currentUrl;
+  task.normalizedUrl = currentUrl;
+  const sharedHint = { tabId: tab.id, sessionId, normalizedUrl: currentUrl, kind: 'CHAT_FLOW', boundAt: Date.now() };
+  state.tabHintsByTaskId[chatFlowHintKey(sessionId)] = { ...sharedHint };
+  state.tabHintsByTaskId[key] = { ...sharedHint };
+  return tab;
+}
+
 async function resolveWorkerTab(chromeApi, state, sessionId, task) {
   const key = workerHintKey(sessionId);
   const hint = state.tabHintsByTaskId[key];
-  const hintedTab = await getValidHintedTab(chromeApi, hint, {
-    sessionId,
-    kind: 'SESSION_WORKER',
-  });
+  const hintedTab = await getValidHintedTab(chromeApi, hint, { sessionId, kind: 'SESSION_WORKER' });
 
   if (hintedTab) {
     const currentUrl = normalizedTabUrl(hintedTab);
     if (currentUrl === task.normalizedUrl) return hintedTab;
-
-    const navigated = await chromeApi.tabs.update(hintedTab.id, {
-      url: task.normalizedUrl,
-      active: false,
-    });
-    state.tabHintsByTaskId[key] = {
-      tabId: navigated.id,
-      sessionId,
-      normalizedUrl: task.normalizedUrl,
-      kind: 'SESSION_WORKER',
-      boundAt: Date.now(),
-    };
-    return navigated;
+    // The worker tab may be navigated only when its live URL still equals the
+    // durable identity previously owned by this Session. A changed/unrelated
+    // live URL is treated as stale and must never be navigated over.
+    if (currentUrl === hint.normalizedUrl) {
+      try {
+        const navigated = await chromeApi.tabs.update(hintedTab.id, { url: task.normalizedUrl, active: false });
+        state.tabHintsByTaskId[key] = {
+          tabId: navigated.id,
+          sessionId,
+          normalizedUrl: task.normalizedUrl,
+          kind: 'SESSION_WORKER',
+          boundAt: Date.now(),
+        };
+        return navigated;
+      } catch {
+        // Fall through to exact-url discovery/create.
+      }
+    }
   }
 
   delete state.tabHintsByTaskId[key];
@@ -188,17 +248,15 @@ async function resolveWorkerTab(chromeApi, state, sessionId, task) {
 
 export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   const session = state.sessionsById?.[sessionId];
-  if (session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) {
-    return resolveWorkerTab(chromeApi, state, sessionId, task);
+  const chatFlow = getPromptCadenceConfig(state, sessionId).chatFlow;
+  if (session && chatFlow.enabled === true && ['same-chat', 'new-chat-after', 'staged'].includes(chatFlow.mode)) {
+    return bindChatFlowTaskTab(chromeApi, state, sessionId, task, session);
   }
+  if (session?.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION) return resolveWorkerTab(chromeApi, state, sessionId, task);
 
   const hint = state.tabHintsByTaskId[task.id];
   if (hint?.tabId != null) {
-    const tab = await getValidHintedTab(chromeApi, hint, {
-      sessionId,
-      kind: 'TASK',
-      normalizedUrl: task.normalizedUrl,
-    });
+    const tab = await getValidHintedTab(chromeApi, hint, { sessionId, kind: 'TASK', normalizedUrl: task.normalizedUrl });
     if (tab) return tab;
     delete state.tabHintsByTaskId[task.id];
   }
