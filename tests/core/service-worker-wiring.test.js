@@ -40,10 +40,12 @@ test('startup and canonical alarm invoke the event-driven execution cycle', () =
   assert.match(source, /alarm\.name === 'autopilot-core-wake'\) runSafely\(runExecutionCycle\(\)\)/);
 });
 
-test('overlapping wake events share one in-flight execution cycle', () => {
+test('overlapping wake events share the current cycle and remember one follow-up drain', () => {
   assert.match(source, /let executionCycleInFlight = null;/);
-  assert.match(source, /if \(executionCycleInFlight\) return executionCycleInFlight;/);
-  assert.match(source, /executionCycleInFlight = cycle\.then\(/);
+  assert.match(source, /let executionCycleRerunRequested = false;/);
+  assert.match(source, /if \(executionCycleInFlight\) \{\s*requestRememberedExecutionRerun\(\);\s*return executionCycleInFlight;\s*\}/s);
+  assert.match(source, /const rerunRequested = executionCycleRerunRequested;/);
+  assert.match(source, /if \(rerunRequested\) runSafely\(runExecutionCycle\(\)\);/);
 });
 
 test('production automatic execution is explicitly enabled while UI reconciliation remains execution-free', () => {
