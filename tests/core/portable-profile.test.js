@@ -121,6 +121,9 @@ test('portable profile imports prompt2, prompt3 and Drive binding without runtim
   input.sessions[0].driveSource = {
     sourceUrl: 'https://drive.google.com/file/d/file-123/view',
     target: 'prompt3',
+    autoSyncEnabled: true,
+    syncIntervalMinutes: 3,
+    minChars: 1000,
   };
 
   applyPortableProfile(state, input, { now: 100 });
@@ -133,6 +136,9 @@ test('portable profile imports prompt2, prompt3 and Drive binding without runtim
   const drive = getDriveSourceConfig(state, 'session-1');
   assert.equal(drive.fileId, 'file-123');
   assert.equal(drive.target, 'prompt3');
+  assert.equal(drive.autoSyncEnabled, true);
+  assert.equal(drive.syncIntervalMinutes, 3);
+  assert.equal(drive.minChars, 1000);
   assert.equal(drive.lastAcceptedVersion, '');
   assert.equal(drive.lastAcceptedHash, '');
 });
@@ -156,6 +162,9 @@ test('portable profile export round-trips cadence and Drive configuration but om
   input.sessions[0].driveSource = {
     sourceUrl: 'https://docs.google.com/document/d/doc-123/edit',
     target: 'prompt2',
+    autoSyncEnabled: true,
+    syncIntervalMinutes: 5,
+    minChars: 1200,
   };
   applyPortableProfile(state, input, { now: 100 });
   state.profile.driveSourceBySessionId['session-1'].lastAcceptedVersion = '99';
@@ -170,6 +179,9 @@ test('portable profile export round-trips cadence and Drive configuration but om
   assert.deepEqual(session.driveSource, {
     sourceUrl: 'https://docs.google.com/document/d/doc-123/edit',
     target: 'prompt2',
+    autoSyncEnabled: true,
+    syncIntervalMinutes: 5,
+    minChars: 1200,
   });
   assert.equal(JSON.stringify(exported).includes('lastAcceptedVersion'), false);
   assert.equal(JSON.stringify(exported).includes('secretish-runtime-hash'), false);
