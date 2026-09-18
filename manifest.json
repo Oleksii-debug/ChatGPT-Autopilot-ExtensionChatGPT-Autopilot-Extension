@@ -12,8 +12,6 @@
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
-    "https://drive.google.com/*",
-    "https://docs.google.com/*",
     "https://www.googleapis.com/*"
   ],
   "background": {
