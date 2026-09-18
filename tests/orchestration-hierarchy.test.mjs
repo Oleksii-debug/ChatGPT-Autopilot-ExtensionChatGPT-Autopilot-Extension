@@ -92,13 +92,18 @@ test('L1-A rejects duplicate node ids', () => {
 
 test('L1-A rejects orphan nodes', () => {
   const g = graph();
+  const manager = g.nodes.find(node => node.id === 'manager');
+  manager.childIds = ['worker-2'];
+  manager.maxActiveChildren = 1;
   g.nodes.find(node => node.id === 'worker-1').parentId = 'missing-manager';
   assert.throws(() => validateOrchestrationGraphV1(g), /Orphan node/);
 });
 
 test('L1-A rejects mismatched parent-child links', () => {
   const g = graph();
-  g.nodes.find(node => node.id === 'manager').childIds = ['worker-1'];
+  const manager = g.nodes.find(node => node.id === 'manager');
+  manager.childIds = ['worker-1'];
+  manager.maxActiveChildren = 1;
   assert.throws(() => validateOrchestrationGraphV1(g), /Mismatched child\/parent link/);
 });
 
