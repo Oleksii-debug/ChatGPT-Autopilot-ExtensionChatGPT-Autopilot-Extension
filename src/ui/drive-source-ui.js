@@ -31,9 +31,17 @@ async function refreshSource() {
   const source = data.source || {};
   $('drive-source-url').value = source.sourceUrl || '';
   $('drive-source-target').value = source.target || 'primary';
-  const identity = source.lastAcceptedVersion
-    ? `Прийнята версія: ${source.lastAcceptedVersion}. Остання синхронізація: ${source.lastSyncedAt ? new Date(source.lastSyncedAt).toLocaleString() : 'невідомо'}.`
+  $('drive-source-auto').checked = source.autoSyncEnabled === true;
+  $('drive-source-interval').value = Number(source.syncIntervalMinutes) || 3;
+  $('drive-source-min-chars').value = Number(source.minChars) || 1000;
+  const accepted = source.lastAcceptedVersion
+    ? `Прийнята версія: ${source.lastAcceptedVersion}. Останнє застосування: ${source.lastSyncedAt ? new Date(source.lastSyncedAt).toLocaleString() : 'невідомо'}.`
     : 'Стабільний snapshot ще не приймався.';
+  const checked = source.lastCheckedAt
+    ? ` Остання перевірка: ${new Date(source.lastCheckedAt).toLocaleString()}.`
+    : '';
+  const error = source.lastSyncError ? ` Помилка: ${source.lastSyncError}.` : '';
+  const identity = `${accepted}${checked}${error}`;
   $('drive-source-identity').textContent = identity;
   return source;
 }
@@ -44,7 +52,23 @@ async function bindSource() {
   try {
     const url = $('drive-source-url').value.trim();
     const target = $('drive-source-target').value;
-    const data = await core('SET_DRIVE_SOURCE', { sessionId, sourceUrl: url, target });
+    const autoSyncEnabled = $('drive-source-auto').checked;
+    const syncIntervalMinutes = Number($('drive-source-interval').value);
+    const minChars = Number($('drive-source-min-chars').value);
+    if (!Number.isInteger(syncIntervalMinutes) || syncIntervalMinutes < 1 || syncIntervalMinutes > 1440) {
+      throw new Error('Інтервал Drive має бути цілим числом від 1 до 1440 хвилин.');
+    }
+    if (!Number.isInteger(minChars) || minChars < 1 || minChars > 1000000) {
+      throw new Error('Мінімальна довжина prompt-а має бути від 1 до 1000000 символів.');
+    }
+    const data = await core('SET_DRIVE_SOURCE', {
+      sessionId,
+      sourceUrl: url,
+      target,
+      autoSyncEnabled,
+      syncIntervalMinutes,
+      minChars,
+    });
     $('drive-source-url').value = data.source.sourceUrl;
     $('drive-source-identity').textContent = 'Джерело прив’язано. Snapshot ще не приймався.';
     setStatus('Джерело Google Drive прив’язано до поточної Session.');
@@ -112,9 +136,9 @@ function ensureRegion() {
     <p id="drive-source-auth" role="status">Перевіряю авторизацію Google Drive…</p>
     <label for="drive-source-url">Посилання на файл Google Drive або Google Docs</label>
     <input id="drive-source-url" type="url" autocomplete="off">
-    <label for="drive-source-picker">Вибрати доступний файл Drive</label>
+    <label for="drive-source-picker">Вибрати вже дозволений файл Drive</label>
     <select id="drive-source-picker" disabled><option value="">— спочатку відкрийте список —</option></select>
-    <button id="drive-source-list-button" type="button">Показати доступні файли Drive</button>
+    <button id="drive-source-list-button" type="button">Показати вже дозволені файли Drive</button>
     <button id="drive-source-use-picked" type="button">Використати вибраний файл</button>
     <label for="drive-source-target">Куди синхронізувати вміст</label>
     <select id="drive-source-target">
@@ -122,6 +146,11 @@ function ensureRegion() {
       <option value="prompt2">Другий prompt</option>
       <option value="prompt3">Третій prompt</option>
     </select>
+    <label><input id="drive-source-auto" type="checkbox"> Автоматично перевіряти Drive</label>
+    <label for="drive-source-interval">Інтервал автоматичної перевірки, хвилин</label>
+    <input id="drive-source-interval" type="number" min="1" max="1440" step="1" value="3">
+    <label for="drive-source-min-chars">Мінімальна довжина prompt-а, символів</label>
+    <input id="drive-source-min-chars" type="number" min="1" max="1000000" step="1" value="1000">
     <button id="drive-source-bind" type="button">Прив’язати джерело</button>
     <button id="drive-source-sync" type="button">Оновити з Drive</button>
     <p id="drive-source-identity" role="status">Стабільний snapshot ще не приймався.</p>
