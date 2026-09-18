@@ -199,7 +199,7 @@ test('L1-C vertical: Manager -> two Workers -> one persistent Manager reconcilia
   assert.equal(state.sessionOrder.length, beforeCount, 'persistent Manager role must reuse its existing Core Session');
   const managerSid = hierarchyCoreSessionId(g.graphId, 'manager');
   const managerTid = hierarchyCoreTaskId(g.graphId, 'manager');
-  assert.equal(state.sessionsById[managerSid].tasksById[managerTid].normalizedUrl, MANAGER_CHAT + '/');
+  assert.equal(state.sessionsById[managerSid].tasksById[managerTid].normalizedUrl, MANAGER_CHAT);
   assert.equal(state.sessionsById[managerSid].orchestrationHierarchy.activationId, result.actions[0].activationId);
   assert.equal(state.sessionsById[managerSid].orchestrationHierarchy.purpose, OrchestrationActivationPurpose.RECONCILE);
 
@@ -218,6 +218,9 @@ test('L1-C unresolved Core operation blocks rearm instead of overwriting Send re
   }), 1);
   runtime = result.runtime;
   materializeHierarchyActionsIntoCore(state, g, runtime, result.actions, { nowMs: START + 2 });
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'first-worker-terminal', {
+    nodeId: 'worker-1', generation: 1, activationId: 'worker-first', status: 'COMPLETED',
+  }), 3).runtime;
 
   const sid = hierarchyCoreSessionId(g.graphId, 'worker-1');
   state.sessionsById[sid].operation = {
@@ -236,9 +239,9 @@ test('L1-C unresolved Core operation blocks rearm instead of overwriting Send re
 
   result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'second-worker-request', {
     nodeId: 'worker-1', generation: 1, activationId: 'worker-second',
-  }), 3);
+  }), 4);
   runtime = result.runtime;
-  const materialized = materializeHierarchyActionsIntoCore(state, g, runtime, result.actions, { nowMs: START + 4 });
+  const materialized = materializeHierarchyActionsIntoCore(state, g, runtime, result.actions, { nowMs: START + 5 });
   assert.equal(materialized.materialized.length, 0);
   assert.equal(materialized.blocked.length, 1);
   assert.equal(materialized.blocked[0].reason, 'CORE_OPERATION_UNRESOLVED');
@@ -255,15 +258,18 @@ test('L1-C safe terminal Core operation can be rearmed for the next activation',
   }), 1);
   runtime = result.runtime;
   materializeHierarchyActionsIntoCore(state, g, runtime, result.actions, { nowMs: START + 2 });
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'safe-first-terminal', {
+    nodeId: 'worker-1', generation: 1, activationId: 'safe-worker-first', status: 'COMPLETED',
+  }), 3).runtime;
 
   const sid = hierarchyCoreSessionId(g.graphId, 'worker-1');
   state.sessionsById[sid].operation = { phase: OperationPhase.SENT_VERIFIED };
 
   result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'safe-second', {
     nodeId: 'worker-1', generation: 1, activationId: 'safe-worker-second',
-  }), 3);
+  }), 4);
   runtime = result.runtime;
-  const materialized = materializeHierarchyActionsIntoCore(state, g, runtime, result.actions, { nowMs: START + 4 });
+  const materialized = materializeHierarchyActionsIntoCore(state, g, runtime, result.actions, { nowMs: START + 5 });
   assert.equal(materialized.materialized.length, 1);
   assert.equal(state.sessionsById[sid].operation, null);
   assert.equal(state.sessionsById[sid].orchestrationHierarchy.activationId, 'safe-worker-second');
