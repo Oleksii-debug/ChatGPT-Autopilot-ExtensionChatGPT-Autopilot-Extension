@@ -11,6 +11,7 @@ import { OrchestrationV2Controller } from '../src/core/orchestration-v2-controll
 import {
   OrchestrationBarrierMode,
   OrchestrationChatMode,
+  OrchestrationHierarchyEventType,
 } from '../src/core/orchestration-hierarchy.js';
 import {
   hierarchyCoreSessionId,
@@ -311,6 +312,99 @@ test('master pause prevents a new hierarchy Session from becoming runnable', asy
   const core = await h.coreRepository.load();
   const manager = core.sessionsById[hierarchyCoreSessionId(graph().graphId, 'manager')];
   assert.equal(manager.runState, RunState.PAUSED);
+});
+
+test('hierarchy Pause and Resume control the already materialized Core Session', async () => {
+  const h = harness();
+  const c = h.controller();
+  await c.configureHierarchy(graph(), { nowMs: h.now() });
+  await c.startHierarchy({ nowMs: h.advance(1) });
+  const managerSid = hierarchyCoreSessionId(graph().graphId, 'manager');
+
+  await c.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.PAUSE_SCOPE,
+    eventId: 'controller-pause-manager',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+
+  let core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].runState, RunState.PAUSED);
+  assert.equal(core.sessionsById[managerSid].orchestrationHierarchy.scopeState, 'PAUSED');
+
+  await c.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.RESUME_SCOPE,
+    eventId: 'controller-resume-manager',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+
+  core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].runState, RunState.RUNNING);
+  assert.equal(core.sessionsById[managerSid].orchestrationHierarchy.scopeState, 'RUNNING');
+});
+
+test('hierarchy Resume never overrides the owner master pause', async () => {
+  const h = harness();
+  await h.coreRepository.update(state => {
+    state.profile.masterPaused = true;
+    return state;
+  });
+  const c = h.controller();
+  await c.configureHierarchy(graph(), { nowMs: h.now() });
+  await c.startHierarchy({ nowMs: h.advance(1) });
+  const managerSid = hierarchyCoreSessionId(graph().graphId, 'manager');
+
+  await c.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.PAUSE_SCOPE,
+    eventId: 'controller-master-pause-scope',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+  await c.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.RESUME_SCOPE,
+    eventId: 'controller-master-resume-scope',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+
+  const core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].runState, RunState.PAUSED);
+});
+
+test('hierarchy Stop revokes the materialized Core Session authority', async () => {
+  const h = harness();
+  const c = h.controller();
+  await c.configureHierarchy(graph(), { nowMs: h.now() });
+  await c.startHierarchy({ nowMs: h.advance(1) });
+  const managerSid = hierarchyCoreSessionId(graph().graphId, 'manager');
+
+  await c.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.STOP_SCOPE,
+    eventId: 'controller-stop-manager',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+
+  const core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].enabled, false);
+  assert.equal(core.sessionsById[managerSid].runState, RunState.STOPPED);
+  assert.equal(core.sessionsById[managerSid].orchestrationHierarchy.scopeState, 'STOPPED');
+});
+
+test('disabling Orchestration V2 also revokes hierarchy-managed Core Sessions', async () => {
+  const h = harness();
+  const c = h.controller();
+  await c.configureHierarchy(graph(), { nowMs: h.now() });
+  await c.startHierarchy({ nowMs: h.advance(1) });
+  const managerSid = hierarchyCoreSessionId(graph().graphId, 'manager');
+  const current = await h.configRepository.load();
+
+  await c.updateConfig({ ...current, enabled: false });
+
+  const core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].enabled, false);
+  assert.equal(core.sessionsById[managerSid].runState, RunState.STOPPED);
 });
 
 test('hierarchy mode short-circuits legacy flat coordinator control path', async () => {
