@@ -119,7 +119,8 @@ function ensureRegion() {
     <label for="drive-source-target">Куди синхронізувати вміст</label>
     <select id="drive-source-target">
       <option value="primary">Основний prompt</option>
-      <option value="secondary">Другий prompt</option>
+      <option value="prompt2">Другий prompt</option>
+      <option value="prompt3">Третій prompt</option>
     </select>
     <button id="drive-source-bind" type="button">Прив’язати джерело</button>
     <button id="drive-source-sync" type="button">Оновити з Drive</button>
