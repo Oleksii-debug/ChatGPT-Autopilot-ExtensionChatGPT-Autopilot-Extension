@@ -10,6 +10,9 @@ import {
 } from './schema.js';
 import { appendLog } from './logger.js';
 import { startSession } from './state-machine.js';
+import { extractDriveFileId } from './drive-api.js';
+import { getDriveSourceConfig, setDriveSourceConfig } from './drive-source.js';
+import { getPromptCadenceConfig, normalizePromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
 export const PORTABLE_PROFILE_VERSION = 1;
@@ -21,6 +24,7 @@ const TERMINAL_OPERATION_PHASES = new Set([
   OperationPhase.SENT_VERIFIED,
   OperationPhase.FAILED_SAFE,
 ]);
+const PORTABLE_DRIVE_TARGETS = new Set(['primary', 'prompt2', 'prompt3']);
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -125,6 +129,42 @@ function buildSession(raw, index, now, version = 1) {
   return session;
 }
 
+function parsePromptCadence(raw, sessionName) {
+  if (raw === undefined) return null;
+  requireRecord(raw, `Session ${sessionName} promptCadence`);
+  const input = raw.prompt2 !== undefined || raw.prompt3 !== undefined
+    ? {
+      prompts: [
+        { enabled: false, prompt: '', everyN: 10 },
+        isRecord(raw.prompt2) ? raw.prompt2 : {},
+        isRecord(raw.prompt3) ? raw.prompt3 : {},
+      ],
+      chatFlow: raw.chatFlow,
+    }
+    : raw;
+  const config = normalizePromptCadenceConfig(input);
+  for (const [index, rule] of config.prompts.entries()) {
+    if (index > 0 && rule.enabled && !rule.prompt.trim()) {
+      throw new Error(`Session ${sessionName} prompt ${index + 1} is enabled but empty`);
+    }
+  }
+  if (config.chatFlow.enabled && config.chatFlow.mode === 'staged' && !config.chatFlow.stage2Prompt.trim()) {
+    throw new Error(`Session ${sessionName} staged chat flow requires stage2Prompt`);
+  }
+  return config;
+}
+
+function parseDriveSource(raw, sessionName) {
+  if (raw === undefined) return null;
+  requireRecord(raw, `Session ${sessionName} driveSource`);
+  const sourceUrl = requireString(raw.sourceUrl ?? '', `Session ${sessionName} driveSource.sourceUrl`, { maxLength: 4096 }).trim();
+  const legacyTarget = raw.target === 'secondary' ? 'prompt2' : raw.target;
+  const target = PORTABLE_DRIVE_TARGETS.has(legacyTarget) ? legacyTarget : 'primary';
+  if (!sourceUrl) return { clear: true, target: 'primary', sourceUrl: '' };
+  const parsed = extractDriveFileId(sourceUrl);
+  return { clear: false, fileId: parsed.fileId, sourceUrl, target };
+}
+
 function parseProfile(profile, now = Date.now()) {
   requireRecord(profile, 'Profile');
   if (profile.format !== PORTABLE_PROFILE_FORMAT) throw new Error(`Unsupported profile format: ${profile.format || 'missing'}`);
@@ -134,11 +174,16 @@ function parseProfile(profile, now = Date.now()) {
   }
   const profileName = requireString(profile.profileName ?? 'ChatGPT Autopilot profile', 'profileName', { allowEmpty: false, maxLength: 500 }).trim();
   const profileAutoStartRequested = profile.autoStart === true;
-  const sessionConfigs = profile.sessions.map((raw, index) => ({
-    raw,
-    session: buildSession(raw, index, now, 1),
-    autoStartRequested: profileAutoStartRequested || raw.autoStart === true,
-  }));
+  const sessionConfigs = profile.sessions.map((raw, index) => {
+    const session = buildSession(raw, index, now, 1);
+    return {
+      raw,
+      session,
+      promptCadence: parsePromptCadence(raw.promptCadence, session.name),
+      driveSource: parseDriveSource(raw.driveSource, session.name),
+      autoStartRequested: profileAutoStartRequested || raw.autoStart === true,
+    };
+  });
   const sessionIds = sessionConfigs.map(item => item.session.id);
   if (new Set(sessionIds).size !== sessionIds.length) throw new Error('Profile contains duplicate Session ids');
   return { profileName, sessionConfigs };
@@ -171,6 +216,20 @@ function reservedUrls(state, excludedSessionIds = new Set()) {
 function clearSessionTabHints(state, sessionId) {
   for (const [key, hint] of Object.entries(state.tabHintsByTaskId || {})) {
     if (hint?.sessionId === sessionId) delete state.tabHintsByTaskId[key];
+  }
+}
+
+function applyPortableExtras(state, item) {
+  const sessionId = item.session.id;
+  if (item.promptCadence !== null) {
+    setPromptCadenceConfig(state, sessionId, item.promptCadence);
+  }
+  if (item.driveSource !== null) {
+    if (item.driveSource.clear) {
+      if (state.profile.driveSourceBySessionId) delete state.profile.driveSourceBySessionId[sessionId];
+    } else {
+      setDriveSourceConfig(state, sessionId, item.driveSource);
+    }
   }
 }
 
@@ -245,6 +304,7 @@ export function applyPortableProfile(state, profile, {
     clearSessionTabHints(state, replacement.id);
     state.sessionsById[replacement.id] = replacement;
     if (!state.sessionOrder.includes(replacement.id)) state.sessionOrder.push(replacement.id);
+    applyPortableExtras(state, item);
     appendLog(state, replacement.id, 'Session configuration imported from portable profile', { at: now });
     importedSessionIds.push(replacement.id);
   }
@@ -267,7 +327,23 @@ export function applyPortableProfile(state, profile, {
   };
 }
 
-function sessionToPortable(session) {
+function promptCadenceToPortable(state, sessionId) {
+  const config = getPromptCadenceConfig(state, sessionId);
+  return {
+    prompt2: { ...config.prompts[1] },
+    prompt3: { ...config.prompts[2] },
+    chatFlow: { ...config.chatFlow },
+  };
+}
+
+function driveSourceToPortable(state, sessionId) {
+  const source = getDriveSourceConfig(state, sessionId);
+  return source.fileId
+    ? { sourceUrl: source.sourceUrl, target: source.target }
+    : { sourceUrl: '', target: 'primary' };
+}
+
+function sessionToPortable(state, session) {
   return {
     id: session.id,
     name: session.name,
@@ -284,6 +360,8 @@ function sessionToPortable(session) {
     tabStrategy: session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
       ? 'worker'
       : session.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK ? 'open-close' : 'keep-open',
+    promptCadence: promptCadenceToPortable(state, session.id),
+    driveSource: driveSourceToPortable(state, session.id),
     tasks: session.taskOrder.map(taskId => {
       const task = session.tasksById[taskId];
       return {
@@ -303,7 +381,7 @@ export function exportPortableProfile(state, { sessionIds = null, profileName = 
     .filter(id => !requested || requested.has(id))
     .map(id => state.sessionsById[id])
     .filter(Boolean)
-    .map(sessionToPortable);
+    .map(session => sessionToPortable(state, session));
   if (!sessions.length) throw new Error('There are no Sessions to export');
   return {
     format: PORTABLE_PROFILE_FORMAT,
