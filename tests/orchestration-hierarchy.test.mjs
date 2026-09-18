@@ -444,6 +444,30 @@ test('L1-E generation recovery atomically supersedes the old generation and prep
   assert.equal(staleRetry.runtime.nodesById.manager.generation, 2);
 });
 
+test('L1-E recovery request is fail-closed while the node scope is paused', () => {
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.PAUSE_SCOPE, 'pause-before-recovery', {
+    nodeId: 'manager',
+  }), 1).runtime;
+
+  const result = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+    'paused-manager-recovery',
+    {
+      nodeId: 'manager',
+      generation: 1,
+      newGeneration: 2,
+      activationId: 'paused-recovery',
+    },
+  ), 2);
+
+  assert.equal(result.reason, 'SCOPE_PAUSED');
+  assert.deepEqual(result.actions, []);
+  assert.equal(result.runtime.nodesById.manager.generation, 1);
+  assert.equal(result.runtime.nodesById.manager.currentActivationId, '');
+});
+
 test('L1-E recovery generation can continue the logical Manager role but old generation cannot launch descendants', () => {
   const g = graph();
   let runtime = createOrchestrationHierarchyRuntime(g, START);
