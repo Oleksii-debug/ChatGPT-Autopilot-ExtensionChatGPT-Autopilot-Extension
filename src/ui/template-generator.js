@@ -24,6 +24,23 @@ function templateSession(index) {
     retryBackoffSeconds: 30,
     retryPolicy: 'safe',
     tabStrategy: 'worker',
+    promptCadence: {
+      prompt2: { enabled: false, prompt: '', everyN: 30 },
+      prompt3: { enabled: false, prompt: '', everyN: 40 },
+      chatFlow: {
+        enabled: false,
+        mode: 'same-chat',
+        newChatEveryN: 10,
+        continuePrompt: 'продовжуй',
+        continueCount: 10,
+        stage2Prompt: '',
+        stage2Count: 10,
+      },
+    },
+    driveSource: {
+      sourceUrl: '',
+      target: 'primary',
+    },
     tasks: [{
       id: `template-session-${ordinal}-task-1`,
       enabled: false,
