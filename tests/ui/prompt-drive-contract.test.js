@@ -8,22 +8,21 @@ const html = fs.readFileSync(new URL('../../src/ui/options.html', import.meta.ur
 
 test('prompt 2 and prompt 3 expose independent labelled cadence controls', () => {
   for (const id of ['prompt2-enabled','prompt2-text','prompt2-every','prompt3-enabled','prompt3-text','prompt3-every']) {
-    assert.match(cadence, new RegExp(`id=["']${id}["']`), `missing ${id}`);
+    assert.ok(cadence.includes(`id="${id}"`), `missing ${id}`);
   }
-  assert.match(cadence, /<label for="prompt2-text">/);
-  assert.match(cadence, /<label for="prompt2-every">/);
-  assert.match(cadence, /<label for="prompt3-text">/);
-  assert.match(cadence, /<label for="prompt3-every">/);
-  assert.match(cadence, /id="prompt2-every" type="number" min="2" max="1000000"/);
-  assert.match(cadence, /id="prompt3-every" type="number" min="2" max="1000000"/);
+  for (const id of ['prompt2-text','prompt2-every','prompt3-text','prompt3-every']) {
+    assert.ok(cadence.includes(`<label for="${id}">`), `missing label for ${id}`);
+  }
+  assert.ok(cadence.includes('id="prompt2-every" type="number" min="2" max="1000000"'));
+  assert.ok(cadence.includes('id="prompt3-every" type="number" min="2" max="1000000"'));
 });
 
 test('chat-flow is a separate opt-in and saving prompt cadence cannot silently enable it', () => {
-  assert.match(cadence, /id="chat-flow-enabled" type="checkbox"/);
-  assert.match(cadence, /id="chat-flow-fields" hidden/);
-  assert.match(cadence, /enabled: $('chat-flow-enabled').checked/);
-  assert.doesNotMatch(cadence, /const chatFlow = {s*enabled: true,/);
-  assert.match(cadence, /chatFlow.enabled && mode === 'staged'/);
+  assert.ok(cadence.includes('id="chat-flow-enabled" type="checkbox"'));
+  assert.ok(cadence.includes('id="chat-flow-fields" hidden'));
+  assert.ok(cadence.includes("enabled: $('chat-flow-enabled').checked"));
+  assert.equal(cadence.includes('const chatFlow = {\n      enabled: true,'), false);
+  assert.ok(cadence.includes("chatFlow.enabled && mode === 'staged'"));
 });
 
 test('Drive source exposes direct link, explicit prompt target and visible autosync safety settings', () => {
@@ -31,31 +30,31 @@ test('Drive source exposes direct link, explicit prompt target and visible autos
     'drive-source-url','drive-source-target','drive-source-auto',
     'drive-source-interval','drive-source-min-chars','drive-source-bind','drive-source-sync',
   ]) {
-    assert.match(drive, new RegExp(`id=["']${id}["']`), `missing ${id}`);
+    assert.ok(drive.includes(`id="${id}"`), `missing ${id}`);
   }
   assert.ok(drive.includes('<option value="primary">Основний prompt</option>'));
   assert.ok(drive.includes('<option value="prompt2">Другий prompt</option>'));
   assert.ok(drive.includes('<option value="prompt3">Третій prompt</option>'));
-  assert.match(drive, /id="drive-source-interval" type="number" min="1" max="1440"[^>]*value="3"/);
-  assert.match(drive, /id="drive-source-min-chars" type="number" min="1" max="1000000"[^>]*value="1000"/);
-  assert.match(drive, /autoSyncEnabled: $('drive-source-auto').checked/);
-  assert.match(drive, /syncIntervalMinutes/);
-  assert.match(drive, /minChars/);
+  assert.ok(drive.includes('id="drive-source-interval" type="number" min="1" max="1440" step="1" value="3"'));
+  assert.ok(drive.includes('id="drive-source-min-chars" type="number" min="1" max="1000000" step="1" value="1000"'));
+  assert.ok(drive.includes("const autoSyncEnabled = $('drive-source-auto').checked"));
+  assert.ok(drive.includes('syncIntervalMinutes'));
+  assert.ok(drive.includes('minChars'));
 });
 
 test('Drive file list is labelled honestly as already-authorized files rather than a full Picker', () => {
-  assert.match(drive, /Вибрати вже дозволений файл Drive/);
-  assert.match(drive, /Показати вже дозволені файли Drive/);
-  assert.doesNotMatch(drive, /Показати доступні файли Drive/);
+  assert.ok(drive.includes('Вибрати вже дозволений файл Drive'));
+  assert.ok(drive.includes('Показати вже дозволені файли Drive'));
+  assert.equal(drive.includes('Показати доступні файли Drive'), false);
 });
 
 test('obsolete duplicate direct Drive import script is not loaded', () => {
-  assert.doesNotMatch(html, /drive-prompt-import\.js/);
-  assert.match(html, /drive-source-ui\.js/);
+  assert.equal(html.includes('drive-prompt-import.js'), false);
+  assert.ok(html.includes('drive-source-ui.js'));
 });
 
 test('dynamic status surfaces stay in normal readable status text', () => {
-  assert.match(cadence, /id="prompt-cadence-status" role="status" tabindex="0"/);
-  assert.match(drive, /id="drive-source-status" role="status" tabindex="0"/);
-  assert.match(drive, /id="drive-source-identity" role="status"/);
+  assert.ok(cadence.includes('id="prompt-cadence-status" role="status" tabindex="0"'));
+  assert.ok(drive.includes('id="drive-source-status" role="status" tabindex="0"'));
+  assert.ok(drive.includes('id="drive-source-identity" role="status"'));
 });
