@@ -33,7 +33,13 @@ test('session template keeps JSON import format stable', () => {
   assert.equal(parsed.sessions[5].tasks[0].url, '');
   assert.deepEqual(parsed.sessions[0].promptCadence.prompt2, { enabled: false, prompt: '', everyN: 30 });
   assert.deepEqual(parsed.sessions[0].promptCadence.prompt3, { enabled: false, prompt: '', everyN: 40 });
-  assert.deepEqual(parsed.sessions[0].driveSource, { sourceUrl: '', target: 'primary' });
+  assert.deepEqual(parsed.sessions[0].driveSource, {
+    sourceUrl: '',
+    target: 'primary',
+    autoSyncEnabled: false,
+    syncIntervalMinutes: 3,
+    minChars: 1000,
+  });
   assert.doesNotThrow(() => previewPortableProfile(parsed, 100));
 });
 
