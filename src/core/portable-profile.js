@@ -185,11 +185,15 @@ function parseProfile(profile, now = Date.now()) {
   const profileAutoStartRequested = profile.autoStart === true;
   const sessionConfigs = profile.sessions.map((raw, index) => {
     const session = buildSession(raw, index, now, 1);
+    const driveSource = parseDriveSource(raw.driveSource, session.name);
+    if (driveSource && !driveSource.clear && driveSource.target === 'primary' && session.promptMode === PromptMode.UNIQUE) {
+      throw new Error(`Session ${session.name} Drive primary target requires shared prompt mode`);
+    }
     return {
       raw,
       session,
       promptCadence: parsePromptCadence(raw.promptCadence, session.name),
-      driveSource: parseDriveSource(raw.driveSource, session.name),
+      driveSource,
       autoStartRequested: profileAutoStartRequested || raw.autoStart === true,
     };
   });
