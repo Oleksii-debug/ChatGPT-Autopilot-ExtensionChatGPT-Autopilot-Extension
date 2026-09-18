@@ -125,3 +125,21 @@ test('prompt3 Drive target updates only prompt 3 and preserves prompt 2', () => 
   assert.equal(config.prompts[2].prompt, 'prompt-3-new');
   assert.equal(config.prompts[2].everyN, 4);
 });
+
+
+test('Drive primary target fails closed in unique prompt mode instead of pretending to update tasks', () => {
+  const s = state();
+  s.sessionsById.s1.promptMode = 'UNIQUE';
+  s.sessionsById.s1.tasksById = { t1: { id: 't1', promptOverride: 'task-specific' } };
+  setDriveSourceConfig(s, 's1', {
+    fileId: 'file-1',
+    sourceUrl: 'https://drive.google.com/file/d/file-1/view',
+    target: 'primary',
+    minChars: 1,
+  });
+  assert.throws(
+    () => acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '1', hash: 'h1', content: 'new text' }),
+    /requires shared prompt mode/,
+  );
+  assert.equal(s.sessionsById.s1.tasksById.t1.promptOverride, 'task-specific');
+});
