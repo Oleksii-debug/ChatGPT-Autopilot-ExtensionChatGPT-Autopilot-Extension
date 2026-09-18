@@ -1,6 +1,7 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { translateText } from './uk-localization.js';
 import { MAX_PORTABLE_FILE_BYTES, extractChatGptUrls, mergeBulkUrls, parsePortableJson } from './config-tools.js';
+import { SESSION_DEFAULT_PROFILE_VALUES } from '../shared/session-defaults.js';
 
 const MAX_TASKS = 50;
 const VISIBLE_LOG_LIMIT = 100;
@@ -61,14 +62,14 @@ function blankSession() {
     defaultUniquePrompt: '',
     runMode: 'continuous',
     tasks: [blankTask()],
-    minimumSendIntervalMinutes: 2,
-    preSendDelaySeconds: 5,
-    busyCheckDelaySeconds: 2,
-    retryBackoffSeconds: 30,
+    minimumSendIntervalMinutes: SESSION_DEFAULT_PROFILE_VALUES.minimumSendIntervalMinutes,
+    preSendDelaySeconds: SESSION_DEFAULT_PROFILE_VALUES.preSendDelaySeconds,
+    busyCheckDelaySeconds: SESSION_DEFAULT_PROFILE_VALUES.busyCheckDelaySeconds,
+    retryBackoffSeconds: SESSION_DEFAULT_PROFILE_VALUES.retryBackoffSeconds,
     retryBackoffUnit: 'seconds',
-    retryPolicy: 'safe',
+    retryPolicy: SESSION_DEFAULT_PROFILE_VALUES.retryPolicy,
     busyChatBehavior: 'skip-next',
-    tabStrategy: 'keep-open',
+    tabStrategy: SESSION_DEFAULT_PROFILE_VALUES.tabStrategy,
     runState: 'STOPPED',
     actionAvailability: { start: true, pause: false, resume: false, stop: false },
     status: {},
