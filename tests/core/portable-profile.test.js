@@ -201,3 +201,19 @@ test('legacy portable profiles without cadence or Drive fields remain valid', ()
   applyPortableProfile(state, input, { now: 100 });
   assert.equal(state.sessionsById['session-1'].sharedPrompt, 'continue');
 });
+
+
+test('portable profile preview rejects Drive primary target in unique prompt mode', () => {
+  const input = profile();
+  input.sessions[0].promptMode = 'unique';
+  input.sessions[0].defaultUniquePrompt = 'default';
+  input.sessions[0].tasks[0].promptOverride = 'task-specific';
+  input.sessions[0].driveSource = {
+    sourceUrl: 'https://drive.google.com/file/d/file-123/view',
+    target: 'primary',
+    autoSyncEnabled: true,
+    syncIntervalMinutes: 3,
+    minChars: 1000,
+  };
+  assert.throws(() => previewPortableProfile(input, 100), /requires shared prompt mode/);
+});
