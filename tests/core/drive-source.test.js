@@ -18,7 +18,7 @@ function state() {
 
 test('Drive source config is durable and source replacement clears accepted identity', () => {
   const s = state();
-  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary' });
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary', minChars: 1 });
   assert.deepEqual(getDriveSourceConfig(s, 's1'), {
     fileId: 'file-1',
     sourceUrl: 'https://drive.google.com/file/d/file-1/view',
@@ -26,10 +26,15 @@ test('Drive source config is durable and source replacement clears accepted iden
     lastAcceptedVersion: '',
     lastAcceptedHash: '',
     lastSyncedAt: 0,
+    lastCheckedAt: 0,
+    lastSyncError: '',
+    autoSyncEnabled: false,
+    syncIntervalMinutes: 3,
+    minChars: 1000,
   });
   s.profile.driveSourceBySessionId.s1.lastAcceptedVersion = '12';
   s.profile.driveSourceBySessionId.s1.lastAcceptedHash = 'h12';
-  setDriveSourceConfig(s, 's1', { fileId: 'file-2', sourceUrl: 'https://drive.google.com/file/d/file-2/view', target: 'primary' });
+  setDriveSourceConfig(s, 's1', { fileId: 'file-2', sourceUrl: 'https://drive.google.com/file/d/file-2/view', target: 'primary', minChars: 1 });
   assert.equal(getDriveSourceConfig(s, 's1').lastAcceptedVersion, '');
 });
 
@@ -56,7 +61,7 @@ test('legacy secondary target normalizes to prompt2 without resetting source ide
 
 test('stable newer Drive snapshot atomically replaces the primary prompt', () => {
   const s = state();
-  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary' });
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary', minChars: 1 });
   const first = acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '10', hash: 'h10', content: 'primary-v10' }, { now: 100 });
   assert.equal(first.accepted, true);
   assert.equal(s.sessionsById.s1.sharedPrompt, 'primary-v10');
@@ -71,7 +76,7 @@ test('stable newer Drive snapshot atomically replaces the primary prompt', () =>
 
 test('older or same-version divergent content fails closed without mutation', () => {
   const s = state();
-  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary' });
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary', minChars: 1 });
   acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '10', hash: 'h10', content: 'primary-v10' }, { now: 100 });
   const before = structuredClone(s);
   assert.throws(() => acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '9', hash: 'h9', content: 'older' }), /older/);
@@ -92,7 +97,7 @@ test('prompt2 Drive target updates only prompt 2 and preserves cadence settings'
       chatFlow: { enabled: false, mode: 'same-chat' },
     },
   };
-  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://docs.google.com/document/d/file-1/edit', target: 'prompt2' });
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://docs.google.com/document/d/file-1/edit', target: 'prompt2', minChars: 1 });
   acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '20', hash: 'h20', content: 'new-prompt-2' });
   assert.equal(s.sessionsById.s1.sharedPrompt, 'primary-v1');
   const config = s.profile.promptCadenceBySessionId.s1;
@@ -113,7 +118,7 @@ test('prompt3 Drive target updates only prompt 3 and preserves prompt 2', () => 
       ],
     },
   };
-  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'prompt3' });
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'prompt3', minChars: 1 });
   acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '21', hash: 'h21', content: 'prompt-3-new' });
   const config = s.profile.promptCadenceBySessionId.s1;
   assert.equal(config.prompts[1].prompt, 'prompt-2');
