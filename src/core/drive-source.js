@@ -13,6 +13,15 @@ function normalizeInteger(value, fallback, min, max) {
   return parsed;
 }
 
+function writeInteger(value, fallback, min, max, label) {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${label} must be an integer from ${min} to ${max}`);
+  }
+  return parsed;
+}
+
 function requireSession(state, sessionId) {
   if (!state?.sessionsById?.[sessionId]) throw new Error('Session not found');
   return state.sessionsById[sessionId];
@@ -86,17 +95,19 @@ export function setDriveSourceConfig(state, sessionId, raw = {}) {
     lastCheckedAt: sourceChanged ? 0 : (Number(previous?.lastCheckedAt) || 0),
     lastSyncError: sourceChanged ? '' : (typeof previous?.lastSyncError === 'string' ? previous.lastSyncError : ''),
     autoSyncEnabled: raw.autoSyncEnabled === true,
-    syncIntervalMinutes: normalizeInteger(
+    syncIntervalMinutes: writeInteger(
       raw.syncIntervalMinutes,
       normalizeInteger(previous?.syncIntervalMinutes, DEFAULT_DRIVE_SYNC_INTERVAL_MINUTES, 1, MAX_DRIVE_SYNC_INTERVAL_MINUTES),
       1,
       MAX_DRIVE_SYNC_INTERVAL_MINUTES,
+      'Drive sync interval',
     ),
-    minChars: normalizeInteger(
+    minChars: writeInteger(
       raw.minChars,
       normalizeInteger(previous?.minChars, DEFAULT_DRIVE_MIN_CHARS, 1, MAX_DRIVE_MIN_CHARS),
       1,
       MAX_DRIVE_MIN_CHARS,
+      'Drive minimum prompt length',
     ),
   };
   return getDriveSourceConfig(state, sessionId);
