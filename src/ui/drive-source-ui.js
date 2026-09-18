@@ -31,9 +31,20 @@ async function refreshSource() {
   const source = data.source || {};
   $('drive-source-url').value = source.sourceUrl || '';
   $('drive-source-target').value = source.target || 'primary';
-  const identity = source.lastAcceptedVersion
-    ? `Прийнята версія: ${source.lastAcceptedVersion}. Остання синхронізація: ${source.lastSyncedAt ? new Date(source.lastSyncedAt).toLocaleString() : 'невідомо'}.`
+  $('drive-source-auto-sync').checked = source.autoSync === true;
+  $('drive-source-sync-minutes').value = String(Math.max(1, Math.round((source.syncIntervalMs || 180000) / 60000)));
+  $('drive-source-minimum-characters').value = String(source.minimumCharacters || 1000);
+  const accepted = source.lastAcceptedVersion
+    ? `Прийнята версія: ${source.lastAcceptedVersion}. Останнє застосування: ${source.lastSyncedAt ? new Date(source.lastSyncedAt).toLocaleString() : 'невідомо'}.`
     : 'Стабільний snapshot ще не приймався.';
+  const checked = source.lastCheckedAt
+    ? ` Остання перевірка: ${new Date(source.lastCheckedAt).toLocaleString()}.`
+    : '';
+  const next = source.autoSync && source.nextSyncAt
+    ? ` Наступна перевірка не раніше: ${new Date(source.nextSyncAt).toLocaleString()}.`
+    : '';
+  const error = source.lastSyncError ? ` Остання помилка: ${source.lastSyncError}.` : '';
+  const identity = accepted + checked + next + error;
   $('drive-source-identity').textContent = identity;
   return source;
 }
@@ -44,7 +55,17 @@ async function bindSource() {
   try {
     const url = $('drive-source-url').value.trim();
     const target = $('drive-source-target').value;
-    const data = await core('SET_DRIVE_SOURCE', { sessionId, sourceUrl: url, target });
+    const autoSync = $('drive-source-auto-sync').checked;
+    const syncIntervalMinutes = Number($('drive-source-sync-minutes').value);
+    const minimumCharacters = Number($('drive-source-minimum-characters').value);
+    const data = await core('SET_DRIVE_SOURCE', {
+      sessionId,
+      sourceUrl: url,
+      target,
+      autoSync,
+      syncIntervalMinutes,
+      minimumCharacters,
+    });
     $('drive-source-url').value = data.source.sourceUrl;
     $('drive-source-identity').textContent = 'Джерело прив’язано. Snapshot ще не приймався.';
     setStatus('Джерело Google Drive прив’язано до поточної Session.');
@@ -122,6 +143,11 @@ function ensureRegion() {
       <option value="prompt2">Другий prompt</option>
       <option value="prompt3">Третій prompt</option>
     </select>
+    <label><input id="drive-source-auto-sync" type="checkbox"> Автоматично перевіряти цей файл</label>
+    <label for="drive-source-sync-minutes">Перевіряти кожні, хвилин</label>
+    <input id="drive-source-sync-minutes" type="number" min="1" max="1440" step="1" value="3">
+    <label for="drive-source-minimum-characters">Мінімальна довжина prompt-а, символів</label>
+    <input id="drive-source-minimum-characters" type="number" min="1" max="1000000" step="1" value="1000">
     <button id="drive-source-bind" type="button">Прив’язати джерело</button>
     <button id="drive-source-sync" type="button">Оновити з Drive</button>
     <p id="drive-source-identity" role="status">Стабільний snapshot ще не приймався.</p>
