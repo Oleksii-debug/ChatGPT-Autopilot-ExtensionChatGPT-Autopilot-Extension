@@ -1,10 +1,16 @@
+import { getPromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence.js';
+
 const PROFILE_KEY = 'driveSourceBySessionId';
-const PRIMARY_TARGETS = new Set(['primary']);
-const SECONDARY_TARGETS = new Set(['secondary']);
+const VALID_TARGETS = new Set(['primary', 'prompt2', 'prompt3']);
 
 function requireSession(state, sessionId) {
   if (!state?.sessionsById?.[sessionId]) throw new Error('Session not found');
   return state.sessionsById[sessionId];
+}
+
+function normalizeTarget(value) {
+  if (value === 'secondary') return 'prompt2';
+  return VALID_TARGETS.has(value) ? value : 'primary';
 }
 
 function normalizeVersion(value) {
@@ -32,7 +38,7 @@ export function getDriveSourceConfig(state, sessionId) {
   return {
     fileId: typeof source?.fileId === 'string' ? source.fileId : '',
     sourceUrl: typeof source?.sourceUrl === 'string' ? source.sourceUrl : '',
-    target: source?.target === 'secondary' ? 'secondary' : 'primary',
+    target: normalizeTarget(source?.target),
     lastAcceptedVersion: typeof source?.lastAcceptedVersion === 'string' ? source.lastAcceptedVersion : '',
     lastAcceptedHash: typeof source?.lastAcceptedHash === 'string' ? source.lastAcceptedHash : '',
     lastSyncedAt: Number.isFinite(source?.lastSyncedAt) && source.lastSyncedAt >= 0 ? source.lastSyncedAt : 0,
@@ -43,12 +49,13 @@ export function setDriveSourceConfig(state, sessionId, raw = {}) {
   requireSession(state, sessionId);
   const fileId = String(raw.fileId || '').trim();
   const sourceUrl = String(raw.sourceUrl || '').trim();
-  const target = raw.target === 'secondary' ? 'secondary' : 'primary';
+  const target = normalizeTarget(raw.target);
   if (!fileId) throw new Error('Drive file id is required');
   if (!sourceUrl) throw new Error('Drive source URL is required');
   const bucket = ensureBucket(state);
   const previous = bucket[sessionId];
-  const sourceChanged = previous && (previous.fileId !== fileId || previous.sourceUrl !== sourceUrl || previous.target !== target);
+  const previousTarget = normalizeTarget(previous?.target);
+  const sourceChanged = previous && (previous.fileId !== fileId || previous.sourceUrl !== sourceUrl || previousTarget !== target);
   bucket[sessionId] = {
     fileId,
     sourceUrl,
@@ -61,12 +68,11 @@ export function setDriveSourceConfig(state, sessionId, raw = {}) {
 }
 
 function applyPromptTarget(state, session, target, content) {
-  if (target === 'secondary') {
-    if (!state.profile.promptCadenceBySessionId || typeof state.profile.promptCadenceBySessionId !== 'object') {
-      state.profile.promptCadenceBySessionId = {};
-    }
-    const current = state.profile.promptCadenceBySessionId[session.id] || { enabled: false, secondaryPrompt: '', everyN: 10 };
-    state.profile.promptCadenceBySessionId[session.id] = { ...current, secondaryPrompt: content };
+  if (target === 'prompt2' || target === 'prompt3') {
+    const config = getPromptCadenceConfig(state, session.id);
+    const index = target === 'prompt2' ? 1 : 2;
+    config.prompts[index] = { ...config.prompts[index], prompt: content };
+    setPromptCadenceConfig(state, session.id, config);
     return;
   }
   if (session.promptMode === 'UNIQUE') {
@@ -112,6 +118,8 @@ export function acceptDriveSnapshot(state, sessionId, snapshot, { now = Date.now
 }
 
 export const DRIVE_SNAPSHOT_TARGETS = Object.freeze({
-  PRIMARY: [...PRIMARY_TARGETS][0],
-  SECONDARY: [...SECONDARY_TARGETS][0],
+  PRIMARY: 'primary',
+  PROMPT2: 'prompt2',
+  PROMPT3: 'prompt3',
+  SECONDARY: 'prompt2',
 });
