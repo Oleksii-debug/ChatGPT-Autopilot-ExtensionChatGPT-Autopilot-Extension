@@ -213,8 +213,29 @@ export function validateOrchestrationGraphV1(raw) {
   const controlEpoch = requireInteger(raw.controlEpoch ?? raw.control_epoch ?? 1, 'controlEpoch', 1, Number.MAX_SAFE_INTEGER);
   const promptProfiles = normalizePromptProfiles(raw.promptProfiles ?? raw.prompt_profiles);
   const promptProfileIds = new Set(promptProfiles.map(profile => profile.id));
-  if (!Array.isArray(raw.nodes) || !raw.nodes.length || raw.nodes.length > 1000) throw new Error('Invalid nodes');
-  const nodes = raw.nodes.map(normalizeNode).sort((a, b) => a.id.localeCompare(b.id));
+
+  // A normalized graph is durable product state and is therefore a valid validator
+  // input on restart. Reconstruct the node list only when the normalized identity
+  // is internally exact; never accept missing/extra/reordered node identities.
+  let nodeSource = raw.nodes;
+  if (!Array.isArray(nodeSource) && Array.isArray(raw.nodeOrder) && isObject(raw.nodesById)) {
+    const order = raw.nodeOrder.map((nodeId, index) => requireId(nodeId, `nodeOrder[${index}]`));
+    const nodeKeys = Object.keys(raw.nodesById).sort((a, b) => a.localeCompare(b));
+    const orderedKeys = [...order].sort((a, b) => a.localeCompare(b));
+    if (new Set(order).size !== order.length
+        || nodeKeys.length !== orderedKeys.length
+        || nodeKeys.some((nodeId, index) => nodeId !== orderedKeys[index])) {
+      throw new Error('Invalid normalized nodes');
+    }
+    nodeSource = order.map(nodeId => {
+      const node = raw.nodesById[nodeId];
+      if (!isObject(node) || node.id !== nodeId) throw new Error('Invalid normalized nodes');
+      return node;
+    });
+  }
+
+  if (!Array.isArray(nodeSource) || !nodeSource.length || nodeSource.length > 1000) throw new Error('Invalid nodes');
+  const nodes = nodeSource.map(normalizeNode).sort((a, b) => a.id.localeCompare(b.id));
   const nodeOrder = nodes.map(node => node.id);
   if (new Set(nodeOrder).size !== nodeOrder.length) throw new Error('Duplicate node id');
   const nodesById = Object.fromEntries(nodes.map(node => [node.id, node]));
