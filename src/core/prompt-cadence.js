@@ -10,7 +10,7 @@ function requireIntegerIfPresent(value, label, min, max) {
   }
 }
 
-function validatePromptCadenceWrite(raw = {}) {
+export function validatePromptCadenceWrite(raw = {}) {
   if (raw.everyN !== undefined) requireIntegerIfPresent(raw.everyN, 'Prompt 2 cadence', 2, MAX_EVERY_N);
   if (Array.isArray(raw.prompts)) {
     if (raw.prompts.length > MAX_PROMPTS) throw new Error(`At most ${MAX_PROMPTS} prompt rules are supported`);
