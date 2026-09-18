@@ -240,6 +240,66 @@ export class OrchestrationV2Controller {
     return { kind: 'HIERARCHY_STARTED', started };
   }
 
+  async recoverHierarchyNode(nodeId, { expectedGeneration = null, nowMs = this.now() } = {}) {
+    const runtime = await this.runtimeRepository.load();
+    const hierarchy = hierarchyContainer(runtime);
+    if (!hierarchy) return { kind: 'NO_HIERARCHY' };
+    const node = hierarchy.graph.nodesById[nodeId];
+    const nodeRuntime = hierarchy.state.nodesById[nodeId];
+    if (!node || !nodeRuntime) throw new Error(`Unknown hierarchy node ${nodeId}`);
+
+    const currentGeneration = nodeRuntime.generation;
+    if (expectedGeneration !== null && Number(expectedGeneration) !== currentGeneration) {
+      return {
+        kind: 'STALE_GENERATION',
+        nodeId,
+        expectedGeneration: Number(expectedGeneration),
+        currentGeneration,
+      };
+    }
+
+    const newGeneration = currentGeneration + 1;
+    const nextRound = nodeRuntime.round + 1;
+    const activationId = `recovery:${nodeId}:g${newGeneration}:r${nextRound}`;
+    const result = await this.dispatchHierarchyEvent({
+      type: OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
+      eventId: `generation-recovery:${hierarchy.graph.graphId}:${nodeId}:g${currentGeneration}-to-g${newGeneration}`,
+      controlEpoch: hierarchy.state.controlEpoch,
+      nodeId,
+      generation: currentGeneration,
+      newGeneration,
+      activationId,
+    }, { nowMs });
+
+    await this.reconcileAlarm({ nowMs });
+    const latestRuntime = await this.runtimeRepository.load();
+    const latestHierarchy = hierarchyContainer(latestRuntime);
+    const latestNodeRuntime = latestHierarchy?.state?.nodesById?.[nodeId];
+    const accepted = latestNodeRuntime?.generation === newGeneration
+      && latestNodeRuntime?.activationLedger?.[activationId];
+
+    if (!accepted) {
+      return {
+        kind: result.reason || 'GENERATION_RECOVERY_BLOCKED',
+        nodeId,
+        previousGeneration: currentGeneration,
+        requestedGeneration: newGeneration,
+        currentGeneration: latestNodeRuntime?.generation ?? currentGeneration,
+        activationId,
+        result,
+      };
+    }
+
+    return {
+      kind: 'HIERARCHY_GENERATION_RECOVERY',
+      nodeId,
+      previousGeneration: currentGeneration,
+      generation: latestNodeRuntime.generation,
+      activationId,
+      result,
+    };
+  }
+
   async syncHierarchyAfterCoreCycle({ nowMs = this.now() } = {}) {
     let summary = { kind: 'NO_HIERARCHY', projected: 0, materialized: [], reused: [], blocked: [] };
     await this.runtimeRepository.update(async runtime => {
