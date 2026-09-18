@@ -21,6 +21,7 @@ import {
 import { SessionFunctionId, isSessionFunctionEnabled, setSessionFunctionEnabled, validateSessionFunctions } from './session-functions.js';
 import { getPromptCadenceConfig, normalizePromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence.js';
 import { getDriveSourceConfig, setDriveSourceConfig } from './drive-source.js';
+import { SESSION_DEFAULT_PROFILE_VALUES } from '../shared/session-defaults.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
 export const PORTABLE_PROFILE_VERSION = 1;
@@ -86,11 +87,11 @@ function buildSession(raw, index, now, version = 1) {
     promptMode: promptMode(raw.promptMode),
     sharedPrompt: requireString(raw.sharedPrompt ?? '', `Session ${name} sharedPrompt`, { maxLength: 200000 }),
     runMode: runMode(raw.runMode),
-    minimumSendIntervalMs: boundedNumber(raw.minimumSendIntervalMinutes, `Session ${name} minimumSendIntervalMinutes`, 1, 1440, 2) * 60000,
-    preSendDelayMs: boundedNumber(raw.preSendDelaySeconds, `Session ${name} preSendDelaySeconds`, 1, 30, 5) * 1000,
-    busyCheckDelayMs: boundedNumber(raw.busyCheckDelaySeconds, `Session ${name} busyCheckDelaySeconds`, 1, 30, 2) * 1000,
-    retryBackoffMs: boundedNumber(raw.retryBackoffSeconds, `Session ${name} retryBackoffSeconds`, 5, 3600, 30) * 1000,
-    tabStrategy: tabStrategy(raw.tabStrategy),
+    minimumSendIntervalMs: boundedNumber(raw.minimumSendIntervalMinutes, `Session ${name} minimumSendIntervalMinutes`, 1, 1440, SESSION_DEFAULT_PROFILE_VALUES.minimumSendIntervalMinutes) * 60000,
+    preSendDelayMs: boundedNumber(raw.preSendDelaySeconds, `Session ${name} preSendDelaySeconds`, 1, 30, SESSION_DEFAULT_PROFILE_VALUES.preSendDelaySeconds) * 1000,
+    busyCheckDelayMs: boundedNumber(raw.busyCheckDelaySeconds, `Session ${name} busyCheckDelaySeconds`, 1, 30, SESSION_DEFAULT_PROFILE_VALUES.busyCheckDelaySeconds) * 1000,
+    retryBackoffMs: boundedNumber(raw.retryBackoffSeconds, `Session ${name} retryBackoffSeconds`, 5, 3600, SESSION_DEFAULT_PROFILE_VALUES.retryBackoffSeconds) * 1000,
+    tabStrategy: tabStrategy(raw.tabStrategy ?? SESSION_DEFAULT_PROFILE_VALUES.tabStrategy),
     activeFunctions,
     now,
   });
