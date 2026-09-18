@@ -60,7 +60,11 @@ function resetTaskForActivation(task, { targetUrl, prompt }) {
 
 function promptForAction(graph, action, promptResolver) {
   const node = graph.nodesById[action.nodeId];
-  const profile = graph.promptProfiles.find(item => item.id === node.promptProfileId);
+  const profileId = action.promptProfileId
+    || (action.purpose === OrchestrationActivationPurpose.RECOVERY
+      ? node.recoveryPromptProfileId
+      : node.promptProfileId);
+  const profile = graph.promptProfiles.find(item => item.id === profileId);
   const resolved = typeof promptResolver === 'function'
     ? promptResolver({ graph, node, profile, action })
     : profile?.prompt;
@@ -112,7 +116,7 @@ function createManagedSession({ graph, node, action, prompt, targetUrl, nowMs, t
     activationId: action.activationId,
     purpose: action.purpose,
     chatMode: node.chatMode,
-    promptProfileId: node.promptProfileId,
+    promptProfileId: action.promptProfileId || node.promptProfileId,
     actionType: action.type,
   };
   return { session, sessionId: sid, taskId: tid };
@@ -297,7 +301,9 @@ export function preparedHierarchyActions(graphRaw, runtimeRaw) {
       round: ledger.round,
       purpose: ledger.purpose,
       chatMode: node.chatMode,
-      promptProfileId: node.promptProfileId,
+      promptProfileId: ledger.purpose === OrchestrationActivationPurpose.RECOVERY
+        ? node.recoveryPromptProfileId
+        : node.promptProfileId,
       authority: 'EXISTING_CORE_SESSION_TASK_PATH',
     });
   }
