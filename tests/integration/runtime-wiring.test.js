@@ -12,8 +12,6 @@ test('manifest wires the options UI and ChatGPT content scripts with bounded per
   assert.deepEqual(manifest.permissions.sort(), ['alarms', 'identity', 'scripting', 'storage', 'tabs']);
   assert.deepEqual(manifest.host_permissions, [
     'https://chatgpt.com/*',
-    'https://drive.google.com/*',
-    'https://docs.google.com/*',
     'https://www.googleapis.com/*',
   ]);
   assert.deepEqual(manifest.content_scripts, [{
