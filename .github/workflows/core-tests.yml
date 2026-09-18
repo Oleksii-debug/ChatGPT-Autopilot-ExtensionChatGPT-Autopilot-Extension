@@ -2,14 +2,13 @@ name: Core deterministic tests
 
 on:
   push:
-    branches: ["core/v01-bootstrap-state-scheduler"]
+    branches: ["main", "source/0.9.19-canonical-convergence"]
     paths:
       - "src/core/**"
       - "src/shared/**"
       - "src/background/**"
-      - "tests/core/**"
-      - "tests/integration/**"
-      - "manifest.json"
+      - "tests-regression/core/**"
+      - "tests-regression/integration/**"
       - "package.json"
       - ".github/workflows/core-tests.yml"
   pull_request:
@@ -17,10 +16,10 @@ on:
       - "src/core/**"
       - "src/shared/**"
       - "src/background/**"
-      - "tests/core/**"
-      - "tests/integration/**"
-      - "manifest.json"
+      - "tests-regression/core/**"
+      - "tests-regression/integration/**"
       - "package.json"
+      - ".github/workflows/core-tests.yml"
 
 permissions:
   contents: read
@@ -33,4 +32,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm test
+      - run: npm run test:core

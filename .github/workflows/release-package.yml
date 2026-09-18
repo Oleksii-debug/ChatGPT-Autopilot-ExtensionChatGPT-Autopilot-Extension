@@ -2,52 +2,55 @@ name: Release package candidate
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main", "source/0.9.19-canonical-convergence"]
     paths:
-      - manifest.json
-      - src/**
-      - scripts/package-release.mjs
-      - tests/release/**
-      - package.json
-      - README.md
-      - CHANGELOG.md
-      - .github/workflows/release-package.yml
+      - "manifest.json"
+      - "src/**"
+      - "scripts/package-release.mjs"
+      - "tests-regression/release/**"
+      - "tests-regression/reliability/**"
+      - "package.json"
+      - "README.md"
+      - "README.txt"
+      - "CHANGES-*.txt"
+      - ".github/workflows/release-package.yml"
   pull_request:
     paths:
-      - manifest.json
-      - src/**
-      - scripts/package-release.mjs
-      - tests/release/**
-      - package.json
-      - README.md
-      - CHANGELOG.md
-      - .github/workflows/release-package.yml
+      - "manifest.json"
+      - "src/**"
+      - "scripts/package-release.mjs"
+      - "tests-regression/release/**"
+      - "tests-regression/reliability/**"
+      - "package.json"
+      - "README.md"
+      - "README.txt"
+      - "CHANGES-*.txt"
+      - ".github/workflows/release-package.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Run deterministic test suite
+          node-version: "22"
+      - name: Run deterministic Node qualification
         run: npm test
-
-      - name: Build canonical candidate package
+      - name: Build canonical installable package
         run: npm run package:release
-
+      - name: Verify recorded installable SHA-256
+        run: |
+          echo "b96496e8b57eac1689b9fd6c2093d6aefbad8d942bff44319c0ea568c532b7be  dist/ChatGPT-Autopilot-0.9.19.zip" | sha256sum -c -
       - name: Upload canonical ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Autopilot-Extension-v0.1
-          path: dist/ChatGPT-Autopilot-Extension-v0.1.zip
+          name: ChatGPT-Autopilot-0.9.19
+          path: dist/ChatGPT-Autopilot-0.9.19.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
