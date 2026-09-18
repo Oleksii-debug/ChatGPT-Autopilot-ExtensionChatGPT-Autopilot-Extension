@@ -41,15 +41,28 @@ jobs:
           node-version: "22"
       - name: Run deterministic Node qualification
         run: npm test
-      - name: Build canonical installable package
-        run: npm run package:release
-      - name: Verify recorded installable SHA-256
+      - name: Build release candidate twice and verify deterministic bytes
+        shell: bash
         run: |
-          echo "b96496e8b57eac1689b9fd6c2093d6aefbad8d942bff44319c0ea568c532b7be  dist/ChatGPT-Autopilot-0.9.19.zip" | sha256sum -c -
-      - name: Upload canonical ZIP
+          set -euo pipefail
+          rm -rf dist
+          npm run package:release
+          candidate="dist/ChatGPT-Autopilot-0.9.19.zip"
+          test -f "$candidate"
+          first_sha="$(sha256sum "$candidate" | awk '{print $1}')"
+          cp "$candidate" /tmp/ChatGPT-Autopilot-first.zip
+          rm -rf dist
+          npm run package:release
+          test -f "$candidate"
+          second_sha="$(sha256sum "$candidate" | awk '{print $1}')"
+          test "$first_sha" = "$second_sha"
+          cmp -s /tmp/ChatGPT-Autopilot-first.zip "$candidate"
+          unzip -t "$candidate"
+          echo "release candidate deterministic SHA-256: $second_sha"
+      - name: Upload release candidate ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Autopilot-0.9.19
+          name: ChatGPT-Autopilot-0.9.19-candidate
           path: dist/ChatGPT-Autopilot-0.9.19.zip
           if-no-files-found: error
           compression-level: 0
