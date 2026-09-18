@@ -2,6 +2,16 @@ import { getPromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence
 
 const PROFILE_KEY = 'driveSourceBySessionId';
 const VALID_TARGETS = new Set(['primary', 'prompt2', 'prompt3']);
+export const DEFAULT_DRIVE_SYNC_INTERVAL_MINUTES = 3;
+export const DEFAULT_DRIVE_MIN_CHARS = 1000;
+export const MAX_DRIVE_SYNC_INTERVAL_MINUTES = 1440;
+export const MAX_DRIVE_MIN_CHARS = 1000000;
+
+function normalizeInteger(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return fallback;
+  return parsed;
+}
 
 function requireSession(state, sessionId) {
   if (!state?.sessionsById?.[sessionId]) throw new Error('Session not found');
@@ -42,6 +52,16 @@ export function getDriveSourceConfig(state, sessionId) {
     lastAcceptedVersion: typeof source?.lastAcceptedVersion === 'string' ? source.lastAcceptedVersion : '',
     lastAcceptedHash: typeof source?.lastAcceptedHash === 'string' ? source.lastAcceptedHash : '',
     lastSyncedAt: Number.isFinite(source?.lastSyncedAt) && source.lastSyncedAt >= 0 ? source.lastSyncedAt : 0,
+    lastCheckedAt: Number.isFinite(source?.lastCheckedAt) && source.lastCheckedAt >= 0 ? source.lastCheckedAt : 0,
+    lastSyncError: typeof source?.lastSyncError === 'string' ? source.lastSyncError : '',
+    autoSyncEnabled: source?.autoSyncEnabled === true,
+    syncIntervalMinutes: normalizeInteger(
+      source?.syncIntervalMinutes,
+      DEFAULT_DRIVE_SYNC_INTERVAL_MINUTES,
+      1,
+      MAX_DRIVE_SYNC_INTERVAL_MINUTES,
+    ),
+    minChars: normalizeInteger(source?.minChars, DEFAULT_DRIVE_MIN_CHARS, 1, MAX_DRIVE_MIN_CHARS),
   };
 }
 
@@ -63,6 +83,21 @@ export function setDriveSourceConfig(state, sessionId, raw = {}) {
     lastAcceptedVersion: sourceChanged ? '' : (previous?.lastAcceptedVersion || ''),
     lastAcceptedHash: sourceChanged ? '' : (previous?.lastAcceptedHash || ''),
     lastSyncedAt: sourceChanged ? 0 : (Number(previous?.lastSyncedAt) || 0),
+    lastCheckedAt: sourceChanged ? 0 : (Number(previous?.lastCheckedAt) || 0),
+    lastSyncError: sourceChanged ? '' : (typeof previous?.lastSyncError === 'string' ? previous.lastSyncError : ''),
+    autoSyncEnabled: raw.autoSyncEnabled === true,
+    syncIntervalMinutes: normalizeInteger(
+      raw.syncIntervalMinutes,
+      normalizeInteger(previous?.syncIntervalMinutes, DEFAULT_DRIVE_SYNC_INTERVAL_MINUTES, 1, MAX_DRIVE_SYNC_INTERVAL_MINUTES),
+      1,
+      MAX_DRIVE_SYNC_INTERVAL_MINUTES,
+    ),
+    minChars: normalizeInteger(
+      raw.minChars,
+      normalizeInteger(previous?.minChars, DEFAULT_DRIVE_MIN_CHARS, 1, MAX_DRIVE_MIN_CHARS),
+      1,
+      MAX_DRIVE_MIN_CHARS,
+    ),
   };
   return getDriveSourceConfig(state, sessionId);
 }
@@ -92,6 +127,9 @@ export function acceptDriveSnapshot(state, sessionId, snapshot, { now = Date.now
   if (!fileId || !hash || !content.trim()) throw new Error('Drive snapshot identity and content are required');
 
   const source = getDriveSourceConfig(state, sessionId);
+  if (content.length < source.minChars) {
+    throw new Error(`Drive prompt is shorter than the configured minimum (${content.length} < ${source.minChars})`);
+  }
   if (!source.fileId || source.fileId !== fileId) throw new Error('Drive snapshot file does not match the configured source');
 
   if (source.lastAcceptedVersion) {
@@ -110,6 +148,8 @@ export function acceptDriveSnapshot(state, sessionId, snapshot, { now = Date.now
     lastAcceptedVersion: version,
     lastAcceptedHash: hash,
     lastSyncedAt: now,
+    lastCheckedAt: now,
+    lastSyncError: '',
   };
   return {
     accepted: true,
@@ -123,3 +163,23 @@ export const DRIVE_SNAPSHOT_TARGETS = Object.freeze({
   PROMPT3: 'prompt3',
   SECONDARY: 'prompt2',
 });
+
+
+export function recordDriveSyncCheck(state, sessionId, { at = Date.now(), error = '' } = {}) {
+  requireSession(state, sessionId);
+  const bucket = ensureBucket(state);
+  if (!bucket[sessionId]) throw new Error('Drive source is not configured');
+  bucket[sessionId] = {
+    ...bucket[sessionId],
+    lastCheckedAt: at,
+    lastSyncError: String(error || ''),
+  };
+  return getDriveSourceConfig(state, sessionId);
+}
+
+export function nextDriveSyncAt(state, sessionId, now = Date.now()) {
+  const source = getDriveSourceConfig(state, sessionId);
+  if (!source.fileId || !source.autoSyncEnabled) return null;
+  if (!source.lastCheckedAt) return now;
+  return source.lastCheckedAt + source.syncIntervalMinutes * 60_000;
+}
