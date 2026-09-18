@@ -33,6 +33,27 @@ test('Drive source config is durable and source replacement clears accepted iden
   assert.equal(getDriveSourceConfig(s, 's1').lastAcceptedVersion, '');
 });
 
+test('legacy secondary target normalizes to prompt2 without resetting source identity', () => {
+  const s = state();
+  s.profile.driveSourceBySessionId = {
+    s1: {
+      fileId: 'file-1',
+      sourceUrl: 'https://drive.google.com/file/d/file-1/view',
+      target: 'secondary',
+      lastAcceptedVersion: '4',
+      lastAcceptedHash: 'h4',
+      lastSyncedAt: 40,
+    },
+  };
+  assert.equal(getDriveSourceConfig(s, 's1').target, 'prompt2');
+  setDriveSourceConfig(s, 's1', {
+    fileId: 'file-1',
+    sourceUrl: 'https://drive.google.com/file/d/file-1/view',
+    target: 'prompt2',
+  });
+  assert.equal(getDriveSourceConfig(s, 's1').lastAcceptedVersion, '4');
+});
+
 test('stable newer Drive snapshot atomically replaces the primary prompt', () => {
   const s = state();
   setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary' });
@@ -59,11 +80,43 @@ test('older or same-version divergent content fails closed without mutation', ()
   assert.deepEqual(s, before);
 });
 
-test('secondary target updates cadence source without disturbing cadence counter or primary prompt', () => {
+test('prompt2 Drive target updates only prompt 2 and preserves cadence settings', () => {
   const s = state();
-  s.profile.promptCadenceBySessionId = { s1: { enabled: true, secondaryPrompt: 'old', everyN: 5 } };
-  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://docs.google.com/document/d/file-1/edit', target: 'secondary' });
-  acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '20', hash: 'h20', content: 'new-secondary' });
+  s.profile.promptCadenceBySessionId = {
+    s1: {
+      prompts: [
+        { enabled: false, prompt: '', everyN: 10 },
+        { enabled: true, prompt: 'old-2', everyN: 5 },
+        { enabled: true, prompt: 'old-3', everyN: 7 },
+      ],
+      chatFlow: { enabled: false, mode: 'same-chat' },
+    },
+  };
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://docs.google.com/document/d/file-1/edit', target: 'prompt2' });
+  acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '20', hash: 'h20', content: 'new-prompt-2' });
   assert.equal(s.sessionsById.s1.sharedPrompt, 'primary-v1');
-  assert.deepEqual(s.profile.promptCadenceBySessionId.s1, { enabled: true, secondaryPrompt: 'new-secondary', everyN: 5 });
+  const config = s.profile.promptCadenceBySessionId.s1;
+  assert.equal(config.prompts[1].prompt, 'new-prompt-2');
+  assert.equal(config.prompts[1].everyN, 5);
+  assert.equal(config.prompts[1].enabled, true);
+  assert.equal(config.prompts[2].prompt, 'old-3');
+});
+
+test('prompt3 Drive target updates only prompt 3 and preserves prompt 2', () => {
+  const s = state();
+  s.profile.promptCadenceBySessionId = {
+    s1: {
+      prompts: [
+        { enabled: false, prompt: '', everyN: 10 },
+        { enabled: true, prompt: 'prompt-2', everyN: 3 },
+        { enabled: true, prompt: 'prompt-3-old', everyN: 4 },
+      ],
+    },
+  };
+  setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'prompt3' });
+  acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '21', hash: 'h21', content: 'prompt-3-new' });
+  const config = s.profile.promptCadenceBySessionId.s1;
+  assert.equal(config.prompts[1].prompt, 'prompt-2');
+  assert.equal(config.prompts[2].prompt, 'prompt-3-new');
+  assert.equal(config.prompts[2].everyN, 4);
 });
