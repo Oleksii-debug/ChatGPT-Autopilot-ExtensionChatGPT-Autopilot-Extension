@@ -8,7 +8,8 @@ import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { CadencedRepository, getPromptCadenceConfig, setPromptCadenceConfig } from '../core/prompt-cadence.js';
 import { getDriveAccessToken, inspectDriveOAuthConfig } from '../core/drive-auth.js';
 import { extractDriveFileId, listAuthorizedDriveFiles, readAuthorizedDriveSnapshot } from '../core/drive-api.js';
-import { acceptDriveSnapshot, getDriveSourceConfig, setDriveSourceConfig } from '../core/drive-source.js';
+import { acceptDriveSnapshot, getDriveSourceConfig, recordDriveSyncCheck, setDriveSourceConfig } from '../core/drive-source.js';
+import { syncDueDriveSources } from '../core/drive-sync.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
@@ -95,6 +96,7 @@ export function runExecutionCycle() {
   if (executionCycleInFlight) return executionCycleInFlight;
   const cycle = (async () => {
     await ensureColdStartReconciled();
+    const driveSync = await syncDueDriveSources({ repository: repo, chromeApi: chrome });
     const result = await runRuntimeCycle({
       repository: repo,
       chromeApi: chrome,
@@ -103,7 +105,7 @@ export function runExecutionCycle() {
       executionAvailable: EXECUTION_AVAILABLE,
     });
     await notifyStatusChanged(result.state);
-    return result;
+    return { ...result, driveSync };
   })();
   executionCycleInFlight = cycle.then(
     result => { executionCycleInFlight = null; return result; },
@@ -167,6 +169,9 @@ async function dispatchDriveCommand(command, payload) {
         fileId: parsed.fileId,
         sourceUrl: payload.sourceUrl,
         target: payload.target,
+        autoSyncEnabled: payload.autoSyncEnabled === true,
+        syncIntervalMinutes: payload.syncIntervalMinutes,
+        minChars: payload.minChars,
       });
       return draft;
     });
@@ -186,6 +191,7 @@ async function dispatchDriveCommand(command, payload) {
     let acceptance;
     const state = await repo.update(draft => {
       acceptance = acceptDriveSnapshot(draft, payload.sessionId, snapshot);
+      if (acceptance?.accepted === false) recordDriveSyncCheck(draft, payload.sessionId, { at: Date.now(), error: '' });
       return draft;
     });
     return { acceptance, source: getDriveSourceConfig(state, payload.sessionId) };
