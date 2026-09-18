@@ -1,4 +1,5 @@
 import { isSessionFunctionEnabled, SessionFunctionId } from './session-functions.js';
+import { ExecutionModuleId, ensureSessionModuleState } from './module-workspaces.js';
 
 const PROFILE_KEY = 'promptCadenceBySessionId';
 const MAX_PROMPTS = 3;
@@ -107,7 +108,19 @@ function accountVerifiedTransitions(state, beforeTimes) {
       const config = getPromptCadenceConfig(state, id);
       if (config.chatFlow.enabled && config.chatFlow.mode === 'staged') {
         const stageOneTotal = 1 + config.chatFlow.continueCount;
-        if (session.cadenceVerifiedSendCount >= stageOneTotal + config.chatFlow.stage2Count) session.runState = 'STOPPED';
+        if (session.cadenceVerifiedSendCount >= stageOneTotal + config.chatFlow.stage2Count) {
+          ensureSessionModuleState(session);
+          const standard = session.moduleWorkspaces[ExecutionModuleId.STANDARD_SENDS];
+          standard.runState = 'STOPPED';
+          standard.moduleCompleted = true;
+          const batch = session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT];
+          const batchActive = isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT)
+            && session.batchChatFlow?.enabled === true
+            && batch
+            && batch.moduleCompleted !== true
+            && ['RUNNING', 'RECOVERING'].includes(batch.runState);
+          if (!batchActive) session.runState = 'STOPPED';
+        }
       }
     }
   }

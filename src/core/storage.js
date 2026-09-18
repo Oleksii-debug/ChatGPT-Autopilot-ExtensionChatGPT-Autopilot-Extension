@@ -1,10 +1,12 @@
 import { STORAGE_KEY, createEmptyState, validateState, SCHEMA_VERSION } from './schema.js';
 import { createDefaultSessionFunctions } from './session-functions.js';
+import { ensureSessionModuleState } from './module-workspaces.js';
 
 function normalizeCurrentSchemaState(raw) {
   const next = structuredClone(raw);
   for (const session of Object.values(next.sessionsById || {})) {
     if (session.activeFunctions === undefined) session.activeFunctions = createDefaultSessionFunctions();
+    ensureSessionModuleState(session);
   }
   return next;
 }

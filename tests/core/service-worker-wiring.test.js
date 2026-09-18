@@ -8,11 +8,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.resolve(here, '../../src/background/service-worker.js'), 'utf8');
 
 test('service worker owns a real runtime-cycle wiring behind the release gate', () => {
-  assert.match(source, /import \{ AutomaticSessionExecutor \} from '\.\.\/core\/automatic-executor\.js';/);
+  assert.match(source, /import \{ SessionCoordinatorExecutor \} from '\.\.\/core\/session-coordinator\.js';/);
   assert.match(source, /import \{ ChromeInteractionTransport \} from '\.\.\/core\/interaction-transport\.js';/);
   assert.match(source, /import \{ reconcileRuntimeColdStart, runRuntimeCycle \} from '\.\.\/core\/runtime-execution\.js';/);
   assert.match(source, /const executorRepo = new CadencedRepository\(repo\);/);
-  assert.match(source, /const executor = new AutomaticSessionExecutor\(executorRepo, chrome, transport\);/);
+  assert.match(source, /const executor = new SessionCoordinatorExecutor\(executorRepo, chrome, transport\);/);
   assert.match(source, /executionAvailable: EXECUTION_AVAILABLE/);
 });
 

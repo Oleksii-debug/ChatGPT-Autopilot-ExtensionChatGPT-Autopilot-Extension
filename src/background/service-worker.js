@@ -1,6 +1,6 @@
 import { StorageRepository } from '../core/storage.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
-import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
+import { SessionCoordinatorExecutor } from '../core/session-coordinator.js';
 import { ChromeInteractionTransport } from '../core/interaction-transport.js';
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
@@ -20,7 +20,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
 const repo = new StorageRepository(chrome);
 const executorRepo = new CadencedRepository(repo);
 const transport = new ChromeInteractionTransport(chrome);
-const executor = new AutomaticSessionExecutor(executorRepo, chrome, transport);
+const executor = new SessionCoordinatorExecutor(executorRepo, chrome, transport);
 const dispatcher = new CoreCommandDispatcher(repo, undefined, { executionAvailable: EXECUTION_AVAILABLE });
 const runSafely = operation => { void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.')); };
 

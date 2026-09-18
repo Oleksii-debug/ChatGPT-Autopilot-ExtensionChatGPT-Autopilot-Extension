@@ -4,6 +4,7 @@ import { pauseSession, resumeSession, startSession, stopSession } from './state-
 import { appendLog } from './logger.js';
 import { EXECUTION_UNAVAILABLE_MESSAGE } from './recovery.js';
 import { applyPortableProfile, exportPortableProfile, previewPortableProfile } from './portable-profile.js';
+import { hasUnresolvedModuleOperation } from './module-workspaces.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -14,7 +15,7 @@ const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.S
 const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns one of these ChatGPT conversations';
 
 function hasUnresolvedOperation(session) {
-  return Boolean(session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase));
+  return hasUnresolvedModuleOperation(session);
 }
 
 function requireSession(state, sessionId) {
