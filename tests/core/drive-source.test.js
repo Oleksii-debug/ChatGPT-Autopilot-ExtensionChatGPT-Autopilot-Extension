@@ -143,3 +143,28 @@ test('Drive primary target fails closed in unique prompt mode instead of pretend
   );
   assert.equal(s.sessionsById.s1.tasksById.t1.promptOverride, 'task-specific');
 });
+
+
+test('Drive source write rejects fractional or out-of-range visible settings', () => {
+  const s = state();
+  assert.throws(
+    () => setDriveSourceConfig(s, 's1', {
+      fileId: 'file-1',
+      sourceUrl: 'https://drive.google.com/file/d/file-1/view',
+      target: 'primary',
+      syncIntervalMinutes: 2.5,
+      minChars: 1000,
+    }),
+    /Drive sync interval must be an integer/,
+  );
+  assert.throws(
+    () => setDriveSourceConfig(s, 's1', {
+      fileId: 'file-1',
+      sourceUrl: 'https://drive.google.com/file/d/file-1/view',
+      target: 'primary',
+      syncIntervalMinutes: 3,
+      minChars: 0,
+    }),
+    /Drive minimum prompt length must be an integer/,
+  );
+});
