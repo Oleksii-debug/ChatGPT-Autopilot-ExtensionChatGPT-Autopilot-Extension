@@ -12,7 +12,7 @@ import { appendLog } from './logger.js';
 import { startSession } from './state-machine.js';
 import { extractDriveFileId } from './drive-api.js';
 import { getDriveSourceConfig, setDriveSourceConfig } from './drive-source.js';
-import { getPromptCadenceConfig, normalizePromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence.js';
+import { getPromptCadenceConfig, normalizePromptCadenceConfig, setPromptCadenceConfig, validatePromptCadenceWrite } from './prompt-cadence.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
 export const PORTABLE_PROFILE_VERSION = 1;
@@ -56,6 +56,14 @@ function boundedNumber(value, label, min, max, fallback) {
   const number = value === undefined ? fallback : Number(value);
   if (!Number.isFinite(number) || number < min || number > max) {
     throw new Error(`${label} must be between ${min} and ${max}`);
+  }
+  return number;
+}
+
+function boundedInteger(value, label, min, max, fallback) {
+  const number = value === undefined ? fallback : Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) {
+    throw new Error(`${label} must be an integer between ${min} and ${max}`);
   }
   return number;
 }
@@ -142,6 +150,7 @@ function parsePromptCadence(raw, sessionName) {
       chatFlow: raw.chatFlow,
     }
     : raw;
+  validatePromptCadenceWrite(input);
   const config = normalizePromptCadenceConfig(input);
   for (const [index, rule] of config.prompts.entries()) {
     if (index > 0 && rule.enabled && !rule.prompt.trim()) {
@@ -161,14 +170,14 @@ function parseDriveSource(raw, sessionName) {
   const legacyTarget = raw.target === 'secondary' ? 'prompt2' : raw.target;
   const target = PORTABLE_DRIVE_TARGETS.has(legacyTarget) ? legacyTarget : 'primary';
   const autoSyncEnabled = raw.autoSyncEnabled === true;
-  const syncIntervalMinutes = boundedNumber(
+  const syncIntervalMinutes = boundedInteger(
     raw.syncIntervalMinutes,
     `Session ${sessionName} driveSource.syncIntervalMinutes`,
     1,
     1440,
     3,
   );
-  const minChars = boundedNumber(raw.minChars, `Session ${sessionName} driveSource.minChars`, 1, 1000000, 1000);
+  const minChars = boundedInteger(raw.minChars, `Session ${sessionName} driveSource.minChars`, 1, 1000000, 1000);
   if (!sourceUrl) return { clear: true, target: 'primary', sourceUrl: '', autoSyncEnabled, syncIntervalMinutes, minChars };
   const parsed = extractDriveFileId(sourceUrl);
   return { clear: false, fileId: parsed.fileId, sourceUrl, target, autoSyncEnabled, syncIntervalMinutes, minChars };
