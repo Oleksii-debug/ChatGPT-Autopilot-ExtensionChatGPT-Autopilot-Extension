@@ -291,7 +291,9 @@ export class OrchestrationV2Manager {
       return draft;
     });
     if (config.enabled) {
-      await controller.enqueueRecoveryEvent({ detail: 'Owner-local pause ended; reconcile live external truth.' });
+      if (!graphId) {
+        await controller.enqueueRecoveryEvent({ detail: 'Owner-local pause ended; reconcile live external truth.' });
+      }
       await controller.cycle({ nowMs: this.now() });
     }
     await controller.reconcileAlarm();
@@ -537,6 +539,14 @@ export class OrchestrationV2Manager {
       stoppedRuntime.desiredActiveWorkers = 0;
       if (stoppedRuntime.coordinator && typeof stoppedRuntime.coordinator === 'object') {
         stoppedRuntime.coordinator.rotationRequested = false;
+      }
+      const hierarchyNodes = stoppedRuntime.hierarchy?.state?.nodesById;
+      if (hierarchyNodes && typeof hierarchyNodes === 'object' && !Array.isArray(hierarchyNodes)) {
+        for (const nodeRuntime of Object.values(hierarchyNodes)) {
+          if (!nodeRuntime || typeof nodeRuntime !== 'object' || Array.isArray(nodeRuntime)) continue;
+          nodeRuntime.scopeState = 'STOPPED';
+          nodeRuntime.lifecycle = 'STOPPED';
+        }
       }
       payload[runtimeKey(orchestraId)] = stoppedRuntime;
     }
