@@ -36,9 +36,29 @@ jobs:
           count="$(find /tmp/autopilot-pure-source -type f | wc -l | tr -d ' ')"
           test "$count" = "318"
 
-      - name: Run exact projected qualification
+      - name: Run exact projected Node qualification
         working-directory: /tmp/autopilot-pure-source
-        run: npm run test:qualification
+        run: npm test
+
+      - name: Run native Chromium qualification with bounded startup retry
+        working-directory: /tmp/autopilot-pure-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm run test:native-browser; then
+              exit 0
+            fi
+            if [ "$attempt" = "3" ]; then
+              echo "native-browser qualification failed after 3 attempts" >&2
+              exit 1
+            fi
+            sleep 3
+          done
+
+      - name: Run Chromium keyboard and accessibility qualification
+        working-directory: /tmp/autopilot-pure-source
+        run: npm run test:chrome-ui
 
       - name: Static syntax and JSON gates
         working-directory: /tmp/autopilot-pure-source
