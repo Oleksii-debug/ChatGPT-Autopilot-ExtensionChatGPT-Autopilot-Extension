@@ -215,7 +215,7 @@ export function materializeHierarchyActionsIntoCore(
         activationId: action.activationId,
         purpose: action.purpose,
         chatMode: node.chatMode,
-        promptProfileId: node.promptProfileId,
+        promptProfileId: action.promptProfileId || node.promptProfileId,
         actionType: action.type,
       };
       session.updatedAt = nowMs;
