@@ -161,11 +161,13 @@ async function bindChatFlowTaskTab(chromeApi, state, sessionId, task, session) {
   const sessionHint = state.tabHintsByTaskId[chatFlowHintKey(sessionId)];
   const shouldCreateNew = chatFlowNeedsNewChat(session, config);
 
-  if (!shouldCreateNew) {
-    const hinted = await getValidHintedTab(chromeApi, hint, { sessionId, kind: 'CHAT_FLOW' })
-      || await getValidHintedTab(chromeApi, sessionHint, { sessionId, kind: 'CHAT_FLOW' });
-    if (hinted) {
-      const currentUrl = normalizedTabUrl(hinted) || CHAT_FLOW_ROOT_URL;
+  const hinted = await getValidHintedTab(chromeApi, hint, { sessionId, kind: 'CHAT_FLOW' })
+    || await getValidHintedTab(chromeApi, sessionHint, { sessionId, kind: 'CHAT_FLOW' });
+
+  if (hinted) {
+    const currentUrl = normalizedTabUrl(hinted) || CHAT_FLOW_ROOT_URL;
+    const boundaryAlreadyApplied = shouldCreateNew && currentUrl === CHAT_FLOW_ROOT_URL;
+    if (!shouldCreateNew || boundaryAlreadyApplied) {
       task.url = currentUrl;
       task.normalizedUrl = currentUrl;
       const sharedHint = { tabId: hinted.id, sessionId, normalizedUrl: currentUrl, kind: 'CHAT_FLOW', boundAt: Date.now() };
