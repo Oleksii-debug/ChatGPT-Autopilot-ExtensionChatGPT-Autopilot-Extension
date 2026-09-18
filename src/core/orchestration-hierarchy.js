@@ -123,6 +123,7 @@ function normalizePromptProfiles(raw) {
       id: requireId(profile.id, `promptProfiles[${index}].id`),
       role: text(profile.role),
       version: requireInteger(profile.version ?? 1, `promptProfiles[${index}].version`, 1, 1000000),
+      prompt: typeof profile.prompt === 'string' ? profile.prompt.trim() : '',
     };
   }).sort((a, b) => a.id.localeCompare(b.id));
   if (new Set(profiles.map(profile => profile.id)).size !== profiles.length) {
