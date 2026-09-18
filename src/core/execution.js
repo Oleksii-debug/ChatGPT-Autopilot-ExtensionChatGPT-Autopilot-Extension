@@ -2,6 +2,7 @@ import { InteractionResult } from '../shared/protocol.js';
 import { OperationPhase, RunState } from './schema.js';
 import { advanceAfterBusy, advanceAfterVerifiedSend } from './scheduler.js';
 import { markBatchVerifiedSend, replaceCompletedBatchSlot, isBatchSessionComplete } from './batch-chat-flow.js';
+import { ExecutionModuleId } from './module-workspaces.js';
 
 export function applyInteractionResult(session, taskIndex, result, { now = Date.now(), promptFingerprint = '' } = {}) {
   const taskId = session.taskOrder[taskIndex];
@@ -25,6 +26,12 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
       session.lastError = '';
       if (session.operation) { session.operation.phase = OperationPhase.SENT_VERIFIED; session.operation.updatedAt = now; }
       advanceAfterVerifiedSend(session, taskIndex, now);
+      if (session.__moduleId !== ExecutionModuleId.BATCH_CHAT) {
+        const prior = Number.isInteger(session.cadenceVerifiedSendCount) && session.cadenceVerifiedSendCount >= 0
+          ? session.cadenceVerifiedSendCount
+          : 0;
+        session.cadenceVerifiedSendCount = prior + 1;
+      }
       if (session.batchChatFlow?.enabled) {
         const lifecycle = markBatchVerifiedSend(task, now, session.batchChatFlow);
         if (lifecycle.completed) {
