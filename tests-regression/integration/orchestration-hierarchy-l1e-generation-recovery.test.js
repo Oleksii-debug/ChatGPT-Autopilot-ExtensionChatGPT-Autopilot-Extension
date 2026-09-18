@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createEmptyState, RunState } from '../../src/core/schema.js';
+import { createEmptyState, OperationPhase, RunState } from '../../src/core/schema.js';
 import {
   createOrchestrationRuntime,
   normalizeOrchestrationRuntime,
@@ -329,4 +329,114 @@ test('L1-E lost Manager chat recovers as one new generation and stale generation
     runtime.hierarchy.state.nodesById.manager.activationLedger[recovery.activationId].phase,
     'TERMINAL',
   );
+});
+
+
+test('L1-E generation recovery waits behind an AMBIGUOUS Core Send and never blind-replays it', async () => {
+  const g = recoveryGraph();
+  const readyUrls = new Set();
+  const h = harness(readyUrls);
+  let controller = h.controller();
+
+  await controller.configureHierarchy(g, { nowMs: h.now() });
+  await controller.startHierarchy({ nowMs: h.advance(1) });
+  await controller.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.GENERATION_SUPERSEDED,
+    eventId: 'seed-manager-generation-17-ambiguous',
+    controlEpoch: 1,
+    nodeId: 'manager',
+    generation: 1,
+    newGeneration: 17,
+  }, { nowMs: h.advance(1) });
+  await controller.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+    eventId: 'manager-g17-ambiguous-request',
+    controlEpoch: 1,
+    nodeId: 'manager',
+    generation: 17,
+    activationId: 'manager-g17-ambiguous',
+    purpose: OrchestrationActivationPurpose.DELEGATE,
+  }, { nowMs: h.advance(1) });
+
+  const managerSid = hierarchyCoreSessionId(g.graphId, 'manager');
+  const managerTid = hierarchyCoreTaskId(g.graphId, 'manager');
+  await h.coreRepository.update(state => {
+    const session = state.sessionsById[managerSid];
+    session.runState = RunState.RECOVERING;
+    session.operation = {
+      operationId: 'ambiguous-g17-send',
+      sessionId: managerSid,
+      taskId: managerTid,
+      promptFingerprint: 'sha256:g17-ambiguous',
+      phase: OperationPhase.AMBIGUOUS,
+      targetUrl: OLD_CHAT,
+      launchUrl: 'https://chatgpt.com/',
+      promptText: 'MANAGER NORMAL PROMPT',
+      generation: 17,
+      createdAt: h.now(),
+      updatedAt: h.now(),
+      preSendDeadline: 0,
+      submitStartedAt: h.now(),
+      verificationDeadline: h.now() + 30000,
+    };
+    return state;
+  });
+
+  const recovery = await controller.recoverHierarchyNode('manager', {
+    expectedGeneration: 17,
+    nowMs: h.advance(1),
+  });
+  assert.equal(recovery.kind, 'HIERARCHY_GENERATION_RECOVERY');
+  assert.equal(recovery.generation, 18);
+  assert.deepEqual(
+    recovery.result.blocked.map(item => item.reason),
+    ['CORE_OPERATION_UNRESOLVED'],
+  );
+
+  let core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].operation.operationId, 'ambiguous-g17-send');
+  assert.equal(core.sessionsById[managerSid].operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(core.sessionsById[managerSid].orchestrationHierarchy.generation, 17);
+
+  let runtime = await h.runtimeRepository.load();
+  const managerRuntime = runtime.hierarchy.state.nodesById.manager;
+  assert.equal(managerRuntime.generation, 18);
+  assert.equal(managerRuntime.activationLedger[recovery.activationId].phase, 'PREPARED');
+
+  controller = h.controller();
+  let sync = await controller.syncHierarchyAfterCoreCycle({ nowMs: h.advance(1) });
+  assert.equal(sync.materialized.length, 0);
+  assert.deepEqual(sync.blocked.map(item => item.reason), ['CORE_OPERATION_UNRESOLVED']);
+
+  core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].operation.operationId, 'ambiguous-g17-send');
+  assert.equal(core.sessionsById[managerSid].operation.phase, OperationPhase.AMBIGUOUS);
+
+  // Only after the existing exact-effect authority resolves the old operation
+  // to a safe terminal phase may the prepared recovery activation reuse the
+  // logical role Session.
+  await h.coreRepository.update(state => {
+    const session = state.sessionsById[managerSid];
+    session.operation.phase = OperationPhase.FAILED_SAFE;
+    session.operation.updatedAt = h.now();
+    session.runState = RunState.STOPPED;
+    return state;
+  });
+
+  controller = h.controller();
+  sync = await controller.syncHierarchyAfterCoreCycle({ nowMs: h.advance(1) });
+  assert.equal(sync.blocked.length, 0);
+  assert.equal(sync.materialized.length, 1);
+
+  core = await h.coreRepository.load();
+  assert.equal(core.sessionsById[managerSid].operation, null);
+  assert.equal(core.sessionsById[managerSid].orchestrationHierarchy.generation, 18);
+  assert.equal(core.sessionsById[managerSid].orchestrationHierarchy.purpose, 'RECOVERY');
+  assert.equal(core.sessionsById[managerSid].tasksById[managerTid].promptOverride, 'MANAGER RECOVERY PROMPT');
+  assert.equal(core.sessionsById[managerSid].tasksById[managerTid].normalizedUrl, 'https://chatgpt.com/');
+  assert.equal(core.sessionOrder.length, 1);
+
+  runtime = await h.runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.manager.generation, 18);
+  assert.equal(runtime.hierarchy.state.nodesById.manager.activationLedger[recovery.activationId].phase, 'PREPARED');
 });
