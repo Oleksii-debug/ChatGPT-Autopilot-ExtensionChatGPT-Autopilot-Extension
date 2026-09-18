@@ -141,6 +141,17 @@ export function createModuleSessionView(session, moduleId) {
       if (property === '__rootSession') return target;
       if (property === 'runState') {
         if (!ACTIVE_ROOT_STATES.has(target.runState)) return target.runState;
+        if (workspace.moduleCompleted === true) return workspace.runState || 'STOPPED';
+        if (workspace.runState === 'RECOVERING' || workspace.runState === 'RUNNING') return workspace.runState;
+        if (moduleId === ExecutionModuleId.STANDARD_SENDS) {
+          const enabled = isSessionFunctionEnabled(target.activeFunctions, SessionFunctionId.ORDINARY_SEND);
+          if (enabled || isUnresolvedModuleOperation(target.operation)) return target.runState;
+        }
+        if (moduleId === ExecutionModuleId.BATCH_CHAT) {
+          const enabled = isSessionFunctionEnabled(target.activeFunctions, SessionFunctionId.BATCH_CHAT)
+            && target.batchChatFlow?.enabled === true;
+          if (enabled || isUnresolvedModuleOperation(workspace.operation)) return target.runState;
+        }
         return workspace.runState || target.runState;
       }
       if (property === 'moduleCompleted') return workspace.moduleCompleted === true;
@@ -151,8 +162,13 @@ export function createModuleSessionView(session, moduleId) {
       return Reflect.get(target, property, receiver);
     },
     set(target, property, value, receiver) {
-      if (property === 'runState' || property === 'moduleCompleted') {
-        workspace[property] = value;
+      if (property === 'runState') {
+        workspace.runState = value;
+        if (value === 'STOPPED' && ACTIVE_ROOT_STATES.has(target.runState)) workspace.moduleCompleted = true;
+        return true;
+      }
+      if (property === 'moduleCompleted') {
+        workspace.moduleCompleted = value === true;
         return true;
       }
       if (moduleId === ExecutionModuleId.BATCH_CHAT && BATCH_WORKSPACE_FIELDS.has(property)) {

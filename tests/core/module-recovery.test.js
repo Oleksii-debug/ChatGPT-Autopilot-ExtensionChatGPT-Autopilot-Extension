@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createEmptyState, createSession, createTask, OperationPhase, RunState } from '../../src/core/schema.js';
+import { createEmptyState, createSession, createTask, OperationPhase, RunState, validateState } from '../../src/core/schema.js';
 import { configureBatchChatFlow } from '../../src/core/batch-chat-flow-service.js';
 import { ExecutionModuleId, createModuleSessionView } from '../../src/core/module-workspaces.js';
 import { SessionFunctionId, setSessionFunctionEnabled } from '../../src/core/session-functions.js';
@@ -85,6 +85,7 @@ test('cold-start turns only nested batch SUBMITTING into AMBIGUOUS and leaves st
   const batch = createModuleSessionView(state.sessionsById.s1, ExecutionModuleId.BATCH_CHAT);
   const batchTaskId = batchOperation(batch, OperationPhase.SUBMITTING);
   batch.tasksById[batchTaskId].retryAfterAt = 7000;
+  state.sessionsById.s1.tasksById['standard-task'].retryAfterAt = 8000;
 
   reconcileStateForStartup(state, 5000);
 
@@ -123,4 +124,18 @@ test('batch runtime error schedules retry on batch task without mutating standar
   assert.equal(after.sessionsById.s1.moduleWorkspaces.batch_chat.tasksById[batchTaskId].status, 'RETRY_WAIT');
   assert.equal(after.sessionsById.s1.moduleWorkspaces.batch_chat.tasksById[batchTaskId].retryAfterAt, 6000);
   assert.match(after.sessionsById.s1.moduleWorkspaces.batch_chat.lastError, /RUNTIME_FAILURE_UNCLASSIFIED/);
+});
+
+
+test('schema accepts the one global send lease when the owned operation lives in nested batch workspace', () => {
+  const state = stateWithBatch();
+  const batch = createModuleSessionView(state.sessionsById.s1, ExecutionModuleId.BATCH_CHAT);
+  batchOperation(batch, OperationPhase.PRE_SEND_WAIT);
+  state.sendArbiter.lease = {
+    ownerSessionId: 's1',
+    operationId: 'batch-op',
+    acquiredAt: 20,
+    expiresAt: 30,
+  };
+  assert.doesNotThrow(() => validateState(state));
 });

@@ -228,7 +228,13 @@ export function validateState(state) {
     requireNonNegativeNumber(lease.expiresAt, 'sendArbiter lease expiresAt');
     if (lease.expiresAt < lease.acquiredAt) throw new Error('Invalid sendArbiter lease expiry');
     const owner = state.sessionsById[lease.ownerSessionId];
-    if (!owner?.operation || owner.operation.operationId !== lease.operationId) throw new Error('Invalid sendArbiter lease owner');
+    const ownerOperations = [
+      owner?.operation,
+      owner?.moduleWorkspaces?.[ExecutionModuleId.BATCH_CHAT]?.operation,
+    ].filter(Boolean);
+    if (!ownerOperations.some(operation => operation.operationId === lease.operationId)) {
+      throw new Error('Invalid sendArbiter lease owner');
+    }
   }
 
   for (const [sessionId, entries] of Object.entries(state.logs)) {
