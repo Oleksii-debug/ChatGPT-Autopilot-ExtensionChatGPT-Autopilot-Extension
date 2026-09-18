@@ -308,7 +308,18 @@ test('L1-E lost Manager chat recovers as one new generation and stale generation
     status: 'COMPLETED',
   }, { nowMs: h.advance(1) });
   assert.equal(lateOld.reason, 'STALE_GENERATION');
-  assert.deepEqual(lateOld.actions, []);
+  assert.equal(
+    lateOld.actions.every(action => (
+      action.nodeId === 'manager'
+      && action.generation === 18
+      && action.purpose === 'RECOVERY'
+    )),
+    true,
+    'stale generation may only leave the already-prepared current recovery action visible',
+  );
+  assert.equal(lateOld.actions.some(action => action.nodeId === 'worker'), false);
+  assert.equal(lateOld.materialized.length, 0);
+  assert.equal(lateOld.reused.length, 1);
 
   core = await h.coreRepository.load();
   assert.equal(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker')], undefined);
