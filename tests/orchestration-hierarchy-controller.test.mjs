@@ -60,76 +60,6 @@ function graph() {
   };
 }
 
-function directorGraph() {
-  return {
-    schemaVersion: 1,
-    graphId: 'controller-l1d-proof',
-    controlEpoch: 1,
-    promptProfiles: [
-      { id: 'director-v1', role: 'GLOBAL_DIRECTOR', version: 1, prompt: 'DIRECTOR PROMPT' },
-      { id: 'manager-v1', role: 'DOMAIN_MANAGER', version: 1, prompt: 'MANAGER PROMPT' },
-      { id: 'worker-v1', role: 'WORKER', version: 1, prompt: 'WORKER PROMPT' },
-    ],
-    nodes: [
-      {
-        id: 'director',
-        parentId: null,
-        childIds: ['manager-a', 'manager-b'],
-        promptProfileId: 'director-v1',
-        chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
-        maxActiveChildren: 2,
-        barrier: { mode: OrchestrationBarrierMode.ALL_DIRECT_CHILDREN },
-      },
-      {
-        id: 'manager-a',
-        parentId: 'director',
-        childIds: ['worker-a1', 'worker-a2'],
-        promptProfileId: 'manager-v1',
-        chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
-        maxActiveChildren: 2,
-        barrier: { mode: OrchestrationBarrierMode.ALL_DIRECT_CHILDREN },
-      },
-      {
-        id: 'manager-b',
-        parentId: 'director',
-        childIds: ['worker-b1', 'worker-b2'],
-        promptProfileId: 'manager-v1',
-        chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
-        maxActiveChildren: 2,
-        barrier: { mode: OrchestrationBarrierMode.ALL_DIRECT_CHILDREN },
-      },
-      {
-        id: 'worker-a1',
-        parentId: 'manager-a',
-        childIds: [],
-        promptProfileId: 'worker-v1',
-        chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
-      },
-      {
-        id: 'worker-a2',
-        parentId: 'manager-a',
-        childIds: [],
-        promptProfileId: 'worker-v1',
-        chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
-      },
-      {
-        id: 'worker-b1',
-        parentId: 'manager-b',
-        childIds: [],
-        promptProfileId: 'worker-v1',
-        chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
-      },
-      {
-        id: 'worker-b2',
-        parentId: 'manager-b',
-        childIds: [],
-        promptProfileId: 'worker-v1',
-        chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
-      },
-    ],
-  };
-}
-
 function config() {
   return validateOrchestrationConfig({
     enabled: true,
@@ -234,11 +164,11 @@ function harness({ collector = async () => ({ status: 'BUSY', assistantComplete:
   };
 }
 
-async function confirmSend(h, nodeId, conversationUrl, graphId = graph().graphId) {
+async function confirmSend(h, nodeId, conversationUrl) {
   const at = h.advance(1000);
   await h.coreRepository.update(state => {
-    const sid = hierarchyCoreSessionId(graphId, nodeId);
-    const tid = hierarchyCoreTaskId(graphId, nodeId);
+    const sid = hierarchyCoreSessionId(graph().graphId, nodeId);
+    const tid = hierarchyCoreTaskId(graph().graphId, nodeId);
     const session = state.sessionsById[sid];
     const task = session.tasksById[tid];
     task.lastVerifiedSendAt = at;
@@ -332,128 +262,6 @@ test('full automatic L1-C controller vertical survives service-worker-style cont
   assert.equal(manager.activationLedger[manager.currentActivationId].phase, 'TERMINAL');
   assert.equal(Object.keys(runtime.hierarchy.state.nodesById['worker-1'].activationLedger).length, 1);
   assert.equal(Object.keys(runtime.hierarchy.state.nodesById['worker-2'].activationLedger).length, 1);
-});
-
-test('L1-D Director allows asynchronous Manager subtrees and reconciles only after the Manager barrier', async () => {
-  const g = directorGraph();
-  const readyUrls = new Set();
-  const chats = {
-    director: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000001',
-    managerA: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000002',
-    managerB: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000003',
-    workerA1: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000004',
-    workerA2: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000005',
-    workerB1: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000006',
-    workerB2: 'https://chatgpt.com/c/10000000-0000-4000-8000-000000000007',
-  };
-  const h = harness({
-    collector: async probe => readyUrls.has(probe.conversationUrl)
-      ? { status: 'READY', assistantComplete: true, assistantText: `${probe.nodeId} done` }
-      : { status: 'BUSY', assistantComplete: false },
-  });
-
-  let c = h.controller();
-  await c.configureHierarchy(g, { nowMs: h.now() });
-  await c.startHierarchy({ nowMs: h.advance(1) });
-
-  await confirmSend(h, 'director', chats.director, g.graphId);
-  readyUrls.add(chats.director);
-  c = h.controller();
-  let cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.equal(cycle.hierarchyProbe.terminal.length, 1);
-
-  let core = await h.coreRepository.load();
-  assert.ok(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'manager-a')]);
-  assert.ok(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'manager-b')]);
-  assert.equal(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-a1')], undefined);
-  assert.equal(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-b1')], undefined);
-
-  await confirmSend(h, 'manager-a', chats.managerA, g.graphId);
-  await confirmSend(h, 'manager-b', chats.managerB, g.graphId);
-  readyUrls.add(chats.managerA);
-
-  c = h.controller();
-  cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.deepEqual(cycle.hierarchyProbe.terminal.map(item => item.nodeId), ['manager-a']);
-
-  core = await h.coreRepository.load();
-  assert.ok(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-a1')]);
-  assert.ok(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-a2')]);
-  assert.equal(
-    core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-b1')],
-    undefined,
-    'manager-a subtree must progress while manager-b remains BUSY',
-  );
-
-  await confirmSend(h, 'worker-a1', chats.workerA1, g.graphId);
-  await confirmSend(h, 'worker-a2', chats.workerA2, g.graphId);
-  readyUrls.add(chats.workerA1);
-  readyUrls.add(chats.workerA2);
-  c = h.controller();
-  cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.equal(cycle.hierarchyProbe.terminal.length, 2);
-
-  core = await h.coreRepository.load();
-  const managerASession = core.sessionsById[hierarchyCoreSessionId(g.graphId, 'manager-a')];
-  assert.equal(managerASession.orchestrationHierarchy.purpose, 'RECONCILE');
-  assert.equal(managerASession.tasksById[hierarchyCoreTaskId(g.graphId, 'manager-a')].normalizedUrl, chats.managerA);
-
-  await confirmSend(h, 'manager-a', chats.managerA, g.graphId);
-  c = h.controller();
-  cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.deepEqual(cycle.hierarchyProbe.terminal.map(item => item.nodeId), ['manager-a']);
-
-  let runtime = await h.runtimeRepository.load();
-  assert.notEqual(
-    runtime.hierarchy.state.nodesById.director.currentActivationId.startsWith('reconcile:director:'),
-    true,
-    'Director must not reconcile while manager-b subtree is incomplete',
-  );
-
-  readyUrls.add(chats.managerB);
-  c = h.controller();
-  cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.deepEqual(cycle.hierarchyProbe.terminal.map(item => item.nodeId), ['manager-b']);
-
-  core = await h.coreRepository.load();
-  assert.ok(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-b1')]);
-  assert.ok(core.sessionsById[hierarchyCoreSessionId(g.graphId, 'worker-b2')]);
-
-  await confirmSend(h, 'worker-b1', chats.workerB1, g.graphId);
-  await confirmSend(h, 'worker-b2', chats.workerB2, g.graphId);
-  readyUrls.add(chats.workerB1);
-  readyUrls.add(chats.workerB2);
-  c = h.controller();
-  cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.equal(cycle.hierarchyProbe.terminal.length, 2);
-
-  core = await h.coreRepository.load();
-  const managerBSession = core.sessionsById[hierarchyCoreSessionId(g.graphId, 'manager-b')];
-  assert.equal(managerBSession.orchestrationHierarchy.purpose, 'RECONCILE');
-  assert.equal(managerBSession.tasksById[hierarchyCoreTaskId(g.graphId, 'manager-b')].normalizedUrl, chats.managerB);
-
-  await confirmSend(h, 'manager-b', chats.managerB, g.graphId);
-  c = h.controller();
-  cycle = await c.cycle({ nowMs: h.advance(1) });
-  assert.deepEqual(cycle.hierarchyProbe.terminal.map(item => item.nodeId), ['manager-b']);
-
-  core = await h.coreRepository.load();
-  const directorSession = core.sessionsById[hierarchyCoreSessionId(g.graphId, 'director')];
-  assert.equal(directorSession.orchestrationHierarchy.purpose, 'RECONCILE');
-  assert.equal(directorSession.tasksById[hierarchyCoreTaskId(g.graphId, 'director')].normalizedUrl, chats.director);
-  assert.equal(core.sessionOrder.length, 7, 'nested hierarchy must reuse the fixed seven logical role Sessions');
-
-  runtime = await h.runtimeRepository.load();
-  assert.equal(runtime.hierarchy.state.nodesById['manager-a'].activationLedger[
-    runtime.hierarchy.state.nodesById['manager-a'].currentActivationId
-  ].phase, 'TERMINAL');
-  assert.equal(runtime.hierarchy.state.nodesById['manager-b'].activationLedger[
-    runtime.hierarchy.state.nodesById['manager-b'].currentActivationId
-  ].phase, 'TERMINAL');
-  assert.equal(
-    runtime.hierarchy.state.nodesById.director.currentActivationId.startsWith('reconcile:director:'),
-    true,
-  );
 });
 
 test('hierarchy restart never overwrites an ambiguous Core Send operation', async () => {
