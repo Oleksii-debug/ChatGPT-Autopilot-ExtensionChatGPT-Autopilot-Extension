@@ -532,6 +532,14 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     if (generation !== nodeRuntime.generation) {
       return { runtime, actions, deduplicated: false, reason: 'STALE_GENERATION' };
     }
+    if (nodeRuntime.scopeState !== 'RUNNING') {
+      return {
+        runtime,
+        actions,
+        deduplicated: false,
+        reason: nodeRuntime.scopeState === 'STOPPED' ? 'SCOPE_STOPPED' : 'SCOPE_PAUSED',
+      };
+    }
     const newGeneration = requireInteger(
       event.newGeneration ?? event.new_generation ?? generation + 1,
       'event.newGeneration',
