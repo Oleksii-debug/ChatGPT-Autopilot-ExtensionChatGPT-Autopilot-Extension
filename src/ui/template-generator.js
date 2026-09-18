@@ -40,6 +40,9 @@ function templateSession(index) {
     driveSource: {
       sourceUrl: '',
       target: 'primary',
+      autoSyncEnabled: false,
+      syncIntervalMinutes: 3,
+      minChars: 1000,
     },
     tasks: [{
       id: `template-session-${ordinal}-task-1`,
