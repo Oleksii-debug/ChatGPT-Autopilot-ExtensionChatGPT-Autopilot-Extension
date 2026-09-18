@@ -263,7 +263,7 @@ export class OrchestrationV2Controller {
     const activationId = `recovery:${nodeId}:g${newGeneration}:r${nextRound}`;
     const result = await this.dispatchHierarchyEvent({
       type: OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
-      eventId: `generation-recovery:${hierarchy.graph.graphId}:${nodeId}:g${currentGeneration}->g${newGeneration}`,
+      eventId: `generation-recovery:${hierarchy.graph.graphId}:${nodeId}:g${currentGeneration}-to-g${newGeneration}`,
       controlEpoch: hierarchy.state.controlEpoch,
       nodeId,
       generation: currentGeneration,
