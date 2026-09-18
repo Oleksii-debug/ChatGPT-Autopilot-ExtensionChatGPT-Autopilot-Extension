@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createSessionTemplate, serializeSessionTemplate, MAX_TEMPLATE_SESSIONS } from '../../src/ui/template-generator.js';
 import { previewPortableProfile } from '../../src/core/portable-profile.js';
 
@@ -30,4 +31,12 @@ test('session template keeps JSON import format stable', () => {
   assert.equal(parsed.sessions.length, 6);
   assert.equal(parsed.sessions[0].tasks[0].enabled, false);
   assert.equal(parsed.sessions[5].tasks[0].url, '');
+});
+
+
+test('template Session count field exposes the same maximum as the generator', () => {
+  const html = fs.readFileSync(new URL('../../src/ui/options.html', import.meta.url), 'utf8');
+  const match = html.match(/id="template-session-count"[^>]*max="(\d+)"/);
+  assert.ok(match, 'template Session count field must declare a max');
+  assert.equal(Number(match[1]), MAX_TEMPLATE_SESSIONS);
 });
