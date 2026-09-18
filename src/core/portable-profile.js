@@ -11,7 +11,13 @@ import {
 import { appendLog } from './logger.js';
 import { startSession } from './state-machine.js';
 import { buildBatchTasks, normalizeBatchChatFlow, validateBatchChatFlow } from './batch-chat-flow.js';
-import { ExecutionModuleId, createBatchModuleWorkspace, ensureSessionModuleState } from './module-workspaces.js';
+import {
+  ExecutionModuleId,
+  createBatchModuleWorkspace,
+  createModuleSessionView,
+  ensureSessionModuleState,
+  hasUnresolvedModuleOperation,
+} from './module-workspaces.js';
 import { SessionFunctionId, isSessionFunctionEnabled, setSessionFunctionEnabled, validateSessionFunctions } from './session-functions.js';
 import { getPromptCadenceConfig, normalizePromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence.js';
 import { getDriveSourceConfig, setDriveSourceConfig } from './drive-source.js';
@@ -24,7 +30,12 @@ const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 
 function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
-function hasUnresolvedOperation(session) { return Boolean(session?.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase)); }
+function hasUnresolvedOperation(session) {
+  if (!session) return false;
+  ensureSessionModuleState(session);
+  return hasUnresolvedModuleOperation(session)
+    || Boolean(session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase));
+}
 function requireRecord(value, label) { if (!isRecord(value)) throw new Error(`${label} must be an object`); }
 function requireId(value, label) { if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value)) throw new Error(`${label} must contain only letters, numbers, dot, underscore, colon or dash`); return value; }
 function requireString(value, label, { allowEmpty = true, maxLength = 200000 } = {}) { if (typeof value !== 'string' || (!allowEmpty && !value.trim()) || value.length > maxLength) throw new Error(`Invalid ${label}`); return value; }
@@ -135,8 +146,56 @@ function parseProfile(profile, now = Date.now()) {
   }));
   const sessionIds = sessionConfigs.map(item => item.session.id); if (new Set(sessionIds).size !== sessionIds.length) throw new Error('Profile contains duplicate Session ids'); return { profileName, sessionConfigs };
 }
-function validateRunnable(session) { const enabled = session.taskOrder.map(id => session.tasksById[id]).filter(task => task.enabled); if (!enabled.length) throw new Error(`Session ${session.name} has no enabled tasks`); for (const task of enabled) { const prompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt; if (!prompt?.trim()) throw new Error(`Session ${session.name} is missing a prompt for ${task.label || task.id}`); } }
-function reservedUrls(state, excludedSessionIds = new Set()) { const urls = new Set(); for (const session of Object.values(state.sessionsById || {})) { if (excludedSessionIds.has(session.id)) continue; if (ACTIVE_STATES.has(session.runState)) for (const taskId of session.taskOrder) { const task = session.tasksById[taskId]; if (task.enabled && task.normalizedUrl && !session.batchChatFlow?.enabled) urls.add(task.normalizedUrl); } if (hasUnresolvedOperation(session) && session.operation?.targetUrl) urls.add(session.operation.targetUrl); } return urls; }
+function validateRunnable(session) {
+  ensureSessionModuleState(session);
+  let runnable = false;
+  if (isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.ORDINARY_SEND)) {
+    const enabled = session.taskOrder.map(id => session.tasksById[id]).filter(task => task.enabled);
+    if (!enabled.length) throw new Error(`Session ${session.name} has no enabled ordinary tasks`);
+    for (const task of enabled) {
+      const prompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
+      if (!prompt?.trim()) throw new Error(`Session ${session.name} is missing a prompt for ${task.label || task.id}`);
+    }
+    runnable = true;
+  }
+  if (isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT) && session.batchChatFlow?.enabled) {
+    validateBatchChatFlow(session.batchChatFlow);
+    const batch = createModuleSessionView(session, ExecutionModuleId.BATCH_CHAT);
+    if (!batch?.taskOrder?.length) throw new Error(`Session ${session.name} has no batch tasks`);
+    runnable = true;
+  }
+  if (!runnable) throw new Error(`Session ${session.name} has no enabled execution function`);
+}
+function reservedUrls(state, excludedSessionIds = new Set()) {
+  const urls = new Set();
+  for (const session of Object.values(state.sessionsById || {})) {
+    if (excludedSessionIds.has(session.id)) continue;
+    ensureSessionModuleState(session);
+    if (ACTIVE_STATES.has(session.runState)
+        && isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.ORDINARY_SEND)) {
+      for (const taskId of session.taskOrder) {
+        const task = session.tasksById[taskId];
+        if (task.enabled && task.normalizedUrl) urls.add(task.normalizedUrl);
+      }
+    }
+    const batch = createModuleSessionView(session, ExecutionModuleId.BATCH_CHAT);
+    if (ACTIVE_STATES.has(session.runState)
+        && batch
+        && isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT)) {
+      for (const taskId of batch.taskOrder) {
+        const task = batch.tasksById[taskId];
+        if (task?.enabled && task.normalizedUrl && task.normalizedUrl !== 'https://chatgpt.com/') urls.add(task.normalizedUrl);
+      }
+    }
+    if (session.operation?.targetUrl && !TERMINAL_OPERATION_PHASES.has(session.operation.phase)) {
+      urls.add(session.operation.targetUrl);
+    }
+    if (batch?.operation?.targetUrl && !TERMINAL_OPERATION_PHASES.has(batch.operation.phase)) {
+      urls.add(batch.operation.targetUrl);
+    }
+  }
+  return urls;
+}
 function clearSessionTabHints(state, sessionId) { for (const [key, hint] of Object.entries(state.tabHintsByTaskId || {})) if (hint?.sessionId === sessionId) delete state.tabHintsByTaskId[key]; }
 
 export function previewPortableProfile(profile, now = Date.now()) { const parsed = parseProfile(profile, now); return { format: PORTABLE_PROFILE_FORMAT, version: PORTABLE_PROFILE_VERSION, profileName: parsed.profileName, sessionCount: parsed.sessionConfigs.length, taskCount: parsed.sessionConfigs.reduce((sum, item) => sum + item.session.taskOrder.length, 0), autoStartSessionCount: parsed.sessionConfigs.filter(item => item.autoStartRequested).length, sessionNames: parsed.sessionConfigs.map(item => item.session.name) }; }
@@ -146,7 +205,23 @@ export function applyPortableProfile(state, profile, { now = Date.now(), confirm
   for (const { session } of parsed.sessionConfigs) { const existing = state.sessionsById[session.id]; if (!existing) continue; if (ACTIVE_STATES.has(existing.runState) || hasUnresolvedOperation(existing)) throw new Error(`Stop or pause Session ${existing.name} and resolve unfinished work before importing over it`); }
   const wantsAutoStart = confirmAutoStart && parsed.sessionConfigs.some(item => item.autoStartRequested); if (wantsAutoStart && !executionAvailable) throw new Error('Automatic execution is unavailable'); if (wantsAutoStart && state.profile.masterPaused) throw new Error('Resume the extension before importing with automatic start');
   const reserved = reservedUrls(state, targetIds);
-  if (wantsAutoStart) for (const item of parsed.sessionConfigs) { if (!item.autoStartRequested) continue; validateRunnable(item.session); for (const taskId of item.session.taskOrder) { const task = item.session.tasksById[taskId]; if (!task.enabled || item.session.batchChatFlow?.enabled) continue; if (reserved.has(task.normalizedUrl)) throw new Error(`Cannot auto-start Session ${item.session.name}: a ChatGPT conversation is already owned by another active or unresolved Session`); reserved.add(task.normalizedUrl); } }
+  if (wantsAutoStart) for (const item of parsed.sessionConfigs) { if (!item.autoStartRequested) continue; validateRunnable(item.session); if (isSessionFunctionEnabled(item.session.activeFunctions, SessionFunctionId.ORDINARY_SEND)) {
+      for (const taskId of item.session.taskOrder) {
+        const task = item.session.tasksById[taskId];
+        if (!task.enabled) continue;
+        if (reserved.has(task.normalizedUrl)) throw new Error(`Cannot auto-start Session ${item.session.name}: a ChatGPT conversation is already owned by another active or unresolved Session`);
+        reserved.add(task.normalizedUrl);
+      }
+    }
+    if (isSessionFunctionEnabled(item.session.activeFunctions, SessionFunctionId.BATCH_CHAT) && item.session.batchChatFlow?.enabled) {
+      const batch = createModuleSessionView(item.session, ExecutionModuleId.BATCH_CHAT);
+      for (const taskId of batch?.taskOrder || []) {
+        const task = batch.tasksById[taskId];
+        if (!task?.enabled || !task.normalizedUrl || task.normalizedUrl === 'https://chatgpt.com/') continue;
+        if (reserved.has(task.normalizedUrl)) throw new Error(`Cannot auto-start Session ${item.session.name}: a ChatGPT conversation is already owned by another active or unresolved Session`);
+        reserved.add(task.normalizedUrl);
+      }
+    } }
   const importedSessionIds = []; const startedSessionIds = [];
   for (const item of parsed.sessionConfigs) {
     const existing = state.sessionsById[item.session.id];
