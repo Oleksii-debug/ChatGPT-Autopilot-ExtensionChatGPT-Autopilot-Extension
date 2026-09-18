@@ -84,6 +84,20 @@ test('L1-A normalizes an N-level graph deterministically', () => {
   assert.equal(a.nodesById.manager.barrier.mode, OrchestrationBarrierMode.ALL_DIRECT_CHILDREN);
 });
 
+test('L1-A normalized graph is safe to validate again after durable restart', () => {
+  const normalized = validateOrchestrationGraphV1(graph());
+  assert.deepEqual(validateOrchestrationGraphV1(normalized), normalized);
+  const runtime = createOrchestrationHierarchyRuntime(normalized, START);
+  assert.equal(runtime.graphId, normalized.graphId);
+  assert.deepEqual(runtime.nodeOrder, normalized.nodeOrder);
+});
+
+test('L1-A normalized graph identity fails closed when nodeOrder and nodesById diverge', () => {
+  const normalized = validateOrchestrationGraphV1(graph());
+  normalized.nodeOrder = normalized.nodeOrder.slice(0, -1);
+  assert.throws(() => validateOrchestrationGraphV1(normalized), /Invalid normalized nodes/);
+});
+
 test('L1-A rejects duplicate node ids', () => {
   const g = graph();
   g.nodes.push({ ...g.nodes[3] });
