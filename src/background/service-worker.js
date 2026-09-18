@@ -92,8 +92,17 @@ async function ensureColdStartReconciled() {
 }
 
 let executionCycleInFlight = null;
+let executionCycleRerunRequested = false;
+
+function requestRememberedExecutionRerun() {
+  executionCycleRerunRequested = true;
+}
+
 export function runExecutionCycle() {
-  if (executionCycleInFlight) return executionCycleInFlight;
+  if (executionCycleInFlight) {
+    requestRememberedExecutionRerun();
+    return executionCycleInFlight;
+  }
   const cycle = (async () => {
     await ensureColdStartReconciled();
     const driveSync = await syncDueDriveSources({ repository: repo, chromeApi: chrome });
@@ -108,8 +117,20 @@ export function runExecutionCycle() {
     return { ...result, driveSync };
   })();
   executionCycleInFlight = cycle.then(
-    result => { executionCycleInFlight = null; return result; },
-    error => { executionCycleInFlight = null; throw error; },
+    result => {
+      executionCycleInFlight = null;
+      const rerunRequested = executionCycleRerunRequested;
+      executionCycleRerunRequested = false;
+      if (rerunRequested) runSafely(runExecutionCycle());
+      return result;
+    },
+    error => {
+      executionCycleInFlight = null;
+      const rerunRequested = executionCycleRerunRequested;
+      executionCycleRerunRequested = false;
+      if (rerunRequested) runSafely(runExecutionCycle());
+      throw error;
+    },
   );
   return executionCycleInFlight;
 }
