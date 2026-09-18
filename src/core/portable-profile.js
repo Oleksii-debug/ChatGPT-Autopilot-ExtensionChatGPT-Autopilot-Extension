@@ -11,6 +11,10 @@ import {
 import { appendLog } from './logger.js';
 import { startSession } from './state-machine.js';
 import { buildBatchTasks, normalizeBatchChatFlow, validateBatchChatFlow } from './batch-chat-flow.js';
+import { ExecutionModuleId, createBatchModuleWorkspace, ensureSessionModuleState } from './module-workspaces.js';
+import { SessionFunctionId, isSessionFunctionEnabled, setSessionFunctionEnabled, validateSessionFunctions } from './session-functions.js';
+import { getPromptCadenceConfig, normalizePromptCadenceConfig, setPromptCadenceConfig } from './prompt-cadence.js';
+import { getDriveSourceConfig, setDriveSourceConfig } from './drive-source.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
 export const PORTABLE_PROFILE_VERSION = 1;
@@ -35,26 +39,100 @@ function buildTask(raw, index) {
 }
 
 function buildSession(raw, index, now, version = 1) {
-  requireRecord(raw, `Session ${index + 1}`); const id = requireId(raw.id, `Session ${index + 1} id`); const name = requireString(raw.name, `Session ${index + 1} name`, { allowEmpty: false, maxLength: 500 }).trim();
+  requireRecord(raw, `Session ${index + 1}`);
+  const id = requireId(raw.id, `Session ${index + 1} id`);
+  const name = requireString(raw.name, `Session ${index + 1} name`, { allowEmpty: false, maxLength: 500 }).trim();
   const rawBatch = raw.batchChatFlow;
-  const config = rawBatch ? validateBatchChatFlow({ ...rawBatch, enabled: true }) : null;
-  const tasks = config ? buildBatchTasks(config, { idFactory: (() => { let i = 0; return () => `${id}:batch:${++i}`; })(), now }) : (() => {
-    if (!Array.isArray(raw.tasks) || raw.tasks.length < 1 || raw.tasks.length > 50) throw new Error(`Session ${name} must contain 1-50 tasks`);
-    return raw.tasks.map(buildTask);
-  })();
-  const taskIds = tasks.map(task => task.id); if (new Set(taskIds).size !== taskIds.length) throw new Error(`Session ${name} contains duplicate Task ids`);
-  const taskUrls = tasks.filter(task => task.normalizedUrl && !config?.enabled).map(task => task.normalizedUrl); if (new Set(taskUrls).size !== taskUrls.length) throw new Error(`Session ${name} contains the same ChatGPT URL more than once`);
-  const session = createSession({ id, name, tasks, promptMode: PromptMode.SHARED, sharedPrompt: config?.primaryPrompt || requireString(raw.sharedPrompt ?? '', `Session ${name} sharedPrompt`, { maxLength: 200000 }), runMode: config ? RunMode.CONTINUOUS : runMode(raw.runMode), minimumSendIntervalMs: boundedNumber(raw.minimumSendIntervalMinutes, `Session ${name} minimumSendIntervalMinutes`, 1, 1440, 2) * 60000, preSendDelayMs: boundedNumber(raw.preSendDelaySeconds, `Session ${name} preSendDelaySeconds`, 1, 30, 5) * 1000, busyCheckDelayMs: boundedNumber(raw.busyCheckDelaySeconds, `Session ${name} busyCheckDelaySeconds`, 1, 30, 2) * 1000, retryBackoffMs: boundedNumber(raw.retryBackoffSeconds, `Session ${name} retryBackoffSeconds`, 5, 3600, 30) * 1000, tabStrategy: config ? TabStrategy.KEEP_TASK_TABS_OPEN : tabStrategy(raw.tabStrategy), now });
-  session.version = Math.max(1, Number(version) || 1); session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`, { maxLength: 200000 }); session.retryPolicy = raw.retryPolicy === 'manual' ? 'manual' : 'safe'; session.busyChatBehavior = 'skip-next'; session.pausedByMaster = false;
-  if (config) session.batchChatFlow = normalizeBatchChatFlow({ ...config, enabled: true });
+  const batchConfig = rawBatch ? validateBatchChatFlow({ ...rawBatch, enabled: true }) : null;
+
+  let tasks;
+  const hasOrdinaryTasks = Array.isArray(raw.tasks) && raw.tasks.length > 0;
+  if (hasOrdinaryTasks) {
+    if (raw.tasks.length > 50) throw new Error(`Session ${name} must contain 1-50 ordinary tasks`);
+    tasks = raw.tasks.map(buildTask);
+  } else if (batchConfig) {
+    tasks = [createTask({
+      id: `${id}:ordinary-placeholder`,
+      url: '',
+      enabled: false,
+      label: 'Ordinary sending disabled',
+      promptOverride: '',
+    })];
+  } else {
+    throw new Error(`Session ${name} must contain 1-50 tasks`);
+  }
+
+  const taskIds = tasks.map(task => task.id);
+  if (new Set(taskIds).size !== taskIds.length) throw new Error(`Session ${name} contains duplicate Task ids`);
+  const taskUrls = tasks.filter(task => task.enabled && task.normalizedUrl).map(task => task.normalizedUrl);
+  if (new Set(taskUrls).size !== taskUrls.length) throw new Error(`Session ${name} contains the same ChatGPT URL more than once`);
+
+  let activeFunctions = raw.activeFunctions === undefined ? undefined : validateSessionFunctions(raw.activeFunctions);
+  const session = createSession({
+    id,
+    name,
+    tasks,
+    promptMode: promptMode(raw.promptMode),
+    sharedPrompt: requireString(raw.sharedPrompt ?? '', `Session ${name} sharedPrompt`, { maxLength: 200000 }),
+    runMode: runMode(raw.runMode),
+    minimumSendIntervalMs: boundedNumber(raw.minimumSendIntervalMinutes, `Session ${name} minimumSendIntervalMinutes`, 1, 1440, 2) * 60000,
+    preSendDelayMs: boundedNumber(raw.preSendDelaySeconds, `Session ${name} preSendDelaySeconds`, 1, 30, 5) * 1000,
+    busyCheckDelayMs: boundedNumber(raw.busyCheckDelaySeconds, `Session ${name} busyCheckDelaySeconds`, 1, 30, 2) * 1000,
+    retryBackoffMs: boundedNumber(raw.retryBackoffSeconds, `Session ${name} retryBackoffSeconds`, 5, 3600, 30) * 1000,
+    tabStrategy: tabStrategy(raw.tabStrategy),
+    activeFunctions,
+    now,
+  });
+  session.version = Math.max(1, Number(version) || 1);
+  session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`, { maxLength: 200000 });
+  session.retryPolicy = raw.retryPolicy === 'manual' ? 'manual' : 'safe';
+  session.busyChatBehavior = 'skip-next';
+  session.pausedByMaster = false;
+
+  if (batchConfig) {
+    const batchTasks = buildBatchTasks(batchConfig, {
+      idFactory: (() => { let i = 0; return () => `${id}:batch:${++i}`; })(),
+      now,
+    });
+    session.batchChatFlow = {
+      ...normalizeBatchChatFlow(batchConfig),
+      enabled: true,
+      nextOrdinal: batchTasks.length + 1,
+      completedTasks: 0,
+    };
+    ensureSessionModuleState(session);
+    session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT] = createBatchModuleWorkspace(batchTasks, {
+      now,
+      runState: RunState.STOPPED,
+    });
+    if (raw.activeFunctions === undefined) {
+      session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT, true);
+      session.activeFunctions = setSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.ORDINARY_SEND, false);
+    }
+  }
   return session;
+}
+
+function portableDriveSource(raw) {
+  if (raw === undefined || raw === null) return null;
+  requireRecord(raw, 'driveSource');
+  const fileId = requireString(raw.fileId ?? '', 'driveSource.fileId', { allowEmpty: false, maxLength: 1024 }).trim();
+  const sourceUrl = requireString(raw.sourceUrl ?? '', 'driveSource.sourceUrl', { allowEmpty: false, maxLength: 4096 }).trim();
+  const target = ['primary', 'prompt2', 'prompt3', 'secondary'].includes(raw.target) ? raw.target : 'primary';
+  return { fileId, sourceUrl, target };
 }
 
 function parseProfile(profile, now = Date.now()) {
   requireRecord(profile, 'Profile'); if (profile.format !== PORTABLE_PROFILE_FORMAT) throw new Error(`Unsupported profile format: ${profile.format || 'missing'}`); if (profile.version !== PORTABLE_PROFILE_VERSION) throw new Error(`Unsupported profile version: ${profile.version}`);
   if (!Array.isArray(profile.sessions) || profile.sessions.length < 1 || profile.sessions.length > MAX_PORTABLE_SESSIONS) throw new Error(`Profile must contain 1-${MAX_PORTABLE_SESSIONS} sessions`);
   const profileName = requireString(profile.profileName ?? 'ChatGPT Autopilot profile', 'profileName', { allowEmpty: false, maxLength: 500 }).trim(); const profileAutoStartRequested = profile.autoStart === true;
-  const sessionConfigs = profile.sessions.map((raw, index) => ({ raw, session: buildSession(raw, index, now, 1), autoStartRequested: profileAutoStartRequested || raw.autoStart === true }));
+  const sessionConfigs = profile.sessions.map((raw, index) => ({
+    raw,
+    session: buildSession(raw, index, now, 1),
+    autoStartRequested: profileAutoStartRequested || raw.autoStart === true,
+    promptCadence: raw.promptCadence === undefined ? null : normalizePromptCadenceConfig(raw.promptCadence),
+    driveSource: portableDriveSource(raw.driveSource),
+  }));
   const sessionIds = sessionConfigs.map(item => item.session.id); if (new Set(sessionIds).size !== sessionIds.length) throw new Error('Profile contains duplicate Session ids'); return { profileName, sessionConfigs };
 }
 function validateRunnable(session) { const enabled = session.taskOrder.map(id => session.tasksById[id]).filter(task => task.enabled); if (!enabled.length) throw new Error(`Session ${session.name} has no enabled tasks`); for (const task of enabled) { const prompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt; if (!prompt?.trim()) throw new Error(`Session ${session.name} is missing a prompt for ${task.label || task.id}`); } }
@@ -70,15 +148,83 @@ export function applyPortableProfile(state, profile, { now = Date.now(), confirm
   const reserved = reservedUrls(state, targetIds);
   if (wantsAutoStart) for (const item of parsed.sessionConfigs) { if (!item.autoStartRequested) continue; validateRunnable(item.session); for (const taskId of item.session.taskOrder) { const task = item.session.tasksById[taskId]; if (!task.enabled || item.session.batchChatFlow?.enabled) continue; if (reserved.has(task.normalizedUrl)) throw new Error(`Cannot auto-start Session ${item.session.name}: a ChatGPT conversation is already owned by another active or unresolved Session`); reserved.add(task.normalizedUrl); } }
   const importedSessionIds = []; const startedSessionIds = [];
-  for (const item of parsed.sessionConfigs) { const existing = state.sessionsById[item.session.id]; const replacement = item.session; if (existing) { replacement.version = Math.max(1, Number(existing.version || 0) + 1); replacement.createdAt = existing.createdAt; replacement.updatedAt = now; } replacement.runState = RunState.STOPPED; replacement.currentTaskIndex = 0; replacement.nextAllowedSendAt = 0; replacement.operation = null; replacement.lastActionAt = 0; replacement.lastSuccessfulSendAt = 0; replacement.lastError = ''; replacement.onePassCompletedTaskIds = []; replacement.pausedByMaster = false; clearSessionTabHints(state, replacement.id); state.sessionsById[replacement.id] = replacement; if (!state.sessionOrder.includes(replacement.id)) state.sessionOrder.push(replacement.id); appendLog(state, replacement.id, 'Session configuration imported from portable profile', { at: now }); importedSessionIds.push(replacement.id); }
+  for (const item of parsed.sessionConfigs) {
+    const existing = state.sessionsById[item.session.id];
+    const replacement = item.session;
+    if (existing) {
+      replacement.version = Math.max(1, Number(existing.version || 0) + 1);
+      replacement.createdAt = existing.createdAt;
+      replacement.updatedAt = now;
+    }
+    replacement.runState = RunState.STOPPED;
+    replacement.currentTaskIndex = 0;
+    replacement.nextAllowedSendAt = 0;
+    replacement.operation = null;
+    replacement.lastActionAt = 0;
+    replacement.lastSuccessfulSendAt = 0;
+    replacement.lastError = '';
+    replacement.onePassCompletedTaskIds = [];
+    replacement.pausedByMaster = false;
+    clearSessionTabHints(state, replacement.id);
+    state.sessionsById[replacement.id] = replacement;
+    if (!state.sessionOrder.includes(replacement.id)) state.sessionOrder.push(replacement.id);
+
+    if (state.profile.promptCadenceBySessionId) delete state.profile.promptCadenceBySessionId[replacement.id];
+    if (state.profile.driveSourceBySessionId) delete state.profile.driveSourceBySessionId[replacement.id];
+    if (item.promptCadence) setPromptCadenceConfig(state, replacement.id, item.promptCadence);
+    if (item.driveSource) setDriveSourceConfig(state, replacement.id, item.driveSource);
+
+    appendLog(state, replacement.id, 'Session configuration imported from portable profile', { at: now });
+    importedSessionIds.push(replacement.id);
+  }
   if (confirmAutoStart) for (const item of parsed.sessionConfigs) if (item.autoStartRequested) { const session = state.sessionsById[item.session.id]; startSession(session, now); appendLog(state, session.id, 'Session started after confirmed portable profile import', { at: now }); startedSessionIds.push(session.id); }
   return { profileName: parsed.profileName, importedSessionIds, startedSessionIds, autoStartRequested: parsed.sessionConfigs.some(item => item.autoStartRequested) };
 }
 
-function sessionToPortable(session) {
-  const base = { id: session.id, name: session.name, autoStart: false, promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared', sharedPrompt: session.sharedPrompt || '', defaultUniquePrompt: session.defaultUniquePrompt || '', runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous', minimumSendIntervalMinutes: session.minimumSendIntervalMs / 60000, preSendDelaySeconds: session.preSendDelayMs / 1000, busyCheckDelaySeconds: session.busyCheckDelayMs / 1000, retryBackoffSeconds: session.retryBackoffMs / 1000, retryPolicy: session.retryPolicy === 'manual' ? 'manual' : 'safe', tabStrategy: session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? 'worker' : session.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK ? 'open-close' : 'keep-open', tasks: session.taskOrder.map(taskId => { const task = session.tasksById[taskId]; return { id: task.id, enabled: task.enabled, label: task.label || '', url: task.url, promptOverride: task.promptOverride || '' }; }) };
-  if (session.batchChatFlow?.enabled) base.batchChatFlow = { ...normalizeBatchChatFlow(session.batchChatFlow), enabled: true, seedUrls: [...(session.batchChatFlow.seedUrls || (session.batchChatFlow.seedUrl ? [session.batchChatFlow.seedUrl] : []))] };
+function sessionToPortable(state, session) {
+  const base = {
+    id: session.id,
+    name: session.name,
+    autoStart: false,
+    promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared',
+    sharedPrompt: session.sharedPrompt || '',
+    defaultUniquePrompt: session.defaultUniquePrompt || '',
+    runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
+    minimumSendIntervalMinutes: session.minimumSendIntervalMs / 60000,
+    preSendDelaySeconds: session.preSendDelayMs / 1000,
+    busyCheckDelaySeconds: session.busyCheckDelayMs / 1000,
+    retryBackoffSeconds: session.retryBackoffMs / 1000,
+    retryPolicy: session.retryPolicy === 'manual' ? 'manual' : 'safe',
+    tabStrategy: session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? 'worker' : session.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK ? 'open-close' : 'keep-open',
+    activeFunctions: validateSessionFunctions(session.activeFunctions),
+    tasks: session.taskOrder.map(taskId => {
+      const task = session.tasksById[taskId];
+      return { id: task.id, enabled: task.enabled, label: task.label || '', url: task.url, promptOverride: task.promptOverride || '' };
+    }),
+  };
+  if (session.batchChatFlow?.enabled) {
+    base.batchChatFlow = {
+      ...normalizeBatchChatFlow(session.batchChatFlow),
+      enabled: true,
+      seedUrls: [...(session.batchChatFlow.seedUrls || (session.batchChatFlow.seedUrl ? [session.batchChatFlow.seedUrl] : []))],
+      nextOrdinal: 1,
+      completedTasks: 0,
+    };
+  }
+  if (state.profile?.promptCadenceBySessionId?.[session.id]) {
+    base.promptCadence = getPromptCadenceConfig(state, session.id);
+  }
+  const drive = state.profile?.driveSourceBySessionId?.[session.id]
+    ? getDriveSourceConfig(state, session.id)
+    : null;
+  if (drive?.fileId && drive?.sourceUrl) {
+    base.driveSource = {
+      fileId: drive.fileId,
+      sourceUrl: drive.sourceUrl,
+      target: drive.target,
+    };
+  }
   return base;
 }
 
-export function exportPortableProfile(state, { sessionIds = null, profileName = 'ChatGPT Autopilot export' } = {}) { const requested = Array.isArray(sessionIds) && sessionIds.length ? new Set(sessionIds) : null; const sessions = state.sessionOrder.filter(id => !requested || requested.has(id)).map(id => state.sessionsById[id]).filter(Boolean).map(sessionToPortable); if (!sessions.length) throw new Error('There are no Sessions to export'); return { format: PORTABLE_PROFILE_FORMAT, version: PORTABLE_PROFILE_VERSION, profileName, autoStart: false, sessions }; }
+export function exportPortableProfile(state, { sessionIds = null, profileName = 'ChatGPT Autopilot export' } = {}) { const requested = Array.isArray(sessionIds) && sessionIds.length ? new Set(sessionIds) : null; const sessions = state.sessionOrder.filter(id => !requested || requested.has(id)).map(id => state.sessionsById[id]).filter(Boolean).map(session => sessionToPortable(state, session)); if (!sessions.length) throw new Error('There are no Sessions to export'); return { format: PORTABLE_PROFILE_FORMAT, version: PORTABLE_PROFILE_VERSION, profileName, autoStart: false, sessions }; }
