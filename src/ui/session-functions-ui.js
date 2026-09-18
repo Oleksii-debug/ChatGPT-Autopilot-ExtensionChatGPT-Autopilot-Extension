@@ -1,7 +1,7 @@
 const FUNCTION_DEFS = [
   { id: 'ordinary_send', label: 'Звичайні надсилання', description: 'Базова робота Session: надсилання промтів у звичайному режимі.', defaultEnabled: true },
   { id: 'batch_chat', label: 'Паралельна робота з чатами', description: 'Працювати одночасно з кількома чатами та після завершення слота запускати наступне завдання.', defaultEnabled: false },
-  { id: 'prompt_cadence', label: 'Додаткові промти', description: 'Керувати Промтом 2, Промтом 3 та режимами переходу між чатами.', defaultEnabled: false },
+  { id: 'prompt_cadence', label: 'Додаткові промти', description: 'Використовувати Промт 2 і Промт 3 на заданих номерах успішних стандартних надсилань.', defaultEnabled: false },
   { id: 'drive_source', label: 'Джерело Google Drive', description: 'Підтягувати актуальний промт або інше налаштоване джерело з Google Drive.', defaultEnabled: false },
 ];
 
