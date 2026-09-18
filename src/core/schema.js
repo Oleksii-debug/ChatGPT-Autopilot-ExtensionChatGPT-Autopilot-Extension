@@ -1,3 +1,7 @@
+import { createDefaultSessionFunctions, validateSessionFunctions } from './session-functions.js';
+import { ExecutionModuleId, ensureSessionModuleState } from './module-workspaces.js';
+import { SESSION_DEFAULTS } from '../shared/session-defaults.js';
+
 export const SCHEMA_VERSION = 1;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -66,11 +70,11 @@ export function createTask({ id, url, promptOverride = '', enabled = true, label
   return { id, enabled, label, url, normalizedUrl: normalizeChatUrl(url), promptOverride, status: 'IDLE', lastCheckedAt: 0, lastVerifiedSendAt: 0, lastVerifiedFingerprint: '', retryAfterAt: 0, manualReviewReason: '' };
 }
 
-export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, minimumSendIntervalMs = 120000, preSendDelayMs = 5000, busyCheckDelayMs = 2000, retryBackoffMs = 30000, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now() }) {
+export function createSession({ id, name, tasks = [], promptMode = PromptMode.SHARED, sharedPrompt = '', runMode = RunMode.CONTINUOUS, minimumSendIntervalMs = SESSION_DEFAULTS.minimumSendIntervalMs, preSendDelayMs = SESSION_DEFAULTS.preSendDelayMs, busyCheckDelayMs = SESSION_DEFAULTS.busyCheckDelayMs, retryBackoffMs = SESSION_DEFAULTS.retryBackoffMs, tabStrategy = TabStrategy.KEEP_TASK_TABS_OPEN, now = Date.now(), activeFunctions = undefined }) {
   if (!id || !name) throw new Error('Session id and name required');
   if (tasks.length < 1 || tasks.length > 50) throw new Error('Session requires 1-50 tasks');
   const tasksById = Object.fromEntries(tasks.map(t => [t.id, t]));
-  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, lastError: '', onePassCompletedTaskIds: [], createdAt: now, updatedAt: now };
+  return ensureSessionModuleState({ id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, lastError: '', onePassCompletedTaskIds: [], activeFunctions: activeFunctions === undefined ? createDefaultSessionFunctions() : validateSessionFunctions(activeFunctions), createdAt: now, updatedAt: now });
 }
 
 function validateTask(task, taskId) {
@@ -115,6 +119,35 @@ function validateOperation(operation, session) {
   if (operation.promptText !== undefined) requireString(operation.promptText, `session ${session.id} operation promptText`);
 }
 
+function validateModuleWorkspace(session, moduleId, workspace) {
+  requireRecord(workspace, `session ${session.id} module workspace ${moduleId}`);
+  requireEnum(workspace.runState, RUN_STATES, `session ${session.id} module ${moduleId} runState`);
+  requireBoolean(workspace.moduleCompleted, `session ${session.id} module ${moduleId} moduleCompleted`);
+  if (moduleId === ExecutionModuleId.STANDARD_SENDS) return;
+
+  requireEnum(workspace.runMode, RUN_MODES, `session ${session.id} module ${moduleId} runMode`);
+  requireEnum(workspace.tabStrategy, TAB_STRATEGIES, `session ${session.id} module ${moduleId} tabStrategy`);
+  requireUniqueStringArray(workspace.taskOrder, `session ${session.id} module ${moduleId} taskOrder`, { min: 1, max: 50 });
+  requireRecord(workspace.tasksById, `session ${session.id} module ${moduleId} tasksById`);
+  if (!Number.isInteger(workspace.currentTaskIndex) || workspace.currentTaskIndex < 0 || workspace.currentTaskIndex >= workspace.taskOrder.length) {
+    throw new Error(`Invalid session ${session.id} module ${moduleId} currentTaskIndex`);
+  }
+  for (const field of ['nextAllowedSendAt', 'lastActionAt', 'lastSuccessfulSendAt']) {
+    requireNonNegativeNumber(workspace[field], `session ${session.id} module ${moduleId} ${field}`);
+  }
+  requireString(workspace.lastError, `session ${session.id} module ${moduleId} lastError`);
+  requireUniqueStringArray(workspace.onePassCompletedTaskIds, `session ${session.id} module ${moduleId} onePassCompletedTaskIds`);
+  const taskIds = Object.keys(workspace.tasksById);
+  if (taskIds.length !== workspace.taskOrder.length || taskIds.some(taskId => !workspace.taskOrder.includes(taskId))) {
+    throw new Error(`Invalid session ${session.id} module ${moduleId} task identity set`);
+  }
+  for (const taskId of workspace.taskOrder) validateTask(workspace.tasksById[taskId], taskId);
+  for (const taskId of workspace.onePassCompletedTaskIds) if (!workspace.tasksById[taskId]) {
+    throw new Error(`Invalid session ${session.id} module ${moduleId} onePassCompletedTaskIds`);
+  }
+  validateOperation(workspace.operation, { id: session.id, tasksById: workspace.tasksById });
+}
+
 function validateSession(session, id) {
   requireRecord(session, `session ${id}`);
   if (session.id !== id) throw new Error(`Invalid session ${id}`);
@@ -135,6 +168,24 @@ function validateSession(session, id) {
   requireEnum(session.tabStrategy, TAB_STRATEGIES, `session ${id} tabStrategy`);
   requireString(session.lastError, `session ${id} lastError`);
   requireUniqueStringArray(session.onePassCompletedTaskIds, `session ${id} onePassCompletedTaskIds`);
+  if (session.activeFunctions !== undefined) validateSessionFunctions(session.activeFunctions);
+  if (session.moduleWorkspaces !== undefined) {
+    requireRecord(session.moduleWorkspaces, `session ${id} moduleWorkspaces`);
+    if (session.moduleWorkspaces[ExecutionModuleId.STANDARD_SENDS] !== undefined) {
+      validateModuleWorkspace(session, ExecutionModuleId.STANDARD_SENDS, session.moduleWorkspaces[ExecutionModuleId.STANDARD_SENDS]);
+    }
+    if (session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT] !== undefined) {
+      validateModuleWorkspace(session, ExecutionModuleId.BATCH_CHAT, session.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT]);
+    }
+  }
+  if (session.moduleCoordinator !== undefined) {
+    requireRecord(session.moduleCoordinator, `session ${id} moduleCoordinator`);
+    requireString(session.moduleCoordinator.lastModuleId, `session ${id} moduleCoordinator lastModuleId`);
+    if (session.moduleCoordinator.lastModuleId
+        && ![ExecutionModuleId.STANDARD_SENDS, ExecutionModuleId.BATCH_CHAT].includes(session.moduleCoordinator.lastModuleId)) {
+      throw new Error(`Invalid session ${id} moduleCoordinator lastModuleId`);
+    }
+  }
   if (session.version !== undefined && (!Number.isInteger(session.version) || session.version < 0)) throw new Error(`Invalid session ${id} version`);
   if (session.pausedByMaster !== undefined) requireBoolean(session.pausedByMaster, `session ${id} pausedByMaster`);
 
@@ -178,7 +229,13 @@ export function validateState(state) {
     requireNonNegativeNumber(lease.expiresAt, 'sendArbiter lease expiresAt');
     if (lease.expiresAt < lease.acquiredAt) throw new Error('Invalid sendArbiter lease expiry');
     const owner = state.sessionsById[lease.ownerSessionId];
-    if (!owner?.operation || owner.operation.operationId !== lease.operationId) throw new Error('Invalid sendArbiter lease owner');
+    const ownerOperations = [
+      owner?.operation,
+      owner?.moduleWorkspaces?.[ExecutionModuleId.BATCH_CHAT]?.operation,
+    ].filter(Boolean);
+    if (!ownerOperations.some(operation => operation.operationId === lease.operationId)) {
+      throw new Error('Invalid sendArbiter lease owner');
+    }
   }
 
   for (const [sessionId, entries] of Object.entries(state.logs)) {

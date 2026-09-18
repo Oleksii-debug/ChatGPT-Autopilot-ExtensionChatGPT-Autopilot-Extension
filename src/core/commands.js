@@ -4,6 +4,16 @@ import { pauseSession, resumeSession, startSession, stopSession } from './state-
 import { appendLog } from './logger.js';
 import { EXECUTION_UNAVAILABLE_MESSAGE } from './recovery.js';
 import { applyPortableProfile, exportPortableProfile, previewPortableProfile } from './portable-profile.js';
+import {
+  ExecutionModuleId,
+  createBatchModuleWorkspace,
+  createModuleSessionView,
+  ensureSessionModuleState,
+  hasUnresolvedModuleOperation,
+} from './module-workspaces.js';
+import { SessionFunctionId, isSessionFunctionEnabled } from './session-functions.js';
+import { buildBatchTasks, normalizeBatchChatFlow, validateBatchChatFlow } from './batch-chat-flow.js';
+import { SESSION_DEFAULT_PROFILE_VALUES } from '../shared/session-defaults.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -14,7 +24,7 @@ const TERMINAL_OPERATION_PHASES = new Set([OperationPhase.NONE, OperationPhase.S
 const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns one of these ChatGPT conversations';
 
 function hasUnresolvedOperation(session) {
-  return Boolean(session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase));
+  return hasUnresolvedModuleOperation(session);
 }
 
 function requireSession(state, sessionId) {
@@ -34,10 +44,10 @@ export function sessionFromUi(config, now = Date.now()) {
   const session = createSession({
     id: config.id || crypto.randomUUID(), name: config.name || 'New session', tasks,
     promptMode: promptModeFromUi(config.promptMode), sharedPrompt: config.sharedPrompt || '', runMode: runModeFromUi(config.runMode),
-    minimumSendIntervalMs: Math.max(1, Number(config.minimumSendIntervalMinutes || 2)) * 60000,
-    preSendDelayMs: Math.min(30000, Math.max(1000, Number(config.preSendDelaySeconds || 5) * 1000)),
-    busyCheckDelayMs: Math.max(500, Number(config.busyCheckDelaySeconds || 2) * 1000),
-    retryBackoffMs: Math.max(5000, Number(config.retryBackoffSeconds || 30) * 1000),
+    minimumSendIntervalMs: Math.max(1, Number(config.minimumSendIntervalMinutes ?? SESSION_DEFAULT_PROFILE_VALUES.minimumSendIntervalMinutes)) * 60000,
+    preSendDelayMs: Math.min(30000, Math.max(1000, Number(config.preSendDelaySeconds ?? SESSION_DEFAULT_PROFILE_VALUES.preSendDelaySeconds) * 1000)),
+    busyCheckDelayMs: Math.max(500, Number(config.busyCheckDelaySeconds ?? SESSION_DEFAULT_PROFILE_VALUES.busyCheckDelaySeconds) * 1000),
+    retryBackoffMs: Math.max(5000, Number(config.retryBackoffSeconds ?? SESSION_DEFAULT_PROFILE_VALUES.retryBackoffSeconds) * 1000),
     tabStrategy: tabStrategyFromUi(config.tabStrategy), now
   });
   session.version = Math.max(1, Number(config.version) || 1);
@@ -51,42 +61,67 @@ export function sessionFromUi(config, now = Date.now()) {
 export function validateRunnableSession(session) {
   if (hasUnresolvedOperation(session)) throw new Error('Resolve the uncertain send operation before starting');
   if (!session.name.trim()) throw new Error('Session name is required');
-  if (session.taskOrder.length < 1 || session.taskOrder.length > 50) throw new Error('Session requires 1-50 tasks');
-  const normalizedUrls = [];
-  let enabledCount = 0;
-  for (const id of session.taskOrder) {
-    const task = session.tasksById[id];
-    if (!task.enabled) continue;
-    enabledCount += 1;
-    if (!task.url) throw new Error(`Task ${id} URL is required`);
-    task.normalizedUrl = normalizeChatUrl(task.url);
-    normalizedUrls.push(task.normalizedUrl);
-    const prompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
-    if (!prompt?.trim()) throw new Error(`Prompt is required for task ${id}`);
+  ensureSessionModuleState(session);
+
+  let runnable = false;
+  if (isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.ORDINARY_SEND)) {
+    if (session.taskOrder.length < 1 || session.taskOrder.length > 50) throw new Error('Session requires 1-50 ordinary tasks');
+    const normalizedUrls = [];
+    let enabledCount = 0;
+    for (const id of session.taskOrder) {
+      const task = session.tasksById[id];
+      if (!task.enabled) continue;
+      enabledCount += 1;
+      if (!task.url) throw new Error(`Task ${id} URL is required`);
+      task.normalizedUrl = normalizeChatUrl(task.url);
+      normalizedUrls.push(task.normalizedUrl);
+      const prompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
+      if (!prompt?.trim()) throw new Error(`Prompt is required for task ${id}`);
+    }
+    if (enabledCount === 0) throw new Error('Enable at least one ordinary task before starting');
+    if (new Set(normalizedUrls).size !== normalizedUrls.length) throw new Error('The same ChatGPT conversation cannot appear twice in one ordinary lane');
+    runnable = true;
   }
-  if (enabledCount === 0) throw new Error('Enable at least one task before starting');
-  if (new Set(normalizedUrls).size !== normalizedUrls.length) throw new Error('The same ChatGPT conversation cannot appear twice in one active session');
+
+  if (isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT) && session.batchChatFlow?.enabled) {
+    validateBatchChatFlow(session.batchChatFlow);
+    const batch = createModuleSessionView(session, ExecutionModuleId.BATCH_CHAT);
+    if (!batch?.taskOrder?.length) throw new Error('Batch Chat Flow has no configured slots');
+    runnable = true;
+  }
+
+  if (!runnable) throw new Error('Enable at least one execution function before starting');
   return session;
 }
 
+function executionOwnedUrls(session) {
+  ensureSessionModuleState(session);
+  const urls = new Set();
+  if (isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.ORDINARY_SEND)) {
+    for (const taskId of session.taskOrder) {
+      const task = session.tasksById[taskId];
+      if (task?.enabled && task.normalizedUrl) urls.add(task.normalizedUrl);
+    }
+  }
+  if (isSessionFunctionEnabled(session.activeFunctions, SessionFunctionId.BATCH_CHAT) && session.batchChatFlow?.enabled) {
+    const batch = createModuleSessionView(session, ExecutionModuleId.BATCH_CHAT);
+    for (const taskId of batch?.taskOrder || []) {
+      const task = batch.tasksById[taskId];
+      if (task?.enabled && task.normalizedUrl && task.normalizedUrl !== 'https://chatgpt.com/') urls.add(task.normalizedUrl);
+    }
+  }
+  if (session.operation?.targetUrl && !TERMINAL_OPERATION_PHASES.has(session.operation.phase)) urls.add(session.operation.targetUrl);
+  const batchOperation = session.moduleWorkspaces?.[ExecutionModuleId.BATCH_CHAT]?.operation;
+  if (batchOperation?.targetUrl && !TERMINAL_OPERATION_PHASES.has(batchOperation.phase)) urls.add(batchOperation.targetUrl);
+  return urls;
+}
+
 function hasReservedUrlCollision(state, session) {
-  const targetUrls = new Set(session.taskOrder
-    .map(id => session.tasksById[id])
-    .filter(task => task.enabled)
-    .map(task => task.normalizedUrl));
-  if (hasUnresolvedOperation(session) && session.operation?.targetUrl) targetUrls.add(session.operation.targetUrl);
+  const targetUrls = executionOwnedUrls(session);
   for (const other of Object.values(state.sessionsById)) {
     if (other.id === session.id) continue;
-    if (ACTIVE_STATES.has(other.runState)) {
-      const collision = other.taskOrder
-        .map(id => other.tasksById[id])
-        .filter(task => task.enabled)
-        .some(task => targetUrls.has(task.normalizedUrl));
-      if (collision) return true;
-    }
-    if (hasUnresolvedOperation(other) && targetUrls.has(other.operation?.targetUrl || '')) {
-      return true;
-    }
+    if (!ACTIVE_STATES.has(other.runState) && !hasUnresolvedOperation(other)) continue;
+    for (const url of executionOwnedUrls(other)) if (targetUrls.has(url)) return true;
   }
   return false;
 }
@@ -196,8 +231,15 @@ export class CoreCommandDispatcher {
         replacement.nextAllowedSendAt=old.nextAllowedSendAt;
         replacement.operation=old.operation;
         replacement.lastSuccessfulSendAt=old.lastSuccessfulSendAt;
+        replacement.cadenceVerifiedSendCount=Number.isInteger(old.cadenceVerifiedSendCount) ? old.cadenceVerifiedSendCount : 0;
+        replacement.lastActionAt=old.lastActionAt;
+        replacement.lastError=old.lastError;
         replacement.createdAt=old.createdAt;
         replacement.onePassCompletedTaskIds=(old.onePassCompletedTaskIds||[]).filter(id=>replacement.tasksById[id]);
+        replacement.activeFunctions=structuredClone(old.activeFunctions);
+        replacement.batchChatFlow=old.batchChatFlow ? structuredClone(old.batchChatFlow) : undefined;
+        replacement.moduleWorkspaces=old.moduleWorkspaces ? structuredClone(old.moduleWorkspaces) : replacement.moduleWorkspaces;
+        replacement.moduleCoordinator=old.moduleCoordinator ? structuredClone(old.moduleCoordinator) : replacement.moduleCoordinator;
         for(const id of replacement.taskOrder){const previous=old.tasksById[id];const current=replacement.tasksById[id];if(previous&&previous.normalizedUrl===current.normalizedUrl){for(const field of ['status','lastCheckedAt','lastVerifiedSendAt','lastVerifiedFingerprint','retryAfterAt','manualReviewReason']) current[field]=previous[field];}}
         cleanTabHintsForUpdatedSession(draft, old, replacement);
         draft.sessionsById[old.id]=replacement;
@@ -206,13 +248,15 @@ export class CoreCommandDispatcher {
       });
       return { session: sessionToUi(state.sessionsById[payload.sessionId],state) };
     }
-    if (command === CoreCommand.DELETE_SESSION) { await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(s.runState!==RunState.STOPPED||hasUnresolvedOperation(s)) throw new Error('Stop the session and resolve uncertain work before deleting'); delete d.sessionsById[payload.sessionId]; d.sessionOrder=d.sessionOrder.filter(id=>id!==payload.sessionId); delete d.logs[payload.sessionId]; for(const [taskId,hint] of Object.entries(d.tabHintsByTaskId)) if(hint?.sessionId===payload.sessionId) delete d.tabHintsByTaskId[taskId]; return d;}); return {}; }
+    if (command === CoreCommand.DELETE_SESSION) { await this.repo.update(d=>{ const s=requireSession(d,payload.sessionId); if(s.runState!==RunState.STOPPED||hasUnresolvedOperation(s)) throw new Error('Stop the session and resolve uncertain work before deleting'); delete d.sessionsById[payload.sessionId]; d.sessionOrder=d.sessionOrder.filter(id=>id!==payload.sessionId); delete d.logs[payload.sessionId]; if(d.profile.promptCadenceBySessionId) delete d.profile.promptCadenceBySessionId[payload.sessionId]; if(d.profile.driveSourceBySessionId) delete d.profile.driveSourceBySessionId[payload.sessionId]; for(const [taskId,hint] of Object.entries(d.tabHintsByTaskId)) if(hint?.sessionId===payload.sessionId) delete d.tabHintsByTaskId[taskId]; return d;}); return {}; }
     if (command === CoreCommand.DUPLICATE_SESSION) {
       const state=await this.repo.update(d=>{
         const old=requireSession(d,payload.sessionId);
         if(hasUnresolvedOperation(old)) throw new Error('Resolve the uncertain send operation before duplicating');
+        ensureSessionModuleState(old);
         const copy=structuredClone(old);
         const now=this.now();
+        const oldId=old.id;
         copy.id=crypto.randomUUID();
         copy.version=1;
         copy.name=`${old.name} copy`;
@@ -222,11 +266,14 @@ export class CoreCommandDispatcher {
         copy.nextAllowedSendAt=0;
         copy.lastActionAt=0;
         copy.lastSuccessfulSendAt=0;
+        copy.cadenceVerifiedSendCount=0;
         copy.lastError='';
         copy.onePassCompletedTaskIds=[];
         copy.createdAt=now;
         copy.updatedAt=now;
         copy.pausedByMaster=false;
+        copy.moduleCoordinator={lastModuleId:''};
+
         const nextTasks={};
         copy.taskOrder=old.taskOrder.map(id=>{
           const nid=crypto.randomUUID();
@@ -234,9 +281,34 @@ export class CoreCommandDispatcher {
           return nid;
         });
         copy.tasksById=nextTasks;
+        copy.moduleWorkspaces={};
+        ensureSessionModuleState(copy);
+
+        if(old.batchChatFlow?.enabled){
+          const config=normalizeBatchChatFlow({...old.batchChatFlow,enabled:true,nextOrdinal:1,completedTasks:0});
+          const tasks=buildBatchTasks(config,{now});
+          copy.batchChatFlow={...config,nextOrdinal:tasks.length+1,completedTasks:0};
+          copy.moduleWorkspaces[ExecutionModuleId.BATCH_CHAT]=createBatchModuleWorkspace(tasks,{now,runState:RunState.STOPPED});
+        }
+
         d.sessionsById[copy.id]=copy;
         d.sessionOrder.push(copy.id);
-        appendLog(d,copy.id,'Session duplicated',{at:now});
+        if(d.profile.promptCadenceBySessionId?.[oldId]){
+          if(!d.profile.promptCadenceBySessionId) d.profile.promptCadenceBySessionId={};
+          d.profile.promptCadenceBySessionId[copy.id]=structuredClone(d.profile.promptCadenceBySessionId[oldId]);
+        }
+        if(d.profile.driveSourceBySessionId?.[oldId]){
+          if(!d.profile.driveSourceBySessionId) d.profile.driveSourceBySessionId={};
+          const drive=structuredClone(d.profile.driveSourceBySessionId[oldId]);
+          drive.lastAcceptedVersion='';
+          drive.lastAcceptedHash='';
+          drive.lastSyncedAt=0;
+          drive.nextSyncAt=0;
+          drive.lastCheckedAt=0;
+          drive.lastSyncError='';
+          d.profile.driveSourceBySessionId[copy.id]=drive;
+        }
+        appendLog(d,copy.id,'Session duplicated with configuration and fresh runtime progress',{at:now});
         return d;
       });
       const id=state.sessionOrder.at(-1);

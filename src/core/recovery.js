@@ -1,12 +1,20 @@
 import { OperationPhase, RunState } from './schema.js';
 import { selectNextTask } from './scheduler.js';
+import {
+  createModuleSessionView,
+  ensureSessionModuleState,
+  listExecutionModuleIds,
+} from './module-workspaces.js';
+import { nextDriveSyncWake } from './drive-source.js';
 
 export const ALARM_NAME = 'autopilot-core-wake';
 export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not available until the durable send runner is installed.';
 
+const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
+
 export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
-    if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
+    if (!ACTIVE_STATES.has(session.runState)) continue;
     session.runState = RunState.PAUSED;
     session.pausedByRuntimeGate = true;
     session.lastError = EXECUTION_UNAVAILABLE_MESSAGE;
@@ -18,11 +26,17 @@ export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.
 
 export function reconcileStateForStartup(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
-    const wasActive = session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING;
+    ensureSessionModuleState(session);
+    const wasActive = ACTIVE_STATES.has(session.runState);
     if (session.runState === RunState.RUNNING) session.runState = RunState.RECOVERING;
-    if (session.operation?.phase === OperationPhase.SUBMITTING) {
-      session.operation.phase = OperationPhase.AMBIGUOUS;
-      if (wasActive) session.runState = RunState.RECOVERING;
+    for (const moduleId of listExecutionModuleIds(session, { includeDisabledWithOperation: true })) {
+      const view = createModuleSessionView(session, moduleId);
+      if (!view?.operation) continue;
+      if (view.operation.phase === OperationPhase.SUBMITTING) {
+        view.operation.phase = OperationPhase.AMBIGUOUS;
+        view.operation.updatedAt = now;
+        if (wasActive && ACTIVE_STATES.has(session.runState)) view.runState = RunState.RECOVERING;
+      }
     }
   }
   const lease = state.sendArbiter.lease;
@@ -30,8 +44,8 @@ export function reconcileStateForStartup(state, now = Date.now()) {
   return state;
 }
 
-function schedulerWakeForSession(session, now) {
-  const decision = selectNextTask(session, now);
+function schedulerWakeForModule(view, now) {
+  const decision = selectNextTask(view, now);
   switch (decision.kind) {
     case 'TASK':
     case 'COMPLETE':
@@ -44,6 +58,25 @@ function schedulerWakeForSession(session, now) {
   }
 }
 
+function operationWakeForModule(view, now, profileSendBarrier) {
+  const phase = view.operation?.phase;
+  if (phase === OperationPhase.MANUAL_REVIEW) return null;
+  if (phase === OperationPhase.PRE_SEND_WAIT) {
+    const taskRetryAfter = view.tasksById?.[view.operation?.taskId]?.retryAfterAt || 0;
+    return Math.max(
+      now,
+      view.operation.preSendDeadline || now,
+      taskRetryAfter,
+      profileSendBarrier,
+    );
+  }
+  if (phase === OperationPhase.AMBIGUOUS) {
+    const taskRetryAfter = view.tasksById?.[view.operation?.taskId]?.retryAfterAt || 0;
+    return Math.max(now, taskRetryAfter);
+  }
+  return null;
+}
+
 export function computeNextWake(state, now = Date.now()) {
   let earliest = Infinity;
   const activeLeaseUntil = state.sendArbiter?.lease?.expiresAt > now
@@ -53,34 +86,23 @@ export function computeNextWake(state, now = Date.now()) {
     state.sendArbiter?.profileNextAllowedSendAt || 0,
     activeLeaseUntil,
   );
+  const driveWake = nextDriveSyncWake(state, now);
+  if (driveWake != null) earliest = Math.min(earliest, driveWake);
 
   for (const session of Object.values(state.sessionsById)) {
-    if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
-    const phase = session.operation?.phase;
-    if (phase === OperationPhase.MANUAL_REVIEW) continue;
-
-    if (phase === OperationPhase.PRE_SEND_WAIT) {
-      const taskRetryAfter = session.tasksById?.[session.operation?.taskId]?.retryAfterAt || 0;
-      earliest = Math.min(
-        earliest,
-        Math.max(
-          now,
-          session.operation.preSendDeadline || now,
-          taskRetryAfter,
-          profileSendBarrier,
-        ),
-      );
-      continue;
+    if (!ACTIVE_STATES.has(session.runState)) continue;
+    ensureSessionModuleState(session);
+    for (const moduleId of listExecutionModuleIds(session, { includeDisabledWithOperation: true })) {
+      const view = createModuleSessionView(session, moduleId);
+      if (!view || !ACTIVE_STATES.has(view.runState)) continue;
+      const operationWake = operationWakeForModule(view, now, profileSendBarrier);
+      if (operationWake != null) {
+        earliest = Math.min(earliest, operationWake);
+        continue;
+      }
+      const schedulerWake = schedulerWakeForModule(view, now);
+      if (schedulerWake != null) earliest = Math.min(earliest, schedulerWake);
     }
-
-    if (phase === OperationPhase.AMBIGUOUS) {
-      const taskRetryAfter = session.tasksById?.[session.operation?.taskId]?.retryAfterAt || 0;
-      earliest = Math.min(earliest, Math.max(now, taskRetryAfter));
-      continue;
-    }
-
-    const schedulerWake = schedulerWakeForSession(session, now);
-    if (schedulerWake != null) earliest = Math.min(earliest, schedulerWake);
   }
 
   return earliest < Infinity ? earliest : null;
@@ -92,10 +114,6 @@ export async function reconcileAlarm(chromeApi, state, now = Date.now()) {
     await chromeApi.alarms.clear(ALARM_NAME);
     return null;
   }
-
-  // Chrome replaces an existing alarm with the same name. Do not clear the
-  // canonical wake first: if replacement creation rejects, the previous wake
-  // remains available as a conservative fallback and durable state stays truth.
   await chromeApi.alarms.create(ALARM_NAME, { when: Math.max(now + 500, wakeAt) });
   return wakeAt;
 }

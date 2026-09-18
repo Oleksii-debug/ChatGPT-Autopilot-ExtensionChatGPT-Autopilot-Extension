@@ -1,10 +1,21 @@
 import { STORAGE_KEY, createEmptyState, validateState, SCHEMA_VERSION } from './schema.js';
+import { createDefaultSessionFunctions } from './session-functions.js';
+import { ensureSessionModuleState } from './module-workspaces.js';
+
+function normalizeCurrentSchemaState(raw) {
+  const next = structuredClone(raw);
+  for (const session of Object.values(next.sessionsById || {})) {
+    if (session.activeFunctions === undefined) session.activeFunctions = createDefaultSessionFunctions();
+    ensureSessionModuleState(session);
+  }
+  return next;
+}
 
 export function migrateState(raw, now = Date.now()) {
   if (raw === undefined) return createEmptyState(now);
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) throw new Error('Stored state is corrupt');
   if (!Number.isInteger(raw.schemaVersion)) throw new Error('Stored state has an invalid schema version');
-  if (raw.schemaVersion === SCHEMA_VERSION) return validateState(raw);
+  if (raw.schemaVersion === SCHEMA_VERSION) return validateState(normalizeCurrentSchemaState(raw));
   if (raw.schemaVersion > SCHEMA_VERSION) throw new Error('State was created by a newer extension version');
   throw new Error(`No migration path from schema ${raw.schemaVersion}`);
 }

@@ -1,6 +1,13 @@
 import { reconcileAlarm, reconcileStateForStartup, suspendActiveSessionsWhenExecutionUnavailable } from './recovery.js';
 import { OperationPhase, RunState } from './schema.js';
 import { appendLog } from './logger.js';
+import {
+  ExecutionModuleId,
+  createModuleSessionView,
+  ensureSessionModuleState,
+  isUnresolvedModuleOperation,
+  listExecutionModuleIds,
+} from './module-workspaces.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
@@ -19,9 +26,7 @@ function runtimeDiagnosticCode(error) {
 
   const message = String(error?.message || error || '');
   if (/frame with id .* was removed/i.test(message)) return 'INTERACTION_DOCUMENT_CHANGED';
-  if (/receiving end does not exist|could not establish connection/i.test(message)) {
-    return 'INTERACTION_RECEIVER_MISSING';
-  }
+  if (/receiving end does not exist|could not establish connection/i.test(message)) return 'INTERACTION_RECEIVER_MISSING';
   if (/no tab with id|tab .* not found/i.test(message)) return 'TAB_NOT_FOUND';
   if (/extension context invalidated/i.test(message)) return 'EXTENSION_CONTEXT_INVALIDATED';
   return 'RUNTIME_FAILURE_UNCLASSIFIED';
@@ -40,6 +45,36 @@ function orderedSessionIds(state) {
     if (!seen.has(id)) ids.push(id);
   }
   return ids;
+}
+
+function moduleForError(session, error) {
+  ensureSessionModuleState(session);
+  const explicit = String(error?.autopilotModuleId || '');
+  if ([ExecutionModuleId.STANDARD_SENDS, ExecutionModuleId.BATCH_CHAT].includes(explicit)
+      && createModuleSessionView(session, explicit)) return explicit;
+  for (const moduleId of listExecutionModuleIds(session, { includeDisabledWithOperation: true })) {
+    const view = createModuleSessionView(session, moduleId);
+    if (isUnresolvedModuleOperation(view?.operation)) return moduleId;
+  }
+  return ExecutionModuleId.STANDARD_SENDS;
+}
+
+function interruptedPreSubmitOperation(session) {
+  ensureSessionModuleState(session);
+  const candidates = [];
+  for (const moduleId of listExecutionModuleIds(session, { includeDisabledWithOperation: true })) {
+    const view = createModuleSessionView(session, moduleId);
+    const operation = view?.operation;
+    if (!operation || !INTERRUPTED_PRE_SUBMIT_PHASES.has(operation.phase)) continue;
+    candidates.push({
+      moduleId,
+      operationId: operation.operationId,
+      phase: operation.phase,
+      createdAt: Number(operation.createdAt || 0),
+    });
+  }
+  candidates.sort((a, b) => a.createdAt - b.createdAt || a.moduleId.localeCompare(b.moduleId));
+  return candidates[0] || null;
 }
 
 async function prepareStartupState(repository, executionAvailable, now) {
@@ -67,21 +102,21 @@ async function persistRuntimeFailure(repository, sessionId, error, now) {
   await repository.update(draft => {
     const session = draft.sessionsById?.[sessionId];
     if (!session || !ACTIVE_STATES.has(session.runState)) return draft;
+    const moduleId = moduleForError(session, error);
+    const view = createModuleSessionView(session, moduleId) || session;
     const retryAt = now + Math.max(1000, session.retryBackoffMs || 30000);
     const taskId = error?.autopilotTaskId
-      || session.operation?.taskId
-      || session.taskOrder?.[session.currentTaskIndex];
-    if (taskId && session.tasksById?.[taskId]) {
-      session.tasksById[taskId].status = 'RETRY_WAIT';
-      session.tasksById[taskId].retryAfterAt = Math.max(
-        session.tasksById[taskId].retryAfterAt || 0,
-        retryAt,
-      );
+      || view.operation?.taskId
+      || view.taskOrder?.[view.currentTaskIndex];
+    if (taskId && view.tasksById?.[taskId]) {
+      view.tasksById[taskId].status = 'RETRY_WAIT';
+      view.tasksById[taskId].retryAfterAt = Math.max(view.tasksById[taskId].retryAfterAt || 0, retryAt);
     }
-    session.lastError = `${RUNTIME_RETRY_MESSAGE} Diagnostic: ${diagnosticCode}.`;
-    session.lastActionAt = now;
+    view.lastError = `${RUNTIME_RETRY_MESSAGE} Diagnostic: ${diagnosticCode}.`;
+    view.lastActionAt = now;
     session.updatedAt = now;
-    appendLog(draft, sessionId, `Runtime retry scheduled [${diagnosticCode}]`, {
+    const moduleSuffix = moduleId === ExecutionModuleId.STANDARD_SENDS ? '' : ` [${moduleId}]`;
+    appendLog(draft, sessionId, `Runtime retry scheduled [${diagnosticCode}]${moduleSuffix}`, {
       at: now,
       level: 'WARN',
     });
@@ -102,15 +137,17 @@ async function failSafeExpiredPreSubmit(repository, sessionId, result, expectedO
   let retryAt = 0;
   await repository.update(draft => {
     const session = draft.sessionsById?.[sessionId];
-    const operation = session?.operation;
-    if (!session
-        || !ACTIVE_STATES.has(session.runState)
-        || operation?.phase !== expectedOperation.phase
+    if (!session || !ACTIVE_STATES.has(session.runState)) return draft;
+    const view = createModuleSessionView(session, expectedOperation.moduleId);
+    const operation = view?.operation;
+    if (!view
+        || !operation
+        || operation.phase !== expectedOperation.phase
         || operation.operationId !== expectedOperation.operationId) {
       return draft;
     }
 
-    const task = session.tasksById?.[operation.taskId];
+    const task = view.tasksById?.[operation.taskId];
     if (!task || (task.retryAfterAt || 0) > now) return draft;
 
     retryAt = now + Math.max(1000, session.retryBackoffMs || 30000);
@@ -118,19 +155,20 @@ async function failSafeExpiredPreSubmit(repository, sessionId, result, expectedO
     task.status = 'RETRY_WAIT';
     operation.phase = OperationPhase.FAILED_SAFE;
     operation.updatedAt = now;
-    session.lastError = expectedOperation.phase === OperationPhase.INSERTING
+    view.lastError = expectedOperation.phase === OperationPhase.INSERTING
       ? INSERTION_RECOVERY_MESSAGE
       : PRE_SUBMIT_RECOVERY_MESSAGE;
-    session.lastActionAt = now;
+    view.lastActionAt = now;
     session.updatedAt = now;
     reconciled = true;
     return draft;
   });
 
   if (!reconciled) return result;
-  return expectedOperation.phase === OperationPhase.INSERTING
+  const base = expectedOperation.phase === OperationPhase.INSERTING
     ? { kind: 'INSERTION_RECOVERY_RETRY', wakeAt: retryAt }
     : { kind: 'PRE_SUBMIT_RECOVERY_RETRY', phase: expectedOperation.phase, wakeAt: retryAt };
+  return { ...base, moduleId: expectedOperation.moduleId };
 }
 
 export async function runRuntimeCycle({
@@ -153,9 +191,7 @@ export async function runRuntimeCycle({
       const live = await repository.load();
       const session = live.sessionsById?.[sessionId];
       if (!session || !ACTIVE_STATES.has(session.runState)) continue;
-      const expectedPreSubmitOperation = INTERRUPTED_PRE_SUBMIT_PHASES.has(session.operation?.phase)
-        ? { operationId: session.operation.operationId, phase: session.operation.phase }
-        : null;
+      const expectedPreSubmitOperation = interruptedPreSubmitOperation(session);
       try {
         const rawResult = await executor.runSessionOnce(sessionId);
         const result = await failSafeExpiredPreSubmit(
