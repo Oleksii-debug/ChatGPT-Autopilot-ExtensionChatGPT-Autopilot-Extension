@@ -444,14 +444,14 @@ test('L1-E generation recovery atomically supersedes the old generation and prep
   assert.equal(staleRetry.runtime.nodesById.manager.generation, 2);
 });
 
-test('L1-E recovery request is fail-closed while the node scope is paused', () => {
+test('L1-E paused recovery does not consume identity and the same request succeeds after Resume', () => {
   const g = graph();
   let runtime = createOrchestrationHierarchyRuntime(g, START);
   runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.PAUSE_SCOPE, 'pause-before-recovery', {
     nodeId: 'manager',
   }), 1).runtime;
 
-  const result = reduce(g, runtime, event(
+  const recoveryEvent = event(
     OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
     'paused-manager-recovery',
     {
@@ -460,12 +460,25 @@ test('L1-E recovery request is fail-closed while the node scope is paused', () =
       newGeneration: 2,
       activationId: 'paused-recovery',
     },
-  ), 2);
+  );
+  const paused = reduce(g, runtime, recoveryEvent, 2);
 
-  assert.equal(result.reason, 'SCOPE_PAUSED');
-  assert.deepEqual(result.actions, []);
-  assert.equal(result.runtime.nodesById.manager.generation, 1);
-  assert.equal(result.runtime.nodesById.manager.currentActivationId, '');
+  assert.equal(paused.reason, 'SCOPE_PAUSED');
+  assert.deepEqual(paused.actions, []);
+  assert.equal(paused.runtime.nodesById.manager.generation, 1);
+  assert.equal(paused.runtime.nodesById.manager.currentActivationId, '');
+  assert.equal(paused.runtime.processedEventIds['paused-manager-recovery'], undefined);
+
+  runtime = reduce(g, paused.runtime, event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'resume-before-recovery', {
+    nodeId: 'manager',
+  }), 3).runtime;
+  const resumed = reduce(g, runtime, recoveryEvent, 4);
+
+  assert.equal(resumed.reason, 'GENERATION_RECOVERY_PREPARED');
+  assert.equal(resumed.actions.length, 1);
+  assert.equal(resumed.runtime.nodesById.manager.generation, 2);
+  assert.equal(resumed.runtime.nodesById.manager.currentActivationId, 'paused-recovery');
+  assert.ok(resumed.runtime.processedEventIds['paused-manager-recovery']);
 });
 
 test('L1-E recovery generation can continue the logical Manager role but old generation cannot launch descendants', () => {
