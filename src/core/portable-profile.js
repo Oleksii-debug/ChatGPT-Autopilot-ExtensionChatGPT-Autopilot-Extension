@@ -160,9 +160,18 @@ function parseDriveSource(raw, sessionName) {
   const sourceUrl = requireString(raw.sourceUrl ?? '', `Session ${sessionName} driveSource.sourceUrl`, { maxLength: 4096 }).trim();
   const legacyTarget = raw.target === 'secondary' ? 'prompt2' : raw.target;
   const target = PORTABLE_DRIVE_TARGETS.has(legacyTarget) ? legacyTarget : 'primary';
-  if (!sourceUrl) return { clear: true, target: 'primary', sourceUrl: '' };
+  const autoSyncEnabled = raw.autoSyncEnabled === true;
+  const syncIntervalMinutes = boundedNumber(
+    raw.syncIntervalMinutes,
+    `Session ${sessionName} driveSource.syncIntervalMinutes`,
+    1,
+    1440,
+    3,
+  );
+  const minChars = boundedNumber(raw.minChars, `Session ${sessionName} driveSource.minChars`, 1, 1000000, 1000);
+  if (!sourceUrl) return { clear: true, target: 'primary', sourceUrl: '', autoSyncEnabled, syncIntervalMinutes, minChars };
   const parsed = extractDriveFileId(sourceUrl);
-  return { clear: false, fileId: parsed.fileId, sourceUrl, target };
+  return { clear: false, fileId: parsed.fileId, sourceUrl, target, autoSyncEnabled, syncIntervalMinutes, minChars };
 }
 
 function parseProfile(profile, now = Date.now()) {
@@ -339,8 +348,20 @@ function promptCadenceToPortable(state, sessionId) {
 function driveSourceToPortable(state, sessionId) {
   const source = getDriveSourceConfig(state, sessionId);
   return source.fileId
-    ? { sourceUrl: source.sourceUrl, target: source.target }
-    : { sourceUrl: '', target: 'primary' };
+    ? {
+      sourceUrl: source.sourceUrl,
+      target: source.target,
+      autoSyncEnabled: source.autoSyncEnabled,
+      syncIntervalMinutes: source.syncIntervalMinutes,
+      minChars: source.minChars,
+    }
+    : {
+      sourceUrl: '',
+      target: 'primary',
+      autoSyncEnabled: false,
+      syncIntervalMinutes: source.syncIntervalMinutes,
+      minChars: source.minChars,
+    };
 }
 
 function sessionToPortable(state, session) {
