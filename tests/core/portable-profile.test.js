@@ -86,6 +86,86 @@ test('portable profile export contains configuration only and defaults autoStart
   assert.equal(exported.sessions[0].operation, undefined);
 });
 
+test('portable profile round-trips ordinary, batch, cadence and Drive configuration without sharing runtime progress', () => {
+  const base = profile().sessions[0];
+  const modular = profile({
+    sessions: [{
+      ...base,
+      activeFunctions: {
+        ordinary_send: { enabled: true, config: {} },
+        batch_chat: { enabled: true, config: {} },
+        prompt_cadence: { enabled: true, config: {} },
+        drive_source: { enabled: true, config: {} },
+      },
+      batchChatFlow: {
+        enabled: true,
+        seedUrls: ['https://chatgpt.com/c/batch-seed'],
+        concurrency: 2,
+        totalTasks: 3,
+        startIntervalMs: 15_000,
+        primaryPrompt: 'BATCH START',
+        continuePrompt: 'BATCH CONTINUE',
+        continueCount: 1,
+        finalPrompt: 'BATCH FINAL',
+      },
+      promptCadence: {
+        prompts: [
+          { enabled: false, prompt: '', everyN: 10 },
+          { enabled: true, prompt: 'PROMPT TWO', everyN: 30 },
+          { enabled: true, prompt: 'PROMPT THREE', everyN: 40 },
+        ],
+        chatFlow: { enabled: false, mode: 'same-chat' },
+      },
+      driveSource: {
+        fileId: 'drive-file-3',
+        sourceUrl: 'https://drive.google.com/file/d/drive-file-3/view',
+        target: 'prompt3',
+      },
+    }],
+  });
+
+  const first = createEmptyState(0);
+  applyPortableProfile(first, modular, { now: 100 });
+  const imported = first.sessionsById['session-1'];
+  assert.deepEqual(imported.taskOrder, ['task-1']);
+  assert.equal(imported.tasksById['task-1'].url, 'https://chatgpt.com/c/a');
+  assert.equal(imported.moduleWorkspaces.batch_chat.taskOrder.length, 2);
+  assert.deepEqual(
+    imported.moduleWorkspaces.batch_chat.taskOrder.map(id => imported.moduleWorkspaces.batch_chat.tasksById[id].retryAfterAt),
+    [100, 15_100],
+  );
+
+  const exported = exportPortableProfile(first, { profileName: 'Modular round trip' });
+  const cfg = exported.sessions[0];
+  assert.equal(cfg.activeFunctions.ordinary_send.enabled, true);
+  assert.equal(cfg.activeFunctions.batch_chat.enabled, true);
+  assert.equal(cfg.activeFunctions.prompt_cadence.enabled, true);
+  assert.equal(cfg.activeFunctions.drive_source.enabled, true);
+  assert.equal(cfg.tasks[0].url, 'https://chatgpt.com/c/a');
+  assert.equal(cfg.batchChatFlow.primaryPrompt, 'BATCH START');
+  assert.equal(cfg.promptCadence.prompts[1].prompt, 'PROMPT TWO');
+  assert.equal(cfg.promptCadence.prompts[2].prompt, 'PROMPT THREE');
+  assert.deepEqual(cfg.driveSource, {
+    fileId: 'drive-file-3',
+    sourceUrl: 'https://drive.google.com/file/d/drive-file-3/view',
+    target: 'prompt3',
+  });
+
+  const second = createEmptyState(0);
+  applyPortableProfile(second, exported, { now: 500 });
+  const restored = second.sessionsById['session-1'];
+  assert.deepEqual(restored.taskOrder, ['task-1']);
+  assert.equal(restored.tasksById['task-1'].url, 'https://chatgpt.com/c/a');
+  assert.equal(restored.moduleWorkspaces.batch_chat.taskOrder.length, 2);
+  assert.equal(second.profile.promptCadenceBySessionId['session-1'].prompts[1].prompt, 'PROMPT TWO');
+  assert.equal(second.profile.promptCadenceBySessionId['session-1'].prompts[2].prompt, 'PROMPT THREE');
+  assert.equal(second.profile.driveSourceBySessionId['session-1'].fileId, 'drive-file-3');
+  assert.equal(second.profile.driveSourceBySessionId['session-1'].target, 'prompt3');
+  assert.equal(restored.runState, RunState.STOPPED);
+  assert.equal(restored.operation, null);
+  assert.equal(restored.moduleWorkspaces.batch_chat.operation, null);
+});
+
 test('Core dispatcher previews imports and exports portable profile through canonical storage', async () => {
   let db = {};
   const chrome = { storage: { local: { get: async key => ({ [key]: db[key] }), set: async record => Object.assign(db, record) } } };
