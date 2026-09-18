@@ -280,10 +280,29 @@ function assertRuntime(graph, runtime) {
     throw new Error('Invalid orchestration hierarchy runtime');
   }
   if (runtime.graphId !== graph.graphId) throw new Error('Runtime graph mismatch');
-  if (!isObject(runtime.nodesById) || !isObject(runtime.processedEventIds)) throw new Error('Invalid orchestration runtime state');
-  for (const nodeId of graph.nodeOrder) {
-    if (!isObject(runtime.nodesById[nodeId])) throw new Error(`Missing runtime node ${nodeId}`);
+  if (Number(runtime.controlEpoch) !== graph.controlEpoch) throw new Error('Runtime control epoch mismatch');
+  if (!isObject(runtime.nodesById) || !isObject(runtime.processedEventIds) || !Array.isArray(runtime.nodeOrder)) {
+    throw new Error('Invalid orchestration runtime state');
   }
+  if (runtime.nodeOrder.length !== graph.nodeOrder.length
+      || runtime.nodeOrder.some((nodeId, index) => nodeId !== graph.nodeOrder[index])) {
+    throw new Error('Runtime node order mismatch');
+  }
+  for (const nodeId of graph.nodeOrder) {
+    const nodeRuntime = runtime.nodesById[nodeId];
+    if (!isObject(nodeRuntime)) throw new Error(`Missing runtime node ${nodeId}`);
+    if (nodeRuntime.nodeId !== nodeId) throw new Error(`Runtime node identity mismatch for ${nodeId}`);
+    if (!Number.isInteger(nodeRuntime.generation) || nodeRuntime.generation < 1) throw new Error(`Invalid runtime generation for ${nodeId}`);
+    if (!isObject(nodeRuntime.activationLedger) || !isObject(nodeRuntime.completedBarrierKeys)) {
+      throw new Error(`Invalid runtime ledger for ${nodeId}`);
+    }
+  }
+}
+
+export function validateOrchestrationHierarchyRuntimeV1(graphRaw, runtimeRaw) {
+  const graph = validateOrchestrationGraphV1(graphRaw);
+  assertRuntime(graph, runtimeRaw);
+  return clone(runtimeRaw);
 }
 
 function descendantsInclusive(graph, nodeId) {
