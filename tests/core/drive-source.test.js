@@ -30,7 +30,7 @@ test('Drive source config is durable and source replacement clears accepted iden
     lastSyncError: '',
     autoSyncEnabled: false,
     syncIntervalMinutes: 3,
-    minChars: 1000,
+    minChars: 1,
   });
   s.profile.driveSourceBySessionId.s1.lastAcceptedVersion = '12';
   s.profile.driveSourceBySessionId.s1.lastAcceptedHash = 'h12';
