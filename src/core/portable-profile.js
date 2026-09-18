@@ -130,7 +130,17 @@ function portableDriveSource(raw) {
   const fileId = requireString(raw.fileId ?? '', 'driveSource.fileId', { allowEmpty: false, maxLength: 1024 }).trim();
   const sourceUrl = requireString(raw.sourceUrl ?? '', 'driveSource.sourceUrl', { allowEmpty: false, maxLength: 4096 }).trim();
   const target = ['primary', 'prompt2', 'prompt3', 'secondary'].includes(raw.target) ? raw.target : 'primary';
-  return { fileId, sourceUrl, target };
+  const autoSync = raw.autoSync === true;
+  const syncIntervalMinutes = boundedNumber(raw.syncIntervalMinutes, 'driveSource.syncIntervalMinutes', 1, 1440, 3);
+  const minimumCharacters = boundedNumber(raw.minimumCharacters, 'driveSource.minimumCharacters', 1, 1000000, 1000);
+  return {
+    fileId,
+    sourceUrl,
+    target,
+    autoSync,
+    syncIntervalMs: syncIntervalMinutes * 60000,
+    minimumCharacters,
+  };
 }
 
 function parseProfile(profile, now = Date.now()) {
@@ -297,6 +307,9 @@ function sessionToPortable(state, session) {
       fileId: drive.fileId,
       sourceUrl: drive.sourceUrl,
       target: drive.target,
+      autoSync: drive.autoSync === true,
+      syncIntervalMinutes: drive.syncIntervalMs / 60000,
+      minimumCharacters: drive.minimumCharacters,
     };
   }
   return base;
