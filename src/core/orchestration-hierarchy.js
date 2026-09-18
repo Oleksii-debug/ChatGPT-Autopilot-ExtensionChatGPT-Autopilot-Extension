@@ -533,6 +533,9 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       return { runtime, actions, deduplicated: false, reason: 'STALE_GENERATION' };
     }
     if (nodeRuntime.scopeState !== 'RUNNING') {
+      if (nodeRuntime.scopeState === 'PAUSED') {
+        delete runtime.processedEventIds[event.eventId];
+      }
       return {
         runtime,
         actions,
