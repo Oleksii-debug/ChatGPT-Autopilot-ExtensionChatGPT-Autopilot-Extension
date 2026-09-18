@@ -123,6 +123,7 @@ function normalizePromptProfiles(raw) {
       id: requireId(profile.id, `promptProfiles[${index}].id`),
       role: text(profile.role),
       version: requireInteger(profile.version ?? 1, `promptProfiles[${index}].version`, 1, 1000000),
+      prompt: typeof profile.prompt === 'string' ? profile.prompt.trim() : '',
     };
   }).sort((a, b) => a.id.localeCompare(b.id));
   if (new Set(profiles.map(profile => profile.id)).size !== profiles.length) {
@@ -327,6 +328,12 @@ function prepareActivation(graph, runtime, {
   if (!node || !nodeRuntime) throw new Error(`Unknown node ${nodeId}`);
   if (generation !== nodeRuntime.generation) return { action: null, reason: 'STALE_GENERATION' };
   if (nodeRuntime.activationLedger[activationId]) return { action: null, reason: 'DUPLICATE_ACTIVATION' };
+  const current = nodeRuntime.currentActivationId
+    ? nodeRuntime.activationLedger[nodeRuntime.currentActivationId]
+    : null;
+  if (current && ![OrchestrationActivationPhase.TERMINAL, OrchestrationActivationPhase.SUPERSEDED].includes(current.phase)) {
+    return { action: null, reason: 'NODE_ACTIVATION_IN_FLIGHT' };
+  }
   const scopeState = ancestorScopeState(graph, runtime, nodeId);
   if (scopeState !== 'RUNNING') return { action: null, reason: `SCOPE_${scopeState}` };
   const normalizedPurpose = text(purpose || (node.childIds.length ? OrchestrationActivationPurpose.DELEGATE : OrchestrationActivationPurpose.WORK)).toUpperCase();
