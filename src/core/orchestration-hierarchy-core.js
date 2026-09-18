@@ -9,10 +9,12 @@ import {
   normalizeChatUrl,
 } from './schema.js';
 import {
+  OrchestrationActivationPurpose,
   OrchestrationChatMode,
   OrchestrationHierarchyActionType,
   OrchestrationHierarchyEventType,
   validateOrchestrationGraphV1,
+  validateOrchestrationHierarchyRuntimeV1,
 } from './orchestration-hierarchy.js';
 
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
@@ -178,6 +180,7 @@ export function materializeHierarchyActionsIntoCore(
     if (!session) {
       const created = createManagedSession({ graph, node, action, prompt, targetUrl, nowMs, timings });
       session = created.session;
+      if (coreState.profile?.masterPaused) session.runState = RunState.PAUSED;
       coreState.sessionsById[sid] = session;
       if (!coreState.sessionOrder.includes(sid)) coreState.sessionOrder.push(sid);
     } else {
@@ -270,4 +273,118 @@ export function projectHierarchyDeliveryEventsFromCore(
   }
 
   return events;
+}
+
+
+export function preparedHierarchyActions(graphRaw, runtimeRaw) {
+  const graph = validateOrchestrationGraphV1(graphRaw);
+  const runtime = validateOrchestrationHierarchyRuntimeV1(graph, runtimeRaw);
+  const actions = [];
+  for (const nodeId of graph.nodeOrder) {
+    const node = graph.nodesById[nodeId];
+    const nodeRuntime = runtime.nodesById[nodeId];
+    const activationId = nodeRuntime.currentActivationId;
+    if (!activationId) continue;
+    const ledger = nodeRuntime.activationLedger[activationId];
+    if (!ledger || ledger.phase !== 'PREPARED' || ledger.generation !== nodeRuntime.generation) continue;
+    actions.push({
+      type: ledger.purpose === OrchestrationActivationPurpose.RECONCILE
+        ? OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
+        : OrchestrationHierarchyActionType.ACTIVATE_NODE,
+      nodeId,
+      activationId,
+      generation: nodeRuntime.generation,
+      round: ledger.round,
+      purpose: ledger.purpose,
+      chatMode: node.chatMode,
+      promptProfileId: node.promptProfileId,
+      authority: 'EXISTING_CORE_SESSION_TASK_PATH',
+    });
+  }
+  return actions;
+}
+
+
+export function syncHierarchyScopeStatesIntoCore(coreState, graphRaw, runtimeRaw) {
+  const graph = validateOrchestrationGraphV1(graphRaw);
+  const runtime = validateOrchestrationHierarchyRuntimeV1(graph, runtimeRaw);
+  if (!isObject(coreState?.sessionsById)) throw new Error('Invalid Core state');
+
+  const transitions = [];
+  for (const nodeId of graph.nodeOrder) {
+    const sessionId = hierarchyCoreSessionId(graph.graphId, nodeId);
+    const session = coreState.sessionsById[sessionId];
+    const binding = session?.orchestrationHierarchy;
+    if (!binding?.managed || binding.graphId !== graph.graphId || binding.nodeId !== nodeId) continue;
+
+    const nodeRuntime = runtime.nodesById[nodeId];
+    const nextScope = nodeRuntime.scopeState;
+    const previousScope = binding.scopeState || 'RUNNING';
+    binding.scopeState = nextScope;
+
+    if (nextScope === 'STOPPED') {
+      session.enabled = false;
+      if (!isUnresolvedOperation(session)) session.runState = RunState.STOPPED;
+    } else if (nextScope === 'PAUSED') {
+      if (session.runState !== RunState.STOPPED) session.runState = RunState.PAUSED;
+    } else if (
+      nextScope === 'RUNNING'
+      && previousScope === 'PAUSED'
+      && session.enabled
+      && session.runState === RunState.PAUSED
+      && coreState.profile?.masterPaused !== true
+    ) {
+      session.runState = RunState.RUNNING;
+    }
+
+    if (previousScope !== nextScope) {
+      transitions.push({
+        nodeId,
+        sessionId,
+        from: previousScope,
+        to: nextScope,
+        runState: session.runState,
+        enabled: session.enabled,
+      });
+    }
+  }
+
+  return { state: coreState, transitions };
+}
+
+export function hierarchyCompletionProbesFromCore(graphRaw, runtimeRaw, coreState) {
+  const graph = validateOrchestrationGraphV1(graphRaw);
+  const runtime = validateOrchestrationHierarchyRuntimeV1(graph, runtimeRaw);
+  if (!isObject(coreState?.sessionsById)) throw new Error('Invalid Core state');
+  const probes = [];
+
+  for (const nodeId of graph.nodeOrder) {
+    const nodeRuntime = runtime.nodesById[nodeId];
+    const activationId = nodeRuntime.currentActivationId;
+    if (!activationId) continue;
+    const ledger = nodeRuntime.activationLedger[activationId];
+    if (!ledger || ledger.phase !== 'EFFECT_CONFIRMED' || ledger.generation !== nodeRuntime.generation) continue;
+
+    const sid = hierarchyCoreSessionId(graph.graphId, nodeId);
+    const tid = hierarchyCoreTaskId(graph.graphId, nodeId);
+    const session = coreState.sessionsById[sid];
+    const task = session?.tasksById?.[tid];
+    const binding = session?.orchestrationHierarchy;
+    if (!task || !binding) continue;
+    if (binding.activationId !== activationId || binding.generation !== nodeRuntime.generation) continue;
+    if (!task.lastConversationUrl || task.lastAssistantBaselineKnown !== true) continue;
+
+    probes.push({
+      nodeId,
+      activationId,
+      generation: nodeRuntime.generation,
+      conversationUrl: task.lastConversationUrl,
+      taskId: tid,
+      sessionId: sid,
+      assistantBaselineCount: Math.max(0, Number(task.lastAssistantBaselineCount || 0)),
+      assistantBaselineKnown: true,
+    });
+  }
+
+  return probes;
 }

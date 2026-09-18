@@ -213,8 +213,29 @@ export function validateOrchestrationGraphV1(raw) {
   const controlEpoch = requireInteger(raw.controlEpoch ?? raw.control_epoch ?? 1, 'controlEpoch', 1, Number.MAX_SAFE_INTEGER);
   const promptProfiles = normalizePromptProfiles(raw.promptProfiles ?? raw.prompt_profiles);
   const promptProfileIds = new Set(promptProfiles.map(profile => profile.id));
-  if (!Array.isArray(raw.nodes) || !raw.nodes.length || raw.nodes.length > 1000) throw new Error('Invalid nodes');
-  const nodes = raw.nodes.map(normalizeNode).sort((a, b) => a.id.localeCompare(b.id));
+
+  // A normalized graph is durable product state and is therefore a valid validator
+  // input on restart. Reconstruct the node list only when the normalized identity
+  // is internally exact; never accept missing/extra/reordered node identities.
+  let nodeSource = raw.nodes;
+  if (!Array.isArray(nodeSource) && Array.isArray(raw.nodeOrder) && isObject(raw.nodesById)) {
+    const order = raw.nodeOrder.map((nodeId, index) => requireId(nodeId, `nodeOrder[${index}]`));
+    const nodeKeys = Object.keys(raw.nodesById).sort((a, b) => a.localeCompare(b));
+    const orderedKeys = [...order].sort((a, b) => a.localeCompare(b));
+    if (new Set(order).size !== order.length
+        || nodeKeys.length !== orderedKeys.length
+        || nodeKeys.some((nodeId, index) => nodeId !== orderedKeys[index])) {
+      throw new Error('Invalid normalized nodes');
+    }
+    nodeSource = order.map(nodeId => {
+      const node = raw.nodesById[nodeId];
+      if (!isObject(node) || node.id !== nodeId) throw new Error('Invalid normalized nodes');
+      return node;
+    });
+  }
+
+  if (!Array.isArray(nodeSource) || !nodeSource.length || nodeSource.length > 1000) throw new Error('Invalid nodes');
+  const nodes = nodeSource.map(normalizeNode).sort((a, b) => a.id.localeCompare(b.id));
   const nodeOrder = nodes.map(node => node.id);
   if (new Set(nodeOrder).size !== nodeOrder.length) throw new Error('Duplicate node id');
   const nodesById = Object.fromEntries(nodes.map(node => [node.id, node]));
@@ -280,10 +301,29 @@ function assertRuntime(graph, runtime) {
     throw new Error('Invalid orchestration hierarchy runtime');
   }
   if (runtime.graphId !== graph.graphId) throw new Error('Runtime graph mismatch');
-  if (!isObject(runtime.nodesById) || !isObject(runtime.processedEventIds)) throw new Error('Invalid orchestration runtime state');
-  for (const nodeId of graph.nodeOrder) {
-    if (!isObject(runtime.nodesById[nodeId])) throw new Error(`Missing runtime node ${nodeId}`);
+  if (Number(runtime.controlEpoch) !== graph.controlEpoch) throw new Error('Runtime control epoch mismatch');
+  if (!isObject(runtime.nodesById) || !isObject(runtime.processedEventIds) || !Array.isArray(runtime.nodeOrder)) {
+    throw new Error('Invalid orchestration runtime state');
   }
+  if (runtime.nodeOrder.length !== graph.nodeOrder.length
+      || runtime.nodeOrder.some((nodeId, index) => nodeId !== graph.nodeOrder[index])) {
+    throw new Error('Runtime node order mismatch');
+  }
+  for (const nodeId of graph.nodeOrder) {
+    const nodeRuntime = runtime.nodesById[nodeId];
+    if (!isObject(nodeRuntime)) throw new Error(`Missing runtime node ${nodeId}`);
+    if (nodeRuntime.nodeId !== nodeId) throw new Error(`Runtime node identity mismatch for ${nodeId}`);
+    if (!Number.isInteger(nodeRuntime.generation) || nodeRuntime.generation < 1) throw new Error(`Invalid runtime generation for ${nodeId}`);
+    if (!isObject(nodeRuntime.activationLedger) || !isObject(nodeRuntime.completedBarrierKeys)) {
+      throw new Error(`Invalid runtime ledger for ${nodeId}`);
+    }
+  }
+}
+
+export function validateOrchestrationHierarchyRuntimeV1(graphRaw, runtimeRaw) {
+  const graph = validateOrchestrationGraphV1(graphRaw);
+  assertRuntime(graph, runtimeRaw);
+  return clone(runtimeRaw);
 }
 
 function descendantsInclusive(graph, nodeId) {

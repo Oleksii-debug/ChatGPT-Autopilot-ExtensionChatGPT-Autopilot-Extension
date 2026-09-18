@@ -36,6 +36,21 @@ import {
 import { fetchGitHubOrchestrationControl } from './orchestration-v2-github.js';
 import { OperationPhase, RunState } from './schema.js';
 import { exportOrchestrationProfile, importOrchestrationProfile, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+import {
+  OrchestrationActivationPurpose,
+  OrchestrationHierarchyEventType,
+  createOrchestrationHierarchyRuntime,
+  reduceOrchestrationHierarchyEvent,
+  validateOrchestrationGraphV1,
+  validateOrchestrationHierarchyRuntimeV1,
+} from './orchestration-hierarchy.js';
+import {
+  hierarchyCompletionProbesFromCore,
+  materializeHierarchyActionsIntoCore,
+  preparedHierarchyActions,
+  projectHierarchyDeliveryEventsFromCore,
+  syncHierarchyScopeStatesIntoCore,
+} from './orchestration-hierarchy-core.js';
 
 export const ORCHESTRATION_V2_ALARM = 'autopilot-orchestration-v2-wake';
 const MIN_CONTROL_RETRY_MS = 15_000;
@@ -47,13 +62,43 @@ function isUnresolvedOperation(session) {
   return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase));
 }
 
-function isManagedOrchestrationSession(session, projectId) {
+function isManagedOrchestrationSession(session, projectId, hierarchyGraphId = '') {
   return (session?.orchestrationWorker?.managed && session.orchestrationWorker.projectId === projectId)
-    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId);
+    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId)
+    || (Boolean(hierarchyGraphId)
+      && session?.orchestrationHierarchy?.managed
+      && session.orchestrationHierarchy.graphId === hierarchyGraphId);
 }
 
 function isTabAlreadyGoneError(error) {
   return /no tab with id|invalid tab id|tab not found/i.test(String(error?.message || error || ''));
+}
+
+function hierarchyContainer(runtime) {
+  const raw = runtime?.hierarchy;
+  if (!raw) return null;
+  if (Number(raw.schemaVersion) !== 1) throw new Error('Unsupported hierarchy container schema');
+  const graph = validateOrchestrationGraphV1(raw.graph);
+  const state = validateOrchestrationHierarchyRuntimeV1(graph, raw.state);
+  return { graph, state };
+}
+
+function hierarchyActionKey(action) {
+  return `${action?.type || ''}:${action?.nodeId || ''}:${action?.activationId || ''}:${action?.generation || ''}`;
+}
+
+function dedupeHierarchyActions(actions = []) {
+  const seen = new Set();
+  return actions.filter(action => {
+    const key = hierarchyActionKey(action);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function hierarchyRootActivationId(nodeId, nodeRuntime) {
+  return `root:${nodeId}:g${nodeRuntime.generation}:r${nodeRuntime.round}`;
 }
 
 export class OrchestrationV2Controller {
@@ -85,8 +130,219 @@ export class OrchestrationV2Controller {
     return { config, runtime: orchestrationSnapshot(runtime, config) };
   }
 
-  async revokeFutureAuthority(projectId, nowMs = this.now()) {
+  async configureHierarchy(graphRaw, { nowMs = this.now() } = {}) {
+    const graph = validateOrchestrationGraphV1(graphRaw);
+    const state = createOrchestrationHierarchyRuntime(graph, nowMs);
     await this.runtimeRepository.update(runtime => {
+      runtime.hierarchy = { schemaVersion: 1, graph, state };
+      return runtime;
+    });
+    await this.reconcileAlarm({ nowMs });
+    return { graph, state };
+  }
+
+  async clearHierarchy({ nowMs = this.now() } = {}) {
+    await this.runtimeRepository.update(runtime => {
+      delete runtime.hierarchy;
+      return runtime;
+    });
+    await this.reconcileAlarm({ nowMs });
+    return { kind: 'HIERARCHY_CLEARED' };
+  }
+
+  async dispatchHierarchyEvent(eventRaw, { nowMs = this.now() } = {}) {
+    let summary = { kind: 'NO_HIERARCHY', actions: [], materialized: [], reused: [], blocked: [] };
+    await this.runtimeRepository.update(async runtime => {
+      const hierarchy = hierarchyContainer(runtime);
+      if (!hierarchy) return runtime;
+      const reduced = reduceOrchestrationHierarchyEvent(hierarchy.graph, hierarchy.state, eventRaw, nowMs);
+      const actions = dedupeHierarchyActions([
+        ...(reduced.actions || []),
+        ...preparedHierarchyActions(hierarchy.graph, reduced.runtime),
+      ]);
+      let materialization = { materialized: [], reused: [], blocked: [] };
+      let scopeSync = { transitions: [] };
+      await this.coreRepository.update(coreState => {
+        materialization = materializeHierarchyActionsIntoCore(
+          coreState,
+          hierarchy.graph,
+          reduced.runtime,
+          actions,
+          {
+            nowMs,
+            timings: {
+              preSendDelayMs: runtime?.hierarchy?.timings?.preSendDelayMs,
+              busyCheckDelayMs: runtime?.hierarchy?.timings?.busyCheckDelayMs,
+              retryBackoffMs: runtime?.hierarchy?.timings?.retryBackoffMs,
+              minimumSendIntervalMs: runtime?.hierarchy?.timings?.minimumSendIntervalMs,
+            },
+          },
+        );
+        scopeSync = syncHierarchyScopeStatesIntoCore(
+          materialization.state,
+          hierarchy.graph,
+          reduced.runtime,
+        );
+        return scopeSync.state;
+      });
+      runtime.hierarchy = {
+        ...runtime.hierarchy,
+        schemaVersion: 1,
+        graph: hierarchy.graph,
+        state: reduced.runtime,
+      };
+      summary = {
+        kind: 'HIERARCHY_EVENT',
+        reason: reduced.reason,
+        deduplicated: reduced.deduplicated === true,
+        actions,
+        materialized: materialization.materialized || [],
+        reused: materialization.reused || [],
+        blocked: materialization.blocked || [],
+        scopeTransitions: scopeSync.transitions || [],
+      };
+      return runtime;
+    });
+    return summary;
+  }
+
+  async startHierarchy({ rootNodeIds = null, nowMs = this.now() } = {}) {
+    const runtime = await this.runtimeRepository.load();
+    const hierarchy = hierarchyContainer(runtime);
+    if (!hierarchy) return { kind: 'NO_HIERARCHY', started: [] };
+    const roots = rootNodeIds == null
+      ? hierarchy.graph.rootIds
+      : (Array.isArray(rootNodeIds) ? rootNodeIds : [rootNodeIds]);
+    const uniqueRoots = [...new Set(roots.map(String))].sort((a, b) => a.localeCompare(b));
+    for (const nodeId of uniqueRoots) {
+      if (!hierarchy.graph.rootIds.includes(nodeId)) throw new Error(`Hierarchy start target is not a root: ${nodeId}`);
+    }
+    const started = [];
+    for (const nodeId of uniqueRoots) {
+      const latestRuntime = await this.runtimeRepository.load();
+      const latest = hierarchyContainer(latestRuntime);
+      const nodeRuntime = latest.state.nodesById[nodeId];
+      const activationId = hierarchyRootActivationId(nodeId, nodeRuntime);
+      const result = await this.dispatchHierarchyEvent({
+        type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+        eventId: `start:${activationId}`,
+        controlEpoch: latest.state.controlEpoch,
+        nodeId,
+        generation: nodeRuntime.generation,
+        activationId,
+        purpose: latest.graph.nodesById[nodeId].childIds.length
+          ? OrchestrationActivationPurpose.DELEGATE
+          : OrchestrationActivationPurpose.WORK,
+      }, { nowMs });
+      started.push({ nodeId, activationId, result });
+    }
+    await this.reconcileAlarm({ nowMs });
+    return { kind: 'HIERARCHY_STARTED', started };
+  }
+
+  async syncHierarchyAfterCoreCycle({ nowMs = this.now() } = {}) {
+    let summary = { kind: 'NO_HIERARCHY', projected: 0, materialized: [], reused: [], blocked: [] };
+    await this.runtimeRepository.update(async runtime => {
+      const hierarchy = hierarchyContainer(runtime);
+      if (!hierarchy) return runtime;
+      const coreSnapshot = await this.coreRepository.load();
+      const projected = projectHierarchyDeliveryEventsFromCore(
+        hierarchy.graph,
+        hierarchy.state,
+        coreSnapshot,
+        { eventPrefix: 'core-hierarchy' },
+      );
+      let state = hierarchy.state;
+      const emittedActions = [];
+      for (const event of projected) {
+        const reduced = reduceOrchestrationHierarchyEvent(hierarchy.graph, state, event, nowMs);
+        state = reduced.runtime;
+        emittedActions.push(...(reduced.actions || []));
+      }
+      const actions = dedupeHierarchyActions([
+        ...emittedActions,
+        ...preparedHierarchyActions(hierarchy.graph, state),
+      ]);
+      let materialization = { materialized: [], reused: [], blocked: [] };
+      let scopeSync = { transitions: [] };
+      await this.coreRepository.update(coreState => {
+        materialization = materializeHierarchyActionsIntoCore(
+          coreState,
+          hierarchy.graph,
+          state,
+          actions,
+          {
+            nowMs,
+            timings: {
+              preSendDelayMs: runtime?.hierarchy?.timings?.preSendDelayMs,
+              busyCheckDelayMs: runtime?.hierarchy?.timings?.busyCheckDelayMs,
+              retryBackoffMs: runtime?.hierarchy?.timings?.retryBackoffMs,
+              minimumSendIntervalMs: runtime?.hierarchy?.timings?.minimumSendIntervalMs,
+            },
+          },
+        );
+        scopeSync = syncHierarchyScopeStatesIntoCore(
+          materialization.state,
+          hierarchy.graph,
+          state,
+        );
+        return scopeSync.state;
+      });
+      runtime.hierarchy = { ...runtime.hierarchy, schemaVersion: 1, graph: hierarchy.graph, state };
+      summary = {
+        kind: 'HIERARCHY_SYNCED',
+        projected: projected.length,
+        actions,
+        materialized: materialization.materialized || [],
+        reused: materialization.reused || [],
+        blocked: materialization.blocked || [],
+        scopeTransitions: scopeSync.transitions || [],
+      };
+      return runtime;
+    });
+    return summary;
+  }
+
+  async probeHierarchyCompletions({ nowMs = this.now() } = {}) {
+    if (typeof this.collectAssistantReport !== 'function') return { kind: 'NO_COLLECTOR', probed: 0, terminal: [] };
+    const runtime = await this.runtimeRepository.load();
+    const hierarchy = hierarchyContainer(runtime);
+    if (!hierarchy) return { kind: 'NO_HIERARCHY', probed: 0, terminal: [] };
+    const coreState = await this.coreRepository.load();
+    const probes = hierarchyCompletionProbesFromCore(hierarchy.graph, hierarchy.state, coreState)
+      .slice(0, MAX_PROBES_PER_CYCLE);
+    const terminal = [];
+    const waiting = [];
+    for (const probe of probes) {
+      let result;
+      try {
+        result = await this.collectAssistantReport(probe);
+      } catch (error) {
+        result = { status: 'TEMPORARY_ERROR', safeDiagnosticCode: error?.safeDiagnosticCode || 'HIERARCHY_REPORT_PROBE_FAILED' };
+      }
+      const status = String(result?.status || '').trim().toUpperCase();
+      if (status === 'READY' && result?.assistantComplete === true) {
+        const dispatched = await this.dispatchHierarchyEvent({
+          type: OrchestrationHierarchyEventType.NODE_TERMINAL,
+          eventId: `hierarchy-terminal:${hierarchy.graph.graphId}:${probe.nodeId}:${probe.activationId}`,
+          controlEpoch: hierarchy.state.controlEpoch,
+          nodeId: probe.nodeId,
+          generation: probe.generation,
+          activationId: probe.activationId,
+          status: 'COMPLETED',
+        }, { nowMs });
+        terminal.push({ nodeId: probe.nodeId, activationId: probe.activationId, dispatched });
+      } else {
+        waiting.push({ nodeId: probe.nodeId, activationId: probe.activationId, status: status || 'UNKNOWN' });
+      }
+    }
+    return { kind: 'HIERARCHY_PROBED', probed: probes.length, terminal, waiting };
+  }
+
+  async revokeFutureAuthority(projectId, nowMs = this.now()) {
+    let hierarchyGraphId = '';
+    await this.runtimeRepository.update(runtime => {
+      hierarchyGraphId = runtime?.hierarchy?.graph?.graphId || '';
       runtime.mode = 'PAUSE';
       runtime.desiredActiveWorkers = 0;
       runtime.pendingCoordinatorEvents = [];
@@ -95,7 +351,7 @@ export class OrchestrationV2Controller {
     });
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
-        if (!isManagedOrchestrationSession(session, projectId)) continue;
+        if (!isManagedOrchestrationSession(session, projectId, hierarchyGraphId)) continue;
         session.enabled = false;
         if (!isUnresolvedOperation(session)) session.runState = RunState.STOPPED;
       }
@@ -125,9 +381,11 @@ export class OrchestrationV2Controller {
       return 0;
     }
     const runtime = await this.runtimeRepository.load();
+    const hierarchy = hierarchyContainer(runtime);
     const activeProbeNeeded = runtime.workerOrder.some(workerId => [WorkerState.ACTIVE, WorkerState.BUSY].includes(runtime.workersById[workerId]?.state));
     const watchdogBaseline = runtime.lastWatchdogAt || runtime.lastCoordinatorDecisionAt || runtime.createdAt || nowMs;
     const candidates = [watchdogBaseline + config.watchdogIntervalSeconds * 1000];
+    if (hierarchy) candidates.push(nowMs + config.workerProbeIntervalSeconds * 1000);
     if (runtime.coordinator.lease) {
       const controlWait = runtime.coordinator.status === CoordinatorStatus.WAITING_CONTROL;
       const coordinatorBackoff = Number(runtime.coordinator.retryAfterAt || 0);
@@ -180,8 +438,9 @@ export class OrchestrationV2Controller {
       return runtime;
     });
     const materialized = await this.materializeQueuedWorkers({ nowMs });
+    const hierarchy = await this.syncHierarchyAfterCoreCycle({ nowMs });
     await this.reconcileAlarm({ nowMs });
-    return { kind: 'SYNCED', delivery, materialized, retirement };
+    return { kind: 'SYNCED', delivery, materialized, retirement, hierarchy };
   }
 
   async materializeQueuedWorkers({ nowMs = this.now() } = {}) {
@@ -710,10 +969,21 @@ export class OrchestrationV2Controller {
         return draft;
       });
       const sync = await this.syncAfterCoreCycle({ nowMs });
+      let runtime = await this.runtimeRepository.load();
+      if (hierarchyContainer(runtime)) {
+        const hierarchyProbe = await this.probeHierarchyCompletions({ nowMs });
+        await this.reconcileAlarm({ nowMs });
+        return {
+          kind: 'HIERARCHY_CYCLE',
+          sync,
+          hierarchyProbe,
+          status: await this.getStatus(),
+        };
+      }
       const workers = await this.probeWorkerCompletions({ nowMs });
       const coordinatorProbe = await this.probeCoordinatorCompletion({ nowMs });
       let control = null;
-      let runtime = await this.runtimeRepository.load();
+      runtime = await this.runtimeRepository.load();
 
       if (runtime.coordinator.status === CoordinatorStatus.WAITING_CONTROL) {
         const direct = await this.applyDirectCoordinatorControl({ nowMs });
