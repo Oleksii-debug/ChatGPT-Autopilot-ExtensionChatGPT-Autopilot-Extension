@@ -120,6 +120,9 @@ test('portable profile round-trips ordinary, batch, cadence and Drive configurat
         fileId: 'drive-file-3',
         sourceUrl: 'https://drive.google.com/file/d/drive-file-3/view',
         target: 'prompt3',
+        autoSync: true,
+        syncIntervalMinutes: 7,
+        minimumCharacters: 1234,
       },
     }],
   });
@@ -149,6 +152,9 @@ test('portable profile round-trips ordinary, batch, cadence and Drive configurat
     fileId: 'drive-file-3',
     sourceUrl: 'https://drive.google.com/file/d/drive-file-3/view',
     target: 'prompt3',
+    autoSync: true,
+    syncIntervalMinutes: 7,
+    minimumCharacters: 1234,
   });
 
   const second = createEmptyState(0);
@@ -161,6 +167,9 @@ test('portable profile round-trips ordinary, batch, cadence and Drive configurat
   assert.equal(second.profile.promptCadenceBySessionId['session-1'].prompts[2].prompt, 'PROMPT THREE');
   assert.equal(second.profile.driveSourceBySessionId['session-1'].fileId, 'drive-file-3');
   assert.equal(second.profile.driveSourceBySessionId['session-1'].target, 'prompt3');
+  assert.equal(second.profile.driveSourceBySessionId['session-1'].autoSync, true);
+  assert.equal(second.profile.driveSourceBySessionId['session-1'].syncIntervalMs, 7 * 60_000);
+  assert.equal(second.profile.driveSourceBySessionId['session-1'].minimumCharacters, 1234);
   assert.equal(restored.runState, RunState.STOPPED);
   assert.equal(restored.operation, null);
   assert.equal(restored.moduleWorkspaces.batch_chat.operation, null);
