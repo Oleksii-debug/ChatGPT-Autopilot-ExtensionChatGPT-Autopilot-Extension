@@ -19,6 +19,26 @@ function state() {
 test('Drive source config is durable and source replacement clears accepted identity', () => {
   const s = state();
   setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://drive.google.com/file/d/file-1/view', target: 'primary' });
+
+test('Drive prompt3 target updates the modern third cadence slot without changing the primary prompt', () => {
+  const s = state();
+  s.profile.promptCadenceBySessionId = {
+    s1: {
+      prompts: [
+        { enabled: false, prompt: '', everyN: 10 },
+        { enabled: true, prompt: 'second', everyN: 30 },
+        { enabled: true, prompt: 'old-third', everyN: 40 },
+      ],
+    },
+  };
+  setDriveSourceConfig(s, 's1', { fileId: 'file-3', sourceUrl: 'https://drive.google.com/file/d/file-3/view', target: 'prompt3' });
+  acceptDriveSnapshot(s, 's1', { fileId: 'file-3', version: '21', hash: 'h21', content: 'new-third' });
+  assert.equal(s.sessionsById.s1.sharedPrompt, 'primary-v1');
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[1].prompt, 'second');
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[2].prompt, 'new-third');
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[2].enabled, true);
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[2].everyN, 40);
+});
   assert.deepEqual(getDriveSourceConfig(s, 's1'), {
     fileId: 'file-1',
     sourceUrl: 'https://drive.google.com/file/d/file-1/view',
@@ -65,5 +85,8 @@ test('secondary target updates cadence source without disturbing cadence counter
   setDriveSourceConfig(s, 's1', { fileId: 'file-1', sourceUrl: 'https://docs.google.com/document/d/file-1/edit', target: 'secondary' });
   acceptDriveSnapshot(s, 's1', { fileId: 'file-1', version: '20', hash: 'h20', content: 'new-secondary' });
   assert.equal(s.sessionsById.s1.sharedPrompt, 'primary-v1');
-  assert.deepEqual(s.profile.promptCadenceBySessionId.s1, { enabled: true, secondaryPrompt: 'new-secondary', everyN: 5 });
+  assert.equal(s.profile.promptCadenceBySessionId.s1.secondaryPrompt, 'new-secondary');
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[1].prompt, 'new-secondary');
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[1].enabled, true);
+  assert.equal(s.profile.promptCadenceBySessionId.s1.prompts[1].everyN, 5);
 });
