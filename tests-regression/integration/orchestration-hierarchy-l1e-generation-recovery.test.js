@@ -440,3 +440,50 @@ test('L1-E generation recovery waits behind an AMBIGUOUS Core Send and never bli
   assert.equal(runtime.hierarchy.state.nodesById.manager.generation, 18);
   assert.equal(runtime.hierarchy.state.nodesById.manager.activationLedger[recovery.activationId].phase, 'PREPARED');
 });
+
+
+test('L1-E controller reports paused recovery truthfully and retries the same transition after Resume', async () => {
+  const g = recoveryGraph();
+  const h = harness(new Set());
+  let controller = h.controller();
+
+  await controller.configureHierarchy(g, { nowMs: h.now() });
+  await controller.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.PAUSE_SCOPE,
+    eventId: 'pause-manager-before-controller-recovery',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+
+  const paused = await controller.recoverHierarchyNode('manager', {
+    expectedGeneration: 1,
+    nowMs: h.advance(1),
+  });
+  assert.equal(paused.kind, 'SCOPE_PAUSED');
+  assert.equal(paused.currentGeneration, 1);
+  assert.equal(paused.requestedGeneration, 2);
+
+  let runtime = await h.runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.manager.generation, 1);
+
+  await controller.dispatchHierarchyEvent({
+    type: OrchestrationHierarchyEventType.RESUME_SCOPE,
+    eventId: 'resume-manager-before-controller-recovery',
+    controlEpoch: 1,
+    nodeId: 'manager',
+  }, { nowMs: h.advance(1) });
+
+  // Same deterministic generation-recovery event identity is legal now because
+  // the PAUSED attempt deliberately did not consume it.
+  controller = h.controller();
+  const recovered = await controller.recoverHierarchyNode('manager', {
+    expectedGeneration: 1,
+    nowMs: h.advance(1),
+  });
+  assert.equal(recovered.kind, 'HIERARCHY_GENERATION_RECOVERY');
+  assert.equal(recovered.generation, 2);
+
+  runtime = await h.runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.manager.generation, 2);
+  assert.equal(runtime.hierarchy.state.nodesById.manager.currentActivationId, recovered.activationId);
+});
