@@ -1705,6 +1705,38 @@ function browserAgentEpochToDateTimeLocal(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function browserAgentSiteRulesFromText(raw) {
+  const lines = String(raw || '').split(/\r?\n/).map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+  if (lines.length > 100) throw new Error('Правил сайтів може бути не більше 100.');
+  const allowed = new Set(['ALLOW', 'ASK', 'DENY', 'INHERIT']);
+  return lines.map((line, index) => {
+    const parts = line.split('|').map(part => part.trim());
+    const pattern = parts[0] || '';
+    const defaultDecision = (parts[1] || 'INHERIT').toUpperCase();
+    if (!pattern) throw new Error(`Правило сайту ${index + 1}: відсутній домен.`);
+    if (!allowed.has(defaultDecision)) throw new Error(`Правило сайту ${index + 1}: використайте ALLOW, ASK або DENY.`);
+    const actionDecisions = {};
+    if (parts[2]) {
+      for (const entry of parts[2].split(',').map(value => value.trim()).filter(Boolean)) {
+        const eq = entry.indexOf('=');
+        if (eq <= 0) throw new Error(`Правило сайту ${index + 1}: виняток має формат дія=ALLOW/ASK/DENY.`);
+        const key = entry.slice(0, eq).trim();
+        const decision = entry.slice(eq + 1).trim().toUpperCase();
+        if (!key || !allowed.has(decision) || decision === 'INHERIT') throw new Error(`Правило сайту ${index + 1}: некоректний виняток ${entry}.`);
+        actionDecisions[key] = decision;
+      }
+    }
+    return { pattern, defaultDecision, actionDecisions };
+  });
+}
+
+function browserAgentSiteRulesToText(rules = []) {
+  return (Array.isArray(rules) ? rules : []).map(rule => {
+    const overrides = Object.entries(rule?.actionDecisions || {}).map(([key, value]) => `${key}=${value}`).join(',');
+    return [rule?.pattern || '', rule?.defaultDecision || 'INHERIT', overrides].filter((value, index) => index < 2 || value).join(' | ');
+  }).join('\n');
+}
+
 function browserAgentPolicyFromForm() {
   const scheduleStartAt = browserAgentDateTimeLocalToEpoch('agent-schedule-start');
   const scheduleEndAt = browserAgentDateTimeLocalToEpoch('agent-schedule-end');
@@ -1720,6 +1752,8 @@ function browserAgentPolicyFromForm() {
     allowCrossOriginNavigation: $('agent-allow-cross-origin').checked,
     closeOwnedTabsOnStop: $('agent-close-tabs-on-stop').checked,
     approvalMode: $('agent-approval-mode').value,
+    credentialDecision: $('agent-credential-decision').value,
+    siteRules: browserAgentSiteRulesFromText($('agent-site-rules').value),
     visionOnDemand: $('agent-vision-on-demand').checked,
     trustedScriptEnabled: $('agent-trusted-script-enabled').checked,
     repeatMode: $('agent-repeat-mode').value,
@@ -1752,6 +1786,8 @@ function fillBrowserAgentPolicy(config = {}) {
   $('agent-allow-cross-origin').checked = config.allowCrossOriginNavigation !== false;
   $('agent-close-tabs-on-stop').checked = config.closeOwnedTabsOnStop === true;
   $('agent-approval-mode').value = config.approvalMode === 'ALLOW_ALL' ? 'ALLOW_ALL' : 'CONSEQUENTIAL';
+  $('agent-credential-decision').value = ['ALLOW','ASK','DENY'].includes(config.credentialDecision) ? config.credentialDecision : 'ASK';
+  $('agent-site-rules').value = browserAgentSiteRulesToText(config.siteRules || []);
   $('agent-vision-on-demand').checked = config.visionOnDemand !== false;
   $('agent-trusted-script-enabled').checked = config.trustedScriptEnabled === true;
   $('agent-repeat-mode').value = ['ONCE','CONTINUOUS','INTERVAL'].includes(config.repeatMode) ? config.repeatMode : 'ONCE';

@@ -6,6 +6,10 @@ import {
   buildBrowserAgentPlannerPrompt,
   BrowserAgentRepeatMode,
   BrowserAgentApprovalMode,
+  BrowserAgentPolicyDecision,
+  normalizeBrowserAgentSiteRules,
+  resolveBrowserAgentOwnerPolicy,
+  resolveBrowserAgentCredentialPolicy,
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
   browserSnapshotSignature,
@@ -165,6 +169,63 @@ test('consequential approval is default policy and classifies multilingual final
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r1' }).requiresApproval, true);
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r2' }).requiresApproval, false);
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r3' }).requiresApproval, true, 'neutral text still requires approval when the live control is a form submit');
+});
+
+test('owner site policy overrides global autonomy and supports credentials independently', () => {
+  const value = config({
+    approvalMode: 'ALLOW_ALL',
+    credentialDecision: 'ALLOW',
+    siteRules: [
+      { pattern: '*.example.edu', defaultDecision: 'ASK', actionDecisions: { trusted_script: 'DENY', credentials: 'ASK' } },
+      { pattern: 'ais.example.edu', defaultDecision: 'ALLOW', actionDecisions: { upload_download: 'DENY', credentials: 'ALLOW' } },
+    ],
+  });
+  assert.equal(value.credentialDecision, BrowserAgentPolicyDecision.ALLOW);
+  assert.deepEqual(value.siteRules, normalizeBrowserAgentSiteRules(value.siteRules));
+  const snapshot = { url: 'https://ais.example.edu/app', frames: [] };
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, snapshot, { type: 'click' }, { requiresApproval: true }).decision, BrowserAgentPolicyDecision.ALLOW);
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, snapshot, { type: 'upload_download' }, { requiresApproval: true }).decision, BrowserAgentPolicyDecision.DENY);
+  assert.equal(resolveBrowserAgentCredentialPolicy(value, snapshot.url).decision, BrowserAgentPolicyDecision.ALLOW);
+
+  const wildcardSnapshot = { url: 'https://other.example.edu/app', frames: [] };
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, wildcardSnapshot, { type: 'click' }, { requiresApproval: false }).decision, BrowserAgentPolicyDecision.ASK);
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, wildcardSnapshot, { type: 'trusted_script' }, { requiresApproval: true }).decision, BrowserAgentPolicyDecision.DENY);
+  assert.equal(resolveBrowserAgentCredentialPolicy(value, wildcardSnapshot.url).decision, BrowserAgentPolicyDecision.ASK);
+});
+
+test('site policy governs destination for navigate, new-tab and visible link clicks', () => {
+  const value = config({
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'blocked.example', defaultDecision: 'DENY', actionDecisions: {} },
+      { pattern: 'ask.example', defaultDecision: 'ASK', actionDecisions: {} },
+    ],
+  });
+  const source = {
+    url: 'https://allowed.example/start',
+    frames: [{ frameId: 0, elements: [
+      { ref: 'r1', tag: 'a', name: 'Blocked destination', href: 'https://blocked.example/next' },
+    ] }],
+  };
+  const nav = resolveBrowserAgentOwnerPolicy(value, source, { type: 'navigate', url: 'https://blocked.example/path' });
+  assert.equal(nav.decision, BrowserAgentPolicyDecision.DENY);
+  assert.match(nav.policyUrl, /blocked\.example/);
+
+  const tab = resolveBrowserAgentOwnerPolicy(value, source, { type: 'new_tab', url: 'https://ask.example/path' });
+  assert.equal(tab.decision, BrowserAgentPolicyDecision.ASK);
+
+  const click = resolveBrowserAgentOwnerPolicy(value, source, { type: 'click', frameId: 0, ref: 'r1' });
+  assert.equal(click.decision, BrowserAgentPolicyDecision.DENY);
+});
+
+test('site policy validation rejects ambiguous duplicates and unsupported action keys', () => {
+  assert.throws(() => config({ siteRules: [
+    { pattern: 'example.com', defaultDecision: 'ALLOW' },
+    { pattern: 'example.com', defaultDecision: 'DENY' },
+  ] }), /Duplicate Browser Agent site policy/);
+  assert.throws(() => config({ siteRules: [
+    { pattern: 'example.com', defaultDecision: 'ALLOW', actionDecisions: { arbitrary_shell: 'ALLOW' } },
+  ] }), /Unsupported Browser Agent policy action/);
 });
 
 test('vision coordinate click is allowed only for the screenshot turn and stays inside the current viewport', () => {
@@ -1890,10 +1951,10 @@ test('Trusted Script planner tool is visible only when owner policy explicitly e
   assert.match(off, /Trusted Script fallback is disabled by owner policy/);
   const on = buildBrowserAgentPlannerPrompt(config({ trustedScriptEnabled: true }), runtime, snapshot);
   assert.match(on, /trusted_script/);
-  assert.match(on, /Every script requires explicit owner approval/i);
+  assert.match(on, /Owner policy requires confirmation/i);
 });
 
-test('Trusted Script requires explicit approval even under ALLOW_ALL and runs through CDP only after approval', async () => {
+test('Trusted Script runs autonomously under ALLOW_ALL while preserving CDP sandboxing', async () => {
   const chrome = makeChrome();
   const debuggerCalls = [];
   chrome.debugger.sendCommand = async (_target, method, params = {}) => {
@@ -1915,14 +1976,7 @@ test('Trusted Script requires explicit approval even under ALLOW_ALL and runs th
   await manager.create({ id: 'job-1', goal: 'Use legacy timetable safely', trustedScriptEnabled: true, approvalMode: 'ALLOW_ALL' });
   await manager.start('job-1', { runInitial: false });
   const cycle = await manager.cycleOne('job-1');
-  assert.equal(cycle.kind, 'WAITING_APPROVAL');
-  assert.equal(debuggerCalls.filter(call => call.method === 'Runtime.evaluate').length, 0, 'script must not execute before owner approval');
-  let live = await manager.get('job-1');
-  assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
-  assert.equal(live.job.runtime.pendingApproval.action.type, 'trusted_script');
-  assert.match(live.job.runtime.pendingApproval.action.code, /legacy/);
-
-  await manager.approvePendingAction('job-1', { runInitial: false });
+  assert.equal(cycle.kind, 'ACTION');
   const runtimeCalls = debuggerCalls.filter(call => call.method === 'Runtime.evaluate');
   assert.equal(runtimeCalls.length, 1);
   assert.match(runtimeCalls[0].params.expression, /querySelector/);
@@ -1931,14 +1985,14 @@ test('Trusted Script requires explicit approval even under ALLOW_ALL and runs th
   const unblockIndex = debuggerCalls.findIndex((call, index) => index > evalIndex && call.method === 'Network.setBlockedURLs' && Array.isArray(call.params.urls) && call.params.urls.length === 0);
   assert.ok(blockIndex >= 0 && blockIndex < evalIndex, 'network guard must be armed before Trusted Script execution');
   assert.ok(unblockIndex > evalIndex, 'network guard must be removed after Trusted Script execution');
-  live = await manager.get('job-1');
+  const live = await manager.get('job-1');
   assert.equal(live.job.runtime.stepCount, 1);
   const serializedHistory = JSON.stringify(live.job.runtime.history);
   assert.ok(!serializedHistory.includes('querySelector'), 'durable history must redact Trusted Script source after execution');
   assert.ok(serializedHistory.includes('trusted-script-executed'));
 });
 
-test('Trusted Script approval is invalidated if the approved browser URL changes before execution', async () => {
+test('Trusted Script consequential approval is invalidated if the approved browser URL changes before execution', async () => {
   const chrome = makeChrome();
   let evaluateCalls = 0;
   chrome.debugger.sendCommand = async (_target, method) => {
@@ -1949,7 +2003,7 @@ test('Trusted Script approval is invalidated if the approved browser URL changes
     chromeApi: chrome,
     routePrompt: async () => ({ text: JSON.stringify({ type: 'trusted_script', purpose: 'legacy click', code: 'document.body.dataset.test="1";' }) }),
   });
-  await manager.create({ id: 'job-1', goal: 'legacy UI', trustedScriptEnabled: true, approvalMode: 'ALLOW_ALL' });
+  await manager.create({ id: 'job-1', goal: 'legacy UI', trustedScriptEnabled: true, approvalMode: 'CONSEQUENTIAL' });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'WAITING_APPROVAL');
   chrome._tabs.get(1).url = 'https://other.example.org/changed';

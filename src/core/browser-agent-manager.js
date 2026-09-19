@@ -21,6 +21,8 @@ import {
   agentUsageCostUsd,
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
+  resolveBrowserAgentOwnerPolicy,
+  BrowserAgentPolicyDecision,
   browserAgentTargetFingerprint,
   browserAgentCoordinateTargetFingerprint,
   verifyBrowserApprovalTarget,
@@ -271,6 +273,8 @@ export class BrowserAgentManager {
       allowCrossOriginNavigation: raw.allowCrossOriginNavigation !== false,
       closeOwnedTabsOnStop: raw.closeOwnedTabsOnStop === true,
       approvalMode: raw.approvalMode || BrowserAgentApprovalMode.CONSEQUENTIAL,
+      credentialDecision: raw.credentialDecision || BrowserAgentPolicyDecision.ASK,
+      siteRules: raw.siteRules || [],
       visionOnDemand: raw.visionOnDemand !== false,
       trustedScriptEnabled: raw.trustedScriptEnabled === true,
       maxModelCalls: raw.maxModelCalls ?? 0,
@@ -1386,7 +1390,6 @@ export class BrowserAgentManager {
     if (action.type === BrowserAgentActionType.TRUSTED_SCRIPT) {
       if (job.config.trustedScriptEnabled !== true) throw new Error('Trusted Script is disabled by owner policy');
       const result = await this.executeTrustedScript(tabId, action);
-      appendHistory(job.runtime, { at: this.now(), type: 'trusted-script-executed', message: `Trusted Script executed on ${result.origin}`, action: { type: action.type, purpose: action.purpose, origin: action.origin } });
       return { kind: 'ACTION', action: { type: action.type, purpose: action.purpose, origin: action.origin }, currentUrl: snapshot.url || '' };
     }
 
@@ -2118,11 +2121,26 @@ export class BrowserAgentManager {
     }
 
     const risk = classifyBrowserAgentActionRisk(snapshot, action);
-    const approvalRequired = risk.requiresApproval && (
-      action.type === BrowserAgentActionType.TRUSTED_SCRIPT
-      || current.job.config.approvalMode === BrowserAgentApprovalMode.CONSEQUENTIAL
-    );
-    if (approvalRequired) return this.requestActionApproval(id, epoch, snapshot, action, risk);
+    const ownerPolicy = resolveBrowserAgentOwnerPolicy(current.job.config, snapshot, action, {
+      requiresApproval: risk.requiresApproval,
+    });
+    if (ownerPolicy.decision === BrowserAgentPolicyDecision.DENY) {
+      return this.recordRecoverableFailure(id, epoch, {
+        type: 'action',
+        error: new Error(`OWNER_POLICY_DENY: ${ownerPolicy.reason}`),
+        action,
+        countStep: false,
+        retryMs: 250,
+        maxConsecutive: 3,
+      });
+    }
+    if (ownerPolicy.decision === BrowserAgentPolicyDecision.ASK) {
+      return this.requestActionApproval(id, epoch, snapshot, action, {
+        ...risk,
+        requiresApproval: true,
+        reason: ownerPolicy.reason,
+      });
+    }
 
     let executed;
     try {
@@ -2147,7 +2165,23 @@ export class BrowserAgentManager {
       job.runtime.lastError = '';
       job.runtime.nextWakeAt = now + Math.max(250, waitMs);
       job.runtime.updatedAt = now;
-      appendHistory(job.runtime, { at: now, type: 'action', action: clone(action), route: planner?.route || '', ...(executed?.partial ? { partial: true, completedCount: executed.completedCount, failedIndex: executed.failedIndex, error: executed.error } : {}) });
+      if (action.type === BrowserAgentActionType.TRUSTED_SCRIPT) {
+        appendHistory(job.runtime, {
+          at: now,
+          type: 'trusted-script-executed',
+          message: `Trusted Script executed autonomously on ${clean(action.origin || snapshot.url || 'allowed origin', 500)}`,
+          action: { type: action.type, purpose: action.purpose || '', origin: action.origin || '' },
+        });
+      }
+      appendHistory(job.runtime, {
+        at: now,
+        type: 'action',
+        action: action.type === BrowserAgentActionType.TRUSTED_SCRIPT
+          ? { type: action.type, purpose: action.purpose || '', origin: action.origin || '' }
+          : clone(action),
+        route: planner?.route || '',
+        ...(executed?.partial ? { partial: true, completedCount: executed.completedCount, failedIndex: executed.failedIndex, error: executed.error } : {}),
+      });
       if (pauseAfter) {
         job.runtime.controlEpoch += 1;
         job.runtime.runState = BrowserAgentRunState.PAUSED;

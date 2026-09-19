@@ -260,3 +260,28 @@ Implemented on top of 0.9.16 coordinate click:
 - no change to Ordinary Session cadence, Scenario Work scheduling, or Orchestration V2 ownership semantics.
 
 Qualification target for this checkpoint: exact full Node matrix + reliability + native Chromium + keyboard/accessibility + static scans + deterministic double packaging; physical owner Windows/NVDA/real UKF AIS remains a separate acceptance step.
+
+
+## Owner-authority autonomy contract — 2026-09-19
+
+This requirement supersedes any earlier wording that treated specific Browser/Universal Agent actions as permanently approval-bound.
+
+### Product contract
+
+- The owner decides autonomy policy. Runtime code MUST NOT impose an unconditional confirmation requirement on an action that the owner has explicitly allowed.
+- A global `ALLOW_ALL` policy means enabled capabilities may execute without per-action confirmation, including submit/publish/send/upload/delete/coordinate actions and Trusted Script.
+- The owner MUST be able to restrict autonomy globally, per site/origin, and ultimately per action/capability. A site-specific rule overrides the global default.
+- Authentication is a policy-controlled capability, not a permanent manual-only boundary. Credentials must be handled through a CredentialBroker/opaque reference boundary so secrets need not be exposed to model prompts, durable history, logs, or unrelated tools.
+- If the owner allows credential use for a site, the agent may complete login flows autonomously using approved credential references. If a site requires an unsupported human-presence mechanism (for example an unavailable external device interaction), runtime reports the missing capability rather than claiming a product policy prohibition.
+- Full autonomy does not mean bypassing technical capability checks, site permissions, exact-effect verification, or explicit owner DENY rules. These are execution invariants, not hidden approval policy.
+- Long-running work remains scheduler/runtime-driven; no requirement exists for one continuous LLM inference.
+
+### Required policy precedence
+
+`explicit action rule -> site/origin rule -> job/global policy -> default`.
+
+Decisions are `ALLOW | ASK | DENY`. `ALLOW_ALL` is the owner-facing global preset that resolves enabled actions to `ALLOW`.
+
+### Delivery consequence
+
+Native Companion and CredentialBroker are release-critical for the Universal Agent, because owner-approved arbitrary local-file use and autonomous credential-backed login cannot be honestly called complete without them.
