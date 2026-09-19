@@ -252,6 +252,11 @@ test('request schema and read bounds fail closed', () => {
   }), /unknown field/);
 });
 
+test('Native host config loader explicitly strips a PowerShell UTF-8 BOM', async () => {
+  const source = await fs.readFile(path.join(repoRoot, 'companion', 'native-host', 'host.mjs'), 'utf8');
+  assert.match(source, /replace\(\/\^\\\\uFEFF\/u, ''\)/);
+});
+
 test('extension manifest and Windows installer expose the exact native host contract', async () => {
   const manifest = JSON.parse(await fs.readFile(path.join(repoRoot, 'manifest.json'), 'utf8'));
   assert.ok(manifest.permissions.includes('nativeMessaging'));
