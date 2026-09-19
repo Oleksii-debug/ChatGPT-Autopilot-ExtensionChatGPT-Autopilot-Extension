@@ -331,3 +331,114 @@ export class DriveFolderDispatchProviderV1 {
     };
   }
 }
+
+
+const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
+const GOOGLE_FOLDER_MIME = 'application/vnd.google-apps.folder';
+const GOOGLE_DOC_MIME = 'application/vnd.google-apps.document';
+const DISPATCH_TEXT_MIME_TYPES = new Set([
+  'application/json',
+  'text/plain',
+  'text/markdown',
+]);
+
+function driveApiUrl(path, params = {}) {
+  const url = new URL(`${DRIVE_API_BASE}${path}`);
+  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, String(value));
+  return url.toString();
+}
+
+async function authorizedFetch(fetchFn, getAccessToken, url, options = {}) {
+  if (typeof getAccessToken !== 'function') {
+    throw new DriveFolderDispatchError('AUTH_REQUIRED', 'Google Drive access-token provider is not configured.');
+  }
+  const token = clean(await getAccessToken());
+  if (!token) throw new DriveFolderDispatchError('AUTH_REQUIRED', 'Google Drive access token is unavailable.');
+  let response;
+  try {
+    response = await fetchFn(url, {
+      ...options,
+      headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+    });
+  } catch (error) {
+    throw new DriveFolderDispatchError('NETWORK', 'Google Drive request failed.', { retryable: true, details: error?.message || '' });
+  }
+  if (response?.ok) return response;
+  const status = Number(response?.status || 0);
+  const code = status === 401 ? 'AUTH_REQUIRED'
+    : status === 403 ? 'ACCESS_DENIED'
+      : status === 404 ? 'NOT_FOUND'
+        : 'HTTP_ERROR';
+  throw new DriveFolderDispatchError(code, `Google Drive HTTP ${status || 'error'}.`, {
+    retryable: [408, 429, 500, 502, 503, 504].includes(status),
+    status,
+  });
+}
+
+export function createGoogleDriveFolderDispatchReader({
+  folderId,
+  getAccessToken,
+  fetchFn = globalThis.fetch,
+} = {}) {
+  const sourceId = extractGoogleDriveFolderSourceId(folderId);
+  if (typeof fetchFn !== 'function') {
+    throw new DriveFolderDispatchError('INVALID_READER', 'fetch is unavailable.');
+  }
+
+  async function listChildren(parentId) {
+    const response = await authorizedFetch(
+      fetchFn,
+      getAccessToken,
+      driveApiUrl('/files', {
+        q: `'${parentId}' in parents and trashed = false`,
+        pageSize: 1000,
+        orderBy: 'name',
+        fields: 'nextPageToken,files(id,name,mimeType,version,size)',
+      }),
+    );
+    const body = await response.json();
+    if (body?.nextPageToken) {
+      throw new DriveFolderDispatchError('OVER_CAPACITY', 'Drive folder exceeds the bounded 1000-entry provider limit.');
+    }
+    return Array.isArray(body?.files) ? body.files : [];
+  }
+
+  return {
+    sourceId,
+    async listGenerations() {
+      const files = await listChildren(sourceId);
+      return files
+        .filter(item => clean(item?.mimeType) === GOOGLE_FOLDER_MIME)
+        .map(item => ({
+          id: item.id,
+          folderId: item.id,
+          name: item.name,
+        }));
+    },
+    async listGenerationEntries({ generation } = {}) {
+      const generationId = requireId(generation?.folderId, 'generation.folderId');
+      return listChildren(generationId);
+    },
+    async readEntryContent({ entry } = {}) {
+      const entryId = requireId(entry?.id, 'entry.id');
+      const mimeType = clean(entry?.mimeType);
+      let url;
+      if (mimeType === GOOGLE_DOC_MIME) {
+        url = driveApiUrl(`/files/${encodeURIComponent(entryId)}/export`, { mimeType: 'text/plain' });
+      } else if (DISPATCH_TEXT_MIME_TYPES.has(mimeType)) {
+        url = driveApiUrl(`/files/${encodeURIComponent(entryId)}`, { alt: 'media' });
+      } else {
+        throw new DriveFolderDispatchError(
+          'UNSUPPORTED_MIME',
+          `Unsupported Drive dispatch MIME type: ${mimeType || 'unknown'}.`,
+        );
+      }
+      const response = await authorizedFetch(fetchFn, getAccessToken, url);
+      const content = await response.text();
+      if (new TextEncoder().encode(content).byteLength > MAX_PROMPT_CHARS + 8192) {
+        throw new DriveFolderDispatchError('DISPATCH_TOO_LARGE', 'Drive dispatch file is too large.');
+      }
+      return content;
+    },
+  };
+}
