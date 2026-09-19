@@ -8,6 +8,7 @@ import {
   planScenarioWorkActions,
   applyScenarioLaunch,
   applyScenarioCompletion,
+  pauseScenarioWork,
 } from '../../src/core/scenario-work.js';
 import {
   ScenarioWorkManager,
@@ -236,4 +237,31 @@ test('Scenario manager normalizes legacy runtime without nextLaunchAt to zero', 
   });
   const loaded = await manager.load();
   assert.equal(loaded.byId[config.id].runtime.nextLaunchAt, 0);
+});
+
+
+test('Scenario completion deadline never delays an already-due timeout', () => {
+  const config = chatConfig();
+  let runtime = startAndLaunch(config, 1_000);
+  runtime.nextLaunchAt = 999_999;
+  runtime.chat.deadlineAt = 10_000;
+
+  const planned = planScenarioWorkActions(config, runtime, 10_000);
+  assert.equal(planned.actions.length, 1);
+  assert.deepEqual(planned.actions[0], { type: 'TIMEOUT', participantKey: 'chat' });
+});
+
+test('Scenario owner Pause dominates future nextLaunchAt', () => {
+  const config = chatConfig();
+  let runtime = startAndLaunch(config, 1_000);
+  runtime = applyScenarioCompletion(config, runtime, 'chat', {
+    chatUrl: 'https://chatgpt.com/c/66666666-6666-4666-8666-666666666666',
+    assistantText: 'done',
+    now: 21_000,
+  });
+  assert.equal(runtime.nextLaunchAt, 81_000);
+
+  runtime = pauseScenarioWork(runtime, 30_000);
+  assert.deepEqual(planScenarioWorkActions(config, runtime, 81_000).actions, []);
+  assert.equal(runtime.nextLaunchAt, 81_000, 'owner pause must preserve the durable completion deadline without executing it');
 });
