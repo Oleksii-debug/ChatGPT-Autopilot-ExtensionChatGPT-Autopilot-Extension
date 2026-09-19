@@ -1,6 +1,7 @@
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
+import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -108,7 +109,7 @@ export function createSession({ id, name, tasks = [], promptMode = PromptMode.SH
   if (!Number.isInteger(logicalCount) || logicalCount < 1 || logicalCount > MAX_LOGICAL_TASKS) throw new Error(`Session configuredTaskCount must be 1-${MAX_LOGICAL_TASKS}`);
   if (logicalCount < tasks.length) throw new Error('Session configuredTaskCount cannot be smaller than physical task count');
   const tasksById = Object.fromEntries(tasks.map(t => [t.id, t]));
-  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, configuredTaskCount: logicalCount, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, successfulSendCount: 0, completedAt: 0, lastError: '', onePassCompletedTaskIds: [], onePassCompletedCount: 0, createdAt: now, updatedAt: now };
+  return { id, name, enabled: true, runState: RunState.STOPPED, promptMode, sharedPrompt, promptCadence: defaultSessionPromptCadence(), runMode, taskOrder: tasks.map(t => t.id), tasksById, currentTaskIndex: 0, configuredTaskCount: logicalCount, minimumSendIntervalMs, preSendDelayMs, busyCheckDelayMs, retryBackoffMs, tabStrategy, nextAllowedSendAt: 0, operation: null, lastActionAt: 0, lastSuccessfulSendAt: 0, successfulSendCount: 0, completedAt: 0, lastError: '', onePassCompletedTaskIds: [], onePassCompletedCount: 0, createdAt: now, updatedAt: now };
 }
 
 function validateTask(task, taskId) {
@@ -172,6 +173,7 @@ function validateSession(session, id) {
   requireEnum(session.runState, RUN_STATES, `session ${id} runState`);
   requireEnum(session.promptMode, PROMPT_MODES, `session ${id} promptMode`);
   requireString(session.sharedPrompt, `session ${id} sharedPrompt`);
+  if (session.promptCadence !== undefined) normalizeSessionPromptCadence(session.promptCadence);
   requireEnum(session.runMode, RUN_MODES, `session ${id} runMode`);
   requireUniqueStringArray(session.taskOrder, `session ${id} taskOrder`, { min: 1, max: MAX_PHYSICAL_TASKS });
   const configuredTaskCount = session.configuredTaskCount === undefined ? session.taskOrder.length : session.configuredTaskCount;
