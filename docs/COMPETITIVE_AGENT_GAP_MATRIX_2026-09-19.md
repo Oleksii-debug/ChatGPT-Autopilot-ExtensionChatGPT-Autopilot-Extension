@@ -361,3 +361,61 @@ take over -> mutate -> fresh observation -> reconcile -> hand back -> resume sam
 33. Project learning that promotes accepted patterns into versioned Skills/Recipes.
 
 These additions strengthen the same final North Star and do not authorize scheduler/Core/policy/recovery/browser/router duplication.
+
+
+## FINAL PARITY+ GAP ADDENDUM — 2026-09-19
+
+Fresh official-product verification adds the following patterns to the competitive baseline:
+
+### OpenAI / ChatGPT Work + Workspace Agents
+- long-running cross-app work can continue for hours and produce finished editable artifacts;
+- cloud-running shared Workspace Agents can operate across tools under organizational permissions;
+- scheduled/recurring work and connected-app workflows reduce the need to keep a local chat open.
+Autopilot requirement: persistent cloud execution, reusable shared Agent/Skill definitions, finished artifact pipelines, cross-device steering and organization-aware authority.
+
+### Anthropic Agent Skills
+- procedural knowledge is packaged as composable, on-demand Skills containing instructions, scripts and resources, with only relevant material loaded for a task.
+Autopilot requirement: portable Skill Packs with dynamic minimal loading, version/provenance, tests/readiness, permission declaration, Recipe-to-Skill promotion and Project/team catalogs.
+
+### Microsoft Copilot Studio
+- computer use spans web + desktop and can run on hosted browsers, Cloud PC pools or owned machines;
+- activity views, transcripts/evidence, governance, inventory, readiness, async flows and agent identities are product surfaces.
+Autopilot requirement: cloud-computer execution fabric, run/evidence timeline, organizational agent identity/RBAC, readiness dashboard, async supervision and cost/runtime telemetry.
+
+### Manus Wide Research
+- suitable complex work can fan out into many parallel subagents and synthesize results faster than strictly serial execution.
+Autopilot requirement: wide parallel decomposition with conflict-aware fanout/fanin, child isolation, per-child budgets, contradiction detection and verifier-led synthesis.
+
+### Replit Agent
+- the product closes the loop from natural-language intent to building, browser testing, repairing and deploying; newer agent patterns emphasize parallel work and shared project context.
+Autopilot requirement: Outcome Contract -> build/execute -> self-test -> repair -> deploy/publish -> verify, with Branch/Variant and shared workboard support.
+
+### OpenHands SDK
+- model-agnostic customizable agent primitives, isolated environments and specialist tooling are useful when embedded behind an owning control plane.
+Autopilot requirement: specialists remain providers with fine-grained execution control and verifier-owned completion, not replacement Cores.
+
+### Cross-competitor gaps Autopilot should intentionally exceed
+1. Exact-effect ambiguity/reconciliation across all providers.
+2. Full keyboard/NVDA semantic parity for control, trace, canvas and review.
+3. Explicit owner-controlled ALLOW/ASK/DENY with transparent inheritance.
+4. Source/revision/provenance-aware Project memory.
+5. Verified Recipe/Skill promotion from successful work.
+6. One durable task/effect identity across local/cloud/remote execution.
+7. Diff-first owner review and low-attention Action Center.
+8. Outcome Contracts that remove the need for sophisticated prompt engineering.
+9. Project Bootstrap that turns existing repo/Drive/site/files into a ready-to-run workspace.
+10. Wide swarm coordination for ordinary users without requiring manual GitHub/chat choreography.
+
+### New competitive requirements added to the North Star
+- Skill Packs as first-class portable packages;
+- wide parallel execution/research;
+- cloud computer pool/execution fabric;
+- accessible run timeline/replay/evidence map;
+- human-supervision escalation routing;
+- agent identity/RBAC/governance;
+- capability discovery/best-path planner;
+- Outcome Contract Builder;
+- Project Bootstrap;
+- diff-first review;
+- remote steering;
+- gated continuous improvement loop.
