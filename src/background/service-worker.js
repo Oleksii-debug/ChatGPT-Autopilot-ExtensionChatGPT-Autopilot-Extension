@@ -419,6 +419,8 @@ export async function dispatchUiMessage(message) {
     result = await orchestrationV2.importProfile(message.payload?.profile);
   } else if (message.command === 'EXPORT_ORCHESTRATION_V2_PROFILE') {
     result = { profile: await orchestrationV2.exportProfile(message.payload?.name || 'Orchestration') };
+  } else if (message.command === 'CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE') {
+    result = await orchestrationV2.configureHierarchyTemplate(message.payload || {});
   } else if (message.command === 'TEST_ORCHESTRATION_V2_CONTROL') {
     result = await orchestrationV2.testControl(message.payload?.settings || null);
   } else if (message.command === 'UPDATE_ORCHESTRATION_V2_SETTINGS') {
