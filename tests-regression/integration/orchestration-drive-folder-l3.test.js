@@ -290,3 +290,63 @@ test('L3 reducer rejects foreign provider/source, non-child targets and external
     }],
   }), 7), /not locally allowed/);
 });
+
+
+test('L3 generation identity may skip forward but older history never becomes current again', () => {
+  const g = graph();
+  let runtime = managerTerminal(g);
+
+  let out = reduce(g, runtime, folderEvent({
+    revision: '41',
+    fingerprint: FP41,
+    eventId: 'history-41',
+    dispatches: [],
+  }), 4);
+  runtime = out.runtime;
+  assert.equal(out.reason, 'PROVIDER_REVISION_ACCEPTED');
+  assert.equal(runtime.nodesById.manager.providerState.lastAcceptedRevision, '41');
+
+  const reconcile41 = runtime.nodesById.manager.currentActivationId;
+  runtime = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+    'history-41-effect',
+    { nodeId: 'manager', generation: 1, activationId: reconcile41 },
+  ), 5).runtime;
+  runtime = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.NODE_TERMINAL,
+    'history-41-terminal',
+    { nodeId: 'manager', generation: 1, activationId: reconcile41, status: 'COMPLETED' },
+  ), 6).runtime;
+
+  out = reduce(g, runtime, folderEvent({
+    revision: '45',
+    fingerprint: 'e'.repeat(64),
+    eventId: 'history-45',
+    dispatches: [],
+  }), 7);
+  runtime = out.runtime;
+  assert.equal(out.reason, 'PROVIDER_REVISION_ACCEPTED');
+  assert.equal(runtime.nodesById.manager.providerState.lastAcceptedRevision, '45');
+
+  const reconcile45 = runtime.nodesById.manager.currentActivationId;
+  runtime = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+    'history-45-effect',
+    { nodeId: 'manager', generation: 1, activationId: reconcile45 },
+  ), 8).runtime;
+  runtime = reduce(g, runtime, event(
+    OrchestrationHierarchyEventType.NODE_TERMINAL,
+    'history-45-terminal',
+    { nodeId: 'manager', generation: 1, activationId: reconcile45, status: 'COMPLETED' },
+  ), 9).runtime;
+
+  const resurrect = reduce(g, runtime, folderEvent({
+    revision: '41',
+    fingerprint: FP41,
+    eventId: 'history-41-resurrect',
+    dispatches: [],
+  }), 10);
+  assert.equal(resurrect.reason, 'STALE_PROVIDER_REVISION');
+  assert.deepEqual(resurrect.actions, []);
+  assert.equal(resurrect.runtime.nodesById.manager.providerState.lastAcceptedRevision, '45');
+});
