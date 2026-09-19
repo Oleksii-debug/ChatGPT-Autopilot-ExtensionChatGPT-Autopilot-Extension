@@ -520,6 +520,35 @@ function orchestrationDriveScalarSourcesFromForm(domains) {
   return out;
 }
 
+
+function orchestrationDriveFolderSourcesFromForm(domains) {
+  const lines = $('orchestration-v2-hierarchy-drive-folders').value
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return {};
+  const allowed = new Set(domains.map(domain => String(domain.id || '').trim().toLowerCase()));
+  const out = {};
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const separator = line.indexOf('|');
+    if (separator <= 0 || separator >= line.length - 1) {
+      throw new Error('Drive folder рядок ' + (index + 1) + ': потрібен формат Manager ID | Google Drive папка.');
+    }
+    const managerId = line.slice(0, separator).trim().toLowerCase();
+    const source = line.slice(separator + 1).trim();
+    if (!allowed.has(managerId)) {
+      throw new Error('Drive folder рядок ' + (index + 1) + ': Manager ' + (managerId || '?') + ' не знайдений у списку вище.');
+    }
+    if (Object.hasOwn(out, managerId)) {
+      throw new Error('Drive folder рядок ' + (index + 1) + ': Manager ' + managerId + ' уже має dispatch-папку.');
+    }
+    if (!source) throw new Error('Drive folder рядок ' + (index + 1) + ': папка не може бути порожньою.');
+    out[managerId] = source;
+  }
+  return out;
+}
+
 async function authorizeOrchestrationDrive() {
   beginOrchestrationV2Action();
   try {
