@@ -112,6 +112,7 @@ export function createPipelineRuntime(config, now = Date.now(), base = {}) {
     updatedAt: now,
     lastActionAt: 0,
     lastLaunchAt: 0,
+    nextLaunchAt: Math.max(0, Number(base.nextLaunchAt || 0)),
     lastError: '',
     totalLaunches: Number(base.totalLaunches || 0),
     totalCompletedTurns: Number(base.totalCompletedTurns || 0),
@@ -217,7 +218,18 @@ function dependencyReady(slot, runtime) {
 }
 
 function canLaunch(runtime, config, now) {
-  return !config.minimumLaunchGapSeconds || !runtime.lastLaunchAt || now >= runtime.lastLaunchAt + config.minimumLaunchGapSeconds * 1000;
+  if (!config.minimumLaunchGapSeconds) return true;
+  const launchSpacingAt = runtime.lastLaunchAt
+    ? runtime.lastLaunchAt + config.minimumLaunchGapSeconds * 1000
+    : 0;
+  const completionSpacingAt = Math.max(0, Number(runtime.nextLaunchAt || 0));
+  return now >= Math.max(launchSpacingAt, completionSpacingAt);
+}
+
+function recordCompletionRelativeLaunchDeadline(runtime, config, now) {
+  runtime.nextLaunchAt = config.minimumLaunchGapSeconds > 0
+    ? now + config.minimumLaunchGapSeconds * 1000
+    : 0;
 }
 
 function resetAuditorForRound(runtime) {
@@ -462,6 +474,7 @@ export function applyPipelineAssistantCompletion(config, runtimeRaw, participant
   const item = findSlot(runtime, participantKey);
   if (!item || item.state !== WAITING) return runtime;
   item.chatUrl = trimmed(chatUrl) || item.chatUrl;
+  recordCompletionRelativeLaunchDeadline(runtime, config, now);
 
   if (item.role === 'AUDITOR') {
     const raw = parseAuditorAllocation(assistantText);

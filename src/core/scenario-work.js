@@ -210,6 +210,7 @@ export function createScenarioWorkRuntime(configRaw, now = Date.now()) {
     updatedAt: now,
     lastActionAt: 0,
     lastLaunchAt: 0,
+    nextLaunchAt: 0,
     lastError: '',
     totalLaunches: 0,
     totalCompletedTurns: 0,
@@ -293,9 +294,18 @@ function launchAction(item, prompt, stage, launchUrl, now, config, reason = '') 
 }
 
 function canLaunch(runtime, config, now) {
-  return !config.minimumLaunchGapSeconds
-    || !runtime.lastLaunchAt
-    || now >= runtime.lastLaunchAt + config.minimumLaunchGapSeconds * 1000;
+  if (!config.minimumLaunchGapSeconds) return true;
+  const launchSpacingAt = runtime.lastLaunchAt
+    ? runtime.lastLaunchAt + config.minimumLaunchGapSeconds * 1000
+    : 0;
+  const completionSpacingAt = Math.max(0, Number(runtime.nextLaunchAt || 0));
+  return now >= Math.max(launchSpacingAt, completionSpacingAt);
+}
+
+function recordCompletionRelativeLaunchDeadline(runtime, config, now) {
+  runtime.nextLaunchAt = config.minimumLaunchGapSeconds > 0
+    ? now + config.minimumLaunchGapSeconds * 1000
+    : 0;
 }
 
 function promptForBootstrap(prompt, fallback) {
@@ -617,6 +627,7 @@ export function applyScenarioCompletion(configRaw, runtimeRaw, participantKey, {
   if (config.mode === ScenarioWorkMode.CHAT_CYCLE) completeChatTurn(runtime, config, item, now);
   else if (config.mode === ScenarioWorkMode.PAIRS) completePairTurn(runtime, config, pairForParticipant(runtime, participantKey), item, now);
   else completeGroupTurn(runtime, config, runtime.group, item, now);
+  recordCompletionRelativeLaunchDeadline(runtime, config, now);
   runtime.lastActionAt = now;
   runtime.updatedAt = now;
   return runtime;
