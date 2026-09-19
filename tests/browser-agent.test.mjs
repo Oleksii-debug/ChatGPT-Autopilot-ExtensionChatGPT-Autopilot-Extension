@@ -193,6 +193,31 @@ test('owner site policy overrides global autonomy and supports credentials indep
   assert.equal(resolveBrowserAgentCredentialPolicy(value, wildcardSnapshot.url).decision, BrowserAgentPolicyDecision.ASK);
 });
 
+test('site policy governs destination for navigate, new-tab and visible link clicks', () => {
+  const value = config({
+    approvalMode: 'ALLOW_ALL',
+    siteRules: [
+      { pattern: 'blocked.example', defaultDecision: 'DENY', actionDecisions: {} },
+      { pattern: 'ask.example', defaultDecision: 'ASK', actionDecisions: {} },
+    ],
+  });
+  const source = {
+    url: 'https://allowed.example/start',
+    frames: [{ frameId: 0, elements: [
+      { ref: 'r1', tag: 'a', name: 'Blocked destination', href: 'https://blocked.example/next' },
+    ] }],
+  };
+  const nav = resolveBrowserAgentOwnerPolicy(value, source, { type: 'navigate', url: 'https://blocked.example/path' });
+  assert.equal(nav.decision, BrowserAgentPolicyDecision.DENY);
+  assert.match(nav.policyUrl, /blocked\.example/);
+
+  const tab = resolveBrowserAgentOwnerPolicy(value, source, { type: 'new_tab', url: 'https://ask.example/path' });
+  assert.equal(tab.decision, BrowserAgentPolicyDecision.ASK);
+
+  const click = resolveBrowserAgentOwnerPolicy(value, source, { type: 'click', frameId: 0, ref: 'r1' });
+  assert.equal(click.decision, BrowserAgentPolicyDecision.DENY);
+});
+
 test('site policy validation rejects ambiguous duplicates and unsupported action keys', () => {
   assert.throws(() => config({ siteRules: [
     { pattern: 'example.com', defaultDecision: 'ALLOW' },
