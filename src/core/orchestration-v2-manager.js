@@ -7,6 +7,7 @@ import {
 } from './orchestration-v2-storage.js';
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
+import { OrchestrationHierarchyEventType } from './orchestration-hierarchy.js';
 import { importOrchestrationProfile, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
@@ -24,6 +25,23 @@ function alarmName(id) { return `${ORCHESTRATION_V2_ALARM_PREFIX}${id}`; }
 function isUnresolvedOperation(session) { return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase)); }
 function hierarchyGraphId(runtime) {
   return text(runtime?.hierarchy?.graph?.graphId);
+}
+async function setHierarchyRootScopes(controller, runtime, eventType, eventPrefix, orchestraId, nowMs) {
+  const graph = runtime?.hierarchy?.graph;
+  const state = runtime?.hierarchy?.state;
+  if (!graph || !state || !Array.isArray(graph.rootIds) || !graph.rootIds.length) return [];
+  const eventBase = Object.keys(state.processedEventIds || {}).length;
+  const results = [];
+  for (let index = 0; index < graph.rootIds.length; index += 1) {
+    const nodeId = graph.rootIds[index];
+    results.push(await controller.dispatchHierarchyEvent({
+      type: eventType,
+      eventId: `owner-${eventPrefix}:${orchestraId}:${state.controlEpoch}:${eventBase + index + 1}:${nodeId}`,
+      controlEpoch: state.controlEpoch,
+      nodeId,
+    }, { nowMs }));
+  }
+  return results;
 }
 function isManagedSession(session, projectId, graphId = '') {
   return (session?.orchestrationWorker?.managed && session.orchestrationWorker.projectId === projectId)
@@ -242,6 +260,20 @@ export class OrchestrationV2Manager {
     const { config } = await controller.getStatus();
     const runtime = await controller.runtimeRepository.load();
     const graphId = hierarchyGraphId(runtime);
+    const nowMs = this.now();
+
+    // Owner Pause must be durable orchestration authority, not only a Core
+    // Session run-state toggle. Pausing every hierarchy root deterministically
+    // covers the entire graph/subtrees through the existing reducer.
+    await setHierarchyRootScopes(
+      controller,
+      runtime,
+      OrchestrationHierarchyEventType.PAUSE_SCOPE,
+      'pause',
+      orchestraId,
+      nowMs,
+    );
+
     const pausedSessionIds = [];
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
@@ -258,7 +290,7 @@ export class OrchestrationV2Manager {
       const item = draft.byId[orchestraId];
       item.ownerPaused = true;
       item.pausedSessionIds = [...new Set([...(item.pausedSessionIds || []), ...pausedSessionIds])];
-      item.updatedAt = this.now();
+      item.updatedAt = nowMs;
       return draft;
     });
     await this.chrome.alarms?.clear?.(alarmName(orchestraId));
@@ -274,6 +306,20 @@ export class OrchestrationV2Manager {
     const { config } = await controller.getStatus();
     const runtime = await controller.runtimeRepository.load();
     const graphId = hierarchyGraphId(runtime);
+    const nowMs = this.now();
+
+    // Restore hierarchy authority first while Core Sessions are still disabled.
+    // This prevents scope synchronization from accidentally starting a paused
+    // Session before the owner-local resume set is restored below.
+    await setHierarchyRootScopes(
+      controller,
+      runtime,
+      OrchestrationHierarchyEventType.RESUME_SCOPE,
+      'resume',
+      orchestraId,
+      nowMs,
+    );
+
     const resumeIds = new Set(item.pausedSessionIds || []);
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
@@ -287,14 +333,14 @@ export class OrchestrationV2Manager {
       const current = draft.byId[orchestraId];
       current.ownerPaused = false;
       current.pausedSessionIds = [];
-      current.updatedAt = this.now();
+      current.updatedAt = nowMs;
       return draft;
     });
     if (config.enabled) {
       if (!graphId) {
         await controller.enqueueRecoveryEvent({ detail: 'Owner-local pause ended; reconcile live external truth.' });
       }
-      await controller.cycle({ nowMs: this.now() });
+      await controller.cycle({ nowMs });
     }
     await controller.reconcileAlarm();
     return this.getStatus(orchestraId);
