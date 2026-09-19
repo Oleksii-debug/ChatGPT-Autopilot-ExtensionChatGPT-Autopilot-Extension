@@ -2312,6 +2312,15 @@ function renderEditor() {
   $('shared-task-url').value = ui.selected.tasks?.[0]?.url || '';
   $('shared-prompt').value = ui.selected.sharedPrompt || '';
   $('default-unique-prompt').value = ui.selected.defaultUniquePrompt || '';
+  const cadence = ui.selected.promptCadence || {};
+  const prompt2 = cadence.prompt2 || {};
+  const prompt3 = cadence.prompt3 || {};
+  $('prompt-2-enabled').checked = prompt2.enabled === true;
+  $('prompt-2-every').value = String(prompt2.everyN ?? 10);
+  $('prompt-2-text').value = prompt2.prompt || '';
+  $('prompt-3-enabled').checked = prompt3.enabled === true;
+  $('prompt-3-every').value = String(prompt3.everyN ?? 20);
+  $('prompt-3-text').value = prompt3.prompt || '';
   $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
   $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
   $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
@@ -2418,6 +2427,19 @@ function collectEditor() {
   }
   s.sharedPrompt = $('shared-prompt').value;
   s.defaultUniquePrompt = $('default-unique-prompt').value;
+  s.promptCadence = {
+    schemaVersion: 1,
+    prompt2: {
+      enabled: $('prompt-2-enabled').checked,
+      everyN: Number($('prompt-2-every').value),
+      prompt: $('prompt-2-text').value,
+    },
+    prompt3: {
+      enabled: $('prompt-3-enabled').checked,
+      everyN: Number($('prompt-3-every').value),
+      prompt: $('prompt-3-text').value,
+    },
+  };
   s.runMode = document.querySelector('input[name="runMode"]:checked')?.value || 'continuous';
   s.configuredTaskCount = Number($('task-count').value);
   s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
@@ -2459,6 +2481,19 @@ function validate(session) {
     if (session.promptMode === 'unique' && !task.promptOverride.trim()) errors.push([`task-prompt-${task.id}`, `Prompt for Task ${i + 1} is required.`]);
   });
   if (hasEnabledTasks && session.promptMode === 'shared' && !session.sharedPrompt.trim()) errors.push(['shared-prompt', 'Shared prompt is required.']);
+  const cadence = session.promptCadence || {};
+  for (const [ordinal, rule, everyId, textId] of [
+    [2, cadence.prompt2 || {}, 'prompt-2-every', 'prompt-2-text'],
+    [3, cadence.prompt3 || {}, 'prompt-3-every', 'prompt-3-text'],
+  ]) {
+    const everyN = Number(rule.everyN);
+    if (!Number.isInteger(everyN) || everyN < 2 || everyN > 1000000) {
+      errors.push([everyId, `Prompt ${ordinal}: N має бути цілим числом від 2 до 1000000.`]);
+    }
+    if (rule.enabled === true && !String(rule.prompt || '').trim()) {
+      errors.push([textId, `Prompt ${ordinal} увімкнений, але текст порожній.`]);
+    }
+  }
   const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const intervalMax = intervalUnit === 'seconds' ? 86400 : 1440;
   if (!(session.minimumSendIntervalValue >= 1 && session.minimumSendIntervalValue <= intervalMax)) errors.push(['minimum-send-interval', `Minimum send interval must be between 1 and ${intervalMax} ${intervalUnit}.`]);
