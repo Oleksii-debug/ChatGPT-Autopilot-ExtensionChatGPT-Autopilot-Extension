@@ -302,7 +302,12 @@ export class DriveFolderDispatchProviderV1 {
     if (beforeSignature !== entriesSignature(after)) {
       throw new DriveFolderDispatchError('UNSTABLE_GENERATION', 'Drive dispatch generation changed while being read.');
     }
-    const snapshotHash = await sha256Text(beforeSignature);
+    const snapshotHash = await sha256Text([
+      source,
+      generation.revision,
+      generation.folderId,
+      beforeSignature,
+    ].join('\u0002'));
 
     for (const item of parsed) {
       item.dispatchIdentity = await sha256Text([
