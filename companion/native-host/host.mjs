@@ -14,7 +14,8 @@ const callerOrigin = String(process.argv[2] || '').trim();
 
 let config;
 try {
-  config = normalizeNativeCompanionConfig(JSON.parse(fs.readFileSync(configPath, 'utf8')));
+  const configText = fs.readFileSync(configPath, 'utf8').replace(/^\\uFEFF/u, '');
+  config = normalizeNativeCompanionConfig(JSON.parse(configText));
 } catch (error) {
   process.stderr.write(`Native Companion configuration failed: ${error.message}\n`);
   process.exit(2);
