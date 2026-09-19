@@ -18,6 +18,13 @@ import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
+import {
+  DRIVE_SCALAR_PROVIDER_V1,
+  DriveScalarProviderV1,
+  createGoogleDriveScalarReader,
+  getChromeDriveAccessToken,
+  inspectChromeDriveOAuth,
+} from '../core/orchestration-drive-scalar-provider.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
@@ -61,6 +68,7 @@ const orchestrationV2 = new OrchestrationV2Manager({
   chromeApi: chrome,
   fetchFn: (...args) => fetch(...args),
   collectAssistantReport: probeAssistantConversation,
+  resolveHierarchyProvider: resolveOrchestrationHierarchyProvider,
 });
 const scenarioWork = new ScenarioWorkManager({
   coreRepository: repo,
@@ -69,6 +77,20 @@ const scenarioWork = new ScenarioWorkManager({
 });
 const AI_REPORT_ALARM = 'autopilot-ai-report-wake';
 const AI_MANAGER_ALARM = 'autopilot-ai-manager-wake';
+
+async function resolveOrchestrationHierarchyProvider({ binding } = {}) {
+  if (binding?.providerId !== DRIVE_SCALAR_PROVIDER_V1) return null;
+  if (!binding.sourceId) return null;
+  const reader = createGoogleDriveScalarReader({
+    fileId: binding.sourceId,
+    getAccessToken: () => getChromeDriveAccessToken(chrome, { interactive: false }),
+    fetchFn: (...args) => fetch(...args),
+  });
+  return new DriveScalarProviderV1({
+    readMetadata: reader.readMetadata,
+    readContent: reader.readContent,
+  });
+}
 
 async function probeAssistantConversation(job) {
   const conversationUrl = String(job?.conversationUrl || '').trim();
@@ -412,7 +434,10 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'DELETE_ORCHESTRATION_V2_ORCHESTRA') {
     result = await orchestrationV2.delete(message.payload?.id || '');
   } else if (message.command === 'GET_ORCHESTRATION_V2_STATUS') {
-    result = await orchestrationV2.getStatus();
+    result = {
+      ...(await orchestrationV2.getStatus()),
+      driveOAuth: inspectChromeDriveOAuth(chrome.runtime?.getManifest?.()),
+    };
   } else if (message.command === 'PREVIEW_ORCHESTRATION_V2_PROFILE') {
     result = { preview: await orchestrationV2.previewProfile(message.payload?.profile) };
   } else if (message.command === 'IMPORT_ORCHESTRATION_V2_PROFILE') {
@@ -421,6 +446,12 @@ export async function dispatchUiMessage(message) {
     result = { profile: await orchestrationV2.exportProfile(message.payload?.name || 'Orchestration') };
   } else if (message.command === 'CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE') {
     result = await orchestrationV2.configureHierarchyTemplate(message.payload || {});
+  } else if (message.command === 'AUTHORIZE_ORCHESTRATION_V2_DRIVE') {
+    await getChromeDriveAccessToken(chrome, { interactive: true });
+    result = {
+      authorized: true,
+      oauth: inspectChromeDriveOAuth(chrome.runtime?.getManifest?.()),
+    };
   } else if (message.command === 'TEST_ORCHESTRATION_V2_CONTROL') {
     result = await orchestrationV2.testControl(message.payload?.settings || null);
   } else if (message.command === 'UPDATE_ORCHESTRATION_V2_SETTINGS') {
