@@ -760,6 +760,30 @@
           <textarea id="prompt-3-text" rows="6"></textarea>
         </fieldset>
 
+        <fieldset id="drive-prompt-source-settings">
+          <legend>Google Drive — джерело промпта</legend>
+          <label><input id="drive-prompt-enabled" type="checkbox" aria-describedby="drive-prompt-help"> Автоматично оновлювати промпт з одного Google Drive / Google Docs файла</label>
+          <p id="drive-prompt-help">Використовується stable read: version до читання → повний текст → version після читання. Якщо версії різні, файл короткий або Drive недоступний, останній успішний локальний промпт не змінюється.</p>
+
+          <label for="drive-prompt-file">Google Drive / Docs посилання або file ID</label>
+          <input id="drive-prompt-file" type="text" autocomplete="off" spellcheck="false">
+
+          <label for="drive-prompt-target">Куди застосовувати файл</label>
+          <select id="drive-prompt-target">
+            <option value="PRIMARY">Primary prompt</option>
+            <option value="PROMPT_2">Prompt 2</option>
+            <option value="PROMPT_3">Prompt 3</option>
+          </select>
+
+          <label for="drive-prompt-interval">Перевіряти кожні, хвилин</label>
+          <input id="drive-prompt-interval" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3">
+
+          <label for="drive-prompt-min-chars">Мінімальна довжина прийнятого промпта, символів</label>
+          <input id="drive-prompt-min-chars" type="number" min="1" max="1000000" step="1" inputmode="numeric" value="1000">
+
+          <p id="drive-prompt-status" role="status">Drive source вимкнено.</p>
+        </fieldset>
+
         <fieldset id="run-mode">
           <legend>Run mode</legend>
           <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
