@@ -9,6 +9,7 @@ import {
   createOrchestrationHierarchyRuntime,
   reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
+  validateOrchestrationHierarchyRuntimeV1,
 } from '../../src/core/orchestration-hierarchy.js';
 import { DRIVE_SCALAR_PROVIDER_V1 } from '../../src/core/orchestration-drive-scalar-provider.js';
 
@@ -263,4 +264,17 @@ test('L2-A provider cannot address foreign group, exceed local max, or bypass Pa
   assert.deepEqual(paused.actions, []);
   assert.equal(paused.runtime.nodesById.manager.providerState.lastAcceptedRevision, '');
   assert.equal(paused.runtime.processedEventIds['provider-paused'], undefined);
+});
+
+
+test('L2-A durable provider state cannot be corrupted to claim a foreign child after restart', () => {
+  const g = validateOrchestrationGraphV1(graph());
+  let runtime = startAndFinishManager(g);
+  runtime = reduce(g, runtime, providerEvent(41, 2), 4).runtime;
+  const persisted = JSON.parse(JSON.stringify(runtime));
+  persisted.nodesById.manager.providerState.activeChildIds.push('foreign-worker');
+  assert.throws(
+    () => validateOrchestrationHierarchyRuntimeV1(g, persisted),
+    /Invalid provider child authority state/,
+  );
 });
