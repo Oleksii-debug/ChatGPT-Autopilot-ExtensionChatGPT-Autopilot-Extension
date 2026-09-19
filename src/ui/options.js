@@ -1,6 +1,7 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
+import { NativeCompanionClient } from '../core/native-companion.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -2021,6 +2022,30 @@ async function requestBrowserAgentCapability(permission) {
   } catch (error) { $('agent-permission-status').textContent = `Capability не дозволено: ${error.message}`; }
 }
 
+async function checkNativeCompanion() {
+  const status = $('agent-native-companion-status');
+  const extensionId = globalThis.chrome?.runtime?.id || 'невідомий';
+  try {
+    status.textContent = 'Перевіряю Native Companion…';
+    const client = new NativeCompanionClient({ chromeApi: globalThis.chrome });
+    const version = globalThis.chrome?.runtime?.getManifest?.()?.version || '';
+    const hello = await client.hello(version);
+    const capabilities = await client.capabilities();
+    const ids = Array.isArray(capabilities?.capabilities)
+      ? capabilities.capabilities.map(item => item?.capabilityId).filter(Boolean)
+      : [];
+    const roots = Array.isArray(capabilities?.roots)
+      ? capabilities.roots.map(item => item?.rootId).filter(Boolean)
+      : [];
+    const message = `Native Companion підключено. Host ${hello?.hostVersion || 'невідомої версії'}, protocol ${hello?.protocolVersion || 1}. Capabilities: ${ids.join(', ') || 'не оголошено'}. Дозволені папки: ${roots.join(', ') || 'немає'}. Extension ID: ${extensionId}.`;
+    status.textContent = message;
+    announce('Native Companion підключено.');
+  } catch (error) {
+    status.textContent = `Native Companion недоступний: ${error.message}. Extension ID для встановлення: ${extensionId}.`;
+    announce('Native Companion недоступний.');
+  }
+}
+
 async function runBrowserAgentNow() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
@@ -3085,6 +3110,7 @@ $('agent-send-follow-up-button').addEventListener('click', sendBrowserAgentFollo
 $('agent-approve-action-button').addEventListener('click', approveBrowserAgentAction);
 $('agent-reject-action-button').addEventListener('click', rejectBrowserAgentAction);
 $('agent-save-policy-button').addEventListener('click', saveBrowserAgentPolicy);
+$('agent-native-companion-check-button').addEventListener('click', checkNativeCompanion);
 $('agent-allow-current-site-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: false }));
 $('agent-allow-all-sites-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: true }));
 $('agent-allow-downloads-button').addEventListener('click', () => requestBrowserAgentCapability('downloads'));
