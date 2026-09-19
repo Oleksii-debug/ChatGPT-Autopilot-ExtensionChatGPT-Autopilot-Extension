@@ -354,7 +354,7 @@ test('consequential click pauses before physical action and explicit approval ex
   assert.equal(chrome._actionCalls.length, 0, 'consequential click must not execute before approval');
   assert.equal(live.job.runtime.pendingApproval.targetName, 'Confirm enrollment');
   await manager.approvePendingAction('job-1', { runInitial: false });
-  const live = await manager.get('job-1');
+  live = await manager.get('job-1');
   assert.equal(chrome._actionCalls.length, 1, 'approved exact action should execute once');
   assert.equal(live.job.runtime.runState, 'RUNNING');
   assert.equal(live.job.runtime.pendingApproval, null);
