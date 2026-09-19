@@ -182,6 +182,7 @@ export function buildOrchestrationRecoveryPrompt({
       required(scope, 'scope', MAX_SCOPE_LENGTH),
       'Re-establish only current-generation authority from external truth; do not rely on the lost transcript.',
     ].join(' '),
+    childNodeIds,
   });
   return `${base}\nRECOVERED_LOGICAL_ROLE=${originalRole}`;
 }
