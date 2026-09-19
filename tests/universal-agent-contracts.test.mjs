@@ -16,6 +16,8 @@ import {
   normalizeToolInvocationV1,
   normalizeVerificationV1,
   toolDescriptorV1FromAgentProvider,
+  assertToolInvocationAuthorizedV1,
+  assertSpecialistHandoffScopedV1,
 } from '../src/core/universal-agent-contracts.js';
 import {
   AgentProviderId,
@@ -335,4 +337,90 @@ test('nested reference collections reject non-array shapes with stable contract 
     credentialRefs: { credentialId: 'cred-1' },
     createdAt: AT,
   }), /credentialRefs must be a bounded array/);
+});
+
+
+test('Tool invocation authorization consistency blocks mismatched decision, provider and capability amplification', () => {
+  const tool = {
+    schemaVersion: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    label: 'Read workspace file',
+    capabilityIds: ['filesystem.read'],
+    readOnly: true,
+  };
+  const invocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-auth-1',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-auth-1',
+    arguments: { pathRef: 'workspace:README.md' },
+    createdAt: AT,
+  };
+  const decision = {
+    schemaVersion: 1,
+    decisionId: 'decision-auth-1',
+    invocationId: 'invoke-auth-1',
+    decision: 'ALLOW',
+    reasonCode: 'POLICY_OK',
+    decidedAt: AT,
+  };
+
+  const authorized = assertToolInvocationAuthorizedV1({
+    invocation,
+    policyDecision: decision,
+    toolDescriptor: tool,
+    grantedCapabilityIds: ['filesystem.read'],
+  });
+  assert.equal(authorized.invocation.invocationId, 'invoke-auth-1');
+  assert.equal(Object.isFrozen(authorized), true);
+
+  assert.throws(() => assertToolInvocationAuthorizedV1({
+    invocation,
+    policyDecision: { ...decision, decision: 'DENY' },
+    toolDescriptor: tool,
+    grantedCapabilityIds: ['filesystem.read'],
+  }), /not authorized/);
+
+  assert.throws(() => assertToolInvocationAuthorizedV1({
+    invocation,
+    policyDecision: { ...decision, decisionId: 'decision-other' },
+    toolDescriptor: tool,
+    grantedCapabilityIds: ['filesystem.read'],
+  }), /policyDecisionId does not match/);
+
+  assert.throws(() => assertToolInvocationAuthorizedV1({
+    invocation: { ...invocation, providerId: 'other-provider' },
+    policyDecision: decision,
+    toolDescriptor: tool,
+    grantedCapabilityIds: ['filesystem.read'],
+  }), /providerId does not match/);
+
+  assert.throws(() => assertToolInvocationAuthorizedV1({
+    invocation: { ...invocation, requestedCapabilityIds: ['filesystem.write'] },
+    policyDecision: decision,
+    toolDescriptor: { ...tool, capabilityIds: ['filesystem.read', 'filesystem.write'] },
+    grantedCapabilityIds: ['filesystem.read'],
+  }), /exceeds granted capabilities: filesystem.write/);
+});
+
+test('Specialist handoff cannot amplify parent capability grant', () => {
+  const handoff = {
+    schemaVersion: 1,
+    handoffId: 'handoff-scope-1',
+    specialistId: 'coding-specialist',
+    goal: 'Inspect and patch bounded workspace code.',
+    requestedCapabilityIds: ['workspace.read', 'workspace.write'],
+    createdAt: AT,
+  };
+  assert.equal(
+    assertSpecialistHandoffScopedV1(handoff, ['workspace.read', 'workspace.write', 'tests.run']).handoffId,
+    'handoff-scope-1',
+  );
+  assert.throws(
+    () => assertSpecialistHandoffScopedV1(handoff, ['workspace.read']),
+    /exceeds granted capabilities: workspace.write/,
+  );
 });
