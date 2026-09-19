@@ -259,7 +259,15 @@ function renderOrchestrationV2Status(data = {}) {
   const launchLimitText = config.maxLaunchesPerWindow ? String(config.maxLaunchesPerWindow) : 'без ліміту';
   const controlCommentText = config.controlCommentId ? `pinned ${config.controlCommentId}` : (provider.canonicalCommentId ? `auto → ${provider.canonicalCommentId}` : 'auto');
   const controlSourceText = runtime.lastAppliedControlSource || 'ще не застосовано';
-  $('orchestration-v2-runtime').textContent = `Coordinator ${coordinator.generation || 1}: turns ${coordinator.turnsUsed || 0}/${coordinator.maxTurns || config.maxCoordinatorTurns || 10}. Workers: queued ${counts.QUEUED || 0}, active ${counts.ACTIVE || 0}, busy ${counts.BUSY || 0}, complete ${counts.COMPLETED || 0}, failed ${counts.FAILED || 0}. Concurrency ${runtime.effectiveDesiredWorkers ?? 0}/${runtime.hardMaxWorkers ?? config.absoluteMaxWorkers ?? 0}. Launch window ${launchPolicy.launchesInWindow ?? 0}/${launchLimitText}. Control ${controlCommentText}. Revision ${runtime.lastAppliedControlRevision || 0}. Джерело керування: ${controlSourceText}. Backpressure: ${backpressureText}.`;
+  const scalarProviders = Array.isArray(runtime.hierarchy?.providers) ? runtime.hierarchy.providers : [];
+  const driveScalarText = scalarProviders.length
+    ? scalarProviders.map(item => {
+      const revision = item.lastAcceptedRevision || 'ще немає';
+      const error = item.lastErrorCode ? `, помилка ${item.lastErrorCode}` : '';
+      return `${item.nodeId}: revision ${revision}, slots ${item.lastRequestedSlotCount || 0}/${item.maxSlots || 0}${error}`;
+    }).join('; ')
+    : 'не налаштовано';
+  $('orchestration-v2-runtime').textContent = `Coordinator ${coordinator.generation || 1}: turns ${coordinator.turnsUsed || 0}/${coordinator.maxTurns || config.maxCoordinatorTurns || 10}. Workers: queued ${counts.QUEUED || 0}, active ${counts.ACTIVE || 0}, busy ${counts.BUSY || 0}, complete ${counts.COMPLETED || 0}, failed ${counts.FAILED || 0}. Concurrency ${runtime.effectiveDesiredWorkers ?? 0}/${runtime.hardMaxWorkers ?? config.absoluteMaxWorkers ?? 0}. Launch window ${launchPolicy.launchesInWindow ?? 0}/${launchLimitText}. Control ${controlCommentText}. Revision ${runtime.lastAppliedControlRevision || 0}. Джерело керування: ${controlSourceText}. Backpressure: ${backpressureText}. Drive scalar: ${driveScalarText}.`;
 }
 
 async function loadOrchestrationV2Status() {
