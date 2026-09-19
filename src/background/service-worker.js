@@ -25,6 +25,11 @@ import {
   getChromeDriveAccessToken,
   inspectChromeDriveOAuth,
 } from '../core/orchestration-drive-scalar-provider.js';
+import {
+  DRIVE_FOLDER_DISPATCH_PROVIDER_V1,
+  DriveFolderDispatchProviderV1,
+  createGoogleDriveFolderDispatchReader,
+} from '../core/orchestration-drive-folder-provider.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
@@ -79,17 +84,32 @@ const AI_REPORT_ALARM = 'autopilot-ai-report-wake';
 const AI_MANAGER_ALARM = 'autopilot-ai-manager-wake';
 
 async function resolveOrchestrationHierarchyProvider({ binding } = {}) {
-  if (binding?.providerId !== DRIVE_SCALAR_PROVIDER_V1) return null;
-  if (!binding.sourceId) return null;
-  const reader = createGoogleDriveScalarReader({
-    fileId: binding.sourceId,
-    getAccessToken: () => getChromeDriveAccessToken(chrome, { interactive: false }),
-    fetchFn: (...args) => fetch(...args),
-  });
-  return new DriveScalarProviderV1({
-    readMetadata: reader.readMetadata,
-    readContent: reader.readContent,
-  });
+  if (!binding?.sourceId) return null;
+  const getAccessToken = () => getChromeDriveAccessToken(chrome, { interactive: false });
+  if (binding.providerId === DRIVE_SCALAR_PROVIDER_V1) {
+    const reader = createGoogleDriveScalarReader({
+      fileId: binding.sourceId,
+      getAccessToken,
+      fetchFn: (...args) => fetch(...args),
+    });
+    return new DriveScalarProviderV1({
+      readMetadata: reader.readMetadata,
+      readContent: reader.readContent,
+    });
+  }
+  if (binding.providerId === DRIVE_FOLDER_DISPATCH_PROVIDER_V1) {
+    const reader = createGoogleDriveFolderDispatchReader({
+      folderId: binding.sourceId,
+      getAccessToken,
+      fetchFn: (...args) => fetch(...args),
+    });
+    return new DriveFolderDispatchProviderV1({
+      listGenerations: reader.listGenerations,
+      listGenerationEntries: reader.listGenerationEntries,
+      readEntryContent: reader.readEntryContent,
+    });
+  }
+  return null;
 }
 
 async function probeAssistantConversation(job) {
