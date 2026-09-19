@@ -235,6 +235,8 @@
           <p class="field-help" id="orchestration-v2-hierarchy-drive-help">Один рядок — один Manager: ID Manager | посилання Google Drive/Docs або file ID. Файл повинен містити тільки одне ціле число від 0 до кількості Workers цього Manager. Drive не може змінити ієрархію або вибрати чужі слоти.</p>
           <label for="orchestration-v2-hierarchy-drive-poll">Перевіряти Drive, хв</label>
           <input id="orchestration-v2-hierarchy-drive-poll" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3" aria-describedby="orchestration-v2-hierarchy-drive-help">
+          <button id="authorize-orchestration-v2-drive-button" type="button">Авторизувати Google Drive</button>
+          <p id="orchestration-v2-drive-auth-status" role="status">Стан авторизації Drive ще не перевірено.</p>
           <label><input id="orchestration-v2-hierarchy-integration" type="checkbox">Додати окремого Integration Manager</label>
           <label><input id="orchestration-v2-hierarchy-qa" type="checkbox">Додати окремий QA / Red Team</label>
           <button id="configure-orchestration-v2-hierarchy-button" type="button" disabled>Створити ієрархію</button>
