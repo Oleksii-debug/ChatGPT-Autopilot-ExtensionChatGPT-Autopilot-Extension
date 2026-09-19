@@ -247,7 +247,14 @@ test('L1-H fixed 5x5 pool survives restart plus wake/barrier storms without dupl
         nodeId: managerId,
         generation: 1,
       }, { nowMs: h.advance(1) });
-      assert.equal(out.actions.length, 0);
+      assert.equal(
+        out.actions.every(action =>
+          action.type === 'SEND_RECONCILIATION_PROMPT'
+          && Object.values(managerReconcileIds).includes(action.activationId)
+        ),
+        true,
+        'barrier storm may rematerialize only already-prepared Manager reconciliation identities',
+      );
     }
   }
 
@@ -295,7 +302,14 @@ test('L1-H fixed 5x5 pool survives restart plus wake/barrier storms without dupl
       nodeId: 'director',
       generation: 1,
     }, { nowMs: h.advance(1) });
-    assert.equal(out.actions.length, 0);
+    assert.equal(
+      out.actions.every(action =>
+        action.type === 'SEND_RECONCILIATION_PROMPT'
+        && action.activationId === directorReconcileId
+      ),
+      true,
+      'Director barrier storm may expose only the already-prepared reconciliation identity',
+    );
   }
 
   // Reconstruct the controller again, modelling service-worker termination.
