@@ -254,3 +254,38 @@ A capability is not considered competitive because a button exists. It must pass
 - real end-to-end vertical acceptance.
 
 The final North Star is defined in docs/FINAL_PRODUCT_NORTH_STAR.md and GitHub #149.
+
+
+## 2026-09-19 late verification addendum
+
+Fresh public-product verification after the initial matrix confirms several frontier patterns that remain binding inputs for Autopilot:
+
+### OpenAI / ChatGPT Work + Workspace Agents + Data Agent
+- ChatGPT Work is positioned as end-to-end work across apps/files with long-running execution, editable finished artifacts, built-in browser use, local desktop context, cross-device continuation and Scheduled Tasks that can run on a schedule, trigger, or monitor for changes.
+- Workspace Agents add reusable/publishable agents with model/effort choice, connected tools/apps, sharing, Slack use, scheduling and API triggering.
+- The 2026 Data Agent pattern adds natural-language investigation over trusted company data plus interactive dashboards and action, reinforcing the need for a first-class Data/Analytics specialist and artifact/dashboard pipeline rather than treating analytics as ad-hoc chat.
+
+Autopilot consequence: Project/Context Fabric, event triggers, plugin/provider packaging, reusable agent/skill definitions, cross-device cloud/local continuity, first-class data connectors, dashboard/artifact generation and governance remain final-product requirements.
+
+### Google / Gemini computer use
+- Gemini 3.5 Flash integrates computer use natively for browser/mobile/desktop action and long-horizon knowledge-work/testing scenarios.
+
+Autopilot consequence: semantic desktop/browser execution with strong postcondition verification must be a first-class tool path, while deterministic API/CLI/UIA methods remain preferred when available.
+
+### Manus Cloud Computer + My Computer
+- Manus combines a persistent always-on cloud computer with local-machine access through the desktop app, including local files, CLI tools and applications.
+
+Autopilot consequence: persistent cloud workspace plus owner-authorized local execution and durable plane handoff are competitive baseline capabilities, not optional extras.
+
+### OpenHands Agent Control Plane
+- OpenHands Enterprise explicitly frames scaling agents as a control-plane problem: central access control, workflow reuse/standardization, observability, audit trail, cost visibility and performance improvement over time.
+
+Autopilot consequence: Swarm Workspace, agent identity, audit/trace, reusable Recipes/skills, cost/runtime telemetry, policy control and evaluation loops must be product surfaces, not hidden internals.
+
+### Replit Agent evaluation/self-testing loop
+- Replit emphasizes browser-based testing, automatic repair and continuous evaluation of whether generated applications actually work for users.
+
+Autopilot consequence: Actor != Verifier, self-testing/retest loops and benchmark-driven improvement remain core completion semantics.
+
+### Competitive interpretation
+These findings do not justify cloning competitor architecture. They strengthen the existing North Star: one canonical Autopilot control plane should combine durable orchestration, owner policy, exact-effect recovery, local+cloud execution, Project memory/context, multi-agent delegation, reusable Recipes, first-class providers, finished artifacts, observability, accessibility and evidence-bound verification.
