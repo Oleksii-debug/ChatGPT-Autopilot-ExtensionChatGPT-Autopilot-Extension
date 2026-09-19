@@ -212,7 +212,7 @@ function normalizeEvent(raw) {
   exactKeys(raw, new Set([
     'schemaVersion', 'eventId', 'type', 'effectId', 'at',
     'observation', 'verification', 'reasonCode', 'summary',
-    'outcome', 'commitId',
+    'outcome', 'commitId', 'executionId',
   ]), 'ExactEffectEventV1');
   if (Number(raw.schemaVersion) !== UniversalExactEffectVersion) {
     throw new Error('Unsupported ExactEffectEventV1 schemaVersion');
@@ -231,7 +231,14 @@ function normalizeEvent(raw) {
     summary: raw.summary,
     outcome: raw.outcome,
     commitId: raw.commitId,
+    executionId: raw.executionId == null || raw.executionId === '' ? '' : id(raw.executionId, 'event.executionId'),
   };
+}
+
+function assertCurrentExecutionEvent(event, state) {
+  if (!state.executionId || event.executionId !== state.executionId) {
+    throw new Error('Event executionId does not match current exact-effect attempt');
+  }
 }
 
 function result(state, {
@@ -300,6 +307,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     if (current.phase !== ExactEffectPhase.EXECUTING) {
       return result(state, { accepted: false, reason: 'OBSERVATION_NOT_EXPECTED' });
     }
+    assertCurrentExecutionEvent(event, current);
     const observation = normalizeObservationV1(event.observation);
     assertObservationBinding(observation, current);
     state.observation = observation;
@@ -311,6 +319,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     if (![ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(current.phase)) {
       return result(state, { accepted: false, reason: 'AMBIGUITY_NOT_EXPECTED' });
     }
+    assertCurrentExecutionEvent(event, current);
     state.phase = ExactEffectPhase.RECONCILE;
     state.ambiguity = {
       reasonCode: id(event.reasonCode, 'reasonCode'),
@@ -324,6 +333,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     if (current.phase !== ExactEffectPhase.OBSERVED) {
       return result(state, { accepted: false, reason: 'VERIFICATION_NOT_EXPECTED' });
     }
+    assertCurrentExecutionEvent(event, current);
     const verification = normalizeVerificationV1(event.verification);
     assertVerificationBinding(verification, current);
     state.verification = verification;
@@ -354,6 +364,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     if (current.phase !== ExactEffectPhase.RECONCILE) {
       return result(state, { accepted: false, reason: 'RECONCILIATION_NOT_EXPECTED' });
     }
+    assertCurrentExecutionEvent(event, current);
     const outcome = String(event.outcome || '').trim().toUpperCase();
     if (!RECONCILE_OUTCOMES.has(outcome)) throw new Error('Reconciliation outcome is invalid');
     const reasonCode = id(event.reasonCode, 'reasonCode');
