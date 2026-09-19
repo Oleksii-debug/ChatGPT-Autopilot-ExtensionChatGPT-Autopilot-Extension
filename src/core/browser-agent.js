@@ -70,8 +70,131 @@ export const BrowserAgentActionType = Object.freeze({
   DONE: 'done',
 });
 
+export const BrowserAgentPolicyDecision = Object.freeze({
+  ALLOW: 'ALLOW',
+  ASK: 'ASK',
+  DENY: 'DENY',
+  INHERIT: 'INHERIT',
+});
+
+const POLICY_DECISIONS = new Set(Object.values(BrowserAgentPolicyDecision));
+
 const ACTION_TYPES = new Set(Object.values(BrowserAgentActionType));
 const BATCH_ACTION_TYPES = new Set([BrowserAgentActionType.FILL, BrowserAgentActionType.SELECT, BrowserAgentActionType.CHECK]);
+
+function normalizePolicyDecision(value, fallback = BrowserAgentPolicyDecision.INHERIT) {
+  const normalized = clean(value, 20).toUpperCase();
+  return POLICY_DECISIONS.has(normalized) ? normalized : fallback;
+}
+
+function normalizeSitePattern(value) {
+  let source = clean(value, 500).toLowerCase();
+  if (!source) throw new Error('Browser Agent site policy pattern is required');
+  if (source.includes('://')) {
+    const parsed = new URL(source);
+    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Browser Agent site policy supports only HTTP(S) hosts');
+    source = parsed.hostname.toLowerCase();
+  }
+  if (source.startsWith('*.')) {
+    const suffix = source.slice(2);
+    if (!suffix || suffix.includes('*') || !suffix.includes('.')) throw new Error('Browser Agent wildcard site policy is invalid');
+    return `*.${suffix}`;
+  }
+  if (source.includes('*') || source.includes('/') || source.includes(':')) throw new Error('Browser Agent site policy must be a hostname or *.hostname');
+  if (!source.includes('.')) throw new Error('Browser Agent site policy hostname is invalid');
+  return source;
+}
+
+function normalizeActionDecisions(raw) {
+  if (raw == null) return {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Browser Agent actionDecisions must be an object');
+  const out = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key !== 'credentials' && !ACTION_TYPES.has(key)) throw new Error(`Unsupported Browser Agent policy action: ${key}`);
+    const decision = normalizePolicyDecision(value);
+    if (decision === BrowserAgentPolicyDecision.INHERIT) continue;
+    out[key] = decision;
+  }
+  return out;
+}
+
+export function normalizeBrowserAgentSiteRules(raw = []) {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw new Error('Browser Agent siteRules must be an array');
+  if (raw.length > 100) throw new Error('Browser Agent siteRules exceeds 100 rules');
+  const seen = new Set();
+  return raw.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`Browser Agent site rule ${index + 1} must be an object`);
+    const pattern = normalizeSitePattern(item.pattern);
+    if (seen.has(pattern)) throw new Error(`Duplicate Browser Agent site policy: ${pattern}`);
+    seen.add(pattern);
+    return {
+      pattern,
+      defaultDecision: normalizePolicyDecision(item.defaultDecision),
+      actionDecisions: normalizeActionDecisions(item.actionDecisions),
+    };
+  });
+}
+
+function sitePatternMatches(hostname, pattern) {
+  const host = String(hostname || '').toLowerCase();
+  if (!host || !pattern) return false;
+  if (pattern.startsWith('*.')) {
+    const suffix = pattern.slice(2);
+    return host.endsWith(`.${suffix}`) && host !== suffix;
+  }
+  return host === pattern;
+}
+
+function bestMatchingSiteRule(siteRules, url) {
+  let hostname = '';
+  try { hostname = new URL(url).hostname.toLowerCase(); } catch { return null; }
+  const matches = (siteRules || []).filter(rule => sitePatternMatches(hostname, rule.pattern));
+  matches.sort((a, b) => {
+    const exactA = a.pattern.startsWith('*.') ? 0 : 1;
+    const exactB = b.pattern.startsWith('*.') ? 0 : 1;
+    if (exactA !== exactB) return exactB - exactA;
+    return b.pattern.length - a.pattern.length;
+  });
+  return matches[0] || null;
+}
+
+export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requiresApproval = false } = {}) {
+  const rule = bestMatchingSiteRule(config?.siteRules || [], snapshot?.url || '');
+  const explicit = rule?.actionDecisions?.[action?.type]
+    || rule?.defaultDecision
+    || BrowserAgentPolicyDecision.INHERIT;
+  let decision = explicit;
+  let source = rule ? `site:${rule.pattern}` : 'global';
+  if (decision === BrowserAgentPolicyDecision.INHERIT) {
+    decision = requiresApproval && config?.approvalMode === BrowserAgentApprovalMode.CONSEQUENTIAL
+      ? BrowserAgentPolicyDecision.ASK
+      : BrowserAgentPolicyDecision.ALLOW;
+    source = 'global';
+  }
+  return {
+    decision,
+    source,
+    pattern: rule?.pattern || '',
+    reason: rule
+      ? `Owner site policy ${rule.pattern} resolved ${action?.type || 'action'} to ${decision}`
+      : `Owner global policy resolved ${action?.type || 'action'} to ${decision}`,
+  };
+}
+
+export function resolveBrowserAgentCredentialPolicy(config, url) {
+  const rule = bestMatchingSiteRule(config?.siteRules || [], url || '');
+  const explicit = rule?.actionDecisions?.credentials || BrowserAgentPolicyDecision.INHERIT;
+  const decision = explicit !== BrowserAgentPolicyDecision.INHERIT
+    ? explicit
+    : normalizePolicyDecision(config?.credentialDecision, BrowserAgentPolicyDecision.ASK);
+  return {
+    decision,
+    source: explicit !== BrowserAgentPolicyDecision.INHERIT ? `site:${rule.pattern}` : 'global',
+    pattern: explicit !== BrowserAgentPolicyDecision.INHERIT ? rule.pattern : '',
+  };
+}
+
 const ALLOWED_KEYS = new Set(['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Space']);
 
 function clean(value, max = 20000) {
@@ -179,6 +302,8 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
     throw new Error('Browser Agent strong provider override requires an explicit strong model');
   }
   const approvalMode = Object.values(BrowserAgentApprovalMode).includes(raw.approvalMode) ? raw.approvalMode : BrowserAgentApprovalMode.CONSEQUENTIAL;
+  const credentialDecision = normalizePolicyDecision(raw.credentialDecision, BrowserAgentPolicyDecision.ASK);
+  const siteRules = normalizeBrowserAgentSiteRules(raw.siteRules || []);
   const activeWindowStart = timeOfDay(raw.activeWindowStart);
   const activeWindowEnd = timeOfDay(raw.activeWindowEnd);
   if (Boolean(activeWindowStart) !== Boolean(activeWindowEnd)) throw new Error('Browser Agent active window requires both start and end times');
@@ -201,6 +326,8 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
     allowCrossOriginNavigation: raw.allowCrossOriginNavigation !== false,
     closeOwnedTabsOnStop: raw.closeOwnedTabsOnStop === true,
     approvalMode,
+    credentialDecision,
+    siteRules,
     visionOnDemand: raw.visionOnDemand !== false,
     trustedScriptEnabled: raw.trustedScriptEnabled === true,
     maxModelCalls: int(raw.maxModelCalls, 0, 0, 1_000_000),
@@ -524,6 +651,9 @@ export function buildBrowserAgentPlannerPrompt(config, runtime, snapshot) {
       ? 'Owner policy is ALLOW_ALL: do not request per-action approval for enabled actions. Respect only explicit site/capability/policy denials and technical preconditions.'
       : 'Owner policy requires confirmation for consequential actions. Never evade, relabel, or work around an approval boundary.',
     '',
+    `OWNER GLOBAL APPROVAL POLICY: ${config.approvalMode}`,
+    `OWNER GLOBAL CREDENTIAL POLICY: ${config.credentialDecision || BrowserAgentPolicyDecision.ASK}`,
+    config.siteRules?.length ? `OWNER SITE POLICY RULES (runtime-enforced):\n${JSON.stringify(config.siteRules)}` : '',
     `OWNER GOAL:\n${config.goal}`,
     instructions.length ? `\nOWNER FOLLOW-UP INSTRUCTIONS:\n${JSON.stringify(instructions)}` : '',
     '',
