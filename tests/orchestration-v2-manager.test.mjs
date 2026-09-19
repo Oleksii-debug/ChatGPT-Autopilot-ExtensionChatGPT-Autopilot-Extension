@@ -339,6 +339,29 @@ test('hierarchy profile import persists the graph setup-only, exports it again, 
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState,'RUNNING');
 });
 
+test('hierarchy profile import fails closed after the first Start even when the orchestra is owner-paused', async()=>{
+  const {manager}=managerFixture();
+  const original=exportOrchestrationProfile(cfg('hierarchy-reimport'),{
+    name:'Hierarchy Reimport',
+    hierarchy:hierarchyGraph('original-profile-graph'),
+  });
+  const imported=await manager.importProfile(original);
+  await manager.start(imported.status.selectedId);
+  await manager.pause(imported.status.selectedId);
+
+  const replacement=exportOrchestrationProfile(cfg('hierarchy-reimport'),{
+    name:'Hierarchy Replacement',
+    hierarchy:hierarchyGraph('replacement-profile-graph'),
+  });
+  await assert.rejects(
+    ()=>manager.importProfile(replacement),
+    /before the first Start/,
+  );
+
+  const runtime=await manager.controllerFor(imported.status.selectedId).runtimeRepository.load();
+  assert.equal(runtime.hierarchy.graph.graphId,'original-profile-graph');
+});
+
 test('different-project profile import creates a fresh orchestra instead of inheriting legacy runtime', async()=>{
   const {manager}=managerFixture();
   await manager.create({name:'Legacy',config:cfg('legacy-project')});
