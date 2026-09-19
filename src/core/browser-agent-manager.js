@@ -22,6 +22,7 @@ import {
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
   resolveBrowserAgentOwnerPolicy,
+  resolveBrowserAgentCredentialPolicy,
   BrowserAgentPolicyDecision,
   browserAgentTargetFingerprint,
   browserAgentCoordinateTargetFingerprint,
@@ -30,8 +31,11 @@ import {
   verifyBrowserCoordinateTarget,
   focusBrowserAgentTarget,
   validateTrustedScriptSource,
+  executeBrowserCredentialFill,
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
+import { NativeCompanionClient } from './native-companion.js';
+import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
 
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
@@ -76,6 +80,7 @@ function sanitizeHistoryValue(value) {
     // The AI receives ephemeral capability handles (tabRef/downloadRef/ref)
     // instead; never re-expose the raw ids through durable history.
     if (['tabId', 'downloadId', 'localPath', 'filePath', 'path'].includes(key)) continue;
+    if (['secret', 'password', 'token', 'credentialValue'].includes(key) && typeof item === 'string') { out[key] = '[secret-redacted]'; continue; }
     if (key === 'code' && typeof item === 'string') { out.code = '[trusted-script-redacted]'; continue; }
     out[key] = sanitizeHistoryValue(item);
   }
@@ -208,7 +213,7 @@ function normalizeStore(raw, now) {
 }
 
 export class BrowserAgentManager {
-  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback } = {}) {
+  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
     // service-worker startup depend on page scripting being available: Core,
     // Ordinary Sessions and orchestration must still load. Agent execution
@@ -220,6 +225,9 @@ export class BrowserAgentManager {
     this.routePrompt = routePrompt;
     this.now = now;
     this.createId = createId;
+    this.nativeCompanion = nativeCompanionClient === undefined
+      ? (chromeApi?.runtime?.sendNativeMessage ? new NativeCompanionClient({ chromeApi }) : null)
+      : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
   }
@@ -840,7 +848,41 @@ export class BrowserAgentManager {
         }
       } catch { /* download observation is best effort; action capability remains explicit */ }
     }
-    return { snapshotId, frames, tabs, downloads: downloads.slice(-30), url: frames.find(frame => frame.frameId === 0)?.url || frames[0].url || '' };
+    const pageUrl = frames.find(frame => frame.frameId === 0)?.url || frames[0].url || '';
+    const credentials = [];
+    let credentialStatus = { policy: BrowserAgentPolicyDecision.DENY, available: false, errorCode: '' };
+    if (job?.config && isHttpUrl(pageUrl)) {
+      const credentialPolicy = resolveBrowserAgentCredentialPolicy(job.config, pageUrl);
+      credentialStatus = { policy: credentialPolicy.decision, available: false, errorCode: '' };
+      if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && this.nativeCompanion) {
+        try {
+          const targetOrigin = new URL(pageUrl).origin;
+          const listed = await this.nativeCompanion.listCredentials({ targetOrigin });
+          const refs = Array.isArray(listed?.credentialRefs) ? listed.credentialRefs.slice(0, 32) : [];
+          for (const raw of refs) {
+            try {
+              const ref = normalizeCredentialRefV1(raw);
+              credentials.push({
+                ref: `c${credentials.length + 1}`,
+                credentialId: ref.credentialId,
+                brokerId: ref.brokerId,
+                kind: ref.kind,
+                scope: [...ref.scope],
+                expiresAt: ref.expiresAt,
+              });
+            } catch { /* malformed broker refs are omitted */ }
+          }
+          credentialStatus.available = true;
+        } catch (error) {
+          credentialStatus.errorCode = clean(error?.code || 'CREDENTIAL_BROKER_UNAVAILABLE', 120);
+        }
+      } else if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY) {
+        credentialStatus.errorCode = 'NATIVE_COMPANION_UNAVAILABLE';
+      } else {
+        credentialStatus.errorCode = 'OWNER_POLICY_DENY';
+      }
+    }
+    return { snapshotId, frames, tabs, downloads: downloads.slice(-30), credentials, credentialStatus, url: pageUrl };
   }
 
   async verifyOwnerAuthority(id, epoch) {
@@ -1386,6 +1428,57 @@ export class BrowserAgentManager {
     if (!Number.isInteger(tabId)) throw new Error('Browser Agent has no active tab');
     let priorTabs = [];
     try { priorTabs = (await this.chrome.tabs.query({})).map(tab => tab.id).filter(Number.isInteger); } catch {}
+
+    if (action.type === BrowserAgentActionType.FILL_CREDENTIAL) {
+      if (!this.nativeCompanion) throw new Error('AGENT_CREDENTIAL_BROKER_UNAVAILABLE');
+      const liveBefore = await this.chrome.tabs.get(tabId);
+      const liveBeforeUrl = clean(liveBefore?.pendingUrl || liveBefore?.url, 4096);
+      if (!isHttpUrl(liveBeforeUrl) || !isHttpUrl(snapshot?.url)) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+      const targetOrigin = new URL(liveBeforeUrl).origin;
+      if (new URL(snapshot.url).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+      const credentialPolicy = resolveBrowserAgentCredentialPolicy(job.config, liveBeforeUrl);
+      if (credentialPolicy.decision === BrowserAgentPolicyDecision.DENY) throw new Error('OWNER_CREDENTIAL_POLICY_DENY');
+      const resolved = await this.nativeCompanion.resolveCredential({
+        credentialId: action.credentialId,
+        targetOrigin,
+      });
+      if (!(await this.verifyOwnerAuthority(job.id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
+      if (!resolved || resolved.credentialId !== action.credentialId || resolved.kind !== 'username-password') {
+        throw new Error('AGENT_CREDENTIAL_RESPONSE_INVALID');
+      }
+      const liveAfter = await this.chrome.tabs.get(tabId);
+      const liveAfterUrl = clean(liveAfter?.pendingUrl || liveAfter?.url, 4096);
+      if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+      let username = typeof resolved.username === 'string' ? resolved.username : '';
+      let secret = typeof resolved.secret === 'string' ? resolved.secret : '';
+      if (!secret) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
+      try {
+        const execution = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [Number(action.passwordFrameId)] },
+          func: executeBrowserCredentialFill,
+          args: [snapshot.snapshotId, action, username, secret],
+        });
+        const result = execution?.[0]?.result;
+        if (!result?.ok || result.passwordFilled !== true) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+      } finally {
+        username = '';
+        secret = '';
+        if (resolved && typeof resolved === 'object') {
+          try { resolved.username = ''; resolved.secret = ''; } catch {}
+        }
+      }
+      return {
+        kind: 'ACTION',
+        action: {
+          type: action.type,
+          credentialRef: action.credentialRef,
+          credentialId: action.credentialId,
+          usernameFilled: Boolean(action.usernameRef),
+          passwordFilled: true,
+        },
+        currentUrl: liveAfterUrl,
+      };
+    }
 
     if (action.type === BrowserAgentActionType.TRUSTED_SCRIPT) {
       if (job.config.trustedScriptEnabled !== true) throw new Error('Trusted Script is disabled by owner policy');
@@ -2121,13 +2214,15 @@ export class BrowserAgentManager {
     }
 
     const risk = classifyBrowserAgentActionRisk(snapshot, action);
-    const ownerPolicy = resolveBrowserAgentOwnerPolicy(current.job.config, snapshot, action, {
-      requiresApproval: risk.requiresApproval,
-    });
+    const ownerPolicy = action.type === BrowserAgentActionType.FILL_CREDENTIAL
+      ? resolveBrowserAgentCredentialPolicy(current.job.config, snapshot.url)
+      : resolveBrowserAgentOwnerPolicy(current.job.config, snapshot, action, {
+        requiresApproval: risk.requiresApproval,
+      });
     if (ownerPolicy.decision === BrowserAgentPolicyDecision.DENY) {
       return this.recordRecoverableFailure(id, epoch, {
         type: 'action',
-        error: new Error(`OWNER_POLICY_DENY: ${ownerPolicy.reason}`),
+        error: new Error(`${action.type === BrowserAgentActionType.FILL_CREDENTIAL ? 'OWNER_CREDENTIAL_POLICY_DENY' : 'OWNER_POLICY_DENY'}: ${ownerPolicy.reason || ownerPolicy.source || 'owner policy'}`),
         action,
         countStep: false,
         retryMs: 250,
@@ -2138,7 +2233,10 @@ export class BrowserAgentManager {
       return this.requestActionApproval(id, epoch, snapshot, action, {
         ...risk,
         requiresApproval: true,
-        reason: ownerPolicy.reason,
+        targetName: risk.targetName || (action.type === BrowserAgentActionType.FILL_CREDENTIAL ? 'credential-backed login fields' : ''),
+        reason: action.type === BrowserAgentActionType.FILL_CREDENTIAL
+          ? `Owner credential policy requires confirmation before using ${action.credentialId} on ${clean(snapshot.url, 500)}`
+          : ownerPolicy.reason,
       });
     }
 
