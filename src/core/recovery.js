@@ -126,6 +126,16 @@ export function computeNextWake(state, now = Date.now()) {
   }
 
   for (const session of Object.values(state.sessionsById)) {
+    // Drive prompt refresh is durable configuration work, not browser Send
+    // execution. It remains due even while the owning Session is stopped.
+    // Reuse the canonical core alarm rather than introducing a second timer.
+    for (const binding of session.drivePromptSources?.bindings || []) {
+      if (binding?.enabled !== true || !binding.fileId) continue;
+      const rawNextCheckAt = Number(binding.nextCheckAt || 0);
+      const nextCheckAt = Number.isFinite(rawNextCheckAt) ? rawNextCheckAt : 0;
+      earliest = Math.min(earliest, Math.max(now, nextCheckAt));
+    }
+
     if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
     const phase = session.operation?.phase;
     if (phase === OperationPhase.MANUAL_REVIEW) continue;
