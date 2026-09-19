@@ -172,6 +172,7 @@ function syncOrchestrationV2ActionAvailability({ busy = false } = {}) {
   }
   $('import-orchestration-v2-profile-button').disabled = Boolean(busy) || !ui.pendingOrchestrationProfile;
   $('configure-orchestration-v2-hierarchy-button').disabled = Boolean(busy) || !hasSelected;
+  $('authorize-orchestration-v2-drive-button').disabled = Boolean(busy);
   $('orchestration-v2-tab-settings').disabled = Boolean(busy) || !hasSelected;
   $('orchestration-v2-tab-state').disabled = Boolean(busy) || !hasSelected;
 }
@@ -211,6 +212,13 @@ function renderOrchestrationV2Status(data = {}) {
   const provider = runtime.provider || {};
   const counts = runtime.workerCounts || {};
   ui.orchestrationV2Config = clone(config);
+  if (data.driveOAuth) ui.orchestrationDriveOAuth = clone(data.driveOAuth);
+  const driveOAuth = data.driveOAuth || ui.orchestrationDriveOAuth || {};
+  $('orchestration-v2-drive-auth-status').textContent = driveOAuth.configured
+    ? 'Google Drive OAuth налаштовано. Авторизація виконується лише після явного натискання кнопки; автоматичний poll не відкриває вікна входу.'
+    : driveOAuth.clientIdPresent
+      ? 'Google Drive OAuth неповний: у manifest немає scope drive.file.'
+      : 'Google Drive OAuth ще не налаштовано реальним client ID. Drive-керування fail-closed і не запускає Workers.';
   $('orchestration-v2-enabled').checked = config.enabled === true;
   $('orchestration-v2-project-id').value = config.projectId || '';
   $('orchestration-v2-target-repository').value = config.targetRepository || '';
@@ -502,6 +510,23 @@ function orchestrationDriveScalarSourcesFromForm(domains) {
     out[managerId] = source;
   }
   return out;
+}
+
+async function authorizeOrchestrationDrive() {
+  beginOrchestrationV2Action();
+  try {
+    setOrchestrationV2Busy(true);
+    $('orchestration-v2-drive-auth-status').textContent = 'Відкриваю авторизацію Google Drive…';
+    await core('AUTHORIZE_ORCHESTRATION_V2_DRIVE');
+    $('orchestration-v2-drive-auth-status').textContent = 'Google Drive авторизовано для Autopilot.';
+    announce('Google Drive авторизовано.');
+    await loadOrchestrationV2Status();
+  } catch (error) {
+    $('orchestration-v2-drive-auth-status').textContent = `Авторизацію Drive не виконано: ${error.message}`;
+    announce('Авторизацію Google Drive не виконано.');
+  } finally {
+    setOrchestrationV2Busy(false);
+  }
 }
 
 async function configureOrchestrationHierarchyTemplate() {
@@ -2859,6 +2884,7 @@ $('orchestration-v2-profile-file').addEventListener('change', onOrchestrationPro
 $('import-orchestration-v2-profile-button').addEventListener('click', importOrchestrationProfile);
 $('export-orchestration-v2-profile-button').addEventListener('click', exportOrchestrationProfile);
 $('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
+$('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
