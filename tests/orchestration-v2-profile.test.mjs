@@ -5,6 +5,7 @@ import {
   ORCHESTRATION_PROFILE_VERSION,
   exportOrchestrationProfile,
   importOrchestrationProfile,
+  importOrchestrationProfileDocument,
   previewOrchestrationProfile,
 } from '../src/core/orchestration-v2-profile.js';
 
@@ -34,6 +35,50 @@ const CONFIG = {
   workerRetryBackoffMs: 90000,
   coordinatorPreSendDelayMs: 7000,
   coordinatorRetryBackoffMs: 120000,
+};
+
+const HIERARCHY = {
+  schemaVersion: 1,
+  graphId: 'proj-main-hierarchy',
+  controlEpoch: 3,
+  promptProfiles: [
+    { id: 'director-v1', role: 'GLOBAL_DIRECTOR', version: 1, prompt: 'DIRECTOR' },
+    { id: 'manager-v1', role: 'DOMAIN_MANAGER', version: 1, prompt: 'MANAGER' },
+    { id: 'worker-v1', role: 'WORKER', version: 1, prompt: 'WORKER' },
+    { id: 'recovery-v1', role: 'RECOVERY', version: 1, prompt: 'RECOVER FROM EXTERNAL TRUTH' },
+  ],
+  nodes: [
+    {
+      id: 'director',
+      parentId: null,
+      childIds: ['manager'],
+      promptProfileId: 'director-v1',
+      recoveryPromptProfileId: 'recovery-v1',
+      chatMode: 'PERSISTENT_CHAT',
+      maxActiveChildren: 1,
+      barrier: { mode: 'ALL_DIRECT_CHILDREN' },
+    },
+    {
+      id: 'manager',
+      parentId: 'director',
+      childIds: ['worker'],
+      promptProfileId: 'manager-v1',
+      recoveryPromptProfileId: 'recovery-v1',
+      chatMode: 'PERSISTENT_CHAT',
+      maxActiveChildren: 1,
+      barrier: { mode: 'ALL_DIRECT_CHILDREN' },
+    },
+    {
+      id: 'worker',
+      parentId: 'manager',
+      childIds: [],
+      promptProfileId: 'worker-v1',
+      recoveryPromptProfileId: 'recovery-v1',
+      chatMode: 'NEW_CHAT_PER_ACTIVATION',
+      maxActiveChildren: 0,
+      barrier: { mode: 'NONE' },
+    },
+  ],
 };
 
 test('orchestration profile round-trip preserves owner policy but never auto-enables', () => {
@@ -113,4 +158,60 @@ test('three user roles round-trip without auto-start and preserve explicit limit
     assert.equal(imported.maxLaunchesPerWindow, role.launches);
     assert.equal(imported.minimumWorkerLaunchIntervalMs, role.gap * 1000);
   }
+});
+
+
+test('hierarchy graph and role prompt profiles round-trip with orchestra profile without auto-start', () => {
+  const profile = exportOrchestrationProfile(CONFIG, { name: 'Hierarchy project', hierarchy: HIERARCHY });
+  assert.equal(profile.hierarchy.graphId, 'proj-main-hierarchy');
+  assert.equal(profile.hierarchy.nodes.length, 3);
+  assert.equal(profile.hierarchy.promptProfiles.find(item => item.id === 'director-v1').prompt, 'DIRECTOR');
+
+  const document = importOrchestrationProfileDocument(profile);
+  assert.equal(document.config.enabled, false);
+  assert.equal(document.hierarchy.controlEpoch, 3);
+  assert.deepEqual(document.hierarchy.nodes.map(node => node.id), ['director', 'manager', 'worker']);
+  assert.equal(document.hierarchy.nodes.find(node => node.id === 'worker').chatMode, 'NEW_CHAT_PER_ACTIVATION');
+  assert.equal(document.hierarchy.nodes.find(node => node.id === 'manager').recoveryPromptProfileId, 'recovery-v1');
+
+  const legacyConfigApi = importOrchestrationProfile(profile);
+  assert.equal(legacyConfigApi.projectId, CONFIG.projectId);
+  assert.equal(legacyConfigApi.enabled, false);
+
+  const preview = previewOrchestrationProfile(profile);
+  assert.deepEqual(preview.hierarchy, {
+    graphId: 'proj-main-hierarchy',
+    controlEpoch: 3,
+    rootCount: 1,
+    nodeCount: 3,
+    promptProfileCount: 4,
+  });
+});
+
+test('hierarchy profile export accepts the normalized durable graph shape used after restart', () => {
+  const portable = exportOrchestrationProfile(CONFIG, { hierarchy: HIERARCHY });
+  const first = importOrchestrationProfileDocument(portable);
+  const normalizedLike = {
+    ...first.hierarchy,
+    rootIds: ['director'],
+    nodeOrder: first.hierarchy.nodes.map(node => node.id),
+    nodesById: Object.fromEntries(first.hierarchy.nodes.map(node => [node.id, node])),
+  };
+  delete normalizedLike.nodes;
+
+  const reexported = exportOrchestrationProfile(CONFIG, { hierarchy: normalizedLike });
+  const second = importOrchestrationProfileDocument(reexported);
+  assert.deepEqual(second.hierarchy, first.hierarchy);
+});
+
+test('hierarchy profile fails closed on unknown envelope fields and invalid role bindings', () => {
+  const profile = exportOrchestrationProfile(CONFIG, { hierarchy: HIERARCHY });
+
+  const extra = structuredClone(profile);
+  extra.hierarchy.surprise = true;
+  assert.throws(() => importOrchestrationProfileDocument(extra), /Unknown hierarchy field/);
+
+  const unknownProfile = structuredClone(profile);
+  unknownProfile.hierarchy.nodes.find(node => node.id === 'worker').promptProfileId = 'missing-profile';
+  assert.throws(() => importOrchestrationProfileDocument(unknownProfile), /Unknown prompt profile/);
 });

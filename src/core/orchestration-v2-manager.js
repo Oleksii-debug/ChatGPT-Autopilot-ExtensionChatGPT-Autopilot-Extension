@@ -8,7 +8,7 @@ import {
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
 import { OrchestrationHierarchyEventType } from './orchestration-hierarchy.js';
-import { importOrchestrationProfile, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+import { importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -466,7 +466,8 @@ export class OrchestrationV2Manager {
   async previewProfile(profile) { return previewOrchestrationProfile(profile); }
   async exportProfile(name = 'Orchestration') { return this.selectedController().then(({ controller }) => controller.exportProfile(name)); }
   async importProfile(profile) {
-    const imported = importOrchestrationProfile(profile);
+    const importedDocument = importOrchestrationProfileDocument(profile);
+    const imported = importedDocument.config;
     let selected;
 
     // 0.9.7 invariant: importing a profile for an already-known project selects
@@ -513,7 +514,15 @@ export class OrchestrationV2Manager {
       throw new Error('Pause the orchestra before importing configuration.');
     }
     const status = await this.updateConfig({ ...imported, enabled: false }, selected.id);
-    return { config: status.config, preview: previewOrchestrationProfile(profile), status };
+    if (importedDocument.hierarchy) {
+      await selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
+    }
+    return {
+      config: status.config,
+      hierarchy: importedDocument.hierarchy,
+      preview: previewOrchestrationProfile(profile),
+      status: await this.getStatus(selected.id),
+    };
   }
   async testControl(settings = null) { return this.selectedController().then(({ controller }) => controller.testControl(settings)); }
 

@@ -35,7 +35,7 @@ import {
 } from './orchestration-v2-storage.js';
 import { fetchGitHubOrchestrationControl } from './orchestration-v2-github.js';
 import { OperationPhase, RunState } from './schema.js';
-import { exportOrchestrationProfile, importOrchestrationProfile, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import {
   OrchestrationActivationPurpose,
   OrchestrationHierarchyEventType,
@@ -794,7 +794,11 @@ export class OrchestrationV2Controller {
 
   async exportProfile(name = 'Orchestration') {
     const config = await this.configRepository.load();
-    return exportOrchestrationProfile(config, { name });
+    const runtime = await this.runtimeRepository.load();
+    return exportOrchestrationProfile(config, {
+      name,
+      hierarchy: runtime?.hierarchy?.graph || null,
+    });
   }
 
   async previewProfile(profile) {
@@ -802,11 +806,14 @@ export class OrchestrationV2Controller {
   }
 
   async importProfile(profile) {
-    const imported = importOrchestrationProfile(profile);
+    const imported = importOrchestrationProfileDocument(profile);
     const current = await this.configRepository.load();
     if (current.enabled) throw new Error('Disable Orchestration V2 before importing configuration.');
-    const saved = await this.updateConfig({ ...imported, enabled: false });
-    return { config: saved, preview: previewOrchestrationProfile(profile) };
+    const saved = await this.updateConfig({ ...imported.config, enabled: false });
+    if (imported.hierarchy) {
+      await this.configureHierarchy(imported.hierarchy, { nowMs: this.now() });
+    }
+    return { config: saved, hierarchy: imported.hierarchy, preview: previewOrchestrationProfile(profile) };
   }
 
   async testControl(rawSettings = null, { nowMs = this.now() } = {}) {

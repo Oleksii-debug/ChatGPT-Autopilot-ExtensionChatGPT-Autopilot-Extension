@@ -246,6 +246,42 @@ test('zero-state profile preview and import create a disabled selected orchestra
   assert.equal(status.orchestra.name,'Zero Import');
   assert.equal(status.selectedId,status.orchestra.id);
 });
+test('hierarchy profile import persists the graph setup-only, exports it again, and Start uses it', async()=>{
+  const {manager,core}=managerFixture();
+  const profile=exportOrchestrationProfile(cfg('hierarchy-import'),{
+    name:'Hierarchy Import',
+    hierarchy:hierarchyGraph('profile-graph'),
+  });
+
+  const result=await manager.importProfile(profile);
+  assert.equal(result.config.projectId,'hierarchy-import');
+  assert.equal(result.config.enabled,false);
+  assert.equal(result.hierarchy.graphId,'profile-graph');
+
+  let runtime=await manager.controllerFor(result.status.selectedId).runtimeRepository.load();
+  assert.equal(runtime.hierarchy.graph.graphId,'profile-graph');
+  assert.deepEqual(runtime.hierarchy.graph.rootIds,['root']);
+  assert.equal(
+    Object.values((await core.load()).sessionsById).some(session=>session.orchestrationHierarchy?.graphId==='profile-graph'),
+    false,
+    'profile import must configure hierarchy without starting it',
+  );
+
+  const exported=await manager.exportProfile('Hierarchy Export');
+  assert.equal(exported.hierarchy.graphId,'profile-graph');
+  assert.equal(exported.hierarchy.nodes[0].id,'root');
+  assert.equal(exported.hierarchy.promptProfiles[0].prompt,'ROOT profile-graph');
+
+  const started=await manager.start(result.status.selectedId);
+  assert.equal(started.hierarchyStart?.kind,'HIERARCHY_STARTED');
+  const hierarchySession=Object.values((await core.load()).sessionsById)
+    .find(session=>session.orchestrationHierarchy?.graphId==='profile-graph');
+  assert.ok(hierarchySession);
+
+  runtime=await manager.controllerFor(result.status.selectedId).runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState,'RUNNING');
+});
+
 test('different-project profile import creates a fresh orchestra instead of inheriting legacy runtime', async()=>{
   const {manager}=managerFixture();
   await manager.create({name:'Legacy',config:cfg('legacy-project')});
