@@ -2321,6 +2321,15 @@ function renderEditor() {
   $('prompt-3-enabled').checked = prompt3.enabled === true;
   $('prompt-3-every').value = String(prompt3.everyN ?? 20);
   $('prompt-3-text').value = prompt3.prompt || '';
+  const driveBinding = ui.selected.drivePromptSources?.bindings?.[0] || null;
+  $('drive-prompt-enabled').checked = driveBinding?.enabled === true;
+  $('drive-prompt-file').value = driveBinding?.fileId || '';
+  $('drive-prompt-target').value = driveBinding?.target || 'PRIMARY';
+  $('drive-prompt-interval').value = String(Math.max(1, Math.round(Number(driveBinding?.pollIntervalMs || 180000) / 60000)));
+  $('drive-prompt-min-chars').value = String(driveBinding?.minChars ?? 1000);
+  $('drive-prompt-status').textContent = driveBinding
+    ? `Drive: ${driveBinding.enabled ? 'увімкнено' : 'вимкнено'}; target ${driveBinding.target || 'PRIMARY'}; accepted version ${driveBinding.lastAcceptedVersion || 'ще немає'}; остання перевірка ${driveBinding.lastCheckedAt ? new Date(driveBinding.lastCheckedAt).toLocaleString() : 'ще не було'}; ${driveBinding.lastErrorCode ? `помилка ${driveBinding.lastErrorCode}` : 'помилок немає'}.`
+    : 'Drive source вимкнено.';
   $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
   $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
   $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
@@ -2440,6 +2449,28 @@ function collectEditor() {
       prompt: $('prompt-3-text').value,
     },
   };
+  const driveEnabled = $('drive-prompt-enabled').checked;
+  const driveSourceText = $('drive-prompt-file').value.trim();
+  const driveTarget = $('drive-prompt-target').value;
+  const priorDrive = s.drivePromptSources?.bindings?.[0] || null;
+  const preserveDriveRuntime = priorDrive
+    && priorDrive.target === driveTarget
+    && priorDrive.fileId === driveSourceText;
+  s.drivePromptSources = {
+    schemaVersion: 1,
+    bindings: (driveEnabled || driveSourceText) ? [{
+      target: driveTarget,
+      enabled: driveEnabled,
+      fileId: driveSourceText,
+      pollIntervalMs: Number($('drive-prompt-interval').value) * 60000,
+      minChars: Number($('drive-prompt-min-chars').value),
+      lastAcceptedVersion: preserveDriveRuntime ? (priorDrive.lastAcceptedVersion || '') : '',
+      lastAcceptedHash: preserveDriveRuntime ? (priorDrive.lastAcceptedHash || '') : '',
+      lastCheckedAt: preserveDriveRuntime ? Number(priorDrive.lastCheckedAt || 0) : 0,
+      nextCheckAt: preserveDriveRuntime ? Number(priorDrive.nextCheckAt || 0) : 0,
+      lastErrorCode: preserveDriveRuntime ? (priorDrive.lastErrorCode || '') : '',
+    }] : [],
+  };
   s.runMode = document.querySelector('input[name="runMode"]:checked')?.value || 'continuous';
   s.configuredTaskCount = Number($('task-count').value);
   s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
@@ -2492,6 +2523,22 @@ function validate(session) {
     }
     if (rule.enabled === true && !String(rule.prompt || '').trim()) {
       errors.push([textId, `Prompt ${ordinal} увімкнений, але текст порожній.`]);
+    }
+  }
+  const driveBinding = session.drivePromptSources?.bindings?.[0] || null;
+  if (driveBinding) {
+    const intervalMinutes = Number(driveBinding.pollIntervalMs) / 60000;
+    if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440) {
+      errors.push(['drive-prompt-interval', 'Drive interval має бути цілим числом від 1 до 1440 хвилин.']);
+    }
+    if (!Number.isInteger(Number(driveBinding.minChars)) || Number(driveBinding.minChars) < 1 || Number(driveBinding.minChars) > 1000000) {
+      errors.push(['drive-prompt-min-chars', 'Мінімальна довжина Drive prompt має бути від 1 до 1000000 символів.']);
+    }
+    if (driveBinding.enabled && !String(driveBinding.fileId || '').trim()) {
+      errors.push(['drive-prompt-file', 'Для увімкненого Drive source потрібне посилання або file ID.']);
+    }
+    if (driveBinding.enabled && driveBinding.target === 'PRIMARY' && session.promptMode === 'unique') {
+      errors.push(['drive-prompt-target', 'Primary Drive prompt доступний лише для shared prompt mode. Для unique mode виберіть Prompt 2 або Prompt 3.']);
     }
   }
   const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
