@@ -743,6 +743,23 @@
           <button id="apply-default-prompt-button" type="button">Fill empty prompt editors with this text</button>
         </div>
 
+        <fieldset id="prompt-cadence-settings">
+          <legend>Додаткові промпти за підтвердженими надсиланнями</legend>
+          <p id="prompt-cadence-help">Лічильник змінюється лише після підтвердженого успішного Send. BUSY, retry або непідтверджена спроба номер не змінюють. Якщо Prompt 2 і Prompt 3 збігаються на одному номері, використовується Prompt 3.</p>
+
+          <label><input id="prompt-2-enabled" type="checkbox" aria-describedby="prompt-cadence-help"> Увімкнути Prompt 2</label>
+          <label for="prompt-2-every">Prompt 2: кожне N-те підтверджене надсилання</label>
+          <input id="prompt-2-every" type="number" min="2" max="1000000" step="1" inputmode="numeric" value="10">
+          <label for="prompt-2-text">Prompt 2</label>
+          <textarea id="prompt-2-text" rows="6"></textarea>
+
+          <label><input id="prompt-3-enabled" type="checkbox" aria-describedby="prompt-cadence-help"> Увімкнути Prompt 3</label>
+          <label for="prompt-3-every">Prompt 3: кожне N-те підтверджене надсилання</label>
+          <input id="prompt-3-every" type="number" min="2" max="1000000" step="1" inputmode="numeric" value="20">
+          <label for="prompt-3-text">Prompt 3</label>
+          <textarea id="prompt-3-text" rows="6"></textarea>
+        </fieldset>
+
         <fieldset id="run-mode">
           <legend>Run mode</legend>
           <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
