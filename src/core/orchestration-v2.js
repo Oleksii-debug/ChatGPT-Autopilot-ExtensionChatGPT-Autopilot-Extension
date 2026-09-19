@@ -1508,6 +1508,31 @@ export function orchestrationSnapshot(runtime, configRaw) {
   const coordinator = clone(runtime.coordinator);
   coordinator.lastAssistantReportAvailable = Boolean(text(coordinator.lastAssistantReport));
   delete coordinator.lastAssistantReport;
+  const hierarchy = runtime?.hierarchy?.graph && runtime?.hierarchy?.state
+    ? {
+      graphId: String(runtime.hierarchy.graph.graphId || ''),
+      nodeCount: Array.isArray(runtime.hierarchy.graph.nodeOrder) ? runtime.hierarchy.graph.nodeOrder.length : 0,
+      providers: (runtime.hierarchy.graph.nodeOrder || [])
+        .map(nodeId => {
+          const node = runtime.hierarchy.graph.nodesById?.[nodeId];
+          if (!node?.providerBinding) return null;
+          const providerState = runtime.hierarchy.state.nodesById?.[nodeId]?.providerState || {};
+          return {
+            nodeId,
+            providerId: node.providerBinding.providerId,
+            maxSlots: node.providerBinding.maxSlots,
+            pollIntervalMs: node.providerBinding.pollIntervalMs,
+            sourceConfigured: Boolean(node.providerBinding.sourceId),
+            lastAcceptedRevision: String(providerState.lastAcceptedRevision || ''),
+            lastRequestedSlotCount: Number(providerState.lastRequestedSlotCount || 0),
+            lastCheckedAt: Number(providerState.lastCheckedAt || 0),
+            nextCheckAt: Number(providerState.nextCheckAt || 0),
+            lastErrorCode: String(providerState.lastErrorCode || ''),
+          };
+        })
+        .filter(Boolean),
+    }
+    : null;
   return {
     projectId: runtime.projectId,
     mode: runtime.mode,
@@ -1528,5 +1553,6 @@ export function orchestrationSnapshot(runtime, configRaw) {
     lastWatchdogAt: runtime.lastWatchdogAt,
     lastCoordinatorDecisionAt: runtime.lastCoordinatorDecisionAt,
     lastControlNote: runtime.lastControlNote,
+    hierarchy,
   };
 }
