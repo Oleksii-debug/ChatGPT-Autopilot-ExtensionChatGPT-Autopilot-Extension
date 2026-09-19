@@ -114,18 +114,30 @@ test('hierarchy orchestra Start materializes roots and owner Pause/Resume stays 
   state=await core.load();
   assert.equal(state.sessionsById[sessionA.id].enabled,false);
   assert.equal(state.sessionsById[sessionA.id].runState,RunState.PAUSED);
+  assert.equal(state.sessionsById[sessionA.id].orchestrationHierarchy.scopeState,'PAUSED');
   assert.equal(state.sessionsById[sessionB.id].enabled,true);
   assert.notEqual(state.sessionsById[sessionB.id].runState,RunState.PAUSED);
 
-  const runtimeBeforeResume=await manager.controllerFor('orch-1').runtimeRepository.load();
+  const hierarchyPausedA=await manager.controllerFor('orch-1').runtimeRepository.load();
+  const hierarchyPausedB=await manager.controllerFor('orch-2').runtimeRepository.load();
+  assert.equal(hierarchyPausedA.hierarchy.state.nodesById.root.scopeState,'PAUSED');
+  assert.equal(hierarchyPausedB.hierarchy.state.nodesById.root.scopeState,'RUNNING');
+
+  const runtimeBeforeResume=hierarchyPausedA;
   assert.deepEqual(runtimeBeforeResume.pendingCoordinatorEvents,[]);
   await manager.resume('orch-1');
 
   state=await core.load();
   assert.equal(state.sessionsById[sessionA.id].enabled,true);
   assert.equal(state.sessionsById[sessionA.id].runState,RunState.RECOVERING);
+  assert.equal(state.sessionsById[sessionA.id].orchestrationHierarchy.scopeState,'RUNNING');
   assert.notEqual(state.sessionsById[sessionB.id].runState,RunState.PAUSED);
   const runtimeAfterResume=await manager.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtimeAfterResume.hierarchy.state.nodesById.root.scopeState,'RUNNING');
+  assert.equal(
+    (await manager.controllerFor('orch-2').runtimeRepository.load()).hierarchy.state.nodesById.root.scopeState,
+    'RUNNING',
+  );
   assert.deepEqual(
     runtimeAfterResume.pendingCoordinatorEvents,
     [],
