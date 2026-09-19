@@ -37,6 +37,8 @@ function isSafeToRemoveSession(session) {
 function ensureManagerRuntimeFields(runtime) {
   const out = clone(runtime);
   out.ownerEpoch = Math.max(0, Number(out.ownerEpoch || 0));
+  out.nextLaunchAt = Math.max(0, Number(out.nextLaunchAt || 0));
+  if (!Number.isFinite(out.nextLaunchAt)) out.nextLaunchAt = 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
   out.deletePending = out.deletePending === true;
   return out;
