@@ -278,7 +278,7 @@ export class OrchestrationV2Manager {
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
         if (!isManagedSession(session, config.projectId, graphId)) continue;
-        if ([RunState.RUNNING, RunState.RECOVERING].includes(session.runState)) {
+        if (session.enabled && [RunState.RUNNING, RunState.RECOVERING, RunState.PAUSED].includes(session.runState)) {
           session.enabled = false;
           session.runState = RunState.PAUSED;
           pausedSessionIds.push(session.id);
