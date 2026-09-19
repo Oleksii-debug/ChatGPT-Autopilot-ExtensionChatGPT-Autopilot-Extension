@@ -854,7 +854,11 @@ export class BrowserAgentManager {
     if (job?.config && isHttpUrl(pageUrl)) {
       const credentialPolicy = resolveBrowserAgentCredentialPolicy(job.config, pageUrl);
       credentialStatus = { policy: credentialPolicy.decision, available: false, errorCode: '' };
-      if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && this.nativeCompanion) {
+      const passwordTargetVisible = frames.some(frame => (frame.elements || []).some(element =>
+        String(element?.tag || '').toLowerCase() === 'input'
+        && String(element?.type || '').toLowerCase() === 'password'
+        && element?.sensitive === true));
+      if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && this.nativeCompanion && passwordTargetVisible) {
         try {
           const targetOrigin = new URL(pageUrl).origin;
           const listed = await this.nativeCompanion.listCredentials({ targetOrigin });
@@ -876,8 +880,10 @@ export class BrowserAgentManager {
         } catch (error) {
           credentialStatus.errorCode = clean(error?.code || 'CREDENTIAL_BROKER_UNAVAILABLE', 120);
         }
-      } else if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY) {
+      } else if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && !this.nativeCompanion) {
         credentialStatus.errorCode = 'NATIVE_COMPANION_UNAVAILABLE';
+      } else if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && !passwordTargetVisible) {
+        credentialStatus.errorCode = 'NO_PASSWORD_FIELD';
       } else {
         credentialStatus.errorCode = 'OWNER_POLICY_DENY';
       }
