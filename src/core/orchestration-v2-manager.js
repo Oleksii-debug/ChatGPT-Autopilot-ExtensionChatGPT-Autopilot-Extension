@@ -7,6 +7,7 @@ import {
 } from './orchestration-v2-storage.js';
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
+import { OrchestrationHierarchyEventType } from './orchestration-hierarchy.js';
 import { importOrchestrationProfile, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
@@ -22,9 +23,32 @@ function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
 function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
 function alarmName(id) { return `${ORCHESTRATION_V2_ALARM_PREFIX}${id}`; }
 function isUnresolvedOperation(session) { return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase)); }
-function isManagedSession(session, projectId) {
+function hierarchyGraphId(runtime) {
+  return text(runtime?.hierarchy?.graph?.graphId);
+}
+async function setHierarchyRootScopes(controller, runtime, eventType, eventPrefix, orchestraId, nowMs) {
+  const graph = runtime?.hierarchy?.graph;
+  const state = runtime?.hierarchy?.state;
+  if (!graph || !state || !Array.isArray(graph.rootIds) || !graph.rootIds.length) return [];
+  const eventBase = Object.keys(state.processedEventIds || {}).length;
+  const results = [];
+  for (let index = 0; index < graph.rootIds.length; index += 1) {
+    const nodeId = graph.rootIds[index];
+    results.push(await controller.dispatchHierarchyEvent({
+      type: eventType,
+      eventId: `owner-${eventPrefix}:${orchestraId}:${state.controlEpoch}:${eventBase + index + 1}:${nodeId}`,
+      controlEpoch: state.controlEpoch,
+      nodeId,
+    }, { nowMs }));
+  }
+  return results;
+}
+function isManagedSession(session, projectId, graphId = '') {
   return (session?.orchestrationWorker?.managed && session.orchestrationWorker.projectId === projectId)
-    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId);
+    || (session?.orchestrationCoordinator?.managed && session.orchestrationCoordinator.projectId === projectId)
+    || (Boolean(graphId)
+      && session?.orchestrationHierarchy?.managed
+      && session.orchestrationHierarchy.graphId === graphId);
 }
 function identityChanged(a, b) {
   return a.projectId !== b.projectId
@@ -218,9 +242,9 @@ export class OrchestrationV2Manager {
     return this.getStatus(id);
   }
 
-  async managedCoreSafety(projectId) {
+  async managedCoreSafety(projectId, graphId = '') {
     const state = await this.coreRepository.load();
-    const managed = Object.values(state.sessionsById || {}).filter(session => isManagedSession(session, projectId));
+    const managed = Object.values(state.sessionsById || {}).filter(session => isManagedSession(session, projectId, graphId));
     return {
       managed,
       unresolved: managed.filter(isUnresolvedOperation),
@@ -234,11 +258,27 @@ export class OrchestrationV2Manager {
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
     const controller = this.controllerFor(orchestraId);
     const { config } = await controller.getStatus();
+    const runtime = await controller.runtimeRepository.load();
+    const graphId = hierarchyGraphId(runtime);
+    const nowMs = this.now();
+
+    // Owner Pause must be durable orchestration authority, not only a Core
+    // Session run-state toggle. Pausing every hierarchy root deterministically
+    // covers the entire graph/subtrees through the existing reducer.
+    await setHierarchyRootScopes(
+      controller,
+      runtime,
+      OrchestrationHierarchyEventType.PAUSE_SCOPE,
+      'pause',
+      orchestraId,
+      nowMs,
+    );
+
     const pausedSessionIds = [];
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
-        if (!isManagedSession(session, config.projectId)) continue;
-        if ([RunState.RUNNING, RunState.RECOVERING].includes(session.runState)) {
+        if (!isManagedSession(session, config.projectId, graphId)) continue;
+        if (session.enabled && [RunState.RUNNING, RunState.RECOVERING, RunState.PAUSED].includes(session.runState)) {
           session.enabled = false;
           session.runState = RunState.PAUSED;
           pausedSessionIds.push(session.id);
@@ -250,7 +290,7 @@ export class OrchestrationV2Manager {
       const item = draft.byId[orchestraId];
       item.ownerPaused = true;
       item.pausedSessionIds = [...new Set([...(item.pausedSessionIds || []), ...pausedSessionIds])];
-      item.updatedAt = this.now();
+      item.updatedAt = nowMs;
       return draft;
     });
     await this.chrome.alarms?.clear?.(alarmName(orchestraId));
@@ -264,10 +304,26 @@ export class OrchestrationV2Manager {
     if (!item) throw new Error('Orchestra not found');
     const controller = this.controllerFor(orchestraId);
     const { config } = await controller.getStatus();
+    const runtime = await controller.runtimeRepository.load();
+    const graphId = hierarchyGraphId(runtime);
+    const nowMs = this.now();
+
+    // Restore hierarchy authority first while Core Sessions are still disabled.
+    // This prevents scope synchronization from accidentally starting a paused
+    // Session before the owner-local resume set is restored below.
+    await setHierarchyRootScopes(
+      controller,
+      runtime,
+      OrchestrationHierarchyEventType.RESUME_SCOPE,
+      'resume',
+      orchestraId,
+      nowMs,
+    );
+
     const resumeIds = new Set(item.pausedSessionIds || []);
     await this.coreRepository.update(state => {
       for (const session of Object.values(state.sessionsById || {})) {
-        if (!resumeIds.has(session.id) || !isManagedSession(session, config.projectId)) continue;
+        if (!resumeIds.has(session.id) || !isManagedSession(session, config.projectId, graphId)) continue;
         session.enabled = true;
         if (session.runState === RunState.PAUSED) session.runState = RunState.RECOVERING;
       }
@@ -277,12 +333,14 @@ export class OrchestrationV2Manager {
       const current = draft.byId[orchestraId];
       current.ownerPaused = false;
       current.pausedSessionIds = [];
-      current.updatedAt = this.now();
+      current.updatedAt = nowMs;
       return draft;
     });
     if (config.enabled) {
-      await controller.enqueueRecoveryEvent({ detail: 'Owner-local pause ended; reconcile live external truth.' });
-      await controller.cycle({ nowMs: this.now() });
+      if (!graphId) {
+        await controller.enqueueRecoveryEvent({ detail: 'Owner-local pause ended; reconcile live external truth.' });
+      }
+      await controller.cycle({ nowMs });
     }
     await controller.reconcileAlarm();
     return this.getStatus(orchestraId);
@@ -291,7 +349,7 @@ export class OrchestrationV2Manager {
   async assertSafeIdentityChange(id, currentConfig) {
     const controller = this.controllerFor(id);
     const runtime = await controller.runtimeRepository.load();
-    const safety = await this.managedCoreSafety(currentConfig.projectId);
+    const safety = await this.managedCoreSafety(currentConfig.projectId, hierarchyGraphId(runtime));
     const liveWorker = (runtime.workerOrder || []).some(workerId => LIVE_WORKER_STATES.has(runtime.workersById?.[workerId]?.state));
     if (safety.unresolved.length || runtime.coordinator?.lease || liveWorker || safety.live.length) {
       throw new Error('Pause is active, but identity cannot change while unresolved Send, active Coordinator or live worker state remains.');
@@ -326,9 +384,11 @@ export class OrchestrationV2Manager {
     if (changed && item.ownerPaused) {
       await this.assertSafeIdentityChange(orchestraId, current);
       if (current.projectId && current.projectId !== next.projectId) {
+        const currentRuntime = await controller.runtimeRepository.load();
+        const currentGraphId = hierarchyGraphId(currentRuntime);
         await this.coreRepository.update(state => {
           for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
-            if (!isManagedSession(session, current.projectId)) continue;
+            if (!isManagedSession(session, current.projectId, currentGraphId)) continue;
             if (isUnresolvedOperation(session)) throw new Error('Unresolved Send prevents project identity change.');
             delete state.sessionsById[sessionId];
             state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
@@ -354,8 +414,13 @@ export class OrchestrationV2Manager {
     const controller = this.controllerFor(orchestraId);
     const current = await controller.configRepository.load();
     if (!current.enabled) await controller.updateConfig({ ...current, enabled: true });
-    const cycle = await controller.cycle({ nowMs: this.now() });
-    return { ...(await this.getStatus(orchestraId)), startCycle: cycle };
+    const nowMs = this.now();
+    const runtime = await controller.runtimeRepository.load();
+    const hierarchyStart = runtime?.hierarchy?.graph
+      ? await controller.startHierarchy({ nowMs })
+      : null;
+    const cycle = await controller.cycle({ nowMs });
+    return { ...(await this.getStatus(orchestraId)), hierarchyStart, startCycle: cycle };
   }
 
   async delete(id = '') {
@@ -366,14 +431,15 @@ export class OrchestrationV2Manager {
     const controller = this.controllerFor(orchestraId);
     const { config } = await controller.getStatus();
     const runtime = await controller.runtimeRepository.load();
-    const safety = await this.managedCoreSafety(config.projectId);
+    const graphId = hierarchyGraphId(runtime);
+    const safety = await this.managedCoreSafety(config.projectId, graphId);
     const liveWorker = (runtime.workerOrder || []).some(workerId => LIVE_WORKER_STATES.has(runtime.workersById?.[workerId]?.state));
     if (safety.unresolved.length || runtime.coordinator?.lease || liveWorker || safety.live.length) {
       throw new Error('Cannot delete orchestra while unresolved Send, active Coordinator or live worker state remains. Pause/stop and reconcile first.');
     }
     await this.coreRepository.update(state => {
       for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
-        if (!isManagedSession(session, config.projectId)) continue;
+        if (!isManagedSession(session, config.projectId, graphId)) continue;
         delete state.sessionsById[sessionId];
         state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
       }
@@ -520,15 +586,24 @@ export class OrchestrationV2Manager {
       if (stoppedRuntime.coordinator && typeof stoppedRuntime.coordinator === 'object') {
         stoppedRuntime.coordinator.rotationRequested = false;
       }
+      const hierarchyNodes = stoppedRuntime.hierarchy?.state?.nodesById;
+      if (hierarchyNodes && typeof hierarchyNodes === 'object' && !Array.isArray(hierarchyNodes)) {
+        for (const nodeRuntime of Object.values(hierarchyNodes)) {
+          if (!nodeRuntime || typeof nodeRuntime !== 'object' || Array.isArray(nodeRuntime)) continue;
+          nodeRuntime.scopeState = 'STOPPED';
+          nodeRuntime.lifecycle = 'STOPPED';
+        }
+      }
       payload[runtimeKey(orchestraId)] = stoppedRuntime;
     }
     await this.chrome.storage.local.set(payload);
 
     const projectId = text(rawConfig.projectId);
-    if (projectId) {
+    const graphId = text(rawRuntime?.hierarchy?.graph?.graphId);
+    if (projectId || graphId) {
       await this.coreRepository.update(state => {
         for (const session of Object.values(state.sessionsById || {})) {
-          if (!isManagedSession(session, projectId)) continue;
+          if (!isManagedSession(session, projectId, graphId)) continue;
           session.enabled = false;
           if (!isUnresolvedOperation(session)) session.runState = RunState.STOPPED;
         }

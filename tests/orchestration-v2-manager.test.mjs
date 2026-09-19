@@ -28,6 +28,26 @@ const cfg = (projectId, enabled = false) => ({
   enabled, projectId, targetRepository:`owner/${projectId}`, controlRepository:`owner/${projectId}`,
   controlIssueNumber:1, masterCoordinatorPrompt:'master', defaultDesiredWorkers:1, absoluteMaxWorkers:2,
 });
+function hierarchyGraph(graphId) {
+  return {
+    schemaVersion: 1,
+    graphId,
+    controlEpoch: 1,
+    promptProfiles: [
+      { id: 'root-v1', role: 'GLOBAL_DIRECTOR', version: 1, prompt: `ROOT ${graphId}` },
+    ],
+    nodes: [
+      {
+        id: 'root',
+        parentId: null,
+        childIds: [],
+        promptProfileId: 'root-v1',
+        chatMode: 'PERSISTENT_CHAT',
+      },
+    ],
+  };
+}
+
 function managerFixture(){
   const chrome = chromeFake();
   const core = new StorageRepository(chrome);
@@ -68,6 +88,90 @@ test('local pause preserves runtime and resume only restores sessions paused by 
   await manager.resume('orch-1');
   assert.equal((await core.load()).sessionsById[managed.id].runState,RunState.RECOVERING);
   assert.equal((await controller.runtimeRepository.load()).lastAppliedControlRevision,7);
+});
+
+test('hierarchy orchestra Start materializes roots and owner Pause/Resume stays isolated', async()=>{
+  const {manager,core}=managerFixture();
+  await manager.create({name:'Hierarchy A',config:cfg('hierarchy-a')});
+  await manager.create({name:'Hierarchy B',config:cfg('hierarchy-b')});
+  await manager.controllerFor('orch-1').configureHierarchy(hierarchyGraph('graph-a'),{nowMs:1000});
+  await manager.controllerFor('orch-2').configureHierarchy(hierarchyGraph('graph-b'),{nowMs:1000});
+
+  const startedA=await manager.start('orch-1');
+  const startedB=await manager.start('orch-2');
+  assert.equal(startedA.hierarchyStart?.kind,'HIERARCHY_STARTED');
+  assert.equal(startedA.startCycle?.kind,'HIERARCHY_CYCLE');
+  assert.equal(startedB.hierarchyStart?.kind,'HIERARCHY_STARTED');
+
+  let state=await core.load();
+  const sessionA=Object.values(state.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='graph-a');
+  const sessionB=Object.values(state.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='graph-b');
+  assert.ok(sessionA); assert.ok(sessionB);
+  assert.equal(sessionA.runState,RunState.RUNNING);
+  assert.equal(sessionB.runState,RunState.RUNNING);
+
+  await manager.pause('orch-1');
+  state=await core.load();
+  assert.equal(state.sessionsById[sessionA.id].enabled,false);
+  assert.equal(state.sessionsById[sessionA.id].runState,RunState.PAUSED);
+  assert.equal(state.sessionsById[sessionA.id].orchestrationHierarchy.scopeState,'PAUSED');
+  assert.equal(state.sessionsById[sessionB.id].enabled,true);
+  assert.notEqual(state.sessionsById[sessionB.id].runState,RunState.PAUSED);
+
+  const hierarchyPausedA=await manager.controllerFor('orch-1').runtimeRepository.load();
+  const hierarchyPausedB=await manager.controllerFor('orch-2').runtimeRepository.load();
+  assert.equal(hierarchyPausedA.hierarchy.state.nodesById.root.scopeState,'PAUSED');
+  assert.equal(hierarchyPausedB.hierarchy.state.nodesById.root.scopeState,'RUNNING');
+
+  const runtimeBeforeResume=hierarchyPausedA;
+  assert.deepEqual(runtimeBeforeResume.pendingCoordinatorEvents,[]);
+  await manager.resume('orch-1');
+
+  state=await core.load();
+  assert.equal(state.sessionsById[sessionA.id].enabled,true);
+  assert.equal(state.sessionsById[sessionA.id].runState,RunState.RECOVERING);
+  assert.equal(state.sessionsById[sessionA.id].orchestrationHierarchy.scopeState,'RUNNING');
+  assert.notEqual(state.sessionsById[sessionB.id].runState,RunState.PAUSED);
+  const runtimeAfterResume=await manager.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtimeAfterResume.hierarchy.state.nodesById.root.scopeState,'RUNNING');
+  assert.equal(
+    (await manager.controllerFor('orch-2').runtimeRepository.load()).hierarchy.state.nodesById.root.scopeState,
+    'RUNNING',
+  );
+  assert.deepEqual(
+    runtimeAfterResume.pendingCoordinatorEvents,
+    [],
+    'hierarchy Resume must not inject legacy Coordinator recovery events',
+  );
+});
+
+test('hierarchy emergency Stop is sticky in raw runtime and revokes only its Core Sessions', async()=>{
+  const {manager,core,chrome}=managerFixture();
+  await manager.create({name:'Hierarchy A',config:cfg('stop-a')});
+  await manager.create({name:'Hierarchy B',config:cfg('stop-b')});
+  await manager.controllerFor('orch-1').configureHierarchy(hierarchyGraph('stop-graph-a'),{nowMs:1000});
+  await manager.controllerFor('orch-2').configureHierarchy(hierarchyGraph('stop-graph-b'),{nowMs:1000});
+  await manager.start('orch-1');
+  await manager.start('orch-2');
+
+  let state=await core.load();
+  const sessionA=Object.values(state.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='stop-graph-a');
+  const sessionB=Object.values(state.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='stop-graph-b');
+  assert.ok(sessionA); assert.ok(sessionB);
+
+  const stopped=await manager.emergencyStop('orch-1');
+  assert.equal(stopped.emergencyStopped,true);
+  assert.equal(chrome.data['autopilotOrchestrationV2Config:orch-1'].enabled,false);
+
+  const rawA=chrome.data['autopilotOrchestrationV2Runtime:orch-1'];
+  assert.equal(rawA.hierarchy.state.nodesById.root.scopeState,'STOPPED');
+  assert.equal(rawA.hierarchy.state.nodesById.root.lifecycle,'STOPPED');
+
+  state=await core.load();
+  assert.equal(state.sessionsById[sessionA.id].enabled,false);
+  assert.equal(state.sessionsById[sessionA.id].runState,RunState.STOPPED);
+  assert.equal(state.sessionsById[sessionB.id].enabled,true);
+  assert.notEqual(state.sessionsById[sessionB.id].runState,RunState.STOPPED);
 });
 
 test('delete isolation removes only selected orchestra and preserves the other namespace', async()=>{
