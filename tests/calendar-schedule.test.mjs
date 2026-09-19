@@ -1,0 +1,66 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  CalendarCatchUp,
+  CalendarScheduleKind,
+  commitCalendarOccurrence,
+  nextCalendarOccurrence,
+  normalizeCalendarSchedule,
+  occurrenceId,
+  zonedDateTimeToEpochMs,
+} from '../src/core/calendar-schedule.js';
+
+test('ONE_TIME resolves exact local datetime with stable occurrence identity', () => {
+  const schedule = normalizeCalendarSchedule({ kind: 'ONE_TIME', date: '2026-09-19', time: '22:32', timeZone: 'Europe/Bratislava' });
+  const at = zonedDateTimeToEpochMs({ date: '2026-09-19', time: '22:32', timeZone: schedule.timeZone });
+  assert.equal(new Date(at).toISOString(), '2026-09-19T20:32:00.000Z');
+  assert.equal(occurrenceId('session-a', at), 'session-a@2026-09-19T20:32:00.000Z');
+});
+
+test('DAILY supports multiple times and catch-up OFF skips missed effects', () => {
+  const schedule = { kind: CalendarScheduleKind.DAILY, startDate: '2026-09-01', times: ['08:00', '20:00'], timeZone: 'Europe/Bratislava', catchUp: CalendarCatchUp.OFF };
+  const now = Date.parse('2026-09-19T10:00:00.000Z'); // 12:00 local
+  const next = nextCalendarOccurrence({ sessionId: 's', schedule, now });
+  assert.equal(next.localDate, '2026-09-19');
+  assert.equal(next.localTime, '20:00:00');
+  assert.equal(next.catchUp, false);
+});
+
+test('catch-up ON returns oldest uncommitted due occurrence and commit prevents duplicate effect', () => {
+  const schedule = { kind: 'EXPLICIT', timeZone: 'UTC', catchUp: 'ON', occurrences: [
+    { date: '2026-09-19', time: '08:00' },
+    { date: '2026-09-19', time: '09:00' },
+  ] };
+  const now = Date.parse('2026-09-19T10:00:00Z');
+  const first = nextCalendarOccurrence({ sessionId: 's', schedule, now });
+  assert.equal(first.localTime, '08:00:00');
+  assert.equal(first.catchUp, true);
+  const runtime = commitCalendarOccurrence({}, first);
+  const second = nextCalendarOccurrence({ sessionId: 's', schedule, runtime, now });
+  assert.equal(second.localTime, '09:00:00');
+  assert.notEqual(second.id, first.id);
+});
+
+test('explicit occurrence list is sorted and rejects duplicate local occurrence', () => {
+  const schedule = normalizeCalendarSchedule({ kind: 'EXPLICIT', timeZone: 'UTC', occurrences: [
+    { date: '2026-09-20', time: '09:00' }, { date: '2026-09-19', time: '09:00' },
+  ] });
+  assert.equal(schedule.occurrences[0].date, '2026-09-19');
+  assert.throws(() => normalizeCalendarSchedule({ kind: 'EXPLICIT', timeZone: 'UTC', occurrences: [
+    { date: '2026-09-19', time: '09:00' }, { date: '2026-09-19', time: '09:00:00' },
+  ] }), /duplicate occurrence/);
+});
+
+test('timezone conversion follows DST and rejects spring-forward gaps', () => {
+  const winter = zonedDateTimeToEpochMs({ date: '2026-01-15', time: '09:00', timeZone: 'Europe/Bratislava' });
+  const summer = zonedDateTimeToEpochMs({ date: '2026-07-15', time: '09:00', timeZone: 'Europe/Bratislava' });
+  assert.equal(new Date(winter).toISOString(), '2026-01-15T08:00:00.000Z');
+  assert.equal(new Date(summer).toISOString(), '2026-07-15T07:00:00.000Z');
+  assert.throws(() => zonedDateTimeToEpochMs({ date: '2026-03-29', time: '02:30', timeZone: 'Europe/Bratislava' }), /does not exist/);
+});
+
+test('committed occurrence history is bounded', () => {
+  let runtime = {};
+  for (let i = 0; i < 10; i += 1) runtime = commitCalendarOccurrence(runtime, { id: `x${i}`, scheduledAt: i }, { maxHistory: 3 });
+  assert.deepEqual(runtime.committedOccurrenceIds, ['x7', 'x8', 'x9']);
+});
