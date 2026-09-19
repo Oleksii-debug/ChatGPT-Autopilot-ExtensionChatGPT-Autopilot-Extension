@@ -83,6 +83,13 @@
         <div id="agent-history" tabindex="0" aria-label="Історія роботи агента">Історії ще немає.</div>
       </details>
 
+      <fieldset class="settings-group" id="agent-native-companion-group">
+        <legend>Windows Native Companion</legend>
+        <p class="field-help">Native Companion дає Agent керовані локальні capabilities. У першій версії це health/capabilities і читання текстових файлів тільки з папок, які ви явно дозволили. Наступний шар використовуватиме цей самий Companion для CredentialBroker.</p>
+        <button id="agent-native-companion-check-button" type="button" aria-describedby="agent-native-companion-status">Перевірити Native Companion</button>
+        <p id="agent-native-companion-status" role="status">Native Companion ще не перевіряли.</p>
+      </fieldset>
+
       <fieldset class="settings-group" id="agent-permission-group">
         <legend>Доступ до сайтів</legend>
         <p class="field-help">Chrome вимагає явного дозволу перед керуванням новим сайтом. Якщо Agent зупинився зі станом WAITING_PERMISSION, надайте потрібний дозвіл і натисніть «Продовжити».</p>

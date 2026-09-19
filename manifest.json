@@ -10,7 +10,8 @@
     "tabs",
     "scripting",
     "debugger",
-    "identity"
+    "identity",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
