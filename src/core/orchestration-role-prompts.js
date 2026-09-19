@@ -24,19 +24,19 @@ function clean(value) {
 
 function required(value, label, max = 4000) {
   const normalized = clean(value);
-  if (!normalized || normalized.length > max) throw new Error(\`Invalid \${label}\`);
+  if (!normalized || normalized.length > max) throw new Error(`Invalid ${label}`);
   return normalized;
 }
 
 function integer(value, label, min, max) {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new Error(\`Invalid \${label}\`);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new Error(`Invalid ${label}`);
   return parsed;
 }
 
 function stableId(value, label) {
   const normalized = required(value, label, 180).toLowerCase();
-  if (!/^[a-z0-9._:+/-]+$/u.test(normalized)) throw new Error(\`Invalid \${label}\`);
+  if (!/^[a-z0-9._:+/-]+$/u.test(normalized)) throw new Error(`Invalid ${label}`);
   return normalized;
 }
 
@@ -112,18 +112,18 @@ export function buildOrchestrationRolePrompt({
   const issue = integer(controlIssueNumber || 0, 'controlIssueNumber', 0, Number.MAX_SAFE_INTEGER);
   const responsibility = required(scope, 'scope', MAX_SCOPE_LENGTH);
   const children = Array.isArray(childNodeIds)
-    ? childNodeIds.map((id, index) => stableId(id, \`childNodeIds[\${index}]\`))
+    ? childNodeIds.map((id, index) => stableId(id, `childNodeIds[${index}]`))
     : (() => { throw new Error('Invalid childNodeIds'); })();
 
   return [
     'AUTOPILOT LEVEL-1 ROLE CONTRACT',
-    \`ROLE=\${normalizedRole}\`,
-    \`LOGICAL_NODE_ID=\${node}\`,
-    \`PARENT_NODE_ID=\${parent}\`,
-    \`PROJECT_ID=\${project}\`,
-    \`TARGET_REPOSITORY=\${target}\`,
-    \`CONTROL_ISSUE=\${issue || 'NOT_CONFIGURED'}\`,
-    \`DIRECT_CHILDREN=\${children.length ? children.join(',') : 'NONE'}\`,
+    `ROLE=${normalizedRole}`,
+    `LOGICAL_NODE_ID=${node}`,
+    `PARENT_NODE_ID=${parent}`,
+    `PROJECT_ID=${project}`,
+    `TARGET_REPOSITORY=${target}`,
+    `CONTROL_ISSUE=${issue || 'NOT_CONFIGURED'}`,
+    `DIRECT_CHILDREN=${children.length ? children.join(',') : 'NONE'}`,
     '',
     'RESPONSIBILITY SCOPE',
     responsibility,
@@ -178,21 +178,21 @@ export function buildOrchestrationRecoveryPrompt({
     targetRepository,
     controlIssueNumber,
     scope: [
-      \`Recover logical role \${originalRole} for the same bounded responsibility.\`,
+      `Recover logical role ${originalRole} for the same bounded responsibility.`,
       required(scope, 'scope', MAX_SCOPE_LENGTH),
       'Re-establish only current-generation authority from external truth; do not rely on the lost transcript.',
     ].join(' '),
   });
-  return \`\${base}\nRECOVERED_LOGICAL_ROLE=\${originalRole}\`;
+  return `${base}\nRECOVERED_LOGICAL_ROLE=${originalRole}`;
 }
 
 function normalizeDomains(raw) {
   if (!Array.isArray(raw) || !raw.length || raw.length > MAX_DOMAINS) throw new Error('Invalid domains');
   const domains = raw.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(\`Invalid domains[\${index}]\`);
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`Invalid domains[${index}]`);
     return {
-      id: stableId(item.id, \`domains[\${index}].id\`),
-      scope: required(item.scope, \`domains[\${index}].scope\`, MAX_SCOPE_LENGTH),
+      id: stableId(item.id, `domains[${index}].id`),
+      scope: required(item.scope, `domains[${index}].scope`, MAX_SCOPE_LENGTH),
     };
   }).sort((a, b) => a.id.localeCompare(b.id));
   if (new Set(domains.map(item => item.id)).size !== domains.length) throw new Error('Duplicate domain id');
@@ -201,8 +201,8 @@ function normalizeDomains(raw) {
 
 function nodeProfileIds(nodeId) {
   return {
-    primary: \`\${nodeId}:prompt-v1\`,
-    recovery: \`\${nodeId}:recovery-v1\`,
+    primary: `${nodeId}:prompt-v1`,
+    recovery: `${nodeId}:recovery-v1`,
   };
 }
 
@@ -229,7 +229,7 @@ export function buildThreeLevelHierarchyTemplate({
   if (totalNodeCount > 1000) throw new Error('Hierarchy template exceeds 1000 logical nodes');
 
   const nodeSpecs = [];
-  const managerIds = domainList.map(domain => \`manager:\${domain.id}\`);
+  const managerIds = domainList.map(domain => `manager:${domain.id}`);
   if (includeIntegrationManager) managerIds.push('integration');
   if (includeQaRedTeam) managerIds.push('qa-red-team');
   managerIds.sort((a, b) => a.localeCompare(b));
@@ -244,8 +244,8 @@ export function buildThreeLevelHierarchyTemplate({
   });
 
   for (const domain of domainList) {
-    const managerId = \`manager:\${domain.id}\`;
-    const workerIds = Array.from({ length: workerCount }, (_, index) => \`worker:\${domain.id}:\${String(index + 1).padStart(2, '0')}\`);
+    const managerId = `manager:${domain.id}`;
+    const workerIds = Array.from({ length: workerCount }, (_, index) => `worker:${domain.id}:${String(index + 1).padStart(2, '0')}`);
     nodeSpecs.push({
       id: managerId,
       parentId: 'director',
@@ -261,7 +261,7 @@ export function buildThreeLevelHierarchyTemplate({
         childIds: [],
         role: OrchestrationRoleTemplate.WORKER,
         chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
-        scope: \`\${domain.scope} Fixed worker slot \${index + 1}/\${workerCount}; take only currently unowned work within this Manager domain.\`,
+        scope: `${domain.scope} Fixed worker slot ${index + 1}/${workerCount}; take only currently unowned work within this Manager domain.`,
       });
     }
   }
