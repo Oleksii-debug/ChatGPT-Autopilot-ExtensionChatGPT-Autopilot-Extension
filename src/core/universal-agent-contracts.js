@@ -344,3 +344,53 @@ export function toolDescriptorV1FromAgentProvider(provider, {
     readOnly,
   });
 }
+
+
+function assertSubset(requested, allowed, label) {
+  const allowedSet = new Set(allowed);
+  const missing = requested.filter(item => !allowedSet.has(item));
+  if (missing.length) throw new Error(`${label} exceeds granted capabilities: ${missing.join(', ')}`);
+}
+
+export function assertToolInvocationAuthorizedV1({
+  invocation,
+  policyDecision,
+  toolDescriptor,
+  grantedCapabilityIds = [],
+} = {}) {
+  const normalizedInvocation = normalizeToolInvocationV1(invocation);
+  const normalizedDecision = normalizePolicyDecisionV1(policyDecision);
+  const normalizedTool = normalizeToolDescriptorV1(toolDescriptor);
+  const granted = idList(grantedCapabilityIds, 'grantedCapabilityIds', { optional: false });
+
+  if (normalizedDecision.decision !== PolicyDecisionKind.ALLOW) {
+    throw new Error(`Tool invocation is not authorized by policy decision: ${normalizedDecision.decision}`);
+  }
+  if (normalizedDecision.decisionId !== normalizedInvocation.policyDecisionId) {
+    throw new Error('Tool invocation policyDecisionId does not match policy decision');
+  }
+  if (normalizedDecision.invocationId !== normalizedInvocation.invocationId) {
+    throw new Error('Policy decision invocationId does not match tool invocation');
+  }
+  if (normalizedTool.toolId !== normalizedInvocation.toolId) {
+    throw new Error('Tool descriptor toolId does not match invocation');
+  }
+  if (normalizedTool.providerId !== normalizedInvocation.providerId) {
+    throw new Error('Tool descriptor providerId does not match invocation');
+  }
+  assertSubset(normalizedInvocation.requestedCapabilityIds, normalizedTool.capabilityIds, 'Tool invocation');
+  assertSubset(normalizedInvocation.requestedCapabilityIds, granted, 'Tool invocation');
+  return frozen({
+    invocation: normalizedInvocation,
+    policyDecision: normalizedDecision,
+    toolDescriptor: normalizedTool,
+    grantedCapabilityIds: granted,
+  });
+}
+
+export function assertSpecialistHandoffScopedV1(handoff, grantedCapabilityIds = []) {
+  const normalized = normalizeSpecialistHandoffV1(handoff);
+  const granted = idList(grantedCapabilityIds, 'grantedCapabilityIds', { optional: false });
+  assertSubset(normalized.requestedCapabilityIds, granted, 'Specialist handoff');
+  return normalized;
+}
