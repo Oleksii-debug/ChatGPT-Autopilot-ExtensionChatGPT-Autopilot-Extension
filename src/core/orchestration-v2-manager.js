@@ -501,6 +501,8 @@ export class OrchestrationV2Manager {
       workersPerManager: options.workersPerManager,
       includeIntegrationManager: options.includeIntegrationManager === true,
       includeQaRedTeam: options.includeQaRedTeam === true,
+      driveScalarSources: options.driveScalarSources || null,
+      driveScalarPollIntervalMs: options.driveScalarPollIntervalMs,
     });
     const configured = await controller.configureHierarchy(graph, { nowMs: this.now() });
     return {
@@ -512,6 +514,9 @@ export class OrchestrationV2Manager {
         promptProfileCount: configured.graph.promptProfiles.length,
         managerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('manager:')).length,
         workerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('worker:')).length,
+        driveScalarProviderCount: configured.graph.nodeOrder.filter(
+          nodeId => configured.graph.nodesById[nodeId]?.providerBinding?.providerId === 'drive-scalar-v1',
+        ).length,
       },
       status: await this.getStatus(id),
     };
