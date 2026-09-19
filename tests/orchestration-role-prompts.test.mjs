@@ -92,8 +92,8 @@ test('three-level template deterministically builds Director -> Managers -> fixe
 
 test('five managers x five workers stays bounded at 31 logical nodes', () => {
   const domains = Array.from({ length: 5 }, (_, index) => ({
-    id: \`domain-\${index + 1}\`,
-    scope: \`Bounded domain \${index + 1}.\`,
+    id: `domain-${index + 1}`,
+    scope: `Bounded domain ${index + 1}.`,
   }));
   const graph = buildThreeLevelHierarchyTemplate({
     ...BASE,
