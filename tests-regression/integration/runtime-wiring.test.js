@@ -9,7 +9,7 @@ const manifest = JSON.parse(fs.readFileSync(new URL('../../manifest.json', impor
 test('manifest wires the options UI and ChatGPT content scripts with bounded permissions', () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.options_ui.page, 'src/ui/options.html');
-  assert.deepEqual(manifest.permissions.sort(), ['alarms', 'debugger', 'identity', 'scripting', 'storage', 'tabs', 'unlimitedStorage']);
+  assert.deepEqual(manifest.permissions.sort(), ['alarms', 'debugger', 'identity', 'nativeMessaging', 'scripting', 'storage', 'tabs', 'unlimitedStorage']);
   assert.deepEqual(manifest.host_permissions, ['https://chatgpt.com/*', 'http://localhost/*', 'http://127.0.0.1/*', 'https://localhost/*', 'https://127.0.0.1/*', 'https://api.github.com/*', 'https://www.googleapis.com/*']);
   assert.equal(manifest.host_permissions.includes('https://drive.google.com/*'), false, 'Drive content is read through the scoped Google Drive API host, not broad Drive page access');
   for (const forbidden of ['https://google.com/*', 'https://*.google.com/*', 'https://drive.google.com/*']) {
