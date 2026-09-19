@@ -179,7 +179,7 @@ test('filesystem.readText rejects traversal, absolute paths, unknown roots and o
   await fs.writeFile(path.join(root, 'small.txt'), 'small', 'utf8');
   await fs.writeFile(path.join(root, 'large.txt'), 'x'.repeat(1024), 'utf8');
 
-  for (const relativePath of ['../outside.txt', path.resolve(temp, 'outside.txt')]) {
+  for (const relativePath of ['../outside.txt', path.resolve(temp, 'outside.txt'), 'small.txt:alternate']) {
     const response = await handleNativeCompanionRequest(request('filesystem.readText', {
       rootId: 'workspace',
       relativePath,
@@ -241,7 +241,7 @@ test('native message framing survives fragmented input and enforces response bou
 
 test('request schema and read bounds fail closed', () => {
   assert.throws(() => createNativeCompanionRequest('unknown', {}), /Unsupported/);
-  assert.equal(MAX_READ_BYTES, 1024 * 1024);
+  assert.equal(MAX_READ_BYTES, 768 * 1024);
   assert.throws(() => normalizeNativeCompanionResponse({
     protocolVersion: 1,
     requestId: 'r1',
