@@ -168,3 +168,30 @@ test('L3 provider rejects over-capacity generation and prompt envelope ambiguity
     },
   })), error => error.code === 'INVALID_DISPATCH_FILE');
 });
+
+
+test('L3 provider rejects snapshot when root generation inventory changes during file read', async () => {
+  let generationReads = 0;
+  const p = new DriveFolderDispatchProviderV1({
+    listGenerations: async () => {
+      generationReads += 1;
+      return generationReads === 1
+        ? [{ id: 'g41', name: 'generation-000041' }]
+        : [
+          { id: 'g41', name: 'generation-000041' },
+          { id: 'g42', name: 'generation-000042' },
+        ];
+    },
+    listGenerationEntries: async () => [
+      entry('ready', 'READY', '3', 'text/plain'),
+      entry('d1', 'child-01.json', '7'),
+    ],
+    readEntryContent: async () => envelope(),
+  });
+
+  await assert.rejects(
+    () => read(p),
+    error => error instanceof DriveFolderDispatchError && error.code === 'UNSTABLE_GENERATION',
+  );
+  assert.equal(generationReads, 2);
+});
