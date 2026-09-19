@@ -58,6 +58,7 @@ export const OrchestrationHierarchyEventType = Object.freeze({
   GENERATION_SUPERSEDED: 'GENERATION_SUPERSEDED',
   GENERATION_RECOVERY_REQUESTED: 'GENERATION_RECOVERY_REQUESTED',
   RUNTIME_RECONCILE: 'RUNTIME_RECONCILE',
+  PROVIDER_SLOT_COUNT_REQUESTED: 'PROVIDER_SLOT_COUNT_REQUESTED',
 });
 
 export const OrchestrationHierarchyActionType = Object.freeze({
@@ -158,7 +159,16 @@ function normalizeProviderBinding(raw, nodeId, childIds) {
   const groupNodeId = requireId(raw.groupNodeId ?? nodeId, `providerBinding.groupNodeId for ${nodeId}`);
   if (groupNodeId !== nodeId) throw new Error(`Provider binding cannot widen authority for ${nodeId}`);
   const maxSlots = requireInteger(raw.maxSlots ?? childIds.length, `providerBinding.maxSlots for ${nodeId}`, 0, childIds.length);
-  return { providerId, groupNodeId, maxSlots };
+  const sourceId = raw.sourceId == null || raw.sourceId === ''
+    ? ''
+    : requireId(raw.sourceId, `providerBinding.sourceId for ${nodeId}`);
+  const pollIntervalMs = requireInteger(
+    raw.pollIntervalMs ?? 180000,
+    `providerBinding.pollIntervalMs for ${nodeId}`,
+    60000,
+    86400000,
+  );
+  return { providerId, groupNodeId, maxSlots, sourceId, pollIntervalMs };
 }
 
 function normalizeNode(raw, index) {
@@ -286,6 +296,16 @@ function newNodeRuntime(nodeId) {
     lastTerminalStatus: '',
     activationLedger: {},
     completedBarrierKeys: {},
+    providerState: {
+      lastAcceptedRevision: '',
+      lastRequestedSlotCount: 0,
+      activeRevision: '',
+      activeChildIds: [],
+      lastAcceptedAt: 0,
+      lastCheckedAt: 0,
+      nextCheckAt: 0,
+      lastErrorCode: '',
+    },
   };
 }
 
@@ -363,6 +383,58 @@ function reconciliationId(parentNodeId, generation, round) {
   return `reconcile:${parentNodeId}:g${generation}:r${round}`;
 }
 
+function normalizeProviderRevision(value) {
+  const raw = String(value ?? '').trim();
+  if (!/^\d+$/u.test(raw) || raw.length > 128) throw new Error('Invalid providerRevision');
+  return raw.replace(/^0+(?=\d)/u, '') || '0';
+}
+
+function compareProviderRevision(left, right) {
+  const a = normalizeProviderRevision(left);
+  const b = normalizeProviderRevision(right);
+  if (a.length !== b.length) return a.length < b.length ? -1 : 1;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+function providerStateFor(nodeRuntime) {
+  if (!isObject(nodeRuntime.providerState)) {
+    nodeRuntime.providerState = {
+      lastAcceptedRevision: '',
+      lastRequestedSlotCount: 0,
+      activeRevision: '',
+      activeChildIds: [],
+      lastAcceptedAt: 0,
+      lastCheckedAt: 0,
+      nextCheckAt: 0,
+      lastErrorCode: '',
+    };
+  }
+  if (!Array.isArray(nodeRuntime.providerState.activeChildIds)) {
+    nodeRuntime.providerState.activeChildIds = [];
+  }
+  return nodeRuntime.providerState;
+}
+
+function currentActivation(nodeRuntime) {
+  return nodeRuntime.currentActivationId
+    ? nodeRuntime.activationLedger[nodeRuntime.currentActivationId]
+    : null;
+}
+
+function canPrepareProviderChild(graph, runtime, childId) {
+  const childRuntime = runtime.nodesById[childId];
+  if (!childRuntime) return { ok: false, reason: 'UNKNOWN_CHILD' };
+  if (ancestorScopeState(graph, runtime, childId) !== 'RUNNING') {
+    return { ok: false, reason: 'CHILD_SCOPE_BLOCKED' };
+  }
+  const current = currentActivation(childRuntime);
+  if (current && ![OrchestrationActivationPhase.TERMINAL, OrchestrationActivationPhase.SUPERSEDED].includes(current.phase)) {
+    return { ok: false, reason: 'CHILD_ACTIVATION_IN_FLIGHT' };
+  }
+  return { ok: true };
+}
+
 function prepareActivation(graph, runtime, {
   nodeId,
   activationId,
@@ -429,23 +501,39 @@ function terminalForCurrentRound(runtimeNode, childId) {
 
 function barrierSatisfied(graph, runtime, parentId) {
   const parent = graph.nodesById[parentId];
+  const parentRuntime = runtime.nodesById[parentId];
+  if (parent.providerBinding) {
+    const providerState = providerStateFor(parentRuntime);
+    if (!providerState.activeRevision) return false;
+    return providerState.activeChildIds.every(childId => {
+      const childRuntime = runtime.nodesById[childId];
+      const current = currentActivation(childRuntime);
+      return Boolean(current && current.phase === OrchestrationActivationPhase.TERMINAL);
+    });
+  }
   const barrier = parent.barrier;
   if (barrier.mode === OrchestrationBarrierMode.NONE) return false;
   const required = barrier.childIds;
   return required.every(childId => {
     const childRuntime = runtime.nodesById[childId];
-    const current = childRuntime.activationLedger[childRuntime.currentActivationId];
+    const current = currentActivation(childRuntime);
     return Boolean(current && current.phase === OrchestrationActivationPhase.TERMINAL);
   });
 }
 
 function maybePrepareParentReconciliation(graph, runtime, parentId, nowMs) {
   if (!parentId || !barrierSatisfied(graph, runtime, parentId)) return null;
+  const parent = graph.nodesById[parentId];
   const parentRuntime = runtime.nodesById[parentId];
-  const key = `g${parentRuntime.generation}:r${parentRuntime.round}`;
+  const providerState = parent.providerBinding ? providerStateFor(parentRuntime) : null;
+  const key = providerState?.activeRevision
+    ? `provider:${parent.providerBinding.providerId}:revision:${providerState.activeRevision}`
+    : `g${parentRuntime.generation}:r${parentRuntime.round}`;
   if (parentRuntime.completedBarrierKeys[key]) return null;
   parentRuntime.completedBarrierKeys[key] = true;
-  const activationId = reconciliationId(parentId, parentRuntime.generation, parentRuntime.round);
+  const activationId = providerState?.activeRevision
+    ? `reconcile:${parentId}:provider:${parent.providerBinding.providerId}:revision:${providerState.activeRevision}:g${parentRuntime.generation}:r${parentRuntime.round}`
+    : reconciliationId(parentId, parentRuntime.generation, parentRuntime.round);
   const prepared = prepareActivation(graph, runtime, {
     nodeId: parentId,
     activationId,
@@ -523,6 +611,119 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       }
     }
     return { runtime, actions, deduplicated: false, reason: nextScope };
+  }
+
+  if (event.type === OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED) {
+    const nodeId = requireId(event.nodeId ?? event.node_id, 'event.nodeId');
+    const node = graph.nodesById[nodeId];
+    const nodeRuntime = runtime.nodesById[nodeId];
+    if (!node || !nodeRuntime) throw new Error(`Unknown node ${nodeId}`);
+    const binding = node.providerBinding;
+    if (!binding) {
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_NOT_CONFIGURED' };
+    }
+    const providerId = requireId(event.providerId ?? event.provider_id, 'event.providerId');
+    if (providerId !== binding.providerId || binding.groupNodeId !== nodeId) {
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_AUTHORITY_MISMATCH' };
+    }
+    const sourceId = event.sourceId == null || event.sourceId === ''
+      ? ''
+      : requireId(event.sourceId, 'event.sourceId');
+    if (binding.sourceId && sourceId !== binding.sourceId) {
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_SOURCE_MISMATCH' };
+    }
+    const providerRevision = normalizeProviderRevision(event.providerRevision ?? event.provider_revision);
+    const requestedSlotCount = requireInteger(
+      event.requestedSlotCount ?? event.requested_slot_count,
+      'event.requestedSlotCount',
+      0,
+      binding.maxSlots,
+    );
+    const providerState = providerStateFor(nodeRuntime);
+    if (providerState.lastAcceptedRevision) {
+      const revisionOrder = compareProviderRevision(providerRevision, providerState.lastAcceptedRevision);
+      if (revisionOrder < 0) {
+        return { runtime, actions, deduplicated: false, reason: 'STALE_PROVIDER_REVISION' };
+      }
+      if (revisionOrder === 0) {
+        if (requestedSlotCount !== providerState.lastRequestedSlotCount) {
+          actions.push({
+            type: OrchestrationHierarchyActionType.MANUAL_REVIEW,
+            nodeId,
+            reason: 'PROVIDER_REVISION_CONFLICT',
+          });
+          return { runtime, actions, deduplicated: false, reason: 'PROVIDER_REVISION_CONFLICT' };
+        }
+        return { runtime, actions, deduplicated: false, reason: 'DUPLICATE_PROVIDER_REVISION' };
+      }
+    }
+    if (ancestorScopeState(graph, runtime, nodeId) !== 'RUNNING') {
+      delete runtime.processedEventIds[event.eventId];
+      return {
+        runtime,
+        actions,
+        deduplicated: false,
+        reason: nodeRuntime.scopeState === 'STOPPED' ? 'SCOPE_STOPPED' : 'SCOPE_PAUSED',
+      };
+    }
+    const parentActivation = currentActivation(nodeRuntime);
+    if (!parentActivation || parentActivation.phase !== OrchestrationActivationPhase.TERMINAL) {
+      delete runtime.processedEventIds[event.eventId];
+      actions.push({ type: OrchestrationHierarchyActionType.WAIT, nodeId, reason: 'PROVIDER_PARENT_NOT_TERMINAL' });
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_PARENT_NOT_TERMINAL' };
+    }
+
+    const targetChildIds = node.childIds.slice(0, requestedSlotCount);
+    for (const childId of node.childIds) {
+      const preflight = canPrepareProviderChild(graph, runtime, childId);
+      if (!preflight.ok) {
+        delete runtime.processedEventIds[event.eventId];
+        actions.push({ type: OrchestrationHierarchyActionType.WAIT, nodeId, reason: 'PROVIDER_SLOTS_BUSY' });
+        return { runtime, actions, deduplicated: false, reason: 'PROVIDER_SLOTS_BUSY' };
+      }
+    }
+
+    for (const childId of targetChildIds) {
+      const childRuntime = runtime.nodesById[childId];
+      const activationId = `provider:${providerId}:revision:${providerRevision}:child:${childId}:g${childRuntime.generation}`;
+      const prepared = prepareActivation(graph, runtime, {
+        nodeId: childId,
+        activationId,
+        generation: childRuntime.generation,
+        purpose: graph.nodesById[childId].childIds.length
+          ? OrchestrationActivationPurpose.DELEGATE
+          : OrchestrationActivationPurpose.WORK,
+        nowMs,
+      });
+      if (!prepared.action) throw new Error(`Provider preflight diverged for ${childId}: ${prepared.reason}`);
+      actions.push(prepared.action);
+    }
+
+    providerState.lastAcceptedRevision = providerRevision;
+    providerState.lastRequestedSlotCount = requestedSlotCount;
+    providerState.activeRevision = providerRevision;
+    providerState.activeChildIds = [...targetChildIds];
+    providerState.lastAcceptedAt = nowMs;
+    providerState.lastCheckedAt = nowMs;
+    providerState.lastErrorCode = '';
+
+    if (requestedSlotCount === 0) {
+      const key = `provider:${binding.providerId}:revision:${providerRevision}`;
+      if (!nodeRuntime.completedBarrierKeys[key]) {
+        nodeRuntime.completedBarrierKeys[key] = true;
+        const activationId = `reconcile:${nodeId}:provider:${binding.providerId}:revision:${providerRevision}:g${nodeRuntime.generation}:r${nodeRuntime.round}`;
+        const prepared = prepareActivation(graph, runtime, {
+          nodeId,
+          activationId,
+          generation: nodeRuntime.generation,
+          purpose: OrchestrationActivationPurpose.RECONCILE,
+          nowMs,
+        });
+        if (prepared.action) actions.push(prepared.action);
+      }
+    }
+
+    return { runtime, actions, deduplicated: false, reason: 'PROVIDER_REVISION_ACCEPTED' };
   }
 
   if (event.type === OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED) {
@@ -704,7 +905,8 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     nodeRuntime.lastTerminalStatus = status;
 
     if ([OrchestrationActivationPurpose.DELEGATE, OrchestrationActivationPurpose.RECOVERY].includes(ledger.purpose)
-        && node.childIds.length) {
+        && node.childIds.length
+        && !node.providerBinding) {
       for (const childId of node.childIds.slice(0, node.maxActiveChildren || node.childIds.length)) {
         const childRuntime = runtime.nodesById[childId];
         const childActivationId = activationIdForChild(activationId, childId, childRuntime.generation, nodeRuntime.round);
