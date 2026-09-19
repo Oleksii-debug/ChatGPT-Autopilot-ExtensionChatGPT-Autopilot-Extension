@@ -134,3 +134,16 @@ test('Browser Agent uses a dedicated durable manager with fast-burst and owner-i
   assert.match(source, /browserAgent\.rejectPendingAction\(/);
   assert.match(source, /alarm\.name === BROWSER_AGENT_ALARM\) runSafely\(browserAgent\.cycleAll\(\)\)/);
 });
+
+
+test('Drive scalar hierarchy provider uses the existing orchestra cycle and explicit OAuth boundary', () => {
+  assert.match(source, /import \{[\s\S]*DRIVE_SCALAR_PROVIDER_V1[\s\S]*DriveScalarProviderV1[\s\S]*createGoogleDriveScalarReader[\s\S]*getChromeDriveAccessToken[\s\S]*inspectChromeDriveOAuth[\s\S]*\} from '\.\.\/core\/orchestration-drive-scalar-provider\.js';/);
+  assert.match(source, /resolveHierarchyProvider: resolveOrchestrationHierarchyProvider/);
+  assert.match(source, /async function resolveOrchestrationHierarchyProvider\(/);
+  assert.match(source, /getChromeDriveAccessToken\(chrome, \{ interactive: false \}\)/, 'automatic provider polling must never open interactive OAuth');
+  assert.match(source, /message\.command === 'AUTHORIZE_ORCHESTRATION_V2_DRIVE'/);
+  assert.match(source, /getChromeDriveAccessToken\(chrome, \{ interactive: true \}\)/, 'interactive OAuth requires an explicit owner command');
+  assert.match(source, /driveOAuth: inspectChromeDriveOAuth\(chrome\.runtime\?\.getManifest\?\.\(\)\)/);
+  assert.doesNotMatch(source, /DRIVE_SCALAR_ALARM|drive-scalar-wake/, 'Drive scalar must not create a second scheduler/alarm');
+  assert.doesNotMatch(source, /authorized:\s*true[\s\S]{0,120}token\s*:/i, 'access token must never be returned to the UI');
+});
