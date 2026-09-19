@@ -296,3 +296,43 @@ test('large unbounded invocation data is rejected', () => {
     createdAt: AT,
   }), /too large/);
 });
+
+
+test('normalized authority envelopes are recursively immutable', () => {
+  const observation = normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'obs-frozen',
+    invocationId: 'invoke-frozen',
+    status: 'OK',
+    data: { nested: { value: 1 } },
+    artifactRefs: [artifact()],
+    observedAt: AT,
+  });
+  assert.equal(Object.isFrozen(observation), true);
+  assert.equal(Object.isFrozen(observation.data), true);
+  assert.equal(Object.isFrozen(observation.data.nested), true);
+  assert.equal(Object.isFrozen(observation.artifactRefs), true);
+  assert.equal(Object.isFrozen(observation.artifactRefs[0]), true);
+  assert.throws(() => { observation.data.nested.value = 2; }, TypeError);
+});
+
+test('nested reference collections reject non-array shapes with stable contract errors', () => {
+  assert.throws(() => normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'obs-shape',
+    invocationId: 'invoke-1',
+    status: 'OK',
+    artifactRefs: 'artifact-1',
+    observedAt: AT,
+  }), /artifactRefs must be a bounded array/);
+
+  assert.throws(() => normalizeSpecialistHandoffV1({
+    schemaVersion: 1,
+    handoffId: 'handoff-shape',
+    specialistId: 'coding-specialist',
+    goal: 'Do work.',
+    requestedCapabilityIds: ['workspace.read'],
+    credentialRefs: { credentialId: 'cred-1' },
+    createdAt: AT,
+  }), /credentialRefs must be a bounded array/);
+});
