@@ -138,8 +138,9 @@ function available(meta, nowMs) {
 
 export function createCredentialBroker({ store, credentialsDir, decryptSecret, now = () => Date.now() } = {}) {
   const normalized = normalizeCredentialStore(store || { schemaVersion: 1, credentials: [] });
-  const baseDir = path.resolve(String(credentialsDir || ''));
-  if (!baseDir || !path.isAbsolute(baseDir)) throw brokerError('CREDENTIAL_CONFIG_INVALID', 'credentialsDir must be absolute');
+  const directorySource = String(credentialsDir || '').trim();
+  if (!directorySource || !path.isAbsolute(directorySource)) throw brokerError('CREDENTIAL_CONFIG_INVALID', 'credentialsDir must be absolute');
+  const baseDir = path.resolve(directorySource);
   if (typeof decryptSecret !== 'function') throw brokerError('CREDENTIAL_CONFIG_INVALID', 'decryptSecret function is required');
 
   return Object.freeze({
