@@ -106,11 +106,20 @@
           <input id="agent-step-delay-ms" type="number" min="0" max="60000" step="50" inputmode="numeric" value="0">
           <label><input id="agent-allow-cross-origin" type="checkbox" checked>Дозволяти переходи між дозволеними сайтами</label>
           <label><input id="agent-close-tabs-on-stop" type="checkbox">Закривати вкладки, створені Agent, після Stop</label>
-          <label for="agent-approval-mode">Підтвердження важливих дій</label>
+          <label for="agent-approval-mode">Глобальна автономність дій</label>
           <select id="agent-approval-mode">
-            <option value="CONSEQUENTIAL">Запитувати перед фінальними/важливими діями</option>
-            <option value="ALLOW_ALL">Дозволяти Agent виконувати їх автономно</option>
+            <option value="CONSEQUENTIAL">ASK — питати перед важливими/фінальними діями</option>
+            <option value="ALLOW_ALL">ALLOW ALL — виконувати всі дозволені дії автономно без підтверджень</option>
           </select>
+          <label for="agent-credential-decision">Глобальна політика логінів і credentials</label>
+          <select id="agent-credential-decision">
+            <option value="ASK">ASK — питати перед використанням дозволеного credential</option>
+            <option value="ALLOW">ALLOW — використовувати дозволені credentials автономно</option>
+            <option value="DENY">DENY — не використовувати credentials у цьому завданні</option>
+          </select>
+          <label for="agent-site-rules">Правила для окремих сайтів, необов’язково</label>
+          <textarea id="agent-site-rules" rows="6" spellcheck="false" placeholder="example.com | ALLOW&#10;bank.example | ASK | trusted_script=DENY,upload_download=ASK&#10;*.example.org | DENY"></textarea>
+          <p class="field-help">Один сайт на рядок: домен | ALLOW, ASK або DENY. Необов’язково після третьої риски можна перевизначити окремі дії, наприклад trusted_script=DENY або upload_download=ASK. Спеціальний ключ credentials=ALLOW/ASK/DENY керує логіном для цього сайту. Правило сайту має пріоритет над глобальною політикою.</p>
           <label><input id="agent-vision-on-demand" type="checkbox" checked>Дозволяти Agent запитувати знімок видимої області для vision, коли DOM/ARIA недостатньо</label>
           <label><input id="agent-trusted-script-enabled" type="checkbox">Дозволяти Trusted Script fallback для складних сайтів. Потреба в підтвердженні визначається вибраною вище політикою; у режимі повної автономії окремого підтвердження немає.</label>
         </fieldset>
