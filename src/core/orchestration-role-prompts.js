@@ -10,6 +10,13 @@ import {
   DRIVE_SCALAR_PROVIDER_V1,
   extractGoogleDriveScalarSourceId,
 } from './orchestration-drive-scalar-provider.js';
+import {
+  DRIVE_FOLDER_DEFAULT_POLL_INTERVAL_MS,
+  DRIVE_FOLDER_MAX_POLL_INTERVAL_MS,
+  DRIVE_FOLDER_MIN_POLL_INTERVAL_MS,
+  DRIVE_FOLDER_DISPATCH_PROVIDER_V1,
+  extractGoogleDriveFolderSourceId,
+} from './orchestration-drive-folder-provider.js';
 
 export const OrchestrationRoleTemplate = Object.freeze({
   GLOBAL_DIRECTOR: 'GLOBAL_DIRECTOR',
@@ -123,22 +130,44 @@ export function buildOrchestrationRolePrompt({
     ? childNodeIds.map((id, index) => stableId(id, `childNodeIds[${index}]`))
     : (() => { throw new Error('Invalid childNodeIds'); })();
 
-  const providerLines = providerBinding
-    ? [
-      '',
-      'DETERMINISTIC CHILD-SLOT PROVIDER',
-      `PROVIDER_ID=${required(providerBinding.providerId, 'providerBinding.providerId', 120)}`,
-      `PROVIDER_SOURCE_ID=${required(providerBinding.sourceId, 'providerBinding.sourceId', 256)}`,
-      `MAX_CHILD_SLOTS=${integer(providerBinding.maxSlots, 'providerBinding.maxSlots', 0, 1000)}`,
-      'When child work is ready, update only the exact locally bound provider file through your authorized Drive tool/integration.',
-      'The entire file content MUST be exactly one decimal integer from 0 through MAX_CHILD_SLOTS. No prose, JSON, labels, lists or multiple values.',
-      'Every new Drive file revision/version is a distinct activation request, even when the integer value is unchanged.',
-      'Use 0 when this round needs no child activation; Autopilot will reconcile the parent without manufacturing worker work.',
-      'Publish a new provider revision only after live project truth and ownership are refreshed and the requested child capacity is intentional.',
-      'The provider file cannot change hierarchy, child identities, parent ownership, maximum slots, chat modes, Pause/Stop authority or safety policy.',
-      'Do not ask Autopilot to infer workload or parse project meaning from this file.',
-    ]
-    : [];
+  let providerLines = [];
+  if (providerBinding) {
+    const providerId = required(providerBinding.providerId, 'providerBinding.providerId', 120);
+    const sourceId = required(providerBinding.sourceId, 'providerBinding.sourceId', 256);
+    const maxSlots = integer(providerBinding.maxSlots, 'providerBinding.maxSlots', 0, 1000);
+    if (providerId === DRIVE_FOLDER_DISPATCH_PROVIDER_V1) {
+      providerLines = [
+        '',
+        'DETERMINISTIC DRIVE FOLDER DISPATCH PROVIDER',
+        `PROVIDER_ID=${providerId}`,
+        `PROVIDER_SOURCE_ID=${sourceId}`,
+        `MAX_CHILD_SLOTS=${maxSlots}`,
+        'Publish each new child-work batch under the exact locally bound Drive root as generation-NNNNNN, with a strictly increasing decimal generation number.',
+        'Inside that generation, publish at most MAX_CHILD_SLOTS dispatch JSON files. Each file targets exactly one configured DIRECT_CHILD and contains schema_version=1, parent_node_id, generation, target_child_id, and exactly one of prompt or prompt_profile_id.',
+        'Do not target sibling/foreign nodes and do not duplicate target_child_id inside one generation.',
+        'Create the READY marker only after every dispatch file is completely written. READY is the publication commit point.',
+        'After READY exists, do not mutate, rename, add, remove or rewrite files in that generation. Publish a newer generation instead.',
+        'An empty READY generation means no child work for this round and is valid; Autopilot will reconcile the parent without manufacturing work.',
+        'The provider cannot change hierarchy, parent ownership, child identities, maximum slots, chat modes, Pause/Stop authority, recovery policy or safety policy.',
+        'Autopilot validates the whole generation atomically and launches nothing if any file is malformed, duplicated, unstable or outside local authority.',
+      ];
+    } else {
+      providerLines = [
+        '',
+        'DETERMINISTIC CHILD-SLOT PROVIDER',
+        `PROVIDER_ID=${providerId}`,
+        `PROVIDER_SOURCE_ID=${sourceId}`,
+        `MAX_CHILD_SLOTS=${maxSlots}`,
+        'When child work is ready, update only the exact locally bound provider file through your authorized Drive tool/integration.',
+        'The entire file content MUST be exactly one decimal integer from 0 through MAX_CHILD_SLOTS. No prose, JSON, labels, lists or multiple values.',
+        'Every new Drive file revision/version is a distinct activation request, even when the integer value is unchanged.',
+        'Use 0 when this round needs no child activation; Autopilot will reconcile the parent without manufacturing worker work.',
+        'Publish a new provider revision only after live project truth and ownership are refreshed and the requested child capacity is intentional.',
+        'The provider file cannot change hierarchy, child identities, parent ownership, maximum slots, chat modes, Pause/Stop authority or safety policy.',
+        'Do not ask Autopilot to infer workload or parse project meaning from this file.',
+      ];
+    }
+  }
 
   return [
     'AUTOPILOT LEVEL-1 ROLE CONTRACT',
@@ -251,6 +280,29 @@ function normalizeDriveScalarSources(raw, domainIds, pollIntervalMs) {
   return out;
 }
 
+function normalizeDriveFolderSources(raw, domainIds, pollIntervalMs) {
+  if (raw === undefined || raw === null) return new Map();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid driveFolderSources');
+  const allowed = new Set(domainIds);
+  const out = new Map();
+  for (const [rawDomainId, rawSource] of Object.entries(raw)) {
+    const domainId = stableId(rawDomainId, 'driveFolderSources domain id');
+    if (!allowed.has(domainId)) throw new Error(`Drive folder source targets unknown domain ${domainId}`);
+    if (out.has(domainId)) throw new Error(`Duplicate Drive folder source for ${domainId}`);
+    const sourceId = extractGoogleDriveFolderSourceId(rawSource);
+    out.set(domainId, {
+      sourceId,
+      pollIntervalMs: integer(
+        pollIntervalMs ?? DRIVE_FOLDER_DEFAULT_POLL_INTERVAL_MS,
+        'driveFolderPollIntervalMs',
+        DRIVE_FOLDER_MIN_POLL_INTERVAL_MS,
+        DRIVE_FOLDER_MAX_POLL_INTERVAL_MS,
+      ),
+    });
+  }
+  return out;
+}
+
 function nodeProfileIds(nodeId) {
   return {
     primary: `${nodeId}:prompt-v1`,
@@ -270,6 +322,8 @@ export function buildThreeLevelHierarchyTemplate({
   includeQaRedTeam = false,
   driveScalarSources = null,
   driveScalarPollIntervalMs = DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
+  driveFolderSources = null,
+  driveFolderPollIntervalMs = DRIVE_FOLDER_DEFAULT_POLL_INTERVAL_MS,
 } = {}) {
   const graph = stableId(graphId, 'graphId');
   const epoch = integer(controlEpoch, 'controlEpoch', 1, Number.MAX_SAFE_INTEGER);
@@ -278,11 +332,22 @@ export function buildThreeLevelHierarchyTemplate({
   const issue = integer(controlIssueNumber || 0, 'controlIssueNumber', 0, Number.MAX_SAFE_INTEGER);
   const domainList = normalizeDomains(domains);
   const workerCount = integer(workersPerManager, 'workersPerManager', 1, MAX_WORKERS_PER_MANAGER);
+  const domainIds = domainList.map(domain => domain.id);
   const driveSources = normalizeDriveScalarSources(
     driveScalarSources,
-    domainList.map(domain => domain.id),
+    domainIds,
     driveScalarPollIntervalMs,
   );
+  const driveFolderRoots = normalizeDriveFolderSources(
+    driveFolderSources,
+    domainIds,
+    driveFolderPollIntervalMs,
+  );
+  for (const domainId of domainIds) {
+    if (driveSources.has(domainId) && driveFolderRoots.has(domainId)) {
+      throw new Error(`Manager ${domainId} cannot use Drive scalar and Drive folder dispatch simultaneously`);
+    }
+  }
   const extraNodeCount = (includeIntegrationManager ? 1 : 0) + (includeQaRedTeam ? 1 : 0);
   const totalNodeCount = 1 + domainList.length + (domainList.length * workerCount) + extraNodeCount;
   if (totalNodeCount > 1000) throw new Error('Hierarchy template exceeds 1000 logical nodes');
@@ -306,6 +371,7 @@ export function buildThreeLevelHierarchyTemplate({
     const managerId = `manager:${domain.id}`;
     const workerIds = Array.from({ length: workerCount }, (_, index) => `worker:${domain.id}:${String(index + 1).padStart(2, '0')}`);
     const driveSource = driveSources.get(domain.id) || null;
+    const driveFolderRoot = driveFolderRoots.get(domain.id) || null;
     nodeSpecs.push({
       id: managerId,
       parentId: 'director',
@@ -313,7 +379,13 @@ export function buildThreeLevelHierarchyTemplate({
       role: OrchestrationRoleTemplate.DOMAIN_MANAGER,
       chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
       scope: domain.scope,
-      providerBinding: driveSource ? {
+      providerBinding: driveFolderRoot ? {
+        providerId: DRIVE_FOLDER_DISPATCH_PROVIDER_V1,
+        groupNodeId: managerId,
+        maxSlots: workerIds.length,
+        sourceId: driveFolderRoot.sourceId,
+        pollIntervalMs: driveFolderRoot.pollIntervalMs,
+      } : driveSource ? {
         providerId: DRIVE_SCALAR_PROVIDER_V1,
         groupNodeId: managerId,
         maxSlots: workerIds.length,
