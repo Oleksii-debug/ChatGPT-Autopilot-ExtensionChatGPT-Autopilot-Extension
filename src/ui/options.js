@@ -419,7 +419,10 @@ async function onOrchestrationProfileFileChange() {
     const comment = preview.controlCommentId ? `comment ${preview.controlCommentId}` : 'auto comment';
     const launch = preview.maxLaunchesPerWindow ? `${preview.maxLaunchesPerWindow}/${preview.launchWindowSeconds}s` : 'без window limit';
     const bootstrap = preview.bootstrapPinnedControlFirst ? 'раннє закріплене керування: так' : 'раннє закріплене керування: ні';
-    $('orchestration-v2-profile-preview').textContent = `${preview.projectId || 'Проєкт'}; workers ${preview.initialWorkers ?? 0}/${preview.maxActiveWorkers ?? 0}; launch ${launch}, gap ${preview.minimumLaunchIntervalSeconds ?? 0}s; ${preview.coordinatorProviderId || '?'} → ${preview.workerProviderId || '?'}; Issue ${preview.controlIssueNumber || 0}, ${comment}; ${bootstrap}.`;
+    const hierarchy = preview.hierarchy
+      ? `; ієрархія ${preview.hierarchy.nodeCount} вузлів, ${preview.hierarchy.rootCount} коренів, ${preview.hierarchy.promptProfileCount} профілів промтів, epoch ${preview.hierarchy.controlEpoch}`
+      : '';
+    $('orchestration-v2-profile-preview').textContent = `${preview.projectId || 'Проєкт'}; workers ${preview.initialWorkers ?? 0}/${preview.maxActiveWorkers ?? 0}; launch ${launch}, gap ${preview.minimumLaunchIntervalSeconds ?? 0}s; ${preview.coordinatorProviderId || '?'} → ${preview.workerProviderId || '?'}; Issue ${preview.controlIssueNumber || 0}, ${comment}; ${bootstrap}${hierarchy}.`;
     syncOrchestrationV2ActionAvailability();
   } catch (error) {
     $('orchestration-v2-profile-preview').textContent = `Помилка: ${error.message}`;
