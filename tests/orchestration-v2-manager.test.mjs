@@ -90,6 +90,63 @@ test('local pause preserves runtime and resume only restores sessions paused by 
   assert.equal((await controller.runtimeRepository.load()).lastAppliedControlRevision,7);
 });
 
+test('owner can configure a fixed Director Manager Worker hierarchy before first Start', async()=>{
+  const {manager,core}=managerFixture();
+  await manager.create({name:'Template',config:cfg('template-project')});
+  const configured=await manager.configureHierarchyTemplate({
+    domains:[
+      {id:'runtime',scope:'Runtime, recovery and reliability.'},
+      {id:'science',scope:'Scientific model and validation.'},
+    ],
+    workersPerManager:2,
+    includeIntegrationManager:true,
+    includeQaRedTeam:true,
+  });
+
+  assert.equal(configured.hierarchy.rootCount,1);
+  assert.equal(configured.hierarchy.managerCount,2);
+  assert.equal(configured.hierarchy.workerCount,4);
+  assert.equal(configured.hierarchy.nodeCount,9);
+  assert.equal(configured.hierarchy.promptProfileCount,18);
+  assert.equal(
+    Object.values((await core.load()).sessionsById).some(session=>session.orchestrationHierarchy?.managed),
+    false,
+    'template configuration must remain setup-only',
+  );
+
+  const profile=await manager.exportProfile('Template');
+  assert.equal(profile.hierarchy.nodes.length,9);
+  assert.ok(profile.hierarchy.nodes.some(node=>node.id==='integration'));
+  assert.ok(profile.hierarchy.nodes.some(node=>node.id==='qa-red-team'));
+  const workerPrompt=profile.hierarchy.promptProfiles.find(item=>item.id==='worker:runtime:01:prompt-v1');
+  assert.match(workerPrompt.prompt,/NO_ACTION/);
+  assert.match(workerPrompt.prompt,/scheduler #2/);
+
+  const started=await manager.start('orch-1');
+  assert.equal(started.hierarchyStart?.kind,'HIERARCHY_STARTED');
+  const rootSession=Object.values((await core.load()).sessionsById)
+    .find(session=>session.orchestrationHierarchy?.nodeId==='director');
+  assert.ok(rootSession);
+});
+
+test('hierarchy template replacement fails closed after physical hierarchy Sessions exist', async()=>{
+  const {manager}=managerFixture();
+  await manager.create({name:'Template',config:cfg('template-replace')});
+  await manager.configureHierarchyTemplate({
+    domains:[{id:'runtime',scope:'Runtime.'}],
+    workersPerManager:1,
+  });
+  await manager.start('orch-1');
+  await manager.pause('orch-1');
+  await assert.rejects(
+    ()=>manager.configureHierarchyTemplate({
+      domains:[{id:'science',scope:'Science.'}],
+      workersPerManager:1,
+    }),
+    /before the first Start/,
+  );
+});
+
 test('hierarchy orchestra Start materializes roots and owner Pause/Resume stays isolated', async()=>{
   const {manager,core}=managerFixture();
   await manager.create({name:'Hierarchy A',config:cfg('hierarchy-a')});
