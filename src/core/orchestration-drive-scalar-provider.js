@@ -1,4 +1,5 @@
 export const DRIVE_SCALAR_PROVIDER_V1 = 'drive-scalar-v1';
+export const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 export const DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS = 3 * 60 * 1000;
 export const DRIVE_SCALAR_MIN_POLL_INTERVAL_MS = 60 * 1000;
 export const DRIVE_SCALAR_MAX_POLL_INTERVAL_MS = 24 * 60 * 60 * 1000;
@@ -253,4 +254,46 @@ export function createGoogleDriveScalarReader({
       return content;
     },
   };
+}
+
+
+export function inspectChromeDriveOAuth(manifest) {
+  const oauth2 = manifest?.oauth2;
+  const scopes = Array.isArray(oauth2?.scopes) ? oauth2.scopes : [];
+  return {
+    configured: Boolean(clean(oauth2?.client_id)) && scopes.includes(DRIVE_FILE_SCOPE),
+    clientIdPresent: Boolean(clean(oauth2?.client_id)),
+    driveFileScopePresent: scopes.includes(DRIVE_FILE_SCOPE),
+  };
+}
+
+export async function getChromeDriveAccessToken(chromeApi, { interactive = false } = {}) {
+  if (!chromeApi?.identity?.getAuthToken) {
+    throw new DriveScalarProviderError(
+      'IDENTITY_UNAVAILABLE',
+      'Chrome Identity API is unavailable for Google Drive authorization.',
+    );
+  }
+  const oauth = inspectChromeDriveOAuth(chromeApi.runtime?.getManifest?.());
+  if (!oauth.configured) {
+    throw new DriveScalarProviderError(
+      'OAUTH_NOT_CONFIGURED',
+      'Google Drive OAuth is not configured with a real client_id and drive.file scope.',
+    );
+  }
+  try {
+    const result = await chromeApi.identity.getAuthToken({ interactive: interactive === true });
+    const token = clean(typeof result === 'string' ? result : result?.token);
+    if (!token) {
+      throw new DriveScalarProviderError('AUTH_REQUIRED', 'Google Drive authorization did not return an access token.');
+    }
+    return token;
+  } catch (error) {
+    if (error instanceof DriveScalarProviderError) throw error;
+    throw new DriveScalarProviderError(
+      'AUTH_REQUIRED',
+      'Google Drive authorization failed.',
+      { details: error?.message || '' },
+    );
+  }
 }
