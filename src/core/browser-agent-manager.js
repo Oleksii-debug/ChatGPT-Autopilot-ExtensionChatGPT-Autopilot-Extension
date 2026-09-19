@@ -2118,10 +2118,11 @@ export class BrowserAgentManager {
     }
 
     const risk = classifyBrowserAgentActionRisk(snapshot, action);
-    const approvalRequired = risk.requiresApproval && (
-      action.type === BrowserAgentActionType.TRUSTED_SCRIPT
-      || current.job.config.approvalMode === BrowserAgentApprovalMode.CONSEQUENTIAL
-    );
+    // Approval is owner policy, not a hard-coded action property. In
+    // ALLOW_ALL mode every action that is otherwise enabled by capability/site
+    // policy proceeds autonomously, including Trusted Script and upload.
+    const approvalRequired = risk.requiresApproval
+      && current.job.config.approvalMode === BrowserAgentApprovalMode.CONSEQUENTIAL;
     if (approvalRequired) return this.requestActionApproval(id, epoch, snapshot, action, risk);
 
     let executed;
