@@ -476,6 +476,34 @@ function orchestrationHierarchyDomainsFromForm() {
   });
 }
 
+function orchestrationDriveScalarSourcesFromForm(domains) {
+  const lines = $('orchestration-v2-hierarchy-drive-sources').value
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return {};
+  const allowed = new Set(domains.map(domain => String(domain.id || '').trim().toLowerCase()));
+  const out = {};
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const separator = line.indexOf('|');
+    if (separator <= 0 || separator >= line.length - 1) {
+      throw new Error(`Drive рядок ${index + 1}: потрібен формат Manager ID | Google Drive файл.`);
+    }
+    const managerId = line.slice(0, separator).trim().toLowerCase();
+    const source = line.slice(separator + 1).trim();
+    if (!allowed.has(managerId)) {
+      throw new Error(`Drive рядок ${index + 1}: Manager ${managerId || '?'} не знайдений у списку вище.`);
+    }
+    if (Object.hasOwn(out, managerId)) {
+      throw new Error(`Drive рядок ${index + 1}: Manager ${managerId} уже має Drive-файл.`);
+    }
+    if (!source) throw new Error(`Drive рядок ${index + 1}: файл не може бути порожнім.`);
+    out[managerId] = source;
+  }
+  return out;
+}
+
 async function configureOrchestrationHierarchyTemplate() {
   beginOrchestrationV2Action();
   try {
@@ -485,16 +513,23 @@ async function configureOrchestrationHierarchyTemplate() {
       $('orchestration-v2-hierarchy-workers').value,
       { min: 1, max: 40, label: 'Workers на одного Manager' },
     );
+    const driveScalarSources = orchestrationDriveScalarSourcesFromForm(domains);
+    const drivePollMinutes = parseStrictBoundedInteger(
+      $('orchestration-v2-hierarchy-drive-poll').value,
+      { min: 1, max: 1440, label: 'Інтервал перевірки Drive, хв' },
+    );
     const data = await core('CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE', {
       domains,
       workersPerManager,
       includeIntegrationManager: $('orchestration-v2-hierarchy-integration').checked,
       includeQaRedTeam: $('orchestration-v2-hierarchy-qa').checked,
+      driveScalarSources,
+      driveScalarPollIntervalMs: drivePollMinutes * 60 * 1000,
     });
     renderOrchestrationV2Status(data.status || await core('GET_ORCHESTRATION_V2_STATUS'));
     const hierarchy = data.hierarchy || {};
     $('orchestration-v2-hierarchy-template-status').textContent =
-      `Створено ${hierarchy.nodeCount || 0} вузлів: Managers ${hierarchy.managerCount || 0}, Workers ${hierarchy.workerCount || 0}, профілів промтів ${hierarchy.promptProfileCount || 0}. Оркестр не запущено.`;
+      `Створено ${hierarchy.nodeCount || 0} вузлів: Managers ${hierarchy.managerCount || 0}, Workers ${hierarchy.workerCount || 0}, Drive-керованих Managers ${hierarchy.driveScalarProviderCount || 0}, профілів промтів ${hierarchy.promptProfileCount || 0}. Оркестр не запущено.`;
     announce('Ієрархію оркестру створено. Автоматичного запуску не було.');
   } catch (error) {
     $('orchestration-v2-hierarchy-template-status').textContent = `Ієрархію не створено: ${error.message}`;
