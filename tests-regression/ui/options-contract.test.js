@@ -370,3 +370,25 @@ test('Orchestration UI exposes keyboard-native deterministic hierarchy template 
   assert.match(js, /Оркестр не запущено/);
   assert.match(js, /configure-orchestration-v2-hierarchy-button'\)\.addEventListener\('click', configureOrchestrationHierarchyTemplate\)/);
 });
+
+
+test('Orchestration Drive scalar controls are keyboard-native, explicit, and do not expose credentials', () => {
+  for (const id of [
+    'orchestration-v2-hierarchy-drive-sources',
+    'orchestration-v2-hierarchy-drive-poll',
+    'authorize-orchestration-v2-drive-button',
+    'orchestration-v2-drive-auth-status',
+  ]) assert.ok(html.includes(`id="${id}"`), `missing Drive scalar control ${id}`);
+
+  has(/<label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково<\/label>/);
+  has(/id="orchestration-v2-hierarchy-drive-sources"[^>]*aria-describedby="orchestration-v2-hierarchy-drive-help"/s);
+  has(/id="orchestration-v2-hierarchy-drive-poll"[^>]*min="1"[^>]*max="1440"[^>]*aria-describedby="orchestration-v2-hierarchy-drive-help"/s);
+  has(/id="orchestration-v2-drive-auth-status" role="status"/);
+  assert.match(js, /function orchestrationDriveScalarSourcesFromForm\(domains\)/);
+  assert.match(js, /driveScalarSources,/);
+  assert.match(js, /driveScalarPollIntervalMs: drivePollMinutes \* 60 \* 1000/);
+  assert.match(js, /core\('AUTHORIZE_ORCHESTRATION_V2_DRIVE'\)/);
+  assert.match(js, /authorize-orchestration-v2-drive-button'\)\.addEventListener\('click', authorizeOrchestrationDrive\)/);
+  assert.match(js, /Drive scalar: \$\{driveScalarText\}/, 'runtime status must expose provider revision/slot state in normal text');
+  assert.doesNotMatch(js, /drive[-_ ]?(?:access[-_ ]?)?token|Bearer\s+\$\{/i, 'UI must never own or render Drive access tokens');
+});

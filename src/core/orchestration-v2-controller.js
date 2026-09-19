@@ -56,6 +56,7 @@ export const ORCHESTRATION_V2_ALARM = 'autopilot-orchestration-v2-wake';
 const MIN_CONTROL_RETRY_MS = 15_000;
 const MIN_ACTIVE_PROBE_MS = 30_000;
 const MAX_PROBES_PER_CYCLE = 200;
+const MAX_HIERARCHY_PROVIDER_POLLS_PER_CYCLE = 50;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 
 function isUnresolvedOperation(session) {
@@ -111,6 +112,7 @@ export class OrchestrationV2Controller {
     configRepository = null,
     runtimeRepository = null,
     alarmName = ORCHESTRATION_V2_ALARM,
+    resolveHierarchyProvider = null,
   } = {}) {
     if (!coreRepository || !chromeApi) throw new Error('Orchestration V2 controller dependencies are required');
     this.coreRepository = coreRepository;
@@ -121,6 +123,9 @@ export class OrchestrationV2Controller {
     this.configRepository = configRepository || new OrchestrationConfigRepository(chromeApi);
     this.runtimeRepository = runtimeRepository || new OrchestrationRuntimeRepository(chromeApi, this.configRepository, { now });
     this.alarmName = alarmName;
+    this.resolveHierarchyProvider = typeof resolveHierarchyProvider === 'function'
+      ? resolveHierarchyProvider
+      : null;
     this.cycleInFlight = null;
   }
 
@@ -363,6 +368,123 @@ export class OrchestrationV2Controller {
     return summary;
   }
 
+  async pollHierarchyProviders({ nowMs = this.now() } = {}) {
+    const runtime = await this.runtimeRepository.load();
+    const hierarchy = hierarchyContainer(runtime);
+    if (!hierarchy) return { kind: 'NO_HIERARCHY', checked: 0, results: [] };
+
+    const due = hierarchy.graph.nodeOrder
+      .map(nodeId => ({
+        nodeId,
+        node: hierarchy.graph.nodesById[nodeId],
+        state: hierarchy.state.nodesById[nodeId],
+      }))
+      .filter(item => item.node?.providerBinding)
+      .filter(item => {
+        const current = item.state?.currentActivationId
+          ? item.state.activationLedger?.[item.state.currentActivationId]
+          : null;
+        if (!current || current.phase !== 'TERMINAL') return false;
+        if (item.state?.scopeState !== 'RUNNING') return false;
+        const nextCheckAt = Number(item.state?.providerState?.nextCheckAt || 0);
+        return nextCheckAt <= nowMs;
+      })
+      .slice(0, MAX_HIERARCHY_PROVIDER_POLLS_PER_CYCLE);
+
+    const results = [];
+    for (const item of due) {
+      const binding = item.node.providerBinding;
+      const pollIntervalMs = Number(binding.pollIntervalMs || 180000);
+      let provider = null;
+      try {
+        provider = this.resolveHierarchyProvider
+          ? await this.resolveHierarchyProvider({
+            graph: hierarchy.graph,
+            node: item.node,
+            binding,
+          })
+          : null;
+      } catch (error) {
+        provider = null;
+        results.push({ nodeId: item.nodeId, kind: 'PROVIDER_RESOLVE_ERROR', error: error?.code || error?.message || 'PROVIDER_RESOLVE_ERROR' });
+      }
+
+      if (!provider || typeof provider.read !== 'function') {
+        await this.runtimeRepository.update(draft => {
+          const state = draft?.hierarchy?.state?.nodesById?.[item.nodeId];
+          if (!state) return draft;
+          state.providerState = state.providerState || {};
+          state.providerState.lastCheckedAt = nowMs;
+          state.providerState.nextCheckAt = nowMs + pollIntervalMs;
+          state.providerState.lastErrorCode = 'PROVIDER_UNAVAILABLE';
+          return draft;
+        });
+        if (!results.some(result => result.nodeId === item.nodeId)) {
+          results.push({ nodeId: item.nodeId, kind: 'PROVIDER_UNAVAILABLE' });
+        }
+        continue;
+      }
+
+      let snapshot;
+      try {
+        snapshot = await provider.read({
+          groupNodeId: item.nodeId,
+          maxWorkers: binding.maxSlots,
+          sourceId: binding.sourceId,
+        });
+      } catch (error) {
+        const code = error?.code || 'PROVIDER_READ_FAILED';
+        await this.runtimeRepository.update(draft => {
+          const state = draft?.hierarchy?.state?.nodesById?.[item.nodeId];
+          if (!state) return draft;
+          state.providerState = state.providerState || {};
+          state.providerState.lastCheckedAt = nowMs;
+          state.providerState.nextCheckAt = nowMs + pollIntervalMs;
+          state.providerState.lastErrorCode = code;
+          return draft;
+        });
+        results.push({ nodeId: item.nodeId, kind: 'PROVIDER_READ_FAILED', error: code });
+        continue;
+      }
+
+      const dispatched = await this.dispatchHierarchyEvent({
+        type: OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED,
+        eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}`,
+        controlEpoch: hierarchy.state.controlEpoch,
+        nodeId: item.nodeId,
+        providerId: snapshot.providerId,
+        sourceId: snapshot.sourceId,
+        providerRevision: snapshot.providerRevision,
+        requestedSlotCount: snapshot.requestedSlotCount,
+      }, { nowMs });
+
+      await this.runtimeRepository.update(draft => {
+        const state = draft?.hierarchy?.state?.nodesById?.[item.nodeId];
+        if (!state) return draft;
+        state.providerState = state.providerState || {};
+        state.providerState.lastCheckedAt = nowMs;
+        state.providerState.nextCheckAt = nowMs + pollIntervalMs;
+        state.providerState.lastErrorCode = [
+          'PROVIDER_REVISION_ACCEPTED',
+          'DUPLICATE_PROVIDER_REVISION',
+          'DUPLICATE_EVENT',
+        ].includes(dispatched.reason)
+          ? ''
+          : String(dispatched.reason || 'PROVIDER_DISPATCH_FAILED');
+        return draft;
+      });
+      results.push({
+        nodeId: item.nodeId,
+        kind: dispatched.reason || 'PROVIDER_DISPATCHED',
+        providerRevision: snapshot.providerRevision,
+        requestedSlotCount: snapshot.requestedSlotCount,
+        dispatched,
+      });
+    }
+
+    return { kind: 'HIERARCHY_PROVIDERS_POLLED', checked: due.length, results };
+  }
+
   async probeHierarchyCompletions({ nowMs = this.now() } = {}) {
     if (typeof this.collectAssistantReport !== 'function') return { kind: 'NO_COLLECTOR', probed: 0, terminal: [] };
     const runtime = await this.runtimeRepository.load();
@@ -445,7 +567,20 @@ export class OrchestrationV2Controller {
     const activeProbeNeeded = runtime.workerOrder.some(workerId => [WorkerState.ACTIVE, WorkerState.BUSY].includes(runtime.workersById[workerId]?.state));
     const watchdogBaseline = runtime.lastWatchdogAt || runtime.lastCoordinatorDecisionAt || runtime.createdAt || nowMs;
     const candidates = [watchdogBaseline + config.watchdogIntervalSeconds * 1000];
-    if (hierarchy) candidates.push(nowMs + config.workerProbeIntervalSeconds * 1000);
+    if (hierarchy) {
+      candidates.push(nowMs + config.workerProbeIntervalSeconds * 1000);
+      for (const nodeId of hierarchy.graph.nodeOrder) {
+        const node = hierarchy.graph.nodesById[nodeId];
+        if (!node?.providerBinding) continue;
+        const nodeRuntime = hierarchy.state.nodesById[nodeId];
+        const current = nodeRuntime?.currentActivationId
+          ? nodeRuntime.activationLedger?.[nodeRuntime.currentActivationId]
+          : null;
+        if (!current || current.phase !== 'TERMINAL' || nodeRuntime?.scopeState !== 'RUNNING') continue;
+        const nextCheckAt = Number(nodeRuntime?.providerState?.nextCheckAt || 0);
+        candidates.push(nextCheckAt > nowMs ? nextCheckAt : nowMs + 1_000);
+      }
+    }
     if (runtime.coordinator.lease) {
       const controlWait = runtime.coordinator.status === CoordinatorStatus.WAITING_CONTROL;
       const coordinatorBackoff = Number(runtime.coordinator.retryAfterAt || 0);
@@ -1039,11 +1174,13 @@ export class OrchestrationV2Controller {
       let runtime = await this.runtimeRepository.load();
       if (hierarchyContainer(runtime)) {
         const hierarchyProbe = await this.probeHierarchyCompletions({ nowMs });
+        const hierarchyProviders = await this.pollHierarchyProviders({ nowMs });
         await this.reconcileAlarm({ nowMs });
         return {
           kind: 'HIERARCHY_CYCLE',
           sync,
           hierarchyProbe,
+          hierarchyProviders,
           status: await this.getStatus(),
         };
       }

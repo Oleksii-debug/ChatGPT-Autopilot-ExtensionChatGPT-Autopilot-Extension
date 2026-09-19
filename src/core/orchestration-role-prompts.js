@@ -3,6 +3,13 @@ import {
   OrchestrationChatMode,
   validateOrchestrationGraphV1,
 } from './orchestration-hierarchy.js';
+import {
+  DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
+  DRIVE_SCALAR_MAX_POLL_INTERVAL_MS,
+  DRIVE_SCALAR_MIN_POLL_INTERVAL_MS,
+  DRIVE_SCALAR_PROVIDER_V1,
+  extractGoogleDriveScalarSourceId,
+} from './orchestration-drive-scalar-provider.js';
 
 export const OrchestrationRoleTemplate = Object.freeze({
   GLOBAL_DIRECTOR: 'GLOBAL_DIRECTOR',
@@ -102,6 +109,7 @@ export function buildOrchestrationRolePrompt({
   controlIssueNumber = 0,
   scope,
   childNodeIds = [],
+  providerBinding = null,
 } = {}) {
   const normalizedRole = required(role, 'role', 80).toUpperCase();
   if (!ROLE_VALUES.has(normalizedRole)) throw new Error('Unsupported orchestration role');
@@ -114,6 +122,23 @@ export function buildOrchestrationRolePrompt({
   const children = Array.isArray(childNodeIds)
     ? childNodeIds.map((id, index) => stableId(id, `childNodeIds[${index}]`))
     : (() => { throw new Error('Invalid childNodeIds'); })();
+
+  const providerLines = providerBinding
+    ? [
+      '',
+      'DETERMINISTIC CHILD-SLOT PROVIDER',
+      `PROVIDER_ID=${required(providerBinding.providerId, 'providerBinding.providerId', 120)}`,
+      `PROVIDER_SOURCE_ID=${required(providerBinding.sourceId, 'providerBinding.sourceId', 256)}`,
+      `MAX_CHILD_SLOTS=${integer(providerBinding.maxSlots, 'providerBinding.maxSlots', 0, 1000)}`,
+      'When child work is ready, update only the exact locally bound provider file through your authorized Drive tool/integration.',
+      'The entire file content MUST be exactly one decimal integer from 0 through MAX_CHILD_SLOTS. No prose, JSON, labels, lists or multiple values.',
+      'Every new Drive file revision/version is a distinct activation request, even when the integer value is unchanged.',
+      'Use 0 when this round needs no child activation; Autopilot will reconcile the parent without manufacturing worker work.',
+      'Publish a new provider revision only after live project truth and ownership are refreshed and the requested child capacity is intentional.',
+      'The provider file cannot change hierarchy, child identities, parent ownership, maximum slots, chat modes, Pause/Stop authority or safety policy.',
+      'Do not ask Autopilot to infer workload or parse project meaning from this file.',
+    ]
+    : [];
 
   return [
     'AUTOPILOT LEVEL-1 ROLE CONTRACT',
@@ -144,6 +169,7 @@ export function buildOrchestrationRolePrompt({
     'Do not stop after one micro-step when a larger causally connected safe block can be completed in this activation.',
     'Use tests and concrete evidence. Never claim implementation, verification or completion that did not physically happen.',
     'If there is no useful, valid, non-duplicated work inside this assigned scope, do not manufacture activity; finish safely as NO_ACTION.',
+    ...providerLines,
     '',
     ...roleInstructions(normalizedRole),
     '',
@@ -165,6 +191,7 @@ export function buildOrchestrationRecoveryPrompt({
   controlIssueNumber = 0,
   scope,
   childNodeIds = [],
+  providerBinding = null,
 } = {}) {
   const originalRole = required(logicalRole, 'logicalRole', 80).toUpperCase();
   if (!ROLE_VALUES.has(originalRole) || originalRole === OrchestrationRoleTemplate.RECOVERY) {
@@ -183,6 +210,7 @@ export function buildOrchestrationRecoveryPrompt({
       'Re-establish only current-generation authority from external truth; do not rely on the lost transcript.',
     ].join(' '),
     childNodeIds,
+    providerBinding,
   });
   return `${base}\nRECOVERED_LOGICAL_ROLE=${originalRole}`;
 }
@@ -198,6 +226,29 @@ function normalizeDomains(raw) {
   }).sort((a, b) => a.id.localeCompare(b.id));
   if (new Set(domains.map(item => item.id)).size !== domains.length) throw new Error('Duplicate domain id');
   return domains;
+}
+
+function normalizeDriveScalarSources(raw, domainIds, pollIntervalMs) {
+  if (raw === undefined || raw === null) return new Map();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid driveScalarSources');
+  const allowed = new Set(domainIds);
+  const out = new Map();
+  for (const [rawDomainId, rawSource] of Object.entries(raw)) {
+    const domainId = stableId(rawDomainId, 'driveScalarSources domain id');
+    if (!allowed.has(domainId)) throw new Error(`Drive scalar source targets unknown domain ${domainId}`);
+    if (out.has(domainId)) throw new Error(`Duplicate Drive scalar source for ${domainId}`);
+    const sourceId = extractGoogleDriveScalarSourceId(rawSource);
+    out.set(domainId, {
+      sourceId,
+      pollIntervalMs: integer(
+        pollIntervalMs ?? DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
+        'driveScalarPollIntervalMs',
+        DRIVE_SCALAR_MIN_POLL_INTERVAL_MS,
+        DRIVE_SCALAR_MAX_POLL_INTERVAL_MS,
+      ),
+    });
+  }
+  return out;
 }
 
 function nodeProfileIds(nodeId) {
@@ -217,6 +268,8 @@ export function buildThreeLevelHierarchyTemplate({
   workersPerManager = 5,
   includeIntegrationManager = false,
   includeQaRedTeam = false,
+  driveScalarSources = null,
+  driveScalarPollIntervalMs = DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
 } = {}) {
   const graph = stableId(graphId, 'graphId');
   const epoch = integer(controlEpoch, 'controlEpoch', 1, Number.MAX_SAFE_INTEGER);
@@ -225,6 +278,11 @@ export function buildThreeLevelHierarchyTemplate({
   const issue = integer(controlIssueNumber || 0, 'controlIssueNumber', 0, Number.MAX_SAFE_INTEGER);
   const domainList = normalizeDomains(domains);
   const workerCount = integer(workersPerManager, 'workersPerManager', 1, MAX_WORKERS_PER_MANAGER);
+  const driveSources = normalizeDriveScalarSources(
+    driveScalarSources,
+    domainList.map(domain => domain.id),
+    driveScalarPollIntervalMs,
+  );
   const extraNodeCount = (includeIntegrationManager ? 1 : 0) + (includeQaRedTeam ? 1 : 0);
   const totalNodeCount = 1 + domainList.length + (domainList.length * workerCount) + extraNodeCount;
   if (totalNodeCount > 1000) throw new Error('Hierarchy template exceeds 1000 logical nodes');
@@ -247,6 +305,7 @@ export function buildThreeLevelHierarchyTemplate({
   for (const domain of domainList) {
     const managerId = `manager:${domain.id}`;
     const workerIds = Array.from({ length: workerCount }, (_, index) => `worker:${domain.id}:${String(index + 1).padStart(2, '0')}`);
+    const driveSource = driveSources.get(domain.id) || null;
     nodeSpecs.push({
       id: managerId,
       parentId: 'director',
@@ -254,6 +313,13 @@ export function buildThreeLevelHierarchyTemplate({
       role: OrchestrationRoleTemplate.DOMAIN_MANAGER,
       chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
       scope: domain.scope,
+      providerBinding: driveSource ? {
+        providerId: DRIVE_SCALAR_PROVIDER_V1,
+        groupNodeId: managerId,
+        maxSlots: workerIds.length,
+        sourceId: driveSource.sourceId,
+        pollIntervalMs: driveSource.pollIntervalMs,
+      } : null,
     });
     for (let index = 0; index < workerIds.length; index += 1) {
       nodeSpecs.push({
@@ -305,6 +371,7 @@ export function buildThreeLevelHierarchyTemplate({
         controlIssueNumber: issue,
         scope: spec.scope,
         childNodeIds: spec.childIds,
+        providerBinding: spec.providerBinding,
       }),
     });
     promptProfiles.push({
@@ -320,6 +387,7 @@ export function buildThreeLevelHierarchyTemplate({
         controlIssueNumber: issue,
         scope: spec.scope,
         childNodeIds: spec.childIds,
+        providerBinding: spec.providerBinding,
       }),
     });
     nodes.push({
@@ -333,6 +401,7 @@ export function buildThreeLevelHierarchyTemplate({
       barrier: {
         mode: spec.childIds.length ? OrchestrationBarrierMode.ALL_DIRECT_CHILDREN : OrchestrationBarrierMode.NONE,
       },
+      providerBinding: spec.providerBinding || null,
     });
   }
 

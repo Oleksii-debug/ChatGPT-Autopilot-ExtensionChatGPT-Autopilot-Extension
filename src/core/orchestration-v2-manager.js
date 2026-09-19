@@ -83,12 +83,21 @@ function normalizeMeta(raw) {
 }
 
 export class OrchestrationV2Manager {
-  constructor({ coreRepository, chromeApi, fetchFn = globalThis.fetch, collectAssistantReport = null, now = () => Date.now(), createId = null } = {}) {
+  constructor({
+    coreRepository,
+    chromeApi,
+    fetchFn = globalThis.fetch,
+    collectAssistantReport = null,
+    resolveHierarchyProvider = null,
+    now = () => Date.now(),
+    createId = null,
+  } = {}) {
     if (!coreRepository || !chromeApi?.storage?.local) throw new Error('Orchestration V2 manager dependencies are required');
     this.coreRepository = coreRepository;
     this.chrome = chromeApi;
     this.fetchFn = fetchFn;
     this.collectAssistantReport = collectAssistantReport;
+    this.resolveHierarchyProvider = typeof resolveHierarchyProvider === 'function' ? resolveHierarchyProvider : null;
     this.now = now;
     this.createId = createId || (() => `orch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     this.controllers = new Map();
@@ -158,6 +167,7 @@ export class OrchestrationV2Manager {
       configRepository,
       runtimeRepository,
       alarmName: alarmName(id),
+      resolveHierarchyProvider: this.resolveHierarchyProvider,
     });
     this.controllers.set(id, controller);
     return controller;
@@ -491,6 +501,8 @@ export class OrchestrationV2Manager {
       workersPerManager: options.workersPerManager,
       includeIntegrationManager: options.includeIntegrationManager === true,
       includeQaRedTeam: options.includeQaRedTeam === true,
+      driveScalarSources: options.driveScalarSources || null,
+      driveScalarPollIntervalMs: options.driveScalarPollIntervalMs,
     });
     const configured = await controller.configureHierarchy(graph, { nowMs: this.now() });
     return {
@@ -502,6 +514,9 @@ export class OrchestrationV2Manager {
         promptProfileCount: configured.graph.promptProfiles.length,
         managerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('manager:')).length,
         workerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('worker:')).length,
+        driveScalarProviderCount: configured.graph.nodeOrder.filter(
+          nodeId => configured.graph.nodesById[nodeId]?.providerBinding?.providerId === 'drive-scalar-v1',
+        ).length,
       },
       status: await this.getStatus(id),
     };

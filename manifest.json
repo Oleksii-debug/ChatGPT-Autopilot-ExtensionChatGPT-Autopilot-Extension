@@ -9,7 +9,8 @@
     "alarms",
     "tabs",
     "scripting",
-    "debugger"
+    "debugger",
+    "identity"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -17,7 +18,8 @@
     "http://127.0.0.1/*",
     "https://localhost/*",
     "https://127.0.0.1/*",
-    "https://api.github.com/*"
+    "https://api.github.com/*",
+    "https://www.googleapis.com/*"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
