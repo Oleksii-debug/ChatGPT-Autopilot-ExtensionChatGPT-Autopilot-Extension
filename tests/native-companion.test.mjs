@@ -104,14 +104,14 @@ test('extension client rejects mismatched or failed Native Companion responses',
 });
 
 test('host configuration requires one exact Chrome extension origin and unique scoped roots', () => {
-  const normalized = normalizeNativeCompanionConfig(config('C:\\Workspace'));
+  const normalized = normalizeNativeCompanionConfig(config(path.resolve(os.tmpdir(), 'Workspace')));
   assert.equal(normalized.allowedOrigin, ORIGIN);
   assert.equal(normalized.roots[0].rootId, 'workspace');
   assert.throws(() => normalizeNativeCompanionConfig({ schemaVersion: 1, allowedOrigin: 'chrome-extension://*/', roots: [] }), /allowedOrigin/);
   assert.throws(() => normalizeNativeCompanionConfig({
     schemaVersion: 1,
     allowedOrigin: ORIGIN,
-    roots: [{ rootId: 'same', path: 'C:\\One' }, { rootId: 'same', path: 'C:\\Two' }],
+    roots: [{ rootId: 'same', path: path.resolve(os.tmpdir(), 'One') }, { rootId: 'same', path: path.resolve(os.tmpdir(), 'Two') }],
   }), /unique/);
 });
 
