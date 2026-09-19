@@ -215,6 +215,7 @@ test('L2-A controller polls on existing wake, materializes exact slot count, and
   core=await h.core.load();
   assert.equal(core.sessionOrder.length,3,'same Drive revision after service-worker reconstruction must not duplicate slots');
   runtime=await h.runtime.load();
+  assert.equal(runtime.hierarchy.state.nodesById.manager.providerState.lastErrorCode,'','safe exact-once replay must not be reported as a Drive error');
   assert.equal(Object.keys(runtime.hierarchy.state.nodesById['worker-1'].activationLedger).length,1);
   assert.equal(Object.keys(runtime.hierarchy.state.nodesById['worker-2'].activationLedger).length,1);
 
