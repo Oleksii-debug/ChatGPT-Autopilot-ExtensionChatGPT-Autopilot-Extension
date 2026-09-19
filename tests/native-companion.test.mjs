@@ -263,7 +263,7 @@ test('extension manifest and Windows installer expose the exact native host cont
 
   const installer = await fs.readFile(path.join(repoRoot, 'companion', 'native-host', 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
   assert.match(installer, /\^\[a-p\]\{32\}\$/);
-  assert.match(installer, /HKCU:\\\\Software\\\\Google\\\\Chrome\\\\NativeMessagingHosts/);
+  assert.ok(installer.includes('HKCU:\\Software\\Google\\Chrome\\NativeMessagingHosts\\org.chatgpt_autopilot.companion'));
   assert.match(installer, /org\.chatgpt_autopilot\.companion/);
   assert.match(installer, /allowed_origins/);
   assert.doesNotMatch(installer, /chrome-extension:\/\/\*/);
