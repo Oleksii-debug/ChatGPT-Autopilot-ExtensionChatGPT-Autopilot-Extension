@@ -1,80 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { McpProviderV1, normalizeMcpProviderConfig } from '../src/core/mcp-provider.js';
-
-const config = { schemaVersion: 1, servers: [{ serverId: 'local.tools', enabled: true, transport: 'local-stdio', commandId: 'approved.node.helper', args: ['server.mjs'], envKeys: [], timeoutMs: 5000 }] };
-const invocation = { schemaVersion: 1, invocationId: 'inv-1', toolId: 'mcp/local.tools/read', providerId: 'mcp/local.tools', requestedCapabilityIds: ['mcp/local.tools/read'], policyDecisionId: 'decision-1', arguments: { path: 'a.txt' }, createdAt: '2026-09-19T20:00:00.000Z', parentInvocationId: null };
-const allow = { schemaVersion: 1, decisionId: 'decision-1', invocationId: 'inv-1', decision: 'ALLOW', reasonCode: 'OWNER_POLICY', reason: '', approvalId: null, decidedAt: '2026-09-19T20:00:01.000Z' };
-
-function factory(handler) {
-  return async () => ({ request: handler, close: async () => {} });
-}
-
-test('config is local-stdio only and rejects unknown/unallowlisted server metadata', () => {
-  assert.throws(() => normalizeMcpProviderConfig({ schemaVersion: 1, servers: [{ ...config.servers[0], transport: 'http' }] }), /local-stdio/);
-  assert.throws(() => normalizeMcpProviderConfig({ schemaVersion: 1, servers: [{ ...config.servers[0], command: 'node.exe' }] }), /unknown field/);
-});
-
-test('discovery returns descriptors but grants no execution authority', async () => {
-  const provider = new McpProviderV1({ config, transportFactory: factory(async (method) => {
-    assert.equal(method, 'tools/list');
-    return { tools: [{ name: 'read', description: 'Read', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } }] };
-  }) });
-  const tools = await provider.discoverTools('local.tools');
-  assert.equal(tools[0].toolId, 'mcp/local.tools/read');
-  assert.equal(tools[0].readOnly, true);
-  await assert.rejects(() => provider.invoke({ serverId: 'local.tools', invocation, policyDecision: { ...allow, decision: 'DENY' } }), /explicit ALLOW/);
-});
-
-test('invoke requires exact policy/invocation binding and forwards bounded call', async () => {
-  let call;
-  const provider = new McpProviderV1({ config, transportFactory: factory(async (method, params, meta) => {
-    call = { method, params, meta };
-    return { content: [{ type: 'text', text: 'ok' }] };
-  }), now: () => Date.parse('2026-09-19T20:00:02.000Z') });
-  await assert.rejects(() => provider.invoke({ serverId: 'local.tools', invocation, policyDecision: { ...allow, invocationId: 'inv-other' } }), /not bound/);
-  const result = await provider.invoke({ serverId: 'local.tools', invocation, policyDecision: allow });
-  assert.equal(call.method, 'tools/call');
-  assert.equal(call.params.name, 'read');
-  assert.equal(call.meta.invocationId, 'inv-1');
-  assert.equal(result.observedAt, '2026-09-19T20:00:02.000Z');
-});
-
-test('unallowlisted servers fail before transport creation', async () => {
-  let created = false;
-  const provider = new McpProviderV1({ config, transportFactory: async () => { created = true; return {}; } });
-  await assert.rejects(() => provider.discoverTools('evil'), /not enabled\/allowlisted/);
-  assert.equal(created, false);
-});
-
-test('ambiguous external effect is surfaced as RECONCILE boundary, never safe retry', async () => {
-  const provider = new McpProviderV1({ config, transportFactory: factory(async () => {
-    const error = new Error('connection lost after write');
-    error.effectMayHaveOccurred = true;
-    error.safeToRetry = true;
-    throw error;
-  }) });
-  await assert.rejects(async () => {
-    try { await provider.invoke({ serverId: 'local.tools', invocation, policyDecision: allow }); }
-    catch (error) {
-      assert.equal(error.code, 'MCP_EFFECT_AMBIGUOUS');
-      assert.equal(error.effectMayHaveOccurred, true);
-      assert.equal(error.safeToRetry, false);
-      throw error;
-    }
-  }, /connection lost/);
-});
-
-test('transport crash invalidates cached connection so next safe operation reconnects', async () => {
-  let generations = 0;
-  const provider = new McpProviderV1({ config, transportFactory: async () => {
-    const generation = ++generations;
-    return { request: async () => {
-      if (generation === 1) { const e = new Error('crash'); e.safeToRetry = true; throw e; }
-      return { tools: [] };
-    }, close: async () => {} };
-  } });
-  await assert.rejects(() => provider.discoverTools('local.tools'), /crash/);
-  assert.deepEqual(await provider.discoverTools('local.tools'), []);
-  assert.equal(generations, 2);
-});
+const config={schemaVersion:1,servers:[{serverId:'local.tools',enabled:true,transport:'local-stdio',commandId:'approved.node.helper',args:['server.mjs'],envKeys:[],timeoutMs:5000}]};
+const invocation={schemaVersion:1,invocationId:'inv-1',toolId:'mcp/local.tools/read',providerId:'mcp/local.tools',requestedCapabilityIds:['mcp/local.tools/read'],policyDecisionId:'decision-1',arguments:{path:'a.txt'},createdAt:'2026-09-19T20:00:00.000Z',parentInvocationId:null};
+const allow={schemaVersion:1,decisionId:'decision-1',invocationId:'inv-1',decision:'ALLOW',reasonCode:'OWNER_POLICY',reason:'',approvalId:null,decidedAt:'2026-09-19T20:00:01.000Z'};
+function factory(handler){return async()=>({request:handler,close:async()=>{}});}
+test('config is local-stdio only and rejects unknown/unallowlisted server metadata',()=>{assert.throws(()=>normalizeMcpProviderConfig({schemaVersion:1,servers:[{...config.servers[0],transport:'http'}]}),/local-stdio/);assert.throws(()=>normalizeMcpProviderConfig({schemaVersion:1,servers:[{...config.servers[0],command:'node.exe'}]}),/unknown field/);});
+test('discovery retains bounded schema authority but grants no execution authority',async()=>{const provider=new McpProviderV1({config,transportFactory:factory(async method=>{assert.equal(method,'tools/list');return{tools:[{name:'read',description:'Read',inputSchema:{type:'object',properties:{path:{type:'string'}},required:['path'],additionalProperties:false},annotations:{readOnlyHint:true}}]};})});const tools=await provider.discoverTools('local.tools');assert.equal(tools[0].toolId,'mcp/local.tools/read');assert.equal(tools[0].readOnly,true);assert.equal(provider.getInputSchema(tools[0].inputSchemaRef).properties.path.type,'string');await assert.rejects(()=>provider.invoke({serverId:'local.tools',invocation,policyDecision:{...allow,decision:'DENY'}}),/explicit ALLOW/);});
+test('malformed, duplicate, too-deep and oversized discovered schemas fail closed',async()=>{for(const tools of [[{name:'read',inputSchema:null}],[{name:'read',inputSchema:{type:'object'}},{name:'read',inputSchema:{type:'object'}}],[{name:'read',inputSchema:{type:'object',description:'x'.repeat(300000)}}]]){const provider=new McpProviderV1({config,transportFactory:factory(async()=>({tools}))});await assert.rejects(()=>provider.discoverTools('local.tools'),/schema|duplicate|large/i);}let deep={type:'object'};for(let i=0;i<30;i++)deep={type:'object',properties:{x:deep}};const provider=new McpProviderV1({config,transportFactory:factory(async()=>({tools:[{name:'read',inputSchema:deep}]}))});await assert.rejects(()=>provider.discoverTools('local.tools'),/deep/i);});
+test('retained discovered schema mediates invocation arguments',async()=>{let method='tools/list';const provider=new McpProviderV1({config,transportFactory:factory(async(m)=>{if(m==='tools/list')return{tools:[{name:'read',inputSchema:{type:'object',properties:{path:{type:'string'}},required:['path'],additionalProperties:false}}]};method=m;return{ok:true};})});await provider.discoverTools('local.tools');await assert.rejects(()=>provider.invoke({serverId:'local.tools',invocation:{...invocation,arguments:{path:7}},policyDecision:allow}),/wrong type/);await assert.rejects(()=>provider.invoke({serverId:'local.tools',invocation:{...invocation,arguments:{path:'a',secret:'x'}},policyDecision:allow}),/Unexpected/);await provider.invoke({serverId:'local.tools',invocation,policyDecision:allow});assert.equal(method,'tools/call');});
+test('invoke requires exact policy/invocation binding and forwards bounded call',async()=>{let call;const provider=new McpProviderV1({config,transportFactory:factory(async(method,params,meta)=>{call={method,params,meta};return{content:[{type:'text',text:'ok'}]};}),now:()=>Date.parse('2026-09-19T20:00:02.000Z')});await assert.rejects(()=>provider.invoke({serverId:'local.tools',invocation,policyDecision:{...allow,invocationId:'inv-other'}}),/not bound/);const result=await provider.invoke({serverId:'local.tools',invocation,policyDecision:allow});assert.equal(call.method,'tools/call');assert.equal(call.params.name,'read');assert.equal(call.meta.invocationId,'inv-1');assert.equal(result.observedAt,'2026-09-19T20:00:02.000Z');});
+test('unallowlisted servers fail before transport creation',async()=>{let created=false;const provider=new McpProviderV1({config,transportFactory:async()=>{created=true;return{};}});await assert.rejects(()=>provider.discoverTools('evil'),/not enabled\/allowlisted/);assert.equal(created,false);});
+test('ambiguous external effect is surfaced as RECONCILE boundary, never safe retry',async()=>{const provider=new McpProviderV1({config,transportFactory:factory(async()=>{const error=new Error('connection lost after write');error.effectMayHaveOccurred=true;error.safeToRetry=true;throw error;})});await assert.rejects(async()=>{try{await provider.invoke({serverId:'local.tools',invocation,policyDecision:allow});}catch(error){assert.equal(error.code,'MCP_EFFECT_AMBIGUOUS');assert.equal(error.effectMayHaveOccurred,true);assert.equal(error.safeToRetry,false);throw error;}},/connection lost/);});
+test('transport crash invalidates cached connection so next safe operation reconnects',async()=>{let generations=0;const provider=new McpProviderV1({config,transportFactory:async()=>{const generation=++generations;return{request:async()=>{if(generation===1){const e=new Error('crash');e.safeToRetry=true;throw e;}return{tools:[]};},close:async()=>{}};}});await assert.rejects(()=>provider.discoverTools('local.tools'),/crash/);assert.deepEqual(await provider.discoverTools('local.tools'),[]);assert.equal(generations,2);});
