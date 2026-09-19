@@ -64,6 +64,7 @@ function event(type, eventId, at, fields = {}) {
     type,
     effectId: 'invoke-1',
     at,
+    executionId: 'invoke-1:attempt:1',
     ...fields,
   };
 }
@@ -325,6 +326,61 @@ test('verification ambiguity routes to reconciliation; failed verification does 
   ));
   assert.equal(result.state.phase, ExactEffectPhase.MANUAL_REVIEW);
   assert.equal(result.action, 'MANUAL_REVIEW');
+});
+
+test('late evidence from an older execution attempt cannot satisfy a SAFE_RETRY attempt', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'start-attempt-1',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'ambiguous-attempt-1',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RESOLVE_RECONCILIATION,
+    'safe-retry-attempt-1',
+    '2026-09-19T12:00:03Z',
+    {
+      outcome: ReconciliationOutcome.SAFE_RETRY,
+      reasonCode: 'NO_EFFECT_PROVEN',
+    },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'start-attempt-2',
+    '2026-09-19T12:00:04Z',
+  )).state;
+  assert.equal(state.executionId, 'invoke-1:attempt:2');
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RECORD_OBSERVATION,
+      'late-observation-attempt-1',
+      '2026-09-19T12:00:05Z',
+      {
+        executionId: 'invoke-1:attempt:1',
+        observation: observation({ observationId: 'obs-late-attempt-1' }),
+      },
+    )),
+    /executionId does not match current exact-effect attempt/,
+  );
+
+  const current = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'observation-attempt-2',
+    '2026-09-19T12:00:05Z',
+    {
+      executionId: 'invoke-1:attempt:2',
+      observation: observation({ observationId: 'obs-attempt-2' }),
+    },
+  ));
+  assert.equal(current.state.phase, ExactEffectPhase.OBSERVED);
+  assert.equal(current.state.observation.observationId, 'obs-attempt-2');
 });
 
 test('effect event replay is idempotent across durable restart', () => {
