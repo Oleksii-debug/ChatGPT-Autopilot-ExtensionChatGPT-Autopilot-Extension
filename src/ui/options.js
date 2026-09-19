@@ -549,6 +549,21 @@ function orchestrationDriveFolderSourcesFromForm(domains) {
   return out;
 }
 
+async function authorizeSessionDrive() {
+  try {
+    $('authorize-session-drive-button').disabled = true;
+    $('drive-prompt-status').textContent = 'Відкриваю авторизацію Google Drive…';
+    await core('AUTHORIZE_ORCHESTRATION_V2_DRIVE');
+    $('drive-prompt-status').textContent = 'Google Drive авторизовано для Autopilot. Збережіть Session, щоб увімкнути синхронізацію.';
+    announce('Google Drive авторизовано.');
+  } catch (error) {
+    $('drive-prompt-status').textContent = `Авторизацію Drive не виконано: ${error.message}`;
+    announce('Авторизацію Google Drive не виконано.');
+  } finally {
+    $('authorize-session-drive-button').disabled = false;
+  }
+}
+
 async function authorizeOrchestrationDrive() {
   beginOrchestrationV2Action();
   try {
@@ -2127,6 +2142,8 @@ function portableDraftConfig(session) {
     urlMode: session.urlMode,
     sharedPrompt: session.sharedPrompt,
     defaultUniquePrompt: session.defaultUniquePrompt,
+    promptCadence: clone(session.promptCadence || null),
+    drivePromptSources: clone(session.drivePromptSources || null),
     runMode: session.runMode,
     tasks: clone(session.tasks || []),
     configuredTaskCount: Number(session.configuredTaskCount || session.tasks?.length || 1),
@@ -2219,6 +2236,13 @@ async function refreshSelectedSessionStatus(sessionId) {
     ui.selected.actionAvailability = latest.actionAvailability;
     ui.selected.status = latest.status;
     ui.selected.log = latest.log;
+
+    // Runtime Drive evidence is safe to refresh live, but never write it back
+    // into the visible draft inputs. The user may currently be editing another
+    // file/target locally; only the status line follows canonical runtime state.
+    const latestDriveBinding = latest.drivePromptSources?.bindings?.[0] || null;
+    renderDrivePromptRuntimeStatus(latestDriveBinding);
+
     const signature = JSON.stringify([
       latest.version,
       latest.runState,
@@ -2227,6 +2251,10 @@ async function refreshSelectedSessionStatus(sessionId) {
       latest.log?.length || 0,
       latest.log?.at?.(-1)?.at || 0,
       latest.log?.at?.(-1)?.message || '',
+      latestDriveBinding?.lastAcceptedVersion || '',
+      latestDriveBinding?.lastCheckedAt || 0,
+      latestDriveBinding?.nextCheckAt || 0,
+      latestDriveBinding?.lastErrorCode || '',
     ]);
     if (signature !== lastRuntimeSignature) {
       lastRuntimeSignature = signature;
@@ -2300,6 +2328,13 @@ function syncTaskModeVisibility() {
   $('unique-default-container').hidden = parts.promptMode !== 'unique';
 }
 
+function renderDrivePromptRuntimeStatus(binding) {
+  if (!$('drive-prompt-status')) return;
+  $('drive-prompt-status').textContent = binding
+    ? `Drive: ${binding.enabled ? 'увімкнено' : 'вимкнено'}; target ${binding.target || 'PRIMARY'}; accepted version ${binding.lastAcceptedVersion || 'ще немає'}; остання перевірка ${binding.lastCheckedAt ? new Date(binding.lastCheckedAt).toLocaleString() : 'ще не було'}; ${binding.lastErrorCode ? `помилка ${binding.lastErrorCode}` : 'помилок немає'}.`
+    : 'Drive source вимкнено.';
+}
+
 function renderEditor() {
   if (!ui.selected) return;
   $('empty-state').hidden = true; $('session-editor').hidden = false;
@@ -2312,6 +2347,22 @@ function renderEditor() {
   $('shared-task-url').value = ui.selected.tasks?.[0]?.url || '';
   $('shared-prompt').value = ui.selected.sharedPrompt || '';
   $('default-unique-prompt').value = ui.selected.defaultUniquePrompt || '';
+  const cadence = ui.selected.promptCadence || {};
+  const prompt2 = cadence.prompt2 || {};
+  const prompt3 = cadence.prompt3 || {};
+  $('prompt-2-enabled').checked = prompt2.enabled === true;
+  $('prompt-2-every').value = String(prompt2.everyN ?? 10);
+  $('prompt-2-text').value = prompt2.prompt || '';
+  $('prompt-3-enabled').checked = prompt3.enabled === true;
+  $('prompt-3-every').value = String(prompt3.everyN ?? 20);
+  $('prompt-3-text').value = prompt3.prompt || '';
+  const driveBinding = ui.selected.drivePromptSources?.bindings?.[0] || null;
+  $('drive-prompt-enabled').checked = driveBinding?.enabled === true;
+  $('drive-prompt-file').value = driveBinding?.fileId || '';
+  $('drive-prompt-target').value = driveBinding?.target || 'PRIMARY';
+  $('drive-prompt-interval').value = String(Math.max(1, Math.round(Number(driveBinding?.pollIntervalMs || 180000) / 60000)));
+  $('drive-prompt-min-chars').value = String(driveBinding?.minChars ?? 1000);
+  renderDrivePromptRuntimeStatus(driveBinding);
   $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
   $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
   $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
@@ -2418,6 +2469,41 @@ function collectEditor() {
   }
   s.sharedPrompt = $('shared-prompt').value;
   s.defaultUniquePrompt = $('default-unique-prompt').value;
+  s.promptCadence = {
+    schemaVersion: 1,
+    prompt2: {
+      enabled: $('prompt-2-enabled').checked,
+      everyN: Number($('prompt-2-every').value),
+      prompt: $('prompt-2-text').value,
+    },
+    prompt3: {
+      enabled: $('prompt-3-enabled').checked,
+      everyN: Number($('prompt-3-every').value),
+      prompt: $('prompt-3-text').value,
+    },
+  };
+  const driveEnabled = $('drive-prompt-enabled').checked;
+  const driveSourceText = $('drive-prompt-file').value.trim();
+  const driveTarget = $('drive-prompt-target').value;
+  const priorDrive = s.drivePromptSources?.bindings?.[0] || null;
+  const preserveDriveRuntime = priorDrive
+    && priorDrive.target === driveTarget
+    && priorDrive.fileId === driveSourceText;
+  s.drivePromptSources = {
+    schemaVersion: 1,
+    bindings: (driveEnabled || driveSourceText) ? [{
+      target: driveTarget,
+      enabled: driveEnabled,
+      fileId: driveSourceText,
+      pollIntervalMs: Number($('drive-prompt-interval').value) * 60000,
+      minChars: Number($('drive-prompt-min-chars').value),
+      lastAcceptedVersion: preserveDriveRuntime ? (priorDrive.lastAcceptedVersion || '') : '',
+      lastAcceptedHash: preserveDriveRuntime ? (priorDrive.lastAcceptedHash || '') : '',
+      lastCheckedAt: preserveDriveRuntime ? Number(priorDrive.lastCheckedAt || 0) : 0,
+      nextCheckAt: preserveDriveRuntime ? Number(priorDrive.nextCheckAt || 0) : 0,
+      lastErrorCode: preserveDriveRuntime ? (priorDrive.lastErrorCode || '') : '',
+    }] : [],
+  };
   s.runMode = document.querySelector('input[name="runMode"]:checked')?.value || 'continuous';
   s.configuredTaskCount = Number($('task-count').value);
   s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
@@ -2459,6 +2545,35 @@ function validate(session) {
     if (session.promptMode === 'unique' && !task.promptOverride.trim()) errors.push([`task-prompt-${task.id}`, `Prompt for Task ${i + 1} is required.`]);
   });
   if (hasEnabledTasks && session.promptMode === 'shared' && !session.sharedPrompt.trim()) errors.push(['shared-prompt', 'Shared prompt is required.']);
+  const cadence = session.promptCadence || {};
+  for (const [ordinal, rule, everyId, textId] of [
+    [2, cadence.prompt2 || {}, 'prompt-2-every', 'prompt-2-text'],
+    [3, cadence.prompt3 || {}, 'prompt-3-every', 'prompt-3-text'],
+  ]) {
+    const everyN = Number(rule.everyN);
+    if (!Number.isInteger(everyN) || everyN < 2 || everyN > 1000000) {
+      errors.push([everyId, `Prompt ${ordinal}: N має бути цілим числом від 2 до 1000000.`]);
+    }
+    if (rule.enabled === true && !String(rule.prompt || '').trim()) {
+      errors.push([textId, `Prompt ${ordinal} увімкнений, але текст порожній.`]);
+    }
+  }
+  const driveBinding = session.drivePromptSources?.bindings?.[0] || null;
+  if (driveBinding) {
+    const intervalMinutes = Number(driveBinding.pollIntervalMs) / 60000;
+    if (!Number.isInteger(intervalMinutes) || intervalMinutes < 1 || intervalMinutes > 1440) {
+      errors.push(['drive-prompt-interval', 'Drive interval має бути цілим числом від 1 до 1440 хвилин.']);
+    }
+    if (!Number.isInteger(Number(driveBinding.minChars)) || Number(driveBinding.minChars) < 1 || Number(driveBinding.minChars) > 1000000) {
+      errors.push(['drive-prompt-min-chars', 'Мінімальна довжина Drive prompt має бути від 1 до 1000000 символів.']);
+    }
+    if (driveBinding.enabled && !String(driveBinding.fileId || '').trim()) {
+      errors.push(['drive-prompt-file', 'Для увімкненого Drive source потрібне посилання або file ID.']);
+    }
+    if (driveBinding.enabled && driveBinding.target === 'PRIMARY' && session.promptMode === 'unique') {
+      errors.push(['drive-prompt-target', 'Primary Drive prompt доступний лише для shared prompt mode. Для unique mode виберіть Prompt 2 або Prompt 3.']);
+    }
+  }
   const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const intervalMax = intervalUnit === 'seconds' ? 86400 : 1440;
   if (!(session.minimumSendIntervalValue >= 1 && session.minimumSendIntervalValue <= intervalMax)) errors.push(['minimum-send-interval', `Minimum send interval must be between 1 and ${intervalMax} ${intervalUnit}.`]);
@@ -2972,9 +3087,29 @@ document.querySelectorAll('input[name="taskConfigurationMode"]').forEach((input)
 $('task-count').addEventListener('change', onTaskCountChange);
 $('task-count').addEventListener('input', () => { if ($('task-count').value) onTaskCountChange(); });
 $('shared-task-url').addEventListener('input', onSharedUrlInput);
+for (const id of [
+  'shared-prompt',
+  'default-unique-prompt',
+  'prompt-2-enabled',
+  'prompt-2-every',
+  'prompt-2-text',
+  'prompt-3-enabled',
+  'prompt-3-every',
+  'prompt-3-text',
+  'drive-prompt-enabled',
+  'drive-prompt-file',
+  'drive-prompt-target',
+  'drive-prompt-interval',
+  'drive-prompt-min-chars',
+]) {
+  const field = $(id);
+  const eventName = field?.tagName === 'SELECT' || field?.type === 'checkbox' ? 'change' : 'input';
+  field?.addEventListener(eventName, scheduleDraftPersistence);
+}
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
+$('authorize-session-drive-button').addEventListener('click', authorizeSessionDrive);
 $('save-session-button').addEventListener('click', saveSession);
 $('start-session-button').addEventListener('click', () => action('START_SESSION', 'Start'));
 $('pause-session-button').addEventListener('click', () => action('PAUSE_SESSION', 'Pause'));

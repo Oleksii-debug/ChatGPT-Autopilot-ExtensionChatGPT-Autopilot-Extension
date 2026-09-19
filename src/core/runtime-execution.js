@@ -160,6 +160,7 @@ export async function reconcileRuntimeColdStart({
   repository,
   chromeApi,
   executionAvailable = false,
+  syncDrivePrompts = null,
   now = () => Date.now(),
 }) {
   if (!repository || !chromeApi) throw new Error('Runtime cold-start dependencies are required');
@@ -391,6 +392,7 @@ export async function runRuntimeCycle({
   executor,
   startup = false,
   executionAvailable = false,
+  syncDrivePrompts = null,
   now = () => Date.now(),
 }) {
   if (!repository || !chromeApi || !executor) throw new Error('Runtime dependencies are required');
@@ -448,9 +450,25 @@ export async function runRuntimeCycle({
     outcomes.push(...concurrentOutcomes.filter(Boolean));
   }
 
+  let drivePromptSync = null;
+  if (typeof syncDrivePrompts === 'function') {
+    try {
+      drivePromptSync = await syncDrivePrompts({ nowMs: now() });
+    } catch (error) {
+      drivePromptSync = {
+        checked: 0,
+        accepted: 0,
+        failed: 1,
+        error: error?.code || error?.message || 'DRIVE_PROMPT_SYNC_FAILED',
+      };
+    }
+  }
+
   const finalState = await repository.load();
   const wakeAt = await reconcileAlarm(chromeApi, finalState, now());
-  return { state: finalState, outcomes, wakeAt };
+  const result = { state: finalState, outcomes, wakeAt };
+  if (typeof syncDrivePrompts === 'function') result.drivePromptSync = drivePromptSync;
+  return result;
 }
 
 export const RuntimeExecutionConstants = Object.freeze({

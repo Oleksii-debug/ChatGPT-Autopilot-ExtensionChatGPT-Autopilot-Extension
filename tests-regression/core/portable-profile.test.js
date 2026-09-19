@@ -167,3 +167,79 @@ test('portable auto-start allows parallel Sessions on the same launch surface bu
     /already owned/,
   );
 });
+
+
+test('portable profile round-trips cadence and Drive config but strips Drive runtime evidence', () => {
+  const state = createEmptyState(0);
+  applyPortableProfile(state, profile(), { now: 100 });
+  const session = state.sessionsById['session-1'];
+  session.promptCadence = {
+    schemaVersion: 1,
+    prompt2: { enabled: true, prompt: 'Prompt two', everyN: 7 },
+    prompt3: { enabled: true, prompt: 'Prompt three', everyN: 13 },
+  };
+  session.drivePromptSources = {
+    schemaVersion: 1,
+    bindings: [{
+      target: 'PROMPT_2',
+      enabled: true,
+      fileId: 'file_abcdef',
+      pollIntervalMs: 180000,
+      minChars: 1200,
+      lastAcceptedVersion: '55',
+      lastAcceptedHash: 'a'.repeat(64),
+      lastCheckedAt: 123456,
+      nextCheckAt: 456789,
+      lastErrorCode: 'NETWORK',
+    }],
+  };
+
+  const exported = exportPortableProfile(state, { profileName: 'Cadence + Drive' });
+  const portable = exported.sessions[0];
+  assert.deepEqual(portable.promptCadence, session.promptCadence);
+  assert.deepEqual(portable.drivePromptSources, {
+    schemaVersion: 1,
+    bindings: [{
+      target: 'PROMPT_2',
+      enabled: true,
+      fileId: 'file_abcdef',
+      pollIntervalMs: 180000,
+      minChars: 1200,
+    }],
+  });
+  assert.equal(JSON.stringify(portable).includes('lastAcceptedVersion'), false);
+  assert.equal(JSON.stringify(portable).includes('lastAcceptedHash'), false);
+  assert.equal(JSON.stringify(portable).includes('NETWORK'), false);
+
+  const restored = createEmptyState(0);
+  applyPortableProfile(restored, exported, { now: 200 });
+  const imported = restored.sessionsById['session-1'];
+  assert.deepEqual(imported.promptCadence, session.promptCadence);
+  assert.deepEqual(imported.drivePromptSources, {
+    schemaVersion: 1,
+    bindings: [{
+      target: 'PROMPT_2',
+      enabled: true,
+      fileId: 'file_abcdef',
+      pollIntervalMs: 180000,
+      minChars: 1200,
+      lastAcceptedVersion: '',
+      lastAcceptedHash: '',
+      lastCheckedAt: 0,
+      nextCheckAt: 0,
+      lastErrorCode: '',
+    }],
+  });
+});
+
+test('portable profile remains backward compatible when cadence and Drive config are absent', () => {
+  const input = profile();
+  delete input.sessions[0].promptCadence;
+  delete input.sessions[0].drivePromptSources;
+  const state = createEmptyState(0);
+  assert.doesNotThrow(() => applyPortableProfile(state, input, { now: 100 }));
+  const session = state.sessionsById['session-1'];
+  assert.equal(session.promptCadence.prompt2.enabled, false);
+  assert.equal(session.promptCadence.prompt3.enabled, false);
+  assert.deepEqual(session.drivePromptSources, { schemaVersion: 1, bindings: [] });
+});

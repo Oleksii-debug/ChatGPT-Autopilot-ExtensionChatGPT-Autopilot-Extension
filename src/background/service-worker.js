@@ -30,6 +30,10 @@ import {
   DriveFolderDispatchProviderV1,
   createGoogleDriveFolderDispatchReader,
 } from '../core/orchestration-drive-folder-provider.js';
+import {
+  createGoogleSessionDrivePromptReader,
+  syncDueSessionDrivePrompts,
+} from '../core/session-drive-prompt-source.js';
 
 const EXECUTION_AVAILABLE = true;
 const READ_ONLY_UI_COMMANDS = new Set([
@@ -110,6 +114,17 @@ async function resolveOrchestrationHierarchyProvider({ binding } = {}) {
     });
   }
   return null;
+}
+
+async function syncSessionDrivePrompts({ nowMs = Date.now() } = {}) {
+  return syncDueSessionDrivePrompts(repo, {
+    nowMs,
+    resolveReader: async binding => createGoogleSessionDrivePromptReader({
+      fileId: binding.fileId,
+      getAccessToken: () => getChromeDriveAccessToken(chrome, { interactive: false }),
+      fetchFn: (...args) => fetch(...args),
+    }),
+  });
 }
 
 async function probeAssistantConversation(job) {
@@ -207,6 +222,7 @@ function beginColdStartReconciliation() {
       repository: repo,
       chromeApi: chrome,
       executionAvailable: EXECUTION_AVAILABLE,
+      syncDrivePrompts: syncSessionDrivePrompts,
     });
     await remoteDispatch.reconcileAlarm();
     // Reconstruct only deterministic alarms here. Ordinary MV3 service-worker
@@ -269,6 +285,7 @@ async function stateAfterManager(result) {
     executor,
     startup: false,
     executionAvailable: false,
+    syncDrivePrompts: syncSessionDrivePrompts,
   });
   return reconciled.state;
 }
@@ -316,6 +333,7 @@ export function runExecutionCycle() {
       executor,
       startup: false,
       executionAvailable: EXECUTION_AVAILABLE,
+      syncDrivePrompts: syncSessionDrivePrompts,
     });
     const remoteSync = await remoteDispatch.syncAfterCoreCycle();
     const orchestrationSync = await orchestrationV2.syncAfterCoreCycle();
@@ -333,6 +351,7 @@ export function runExecutionCycle() {
         executor,
         startup: false,
         executionAvailable: false,
+        syncDrivePrompts: syncSessionDrivePrompts,
       });
     }
     const stateAfterRemoteSync = await repo.load();
@@ -419,6 +438,7 @@ export async function reconcileRuntime() {
     executor,
     startup: false,
     executionAvailable: false,
+    syncDrivePrompts: syncSessionDrivePrompts,
   });
   await notifyStatusChanged(cycle.state);
   return cycle.state;

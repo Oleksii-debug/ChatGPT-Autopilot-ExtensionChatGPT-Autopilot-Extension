@@ -1,3 +1,5 @@
+import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
+import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { CoreCommand } from '../shared/protocol.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, MAX_PHYSICAL_TASKS, MAX_LOGICAL_TASKS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, isExclusiveConversationUrl, normalizeChatUrl } from './schema.js';
 import { configuredTaskCount as logicalTaskCount, isCompactLogicalSession, onePassCompletedCount } from './scheduler.js';
@@ -135,6 +137,8 @@ export function sessionFromUi(config, now = Date.now()) {
     tabStrategy: tabStrategyFromUi(config.tabStrategy), now
   });
   session.version = Math.max(1, Number(config.version) || 1);
+  session.promptCadence = normalizeSessionPromptCadence(config.promptCadence);
+  session.drivePromptSources = normalizeSessionDrivePromptSources(config.drivePromptSources);
   session.defaultUniquePrompt = config.defaultUniquePrompt || '';
   session.retryPolicy = config.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
