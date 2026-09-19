@@ -1173,14 +1173,14 @@ export class OrchestrationV2Controller {
       const sync = await this.syncAfterCoreCycle({ nowMs });
       let runtime = await this.runtimeRepository.load();
       if (hierarchyContainer(runtime)) {
-        const hierarchyProviders = await this.pollHierarchyProviders({ nowMs });
         const hierarchyProbe = await this.probeHierarchyCompletions({ nowMs });
+        const hierarchyProviders = await this.pollHierarchyProviders({ nowMs });
         await this.reconcileAlarm({ nowMs });
         return {
           kind: 'HIERARCHY_CYCLE',
           sync,
-          hierarchyProviders,
           hierarchyProbe,
+          hierarchyProviders,
           status: await this.getStatus(),
         };
       }
