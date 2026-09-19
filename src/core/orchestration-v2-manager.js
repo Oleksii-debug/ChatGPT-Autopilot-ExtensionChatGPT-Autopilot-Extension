@@ -8,6 +8,7 @@ import {
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
 import { OrchestrationHierarchyEventType } from './orchestration-hierarchy.js';
+import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
@@ -461,6 +462,49 @@ export class OrchestrationV2Manager {
     const meta = await this.loadMeta();
     if (!meta.selectedId || !meta.byId[meta.selectedId]) throw new Error('Create or select an orchestra first.');
     return { id: meta.selectedId, item: meta.byId[meta.selectedId], controller: this.controllerFor(meta.selectedId) };
+  }
+
+  async configureHierarchyTemplate(options = {}) {
+    const { id, item, controller } = await this.selectedController();
+    const { config } = await controller.getStatus();
+    if (!config.projectId || !config.targetRepository) {
+      throw new Error('Save project ID and target repository before configuring hierarchy.');
+    }
+    if (config.enabled && item.ownerPaused !== true) {
+      throw new Error('Pause or disable the orchestra before configuring hierarchy.');
+    }
+
+    const runtime = await controller.runtimeRepository.load();
+    const currentGraphId = hierarchyGraphId(runtime);
+    const safety = await this.managedCoreSafety(config.projectId, currentGraphId);
+    if (safety.managed.length) {
+      throw new Error('Hierarchy template can only be configured before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
+    }
+
+    const graph = buildThreeLevelHierarchyTemplate({
+      graphId: options.graphId || `${id}-hierarchy`,
+      controlEpoch: Number(options.controlEpoch || 1),
+      projectId: config.projectId,
+      targetRepository: config.targetRepository,
+      controlIssueNumber: config.controlIssueNumber || 0,
+      domains: options.domains,
+      workersPerManager: options.workersPerManager,
+      includeIntegrationManager: options.includeIntegrationManager === true,
+      includeQaRedTeam: options.includeQaRedTeam === true,
+    });
+    const configured = await controller.configureHierarchy(graph, { nowMs: this.now() });
+    return {
+      hierarchy: {
+        graphId: configured.graph.graphId,
+        controlEpoch: configured.graph.controlEpoch,
+        rootCount: configured.graph.rootIds.length,
+        nodeCount: configured.graph.nodeOrder.length,
+        promptProfileCount: configured.graph.promptProfiles.length,
+        managerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('manager:')).length,
+        workerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('worker:')).length,
+      },
+      status: await this.getStatus(id),
+    };
   }
 
   async previewProfile(profile) { return previewOrchestrationProfile(profile); }
