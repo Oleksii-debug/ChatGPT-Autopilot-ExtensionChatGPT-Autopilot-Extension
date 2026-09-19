@@ -31,6 +31,7 @@ export const ExactEffectEventType = Object.freeze({
 });
 
 export const ExactEffectActionType = Object.freeze({
+  START_EXECUTION: 'START_EXECUTION',
   EXECUTE: 'EXECUTE',
   VERIFY: 'VERIFY',
   RECONCILE: 'RECONCILE',
@@ -206,7 +207,7 @@ export function planExactEffectRecoveryV1(input) {
   const state = normalizeExactEffectV1(input);
   switch (state.phase) {
     case ExactEffectPhase.PREPARED:
-      return [baseAction(ExactEffectActionType.EXECUTE, state)];
+      return [baseAction(ExactEffectActionType.START_EXECUTION, state)];
     case ExactEffectPhase.EXECUTING:
     case ExactEffectPhase.AMBIGUOUS:
     case ExactEffectPhase.RECONCILING:
@@ -250,7 +251,7 @@ export function reduceExactEffectV1(stateInput, eventInput, { nowMs = Date.now()
   if (event.type === ExactEffectEventType.EXECUTION_STARTED) {
     if (state.phase !== ExactEffectPhase.PREPARED) return result(state, planExactEffectRecoveryV1(state), 'EXECUTION_NOT_ALLOWED');
     const next = withState(state, { phase: ExactEffectPhase.EXECUTING }, nowMs);
-    return result(next, [], 'EXECUTION_STARTED');
+    return result(next, [baseAction(ExactEffectActionType.EXECUTE, next)], 'EXECUTION_STARTED');
   }
 
   if (event.type === ExactEffectEventType.PRE_EFFECT_ABORTED) {
