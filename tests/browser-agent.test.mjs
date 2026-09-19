@@ -6,6 +6,10 @@ import {
   buildBrowserAgentPlannerPrompt,
   BrowserAgentRepeatMode,
   BrowserAgentApprovalMode,
+  BrowserAgentPolicyDecision,
+  normalizeBrowserAgentSiteRules,
+  resolveBrowserAgentOwnerPolicy,
+  resolveBrowserAgentCredentialPolicy,
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
   browserSnapshotSignature,
@@ -165,6 +169,38 @@ test('consequential approval is default policy and classifies multilingual final
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r1' }).requiresApproval, true);
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r2' }).requiresApproval, false);
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r3' }).requiresApproval, true, 'neutral text still requires approval when the live control is a form submit');
+});
+
+test('owner site policy overrides global autonomy and supports credentials independently', () => {
+  const value = config({
+    approvalMode: 'ALLOW_ALL',
+    credentialDecision: 'ALLOW',
+    siteRules: [
+      { pattern: '*.example.edu', defaultDecision: 'ASK', actionDecisions: { trusted_script: 'DENY', credentials: 'ASK' } },
+      { pattern: 'ais.example.edu', defaultDecision: 'ALLOW', actionDecisions: { upload_download: 'DENY', credentials: 'ALLOW' } },
+    ],
+  });
+  assert.equal(value.credentialDecision, BrowserAgentPolicyDecision.ALLOW);
+  assert.deepEqual(value.siteRules, normalizeBrowserAgentSiteRules(value.siteRules));
+  const snapshot = { url: 'https://ais.example.edu/app', frames: [] };
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, snapshot, { type: 'click' }, { requiresApproval: true }).decision, BrowserAgentPolicyDecision.ALLOW);
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, snapshot, { type: 'upload_download' }, { requiresApproval: true }).decision, BrowserAgentPolicyDecision.DENY);
+  assert.equal(resolveBrowserAgentCredentialPolicy(value, snapshot.url).decision, BrowserAgentPolicyDecision.ALLOW);
+
+  const wildcardSnapshot = { url: 'https://other.example.edu/app', frames: [] };
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, wildcardSnapshot, { type: 'click' }, { requiresApproval: false }).decision, BrowserAgentPolicyDecision.ASK);
+  assert.equal(resolveBrowserAgentOwnerPolicy(value, wildcardSnapshot, { type: 'trusted_script' }, { requiresApproval: true }).decision, BrowserAgentPolicyDecision.DENY);
+  assert.equal(resolveBrowserAgentCredentialPolicy(value, wildcardSnapshot.url).decision, BrowserAgentPolicyDecision.ASK);
+});
+
+test('site policy validation rejects ambiguous duplicates and unsupported action keys', () => {
+  assert.throws(() => config({ siteRules: [
+    { pattern: 'example.com', defaultDecision: 'ALLOW' },
+    { pattern: 'example.com', defaultDecision: 'DENY' },
+  ] }), /Duplicate Browser Agent site policy/);
+  assert.throws(() => config({ siteRules: [
+    { pattern: 'example.com', defaultDecision: 'ALLOW', actionDecisions: { arbitrary_shell: 'ALLOW' } },
+  ] }), /Unsupported Browser Agent policy action/);
 });
 
 test('vision coordinate click is allowed only for the screenshot turn and stays inside the current viewport', () => {
@@ -1924,7 +1960,7 @@ test('Trusted Script runs autonomously under ALLOW_ALL while preserving CDP sand
   const unblockIndex = debuggerCalls.findIndex((call, index) => index > evalIndex && call.method === 'Network.setBlockedURLs' && Array.isArray(call.params.urls) && call.params.urls.length === 0);
   assert.ok(blockIndex >= 0 && blockIndex < evalIndex, 'network guard must be armed before Trusted Script execution');
   assert.ok(unblockIndex > evalIndex, 'network guard must be removed after Trusted Script execution');
-  live = await manager.get('job-1');
+  const live = await manager.get('job-1');
   assert.equal(live.job.runtime.stepCount, 1);
   const serializedHistory = JSON.stringify(live.job.runtime.history);
   assert.ok(!serializedHistory.includes('querySelector'), 'durable history must redact Trusted Script source after execution');
