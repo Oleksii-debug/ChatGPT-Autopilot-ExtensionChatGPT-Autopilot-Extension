@@ -1,165 +1,45 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const CalendarScheduleKind = Object.freeze({
-  ONE_TIME: 'ONE_TIME',
-  DAILY: 'DAILY',
-  EXPLICIT: 'EXPLICIT',
-});
-
+export const CalendarScheduleKind = Object.freeze({ ONE_TIME: 'ONE_TIME', DAILY: 'DAILY', EXPLICIT: 'EXPLICIT' });
 export const CalendarCatchUp = Object.freeze({ OFF: 'OFF', ON: 'ON' });
 
-function requireRecord(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid ${label}`);
-}
-
-function requireTimeZone(timeZone) {
-  const value = String(timeZone || '').trim();
-  if (!value) throw new Error('Calendar schedule timeZone required');
-  try { new Intl.DateTimeFormat('en-US', { timeZone: value }).format(0); } catch { throw new Error('Invalid calendar schedule timeZone'); }
-  return value;
-}
-
-function parseDate(value, label = 'date') {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(String(value || ''));
-  if (!match) throw new Error(`Invalid calendar schedule ${label}`);
-  const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]);
-  const probe = new Date(Date.UTC(year, month - 1, day));
-  if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) throw new Error(`Invalid calendar schedule ${label}`);
-  return { year, month, day, key: `${match[1]}-${match[2]}-${match[3]}` };
-}
-
-function parseTime(value, label = 'time') {
-  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/u.exec(String(value || ''));
-  if (!match) throw new Error(`Invalid calendar schedule ${label}`);
-  const hour = Number(match[1]); const minute = Number(match[2]); const second = Number(match[3] || 0);
-  if (hour > 23 || minute > 59 || second > 59) throw new Error(`Invalid calendar schedule ${label}`);
-  return { hour, minute, second, key: `${match[1]}:${match[2]}:${String(second).padStart(2, '0')}` };
-}
-
-function localPartsAt(epochMs, timeZone) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date(epochMs));
-  const get = type => Number(parts.find(part => part.type === type)?.value);
-  return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') };
-}
-
-function localScalar(parts) {
-  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour || 0, parts.minute || 0, parts.second || 0);
-}
-
-// Convert a wall-clock value to an instant without depending on the host's local
-// timezone. Iteration converges on ordinary instants and both sides of DST
-// offset changes. Non-existent spring-forward wall times are rejected.
-export function zonedDateTimeToEpochMs({ date, time, timeZone }) {
-  const d = typeof date === 'string' ? parseDate(date) : date;
-  const t = typeof time === 'string' ? parseTime(time) : time;
-  const zone = requireTimeZone(timeZone);
-  const wanted = { ...d, ...t };
-  const wantedScalar = localScalar(wanted);
-  let guess = wantedScalar;
-  for (let i = 0; i < 6; i += 1) {
-    const actual = localPartsAt(guess, zone);
-    const delta = wantedScalar - localScalar(actual);
-    if (delta === 0) break;
-    guess += delta;
-  }
-  const resolved = localPartsAt(guess, zone);
-  if (localScalar(resolved) !== wantedScalar) throw new Error('Calendar wall time does not exist in configured timezone');
-  return guess;
-}
-
-function addLocalDays(date, days) {
-  const probe = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
-  return { year: probe.getUTCFullYear(), month: probe.getUTCMonth() + 1, day: probe.getUTCDate(), key: probe.toISOString().slice(0, 10) };
-}
-
-function normalizeExplicitOccurrence(item, timeZone) {
-  requireRecord(item, 'calendar occurrence');
-  const date = parseDate(item.date, 'occurrence date');
-  const time = parseTime(item.time, 'occurrence time');
-  const scheduledAt = zonedDateTimeToEpochMs({ date, time, timeZone });
-  return { date: date.key, time: time.key, scheduledAt };
-}
+function requireRecord(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid ${label}`); }
+function requireTimeZone(timeZone) { const value = String(timeZone || '').trim(); if (!value) throw new Error('Calendar schedule timeZone required'); try { new Intl.DateTimeFormat('en-US', { timeZone: value }).format(0); } catch { throw new Error('Invalid calendar schedule timeZone'); } return value; }
+function parseDate(value, label = 'date') { const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(String(value || '')); if (!match) throw new Error(`Invalid calendar schedule ${label}`); const year = Number(match[1]); const month = Number(match[2]); const day = Number(match[3]); const probe = new Date(Date.UTC(year, month - 1, day)); if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) throw new Error(`Invalid calendar schedule ${label}`); return { year, month, day, key: `${match[1]}-${match[2]}-${match[3]}` }; }
+function parseTime(value, label = 'time') { const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/u.exec(String(value || '')); if (!match) throw new Error(`Invalid calendar schedule ${label}`); const hour = Number(match[1]); const minute = Number(match[2]); const second = Number(match[3] || 0); if (hour > 23 || minute > 59 || second > 59) throw new Error(`Invalid calendar schedule ${label}`); return { hour, minute, second, key: `${match[1]}:${match[2]}:${String(second).padStart(2, '0')}` }; }
+function localPartsAt(epochMs, timeZone) { const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(epochMs)); const get = type => Number(parts.find(part => part.type === type)?.value); return { year: get('year'), month: get('month'), day: get('day'), hour: get('hour'), minute: get('minute'), second: get('second') }; }
+function localScalar(parts) { return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour || 0, parts.minute || 0, parts.second || 0); }
+export function zonedDateTimeToEpochMs({ date, time, timeZone }) { const d = typeof date === 'string' ? parseDate(date) : date; const t = typeof time === 'string' ? parseTime(time) : time; const zone = requireTimeZone(timeZone); const wanted = { ...d, ...t }; const wantedScalar = localScalar(wanted); let guess = wantedScalar; for (let i = 0; i < 6; i += 1) { const actual = localPartsAt(guess, zone); const delta = wantedScalar - localScalar(actual); if (delta === 0) break; guess += delta; } const resolved = localPartsAt(guess, zone); if (localScalar(resolved) !== wantedScalar) throw new Error('Calendar wall time does not exist in configured timezone'); return guess; }
+function addLocalDays(date, days) { const probe = new Date(Date.UTC(date.year, date.month - 1, date.day + days)); return { year: probe.getUTCFullYear(), month: probe.getUTCMonth() + 1, day: probe.getUTCDate(), key: probe.toISOString().slice(0, 10) }; }
+function normalizeExplicitOccurrence(item, timeZone) { requireRecord(item, 'calendar occurrence'); const date = parseDate(item.date, 'occurrence date'); const time = parseTime(item.time, 'occurrence time'); const scheduledAt = zonedDateTimeToEpochMs({ date, time, timeZone }); return { date: date.key, time: time.key, scheduledAt }; }
 
 export function normalizeCalendarSchedule(input) {
-  requireRecord(input, 'calendar schedule');
-  const kind = String(input.kind || '').toUpperCase();
-  if (!Object.values(CalendarScheduleKind).includes(kind)) throw new Error('Invalid calendar schedule kind');
-  const timeZone = requireTimeZone(input.timeZone);
-  const catchUp = String(input.catchUp || CalendarCatchUp.OFF).toUpperCase();
-  if (!Object.values(CalendarCatchUp).includes(catchUp)) throw new Error('Invalid calendar schedule catchUp');
-  const schedule = { kind, timeZone, catchUp };
-
-  if (kind === CalendarScheduleKind.ONE_TIME) {
-    const occurrence = normalizeExplicitOccurrence({ date: input.date, time: input.time }, timeZone);
-    return { ...schedule, date: occurrence.date, time: occurrence.time };
-  }
-  if (kind === CalendarScheduleKind.DAILY) {
-    const startDate = parseDate(input.startDate, 'startDate').key;
-    const times = [...new Set((input.times || []).map(value => parseTime(value).key))].sort();
-    if (!times.length || times.length > 48) throw new Error('Calendar DAILY schedule requires 1-48 unique times');
-    return { ...schedule, startDate, times };
-  }
-  const occurrences = (input.occurrences || []).map(item => normalizeExplicitOccurrence(item, timeZone))
-    .sort((a, b) => a.scheduledAt - b.scheduledAt);
-  if (!occurrences.length || occurrences.length > 10000) throw new Error('Calendar EXPLICIT schedule requires 1-10000 occurrences');
-  const seen = new Set();
-  for (const item of occurrences) {
-    const key = `${item.date}T${item.time}`;
-    if (seen.has(key)) throw new Error('Calendar EXPLICIT schedule contains duplicate occurrence');
-    seen.add(key);
-  }
-  return { ...schedule, occurrences: occurrences.map(({ date, time }) => ({ date, time })) };
+  requireRecord(input, 'calendar schedule'); const kind = String(input.kind || '').toUpperCase(); if (!Object.values(CalendarScheduleKind).includes(kind)) throw new Error('Invalid calendar schedule kind'); const timeZone = requireTimeZone(input.timeZone); const catchUp = String(input.catchUp || CalendarCatchUp.OFF).toUpperCase(); if (!Object.values(CalendarCatchUp).includes(catchUp)) throw new Error('Invalid calendar schedule catchUp'); const schedule = { kind, timeZone, catchUp };
+  if (kind === CalendarScheduleKind.ONE_TIME) { const occurrence = normalizeExplicitOccurrence({ date: input.date, time: input.time }, timeZone); return { ...schedule, date: occurrence.date, time: occurrence.time }; }
+  if (kind === CalendarScheduleKind.DAILY) { const startDate = parseDate(input.startDate, 'startDate').key; const times = [...new Set((input.times || []).map(value => parseTime(value).key))].sort(); if (!times.length || times.length > 48) throw new Error('Calendar DAILY schedule requires 1-48 unique times'); return { ...schedule, startDate, times }; }
+  const occurrences = (input.occurrences || []).map(item => normalizeExplicitOccurrence(item, timeZone)).sort((a, b) => a.scheduledAt - b.scheduledAt); if (!occurrences.length || occurrences.length > 10000) throw new Error('Calendar EXPLICIT schedule requires 1-10000 occurrences'); const seen = new Set(); for (const item of occurrences) { const key = `${item.date}T${item.time}`; if (seen.has(key)) throw new Error('Calendar EXPLICIT schedule contains duplicate occurrence'); seen.add(key); } return { ...schedule, occurrences: occurrences.map(({ date, time }) => ({ date, time })) };
 }
 
-export function occurrenceId(sessionId, scheduledAt) {
-  if (!sessionId) throw new Error('Calendar occurrence sessionId required');
-  return `${sessionId}@${new Date(scheduledAt).toISOString()}`;
-}
-
-function candidate(sessionId, schedule, date, time) {
-  const scheduledAt = zonedDateTimeToEpochMs({ date, time, timeZone: schedule.timeZone });
-  return { id: occurrenceId(sessionId, scheduledAt), scheduledAt, localDate: date.key, localTime: time.key };
-}
-
-function candidatesNearNow(sessionId, schedule, now) {
-  if (schedule.kind === CalendarScheduleKind.ONE_TIME) {
-    return [candidate(sessionId, schedule, parseDate(schedule.date), parseTime(schedule.time))];
-  }
-  if (schedule.kind === CalendarScheduleKind.EXPLICIT) {
-    return schedule.occurrences.map(item => candidate(sessionId, schedule, parseDate(item.date), parseTime(item.time)));
-  }
-  const localNow = localPartsAt(now, schedule.timeZone);
-  const today = { year: localNow.year, month: localNow.month, day: localNow.day, key: `${localNow.year}-${String(localNow.month).padStart(2, '0')}-${String(localNow.day).padStart(2, '0')}` };
-  const start = parseDate(schedule.startDate);
-  const out = [];
-  for (let delta = -2; delta <= 370; delta += 1) {
-    const date = addLocalDays(today, delta);
-    if (localScalar(date) < localScalar(start)) continue;
-    for (const value of schedule.times) out.push(candidate(sessionId, schedule, date, parseTime(value)));
-  }
-  return out.sort((a, b) => a.scheduledAt - b.scheduledAt);
+export function occurrenceId(sessionId, scheduledAt) { if (!sessionId) throw new Error('Calendar occurrence sessionId required'); return `${sessionId}@${new Date(scheduledAt).toISOString()}`; }
+function candidate(sessionId, schedule, date, time) { const scheduledAt = zonedDateTimeToEpochMs({ date, time, timeZone: schedule.timeZone }); return { id: occurrenceId(sessionId, scheduledAt), scheduledAt, localDate: date.key, localTime: time.key }; }
+function todayInZone(now, timeZone) { const p = localPartsAt(now, timeZone); return { year: p.year, month: p.month, day: p.day, key: `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}` }; }
+function firstDailyCandidateOnOrAfter(sessionId, schedule, startDate, minEpoch) { let date = startDate; for (;;) { for (const value of schedule.times) { const item = candidate(sessionId, schedule, date, parseTime(value)); if (item.scheduledAt >= minEpoch) return item; } date = addLocalDays(date, 1); } }
+function nextDaily(sessionId, schedule, runtime, now) {
+  const start = parseDate(schedule.startDate); const today = todayInZone(now, schedule.timeZone); const cursor = Number.isFinite(runtime.reconciledThrough) ? runtime.reconciledThrough : null;
+  if (schedule.catchUp === CalendarCatchUp.OFF) return firstDailyCandidateOnOrAfter(sessionId, schedule, localScalar(start) > localScalar(today) ? start : today, now);
+  const floor = cursor == null ? zonedDateTimeToEpochMs({ date: start, time: parseTime(schedule.times[0]), timeZone: schedule.timeZone }) : cursor + 1;
+  const floorLocal = localPartsAt(floor, schedule.timeZone); const floorDate = { year: floorLocal.year, month: floorLocal.month, day: floorLocal.day, key: `${floorLocal.year}-${String(floorLocal.month).padStart(2, '0')}-${String(floorLocal.day).padStart(2, '0')}` };
+  const date = localScalar(floorDate) < localScalar(start) ? start : floorDate; const item = firstDailyCandidateOnOrAfter(sessionId, schedule, date, floor); return { ...item, due: item.scheduledAt <= now, catchUp: item.scheduledAt < now };
 }
 
 export function nextCalendarOccurrence({ sessionId, schedule: rawSchedule, runtime = {}, now = Date.now() }) {
   const schedule = normalizeCalendarSchedule(rawSchedule);
+  if (schedule.kind === CalendarScheduleKind.DAILY) return nextDaily(sessionId, schedule, runtime, now);
   const committed = new Set(Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds : []);
-  const candidates = candidatesNearNow(sessionId, schedule, now).filter(item => !committed.has(item.id));
-  if (!candidates.length) return null;
-
-  if (schedule.catchUp === CalendarCatchUp.ON) {
-    const due = candidates.filter(item => item.scheduledAt <= now);
-    if (due.length) return { ...due[0], due: true, catchUp: due[0].scheduledAt < now };
-  }
-  const future = candidates.find(item => item.scheduledAt >= now);
-  if (!future) return null;
-  return { ...future, due: future.scheduledAt <= now, catchUp: false };
+  const candidates = (schedule.kind === CalendarScheduleKind.ONE_TIME ? [candidate(sessionId, schedule, parseDate(schedule.date), parseTime(schedule.time))] : schedule.occurrences.map(item => candidate(sessionId, schedule, parseDate(item.date), parseTime(item.time)))).filter(item => !committed.has(item.id));
+  if (!candidates.length) return null; if (schedule.catchUp === CalendarCatchUp.ON) { const due = candidates.filter(item => item.scheduledAt <= now); if (due.length) return { ...due[0], due: true, catchUp: due[0].scheduledAt < now }; } const future = candidates.find(item => item.scheduledAt >= now); if (!future) return null; return { ...future, due: future.scheduledAt <= now, catchUp: false };
 }
 
 export function commitCalendarOccurrence(runtime = {}, occurrence, { maxHistory = 512 } = {}) {
-  if (!occurrence?.id) throw new Error('Calendar occurrence id required');
-  const history = Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds.filter(Boolean) : [];
-  if (!history.includes(occurrence.id)) history.push(occurrence.id);
-  return { ...runtime, committedOccurrenceIds: history.slice(-Math.max(1, maxHistory)), lastCommittedOccurrenceId: occurrence.id, lastCommittedAt: occurrence.scheduledAt };
+  if (!occurrence?.id) throw new Error('Calendar occurrence id required'); const history = Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds.filter(Boolean) : []; if (!history.includes(occurrence.id)) history.push(occurrence.id); const reconciledThrough = Math.max(Number.isFinite(runtime.reconciledThrough) ? runtime.reconciledThrough : -Infinity, occurrence.scheduledAt); return { ...runtime, committedOccurrenceIds: history.slice(-Math.max(1, maxHistory)), lastCommittedOccurrenceId: occurrence.id, lastCommittedAt: occurrence.scheduledAt, reconciledThrough };
 }
