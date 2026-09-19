@@ -97,6 +97,13 @@ function entriesSignature(entries) {
     .join('\u0001');
 }
 
+function generationsSignature(generations) {
+  return generations
+    .map(item => [item.folderId, item.name, item.revision].join('\u0000'))
+    .sort((a, b) => a.localeCompare(b))
+    .join('\u0001');
+}
+
 async function sha256Text(value) {
   if (!globalThis.crypto?.subtle) {
     throw new DriveFolderDispatchError('HASH_UNAVAILABLE', 'Web Crypto is unavailable for dispatch snapshot identity.');
@@ -249,6 +256,7 @@ export class DriveFolderDispatchProviderV1 {
       .sort((a, b) => compareRevision(b.revision, a.revision));
     if (!generations.length) return { kind: 'NO_GENERATION', providerId: DRIVE_FOLDER_DISPATCH_PROVIDER_V1, groupNodeId: group, sourceId: source };
 
+    const generationInventoryBefore = generationsSignature(generations);
     const generation = generations[0];
     const beforeRaw = await this.listGenerationEntries({ sourceId: source, generation });
     if (!Array.isArray(beforeRaw) || beforeRaw.length > MAX_ENTRIES + 1) {
@@ -302,6 +310,22 @@ export class DriveFolderDispatchProviderV1 {
     if (beforeSignature !== entriesSignature(after)) {
       throw new DriveFolderDispatchError('UNSTABLE_GENERATION', 'Drive dispatch generation changed while being read.');
     }
+
+    const rawGenerationsAfter = await this.listGenerations({ sourceId: source });
+    if (!Array.isArray(rawGenerationsAfter) || rawGenerationsAfter.length > MAX_GENERATIONS) {
+      throw new DriveFolderDispatchError('INVALID_GENERATION_LIST', 'Invalid Drive generation list after read.');
+    }
+    const generationsAfter = rawGenerationsAfter
+      .map(normalizeGeneration)
+      .filter(Boolean)
+      .sort((a, b) => compareRevision(b.revision, a.revision));
+    if (generationInventoryBefore !== generationsSignature(generationsAfter)) {
+      throw new DriveFolderDispatchError(
+        'UNSTABLE_GENERATION',
+        'Drive dispatch generation inventory changed while the selected generation was being read.',
+      );
+    }
+
     const snapshotHash = await sha256Text([
       source,
       generation.revision,
