@@ -738,15 +738,30 @@ export class ScenarioWorkManager {
         next = Math.min(next, now + Math.min(5_000, item.config.pollSeconds * 1000));
       }
       if (item.runtime.runState !== ScenarioWorkRunState.RUNNING) continue;
-      next = Math.min(next, now + item.config.pollSeconds * 1000);
-      for (const participant of scenarioWorkParticipants(item.runtime)) {
-        if (participant.state === ScenarioParticipantState.WAITING && participant.deadlineAt > now) next = Math.min(next, participant.deadlineAt);
+      const participants = scenarioWorkParticipants(item.runtime);
+      const waiting = participants.filter(participant => participant.state === ScenarioParticipantState.WAITING);
+      for (const participant of waiting) {
+        if (participant.deadlineAt > now) next = Math.min(next, participant.deadlineAt);
       }
-      if (item.config.minimumLaunchGapSeconds > 0 && item.runtime.lastLaunchAt) {
-        next = Math.min(next, item.runtime.lastLaunchAt + item.config.minimumLaunchGapSeconds * 1000);
-      }
-      if (item.config.minimumLaunchGapSeconds > 0 && Number(item.runtime.nextLaunchAt || 0) > now) {
-        next = Math.min(next, Number(item.runtime.nextLaunchAt));
+
+      const launchSpacingAt = item.config.minimumLaunchGapSeconds > 0 && item.runtime.lastLaunchAt
+        ? item.runtime.lastLaunchAt + item.config.minimumLaunchGapSeconds * 1000
+        : 0;
+      const completionSpacingAt = item.config.minimumLaunchGapSeconds > 0
+        ? Number(item.runtime.nextLaunchAt || 0)
+        : 0;
+      const launchGateAt = Math.max(launchSpacingAt, completionSpacingAt);
+
+      if (waiting.length) {
+        // Assistant completion is observed by polling; keep the existing
+        // bounded poll while a physical chat is actually in flight.
+        next = Math.min(next, now + item.config.pollSeconds * 1000);
+      } else if (launchGateAt > now) {
+        // Once the assistant really completed, do not wake every poll interval
+        // merely to rediscover the same completion-relative delay.
+        next = Math.min(next, launchGateAt);
+      } else {
+        next = Math.min(next, now + item.config.pollSeconds * 1000);
       }
     }
     return next < Infinity ? Math.max(now + 250, next) : 0;
