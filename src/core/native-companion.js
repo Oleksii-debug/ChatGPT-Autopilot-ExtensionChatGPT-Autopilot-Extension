@@ -28,11 +28,13 @@ function requestId(value) {
   return id;
 }
 
-function boundedPayload(value) {
+function boundedPayload(value, { maxBytes = 256_000, label = 'payload' } = {}) {
   if (value == null) return {};
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Native Companion payload must be an object');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Native Companion ${label} must be an object`);
   const out = structuredClone(value);
-  if (JSON.stringify(out).length > 256_000) throw new Error('Native Companion payload is too large');
+  const serialized = JSON.stringify(out);
+  const bytes = new TextEncoder().encode(serialized).byteLength;
+  if (bytes > maxBytes) throw new Error(`Native Companion ${label} is too large`);
   return out;
 }
 
@@ -60,7 +62,7 @@ export function normalizeNativeCompanionResponse(input, expected = {}) {
 
   if (input.ok) {
     if (input.error != null) throw new Error('Successful Native Companion response cannot contain error');
-    const result = input.result == null ? {} : boundedPayload(input.result);
+    const result = input.result == null ? {} : boundedPayload(input.result, { maxBytes: 900_000, label: 'result' });
     return Object.freeze({ protocolVersion: 1, requestId: normalizedId, type, ok: true, result, error: null });
   }
 
