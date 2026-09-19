@@ -348,7 +348,8 @@ function assertRuntime(graph, runtime) {
       if (!isObject(nodeRuntime.providerState)) throw new Error(`Invalid provider runtime state for ${nodeId}`);
       const providerState = nodeRuntime.providerState;
       for (const revision of [providerState.lastAcceptedRevision || '', providerState.activeRevision || '']) {
-        if (revision && (!/^\\d+$/u.test(String(revision)) || String(revision).length > 128)) {
+        const revisionText = String(revision);
+        if (revision && (!/^[0-9]+$/u.test(revisionText) || revisionText.length > 128)) {
           throw new Error(`Invalid provider revision state for ${nodeId}`);
         }
       }
