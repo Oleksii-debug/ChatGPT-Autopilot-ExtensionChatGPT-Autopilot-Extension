@@ -839,3 +839,218 @@ In addition to existing North-Star metrics, track where technically observable:
 - percentage of repeated workflows served by verified Recipes/Skills rather than fresh reasoning.
 
 These metrics exist to minimize TIME_TO_VERIFIED_FINISHED_OUTCOME, not to maximize agent activity.
+
+
+## 12. FINAL COMPETITIVE PARITY+ ADDENDUM — 2026-09-19
+
+This section is binding final scope. It captures additional frontier patterns verified after the earlier North Star expansion and translates them into Autopilot product requirements without cloning any competitor's internal architecture.
+
+### 12.1 Portable Skill Packs as a first-class product surface
+
+Autopilot must support discoverable, composable, versioned Skill Packs that package procedural knowledge, scripts, resources, schemas, evaluators and provider bindings. A Skill Pack is not a new Agent Core: it is loaded on demand behind the canonical policy/orchestration/tool contracts.
+
+Required properties:
+- minimal relevant loading rather than dumping all skill instructions into every context;
+- source/version/provenance/signature;
+- declared capabilities and permission requirements;
+- dependencies and compatibility constraints;
+- tests/evals and readiness state;
+- update/rollback;
+- Project-level enable/disable;
+- local/private and shared/team distributions;
+- conversion path from a verified Recipe to a reusable Skill Pack;
+- import/export and future marketplace/catalog support.
+
+### 12.2 Wide parallel execution and research
+
+The Agent must be able to decompose suitable goals into many independent parallel subtasks, with an owner-configurable fanout and global resource governor. This applies to research, coding, audits, migrations, content/catalog work, data analysis and verification.
+
+The system must distinguish true parallelizable work from dependency-bound work. Parallelism must never create duplicate mutation ownership. Required mechanics include:
+- plan DAG and critical path;
+- dynamic fanout/fanin;
+- isolated child context/workspace;
+- live conflict keys/leases;
+- result synthesis and contradiction detection;
+- per-child budget/model/provider selection;
+- early cancellation of redundant/low-value branches;
+- work stealing/backpressure when one queue is blocked and another is executable;
+- verifier-led merge of child results.
+
+### 12.3 Cloud computer pool / execution fabric
+
+Beyond one persistent cloud workspace, Autopilot should support a pool of isolated cloud execution environments for concurrent browser/code/data work when demand requires it.
+
+The pool is an execution fabric behind the same canonical task identity, policy and exact-effect authority. Requirements:
+- isolated per-Agent/Project workspace;
+- warm/cold capacity management;
+- browser/terminal/filesystem capability descriptors;
+- resumable checkpoints and artifact sync;
+- explicit local-vs-cloud affinity;
+- capacity/rate/cost scheduling;
+- no hidden duplication of scheduler/recovery/policy;
+- secure teardown/scrubbing and evidence retention;
+- deterministic handoff back to local execution when local-only resources are required.
+
+### 12.4 Run Timeline, replay and evidence map
+
+Every consequential long-running job needs an accessible run timeline that explains observable actions without exposing hidden chain-of-thought.
+
+Surface:
+- plan revisions;
+- tasks/subagents and ownership changes;
+- tool/provider invocations;
+- external effects and exact-effect IDs;
+- before/after state/evidence;
+- screenshots or semantic snapshots where useful;
+- test/verifier outcomes;
+- errors/retries/reconciliation;
+- checkpoints;
+- artifacts;
+- costs/runtime/tool usage where available;
+- owner interventions/takeovers;
+- final acceptance evidence.
+
+Support replay for understanding/debugging and safe deterministic re-run only through Recipe/exact-effect rules; replay must never blindly repeat external effects.
+
+### 12.5 Human supervision and escalation routing
+
+ASK must become a complete supervision workflow, not merely a modal confirmation.
+
+Support:
+- named authorized reviewer(s) in team mode;
+- reason + exact requested decision;
+- bounded choices and data needed for the decision;
+- timeout/escalation policy;
+- mobile/notification delivery where available;
+- durable WAITING_APPROVAL state;
+- resume from the same durable step after decision;
+- no loss of surrounding context/evidence;
+- explicit difference between owner policy ASK and model uncertainty/clarification.
+
+Human supervision is a workflow feature, not a safety guarantee. Exact-effect and technical validation remain mandatory.
+
+### 12.6 Agent identity, RBAC and organizational governance
+
+For shared/team/commercial operation, every human user, top-level Agent, subagent and remote Agent peer needs durable identity and auditable authority.
+
+Required:
+- role-based and resource-scoped grants;
+- per-agent identity/service identity where providers support it;
+- separate credential ownership;
+- organization policies that constrain but do not silently broaden user authority;
+- audit export;
+- provider/data loss prevention rules;
+- inventory of Agents, Skills, Recipes, providers and active executions;
+- readiness/security status by capability;
+- revocation/rotation without corrupting running durable state.
+
+### 12.7 Capability Discovery and best-path planner
+
+Before acting, the system should discover the safest/fastest available path for the requested outcome and rank execution methods by determinism and cost:
+API/provider -> deterministic CLI/object model -> semantic browser/UIA -> visual computer use -> OCR fallback.
+
+Capability discovery must consider:
+- installed/connected providers;
+- authenticated account/origin;
+- current permissions;
+- provider health/readiness;
+- data locality;
+- estimated latency/cost;
+- required verification;
+- Project policy;
+- exact-effect support.
+
+Recommendation/discovery never grants permission, installs software or authenticates implicitly.
+
+### 12.8 Outcome Contract Builder
+
+For a non-programmer, the system should translate a natural-language goal into an inspectable Outcome Contract containing:
+- desired result;
+- observable completion criteria;
+- important constraints;
+- source-of-truth locations;
+- allowed authority;
+- budget/time/concurrency boundaries;
+- required deliverables;
+- verifier plan;
+- optional schedule/triggers.
+
+The owner can accept/edit it, then the same contract drives planner, workers and verifier. This reduces prompt engineering and repeated clarification dramatically.
+
+### 12.9 Project Bootstrap / instant onboarding
+
+Create a Project from existing reality with minimal manual setup. Autopilot should be able to inspect owner-authorized repo(s), Drive folders/docs, websites/CMS, local folders, issue trackers and selected chats, then propose:
+- Project goal/state summary;
+- source-of-truth map;
+- current architecture/assets;
+- open blockers;
+- candidate tasks;
+- policies/credentials/providers needed;
+- initial Context Capsule;
+- initial eval/acceptance suite.
+
+Nothing discovered becomes owner instruction automatically; the bootstrap is reviewable and source-linked.
+
+### 12.10 Diff-first owner review
+
+To reduce attention cost, default owner review should emphasize changes and exceptions rather than full transcripts.
+
+Provide:
+- what changed;
+- why it changed at an outcome/evidence level;
+- files/artifacts/effects changed;
+- tests/verifier results;
+- unresolved risks;
+- only decisions needing attention;
+- rollback/compensating options where applicable.
+
+For blind/NVDA users this must be a complete text/semantic experience, not a visual diff-only surface.
+
+### 12.11 Remote steering and cross-device control
+
+A running Agent should be inspectable and steerable from another authorized device without moving the underlying local-only data off the local host unless policy permits.
+
+Support:
+- status;
+- pause/resume/stop;
+- add instruction;
+- answer ASK/clarification;
+- approve handoff to another execution plane;
+- view compact trace/evidence;
+- receive completion/blocker notifications.
+
+Remote steering changes instructions/state through the same canonical durable control plane.
+
+### 12.12 Continuous improvement loop
+
+The product should improve from verified outcomes using a gated promotion loop:
+run evidence -> failure/success classification -> candidate improvement -> regression/eval -> owner/team review where required -> versioned promotion.
+
+Candidate improvements may target:
+- Recipe/Skill procedure;
+- provider selection heuristic;
+- verifier rule;
+- Context Capsule selection;
+- retry/recovery strategy;
+- Project convention.
+
+Core owner policy and safety contracts are never silently self-modified.
+
+### 12.13 Competitive acceptance criteria
+
+World-class parity is not feature-count parity. A capability is competitive only if it demonstrates:
+- real end-to-end completion;
+- long-horizon continuation;
+- restart/recovery;
+- ambiguity reconciliation;
+- low duplicate-work/effect rate;
+- accessible owner control;
+- observable evidence;
+- bounded resource use;
+- secure identity/credentials/data flow;
+- current-source grounding;
+- portable/reusable procedure where repetition exists.
+
+### 12.14 Final user-value objective
+
+The product should make a capable non-programmer able to operate many simultaneous software/research/operations projects with dramatically less coordination overhead. The dominant product KPI remains TIME_TO_VERIFIED_FINISHED_OUTCOME, accompanied by OWNER_ATTENTION_MINUTES_PER_OUTCOME and VERIFIED_AUTOMATION_REUSE_RATE.
