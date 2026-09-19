@@ -289,3 +289,75 @@ Autopilot consequence: Actor != Verifier, self-testing/retest loops and benchmar
 
 ### Competitive interpretation
 These findings do not justify cloning competitor architecture. They strengthen the existing North Star: one canonical Autopilot control plane should combine durable orchestration, owner policy, exact-effect recovery, local+cloud execution, Project memory/context, multi-agent delegation, reusable Recipes, first-class providers, finished artifacts, observability, accessibility and evidence-bound verification.
+
+
+## 2026-09-19 frontier productivity verification addendum
+
+Fresh verification adds several product patterns that were not explicit enough in the initial matrix.
+
+### Replit Agent 4 — parallel build, shared board, plan-while-building, canvas/variants
+Verified public 2026 patterns include:
+- planning can continue while other agent tasks build in parallel;
+- tasks run in isolated environments and surface on a shared task board;
+- agent-assisted conflict/merge handling reduces manual Git coordination;
+- a design canvas supports direct manipulation, live previews and side-by-side UI variants;
+- multiple artifact types can share one project context.
+
+Autopilot consequence:
+- completion-driven multi-worker refill/work stealing and a live shared Swarm/Project board;
+- plan-while-executing rather than forced plan -> wait -> build sequencing;
+- Branch/Variant Laboratory and Artifact/Design Canvas with an NVDA-accessible semantic twin;
+- automatic conflict detection/merge assistance as part of result consolidation rather than owner busywork.
+
+Evidence reviewed: Replit “What’s changed from Agent 3 to Agent 4” (2026-03-19), “Introducing Replit Agent 4: Built for Creativity” (2026-03-11), and Agent 4 launch material (2026-03-23).
+
+### Manus — Branch, Plan Mode, Auto-Publish, Project Skills, learning Projects and connector recommendation
+Verified 2026 product catalog patterns include Branch, Plan Mode, Auto-Publish, persistent Cloud Computer, My Computer, Scheduled Tasks 2.0, Project Skills, Projects that learn from every task, connector recommendation, Meeting Minutes, preferred browser, multi-account Google connections and broad app connectors.
+
+Autopilot consequence:
+- Project Skills/Recipes and source-linked project learning remain final scope;
+- provider/connector recommendation should use capability discovery but never silently grant/install/authenticate;
+- continuous preview/publish/monitor/rollback should be a first-class release/operations workflow;
+- meeting/recording -> actions/project-memory should be a first-class pipeline;
+- branch/variant and local/cloud handoff must be product UX, not hidden implementation detail.
+
+Evidence reviewed: Manus 2026 product announcements, Cloud Computer help (2026-06-05), and My Computer help (2026-03-24).
+
+### Microsoft Copilot Studio — readiness and evaluation as product surfaces
+Verified 2026 Microsoft material exposes computer-use operations, MCP/tool integration, agent inventories, readiness/status views, usage/cost telemetry and customizable evaluation test sets.
+
+Autopilot consequence:
+- provider/Agent readiness must be shown as observable tested state;
+- golden + generated/adversarial test sets should feed release gates;
+- cost/runtime/result telemetry belongs in Swarm/Project observability;
+- desktop computer use remains a managed capability behind policy rather than an opaque model action.
+
+### Anthropic / Claude Code — subagents, MCP, hooks and encoded team conventions
+Verified 2026 Anthropic guidance emphasizes subagents, hooks, MCP and context strategies for scaling real codebases and encoding team conventions.
+
+Autopilot consequence:
+- Project Skills/Recipes + event hooks/triggers should encode reusable team procedure;
+- child agents need isolated context/tool scope;
+- conventions learned from accepted work can be promoted into explicit versioned skills, never silently into Core authority.
+
+### Human takeover / handback
+Modern computer-use agents expose a practical need for the user to take control when automation is blocked or the user wants to intervene. Autopilot must make this reversible collaboration explicit:
+
+take over -> mutate -> fresh observation -> reconcile -> hand back -> resume same durable job.
+
+### Resulting high-leverage additions to the competitive baseline
+21. Completion-driven dispatch/refill; timer polling only as watchdog fallback where events are unavailable.
+22. Adaptive work stealing/backpressure across worker/account/model/provider capacity.
+23. Takeover -> handback with world-state re-observation and safe resume.
+24. Plan-while-executing shared task board.
+25. Branch/Variant Laboratory with isolated candidates and evidence-based merge.
+26. Artifact/Design Canvas plus complete accessible semantic twin.
+27. Provider/connector recommendation without implicit permission.
+28. Continuous build/publish/monitor/repair/rollback loop.
+29. Meeting/recording -> decisions/tasks/project-memory pipeline.
+30. First-class data/dashboard/anomaly workflows.
+31. Mobile/optional voice quick control over the same canonical jobs.
+32. Readiness/evaluation dashboard with repeatable golden/generated/adversarial tests.
+33. Project learning that promotes accepted patterns into versioned Skills/Recipes.
+
+These additions strengthen the same final North Star and do not authorize scheduler/Core/policy/recovery/browser/router duplication.
