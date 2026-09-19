@@ -304,6 +304,15 @@ export class DriveFolderDispatchProviderV1 {
     }
     const snapshotHash = await sha256Text(beforeSignature);
 
+    for (const item of parsed) {
+      item.dispatchIdentity = await sha256Text([
+        source,
+        generation.revision,
+        item.fileId,
+        item.fileVersion,
+        item.targetChildId,
+      ].join('\u0000'));
+    }
     parsed.sort((a, b) => a.order - b.order || a.targetChildId.localeCompare(b.targetChildId) || a.fileId.localeCompare(b.fileId));
     return {
       kind: 'READY',
