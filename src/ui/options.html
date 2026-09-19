@@ -230,6 +230,11 @@
           <textarea id="orchestration-v2-hierarchy-domains" rows="6" spellcheck="true" aria-describedby="orchestration-v2-hierarchy-template-help" placeholder="runtime | Runtime, execution, recovery and reliability.&#10;science | Scientific model, evidence and validation."></textarea>
           <label for="orchestration-v2-hierarchy-workers">Workers на одного Manager</label>
           <input id="orchestration-v2-hierarchy-workers" type="number" min="1" max="40" step="1" inputmode="numeric" value="5">
+          <label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково</label>
+          <textarea id="orchestration-v2-hierarchy-drive-sources" rows="4" spellcheck="false" aria-describedby="orchestration-v2-hierarchy-drive-help" placeholder="runtime | https://docs.google.com/document/d/FILE_ID/edit&#10;science | FILE_ID"></textarea>
+          <p class="field-help" id="orchestration-v2-hierarchy-drive-help">Один рядок — один Manager: ID Manager | посилання Google Drive/Docs або file ID. Файл повинен містити тільки одне ціле число від 0 до кількості Workers цього Manager. Drive не може змінити ієрархію або вибрати чужі слоти.</p>
+          <label for="orchestration-v2-hierarchy-drive-poll">Перевіряти Drive, хв</label>
+          <input id="orchestration-v2-hierarchy-drive-poll" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3" aria-describedby="orchestration-v2-hierarchy-drive-help">
           <label><input id="orchestration-v2-hierarchy-integration" type="checkbox">Додати окремого Integration Manager</label>
           <label><input id="orchestration-v2-hierarchy-qa" type="checkbox">Додати окремий QA / Red Team</label>
           <button id="configure-orchestration-v2-hierarchy-button" type="button" disabled>Створити ієрархію</button>
