@@ -559,6 +559,12 @@ export class OrchestrationV2Manager {
     }
     const status = await this.updateConfig({ ...imported, enabled: false }, selected.id);
     if (importedDocument.hierarchy) {
+      const currentRuntime = await selected.controller.runtimeRepository.load();
+      const currentGraphId = hierarchyGraphId(currentRuntime);
+      const safety = await this.managedCoreSafety(status.config.projectId, currentGraphId);
+      if (safety.managed.length) {
+        throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
+      }
       await selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
     }
     return {
