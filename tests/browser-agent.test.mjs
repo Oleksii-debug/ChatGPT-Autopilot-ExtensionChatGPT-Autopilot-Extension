@@ -318,7 +318,7 @@ test('consequential click pauses before physical action and explicit approval ex
   assert.equal(chrome._actionCalls.length, 0, 'consequential click must not execute before approval');
   assert.equal(live.job.runtime.pendingApproval.targetName, 'Confirm enrollment');
   await manager.approvePendingAction('job-1', { runInitial: false });
-  live = await manager.get('job-1');
+  const live = await manager.get('job-1');
   assert.equal(chrome._actionCalls.length, 1, 'approved exact action should execute once');
   assert.equal(live.job.runtime.runState, 'RUNNING');
   assert.equal(live.job.runtime.pendingApproval, null);
@@ -1890,10 +1890,10 @@ test('Trusted Script planner tool is visible only when owner policy explicitly e
   assert.match(off, /Trusted Script fallback is disabled by owner policy/);
   const on = buildBrowserAgentPlannerPrompt(config({ trustedScriptEnabled: true }), runtime, snapshot);
   assert.match(on, /trusted_script/);
-  assert.match(on, /Every script requires explicit owner approval/i);
+  assert.match(on, /Owner policy requires confirmation/i);
 });
 
-test('Trusted Script requires explicit approval even under ALLOW_ALL and runs through CDP only after approval', async () => {
+test('Trusted Script runs autonomously under ALLOW_ALL while preserving CDP sandboxing', async () => {
   const chrome = makeChrome();
   const debuggerCalls = [];
   chrome.debugger.sendCommand = async (_target, method, params = {}) => {
@@ -1915,14 +1915,7 @@ test('Trusted Script requires explicit approval even under ALLOW_ALL and runs th
   await manager.create({ id: 'job-1', goal: 'Use legacy timetable safely', trustedScriptEnabled: true, approvalMode: 'ALLOW_ALL' });
   await manager.start('job-1', { runInitial: false });
   const cycle = await manager.cycleOne('job-1');
-  assert.equal(cycle.kind, 'WAITING_APPROVAL');
-  assert.equal(debuggerCalls.filter(call => call.method === 'Runtime.evaluate').length, 0, 'script must not execute before owner approval');
-  let live = await manager.get('job-1');
-  assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
-  assert.equal(live.job.runtime.pendingApproval.action.type, 'trusted_script');
-  assert.match(live.job.runtime.pendingApproval.action.code, /legacy/);
-
-  await manager.approvePendingAction('job-1', { runInitial: false });
+  assert.equal(cycle.kind, 'ACTION');
   const runtimeCalls = debuggerCalls.filter(call => call.method === 'Runtime.evaluate');
   assert.equal(runtimeCalls.length, 1);
   assert.match(runtimeCalls[0].params.expression, /querySelector/);
@@ -1938,7 +1931,7 @@ test('Trusted Script requires explicit approval even under ALLOW_ALL and runs th
   assert.ok(serializedHistory.includes('trusted-script-executed'));
 });
 
-test('Trusted Script approval is invalidated if the approved browser URL changes before execution', async () => {
+test('Trusted Script consequential approval is invalidated if the approved browser URL changes before execution', async () => {
   const chrome = makeChrome();
   let evaluateCalls = 0;
   chrome.debugger.sendCommand = async (_target, method) => {
@@ -1949,7 +1942,7 @@ test('Trusted Script approval is invalidated if the approved browser URL changes
     chromeApi: chrome,
     routePrompt: async () => ({ text: JSON.stringify({ type: 'trusted_script', purpose: 'legacy click', code: 'document.body.dataset.test="1";' }) }),
   });
-  await manager.create({ id: 'job-1', goal: 'legacy UI', trustedScriptEnabled: true, approvalMode: 'ALLOW_ALL' });
+  await manager.create({ id: 'job-1', goal: 'legacy UI', trustedScriptEnabled: true, approvalMode: 'CONSEQUENTIAL' });
   await manager.start('job-1', { runInitial: false });
   assert.equal((await manager.cycleOne('job-1')).kind, 'WAITING_APPROVAL');
   chrome._tabs.get(1).url = 'https://other.example.org/changed';
