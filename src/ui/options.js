@@ -2127,6 +2127,8 @@ function portableDraftConfig(session) {
     urlMode: session.urlMode,
     sharedPrompt: session.sharedPrompt,
     defaultUniquePrompt: session.defaultUniquePrompt,
+    promptCadence: clone(session.promptCadence || null),
+    drivePromptSources: clone(session.drivePromptSources || null),
     runMode: session.runMode,
     tasks: clone(session.tasks || []),
     configuredTaskCount: Number(session.configuredTaskCount || session.tasks?.length || 1),
@@ -2219,6 +2221,13 @@ async function refreshSelectedSessionStatus(sessionId) {
     ui.selected.actionAvailability = latest.actionAvailability;
     ui.selected.status = latest.status;
     ui.selected.log = latest.log;
+
+    // Runtime Drive evidence is safe to refresh live, but never write it back
+    // into the visible draft inputs. The user may currently be editing another
+    // file/target locally; only the status line follows canonical runtime state.
+    const latestDriveBinding = latest.drivePromptSources?.bindings?.[0] || null;
+    renderDrivePromptRuntimeStatus(latestDriveBinding);
+
     const signature = JSON.stringify([
       latest.version,
       latest.runState,
@@ -2227,6 +2236,10 @@ async function refreshSelectedSessionStatus(sessionId) {
       latest.log?.length || 0,
       latest.log?.at?.(-1)?.at || 0,
       latest.log?.at?.(-1)?.message || '',
+      latestDriveBinding?.lastAcceptedVersion || '',
+      latestDriveBinding?.lastCheckedAt || 0,
+      latestDriveBinding?.nextCheckAt || 0,
+      latestDriveBinding?.lastErrorCode || '',
     ]);
     if (signature !== lastRuntimeSignature) {
       lastRuntimeSignature = signature;
@@ -2300,6 +2313,13 @@ function syncTaskModeVisibility() {
   $('unique-default-container').hidden = parts.promptMode !== 'unique';
 }
 
+function renderDrivePromptRuntimeStatus(binding) {
+  if (!$('drive-prompt-status')) return;
+  $('drive-prompt-status').textContent = binding
+    ? `Drive: ${binding.enabled ? 'увімкнено' : 'вимкнено'}; target ${binding.target || 'PRIMARY'}; accepted version ${binding.lastAcceptedVersion || 'ще немає'}; остання перевірка ${binding.lastCheckedAt ? new Date(binding.lastCheckedAt).toLocaleString() : 'ще не було'}; ${binding.lastErrorCode ? `помилка ${binding.lastErrorCode}` : 'помилок немає'}.`
+    : 'Drive source вимкнено.';
+}
+
 function renderEditor() {
   if (!ui.selected) return;
   $('empty-state').hidden = true; $('session-editor').hidden = false;
@@ -2327,9 +2347,7 @@ function renderEditor() {
   $('drive-prompt-target').value = driveBinding?.target || 'PRIMARY';
   $('drive-prompt-interval').value = String(Math.max(1, Math.round(Number(driveBinding?.pollIntervalMs || 180000) / 60000)));
   $('drive-prompt-min-chars').value = String(driveBinding?.minChars ?? 1000);
-  $('drive-prompt-status').textContent = driveBinding
-    ? `Drive: ${driveBinding.enabled ? 'увімкнено' : 'вимкнено'}; target ${driveBinding.target || 'PRIMARY'}; accepted version ${driveBinding.lastAcceptedVersion || 'ще немає'}; остання перевірка ${driveBinding.lastCheckedAt ? new Date(driveBinding.lastCheckedAt).toLocaleString() : 'ще не було'}; ${driveBinding.lastErrorCode ? `помилка ${driveBinding.lastErrorCode}` : 'помилок немає'}.`
-    : 'Drive source вимкнено.';
+  renderDrivePromptRuntimeStatus(driveBinding);
   $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
   $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
   $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
