@@ -20,26 +20,29 @@ export function normalizeCalendarSchedule(input) {
   const occurrences = (input.occurrences || []).map(item => normalizeExplicitOccurrence(item, timeZone)).sort((a, b) => a.scheduledAt - b.scheduledAt); if (!occurrences.length || occurrences.length > 10000) throw new Error('Calendar EXPLICIT schedule requires 1-10000 occurrences'); const seen = new Set(); for (const item of occurrences) { const key = `${item.date}T${item.time}`; if (seen.has(key)) throw new Error('Calendar EXPLICIT schedule contains duplicate occurrence'); seen.add(key); } return { ...schedule, occurrences: occurrences.map(({ date, time }) => ({ date, time })) };
 }
 
-export function occurrenceId(sessionId, scheduledAt) { if (!sessionId) throw new Error('Calendar occurrence sessionId required'); return `${sessionId}@${new Date(scheduledAt).toISOString()}`; }
-function candidate(sessionId, schedule, date, time) { const scheduledAt = zonedDateTimeToEpochMs({ date, time, timeZone: schedule.timeZone }); return { id: occurrenceId(sessionId, scheduledAt), scheduledAt, localDate: date.key, localTime: time.key }; }
+function hashRevision(value) { let hash = 2166136261; for (let i = 0; i < value.length; i += 1) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(16).padStart(8, '0'); }
+export function calendarScheduleRevision(rawSchedule) { const schedule = normalizeCalendarSchedule(rawSchedule); return `v1-${hashRevision(JSON.stringify(schedule))}`; }
+export function occurrenceId(sessionId, scheduledAt, revision = 'legacy') { if (!sessionId) throw new Error('Calendar occurrence sessionId required'); return `${sessionId}@${revision}@${new Date(scheduledAt).toISOString()}`; }
+function candidate(sessionId, schedule, revision, date, time) { const scheduledAt = zonedDateTimeToEpochMs({ date, time, timeZone: schedule.timeZone }); return { id: occurrenceId(sessionId, scheduledAt, revision), revision, scheduledAt, localDate: date.key, localTime: time.key }; }
 function todayInZone(now, timeZone) { const p = localPartsAt(now, timeZone); return { year: p.year, month: p.month, day: p.day, key: `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}` }; }
-function firstDailyCandidateOnOrAfter(sessionId, schedule, startDate, minEpoch) { let date = startDate; for (;;) { for (const value of schedule.times) { const item = candidate(sessionId, schedule, date, parseTime(value)); if (item.scheduledAt >= minEpoch) return item; } date = addLocalDays(date, 1); } }
-function nextDaily(sessionId, schedule, runtime, now) {
-  const start = parseDate(schedule.startDate); const today = todayInZone(now, schedule.timeZone); const cursor = Number.isFinite(runtime.reconciledThrough) ? runtime.reconciledThrough : null;
-  if (schedule.catchUp === CalendarCatchUp.OFF) return firstDailyCandidateOnOrAfter(sessionId, schedule, localScalar(start) > localScalar(today) ? start : today, now);
+function firstDailyCandidateOnOrAfter(sessionId, schedule, revision, startDate, minEpoch) { let date = startDate; for (;;) { for (const value of schedule.times) { const item = candidate(sessionId, schedule, revision, date, parseTime(value)); if (item.scheduledAt >= minEpoch) return item; } date = addLocalDays(date, 1); } }
+function revisionCursor(runtime, revision) { const cursors = runtime.reconciledThroughByRevision; if (cursors && Number.isFinite(cursors[revision])) return cursors[revision]; if (runtime.recurrenceRevision === revision && Number.isFinite(runtime.reconciledThrough)) return runtime.reconciledThrough; return null; }
+function nextDaily(sessionId, schedule, revision, runtime, now) {
+  const start = parseDate(schedule.startDate); const today = todayInZone(now, schedule.timeZone); const cursor = revisionCursor(runtime, revision);
+  if (schedule.catchUp === CalendarCatchUp.OFF) return firstDailyCandidateOnOrAfter(sessionId, schedule, revision, localScalar(start) > localScalar(today) ? start : today, now);
   const floor = cursor == null ? zonedDateTimeToEpochMs({ date: start, time: parseTime(schedule.times[0]), timeZone: schedule.timeZone }) : cursor + 1;
   const floorLocal = localPartsAt(floor, schedule.timeZone); const floorDate = { year: floorLocal.year, month: floorLocal.month, day: floorLocal.day, key: `${floorLocal.year}-${String(floorLocal.month).padStart(2, '0')}-${String(floorLocal.day).padStart(2, '0')}` };
-  const date = localScalar(floorDate) < localScalar(start) ? start : floorDate; const item = firstDailyCandidateOnOrAfter(sessionId, schedule, date, floor); return { ...item, due: item.scheduledAt <= now, catchUp: item.scheduledAt < now };
+  const date = localScalar(floorDate) < localScalar(start) ? start : floorDate; const item = firstDailyCandidateOnOrAfter(sessionId, schedule, revision, date, floor); return { ...item, due: item.scheduledAt <= now, catchUp: item.scheduledAt < now };
 }
 
 export function nextCalendarOccurrence({ sessionId, schedule: rawSchedule, runtime = {}, now = Date.now() }) {
-  const schedule = normalizeCalendarSchedule(rawSchedule);
-  if (schedule.kind === CalendarScheduleKind.DAILY) return nextDaily(sessionId, schedule, runtime, now);
+  const schedule = normalizeCalendarSchedule(rawSchedule); const revision = calendarScheduleRevision(schedule);
+  if (schedule.kind === CalendarScheduleKind.DAILY) return nextDaily(sessionId, schedule, revision, runtime, now);
   const committed = new Set(Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds : []);
-  const candidates = (schedule.kind === CalendarScheduleKind.ONE_TIME ? [candidate(sessionId, schedule, parseDate(schedule.date), parseTime(schedule.time))] : schedule.occurrences.map(item => candidate(sessionId, schedule, parseDate(item.date), parseTime(item.time)))).filter(item => !committed.has(item.id));
+  const candidates = (schedule.kind === CalendarScheduleKind.ONE_TIME ? [candidate(sessionId, schedule, revision, parseDate(schedule.date), parseTime(schedule.time))] : schedule.occurrences.map(item => candidate(sessionId, schedule, revision, parseDate(item.date), parseTime(item.time)))).filter(item => !committed.has(item.id));
   if (!candidates.length) return null; if (schedule.catchUp === CalendarCatchUp.ON) { const due = candidates.filter(item => item.scheduledAt <= now); if (due.length) return { ...due[0], due: true, catchUp: due[0].scheduledAt < now }; } const future = candidates.find(item => item.scheduledAt >= now); if (!future) return null; return { ...future, due: future.scheduledAt <= now, catchUp: false };
 }
 
 export function commitCalendarOccurrence(runtime = {}, occurrence, { maxHistory = 512 } = {}) {
-  if (!occurrence?.id) throw new Error('Calendar occurrence id required'); const history = Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds.filter(Boolean) : []; if (!history.includes(occurrence.id)) history.push(occurrence.id); const reconciledThrough = Math.max(Number.isFinite(runtime.reconciledThrough) ? runtime.reconciledThrough : -Infinity, occurrence.scheduledAt); return { ...runtime, committedOccurrenceIds: history.slice(-Math.max(1, maxHistory)), lastCommittedOccurrenceId: occurrence.id, lastCommittedAt: occurrence.scheduledAt, reconciledThrough };
+  if (!occurrence?.id || !occurrence?.revision) throw new Error('Calendar occurrence id/revision required'); const history = Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds.filter(Boolean) : []; if (!history.includes(occurrence.id)) history.push(occurrence.id); const cursors = { ...(runtime.reconciledThroughByRevision || {}) }; cursors[occurrence.revision] = Math.max(Number.isFinite(cursors[occurrence.revision]) ? cursors[occurrence.revision] : -Infinity, occurrence.scheduledAt); return { ...runtime, committedOccurrenceIds: history.slice(-Math.max(1, maxHistory)), lastCommittedOccurrenceId: occurrence.id, lastCommittedAt: occurrence.scheduledAt, recurrenceRevision: occurrence.revision, reconciledThrough: cursors[occurrence.revision], reconciledThroughByRevision: cursors };
 }
