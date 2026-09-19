@@ -1054,3 +1054,351 @@ World-class parity is not feature-count parity. A capability is competitive only
 ### 12.14 Final user-value objective
 
 The product should make a capable non-programmer able to operate many simultaneous software/research/operations projects with dramatically less coordination overhead. The dominant product KPI remains TIME_TO_VERIFIED_FINISHED_OUTCOME, accompanied by OWNER_ATTENTION_MINUTES_PER_OUTCOME and VERIFIED_AUTOMATION_REUSE_RATE.
+
+
+## 13. POST-EXISTING PRIORITY — PRODUCTIVITY INTELLIGENCE LAYER
+
+Status: BINDING ADDITIVE FINAL SCOPE, LOWER PRIORITY THAN THE CAPABILITY FAMILIES ALREADY DEFINED ABOVE.
+Owner ordering decision: implement this layer AFTER the already-ratified North Star / competitive parity+ scope and its dependency-ordered delivery horizons, unless a narrowly scoped component is later proven to be a direct prerequisite for an already-prioritized capability. This addendum MUST NOT displace active MCP/SCHED/provider/Project/Agent/Recipe/cloud/reliability work merely because it is newer.
+
+Purpose: after Autopilot already has the planned provider, Project/Context, Agent/subagent, Verifier, Recipe/Skill, artifact, cloud/local, observability, evaluation and reliability foundations, add a higher-order productivity layer whose job is to reduce owner attention, repeated context processing, duplicated work, unnecessary model reasoning and cross-project reinvention.
+
+This layer extends the existing canonical Core. It MUST NOT create scheduler #2, Project/Context engine #2, memory authority #2, policy engine #2, router #2, recovery #2, Agent framework #2 or provider authority #2.
+
+### 13.1 Attention OS / Owner Attention Optimizer
+
+Treat owner attention as a scarce governed resource, not an unlimited fallback.
+
+For every potential owner interruption, estimate at least:
+- consequence/risk of a wrong autonomous decision;
+- reversibility/compensability;
+- cost of delay;
+- deadline proximity;
+- uncertainty;
+- whether canonical sources can answer the question automatically;
+- whether several questions can be batched into one decision;
+- whether the task can safely continue around the unresolved point.
+
+Required behavior:
+- suppress routine status noise;
+- batch related decisions;
+- surface only material blockers/ASK items;
+- provide bounded choices, evidence and consequence;
+- resume the exact same durable step after the decision;
+- never convert model uncertainty into owner interruption when a safe deterministic evidence-gathering action is available first.
+
+Primary metric: OWNER_ATTENTION_MINUTES_PER_VERIFIED_OUTCOME.
+
+### 13.2 Semantic Change Bus / Incremental Recompute Graph
+
+Event triggers should carry semantic deltas, not only “something changed”.
+
+Maintain dependency relationships between source changes and affected:
+- Project facts;
+- Context Capsules;
+- plan nodes;
+- artifacts;
+- tests;
+- verification requirements;
+- Recipes/Skills;
+- downstream tasks.
+
+A change should invalidate/recompute only the affected subgraph when possible. Example: README-only change must not wake unrelated security/release workers; a scheduler contract change should invalidate only scheduler-dependent implementation/tests/UI/docs/release evidence.
+
+Required primitives:
+- change identity and source revision;
+- semantic delta classification;
+- dependency edges;
+- invalidation set;
+- recomputation priority;
+- stale-derived-state marker;
+- verifier coverage for incremental correctness.
+
+Goal: reduce repeated full-project rereads and unnecessary worker/model activation.
+
+### 13.3 Context Compiler / Delta Context Capsules
+
+Evolve Context Capsules into an incrementally compiled context system.
+
+Every reusable context fragment should preserve:
+- source identity;
+- source revision/SHA;
+- authority class;
+- dependencies;
+- freshness/staleness state;
+- hash;
+- cached structured summary;
+- retrieval pointer for full material.
+
+When a worker already knows Project Capsule revision N, prefer a bounded delta from N -> N+1 rather than resending the entire project history. Large material remains referenced and retrieved on demand.
+
+Track:
+- context bytes/tokens resent per verified outcome;
+- worker startup latency;
+- stale-context incidents;
+- invariant loss after compaction;
+- cache/reuse hit rate.
+
+### 13.4 Truth Arbitration Engine
+
+Formalize fact-specific canonical truth resolution.
+
+Different fact classes may have different authority order. Examples:
+- deployed revision -> deployment/provider/live system;
+- current source -> canonical Git main;
+- owner product requirement -> latest explicit owner instruction / binding product authority;
+- sent email -> mail provider state;
+- document revision -> configured canonical document/provider.
+
+Required:
+- configurable truth rules by resource/fact class;
+- provenance and revision;
+- conflict detection;
+- automatic refresh from the highest-authority available source;
+- stale memory/summaries never outrank newer canonical evidence;
+- unresolved conflicts become one bounded Attention OS item rather than repeated worker debate.
+
+### 13.5 Cross-Project Intelligence Graph
+
+Add a portfolio-level graph across owner-authorized Projects/repositories to prevent repeated engineering.
+
+Index reusable:
+- components/contracts;
+- tests/invariants;
+- providers;
+- schedulers/recovery patterns;
+- memory/context patterns;
+- accessibility mechanisms;
+- evaluation infrastructure;
+- release/deployment mechanisms;
+- known donor implementations.
+
+Before a Project implements a generic infrastructure capability, query the graph for existing first-party implementations and produce:
+- likely donor(s);
+- semantic similarity;
+- compatibility/gap summary;
+- provenance/license boundary;
+- reusable tests/invariants;
+- thin-adapter opportunity;
+- reason to reuse or reason not to.
+
+This generalizes project-specific donor rules into an Autopilot-wide capability while preserving each Project's own domain authority.
+
+### 13.6 Duplicate Work Radar
+
+Claims/leases prevent exact ownership collision; Duplicate Work Radar must detect semantic/causal overlap even when task names differ.
+
+Compare active/planned work by:
+- affected subsystem/files/resources;
+- intended outcome;
+- dependencies;
+- acceptance criteria;
+- conflict keys;
+- semantic similarity;
+- expected side effects.
+
+On high overlap:
+- merge tasks;
+- redirect one worker to independent verification/review;
+- narrow scopes;
+- delay one lineage;
+- require explicit parallel-variant semantics if both are intentionally retained.
+
+Track duplicate/conflicting worker rate and avoided duplicate work.
+
+### 13.7 Agent-to-Automation Compiler
+
+Repeated Agent reasoning should progressively become cheaper deterministic execution where evidence supports it.
+
+Lifecycle:
+Agent exploration -> verified successful trace -> secret/private-data sanitization -> parameter inference -> Candidate Recipe/Skill -> deterministic replay -> verifier/evals -> versioned promotion.
+
+Optimization ladder:
+deterministic algorithm/API/Recipe -> small/local model -> stronger/local model -> cloud model only when justified.
+
+The system should identify repeated reasoning patterns and propose compilation when recurrence and stability justify it. Promotion never silently expands owner authority.
+
+Primary metric: VERIFIED_AUTOMATION_REUSE_RATE plus saved model/runtime/owner attention.
+
+### 13.8 Live Provider Canary Network
+
+Readiness must be continuously observed, not only asserted at release time.
+
+Run bounded harmless canaries appropriate to each provider/capability, such as:
+- ChatGPT composer/state detectability;
+- GitHub read path;
+- Drive metadata/read path;
+- MCP handshake/schema;
+- Native Companion health/capabilities;
+- UIA safe test enumeration;
+- cloud checkpoint/resume;
+- provider authentication/readiness without consequential mutation.
+
+A failed canary may:
+- lower provider readiness;
+- remove the provider from critical routing;
+- activate a safe fallback;
+- create a repair task;
+- block consequential work that lacks a verified execution path.
+
+Never use a canary to perform destructive or economically consequential actions.
+
+### 13.9 Shadow Mode / Autonomy Qualification
+
+Provide an explicit SHADOW execution mode:
+- observe live state;
+- plan;
+- choose tools/actions;
+- predict effects and verification;
+- record what would have been executed;
+- do not perform external consequential effects.
+
+Use shadow evidence to compare proposed autonomous behavior with verified human/production outcomes. Authority may progress by effect class through:
+SHADOW -> ASK -> ALLOW,
+only under owner policy and readiness/evaluation evidence.
+
+### 13.10 Agent Workflow Debugger
+
+Extend the Run Timeline into a professional debugging surface for Agent workflows.
+
+Support:
+- breakpoint before selected effect classes;
+- inspect world-state snapshot at a checkpoint;
+- inspect plan/task/provider/policy/evidence state;
+- replay safe internal planning/tool-selection from a checkpoint;
+- run an alternate model/router/plan branch without repeating external effects;
+- create branch/variant continuations from internal checkpoints;
+- compare divergences and verifier outcomes.
+
+Replay/debugging MUST NOT reveal hidden chain-of-thought and MUST NOT blindly re-execute external effects.
+
+### 13.11 Multi-Account Identity Graph
+
+Credentials and identity are separate concepts. Maintain durable owner-authorized identity/account context for:
+- browser profiles;
+- ChatGPT accounts;
+- Google accounts;
+- GitHub identities/orgs;
+- CMS environments;
+- workspaces/tenants;
+- staging vs production identities.
+
+A job/provider invocation may require an explicit identity scope. Before consequential action, verify that observed authenticated identity matches the required identity. Wrong-account ambiguity blocks/reconciles rather than executing “the right action in the wrong account”.
+
+### 13.12 Deadline / SLA Brain
+
+Extend priority/resource governance with deadline-aware completion forecasting.
+
+Estimate whether the current plan is likely to meet owner deadlines/SLA constraints using observed throughput, dependencies, queue state, provider readiness and uncertainty.
+
+When risk increases, policy may:
+- increase safe fanout;
+- allocate stronger/faster models;
+- activate cloud capacity;
+- defer lower-value work;
+- prune low-value speculative branches;
+- prioritize dependency-unlocking tasks;
+- surface an owner decision only when automatic reallocation cannot preserve the target.
+
+Do not claim precise outcome probabilities without calibrated evidence; use bounded operational risk classes until sufficient empirical data exists.
+
+### 13.13 Human-Time Economics
+
+Resource optimization must include owner time, not only token/API cost.
+
+Routing/governance should compare expected:
+- machine/API cost;
+- runtime/latency;
+- probability of verifier pass;
+- expected rework;
+- owner review/coordination minutes;
+- deadline cost.
+
+A slightly more expensive model/provider may be preferred when it materially reduces owner attention or rework and remains within policy/budget.
+
+### 13.14 Autopilot SDK / CLI / Local API
+
+Expose the canonical Autopilot control plane programmatically without creating a second orchestration authority.
+
+Future supported operations should include authenticated/scoped forms of:
+- create/open Project;
+- submit Outcome Contract;
+- start/pause/resume/stop Agent;
+- inspect status/plan/evidence;
+- submit ASK decision;
+- trigger Recipe/Skill;
+- register/query provider capabilities;
+- subscribe to canonical events;
+- query artifacts/results.
+
+CLI/API/SDK calls map onto the same durable identities, policy, scheduler, recovery and exact-effect semantics as the UI.
+
+Goal: allow owner applications and other first-party Projects to use Autopilot as an execution platform instead of rebuilding automation infrastructure.
+
+### 13.15 User-Facing ROI / Automation Opportunity Engine
+
+Provide a simple evidence-backed productivity report, not vanity activity metrics.
+
+Possible outputs:
+- verified outcomes completed;
+- estimated owner coordination time avoided;
+- repeated context avoided;
+- percentage of repeated workflows served by verified Recipes/Skills;
+- model/provider/runtime spend;
+- rework and verifier reopen rate;
+- top causes of delay;
+- top recurring manual workflows;
+- recommended next automation/Recipe opportunity.
+
+Recommendations must cite observable run history and must not fabricate precise time savings when only rough estimates are available.
+
+## 14. Agent maturity reinforcement — no duplicate backlog
+
+The earlier Agent requirements remain higher-priority and authoritative: broad tool/provider execution, durable Agent Plan DAG, hierarchical subagents, independent Verifier, long-horizon context, persistent cloud execution, world-state freshness, self-testing/repair, procedural learning, adaptive routing and exact-effect recovery.
+
+This addendum does NOT create replacements for those items. It adds the following maturity criteria after their foundations exist:
+
+- negative/failure memory: failed approaches and known failure signatures remain retrievable so Agents do not repeatedly rediscover the same dead ends;
+- empirical routing: model/provider routing should increasingly use measured verifier pass rate, latency, cost, rework and task-class performance rather than static assumptions;
+- world-state identity binding: account/environment/revision/lease freshness is verified before consequential actions;
+- reasoning-to-determinism pressure: repeated stable work should migrate toward Recipes/APIs/algorithms;
+- live readiness pressure: critical routing should prefer currently healthy, recently canary-verified providers;
+- owner-attention pressure: Agents should gather evidence and resolve safe uncertainty before escalating to the owner.
+
+## 15. Post-existing delivery order
+
+The binding implementation rule for this addendum is:
+
+1. Continue current active lineages and already-ratified North Star dependencies first.
+2. Complete the existing provider/Project/Context/Agent/subagent/Verifier/Recipe/Artifact/cloud/observability/evaluation/reliability foundations in their dependency-driven order.
+3. Do not open speculative parallel branches for this addendum while earlier prerequisite scope is unfinished.
+4. When earlier foundations make these capabilities executable, auditors may promote the highest-leverage unowned Productivity Intelligence slice.
+5. Exception: a narrow component may move earlier only when live evidence proves it is a direct dependency or materially shortens an already-prioritized critical path without duplicating authority.
+6. Newness of this addendum alone is NEVER a reason to outrank earlier work.
+
+Candidate post-existing slice IDs for future queueing:
+ATTN-001, CHANGE-001, CTXCOMP-001, TRUTH-001, XPROJECT-001, DUPRADAR-001, AUTOCOMP-001, CANARY-001, SHADOW-001, DEBUG-001, IDGRAPH-001, SLA-001, HUMANCOST-001, SDK-001, ROI-001.
+
+These IDs are planning labels only. They are not READY_NOW claims and must not be instantiated as mutation lineages until the live dependency/ownership auditor promotes them.
+
+## 16. Extended value objective
+
+After the already-defined whole-product capabilities are implemented, the next optimization ceiling is not “more Agent activity”. It is:
+
+MINIMIZE
+- TIME_TO_VERIFIED_FINISHED_OUTCOME;
+- OWNER_ATTENTION_MINUTES_PER_VERIFIED_OUTCOME;
+- REPEATED_CONTEXT_PROCESSING;
+- DUPLICATE_CAUSAL_WORK;
+- UNNECESSARY_MODEL_REASONING;
+- CROSS_PROJECT_REINVENTION;
+
+while maximizing:
+- VERIFIED_AUTOMATION_REUSE_RATE;
+- INCREMENTAL_RECOMPUTE_RATE;
+- CONTEXT_DELTA_REUSE;
+- PROVIDER_LIVE_READINESS;
+- SAFE_AUTONOMY_COVERAGE;
+- CROSS_PROJECT_COMPONENT_REUSE.
+
+The final intended experience remains: the owner states the outcome and authority once; Autopilot chooses and coordinates the best available execution path, minimizes unnecessary owner involvement and repeated reasoning, proves the result, learns reusable procedure safely, and reuses existing first-party capability instead of rebuilding it.
