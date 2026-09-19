@@ -745,6 +745,9 @@ export class ScenarioWorkManager {
       if (item.config.minimumLaunchGapSeconds > 0 && item.runtime.lastLaunchAt) {
         next = Math.min(next, item.runtime.lastLaunchAt + item.config.minimumLaunchGapSeconds * 1000);
       }
+      if (item.config.minimumLaunchGapSeconds > 0 && Number(item.runtime.nextLaunchAt || 0) > now) {
+        next = Math.min(next, Number(item.runtime.nextLaunchAt));
+      }
     }
     return next < Infinity ? Math.max(now + 250, next) : 0;
   }
