@@ -392,6 +392,7 @@ export async function runRuntimeCycle({
   executor,
   startup = false,
   executionAvailable = false,
+  syncDrivePrompts = null,
   now = () => Date.now(),
 }) {
   if (!repository || !chromeApi || !executor) throw new Error('Runtime dependencies are required');
@@ -465,7 +466,9 @@ export async function runRuntimeCycle({
 
   const finalState = await repository.load();
   const wakeAt = await reconcileAlarm(chromeApi, finalState, now());
-  return { state: finalState, outcomes, drivePromptSync, wakeAt };
+  const result = { state: finalState, outcomes, wakeAt };
+  if (typeof syncDrivePrompts === 'function') result.drivePromptSync = drivePromptSync;
+  return result;
 }
 
 export const RuntimeExecutionConstants = Object.freeze({
