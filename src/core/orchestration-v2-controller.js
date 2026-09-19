@@ -449,7 +449,7 @@ export class OrchestrationV2Controller {
 
       const dispatched = await this.dispatchHierarchyEvent({
         type: OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED,
-        eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}`,
+        eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}:slots:${snapshot.requestedSlotCount}`,
         controlEpoch: hierarchy.state.controlEpoch,
         nodeId: item.nodeId,
         providerId: snapshot.providerId,
