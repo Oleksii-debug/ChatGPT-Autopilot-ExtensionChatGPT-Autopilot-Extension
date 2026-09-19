@@ -3,6 +3,13 @@ import {
   OrchestrationChatMode,
   validateOrchestrationGraphV1,
 } from './orchestration-hierarchy.js';
+import {
+  DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
+  DRIVE_SCALAR_MAX_POLL_INTERVAL_MS,
+  DRIVE_SCALAR_MIN_POLL_INTERVAL_MS,
+  DRIVE_SCALAR_PROVIDER_V1,
+  extractGoogleDriveScalarSourceId,
+} from './orchestration-drive-scalar-provider.js';
 
 export const OrchestrationRoleTemplate = Object.freeze({
   GLOBAL_DIRECTOR: 'GLOBAL_DIRECTOR',
@@ -200,6 +207,29 @@ function normalizeDomains(raw) {
   return domains;
 }
 
+function normalizeDriveScalarSources(raw, domainIds, pollIntervalMs) {
+  if (raw === undefined || raw === null) return new Map();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid driveScalarSources');
+  const allowed = new Set(domainIds);
+  const out = new Map();
+  for (const [rawDomainId, rawSource] of Object.entries(raw)) {
+    const domainId = stableId(rawDomainId, 'driveScalarSources domain id');
+    if (!allowed.has(domainId)) throw new Error(`Drive scalar source targets unknown domain ${domainId}`);
+    if (out.has(domainId)) throw new Error(`Duplicate Drive scalar source for ${domainId}`);
+    const sourceId = extractGoogleDriveScalarSourceId(rawSource);
+    out.set(domainId, {
+      sourceId,
+      pollIntervalMs: integer(
+        pollIntervalMs ?? DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
+        'driveScalarPollIntervalMs',
+        DRIVE_SCALAR_MIN_POLL_INTERVAL_MS,
+        DRIVE_SCALAR_MAX_POLL_INTERVAL_MS,
+      ),
+    });
+  }
+  return out;
+}
+
 function nodeProfileIds(nodeId) {
   return {
     primary: `${nodeId}:prompt-v1`,
@@ -217,6 +247,8 @@ export function buildThreeLevelHierarchyTemplate({
   workersPerManager = 5,
   includeIntegrationManager = false,
   includeQaRedTeam = false,
+  driveScalarSources = null,
+  driveScalarPollIntervalMs = DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
 } = {}) {
   const graph = stableId(graphId, 'graphId');
   const epoch = integer(controlEpoch, 'controlEpoch', 1, Number.MAX_SAFE_INTEGER);
@@ -225,6 +257,11 @@ export function buildThreeLevelHierarchyTemplate({
   const issue = integer(controlIssueNumber || 0, 'controlIssueNumber', 0, Number.MAX_SAFE_INTEGER);
   const domainList = normalizeDomains(domains);
   const workerCount = integer(workersPerManager, 'workersPerManager', 1, MAX_WORKERS_PER_MANAGER);
+  const driveSources = normalizeDriveScalarSources(
+    driveScalarSources,
+    domainList.map(domain => domain.id),
+    driveScalarPollIntervalMs,
+  );
   const extraNodeCount = (includeIntegrationManager ? 1 : 0) + (includeQaRedTeam ? 1 : 0);
   const totalNodeCount = 1 + domainList.length + (domainList.length * workerCount) + extraNodeCount;
   if (totalNodeCount > 1000) throw new Error('Hierarchy template exceeds 1000 logical nodes');
@@ -247,6 +284,7 @@ export function buildThreeLevelHierarchyTemplate({
   for (const domain of domainList) {
     const managerId = `manager:${domain.id}`;
     const workerIds = Array.from({ length: workerCount }, (_, index) => `worker:${domain.id}:${String(index + 1).padStart(2, '0')}`);
+    const driveSource = driveSources.get(domain.id) || null;
     nodeSpecs.push({
       id: managerId,
       parentId: 'director',
@@ -254,6 +292,13 @@ export function buildThreeLevelHierarchyTemplate({
       role: OrchestrationRoleTemplate.DOMAIN_MANAGER,
       chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
       scope: domain.scope,
+      providerBinding: driveSource ? {
+        providerId: DRIVE_SCALAR_PROVIDER_V1,
+        groupNodeId: managerId,
+        maxSlots: workerIds.length,
+        sourceId: driveSource.sourceId,
+        pollIntervalMs: driveSource.pollIntervalMs,
+      } : null,
     });
     for (let index = 0; index < workerIds.length; index += 1) {
       nodeSpecs.push({
@@ -333,6 +378,7 @@ export function buildThreeLevelHierarchyTemplate({
       barrier: {
         mode: spec.childIds.length ? OrchestrationBarrierMode.ALL_DIRECT_CHILDREN : OrchestrationBarrierMode.NONE,
       },
+      providerBinding: spec.providerBinding || null,
     });
   }
 
