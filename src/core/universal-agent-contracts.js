@@ -105,7 +105,18 @@ function jsonData(value, label, { optional = true } = {}) {
 }
 
 function frozen(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) frozen(child);
   return Object.freeze(value);
+}
+
+function normalizedObjectList(value, label, normalizeItem, { max = MAX_LIST } = {}) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
+  return value.map((item, index) => {
+    try { return normalizeItem(item); }
+    catch (error) { throw new Error(`${label}[${index}]: ${error.message}`); }
+  });
 }
 
 const CAPABILITY_KEYS = new Set(['schemaVersion', 'capabilityId', 'description', 'riskClass', 'attributes']);
@@ -221,11 +232,7 @@ export function normalizeObservationV1(input) {
   exactKeys(raw, OBSERVATION_KEYS, 'ObservationV1');
   const status = String(raw.status || '').trim().toUpperCase();
   if (!OBSERVATION_STATUSES.has(status)) throw new Error('status is invalid');
-  const artifactRefs = (raw.artifactRefs || []).map((item, index) => {
-    try { return normalizeArtifactRefV1(item); }
-    catch (error) { throw new Error(`artifactRefs[${index}]: ${error.message}`); }
-  });
-  if (artifactRefs.length > MAX_LIST) throw new Error('artifactRefs must be bounded');
+  const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1);
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ObservationV1'),
     observationId: id(raw.observationId, 'observationId'),
@@ -284,15 +291,8 @@ const HANDOFF_KEYS = new Set([
 export function normalizeSpecialistHandoffV1(input) {
   const raw = plain(input, 'SpecialistHandoffV1');
   exactKeys(raw, HANDOFF_KEYS, 'SpecialistHandoffV1');
-  const artifactRefs = (raw.artifactRefs || []).map((item, index) => {
-    try { return normalizeArtifactRefV1(item); }
-    catch (error) { throw new Error(`artifactRefs[${index}]: ${error.message}`); }
-  });
-  const credentialRefs = (raw.credentialRefs || []).map((item, index) => {
-    try { return normalizeCredentialRefV1(item); }
-    catch (error) { throw new Error(`credentialRefs[${index}]: ${error.message}`); }
-  });
-  if (artifactRefs.length > MAX_LIST || credentialRefs.length > 64) throw new Error('handoff references must be bounded');
+  const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1);
+  const credentialRefs = normalizedObjectList(raw.credentialRefs, 'credentialRefs', normalizeCredentialRefV1, { max: 64 });
   const requestedCapabilityIds = idList(raw.requestedCapabilityIds, 'requestedCapabilityIds', { optional: false });
   if (!requestedCapabilityIds.length) throw new Error('requestedCapabilityIds must not be empty');
   return frozen({
