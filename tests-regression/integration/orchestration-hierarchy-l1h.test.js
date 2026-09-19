@@ -327,3 +327,73 @@ test('L1-H fixed 5x5 pool survives restart plus wake/barrier storms without dupl
     'Director must have one initial and one reconciliation activation',
   );
 });
+
+
+test('L1-H tab/probe loss and rate-limit signals wait safely, then recover without duplicate descendant launch', async () => {
+  const g = graph();
+  const directorChat = chatUrl(900);
+  let probeMode = 'TAB_GONE';
+  const h = harness(async probe => {
+    if (probeMode === 'TAB_GONE') {
+      const error = new Error('No tab with id');
+      error.safeDiagnosticCode = 'TAB_GONE';
+      throw error;
+    }
+    if (probeMode === 'RATE_LIMITED') {
+      return { status: 'RATE_LIMITED', assistantComplete: false };
+    }
+    return { status: 'READY', assistantComplete: true, assistantText: `${probe.nodeId} recovered` };
+  });
+
+  let controller = h.controller();
+  await controller.configureHierarchy(g, { nowMs: h.now() });
+  await controller.startHierarchy({ nowMs: h.advance(1) });
+  await confirmSend(h, g.graphId, 'director', directorChat);
+
+  controller = h.controller();
+  let cycle = await controller.cycle({ nowMs: h.advance(1) });
+  assert.deepEqual(cycle.hierarchyProbe.terminal, []);
+  assert.equal(cycle.hierarchyProbe.waiting.length, 1);
+  assert.equal(cycle.hierarchyProbe.waiting[0].status, 'TEMPORARY_ERROR');
+
+  let runtime = await h.runtimeRepository.load();
+  const activationId = runtime.hierarchy.state.nodesById.director.currentActivationId;
+  assert.equal(
+    runtime.hierarchy.state.nodesById.director.activationLedger[activationId].phase,
+    'EFFECT_CONFIRMED',
+    'temporary tab/probe loss must preserve verified Send authority without inventing completion',
+  );
+  let core = await h.coreRepository.load();
+  assert.equal(
+    g.nodeOrder.filter(id => id.startsWith('manager:'))
+      .filter(id => core.sessionsById[hierarchyCoreSessionId(g.graphId, id)]).length,
+    0,
+  );
+
+  probeMode = 'RATE_LIMITED';
+  controller = h.controller();
+  cycle = await controller.cycle({ nowMs: h.advance(1) });
+  assert.deepEqual(cycle.hierarchyProbe.terminal, []);
+  assert.equal(cycle.hierarchyProbe.waiting[0].status, 'RATE_LIMITED');
+  runtime = await h.runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.director.currentActivationId, activationId);
+
+  probeMode = 'READY';
+  controller = h.controller();
+  cycle = await controller.cycle({ nowMs: h.advance(1) });
+  assert.deepEqual(cycle.hierarchyProbe.terminal.map(item => item.nodeId), ['director']);
+
+  core = await h.coreRepository.load();
+  const managers = g.nodeOrder.filter(id => id.startsWith('manager:'));
+  assert.equal(
+    managers.filter(id => core.sessionsById[hierarchyCoreSessionId(g.graphId, id)]).length,
+    5,
+    'recovered Director terminal must launch each configured Manager exactly once',
+  );
+  assert.equal(core.sessionOrder.length, 6);
+
+  controller = h.controller();
+  await controller.cycle({ nowMs: h.advance(1) });
+  core = await h.coreRepository.load();
+  assert.equal(core.sessionOrder.length, 6, 'restart after recovery must not duplicate Manager role Sessions');
+});
