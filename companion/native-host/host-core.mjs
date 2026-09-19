@@ -6,7 +6,7 @@ export const HOST_NAME = 'org.chatgpt_autopilot.companion';
 export const PROTOCOL_VERSION = 1;
 export const HOST_VERSION = '0.1.0';
 export const MAX_NATIVE_MESSAGE_BYTES = 1024 * 1024;
-export const MAX_READ_BYTES = 1024 * 1024;
+export const MAX_READ_BYTES = 768 * 1024;
 
 export const RequestType = Object.freeze({
   HELLO: 'hello',
@@ -47,7 +47,7 @@ function normalizeRequest(input) {
   if (!REQUEST_TYPES.has(type)) throw companionError('UNSUPPORTED_REQUEST', `Unsupported Native Companion request: ${type || '(empty)'}`);
   const payload = input.payload == null ? {} : input.payload;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw companionError('INVALID_REQUEST', 'payload must be an object');
-  if (JSON.stringify(payload).length > 256_000) throw companionError('INVALID_REQUEST', 'payload is too large');
+  if (Buffer.byteLength(JSON.stringify(payload), 'utf8') > 256_000) throw companionError('INVALID_REQUEST', 'payload is too large');
   return { protocolVersion: 1, requestId: normalizeId(input.requestId, 'requestId'), type, payload };
 }
 
@@ -118,7 +118,7 @@ async function readScopedText(payload, config, fsApi) {
   const relativePath = requireString(payload.relativePath, 'relativePath');
   if (path.isAbsolute(relativePath)) throw companionError('PATH_OUTSIDE_SCOPE', 'relativePath must not be absolute');
   const segments = relativePath.replace(/\\/gu, '/').split('/');
-  if (segments.some(segment => segment === '..' || segment === '')) throw companionError('PATH_OUTSIDE_SCOPE', 'relativePath contains an invalid path segment');
+  if (segments.some(segment => segment === '..' || segment === '' || segment.includes(':'))) throw companionError('PATH_OUTSIDE_SCOPE', 'relativePath contains an invalid path segment');
   const root = config.roots.find(item => item.rootId === rootId);
   if (!root) throw companionError('ROOT_NOT_ALLOWED', 'Requested filesystem root is not configured');
   const maxBytes = requireReadLimit(payload.maxBytes);
