@@ -131,6 +131,9 @@ test('host hello, health and capabilities are versioned and caller-bound', async
   });
   assert.equal(capabilities.ok, true);
   assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'filesystem.readText'));
+  assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'credentials.list'));
+  assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'credentials.resolve'));
+  assert.equal(capabilities.result.credentialBrokerAvailable, false);
   assert.equal(capabilities.result.roots.length, 0);
 
   const rejected = await handleNativeCompanionRequest(request('health'), {
@@ -146,6 +149,92 @@ test('host hello, health and capabilities are versioned and caller-bound', async
   });
   assert.equal(mismatch.ok, false);
   assert.equal(mismatch.error.code, 'PROTOCOL_MISMATCH');
+});
+
+test('Native Companion credential client and host keep listing opaque and resolve only on explicit request', async () => {
+  const brokerCalls = [];
+  const broker = {
+    list(targetOrigin) {
+      brokerCalls.push(['list', targetOrigin]);
+      return [{
+        schemaVersion: 1,
+        credentialId: 'ais-main',
+        brokerId: 'native-companion',
+        kind: 'username-password',
+        scope: ['https://ais.example.edu'],
+        expiresAt: null,
+      }];
+    },
+    async resolve(input) {
+      brokerCalls.push(['resolve', structuredClone(input)]);
+      return {
+        credentialId: input.credentialId,
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: 'owner@example.edu',
+        secret: 'S3cret-value',
+      };
+    },
+  };
+
+  const listed = await handleNativeCompanionRequest(request('credentials.list', {
+    targetOrigin: 'https://ais.example.edu',
+  }, 'cred-list'), {
+    config: config(),
+    callerOrigin: ORIGIN,
+    credentialBroker: broker,
+  });
+  assert.equal(listed.ok, true);
+  assert.equal(listed.result.credentialRefs.length, 1);
+  assert.equal(JSON.stringify(listed.result).includes('owner@example.edu'), false);
+  assert.equal(JSON.stringify(listed.result).includes('S3cret-value'), false);
+  assert.deepEqual(brokerCalls, [['list', 'https://ais.example.edu']]);
+
+  const resolved = await handleNativeCompanionRequest(request('credentials.resolve', {
+    credentialId: 'ais-main',
+    targetOrigin: 'https://ais.example.edu',
+  }, 'cred-resolve'), {
+    config: config(),
+    callerOrigin: ORIGIN,
+    credentialBroker: broker,
+  });
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.result.username, 'owner@example.edu');
+  assert.equal(resolved.result.secret, 'S3cret-value');
+  assert.equal(brokerCalls.length, 2);
+
+  const unavailable = await handleNativeCompanionRequest(request('credentials.list', {
+    targetOrigin: 'https://ais.example.edu',
+  }, 'cred-unavailable'), {
+    config: config(),
+    callerOrigin: ORIGIN,
+  });
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.error.code, 'CREDENTIAL_BROKER_UNAVAILABLE');
+});
+
+test('Native Companion extension client sends scoped credential requests without inventing fields', async () => {
+  const messages = [];
+  const chromeApi = {
+    runtime: {
+      async sendNativeMessage(_host, message) {
+        messages.push(structuredClone(message));
+        const result = message.type === 'credentials.list'
+          ? { credentialRefs: [{ schemaVersion: 1, credentialId: 'ais-main', brokerId: 'native-companion', kind: 'username-password', scope: ['https://ais.example.edu'], expiresAt: null }] }
+          : { credentialId: 'ais-main', kind: 'username-password', targetOrigin: 'https://ais.example.edu', username: 'owner@example.edu', secret: 'S3cret-value' };
+        return { protocolVersion: 1, requestId: message.requestId, type: message.type, ok: true, result };
+      },
+    },
+  };
+  let n = 0;
+  const client = new NativeCompanionClient({ chromeApi, createId: () => `cred-${++n}` });
+  const listed = await client.listCredentials({ targetOrigin: 'https://ais.example.edu' });
+  const resolved = await client.resolveCredential({ credentialId: 'ais-main', targetOrigin: 'https://ais.example.edu' });
+  assert.equal(listed.credentialRefs[0].credentialId, 'ais-main');
+  assert.equal(resolved.secret, 'S3cret-value');
+  assert.deepEqual(messages.map(item => item.type), ['credentials.list', 'credentials.resolve']);
+  assert.deepEqual(messages[0].payload, { targetOrigin: 'https://ais.example.edu' });
+  assert.deepEqual(messages[1].payload, { credentialId: 'ais-main', targetOrigin: 'https://ais.example.edu' });
 });
 
 test('filesystem.readText reads only a valid UTF-8 file inside an explicitly configured root', async t => {
