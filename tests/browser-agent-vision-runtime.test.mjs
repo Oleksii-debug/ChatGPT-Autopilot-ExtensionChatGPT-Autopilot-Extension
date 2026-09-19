@@ -275,7 +275,7 @@ test('vision disabled by owner policy cannot create a pending screenshot obligat
   await manager.create({ id: 'vision-job', goal: 'Do not use screenshots', visionOnDemand: false });
   await manager.start('vision-job', { runInitial: false });
   const result = await manager.cycleOne('vision-job');
-  assert.equal(result.kind, 'RETRY');
+  assert.equal(result.kind, 'ACTION_RETRY');
   const live = await manager.get('vision-job');
   assert.equal(live.job.runtime.visionPending, false);
   assert.equal(chrome.screenshotCount(), 0);
