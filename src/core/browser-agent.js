@@ -551,6 +551,50 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.ref = clean(raw.ref, 120);
     if (!Number.isInteger(action.frameId) || !action.ref || !refs.has(`${action.frameId}:${action.ref}`)) throw new Error('Browser Agent action references an element outside the current snapshot');
   }
+  if (type === BrowserAgentActionType.FILL_CREDENTIAL) {
+    const credentialRef = clean(raw.credentialRef, 80);
+    const credential = (snapshot?.credentials || []).find(item => item?.ref === credentialRef);
+    if (!credential || !clean(credential.credentialId, 128)) throw new Error('Browser Agent credential action references a credential outside the current snapshot');
+
+    const passwordFrameId = Number(raw.passwordFrameId);
+    const passwordRef = clean(raw.passwordRef, 120);
+    if (!Number.isInteger(passwordFrameId) || !passwordRef || !refs.has(`${passwordFrameId}:${passwordRef}`)) {
+      throw new Error('Browser Agent credential action requires an exact current password field');
+    }
+    const passwordFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === passwordFrameId);
+    const passwordElement = (passwordFrame?.elements || []).find(item => item.ref === passwordRef);
+    if (String(passwordElement?.tag || '').toLowerCase() !== 'input'
+      || String(passwordElement?.type || '').toLowerCase() !== 'password'
+      || passwordElement?.sensitive !== true) {
+      throw new Error('Browser Agent credential password target must be a current password input');
+    }
+
+    let usernameFrameId = null;
+    let usernameRef = '';
+    if (raw.usernameRef != null || raw.usernameFrameId != null) {
+      usernameFrameId = Number(raw.usernameFrameId);
+      usernameRef = clean(raw.usernameRef, 120);
+      if (!Number.isInteger(usernameFrameId) || !usernameRef || !refs.has(`${usernameFrameId}:${usernameRef}`)) {
+        throw new Error('Browser Agent credential username target is outside the current snapshot');
+      }
+      if (usernameFrameId !== passwordFrameId) throw new Error('Browser Agent credential username/password fields must be in the same frame in V1');
+      const usernameFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === usernameFrameId);
+      const usernameElement = (usernameFrame?.elements || []).find(item => item.ref === usernameRef);
+      const usernameType = String(usernameElement?.type || '').toLowerCase();
+      if (!usernameElement || usernameElement.sensitive === true || usernameType === 'password' || usernameType === 'file') {
+        throw new Error('Browser Agent credential username target is not a non-sensitive editable field');
+      }
+    }
+
+    action.credentialRef = credentialRef;
+    action.credentialId = clean(credential.credentialId, 128);
+    action.frameId = passwordFrameId;
+    action.ref = passwordRef;
+    action.passwordFrameId = passwordFrameId;
+    action.passwordRef = passwordRef;
+    action.usernameFrameId = usernameFrameId;
+    action.usernameRef = usernameRef;
+  }
   if (type === BrowserAgentActionType.FILL) action.text = typeof raw.text === 'string' ? raw.text.slice(0, 50000) : '';
   if (type === BrowserAgentActionType.SELECT) {
     action.value = clean(raw.value, 5000);
@@ -851,6 +895,70 @@ export function executeBrowserPageAction(snapshotId, action) {
     return { ok: true, kind: 'scroll', url: location.href };
   }
   throw new Error('AGENT_DOM_ACTION_UNSUPPORTED');
+}
+
+export function executeBrowserCredentialFill(snapshotId, action, username, secret) {
+  const marker = 'data-autopilot-agent-ref';
+  const snapshotMarker = 'data-autopilot-agent-snapshot';
+  const find = ref => Array.from(document.querySelectorAll(`[${marker}]`)).find(element =>
+    element.getAttribute(marker) === String(ref || '')
+    && element.getAttribute(snapshotMarker) === String(snapshotId || ''));
+
+  const password = find(action?.passwordRef);
+  if (!(password instanceof HTMLInputElement)
+    || String(password.type || '').toLowerCase() !== 'password'
+    || password.disabled
+    || password.hidden
+    || password.inert
+    || password.getAttribute('aria-hidden') === 'true'
+    || password.getAttribute('aria-disabled') === 'true') {
+    throw new Error('AGENT_CREDENTIAL_PASSWORD_TARGET_STALE');
+  }
+
+  const passwordValue = String(secret ?? '');
+  if (!passwordValue) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
+
+  const dispatch = element => {
+    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  };
+  const setInputValue = (element, value) => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (setter) setter.call(element, value); else element.value = value;
+    dispatch(element);
+  };
+
+  let usernameFilled = false;
+  if (action?.usernameRef) {
+    const user = find(action.usernameRef);
+    if (!user || !user.isConnected || user.disabled || user.hidden || user.inert
+      || user.getAttribute('aria-hidden') === 'true' || user.getAttribute('aria-disabled') === 'true') {
+      throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_STALE');
+    }
+    const value = String(username ?? '');
+    const tag = String(user.tagName || '').toLowerCase();
+    const inputType = tag === 'input' ? String(user.type || 'text').toLowerCase() : '';
+    if (inputType === 'password' || inputType === 'file') throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_INVALID');
+    user.focus?.({ preventScroll: true });
+    if (tag === 'input') {
+      setInputValue(user, value);
+    } else if (tag === 'textarea') {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      if (setter) setter.call(user, value); else user.value = value;
+      dispatch(user);
+    } else if (user.isContentEditable) {
+      user.textContent = value;
+      dispatch(user);
+    } else {
+      throw new Error('AGENT_CREDENTIAL_USERNAME_TARGET_INVALID');
+    }
+    usernameFilled = true;
+  }
+
+  password.focus?.({ preventScroll: true });
+  setInputValue(password, passwordValue);
+  if (String(password.value || '') !== passwordValue) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+  return { ok: true, usernameFilled, passwordFilled: true, url: location.href };
 }
 
 export function browserAgentTargetFingerprint(snapshot, action) {
