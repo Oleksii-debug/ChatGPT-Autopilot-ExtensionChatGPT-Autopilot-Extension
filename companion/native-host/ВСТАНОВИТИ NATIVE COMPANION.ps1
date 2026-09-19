@@ -9,13 +9,17 @@ $source = $PSScriptRoot
 $target = Join-Path $env:LOCALAPPDATA 'ChatGPT-Autopilot\Native-Companion'
 $runtime = Join-Path $target 'runtime'
 $configDir = Join-Path $target 'config'
-New-Item -ItemType Directory -Path $target, $runtime, $configDir -Force | Out-Null
+$credentialsDir = Join-Path $configDir 'credentials'
+New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDir -Force | Out-Null
 
 $copyNames = @(
   'host.mjs',
   'host-core.mjs',
+  'credential-broker.mjs',
   'NativeHostLauncher.cs',
   'НАЛАШТУВАТИ ДОЗВОЛЕНУ ПАПКУ.ps1',
+  'ДОДАТИ CREDENTIAL.ps1',
+  'ВИДАЛИТИ CREDENTIAL.ps1',
   'ВИДАЛИТИ NATIVE COMPANION.ps1',
   'README-УКРАЇНСЬКОЮ.txt'
 )
@@ -83,6 +87,7 @@ Write-Host ''
 Write-Host 'Native Companion встановлено.'
 Write-Host "Chrome extension ID: $ExtensionId"
 Write-Host "Manifest: $manifestPath"
-Write-Host 'За замовчуванням доступу до папок немає.'
+Write-Host 'За замовчуванням доступу до папок і credentials немає.'
 Write-Host 'Для файлового доступу запустіть «НАЛАШТУВАТИ ДОЗВОЛЕНУ ПАПКУ.ps1» у встановленій папці.'
+Write-Host 'Для автономного логіну додайте credential через «ДОДАТИ CREDENTIAL.ps1».'
 Write-Host 'Після встановлення перезапустіть Chrome.'

@@ -6,6 +6,8 @@ export const NativeCompanionRequestType = Object.freeze({
   HEALTH: 'health',
   CAPABILITIES: 'capabilities',
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
+  CREDENTIALS_LIST: 'credentials.list',
+  CREDENTIALS_RESOLVE: 'credentials.resolve',
 });
 
 const REQUEST_TYPES = new Set(Object.values(NativeCompanionRequestType));
@@ -122,6 +124,19 @@ export class NativeCompanionClient {
       rootId: clean(rootId, 128),
       relativePath: typeof relativePath === 'string' ? relativePath : '',
       maxBytes,
+    });
+  }
+
+  listCredentials({ targetOrigin } = {}) {
+    return this.send(NativeCompanionRequestType.CREDENTIALS_LIST, {
+      targetOrigin: clean(targetOrigin, 2048),
+    });
+  }
+
+  resolveCredential({ credentialId, targetOrigin } = {}) {
+    return this.send(NativeCompanionRequestType.CREDENTIALS_RESOLVE, {
+      credentialId: clean(credentialId, 128),
+      targetOrigin: clean(targetOrigin, 2048),
     });
   }
 }

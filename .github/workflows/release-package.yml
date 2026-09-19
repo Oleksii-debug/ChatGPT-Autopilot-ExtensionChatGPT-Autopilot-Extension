@@ -6,6 +6,8 @@ on:
     paths:
       - "manifest.json"
       - "src/**"
+      - "companion/**"
+      - "tests/**"
       - "scripts/package-release.mjs"
       - "tests-regression/release/**"
       - "tests-regression/reliability/**"
@@ -18,6 +20,8 @@ on:
     paths:
       - "manifest.json"
       - "src/**"
+      - "companion/**"
+      - "tests/**"
       - "scripts/package-release.mjs"
       - "tests-regression/release/**"
       - "tests-regression/reliability/**"

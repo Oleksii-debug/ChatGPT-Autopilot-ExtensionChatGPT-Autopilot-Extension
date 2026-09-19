@@ -13,6 +13,8 @@ export const RequestType = Object.freeze({
   HEALTH: 'health',
   CAPABILITIES: 'capabilities',
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
+  CREDENTIALS_LIST: 'credentials.list',
+  CREDENTIALS_RESOLVE: 'credentials.resolve',
 });
 
 const REQUEST_TYPES = new Set(Object.values(RequestType));
@@ -150,7 +152,7 @@ async function readScopedText(payload, config, fsApi) {
   };
 }
 
-export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now() } = {}) {
+export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now(), credentialBroker = null } = {}) {
   let request;
   try {
     const normalizedConfig = normalizeNativeCompanionConfig(config);
@@ -172,12 +174,26 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
         capabilities: [
           { capabilityId: 'native.health', readOnly: true },
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
+          { capabilityId: 'credentials.list', readOnly: true, scoped: true },
+          { capabilityId: 'credentials.resolve', readOnly: false, scoped: true, sensitive: true },
         ],
         roots: normalizedConfig.roots.map(item => ({ rootId: item.rootId })),
+        credentialBrokerAvailable: Boolean(credentialBroker),
       });
     }
     if (request.type === RequestType.FILESYSTEM_READ_TEXT) {
       return response(request, await readScopedText(request.payload, normalizedConfig, fsApi));
+    }
+    if (request.type === RequestType.CREDENTIALS_LIST) {
+      if (!credentialBroker) throw companionError('CREDENTIAL_BROKER_UNAVAILABLE', 'CredentialBroker is not configured');
+      return response(request, { credentialRefs: credentialBroker.list(request.payload.targetOrigin) });
+    }
+    if (request.type === RequestType.CREDENTIALS_RESOLVE) {
+      if (!credentialBroker) throw companionError('CREDENTIAL_BROKER_UNAVAILABLE', 'CredentialBroker is not configured');
+      return response(request, await credentialBroker.resolve({
+        credentialId: request.payload.credentialId,
+        targetOrigin: request.payload.targetOrigin,
+      }));
     }
     throw companionError('UNSUPPORTED_REQUEST', 'Unsupported Native Companion request');
   } catch (error) {

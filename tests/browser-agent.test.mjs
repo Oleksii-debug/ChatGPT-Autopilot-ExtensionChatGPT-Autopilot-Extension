@@ -171,6 +171,306 @@ test('consequential approval is default policy and classifies multilingual final
   assert.equal(classifyBrowserAgentActionRisk(snapshot, { type: 'click', frameId: 0, ref: 'r3' }).requiresApproval, true, 'neutral text still requires approval when the live control is a form submit');
 });
 
+test('fill_credential parser accepts only a current broker ref and current password field', () => {
+  const snapshot = {
+    url: 'https://ais.example.edu/login',
+    frames: [{ frameId: 0, elements: [
+      { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false },
+      { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true },
+      { ref: 'r3', tag: 'input', role: '', type: 'text', name: 'Other', sensitive: false },
+    ] }],
+    credentials: [{ ref: 'c1', credentialId: 'ais-main', brokerId: 'native-companion', kind: 'username-password', scope: ['https://ais.example.edu'], expiresAt: null }],
+  };
+  const action = parseBrowserAgentAction(JSON.stringify({
+    type: 'fill_credential',
+    credentialRef: 'c1',
+    usernameFrameId: 0,
+    usernameRef: 'r1',
+    passwordFrameId: 0,
+    passwordRef: 'r2',
+  }), snapshot);
+  assert.equal(action.type, 'fill_credential');
+  assert.equal(action.credentialId, 'ais-main');
+  assert.equal(action.usernameRef, 'r1');
+  assert.equal(action.passwordRef, 'r2');
+
+  assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+    type: 'fill_credential',
+    credentialRef: 'missing',
+    passwordFrameId: 0,
+    passwordRef: 'r2',
+  }), snapshot), /credential outside the current snapshot/);
+
+  assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+    type: 'fill_credential',
+    credentialRef: 'c1',
+    passwordFrameId: 0,
+    passwordRef: 'r3',
+  }), snapshot), /password target must be a current password input/);
+});
+
+test('credential ALLOW runs autonomous login fill while keeping secret out of prompt and durable history', async () => {
+  const chrome = makeChrome();
+  const nativeCalls = [];
+  const executionArgs = [];
+  const secretValue = 'NeverExpose-123!';
+  const usernameValue = 'owner@example.edu';
+  const nativeCompanionClient = {
+    async listCredentials({ targetOrigin }) {
+      nativeCalls.push(['list', targetOrigin]);
+      return {
+        credentialRefs: [{
+          schemaVersion: 1,
+          credentialId: 'ais-main',
+          brokerId: 'native-companion',
+          kind: 'username-password',
+          scope: ['https://ais.example.edu'],
+          expiresAt: null,
+        }],
+      };
+    },
+    async resolveCredential(input) {
+      nativeCalls.push(['resolve', structuredClone(input)]);
+      return {
+        credentialId: 'ais-main',
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: usernameValue,
+        secret: secretValue,
+      };
+    },
+  };
+  const original = chrome.scripting.executeScript;
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'snapshotBrowserPage') {
+      const snapshotId = details.args[0];
+      return [{ frameId: 0, result: {
+        snapshotId,
+        url: 'https://ais.example.edu/login',
+        title: 'AIS login',
+        text: 'Sign in',
+        elements: [
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+        ],
+        viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+      } }];
+    }
+    if (details.func?.name === 'executeBrowserCredentialFill') {
+      executionArgs.push(structuredClone(details.args));
+      return [{ frameId: 0, result: { ok: true, usernameFilled: true, passwordFilled: true, url: 'https://ais.example.edu/login' } }];
+    }
+    return original(details);
+  };
+
+  const prompts = [];
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async payload => {
+      prompts.push(structuredClone(payload));
+      return {
+        text: JSON.stringify({
+          type: 'fill_credential',
+          credentialRef: 'c1',
+          usernameFrameId: 0,
+          usernameRef: 'r1',
+          passwordFrameId: 0,
+          passwordRef: 'r2',
+        }),
+        usage: { inputTokens: 4, outputTokens: 2, totalTokens: 6, modelCalls: 1 },
+      };
+    },
+    now: (() => { let n = 140_000; return () => ++n; })(),
+  });
+
+  await manager.create({
+    id: 'job-1',
+    goal: 'Log in autonomously',
+    approvalMode: 'ALLOW_ALL',
+    credentialDecision: 'ALLOW',
+    stepDelayMs: 0,
+  });
+  await manager.start('job-1', { runInitial: false });
+  const result = await manager.cycleOne('job-1');
+  assert.equal(result.kind, 'ACTION');
+  assert.deepEqual(nativeCalls, [
+    ['list', 'https://ais.example.edu'],
+    ['resolve', { credentialId: 'ais-main', targetOrigin: 'https://ais.example.edu' }],
+  ]);
+  assert.equal(executionArgs.length, 1);
+  assert.equal(executionArgs[0][2], usernameValue);
+  assert.equal(executionArgs[0][3], secretValue);
+
+  const promptText = JSON.stringify(prompts);
+  assert.equal(promptText.includes(secretValue), false, 'secret must never enter model prompt');
+  assert.equal(promptText.includes(usernameValue), false, 'username remains behind credential execution boundary');
+  assert.match(promptText, /ais-main/);
+
+  const live = await manager.get('job-1');
+  const history = JSON.stringify(live.job.runtime.history);
+  assert.equal(history.includes(secretValue), false, 'secret must never enter durable history');
+  assert.equal(history.includes(usernameValue), false, 'resolved username must never enter durable history');
+  assert.match(history, /fill_credential/);
+  assert.match(history, /ais-main/);
+});
+
+test('credential ASK waits for owner confirmation before broker resolve and then executes exactly once', async () => {
+  const chrome = makeChrome();
+  let resolveCalls = 0;
+  let credentialExecutions = 0;
+  const nativeCompanionClient = {
+    async listCredentials() {
+      return {
+        credentialRefs: [{
+          schemaVersion: 1,
+          credentialId: 'ais-main',
+          brokerId: 'native-companion',
+          kind: 'username-password',
+          scope: ['https://ais.example.edu'],
+          expiresAt: null,
+        }],
+      };
+    },
+    async resolveCredential(input) {
+      resolveCalls += 1;
+      return {
+        credentialId: input.credentialId,
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: 'owner@example.edu',
+        secret: 'approval-secret',
+      };
+    },
+  };
+  const original = chrome.scripting.executeScript;
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'snapshotBrowserPage') {
+      const snapshotId = details.args[0];
+      return [{ frameId: 0, result: {
+        snapshotId,
+        url: 'https://ais.example.edu/app',
+        title: 'AIS',
+        text: 'Login',
+        elements: [
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+        ],
+        viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+      } }];
+    }
+    if (details.func?.name === 'executeBrowserCredentialFill') {
+      credentialExecutions += 1;
+      return [{ frameId: 0, result: { ok: true, usernameFilled: true, passwordFilled: true, url: 'https://ais.example.edu/app' } }];
+    }
+    return original(details);
+  };
+
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async () => ({
+      text: JSON.stringify({
+        type: 'fill_credential',
+        credentialRef: 'c1',
+        usernameFrameId: 0,
+        usernameRef: 'r1',
+        passwordFrameId: 0,
+        passwordRef: 'r2',
+      }),
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+    }),
+    now: (() => { let n = 150_000; return () => ++n; })(),
+  });
+
+  await manager.create({ id: 'job-1', goal: 'Log in', credentialDecision: 'ASK', stepDelayMs: 0 });
+  await manager.start('job-1', { runInitial: false });
+  const first = await manager.cycleOne('job-1');
+  assert.equal(first.kind, 'WAITING_APPROVAL');
+  assert.equal(resolveCalls, 0, 'ASK must not decrypt before approval');
+  assert.equal(credentialExecutions, 0);
+
+  await manager.approvePendingAction('job-1', { runInitial: false });
+  assert.equal(resolveCalls, 1);
+  assert.equal(credentialExecutions, 1);
+  const live = await manager.get('job-1');
+  assert.equal(live.job.runtime.runState, 'RUNNING');
+  assert.equal(JSON.stringify(live.job.runtime.history).includes('approval-secret'), false);
+});
+
+test('credential resolve is discarded if page origin changes before secret insertion', async () => {
+  const chrome = makeChrome();
+  let credentialExecutions = 0;
+  const nativeCompanionClient = {
+    async listCredentials() {
+      return { credentialRefs: [{
+        schemaVersion: 1,
+        credentialId: 'ais-main',
+        brokerId: 'native-companion',
+        kind: 'username-password',
+        scope: ['https://ais.example.edu'],
+        expiresAt: null,
+      }] };
+    },
+    async resolveCredential(input) {
+      chrome._tabs.get(1).url = 'https://evil.example/phish';
+      return {
+        credentialId: input.credentialId,
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: 'owner@example.edu',
+        secret: 'must-not-be-inserted',
+      };
+    },
+  };
+  const original = chrome.scripting.executeScript;
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'snapshotBrowserPage') {
+      const snapshotId = details.args[0];
+      return [{ frameId: 0, result: {
+        snapshotId,
+        url: 'https://ais.example.edu/app',
+        title: 'AIS',
+        text: 'Login',
+        elements: [
+          { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false, editable: true },
+          { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false },
+        ],
+        viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+      } }];
+    }
+    if (details.func?.name === 'executeBrowserCredentialFill') {
+      credentialExecutions += 1;
+      return [{ frameId: 0, result: { ok: true, passwordFilled: true } }];
+    }
+    return original(details);
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async () => ({
+      text: JSON.stringify({
+        type: 'fill_credential',
+        credentialRef: 'c1',
+        usernameFrameId: 0,
+        usernameRef: 'r1',
+        passwordFrameId: 0,
+        passwordRef: 'r2',
+      }),
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+    }),
+    now: (() => { let n = 160_000; return () => ++n; })(),
+  });
+  await manager.create({ id: 'job-1', goal: 'Login only to AIS', credentialDecision: 'ALLOW', approvalMode: 'ALLOW_ALL', stepDelayMs: 0 });
+  await manager.start('job-1', { runInitial: false });
+  const result = await manager.cycleOne('job-1');
+  assert.equal(result.kind, 'ACTION_RETRY');
+  assert.equal(credentialExecutions, 0, 'stale origin must block credential insertion');
+  const live = await manager.get('job-1');
+  assert.match(live.job.runtime.lastError, /AGENT_CREDENTIAL_ORIGIN_STALE/);
+  assert.equal(JSON.stringify(live.job.runtime.history).includes('must-not-be-inserted'), false);
+});
+
 test('owner site policy overrides global autonomy and supports credentials independently', () => {
   const value = config({
     approvalMode: 'ALLOW_ALL',
