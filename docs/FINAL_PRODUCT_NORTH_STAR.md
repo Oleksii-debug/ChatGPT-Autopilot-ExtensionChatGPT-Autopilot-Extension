@@ -734,3 +734,108 @@ UNDERSTAND -> PLAN -> DELEGATE -> ACT -> VERIFY -> RECOVER -> LEARN PROCEDURES -
 across chats, web, desktop, files, code, data, communication and connected services, with owner-controlled authority, durable local/cloud continuity, evidence-bound completion and keyboard/NVDA usability.
 
 This file is a binding end-state contract. Intermediate implementation ordering may change from live evidence; the final capability contract may only be narrowed by explicit owner decision.
+
+
+## 10. Frontier productivity acceleration addendum — binding 2026-09-19
+
+The following capabilities are additive final-scope requirements because they directly reduce coordination latency, waiting, context switching and manual supervision. They MUST reuse the canonical scheduler/Core/policy/recovery/Agent/Artifact authorities rather than create parallel engines.
+
+### 10.1 Completion-driven swarm scheduling and work stealing
+The current fixed recurring pulse model is a bootstrap/watchdog, not the final optimum. Where reliable terminal/change events exist, the finished product must refill work immediately on completion.
+
+Required behavior:
+- worker/agent terminal events immediately release capacity and wake reconciliation/refill;
+- idle eligible workers may safely steal the highest-value unowned READY work after live conflict/dependency checks;
+- critical-path and dependency-aware prioritization outranks round-robin fairness;
+- account/model/provider rate limits, concurrency ceilings and temporary failures feed dispatch/backpressure;
+- fixed interval pulses remain bounded watchdog/recovery fallback when event delivery is unavailable or suspect;
+- dispatch sends delta Context Capsules instead of repeatedly resending full project history;
+- no worker receives artificial busywork merely to keep a slot occupied.
+
+Track queue latency, worker idle time while READY work exists, duplicate claim rate, critical-path completion time and manual coordination minutes per outcome.
+
+### 10.2 Owner takeover -> observe -> handback
+The owner must be able to take over a browser, desktop/app surface, code/artifact workspace or other interactive execution surface while an Agent is running, make a manual correction, then hand control back without losing the task.
+
+Handback requires fresh world-state observation, stale-target invalidation, exact-effect reconciliation where needed and continuation from the new verified state. Manual intervention must not silently reset the task or duplicate already-completed effects. The flow must be keyboard/NVDA operable.
+
+### 10.3 Plan-while-executing and live shared workboard
+Planning and execution should not be artificially serialized. While existing work runs, the owner or another authorized collaborator/Agent may add requests, refine priorities or create new independent tasks.
+
+Provide one accessible shared board/state view with at least Draft/Ready/Active/Review/Blocked/Done semantics, dependency/conflict visibility and agent ownership. New tasks are sequenced automatically from dependencies and capacity. Owner policy decides whether a merge/effect needs ASK; planning itself does not impose a hidden confirmation barrier.
+
+### 10.4 Branch / Variant Laboratory
+Support context-preserving parallel exploration for code, design, documents, prompts, plans and other reversible internal artifacts:
+- isolated candidate branches/variants from one checkpoint;
+- concurrent execution when safe;
+- side-by-side comparison of artifacts, tests, visual/accessibility results, cost/time and verifier evidence;
+- evidence-based select/merge or synthesis;
+- explicit provenance, discard and rollback.
+
+External real-world effects are not rewound by branching; they continue to use exact-effect/compensation semantics.
+
+### 10.5 Artifact + Design Canvas with accessible semantic twin
+Add an optional workspace where multiple artifacts can be explored together with live previews and variants: web/app UI, documents, slides, images, dashboards, data views and code-backed previews.
+
+Direct manipulation must update the underlying versioned artifact rather than create a disconnected mockup. A visual canvas MUST have a keyboard/NVDA-accessible semantic twin: structured artifact tree, properties, variants, commands, status and comparison results. No core workflow may become canvas-only.
+
+### 10.6 Provider / connector recommendation and capability discovery
+Given an owner goal, Autopilot should determine which already-authorized provider, skill, Recipe, MCP server, direct API, browser path or local tool is the most deterministic path.
+
+If a useful provider is missing, the UI may recommend it with explicit capability/permission/source information. Discovery/recommendation never grants permission and never silently installs or authenticates a provider. The capability registry must be machine-readable and feed planning/routing.
+
+### 10.7 Continuous build -> publish -> operate loop
+For owner-authorized software, websites and CMS work, completion can extend beyond producing source:
+
+preview/staging -> automated tests -> accessibility/performance checks -> publish/deploy -> synthetic/live verification -> monitor -> detect regression/anomaly -> repair or rollback under policy.
+
+Auto-publish/continuous operation is optional per Project and must use release identities, evidence, rollback points and exact-effect semantics. A successful local build is not proof of a healthy production deployment.
+
+### 10.8 Meeting / recording / multimodal -> Project actions
+Support owner-authorized meeting or recording ingestion as a first-class Project input:
+
+transcript/notes/audio/video/artifacts -> decisions -> action items -> assigned Tasks -> calendar/follow-up drafts -> Project memory/source links.
+
+The pipeline must separate verbatim source, extracted claims, decisions and inferred tasks; retain provenance; support correction; and respect recording/privacy policy.
+
+### 10.9 First-class Data/Analytics Agent workflows
+Beyond ad-hoc Python, provide source-aware data work across authorized spreadsheets, databases, warehouses/APIs and files:
+- schema discovery;
+- query/transform lineage;
+- reproducible analysis;
+- interactive/static dashboards and reports;
+- anomaly/change detection;
+- scheduled monitoring;
+- verifier checks for calculations and source freshness;
+- trigger downstream actions under owner policy.
+
+Data conclusions must retain source/query/time provenance and expose uncertainty rather than silently convert stale data into durable Project facts.
+
+### 10.10 Mobile and optional voice quick-control plane
+Cross-device continuity should include a lightweight mobile control experience for status, notification, pause/resume/stop, owner ASK decisions, quick task creation and result review. Optional voice commands may accelerate hands-free operation but must map onto the same authenticated owner policy and have a complete non-voice keyboard/text equivalent. Mobile/voice is a surface over canonical jobs, never a second orchestration engine.
+
+### 10.11 Readiness/evaluation gates, not demo-based confidence
+Each provider/specialist/Agent release should expose a readiness view backed by repeatable test sets and observable acceptance contracts. Support curated golden cases plus generated/adversarial cases, regression history and capability-family pass/fail status.
+
+A capability is not production-ready because one demo worked. Release/readiness requires applicable deterministic, recovery, policy, security, accessibility and end-to-end gates.
+
+### 10.12 Project learning from accepted work
+Projects may learn conventions, preferred structures, accepted fixes, routing outcomes and reusable domain procedures from completed tasks. Learning must be source-linked, inspectable and reversible. Repeated accepted behavior should be proposed for promotion into Project Skills/Recipes rather than silently rewriting owner instructions or Core policy.
+
+## 11. Productivity metrics addendum
+
+In addition to existing North-Star metrics, track where technically observable:
+- READY-work queue latency;
+- worker utilization and avoidable idle time;
+- completion-driven refill latency;
+- work-stealing success/conflict rate;
+- context bytes/tokens resent per verified outcome;
+- owner coordination minutes per Project;
+- takeover/handback resume success;
+- branch/variant merge success and conflict rate;
+- time from accepted change to verified deployment;
+- automated regression detection-to-repair time;
+- provider recommendation acceptance/success rate;
+- percentage of repeated workflows served by verified Recipes/Skills rather than fresh reasoning.
+
+These metrics exist to minimize TIME_TO_VERIFIED_FINISHED_OUTCOME, not to maximize agent activity.
