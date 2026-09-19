@@ -9,13 +9,14 @@ const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
 const UTF8_FLAG = 0x0800;
 const ZIP_STORE = 0;
-const NORMALIZED_TEXT_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.md', '.mjs', '.txt']);
+const NORMALIZED_TEXT_EXTENSIONS = new Set(['.cmd', '.cs', '.css', '.html', '.js', '.json', '.md', '.mjs', '.ps1', '.txt']);
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FORBIDDEN_PATH_PATTERNS = [
   /(^|\/)\.env(?:\.|$)/i,
   /(^|\/)(Cookies?|Login Data|Local State|Web Data)(\/|$)/i,
-  /\.(?:sqlite|sqlite3|db|pem|key)$/i,
+  /\.(?:sqlite|sqlite3|db|pem|key|p12|pfx|dpapi)$/i,
+  /(^|\/)(?:credentials|secrets|private-data)(\/|$)/i,
 ];
 const FORBIDDEN_TEXT_PATTERNS = [
   { name: 'private ChatGPT conversation URL', pattern: /https:\/\/chatgpt\.com\/(?:c|share)\/[A-Za-z0-9_-]{8,}/i },
@@ -78,25 +79,28 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
   const qaPath = path.join(root, `QA-${RELEASE_VERSION}.txt`);
   const srcPath = path.join(root, 'src');
   const iconsPath = path.join(root, 'icons');
-  const [manifestText, readmeStat, changesStat, qaStat, srcStat, iconsStat] = await Promise.all([
+  const companionPath = path.join(root, 'companion');
+  const [manifestText, readmeStat, changesStat, qaStat, srcStat, iconsStat, companionStat] = await Promise.all([
     fs.readFile(manifestPath, 'utf8'),
     fs.stat(readmePath),
     fs.stat(changesPath),
     fs.stat(qaPath),
     fs.stat(srcPath),
     fs.stat(iconsPath),
+    fs.stat(companionPath),
   ]);
   if (!readmeStat.isFile()) throw new Error('README.txt must be a file');
   if (!changesStat.isFile()) throw new Error(`CHANGES-${RELEASE_VERSION}.txt must be a file`);
   if (!qaStat.isFile()) throw new Error(`QA-${RELEASE_VERSION}.txt must be a file`);
   if (!srcStat.isDirectory()) throw new Error('src must be a directory');
   if (!iconsStat.isDirectory()) throw new Error('icons must be a directory');
+  if (!companionStat.isDirectory()) throw new Error('companion must be a directory');
 
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
   if (manifest.version !== RELEASE_VERSION) throw new Error(`v${RELEASE_VERSION} package requires manifest version ${RELEASE_VERSION}, found ${manifest.version || 'missing'}`);
 
-  const files = [`CHANGES-${RELEASE_VERSION}.txt`, `QA-${RELEASE_VERSION}.txt`, 'README.txt', 'manifest.json', ...await walkFiles(root, 'icons'), ...await walkFiles(root, 'src')].sort();
+  const files = [`CHANGES-${RELEASE_VERSION}.txt`, `QA-${RELEASE_VERSION}.txt`, 'README.txt', 'manifest.json', ...await walkFiles(root, 'companion'), ...await walkFiles(root, 'icons'), ...await walkFiles(root, 'src')].sort();
   const fileSet = new Set(files);
   for (const resource of manifestResourcePaths(manifest)) {
     if (!fileSet.has(resource)) {
