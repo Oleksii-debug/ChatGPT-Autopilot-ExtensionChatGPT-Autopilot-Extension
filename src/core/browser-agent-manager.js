@@ -21,6 +21,8 @@ import {
   agentUsageCostUsd,
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
+  resolveBrowserAgentOwnerPolicy,
+  BrowserAgentPolicyDecision,
   browserAgentTargetFingerprint,
   browserAgentCoordinateTargetFingerprint,
   verifyBrowserApprovalTarget,
@@ -271,6 +273,8 @@ export class BrowserAgentManager {
       allowCrossOriginNavigation: raw.allowCrossOriginNavigation !== false,
       closeOwnedTabsOnStop: raw.closeOwnedTabsOnStop === true,
       approvalMode: raw.approvalMode || BrowserAgentApprovalMode.CONSEQUENTIAL,
+      credentialDecision: raw.credentialDecision || BrowserAgentPolicyDecision.ASK,
+      siteRules: raw.siteRules || [],
       visionOnDemand: raw.visionOnDemand !== false,
       trustedScriptEnabled: raw.trustedScriptEnabled === true,
       maxModelCalls: raw.maxModelCalls ?? 0,
@@ -2118,12 +2122,26 @@ export class BrowserAgentManager {
     }
 
     const risk = classifyBrowserAgentActionRisk(snapshot, action);
-    // Approval is owner policy, not a hard-coded action property. In
-    // ALLOW_ALL mode every action that is otherwise enabled by capability/site
-    // policy proceeds autonomously, including Trusted Script and upload.
-    const approvalRequired = risk.requiresApproval
-      && current.job.config.approvalMode === BrowserAgentApprovalMode.CONSEQUENTIAL;
-    if (approvalRequired) return this.requestActionApproval(id, epoch, snapshot, action, risk);
+    const ownerPolicy = resolveBrowserAgentOwnerPolicy(current.job.config, snapshot, action, {
+      requiresApproval: risk.requiresApproval,
+    });
+    if (ownerPolicy.decision === BrowserAgentPolicyDecision.DENY) {
+      return this.recordRecoverableFailure(id, epoch, {
+        type: 'action',
+        error: new Error(`OWNER_POLICY_DENY: ${ownerPolicy.reason}`),
+        action,
+        countStep: false,
+        retryMs: 250,
+        maxConsecutive: 3,
+      });
+    }
+    if (ownerPolicy.decision === BrowserAgentPolicyDecision.ASK) {
+      return this.requestActionApproval(id, epoch, snapshot, action, {
+        ...risk,
+        requiresApproval: true,
+        reason: ownerPolicy.reason,
+      });
+    }
 
     let executed;
     try {
