@@ -431,6 +431,13 @@ export class OrchestrationV2Controller {
           groupNodeId: item.nodeId,
           maxWorkers: binding.maxSlots,
           sourceId: binding.sourceId,
+          childNodeIds: [...item.node.childIds],
+          childPromptProfileIds: Object.fromEntries(
+            item.node.childIds.map(childId => [
+              childId,
+              [hierarchy.graph.nodesById[childId]?.promptProfileId].filter(Boolean),
+            ]),
+          ),
         });
       } catch (error) {
         const code = error?.code || 'PROVIDER_READ_FAILED';
@@ -447,16 +454,51 @@ export class OrchestrationV2Controller {
         continue;
       }
 
-      const dispatched = await this.dispatchHierarchyEvent({
-        type: OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED,
-        eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}`,
-        controlEpoch: hierarchy.state.controlEpoch,
-        nodeId: item.nodeId,
-        providerId: snapshot.providerId,
-        sourceId: snapshot.sourceId,
-        providerRevision: snapshot.providerRevision,
-        requestedSlotCount: snapshot.requestedSlotCount,
-      }, { nowMs });
+      if (snapshot?.kind === 'NO_GENERATION' || snapshot?.kind === 'NOT_READY') {
+        await this.runtimeRepository.update(draft => {
+          const state = draft?.hierarchy?.state?.nodesById?.[item.nodeId];
+          if (!state) return draft;
+          state.providerState = state.providerState || {};
+          state.providerState.lastCheckedAt = nowMs;
+          state.providerState.nextCheckAt = nowMs + pollIntervalMs;
+          state.providerState.lastErrorCode = '';
+          return draft;
+        });
+        results.push({
+          nodeId: item.nodeId,
+          kind: snapshot.kind,
+          providerRevision: snapshot.providerRevision || '',
+          requestedSlotCount: 0,
+        });
+        continue;
+      }
+
+      let providerEvent;
+      if (snapshot?.providerId === 'drive-folder-dispatch-v1' && snapshot?.kind === 'READY') {
+        providerEvent = {
+          type: OrchestrationHierarchyEventType.PROVIDER_FOLDER_DISPATCH_REQUESTED,
+          eventId: `provider-folder:${snapshot.snapshotHash}`,
+          controlEpoch: hierarchy.state.controlEpoch,
+          nodeId: item.nodeId,
+          providerId: snapshot.providerId,
+          sourceId: snapshot.sourceId,
+          providerRevision: snapshot.providerRevision,
+          dispatchFingerprint: snapshot.snapshotHash,
+          dispatches: snapshot.dispatches,
+        };
+      } else {
+        providerEvent = {
+          type: OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED,
+          eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}`,
+          controlEpoch: hierarchy.state.controlEpoch,
+          nodeId: item.nodeId,
+          providerId: snapshot.providerId,
+          sourceId: snapshot.sourceId,
+          providerRevision: snapshot.providerRevision,
+          requestedSlotCount: snapshot.requestedSlotCount,
+        };
+      }
+      const dispatched = await this.dispatchHierarchyEvent(providerEvent, { nowMs });
 
       await this.runtimeRepository.update(draft => {
         const state = draft?.hierarchy?.state?.nodesById?.[item.nodeId];
@@ -477,7 +519,7 @@ export class OrchestrationV2Controller {
         nodeId: item.nodeId,
         kind: dispatched.reason || 'PROVIDER_DISPATCHED',
         providerRevision: snapshot.providerRevision,
-        requestedSlotCount: snapshot.requestedSlotCount,
+        requestedSlotCount: snapshot.requestedSlotCount ?? snapshot.dispatches?.length ?? 0,
         dispatched,
       });
     }
