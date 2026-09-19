@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { reconcileRuntimeColdStart, runRuntimeCycle, RuntimeExecutionConstants } from '../../src/core/runtime-execution.js';
-import { computeNextWake } from '../../src/core/recovery.js';
+import { computeNextWake, suspendActiveSessionsWhenExecutionUnavailable } from '../../src/core/recovery.js';
 import { createEmptyState, createSession, createTask, OperationPhase, RunState } from '../../src/core/schema.js';
 
 class Repo {
@@ -392,4 +392,32 @@ test('post-submit ambiguous transport failure preserves the exact evidence tab i
   assert.equal(after.tabHintsByTaskId['evidence-t1'].tabId, 77);
   assert.equal(after.tabHintsByTaskId['evidence-t1'].retirePending, false);
   assert.ok(after.diagnostics.some(item => item.event === 'ДОКАЗОВУ_ВКЛАДКУ_ПІСЛЯ_SEND_ЗБЕРЕЖЕНО'));
+});
+
+
+test('execution-unavailable suspension preserves Drive prompt bindings without throwing', () => {
+  const value = session('drive-gated', RunState.RUNNING);
+  value.drivePromptSources = {
+    schemaVersion: 1,
+    bindings: [{
+      target: 'PRIMARY',
+      enabled: true,
+      fileId: 'file_abcdef',
+      pollIntervalMs: 180000,
+      minChars: 1000,
+      lastAcceptedVersion: '7',
+      lastAcceptedHash: 'a'.repeat(64),
+      lastCheckedAt: 1000,
+      nextCheckAt: 181000,
+      lastErrorCode: '',
+    }],
+  };
+  const state = stateWith(value);
+
+  assert.doesNotThrow(() => suspendActiveSessionsWhenExecutionUnavailable(state, 5000));
+  assert.equal(state.sessionsById['drive-gated'].runState, RunState.PAUSED);
+  assert.equal(state.sessionsById['drive-gated'].pausedByRuntimeGate, true);
+  assert.equal(state.sessionsById['drive-gated'].drivePromptSources.bindings[0].fileId, 'file_abcdef');
+  assert.equal(state.sessionsById['drive-gated'].drivePromptSources.bindings[0].lastAcceptedVersion, '7');
+  assert.equal(state.sessionsById['drive-gated'].drivePromptSources.bindings[0].nextCheckAt, 181000);
 });
