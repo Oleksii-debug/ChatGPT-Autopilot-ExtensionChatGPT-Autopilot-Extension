@@ -3072,6 +3072,25 @@ document.querySelectorAll('input[name="taskConfigurationMode"]').forEach((input)
 $('task-count').addEventListener('change', onTaskCountChange);
 $('task-count').addEventListener('input', () => { if ($('task-count').value) onTaskCountChange(); });
 $('shared-task-url').addEventListener('input', onSharedUrlInput);
+for (const id of [
+  'shared-prompt',
+  'default-unique-prompt',
+  'prompt-2-enabled',
+  'prompt-2-every',
+  'prompt-2-text',
+  'prompt-3-enabled',
+  'prompt-3-every',
+  'prompt-3-text',
+  'drive-prompt-enabled',
+  'drive-prompt-file',
+  'drive-prompt-target',
+  'drive-prompt-interval',
+  'drive-prompt-min-chars',
+]) {
+  const field = $(id);
+  const eventName = field?.tagName === 'SELECT' || field?.type === 'checkbox' ? 'change' : 'input';
+  field?.addEventListener(eventName, scheduleDraftPersistence);
+}
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
