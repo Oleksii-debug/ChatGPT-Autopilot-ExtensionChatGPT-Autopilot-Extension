@@ -503,6 +503,8 @@ export class OrchestrationV2Manager {
       includeQaRedTeam: options.includeQaRedTeam === true,
       driveScalarSources: options.driveScalarSources || null,
       driveScalarPollIntervalMs: options.driveScalarPollIntervalMs,
+      driveFolderSources: options.driveFolderSources || null,
+      driveFolderPollIntervalMs: options.driveFolderPollIntervalMs,
     });
     const configured = await controller.configureHierarchy(graph, { nowMs: this.now() });
     return {
@@ -516,6 +518,9 @@ export class OrchestrationV2Manager {
         workerCount: configured.graph.nodeOrder.filter(nodeId => nodeId.startsWith('worker:')).length,
         driveScalarProviderCount: configured.graph.nodeOrder.filter(
           nodeId => configured.graph.nodesById[nodeId]?.providerBinding?.providerId === 'drive-scalar-v1',
+        ).length,
+        driveFolderProviderCount: configured.graph.nodeOrder.filter(
+          nodeId => configured.graph.nodesById[nodeId]?.providerBinding?.providerId === 'drive-folder-dispatch-v1',
         ).length,
       },
       status: await this.getStatus(id),

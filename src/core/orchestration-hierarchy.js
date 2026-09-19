@@ -59,6 +59,7 @@ export const OrchestrationHierarchyEventType = Object.freeze({
   GENERATION_RECOVERY_REQUESTED: 'GENERATION_RECOVERY_REQUESTED',
   RUNTIME_RECONCILE: 'RUNTIME_RECONCILE',
   PROVIDER_SLOT_COUNT_REQUESTED: 'PROVIDER_SLOT_COUNT_REQUESTED',
+  PROVIDER_FOLDER_DISPATCH_REQUESTED: 'PROVIDER_FOLDER_DISPATCH_REQUESTED',
 });
 
 export const OrchestrationHierarchyActionType = Object.freeze({
@@ -305,6 +306,7 @@ function newNodeRuntime(nodeId) {
       lastCheckedAt: 0,
       nextCheckAt: 0,
       lastErrorCode: '',
+      lastAcceptedDispatchFingerprint: '',
     },
   };
 }
@@ -361,6 +363,10 @@ function assertRuntime(graph, runtime) {
           || providerState.activeChildIds.some(childId => !graph.nodesById[nodeId].childIds.includes(childId))
           || new Set(providerState.activeChildIds).size !== providerState.activeChildIds.length) {
         throw new Error(`Invalid provider child authority state for ${nodeId}`);
+      }
+      const dispatchFingerprint = String(providerState.lastAcceptedDispatchFingerprint || '');
+      if (dispatchFingerprint && !/^[a-f0-9]{64}$/u.test(dispatchFingerprint)) {
+        throw new Error(`Invalid provider dispatch fingerprint state for ${nodeId}`);
       }
       for (const key of ['lastAcceptedAt', 'lastCheckedAt', 'nextCheckAt']) {
         const value = Number(providerState[key] || 0);
@@ -464,6 +470,9 @@ function prepareActivation(graph, runtime, {
   generation,
   purpose,
   nowMs,
+  promptPayload = '',
+  promptProfileId = '',
+  providerDispatchIdentity = '',
 }) {
   const node = graph.nodesById[nodeId];
   const nodeRuntime = runtime.nodesById[nodeId];
@@ -480,6 +489,12 @@ function prepareActivation(graph, runtime, {
   if (scopeState !== 'RUNNING') return { action: null, reason: `SCOPE_${scopeState}` };
   const normalizedPurpose = text(purpose || (node.childIds.length ? OrchestrationActivationPurpose.DELEGATE : OrchestrationActivationPurpose.WORK)).toUpperCase();
   if (!PURPOSES.has(normalizedPurpose)) throw new Error('Invalid activation purpose');
+  const durablePromptPayload = typeof promptPayload === 'string' ? promptPayload.trim() : '';
+  if (durablePromptPayload.length > 200000) throw new Error('Invalid activation promptPayload');
+  const durablePromptProfileId = promptProfileId ? requireId(promptProfileId, 'activation.promptProfileId') : '';
+  const durableProviderDispatchIdentity = providerDispatchIdentity
+    ? requireId(providerDispatchIdentity, 'activation.providerDispatchIdentity')
+    : '';
   nodeRuntime.activationLedger[activationId] = {
     activationId,
     nodeId,
@@ -492,15 +507,20 @@ function prepareActivation(graph, runtime, {
     terminalAt: 0,
     effectRef: '',
     terminalStatus: '',
+    promptPayload: durablePromptPayload,
+    promptProfileId: durablePromptProfileId,
+    providerDispatchIdentity: durableProviderDispatchIdentity,
   };
   nodeRuntime.currentActivationId = activationId;
   nodeRuntime.lifecycle = OrchestrationNodeLifecycle.PREPARING_EFFECT;
   const actionType = normalizedPurpose === OrchestrationActivationPurpose.RECONCILE
     ? OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
     : OrchestrationHierarchyActionType.ACTIVATE_NODE;
-  const promptProfileId = normalizedPurpose === OrchestrationActivationPurpose.RECOVERY
-    ? node.recoveryPromptProfileId
-    : node.promptProfileId;
+  const resolvedPromptProfileId = durablePromptProfileId || (
+    normalizedPurpose === OrchestrationActivationPurpose.RECOVERY
+      ? node.recoveryPromptProfileId
+      : node.promptProfileId
+  );
   return {
     action: {
       type: actionType,
@@ -510,7 +530,9 @@ function prepareActivation(graph, runtime, {
       round: nodeRuntime.round,
       purpose: normalizedPurpose,
       chatMode: node.chatMode,
-      promptProfileId,
+      promptProfileId: resolvedPromptProfileId,
+      promptPayload: durablePromptPayload,
+      providerDispatchIdentity: durableProviderDispatchIdentity,
       authority: 'EXISTING_CORE_SESSION_TASK_PATH',
     },
     reason: 'PREPARED',
@@ -634,6 +656,172 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       }
     }
     return { runtime, actions, deduplicated: false, reason: nextScope };
+  }
+
+  if (event.type === OrchestrationHierarchyEventType.PROVIDER_FOLDER_DISPATCH_REQUESTED) {
+    const nodeId = requireId(event.nodeId ?? event.node_id, 'event.nodeId');
+    const node = graph.nodesById[nodeId];
+    const nodeRuntime = runtime.nodesById[nodeId];
+    if (!node || !nodeRuntime) throw new Error(`Unknown node ${nodeId}`);
+    const binding = node.providerBinding;
+    if (!binding) {
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_NOT_CONFIGURED' };
+    }
+
+    const providerId = requireId(event.providerId ?? event.provider_id, 'event.providerId');
+    if (providerId !== binding.providerId || binding.groupNodeId !== nodeId) {
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_AUTHORITY_MISMATCH' };
+    }
+    const sourceId = event.sourceId == null || event.sourceId === ''
+      ? ''
+      : requireId(event.sourceId, 'event.sourceId');
+    if (binding.sourceId && sourceId !== binding.sourceId) {
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_SOURCE_MISMATCH' };
+    }
+
+    const providerRevision = normalizeProviderRevision(event.providerRevision ?? event.provider_revision);
+    const dispatchFingerprint = String(event.dispatchFingerprint ?? event.dispatch_fingerprint ?? '').trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/u.test(dispatchFingerprint)) throw new Error('Invalid event.dispatchFingerprint');
+    if (!Array.isArray(event.dispatches) || event.dispatches.length > binding.maxSlots) {
+      throw new Error('Invalid event.dispatches');
+    }
+
+    const dispatches = event.dispatches.map((raw, index) => {
+      if (!isObject(raw)) throw new Error(`Invalid event.dispatches[${index}]`);
+      const fileId = requireId(raw.fileId ?? raw.file_id, `event.dispatches[${index}].fileId`);
+      const fileVersion = normalizeProviderRevision(raw.fileVersion ?? raw.file_version);
+      const dispatchIdentity = String(raw.dispatchIdentity ?? raw.dispatch_identity ?? '').trim().toLowerCase();
+      if (!/^[a-f0-9]{64}$/u.test(dispatchIdentity)) {
+        throw new Error(`Invalid event.dispatches[${index}].dispatchIdentity`);
+      }
+      const targetChildId = requireId(
+        raw.targetChildId ?? raw.target_child_id,
+        `event.dispatches[${index}].targetChildId`,
+      );
+      if (!node.childIds.includes(targetChildId)) {
+        throw new Error(`Provider dispatch references non-child ${targetChildId}`);
+      }
+      const promptPayload = typeof raw.promptPayload === 'string'
+        ? raw.promptPayload.trim()
+        : typeof raw.prompt === 'string'
+          ? raw.prompt.trim()
+          : '';
+      if (promptPayload.length > 200000) throw new Error(`Invalid event.dispatches[${index}].promptPayload`);
+      const promptProfileId = raw.promptProfileId ?? raw.prompt_profile_id ?? '';
+      const normalizedProfileId = promptProfileId
+        ? requireId(promptProfileId, `event.dispatches[${index}].promptProfileId`)
+        : '';
+      if (Boolean(promptPayload) === Boolean(normalizedProfileId)) {
+        throw new Error(`Invalid event.dispatches[${index}] prompt authority`);
+      }
+      if (normalizedProfileId && normalizedProfileId !== graph.nodesById[targetChildId].promptProfileId) {
+        throw new Error(`Provider dispatch prompt profile not locally allowed for ${targetChildId}`);
+      }
+      return {
+        fileId,
+        fileVersion,
+        dispatchIdentity,
+        targetChildId,
+        promptPayload,
+        promptProfileId: normalizedProfileId,
+      };
+    });
+    if (new Set(dispatches.map(item => item.targetChildId)).size !== dispatches.length) {
+      throw new Error('Duplicate provider dispatch child target');
+    }
+    if (new Set(dispatches.map(item => item.dispatchIdentity)).size !== dispatches.length) {
+      throw new Error('Duplicate provider dispatch identity');
+    }
+
+    const providerState = providerStateFor(nodeRuntime);
+    if (providerState.lastAcceptedRevision) {
+      const revisionOrder = compareProviderRevision(providerRevision, providerState.lastAcceptedRevision);
+      if (revisionOrder < 0) {
+        return { runtime, actions, deduplicated: false, reason: 'STALE_PROVIDER_REVISION' };
+      }
+      if (revisionOrder === 0) {
+        if (providerState.lastAcceptedDispatchFingerprint !== dispatchFingerprint) {
+          actions.push({
+            type: OrchestrationHierarchyActionType.MANUAL_REVIEW,
+            nodeId,
+            reason: 'PROVIDER_REVISION_CONFLICT',
+          });
+          return { runtime, actions, deduplicated: false, reason: 'PROVIDER_REVISION_CONFLICT' };
+        }
+        return { runtime, actions, deduplicated: false, reason: 'DUPLICATE_PROVIDER_REVISION' };
+      }
+    }
+
+    if (ancestorScopeState(graph, runtime, nodeId) !== 'RUNNING') {
+      delete runtime.processedEventIds[event.eventId];
+      return {
+        runtime,
+        actions,
+        deduplicated: false,
+        reason: nodeRuntime.scopeState === 'STOPPED' ? 'SCOPE_STOPPED' : 'SCOPE_PAUSED',
+      };
+    }
+    const parentActivation = currentActivation(nodeRuntime);
+    if (!parentActivation || parentActivation.phase !== OrchestrationActivationPhase.TERMINAL) {
+      delete runtime.processedEventIds[event.eventId];
+      actions.push({ type: OrchestrationHierarchyActionType.WAIT, nodeId, reason: 'PROVIDER_PARENT_NOT_TERMINAL' });
+      return { runtime, actions, deduplicated: false, reason: 'PROVIDER_PARENT_NOT_TERMINAL' };
+    }
+
+    for (const childId of node.childIds) {
+      const preflight = canPrepareProviderChild(graph, runtime, childId);
+      if (!preflight.ok) {
+        delete runtime.processedEventIds[event.eventId];
+        actions.push({ type: OrchestrationHierarchyActionType.WAIT, nodeId, reason: 'PROVIDER_SLOTS_BUSY' });
+        return { runtime, actions, deduplicated: false, reason: 'PROVIDER_SLOTS_BUSY' };
+      }
+    }
+
+    for (const item of dispatches) {
+      const childRuntime = runtime.nodesById[item.targetChildId];
+      const activationId = `provider:${providerId}:dispatch:${item.dispatchIdentity}:g${childRuntime.generation}`;
+      const prepared = prepareActivation(graph, runtime, {
+        nodeId: item.targetChildId,
+        activationId,
+        generation: childRuntime.generation,
+        purpose: graph.nodesById[item.targetChildId].childIds.length
+          ? OrchestrationActivationPurpose.DELEGATE
+          : OrchestrationActivationPurpose.WORK,
+        nowMs,
+        promptPayload: item.promptPayload,
+        promptProfileId: item.promptProfileId,
+        providerDispatchIdentity: item.dispatchIdentity,
+      });
+      if (!prepared.action) throw new Error(`Provider dispatch preflight diverged for ${item.targetChildId}: ${prepared.reason}`);
+      actions.push(prepared.action);
+    }
+
+    providerState.lastAcceptedRevision = providerRevision;
+    providerState.lastRequestedSlotCount = dispatches.length;
+    providerState.activeRevision = providerRevision;
+    providerState.activeChildIds = dispatches.map(item => item.targetChildId);
+    providerState.lastAcceptedAt = nowMs;
+    providerState.lastCheckedAt = nowMs;
+    providerState.lastErrorCode = '';
+    providerState.lastAcceptedDispatchFingerprint = dispatchFingerprint;
+
+    if (dispatches.length === 0) {
+      const key = `provider:${binding.providerId}:revision:${providerRevision}`;
+      if (!nodeRuntime.completedBarrierKeys[key]) {
+        nodeRuntime.completedBarrierKeys[key] = true;
+        const activationId = `reconcile:${nodeId}:provider:${binding.providerId}:revision:${providerRevision}:g${nodeRuntime.generation}:r${nodeRuntime.round}`;
+        const prepared = prepareActivation(graph, runtime, {
+          nodeId,
+          activationId,
+          generation: nodeRuntime.generation,
+          purpose: OrchestrationActivationPurpose.RECONCILE,
+          nowMs,
+        });
+        if (prepared.action) actions.push(prepared.action);
+      }
+    }
+
+    return { runtime, actions, deduplicated: false, reason: 'PROVIDER_REVISION_ACCEPTED' };
   }
 
   if (event.type === OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED) {

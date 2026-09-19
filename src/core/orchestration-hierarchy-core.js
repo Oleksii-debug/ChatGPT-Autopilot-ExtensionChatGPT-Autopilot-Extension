@@ -60,6 +60,8 @@ function resetTaskForActivation(task, { targetUrl, prompt }) {
 
 function promptForAction(graph, action, promptResolver) {
   const node = graph.nodesById[action.nodeId];
+  const directPayload = typeof action.promptPayload === 'string' ? action.promptPayload.trim() : '';
+  if (directPayload) return directPayload;
   const profileId = action.promptProfileId
     || (action.purpose === OrchestrationActivationPurpose.RECOVERY
       ? node.recoveryPromptProfileId
@@ -118,6 +120,9 @@ function createManagedSession({ graph, node, action, prompt, targetUrl, nowMs, t
     chatMode: node.chatMode,
     promptProfileId: action.promptProfileId || node.promptProfileId,
     actionType: action.type,
+    ...(action.providerDispatchIdentity
+      ? { providerDispatchIdentity: action.providerDispatchIdentity }
+      : {}),
   };
   return { session, sessionId: sid, taskId: tid };
 }
@@ -217,6 +222,9 @@ export function materializeHierarchyActionsIntoCore(
         chatMode: node.chatMode,
         promptProfileId: action.promptProfileId || node.promptProfileId,
         actionType: action.type,
+        ...(action.providerDispatchIdentity
+          ? { providerDispatchIdentity: action.providerDispatchIdentity }
+          : {}),
       };
       session.updatedAt = nowMs;
     }
@@ -301,9 +309,13 @@ export function preparedHierarchyActions(graphRaw, runtimeRaw) {
       round: ledger.round,
       purpose: ledger.purpose,
       chatMode: node.chatMode,
-      promptProfileId: ledger.purpose === OrchestrationActivationPurpose.RECOVERY
-        ? node.recoveryPromptProfileId
-        : node.promptProfileId,
+      promptProfileId: ledger.promptProfileId || (
+        ledger.purpose === OrchestrationActivationPurpose.RECOVERY
+          ? node.recoveryPromptProfileId
+          : node.promptProfileId
+      ),
+      promptPayload: typeof ledger.promptPayload === 'string' ? ledger.promptPayload : '',
+      providerDispatchIdentity: ledger.providerDispatchIdentity || '',
       authority: 'EXISTING_CORE_SESSION_TASK_PATH',
     });
   }
