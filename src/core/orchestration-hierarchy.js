@@ -344,6 +344,28 @@ function assertRuntime(graph, runtime) {
     if (!isObject(nodeRuntime.activationLedger) || !isObject(nodeRuntime.completedBarrierKeys)) {
       throw new Error(`Invalid runtime ledger for ${nodeId}`);
     }
+    if (nodeRuntime.providerState !== undefined) {
+      if (!isObject(nodeRuntime.providerState)) throw new Error(`Invalid provider runtime state for ${nodeId}`);
+      const providerState = nodeRuntime.providerState;
+      for (const revision of [providerState.lastAcceptedRevision || '', providerState.activeRevision || '']) {
+        if (revision && (!/^\\d+$/u.test(String(revision)) || String(revision).length > 128)) {
+          throw new Error(`Invalid provider revision state for ${nodeId}`);
+        }
+      }
+      const requested = Number(providerState.lastRequestedSlotCount || 0);
+      if (!Number.isInteger(requested) || requested < 0 || requested > (graph.nodesById[nodeId].providerBinding?.maxSlots ?? graph.nodesById[nodeId].childIds.length)) {
+        throw new Error(`Invalid provider slot state for ${nodeId}`);
+      }
+      if (!Array.isArray(providerState.activeChildIds)
+          || providerState.activeChildIds.some(childId => !graph.nodesById[nodeId].childIds.includes(childId))
+          || new Set(providerState.activeChildIds).size !== providerState.activeChildIds.length) {
+        throw new Error(`Invalid provider child authority state for ${nodeId}`);
+      }
+      for (const key of ['lastAcceptedAt', 'lastCheckedAt', 'nextCheckAt']) {
+        const value = Number(providerState[key] || 0);
+        if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid provider timestamp state for ${nodeId}`);
+      }
+    }
   }
 }
 
