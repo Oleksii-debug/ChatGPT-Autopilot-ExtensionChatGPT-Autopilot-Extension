@@ -345,3 +345,11 @@ test('Orchestration JSON import is visible in zero state and remains setup-only'
   assert.doesNotMatch(js, /import-orchestration-v2-profile-button'\)\.disabled = Boolean\(busy\) \|\| !hasSelected/);
   assert.match(js, /JSON оркестру імпортовано\. Автоматичного запуску не було\./);
 });
+
+
+test('orchestration profile preview exposes imported hierarchy counts in normal text', () => {
+  assert.match(js, /const hierarchy = preview\.hierarchy/);
+  assert.match(js, /ієрархія \$\{preview\.hierarchy\.nodeCount\} вузлів/);
+  assert.match(js, /\$\{preview\.hierarchy\.rootCount\} коренів/);
+  assert.match(js, /\$\{preview\.hierarchy\.promptProfileCount\} профілів промтів/);
+});
