@@ -205,7 +205,11 @@ test('L2-A controller polls on existing wake, materializes exact slot count, and
   controller=h.makeController();
   cycle=await controller.cycle({nowMs:h.now()});
   assert.equal(cycle.hierarchyProviders.checked,1);
-  assert.equal(cycle.hierarchyProviders.results[0].kind,'DUPLICATE_PROVIDER_REVISION');
+  assert.equal(
+    cycle.hierarchyProviders.results[0].kind,
+    'DUPLICATE_EVENT',
+    'controller reuses one deterministic event identity per Drive revision, so replay is rejected before provider-revision fallback dedupe',
+  );
   assert.equal(reads,2);
 
   core=await h.core.load();
