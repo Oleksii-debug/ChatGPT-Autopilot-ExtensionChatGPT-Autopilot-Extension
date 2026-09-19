@@ -10,7 +10,8 @@ V1 ВМІЄ
 1. protocol/version handshake;
 2. health;
 3. список capabilities;
-4. читання UTF-8 текстових файлів лише з папок, які власник явно додав.
+4. читання UTF-8 текстових файлів лише з папок, які власник явно додав;
+5. CredentialBroker: показувати Agent лише opaque credential refs і, тільки під час дозволеного виконання, локально розкривати DPAPI-секрет для потрібного origin.
 
 ВСТАНОВЛЕННЯ
 
@@ -26,6 +27,16 @@ V1 ВМІЄ
 filesystem.readText приймає тільки RootId + відносний шлях.
 Абсолютні шляхи, .., symlink/junction escape і файли поза дозволеним root блокуються.
 
+CREDENTIALS
+
+Запустіть «ДОДАТИ CREDENTIAL.ps1».
+Вкажіть Credential ID, дозволений HTTPS origin (або кілька через кому), username і пароль.
+Пароль зберігається окремо через Windows DPAPI для поточного Windows-користувача.
+Agent/модель отримує лише CredentialRef. Пароль розкривається тільки в локальній execution boundary під час credential-fill і не повинен потрапляти в prompt/history.
+
+Owner policy ALLOW/ASK/DENY визначає, чи може Agent використати credential на конкретному сайті.
+«ВИДАЛИТИ CREDENTIAL.ps1» видаляє metadata та відповідний DPAPI-файл.
+
 ЩО ДАЛІ
 
-Наступний шар — CredentialBroker. Він використовуватиме цей самий Companion і owner policy ALLOW/ASK/DENY для автономних логінів, не створюючи другого локального сервісу.
+Browser credential action використовує цей самий Broker для автономного заповнення login forms; жодного другого локального сервісу не створюється.
