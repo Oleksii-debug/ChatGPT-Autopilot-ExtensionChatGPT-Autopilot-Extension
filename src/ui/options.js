@@ -549,6 +549,21 @@ function orchestrationDriveFolderSourcesFromForm(domains) {
   return out;
 }
 
+async function authorizeSessionDrive() {
+  try {
+    $('authorize-session-drive-button').disabled = true;
+    $('drive-prompt-status').textContent = 'Відкриваю авторизацію Google Drive…';
+    await core('AUTHORIZE_ORCHESTRATION_V2_DRIVE');
+    $('drive-prompt-status').textContent = 'Google Drive авторизовано для Autopilot. Збережіть Session, щоб увімкнути синхронізацію.';
+    announce('Google Drive авторизовано.');
+  } catch (error) {
+    $('drive-prompt-status').textContent = `Авторизацію Drive не виконано: ${error.message}`;
+    announce('Авторизацію Google Drive не виконано.');
+  } finally {
+    $('authorize-session-drive-button').disabled = false;
+  }
+}
+
 async function authorizeOrchestrationDrive() {
   beginOrchestrationV2Action();
   try {
@@ -3094,6 +3109,7 @@ for (const id of [
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
+$('authorize-session-drive-button').addEventListener('click', authorizeSessionDrive);
 $('save-session-button').addEventListener('click', saveSession);
 $('start-session-button').addEventListener('click', () => action('START_SESSION', 'Start'));
 $('pause-session-button').addEventListener('click', () => action('PAUSE_SESSION', 'Pause'));
