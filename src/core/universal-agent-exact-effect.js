@@ -370,9 +370,17 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     const reasonCode = id(event.reasonCode, 'reasonCode');
     const summary = optionalText(event.summary, 'summary');
 
+    let reconciliationObservation = current.observation;
+    if (event.observation != null) {
+      reconciliationObservation = normalizeObservationV1(event.observation);
+      assertObservationBinding(reconciliationObservation, current);
+      state.observation = reconciliationObservation;
+    }
+
     if (outcome === ReconciliationOutcome.VERIFIED) {
+      if (!reconciliationObservation) throw new Error('VERIFIED reconciliation requires observation evidence');
       const verification = normalizeVerificationV1(event.verification);
-      assertVerificationBinding(verification, current);
+      assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
       if (![VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status)) {
         throw new Error('VERIFIED reconciliation requires a verified verification');
       }
@@ -382,16 +390,28 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       return result(state, { reason: 'RECONCILIATION_VERIFIED', action: 'COMMIT' });
     }
 
-    if (event.verification != null) {
-      const verification = normalizeVerificationV1(event.verification);
-      assertVerificationBinding(verification, current);
-      state.verification = verification;
-    }
-    state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
     if (outcome === ReconciliationOutcome.SAFE_RETRY) {
+      if (!reconciliationObservation || event.verification == null) {
+        throw new Error('SAFE_RETRY reconciliation requires observation and failed verification evidence');
+      }
+      const verification = normalizeVerificationV1(event.verification);
+      assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
+      if (verification.status !== VerificationStatus.FAILED) {
+        throw new Error('SAFE_RETRY reconciliation requires FAILED verification proving no committed effect');
+      }
+      state.verification = verification;
+      state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
       state.phase = ExactEffectPhase.SAFE_RETRY;
       return result(state, { reason: 'RECONCILIATION_SAFE_RETRY', action: 'SAFE_RETRY' });
     }
+
+    if (event.verification != null) {
+      if (!reconciliationObservation) throw new Error('Reconciliation verification requires observation evidence');
+      const verification = normalizeVerificationV1(event.verification);
+      assertVerificationBinding(verification, { ...current, observation: reconciliationObservation });
+      state.verification = verification;
+    }
+    state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
     state.phase = ExactEffectPhase.MANUAL_REVIEW;
     return result(state, { reason: 'RECONCILIATION_MANUAL_REVIEW', action: 'MANUAL_REVIEW' });
   }
