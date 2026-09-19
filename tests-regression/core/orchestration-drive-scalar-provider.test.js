@@ -270,3 +270,34 @@ test('L2-A owner template binds Drive only to the exact configured Manager and l
     /unknown domain science/,
   );
 });
+
+
+test('L2-A provider-bound Manager and recovery prompts carry the strict scalar publication contract', () => {
+  const graph = buildThreeLevelHierarchyTemplate({
+    graphId: 'drive-prompt-contract',
+    projectId: 'project',
+    targetRepository: 'owner/repo',
+    domains: [{ id: 'runtime', scope: 'Runtime.' }],
+    workersPerManager: 3,
+    driveScalarSources: { runtime: 'file_abcdef' },
+  });
+  const manager = graph.nodesById['manager:runtime'];
+  const primary = graph.promptProfiles.find(profile => profile.id === manager.promptProfileId)?.prompt || '';
+  const recovery = graph.promptProfiles.find(profile => profile.id === manager.recoveryPromptProfileId)?.prompt || '';
+
+  for (const prompt of [primary, recovery]) {
+    assert.match(prompt, /DETERMINISTIC CHILD-SLOT PROVIDER/);
+    assert.match(prompt, /PROVIDER_ID=drive-scalar-v1/);
+    assert.match(prompt, /PROVIDER_SOURCE_ID=file_abcdef/);
+    assert.match(prompt, /MAX_CHILD_SLOTS=3/);
+    assert.match(prompt, /entire file content MUST be exactly one decimal integer/);
+    assert.match(prompt, /Every new Drive file revision\/version is a distinct activation request/);
+    assert.match(prompt, /Use 0 when this round needs no child activation/);
+    assert.match(prompt, /cannot change hierarchy, child identities, parent ownership, maximum slots/);
+  }
+
+  const worker = graph.nodesById['worker:runtime:01'];
+  const workerPrompt = graph.promptProfiles.find(profile => profile.id === worker.promptProfileId)?.prompt || '';
+  assert.doesNotMatch(workerPrompt, /DETERMINISTIC CHILD-SLOT PROVIDER/);
+  assert.doesNotMatch(workerPrompt, /PROVIDER_SOURCE_ID=/);
+});
