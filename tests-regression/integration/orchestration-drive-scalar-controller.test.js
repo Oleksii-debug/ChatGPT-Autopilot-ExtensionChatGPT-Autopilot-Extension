@@ -177,12 +177,8 @@ test('L2-A controller polls on existing wake, materializes exact slot count, and
   await confirmManagerSend(h);
 
   let cycle=await controller.cycle({nowMs:h.advance(1)});
-  assert.equal(cycle.hierarchyProviders.checked,0,'provider must not run before Manager terminal');
   assert.deepEqual(cycle.hierarchyProbe.terminal.map(item=>item.nodeId),['manager']);
-
-  controller=h.makeController();
-  cycle=await controller.cycle({nowMs:h.advance(1)});
-  assert.equal(cycle.hierarchyProviders.checked,1);
+  assert.equal(cycle.hierarchyProviders.checked,1,'Manager terminal must make its provider eligible in the same orchestration cycle');
   assert.equal(cycle.hierarchyProviders.results[0].kind,'PROVIDER_REVISION_ACCEPTED');
   assert.equal(reads,1);
 
@@ -242,10 +238,8 @@ test('L2-A provider auth/read failure fails closed, records backoff on same alar
   await controller.configureHierarchy(graph(),{nowMs:h.now()});
   await controller.startHierarchy({nowMs:h.advance(1)});
   await confirmManagerSend(h);
-  await controller.cycle({nowMs:h.advance(1)});
-
-  controller=h.makeController();
   const cycle=await controller.cycle({nowMs:h.advance(1)});
+  assert.deepEqual(cycle.hierarchyProbe.terminal.map(item=>item.nodeId),['manager']);
   assert.equal(cycle.hierarchyProviders.checked,1);
   assert.equal(cycle.hierarchyProviders.results[0].kind,'PROVIDER_READ_FAILED');
   assert.equal(cycle.hierarchyProviders.results[0].error,'AUTH_REQUIRED');
