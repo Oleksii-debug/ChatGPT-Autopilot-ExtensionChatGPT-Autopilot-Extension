@@ -12,6 +12,8 @@ import {
   normalizeChatUrl,
 } from './schema.js';
 import { appendLog } from './logger.js';
+import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
+import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { startSession } from './state-machine.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
@@ -139,6 +141,24 @@ function buildSession(raw, index, now, version = 1) {
     now,
   });
   session.version = Math.max(1, Number(version) || 1);
+  session.promptCadence = normalizeSessionPromptCadence(raw.promptCadence);
+  const portableDrive = normalizeSessionDrivePromptSources(raw.drivePromptSources);
+  session.drivePromptSources = {
+    schemaVersion: portableDrive.schemaVersion,
+    bindings: portableDrive.bindings.map(binding => ({
+      target: binding.target,
+      enabled: binding.enabled,
+      fileId: binding.fileId,
+      pollIntervalMs: binding.pollIntervalMs,
+      minChars: binding.minChars,
+      // Portable config never imports another machine's runtime evidence.
+      lastAcceptedVersion: '',
+      lastAcceptedHash: '',
+      lastCheckedAt: 0,
+      nextCheckAt: 0,
+      lastErrorCode: '',
+    })),
+  };
   session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`);
   session.retryPolicy = raw.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
@@ -303,6 +323,20 @@ function sessionToPortable(session) {
     urlMode: session.urlMode === 'unique' ? 'unique' : 'shared',
     sharedPrompt: session.sharedPrompt || '',
     defaultUniquePrompt: session.defaultUniquePrompt || '',
+    promptCadence: normalizeSessionPromptCadence(session.promptCadence),
+    drivePromptSources: (() => {
+      const sources = normalizeSessionDrivePromptSources(session.drivePromptSources);
+      return {
+        schemaVersion: sources.schemaVersion,
+        bindings: sources.bindings.map(binding => ({
+          target: binding.target,
+          enabled: binding.enabled,
+          fileId: binding.fileId,
+          pollIntervalMs: binding.pollIntervalMs,
+          minChars: binding.minChars,
+        })),
+      };
+    })(),
     runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
     configuredTaskCount: Number(session.configuredTaskCount || session.taskOrder.length),
     minimumSendIntervalValue: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? session.minimumSendIntervalMs / 60000 : session.minimumSendIntervalMs / 1000,
