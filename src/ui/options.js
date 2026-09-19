@@ -1458,7 +1458,7 @@ function scenarioWorkConfigFromForm() {
     maxGenerations: scenarioWorkInt('scenario-work-generations', 0, 10000, 'Кількість поколінь'),
     responseTimeoutMinutes: scenarioWorkInt('scenario-work-timeout', 1, 1440, 'Час очікування відповіді'),
     pollSeconds: scenarioWorkInt('scenario-work-poll', 5, 600, 'Інтервал перевірки'),
-    minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Інтервал між новими роботами'),
+    minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Пауза після завершення відповіді'),
     preSendDelaySeconds: scenarioWorkInt('scenario-work-pre-send', 1, 30, 'Пауза перед надсиланням'),
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
