@@ -1448,17 +1448,21 @@ export class BrowserAgentManager {
         credentialId: action.credentialId,
         targetOrigin,
       });
-      if (!(await this.verifyOwnerAuthority(job.id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
-      if (!resolved || resolved.credentialId !== action.credentialId || resolved.kind !== 'username-password') {
-        throw new Error('AGENT_CREDENTIAL_RESPONSE_INVALID');
-      }
-      const liveAfter = await this.chrome.tabs.get(tabId);
-      const liveAfterUrl = clean(liveAfter?.pendingUrl || liveAfter?.url, 4096);
-      if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
-      let username = typeof resolved.username === 'string' ? resolved.username : '';
-      let secret = typeof resolved.secret === 'string' ? resolved.secret : '';
-      if (!secret) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
+      let username = '';
+      let secret = '';
       try {
+        if (!(await this.verifyOwnerAuthority(job.id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
+        if (!resolved || resolved.credentialId !== action.credentialId || resolved.kind !== 'username-password') {
+          throw new Error('AGENT_CREDENTIAL_RESPONSE_INVALID');
+        }
+        username = typeof resolved.username === 'string' ? resolved.username : '';
+        secret = typeof resolved.secret === 'string' ? resolved.secret : '';
+        if (!secret) throw new Error('AGENT_CREDENTIAL_SECRET_EMPTY');
+
+        const liveAfter = await this.chrome.tabs.get(tabId);
+        const liveAfterUrl = clean(liveAfter?.pendingUrl || liveAfter?.url, 4096);
+        if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+
         const execution = await this.requireScripting().executeScript({
           target: { tabId, frameIds: [Number(action.passwordFrameId)] },
           func: executeBrowserCredentialFill,
@@ -1466,6 +1470,17 @@ export class BrowserAgentManager {
         });
         const result = execution?.[0]?.result;
         if (!result?.ok || result.passwordFilled !== true) throw new Error('AGENT_CREDENTIAL_EFFECT_NOT_OBSERVED');
+        return {
+          kind: 'ACTION',
+          action: {
+            type: action.type,
+            credentialRef: action.credentialRef,
+            credentialId: action.credentialId,
+            usernameFilled: Boolean(action.usernameRef),
+            passwordFilled: true,
+          },
+          currentUrl: liveAfterUrl,
+        };
       } finally {
         username = '';
         secret = '';
@@ -1473,17 +1488,6 @@ export class BrowserAgentManager {
           try { resolved.username = ''; resolved.secret = ''; } catch {}
         }
       }
-      return {
-        kind: 'ACTION',
-        action: {
-          type: action.type,
-          credentialRef: action.credentialRef,
-          credentialId: action.credentialId,
-          usernameFilled: Boolean(action.usernameRef),
-          passwordFilled: true,
-        },
-        currentUrl: liveAfterUrl,
-      };
     }
 
     if (action.type === BrowserAgentActionType.TRUSTED_SCRIPT) {
