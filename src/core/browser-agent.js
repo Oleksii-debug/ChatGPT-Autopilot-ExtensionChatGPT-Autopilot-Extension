@@ -159,8 +159,30 @@ function bestMatchingSiteRule(siteRules, url) {
   return matches[0] || null;
 }
 
+function browserAgentPolicyTargetUrl(snapshot, action) {
+  const current = clean(snapshot?.url, 4096);
+  if ([BrowserAgentActionType.NAVIGATE, BrowserAgentActionType.NEW_TAB, BrowserAgentActionType.DOWNLOAD].includes(action?.type)) {
+    return clean(action?.url, 4096) || current;
+  }
+  if (action?.type === BrowserAgentActionType.CLICK) {
+    const element = browserAgentSnapshotElement(snapshot, action);
+    const href = clean(element?.href, 4096);
+    if (href) {
+      try { return new URL(href, current || undefined).toString(); } catch { /* current page policy below */ }
+    }
+  }
+  if (action?.type === BrowserAgentActionType.CLICK_AT) {
+    const href = clean(action?.coordinateTarget?.href, 4096);
+    if (href) {
+      try { return new URL(href, current || undefined).toString(); } catch { /* current page policy below */ }
+    }
+  }
+  return current;
+}
+
 export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requiresApproval = false } = {}) {
-  const rule = bestMatchingSiteRule(config?.siteRules || [], snapshot?.url || '');
+  const policyUrl = browserAgentPolicyTargetUrl(snapshot, action);
+  const rule = bestMatchingSiteRule(config?.siteRules || [], policyUrl);
   const explicit = rule?.actionDecisions?.[action?.type]
     || rule?.defaultDecision
     || BrowserAgentPolicyDecision.INHERIT;
@@ -176,6 +198,7 @@ export function resolveBrowserAgentOwnerPolicy(config, snapshot, action, { requi
     decision,
     source,
     pattern: rule?.pattern || '',
+    policyUrl,
     reason: rule
       ? `Owner site policy ${rule.pattern} resolved ${action?.type || 'action'} to ${decision}`
       : `Owner global policy resolved ${action?.type || 'action'} to ${decision}`,
