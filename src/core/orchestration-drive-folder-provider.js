@@ -97,6 +97,33 @@ function entriesSignature(entries) {
     .join('\u0001');
 }
 
+async function sha256Text(value) {
+  if (!globalThis.crypto?.subtle) {
+    throw new DriveFolderDispatchError('HASH_UNAVAILABLE', 'Web Crypto is unavailable for dispatch snapshot identity.');
+  }
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function extractGoogleDriveFolderSourceId(value) {
+  const raw = clean(String(value ?? ''));
+  if (/^[A-Za-z0-9_-]{6,256}$/u.test(raw)) return raw;
+  let url;
+  try { url = new URL(raw); } catch {
+    throw new DriveFolderDispatchError('INVALID_SOURCE', 'Invalid Google Drive folder reference.');
+  }
+  if (url.hostname.toLowerCase() !== 'drive.google.com') {
+    throw new DriveFolderDispatchError('INVALID_SOURCE', 'Invalid Google Drive folder reference.');
+  }
+  let id = url.pathname.match(/^\/drive\/folders\/([^/]+)/u)?.[1] || '';
+  try { id = decodeURIComponent(id); } catch { id = ''; }
+  if (!/^[A-Za-z0-9_-]{6,256}$/u.test(id)) {
+    throw new DriveFolderDispatchError('INVALID_SOURCE', 'Invalid Google Drive folder reference.');
+  }
+  return id;
+}
+
 function parseDispatchEnvelope(rawText, {
   groupNodeId,
   generationRevision,
@@ -249,13 +276,16 @@ export class DriveFolderDispatchProviderV1 {
     const parsed = [];
     for (const entry of dispatchEntries) {
       const content = await this.readEntryContent({ sourceId: source, generation, entry });
-      parsed.push(parseDispatchEnvelope(content, {
-        groupNodeId: group,
-        generationRevision: generation.revision,
-        allowedChildIds,
-        localPromptProfilesByChild,
-        fileId: entry.id,
-      }));
+      parsed.push({
+        ...parseDispatchEnvelope(content, {
+          groupNodeId: group,
+          generationRevision: generation.revision,
+          allowedChildIds,
+          localPromptProfilesByChild,
+          fileId: entry.id,
+        }),
+        fileVersion: entry.version,
+      });
     }
 
     const targets = parsed.map(item => item.targetChildId);
@@ -268,9 +298,11 @@ export class DriveFolderDispatchProviderV1 {
       throw new DriveFolderDispatchError('INVALID_ENTRY_LIST', 'Invalid Drive generation entry list after read.');
     }
     const after = afterRaw.map(normalizeEntry);
-    if (entriesSignature(before) !== entriesSignature(after)) {
+    const beforeSignature = entriesSignature(before);
+    if (beforeSignature !== entriesSignature(after)) {
       throw new DriveFolderDispatchError('UNSTABLE_GENERATION', 'Drive dispatch generation changed while being read.');
     }
+    const snapshotHash = await sha256Text(beforeSignature);
 
     parsed.sort((a, b) => a.order - b.order || a.targetChildId.localeCompare(b.targetChildId) || a.fileId.localeCompare(b.fileId));
     return {
@@ -280,6 +312,7 @@ export class DriveFolderDispatchProviderV1 {
       sourceId: source,
       providerRevision: generation.revision,
       generationFolderId: generation.folderId,
+      snapshotHash,
       dispatches: parsed,
     };
   }
