@@ -464,7 +464,11 @@ export class OrchestrationV2Controller {
         state.providerState = state.providerState || {};
         state.providerState.lastCheckedAt = nowMs;
         state.providerState.nextCheckAt = nowMs + pollIntervalMs;
-        state.providerState.lastErrorCode = ['PROVIDER_REVISION_ACCEPTED', 'DUPLICATE_PROVIDER_REVISION'].includes(dispatched.reason)
+        state.providerState.lastErrorCode = [
+          'PROVIDER_REVISION_ACCEPTED',
+          'DUPLICATE_PROVIDER_REVISION',
+          'DUPLICATE_EVENT',
+        ].includes(dispatched.reason)
           ? ''
           : String(dispatched.reason || 'PROVIDER_DISPATCH_FAILED');
         return draft;
