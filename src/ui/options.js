@@ -171,6 +171,7 @@ function syncOrchestrationV2ActionAvailability({ busy = false } = {}) {
     $(id).disabled = Boolean(busy) || !hasSelected;
   }
   $('import-orchestration-v2-profile-button').disabled = Boolean(busy) || !ui.pendingOrchestrationProfile;
+  $('configure-orchestration-v2-hierarchy-button').disabled = Boolean(busy) || !hasSelected;
   $('orchestration-v2-tab-settings').disabled = Boolean(busy) || !hasSelected;
   $('orchestration-v2-tab-state').disabled = Boolean(busy) || !hasSelected;
 }
@@ -454,6 +455,52 @@ async function exportOrchestrationProfile() {
     downloadJson(data.profile, `${safeFileName(data.profile.name || 'Orchestration')}-orchestration.json`);
   } catch (error) {
     $('orchestration-v2-profile-preview').textContent = `Експорт не виконано: ${error.message}`;
+  }
+}
+
+function orchestrationHierarchyDomainsFromForm() {
+  const lines = $('orchestration-v2-hierarchy-domains').value
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .filter(Boolean);
+  if (!lines.length) throw new Error('Додайте хоча б одного Manager у форматі ID | область відповідальності.');
+  return lines.map((line, index) => {
+    const separator = line.indexOf('|');
+    if (separator <= 0 || separator >= line.length - 1) {
+      throw new Error(`Рядок ${index + 1}: потрібен формат ID | область відповідальності.`);
+    }
+    const id = line.slice(0, separator).trim();
+    const scope = line.slice(separator + 1).trim();
+    if (!id || !scope) throw new Error(`Рядок ${index + 1}: ID та область не можуть бути порожніми.`);
+    return { id, scope };
+  });
+}
+
+async function configureOrchestrationHierarchyTemplate() {
+  beginOrchestrationV2Action();
+  try {
+    setOrchestrationV2Busy(true);
+    const domains = orchestrationHierarchyDomainsFromForm();
+    const workersPerManager = parseStrictBoundedInteger(
+      $('orchestration-v2-hierarchy-workers').value,
+      { min: 1, max: 40, label: 'Workers на одного Manager' },
+    );
+    const data = await core('CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE', {
+      domains,
+      workersPerManager,
+      includeIntegrationManager: $('orchestration-v2-hierarchy-integration').checked,
+      includeQaRedTeam: $('orchestration-v2-hierarchy-qa').checked,
+    });
+    renderOrchestrationV2Status(data.status || await core('GET_ORCHESTRATION_V2_STATUS'));
+    const hierarchy = data.hierarchy || {};
+    $('orchestration-v2-hierarchy-template-status').textContent =
+      `Створено ${hierarchy.nodeCount || 0} вузлів: Managers ${hierarchy.managerCount || 0}, Workers ${hierarchy.workerCount || 0}, профілів промтів ${hierarchy.promptProfileCount || 0}. Оркестр не запущено.`;
+    announce('Ієрархію оркестру створено. Автоматичного запуску не було.');
+  } catch (error) {
+    $('orchestration-v2-hierarchy-template-status').textContent = `Ієрархію не створено: ${error.message}`;
+    announce('Помилка створення ієрархії.');
+  } finally {
+    setOrchestrationV2Busy(false);
   }
 }
 
@@ -2776,6 +2823,7 @@ $('delete-orchestration-v2-orchestra-button').addEventListener('click', deleteOr
 $('orchestration-v2-profile-file').addEventListener('change', onOrchestrationProfileFileChange);
 $('import-orchestration-v2-profile-button').addEventListener('click', importOrchestrationProfile);
 $('export-orchestration-v2-profile-button').addEventListener('click', exportOrchestrationProfile);
+$('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
