@@ -28,7 +28,7 @@ function repository(value, label) {
 
 function portableHierarchyGraph(raw) {
   const source = object(raw, 'hierarchy');
-  exactKeys(source, ['schemaVersion','graphId','controlEpoch','promptProfiles','nodes'], 'hierarchy');
+  exactKeys(source, ['schemaVersion','graphId','controlEpoch','promptProfiles','nodes','rootIds','nodeOrder','nodesById'], 'hierarchy');
   const graph = validateOrchestrationGraphV1(source);
   return {
     schemaVersion: graph.schemaVersion,
