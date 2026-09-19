@@ -12,7 +12,9 @@ test('manifest wires the options UI and ChatGPT content scripts with bounded per
   assert.deepEqual(manifest.permissions.sort(), ['alarms', 'debugger', 'identity', 'scripting', 'storage', 'tabs', 'unlimitedStorage']);
   assert.deepEqual(manifest.host_permissions, ['https://chatgpt.com/*', 'http://localhost/*', 'http://127.0.0.1/*', 'https://localhost/*', 'https://127.0.0.1/*', 'https://api.github.com/*', 'https://www.googleapis.com/*']);
   assert.equal(manifest.host_permissions.includes('https://drive.google.com/*'), false, 'Drive content is read through the scoped Google Drive API host, not broad Drive page access');
-  assert.equal(manifest.host_permissions.some(value => /\\*\\.google\\.com|https:\\/\\/google\\.com/u.test(value)), false, 'Drive support must not broaden host access to arbitrary Google pages');
+  for (const forbidden of ['https://google.com/*', 'https://*.google.com/*', 'https://drive.google.com/*']) {
+    assert.equal(manifest.host_permissions.includes(forbidden), false, `unexpected broad Google host permission ${forbidden}`);
+  }
   assert.equal(manifest.oauth2, undefined, 'repository must not ship a fake OAuth client identity');
   assert.deepEqual(manifest.content_scripts, [{
     matches: ['https://chatgpt.com/*'],
