@@ -51,8 +51,10 @@ test('recovery prompt preserves logical role without relying on lost chat transc
     targetRepository: 'Oleksii-debug/Autosport',
     controlIssueNumber: 1,
     scope: 'Runtime and recovery.',
+    childNodeIds: ['worker:runtime:01'],
   });
   assert.match(prompt, /ROLE != CHAT/);
+  assert.match(prompt, /DIRECT_CHILDREN=worker:runtime:01/);
   assert.match(prompt, /previous transcript as unavailable and non-authoritative/);
   assert.match(prompt, /stale-generation ownership/);
   assert.match(prompt, /RECOVERED_LOGICAL_ROLE=DOMAIN_MANAGER/);
