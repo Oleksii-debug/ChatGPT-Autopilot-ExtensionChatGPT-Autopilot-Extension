@@ -150,6 +150,22 @@ function parseDispatchEnvelope(rawText, {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', 'Dispatch envelope must be an object.');
   }
+  const allowedFields = new Set([
+    'schema_version',
+    'parent_node_id',
+    'generation',
+    'target_child_id',
+    'prompt',
+    'prompt_profile_id',
+    'order',
+  ]);
+  const unknownFields = Object.keys(raw).filter(key => !allowedFields.has(key));
+  if (unknownFields.length) {
+    throw new DriveFolderDispatchError(
+      'INVALID_DISPATCH_FILE',
+      `Unknown dispatch envelope field: ${unknownFields[0]}`,
+    );
+  }
   if (Number(raw.schema_version) !== DRIVE_FOLDER_DISPATCH_SCHEMA_VERSION) {
     throw new DriveFolderDispatchError('INVALID_DISPATCH_FILE', 'Unsupported dispatch schema_version.');
   }
@@ -255,6 +271,12 @@ export class DriveFolderDispatchProviderV1 {
       .filter(Boolean)
       .sort((a, b) => compareRevision(b.revision, a.revision));
     if (!generations.length) return { kind: 'NO_GENERATION', providerId: DRIVE_FOLDER_DISPATCH_PROVIDER_V1, groupNodeId: group, sourceId: source };
+    if (new Set(generations.map(item => item.folderId)).size !== generations.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_GENERATION', 'Duplicate generation folder identity in Drive root.');
+    }
+    if (new Set(generations.map(item => item.revision)).size !== generations.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_GENERATION', 'Multiple Drive folders publish the same generation revision.');
+    }
 
     const generationInventoryBefore = generationsSignature(generations);
     const generation = generations[0];
@@ -319,6 +341,10 @@ export class DriveFolderDispatchProviderV1 {
       .map(normalizeGeneration)
       .filter(Boolean)
       .sort((a, b) => compareRevision(b.revision, a.revision));
+    if (new Set(generationsAfter.map(item => item.folderId)).size !== generationsAfter.length
+        || new Set(generationsAfter.map(item => item.revision)).size !== generationsAfter.length) {
+      throw new DriveFolderDispatchError('DUPLICATE_GENERATION', 'Ambiguous generation identity appeared during Drive read.');
+    }
     if (generationInventoryBefore !== generationsSignature(generationsAfter)) {
       throw new DriveFolderDispatchError(
         'UNSTABLE_GENERATION',
