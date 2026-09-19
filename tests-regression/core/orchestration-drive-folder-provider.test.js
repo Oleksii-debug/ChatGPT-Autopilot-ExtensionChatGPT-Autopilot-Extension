@@ -195,3 +195,35 @@ test('L3 provider rejects snapshot when root generation inventory changes during
   );
   assert.equal(generationReads, 2);
 });
+
+
+test('L3 provider rejects duplicate generation revisions or folder identities', async () => {
+  await assert.rejects(
+    () => read(provider({
+      generations: [
+        { id: 'g41a', name: 'generation-000041' },
+        { id: 'g41b', name: 'generation-000041' },
+      ],
+    })),
+    error => error instanceof DriveFolderDispatchError && error.code === 'DUPLICATE_GENERATION',
+  );
+
+  await assert.rejects(
+    () => read(provider({
+      generations: [
+        { id: 'same-folder', name: 'generation-000041' },
+        { id: 'same-folder', name: 'generation-000042' },
+      ],
+    })),
+    error => error instanceof DriveFolderDispatchError && error.code === 'DUPLICATE_GENERATION',
+  );
+});
+
+test('L3 provider rejects unknown dispatch envelope fields instead of silently ignoring them', async () => {
+  const raw = JSON.parse(envelope());
+  raw.command = 'launch_foreign_scheduler';
+  await assert.rejects(
+    () => read(provider({ contents: { d1: JSON.stringify(raw) } })),
+    error => error instanceof DriveFolderDispatchError && error.code === 'INVALID_DISPATCH_FILE',
+  );
+});
