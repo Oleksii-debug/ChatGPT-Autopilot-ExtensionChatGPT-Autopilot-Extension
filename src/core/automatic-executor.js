@@ -8,6 +8,7 @@ import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
 import { appendLog } from './logger.js';
 import { AgentProviderId } from './capability-registry.js';
+import { promptForVerifiedSendOrdinal } from './session-prompt-cadence.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const QUIESCENT_STATES = new Set([RunState.PAUSED, RunState.STOPPED]);
@@ -43,7 +44,8 @@ function taskIndex(session, taskId) {
 }
 
 export function composePromptForSession(session, task) {
-  const basePrompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
+  const primaryPrompt = session.promptMode === PromptMode.UNIQUE ? task.promptOverride : session.sharedPrompt;
+  const basePrompt = promptForVerifiedSendOrdinal(session, primaryPrompt);
   const handoff = typeof session.aiCoordinatorHandoff === 'string' ? session.aiCoordinatorHandoff.trim() : '';
   if (!handoff) return basePrompt;
   return `${basePrompt}
