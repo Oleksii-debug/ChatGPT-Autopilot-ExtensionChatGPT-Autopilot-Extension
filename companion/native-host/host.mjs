@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createCredentialBroker } from './credential-broker.mjs';
 import {
   NativeMessageDecoder,
   encodeNativeMessage,
@@ -11,11 +13,66 @@ import {
 const baseDir = path.dirname(fileURLToPath(import.meta.url));
 const configPath = process.env.AUTOPILOT_NATIVE_CONFIG || path.join(baseDir, 'config', 'native-companion.json');
 const callerOrigin = String(process.argv[2] || '').trim();
+const credentialStorePath = path.join(baseDir, 'config', 'credentials.json');
+const credentialsDir = path.join(baseDir, 'config', 'credentials');
+
+function readJsonOrDefault(filePath, fallback) {
+  if (!fs.existsSync(filePath)) return fallback;
+  return JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\\uFEFF/u, ''));
+}
+
+async function decryptDpapiSecret(secretPath) {
+  if (process.platform !== 'win32') {
+    const error = new Error('Windows DPAPI credential resolution is available only on Windows');
+    error.code = 'CREDENTIAL_DECRYPT_UNAVAILABLE';
+    throw error;
+  }
+  const script = [
+    "$ErrorActionPreference = 'Stop'",
+    "$encrypted = Get-Content -LiteralPath $env:AUTOPILOT_SECRET_FILE -Raw",
+    "$secure = ConvertTo-SecureString $encrypted",
+    "$ptr = [IntPtr]::Zero",
+    "try {",
+    "  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)",
+    "  $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)",
+    "  [Console]::Out.Write([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($plain)))",
+    "} finally {",
+    "  if ($ptr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }",
+    "  $plain = $null",
+    "}"
+  ].join('; ');
+  const child = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '-'], {
+    input: script,
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 10_000,
+    maxBuffer: 256_000,
+    env: { ...process.env, AUTOPILOT_SECRET_FILE: secretPath },
+  });
+  if (child.error || child.status !== 0) {
+    const error = new Error('Windows DPAPI could not decrypt the requested credential');
+    error.code = 'CREDENTIAL_DECRYPT_FAILED';
+    throw error;
+  }
+  const encoded = String(child.stdout || '').trim();
+  if (!encoded || !/^[A-Za-z0-9+/]+={0,2}$/u.test(encoded)) {
+    const error = new Error('Windows DPAPI returned an invalid credential payload');
+    error.code = 'CREDENTIAL_DECRYPT_FAILED';
+    throw error;
+  }
+  return Buffer.from(encoded, 'base64').toString('utf8');
+}
 
 let config;
+let credentialBroker;
 try {
   const configText = fs.readFileSync(configPath, 'utf8').replace(/^\\uFEFF/u, '');
   config = normalizeNativeCompanionConfig(JSON.parse(configText));
+  credentialBroker = createCredentialBroker({
+    store: readJsonOrDefault(credentialStorePath, { schemaVersion: 1, credentials: [] }),
+    credentialsDir,
+    decryptSecret: decryptDpapiSecret,
+  });
 } catch (error) {
   process.stderr.write(`Native Companion configuration failed: ${error.message}\n`);
   process.exit(2);
@@ -40,7 +97,7 @@ process.stdin.on('data', chunk => {
   }
   for (const message of messages) {
     chain = chain.then(async () => {
-      const response = await handleNativeCompanionRequest(message, { config, callerOrigin });
+      const response = await handleNativeCompanionRequest(message, { config, callerOrigin, credentialBroker });
       writeResponse(response);
     }).catch(error => {
       process.stderr.write(`Native Companion request failed unexpectedly: ${error.message}\n`);
