@@ -120,7 +120,9 @@ function createManagedSession({ graph, node, action, prompt, targetUrl, nowMs, t
     chatMode: node.chatMode,
     promptProfileId: action.promptProfileId || node.promptProfileId,
     actionType: action.type,
-    providerDispatchIdentity: action.providerDispatchIdentity || '',
+    ...(action.providerDispatchIdentity
+      ? { providerDispatchIdentity: action.providerDispatchIdentity }
+      : {}),
   };
   return { session, sessionId: sid, taskId: tid };
 }
@@ -220,7 +222,9 @@ export function materializeHierarchyActionsIntoCore(
         chatMode: node.chatMode,
         promptProfileId: action.promptProfileId || node.promptProfileId,
         actionType: action.type,
-        providerDispatchIdentity: action.providerDispatchIdentity || '',
+        ...(action.providerDispatchIdentity
+          ? { providerDispatchIdentity: action.providerDispatchIdentity }
+          : {}),
       };
       session.updatedAt = nowMs;
     }
