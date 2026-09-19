@@ -447,6 +447,30 @@ export class OrchestrationV2Controller {
         continue;
       }
 
+      const latestBeforeDispatch = await this.runtimeRepository.load();
+      const latestProviderState = latestBeforeDispatch?.hierarchy?.state?.nodesById?.[item.nodeId]?.providerState || {};
+      if (
+        String(latestProviderState.lastAcceptedRevision || '') === String(snapshot.providerRevision)
+        && Number(latestProviderState.lastRequestedSlotCount || 0) === Number(snapshot.requestedSlotCount)
+      ) {
+        await this.runtimeRepository.update(draft => {
+          const state = draft?.hierarchy?.state?.nodesById?.[item.nodeId];
+          if (!state) return draft;
+          state.providerState = state.providerState || {};
+          state.providerState.lastCheckedAt = nowMs;
+          state.providerState.nextCheckAt = nowMs + pollIntervalMs;
+          state.providerState.lastErrorCode = '';
+          return draft;
+        });
+        results.push({
+          nodeId: item.nodeId,
+          kind: 'DUPLICATE_PROVIDER_REVISION',
+          providerRevision: snapshot.providerRevision,
+          requestedSlotCount: snapshot.requestedSlotCount,
+        });
+        continue;
+      }
+
       const dispatched = await this.dispatchHierarchyEvent({
         type: OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED,
         eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}:slots:${snapshot.requestedSlotCount}`,
