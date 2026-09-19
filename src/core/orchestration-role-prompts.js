@@ -164,6 +164,7 @@ export function buildOrchestrationRecoveryPrompt({
   targetRepository,
   controlIssueNumber = 0,
   scope,
+  childNodeIds = [],
 } = {}) {
   const originalRole = required(logicalRole, 'logicalRole', 80).toUpperCase();
   if (!ROLE_VALUES.has(originalRole) || originalRole === OrchestrationRoleTemplate.RECOVERY) {
@@ -223,6 +224,9 @@ export function buildThreeLevelHierarchyTemplate({
   const issue = integer(controlIssueNumber || 0, 'controlIssueNumber', 0, Number.MAX_SAFE_INTEGER);
   const domainList = normalizeDomains(domains);
   const workerCount = integer(workersPerManager, 'workersPerManager', 1, MAX_WORKERS_PER_MANAGER);
+  const extraNodeCount = (includeIntegrationManager ? 1 : 0) + (includeQaRedTeam ? 1 : 0);
+  const totalNodeCount = 1 + domainList.length + (domainList.length * workerCount) + extraNodeCount;
+  if (totalNodeCount > 1000) throw new Error('Hierarchy template exceeds 1000 logical nodes');
 
   const nodeSpecs = [];
   const managerIds = domainList.map(domain => \`manager:\${domain.id}\`);
@@ -314,6 +318,7 @@ export function buildThreeLevelHierarchyTemplate({
         targetRepository: target,
         controlIssueNumber: issue,
         scope: spec.scope,
+        childNodeIds: spec.childIds,
       }),
     });
     nodes.push({
