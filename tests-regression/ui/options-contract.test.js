@@ -353,3 +353,20 @@ test('orchestration profile preview exposes imported hierarchy counts in normal 
   assert.match(js, /\$\{preview\.hierarchy\.rootCount\} коренів/);
   assert.match(js, /\$\{preview\.hierarchy\.promptProfileCount\} профілів промтів/);
 });
+
+
+test('Orchestration UI exposes keyboard-native deterministic hierarchy template controls', () => {
+  for (const id of [
+    'orchestration-v2-hierarchy-domains',
+    'orchestration-v2-hierarchy-workers',
+    'orchestration-v2-hierarchy-integration',
+    'orchestration-v2-hierarchy-qa',
+    'configure-orchestration-v2-hierarchy-button',
+    'orchestration-v2-hierarchy-template-status',
+  ]) assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
+  assert.match(html, /<legend>Стандартна ієрархія Director → Managers → Workers<\/legend>/);
+  assert.match(js, /function orchestrationHierarchyDomainsFromForm\(\)/);
+  assert.match(js, /CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE/);
+  assert.match(js, /Оркестр не запущено/);
+  assert.match(js, /configure-orchestration-v2-hierarchy-button'\)\.addEventListener\('click', configureOrchestrationHierarchyTemplate\)/);
+});

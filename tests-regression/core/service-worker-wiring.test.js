@@ -98,6 +98,11 @@ test('service worker uses manager-level multi-orchestra cycle and per-orchestra 
   assert.doesNotMatch(source, /new OrchestrationV2Controller\(/);
 });
 
+test('owner hierarchy template command routes only through Orchestration V2 manager', () => {
+  assert.match(source, /message\.command === 'CONFIGURE_ORCHESTRATION_V2_HIERARCHY_TEMPLATE'/);
+  assert.match(source, /orchestrationV2\.configureHierarchyTemplate\(message\.payload \|\| \{\}\)/);
+});
+
 test('manager owns multi-orchestra UI command routing', () => {
   for (const command of [
     'LIST_ORCHESTRATION_V2_ORCHESTRAS',
