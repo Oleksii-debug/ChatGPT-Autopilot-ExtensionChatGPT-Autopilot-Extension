@@ -6,6 +6,12 @@ export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not availab
 
 export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
+    for (const binding of session.drivePromptSources?.bindings || []) {
+      if (binding?.enabled !== true || !binding.fileId) continue;
+      const nextCheckAt = Number(binding.nextCheckAt || 0);
+      earliest = Math.min(earliest, Math.max(now, Number.isFinite(nextCheckAt) ? nextCheckAt : now));
+    }
+
     if (session.runState !== RunState.RUNNING && session.runState !== RunState.RECOVERING) continue;
     session.runState = RunState.PAUSED;
     session.pausedByRuntimeGate = true;
