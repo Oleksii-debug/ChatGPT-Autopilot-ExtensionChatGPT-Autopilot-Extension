@@ -170,6 +170,14 @@ test('SAFE_RETRY is the only ambiguous path that authorizes another physical exe
       outcome: ReconciliationOutcome.SAFE_RETRY,
       reasonCode: 'POSTCONDITION_PROVES_NO_EFFECT',
       summary: 'Verifier proved effect did not occur.',
+      observation: observation({ observationId: 'reconcile-obs-1', status: 'ERROR', summary: 'Expected effect is absent.' }),
+      verification: verification({
+        verificationId: 'reconcile-verify-1',
+        observationId: 'reconcile-obs-1',
+        status: 'FAILED',
+        reasonCode: 'POSTCONDITION_ABSENT',
+        summary: 'No committed effect exists; retry is safe.',
+      }),
     },
   ));
   state = result.state;
@@ -186,6 +194,34 @@ test('SAFE_RETRY is the only ambiguous path that authorizes another physical exe
   assert.equal(state.phase, ExactEffectPhase.EXECUTING);
   assert.equal(state.attempt, 2);
   assert.equal(state.executionId, 'invoke-1:attempt:2');
+});
+
+test('SAFE_RETRY without fresh reconciliation evidence fails closed', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'start-no-evidence',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'ambiguous-no-evidence',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'unsafe-safe-retry',
+      '2026-09-19T12:00:03Z',
+      {
+        outcome: ReconciliationOutcome.SAFE_RETRY,
+        reasonCode: 'CALLER_ASSERTED_SAFE',
+      },
+    )),
+    /requires observation and failed verification evidence/,
+  );
 });
 
 test('verified reconciliation commits the original ambiguous effect without replaying it', () => {
@@ -348,6 +384,13 @@ test('late evidence from an older execution attempt cannot satisfy a SAFE_RETRY 
     {
       outcome: ReconciliationOutcome.SAFE_RETRY,
       reasonCode: 'NO_EFFECT_PROVEN',
+      observation: observation({ observationId: 'reconcile-obs-late', status: 'ERROR', summary: 'Effect absent.' }),
+      verification: verification({
+        verificationId: 'reconcile-verify-late',
+        observationId: 'reconcile-obs-late',
+        status: 'FAILED',
+        reasonCode: 'POSTCONDITION_ABSENT',
+      }),
     },
   )).state;
   state = reduceExactEffectV1(state, event(
