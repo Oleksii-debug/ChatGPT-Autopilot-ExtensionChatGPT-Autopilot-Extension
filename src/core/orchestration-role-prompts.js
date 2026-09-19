@@ -109,6 +109,7 @@ export function buildOrchestrationRolePrompt({
   controlIssueNumber = 0,
   scope,
   childNodeIds = [],
+  providerBinding = null,
 } = {}) {
   const normalizedRole = required(role, 'role', 80).toUpperCase();
   if (!ROLE_VALUES.has(normalizedRole)) throw new Error('Unsupported orchestration role');
@@ -121,6 +122,23 @@ export function buildOrchestrationRolePrompt({
   const children = Array.isArray(childNodeIds)
     ? childNodeIds.map((id, index) => stableId(id, `childNodeIds[${index}]`))
     : (() => { throw new Error('Invalid childNodeIds'); })();
+
+  const providerLines = providerBinding
+    ? [
+      '',
+      'DETERMINISTIC CHILD-SLOT PROVIDER',
+      `PROVIDER_ID=${required(providerBinding.providerId, 'providerBinding.providerId', 120)}`,
+      `PROVIDER_SOURCE_ID=${required(providerBinding.sourceId, 'providerBinding.sourceId', 256)}`,
+      `MAX_CHILD_SLOTS=${integer(providerBinding.maxSlots, 'providerBinding.maxSlots', 0, 1000)}`,
+      'When child work is ready, update only the exact locally bound provider file through your authorized Drive tool/integration.',
+      'The entire file content MUST be exactly one decimal integer from 0 through MAX_CHILD_SLOTS. No prose, JSON, labels, lists or multiple values.',
+      'Every new Drive file revision/version is a distinct activation request, even when the integer value is unchanged.',
+      'Use 0 when this round needs no child activation; Autopilot will reconcile the parent without manufacturing worker work.',
+      'Publish a new provider revision only after live project truth and ownership are refreshed and the requested child capacity is intentional.',
+      'The provider file cannot change hierarchy, child identities, parent ownership, maximum slots, chat modes, Pause/Stop authority or safety policy.',
+      'Do not ask Autopilot to infer workload or parse project meaning from this file.',
+    ]
+    : [];
 
   return [
     'AUTOPILOT LEVEL-1 ROLE CONTRACT',
@@ -151,6 +169,7 @@ export function buildOrchestrationRolePrompt({
     'Do not stop after one micro-step when a larger causally connected safe block can be completed in this activation.',
     'Use tests and concrete evidence. Never claim implementation, verification or completion that did not physically happen.',
     'If there is no useful, valid, non-duplicated work inside this assigned scope, do not manufacture activity; finish safely as NO_ACTION.',
+    ...providerLines,
     '',
     ...roleInstructions(normalizedRole),
     '',
@@ -172,6 +191,7 @@ export function buildOrchestrationRecoveryPrompt({
   controlIssueNumber = 0,
   scope,
   childNodeIds = [],
+  providerBinding = null,
 } = {}) {
   const originalRole = required(logicalRole, 'logicalRole', 80).toUpperCase();
   if (!ROLE_VALUES.has(originalRole) || originalRole === OrchestrationRoleTemplate.RECOVERY) {
@@ -190,6 +210,7 @@ export function buildOrchestrationRecoveryPrompt({
       'Re-establish only current-generation authority from external truth; do not rely on the lost transcript.',
     ].join(' '),
     childNodeIds,
+    providerBinding,
   });
   return `${base}\nRECOVERED_LOGICAL_ROLE=${originalRole}`;
 }
@@ -350,6 +371,7 @@ export function buildThreeLevelHierarchyTemplate({
         controlIssueNumber: issue,
         scope: spec.scope,
         childNodeIds: spec.childIds,
+        providerBinding: spec.providerBinding,
       }),
     });
     promptProfiles.push({
@@ -365,6 +387,7 @@ export function buildThreeLevelHierarchyTemplate({
         controlIssueNumber: issue,
         scope: spec.scope,
         childNodeIds: spec.childIds,
+        providerBinding: spec.providerBinding,
       }),
     });
     nodes.push({
