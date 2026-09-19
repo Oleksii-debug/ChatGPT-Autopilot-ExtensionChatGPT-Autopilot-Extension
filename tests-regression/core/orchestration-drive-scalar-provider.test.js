@@ -1,13 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { buildThreeLevelHierarchyTemplate } from '../../src/core/orchestration-role-prompts.js';
+
 import {
+  DRIVE_FILE_SCOPE,
   DRIVE_SCALAR_PROVIDER_V1,
   DriveScalarProviderError,
   DriveScalarProviderV1,
   compareDriveProviderRevisions,
   createGoogleDriveScalarReader,
   extractGoogleDriveScalarSourceId,
+  getChromeDriveAccessToken,
+  inspectChromeDriveOAuth,
   normalizeDriveProviderRevision,
   parseDriveScalarContent,
 } from '../../src/core/orchestration-drive-scalar-provider.js';
@@ -184,5 +189,84 @@ test('L2-A Google Drive reader fails closed on auth and unsupported MIME', async
   await assert.rejects(
     () => unsupported.readContent({ metadata: meta }),
     error => error.code === 'UNSUPPORTED_MIME',
+  );
+});
+
+
+test('L2-A Chrome OAuth boundary fails closed until a real drive.file client is deployed', async () => {
+  assert.deepEqual(inspectChromeDriveOAuth({}), {
+    configured: false,
+    clientIdPresent: false,
+    driveFileScopePresent: false,
+  });
+
+  let authCalls = 0;
+  const chromeApi = {
+    runtime: { getManifest: () => ({ manifest_version: 3 }) },
+    identity: { async getAuthToken() { authCalls += 1; return { token: 'must-not-be-called' }; } },
+  };
+  await assert.rejects(
+    () => getChromeDriveAccessToken(chromeApi, { interactive: true }),
+    error => error.code === 'OAUTH_NOT_CONFIGURED',
+  );
+  assert.equal(authCalls, 0, 'missing OAuth deployment must fail before Chrome auth is invoked');
+
+  const configured = {
+    runtime: {
+      getManifest: () => ({
+        oauth2: { client_id: 'real-client-id.apps.googleusercontent.com', scopes: [DRIVE_FILE_SCOPE] },
+      }),
+    },
+    identity: {
+      async getAuthToken(options) {
+        authCalls += 1;
+        assert.equal(options.interactive, false);
+        return { token: 'transient-token' };
+      },
+    },
+  };
+  assert.equal(inspectChromeDriveOAuth(configured.runtime.getManifest()).configured, true);
+  assert.equal(await getChromeDriveAccessToken(configured, { interactive: false }), 'transient-token');
+  assert.equal(authCalls, 1);
+});
+
+test('L2-A owner template binds Drive only to the exact configured Manager and local slot maximum', () => {
+  const graph = buildThreeLevelHierarchyTemplate({
+    graphId: 'drive-template',
+    projectId: 'project',
+    targetRepository: 'owner/repo',
+    domains: [
+      { id: 'runtime', scope: 'Runtime.' },
+      { id: 'science', scope: 'Science.' },
+    ],
+    workersPerManager: 4,
+    driveScalarSources: {
+      runtime: 'https://docs.google.com/document/d/file_abcdef/edit',
+    },
+    driveScalarPollIntervalMs: 120000,
+  });
+
+  const runtimeManager = graph.nodesById['manager:runtime'];
+  const scienceManager = graph.nodesById['manager:science'];
+  assert.deepEqual(runtimeManager.providerBinding, {
+    providerId: DRIVE_SCALAR_PROVIDER_V1,
+    groupNodeId: 'manager:runtime',
+    maxSlots: 4,
+    sourceId: 'file_abcdef',
+    pollIntervalMs: 120000,
+  });
+  assert.equal(scienceManager.providerBinding, null);
+  assert.equal(graph.nodesById['worker:runtime:01'].providerBinding, null);
+
+  assert.throws(
+    () => buildThreeLevelHierarchyTemplate({
+      graphId: 'foreign-drive-template',
+      projectId: 'project',
+      targetRepository: 'owner/repo',
+      domains: [{ id: 'runtime', scope: 'Runtime.' }],
+      workersPerManager: 2,
+      driveScalarSources: { science: 'file_abcdef' },
+    }),
+    /unknown domain science/,
   );
 });
