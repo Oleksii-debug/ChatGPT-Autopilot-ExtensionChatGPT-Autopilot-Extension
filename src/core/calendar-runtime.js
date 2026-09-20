@@ -47,15 +47,41 @@ function catchUpProbeRuntime(runtime, schedule, probeSchedule) {
   };
 }
 
+function reconcileMissedThrough(session, schedule, occurrence, now) {
+  assertOccurrenceBelongsToSession(session, schedule, occurrence);
+  const revision = occurrence.revision;
+  const reconciledThrough = Math.max(occurrence.scheduledAt, now - 1);
+  const committed = commitCalendarOccurrence(session.calendarRuntime || {}, occurrence);
+  session.calendarRuntime = {
+    ...committed,
+    recurrenceRevision: revision,
+    reconciledThrough,
+    reconciledThroughByRevision: {
+      ...(committed.reconciledThroughByRevision || {}),
+      [revision]: reconciledThrough,
+    },
+    lastOccurrence: {
+      id: occurrence.id,
+      revision,
+      scheduledFor: occurrence.scheduledAt,
+      executedAt: now,
+      state: CalendarOccurrenceState.MISSED_SKIPPED,
+      reconciledThrough,
+    },
+  };
+  return session;
+}
+
 /** Thin admission adapter over the canonical calendar scheduler. */
 export function calendarAdmissionForSession(session, now = Date.now()) {
   if (!session?.calendarSchedule) return { kind: 'UNSCHEDULED', occurrence: null };
   const schedule = normalizeCalendarSchedule(session.calendarSchedule);
   const runtime = session.calendarRuntime || {};
 
-  // OFF must not execute an occurrence missed while the app was stopped. Probe
-  // the same scheduler with catch-up enabled, then bind the missed instant back
-  // to the actual OFF revision before durably reconciling it as skipped.
+  // OFF must never replay downtime backlog. Probe once with catch-up enabled to
+  // prove at least one missed occurrence exists, then advance the canonical
+  // revision cursor through the instant before `now`. This is O(1) admission
+  // state growth and avoids replaying DAILY/EXPLICIT history occurrence by occurrence.
   if (schedule.catchUp === CalendarCatchUp.OFF) {
     const probeSchedule = { ...schedule, catchUp: CalendarCatchUp.ON };
     const missed = nextCalendarOccurrence({
@@ -67,8 +93,8 @@ export function calendarAdmissionForSession(session, now = Date.now()) {
     if (missed?.scheduledAt < now) {
       const revision = calendarScheduleRevision(schedule);
       const occurrence = { ...missed, id: occurrenceId(session.id, missed.scheduledAt, revision), revision, catchUp: false };
-      commitOccurrenceState(session, schedule, occurrence, CalendarOccurrenceState.MISSED_SKIPPED, now);
-      return { kind: CalendarOccurrenceState.MISSED_SKIPPED, occurrence };
+      reconcileMissedThrough(session, schedule, occurrence, now);
+      return { kind: CalendarOccurrenceState.MISSED_SKIPPED, occurrence, reconciledThrough: now - 1 };
     }
   }
 
