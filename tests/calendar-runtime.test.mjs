@@ -22,18 +22,32 @@ test('one-time occurrence is due exactly at scheduled instant', () => {
   assert.equal(result.kind, CalendarOccurrenceState.DUE);
 });
 
-test('catch-up OFF durably skips missed occurrence and advances to subsequent occurrence after restart', () => {
+test('catch-up OFF durably skips missed backlog and advances to subsequent occurrence after restart', () => {
   const s = session({ kind: 'EXPLICIT', timeZone: 'UTC', catchUp: 'OFF', occurrences: [
-    { date: '2026-09-21', time: '09:00' }, { date: '2026-09-21', time: '14:00' },
+    { date: '2026-09-21', time: '08:00' }, { date: '2026-09-21', time: '09:00' }, { date: '2026-09-21', time: '14:00' },
   ] });
-  const skipped = calendarAdmissionForSession(s, utc('2026-09-21T12:00:00Z'));
+  const now = utc('2026-09-21T12:00:00Z');
+  const skipped = calendarAdmissionForSession(s, now);
   assert.equal(skipped.kind, CalendarOccurrenceState.MISSED_SKIPPED);
   assert.equal(s.calendarRuntime.lastOccurrence.state, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(s.calendarRuntime.reconciledThrough, now - 1);
   const persistedRuntime = structuredClone(s.calendarRuntime);
   const restarted = { id: s.id, calendarSchedule: s.calendarSchedule, calendarRuntime: persistedRuntime };
   const next = calendarAdmissionForSession(restarted, utc('2026-09-21T12:01:00Z'));
   assert.equal(next.kind, CalendarOccurrenceState.WAITING);
   assert.equal(next.occurrence.scheduledAt, utc('2026-09-21T14:00:00Z'));
+});
+
+test('catch-up OFF DAILY with old startDate reconciles historical backlog in one admission', () => {
+  const s = session({ kind: 'DAILY', timeZone: 'UTC', catchUp: 'OFF', startDate: '2020-01-01', times: ['08:00', '12:00', '18:00'] });
+  const now = utc('2026-09-21T15:00:00Z');
+  const skipped = calendarAdmissionForSession(s, now);
+  assert.equal(skipped.kind, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(s.calendarRuntime.reconciledThrough, now - 1);
+  assert.equal(s.calendarRuntime.lastOccurrence.reconciledThrough, now - 1);
+  const next = calendarAdmissionForSession(s, now);
+  assert.equal(next.kind, CalendarOccurrenceState.WAITING);
+  assert.equal(next.occurrence.scheduledAt, utc('2026-09-21T18:00:00Z'));
 });
 
 test('catch-up ON exposes missed occurrence without silently committing it', () => {
