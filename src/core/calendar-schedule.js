@@ -38,8 +38,8 @@ function nextDaily(sessionId, schedule, revision, runtime, now) {
 export function nextCalendarOccurrence({ sessionId, schedule: rawSchedule, runtime = {}, now = Date.now() }) {
   const schedule = normalizeCalendarSchedule(rawSchedule); const revision = calendarScheduleRevision(schedule);
   if (schedule.kind === CalendarScheduleKind.DAILY) return nextDaily(sessionId, schedule, revision, runtime, now);
-  const committed = new Set(Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds : []);
-  const candidates = (schedule.kind === CalendarScheduleKind.ONE_TIME ? [candidate(sessionId, schedule, revision, parseDate(schedule.date), parseTime(schedule.time))] : schedule.occurrences.map(item => candidate(sessionId, schedule, revision, parseDate(item.date), parseTime(item.time)))).filter(item => !committed.has(item.id));
+  const committed = new Set(Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds : []); const cursor = revisionCursor(runtime, revision);
+  const candidates = (schedule.kind === CalendarScheduleKind.ONE_TIME ? [candidate(sessionId, schedule, revision, parseDate(schedule.date), parseTime(schedule.time))] : schedule.occurrences.map(item => candidate(sessionId, schedule, revision, parseDate(item.date), parseTime(item.time)))).filter(item => !committed.has(item.id) && (cursor == null || item.scheduledAt > cursor));
   if (!candidates.length) return null; if (schedule.catchUp === CalendarCatchUp.ON) { const due = candidates.filter(item => item.scheduledAt <= now); if (due.length) return { ...due[0], due: true, catchUp: due[0].scheduledAt < now }; } const future = candidates.find(item => item.scheduledAt >= now); if (!future) return null; return { ...future, due: future.scheduledAt <= now, catchUp: false };
 }
 
