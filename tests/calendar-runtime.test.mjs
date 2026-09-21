@@ -50,6 +50,28 @@ test('catch-up OFF DAILY with old startDate reconciles historical backlog in one
   assert.equal(next.occurrence.scheduledAt, utc('2026-09-21T18:00:00Z'));
 });
 
+test('catch-up OFF DAILY probe stays age-independent across DST zone', () => {
+  const old = session({ kind: 'DAILY', timeZone: 'Europe/Bratislava', catchUp: 'OFF', startDate: '2000-01-01', times: ['08:00', '12:00', '18:00'] });
+  const recent = session({ kind: 'DAILY', timeZone: 'Europe/Bratislava', catchUp: 'OFF', startDate: '2026-10-23', times: ['08:00', '12:00', '18:00'] }, 'recent');
+  const now = utc('2026-10-26T14:00:00Z');
+  const oldResult = calendarAdmissionForSession(old, now);
+  const recentResult = calendarAdmissionForSession(recent, now);
+  assert.equal(oldResult.kind, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(recentResult.kind, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.ok(oldResult.occurrence.scheduledAt >= now - 3 * 24 * 60 * 60 * 1000);
+  assert.ok(recentResult.occurrence.scheduledAt >= now - 3 * 24 * 60 * 60 * 1000);
+  assert.equal(old.calendarRuntime.reconciledThrough, now - 1);
+  assert.equal(recent.calendarRuntime.reconciledThrough, now - 1);
+});
+
+test('catch-up OFF DAILY with future start does not synthesize a missed occurrence', () => {
+  const s = session({ kind: 'DAILY', timeZone: 'UTC', catchUp: 'OFF', startDate: '2026-09-22', times: ['08:00', '18:00'] });
+  const result = calendarAdmissionForSession(s, utc('2026-09-21T15:00:00Z'));
+  assert.equal(result.kind, CalendarOccurrenceState.WAITING);
+  assert.equal(result.occurrence.scheduledAt, utc('2026-09-22T08:00:00Z'));
+  assert.deepEqual(s.calendarRuntime, {});
+});
+
 test('catch-up ON exposes missed occurrence without silently committing it', () => {
   const s = session({ kind: 'EXPLICIT', timeZone: 'UTC', catchUp: 'ON', occurrences: [
     { date: '2026-09-21', time: '09:00' }, { date: '2026-09-21', time: '14:00' },
