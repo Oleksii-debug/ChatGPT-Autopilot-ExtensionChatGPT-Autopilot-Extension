@@ -7,6 +7,8 @@ import {
   occurrenceId,
 } from './calendar-schedule.js';
 
+const DAILY_PROBE_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
+
 export const CalendarOccurrenceState = Object.freeze({
   WAITING: 'WAITING',
   DUE: 'DUE',
@@ -32,7 +34,7 @@ function commitOccurrenceState(session, schedule, occurrence, state, executedAt)
   return session;
 }
 
-function catchUpProbeRuntime(runtime, schedule, probeSchedule) {
+function catchUpProbeRuntime(runtime, schedule, probeSchedule, now) {
   const revision = calendarScheduleRevision(schedule);
   const probeRevision = calendarScheduleRevision(probeSchedule);
   const cursor = Number.isFinite(runtime.reconciledThroughByRevision?.[revision])
@@ -40,11 +42,27 @@ function catchUpProbeRuntime(runtime, schedule, probeSchedule) {
     : runtime.recurrenceRevision === revision && Number.isFinite(runtime.reconciledThrough)
       ? runtime.reconciledThrough
       : null;
-  if (cursor == null) return runtime;
-  return {
-    ...runtime,
-    reconciledThroughByRevision: { ...(runtime.reconciledThroughByRevision || {}), [probeRevision]: cursor },
-  };
+  if (cursor != null) {
+    return {
+      ...runtime,
+      reconciledThroughByRevision: { ...(runtime.reconciledThroughByRevision || {}), [probeRevision]: cursor },
+    };
+  }
+  // DAILY catch-up ON normally starts at startDate and can walk years of local
+  // dates. For an OFF-policy missed/not-missed probe we only need to know
+  // whether a recent occurrence precedes now. A DAILY schedule has at least one
+  // occurrence every local day once started, so a three-day cursor seed safely
+  // spans DST transitions while bounding candidate search independent of age.
+  if (schedule.kind === 'DAILY') {
+    return {
+      ...runtime,
+      reconciledThroughByRevision: {
+        ...(runtime.reconciledThroughByRevision || {}),
+        [probeRevision]: now - DAILY_PROBE_LOOKBACK_MS,
+      },
+    };
+  }
+  return runtime;
 }
 
 function reconcileMissedThrough(session, schedule, occurrence, now) {
@@ -80,14 +98,13 @@ export function calendarAdmissionForSession(session, now = Date.now()) {
 
   // OFF must never replay downtime backlog. Probe once with catch-up enabled to
   // prove at least one missed occurrence exists, then advance the canonical
-  // revision cursor through the instant before `now`. This is O(1) admission
-  // state growth and avoids replaying DAILY/EXPLICIT history occurrence by occurrence.
+  // revision cursor through the instant before `now`.
   if (schedule.catchUp === CalendarCatchUp.OFF) {
     const probeSchedule = { ...schedule, catchUp: CalendarCatchUp.ON };
     const missed = nextCalendarOccurrence({
       sessionId: session.id,
       schedule: probeSchedule,
-      runtime: catchUpProbeRuntime(runtime, schedule, probeSchedule),
+      runtime: catchUpProbeRuntime(runtime, schedule, probeSchedule, now),
       now,
     });
     if (missed?.scheduledAt < now) {
