@@ -3,9 +3,24 @@ import assert from 'node:assert/strict';
 import { acquireBrowserTargetLeaseV1, normalizeBrowserTargetLeaseV1, releaseBrowserTargetLeaseV1 } from '../src/core/browser-target-lease.js';
 
 const NOW = '2026-09-21T02:16:00.000Z';
+const VALID = Object.freeze({
+  schemaVersion: 1,
+  targetId: 'page:1',
+  ownerInvocationId: 'inv:1',
+  leaseId: 'lease:1',
+  acquiredAt: NOW,
+  expiresAt: '2026-09-21T02:16:30.000Z',
+});
 
-test('BrowserTargetLease rejects malformed or unbounded leases', () => {
-  assert.throws(() => normalizeBrowserTargetLeaseV1({ schemaVersion: 1 }), /targetId/);
+test('BrowserTargetLease rejects every required field independently and unknown fields fail closed', () => {
+  for (const field of ['targetId', 'ownerInvocationId', 'leaseId', 'acquiredAt', 'expiresAt']) {
+    const malformed = { ...VALID };
+    delete malformed[field];
+    assert.throws(() => normalizeBrowserTargetLeaseV1(malformed), new RegExp(field));
+  }
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, unexpected: true }), /unknown field: unexpected/);
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, schemaVersion: 2 }), /schemaVersion/);
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, expiresAt: NOW }), /expiresAt must be after acquiredAt/);
   assert.throws(() => acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW, ttlMs: 999 }), /ttlMs/);
 });
 
