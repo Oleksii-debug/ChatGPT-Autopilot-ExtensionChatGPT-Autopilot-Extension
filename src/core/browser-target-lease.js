@@ -35,7 +35,11 @@ export function acquireBrowserTargetLeaseV1({ current = null, targetId, ownerInv
   const nowIso = iso(now, 'now');
   if (!Number.isInteger(ttlMs) || ttlMs < 1_000 || ttlMs > 300_000) throw new Error('ttlMs is invalid');
   const existing = current ? normalizeBrowserTargetLeaseV1(current) : null;
-  if (existing && existing.targetId === String(targetId).trim() && Date.parse(existing.expiresAt) > Date.parse(nowIso)) {
+  const requestedTargetId = requiredId(targetId, 'targetId');
+  if (existing && Date.parse(existing.expiresAt) > Date.parse(nowIso)) {
+    if (existing.targetId !== requestedTargetId) {
+      return Object.freeze({ status: 'CONFLICT', lease: existing });
+    }
     if (existing.ownerInvocationId !== String(ownerInvocationId).trim()) {
       return Object.freeze({ status: 'CONFLICT', lease: existing });
     }
@@ -43,7 +47,7 @@ export function acquireBrowserTargetLeaseV1({ current = null, targetId, ownerInv
   }
   const lease = normalizeBrowserTargetLeaseV1({
     schemaVersion: LEASE_VERSION,
-    targetId,
+    targetId: requestedTargetId,
     ownerInvocationId,
     leaseId,
     acquiredAt: nowIso,
