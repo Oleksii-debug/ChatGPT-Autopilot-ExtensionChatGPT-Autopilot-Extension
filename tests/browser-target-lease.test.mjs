@@ -32,6 +32,15 @@ test('BrowserTargetLease serializes conflicting invocation ownership', () => {
   assert.equal(conflict.lease.ownerInvocationId, 'inv:1');
 });
 
+test('BrowserTargetLease preserves a live target when another target is requested', () => {
+  const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW });
+  const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:2', ownerInvocationId: 'inv:1', leaseId: 'lease:2', now: '2026-09-21T02:16:01Z' });
+  assert.equal(conflict.status, 'CONFLICT');
+  assert.deepEqual(conflict.lease, first.lease);
+  assert.equal(conflict.lease.targetId, 'page:1');
+  assert.equal(conflict.lease.leaseId, 'lease:1');
+});
+
 test('BrowserTargetLease survives restart as data and only expires deterministically', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW, ttlMs: 2_000 });
   const restored = JSON.parse(JSON.stringify(first.lease));
