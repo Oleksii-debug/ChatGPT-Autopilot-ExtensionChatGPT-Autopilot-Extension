@@ -523,3 +523,110 @@ test('0.9.7 importing an existing project selects that orchestra instead of muta
   assert.equal((await manager.getStatus('orch-1')).config.projectId,'project-a');
   assert.equal((await manager.getStatus('orch-2')).config.projectId,'project-b');
 });
+
+
+test('delete purges managed hierarchy session logs and tab hints without orphan-owner validation failure', async()=>{
+  const {manager,core}=harness();
+  await manager.create({name:'Hierarchy cleanup',config:cfg('cleanup')});
+  await manager.configureHierarchy({
+    schemaVersion:1,
+    graphId:'cleanup-graph',
+    controlEpoch:1,
+    promptProfiles:[
+      {id:'director-p',role:'GLOBAL_DIRECTOR',version:1,prompt:'Director prompt'},
+    ],
+    nodes:[
+      {
+        id:'director',
+        parentId:null,
+        childIds:[],
+        promptProfileId:'director-p',
+        chatMode:'PERSISTENT_CHAT',
+        maxActiveChildren:0,
+        barrier:{mode:'NONE'},
+      },
+    ],
+  });
+  await manager.start('orch-1');
+
+  const before=await core.load();
+  const session=Object.values(before.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='cleanup-graph');
+  assert.ok(session);
+  await core.update(state=>{
+    state.logs[session.id]=[{at:1000,level:'info',message:'managed hierarchy log'}];
+    state.tabHintsByTaskId[session.taskOrder[0]]={
+      tabId:77,
+      sessionId:session.id,
+      normalizedUrl:'https://chatgpt.com/',
+      kind:'TASK',
+      ownedByExtension:true,
+      retirePending:false,
+      boundAt:1000,
+    };
+    return state;
+  });
+
+  await manager.emergencyStop('orch-1');
+  await manager.delete('orch-1');
+
+  const after=await core.load();
+  assert.equal(after.sessionsById[session.id],undefined);
+  assert.equal(after.logs[session.id],undefined);
+  assert.equal(
+    Object.values(after.tabHintsByTaskId||{}).some(hint=>hint?.sessionId===session.id),
+    false,
+  );
+});
+
+test('owner-paused project identity rebind purges managed session logs and tab hints', async()=>{
+  const {manager,core}=harness();
+  await manager.create({name:'Hierarchy rebind cleanup',config:cfg('rebind-a')});
+  await manager.configureHierarchy({
+    schemaVersion:1,
+    graphId:'rebind-cleanup-graph',
+    controlEpoch:1,
+    promptProfiles:[
+      {id:'director-p',role:'GLOBAL_DIRECTOR',version:1,prompt:'Director prompt'},
+    ],
+    nodes:[
+      {
+        id:'director',
+        parentId:null,
+        childIds:[],
+        promptProfileId:'director-p',
+        chatMode:'PERSISTENT_CHAT',
+        maxActiveChildren:0,
+        barrier:{mode:'NONE'},
+      },
+    ],
+  });
+  await manager.start('orch-1');
+  await manager.pause('orch-1');
+
+  const before=await core.load();
+  const session=Object.values(before.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='rebind-cleanup-graph');
+  assert.ok(session);
+  await core.update(state=>{
+    state.logs[session.id]=[{at:1000,level:'info',message:'managed hierarchy log'}];
+    state.tabHintsByTaskId[session.taskOrder[0]]={
+      tabId:78,
+      sessionId:session.id,
+      normalizedUrl:'https://chatgpt.com/',
+      kind:'TASK',
+      ownedByExtension:true,
+      retirePending:false,
+      boundAt:1000,
+    };
+    return state;
+  });
+
+  await manager.updateConfig(cfg('rebind-b'),'orch-1');
+
+  const after=await core.load();
+  assert.equal(after.sessionsById[session.id],undefined);
+  assert.equal(after.logs[session.id],undefined);
+  assert.equal(
+    Object.values(after.tabHintsByTaskId||{}).some(hint=>hint?.sessionId===session.id),
+    false,
+  );
+});
