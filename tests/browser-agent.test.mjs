@@ -103,6 +103,38 @@ test('prompt-first config allows empty URL and keeps policy as optional ceilings
   assert.equal(value.allowCrossOriginNavigation, true);
 });
 
+test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00Z') });
+  await manager.create({ id:'job-1', goal:'Complete a mixed-plane task' });
+  await manager.update(store => {
+    store.byId['job-1'].runtime.plan = {
+      schemaVersion:1, planId:'plan-1', jobId:'job-1', objective:'Complete safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      nodes:[
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+      ],
+    };
+    return store;
+  });
+  const prepared = await manager.prepareSpecialistHandoff('job-1', {
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00Z', priority:5,
+  });
+  assert.equal(prepared.reused, false);
+  assert.equal((await manager.listSpecialistHandoffs('job-1')).handoffs.length, 1);
+  await manager.update(store => { store.byId['job-1'].runtime.runState = 'RUNNING'; return store; });
+  const pending = await manager.cycleOne('job-1');
+  assert.equal(pending.kind, 'SPECIALIST_PENDING', 'a durable handoff prevents duplicate external-dispatch requests');
+  const claimed = await manager.claimSpecialistHandoffs('job-1', { availableSlots:1, leaseSeconds:60 });
+  assert.equal(claimed.claimed.length, 1);
+  const completed = await manager.completeSpecialistHandoff('job-1', { agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:1'] });
+  assert.equal(completed.verificationRequired, claimed.claimed[0]);
+  await assert.rejects(() => manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', verificationAuthorityId:'policy:archive', evidence:'self verified' }), /independent/);
+  const verified = await manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:archive', evidence:'Fresh artifact hash and current-state observation match.' });
+  assert.equal(verified.plan.nodes.find(node => node.nodeId === 'archive').state, 'VERIFIED');
+  assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
+});
+
 test('per-Agent AI routing is optional, isolated, and explicit provider overrides require an explicit model', () => {
   const inherited = config();
   assert.equal(inherited.aiRoutingMode, 'inherit');
