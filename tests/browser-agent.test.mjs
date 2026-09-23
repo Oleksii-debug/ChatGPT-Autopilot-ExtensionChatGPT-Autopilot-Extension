@@ -135,6 +135,33 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
 });
 
+test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
+  const chrome = makeChrome();
+  const at = '2026-09-23T12:00:00Z';
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse(at) });
+  for (const jobId of ['job-1', 'job-2']) {
+    await manager.create({ id:jobId, goal:`Complete ${jobId}` });
+    await manager.update(store => {
+      store.byId[jobId].runtime.plan = {
+        schemaVersion:1, planId:`plan-${jobId}`, jobId, objective:'Complete safely', successCriteria:['Verified'], createdAt:at, updatedAt:at, revision:1,
+        nodes:[
+          { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:[`web:${jobId}`], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:at },
+          { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:[`files:${jobId}`], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:at },
+        ],
+      };
+      return store;
+    });
+    await manager.prepareSpecialistHandoff(jobId, { nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:`policy:${jobId}`, deadlineAt:'2026-09-23T13:00:00Z' });
+  }
+  const first = await manager.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at });
+  assert.deepEqual(first.claimed.map(item => item.jobId), ['job-1']);
+  assert.equal((await manager.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30Z') });
+  const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30Z' });
+  assert.equal(afterRestart.claimed.length, 0, 'a restart must retain the product-wide lease fence');
+  assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
+});
+
 test('per-Agent AI routing is optional, isolated, and explicit provider overrides require an explicit model', () => {
   const inherited = config();
   assert.equal(inherited.aiRoutingMode, 'inherit');
