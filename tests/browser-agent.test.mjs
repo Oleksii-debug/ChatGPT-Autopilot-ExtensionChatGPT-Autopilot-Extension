@@ -924,6 +924,35 @@ test('Browser Agent persists a planner-proposed DAG without treating planning as
   assert.equal(live.job.runtime.stepCount, 0);
 });
 
+test('Browser Agent independently verifies a READY Browser plan node and unblocks durable completion', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  let phase = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'page version 0 is visible in the current semantic snapshot.' }] }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+      }
+      if (phase++ === 0) return { text: JSON.stringify({ type: 'plan', plan: {
+        schemaVersion: 1, planId: 'plan-node', jobId: 'job-plan-node', objective: 'Inspect page', successCriteria: ['Page inspected'], createdAt: at, updatedAt: at, revision: 1,
+        nodes: [{ nodeId: 'inspect', title: 'Inspect page', objective: 'Read the page', dependsOn: [], conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER', acceptanceCriteria: ['page version 0 is visible'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+      } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({ type: 'verify_plan_node', nodeId: 'inspect', evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'page version 0' }] } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+    },
+  });
+  await manager.create({ id: 'job-plan-node', goal: 'Inspect page' });
+  await manager.start('job-plan-node', { runInitial: false });
+  assert.equal((await manager.cycleOne('job-plan-node')).kind, 'PLAN_UPDATED');
+  const result = await manager.cycleOne('job-plan-node');
+  const live = await manager.get('job-plan-node');
+  assert.equal(result.kind, 'PLAN_NODE_VERIFIED');
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'VERIFIED');
+  assert.match(live.job.runtime.plan.nodes[0].evidence, /page version 0/);
+});
+
 test('schedule policy validates paired active-window fields and ordered absolute bounds', () => {
   assert.throws(() => config({ activeWindowStart: '08:00' }), /requires both start and end times/);
   assert.throws(() => config({ scheduleStartAt: 20_000, scheduleEndAt: 10_000 }), /schedule end must be after start/);
