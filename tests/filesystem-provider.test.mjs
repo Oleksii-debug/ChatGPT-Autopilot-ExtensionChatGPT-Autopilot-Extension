@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs/promises';
 import {
+  authorizeFilesystemPathAtIoV1,
   authorizeFilesystemPathV1,
   boundReadV1,
   boundSearchResultsV1,
@@ -21,6 +24,21 @@ test('filesystem scope rejects traversal and sibling-prefix escape', () => {
   assert.equal(authorizeFilesystemPathV1(scope, path.join(root, 'docs/a.txt')), path.resolve(root, 'docs/a.txt'));
   assert.throws(() => authorizeFilesystemPathV1(scope, path.join(root, '..', 'secret.txt')), /outside owner scope/);
   assert.throws(() => authorizeFilesystemPathV1(scope, `${root}-other/file.txt`), /outside owner scope/);
+});
+
+test('I/O fence rejects symlink escape for reads and missing write destinations', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const owned = path.join(sandbox, 'owned');
+  const outside = path.join(sandbox, 'outside');
+  await fs.mkdir(owned);
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(outside, 'secret.txt'), 'secret');
+  await fs.symlink(outside, path.join(owned, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+  const ioScope = createFilesystemScopeV1({ scopeId: 'io-owner', roots: [owned], writableRoots: [owned] });
+  await assert.rejects(authorizeFilesystemPathAtIoV1(ioScope, path.join(owned, 'escape', 'secret.txt')), /escapes owner scope/);
+  await assert.rejects(authorizeFilesystemPathAtIoV1(ioScope, path.join(owned, 'escape', 'new.txt'), { write: true }), /escapes owner scope/);
+  assert.equal(await authorizeFilesystemPathAtIoV1(ioScope, path.join(owned, 'new.txt'), { write: true }), path.join(owned, 'new.txt'));
 });
 
 test('write scope cannot exceed readable owner scope', () => {
