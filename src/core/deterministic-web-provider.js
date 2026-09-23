@@ -83,10 +83,14 @@ export function createDeterministicWebProviderV1({ transport, readLease = () => 
       if (acquired.status === 'CONFLICT') return Object.freeze({ status: 'TARGET_CONFLICT', lease: acquired.lease });
       await writeLease(targetId, acquired.lease);
       const normalizedAction = normalizeDeterministicWebActionV1(action);
-      let effectObserved = false;
+      let dispatchStarted = false;
+      let terminal = false;
       try {
+        // Once an effectful dispatch begins, a rejection is not proof that no effect
+        // happened. Treat every failure from dispatch through verification as
+        // ambiguous and keep the target fenced until canonical reconciliation.
+        dispatchStarted = true;
         await transport.execute({ targetId, action: normalizedAction, invocationId });
-        effectObserved = true;
         const raw = await transport.observe({ targetId, invocationId });
         const observation = normalizeObservationV1({
           schemaVersion: 1,
@@ -99,13 +103,26 @@ export function createDeterministicWebProviderV1({ transport, readLease = () => 
           observedAt: now(),
         });
         const verification = verifyPostcondition({ invocationId, observation, expected: postcondition || {}, now: now() });
+        terminal = true;
         return Object.freeze({ status: verification.status, observation, verification });
       } catch (error) {
-        if (effectObserved) return Object.freeze({ status: 'AMBIGUOUS', reconcileRequired: true, error: String(error?.message || error) });
+        if (dispatchStarted) {
+          return Object.freeze({
+            status: 'AMBIGUOUS',
+            reconcileRequired: true,
+            lease: acquired.lease,
+            error: String(error?.message || error),
+          });
+        }
         throw error;
       } finally {
-        const released = releaseBrowserTargetLeaseV1(acquired.lease, { ownerInvocationId: invocationId, leaseId: acquired.lease.leaseId });
-        await writeLease(targetId, released.lease);
+        // Unresolved ambiguity deliberately retains the live lease. A competing
+        // invocation must not mutate the same target until reconciliation reaches
+        // a terminal VERIFIED/SAFE_RETRY/MANUAL_REVIEW outcome.
+        if (terminal || !dispatchStarted) {
+          const released = releaseBrowserTargetLeaseV1(acquired.lease, { ownerInvocationId: invocationId, leaseId: acquired.lease.leaseId });
+          await writeLease(targetId, released.lease);
+        }
       }
     },
   });
