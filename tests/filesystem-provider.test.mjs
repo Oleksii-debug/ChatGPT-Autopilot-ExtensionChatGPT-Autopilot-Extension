@@ -13,8 +13,10 @@ import {
   createFilesystemScopeV1,
   markFilesystemExecutingV1,
   observeFilesystemMutationV1,
+  readFilesystemFileV1,
   recoverFilesystemMutationV1,
   verifyFilesystemMutationV1,
+  withAuthorizedExistingFileV1,
 } from '../companion/native-host/filesystem-provider.mjs';
 
 const root = path.resolve('/owner/project');
@@ -39,6 +41,55 @@ test('I/O fence rejects symlink escape for reads and missing write destinations'
   await assert.rejects(authorizeFilesystemPathAtIoV1(ioScope, path.join(owned, 'escape', 'secret.txt')), /escapes owner scope/);
   await assert.rejects(authorizeFilesystemPathAtIoV1(ioScope, path.join(owned, 'escape', 'new.txt'), { write: true }), /escapes owner scope/);
   assert.equal(await authorizeFilesystemPathAtIoV1(ioScope, path.join(owned, 'new.txt'), { write: true }), path.join(owned, 'new.txt'));
+});
+
+test('real read is handle-bound, bounded, and rejects a target swapped after admission', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-io-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const owned = path.join(sandbox, 'owned');
+  const outside = path.join(sandbox, 'outside');
+  await fs.mkdir(owned);
+  await fs.mkdir(outside);
+  const target = path.join(owned, 'data.txt');
+  const secret = path.join(outside, 'secret.txt');
+  await fs.writeFile(target, 'abcdef');
+  await fs.writeFile(secret, 'outside-secret');
+  const ioScope = createFilesystemScopeV1({ scopeId: 'handle-owner', roots: [owned], writableRoots: [owned] });
+
+  const read = await readFilesystemFileV1(ioScope, target, { maxBytes: 3 });
+  assert.equal(read.bytes.toString(), 'abc');
+  assert.equal(read.truncated, true);
+
+  await assert.rejects(readFilesystemFileV1(ioScope, target, {
+    beforeOpen: async () => {
+      await fs.rm(target);
+      await fs.symlink(secret, target, 'file');
+    },
+  }), /symbolic link|escapes owner scope|identity changed|ELOOP/i);
+});
+
+test('existing-file write boundary checks object identity before invoking effect callback', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-write-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const owned = path.join(sandbox, 'owned');
+  const outside = path.join(sandbox, 'outside');
+  await fs.mkdir(owned);
+  await fs.mkdir(outside);
+  const target = path.join(owned, 'data.txt');
+  const secret = path.join(outside, 'secret.txt');
+  await fs.writeFile(target, 'owned');
+  await fs.writeFile(secret, 'secret');
+  const ioScope = createFilesystemScopeV1({ scopeId: 'write-owner', roots: [owned], writableRoots: [owned] });
+  let effectCalled = false;
+  await assert.rejects(withAuthorizedExistingFileV1(ioScope, target, {
+    write: true,
+    beforeOpen: async () => {
+      await fs.rm(target);
+      await fs.symlink(secret, target, 'file');
+    },
+  }, async () => { effectCalled = true; }), /symbolic link|escapes owner scope|identity changed|ELOOP/i);
+  assert.equal(effectCalled, false);
+  assert.equal(await fs.readFile(secret, 'utf8'), 'secret');
 });
 
 test('write scope cannot exceed readable owner scope', () => {
