@@ -268,7 +268,11 @@ function renderOrchestrationV2Status(data = {}) {
       return `${item.nodeId}: revision ${revision}, slots ${item.lastRequestedSlotCount || 0}/${item.maxSlots || 0}${error}`;
     }).join('; ')
     : 'не налаштовано';
-  $('orchestration-v2-runtime').textContent = `Coordinator ${coordinator.generation || 1}: turns ${coordinator.turnsUsed || 0}/${coordinator.maxTurns || config.maxCoordinatorTurns || 10}. Workers: queued ${counts.QUEUED || 0}, active ${counts.ACTIVE || 0}, busy ${counts.BUSY || 0}, complete ${counts.COMPLETED || 0}, failed ${counts.FAILED || 0}. Concurrency ${runtime.effectiveDesiredWorkers ?? 0}/${runtime.hardMaxWorkers ?? config.absoluteMaxWorkers ?? 0}. Launch window ${launchPolicy.launchesInWindow ?? 0}/${launchLimitText}. Control ${controlCommentText}. Revision ${runtime.lastAppliedControlRevision || 0}. Джерело керування: ${controlSourceText}. Backpressure: ${backpressureText}. Drive scalar: ${driveScalarText}.`;
+  const hierarchy = runtime.hierarchy;
+  const hierarchyText = hierarchy
+    ? `Ієрархія: вузлів ${hierarchy.nodeCount || 0}; Director ${hierarchy.rootCount || 0}; Managers ${hierarchy.managerCount || 0}; Workers ${hierarchy.workerCount || 0}; активних активацій ${hierarchy.activeActivationCount || 0}. Фази: ${Object.entries(hierarchy.lifecycleCounts || {}).map(([key, value]) => `${key} ${value}`).join(', ') || 'немає'}. `
+    : '';
+  $('orchestration-v2-runtime').textContent = `${hierarchyText}Coordinator ${coordinator.generation || 1}: turns ${coordinator.turnsUsed || 0}/${coordinator.maxTurns || config.maxCoordinatorTurns || 10}. Legacy workers: queued ${counts.QUEUED || 0}, active ${counts.ACTIVE || 0}, busy ${counts.BUSY || 0}, complete ${counts.COMPLETED || 0}, failed ${counts.FAILED || 0}. Concurrency ${runtime.effectiveDesiredWorkers ?? 0}/${runtime.hardMaxWorkers ?? config.absoluteMaxWorkers ?? 0}. Launch window ${launchPolicy.launchesInWindow ?? 0}/${launchLimitText}. Control ${controlCommentText}. Revision ${runtime.lastAppliedControlRevision || 0}. Джерело керування: ${controlSourceText}. Backpressure: ${backpressureText}. Drive scalar: ${driveScalarText}.`;
 }
 
 async function loadOrchestrationV2Status() {
