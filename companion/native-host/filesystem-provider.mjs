@@ -1,5 +1,6 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 
 export const FILESYSTEM_PROVIDER_VERSION = 1;
 export const MAX_READ_BYTES = 1024 * 1024;
@@ -39,6 +40,37 @@ export function authorizeFilesystemPathV1(scope, requestedPath, { write = false 
   const roots = write ? scope.writableRoots : scope.roots;
   if (!roots.some(root => isWithin(root, candidate))) fail(write ? 'Filesystem write outside owner scope' : 'Filesystem read outside owner scope');
   return candidate;
+}
+
+async function realpathExistingOrParent(candidate, { allowMissingLeaf }) {
+  let cursor = candidate;
+  const missing = [];
+  while (true) {
+    try {
+      const real = canonical(await fs.realpath(cursor));
+      if (missing.length && !allowMissingLeaf) fail('Filesystem path does not exist');
+      return canonical(path.join(real, ...missing.reverse()));
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      const parent = path.dirname(cursor);
+      if (parent === cursor) throw error;
+      missing.push(path.basename(cursor));
+      cursor = parent;
+    }
+  }
+}
+
+// Mandatory immediately-before-I/O fence. Lexical authorization alone is not an
+// execution authority because symlinks/junctions/reparse points can redirect it.
+export async function authorizeFilesystemPathAtIoV1(scope, requestedPath, { write = false, allowMissingLeaf = write } = {}) {
+  const lexical = authorizeFilesystemPathV1(scope, requestedPath, { write });
+  const roots = write ? scope.writableRoots : scope.roots;
+  const realRoots = await Promise.all(roots.map(async root => canonical(await fs.realpath(root))));
+  const realCandidate = await realpathExistingOrParent(lexical, { allowMissingLeaf });
+  if (!realRoots.some(root => isWithin(root, realCandidate))) {
+    fail(write ? 'Filesystem write escapes owner scope through link/reparse point' : 'Filesystem read escapes owner scope through link/reparse point');
+  }
+  return realCandidate;
 }
 
 export function boundReadV1(buffer, { maxBytes = MAX_READ_BYTES } = {}) {
