@@ -658,6 +658,19 @@ export class OrchestrationV2Controller {
     const backpressureUntil = projectBackpressureUntil(runtime, nowMs);
     if (backpressureUntil > nowMs) candidates.push(backpressureUntil);
     let wakeAt = Math.max(nowMs + 1_000, Math.min(...candidates.filter(value => Number.isFinite(value) && value > 0)));
+
+    // Never postpone an already-scheduled earlier orchestration wake. Core can
+    // reconcile much more frequently than hierarchy completion probes (for
+    // example when many unrelated Sessions are active). Replacing the alarm on
+    // every Core cycle with `now + workerProbeInterval` can otherwise starve a
+    // finished Director/Manager forever: every unrelated wake moves the probe
+    // another interval into the future before it gets a chance to fire.
+    const existingAlarm = await this.chrome.alarms?.get?.(this.alarmName);
+    const existingWakeAt = Number(existingAlarm?.scheduledTime || 0);
+    if (Number.isFinite(existingWakeAt) && existingWakeAt > nowMs && existingWakeAt < wakeAt) {
+      wakeAt = existingWakeAt;
+    }
+
     await this.chrome.alarms?.create?.(this.alarmName, { when: wakeAt });
     return wakeAt;
   }
