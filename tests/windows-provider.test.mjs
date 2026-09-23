@@ -2,61 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWindowsProvider, normalizeWindowsProviderConfig } from '../companion/native-host/windows-provider.mjs';
 
-const config = {
-  schemaVersion: 1,
-  executables: [
-    { executableId: 'git', path: 'C:\\Program Files\\Git\\cmd\\git.exe', readOnly: false },
-  ],
-};
-
-test('Windows provider accepts only pinned owner-configured executable identities', async () => {
-  const calls = [];
-  const provider = createWindowsProvider({
-    config,
-    platform: 'win32',
-    execFile: async (...args) => { calls.push(args); return { stdout: 'ok', stderr: '', exitCode: 0 }; },
-  });
-  const result = await provider.execPinned({ executableId: 'git', args: ['status'], timeoutMs: 5000 });
-  assert.equal(result.stdout, 'ok');
-  assert.deepEqual(calls[0], ['C:\\Program Files\\Git\\cmd\\git.exe', ['status'], { windowsHide: true, timeout: 5000, maxBuffer: 256 * 1024 }]);
-  await assert.rejects(() => provider.execPinned({ executableId: 'powershell', args: [] }), /not owner-configured/);
-});
-
-test('Windows provider rejects model-controlled executable paths and unknown fields', async () => {
-  const provider = createWindowsProvider({ config, platform: 'win32', execFile: async () => ({}) });
-  await assert.rejects(() => provider.execPinned({ executableId: 'git', path: 'C:\\evil.exe', args: [] }), /unknown field: path/);
-  await assert.rejects(() => provider.execPinned({ executableId: 'git', args: new Array(65).fill('x') }), /at most 64/);
-});
-
-test('Windows provider fails closed off Windows', async () => {
-  const provider = createWindowsProvider({ config, platform: 'linux', execFile: async () => ({}) });
-  await assert.rejects(() => provider.execPinned({ executableId: 'git' }), /only on Windows/);
-});
-
-test('UIA query is semantic, bounded, and does not expose arbitrary adapter fields', async () => {
-  const provider = createWindowsProvider({
-    config,
-    platform: 'win32',
-    execFile: async () => ({}),
-    uiaAdapter: {
-      query: async request => {
-        assert.deepEqual(request, { windowId: 'window-1', role: 'button', name: 'Save', limit: 2 });
-        return [{ elementId: 'el-1', role: 'button', name: 'Save', enabled: true, offscreen: false }];
-      },
-    },
-  });
-  const rows = await provider.queryUia({ windowId: 'window-1', role: 'button', name: 'Save', limit: 2 });
-  assert.deepEqual(rows, [{ elementId: 'el-1', role: 'button', name: 'Save', enabled: true, offscreen: false }]);
-  await assert.rejects(() => provider.queryUia({ windowId: 'window-1', limit: 257 }), /limit must be/);
-});
-
-test('UIA result schema fails closed and config is strict', async () => {
-  assert.throws(() => normalizeWindowsProviderConfig({ ...config, extra: true }), /unknown field/);
-  const provider = createWindowsProvider({
-    config,
-    platform: 'win32',
-    execFile: async () => ({}),
-    uiaAdapter: { query: async () => [{ elementId: 'el-1', role: 'button', name: 'Save', secret: 'no' }] },
-  });
-  await assert.rejects(() => provider.queryUia({ windowId: 'window-1' }), /unknown field: secret/);
-});
+const config = { schemaVersion: 1, executables: [{ executableId: 'git', path: 'C:\\Program Files\\Git\\cmd\\git.exe', readOnly: false }] };
+test('Windows provider accepts only pinned owner-configured executable identities', async () => { const calls=[]; const provider=createWindowsProvider({config,platform:'win32',execFile:async(...args)=>{calls.push(args);return {stdout:'ok',stderr:'',exitCode:0};}}); const result=await provider.execPinned({executableId:'git',args:['status'],timeoutMs:5000}); assert.equal(result.stdout,'ok'); assert.deepEqual(calls[0],['C:\\Program Files\\Git\\cmd\\git.exe',['status'],{windowsHide:true,timeout:5000,maxBuffer:256*1024}]); await assert.rejects(()=>provider.execPinned({executableId:'powershell',args:[]}),/not owner-configured/); });
+test('Windows provider rejects model-controlled executable paths and unknown fields', async () => { const provider=createWindowsProvider({config,platform:'win32',execFile:async()=>({})}); await assert.rejects(()=>provider.execPinned({executableId:'git',path:'C:\\evil.exe',args:[]}),/unknown field: path/); await assert.rejects(()=>provider.execPinned({executableId:'git',args:new Array(65).fill('x')}),/at most 64/); });
+test('Windows provider fails closed off Windows', async () => { const provider=createWindowsProvider({config,platform:'linux',execFile:async()=>({})}); await assert.rejects(()=>provider.execPinned({executableId:'git'}),/only on Windows/); });
+test('UIA query is semantic, bounded, and does not expose arbitrary adapter fields', async () => { const provider=createWindowsProvider({config,platform:'win32',execFile:async()=>({}),uiaAdapter:{query:async request=>{assert.deepEqual(request,{windowId:'window-1',role:'button',name:'Save',limit:2});return [{elementId:'el-1',role:'button',name:'Save',enabled:true,offscreen:false}];}}}); const rows=await provider.queryUia({windowId:'window-1',role:'button',name:'Save',limit:2}); assert.deepEqual(rows,[{elementId:'el-1',role:'button',name:'Save',enabled:true,offscreen:false}]); await assert.rejects(()=>provider.queryUia({windowId:'window-1',limit:257}),/limit must be/); });
+test('UIA result schema fails closed and config is strict', async () => { assert.throws(()=>normalizeWindowsProviderConfig({...config,extra:true}),/unknown field/); const provider=createWindowsProvider({config,platform:'win32',execFile:async()=>({}),uiaAdapter:{query:async()=>[{elementId:'el-1',role:'button',name:'Save',secret:'no'}]}}); await assert.rejects(()=>provider.queryUia({windowId:'window-1'}),/unknown field: secret/); });
