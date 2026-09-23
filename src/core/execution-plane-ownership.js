@@ -70,6 +70,12 @@ function assertLeaseDuration(at, leaseUntil) {
   if (end <= start || end - start > MAX_LEASE_MS) throw new Error('execution ownership lease duration is invalid');
 }
 
+function assertLeaseLive(current, at) {
+  if (Date.parse(ts(at,'at')) > Date.parse(current.leaseUntil)) {
+    throw new Error('execution ownership lease has expired and requires reconciliation');
+  }
+}
+
 export function claimExecutionOwnershipV1(raw, { plane: requestedPlane, ownerId, leaseId, leaseUntil, at = new Date().toISOString() } = {}) {
   const current = normalizeExecutionOwnershipV1(raw);
   if (current.state !== ExecutionOwnershipState.AVAILABLE) throw new Error('execution effect is not available to claim');
@@ -80,12 +86,14 @@ export function claimExecutionOwnershipV1(raw, { plane: requestedPlane, ownerId,
 export function requestExecutionHandoffV1(raw, { leaseId, toPlane, handoffId, at = new Date().toISOString() } = {}) {
   const current = normalizeExecutionOwnershipV1(raw);
   if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) throw new Error('only the current execution owner may request handoff');
+  assertLeaseLive(current, at);
   return next(current, { state: ExecutionOwnershipState.HANDOFF_PENDING, handoffToPlane: plane(toPlane), handoffId: id(handoffId,'handoffId') }, at);
 }
 
 export function acceptExecutionHandoffV1(raw, { handoffId, ownerId, leaseId, leaseUntil, at = new Date().toISOString() } = {}) {
   const current = normalizeExecutionOwnershipV1(raw);
   if (current.state !== ExecutionOwnershipState.HANDOFF_PENDING || current.handoffId !== id(handoffId,'handoffId')) throw new Error('execution handoff identity mismatch');
+  assertLeaseLive(current, at);
   assertLeaseDuration(at, leaseUntil);
   return next(current, { state: ExecutionOwnershipState.OWNED, ownerPlane: current.handoffToPlane, ownerId: id(ownerId,'ownerId'), leaseId: id(leaseId,'leaseId'), leaseUntil: ts(leaseUntil,'leaseUntil'), handoffToPlane: '', handoffId: '' }, at);
 }
@@ -114,5 +122,6 @@ export function resolveExecutionReconciliationV1(raw, { leaseId, outcome, eviden
 export function verifyOwnedExecutionV1(raw, { leaseId, at = new Date().toISOString() } = {}) {
   const current = normalizeExecutionOwnershipV1(raw);
   if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) throw new Error('only the current execution owner may verify completion');
+  assertLeaseLive(current, at);
   return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '' }, at);
 }

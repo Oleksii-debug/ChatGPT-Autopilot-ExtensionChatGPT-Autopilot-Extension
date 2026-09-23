@@ -94,3 +94,12 @@ test('lease duration is bounded and target plane must differ on handoff', () => 
   assert.throws(() => claimExecutionOwnershipV1(base(), { plane:'LOCAL', ownerId:'x', leaseId:'l', leaseUntil:'2026-09-25T13:10:00Z', at:T1 }), /duration/);
   assert.throws(() => requestExecutionHandoffV1(localOwned(), { leaseId:'lease-local', toPlane:'LOCAL', handoffId:'h', at:T1 }), /distinct target/);
 });
+
+test('expired lease fences handoff and completion until reconciliation resolves the ownership', () => {
+  const owned = localOwned();
+  assert.throws(() => requestExecutionHandoffV1(owned, { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-expired', at:T3 }), /expired.*reconciliation/);
+  assert.throws(() => verifyOwnedExecutionV1(owned, { leaseId:'lease-local', at:T3 }), /expired.*reconciliation/);
+
+  const pending = requestExecutionHandoffV1(owned, { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-before-expiry', at:'2026-09-23T13:11:00Z' });
+  assert.throws(() => acceptExecutionHandoffV1(pending, { handoffId:'handoff-before-expiry', ownerId:'remote', leaseId:'lease-remote', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /expired.*reconciliation/);
+});
