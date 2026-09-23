@@ -976,6 +976,24 @@ test('Browser Agent atomically claims the referenced READY plan node before a ph
   assert.equal(chrome._actionCalls[0].planNodeId, 'act');
 });
 
+test('Browser Agent exposes ready non-Browser work as a bounded specialist handoff instead of pretending to execute it', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'plan', plan: {
+      schemaVersion: 1, planId: 'plan-specialist', jobId: 'job-specialist', objective: 'Inspect remote source', successCriteria: ['Source inspected'], createdAt: at, updatedAt: at, revision: 1,
+      nodes: [{ nodeId: 'remote-inspect', title: 'Inspect source', objective: 'Read remote source', dependsOn: [], conflictKeys: ['repo:main'], ownerId: 'specialist', executionPlane: 'REMOTE', acceptanceCriteria: ['Evidence returned'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+    } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-specialist', goal: 'Inspect remote source' });
+  await manager.start('job-specialist', { runInitial: false });
+  assert.equal((await manager.cycleOne('job-specialist')).kind, 'PLAN_UPDATED');
+  const result = await manager.cycleOne('job-specialist');
+  assert.equal(result.kind, 'SPECIALIST_REQUIRED');
+  assert.equal(result.node.executionPlane, 'REMOTE');
+});
+
 test('schedule policy validates paired active-window fields and ordered absolute bounds', () => {
   assert.throws(() => config({ activeWindowStart: '08:00' }), /requires both start and end times/);
   assert.throws(() => config({ scheduleStartAt: 20_000, scheduleEndAt: 10_000 }), /schedule end must be after start/);

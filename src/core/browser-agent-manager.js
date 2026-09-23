@@ -1887,6 +1887,20 @@ export class BrowserAgentManager {
     if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) return { kind: 'IDLE' };
     const schedule = browserAgentScheduleDecision(current.job.config, now);
     if (!schedule.allowed) return this.applyScheduleGate(id);
+    const externalNode = current.job.runtime.plan?.nodes?.find(node => node.state === AgentPlanNodeState.READY && node.executionPlane !== 'BROWSER');
+    if (externalNode) {
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+        const previous = job.runtime.history?.at(-1);
+        if (previous?.type !== 'specialist-required' || previous?.nodeId !== externalNode.nodeId) {
+          appendHistory(job.runtime, { at: now, type: 'specialist-required', nodeId: externalNode.nodeId, message: `External ${externalNode.executionPlane} plan node is ready for bounded specialist handoff.` });
+        }
+        job.runtime.updatedAt = now;
+        return store;
+      });
+      return { kind: 'SPECIALIST_REQUIRED', node: clone(externalNode) };
+    }
     const epoch = current.job.runtime.controlEpoch;
     if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
     const tab = await this.ensureTab(current.job);
