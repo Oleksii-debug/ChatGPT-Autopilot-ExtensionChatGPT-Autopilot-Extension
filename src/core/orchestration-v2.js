@@ -1509,10 +1509,39 @@ export function orchestrationSnapshot(runtime, configRaw) {
   coordinator.lastAssistantReportAvailable = Boolean(text(coordinator.lastAssistantReport));
   delete coordinator.lastAssistantReport;
   const hierarchy = runtime?.hierarchy?.graph && runtime?.hierarchy?.state
-    ? {
+    ? (() => {
+      const nodeIds = Array.isArray(runtime.hierarchy.graph.nodeOrder) ? runtime.hierarchy.graph.nodeOrder : [];
+      const rootCount = nodeIds.filter(nodeId => !runtime.hierarchy.graph.nodesById?.[nodeId]?.parentId).length;
+      const managerCount = nodeIds.filter(nodeId => {
+        const node = runtime.hierarchy.graph.nodesById?.[nodeId];
+        return Boolean(node?.parentId) && Array.isArray(node?.childIds) && node.childIds.length > 0;
+      }).length;
+      const workerCount = nodeIds.filter(nodeId => {
+        const node = runtime.hierarchy.graph.nodesById?.[nodeId];
+        return Boolean(node?.parentId) && (!Array.isArray(node?.childIds) || node.childIds.length === 0);
+      }).length;
+      const lifecycleCounts = {};
+      let activeActivationCount = 0;
+      for (const nodeId of nodeIds) {
+        const nodeState = runtime.hierarchy.state.nodesById?.[nodeId] || {};
+        const lifecycle = String(nodeState.lifecycle || 'IDLE');
+        lifecycleCounts[lifecycle] = Number(lifecycleCounts[lifecycle] || 0) + 1;
+        const current = nodeState.currentActivationId
+          ? nodeState.activationLedger?.[nodeState.currentActivationId]
+          : null;
+        if (current && current.phase && current.phase !== 'TERMINAL' && current.phase !== 'SUPERSEDED') {
+          activeActivationCount += 1;
+        }
+      }
+      return {
       graphId: String(runtime.hierarchy.graph.graphId || ''),
-      nodeCount: Array.isArray(runtime.hierarchy.graph.nodeOrder) ? runtime.hierarchy.graph.nodeOrder.length : 0,
-      providers: (runtime.hierarchy.graph.nodeOrder || [])
+      nodeCount: nodeIds.length,
+      rootCount,
+      managerCount,
+      workerCount,
+      activeActivationCount,
+      lifecycleCounts,
+      providers: nodeIds
         .map(nodeId => {
           const node = runtime.hierarchy.graph.nodesById?.[nodeId];
           if (!node?.providerBinding) return null;
@@ -1531,7 +1560,8 @@ export function orchestrationSnapshot(runtime, configRaw) {
           };
         })
         .filter(Boolean),
-    }
+      };
+    })()
     : null;
   return {
     projectId: runtime.projectId,
