@@ -41,6 +41,13 @@ import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orches
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
+import {
+  prepareAgentPlanSpecialistHandoffV1,
+  claimAgentPlanSpecialistHandoffsV1,
+  completeAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffV1,
+  specialistAssignmentIdForPlanNodeV1,
+} from './agent-specialist-bridge.js';
 
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
@@ -108,6 +115,12 @@ function normalizeRuntime(raw, now) {
   if (!raw || typeof raw !== 'object') return base;
   const allowed = new Set(Object.values(BrowserAgentRunState));
   const runState = allowed.has(raw.runState) ? raw.runState : BrowserAgentRunState.STOPPED;
+  const plan = raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null;
+  // Handoffs live in the already-durable Browser Agent job record.  A corrupt
+  // record is ignored here and later actions fail closed against the plan.
+  const specialistHandoffs = plan && Array.isArray(raw.specialistHandoffs)
+    ? raw.specialistHandoffs.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
+    : [];
   return {
     ...base,
     ...clone(raw),
@@ -196,7 +209,8 @@ function normalizeRuntime(raw, now) {
     } : null,
     ownerInstructions: (Array.isArray(raw.ownerInstructions) ? raw.ownerInstructions : []).map(value => clean(value, 5000)).filter(Boolean).slice(-MAX_OWNER_INSTRUCTIONS),
     history: (Array.isArray(raw.history) ? raw.history : []).slice(-MAX_HISTORY),
-    plan: raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null,
+    plan,
+    specialistHandoffs,
     verifiedOutcome: raw.verifiedOutcome && typeof raw.verifiedOutcome === 'object' ? {
       snapshotSignature: clean(raw.verifiedOutcome.snapshotSignature, 80),
       verifiedAt: Math.max(0, Number(raw.verifiedOutcome.verifiedAt || 0)),
@@ -339,6 +353,91 @@ export class BrowserAgentManager {
     const store = await this.load();
     const target = id || store.selectedId;
     return { selectedId: target || '', job: target && store.byId[target] ? clone(store.byId[target]) : null };
+  }
+
+  async listSpecialistHandoffs(id = '') {
+    const current = await this.get(id);
+    if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
+    return {
+      selectedId: current.selectedId,
+      jobId: current.job.id,
+      planId: current.job.runtime.plan?.planId || '',
+      handoffs: clone(current.job.runtime.specialistHandoffs || []),
+    };
+  }
+
+  async prepareSpecialistHandoff(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to hand off');
+      const assignment = prepareAgentPlanSpecialistHandoffV1(job.runtime.plan, { ...payload, at: payload.at || now });
+      const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+      const existing = handoffs.find(item => item?.agentId === assignment.agentId);
+      if (existing) {
+        result = { assignment: clone(existing), reused: true };
+        return store;
+      }
+      job.runtime.specialistHandoffs = [...handoffs, assignment];
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-prepared', nodeId: payload.nodeId, agentId: assignment.agentId, message: `Bounded ${assignment.specialistId} handoff prepared; execution is not yet claimed.` });
+      result = { assignment: clone(assignment), reused: false };
+      return store;
+    });
+    return result;
+  }
+
+  async claimSpecialistHandoffs(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, at: payload.at || now });
+      job.runtime.plan = claimed.plan;
+      job.runtime.specialistHandoffs = claimed.assignments;
+      job.runtime.updatedAt = this.now();
+      for (const agentId of claimed.claimed) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease claimed; no provider effect was dispatched by this bridge.' });
+      for (const agentId of claimed.reconciliationRequired) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+      result = clone(claimed);
+      return store;
+    });
+    return result;
+  }
+
+  async completeSpecialistHandoff(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to complete');
+      const completed = completeAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, at: payload.at || now });
+      job.runtime.plan = completed.plan;
+      job.runtime.specialistHandoffs = completed.assignments;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-completed', agentId: completed.verificationRequired, message: 'Specialist result recorded; independent verification is required before plan completion.' });
+      result = clone(completed);
+      return store;
+    });
+    return result;
+  }
+
+  async verifySpecialistHandoff(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
+      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, at: payload.at || now });
+      job.runtime.plan = verified.plan;
+      job.runtime.specialistHandoffs = verified.assignments;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      result = clone(verified);
+      return store;
+    });
+    return result;
   }
 
   async create(raw = {}) {
@@ -1889,6 +1988,7 @@ export class BrowserAgentManager {
     if (!schedule.allowed) return this.applyScheduleGate(id);
     const externalNode = current.job.runtime.plan?.nodes?.find(node => node.state === AgentPlanNodeState.READY && node.executionPlane !== 'BROWSER');
     if (externalNode) {
+      const existingHandoff = (current.job.runtime.specialistHandoffs || []).find(item => item?.agentId === specialistAssignmentIdForPlanNodeV1(current.job.runtime.plan.planId, externalNode.nodeId));
       await this.update(store => {
         const job = store.byId[id];
         if (!job || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -1899,7 +1999,7 @@ export class BrowserAgentManager {
         job.runtime.updatedAt = now;
         return store;
       });
-      return { kind: 'SPECIALIST_REQUIRED', node: clone(externalNode) };
+      return { kind: existingHandoff ? 'SPECIALIST_PENDING' : 'SPECIALIST_REQUIRED', node: clone(externalNode), ...(existingHandoff ? { handoff: clone(existingHandoff) } : {}) };
     }
     const epoch = current.job.runtime.controlEpoch;
     if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
