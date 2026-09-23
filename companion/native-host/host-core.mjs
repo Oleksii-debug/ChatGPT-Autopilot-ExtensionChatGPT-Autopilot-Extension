@@ -15,6 +15,8 @@ export const RequestType = Object.freeze({
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
   CREDENTIALS_LIST: 'credentials.list',
   CREDENTIALS_RESOLVE: 'credentials.resolve',
+  MCP_REQUEST: 'mcp.request',
+  MCP_CLOSE: 'mcp.close',
 });
 
 const REQUEST_TYPES = new Set(Object.values(RequestType));
@@ -152,7 +154,7 @@ async function readScopedText(payload, config, fsApi) {
   };
 }
 
-export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now(), credentialBroker = null } = {}) {
+export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now(), credentialBroker = null, mcpBridge = null } = {}) {
   let request;
   try {
     const normalizedConfig = normalizeNativeCompanionConfig(config);
@@ -176,9 +178,11 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
           { capabilityId: 'credentials.list', readOnly: true, scoped: true },
           { capabilityId: 'credentials.resolve', readOnly: false, scoped: true, sensitive: true },
+          { capabilityId: 'mcp.localStdio', readOnly: false, scoped: true },
         ],
         roots: normalizedConfig.roots.map(item => ({ rootId: item.rootId })),
         credentialBrokerAvailable: Boolean(credentialBroker),
+        mcpBridgeAvailable: Boolean(mcpBridge),
       });
     }
     if (request.type === RequestType.FILESYSTEM_READ_TEXT) {
@@ -194,6 +198,14 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
         credentialId: request.payload.credentialId,
         targetOrigin: request.payload.targetOrigin,
       }));
+    }
+    if (request.type === RequestType.MCP_REQUEST) {
+      if (!mcpBridge) throw companionError('MCP_BRIDGE_UNAVAILABLE', 'MCP local-stdio bridge is unavailable');
+      return response(request, await mcpBridge.request(request.payload));
+    }
+    if (request.type === RequestType.MCP_CLOSE) {
+      if (!mcpBridge) throw companionError('MCP_BRIDGE_UNAVAILABLE', 'MCP local-stdio bridge is unavailable');
+      return response(request, await mcpBridge.close(request.payload));
     }
     throw companionError('UNSUPPORTED_REQUEST', 'Unsupported Native Companion request');
   } catch (error) {
