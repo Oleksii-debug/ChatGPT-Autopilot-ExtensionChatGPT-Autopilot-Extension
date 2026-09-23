@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createCredentialBroker } from './credential-broker.mjs';
+import { McpStdioBridge } from './mcp-stdio-bridge.mjs';
 import {
   NativeMessageDecoder,
   encodeNativeMessage,
@@ -15,10 +16,11 @@ const configPath = process.env.AUTOPILOT_NATIVE_CONFIG || path.join(baseDir, 'co
 const callerOrigin = String(process.argv[2] || '').trim();
 const credentialStorePath = path.join(baseDir, 'config', 'credentials.json');
 const credentialsDir = path.join(baseDir, 'config', 'credentials');
+const mcpRegistryPath = path.join(baseDir, 'config', 'mcp-commands.json');
 
 function readJsonOrDefault(filePath, fallback) {
   if (!fs.existsSync(filePath)) return fallback;
-  return JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\\uFEFF/u, ''));
+  return JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/u, '').replace(/^\\uFEFF/u, ''));
 }
 
 async function decryptDpapiSecret(secretPath) {
@@ -65,13 +67,17 @@ async function decryptDpapiSecret(secretPath) {
 
 let config;
 let credentialBroker;
+let mcpBridge;
 try {
-  const configText = fs.readFileSync(configPath, 'utf8').replace(/^\\uFEFF/u, '');
+  const configText = fs.readFileSync(configPath, 'utf8').replace(/^\uFEFF/u, '').replace(/^\\uFEFF/u, '');
   config = normalizeNativeCompanionConfig(JSON.parse(configText));
   credentialBroker = createCredentialBroker({
     store: readJsonOrDefault(credentialStorePath, { schemaVersion: 1, credentials: [] }),
     credentialsDir,
     decryptSecret: decryptDpapiSecret,
+  });
+  mcpBridge = new McpStdioBridge({
+    registry: readJsonOrDefault(mcpRegistryPath, { schemaVersion: 1, commands: [] }),
   });
 } catch (error) {
   process.stderr.write(`Native Companion configuration failed: ${error.message}\n`);
@@ -97,7 +103,12 @@ process.stdin.on('data', chunk => {
   }
   for (const message of messages) {
     chain = chain.then(async () => {
-      const response = await handleNativeCompanionRequest(message, { config, callerOrigin, credentialBroker });
+      const response = await handleNativeCompanionRequest(message, {
+        config,
+        callerOrigin,
+        credentialBroker,
+        mcpBridge,
+      });
       writeResponse(response);
     }).catch(error => {
       process.stderr.write(`Native Companion request failed unexpectedly: ${error.message}\n`);
