@@ -11,6 +11,7 @@ const MAX_CANDIDATES = 128;
 const MAX_RESULTS = 32;
 const MAX_QUERY = 512;
 const MAX_ALLOWED_IDS = 128;
+const MAX_CURRENT_SOURCES = 512;
 const AUTHORITY_RANK = Object.freeze({
   [SourceAuthorityKind.ADVISORY]: 1,
   [SourceAuthorityKind.DERIVED]: 2,
@@ -24,8 +25,7 @@ function frozen(value) {
 }
 
 function boundedIds(value, label) {
-  if (value == null) return null;
-  if (!Array.isArray(value) || value.length > MAX_ALLOWED_IDS) throw new Error(`${label} must be a bounded array`);
+  if (!Array.isArray(value) || value.length > MAX_ALLOWED_IDS) throw new Error(`${label} must be an explicit bounded array`);
   const out = value.map(item => String(item ?? '').trim()).filter(Boolean);
   if (out.length !== value.length || new Set(out).size !== out.length) throw new Error(`${label} must contain unique non-empty ids`);
   return new Set(out);
@@ -40,10 +40,12 @@ function queryTokens(query) {
   return tokens;
 }
 
-function searchableText(snapshot, capsule, sources) {
-  const sourceText = sources.map(source => [
+// Only provenance-bound, already-authorized identity fields are searchable here.
+// Arbitrary source metadata is deliberately excluded: source authorization is not
+// authorization to expose/index every metadata field attached by a provider.
+function searchableText(snapshot, capsule, admittedSources) {
+  const sourceText = admittedSources.map(source => [
     source.sourceId, source.kind, source.uri, source.revisionId, source.authority,
-    JSON.stringify(source.metadata || {}),
   ].join(' ')).join(' ');
   return `${snapshot.title} ${snapshot.projectId} ${snapshot.revisionId} ${capsule.summary} ${capsule.capsuleId} ${sourceText}`.toLocaleLowerCase('en-US');
 }
@@ -65,15 +67,21 @@ function sourceIdentityMatches(snapshotSource, currentSource) {
     && (!snapshotSource.contentSha256 || snapshotSource.contentSha256 === currentSource.contentSha256);
 }
 
+function currentSourceKey(source) {
+  return `${source.projectId}\u001f${source.sourceId}`;
+}
+
 export function searchProjectContextV1({
   query,
   candidates = [],
-  allowedSourceIds = null,
+  currentSourceRefs,
+  allowedSourceIds,
   allowedAuthorities = [SourceAuthorityKind.CANONICAL, SourceAuthorityKind.DERIVED, SourceAuthorityKind.ADVISORY],
   limit = 8,
 } = {}) {
   const tokens = queryTokens(query);
   if (!Array.isArray(candidates) || candidates.length > MAX_CANDIDATES) throw new Error('candidates must be a bounded array');
+  if (!Array.isArray(currentSourceRefs) || currentSourceRefs.length > MAX_CURRENT_SOURCES) throw new Error('currentSourceRefs must be an explicit bounded trusted-current-state array');
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_RESULTS) throw new Error('limit is invalid');
   const allowedIds = boundedIds(allowedSourceIds, 'allowedSourceIds');
   if (!Array.isArray(allowedAuthorities) || allowedAuthorities.length > 3) throw new Error('allowedAuthorities must be bounded');
@@ -82,39 +90,43 @@ export function searchProjectContextV1({
     if (!(authority in AUTHORITY_RANK)) throw new Error(`Unsupported authority: ${authority}`);
   }
 
+  const normalizedCurrent = currentSourceRefs.map(normalizeProjectSourceRefV1);
+  const currentByProjectAndId = new Map(normalizedCurrent.map(source => [currentSourceKey(source), source]));
+  if (currentByProjectAndId.size !== normalizedCurrent.length) throw new Error('currentSourceRefs has duplicate project/source ids');
+
   const results = [];
   for (let index = 0; index < candidates.length; index += 1) {
     const raw = candidates[index];
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`candidates[${index}] must be an object`);
+    if (Object.hasOwn(raw, 'currentSourceRefs')) throw new Error(`candidates[${index}] must not inject currentSourceRefs`);
     const snapshot = normalizeProjectSnapshotV1(raw.snapshot);
     const capsule = normalizeContextCapsuleV1(raw.capsule);
-    const currentSourceRefs = Array.isArray(raw.currentSourceRefs)
-      ? raw.currentSourceRefs.map(normalizeProjectSourceRefV1)
-      : [];
     if (capsule.projectId !== snapshot.projectId || capsule.projectRevisionId !== snapshot.revisionId) continue;
+    // A source-scoped retrieval result must actually be provenance-bound to a source.
+    if (!capsule.sourceBindings.length) continue;
 
-    const currentById = new Map(currentSourceRefs.map(source => [source.sourceId, source]));
-    if (currentById.size !== currentSourceRefs.length) throw new Error(`candidates[${index}] has duplicate current source ids`);
     const snapshotById = new Map(snapshot.sourceRefs.map(source => [source.sourceId, source]));
+    const admittedSources = [];
     let permitted = true;
     let authorityFloor = 3;
     for (const binding of capsule.sourceBindings) {
-      const source = currentById.get(binding.sourceId);
+      const source = currentByProjectAndId.get(`${snapshot.projectId}\u001f${binding.sourceId}`);
       const snapshotSource = snapshotById.get(binding.sourceId);
       if (!source || !snapshotSource || source.projectId !== snapshot.projectId) { permitted = false; break; }
-      if (allowedIds && !allowedIds.has(source.sourceId)) { permitted = false; break; }
+      if (!allowedIds.has(source.sourceId)) { permitted = false; break; }
       if (!authoritySet.has(source.authority)) { permitted = false; break; }
       if (!sourceIdentityMatches(snapshotSource, source)) { permitted = false; break; }
       if (binding.revisionId !== source.revisionId || (binding.contentSha256 && binding.contentSha256 !== source.contentSha256)) {
         permitted = false; break;
       }
+      admittedSources.push(source);
       authorityFloor = Math.min(authorityFloor, AUTHORITY_RANK[source.authority]);
     }
     if (!permitted) continue;
 
-    const currentState = deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRefs });
+    const currentState = deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRefs: admittedSources });
     if (currentState.status !== 'FRESH') continue;
-    const score = candidateScore(searchableText(snapshot, capsule, currentSourceRefs), tokens);
+    const score = candidateScore(searchableText(snapshot, capsule, admittedSources), tokens);
     if (!score) continue;
     results.push(frozen({
       schemaVersion: ProjectContextSearchVersion,
