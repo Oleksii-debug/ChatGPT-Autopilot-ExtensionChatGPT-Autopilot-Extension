@@ -40,14 +40,16 @@ function queryTokens(query) {
   return tokens;
 }
 
-// Only provenance-bound, already-authorized identity fields are searchable here.
-// Arbitrary source metadata is deliberately excluded: source authorization is not
-// authorization to expose/index every metadata field attached by a provider.
+// Search is deliberately limited to provenance/identity fields whose visibility is
+// established by the explicit source permission envelope. Capsule summary and
+// arbitrary source metadata are content, not authority-bearing identity; exposing
+// or indexing them requires a separate content-visibility authority and therefore
+// stays outside this conservative retrieval boundary.
 function searchableText(snapshot, capsule, admittedSources) {
   const sourceText = admittedSources.map(source => [
     source.sourceId, source.kind, source.uri, source.revisionId, source.authority,
   ].join(' ')).join(' ');
-  return `${snapshot.title} ${snapshot.projectId} ${snapshot.revisionId} ${capsule.summary} ${capsule.capsuleId} ${sourceText}`.toLocaleLowerCase('en-US');
+  return `${snapshot.title} ${snapshot.projectId} ${snapshot.revisionId} ${capsule.capsuleId} ${sourceText}`.toLocaleLowerCase('en-US');
 }
 
 function candidateScore(text, tokens) {
@@ -102,7 +104,6 @@ export function searchProjectContextV1({
     const snapshot = normalizeProjectSnapshotV1(raw.snapshot);
     const capsule = normalizeContextCapsuleV1(raw.capsule);
     if (capsule.projectId !== snapshot.projectId || capsule.projectRevisionId !== snapshot.revisionId) continue;
-    // A source-scoped retrieval result must actually be provenance-bound to a source.
     if (!capsule.sourceBindings.length) continue;
 
     const snapshotById = new Map(snapshot.sourceRefs.map(source => [source.sourceId, source]));
@@ -137,7 +138,6 @@ export function searchProjectContextV1({
       authorityFloor,
       sourceBindings: capsule.sourceBindings,
       artifactRefs: capsule.artifactRefs,
-      summary: capsule.summary,
       advisoryOnly: true,
     }));
   }
