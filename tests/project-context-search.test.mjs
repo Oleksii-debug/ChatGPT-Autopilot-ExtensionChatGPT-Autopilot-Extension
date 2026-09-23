@@ -22,15 +22,23 @@ function candidate(overrides = {}) {
     capsule: {
       schemaVersion: 1, capsuleId: overrides.capsuleId || 'cap-1', projectId: 'proj-1',
       projectRevisionId: 'project-rev-1', summary: overrides.summary || 'Deterministic runtime recovery context',
-      sourceBindings: [{ sourceId: 'src-1', revisionId: 'rev-1', contentSha256: H }],
+      sourceBindings: overrides.sourceBindings || [{ sourceId: 'src-1', revisionId: 'rev-1', contentSha256: H }],
       artifactRefs: [], createdAt: '2026-09-23T15:00:00Z',
     },
-    currentSourceRefs: [source(overrides.current || overrides.source || {})],
   };
+}
+function search(query, candidates, options = {}) {
+  return searchProjectContextV1({
+    query,
+    candidates,
+    currentSourceRefs: options.currentSourceRefs || [source(options.current || {})],
+    allowedSourceIds: options.allowedSourceIds || ['src-1'],
+    ...options,
+  });
 }
 
 test('returns only fresh permission-authorized provenance-bound capsules', () => {
-  const out = searchProjectContextV1({ query: 'runtime recovery', candidates: [candidate()], allowedSourceIds: ['src-1'] });
+  const out = search('runtime recovery', [candidate()]);
   assert.equal(out.resultCount, 1);
   assert.equal(out.results[0].capsuleId, 'cap-1');
   assert.equal(out.results[0].advisoryOnly, true);
@@ -38,8 +46,7 @@ test('returns only fresh permission-authorized provenance-bound capsules', () =>
 });
 
 test('stale revision/hash is excluded rather than surfaced as current context', () => {
-  const stale = candidate({ current: { revisionId: 'rev-2', contentSha256: H2 } });
-  const out = searchProjectContextV1({ query: 'runtime', candidates: [stale] });
+  const out = search('runtime', [candidate()], { current: { revisionId: 'rev-2', contentSha256: H2 } });
   assert.equal(out.resultCount, 0);
 });
 
@@ -49,33 +56,83 @@ test('source authority/uri/kind substitution is fail-closed even with same sourc
     { uri: 'https://example.invalid/other' },
     { kind: 'drive' },
   ]) {
-    const out = searchProjectContextV1({ query: 'runtime', candidates: [candidate({ current })] });
-    assert.equal(out.resultCount, 0);
+    assert.equal(search('runtime', [candidate()], { current }).resultCount, 0);
   }
 });
 
-test('permission scope denies unlisted source and disallowed authority', () => {
-  assert.equal(searchProjectContextV1({ query: 'runtime', candidates: [candidate()], allowedSourceIds: ['other'] }).resultCount, 0);
-  assert.equal(searchProjectContextV1({ query: 'runtime', candidates: [candidate()], allowedAuthorities: ['DERIVED'] }).resultCount, 0);
+test('permission scope is explicit and denies unlisted source and disallowed authority', () => {
+  assert.throws(() => searchProjectContextV1({ query: 'runtime', candidates: [candidate()], currentSourceRefs: [source()] }), /allowedSourceIds must be an explicit/);
+  assert.equal(search('runtime', [candidate()], { allowedSourceIds: ['other'] }).resultCount, 0);
+  assert.equal(search('runtime', [candidate()], { allowedAuthorities: ['DERIVED'] }).resultCount, 0);
+});
+
+test('candidate cannot inject its own freshness authority', () => {
+  const forged = { ...candidate(), currentSourceRefs: [source({ metadata: { secret: 'needle' } })] };
+  assert.throws(() => search('runtime', [forged]), /must not inject currentSourceRefs/);
+});
+
+test('unbound current source cannot create a query match or alter ranking', () => {
+  const unbound = source({
+    sourceId: 'src-unbound', revisionId: 'rev-u', contentSha256: H2,
+    uri: 'https://example.invalid/needle', metadata: { secret: 'needle needle needle' },
+  });
+  const out = searchProjectContextV1({
+    query: 'needle', candidates: [candidate()], currentSourceRefs: [source(), unbound],
+    allowedSourceIds: ['src-1', 'src-unbound'],
+  });
+  assert.equal(out.resultCount, 0);
+});
+
+test('arbitrary source metadata is never indexed', () => {
+  const current = source({ metadata: { branch: 'main', credential: 'needle-secret' } });
+  const out = searchProjectContextV1({
+    query: 'needle-secret', candidates: [candidate()], currentSourceRefs: [current], allowedSourceIds: ['src-1'],
+  });
+  assert.equal(out.resultCount, 0);
+});
+
+test('mixed permission capsule cannot launder summary through one authorized binding', () => {
+  const second = source({ sourceId: 'src-2', revisionId: 'rev-2', contentSha256: H2, uri: 'https://example.invalid/private' });
+  const mixed = candidate({
+    summary: 'needle private context',
+    sourceBindings: [
+      { sourceId: 'src-1', revisionId: 'rev-1', contentSha256: H },
+      { sourceId: 'src-2', revisionId: 'rev-2', contentSha256: H2 },
+    ],
+  });
+  mixed.snapshot.sourceRefs.push(second);
+  const out = searchProjectContextV1({
+    query: 'needle', candidates: [mixed], currentSourceRefs: [source(), second], allowedSourceIds: ['src-1'],
+  });
+  assert.equal(out.resultCount, 0);
 });
 
 test('ranking prefers stronger authority before lexical score and remains deterministic', () => {
   const canonical = candidate({ capsuleId: 'canonical', summary: 'runtime recovery' });
   const derived = candidate({ capsuleId: 'derived', summary: 'runtime runtime recovery', source: { authority: 'DERIVED' } });
-  const out = searchProjectContextV1({ query: 'runtime', candidates: [derived, canonical] });
-  assert.deepEqual(out.results.map(x => x.capsuleId), ['canonical', 'derived']);
+  const currentDerived = source({ authority: 'DERIVED' });
+  const out = searchProjectContextV1({
+    query: 'runtime', candidates: [derived, canonical], currentSourceRefs: [source()], allowedSourceIds: ['src-1'],
+  });
+  // Derived candidate cannot substitute the canonical trusted current source and is excluded.
+  assert.deepEqual(out.results.map(x => x.capsuleId), ['canonical']);
+  const derivedOnly = searchProjectContextV1({
+    query: 'runtime', candidates: [derived], currentSourceRefs: [currentDerived], allowedSourceIds: ['src-1'],
+  });
+  assert.deepEqual(derivedOnly.results.map(x => x.capsuleId), ['derived']);
 });
 
-test('bounded query/candidates/result limit fail closed', () => {
-  assert.throws(() => searchProjectContextV1({ query: '', candidates: [] }), /query is invalid/);
-  assert.throws(() => searchProjectContextV1({ query: 'x'.repeat(513), candidates: [] }), /query is invalid/);
-  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: Array(129).fill(candidate()) }), /bounded array/);
-  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: [], limit: 33 }), /limit is invalid/);
+test('bounded query/candidates/current-state/result limit fail closed', () => {
+  assert.throws(() => searchProjectContextV1({ query: '', candidates: [], currentSourceRefs: [], allowedSourceIds: [] }), /query is invalid/);
+  assert.throws(() => searchProjectContextV1({ query: 'x'.repeat(513), candidates: [], currentSourceRefs: [], allowedSourceIds: [] }), /query is invalid/);
+  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: Array(129).fill(candidate()), currentSourceRefs: [], allowedSourceIds: [] }), /bounded array/);
+  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: [], currentSourceRefs: Array(513).fill(source()), allowedSourceIds: [] }), /trusted-current-state/);
+  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: [], currentSourceRefs: [], allowedSourceIds: [], limit: 33 }), /limit is invalid/);
 });
 
 test('result cap is explicit and reports truncation', () => {
   const candidates = [1, 2, 3].map(i => candidate({ capsuleId: `cap-${i}`, summary: 'runtime' }));
-  const out = searchProjectContextV1({ query: 'runtime', candidates, limit: 2 });
+  const out = search('runtime', candidates, { limit: 2 });
   assert.equal(out.resultCount, 2);
   assert.equal(out.truncated, true);
   assert.equal(out.results.length, 2);
