@@ -372,13 +372,18 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to hand off');
-      const assignment = prepareAgentPlanSpecialistHandoffV1(job.runtime.plan, { ...payload, at: payload.at || now });
+      // Persist the reconciliation that made this external node READY before
+      // recording its handoff. Otherwise a restart/cycle could re-plan the
+      // already-admitted node and request the same specialist twice.
+      const plan = reconcileAgentPlanV1(job.runtime.plan, { at: payload.at || now });
+      const assignment = prepareAgentPlanSpecialistHandoffV1(plan, { ...payload, at: payload.at || now });
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
         result = { assignment: clone(existing), reused: true };
         return store;
       }
+      job.runtime.plan = plan;
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-prepared', nodeId: payload.nodeId, agentId: assignment.agentId, message: `Bounded ${assignment.specialistId} handoff prepared; execution is not yet claimed.` });

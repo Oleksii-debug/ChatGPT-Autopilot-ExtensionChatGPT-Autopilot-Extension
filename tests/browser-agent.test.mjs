@@ -122,6 +122,9 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   });
   assert.equal(prepared.reused, false);
   assert.equal((await manager.listSpecialistHandoffs('job-1')).handoffs.length, 1);
+  await manager.update(store => { store.byId['job-1'].runtime.runState = 'RUNNING'; return store; });
+  const pending = await manager.cycleOne('job-1');
+  assert.equal(pending.kind, 'SPECIALIST_PENDING', 'a durable handoff prevents duplicate external-dispatch requests');
   const claimed = await manager.claimSpecialistHandoffs('job-1', { availableSlots:1, leaseSeconds:60 });
   assert.equal(claimed.claimed.length, 1);
   const completed = await manager.completeSpecialistHandoff('job-1', { agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:1'] });
