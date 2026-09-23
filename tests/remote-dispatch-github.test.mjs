@@ -99,6 +99,20 @@ test('403 with exhausted GitHub rate limit becomes typed RATE_LIMITED error', as
   }), error => error.code === 'RATE_LIMITED' && error.retryAfterSeconds === 120 && error.rateLimitRemaining === 0);
 });
 
+test('429 becomes typed RATE_LIMITED even when remaining header is absent', async () => {
+  await assert.rejects(() => fetchGitHubDispatchComments({
+    fetchFn: async () => response({}, { status: 429, headers: { 'retry-after': '90' } }),
+    repository: 'owner/repo', issueNumber: 121,
+  }), error => error.code === 'RATE_LIMITED' && error.status === 429 && error.retryAfterSeconds === 90);
+});
+
+test('secondary 403 with Retry-After becomes typed RATE_LIMITED before primary quota is exhausted', async () => {
+  await assert.rejects(() => fetchGitHubDispatchComments({
+    fetchFn: async () => response({}, { status: 403, headers: { 'x-ratelimit-remaining': '42', 'retry-after': '60' } }),
+    repository: 'owner/repo', issueNumber: 121,
+  }), error => error.code === 'RATE_LIMITED' && error.status === 403 && error.retryAfterSeconds === 60 && error.rateLimitRemaining === 42);
+});
+
 test('invalid repository and issue configuration fail before network call', async () => {
   let called = false;
   const fetchFn = async () => { called = true; return response({}); };
