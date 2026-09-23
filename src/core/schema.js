@@ -158,6 +158,13 @@ function validateOperation(operation, session) {
     throw new Error(`Invalid session ${session.id} operation generation`);
   }
   if (operation.promptText !== undefined) requireString(operation.promptText, `session ${session.id} operation promptText`);
+  if (operation.calendarOccurrence !== undefined) {
+    requireRecord(operation.calendarOccurrence, `session ${session.id} operation calendarOccurrence`);
+    requireString(operation.calendarOccurrence.id, `session ${session.id} operation calendarOccurrence id`);
+    requireString(operation.calendarOccurrence.revision, `session ${session.id} operation calendarOccurrence revision`);
+    requireNonNegativeNumber(operation.calendarOccurrence.scheduledAt, `session ${session.id} operation calendarOccurrence scheduledAt`);
+    if (operation.calendarOccurrence.catchUp !== undefined) requireBoolean(operation.calendarOccurrence.catchUp, `session ${session.id} operation calendarOccurrence catchUp`);
+  }
   if (operation.launchUrl !== undefined) {
     requireString(operation.launchUrl, `session ${session.id} operation launchUrl`);
     if (operation.launchUrl && normalizeChatUrl(operation.launchUrl) !== operation.launchUrl) {

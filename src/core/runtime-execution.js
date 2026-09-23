@@ -3,6 +3,8 @@ import { OperationPhase, RunState, TabStrategy } from './schema.js';
 import { appendLog } from './logger.js';
 import { appendDiagnostic } from './diagnostics.js';
 import { orderedSessionIdsForFairness } from './scheduler-fairness.js';
+import { CalendarOccurrenceState, calendarAdmissionForSession, commitVerifiedCalendarOccurrence } from './calendar-runtime.js';
+import { InteractionResult } from '../shared/protocol.js';
 
 const ACTIVE_STATES = new Set([RunState.RUNNING, RunState.RECOVERING]);
 const PROFILE_BUSY_MESSAGE = 'Profile send arbiter is busy';
@@ -40,6 +42,11 @@ const SAFE_PRE_SUBMIT_PHASES = new Set([
   OperationPhase.INSERTED,
   OperationPhase.PRE_SEND_WAIT,
 ]);
+const TERMINAL_OPERATION_PHASES = new Set([
+  OperationPhase.NONE,
+  OperationPhase.SENT_VERIFIED,
+  OperationPhase.FAILED_SAFE,
+]);
 
 const POST_SUBMIT_EVIDENCE_PRESERVE_CODES = new Set([
   'TAB_NAVIGATION_TIMEOUT',
@@ -57,6 +64,73 @@ function runtimeConcurrency(state) {
   const raw = Number(state?.profile?.maxConcurrentSessionOperations);
   if (!Number.isFinite(raw)) return DEFAULT_MAX_CONCURRENT_SESSION_OPERATIONS;
   return Math.max(1, Math.min(MAX_CONCURRENT_SESSION_OPERATIONS, Math.floor(raw)));
+}
+
+function sameCalendarOccurrence(left, right) {
+  return Boolean(left && right
+    && left.id === right.id
+    && left.revision === right.revision
+    && left.scheduledAt === right.scheduledAt);
+}
+
+function pendingCalendarOccurrence(session) {
+  const occurrence = session?.calendarRuntime?.activeOccurrence;
+  if (!occurrence?.id || !occurrence?.revision || !Number.isFinite(occurrence?.scheduledAt)) return null;
+  return occurrence;
+}
+
+// A positive Send is durable before the runtime outcome is persisted. If the
+// extension dies in that interval, commit the already-bound calendar effect
+// before considering any later occurrence. This makes restart reconciliation
+// strictly prefer no duplicate scheduled sends.
+function reconcileVerifiedCalendarOccurrence(session, executedAt) {
+  const active = pendingCalendarOccurrence(session);
+  if (!active || session?.operation?.phase !== OperationPhase.SENT_VERIFIED) return false;
+  if (!sameCalendarOccurrence(active, session.operation.calendarOccurrence)) return false;
+  commitVerifiedCalendarOccurrence(session, active, executedAt);
+  delete session.calendarRuntime.activeOccurrence;
+  return true;
+}
+
+async function admitCalendarExecution(repository, sessionId, at) {
+  let admission = null;
+  await repository.update(draft => {
+    const session = draft.sessionsById?.[sessionId];
+    if (!session || !ACTIVE_STATES.has(session.runState)) return draft;
+
+    const reconciled = reconcileVerifiedCalendarOccurrence(session, at);
+    const pending = pendingCalendarOccurrence(session);
+    // Existing operations were already admitted. Calendar schedules may delay
+    // new external effects, but must never strand evidence/recovery work.
+    if (session.operation && !TERMINAL_OPERATION_PHASES.has(session.operation.phase)) {
+      admission = { kind: 'RECOVERY_BYPASS', reconciled };
+      return draft;
+    }
+    if (pending) {
+      admission = { kind: CalendarOccurrenceState.DUE, occurrence: pending, resumed: true, reconciled };
+      return draft;
+    }
+
+    admission = { ...calendarAdmissionForSession(session, at), reconciled };
+    if ([CalendarOccurrenceState.DUE, CalendarOccurrenceState.MISSED_WAITING_CATCHUP].includes(admission.kind)) {
+      // This is the durable admission checkpoint. DurableSubmissionCoordinator
+      // copies it into the operation before insertion/send can begin.
+      session.calendarRuntime = { ...(session.calendarRuntime || {}), activeOccurrence: { ...admission.occurrence } };
+    }
+    return draft;
+  });
+  return admission || { kind: 'INACTIVE' };
+}
+
+async function commitCalendarAfterVerifiedRuntimeResult(repository, sessionId, result, executedAt) {
+  if (result?.result?.status !== InteractionResult.SENT_VERIFIED) return false;
+  let committed = false;
+  await repository.update(draft => {
+    const session = draft.sessionsById?.[sessionId];
+    if (session) committed = reconcileVerifiedCalendarOccurrence(session, executedAt);
+    return draft;
+  });
+  return committed;
 }
 
 async function mapWithConcurrency(items, limit, mapper) {
@@ -417,6 +491,18 @@ export async function runRuntimeCycle({
         const live = await repository.load();
         const session = live.sessionsById?.[sessionId];
         if (!session || !ACTIVE_STATES.has(session.runState)) return null;
+        const calendarAdmission = await admitCalendarExecution(repository, sessionId, now());
+        if ([
+          CalendarOccurrenceState.WAITING,
+          CalendarOccurrenceState.MISSED_SKIPPED,
+          'EXHAUSTED',
+        ].includes(calendarAdmission.kind)) {
+          const result = calendarAdmission.kind === CalendarOccurrenceState.WAITING
+            ? { kind: 'CALENDAR_WAIT', wakeAt: calendarAdmission.wakeAt }
+            : { kind: `CALENDAR_${calendarAdmission.kind}` };
+          await persistRuntimeOutcome(repository, sessionId, result, now());
+          return { sessionId, result };
+        }
         const expectedPreSubmitOperation = INTERRUPTED_PRE_SUBMIT_PHASES.has(session.operation?.phase)
           ? { operationId: session.operation.operationId, phase: session.operation.phase }
           : null;
@@ -429,6 +515,7 @@ export async function runRuntimeCycle({
             expectedPreSubmitOperation,
             now(),
           );
+          await commitCalendarAfterVerifiedRuntimeResult(repository, sessionId, result, now());
           await persistRuntimeOutcome(repository, sessionId, result, now());
           return { sessionId, result };
         } catch (error) {
