@@ -1738,6 +1738,19 @@ function browserAgentSiteRulesToText(rules = []) {
   }).join('\n');
 }
 
+function browserAgentAcceptanceCriteriaFromText(raw) {
+  const criteria = String(raw || '').split(/\r?\n/u).map(line => line.trim()).filter(Boolean);
+  if (criteria.length > 20) throw new Error('Критеріїв завершення може бути не більше 20.');
+  if (criteria.some(criterion => criterion.length > 1000)) throw new Error('Кожен критерій завершення має бути до 1000 символів.');
+  const seen = new Set();
+  for (const criterion of criteria) {
+    const key = criterion.toLocaleLowerCase();
+    if (seen.has(key)) throw new Error(`Повторюваний критерій завершення: ${criterion}`);
+    seen.add(key);
+  }
+  return criteria;
+}
+
 function browserAgentPolicyFromForm() {
   const scheduleStartAt = browserAgentDateTimeLocalToEpoch('agent-schedule-start');
   const scheduleEndAt = browserAgentDateTimeLocalToEpoch('agent-schedule-end');
@@ -1757,6 +1770,7 @@ function browserAgentPolicyFromForm() {
     siteRules: browserAgentSiteRulesFromText($('agent-site-rules').value),
     visionOnDemand: $('agent-vision-on-demand').checked,
     trustedScriptEnabled: $('agent-trusted-script-enabled').checked,
+    acceptanceCriteria: browserAgentAcceptanceCriteriaFromText($('agent-acceptance-criteria').value),
     repeatMode: $('agent-repeat-mode').value,
     intervalSeconds: browserAgentInteger('agent-interval-seconds', 1, 604800, 'Інтервал Agent'),
     scheduleStartAt,
@@ -1791,6 +1805,7 @@ function fillBrowserAgentPolicy(config = {}) {
   $('agent-site-rules').value = browserAgentSiteRulesToText(config.siteRules || []);
   $('agent-vision-on-demand').checked = config.visionOnDemand !== false;
   $('agent-trusted-script-enabled').checked = config.trustedScriptEnabled === true;
+  $('agent-acceptance-criteria').value = (config.acceptanceCriteria || []).join('\n');
   $('agent-repeat-mode').value = ['ONCE','CONTINUOUS','INTERVAL'].includes(config.repeatMode) ? config.repeatMode : 'ONCE';
   $('agent-interval-seconds').value = String(config.intervalSeconds ?? 60);
   $('agent-schedule-start').value = browserAgentEpochToDateTimeLocal(config.scheduleStartAt);
@@ -1852,11 +1867,12 @@ ${pendingScript}` : '';
   }
   const url = runtime.currentUrl || config.startUrl || 'активна вкладка';
   const result = runtime.resultSummary ? ` Результат: ${runtime.resultSummary}` : '';
+  const verified = runtime.verifiedOutcome?.checks?.length ? ` Перевірено критеріїв: ${runtime.verifiedOutcome.checks.length}/${config.acceptanceCriteria?.length || runtime.verifiedOutcome.checks.length}.` : '';
   const error = runtime.lastError ? ` ${runtime.lastError}` : '';
   const cycles = Number(runtime.completedCycles || 0);
   const nextWake = Number(runtime.nextWakeAt || 0) > Date.now() ? ` Наступний запуск: ${new Date(runtime.nextWakeAt).toLocaleString()}.` : '';
   const capability = runtime.capabilityPermission ? ` Потрібна capability: ${runtime.capabilityPermission}.` : '';
-  $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${result}${error}`;
+  $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${result}${verified}${error}`;
   $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.`;
   const history = Array.isArray(runtime.history) ? runtime.history : [];
   $('agent-history').textContent = history.length

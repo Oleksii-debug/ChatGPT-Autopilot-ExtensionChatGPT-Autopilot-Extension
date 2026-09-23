@@ -129,6 +129,9 @@
           <p class="field-help">Один сайт на рядок: домен | ALLOW, ASK або DENY. Необов’язково після третьої риски можна перевизначити окремі дії, наприклад trusted_script=DENY або upload_download=ASK. Спеціальний ключ credentials=ALLOW/ASK/DENY керує логіном для цього сайту. Правило сайту має пріоритет над глобальною політикою.</p>
           <label><input id="agent-vision-on-demand" type="checkbox" checked>Дозволяти Agent запитувати знімок видимої області для vision, коли DOM/ARIA недостатньо</label>
           <label><input id="agent-trusted-script-enabled" type="checkbox">Дозволяти Trusted Script fallback для складних сайтів. Потреба в підтвердженні визначається вибраною вище політикою; у режимі повної автономії окремого підтвердження немає.</label>
+          <label for="agent-acceptance-criteria">Критерії завершеного результату, необов’язково</label>
+          <textarea id="agent-acceptance-criteria" rows="4" spellcheck="true" aria-describedby="agent-acceptance-criteria-help" placeholder="Наприклад: На сторінці видно підтвердження бронювання&#10;Наприклад: Вибрано саме ранковий варіант"></textarea>
+          <p id="agent-acceptance-criteria-help" class="field-help">Один перевірюваний критерій на рядок. Якщо вони задані, Agent не може позначити завдання завершеним без свіжого доказу для кожного критерію з поточної сторінки.</p>
         </fieldset>
         <fieldset class="settings-group">
           <legend>Розклад і повторення</legend>
