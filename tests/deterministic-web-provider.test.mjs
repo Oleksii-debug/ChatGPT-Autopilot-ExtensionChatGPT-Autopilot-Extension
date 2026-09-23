@@ -59,12 +59,29 @@ test('does not mutate a target with a live lease owned by another invocation', a
   assert.equal(called, false);
 });
 
-test('post-effect observation failure is AMBIGUOUS and requires reconciliation, never blind retry', async () => {
-  const p = provider({ execute: async () => {}, observe: async () => { throw new Error('browser disconnected'); } });
+test('post-effect observation failure is AMBIGUOUS and retains lease for reconciliation', async () => {
+  const leaseState = { value: null };
+  const p = provider({ execute: async () => {}, observe: async () => { throw new Error('browser disconnected'); } }, leaseState);
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
   assert.equal(result.status, 'AMBIGUOUS');
   assert.equal(result.reconcileRequired, true);
   assert.match(result.error, /disconnected/);
+  assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
+});
+
+test('effectful dispatch rejection is AMBIGUOUS and fences a competing invocation', async () => {
+  const leaseState = { value: null };
+  const p = provider({ execute: async () => { throw new Error('connection lost after dispatch'); }, observe: async () => ({ data: {} }) }, leaseState);
+  const result = await p.invoke({ ...fixtures('inv-1'), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
+  assert.equal(result.status, 'AMBIGUOUS');
+  assert.equal(result.reconcileRequired, true);
+  assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
+
+  let competingExecuted = false;
+  const competitor = provider({ execute: async () => { competingExecuted = true; }, observe: async () => ({ data: { visibleSelectors: ['#receipt'] }, artifactRefs: [] }) }, leaseState);
+  const blocked = await competitor.invoke({ ...fixtures('inv-2'), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
+  assert.equal(blocked.status, 'TARGET_CONFLICT');
+  assert.equal(competingExecuted, false);
 });
 
 test('independent verifier fails when expected selector is absent', async () => {
