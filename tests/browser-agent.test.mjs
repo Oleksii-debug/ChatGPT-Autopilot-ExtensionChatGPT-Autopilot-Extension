@@ -13,6 +13,7 @@ import {
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
   browserSnapshotSignature,
+  verifyBrowserAgentOutcomeEvidence,
 } from '../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
 
@@ -850,6 +851,33 @@ test('ALLOW_ALL approval policy keeps fully autonomous click execution available
 
 test('monetary budget is rejected when no token pricing exists', () => {
   assert.throws(() => config({ maxCostUsd: 5 }), /requires input and\/or output token pricing/);
+});
+
+test('owner outcome contract is normalized and completion evidence must bind every criterion to the fresh snapshot', () => {
+  const config = normalizeBrowserAgentConfig({ id: 'job-contract', goal: 'Verify selected course', acceptanceCriteria: ['The selected course is visible', 'The timetable has no conflict'] });
+  assert.deepEqual(config.acceptanceCriteria, ['The selected course is visible', 'The timetable has no conflict']);
+  assert.throws(() => normalizeBrowserAgentConfig({ id: 'job-contract', goal: 'x', acceptanceCriteria: ['same', 'Same'] }), /Duplicate Browser Agent acceptance criterion/);
+  const snapshot = { url: 'https://ais.example.edu/app', frames: [{ frameId: 0, url: 'https://ais.example.edu/app', text: 'Course A selected; no conflicts', elements: [] }] };
+  const signature = browserSnapshotSignature(snapshot);
+  const complete = { type: 'done', evidence: { snapshotSignature: signature, checks: [{ criterion: 1, detail: 'Course A is selected.' }, { criterion: 2, detail: 'No conflict marker is present.' }] } };
+  assert.equal(verifyBrowserAgentOutcomeEvidence(config, complete, snapshot).ok, true);
+  assert.match(verifyBrowserAgentOutcomeEvidence(config, { ...complete, evidence: { ...complete.evidence, checks: [complete.evidence.checks[0]] } }, snapshot).reason, /incomplete/);
+  assert.match(verifyBrowserAgentOutcomeEvidence(config, { ...complete, evidence: { ...complete.evidence, snapshotSignature: 'stale' } }, snapshot).reason, /current semantic page snapshot/);
+});
+
+test('Browser Agent does not complete an explicit outcome contract on model assertion alone', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'done', summary: 'I think it is complete' }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-contract', goal: 'Verify course', acceptanceCriteria: ['Course A is selected'] });
+  await manager.start('job-contract', { runInitial: false });
+  await manager.cycleOne('job-contract');
+  const live = await manager.get('job-contract');
+  assert.equal(live.job.runtime.runState, 'RUNNING');
+  assert.equal(live.job.runtime.completedAt, 0);
+  assert.match(live.job.runtime.lastError, /Outcome contract requires evidence/);
 });
 
 test('schedule policy validates paired active-window fields and ordered absolute bounds', () => {

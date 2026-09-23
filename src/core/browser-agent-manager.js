@@ -32,6 +32,7 @@ import {
   focusBrowserAgentTarget,
   validateTrustedScriptSource,
   executeBrowserCredentialFill,
+  verifyBrowserAgentOutcomeEvidence,
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
@@ -184,6 +185,15 @@ function normalizeRuntime(raw, now) {
     } : null,
     ownerInstructions: (Array.isArray(raw.ownerInstructions) ? raw.ownerInstructions : []).map(value => clean(value, 5000)).filter(Boolean).slice(-MAX_OWNER_INSTRUCTIONS),
     history: (Array.isArray(raw.history) ? raw.history : []).slice(-MAX_HISTORY),
+    verifiedOutcome: raw.verifiedOutcome && typeof raw.verifiedOutcome === 'object' ? {
+      snapshotSignature: clean(raw.verifiedOutcome.snapshotSignature, 80),
+      verifiedAt: Math.max(0, Number(raw.verifiedOutcome.verifiedAt || 0)),
+      checks: (Array.isArray(raw.verifiedOutcome.checks) ? raw.verifiedOutcome.checks : []).slice(0, 20).map(check => ({
+        criterion: Math.max(0, Number(check?.criterion || 0)),
+        text: clean(check?.text, 1000),
+        detail: clean(check?.detail, 1000),
+      })).filter(check => check.criterion > 0 && check.text && check.detail),
+    } : null,
     nextWakeAt: Math.max(0, Number(raw.nextWakeAt || 0)),
     updatedAt: Math.max(0, Number(raw.updatedAt || now)),
   };
@@ -276,6 +286,7 @@ export class BrowserAgentManager {
       startUrl: raw.startUrl || '',
       startFromActiveTab: raw.startFromActiveTab !== false,
       goal: raw.goal || '',
+      acceptanceCriteria: raw.acceptanceCriteria || [],
       maxSteps: raw.maxSteps ?? 500,
       stepDelayMs: raw.stepDelayMs ?? 0,
       allowCrossOriginNavigation: raw.allowCrossOriginNavigation !== false,
@@ -331,7 +342,9 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+      const previousCriteria = JSON.stringify(job.config.acceptanceCriteria || []);
       job.config = normalizeBrowserAgentConfig({ ...job.config, ...rawConfig, id }, { id });
+      if (JSON.stringify(job.config.acceptanceCriteria || []) !== previousCriteria) job.runtime.verifiedOutcome = null;
       job.updatedAt = now;
       return store;
     });
@@ -2170,6 +2183,12 @@ export class BrowserAgentManager {
     }
 
     if (action.type === BrowserAgentActionType.DONE) {
+      const verification = verifyBrowserAgentOutcomeEvidence(current.job.config, action, snapshot);
+      if (!verification.ok) {
+        return this.recordRecoverableFailure(id, epoch, {
+          type: 'verification', error: new Error(verification.reason), action, countStep: false, retryMs: 500, maxConsecutive: 4,
+        });
+      }
       const repeating = current.job.config.repeatMode !== BrowserAgentRepeatMode.ONCE;
       await this.update(store => {
         const job = store.byId[id];
@@ -2177,6 +2196,7 @@ export class BrowserAgentManager {
         job.runtime.completedCycles = Math.max(0, Number(job.runtime.completedCycles || 0)) + 1;
         job.runtime.lastCompletedCycleAt = now;
         job.runtime.resultSummary = action.summary;
+        job.runtime.verifiedOutcome = { ...verification, verifiedAt: now };
         job.runtime.lastError = '';
         job.runtime.lastAction = null;
         job.runtime.lastActionSnapshotId = '';

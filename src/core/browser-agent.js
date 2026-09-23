@@ -262,6 +262,21 @@ function optionalEpochMs(value) {
   if (!Number.isFinite(n) || n < 0) throw new Error('Browser Agent schedule timestamp is invalid');
   return Math.floor(n);
 }
+
+export function normalizeBrowserAgentAcceptanceCriteria(raw = []) {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw new Error('Browser Agent acceptanceCriteria must be an array');
+  if (raw.length > 20) throw new Error('Browser Agent acceptanceCriteria exceeds 20 criteria');
+  const seen = new Set();
+  return raw.map((value, index) => {
+    const criterion = clean(value, 1000);
+    if (!criterion) throw new Error(`Browser Agent acceptance criterion ${index + 1} is required`);
+    const key = criterion.toLocaleLowerCase();
+    if (seen.has(key)) throw new Error(`Duplicate Browser Agent acceptance criterion: ${criterion}`);
+    seen.add(key);
+    return criterion;
+  });
+}
 function minutesOfDay(hhmm) {
   if (!hhmm) return null;
   const [h, m] = hhmm.split(':').map(Number);
@@ -348,6 +363,7 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
     startUrl: optionalHttpUrl(raw.startUrl),
     startFromActiveTab: raw.startFromActiveTab !== false,
     goal,
+    acceptanceCriteria: normalizeBrowserAgentAcceptanceCriteria(raw.acceptanceCriteria),
     // These are safety ceilings, not required task parameters. They stay out of
     // the primary prompt-first UI and can be changed in advanced policy.
     maxSteps: int(raw.maxSteps, 500, 1, 10000),
@@ -421,6 +437,7 @@ export function createBrowserAgentRuntime(now = Date.now()) {
     updatedAt: now,
     completedAt: 0,
     resultSummary: '',
+    verifiedOutcome: null,
     completedCycles: 0,
     lastCompletedCycleAt: 0,
   };
@@ -629,7 +646,22 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
     action.message = clean(raw.message, 1000);
     if (!action.message) throw new Error('Browser Agent notify action requires message');
   }
-  if (type === BrowserAgentActionType.DONE) action.summary = clean(raw.summary || raw.result || 'Готово', 4000) || 'Готово';
+  if (type === BrowserAgentActionType.DONE) {
+    action.summary = clean(raw.summary || raw.result || 'Готово', 4000) || 'Готово';
+    const evidence = raw.evidence;
+    if (evidence != null) {
+      if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) throw new Error('Browser Agent done evidence must be an object');
+      const snapshotSignature = clean(evidence.snapshotSignature, 80);
+      const checks = Array.isArray(evidence.checks) ? evidence.checks.slice(0, 20).map((check, index) => {
+        if (!check || typeof check !== 'object' || Array.isArray(check)) throw new Error(`Browser Agent done evidence check ${index + 1} must be an object`);
+        const criterion = Number(check.criterion);
+        const detail = clean(check.detail || check.evidence, 1000);
+        if (!Number.isInteger(criterion) || criterion < 1 || !detail) throw new Error(`Browser Agent done evidence check ${index + 1} is invalid`);
+        return { criterion, detail };
+      }) : [];
+      action.evidence = { snapshotSignature, checks };
+    }
+  }
   return action;
 }
 
@@ -670,6 +702,33 @@ export function parseBrowserAgentAction(rawText, snapshot) {
   }
   if (action.type === BrowserAgentActionType.NEW_TAB) action.url = safeHttpUrl(raw.url);
   return action;
+}
+
+/** Deterministic completion gate: a model may propose DONE, but it cannot
+ * complete an explicit owner contract without fresh, criterion-by-criterion
+ * evidence bound to the semantic observation used for that decision. */
+export function verifyBrowserAgentOutcomeEvidence(config, action, snapshot) {
+  const criteria = normalizeBrowserAgentAcceptanceCriteria(config?.acceptanceCriteria);
+  if (!criteria.length) return { ok: true, checks: [], snapshotSignature: browserSnapshotSignature(snapshot) };
+  if (action?.type !== BrowserAgentActionType.DONE) return { ok: false, reason: 'Outcome verification is only available for done actions' };
+  const expectedSignature = browserSnapshotSignature(snapshot);
+  const evidence = action.evidence;
+  if (!evidence || evidence.snapshotSignature !== expectedSignature) {
+    return { ok: false, reason: 'Outcome contract requires evidence from the current semantic page snapshot' };
+  }
+  const seen = new Set();
+  for (const check of evidence.checks || []) {
+    if (!Number.isInteger(check.criterion) || check.criterion < 1 || check.criterion > criteria.length || seen.has(check.criterion) || !clean(check.detail, 1000)) {
+      return { ok: false, reason: 'Outcome contract evidence does not cover each criterion exactly once' };
+    }
+    seen.add(check.criterion);
+  }
+  if (seen.size !== criteria.length) return { ok: false, reason: 'Outcome contract evidence is incomplete' };
+  return {
+    ok: true,
+    snapshotSignature: expectedSignature,
+    checks: criteria.map((criterion, index) => ({ criterion: index + 1, text: criterion, detail: evidence.checks.find(check => check.criterion === index + 1).detail })),
+  };
 }
 
 export function buildBrowserAgentPlannerPrompt(config, runtime, snapshot) {
@@ -722,6 +781,9 @@ export function buildBrowserAgentPlannerPrompt(config, runtime, snapshot) {
     'For key use only Enter, Tab, Escape, arrows, or Space. Enter/Space MUST include the exact current frameId/ref target; never send an untargeted activation key.',
     '{"type":"key","key":"Enter","frameId":0,"ref":"r6"}',
     'Use done only when the owner goal is actually complete, blocked by required manual authentication/approval, or cannot proceed safely.',
+    config.acceptanceCriteria?.length
+      ? `OWNER OUTCOME CONTRACT (completion is rejected unless every criterion has fresh evidence from this exact snapshot):\n${config.acceptanceCriteria.map((criterion, index) => `${index + 1}. ${criterion}`).join('\n')}\nFor done return evidence exactly as {"snapshotSignature":"${browserSnapshotSignature(snapshot)}","checks":[{"criterion":1,"detail":"observed proof"}]}; include one non-empty check for every numbered criterion, exactly once.`
+      : '',
     config.approvalMode === BrowserAgentApprovalMode.ALLOW_ALL
       ? 'Owner policy is ALLOW_ALL: do not request per-action approval for enabled actions. Respect only explicit site/capability/policy denials and technical preconditions.'
       : 'Owner policy requires confirmation for consequential actions. Never evade, relabel, or work around an approval boundary.',
