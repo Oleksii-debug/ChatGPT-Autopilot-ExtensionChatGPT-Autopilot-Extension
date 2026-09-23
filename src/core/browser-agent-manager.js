@@ -424,6 +424,52 @@ export class BrowserAgentManager {
     return result;
   }
 
+  /**
+   * Atomically admits specialist handoffs across every durable Browser Agent
+   * job.  The existing per-job claim contract still owns lease creation; this
+   * method only distributes one product-wide capacity budget, so service
+   * worker restart cannot briefly over-admit independent jobs.
+   */
+  async claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs, ...payload } = {}) {
+    const limit = Number(maxConcurrentHandoffs);
+    if (!Number.isInteger(limit) || limit < 0 || limit > 256) throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
+        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(payload.at || now));
+      let remaining = Math.max(0, limit - liveLeases.length);
+      const claimed = [];
+      const reconciliationRequired = [];
+      for (const jobId of store.order) {
+        const job = store.byId[jobId];
+        if (!job?.runtime?.plan) continue;
+        const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+          ...payload,
+          availableSlots: remaining,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at: payload.at || now,
+        });
+        job.runtime.plan = outcome.plan;
+        job.runtime.specialistHandoffs = outcome.assignments;
+        job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
+        job.runtime.updatedAt = this.now();
+        remaining -= outcome.claimed.length;
+        for (const agentId of outcome.claimed) {
+          claimed.push({ jobId, agentId });
+          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
+        }
+        for (const agentId of outcome.reconciliationRequired) {
+          reconciliationRequired.push({ jobId, agentId });
+          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+        }
+      }
+      result = { maxConcurrentHandoffs: limit, activeLeases: liveLeases.length, remainingSlots: remaining, claimed, reconciliationRequired };
+      return store;
+    });
+    return result;
+  }
+
   async completeSpecialistHandoff(id, payload = {}) {
     const now = new Date(this.now()).toISOString();
     let result = null;
