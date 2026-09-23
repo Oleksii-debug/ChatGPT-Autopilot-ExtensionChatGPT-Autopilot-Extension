@@ -880,6 +880,31 @@ test('Browser Agent does not complete an explicit outcome contract on model asse
   assert.match(live.job.runtime.lastError, /Outcome contract requires evidence/);
 });
 
+test('Browser Agent requires a separate read-only verifier before completing an explicit outcome contract', async () => {
+  const chrome = makeChrome();
+  let verifierCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        verifierCalls += 1;
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'Current semantic page shows page version 0.' }] }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+      }
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({ type: 'done', summary: 'Verified', evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'page version 0' }] } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+    },
+  });
+  await manager.create({ id: 'job-contract-independent', goal: 'Verify page', acceptanceCriteria: ['The current page is observed'] });
+  await manager.start('job-contract-independent', { runInitial: false });
+  const result = await manager.cycleOne('job-contract-independent');
+  const live = await manager.get('job-contract-independent');
+  assert.equal(result.kind, 'COMPLETED');
+  assert.equal(verifierCalls, 1);
+  assert.equal(live.job.runtime.verifiedOutcome.checks[0].detail, 'Current semantic page shows page version 0.');
+  assert.equal(live.job.runtime.modelCalls, 2);
+});
+
 test('Browser Agent persists a planner-proposed DAG without treating planning as a browser effect', async () => {
   const chrome = makeChrome();
   const at = new Date().toISOString();
