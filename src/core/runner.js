@@ -68,6 +68,13 @@ export class DurableSubmissionCoordinator {
         targetUrl: task.normalizedUrl || task.url,
         now,
       });
+      // Runtime admission is persisted before a new operation is allowed to
+      // start. Copy that immutable identity into the operation in this same
+      // transaction, so recovery can prove which scheduled effect it owns.
+      const occurrence = liveSession.calendarRuntime?.activeOccurrence;
+      if (occurrence?.id && occurrence?.revision && Number.isFinite(occurrence?.scheduledAt)) {
+        liveSession.operation.calendarOccurrence = { ...occurrence };
+      }
       liveSession.operation.generation = generation;
       liveSession.operation.promptText = promptText;
       return draft;

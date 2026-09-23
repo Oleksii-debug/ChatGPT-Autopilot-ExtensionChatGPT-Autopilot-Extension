@@ -1,5 +1,6 @@
 import { OperationPhase, RunState } from './schema.js';
 import { selectNextTask } from './scheduler.js';
+import { CalendarOccurrenceState, calendarAdmissionForSession } from './calendar-runtime.js';
 
 export const ALARM_NAME = 'autopilot-core-wake';
 export const EXECUTION_UNAVAILABLE_MESSAGE = 'Automatic execution is not available until the durable send runner is installed.';
@@ -15,7 +16,6 @@ export function suspendActiveSessionsWhenExecutionUnavailable(state, now = Date.
   }
   return state;
 }
-
 
 export function healUnattendedManualHolds(session, now = Date.now(), { resumeMachinePause = true } = {}) {
   if (!session || session.retryPolicy === 'manual') return false;
@@ -82,9 +82,6 @@ export function reconcileStateForStartup(state, now = Date.now()) {
       if (wasActive) session.runState = RunState.RECOVERING;
     }
   }
-  // 0.9.8 removed the profile-wide Send lease/gap. Durable per-Session
-  // SUBMITTING -> AMBIGUOUS recovery is sufficient and permits independent
-  // tabs to progress concurrently after restart.
   state.sendArbiter.lease = null;
   state.sendArbiter.profileNextAllowedSendAt = 0;
   return state;
@@ -104,25 +101,36 @@ function schedulerWakeForSession(session, now) {
   }
 }
 
+function calendarWakeForSession(session, now) {
+  if (!session.calendarSchedule) return null;
+  // Wake calculation must be observational. catch-up OFF admission can durably
+  // reconcile missed occurrences, so evaluate a clone and leave persistence to
+  // the runtime admission path.
+  const admission = calendarAdmissionForSession(structuredClone(session), now);
+  switch (admission.kind) {
+    case CalendarOccurrenceState.WAITING:
+      return Math.max(now, admission.wakeAt);
+    case CalendarOccurrenceState.DUE:
+    case CalendarOccurrenceState.MISSED_WAITING_CATCHUP:
+    case CalendarOccurrenceState.MISSED_SKIPPED:
+      return now;
+    case 'EXHAUSTED':
+      return null;
+    default:
+      return null;
+  }
+}
+
 export function computeNextWake(state, now = Date.now()) {
   let earliest = Infinity;
   let retirementEarliest = Infinity;
 
-  // Physical tab retirement is durable work even when its owning Session has
-  // already been explicitly stopped. Without a wake for retirePending hints, a
-  // transient chrome.tabs.remove failure during Stop could preserve ownership
-  // correctly but never receive another cleanup attempt when no active Session
-  // remained. Keep retirement inside the canonical core alarm instead of
-  // inventing a second scheduler.
   for (const hint of Object.values(state.tabHintsByTaskId || {})) {
     if (hint?.retirePending !== true || hint?.ownedByExtension !== true || !Number.isInteger(hint?.tabId)) continue;
     retirementEarliest = Math.min(retirementEarliest, Math.max(now, Number(hint.retireRetryAt || 0) || now));
   }
 
   for (const session of Object.values(state.sessionsById)) {
-    // Drive prompt refresh is durable configuration work, not browser Send
-    // execution. It remains due even while the owning Session is stopped.
-    // Reuse the canonical core alarm rather than introducing a second timer.
     for (const binding of session.drivePromptSources?.bindings || []) {
       if (binding?.enabled !== true || !binding.fileId) continue;
       const rawNextCheckAt = Number(binding.nextCheckAt || 0);
@@ -134,16 +142,12 @@ export function computeNextWake(state, now = Date.now()) {
     const phase = session.operation?.phase;
     if (phase === OperationPhase.MANUAL_REVIEW) continue;
 
+    // An already-started effect/recovery obligation must reconcile regardless
+    // of the next calendar occurrence. Calendar gates only admission of new
+    // work; it must never hide AMBIGUOUS or pre-send durable evidence.
     if (phase === OperationPhase.PRE_SEND_WAIT) {
       const taskRetryAfter = session.tasksById?.[session.operation?.taskId]?.retryAfterAt || 0;
-      earliest = Math.min(
-        earliest,
-        Math.max(
-          now,
-          session.operation.preSendDeadline || now,
-          taskRetryAfter,
-        ),
-      );
+      earliest = Math.min(earliest, Math.max(now, session.operation.preSendDeadline || now, taskRetryAfter));
       continue;
     }
 
@@ -153,14 +157,18 @@ export function computeNextWake(state, now = Date.now()) {
       continue;
     }
 
+    const calendarWake = calendarWakeForSession(session, now);
+    if (session.calendarSchedule) {
+      if (calendarWake != null) earliest = Math.min(earliest, calendarWake);
+      continue;
+    }
+
     const schedulerWake = schedulerWakeForSession(session, now);
     if (schedulerWake != null) earliest = Math.min(earliest, schedulerWake);
   }
 
   const profileRateLimitUntil = Number(state.profile?.rateLimitUntil || 0);
-  if (earliest < Infinity && profileRateLimitUntil > now) {
-    earliest = Math.max(earliest, profileRateLimitUntil);
-  }
+  if (earliest < Infinity && profileRateLimitUntil > now) earliest = Math.max(earliest, profileRateLimitUntil);
   const wakeAt = Math.min(earliest, retirementEarliest);
   return wakeAt < Infinity ? wakeAt : null;
 }
@@ -172,9 +180,6 @@ export async function reconcileAlarm(chromeApi, state, now = Date.now()) {
     return null;
   }
 
-  // Chrome replaces an existing alarm with the same name. Do not clear the
-  // canonical wake first: if replacement creation rejects, the previous wake
-  // remains available as a conservative fallback and durable state stays truth.
   await chromeApi.alarms.create(ALARM_NAME, { when: Math.max(now + 500, wakeAt) });
   return wakeAt;
 }
