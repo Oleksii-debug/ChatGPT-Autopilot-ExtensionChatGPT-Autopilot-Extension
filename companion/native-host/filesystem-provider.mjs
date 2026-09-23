@@ -1,6 +1,7 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 
 export const FILESYSTEM_PROVIDER_VERSION = 1;
 export const MAX_READ_BYTES = 1024 * 1024;
@@ -60,17 +61,71 @@ async function realpathExistingOrParent(candidate, { allowMissingLeaf }) {
   }
 }
 
-// Mandatory immediately-before-I/O fence. Lexical authorization alone is not an
-// execution authority because symlinks/junctions/reparse points can redirect it.
-export async function authorizeFilesystemPathAtIoV1(scope, requestedPath, { write = false, allowMissingLeaf = write } = {}) {
-  const lexical = authorizeFilesystemPathV1(scope, requestedPath, { write });
+async function realRootsFor(scope, write) {
   const roots = write ? scope.writableRoots : scope.roots;
-  const realRoots = await Promise.all(roots.map(async root => canonical(await fs.realpath(root))));
-  const realCandidate = await realpathExistingOrParent(lexical, { allowMissingLeaf });
-  if (!realRoots.some(root => isWithin(root, realCandidate))) {
+  return Promise.all(roots.map(async root => canonical(await fs.realpath(root))));
+}
+
+function requireContained(realRoots, candidate, write) {
+  if (!realRoots.some(root => isWithin(root, candidate))) {
     fail(write ? 'Filesystem write escapes owner scope through link/reparse point' : 'Filesystem read escapes owner scope through link/reparse point');
   }
+}
+
+// Mandatory immediately-before-I/O admission fence. Lexical authorization alone is
+// never execution authority because symlinks/junctions/reparse points can redirect it.
+export async function authorizeFilesystemPathAtIoV1(scope, requestedPath, { write = false, allowMissingLeaf = write } = {}) {
+  const lexical = authorizeFilesystemPathV1(scope, requestedPath, { write });
+  const realRoots = await realRootsFor(scope, write);
+  const realCandidate = await realpathExistingOrParent(lexical, { allowMissingLeaf });
+  requireContained(realRoots, realCandidate, write);
   return realCandidate;
+}
+
+function sameFileIdentity(a, b) {
+  return a.dev === b.dev && a.ino === b.ino;
+}
+
+// Existing-file effects are bound to the checked object, not merely a checked pathname.
+// We deliberately do not create a missing leaf here: Node has no portable openat-style
+// parent-handle API, so creation remains fail-closed until an equivalent secure primitive
+// is available in the Native Companion platform adapter.
+export async function withAuthorizedExistingFileV1(scope, requestedPath, { write = false, beforeOpen = null } = {}, effect) {
+  if (typeof effect !== 'function') fail('Filesystem I/O effect callback required');
+  const lexical = authorizeFilesystemPathV1(scope, requestedPath, { write });
+  const admitted = await authorizeFilesystemPathAtIoV1(scope, lexical, { write, allowMissingLeaf: false });
+  if (beforeOpen != null) {
+    if (typeof beforeOpen !== 'function') fail('Invalid filesystem beforeOpen hook');
+    await beforeOpen();
+  }
+
+  const noFollow = Number.isInteger(fsConstants.O_NOFOLLOW) ? fsConstants.O_NOFOLLOW : 0;
+  const flags = (write ? fsConstants.O_RDWR : fsConstants.O_RDONLY) | noFollow;
+  let handle;
+  try {
+    handle = await fs.open(lexical, flags);
+    const [handleStat, pathStat, postOpenReal, realRoots] = await Promise.all([
+      handle.stat(),
+      fs.stat(lexical),
+      fs.realpath(lexical).then(canonical),
+      realRootsFor(scope, write),
+    ]);
+    requireContained(realRoots, postOpenReal, write);
+    if (canonical(postOpenReal) !== canonical(admitted) || !sameFileIdentity(handleStat, pathStat)) {
+      fail('Filesystem path identity changed during I/O authorization');
+    }
+    return await effect(handle, Object.freeze({ path: postOpenReal, stat: handleStat }));
+  } finally {
+    await handle?.close();
+  }
+}
+
+export async function readFilesystemFileV1(scope, requestedPath, { maxBytes = MAX_READ_BYTES, beforeOpen = null } = {}) {
+  return withAuthorizedExistingFileV1(scope, requestedPath, { beforeOpen }, async handle => {
+    const buffer = Buffer.alloc(maxBytes + 1);
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+    return boundReadV1(buffer.subarray(0, bytesRead), { maxBytes });
+  });
 }
 
 export function boundReadV1(buffer, { maxBytes = MAX_READ_BYTES } = {}) {
