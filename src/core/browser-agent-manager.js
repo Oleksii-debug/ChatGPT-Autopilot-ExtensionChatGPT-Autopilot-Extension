@@ -43,6 +43,7 @@ import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
+  prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
   completeAgentPlanSpecialistHandoffV1,
   verifyAgentPlanSpecialistHandoffV1,
@@ -121,9 +122,14 @@ function normalizeRuntime(raw, now) {
   const specialistHandoffs = plan && Array.isArray(raw.specialistHandoffs)
     ? raw.specialistHandoffs.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
+    ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
+    : [];
   return {
     ...base,
     ...clone(raw),
+    specialistHandoffs,
+    specialistExecutionOwnerships,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -363,6 +369,7 @@ export class BrowserAgentManager {
       jobId: current.job.id,
       planId: current.job.runtime.plan?.planId || '',
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
+      executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
     };
   }
 
@@ -377,17 +384,22 @@ export class BrowserAgentManager {
       // already-admitted node and request the same specialist twice.
       const plan = reconcileAgentPlanV1(job.runtime.plan, { at: payload.at || now });
       const assignment = prepareAgentPlanSpecialistHandoffV1(plan, { ...payload, at: payload.at || now });
+      const executionOwnership = prepareAgentPlanSpecialistExecutionOwnershipV1(plan, { ...payload, at: payload.at || now });
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+      const executionOwnerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
-        result = { assignment: clone(existing), reused: true };
+        const existingOwnership = executionOwnerships.find(item => item?.effectId === executionOwnership.effectId);
+        if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
+        result = { assignment: clone(existing), executionOwnership:clone(existingOwnership), reused: true };
         return store;
       }
       job.runtime.plan = plan;
       job.runtime.specialistHandoffs = [...handoffs, assignment];
+      job.runtime.specialistExecutionOwnerships = [...executionOwnerships, executionOwnership];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-prepared', nodeId: payload.nodeId, agentId: assignment.agentId, message: `Bounded ${assignment.specialistId} handoff prepared; execution is not yet claimed.` });
-      result = { assignment: clone(assignment), reused: false };
+      result = { assignment: clone(assignment), executionOwnership:clone(executionOwnership), reused: false };
       return store;
     });
     return result;
@@ -399,9 +411,10 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, at: payload.at || now });
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
+      job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
       job.runtime.updatedAt = this.now();
       for (const agentId of claimed.claimed) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease claimed; no provider effect was dispatched by this bridge.' });
       for (const agentId of claimed.reconciliationRequired) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
@@ -417,9 +430,10 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to complete');
-      const completed = completeAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, at: payload.at || now });
+      const completed = completeAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
       job.runtime.plan = completed.plan;
       job.runtime.specialistHandoffs = completed.assignments;
+      job.runtime.specialistExecutionOwnerships = completed.executionOwnerships;
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-completed', agentId: completed.verificationRequired, message: 'Specialist result recorded; independent verification is required before plan completion.' });
       result = clone(completed);
@@ -434,9 +448,10 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, at: payload.at || now });
+      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
+      job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
       result = clone(verified);
