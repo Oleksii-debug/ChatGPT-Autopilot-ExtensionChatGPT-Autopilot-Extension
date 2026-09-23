@@ -1870,9 +1870,11 @@ ${pendingScript}` : '';
   const verified = runtime.verifiedOutcome?.checks?.length ? ` Перевірено критеріїв: ${runtime.verifiedOutcome.checks.length}/${config.acceptanceCriteria?.length || runtime.verifiedOutcome.checks.length}.` : '';
   const error = runtime.lastError ? ` ${runtime.lastError}` : '';
   const cycles = Number(runtime.completedCycles || 0);
+  const plan = runtime.plan;
+  const planStatus = plan?.nodes?.length ? ` План: ${plan.nodes.filter(node => node.state === 'READY').length} готових, ${plan.nodes.filter(node => node.state === 'RUNNING').length} у роботі, ${plan.nodes.filter(node => node.state === 'VERIFIED').length}/${plan.nodes.length} перевірено.` : '';
   const nextWake = Number(runtime.nextWakeAt || 0) > Date.now() ? ` Наступний запуск: ${new Date(runtime.nextWakeAt).toLocaleString()}.` : '';
   const capability = runtime.capabilityPermission ? ` Потрібна capability: ${runtime.capabilityPermission}.` : '';
-  $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${result}${verified}${error}`;
+  $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${planStatus}${result}${verified}${error}`;
   $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.`;
   const history = Array.isArray(runtime.history) ? runtime.history : [];
   $('agent-history').textContent = history.length

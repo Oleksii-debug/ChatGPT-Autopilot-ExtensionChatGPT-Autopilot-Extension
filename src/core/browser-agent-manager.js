@@ -37,6 +37,7 @@ import {
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeAgentPlanV1, reconcileAgentPlanV1 } from './agent-plan.js';
 
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
@@ -185,6 +186,7 @@ function normalizeRuntime(raw, now) {
     } : null,
     ownerInstructions: (Array.isArray(raw.ownerInstructions) ? raw.ownerInstructions : []).map(value => clean(value, 5000)).filter(Boolean).slice(-MAX_OWNER_INSTRUCTIONS),
     history: (Array.isArray(raw.history) ? raw.history : []).slice(-MAX_HISTORY),
+    plan: raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null,
     verifiedOutcome: raw.verifiedOutcome && typeof raw.verifiedOutcome === 'object' ? {
       snapshotSignature: clean(raw.verifiedOutcome.snapshotSignature, 80),
       verifiedAt: Math.max(0, Number(raw.verifiedOutcome.verifiedAt || 0)),
@@ -2180,6 +2182,26 @@ export class BrowserAgentManager {
       }
       action.coordinateStartTarget = clone(startProof.target);
       action.coordinateEndTarget = clone(endProof.target);
+    }
+
+    if (action.type === BrowserAgentActionType.PLAN) {
+      let plan;
+      try {
+        plan = reconcileAgentPlanV1(action.plan, { at: new Date(now).toISOString() });
+        if (plan.jobId !== id) throw new Error('AgentPlan jobId does not match Browser Agent job');
+      } catch (error) {
+        return this.recordRecoverableFailure(id, epoch, { type: 'planning', error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      }
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job || job.runtime.controlEpoch !== epoch || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+        job.runtime.plan = plan;
+        job.runtime.lastError = '';
+        job.runtime.updatedAt = now;
+        appendHistory(job.runtime, { at: now, type: 'plan', message: `Durable plan updated: ${plan.nodes.length} node(s), revision ${plan.revision}.` });
+        return store;
+      });
+      return { kind: 'PLAN_UPDATED', plan };
     }
 
     if (action.type === BrowserAgentActionType.DONE) {
