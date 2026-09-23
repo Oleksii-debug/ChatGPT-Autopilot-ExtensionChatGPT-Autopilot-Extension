@@ -880,6 +880,25 @@ test('Browser Agent does not complete an explicit outcome contract on model asse
   assert.match(live.job.runtime.lastError, /Outcome contract requires evidence/);
 });
 
+test('Browser Agent persists a planner-proposed DAG without treating planning as a browser effect', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'plan', plan: {
+      schemaVersion: 1, planId: 'plan-1', jobId: 'job-plan', objective: 'Inspect course', successCriteria: ['Course is visible'], createdAt: at, updatedAt: at, revision: 1,
+      nodes: [{ nodeId: 'inspect', title: 'Inspect course', objective: 'Read the course page', dependsOn: [], conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER', acceptanceCriteria: ['Course text observed'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+    } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-plan', goal: 'Inspect course' });
+  await manager.start('job-plan', { runInitial: false });
+  const result = await manager.cycleOne('job-plan');
+  const live = await manager.get('job-plan');
+  assert.equal(result.kind, 'PLAN_UPDATED');
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'READY');
+  assert.equal(live.job.runtime.stepCount, 0);
+});
+
 test('schedule policy validates paired active-window fields and ordered absolute bounds', () => {
   assert.throws(() => config({ activeWindowStart: '08:00' }), /requires both start and end times/);
   assert.throws(() => config({ scheduleStartAt: 20_000, scheduleEndAt: 10_000 }), /schedule end must be after start/);
