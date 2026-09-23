@@ -46,6 +46,13 @@ const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const PLAN_BOUND_ACTIONS = new Set([
+  BrowserAgentActionType.CLICK, BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.DRAG_AT, BrowserAgentActionType.TYPE_AT,
+  BrowserAgentActionType.TRUSTED_SCRIPT, BrowserAgentActionType.FILL, BrowserAgentActionType.FILL_CREDENTIAL, BrowserAgentActionType.SELECT,
+  BrowserAgentActionType.CHECK, BrowserAgentActionType.BATCH, BrowserAgentActionType.NEW_TAB, BrowserAgentActionType.SWITCH_TAB,
+  BrowserAgentActionType.CLOSE_TAB, BrowserAgentActionType.DOWNLOAD, BrowserAgentActionType.UPLOAD_DOWNLOAD, BrowserAgentActionType.KEY,
+  BrowserAgentActionType.SCROLL, BrowserAgentActionType.NAVIGATE, BrowserAgentActionType.BACK, BrowserAgentActionType.RELOAD,
+]);
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
 
@@ -2296,6 +2303,25 @@ export class BrowserAgentManager {
         return store;
       });
       return { kind: 'PLAN_NODE_VERIFIED', nodeId: node.nodeId, plan: nextPlan };
+    }
+
+    if (current.job.runtime.plan && PLAN_BOUND_ACTIONS.has(action.type)) {
+      const node = current.job.runtime.plan.nodes.find(item => item.nodeId === action.planNodeId);
+      if (!node || node.executionPlane !== 'BROWSER' || ![AgentPlanNodeState.READY, AgentPlanNodeState.RUNNING].includes(node.state)) {
+        return this.recordRecoverableFailure(id, epoch, { type: 'planning', error: new Error('Effectful Browser Agent action requires an eligible planNodeId'), action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      }
+      if (node.state === AgentPlanNodeState.READY) {
+        const plan = transitionAgentPlanNodeV1(current.job.runtime.plan, { nodeId: node.nodeId, state: AgentPlanNodeState.RUNNING, at: new Date(now).toISOString() });
+        await this.update(store => {
+          const job = store.byId[id];
+          if (!job || job.runtime.controlEpoch !== epoch || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+          job.runtime.plan = plan;
+          job.runtime.updatedAt = now;
+          appendHistory(job.runtime, { at: now, type: 'plan-node-running', message: `Plan node ${node.nodeId} claimed for Browser execution.`, nodeId: node.nodeId });
+          return store;
+        });
+        current.job.runtime.plan = plan;
+      }
     }
 
     if (action.type === BrowserAgentActionType.DONE) {

@@ -523,6 +523,8 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
   }
 
   const action = { type };
+  const planNodeId = clean(raw?.planNodeId, 180);
+  if (planNodeId) action.planNodeId = planNodeId;
   if (type === BrowserAgentActionType.PLAN) {
     if (!raw.plan || typeof raw.plan !== 'object' || Array.isArray(raw.plan)) throw new Error('Browser Agent plan action requires a plan object');
     action.plan = structuredClone(raw.plan);
@@ -826,7 +828,7 @@ export function buildBrowserAgentPlannerPrompt(config, runtime, snapshot) {
     'Use new_tab with an explicit http(s) URL when parallel browsing or preserving the current page materially helps the owner goal.',
     'Use batch to fill/select/check up to 8 stable controls from the SAME current snapshot when that safely reduces model round-trips. Do not put click/navigation/key/wait/done inside batch.',
     `Use plan before complex multi-step work to propose a bounded durable DAG. Planning is not a browser effect. The plan must use jobId ${config.id}, contain schemaVersion 1, and contain only BROWSER, LOCAL, CLOUD, or REMOTE executionPlane values.`,
-    'When a durable plan is present, use verify_plan_node only for a READY/RUNNING BROWSER node after its acceptance criteria are directly observable. Return nodeId and evidence exactly like done; Autopilot independently verifies it before marking that node VERIFIED. Do not use done until every plan node is VERIFIED.',
+    'When a durable plan is present, every effectful Browser action (click/fill/select/check/navigation/tab/download/upload/key/scroll/trusted script/batch) MUST include planNodeId of a READY/RUNNING BROWSER node. Autopilot atomically claims READY nodes before execution. Use verify_plan_node only for a READY/RUNNING BROWSER node after its acceptance criteria are directly observable. Return nodeId and evidence exactly like done; Autopilot independently verifies it before marking that node VERIFIED. Do not use done until every plan node is VERIFIED.',
     'Examples:',
     '{"type":"fill","frameId":0,"ref":"r1","text":"..."}',
     '{"type":"fill_credential","credentialRef":"c1","usernameFrameId":0,"usernameRef":"r1","passwordFrameId":0,"passwordRef":"r2"}',

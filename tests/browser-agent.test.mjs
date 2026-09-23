@@ -953,6 +953,29 @@ test('Browser Agent independently verifies a READY Browser plan node and unblock
   assert.match(live.job.runtime.plan.nodes[0].evidence, /page version 0/);
 });
 
+test('Browser Agent atomically claims the referenced READY plan node before a physical action', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  let phase = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => phase++ === 0
+      ? ({ text: JSON.stringify({ type: 'plan', plan: {
+        schemaVersion: 1, planId: 'plan-claim', jobId: 'job-plan-claim', objective: 'Act once', successCriteria: ['Clicked'], createdAt: at, updatedAt: at, revision: 1,
+        nodes: [{ nodeId: 'act', title: 'Act', objective: 'Click Add course', dependsOn: [], conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER', acceptanceCriteria: ['Page changes'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+      } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } })
+      : ({ text: JSON.stringify({ type: 'click', frameId: 0, ref: 'r1', planNodeId: 'act' }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-plan-claim', goal: 'Act once', approvalMode: 'ALLOW_ALL' });
+  await manager.start('job-plan-claim', { runInitial: false });
+  await manager.cycleOne('job-plan-claim');
+  const result = await manager.cycleOne('job-plan-claim');
+  const live = await manager.get('job-plan-claim');
+  assert.equal(result.kind, 'ACTION');
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'RUNNING');
+  assert.equal(chrome._actionCalls[0].planNodeId, 'act');
+});
+
 test('schedule policy validates paired active-window fields and ordered absolute bounds', () => {
   assert.throws(() => config({ activeWindowStart: '08:00' }), /requires both start and end times/);
   assert.throws(() => config({ scheduleStartAt: 20_000, scheduleEndAt: 10_000 }), /schedule end must be after start/);
