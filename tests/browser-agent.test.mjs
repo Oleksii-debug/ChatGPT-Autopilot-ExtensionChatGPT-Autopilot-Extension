@@ -118,7 +118,7 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
     return store;
   });
   const prepared = await manager.prepareSpecialistHandoff('job-1', {
-    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], deadlineAt:'2026-09-23T13:00:00Z', priority:5,
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00Z', priority:5,
   });
   assert.equal(prepared.reused, false);
   assert.equal((await manager.listSpecialistHandoffs('job-1')).handoffs.length, 1);
@@ -129,9 +129,10 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   assert.equal(claimed.claimed.length, 1);
   const completed = await manager.completeSpecialistHandoff('job-1', { agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:1'] });
   assert.equal(completed.verificationRequired, claimed.claimed[0]);
-  await assert.rejects(() => manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', evidence:'self verified' }), /independent/);
-  const verified = await manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'verifier-1', evidence:'Fresh artifact hash and current-state observation match.' });
+  await assert.rejects(() => manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', verificationAuthorityId:'policy:archive', evidence:'self verified' }), /independent/);
+  const verified = await manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:archive', evidence:'Fresh artifact hash and current-state observation match.' });
   assert.equal(verified.plan.nodes.find(node => node.nodeId === 'archive').state, 'VERIFIED');
+  assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
 });
 
 test('per-Agent AI routing is optional, isolated, and explicit provider overrides require an explicit model', () => {
