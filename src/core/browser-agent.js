@@ -737,6 +737,50 @@ export function verifyBrowserAgentOutcomeEvidence(config, action, snapshot) {
   };
 }
 
+/** A verifier is deliberately a read-only second model turn.  It receives the
+ * same immutable semantic snapshot as the actor, but cannot emit Browser Agent
+ * actions or alter policy.  The deterministic runtime remains the authority
+ * that binds its answer to the observed snapshot and owner criteria. */
+export function buildBrowserAgentOutcomeVerifierPrompt(config, snapshot) {
+  const criteria = normalizeBrowserAgentAcceptanceCriteria(config?.acceptanceCriteria);
+  return [
+    'You are the independent, read-only verifier for a Browser Agent outcome.',
+    'Return EXACTLY one JSON object and no Markdown. You cannot perform actions, grant permissions, or infer facts not present in the semantic snapshot.',
+    'For each owner acceptance criterion, decide whether the CURRENT snapshot directly proves it. If any criterion is not directly proven, return {"verified":false,"checks":[]}.',
+    'When all are proven, return {"verified":true,"checks":[{"criterion":1,"detail":"short observed evidence"}]}. Include each criterion exactly once and use only snapshot facts.',
+    `OWNER ACCEPTANCE CRITERIA:\n${criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join('\n')}`,
+    `SNAPSHOT SIGNATURE: ${browserSnapshotSignature(snapshot)}`,
+    `CURRENT SEMANTIC SNAPSHOT:\n${JSON.stringify(snapshot)}`,
+  ].join('\n\n');
+}
+
+export function parseBrowserAgentOutcomeVerification(rawText, config) {
+  let raw;
+  try { raw = JSON.parse(extractJsonObject(rawText)); }
+  catch (error) { throw new Error(`Invalid Browser Agent verifier JSON: ${error.message}`); }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || Object.keys(raw).some(key => !['verified', 'checks'].includes(key))) {
+    throw new Error('Browser Agent verifier response has an invalid shape');
+  }
+  if (raw.verified !== true) return { verified: false, checks: [] };
+  const criteria = normalizeBrowserAgentAcceptanceCriteria(config?.acceptanceCriteria);
+  const checks = Array.isArray(raw.checks) ? raw.checks : [];
+  if (checks.length !== criteria.length) throw new Error('Browser Agent verifier did not cover each criterion exactly once');
+  const seen = new Set();
+  const normalized = checks.map((check, index) => {
+    if (!check || typeof check !== 'object' || Array.isArray(check) || Object.keys(check).some(key => !['criterion', 'detail'].includes(key))) {
+      throw new Error(`Browser Agent verifier check ${index + 1} has an invalid shape`);
+    }
+    const criterion = Number(check.criterion);
+    const detail = clean(check.detail, 1000);
+    if (!Number.isInteger(criterion) || criterion < 1 || criterion > criteria.length || seen.has(criterion) || !detail) {
+      throw new Error('Browser Agent verifier did not cover each criterion exactly once');
+    }
+    seen.add(criterion);
+    return { criterion, text: criteria[criterion - 1], detail };
+  });
+  return { verified: true, checks: normalized };
+}
+
 export function buildBrowserAgentPlannerPrompt(config, runtime, snapshot) {
   const recent = Array.isArray(runtime.history) ? runtime.history.slice(-12) : [];
   const instructions = Array.isArray(runtime.ownerInstructions) ? runtime.ownerInstructions.slice(-8) : [];
