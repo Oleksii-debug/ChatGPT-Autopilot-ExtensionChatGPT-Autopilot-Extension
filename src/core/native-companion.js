@@ -4,6 +4,7 @@ export const NATIVE_COMPANION_PROTOCOL_VERSION = 1;
 export const NativeCompanionRequestType = Object.freeze({
   HELLO: 'hello', HEALTH: 'health', CAPABILITIES: 'capabilities', FILESYSTEM_READ_TEXT: 'filesystem.readText',
   CREDENTIALS_LIST: 'credentials.list', CREDENTIALS_RESOLVE: 'credentials.resolve', MCP_REQUEST: 'mcp.request', MCP_CLOSE: 'mcp.close',
+  WINDOWS_EXEC_PINNED: 'windows.execPinned', WINDOWS_UIA_QUERY: 'windows.uia.query',
 });
 const REQUEST_TYPES = new Set(Object.values(NativeCompanionRequestType));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -23,5 +24,6 @@ export class NativeCompanionClient{
  readText({rootId,relativePath,maxBytes=262144}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_READ_TEXT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',maxBytes});}
  listCredentials({targetOrigin}={}){return this.send(NativeCompanionRequestType.CREDENTIALS_LIST,{targetOrigin:clean(targetOrigin,2048)});} resolveCredential({credentialId,targetOrigin}={}){return this.send(NativeCompanionRequestType.CREDENTIALS_RESOLVE,{credentialId:clean(credentialId,128),targetOrigin:clean(targetOrigin,2048)});}
  mcpRequest(payload){return this.send(NativeCompanionRequestType.MCP_REQUEST,payload);} mcpClose(commandId){return this.send(NativeCompanionRequestType.MCP_CLOSE,{commandId});}
+ windowsExecPinned(payload){return this.send(NativeCompanionRequestType.WINDOWS_EXEC_PINNED,payload);} windowsQueryUia(payload){return this.send(NativeCompanionRequestType.WINDOWS_UIA_QUERY,payload);}
 }
 export function createNativeMcpTransportFactory(nativeClient){return async(server)=>({request:async(method,params,meta={})=>nativeClient.mcpRequest({commandId:server.commandId,method,params,timeoutMs:meta.timeoutMs??server.timeoutMs,invocationId:meta.invocationId??''}),notify:async(method,params,meta={})=>nativeClient.mcpRequest({commandId:server.commandId,method,params,timeoutMs:meta.timeoutMs??server.timeoutMs,notification:true}),close:async()=>{await nativeClient.mcpClose(server.commandId);}});}
