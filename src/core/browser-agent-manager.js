@@ -45,6 +45,7 @@ import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
+  authorizeAgentPlanSpecialistSafeRetryV1,
   completeAgentPlanSpecialistHandoffV1,
   verifyAgentPlanSpecialistHandoffV1,
   specialistAssignmentIdForPlanNodeV1,
@@ -465,6 +466,36 @@ export class BrowserAgentManager {
         }
       }
       result = { maxConcurrentHandoffs: limit, activeLeases: liveLeases.length, remainingSlots: remaining, claimed, reconciliationRequired };
+      return store;
+    });
+    return result;
+  }
+
+  async authorizeSpecialistSafeRetry(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
+      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+        ...payload,
+        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+        at: payload.at || now,
+      });
+      job.runtime.plan = retriable.plan;
+      job.runtime.specialistHandoffs = retriable.assignments;
+      job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-safe-retry-authorized',
+        agentId: retriable.retriableAgentId,
+        verifierId: retriable.safeRetryEvidence.verifierId,
+        verificationAuthorityId: retriable.safeRetryEvidence.verificationAuthorityId,
+        evidence: retriable.safeRetryEvidence.evidence,
+        message: 'Independent no-effect evidence authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+      });
+      result = clone(retriable);
       return store;
     });
     return result;

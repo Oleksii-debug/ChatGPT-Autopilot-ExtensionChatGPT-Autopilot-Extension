@@ -4,6 +4,7 @@ import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
+  authorizeAgentPlanSpecialistSafeRetryV1,
   completeAgentPlanSpecialistHandoffV1,
   verifyAgentPlanSpecialistHandoffV1,
 } from '../src/core/agent-specialist-bridge.js';
@@ -34,6 +35,28 @@ test('claim is durable and never silently retries an expired external lease', ()
   assert.equal(afterExpiry.executionOwnerships[0].state, 'RECONCILE');
   const repeated = claimAgentPlanSpecialistHandoffsV1(afterExpiry.plan, afterExpiry.assignments, { executionOwnerships:afterExpiry.executionOwnerships, availableSlots:1, at:'2026-09-23T12:02:00.000Z' });
   assert.equal(repeated.executionOwnerships[0].state, 'RECONCILE');
+});
+
+test('expired handoff becomes retriable only after independent no-effect evidence bound to its policy', () => {
+  const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
+  const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), [assignment], { executionOwnerships:[ownership()], availableSlots:1, leaseSeconds:30, at:T0 });
+  const expired = claimAgentPlanSpecialistHandoffsV1(claimed.plan, claimed.assignments, { executionOwnerships:claimed.executionOwnerships, availableSlots:1, at:T1 });
+  const agentId = claimed.assignments[0].agentId;
+  const leaseId = claimed.assignments[0].leaseId;
+  const payload = { executionOwnerships:expired.executionOwnerships, agentId, leaseId, verifierId:'reconciler-1', verificationAuthorityId:'policy:archive', evidence:'Fresh provider observation proves the archive does not exist.', at:'2026-09-23T12:01:01.000Z' };
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, evidence:'' }), /evidence/);
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verifierId:agentId }), /independent/);
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verificationAuthorityId:'policy:other' }), /policy envelope/);
+  const retriable = authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, payload);
+  assert.equal(retriable.assignments[0].state, 'READY');
+  assert.equal(retriable.assignments[0].leaseId, '');
+  assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
+  assert.equal(retriable.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId, 'effect identity must survive reconciliation');
+  assert.equal(retriable.plan.nodes.find(node => node.nodeId === 'local').state, 'READY');
+  const reclaimed = claimAgentPlanSpecialistHandoffsV1(retriable.plan, retriable.assignments, { executionOwnerships:retriable.executionOwnerships, availableSlots:1, leaseSeconds:30, at:'2026-09-23T12:01:02.000Z' });
+  assert.deepEqual(reclaimed.claimed, [agentId]);
+  assert.notEqual(reclaimed.assignments[0].leaseId, leaseId);
+  assert.equal(reclaimed.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId);
 });
 
 test('completed specialist result cannot finish a plan without independent verification', () => {

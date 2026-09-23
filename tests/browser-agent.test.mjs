@@ -135,6 +135,48 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
 });
 
+test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handoff only through normal capacity', async () => {
+  const chrome = makeChrome();
+  let clock = Date.parse('2026-09-23T12:00:00Z');
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
+  await manager.create({ id:'job-retry', goal:'Recover an ambiguous specialist effect' });
+  await manager.update(store => {
+    store.byId['job-retry'].runtime.plan = {
+      schemaVersion:1, planId:'plan-retry', jobId:'job-retry', objective:'Recover safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      nodes:[
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web:retry'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files:retry'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+      ],
+    };
+    return store;
+  });
+  await manager.prepareSpecialistHandoff('job-retry', {
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:retry', deadlineAt:'2026-09-23T13:00:00Z',
+  });
+  const claimed = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  clock = Date.parse('2026-09-23T12:01:00Z');
+  const expired = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1 });
+  assert.deepEqual(expired.claimed, []);
+  assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
+  const reconciliation = { agentId, leaseId, verifierId:'provider-observer', verificationAuthorityId:'policy:retry', evidence:'A fresh provider query proves no archive exists.' };
+  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', { ...reconciliation, evidence:'' }), /evidence/);
+  const retriable = await manager.authorizeSpecialistSafeRetry('job-retry', reconciliation);
+  assert.equal(retriable.assignments[0].state, 'READY');
+  assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
+  const durable = await manager.get('job-retry');
+  assert.equal(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
+  assert.equal(durable.job.runtime.history.at(-1).evidence, reconciliation.evidence);
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock + 2_000 });
+  const beforeAdmission = await restarted.listSpecialistHandoffs('job-retry');
+  assert.equal(beforeAdmission.handoffs[0].state, 'READY', 'restart must preserve explicit SAFE_RETRY authorization');
+  const reclaimed = await restarted.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
+  assert.deepEqual(reclaimed.claimed, [agentId]);
+  assert.notEqual(reclaimed.assignments[0].leaseId, leaseId);
+  assert.equal(reclaimed.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId);
+});
+
 test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
   const chrome = makeChrome();
   const at = '2026-09-23T12:00:00Z';
