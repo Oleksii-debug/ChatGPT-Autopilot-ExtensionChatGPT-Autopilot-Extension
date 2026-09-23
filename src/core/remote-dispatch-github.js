@@ -47,10 +47,12 @@ async function readJson(response, label) {
   if (!response?.ok) {
     const status = Number(response?.status || 0);
     const remaining = rateLimitRemaining(response);
-    const code = status === 403 && remaining === 0 ? 'RATE_LIMITED' : status === 404 ? 'NOT_FOUND' : 'HTTP_ERROR';
+    const retryAfter = retryAfterSeconds(response);
+    const rateLimited = status === 429 || (status === 403 && (remaining === 0 || retryAfter > 0));
+    const code = rateLimited ? 'RATE_LIMITED' : status === 404 ? 'NOT_FOUND' : 'HTTP_ERROR';
     throw new RemoteDispatchGitHubError(code, `${label} failed with HTTP ${status || 'unknown'}`, {
       status,
-      retryAfterSeconds: retryAfterSeconds(response),
+      retryAfterSeconds: retryAfter,
       rateLimitRemaining: remaining,
     });
   }
