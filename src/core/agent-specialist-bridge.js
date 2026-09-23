@@ -12,6 +12,7 @@ import {
   normalizeExecutionOwnershipV1,
   claimExecutionOwnershipV1,
   recoverExpiredExecutionOwnershipV1,
+  resolveExecutionReconciliationV1,
   verifyExecutionByAuthorityV1,
 } from './execution-plane-ownership.js';
 
@@ -148,6 +149,58 @@ export function claimAgentPlanSpecialistHandoffsV1(rawPlan, rawAssignments, { ex
     plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.RUNNING, at: now });
   }
   return freeze({ plan, assignments: merged, executionOwnerships: ownerships.map(normalizeExecutionOwnershipV1), claimed: claimedResult.claimed, reconciliationRequired: expired });
+}
+
+/**
+ * Makes an expired handoff eligible for a new lease only after an independent
+ * verifier proves that the ambiguous attempt committed no effect.  This does
+ * not dispatch the retry: normal bounded admission must claim it again.
+ */
+export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments, {
+  executionOwnerships = [], agentId, leaseId, verifierId, verificationAuthorityId, evidence,
+  at = new Date().toISOString(),
+} = {}) {
+  let plan = normalizeAgentPlanV1(rawPlan);
+  const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
+  const assignment = assignments.find(item => item.agentId === id(agentId, 'agentId'));
+  const preservedLeaseId = id(leaseId, 'leaseId');
+  if (!assignment || assignment.state !== SpecialistAssignmentState.LEASED || assignment.leaseId !== preservedLeaseId) {
+    throw new Error('SAFE_RETRY requires the preserved specialist lease identity');
+  }
+  const verifier = id(verifierId, 'verifierId');
+  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) {
+    throw new Error('SAFE_RETRY verifier must be independent from specialist and parent');
+  }
+  const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
+  const node = nodeForAssignment(plan, assignment);
+  if (node.state !== AgentPlanNodeState.RUNNING) throw new Error('SAFE_RETRY requires the ambiguous AgentPlan node to remain RUNNING');
+  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
+  const ownership = ownerships.find(item => item.effectId === effectId);
+  if (ownership.state !== ExecutionOwnershipState.RECONCILE || ownership.leaseId !== preservedLeaseId) {
+    throw new Error('SAFE_RETRY requires matching canonical execution reconciliation');
+  }
+  const authority = id(verificationAuthorityId, 'verificationAuthorityId');
+  if (authority !== ownership.policyEnvelopeId) throw new Error('SAFE_RETRY authority must bind the execution policy envelope');
+  const noEffectEvidence = text(evidence, 'SAFE_RETRY no-effect evidence', 1000);
+  const availableOwnership = resolveExecutionReconciliationV1(ownership, {
+    leaseId: preservedLeaseId,
+    outcome: 'SAFE_RETRY',
+    evidence: noEffectEvidence,
+    at,
+  });
+  assignment.state = SpecialistAssignmentState.READY;
+  assignment.leaseId = '';
+  assignment.leaseExpiresAt = '';
+  assignment.resultArtifactIds = [];
+  assignment.updatedAt = timestamp(at, 'at');
+  plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.READY, at });
+  return freeze({
+    plan,
+    assignments: assignments.map(normalizeSpecialistAssignmentV1),
+    executionOwnerships: ownerships.map(item => item.effectId === effectId ? availableOwnership : item),
+    retriableAgentId: assignment.agentId,
+    safeRetryEvidence: { verifierId: verifier, verificationAuthorityId: authority, evidence: noEffectEvidence },
+  });
 }
 
 export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { executionOwnerships = [], agentId, leaseId, resultArtifactIds, at = new Date().toISOString() } = {}) {
