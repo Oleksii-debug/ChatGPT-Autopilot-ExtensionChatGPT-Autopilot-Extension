@@ -370,3 +370,85 @@ test('precondition fingerprint rejects same-ID/revision snapshots with substitut
     'canonical normalization must make semantically identical observation order stable',
   );
 });
+
+test('public freshness and precondition envelopes reject accessors before reading them', () => {
+  let reads = 0;
+  const options = {};
+  Object.defineProperty(options, 'at', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ASSESSED;
+    },
+  });
+  options.requiredResourceIds = ['repo-main'];
+  assert.throws(
+    () => assessWorldStateSnapshotFreshnessV1(snapshot(), [current()], options),
+    /field must be a data property: at/,
+  );
+  assert.equal(reads, 0);
+
+  const request = {
+    snapshot: snapshot(),
+    currentObservations: [current()],
+    invocationId: 'invoke-1',
+    at: ASSESSED,
+  };
+  Object.defineProperty(request, 'precondition', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return precondition();
+    },
+  });
+  assert.throws(
+    () => assertWorldStatePreconditionFreshV1(request),
+    /field must be a data property: precondition/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('public guard envelopes reject hidden, symbol, unknown and exotic authority fields', () => {
+  const hiddenOptions = { at: ASSESSED, requiredResourceIds: ['repo-main'] };
+  Object.defineProperty(hiddenOptions, 'requiredResourceIds', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: ['repo-main'],
+  });
+  assert.throws(
+    () => assessWorldStateSnapshotFreshnessV1(snapshot(), [current()], hiddenOptions),
+    /non-enumerable field: requiredResourceIds/,
+  );
+
+  const symbolOptions = { at: ASSESSED, requiredResourceIds: ['repo-main'] };
+  symbolOptions[Symbol('authority')] = 'FRESH';
+  assert.throws(
+    () => assessWorldStateSnapshotFreshnessV1(snapshot(), [current()], symbolOptions),
+    /symbol field/,
+  );
+
+  assert.throws(
+    () => assessWorldStateSnapshotFreshnessV1(snapshot(), [current()], {
+      at: ASSESSED,
+      requiredResourceIds: ['repo-main'],
+      forceFresh: true,
+    }),
+    /unknown field: forceFresh/,
+  );
+
+  const exoticRequest = Object.create({
+    precondition: precondition(),
+    snapshot: snapshot(),
+    currentObservations: [current()],
+    invocationId: 'invoke-1',
+    at: ASSESSED,
+  });
+  assert.throws(
+    () => assertWorldStatePreconditionFreshV1(exoticRequest),
+    /plain data object/,
+  );
+});
+
