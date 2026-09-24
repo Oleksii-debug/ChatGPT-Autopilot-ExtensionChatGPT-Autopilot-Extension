@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
+import { createFilesystemScopeV1, withAuthorizedExistingFileV1 } from './filesystem-provider.mjs';
 import { normalizeWindowsProviderConfig } from './windows-provider.mjs';
 
 export const HOST_NAME = 'org.chatgpt_autopilot.companion';
@@ -121,7 +122,7 @@ function requireReadLimit(value) {
   return n;
 }
 
-async function readScopedText(payload, config, fsApi) {
+async function readScopedText(payload, config, fsApi, beforeOpen = null) {
   const rootId = normalizeId(payload.rootId, 'rootId');
   const relativePath = requireString(payload.relativePath, 'relativePath');
   if (path.isAbsolute(relativePath)) throw companionError('PATH_OUTSIDE_SCOPE', 'relativePath must not be absolute');
@@ -132,33 +133,45 @@ async function readScopedText(payload, config, fsApi) {
   const maxBytes = requireReadLimit(payload.maxBytes);
 
   let rootReal;
-  let fileReal;
   try {
     rootReal = await fsApi.realpath(root.path);
-    fileReal = await fsApi.realpath(path.resolve(root.path, relativePath));
   } catch {
     throw companionError('FILE_NOT_FOUND', 'Requested file is unavailable');
   }
-  const rel = path.relative(rootReal, fileReal);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw companionError('PATH_OUTSIDE_SCOPE', 'Requested file escapes the configured root');
-
-  const stat = await fsApi.stat(fileReal);
-  if (!stat.isFile()) throw companionError('NOT_A_FILE', 'Requested path is not a file');
-  if (stat.size > maxBytes) throw companionError('FILE_TOO_LARGE', `Requested file exceeds maxBytes (${stat.size} > ${maxBytes})`);
-  const bytes = await fsApi.readFile(fileReal);
-  if (bytes.byteLength > maxBytes) throw companionError('FILE_TOO_LARGE', 'Requested file grew beyond maxBytes during read');
+  const scope = createFilesystemScopeV1({ scopeId: rootId, roots: [root.path] });
+  let read;
+  try {
+    read = await withAuthorizedExistingFileV1(scope, path.resolve(root.path, relativePath), { beforeOpen }, async (handle, admitted) => {
+      const rel = path.relative(rootReal, admitted.path);
+      if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) throw companionError('PATH_OUTSIDE_SCOPE', 'Requested file escapes the configured root');
+      if (!admitted.stat.isFile()) throw companionError('NOT_A_FILE', 'Requested path is not a file');
+      if (admitted.stat.size > maxBytes) throw companionError('FILE_TOO_LARGE', `Requested file exceeds maxBytes (${admitted.stat.size} > ${maxBytes})`);
+      const buffer = Buffer.alloc(maxBytes + 1);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      if (bytesRead > maxBytes) throw companionError('FILE_TOO_LARGE', 'Requested file grew beyond maxBytes during read');
+      return { relativePath: rel.replace(/\\/gu, '/'), bytes: buffer.subarray(0, bytesRead) };
+    });
+  } catch (error) {
+    if (error?.code && !['ENOENT', 'ELOOP'].includes(error.code)) throw error;
+    if (error?.code === 'ENOENT') throw companionError('FILE_NOT_FOUND', 'Requested file is unavailable');
+    if (error?.code === 'ELOOP' || /escapes owner scope|symbolic link|identity changed/iu.test(String(error?.message || ''))) {
+      throw companionError('PATH_OUTSIDE_SCOPE', 'Requested file escapes the configured root');
+    }
+    throw error;
+  }
+  const { bytes } = read;
   let text;
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
   catch { throw companionError('UNSUPPORTED_ENCODING', 'Only valid UTF-8 text files are supported by filesystem.readText V1'); }
   return {
     rootId,
-    relativePath: rel.replace(/\\/gu, '/'),
+    relativePath: read.relativePath,
     sizeBytes: bytes.byteLength,
     text,
   };
 }
 
-export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now(), credentialBroker = null, mcpBridge = null, windowsProvider = null } = {}) {
+export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, fsReadBeforeOpen = null, now = () => Date.now(), credentialBroker = null, mcpBridge = null, windowsProvider = null } = {}) {
   let request;
   try {
     const normalizedConfig = normalizeNativeCompanionConfig(config);
@@ -192,7 +205,7 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
       });
     }
     if (request.type === RequestType.FILESYSTEM_READ_TEXT) {
-      return response(request, await readScopedText(request.payload, normalizedConfig, fsApi));
+      return response(request, await readScopedText(request.payload, normalizedConfig, fsApi, fsReadBeforeOpen));
     }
     if (request.type === RequestType.CREDENTIALS_LIST) {
       if (!credentialBroker) throw companionError('CREDENTIAL_BROKER_UNAVAILABLE', 'CredentialBroker is not configured');

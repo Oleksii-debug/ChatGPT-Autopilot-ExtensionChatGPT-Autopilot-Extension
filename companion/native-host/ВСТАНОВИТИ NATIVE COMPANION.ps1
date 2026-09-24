@@ -15,6 +15,7 @@ New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDi
 $copyNames = @(
   'host.mjs',
   'host-core.mjs',
+  'filesystem-provider.mjs',
   'credential-broker.mjs',
   'mcp-stdio-bridge.mjs',
   'windows-provider.mjs',

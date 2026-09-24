@@ -335,12 +335,37 @@ test('filesystem.readText rejects a symlink that escapes the configured root', a
   assert.equal(response.error.code, 'PATH_OUTSIDE_SCOPE');
 });
 
-test('Windows installer includes each module imported by the Native Host entrypoint', async () => {
+test('native host read refuses a symlink swapped after scope admission', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-native-swap-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  const outside = path.join(temp, 'private.txt');
+  await fs.writeFile(target, 'allowed');
+  await fs.writeFile(outside, 'outside-secret');
+  const result = await handleNativeCompanionRequest(request('filesystem.readText', {
+    rootId: 'workspace', relativePath: 'note.txt',
+  }), {
+    config: config(root), callerOrigin: ORIGIN,
+    fsReadBeforeOpen: async () => {
+      await fs.rm(target);
+      await fs.symlink(outside, target, 'file');
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'PATH_OUTSIDE_SCOPE');
+  assert.equal(JSON.stringify(result).includes('outside-secret'), false);
+});
+
+test('Windows installer copies every local module imported by the Native Host', async () => {
   const hostDir = path.join(repoRoot, 'companion', 'native-host');
-  const host = await fs.readFile(path.join(hostDir, 'host.mjs'), 'utf8');
   const installer = await fs.readFile(path.join(hostDir, 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
-  for (const [, localModule] of host.matchAll(/from ['"]\.\/([^'"]+\.mjs)['"]/gu)) {
-    assert.ok(installer.includes(`'${localModule}'`), `Installer omits ${localModule}`);
+  for (const entry of ['host.mjs', 'host-core.mjs', 'filesystem-provider.mjs']) {
+    const source = await fs.readFile(path.join(hostDir, entry), 'utf8');
+    for (const [, localModule] of source.matchAll(/from ['"]\.\/([^'"]+\.mjs)['"]/gu)) {
+      assert.ok(installer.includes(`'${localModule}'`), `${entry} imports ${localModule}, but installer does not copy it`);
+    }
   }
 });
 
