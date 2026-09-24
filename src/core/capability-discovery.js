@@ -83,6 +83,7 @@ function frozen(value) {
 const PROVIDER_STATE_KEYS = new Set([
   'schemaVersion',
   'providerId',
+  'toolId',
   'health',
   'installationRequired',
   'installed',
@@ -102,6 +103,7 @@ export function normalizeProviderReadinessV1(input) {
   return frozen({
     schemaVersion: 1,
     providerId: id(raw.providerId, 'providerId'),
+    toolId: raw.toolId == null || raw.toolId === '' ? '' : id(raw.toolId, 'toolId'),
     health,
     installationRequired: bool(raw.installationRequired, 'installationRequired'),
     installed: bool(raw.installed, 'installed'),
@@ -144,13 +146,22 @@ function normalizeInventory({ capabilities, tools, providerStates }) {
   }
 
   const normalizedStates = boundedArray(providerStates, 'providerStates', MAX_PROVIDER_STATES).map(normalizeProviderReadinessV1);
-  const statesByProviderId = new Map();
+  const toolsById = new Map(normalizedTools.map(tool => [tool.toolId, tool]));
+  const statesByProviderTool = new Map();
   for (const state of normalizedStates) {
-    if (statesByProviderId.has(state.providerId)) throw new Error('providerStates contain duplicate providerId');
-    statesByProviderId.set(state.providerId, state);
+    if (state.toolId) {
+      const tool = toolsById.get(state.toolId);
+      if (!tool) throw new Error(`providerStates references unknown toolId: ${state.toolId}`);
+      if (tool.providerId !== state.providerId) {
+        throw new Error(`providerStates toolId ${state.toolId} does not belong to providerId ${state.providerId}`);
+      }
+    }
+    const key = `${state.providerId}\u0000${state.toolId}`;
+    if (statesByProviderTool.has(key)) throw new Error('providerStates contain duplicate provider/tool readiness identity');
+    statesByProviderTool.set(key, state);
   }
 
-  return { normalizedCapabilities, normalizedTools, statesByProviderId, capabilityIds };
+  return { normalizedCapabilities, normalizedTools, statesByProviderTool, capabilityIds };
 }
 
 function requestedIds(value) {
@@ -195,12 +206,15 @@ function compareCandidate(a, b) {
     || a.toolId.localeCompare(b.toolId);
 }
 
-function providerFacts(providerId, statesByProviderId) {
-  const state = statesByProviderId.get(providerId);
-  if (state) return state;
+function providerFacts(providerId, toolId, statesByProviderTool) {
+  const toolSpecific = statesByProviderTool.get(`${providerId}\u0000${toolId}`);
+  if (toolSpecific) return toolSpecific;
+  const providerWide = statesByProviderTool.get(`${providerId}\u0000`);
+  if (providerWide) return providerWide;
   return Object.freeze({
     schemaVersion: 1,
     providerId,
+    toolId,
     health: ProviderHealthStatus.UNKNOWN,
     installationRequired: false,
     installed: false,
@@ -257,7 +271,7 @@ export function discoverCapabilityPathsV1({
     .map(tool => {
       const matchingCapabilityIds = tool.capabilityIds.filter(capabilityId => requestedSet.has(capabilityId)).sort();
       if (!matchingCapabilityIds.length) return null;
-      const state = providerFacts(tool.providerId, inventory.statesByProviderId);
+      const state = providerFacts(tool.providerId, tool.toolId, inventory.statesByProviderTool);
       return frozen({
         providerId: tool.providerId,
         toolId: tool.toolId,
