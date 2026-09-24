@@ -24,14 +24,15 @@ const MAX_EVIDENCE_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
 
 function requireId(value, label) {
-  const out = String(value ?? '').trim();
+  if (typeof value !== 'string') throw new Error(`${label} is invalid`);
+  const out = value.trim();
   if (!ID.test(out)) throw new Error(`${label} is invalid`);
   return out;
 }
 
 function requireStore(store) {
-  if (!store || typeof store.load !== 'function' || typeof store.save !== 'function') {
-    throw new Error('Canonical exact-effect state store adapter is required');
+  if (!store || typeof store.update !== 'function') {
+    throw new Error('Canonical atomic durable exact-effect store is required');
   }
 }
 
@@ -111,30 +112,74 @@ export class GitHubExactEffectExecutorV1 {
 
   #at() { return new Date(this.now()).toISOString(); }
 
+  async #atomic(mutator) {
+    let result;
+    await this.store.update(draft => {
+      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+        throw new Error('Canonical exact-effect store root is invalid');
+      }
+      if (draft.effectsById == null) draft.effectsById = {};
+      if (!draft.effectsById || typeof draft.effectsById !== 'object' || Array.isArray(draft.effectsById)) {
+        throw new Error('Canonical exact-effect store effectsById is invalid');
+      }
+      result = mutator(draft.effectsById);
+      return draft;
+    });
+    return result;
+  }
+
   async #save(state) {
     const normalized = normalizeExactEffectStateV1(state);
-    await this.store.save(normalized.effectId, normalized);
-    return normalized;
-  }
-
-  async #loadAuthorized(invocation) {
-    const invocationId = requireId(invocation?.invocationId, 'invocationId');
-    const stored = await this.store.load(invocationId);
-    if (!stored) return this.#save(createExactEffectStateV1(invocation, { createdAt: invocation.createdAt }));
-    const state = normalizeExactEffectStateV1(stored);
-    if (canonical(state.invocation) !== canonical(invocation)) {
-      throw new Error('GitHub exact-effect invocation binding changed');
-    }
-    return state;
-  }
-
-  async #moveInterruptedToReconcile(state) {
-    if (![ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) return state;
-    const next = event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'restart-ambiguity', this.#at(), {
-      reasonCode: 'GITHUB_DISPATCH_INTERRUPTED',
-      summary: 'Interrupted GitHub mutation requires independent reconciliation before any retry.',
+    return this.#atomic(effectsById => {
+      const prior = effectsById[normalized.effectId];
+      effectsById[normalized.effectId] = {
+        ...(prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {}),
+        state: normalized,
+      };
+      return normalized;
     });
-    return this.#save(next);
+  }
+
+  async #loadById(invocationId) {
+    const id = requireId(invocationId, 'invocationId');
+    return this.#atomic(effectsById => {
+      const stored = effectsById[id]?.state;
+      return stored ? normalizeExactEffectStateV1(stored) : null;
+    });
+  }
+
+  async #admitExecution(invocation) {
+    const invocationId = requireId(invocation?.invocationId, 'invocationId');
+    return this.#atomic(effectsById => {
+      const prior = effectsById[invocationId];
+      let state = prior?.state
+        ? normalizeExactEffectStateV1(prior.state)
+        : createExactEffectStateV1(invocation, { createdAt: invocation.createdAt });
+
+      if (prior?.state && canonical(state.invocation) !== canonical(invocation)) {
+        throw new Error('GitHub exact-effect invocation binding changed');
+      }
+      if (state.phase === ExactEffectPhase.VERIFIED) {
+        return Object.freeze({ status: 'VERIFIED', state });
+      }
+      if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(state.phase)) {
+        return Object.freeze({ status: 'BLOCKED', state });
+      }
+
+      state = event(state, ExactEffectEventType.BEGIN_EXECUTION, 'begin', this.#at());
+      effectsById[invocationId] = {
+        ...(prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {}),
+        state,
+      };
+      return Object.freeze({ status: 'EXECUTING', state });
+    });
+  }
+
+  async #commitVerified(state) {
+    if (state.phase !== ExactEffectPhase.VERIFIED) throw new Error('Only a verified GitHub effect may be committed');
+    return this.#save(event(state, ExactEffectEventType.COMMIT, 'commit', this.#at(), {
+      commitId: `${state.effectId}:commit`,
+    }));
   }
 
   async invoke({ invocation, policyDecision } = {}) {
@@ -146,9 +191,13 @@ export class GitHubExactEffectExecutorV1 {
     invocation = authorized.invocation;
     policyDecision = authorized.policyDecision;
 
-    let state = await this.#loadAuthorized(invocation);
-    state = await this.#moveInterruptedToReconcile(state);
-    if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(state.phase)) {
+    const admitted = await this.#admitExecution(invocation);
+    let state = admitted.state;
+    if (admitted.status === 'VERIFIED') {
+      state = await this.#commitVerified(state);
+      return Object.freeze({ providerResult: null, effectState: state, resumedCommit: true });
+    }
+    if (admitted.status !== 'EXECUTING') {
       const error = new Error(state.phase === ExactEffectPhase.RECONCILE
         ? 'GitHub effect requires reconciliation before retry'
         : `GitHub effect cannot execute from ${state.phase}`);
@@ -157,8 +206,6 @@ export class GitHubExactEffectExecutorV1 {
       error.safeToRetry = false;
       throw error;
     }
-
-    state = await this.#save(event(state, ExactEffectEventType.BEGIN_EXECUTION, 'begin', this.#at()));
 
     try {
       const providerResult = await this.provider.invoke({ invocation, policyDecision });
@@ -183,10 +230,8 @@ export class GitHubExactEffectExecutorV1 {
         throw error;
       }
 
-      state = await this.#save(event(state, ExactEffectEventType.COMMIT, 'commit', this.#at(), {
-        commitId: `${state.effectId}:commit`,
-      }));
-      return Object.freeze({ providerResult, effectState: state });
+      state = await this.#commitVerified(state);
+      return Object.freeze({ providerResult, effectState: state, resumedCommit: false });
     } catch (error) {
       if ([ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) {
         state = await this.#save(event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'dispatch-ambiguity', this.#at(), {
@@ -201,12 +246,30 @@ export class GitHubExactEffectExecutorV1 {
     }
   }
 
+  async recoverInterrupted() {
+    return this.#atomic(effectsById => {
+      const recovered = [];
+      for (const [invocationId, entry] of Object.entries(effectsById)) {
+        if (!entry?.state) continue;
+        let state = normalizeExactEffectStateV1(entry.state);
+        if (state.invocation.providerId !== 'remote/github'
+          || ![ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) continue;
+        state = event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'restart-ambiguity', this.#at(), {
+          reasonCode: 'GITHUB_DISPATCH_INTERRUPTED',
+          summary: 'Interrupted GitHub mutation requires independent reconciliation before any retry.',
+        });
+        entry.state = state;
+        recovered.push(Object.freeze({ invocationId, phase: state.phase }));
+      }
+      return Object.freeze(recovered);
+    });
+  }
+
   async reconcile({ invocationId, outcome, reasonCode = 'GITHUB_RECONCILED', summary = '' } = {}) {
     const id = requireId(invocationId, 'invocationId');
-    const stored = await this.store.load(id);
+    const stored = await this.#loadById(id);
     if (!stored) throw new Error('Exact-effect state was not found');
-    let state = normalizeExactEffectStateV1(stored);
-    state = await this.#moveInterruptedToReconcile(state);
+    let state = stored;
     if (state.phase !== ExactEffectPhase.RECONCILE) throw new Error('GitHub effect is not awaiting reconciliation');
 
     const normalizedOutcome = String(outcome || '').trim().toUpperCase();
@@ -278,9 +341,7 @@ export class GitHubExactEffectExecutorV1 {
       verification,
     }));
     if (state.phase === ExactEffectPhase.VERIFIED) {
-      state = await this.#save(event(state, ExactEffectEventType.COMMIT, 'reconcile-commit', this.#at(), {
-        commitId: `${state.effectId}:commit`,
-      }));
+      state = await this.#commitVerified(state);
     }
     return state;
   }
