@@ -14,6 +14,9 @@ const DEFAULT_UPSTREAM_TIMEOUT_MS = Math.min(900_000, Math.max(5_000, Number(pro
 const STATUS_PROBE_TIMEOUT_MS = Math.min(15_000, Math.max(1_000, Number(process.env.AUTOPILOT_STATUS_TIMEOUT_MS || 3_000)));
 const DEFAULT_MAX_PENDING_INFERENCE = Math.min(256, Math.max(1, Number(process.env.AUTOPILOT_AI_MAX_PENDING || 32)));
 const PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
+const PINNED_COMPATIBLE_CREDENTIAL_BINDINGS = Object.freeze({
+  MISTRAL_API_KEY: Object.freeze({ endpointId: 'mistral', origin: 'https://api.mistral.ai' }),
+});
 const GATEWAY_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PID_DIR = path.join(GATEWAY_DIR, 'runtime-state');
 const PID_FILE = path.join(PID_DIR, 'gateway.pid');
@@ -74,6 +77,7 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
   }];
   if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
   const seen = new Set();
+  const seenPinnedCredentialRefs = new Set();
   return Object.freeze(entries.map((item, index) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     const extra = Object.keys(item).filter(key => !['endpointId', 'baseUrl', 'apiKeyEnv'].includes(key));
@@ -84,7 +88,22 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
     seen.add(endpointId);
     const apiKeyEnv = clean(item.apiKeyEnv);
     if (apiKeyEnv && !/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw gatewayError(`OpenAI-compatible endpoint ${endpointId} has an invalid apiKeyEnv`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
-    return Object.freeze({ endpointId, baseUrl: normalizeCompatibleBaseUrl(item.baseUrl), apiKeyEnv });
+    const baseUrl = normalizeCompatibleBaseUrl(item.baseUrl);
+    const pinnedCredential = apiKeyEnv ? PINNED_COMPATIBLE_CREDENTIAL_BINDINGS[apiKeyEnv] : null;
+    if (pinnedCredential) {
+      if (endpointId !== pinnedCredential.endpointId || new URL(baseUrl).origin !== pinnedCredential.origin) {
+        throw gatewayError(
+          `Credential ${apiKeyEnv} is pinned to endpoint ${pinnedCredential.endpointId} at ${pinnedCredential.origin}`,
+          500,
+          'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH',
+        );
+      }
+      if (seenPinnedCredentialRefs.has(apiKeyEnv)) {
+        throw gatewayError(`Pinned credential reference is duplicated: ${apiKeyEnv}`, 500, 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
+      }
+      seenPinnedCredentialRefs.add(apiKeyEnv);
+    }
+    return Object.freeze({ endpointId, baseUrl, apiKeyEnv });
   }));
 }
 
@@ -324,8 +343,17 @@ function openAiHeaders() {
 }
 
 function compatibleHeaders(endpoint, env = process.env) {
-  const key = endpoint?.apiKeyEnv ? clean(env[endpoint.apiKeyEnv]) : '';
-  return key ? { authorization: `Bearer ${key}` } : {};
+  const apiKeyEnv = clean(endpoint?.apiKeyEnv);
+  if (!apiKeyEnv) return {};
+  const key = clean(env[apiKeyEnv]);
+  if (!key) {
+    throw gatewayError(
+      `Credential ${apiKeyEnv} is not configured for OpenAI-compatible endpoint ${clean(endpoint?.endpointId) || 'unknown'}`,
+      428,
+      'AI_PROVIDER_API_KEY_NOT_CONFIGURED',
+    );
+  }
+  return { authorization: `Bearer ${key}` };
 }
 
 function normalizeImageDataUrl(value) {
