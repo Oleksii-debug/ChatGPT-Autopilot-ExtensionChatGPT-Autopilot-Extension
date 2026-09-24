@@ -264,6 +264,18 @@ function normalizeInput(input) {
     throw new Error('artifactRefs contains duplicate artifactId');
   }
 
+  const bootstrapTime = Date.parse(createdAt);
+  for (const source of sourceRefs) {
+    if (Date.parse(source.observedAt) > bootstrapTime) {
+      throw new Error(`source observedAt is after bootstrap createdAt: ${source.sourceId}`);
+    }
+  }
+  for (const artifact of artifactRefs) {
+    if (Date.parse(artifact.createdAt) > bootstrapTime) {
+      throw new Error(`artifact createdAt is after bootstrap createdAt: ${artifact.artifactId}`);
+    }
+  }
+
   const requiredSourceIds = uniqueIds(
     ownValue(raw, 'requiredSourceIds'),
     'requiredSourceIds',
