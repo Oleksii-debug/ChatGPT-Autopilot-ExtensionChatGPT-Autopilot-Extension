@@ -25,6 +25,7 @@ const VARIABLE_KEYS = new Set(['name', 'required', 'maxChars', 'defaultValue', '
 const SOURCE_KEYS = new Set(['sourceId', 'revisionId', 'contentSha256']);
 const CADENCE_KEYS = new Set(['mode', 'referenceId']);
 const TRIGGER_KEYS = new Set(['mode', 'referenceId']);
+const RENDER_KEYS = new Set(['values', 'currentSourceBindings', 'trigger']);
 const PLACEHOLDER = /{{\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*}}/gu;
 
 function plain(value, label) {
@@ -320,11 +321,12 @@ function normalizeValues(asset, rawValues) {
   return values;
 }
 
-export function renderPromptAssetV1(assetInput, {
-  values = null,
-  currentSourceBindings = [],
-  trigger = null,
-} = {}) {
+export function renderPromptAssetV1(assetInput, options = {}) {
+  const rawOptions = plain(options, 'render options');
+  exactKeys(rawOptions, RENDER_KEYS, 'render options');
+  const values = Object.hasOwn(rawOptions, 'values') ? rawOptions.values : null;
+  const currentSourceBindings = Object.hasOwn(rawOptions, 'currentSourceBindings') ? rawOptions.currentSourceBindings : [];
+  const trigger = Object.hasOwn(rawOptions, 'trigger') ? rawOptions.trigger : null;
   const asset = normalizePromptAssetV1(assetInput);
   assertSourceFreshness(asset, currentSourceBindings);
   assertCadenceTrigger(asset, trigger);
@@ -394,8 +396,15 @@ export function diffPromptAssetVersionsV1(previousInput, nextInput) {
     else {
       const beforeShape = variablePublicShape(before);
       const afterShape = variablePublicShape(after);
-      if (JSON.stringify(beforeShape) !== JSON.stringify(afterShape)) {
-        variableChanges.push({ name, change: 'CHANGED', before: beforeShape, after: afterShape });
+      const defaultChanged = before.defaultValue !== after.defaultValue;
+      if (JSON.stringify(beforeShape) !== JSON.stringify(afterShape) || defaultChanged) {
+        variableChanges.push({
+          name,
+          change: 'CHANGED',
+          before: beforeShape,
+          after: afterShape,
+          defaultChanged,
+        });
       }
     }
   }
