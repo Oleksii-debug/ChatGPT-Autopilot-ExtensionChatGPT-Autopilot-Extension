@@ -15,7 +15,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const FORBIDDEN_WINDOWS_CHARS = /[<>:"\\|?*\u0000-\u001f\u007f]/u;
 const FORBIDDEN_DISPLAY_CHARS = /[\u2028\u2029\u202a-\u202e\u2066-\u2069]/u;
-const RESERVED_WINDOWS_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/iu;
+const RESERVED_WINDOWS_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³])$/iu;
 const MAX_PATH_LENGTH = 1024;
 const MAX_SEGMENT_LENGTH = 255;
 const CHECKSUM_PATH = 'checksums.txt';
@@ -122,6 +122,7 @@ function normalizePath(value) {
       throw new Error('bundle path contains an unsafe segment');
     }
     if (segment.length > MAX_SEGMENT_LENGTH) throw new Error('bundle path segment is too long');
+    if (segment.startsWith(' ')) throw new Error('bundle path segment may not begin with ASCII space');
     if (/[. ]$/u.test(segment)) throw new Error('bundle path segment may not end in dot or space');
     const base = segment.split('.')[0];
     if (RESERVED_WINDOWS_NAMES.test(base)) throw new Error('bundle path contains a reserved Windows name');
