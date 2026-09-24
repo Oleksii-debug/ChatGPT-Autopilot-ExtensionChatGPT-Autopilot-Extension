@@ -5,6 +5,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { handleNativeCompanionRequest } from '../companion/native-host/host-core.mjs';
+import {
+  searchScopedFilesystemV1,
+  writeExistingTextScopedV1,
+} from '../companion/native-host/filesystem-host-provider.mjs';
 
 const EXTENSION_ID = 'abcdefghijklmnopabcdefghijklmnop';
 const ORIGIN = `chrome-extension://${EXTENSION_ID}/`;
@@ -129,4 +133,86 @@ test('existing-text mutation fails closed if target is swapped to an outside sym
   assert.equal(response.ok, false);
   assert.equal(response.error.code, 'PATH_OUTSIDE_SCOPE');
   assert.equal(await fs.readFile(outside, 'utf8'), 'secret');
+});
+
+
+test('Native filesystem IPC rejects coerced bounds and exotic payload authority', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-host-boundary-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  await fs.writeFile(path.join(root, 'note.txt'), 'before', 'utf8');
+  const cfg = config(root, true);
+
+  const stringBound = await handleNativeCompanionRequest(request('filesystem.search', {
+    rootId: 'workspace',
+    query: 'note',
+    maxResults: '10',
+    maxEntries: 100,
+  }, 'string-bound'), { config: cfg, callerOrigin: ORIGIN });
+  assert.equal(stringBound.ok, false);
+  assert.equal(stringBound.error.code, 'INVALID_REQUEST');
+
+  const inheritedSearch = Object.create({
+    rootId: 'workspace',
+    query: 'note',
+    maxResults: 10,
+    maxEntries: 100,
+  });
+  await assert.rejects(
+    () => searchScopedFilesystemV1(inheritedSearch, cfg),
+    error => error.code === 'INVALID_REQUEST' && /plain object/.test(error.message),
+  );
+
+  const symbolicSearch = {
+    rootId: 'workspace',
+    query: 'note',
+    maxResults: 10,
+    maxEntries: 100,
+  };
+  symbolicSearch[Symbol('authority')] = true;
+  await assert.rejects(
+    () => searchScopedFilesystemV1(symbolicSearch, cfg),
+    error => error.code === 'INVALID_REQUEST' && /unknown field/.test(error.message),
+  );
+
+  const nonEnumerableWrite = {
+    rootId: 'workspace',
+    relativePath: 'note.txt',
+    text: 'after',
+    expectedSha256: digest('before'),
+  };
+  Object.defineProperty(nonEnumerableWrite, 'expectedSha256', {
+    value: digest('before'),
+    enumerable: false,
+    configurable: true,
+  });
+  await assert.rejects(
+    () => writeExistingTextScopedV1(nonEnumerableWrite, cfg),
+    error => error.code === 'INVALID_REQUEST' && /enumerable data property/.test(error.message),
+  );
+  assert.equal(await fs.readFile(path.join(root, 'note.txt'), 'utf8'), 'before');
+});
+
+test('Native filesystem write digest is strict lowercase text and never coerced', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-host-digest-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  await fs.writeFile(target, 'before', 'utf8');
+  const cfg = config(root, true);
+
+  for (const expectedSha256 of [123, true, { toString: () => digest('before') }, digest('before').toUpperCase()]) {
+    await assert.rejects(
+      () => writeExistingTextScopedV1({
+        rootId: 'workspace',
+        relativePath: 'note.txt',
+        text: 'after',
+        expectedSha256,
+      }, cfg),
+      error => error.code === 'INVALID_REQUEST' && /lowercase SHA-256/.test(error.message),
+    );
+    assert.equal(await fs.readFile(target, 'utf8'), 'before');
+  }
 });
