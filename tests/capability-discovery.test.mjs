@@ -363,3 +363,95 @@ test('candidate tie-breaking uses locale-independent code-unit order regardless 
   assert.equal(forward.plan[0].providerId, 'Provider/A');
   assert.equal(reverse.plan[0].providerId, 'Provider/A');
 });
+
+
+test('collection boundaries reject accessor-backed inventory and request items without executing getters', () => {
+  let providerStateReads = 0;
+  const providerStates = [];
+  Object.defineProperty(providerStates, 0, {
+    enumerable:true,
+    configurable:true,
+    get() {
+      providerStateReads += 1;
+      return state('local/fs');
+    },
+  });
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates,
+    requestedCapabilityIds:['filesystem.read'],
+  }), /enumerable data property/);
+  assert.equal(providerStateReads, 0, 'providerStates getter must never execute');
+
+  let requestedReads = 0;
+  const requestedCapabilityIds = [];
+  Object.defineProperty(requestedCapabilityIds, 0, {
+    enumerable:true,
+    configurable:true,
+    get() {
+      requestedReads += 1;
+      return 'filesystem.read';
+    },
+  });
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[],
+    requestedCapabilityIds,
+  }), /enumerable data property/);
+  assert.equal(requestedReads, 0, 'requestedCapabilityIds getter must never execute');
+});
+
+test('collection boundaries reject sparse, hidden, custom, symbol and exotic arrays', () => {
+  const sparse = new Array(1);
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:sparse,
+    tools:[],
+    providerStates:[],
+    requestedCapabilityIds:[],
+  }), /must not be sparse/);
+
+  const hidden = [state('local/fs')];
+  Object.defineProperty(hidden, 0, {
+    enumerable:false,
+    configurable:true,
+    writable:true,
+    value:hidden[0],
+  });
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:hidden,
+    requestedCapabilityIds:['filesystem.read'],
+  }), /enumerable data property/);
+
+  const custom = [capability('filesystem.read')];
+  custom.metadata = 'authority';
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:custom,
+    tools:[],
+    providerStates:[],
+    requestedCapabilityIds:[],
+  }), /non-index array data/);
+
+  const symbolic = [capability('filesystem.read')];
+  symbolic[Symbol('authority')] = true;
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:symbolic,
+    tools:[],
+    providerStates:[],
+    requestedCapabilityIds:[],
+  }), /non-index array data/);
+
+  const exotic = [capability('filesystem.read')];
+  Object.setPrototypeOf(exotic, null);
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:exotic,
+    tools:[],
+    providerStates:[],
+    requestedCapabilityIds:[],
+  }), /bounded plain array/);
+});
