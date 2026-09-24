@@ -151,7 +151,7 @@ function encodePowerShellUiaScript(request) {
     "} elseif ([string]$request.windowId -match '^hwnd:([1-9][0-9]{0,18})$') {",
     "  $handleValue = [Int64]$Matches[1]",
     "  if ($handleValue -le 0) { throw 'Invalid UIA window handle' }",
-    "  $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]::new($handleValue))",
+    "  $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$handleValue)",
     "  if ($null -eq $root) { throw 'UIA window handle is unavailable' }",
     "} else {",
     "  throw 'windowId must be desktop or canonical hwnd:<decimal>'",
@@ -217,7 +217,7 @@ function encodePowerShellUiaScript(request) {
     "    }",
     "  }",
     "}",
-    "$json = ConvertTo-Json -InputObject $results.ToArray() -Compress -Depth 3",
+    "$json = ConvertTo-Json -InputObject ($results.ToArray()) -Compress -Depth 3",
     "[Console]::Out.Write($json)",
   ].join('\n');
   return Buffer.from(script, 'utf16le').toString('base64');
