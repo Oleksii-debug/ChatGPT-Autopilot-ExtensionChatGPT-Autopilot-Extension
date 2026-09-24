@@ -24,7 +24,7 @@ function object(value, label) {
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label} fields must be own data properties`);
     }
   }
