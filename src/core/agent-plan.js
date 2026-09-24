@@ -27,11 +27,40 @@ const PLANES = new Set(Object.values(AgentExecutionPlane));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const TERMINAL = new Set([AgentPlanNodeState.VERIFIED, AgentPlanNodeState.FAILED, AgentPlanNodeState.CANCELLED]);
 
-function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`); return value; }
-function exact(raw, allowed, label) { for (const key of Object.keys(raw)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`); }
-function id(value, label) { const out = String(value ?? '').trim(); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
-function text(value, label, { max = 4000, optional = false } = {}) { if ((value == null || value === '') && optional) return ''; const out = typeof value === 'string' ? value.trim() : ''; if (!out || out.length > max) throw new Error(`${label} is invalid`); return out; }
-function timestamp(value, label) { const ms = Date.parse(String(value ?? '')); if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`); return new Date(ms).toISOString(); }
+function object(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
+  if (Object.getOwnPropertySymbols(value).length) throw new Error(`${label} cannot contain symbol fields`);
+  return value;
+}
+function exact(raw, allowed, label) {
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field: ${String(key)}`);
+  }
+}
+function id(value, label) {
+  if (typeof value !== 'string' || !ID.test(value)) throw new Error(`${label} is invalid`);
+  return value;
+}
+function text(value, label, { max = 4000, optional = false } = {}) {
+  if ((value == null || value === '') && optional) return '';
+  const out = typeof value === 'string' ? value.trim() : '';
+  if (!out || out.length > max) throw new Error(`${label} is invalid`);
+  return out;
+}
+function timestamp(value, label) {
+  if (typeof value !== 'string') throw new Error(`${label} must be a timestamp string`);
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
+  return new Date(ms).toISOString();
+}
+function strictInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
 function uniqueIds(value, label, max = 128) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => id(item, `${label}[${index}]`)); if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
 function uniqueText(value, label, max = 32) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => text(item, `${label}[${index}]`, { max: 1000 })); if (new Set(out.map(item => item.toLocaleLowerCase())).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
 function frozen(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) frozen(child); return Object.freeze(value); }
@@ -39,8 +68,11 @@ function frozen(value) { if (!value || typeof value !== 'object' || Object.isFro
 function normalizeBudget(raw = {}) {
   object(raw, 'AgentPlan budget');
   exact(raw, new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']), 'AgentPlan budget');
-  const bounded = (value, label, max) => { const n = Number(value ?? 0); if (!Number.isInteger(n) || n < 0 || n > max) throw new Error(`AgentPlan budget ${label} is invalid`); return n; };
-  return { maxModelCalls: bounded(raw.maxModelCalls, 'maxModelCalls', 1_000_000), maxRuntimeSeconds: bounded(raw.maxRuntimeSeconds, 'maxRuntimeSeconds', 31_536_000), maxCostUsdMicros: bounded(raw.maxCostUsdMicros, 'maxCostUsdMicros', Number.MAX_SAFE_INTEGER) };
+  return {
+    maxModelCalls: strictInteger(raw.maxModelCalls === undefined ? 0 : raw.maxModelCalls, 'AgentPlan budget maxModelCalls', { max: 1_000_000 }),
+    maxRuntimeSeconds: strictInteger(raw.maxRuntimeSeconds === undefined ? 0 : raw.maxRuntimeSeconds, 'AgentPlan budget maxRuntimeSeconds', { max: 31_536_000 }),
+    maxCostUsdMicros: strictInteger(raw.maxCostUsdMicros === undefined ? 0 : raw.maxCostUsdMicros, 'AgentPlan budget maxCostUsdMicros'),
+  };
 }
 
 function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
@@ -59,18 +91,18 @@ function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
 function normalizeNode(raw) {
   object(raw, 'AgentPlan node');
   exact(raw, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
-  const state = String(raw.state || AgentPlanNodeState.PENDING).toUpperCase();
-  if (!NODE_STATES.has(state)) throw new Error('AgentPlan node state is invalid');
+  const state = raw.state === undefined ? AgentPlanNodeState.PENDING : raw.state;
+  if (typeof state !== 'string' || !NODE_STATES.has(state)) throw new Error('AgentPlan node state is invalid');
   return {
     nodeId: id(raw.nodeId, 'AgentPlan nodeId'),
     title: text(raw.title, 'AgentPlan node title', { max: 240 }),
     objective: text(raw.objective, 'AgentPlan node objective', { max: 4000 }),
-    dependsOn: uniqueIds(raw.dependsOn || [], 'AgentPlan node dependsOn'),
-    conflictKeys: uniqueIds(raw.conflictKeys || [], 'AgentPlan node conflictKeys'),
+    dependsOn: uniqueIds(raw.dependsOn === undefined ? [] : raw.dependsOn, 'AgentPlan node dependsOn'),
+    conflictKeys: uniqueIds(raw.conflictKeys === undefined ? [] : raw.conflictKeys, 'AgentPlan node conflictKeys'),
     ownerId: raw.ownerId == null || raw.ownerId === '' ? '' : id(raw.ownerId, 'AgentPlan node ownerId'),
-    executionPlane: PLANES.has(String(raw.executionPlane || '').toUpperCase()) ? String(raw.executionPlane).toUpperCase() : (() => { throw new Error('AgentPlan node executionPlane is invalid'); })(),
-    acceptanceCriteria: uniqueText(raw.acceptanceCriteria || [], 'AgentPlan node acceptanceCriteria'),
-    budget: normalizeBudget(raw.budget || {}),
+    executionPlane: typeof raw.executionPlane === 'string' && PLANES.has(raw.executionPlane) ? raw.executionPlane : (() => { throw new Error('AgentPlan node executionPlane is invalid'); })(),
+    acceptanceCriteria: uniqueText(raw.acceptanceCriteria === undefined ? [] : raw.acceptanceCriteria, 'AgentPlan node acceptanceCriteria'),
+    budget: normalizeBudget(raw.budget === undefined ? {} : raw.budget),
     state,
     evidence: raw.evidence == null || raw.evidence === '' ? '' : text(raw.evidence, 'AgentPlan node evidence', { max: 8000 }),
     updatedAt: timestamp(raw.updatedAt, 'AgentPlan node updatedAt'),
@@ -94,19 +126,18 @@ function assertAcyclic(nodes) {
 export function normalizeAgentPlanV1(raw) {
   object(raw, 'AgentPlanV1');
   exact(raw, new Set(['schemaVersion', 'planId', 'jobId', 'objective', 'successCriteria', 'nodes', 'createdAt', 'updatedAt', 'revision']), 'AgentPlanV1');
-  if (Number(raw.schemaVersion) !== AGENT_PLAN_VERSION) throw new Error('Unsupported AgentPlanV1 schemaVersion');
+  if (raw.schemaVersion !== AGENT_PLAN_VERSION) throw new Error('Unsupported AgentPlanV1 schemaVersion');
   if (!Array.isArray(raw.nodes) || raw.nodes.length < 1 || raw.nodes.length > 128) throw new Error('AgentPlan nodes must contain 1-128 nodes');
   const nodes = raw.nodes.map(normalizeNode);
   if (new Set(nodes.map(node => node.nodeId)).size !== nodes.length) throw new Error('AgentPlan contains duplicate nodeId');
   assertAcyclic(nodes);
-  const revision = Number(raw.revision);
-  if (!Number.isInteger(revision) || revision < 1) throw new Error('AgentPlan revision is invalid');
+  const revision = strictInteger(raw.revision, 'AgentPlan revision', { min: 1 });
   return frozen({
     schemaVersion: AGENT_PLAN_VERSION,
     planId: id(raw.planId, 'AgentPlan planId'),
     jobId: id(raw.jobId, 'AgentPlan jobId'),
     objective: text(raw.objective, 'AgentPlan objective', { max: 8000 }),
-    successCriteria: uniqueText(raw.successCriteria || [], 'AgentPlan successCriteria'),
+    successCriteria: uniqueText(raw.successCriteria === undefined ? [] : raw.successCriteria, 'AgentPlan successCriteria'),
     nodes,
     createdAt: timestamp(raw.createdAt, 'AgentPlan createdAt'),
     updatedAt: timestamp(raw.updatedAt, 'AgentPlan updatedAt'),
@@ -155,8 +186,14 @@ export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelo
   const addedIds = new Set();
   const additions = nodes.map((rawNode, index) => {
     object(rawNode, `AgentPlan extension node[${index}]`);
-    if ('state' in rawNode && String(rawNode.state || '').toUpperCase() !== AgentPlanNodeState.PENDING) throw new Error('AgentPlan extension node state must be PENDING');
-    if ('evidence' in rawNode && rawNode.evidence != null && String(rawNode.evidence).trim() !== '') throw new Error('AgentPlan extension node cannot inject evidence');
+    if (Object.hasOwn(rawNode, 'state') && rawNode.state !== AgentPlanNodeState.PENDING) {
+      throw new Error('AgentPlan extension node state must be PENDING');
+    }
+    if (Object.hasOwn(rawNode, 'evidence') && rawNode.evidence !== undefined && rawNode.evidence !== '') {
+      if (typeof rawNode.evidence !== 'string' || rawNode.evidence.trim() !== '') {
+        throw new Error('AgentPlan extension node cannot inject evidence');
+      }
+    }
     const candidate = normalizeNode({ ...structuredClone(rawNode), state: AgentPlanNodeState.PENDING, evidence: '', updatedAt });
     if (existingIds.has(candidate.nodeId) || addedIds.has(candidate.nodeId)) throw new Error('AgentPlan extension contains duplicate nodeId');
     addedIds.add(candidate.nodeId);
@@ -199,8 +236,8 @@ export function transitionAgentPlanNodeV1(raw, { nodeId, state, evidence = '', a
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const node = plan.nodes.find(item => item.nodeId === nodeId);
   if (!node) throw new Error('AgentPlan node not found');
-  const next = String(state || '').toUpperCase();
-  if (!NODE_STATES.has(next)) throw new Error('AgentPlan node state is invalid');
+  const next = state;
+  if (typeof next !== 'string' || !NODE_STATES.has(next)) throw new Error('AgentPlan node state is invalid');
   if (TERMINAL.has(node.state)) throw new Error('AgentPlan terminal node cannot be changed');
   if (next === AgentPlanNodeState.RUNNING && node.state !== AgentPlanNodeState.READY) throw new Error('AgentPlan node must be READY before RUNNING');
   if (next === AgentPlanNodeState.VERIFIED && (!text(evidence, 'AgentPlan verified node evidence', { max: 8000 }) || node.state !== AgentPlanNodeState.RUNNING)) throw new Error('AgentPlan VERIFIED requires RUNNING node and evidence');
