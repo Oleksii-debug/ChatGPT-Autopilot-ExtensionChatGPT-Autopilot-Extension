@@ -123,6 +123,18 @@ test('generic OpenAI-compatible endpoint setup requires HTTPS for remote hosts a
   assert.match(menu, /НАЛАШТУВАТИ OPENAI-COMPATIBLE АДРЕСУ\.ps1/);
 });
 
+test('multiple compatible endpoint setup is bounded and never writes inline API keys', () => {
+  const setup = read('ДОДАТИ OPENAI-COMPATIBLE ENDPOINT.ps1');
+  const menu = read('СТАРТ — ВИБРАТИ РЕЖИМ.ps1');
+  assert.match(setup, /compatibleEndpoints/);
+  assert.match(setup, /endpointId/);
+  assert.match(setup, /apiKeyEnv/);
+  assert.match(setup, /Count -gt 16/);
+  assert.match(setup, /Віддалений OpenAI-compatible API повинен використовувати HTTPS/);
+  assert.doesNotMatch(setup, /Read-Host[^\n]*API key[^\n]*-AsSecureString/i);
+  assert.match(menu, /ДОДАТИ OPENAI-COMPATIBLE ENDPOINT\.ps1/);
+});
+
 
 test('Windows companion exposes explicit bounded Chrome-extension pairing and reset scripts', () => {
   const open = read('ВІДКРИТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ.ps1');

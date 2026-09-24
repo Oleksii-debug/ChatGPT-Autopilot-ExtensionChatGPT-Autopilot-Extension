@@ -125,3 +125,21 @@ export function verifyOwnedExecutionV1(raw, { leaseId, at = new Date().toISOStri
   assertLeaseLive(current, at);
   return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '' }, at);
 }
+
+/**
+ * Closes an owned effect only when a verifier is distinct from the effect
+ * owner and explicitly binds its authority to the immutable policy envelope
+ * that admitted that effect.  It is a contract boundary: callers must obtain
+ * the envelope reference from the canonical owner-policy path, never from a
+ * provider or specialist response.
+ */
+export function verifyExecutionByAuthorityV1(raw, { leaseId, verifierId, verificationAuthorityId, evidence, at = new Date().toISOString() } = {}) {
+  const current = normalizeExecutionOwnershipV1(raw);
+  if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) throw new Error('only the current execution lease may be independently verified');
+  assertLeaseLive(current, at);
+  const verifier = id(verifierId, 'verifierId');
+  if (verifier === current.ownerId) throw new Error('execution verifier must be independent from the effect owner');
+  if (id(verificationAuthorityId, 'verificationAuthorityId') !== current.policyEnvelopeId) throw new Error('verification authority must bind the execution policy envelope');
+  boundedText(evidence, 'verification evidence', 8000);
+  return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '' }, at);
+}
