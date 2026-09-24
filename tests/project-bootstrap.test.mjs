@@ -3,10 +3,8 @@ import assert from 'node:assert/strict';
 import {
   ProjectBootstrapBlockerCode,
   ProjectBootstrapStatus,
-  admitProjectBootstrapV1,
   buildProjectBootstrapV1,
 } from '../src/core/project-bootstrap.js';
-import { createProjectWorkspace } from '../src/core/project-workspace.js';
 import { normalizeArtifactRefV1 } from '../src/core/universal-agent-contracts.js';
 
 const AT = '2026-09-25T00:00:00.000Z';
@@ -109,14 +107,9 @@ test('required sources and artifacts without exact digests produce deterministic
     },
   ]);
 
-  const workspace = createProjectWorkspace(1);
-  assert.throws(
-    () => admitProjectBootstrapV1(workspace, input({
-      sourceRefs: [source('repo', ''), source('drive', SHA_C, { kind:'drive.folder', uri:'drive://folder-1' })],
-    }), { nowMs:2 }),
-    /Project bootstrap is BLOCKED/,
-  );
-  assert.deepEqual(workspace.projectsById, {});
+  assert.equal(result.advisoryOnly, true);
+  assert.equal(result.admissionAuthorized, false);
+  assert.equal(result.requiresTrustedSourceAdmission, true);
 });
 
 test('required identities must resolve exactly and duplicates fail closed', () => {
@@ -151,16 +144,13 @@ test('source project identity cannot cross bootstrap project boundary', () => {
   );
 });
 
-test('READY bootstrap is admitted through existing ProjectWorkspace authority and cannot overwrite a project', () => {
-  const workspace = createProjectWorkspace(1);
-  const admitted = admitProjectBootstrapV1(workspace, input(), { nowMs:2 });
-  assert.equal(admitted.bootstrap.status, ProjectBootstrapStatus.READY);
-  assert.equal(admitted.project.projectId, 'project-1');
-  assert.equal(workspace.projectsById['project-1'].snapshot.revisionId, 'project-rev-1');
-  assert.throws(
-    () => admitProjectBootstrapV1(workspace, input({ bootstrapId:'bootstrap-2' }), { nowMs:3 }),
-    /Project already exists/,
-  );
+test('READY bootstrap is advisory-only until trusted source admission is supplied elsewhere', () => {
+  const result = buildProjectBootstrapV1(input());
+  assert.equal(result.status, ProjectBootstrapStatus.READY);
+  assert.equal(result.advisoryOnly, true);
+  assert.equal(result.admissionAuthorized, false);
+  assert.equal(result.requiresTrustedSourceAdmission, true);
+  assert.equal(Object.hasOwn(result, 'project'), false);
 });
 
 test('top-level accessor authority is rejected without executing getter', () => {
