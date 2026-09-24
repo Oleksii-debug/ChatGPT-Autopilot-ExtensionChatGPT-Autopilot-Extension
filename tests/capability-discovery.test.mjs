@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CapabilityPathKind,
   CapabilityPathReadiness,
   ProviderHealthStatus,
   discoverCapabilityPathsV1,
@@ -34,6 +35,7 @@ function state(providerId, overrides = {}) {
     installed:true,
     authenticationRequired:false,
     authenticated:true,
+    pathKind:CapabilityPathKind.API,
     latencyMs:10,
     reasonCode:'',
     ...overrides,
@@ -69,6 +71,7 @@ test('discovery produces a deterministic executable coverage plan without granti
       toolId:'fs.inspect',
       capabilityIds:['artifact.write', 'filesystem.read'],
       readiness:'READY',
+      pathKind:'API',
       requiresPolicyDecision:true,
       permissionGranted:false,
     },
@@ -78,6 +81,7 @@ test('discovery produces a deterministic executable coverage plan without granti
       toolId:'github.mutate',
       capabilityIds:['github.code'],
       readiness:'DEGRADED',
+      pathKind:'API',
       requiresPolicyDecision:true,
       permissionGranted:false,
     },
@@ -192,6 +196,7 @@ test('provider readiness boundary rejects coercion, inherited authority and exot
     { ...valid, health:true },
     { ...valid, installed:1 },
     { ...valid, authenticated:'true' },
+    { ...valid, pathKind:'MAGIC' },
     { ...valid, latencyMs:'10' },
   ]) {
     assert.throws(() => normalizeProviderReadinessV1(bad));
@@ -229,4 +234,27 @@ test('degraded providers remain executable but sort behind ready providers for e
   });
   assert.equal(result.candidates[0].toolId, 'a.ready');
   assert.equal(result.plan[0].toolId, 'a.ready');
+});
+
+
+test('best-path planning prefers deterministic API/CLI/semantic/UIA paths before visual or OCR fallback', () => {
+  const result = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('visual.fast', 'visual/provider', ['filesystem.read']),
+      tool('uia.slower', 'uia/provider', ['filesystem.read']),
+      tool('api.slowest', 'api/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('visual/provider', { pathKind:'VISUAL', latencyMs:1 }),
+      state('uia/provider', { pathKind:'UIA', latencyMs:20 }),
+      state('api/provider', { pathKind:'API', latencyMs:100 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => item.toolId), ['api.slowest', 'uia.slower', 'visual.fast']);
+  assert.equal(result.plan[0].toolId, 'api.slowest');
+  assert.equal(result.plan[0].pathKind, 'API');
+  assert.equal(result.plan[0].permissionGranted, false);
 });
