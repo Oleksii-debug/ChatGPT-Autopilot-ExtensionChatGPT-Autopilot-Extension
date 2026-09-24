@@ -224,10 +224,11 @@ test('UIA result schema fails closed on extra fields and state type aliases', as
   );
 });
 
-test('production UIA fallback uses fixed encoded PowerShell and returns reusable hwnd identities', async () => {
+test('production UIA fallback uses fixed encoded PowerShell and returns observation-bound window identities', async () => {
   const calls = [];
   const powershellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
   const modelSuppliedName = "Save'; Get-ChildItem Env:";
+  const observedWindow = 'win:4242:pid:77:rid:42.7.-3';
   const provider = createWindowsProvider({
     config,
     platform: 'win32',
@@ -237,7 +238,7 @@ test('production UIA fallback uses fixed encoded PowerShell and returns reusable
       return {
         stdout: JSON.stringify([
           {
-            elementId: 'hwnd:4242',
+            elementId: observedWindow,
             role: 'Window',
             name: 'Editor',
             enabled: true,
@@ -251,7 +252,7 @@ test('production UIA fallback uses fixed encoded PowerShell and returns reusable
 
   const capability = provider.capabilities().find(item => item.capabilityId === 'windows.uia.query');
   assert.equal(capability.available, true);
-  assert.equal(capability.windowIdFormat, 'desktop | hwnd:<decimal>');
+  assert.equal(capability.windowIdFormat, 'desktop | win:<hwnd>:pid:<pid>:rid:<runtimeId>');
 
   const rows = await provider.queryUia({
     windowId: 'desktop',
@@ -262,7 +263,7 @@ test('production UIA fallback uses fixed encoded PowerShell and returns reusable
 
   assert.deepEqual(rows, [
     {
-      elementId: 'hwnd:4242',
+      elementId: observedWindow,
       role: 'Window',
       name: 'Editor',
       enabled: true,
@@ -275,7 +276,9 @@ test('production UIA fallback uses fixed encoded PowerShell and returns reusable
   const script = Buffer.from(calls[0][1][3], 'base64').toString('utf16le');
   assert.match(script, /UIAutomationClient/);
   assert.match(script, /ControlViewWalker/);
-  assert.match(script, /windowId must be desktop or canonical hwnd/);
+  assert.match(script, /UIA window reference is stale/);
+  assert.match(script, /rootProcessId -ne \$expectedProcessId/);
+  assert.match(script, /rootRuntimeId, \$expectedRuntimeId/);
   assert.equal(script.includes(modelSuppliedName), false, 'model text must be encoded as data, not interpolated PowerShell');
   assert.equal(Object.hasOwn(calls[0][2].env, 'OPENAI_API_KEY'), false);
   assert.equal(Object.hasOwn(calls[0][2].env, 'MISTRAL_API_KEY'), false);
@@ -293,7 +296,7 @@ test('PowerShell UIA adapter rejects non-canonical window identities before proc
     },
   });
 
-  for (const windowId of ['window-1', 'hwnd:01', 'hwnd:9999999999999999999']) {
+  for (const windowId of ['window-1', 'hwnd:4242', 'win:01:pid:77:rid:42.7', 'win:4242:pid:0:rid:42.7', 'win:4242:pid:77:rid:042.7', 'win:9999999999999999999:pid:77:rid:42.7']) {
     await assert.rejects(
       () => adapter.query({ windowId, role: '', name: '', limit: 2 }),
       /windowId/,
@@ -308,6 +311,43 @@ test('PowerShell UIA adapter rejects non-canonical window identities before proc
     /limit must be/,
   );
   assert.equal(calls, 0);
+});
+
+test('PowerShell UIA adapter binds a targeted window to handle, process, and runtime identity', async () => {
+  const calls = [];
+  const adapter = createPowerShellUiaAdapter({
+    powershellPath: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    execFile: async (...args) => {
+      calls.push(args);
+      return { stdout: '[]', stderr: '' };
+    },
+  });
+
+  const windowId = 'win:4242:pid:77:rid:42.7.-3';
+  await adapter.query({ windowId, role: '', name: '', limit: 2 });
+  assert.equal(calls.length, 1);
+  const script = Buffer.from(calls[0][1][3], 'base64').toString('utf16le');
+  assert.match(script, /expectedHandle/);
+  assert.match(script, /expectedProcessId/);
+  assert.match(script, /expectedRuntimeId/);
+  assert.match(script, /rootHandle -ne \$expectedHandle/);
+  assert.match(script, /rootProcessId -ne \$expectedProcessId/);
+  assert.match(script, /rootRuntimeId, \$expectedRuntimeId/);
+  assert.match(script, /throw 'UIA window reference is stale'/);
+});
+
+test('PowerShell UIA adapter rejects raw HWND output as non-canonical authority', async () => {
+  const adapter = createPowerShellUiaAdapter({
+    powershellPath: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    execFile: async () => ({
+      stdout: JSON.stringify([{ elementId: 'hwnd:4242', role: 'Window', name: 'Old', enabled: true, offscreen: false }]),
+      stderr: '',
+    }),
+  });
+  await assert.rejects(
+    () => adapter.query({ windowId: 'desktop', role: '', name: '', limit: 2 }),
+    error => error.code === 'WINDOWS_UIA_INVALID_RESPONSE',
+  );
 });
 
 test('PowerShell UIA adapter requires an own plain request envelope before process launch', async () => {
