@@ -49,8 +49,8 @@ function at(now) { return new Date(now()).toISOString(); }
 function eventId(invocationId, suffix) { return `${invocationId}:${suffix}`; }
 
 function assertStore(store) {
-  if (!store || typeof store.load !== 'function' || typeof store.save !== 'function') {
-    throw new Error('Canonical exact-effect state store adapter is required');
+  if (!store || typeof store.update !== 'function') {
+    throw new Error('Canonical atomic durable exact-effect store is required');
   }
 }
 
@@ -106,17 +106,75 @@ export class FilesystemExactEffectExecutorV1 {
     this.now = now;
   }
 
-  async #save(state) {
-    const normalized = normalizeExactEffectStateV1(state);
-    await this.store.save(normalized.effectId, normalized);
-    return normalized;
+  async #atomic(mutator) {
+    let result;
+    await this.store.update(draft => {
+      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) {
+        throw new Error('Canonical exact-effect store root is invalid');
+      }
+      if (draft.effectsById == null) draft.effectsById = {};
+      if (!draft.effectsById || typeof draft.effectsById !== 'object' || Array.isArray(draft.effectsById)) {
+        throw new Error('Canonical exact-effect store effectsById is invalid');
+      }
+      result = mutator(draft.effectsById);
+      return draft;
+    });
+    return result;
   }
 
-  async #load(invocation) {
+  async #save(state) {
+    const normalized = normalizeExactEffectStateV1(state);
+    return this.#atomic(effectsById => {
+      const prior = effectsById[normalized.effectId];
+      effectsById[normalized.effectId] = {
+        ...(prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {}),
+        state: normalized,
+      };
+      return normalized;
+    });
+  }
+
+  async #loadById(invocationId) {
+    const id = requireId(invocationId, 'invocationId');
+    return this.#atomic(effectsById => {
+      const stored = effectsById[id]?.state;
+      return stored ? normalizeExactEffectStateV1(stored) : null;
+    });
+  }
+
+  async #admitExecution(invocation) {
     const invocationId = requireId(invocation?.invocationId, 'invocationId');
-    const stored = await this.store.load(invocationId);
-    if (stored) return normalizeExactEffectStateV1(stored);
-    return this.#save(createExactEffectStateV1(invocation, { createdAt: invocation.createdAt }));
+    return this.#atomic(effectsById => {
+      const prior = effectsById[invocationId];
+      let state = prior?.state
+        ? normalizeExactEffectStateV1(prior.state)
+        : createExactEffectStateV1(invocation, { createdAt: invocation.createdAt });
+
+      if (prior?.state && JSON.stringify(state.invocation) !== JSON.stringify(invocation)) {
+        throw new Error('Filesystem exact-effect invocation binding changed');
+      }
+      if (state.phase === ExactEffectPhase.VERIFIED) {
+        return Object.freeze({ status: 'VERIFIED', state });
+      }
+      if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(state.phase)) {
+        return Object.freeze({ status: 'BLOCKED', state });
+      }
+
+      const startedAt = at(this.now);
+      const begin = reduceExactEffectV1(state, {
+        schemaVersion: 1,
+        eventId: eventId(state.effectId, `begin-${state.attempt + 1}`),
+        type: ExactEffectEventType.BEGIN_EXECUTION,
+        effectId: state.effectId,
+        at: startedAt,
+      });
+      state = begin.state;
+      effectsById[invocationId] = {
+        ...(prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {}),
+        state,
+      };
+      return Object.freeze({ status: 'EXECUTING', state });
+    });
   }
 
   async #commitVerified(state) {
@@ -250,12 +308,13 @@ export class FilesystemExactEffectExecutorV1 {
     invocation = authorized.invocation;
     policyDecision = authorized.policyDecision;
 
-    let state = await this.#load(invocation);
-    if (state.phase === ExactEffectPhase.VERIFIED) {
+    const admitted = await this.#admitExecution(invocation);
+    let state = admitted.state;
+    if (admitted.status === 'VERIFIED') {
       state = await this.#commitVerified(state);
       return Object.freeze({ providerResult: null, effectState: state, resumedCommit: true });
     }
-    if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(state.phase)) {
+    if (admitted.status !== 'EXECUTING') {
       const error = new Error(state.phase === ExactEffectPhase.RECONCILE
         ? 'Filesystem effect requires reconciliation before retry'
         : `Filesystem effect cannot execute from ${state.phase}`);
@@ -263,16 +322,6 @@ export class FilesystemExactEffectExecutorV1 {
       error.effectState = state;
       throw error;
     }
-
-    const startedAt = at(this.now);
-    const begin = reduceExactEffectV1(state, {
-      schemaVersion: 1,
-      eventId: eventId(state.effectId, `begin-${state.attempt + 1}`),
-      type: ExactEffectEventType.BEGIN_EXECUTION,
-      effectId: state.effectId,
-      at: startedAt,
-    });
-    state = await this.#save(begin.state); // durable EXECUTING before Native Companion mutation
 
     try {
       const providerResult = await this.provider.invoke({ invocation, policyDecision });
@@ -350,9 +399,9 @@ export class FilesystemExactEffectExecutorV1 {
     const id = requireId(invocationId, 'invocationId');
     const normalizedOutcome = String(outcome || '').trim().toUpperCase();
     if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('Reconciliation outcome is invalid');
-    const stored = await this.store.load(id);
+    const stored = await this.#loadById(id);
     if (!stored) throw new Error('Exact-effect state was not found');
-    let state = normalizeExactEffectStateV1(stored);
+    let state = stored;
 
     // A crash may occur after durable reconciliation verification but before the
     // deterministic COMMIT save. Resuming that commit is safe because it performs
