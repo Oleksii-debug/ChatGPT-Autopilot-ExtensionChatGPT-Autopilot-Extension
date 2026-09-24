@@ -17,6 +17,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_LABEL = 2_000;
 const MAX_STEPS = 128;
+const MAX_PROCESSED_EVENTS = 1024;
 const MAX_JSON_DEPTH = 64;
 
 const TRANSACTION_KEYS = new Set([
@@ -120,8 +121,8 @@ function timestamp(value, label) {
   return new Date(millis).toISOString();
 }
 
-function idList(value, label) {
-  const input = denseArray(value ?? [], label, MAX_STEPS);
+function idList(value, label, { max = MAX_STEPS } = {}) {
+  const input = denseArray(value ?? [], label, max);
   const output = input.map((item, index) => id(item, `${label}[${index}]`));
   if (new Set(output).size !== output.length) throw new Error(`${label} contains duplicates`);
   return output.sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0)));
@@ -333,9 +334,12 @@ async function assertExactEffectEnvelope(input, label, cryptoApi) {
   if (input.executionId) id(input.executionId, `${label}.executionId`);
   if (typeof input.commitId !== 'string') throw new Error(`${label}.commitId must be text`);
   if (input.commitId) id(input.commitId, `${label}.commitId`);
-  timestamp(input.createdAt, `${label}.createdAt`);
-  timestamp(input.updatedAt, `${label}.updatedAt`);
-  idList(input.processedEventIds, `${label}.processedEventIds`);
+  const createdAt = timestamp(input.createdAt, `${label}.createdAt`);
+  const updatedAt = timestamp(input.updatedAt, `${label}.updatedAt`);
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) {
+    throw new Error(`${label}.updatedAt cannot predate createdAt`);
+  }
+  idList(input.processedEventIds, `${label}.processedEventIds`, { max: MAX_PROCESSED_EVENTS });
   return createCrossAppInvocationFingerprintV1(input.invocation, cryptoApi);
 }
 
