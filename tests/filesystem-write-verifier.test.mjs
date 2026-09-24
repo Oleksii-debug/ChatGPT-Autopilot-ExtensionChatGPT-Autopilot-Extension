@@ -56,11 +56,10 @@ test('normal filesystem verification trusts fresh readback rather than mutation 
   assert.equal(ok.attempt, 1);
   assert.deepEqual(ok.evidenceArtifactIds, ['artifact-verify-1']);
 
-  current = 'diverged';
-  await assert.rejects(
-    () => verifier.verify({ invocation: inv, executionId: 'fs-verify-1:attempt:1', observation }),
-    /FILE_TOO_LARGE|exceeds|maxBytes|too large/i,
-  );
+  current = 'other';
+  const mismatch = await verifier.verify({ invocation: inv, executionId: 'fs-verify-1:attempt:1', observation });
+  assert.equal(mismatch.status, 'AMBIGUOUS');
+  assert.equal(mismatch.reasonCode, 'FILESYSTEM_POSTCONDITION_MISMATCH');
 });
 
 test('reconciliation classifies desired digest as committed and unchanged prior digest as safe retry proof', async () => {
