@@ -183,6 +183,26 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_OBSERVATION, 'observe', { observation });
         });
         const verification = verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now: now() });
+        if (verification.status !== VerificationStatus.VERIFIED) {
+          const effectState = await atomic(draft => {
+            const entry = draft.effectsById[invocationId];
+            const state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.DECLARE_AMBIGUITY, 'postcondition-ambiguity', {
+              reasonCode: verification.reasonCode,
+              summary: 'The browser action may have occurred, but its postcondition was not independently verified.',
+            });
+            entry.state = state;
+            return state;
+          });
+          return Object.freeze({
+            status: 'AMBIGUOUS',
+            reconcileRequired: true,
+            lease: admitted.lease,
+            observation,
+            verification,
+            effectState,
+            error: 'WEB_POSTCONDITION_UNCERTAIN',
+          });
+        }
         const effectState = await atomic(draft => {
           const entry = draft.effectsById[invocationId];
           let state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_VERIFICATION, 'verify', { verification });
