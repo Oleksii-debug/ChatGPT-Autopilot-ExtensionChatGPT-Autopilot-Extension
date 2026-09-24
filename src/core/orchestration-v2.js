@@ -1523,14 +1523,28 @@ export function orchestrationSnapshot(runtime, configRaw) {
         return Boolean(node?.parentId) && (!Array.isArray(node?.childIds) || node.childIds.length === 0);
       }).length;
       const lifecycleCounts = {};
+      const roleCounts = { director: {}, manager: {}, worker: {} };
+      const effectCounts = {};
+      const roleEffectCounts = { director: {}, manager: {}, worker: {} };
       let activeActivationCount = 0;
       for (const nodeId of nodeIds) {
+        const graphNode = runtime.hierarchy.graph.nodesById?.[nodeId] || {};
+        const role = !graphNode.parentId ? 'director' : graphNode.childIds?.length ? 'manager' : 'worker';
         const nodeState = runtime.hierarchy.state.nodesById?.[nodeId] || {};
         const lifecycle = String(nodeState.lifecycle || 'IDLE');
         lifecycleCounts[lifecycle] = Number(lifecycleCounts[lifecycle] || 0) + 1;
+        roleCounts[role][lifecycle] = Number(roleCounts[role][lifecycle] || 0) + 1;
         const current = nodeState.currentActivationId
           ? nodeState.activationLedger?.[nodeState.currentActivationId]
           : null;
+        const category = lifecycle === 'PAUSED' ? 'PAUSED'
+          : lifecycle === 'STOPPED' ? 'STOPPED'
+          : lifecycle === 'MANUAL_REVIEW' || current?.phase === 'AMBIGUOUS' ? 'AMBIGUOUS_EFFECT'
+          : current?.phase === 'EFFECT_CONFIRMED' ? 'WAITING_RESPONSE'
+          : current?.phase === 'PREPARED' || lifecycle === 'PREPARING_EFFECT' ? 'RUNNING'
+          : lifecycle === 'TERMINAL' || lifecycle === 'IDLE' ? 'READY' : 'RUNNING';
+        effectCounts[category] = Number(effectCounts[category] || 0) + 1;
+        roleEffectCounts[role][category] = Number(roleEffectCounts[role][category] || 0) + 1;
         if (current && current.phase && current.phase !== 'TERMINAL' && current.phase !== 'SUPERSEDED') {
           activeActivationCount += 1;
         }
@@ -1549,6 +1563,9 @@ export function orchestrationSnapshot(runtime, configRaw) {
       workerCount,
       activeActivationCount,
       lifecycleCounts,
+      roleCounts,
+      effectCounts,
+      roleEffectCounts,
       providers: nodeIds
         .map(nodeId => {
           const node = runtime.hierarchy.graph.nodesById?.[nodeId];
