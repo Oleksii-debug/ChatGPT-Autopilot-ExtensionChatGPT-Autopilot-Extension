@@ -84,6 +84,13 @@ const expectedSubject = {
   subjectRevisionId: 'commit-abc123',
 };
 
+const trustedExecution = Object.freeze({
+  runId: 'run-1',
+  producerInvocationId: 'benchmark-runner-1',
+  startedAt: START,
+  completedAt: END,
+});
+
 const DEFAULT_TRUSTED_EVIDENCE_IDS = Object.freeze([
   'evidence-latency',
   'evidence-quality',
@@ -111,6 +118,7 @@ function trustedEvidenceArtifacts(ids = DEFAULT_TRUSTED_EVIDENCE_IDS) {
 function evaluateBenchmarkRunV1(args = {}) {
   return evaluateBenchmarkRunV1Raw({
     ...args,
+    trustedExecution: args.trustedExecution ?? trustedExecution,
     trustedEvidenceArtifacts: args.trustedEvidenceArtifacts ?? trustedEvidenceArtifacts(),
   });
 }
@@ -575,3 +583,77 @@ test('rejects non-canonical timestamps and completed-before-started runs', () =>
     /precedes startedAt/,
   );
 });
+
+test('binds trusted evidence causally to the exact benchmark execution', () => {
+  const afterRun = trustedEvidenceArtifacts();
+  afterRun[0] = { ...afterRun[0], createdAt: '2026-09-24T21:55:06.000Z' };
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: afterRun,
+    }),
+    /outside the trusted benchmark execution interval/,
+  );
+
+  const beforeRun = trustedEvidenceArtifacts();
+  beforeRun[0] = { ...beforeRun[0], createdAt: '2026-09-24T21:54:59.999Z' };
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: beforeRun,
+    }),
+    /outside the trusted benchmark execution interval/,
+  );
+
+  const foreignProducer = trustedEvidenceArtifacts();
+  foreignProducer[0] = { ...foreignProducer[0], producerInvocationId: 'other-runner' };
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: foreignProducer,
+    }),
+    /producer does not match trusted benchmark execution/,
+  );
+
+  const exact = evaluateBenchmarkRunV1({
+    suite: suite(),
+    run: run(),
+    expectedSubject,
+  });
+  assert.equal(exact.status, BenchmarkEvaluationStatus.PASS);
+});
+
+test('caller run identity and interval must match separately trusted execution provenance', () => {
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run({ runId: 'forged-run' }),
+      expectedSubject,
+    }),
+    /execution identity\/time does not match trusted execution/,
+  );
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run({ completedAt: '2026-09-24T21:55:06.000Z' }),
+      expectedSubject,
+    }),
+    /execution identity\/time does not match trusted execution/,
+  );
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedExecution: { ...trustedExecution, producerInvocationId: 'different-runner' },
+    }),
+    /producer does not match trusted benchmark execution/,
+  );
+});
+
