@@ -145,3 +145,22 @@ test('gateway rejects malformed or oversized vision image before contacting prov
   );
   assert.equal(calls, 0);
 });
+
+test('gateway preserves typed retry evidence for provider quota, timeout and availability failures', async () => {
+  await assert.rejects(
+    () => completeProvider({ provider:'ollama', model:'local', prompt:'task' }, { fetchFn:async () => response({ error:{ message:'secondary quota' } }, 429) }),
+    error => error.statusCode === 429 && error.code === 'AI_PROVIDER_RATE_LIMITED',
+  );
+  await assert.rejects(
+    () => completeProvider({ provider:'ollama', model:'local', prompt:'task' }, { fetchFn:async () => response({ error:{ message:'down' } }, 503) }),
+    error => error.statusCode === 503 && error.code === 'AI_PROVIDER_UNAVAILABLE',
+  );
+  await assert.rejects(
+    () => completeProvider({ provider:'ollama', model:'local', prompt:'task' }, { fetchFn:async () => { throw new TypeError('connection refused'); } }),
+    error => error.statusCode === 503 && error.code === 'AI_PROVIDER_UNAVAILABLE',
+  );
+  await assert.rejects(
+    () => completeProvider({ provider:'ollama', model:'local', prompt:'task' }, { fetchFn:async () => { const error = new Error('aborted'); error.name = 'AbortError'; throw error; } }),
+    error => error.statusCode === 504 && error.code === 'AI_PROVIDER_TIMEOUT',
+  );
+});

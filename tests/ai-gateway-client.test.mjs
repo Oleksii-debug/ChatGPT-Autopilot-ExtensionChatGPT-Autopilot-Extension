@@ -36,3 +36,20 @@ test('gateway client forwards optional vision image only to localhost gateway pa
   await client.complete({ gatewayUrl: 'http://127.0.0.1:17621', timeoutSeconds: 30, provider: 'openai', model: 'vision', prompt: 'inspect', imageDataUrl });
   assert.equal(body.imageDataUrl, imageDataUrl);
 });
+
+test('gateway client preserves typed HTTP failure evidence and compatible endpoint identity', async () => {
+  let body;
+  const client = new AiGatewayClient({ fetchFn: async (_url, init = {}) => {
+    body = JSON.parse(init.body);
+    return new Response(JSON.stringify({ error:'secondary quota exhausted', code:'AI_PROVIDER_QUOTA_EXHAUSTED' }), { status:429 });
+  } });
+  await assert.rejects(
+    () => client.complete({ gatewayUrl:'http://127.0.0.1:17621', timeoutSeconds:30, provider:'openai-compatible', endpointId:'team-a', model:'coder', prompt:'task' }),
+    error => {
+      assert.equal(error.status, 429);
+      assert.equal(error.code, 'AI_PROVIDER_QUOTA_EXHAUSTED');
+      return true;
+    },
+  );
+  assert.equal(body.endpointId, 'team-a');
+});
