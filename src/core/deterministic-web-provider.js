@@ -239,6 +239,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
       const observedAt = Date.parse(observation.observedAt);
       const verifiedAt = Date.parse(verification.verifiedAt);
       if (proof?.verifierId === PROVIDER_ID || !proof?.verifierId
+        || proof?.targetId !== snapshot.targetId
         || verification.verifierId !== proof.verifierId
         || verification.verificationAuthorityId !== snapshot.state.invocation.policyDecisionId
         || verification.effectId !== invocationId
