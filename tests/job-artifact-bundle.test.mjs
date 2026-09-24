@@ -6,6 +6,7 @@ import {
   JobArtifactCategory,
   buildJobArtifactBundleV1,
 } from '../src/core/job-artifact-bundle.js';
+import { normalizeArtifactRefV1 } from '../src/core/universal-agent-contracts.js';
 
 const AT = '2026-09-24T21:33:00.000Z';
 
@@ -290,4 +291,134 @@ test('rejects sparse entry and disclosure arrays instead of silently skipping ho
   const sparseDisclosure = validInput();
   sparseDisclosure.disclosure.allowedSensitiveArtifactIds.length = 2;
   assert.throws(() => buildJobArtifactBundleV1(sparseDisclosure), /allowedSensitiveArtifactIds must not be sparse/);
+});
+
+
+test('accepts the exact canonical ArtifactRefV1 optional-field representation', () => {
+  const canonical = normalizeArtifactRefV1({
+    schemaVersion:1,
+    artifactId:'canonical-optional',
+    kind:'job-output',
+    uri:'artifact://job-1/canonical-optional',
+    sha256:'9'.repeat(64),
+    sizeBytes:0,
+    createdAt:AT,
+    sensitive:false,
+  });
+  assert.equal(canonical.mediaType, '');
+  assert.equal(canonical.producerInvocationId, null);
+
+  const input = validInput();
+  input.entries.push({
+    path:'artifacts/canonical-optional.bin',
+    category:JobArtifactCategory.ARTIFACT,
+    artifactRef:canonical,
+  });
+  const bundle = buildJobArtifactBundleV1(input);
+  const accepted = bundle.entries.find((item) => item.artifactRef.artifactId === 'canonical-optional');
+  assert.equal(accepted.artifactRef.mediaType, '');
+  assert.equal(accepted.artifactRef.producerInvocationId, null);
+});
+
+test('canonical control paths are bound to their semantic media type', () => {
+  for (const [path, wrongMedia] of [
+    ['SUMMARY.md', 'application/json'],
+    ['REPORT.json', 'text/markdown'],
+    ['timeline.jsonl', 'application/json'],
+  ]) {
+    const input = validInput();
+    input.entries.find((item) => item.path === path).artifactRef.mediaType = wrongMedia;
+    assert.throws(() => buildJobArtifactBundleV1(input), new RegExp(path.replace('.', '\\.') + ' requires mediaType'));
+  }
+
+  const withParameter = validInput();
+  withParameter.entries.find((item) => item.path === 'SUMMARY.md').artifactRef.mediaType = 'text/markdown; charset=utf-8';
+  assert.equal(buildJobArtifactBundleV1(withParameter).bundleId, 'bundle-1');
+});
+
+test('bundle collection boundaries reject accessor-backed entries and disclosure without executing getters', () => {
+  let entryReads = 0;
+  const input = validInput();
+  const hostileEntries = [...input.entries];
+  Object.defineProperty(hostileEntries, 0, {
+    enumerable:true,
+    configurable:true,
+    get() {
+      entryReads += 1;
+      return input.entries[0];
+    },
+  });
+  input.entries = hostileEntries;
+  assert.throws(() => buildJobArtifactBundleV1(input), /entries\[0\] must be an enumerable data property/);
+  assert.equal(entryReads, 0, 'entry getter must never execute');
+
+  let disclosureReads = 0;
+  const disclosureInput = validInput();
+  const hostileDisclosure = [];
+  Object.defineProperty(hostileDisclosure, 0, {
+    enumerable:true,
+    configurable:true,
+    get() {
+      disclosureReads += 1;
+      return 'evidence-1';
+    },
+  });
+  disclosureInput.disclosure.allowedSensitiveArtifactIds = hostileDisclosure;
+  assert.throws(
+    () => buildJobArtifactBundleV1(disclosureInput),
+    /allowedSensitiveArtifactIds\[0\] must be an enumerable data property/,
+  );
+  assert.equal(disclosureReads, 0, 'sensitive-disclosure getter must never execute');
+});
+
+test('bundle collection boundaries reject hidden, custom, symbol and exotic array data', () => {
+  const hidden = validInput();
+  Object.defineProperty(hidden.entries, 0, {
+    enumerable:false,
+    configurable:true,
+    writable:true,
+    value:hidden.entries[0],
+  });
+  assert.throws(() => buildJobArtifactBundleV1(hidden), /entries\[0\] must be an enumerable data property/);
+
+  const custom = validInput();
+  custom.entries.metadata = 'authority';
+  assert.throws(() => buildJobArtifactBundleV1(custom), /entries contains non-index array data/);
+
+  const symbolic = validInput();
+  symbolic.disclosure.allowedSensitiveArtifactIds[Symbol('authority')] = 'result';
+  assert.throws(() => buildJobArtifactBundleV1(symbolic), /allowedSensitiveArtifactIds contains non-index array data/);
+
+  const exotic = validInput();
+  Object.setPrototypeOf(exotic.entries, null);
+  assert.throws(() => buildJobArtifactBundleV1(exotic), /entries must be a bounded plain array/);
+});
+
+test('hidden schema-valid bundle and ArtifactRef fields fail closed', () => {
+  const hiddenBundleId = validInput();
+  Object.defineProperty(hiddenBundleId, 'bundleId', {
+    enumerable:false,
+    configurable:true,
+    writable:true,
+    value:'bundle-hidden',
+  });
+  assert.throws(() => buildJobArtifactBundleV1(hiddenBundleId), /non-enumerable field: bundleId/);
+
+  const hiddenDigest = validInput();
+  Object.defineProperty(hiddenDigest.entries[0].artifactRef, 'sha256', {
+    enumerable:false,
+    configurable:true,
+    writable:true,
+    value:'c'.repeat(64),
+  });
+  assert.throws(() => buildJobArtifactBundleV1(hiddenDigest), /non-enumerable field: sha256/);
+
+  const hiddenSensitive = validInput();
+  Object.defineProperty(hiddenSensitive.entries[0].artifactRef, 'sensitive', {
+    enumerable:false,
+    configurable:true,
+    writable:true,
+    value:true,
+  });
+  assert.throws(() => buildJobArtifactBundleV1(hiddenSensitive), /non-enumerable field: sensitive/);
 });
