@@ -1,0 +1,84 @@
+name: Одноразове застосування маршрутизації моделей
+
+on:
+  push:
+    branches:
+      - agent/model-routing-parallel-mistral-20260924
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Застосувати та перевірити
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .autopilot-patch/chunk-*.b64 | base64 -d | gzip -d > /tmp/autopilot.patch
+          patch -p1 --batch --forward < /tmp/autopilot.patch
+
+          while IFS=$'\t' read -r expected path; do
+            [ -z "$expected" ] && continue
+            actual="$(git hash-object "$path")"
+            if [ "$actual" != "$expected" ]; then
+              echo "Контрольна сума не збігається: $path" >&2
+              echo "очікувалось=$expected фактично=$actual" >&2
+              exit 1
+            fi
+          done <<'HASHES'
+          25c5b408e2372802b75da98e10c1df2ff616945e	CHANGES-0.9.19.txt
+          e02b5afbaf63165b74ae038ad0780ea7363e1485	QA-0.9.19.txt
+          0e88113287e41b4e439980de3d5fcc1a4290e298	README.txt
+          252c57c87e3820a3769f921b2e98563b3b4e45e4	companion/ai-gateway/ENDPOINT-CREDENTIAL-HELPER.ps1
+          acfdc65bb2cf67b84e98aa7ad682bf73767d84bd	companion/ai-gateway/README-УКРАЇНСЬКОЮ.txt
+          518c2ac48375f25dee42c9acb746096cb579b19b	companion/ai-gateway/SAVE COMPATIBLE ENDPOINT KEY.ps1
+          936d01bbfe8ab51bfc0d589b06ee6e0dbd9ce553	companion/ai-gateway/SETUP MISTRAL.ps1
+          fd3b24f58be31a2484b7835460327ea4ec0a86d2	companion/ai-gateway/gateway.mjs
+          9a401836f672c0325d33e5424c44cb8a47eb69f9	companion/ai-gateway/ДОДАТИ OPENAI-COMPATIBLE ENDPOINT.ps1
+          e2ba98d20c92301021be583c48410ce10fa74dbd	companion/ai-gateway/ЗАПУСТИТИ GATEWAY.ps1
+          73d174ce535498100e64a972730df0ea01aa8d86	companion/ai-gateway/ЗАПУСТИТИ — LM STUDIO або OPENAI-COMPATIBLE.ps1
+          5ec12cd2d124e9c0905f9ed7fd14e3a10c2b0e84	companion/ai-gateway/ЗАПУСТИТИ — OPENAI API.ps1
+          2b1a3b0116b10ff96b1ac95432812602ddb9a5ce	companion/ai-gateway/ЗАПУСТИТИ — ЛОКАЛЬНИЙ ШІ.ps1
+          8723d1989f2c917993430b8b21f51f3a5711c3e0	companion/ai-gateway/НАЛАШТУВАТИ OPENAI-COMPATIBLE АДРЕСУ.ps1
+          0446b04cd3a8353b7c679a7ba48a7e2d34e1640c	companion/ai-gateway/СТАРТ GATEWAY — АВТО.ps1
+          b127962390caadb4ea1bf3c2b4159ff11321801e	src/background/service-worker.js
+          05eb678c956cc77f3f958b4c2debaf763efea7ba	src/config/orchestration-v2-template.json
+          1107ee02e4e974c9eef33c291ee79c934ab50da8	src/core/ai-orchestrator.js
+          81d6ff3d2298a7ce6efa1991da01caf93d49f18e	src/core/ai-route-pool.js
+          c61ebb242d621d1f975e28c8b96d46512277037c	src/core/async-concurrency-gate.js
+          fd49193e02bcf7741279dbd7a028f81676a4cd9e	src/core/commands.js
+          05a84a286e6b4a441dd0f0d64ce784f37182f84c	src/core/orchestration-v2-profile.js
+          aa5d23b51072c583a711f5c9645a3ffd5d5e45cb	src/core/orchestration-v2.js
+          99e841ddb22b7cd19343640c3637381dee81dd9e	src/shared/protocol.js
+          51e8c1abe4cfd1f0817ac78a07a298c4187eea74	src/ui/_preview_orchestration.html
+          12220c19b03daca145c063d22de6a35c3cb6b4c4	src/ui/options.html
+          769e17921d5d910eb50aa2e338be35bcfd7e4e89	src/ui/options.js
+          HASHES
+
+          while IFS= read -r file; do node --check "$file"; done < <(find src companion/ai-gateway -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) | sort)
+          node -e "JSON.parse(require('fs').readFileSync('src/config/orchestration-v2-template.json','utf8'))"
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          for name in ('src/ui/options.html','src/ui/_preview_orchestration.html'):
+              text=Path(name).read_text(encoding='utf-8')
+              ids=re.findall(r'\bid=[\"\']([^\"\']+)[\"\']',text)
+              dup=sorted({x for x in ids if ids.count(x)>1})
+              if dup: raise SystemExit(f'{name}: дубльовані id: {dup}')
+          PY
+          git diff --check
+
+          rm -rf .autopilot-patch
+          rm -f .github/workflows/one-shot-model-routing-materialize.yml
+          git config user.name 'autopilot-materializer'
+          git config user.email 'autopilot-materializer@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'Агент: маршрутизація моделей, Містраль і паралельні виконавці'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
