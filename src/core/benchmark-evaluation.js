@@ -44,6 +44,7 @@ const RESULT_KEYS = new Set([
   'caseId', 'outcome', 'metrics', 'evidenceArtifactIds', 'reasonCode',
 ]);
 const SUBJECT_KEYS = new Set(['subjectId', 'subjectRevisionId']);
+const EXECUTION_KEYS = new Set(['runId', 'producerInvocationId', 'startedAt', 'completedAt']);
 
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -278,7 +279,7 @@ function normalizeMetrics(input, expectedMetricIds, label, { required }) {
   return freeze(Object.fromEntries(entries));
 }
 
-function normalizeCaseResult(input, suiteCase, trustedEvidenceById) {
+function normalizeCaseResult(input, suiteCase, trustedEvidenceById, trustedExecution) {
   const label = 'BenchmarkCaseResultV1 ' + suiteCase.caseId;
   const raw = record(input, label);
   exactKeys(raw, RESULT_KEYS, label);
@@ -302,9 +303,24 @@ function normalizeCaseResult(input, suiteCase, trustedEvidenceById) {
     { min: 1 },
   );
   for (const evidenceArtifactId of evidenceArtifactIds) {
-    if (!trustedEvidenceById.has(evidenceArtifactId)) {
+    const artifact = trustedEvidenceById.get(evidenceArtifactId);
+    if (!artifact) {
       throw new Error(
         label + ' references unknown trusted evidence artifact: ' + evidenceArtifactId,
+      );
+    }
+    if (artifact.producerInvocationId !== trustedExecution.producerInvocationId) {
+      throw new Error(
+        label + ' evidence artifact producer does not match trusted benchmark execution: '
+          + evidenceArtifactId,
+      );
+    }
+    const artifactTime = Date.parse(artifact.createdAt);
+    if (artifactTime < Date.parse(trustedExecution.startedAt)
+      || artifactTime > Date.parse(trustedExecution.completedAt)) {
+      throw new Error(
+        label + ' evidence artifact is outside the trusted benchmark execution interval: '
+          + evidenceArtifactId,
       );
     }
   }
@@ -333,6 +349,7 @@ export function evaluateBenchmarkRunV1({
   suite,
   run,
   expectedSubject,
+  trustedExecution,
   trustedEvidenceArtifacts,
 } = {}) {
   const normalizedSuite = normalizeBenchmarkSuiteV1(suite);
@@ -343,6 +360,31 @@ export function evaluateBenchmarkRunV1({
     subject.subjectRevisionId,
     'ExpectedBenchmarkSubjectV1 subjectRevisionId',
   );
+
+  const execution = record(trustedExecution, 'TrustedBenchmarkExecutionV1');
+  exactKeys(execution, EXECUTION_KEYS, 'TrustedBenchmarkExecutionV1');
+  const trustedRunId = id(execution.runId, 'TrustedBenchmarkExecutionV1 runId');
+  const trustedProducerInvocationId = id(
+    execution.producerInvocationId,
+    'TrustedBenchmarkExecutionV1 producerInvocationId',
+  );
+  const trustedStartedAt = timestamp(
+    execution.startedAt,
+    'TrustedBenchmarkExecutionV1 startedAt',
+  );
+  const trustedCompletedAt = timestamp(
+    execution.completedAt,
+    'TrustedBenchmarkExecutionV1 completedAt',
+  );
+  if (Date.parse(trustedCompletedAt) < Date.parse(trustedStartedAt)) {
+    throw new Error('TrustedBenchmarkExecutionV1 completedAt precedes startedAt');
+  }
+  const normalizedTrustedExecution = freeze({
+    runId: trustedRunId,
+    producerInvocationId: trustedProducerInvocationId,
+    startedAt: trustedStartedAt,
+    completedAt: trustedCompletedAt,
+  });
   const trustedEvidenceById = normalizeTrustedEvidenceArtifacts(trustedEvidenceArtifacts);
 
   const rawRun = record(run, 'BenchmarkRunV1');
@@ -363,10 +405,16 @@ export function evaluateBenchmarkRunV1({
     throw new Error('BenchmarkRunV1 subject identity/revision mismatch');
   }
 
+  const runId = id(rawRun.runId, 'BenchmarkRunV1 runId');
   const startedAt = timestamp(rawRun.startedAt, 'BenchmarkRunV1 startedAt');
   const completedAt = timestamp(rawRun.completedAt, 'BenchmarkRunV1 completedAt');
   if (Date.parse(completedAt) < Date.parse(startedAt)) {
     throw new Error('BenchmarkRunV1 completedAt precedes startedAt');
+  }
+  if (runId !== normalizedTrustedExecution.runId
+    || startedAt !== normalizedTrustedExecution.startedAt
+    || completedAt !== normalizedTrustedExecution.completedAt) {
+    throw new Error('BenchmarkRunV1 execution identity/time does not match trusted execution');
   }
 
   const rawResults = denseArray(rawRun.results, 'BenchmarkRunV1 results', {
@@ -395,7 +443,12 @@ export function evaluateBenchmarkRunV1({
   let passedCaseCount = 0;
 
   for (const suiteCase of normalizedSuite.cases) {
-    const result = normalizeCaseResult(byCase.get(suiteCase.caseId), suiteCase, trustedEvidenceById);
+    const result = normalizeCaseResult(
+      byCase.get(suiteCase.caseId),
+      suiteCase,
+      trustedEvidenceById,
+      normalizedTrustedExecution,
+    );
     const assertionResults = [];
 
     if (result.outcome === BenchmarkCaseOutcome.MEASURED) {
@@ -431,7 +484,7 @@ export function evaluateBenchmarkRunV1({
   const failedCaseCount = caseCount - passedCaseCount;
   return freeze({
     schemaVersion: BENCHMARK_EVALUATION_SCHEMA_VERSION,
-    runId: id(rawRun.runId, 'BenchmarkRunV1 runId'),
+    runId,
     suiteId: normalizedSuite.suiteId,
     suiteRevisionId: normalizedSuite.suiteRevisionId,
     subjectId,
