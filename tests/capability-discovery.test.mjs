@@ -185,7 +185,14 @@ test('inventory identity conflicts and dangling tool capability references fail 
     tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'])],
     providerStates:[state('local/fs'), state('local/fs')],
     requestedCapabilityIds:['filesystem.read'],
-  }), /duplicate providerId/);
+  }), /duplicate provider\/tool readiness identity/);
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'])],
+    providerStates:[state('other/provider', { toolId:'fs.inspect' })],
+    requestedCapabilityIds:['filesystem.read'],
+  }), /does not belong to providerId/);
 });
 
 test('provider readiness boundary rejects coercion, inherited authority and exotic objects', () => {
@@ -257,4 +264,26 @@ test('best-path planning prefers deterministic API/CLI/semantic/UIA paths before
   assert.equal(result.plan[0].toolId, 'api.slowest');
   assert.equal(result.plan[0].pathKind, 'API');
   assert.equal(result.plan[0].permissionGranted, false);
+});
+
+
+test('tool-specific path readiness overrides provider-wide fallback for mixed-mode providers', () => {
+  const result = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('windows.visual', 'windows/provider', ['filesystem.read']),
+      tool('windows.uia', 'windows/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('windows/provider', { pathKind:'VISUAL', latencyMs:1 }),
+      state('windows/provider', { toolId:'windows.uia', pathKind:'UIA', latencyMs:40 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => [item.toolId, item.pathKind]), [
+    ['windows.uia', 'UIA'],
+    ['windows.visual', 'VISUAL'],
+  ]);
+  assert.equal(result.plan[0].toolId, 'windows.uia');
 });
