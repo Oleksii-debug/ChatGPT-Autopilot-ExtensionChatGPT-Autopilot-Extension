@@ -93,6 +93,19 @@ test('AgentPlan extension boundary rejects coerced and inherited model authority
   const symbolNode = node('symbol-node');
   symbolNode[Symbol('hidden-authority')] = true;
   assert.throws(() => call(symbolNode), /symbol fields/);
+
+  let budgetReads = 0;
+  const accessorBudgetNode = node('accessor-budget');
+  Object.defineProperty(accessorBudgetNode, 'budget', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      budgetReads += 1;
+      return { maxModelCalls: 0, maxRuntimeSeconds: 0, maxCostUsdMicros: 0 };
+    },
+  });
+  assert.throws(() => call(accessorBudgetNode), /own data properties/);
+  assert.equal(budgetReads, 0, 'budget getter must never execute before admission');
 });
 
 test('AgentPlan evolution boundary rejects coerced and inherited full-plan authority', () => {

@@ -31,7 +31,14 @@ function object(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
-  if (Object.getOwnPropertySymbols(value).length) throw new Error(`${label} cannot contain symbol fields`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} cannot contain symbol fields`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} fields must be own data properties`);
+    }
+    if (!descriptor.enumerable) throw new Error(`${label} cannot contain non-enumerable fields`);
+  }
   return value;
 }
 function exact(raw, allowed, label) {
@@ -194,7 +201,17 @@ export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelo
         throw new Error('AgentPlan extension node cannot inject evidence');
       }
     }
-    const candidate = normalizeNode({ ...structuredClone(rawNode), state: AgentPlanNodeState.PENDING, evidence: '', updatedAt });
+    // Validate nested budget authority before cloning: structuredClone() can
+    // erase an exotic prototype and silently turn malformed budget input into
+    // an apparently safe plain object.
+    const normalizedBudget = normalizeBudget(rawNode.budget === undefined ? {} : rawNode.budget);
+    const candidate = normalizeNode({
+      ...structuredClone(rawNode),
+      budget: normalizedBudget,
+      state: AgentPlanNodeState.PENDING,
+      evidence: '',
+      updatedAt,
+    });
     if (existingIds.has(candidate.nodeId) || addedIds.has(candidate.nodeId)) throw new Error('AgentPlan extension contains duplicate nodeId');
     addedIds.add(candidate.nodeId);
     return candidate;
