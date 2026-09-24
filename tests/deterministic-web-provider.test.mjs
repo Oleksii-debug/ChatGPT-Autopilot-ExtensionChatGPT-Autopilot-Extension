@@ -163,8 +163,9 @@ test('a restarted provider does not replay a durable EXECUTING effect; manual re
   finishDispatch();
   assert.equal((await pending).status, 'AMBIGUOUS');
   await assert.rejects(() => restarted.reconcile({ invocationId: 'inv-1', outcome: 'MANUAL_REVIEW' }), /independent web reconciliation verifier/);
-  const withQuiescenceProof = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+  const withQuiescenceProof = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
+    targetId,
     observation: { schemaVersion: 1, observationId: 'quiescent-observation', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { quiescent: true }, artifactRefs: [], observedAt: at },
     verification: { schemaVersion: 1, verificationId: 'quiescent-verification', invocationId: invocation.invocationId, observationId: 'quiescent-observation', status: 'AMBIGUOUS', reasonCode: 'EFFECT_UNRESOLVED', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
   }) });
@@ -208,15 +209,17 @@ test('safe retry needs fresh independently bound no-effect evidence', async () =
   const request = { ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } };
   assert.equal((await initial.invoke(request)).status, 'AMBIGUOUS');
   await assert.rejects(() => initial.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /independent web reconciliation verifier/);
-  const bad = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+  const bad = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
+    targetId,
     observation: { schemaVersion: 1, observationId: 'reconcile-obs', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { committed: true }, artifactRefs: [], observedAt: at },
     verification: { schemaVersion: 1, verificationId: 'reconcile-check', invocationId: invocation.invocationId, observationId: 'reconcile-obs', status: 'FAILED', reasonCode: 'NO_COMMITTED_EFFECT', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
   }) });
   await assert.rejects(() => bad.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /proof of no committed effect/);
   assert.equal(store.snapshot().effectsById['inv-1'].state.phase, 'RECONCILE');
-  const safe = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+  const safe = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
+    targetId,
     observation: { schemaVersion: 1, observationId: 'reconcile-obs', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { committed: false }, artifactRefs: [], observedAt: at },
     verification: { schemaVersion: 1, verificationId: 'reconcile-check', invocationId: invocation.invocationId, observationId: 'reconcile-obs', status: 'FAILED', reasonCode: 'NO_COMMITTED_EFFECT', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
   }) });
