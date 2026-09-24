@@ -265,12 +265,13 @@ function normalizeUiaRows(rows, limit) {
 export function createPowerShellUiaAdapter({ execFile, powershellPath = null } = {}) {
   if (typeof execFile !== 'function') fail('WINDOWS_CONFIG_INVALID', 'execFile adapter is required');
   return Object.freeze({
-    async query({ windowId, role = '', name = '', limit = 64 } = {}) {
+    async query(payload = {}) {
+      exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'PowerShell UIA query');
       const request = {
-        windowId: canonicalPowerShellWindowId(windowId),
-        role: boundedOptionalText(role, 'role', 120),
-        name: boundedOptionalText(name, 'name', 512),
-        limit: strictInteger(limit, 'limit', 1, MAX_UIA_RESULTS, 64),
+        windowId: canonicalPowerShellWindowId(payload.windowId),
+        role: boundedOptionalText(payload.role, 'role', 120),
+        name: boundedOptionalText(payload.name, 'name', 512),
+        limit: strictInteger(payload.limit, 'limit', 1, MAX_UIA_RESULTS, 64),
       };
       const encoded = encodePowerShellUiaScript(request);
       let result;
@@ -325,7 +326,7 @@ export function createWindowsProvider({
           capabilityId: 'windows.uia.query',
           readOnly: true,
           scoped: true,
-          available: Boolean(effectiveUiaAdapter),
+          available: typeof effectiveUiaAdapter?.query === 'function',
           windowIdFormat: 'desktop | hwnd:<decimal>',
         },
       ]);
