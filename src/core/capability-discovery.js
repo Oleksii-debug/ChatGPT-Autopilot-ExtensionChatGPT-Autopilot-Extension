@@ -19,7 +19,17 @@ export const CapabilityPathReadiness = Object.freeze({
   UNAVAILABLE: 'UNAVAILABLE',
 });
 
+export const CapabilityPathKind = Object.freeze({
+  API: 'API',
+  CLI: 'CLI',
+  SEMANTIC_BROWSER: 'SEMANTIC_BROWSER',
+  UIA: 'UIA',
+  VISUAL: 'VISUAL',
+  OCR: 'OCR',
+});
+
 const HEALTH = new Set(Object.values(ProviderHealthStatus));
+const PATH_KINDS = new Set(Object.values(CapabilityPathKind));
 const EXECUTABLE = new Set([CapabilityPathReadiness.READY, CapabilityPathReadiness.DEGRADED]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_CAPABILITIES = 512;
@@ -78,6 +88,7 @@ const PROVIDER_STATE_KEYS = new Set([
   'installed',
   'authenticationRequired',
   'authenticated',
+  'pathKind',
   'latencyMs',
   'reasonCode',
 ]);
@@ -96,6 +107,11 @@ export function normalizeProviderReadinessV1(input) {
     installed: bool(raw.installed, 'installed'),
     authenticationRequired: bool(raw.authenticationRequired, 'authenticationRequired'),
     authenticated: bool(raw.authenticated, 'authenticated'),
+    pathKind: (() => {
+      const value = id(raw.pathKind, 'pathKind').toUpperCase();
+      if (!PATH_KINDS.has(value)) throw new Error('pathKind is invalid');
+      return value;
+    })(),
     latencyMs: optionalInteger(raw.latencyMs, 'latencyMs', MAX_LATENCY_MS),
     reasonCode: raw.reasonCode == null || raw.reasonCode === '' ? '' : id(raw.reasonCode, 'reasonCode'),
   });
@@ -155,12 +171,24 @@ function readinessRank(value) {
   }[value] ?? 99;
 }
 
+function pathRank(value) {
+  return {
+    [CapabilityPathKind.API]: 0,
+    [CapabilityPathKind.CLI]: 1,
+    [CapabilityPathKind.SEMANTIC_BROWSER]: 2,
+    [CapabilityPathKind.UIA]: 3,
+    [CapabilityPathKind.VISUAL]: 4,
+    [CapabilityPathKind.OCR]: 5,
+  }[value] ?? 99;
+}
+
 function latencyRank(value) {
   return value > 0 ? value : Number.MAX_SAFE_INTEGER;
 }
 
 function compareCandidate(a, b) {
   return readinessRank(a.readiness) - readinessRank(b.readiness)
+    || pathRank(a.pathKind) - pathRank(b.pathKind)
     || b.matchingCapabilityIds.length - a.matchingCapabilityIds.length
     || latencyRank(a.latencyMs) - latencyRank(b.latencyMs)
     || a.providerId.localeCompare(b.providerId)
@@ -178,6 +206,7 @@ function providerFacts(providerId, statesByProviderId) {
     installed: false,
     authenticationRequired: false,
     authenticated: false,
+    pathKind: CapabilityPathKind.OCR,
     latencyMs: 0,
     reasonCode: 'PROVIDER_STATE_MISSING',
   });
@@ -205,6 +234,7 @@ function buildPlan(candidates, knownRequestedIds) {
       toolId: selected.candidate.toolId,
       capabilityIds,
       readiness: selected.candidate.readiness,
+      pathKind: selected.candidate.pathKind,
       requiresPolicyDecision: true,
       permissionGranted: false,
     }));
@@ -234,6 +264,7 @@ export function discoverCapabilityPathsV1({
         matchingCapabilityIds,
         readiness: readinessFor(state),
         health: state.health,
+        pathKind: state.pathKind,
         readOnly: tool.readOnly,
         latencyMs: state.latencyMs,
         reasonCode: state.reasonCode,
