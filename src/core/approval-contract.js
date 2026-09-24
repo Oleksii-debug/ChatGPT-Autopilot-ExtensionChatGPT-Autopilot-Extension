@@ -146,9 +146,12 @@ function strictInvocationInput(value) {
   if (raw.parentInvocationId != null && typeof raw.parentInvocationId !== 'string') {
     fail('ToolInvocationV1.parentInvocationId must be a string');
   }
-  if (!Array.isArray(raw.requestedCapabilityIds)
-      || raw.requestedCapabilityIds.some(value => typeof value !== 'string')) {
-    fail('ToolInvocationV1.requestedCapabilityIds must contain strings');
+  assertArrayShape(raw.requestedCapabilityIds, 'ToolInvocationV1.requestedCapabilityIds');
+  for (let index = 0; index < raw.requestedCapabilityIds.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(raw.requestedCapabilityIds, String(index));
+    if (!descriptor || typeof descriptor.value !== 'string') {
+      fail('ToolInvocationV1.requestedCapabilityIds must contain strings');
+    }
   }
   assertStrictJsonData(raw.arguments, 'ToolInvocationV1.arguments');
   return normalizeToolInvocationV1(raw);
@@ -188,9 +191,13 @@ function canonicalJson(value, label = 'value') {
   return `{${keys.map(key => `${JSON.stringify(key)}:${canonicalJson(value[key], `${label}.${key}`)}`).join(',')}}`;
 }
 
-function bindingPayload(policyDecision, invocation) {
+function bindingPayload(policyDecision, invocation, { requestedAt, expiresAt }) {
   return {
     tag: 'chatgpt-autopilot-approval-binding-v1',
+    ticketTiming: {
+      requestedAt,
+      expiresAt,
+    },
     policyDecision: {
       schemaVersion: policyDecision.schemaVersion,
       decisionId: policyDecision.decisionId,
@@ -235,13 +242,28 @@ function toHex(bytes) {
 export async function createApprovalBindingFingerprintV1({
   policyDecision,
   invocation,
+  requestedAt = '',
+  expiresAt = '',
   cryptoApi = globalThis.crypto,
 } = {}) {
   const policy = strictPolicyInput(policyDecision);
   const toolInvocation = strictInvocationInput(invocation);
   assertApprovalBinding(policy, toolInvocation);
+  const normalizedRequestedAt = requestedAt === ''
+    ? policy.decidedAt
+    : requireTimestamp(requestedAt, 'requestedAt');
+  if (normalizedRequestedAt !== policy.decidedAt) {
+    fail('requestedAt must equal policy decidedAt');
+  }
+  const normalizedExpiresAt = requireTimestamp(expiresAt, 'expiresAt', { optional: true });
+  if (normalizedExpiresAt && Date.parse(normalizedExpiresAt) <= Date.parse(normalizedRequestedAt)) {
+    fail('expiresAt must be after requestedAt');
+  }
   if (!cryptoApi?.subtle?.digest) fail('Web Crypto SHA-256 is unavailable');
-  const canonical = canonicalJson(bindingPayload(policy, toolInvocation), 'approvalBinding');
+  const canonical = canonicalJson(bindingPayload(policy, toolInvocation, {
+    requestedAt: normalizedRequestedAt,
+    expiresAt: normalizedExpiresAt,
+  }), 'approvalBinding');
   const digest = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
   return `sha256:${toHex(new Uint8Array(digest))}`;
 }
@@ -316,6 +338,8 @@ export async function createApprovalTicketV1({
   const bindingFingerprint = await createApprovalBindingFingerprintV1({
     policyDecision: policy,
     invocation: toolInvocation,
+    requestedAt: policy.decidedAt,
+    expiresAt: normalizedExpiresAt,
     cryptoApi,
   });
   return normalizeApprovalTicketV1({
@@ -362,9 +386,14 @@ async function assertTicketBinding(ticket, policyDecision, invocation, cryptoApi
       || ticket.policyDecisionId !== policy.decisionId) {
     fail('Approval ticket identity does not match current invocation/policy');
   }
+  if (ticket.requestedAt !== policy.decidedAt) {
+    fail('Approval ticket requestedAt does not match policy decidedAt');
+  }
   const fingerprint = await createApprovalBindingFingerprintV1({
     policyDecision: policy,
     invocation: toolInvocation,
+    requestedAt: ticket.requestedAt,
+    expiresAt: ticket.expiresAt,
     cryptoApi,
   });
   if (fingerprint !== ticket.bindingFingerprint) {

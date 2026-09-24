@@ -364,3 +364,70 @@ test('normalized ticket rejects caller-supplied resolved state without complete 
     resolvedAt: '2026-09-24T22:35:00Z',
   }), /complete resolution fields/);
 });
+
+
+test('approval timing is immutable under the exact binding fingerprint', async () => {
+  const p = policy();
+  const i = invocation();
+  const pending = await createApprovalTicketV1({
+    policyDecision:p,
+    invocation:i,
+    expiresAt:'2026-09-24T22:36:00Z',
+    cryptoApi:webcrypto,
+  });
+
+  const extended = { ...pending, expiresAt:'2026-09-24T23:36:00Z' };
+  await assert.rejects(
+    resolveApprovalTicketV1({
+      ticket:extended,
+      resolution:resolution({ resolvedAt:'2026-09-24T22:40:00Z' }),
+      policyDecision:p,
+      invocation:i,
+      cryptoApi:webcrypto,
+    }),
+    /binding fingerprint/,
+  );
+
+  const removed = { ...pending, expiresAt:'' };
+  await assert.rejects(
+    resolveApprovalTicketV1({
+      ticket:removed,
+      resolution:resolution(),
+      policyDecision:p,
+      invocation:i,
+      cryptoApi:webcrypto,
+    }),
+    /binding fingerprint/,
+  );
+
+  const shiftedRequest = { ...pending, requestedAt:'2026-09-24T22:31:00.000Z' };
+  await assert.rejects(
+    resolveApprovalTicketV1({
+      ticket:shiftedRequest,
+      resolution:resolution(),
+      policyDecision:p,
+      invocation:i,
+      cryptoApi:webcrypto,
+    }),
+    /requestedAt does not match policy decidedAt/,
+  );
+});
+
+test('requested capability array accessors fail before any authority value is read', async () => {
+  let reads = 0;
+  const capabilities = [];
+  Object.defineProperty(capabilities, '0', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      reads += 1;
+      return reads === 1 ? 'artifact.read' : 'cms.publish';
+    },
+  });
+  const i = invocation({}, { requestedCapabilityIds:capabilities });
+  await assert.rejects(
+    createApprovalTicketV1({ policyDecision:policy(), invocation:i, cryptoApi:webcrypto }),
+    /enumerable data items only/,
+  );
+  assert.equal(reads, 0, 'capability getter must never execute before approval binding');
+});
