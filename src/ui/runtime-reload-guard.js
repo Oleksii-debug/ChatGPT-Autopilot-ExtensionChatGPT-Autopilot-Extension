@@ -1,3 +1,5 @@
+import './scenario-work-import-rollback-guard.js';
+
 const STALE_CORE_PATTERN = /Unknown Core command:/i;
 let reloadScheduled = false;
 
