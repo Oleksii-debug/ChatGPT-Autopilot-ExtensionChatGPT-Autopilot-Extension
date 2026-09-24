@@ -85,8 +85,11 @@ test('each metered provider invocation always consumes exactly one model call', 
 });
 
 test('paid routes with entirely unknown pricing fail closed', () => {
+  const unknownPriceRoute = route();
+  delete unknownPriceRoute.inputPricePerMillionUsd;
+  delete unknownPriceRoute.outputPricePerMillionUsd;
   assert.throws(() => meterAiRouteUsageV1({
-    route: route({ inputPricePerMillionUsd: 0, outputPricePerMillionUsd: 0 }),
+    route: unknownPriceRoute,
     invocationId: 'invoke-unknown-price',
     inputTokens: 10,
     outputTokens: 5,
@@ -278,6 +281,57 @@ test('hostile prototype-bearing evidence and inherited route pricing cannot beco
     if (priorOutput) Object.defineProperty(Object.prototype, 'outputPricePerMillionUsd', priorOutput);
     else delete Object.prototype.outputPricePerMillionUsd;
   }
+});
+
+test('cost authority rejects accessors, hidden fields, symbols, and accessor-backed aggregate entries without executing getters', () => {
+  const record = meterAiRouteUsageV1({
+    route: route(),
+    invocationId: 'invoke-data-only',
+    inputTokens: 10,
+    outputTokens: 2,
+    observedAt: AT,
+  });
+
+  let reads = 0;
+  const accessorRecord = { ...record };
+  Object.defineProperty(accessorRecord, 'costUsdMicros', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return record.costUsdMicros; },
+  });
+  assert.throws(() => normalizeAiCostRecordV1(accessorRecord), /data properties/);
+  assert.equal(reads, 0, 'financial evidence getter must never execute');
+
+  const accessorRoute = route();
+  Object.defineProperty(accessorRoute, 'inputPricePerMillionUsd', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return 1.5; },
+  });
+  assert.throws(() => meterAiRouteUsageV1({
+    route: accessorRoute,
+    invocationId: 'invoke-route-getter',
+    inputTokens: 1,
+    outputTokens: 0,
+    observedAt: AT,
+  }), /data properties/);
+  assert.equal(reads, 0, 'route pricing getter must never execute');
+
+  const hiddenRecord = { ...record };
+  Object.defineProperty(hiddenRecord, 'hiddenAuthority', { value: 'secret', enumerable: false });
+  assert.throws(() => normalizeAiCostRecordV1(hiddenRecord), /data properties/);
+
+  const symbolRecord = { ...record, [Symbol('hidden-cost-authority')]: 1 };
+  assert.throws(() => normalizeAiCostRecordV1(symbolRecord), /symbol field/);
+
+  const records = [record];
+  Object.defineProperty(records, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return record; },
+  });
+  assert.throws(() => aggregateAiCostRecordsV1(records), /data properties/);
+  assert.equal(reads, 0, 'aggregate element getter must never execute');
 });
 
 test('cost records convert directly into the resource-usage dimensions required by budget admission', () => {
