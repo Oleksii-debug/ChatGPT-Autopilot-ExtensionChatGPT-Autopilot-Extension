@@ -311,6 +311,8 @@
 
       <fieldset class="settings-group" id="orchestration-v2-limits-group">
         <legend>Локальні ліміти</legend>
+        <label><input id="orchestration-v2-owner-fixed-workers" type="checkbox" aria-describedby="orchestration-v2-owner-fixed-workers-help">Фіксувати кількість workers за значенням власника</label>
+        <p class="field-help" id="orchestration-v2-owner-fixed-workers-help">Коли увімкнено, координатор може запропонувати іншу кількість, але Autopilot лише фіксує запит і не змінює Start workers.</p>
         <label for="orchestration-v2-desired-workers">Start workers</label>
         <input id="orchestration-v2-desired-workers" type="number" min="0" max="200" step="1" inputmode="numeric">
         <label for="orchestration-v2-max-workers">Max active workers</label>

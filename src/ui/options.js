@@ -142,6 +142,7 @@ function orchestrationV2SettingsFromForm() {
     masterPromptVersion: integer('orchestration-v2-prompt-version', 1, 100000, 'Prompt version'),
     // Reserved compatibility field: no runtime behavior in Orchestration V2. Keep fail-closed.
     fallbackUniversalPromptEnabled: false,
+    ownerFixedDesiredWorkers: $('orchestration-v2-owner-fixed-workers').checked,
     defaultDesiredWorkers,
     absoluteMaxWorkers,
     maxLaunchesPerWindow: integer('orchestration-v2-max-launches-window', 0, 10000, 'Запусків за вікно'),
@@ -233,6 +234,7 @@ function renderOrchestrationV2Status(data = {}) {
   $('orchestration-v2-master-prompt').value = config.masterCoordinatorPrompt || '';
   $('orchestration-v2-tick-prompt').value = config.coordinatorTickPrompt || '';
   $('orchestration-v2-prompt-version').value = String(config.masterPromptVersion ?? 1);
+  $('orchestration-v2-owner-fixed-workers').checked = config.ownerFixedDesiredWorkers === true;
   $('orchestration-v2-desired-workers').value = String(config.defaultDesiredWorkers ?? 5);
   $('orchestration-v2-max-workers').value = String(config.absoluteMaxWorkers ?? 8);
   $('orchestration-v2-max-launches-window').value = String(config.maxLaunchesPerWindow ?? 0);

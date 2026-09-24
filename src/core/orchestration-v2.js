@@ -69,6 +69,7 @@ export const DEFAULT_ORCHESTRATION_CONFIG = Object.freeze({
   masterCoordinatorPrompt: '',
   coordinatorTickPrompt: 'Продовжуй координацію. Перечитай live GitHub і прийми наступне рішення.',
   masterPromptVersion: 1,
+  ownerFixedDesiredWorkers: false,
   defaultDesiredWorkers: 5,
   absoluteMaxWorkers: 8,
   maxLaunchesPerWindow: 6,
@@ -196,6 +197,7 @@ export function validateOrchestrationConfig(raw = {}) {
     masterCoordinatorPrompt: typeof raw.masterCoordinatorPrompt === 'string' ? raw.masterCoordinatorPrompt.trim() : '',
     coordinatorTickPrompt: typeof raw.coordinatorTickPrompt === 'string' && raw.coordinatorTickPrompt.trim() ? raw.coordinatorTickPrompt.trim() : DEFAULT_ORCHESTRATION_CONFIG.coordinatorTickPrompt,
     masterPromptVersion: boundedInt(raw.masterPromptVersion, 1, 100000, 1),
+    ownerFixedDesiredWorkers: raw.ownerFixedDesiredWorkers === true,
     defaultDesiredWorkers,
     absoluteMaxWorkers,
     maxLaunchesPerWindow: boundedInt(raw.maxLaunchesPerWindow, 0, 10000, DEFAULT_ORCHESTRATION_CONFIG.maxLaunchesPerWindow),
@@ -420,7 +422,9 @@ export function normalizeOrchestrationRuntime(raw, configRaw = {}, nowMs = Date.
   }
   const runtime = clone(raw);
   runtime.mode = MODES.has(runtime.mode) ? runtime.mode : OrchestrationMode.RUN;
-  runtime.desiredActiveWorkers = boundedInt(runtime.desiredActiveWorkers, 0, config.absoluteMaxWorkers, config.defaultDesiredWorkers);
+  runtime.desiredActiveWorkers = config.ownerFixedDesiredWorkers
+    ? config.defaultDesiredWorkers
+    : boundedInt(runtime.desiredActiveWorkers, 0, config.absoluteMaxWorkers, config.defaultDesiredWorkers);
   runtime.hardMaxWorkers = config.absoluteMaxWorkers;
   runtime.nextWorkerOrdinal = boundedInt(runtime.nextWorkerOrdinal, 1, Number.MAX_SAFE_INTEGER, 1);
   runtime.nextEventId = boundedInt(runtime.nextEventId, 1, Number.MAX_SAFE_INTEGER, 1);
@@ -764,6 +768,13 @@ export function applyControlDecision(runtime, rawControl, configRaw, nowMs = Dat
     if (action.type === ControlActionType.NO_ACTION) continue;
     if (action.type === ControlActionType.SET_DESIRED_CONCURRENCY) {
       runtime.lastRequestedDesiredWorkers = action.value;
+      if (config.ownerFixedDesiredWorkers) {
+        const next = config.defaultDesiredWorkers;
+        result.concurrencyChanged ||= next !== runtime.desiredActiveWorkers;
+        runtime.desiredActiveWorkers = next;
+        result.notes.push(`Owner-fixed worker count retained at ${next}; coordinator requested ${action.value}.`);
+        continue;
+      }
       const next = Math.min(config.absoluteMaxWorkers, action.value);
       result.concurrencyChanged ||= next !== runtime.desiredActiveWorkers;
       runtime.desiredActiveWorkers = next;
@@ -1272,6 +1283,7 @@ export function coordinatorControlContract(configRaw) {
     ? `Update canonical issue comment id ${config.controlCommentId}; do not create a new comment for each tick.`
     : 'Use one stable canonical issue comment. If it does not exist yet, create it once, then update that same comment on future turns.';
   return `AUTOPILOT ORCHESTRATION CONTROL V2 CONTRACT\nGitHub control issue: ${controlLocation}\n${commentInstruction}\nEvery coordinator turn, including NO_ACTION, return a strictly machine-readable current control decision with a monotonically increasing revision. Direct Chat is the PRIMARY low-latency control channel; GitHub is the durable mirror/fallback.\nAUTOPILOT ACK RULE: the machine handoff field last_control_revision is the only authority for what Autopilot has actually applied. Never assume a GitHub control revision/task was dispatched merely because it exists in GitHub or because an earlier coordinator mentioned it. If live GitHub contains an ADD_TASKS decision whose revision is greater than last_control_revision, re-emit the still-required task(s) in the next revision with the SAME task_id and SAME exact_once_key; Autopilot will deduplicate safely. Only after last_control_revision reaches/passes that decision may you treat it as applied.\nYour ChatGPT response MUST END with exactly one direct control block: the line ${ORCHESTRATION_CONTROL_MARKER} immediately followed by exactly one fenced JSON object, with no non-whitespace text after the closing fence. Mirror the same decision to the canonical GitHub control comment when available. The GitHub mirror comment MUST begin exactly with ${ORCHESTRATION_CONTROL_MARKER} and contain exactly one fenced JSON object.\nRequired top-level fields: schema_version=2, project_id=${config.projectId}, revision, coordinator_generation, generated_at, expires_at, mode, actions.\nAllowed action types only: NO_ACTION, SET_DESIRED_CONCURRENCY, ADD_TASKS, CANCEL_QUEUED_TASKS, SUPERSEDE_TASKS, PAUSE, RESUME, ROTATE_COORDINATOR, CONTROL_NOTE.\nNO_ACTION must be the only action when used.\nADD_TASKS task fields: task_id, prompt, priority, dependencies[], conflict_key, generation, launch_mode(FRESH_CHAT by default), optional continue_worker_id, exact_once_key, not_before, expires_at, target_repository.\nNever put credentials, cookies, private browser/profile data, secret tokens or arbitrary executable code into control.\nCoordinator may propose a large backlog; Autopilot independently enforces the owner's local concurrency and launch-rate limits. Never assume requested concurrency equals executable capacity.
+When owner_fixed_desired_workers=true, SET_DESIRED_CONCURRENCY is advisory only: Autopilot records the requested value but retains the owner's fixed desired worker count.
 Never create tasks merely because a periodic watchdog tick occurred. Live GitHub project state is authoritative.`;
 }
 
@@ -1287,6 +1299,7 @@ export function buildCoordinatorTickPrompt(runtime, configRaw, { initial = false
       last_control_revision: runtime.lastAppliedControlRevision,
       requested_active_workers: runtime.lastRequestedDesiredWorkers,
       desired_active_workers: runtime.desiredActiveWorkers,
+      owner_fixed_desired_workers: config.ownerFixedDesiredWorkers,
       absolute_max_workers: config.absoluteMaxWorkers,
       active_worker_ids: runtime.workerOrder.filter(id => SLOT_STATES.has(runtime.workersById[id]?.state)),
       stale_worker_ids: runtime.workerOrder.filter(id => runtime.workersById[id]?.state === WorkerState.STALE),
@@ -1294,7 +1307,7 @@ export function buildCoordinatorTickPrompt(runtime, configRaw, { initial = false
       pending_events: runtime.coordinator.lease
         ? runtime.pendingCoordinatorEvents.filter(event => runtime.coordinator.lease.eventIds?.includes(event.id))
         : runtime.pendingCoordinatorEvents.slice(0, MAX_COORDINATOR_EVENTS_PER_TURN),
-      policy: { watchdog_interval_seconds: config.watchdogIntervalSeconds, max_coordinator_turns: config.maxCoordinatorTurns, max_active_workers: config.absoluteMaxWorkers, max_launches_per_window: config.maxLaunchesPerWindow, launch_window_seconds: config.launchWindowSeconds, minimum_worker_launch_interval_seconds: config.minimumWorkerLaunchIntervalMs / 1000 },
+      policy: { owner_fixed_desired_workers: config.ownerFixedDesiredWorkers, watchdog_interval_seconds: config.watchdogIntervalSeconds, max_coordinator_turns: config.maxCoordinatorTurns, max_active_workers: config.absoluteMaxWorkers, max_launches_per_window: config.maxLaunchesPerWindow, launch_window_seconds: config.launchWindowSeconds, minimum_worker_launch_interval_seconds: config.minimumWorkerLaunchIntervalMs / 1000 },
     };
     return `${config.masterCoordinatorPrompt}\n\n${coordinatorControlContract(config)}\n\nAUTOPILOT_MACHINE_HANDOFF_V2\n\`\`\`json\n${JSON.stringify(handoff, null, 2)}\n\`\`\`\n\nMandatory: reread live GitHub before deciding. End this ChatGPT response with the strict V2 direct control block required above; mirror the same revision to the canonical GitHub control location. Treat handoff last_control_revision as Autopilot's durable ACK: any required task from a newer/unacknowledged GitHub revision must be reasserted idempotently with the SAME task_id/exact_once_key instead of replaced by NO_ACTION. Do not create work merely because this coordinator chat was opened.`;
   }
@@ -1317,6 +1330,7 @@ export function buildCoordinatorTickPrompt(runtime, configRaw, { initial = false
     last_control_revision: runtime.lastAppliedControlRevision,
     requested_active_workers: runtime.lastRequestedDesiredWorkers,
     desired_active_workers: runtime.desiredActiveWorkers,
+    owner_fixed_desired_workers: config.ownerFixedDesiredWorkers,
     agent_providers: { coordinator: config.coordinatorAgentProviderId, worker: config.workerAgentProviderId },
     local_launch_limits: { max_active_workers: config.absoluteMaxWorkers, max_launches_per_window: config.maxLaunchesPerWindow, launch_window_seconds: config.launchWindowSeconds, minimum_worker_launch_interval_seconds: config.minimumWorkerLaunchIntervalMs / 1000 },
     effective_active_slots: reservedWorkerSlots(runtime),
@@ -1578,6 +1592,7 @@ export function orchestrationSnapshot(runtime, configRaw) {
     desiredActiveWorkers: runtime.desiredActiveWorkers,
     effectiveDesiredWorkers: effectiveDesiredWorkers(runtime, config),
     hardMaxWorkers: config.absoluteMaxWorkers,
+    ownerFixedDesiredWorkers: config.ownerFixedDesiredWorkers,
     requestedActiveWorkers: runtime.lastRequestedDesiredWorkers,
     launchPolicy: workerLaunchPolicy(runtime, config, Date.now()),
     reservedWorkerSlots: reservedWorkerSlots(runtime),
