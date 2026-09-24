@@ -39,6 +39,8 @@ function githubClient(overrides = {}) {
     readRepository: async args => ({ operation: 'readRepository', args }),
     readFile: async args => ({ operation: 'readFile', args }),
     readTree: async args => ({ operation: 'readTree', args }),
+    readBranch: async args => ({ operation: 'readBranch', args }),
+    findPullRequests: async args => ({ operation: 'findPullRequests', args }),
     createBranch: async args => ({ operation: 'createBranch', args }),
     putFile: async args => ({ operation: 'putFile', args }),
     deleteFile: async args => ({ operation: 'deleteFile', args }),
@@ -90,6 +92,37 @@ test('ordinary session and specialist paths share the same ToolInvocation capabi
   assert.equal(first.result.operation, 'readRepository');
   assert.equal(second.result.operation, 'readTree');
   assert.equal(second.invocationId, 'github-inv-specialist');
+});
+
+test('reconciliation reads are separately capability-gated and remain read-only', async () => {
+  const provider = new GitHubAgentProviderV1({
+    githubClient: githubClient(),
+    grantedCapabilityIds: [GitHubCapabilityId.BRANCH_READ, GitHubCapabilityId.PULL_REQUEST_READ],
+    now: () => Date.parse(at),
+  });
+
+  const branch = await provider.invoke({
+    invocation: invocation(GitHubToolId.BRANCH_READ, GitHubCapabilityId.BRANCH_READ, { repositoryFullName: 'owner/repo', branch: 'work/x' }),
+    policyDecision: allow,
+  });
+  assert.equal(branch.result.operation, 'readBranch');
+
+  const pullInvocation = {
+    ...invocation(GitHubToolId.PULL_REQUEST_FIND, GitHubCapabilityId.PULL_REQUEST_READ, { repositoryFullName: 'owner/repo', head: 'work/x', base: 'main' }),
+    invocationId: 'github-inv-pr-find',
+    policyDecisionId: 'decision-pr-find',
+  };
+  const pullAllow = { ...allow, decisionId: 'decision-pr-find', invocationId: 'github-inv-pr-find' };
+  const pulls = await provider.invoke({ invocation: pullInvocation, policyDecision: pullAllow });
+  assert.equal(pulls.result.operation, 'findPullRequests');
+
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: invocation(GitHubToolId.BRANCH_CREATE, GitHubCapabilityId.BRANCH_CREATE, { repositoryFullName: 'owner/repo', branch: 'work/y', fromSha: 'a'.repeat(40) }),
+      policyDecision: allow,
+    }),
+    /granted|capabilit/i,
+  );
 });
 
 test('effectful transport ambiguity is never marked retry-safe by provider', async () => {
