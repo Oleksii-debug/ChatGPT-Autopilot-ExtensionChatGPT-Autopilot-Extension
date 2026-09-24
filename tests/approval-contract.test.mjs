@@ -307,6 +307,46 @@ test('strict boundary rejects coerced, prototype, accessor, symbol and hidden au
   );
 });
 
+test('nested invocation arguments reject accessor, symbol, exotic prototype and cycles before cloning', async () => {
+  const nestedAccessor = invocation();
+  let getterExecuted = false;
+  Object.defineProperty(nestedAccessor.arguments.body, 'secret', {
+    enumerable: true,
+    get() {
+      getterExecuted = true;
+      throw new Error('nested getter executed');
+    },
+  });
+  await assert.rejects(
+    createApprovalTicketV1({ policyDecision: policy(), invocation: nestedAccessor, cryptoApi: webcrypto }),
+    /enumerable data fields only/,
+  );
+  assert.equal(getterExecuted, false);
+
+  const nestedSymbol = invocation();
+  nestedSymbol.arguments.body[Symbol('authority')] = true;
+  await assert.rejects(
+    createApprovalTicketV1({ policyDecision: policy(), invocation: nestedSymbol, cryptoApi: webcrypto }),
+    /symbol fields/,
+  );
+
+  const exotic = invocation();
+  exotic.arguments.body = Object.create({ inherited: true });
+  exotic.arguments.body.title = 'Release';
+  exotic.arguments.body.publish = true;
+  await assert.rejects(
+    createApprovalTicketV1({ policyDecision: policy(), invocation: exotic, cryptoApi: webcrypto }),
+    /plain object/,
+  );
+
+  const cyclic = invocation();
+  cyclic.arguments.body.self = cyclic.arguments.body;
+  await assert.rejects(
+    createApprovalTicketV1({ policyDecision: policy(), invocation: cyclic, cryptoApi: webcrypto }),
+    /contains a cycle/,
+  );
+});
+
 test('normalized ticket rejects caller-supplied resolved state without complete coherent resolution', () => {
   assert.throws(() => normalizeApprovalTicketV1({
     schemaVersion: 1,

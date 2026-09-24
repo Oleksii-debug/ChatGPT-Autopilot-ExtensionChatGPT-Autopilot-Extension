@@ -111,6 +111,32 @@ function strictPolicyInput(value) {
   return normalizePolicyDecisionV1(raw);
 }
 
+function assertStrictJsonData(value, label, seen = new Set()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) fail(`${label} contains a non-finite number`);
+    return;
+  }
+  if (!value || typeof value !== 'object') fail(`${label} contains a non-JSON value`);
+  if (seen.has(value)) fail(`${label} contains a cycle`);
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) {
+      assertArrayShape(value, label);
+      for (let index = 0; index < value.length; index += 1) {
+        assertStrictJsonData(value[index], `${label}[${index}]`, seen);
+      }
+      return;
+    }
+    ownDataRecord(value, label);
+    for (const key of Object.keys(value)) {
+      assertStrictJsonData(value[key], `${label}.${key}`, seen);
+    }
+  } finally {
+    seen.delete(value);
+  }
+}
+
 function strictInvocationInput(value) {
   const raw = strictUniversalRecord(value, 'ToolInvocationV1');
   requireVersion(raw.schemaVersion, 'ToolInvocationV1');
@@ -124,7 +150,7 @@ function strictInvocationInput(value) {
       || raw.requestedCapabilityIds.some(value => typeof value !== 'string')) {
     fail('ToolInvocationV1.requestedCapabilityIds must contain strings');
   }
-  strictUniversalRecord(raw.arguments, 'ToolInvocationV1.arguments');
+  assertStrictJsonData(raw.arguments, 'ToolInvocationV1.arguments');
   return normalizeToolInvocationV1(raw);
 }
 
