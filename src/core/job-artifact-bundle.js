@@ -276,6 +276,12 @@ export function buildJobArtifactBundleV1(input) {
   });
 
   const entries = entryInputs.map(normalizeEntry);
+  const createdAt = requireIsoTimestamp(raw.createdAt, 'createdAt');
+  for (const entry of entries) {
+    if (Date.parse(entry.artifactRef.createdAt) > Date.parse(createdAt)) {
+      throw new Error('bundle createdAt cannot predate artifact: ' + entry.artifactRef.artifactId);
+    }
+  }
   const disclosure = normalizeDisclosure(raw.disclosure);
   const seenPaths = new Map();
   const seenArtifactIds = new Set();
@@ -330,7 +336,7 @@ export function buildJobArtifactBundleV1(input) {
     jobId: requireId(raw.jobId, 'jobId'),
     planId: requireId(raw.planId, 'planId', { optional: true }),
     projectId: requireId(raw.projectId, 'projectId', { optional: true }),
-    createdAt: requireIsoTimestamp(raw.createdAt, 'createdAt'),
+    createdAt,
     disclosure,
     entries: frozenEntries,
     checksumFile,
