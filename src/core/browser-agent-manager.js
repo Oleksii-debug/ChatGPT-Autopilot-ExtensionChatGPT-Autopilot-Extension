@@ -491,10 +491,13 @@ export class BrowserAgentManager {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryEvidence.verifierId,
-        verificationAuthorityId: retriable.safeRetryEvidence.verificationAuthorityId,
-        evidence: retriable.safeRetryEvidence.evidence,
-        message: 'Independent no-effect evidence authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+        verifierId: retriable.safeRetryVerification.verifierId,
+        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
+        verificationId: retriable.safeRetryVerification.verificationId,
+        observationId: retriable.safeRetryVerification.observationId,
+        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
+        evidence: retriable.safeRetryVerification.summary,
+        message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
       });
       result = clone(retriable);
       return store;
