@@ -47,12 +47,23 @@ function policy(id = 'fs-effect-1') {
   };
 }
 function memoryStore(onSave = null) {
-  const values = new Map();
+  let root = { effectsById: {} };
   return {
-    async load(id) { return values.has(id) ? structuredClone(values.get(id)) : null; },
-    async save(id, state) {
-      values.set(id, structuredClone(state));
-      onSave?.(structuredClone(state));
+    async update(mutator) {
+      const before = JSON.stringify(root);
+      const draft = structuredClone(root);
+      const returned = mutator(draft);
+      root = structuredClone(returned === undefined ? draft : returned);
+      if (JSON.stringify(root) !== before && onSave) {
+        for (const entry of Object.values(root.effectsById || {})) {
+          if (entry?.state) onSave(structuredClone(entry.state));
+        }
+      }
+      return structuredClone(root);
+    },
+    async load(id) {
+      const state = root.effectsById?.[id]?.state;
+      return state ? structuredClone(state) : null;
     },
   };
 }
@@ -104,6 +115,89 @@ test('filesystem write persists EXECUTING before dispatch, verifies, commits, an
   assert.ok(savedPhases.indexOf(ExactEffectPhase.EXECUTING) < savedPhases.indexOf(ExactEffectPhase.OBSERVED));
   assert.equal(persisted.some(serialized => serialized.includes('"text":"after"')), false);
   await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: policy() }), /cannot execute from COMMITTED/);
+  assert.equal(counter.calls, 1);
+});
+
+test('concurrent same-invocation contenders share one atomic admission and dispatch exactly once', async () => {
+  const store = memoryStore();
+  let releaseDispatch;
+  const dispatchGate = new Promise(resolve => { releaseDispatch = resolve; });
+  const counter = { calls: 0 };
+  const provider = {
+    authorize: ({ invocation: inv, policyDecision }) => ({ invocation: inv, policyDecision }),
+    invoke: async ({ invocation: inv }) => {
+      counter.calls += 1;
+      await dispatchGate;
+      return {
+        providerId: FILESYSTEM_PROVIDER_ID,
+        invocationId: inv.invocationId,
+        observedAt: new Date(baseMs + 1000).toISOString(),
+        result: { rootId: 'workspace', relativePath: 'note.txt', sha256: 'a'.repeat(64), alreadyApplied: false },
+      };
+    },
+  };
+  let nowMs = baseMs;
+  const executor = new FilesystemExactEffectExecutorV1({
+    provider,
+    store,
+    verify: verified,
+    now: () => { nowMs += 1000; return nowMs; },
+  });
+  const inv = invocation('fs-effect-concurrent');
+  const decision = policy(inv.invocationId);
+
+  const first = executor.invoke({ invocation: inv, policyDecision: decision });
+  await Promise.resolve();
+  const second = executor.invoke({ invocation: structuredClone(inv), policyDecision: structuredClone(decision) });
+
+  await assert.rejects(() => second, error => {
+    assert.equal(error.code, 'FILESYSTEM_EFFECT_NOT_EXECUTABLE');
+    assert.equal(error.effectState.phase, ExactEffectPhase.EXECUTING);
+    return true;
+  });
+  assert.equal(counter.calls, 1, 'only the atomically admitted contender may dispatch');
+
+  releaseDispatch();
+  const result = await first;
+  assert.equal(result.effectState.phase, ExactEffectPhase.COMMITTED);
+  assert.equal(counter.calls, 1);
+  assert.equal((await store.load(inv.invocationId)).phase, ExactEffectPhase.COMMITTED);
+});
+
+test('same invocation id cannot be rebound to different filesystem arguments before dispatch', async () => {
+  const store = memoryStore();
+  const counter = { calls: 0 };
+  let releaseDispatch;
+  const dispatchGate = new Promise(resolve => { releaseDispatch = resolve; });
+  const provider = {
+    authorize: ({ invocation: inv, policyDecision }) => ({ invocation: inv, policyDecision }),
+    invoke: async ({ invocation: inv }) => {
+      counter.calls += 1;
+      await dispatchGate;
+      return {
+        providerId: FILESYSTEM_PROVIDER_ID,
+        invocationId: inv.invocationId,
+        observedAt: new Date(baseMs + 1000).toISOString(),
+        result: { rootId: 'workspace', relativePath: 'note.txt', sha256: 'a'.repeat(64), alreadyApplied: false },
+      };
+    },
+  };
+  let nowMs = baseMs;
+  const executor = new FilesystemExactEffectExecutorV1({ provider, store, verify: verified, now: () => { nowMs += 1000; return nowMs; } });
+  const original = invocation('fs-effect-binding-race');
+  const first = executor.invoke({ invocation: original, policyDecision: policy(original.invocationId) });
+  await Promise.resolve();
+
+  const changed = structuredClone(original);
+  changed.arguments.relativePath = 'other.txt';
+  await assert.rejects(
+    () => executor.invoke({ invocation: changed, policyDecision: policy(changed.invocationId) }),
+    /invocation binding changed/,
+  );
+  assert.equal(counter.calls, 1);
+
+  releaseDispatch();
+  await first;
   assert.equal(counter.calls, 1);
 });
 
