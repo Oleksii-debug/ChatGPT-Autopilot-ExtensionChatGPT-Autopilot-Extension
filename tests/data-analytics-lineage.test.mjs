@@ -162,6 +162,33 @@ test('analytics authority boundary rejects getters, hidden fields, symbols, exot
   assert.throws(() => normalizeDataDatasetSnapshotV1({ ...dataset(), policyDecision: 'ALLOW' }), /unknown field/);
 });
 
+test('materialized provenance never aliases missing or noncanonical evidence to safe defaults', () => {
+  const missingSensitive = dataset();
+  delete missingSensitive.artifactRef.sensitive;
+  assert.throws(() => normalizeDataDatasetSnapshotV1(missingSensitive), /sensitive is required/);
+
+  const missingSize = dataset();
+  delete missingSize.artifactRef.sizeBytes;
+  assert.throws(() => normalizeDataDatasetSnapshotV1(missingSize), /sizeBytes is required/);
+
+  const upperArtifactDigest = dataset();
+  upperArtifactDigest.artifactRef.sha256 = sha('A');
+  upperArtifactDigest.contentSha256 = sha('A');
+  assert.throws(() => normalizeDataDatasetSnapshotV1(upperArtifactDigest), /sha256 is invalid|contentSha256 is invalid/);
+
+  const upperSourceDigest = dataset();
+  upperSourceDigest.sourceRefs[0].contentSha256 = sha('B');
+  assert.throws(() => normalizeDataDatasetSnapshotV1(upperSourceDigest), /contentSha256 is invalid/);
+
+  const noncanonicalSourceTime = dataset();
+  noncanonicalSourceTime.sourceRefs[0].observedAt = '2026-09-24T20:00:00Z';
+  assert.throws(() => normalizeDataDatasetSnapshotV1(noncanonicalSourceTime), /canonical timestamp/);
+
+  const missingSourceDigest = dataset();
+  delete missingSourceDigest.sourceRefs[0].contentSha256;
+  assert.throws(() => normalizeDataDatasetSnapshotV1(missingSourceDigest), /contentSha256 is required/);
+});
+
 test('freshness is exact revision/hash/source identity evidence and never grants permission', () => {
   const snap = dataset();
   const fresh = assessDataDatasetFreshnessV1(snap, [source()]);

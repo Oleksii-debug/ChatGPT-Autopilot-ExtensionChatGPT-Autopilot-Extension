@@ -165,19 +165,39 @@ function unique(items, key, label) {
   return items;
 }
 
+function requireOwn(raw, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(raw, key)) throw new Error(`${label}.${key} is required`);
+}
+
 function strictProjectSourceRef(input, label = 'ProjectSourceRefV1') {
   const raw = strictRecord(input, label);
+  for (const key of ['schemaVersion', 'sourceId', 'projectId', 'kind', 'uri', 'revisionId', 'contentSha256', 'observedAt', 'authority']) {
+    requireOwn(raw, key, label);
+  }
+  id(raw.sourceId, `${label}.sourceId`);
+  id(raw.projectId, `${label}.projectId`);
+  id(raw.kind, `${label}.kind`);
+  text(raw.uri, `${label}.uri`, { max: 4096 });
+  id(raw.revisionId, `${label}.revisionId`);
+  digest(raw.contentSha256, `${label}.contentSha256`);
+  timestamp(raw.observedAt, `${label}.observedAt`);
+  if (typeof raw.authority !== 'string' || raw.authority !== raw.authority.trim() || raw.authority !== raw.authority.toUpperCase()) {
+    throw new Error(`${label}.authority must be canonical text`);
+  }
   if (raw.metadata !== undefined) guardJsonData(raw.metadata, `${label}.metadata`);
-  const normalized = normalizeProjectSourceRefV1(raw);
-  if (!normalized.contentSha256) throw new Error(`${label}.contentSha256 must be materialized`);
-  return normalized;
+  return normalizeProjectSourceRefV1(raw);
 }
 
 function strictArtifactRef(input, label = 'ArtifactRefV1') {
-  strictRecord(input, label);
-  const normalized = normalizeArtifactRefV1(input);
-  if (!normalized.sha256) throw new Error(`${label}.sha256 must be materialized`);
-  return normalized;
+  const raw = strictRecord(input, label);
+  for (const key of ['schemaVersion', 'artifactId', 'kind', 'uri', 'sha256', 'sizeBytes', 'createdAt', 'sensitive']) {
+    requireOwn(raw, key, label);
+  }
+  digest(raw.sha256, `${label}.sha256`);
+  integer(raw.sizeBytes, `${label}.sizeBytes`);
+  bool(raw.sensitive, `${label}.sensitive`);
+  timestamp(raw.createdAt, `${label}.createdAt`);
+  return normalizeArtifactRefV1(raw);
 }
 
 const COLUMN_KEYS = new Set(['name', 'logicalType', 'sourceType', 'nullable', 'ordinal']);
