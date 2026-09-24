@@ -248,17 +248,22 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
     response = await fetchFn(url, { ...init, signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
     text = await response.text();
   } catch (error) {
-    if (error?.name === 'AbortError') throw new Error(`Upstream request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
-    throw error;
+    if (error?.name === 'AbortError') throw gatewayError(`Upstream request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`, 504, 'AI_PROVIDER_TIMEOUT');
+    throw gatewayError(`Upstream provider is unavailable: ${clean(error?.message || error).slice(0, 500) || 'network failure'}`, 503, 'AI_PROVIDER_UNAVAILABLE');
   } finally {
     clearTimeout(timer);
   }
   let body;
   try { body = text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`Upstream returned invalid JSON (HTTP ${response.status})`); }
+  catch { throw gatewayError(`Upstream returned invalid JSON (HTTP ${response.status})`, 502, 'AI_PROVIDER_INVALID_RESPONSE'); }
   if (!response.ok) {
     const detail = clean(body?.error?.message) || clean(body?.error) || clean(body?.message);
-    throw new Error(detail ? `Upstream ${response.status}: ${detail}` : `Upstream ${response.status}`);
+    const message = detail ? `Upstream ${response.status}: ${detail}` : `Upstream ${response.status}`;
+    if (response.status === 429) throw gatewayError(message, 429, 'AI_PROVIDER_RATE_LIMITED');
+    if ([408, 425].includes(response.status)) throw gatewayError(message, response.status, 'AI_PROVIDER_TIMEOUT');
+    if (response.status >= 500) throw gatewayError(message, response.status, 'AI_PROVIDER_UNAVAILABLE');
+    if ([401, 403].includes(response.status)) throw gatewayError(message, response.status, 'AI_PROVIDER_AUTH_REJECTED');
+    throw gatewayError(message, response.status, 'AI_PROVIDER_REJECTED');
   }
   return body;
 }

@@ -319,6 +319,7 @@ export class BrowserAgentManager {
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
         routerOverride: browserAgentRouterOverride(job.config),
+        taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
       });
     } catch (error) { return { ok: false, error }; }
@@ -2357,6 +2358,7 @@ export class BrowserAgentManager {
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(current.job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
         routerOverride: browserAgentRouterOverride(current.job.config),
+        taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
       });
@@ -2367,6 +2369,15 @@ export class BrowserAgentManager {
           const job = store.byId[id];
           if (!job || job.runtime.controlEpoch !== epoch) return store;
           job.runtime.modelCalls += failedCalls;
+          if (error?.routerRuntime) job.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          job.runtime.updatedAt = this.now();
+          return store;
+        });
+      } else if (error?.routerRuntime) {
+        await this.update(store => {
+          const job = store.byId[id];
+          if (!job || job.runtime.controlEpoch !== epoch) return store;
+          job.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
           job.runtime.updatedAt = this.now();
           return store;
         });
