@@ -11,7 +11,7 @@ import {
 const routes = () => normalizeAiRoutePool([
   { routeId:'paid-remote', provider:'openai', model:'strong', roles:['planner'], priority:30, locality:'remote', costClass:'paid', inputPricePerMillionUsd:10, outputPricePerMillionUsd:30 },
   { routeId:'free-local', provider:'ollama', model:'local', roles:['planner'], priority:20, locality:'local', costClass:'free' },
-  { routeId:'compatible', provider:'openai-compatible', endpointId:'team-a', model:'worker', roles:['planner','coder'], capabilityIds:['code'], priority:10, locality:'remote', costClass:'paid' },
+  { routeId:'compatible', provider:'openai-compatible', endpointId:'team-a', model:'worker', roles:['planner','coder'], capabilityIds:['code'], priority:10, locality:'remote', costClass:'paid', inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
 ]);
 
 test('route pool applies owner allow/deny, cost, locality, capability and deterministic order', () => {
@@ -22,6 +22,46 @@ test('route pool applies owner allow/deny, cost, locality, capability and determ
   assert.deepEqual(coder.candidates.map(route => route.routeId), ['compatible']);
   const deniedCapability = selectAiRouteCandidates({ routes:routes(), policy:{ allowRouteIds:['compatible'] }, role:'coder', capabilityIds:['filesystem.write'], now:1000 });
   assert.deepEqual(deniedCapability.candidates, []);
+});
+
+test('paid routes with any unknown price dimension are rejected before automatic dispatch', () => {
+  const missingOutput = normalizeAiRoutePool([{
+    routeId:'missing-output', provider:'openai', model:'paid', roles:['planner'],
+    priority:50, locality:'remote', costClass:'paid', inputPricePerMillionUsd:3,
+  }]);
+  assert.equal(missingOutput[0].inputPriceKnown, true);
+  assert.equal(missingOutput[0].outputPriceKnown, false);
+  const outputSelection = selectAiRouteCandidates({
+    routes:missingOutput,
+    policy:{ maxInputPricePerMillionUsd:10, maxOutputPricePerMillionUsd:10, pinnedRouteId:'missing-output' },
+    role:'planner',
+    now:1000,
+  });
+  assert.deepEqual(outputSelection.candidates, []);
+  assert.deepEqual(outputSelection.eligibleRouteIds, []);
+
+  const missingInput = normalizeAiRoutePool([{
+    routeId:'missing-input', provider:'openai', model:'paid', roles:['planner'],
+    priority:50, locality:'remote', costClass:'paid', outputPricePerMillionUsd:7,
+  }]);
+  assert.equal(missingInput[0].inputPriceKnown, false);
+  assert.equal(missingInput[0].outputPriceKnown, true);
+  const inputSelection = selectAiRouteCandidates({
+    routes:missingInput,
+    policy:{ maxInputPricePerMillionUsd:10, maxOutputPricePerMillionUsd:10 },
+    role:'planner',
+    now:1000,
+  });
+  assert.deepEqual(inputSelection.candidates, []);
+
+  const explicitZero = normalizeAiRoutePool([{
+    routeId:'zero-known', provider:'openai', model:'paid-zero', roles:['planner'],
+    locality:'remote', costClass:'paid', inputPricePerMillionUsd:0, outputPricePerMillionUsd:0,
+  }]);
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:explicitZero, policy:{}, role:'planner', now:1000 }).candidates.map(route => route.routeId),
+    ['zero-known'],
+  );
 });
 
 test('route failures create bounded backoff and open a circuit at the configured threshold', () => {
