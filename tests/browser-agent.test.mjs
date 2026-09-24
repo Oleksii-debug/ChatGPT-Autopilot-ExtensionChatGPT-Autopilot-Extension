@@ -86,6 +86,39 @@ function makeChrome({ permission = true } = {}) {
   return api;
 }
 
+test('native click rechecks the same target after debugger attach and uses its new coordinates', async () => {
+  const chrome = makeChrome();
+  const calls = [];
+  let attached = false;
+  chrome.scripting.executeScript = async ({ func, args }) => {
+    assert.equal(func.name, 'proveBrowserNativeClick');
+    assert.deepEqual(args, ['snapshot-1', 'r1']);
+    return [{ result: { x: attached ? 45 : 10, y: attached ? 50 : 15, url: 'https://ais.example.edu/app' } }];
+  };
+  chrome.debugger.attach = async () => { attached = true; };
+  chrome.debugger.detach = async () => { attached = false; };
+  chrome.debugger.sendCommand = async (_target, _method, params) => { calls.push(params); };
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1'), true);
+  assert.deepEqual(calls.map(({ x, y }) => [x, y]), [[45, 50], [45, 50]]);
+  assert.equal(attached, false);
+});
+
+test('native click never dispatches when the proven target disappears after debugger attach', async () => {
+  const chrome = makeChrome();
+  let attached = false;
+  let dispatches = 0;
+  let detached = false;
+  chrome.scripting.executeScript = async () => [{ result: attached ? null : { x: 10, y: 15, url: 'https://ais.example.edu/app' } }];
+  chrome.debugger.attach = async () => { attached = true; };
+  chrome.debugger.detach = async () => { detached = true; };
+  chrome.debugger.sendCommand = async () => { dispatches += 1; };
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  assert.equal(await manager.nativeClick(1, 0, 'snapshot-1', 'r1'), false);
+  assert.equal(dispatches, 0);
+  assert.equal(detached, true);
+});
+
 function config(overrides = {}) {
   return normalizeBrowserAgentConfig({
     id: 'job-1',

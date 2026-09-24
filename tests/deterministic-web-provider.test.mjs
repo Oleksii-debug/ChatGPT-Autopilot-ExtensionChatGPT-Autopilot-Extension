@@ -10,15 +10,36 @@ function fixtures(invocationId = 'inv-1') {
   return { toolDescriptor, invocation, policyDecision, grantedCapabilityIds: ['web.general'] };
 }
 
-function provider(transport, leaseState = { value: null }) {
+function durableStore(leaseState = { value: null }) {
+  let record = { effectsById: {}, leasesByTargetId: { 'tab-1': leaseState.value } };
+  let chain = Promise.resolve();
+  return {
+    async update(mutator) {
+      const operation = chain.then(() => {
+        const draft = structuredClone(record);
+        const result = mutator(draft);
+        record = draft;
+        leaseState.value = record.leasesByTargetId['tab-1'] || null;
+        return result;
+      });
+      chain = operation.catch(() => {});
+      return operation;
+    },
+    snapshot() { return structuredClone(record); },
+  };
+}
+
+function provider(transport, leaseState = { value: null }, store = durableStore(leaseState)) {
   return createDeterministicWebProviderV1({
-    transport,
-    readLease: async () => leaseState.value,
-    writeLease: async (_targetId, value) => { leaseState.value = value; },
+    transport, store,
     now: () => at,
     leaseId: () => 'lease-1',
   });
 }
+
+test('provider refuses ephemeral/no-op lease callbacks before any browser effect', () => {
+  assert.throws(() => createDeterministicWebProviderV1({ transport: { execute() {}, observe() {} } }), /atomic durable exact-effect store/);
+});
 
 test('normalizes bounded deterministic web actions and rejects unsafe URL protocols', () => {
   assert.deepEqual(normalizeDeterministicWebActionV1({ kind: 'navigate', url: 'https://example.test/path' }), { kind: 'NAVIGATE', url: 'https://example.test/path' });
@@ -73,11 +94,12 @@ test('does not mutate a target with a live lease owned by another invocation', a
 
 test('post-effect observation failure is AMBIGUOUS and retains lease for reconciliation', async () => {
   const leaseState = { value: null };
-  const p = provider({ execute: async () => {}, observe: async () => { throw new Error('browser disconnected'); } }, leaseState);
+  const p = provider({ execute: async () => {}, observe: async () => { throw new Error('browser disconnected with private page text'); } }, leaseState);
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
   assert.equal(result.status, 'AMBIGUOUS');
   assert.equal(result.reconcileRequired, true);
-  assert.match(result.error, /disconnected/);
+  assert.equal(result.error, 'WEB_DISPATCH_UNCERTAIN');
+  assert.ok(!JSON.stringify(result).includes('private page text'));
   assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
 });
 
@@ -117,4 +139,88 @@ test('independent verifier fails when expected selector is absent', async () => 
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } });
   assert.equal(result.status, 'FAILED');
   assert.equal(result.verification.reasonCode, 'SELECTOR_NOT_VISIBLE');
+});
+
+test('a restarted provider does not replay a durable EXECUTING effect; manual reconciliation frees its target', async () => {
+  const leaseState = { value: null };
+  const store = durableStore(leaseState);
+  let finishDispatch;
+  let dispatches = 0;
+  const transport = {
+    execute: async () => { dispatches += 1; await new Promise(resolve => { finishDispatch = resolve; }); },
+    observe: async () => ({ data: { visibleSelectors: ['#done'] } }),
+  };
+  const first = provider(transport, leaseState, store);
+  const request = { ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } };
+  const pending = first.invoke(request);
+  while (!finishDispatch) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(store.snapshot().effectsById['inv-1'].state.phase, 'EXECUTING');
+  const restarted = provider(transport, leaseState, store);
+  const blocked = await restarted.invoke(request);
+  assert.equal(blocked.status, 'RECONCILE_REQUIRED');
+  assert.equal(blocked.effectState.phase, 'RECONCILE');
+  assert.equal(dispatches, 1);
+  finishDispatch();
+  assert.equal((await pending).status, 'AMBIGUOUS');
+  await assert.rejects(() => restarted.reconcile({ invocationId: 'inv-1', outcome: 'MANUAL_REVIEW' }), /independent web reconciliation verifier/);
+  const withQuiescenceProof = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+    verifierId: 'independent-verifier',
+    observation: { schemaVersion: 1, observationId: 'quiescent-observation', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { quiescent: true }, artifactRefs: [], observedAt: at },
+    verification: { schemaVersion: 1, verificationId: 'quiescent-verification', invocationId: invocation.invocationId, observationId: 'quiescent-observation', status: 'AMBIGUOUS', reasonCode: 'EFFECT_UNRESOLVED', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
+  }) });
+  const settled = await withQuiescenceProof.reconcile({ invocationId: 'inv-1', outcome: 'MANUAL_REVIEW' });
+  assert.equal(settled.phase, 'MANUAL_REVIEW');
+  assert.equal(leaseState.value, null);
+  assert.equal((await restarted.invoke(request)).status, 'MANUAL_REVIEW');
+  assert.equal(dispatches, 1);
+});
+
+test('atomic admission fences concurrent invocations of the same target across provider instances', async () => {
+  const leaseState = { value: null };
+  const store = durableStore(leaseState);
+  let finishDispatch;
+  let dispatches = 0;
+  const transport = {
+    execute: async () => { dispatches += 1; await new Promise(resolve => { finishDispatch = resolve; }); },
+    observe: async () => ({ data: { visibleSelectors: ['#done'] } }),
+  };
+  const first = provider(transport, leaseState, store);
+  const second = provider(transport, leaseState, store);
+  const args = id => ({ ...fixtures(id), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } });
+  const pending = first.invoke(args('inv-1'));
+  const competitor = await second.invoke(args('inv-2'));
+  assert.equal(competitor.status, 'TARGET_CONFLICT');
+  assert.equal(dispatches, 1);
+  finishDispatch();
+  assert.equal((await pending).status, 'VERIFIED');
+  assert.equal(store.snapshot().effectsById['inv-1'].state.phase, 'COMMITTED');
+});
+
+test('safe retry needs fresh independently bound no-effect evidence', async () => {
+  const leaseState = { value: null };
+  const store = durableStore(leaseState);
+  let dispatches = 0;
+  const transport = {
+    execute: async () => { dispatches += 1; if (dispatches === 1) throw new Error('lost after dispatch'); },
+    observe: async () => ({ data: { visibleSelectors: ['#done'] } }),
+  };
+  const initial = provider(transport, leaseState, store);
+  const request = { ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } };
+  assert.equal((await initial.invoke(request)).status, 'AMBIGUOUS');
+  await assert.rejects(() => initial.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /independent web reconciliation verifier/);
+  const bad = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+    verifierId: 'independent-verifier',
+    observation: { schemaVersion: 1, observationId: 'reconcile-obs', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { committed: true }, artifactRefs: [], observedAt: at },
+    verification: { schemaVersion: 1, verificationId: 'reconcile-check', invocationId: invocation.invocationId, observationId: 'reconcile-obs', status: 'FAILED', reasonCode: 'NO_COMMITTED_EFFECT', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
+  }) });
+  await assert.rejects(() => bad.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /proof of no committed effect/);
+  assert.equal(store.snapshot().effectsById['inv-1'].state.phase, 'RECONCILE');
+  const safe = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+    verifierId: 'independent-verifier',
+    observation: { schemaVersion: 1, observationId: 'reconcile-obs', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { committed: false }, artifactRefs: [], observedAt: at },
+    verification: { schemaVersion: 1, verificationId: 'reconcile-check', invocationId: invocation.invocationId, observationId: 'reconcile-obs', status: 'FAILED', reasonCode: 'NO_COMMITTED_EFFECT', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
+  }) });
+  assert.equal((await safe.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' })).phase, 'SAFE_RETRY');
+  assert.equal((await safe.invoke(request)).status, 'VERIFIED');
+  assert.equal(dispatches, 2);
 });
