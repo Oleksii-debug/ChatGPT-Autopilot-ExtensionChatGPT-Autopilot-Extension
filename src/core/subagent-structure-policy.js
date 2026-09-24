@@ -1,7 +1,11 @@
+import { validateOrchestrationGraphV1 } from './orchestration-hierarchy.js';
+
 /**
- * Pure structural admission for owner-controlled subagent creation.
- * Global child/concurrency budgets remain with the canonical resource budget
- * governor; scheduling, persistence and worker spawning remain elsewhere.
+ * Structural admission for owner-controlled subagent creation.
+ * Canonical parent depth/fanout facts are derived from the validated durable
+ * orchestration graph. Global child/concurrency budgets remain with the
+ * canonical resource budget governor; scheduling, persistence and spawning
+ * remain elsewhere.
  */
 export const SUBAGENT_STRUCTURE_POLICY_VERSION = 1;
 
@@ -20,6 +24,18 @@ const POLICY_KEYS = new Set([
   'allowAgentCreatedChildren',
   'maxDepth',
   'maxChildrenPerAgent',
+]);
+
+const CAPACITY_REQUEST_KEYS = new Set([
+  'policy',
+  'initiator',
+  'graph',
+  'parentNodeId',
+]);
+
+const ADMISSION_REQUEST_KEYS = new Set([
+  ...CAPACITY_REQUEST_KEYS,
+  'requestedChildren',
 ]);
 
 const MAX_DEPTH = 64;
@@ -52,6 +68,15 @@ function boolean(value, label) {
   return value;
 }
 
+function requiredId(value, label) {
+  if (typeof value !== 'string') throw new Error(`${label} is invalid`);
+  const normalized = value.trim();
+  if (!normalized || normalized.length > 180 || !/^[A-Za-z0-9._:@/+-]+$/u.test(normalized)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return normalized;
+}
+
 function frozen(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) frozen(child);
@@ -78,22 +103,58 @@ export function normalizeSubagentStructurePolicyV1(input = {}) {
   });
 }
 
-export function remainingSubagentStructureCapacityV1({
-  policy,
-  initiator: initiatorInput,
-  parentDepth,
-  currentDirectChildren,
-} = {}) {
-  const normalizedPolicy = normalizeSubagentStructurePolicyV1(policy);
-  const normalizedInitiator = initiator(initiatorInput);
-  const depth = integer(parentDepth, 'parentDepth', { max: MAX_DEPTH });
-  const children = integer(currentDirectChildren, 'currentDirectChildren', { max: MAX_CHILDREN_PER_AGENT });
-  const childDepth = depth + 1;
+export function deriveSubagentStructureFactsFromGraphV1({ graph, parentNodeId } = {}) {
+  const canonicalGraph = validateOrchestrationGraphV1(graph);
+  const parentId = requiredId(parentNodeId, 'parentNodeId');
+  const parent = canonicalGraph.nodesById[parentId];
+  if (!parent) throw new Error('parentNodeId is not present in canonical orchestration graph');
+
+  let depth = 0;
+  let cursor = parent;
+  while (cursor.parentId !== null) {
+    const next = canonicalGraph.nodesById[cursor.parentId];
+    if (!next) throw new Error('Canonical orchestration graph parent is missing');
+    depth += 1;
+    cursor = next;
+  }
+
+  return frozen({
+    parentNodeId: parentId,
+    parentDepth: depth,
+    currentDirectChildren: parent.childIds.length,
+  });
+}
+
+function normalizedCapacityRequest(input, { includeRequestedChildren }) {
+  const raw = plainObject(input || {}, 'SubagentStructureAdmissionRequestV1');
+  exactKeys(
+    raw,
+    includeRequestedChildren ? ADMISSION_REQUEST_KEYS : CAPACITY_REQUEST_KEYS,
+    'SubagentStructureAdmissionRequestV1',
+  );
+  const normalizedPolicy = normalizeSubagentStructurePolicyV1(own(raw, 'policy', {}));
+  const normalizedInitiator = initiator(own(raw, 'initiator', undefined));
+  const facts = deriveSubagentStructureFactsFromGraphV1({
+    graph: own(raw, 'graph', undefined),
+    parentNodeId: own(raw, 'parentNodeId', undefined),
+  });
+  const requestedChildren = includeRequestedChildren
+    ? integer(own(raw, 'requestedChildren', undefined), 'requestedChildren', { min: 1, max: MAX_CHILDREN_PER_AGENT })
+    : null;
+  return { normalizedPolicy, normalizedInitiator, facts, requestedChildren };
+}
+
+function capacityFromFacts(normalizedPolicy, normalizedInitiator, facts) {
+  const childDepth = facts.parentDepth + 1;
   const agentCreationBlocked = normalizedInitiator === SubagentSpawnInitiator.AGENT
     && !normalizedPolicy.allowAgentCreatedChildren;
   const depthBlocked = childDepth > normalizedPolicy.maxDepth;
-  const availableDirectChildren = Math.max(0, normalizedPolicy.maxChildrenPerAgent - children);
+  const availableDirectChildren = Math.max(
+    0,
+    normalizedPolicy.maxChildrenPerAgent - facts.currentDirectChildren,
+  );
   return frozen({
+    parentNodeId: facts.parentNodeId,
     childDepth,
     agentCreationBlocked,
     depthBlocked,
@@ -101,27 +162,27 @@ export function remainingSubagentStructureCapacityV1({
   });
 }
 
-export function evaluateSubagentStructureAdmissionV1({
-  policy,
-  initiator: initiatorInput,
-  parentDepth,
-  currentDirectChildren,
-  requestedChildren,
-} = {}) {
-  const normalizedPolicy = normalizeSubagentStructurePolicyV1(policy);
-  const normalizedInitiator = initiator(initiatorInput);
-  const requested = integer(requestedChildren, 'requestedChildren', { min: 1, max: MAX_CHILDREN_PER_AGENT });
-  const capacity = remainingSubagentStructureCapacityV1({
-    policy: normalizedPolicy,
-    initiator: normalizedInitiator,
-    parentDepth,
-    currentDirectChildren,
-  });
+export function remainingSubagentStructureCapacityV1(input = {}) {
+  const { normalizedPolicy, normalizedInitiator, facts } = normalizedCapacityRequest(
+    input,
+    { includeRequestedChildren: false },
+  );
+  return capacityFromFacts(normalizedPolicy, normalizedInitiator, facts);
+}
+
+export function evaluateSubagentStructureAdmissionV1(input = {}) {
+  const {
+    normalizedPolicy,
+    normalizedInitiator,
+    facts,
+    requestedChildren,
+  } = normalizedCapacityRequest(input, { includeRequestedChildren: true });
+  const capacity = capacityFromFacts(normalizedPolicy, normalizedInitiator, facts);
 
   let reasonCode = 'WITHIN_STRUCTURE_POLICY';
   if (capacity.agentCreationBlocked) reasonCode = 'AGENT_CHILD_CREATION_DISABLED';
   else if (capacity.depthBlocked) reasonCode = 'MAX_DEPTH_EXCEEDED';
-  else if (requested > capacity.availableDirectChildren) reasonCode = 'MAX_FANOUT_EXCEEDED';
+  else if (requestedChildren > capacity.availableDirectChildren) reasonCode = 'MAX_FANOUT_EXCEEDED';
 
   return frozen({
     decision: reasonCode === 'WITHIN_STRUCTURE_POLICY'
@@ -129,7 +190,8 @@ export function evaluateSubagentStructureAdmissionV1({
       : SubagentStructureDecision.DENY,
     reasonCode,
     initiator: normalizedInitiator,
-    requestedChildren: requested,
+    parentNodeId: capacity.parentNodeId,
+    requestedChildren,
     childDepth: capacity.childDepth,
     availableDirectChildren: capacity.availableDirectChildren,
     policy: normalizedPolicy,
