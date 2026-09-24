@@ -9,13 +9,16 @@ export const AiRouteRole = Object.freeze({
 });
 export const AiRouteLocality = Object.freeze({ LOCAL: 'local', REMOTE: 'remote' });
 export const AiRouteCostClass = Object.freeze({ FREE: 'free', PAID: 'paid' });
+export const AiWorkerAllocationMode = Object.freeze({ AUTO: 'auto', MANUAL: 'manual' });
 
 const PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
 const ROLES = new Set(Object.values(AiRouteRole));
 const LOCALITIES = new Set(Object.values(AiRouteLocality));
 const COST_CLASSES = new Set(Object.values(AiRouteCostClass));
+const WORKER_ALLOCATION_MODES = new Set(Object.values(AiWorkerAllocationMode));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_ROUTES = 32;
+const MAX_PARALLEL_WORKERS = 200;
 
 export const DEFAULT_AI_ROUTE_POLICY = Object.freeze({
   autoSwitch: true,
@@ -32,11 +35,19 @@ export const DEFAULT_AI_ROUTE_POLICY = Object.freeze({
   circuitBreakerSeconds: 300,
 });
 
+export const DEFAULT_AI_WORKER_POLICY = Object.freeze({
+  allocationMode: AiWorkerAllocationMode.AUTO,
+  maxParallelWorkers: 8,
+  manualRouteWorkers: Object.freeze({}),
+});
+
 function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`); return value; }
 function exact(value, allowed, label) { for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`); }
 function clean(value, max = 4000) { const out = typeof value === 'string' ? value.trim() : ''; if (out.length > max) throw new Error('AI route text is too long'); return out; }
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
+function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
+function own(record, key) { return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined; }
 function price(value, label) { const out = Number(value ?? 0); if (!Number.isFinite(out) || out < 0 || out > 1_000_000) throw new Error(`${label} is invalid`); return out; }
 function knownPriceDimension(item, priceKey, knownKey, label) {
   if (Object.hasOwn(item, knownKey)) {
@@ -53,7 +64,7 @@ export function normalizeAiRoutePool(raw = []) {
   if (!Array.isArray(raw) || raw.length > MAX_ROUTES) throw new Error(`AI route pool must contain at most ${MAX_ROUTES} routes`);
   const routes = raw.map((item, index) => {
     object(item, `AI route ${index + 1}`);
-    exact(item, new Set(['schemaVersion','routeId','provider','model','endpointId','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision']), `AI route ${index + 1}`);
+    exact(item, new Set(['schemaVersion','routeId','provider','model','endpointId','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision','maxWorkers']), `AI route ${index + 1}`);
     if (Number(item.schemaVersion ?? AI_ROUTE_POOL_VERSION) !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
     const provider = clean(item.provider, 40);
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
@@ -84,6 +95,7 @@ export function normalizeAiRoutePool(raw = []) {
       inputPriceKnown,
       outputPriceKnown,
       supportsVision: item.supportsVision === true,
+      maxWorkers: strictInteger(item.maxWorkers ?? 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
     });
   });
   if (new Set(routes.map(route => route.routeId)).size !== routes.length) throw new Error('AI route pool contains duplicate routeId');
@@ -112,6 +124,35 @@ export function normalizeAiRoutePolicy(raw = {}) {
   });
 }
 
+export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
+  if (raw == null) raw = {};
+  object(raw, 'AI worker policy');
+  exact(raw, new Set(['allocationMode','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
+  const allocationMode = clean(raw.allocationMode || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
+  if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
+  const maxParallelWorkers = strictInteger(raw.maxParallelWorkers ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
+  const pool = normalizeAiRoutePool(routes);
+  const routeIds = new Set(pool.map(route => route.routeId));
+  const source = raw.manualRouteWorkers ?? {};
+  object(source, 'AI worker manualRouteWorkers');
+  if (Object.keys(source).length > MAX_ROUTES) throw new Error('AI worker manualRouteWorkers is too large');
+  const manualRouteWorkers = {};
+  let manualTotal = 0;
+  for (const [rawRouteId, value] of Object.entries(source)) {
+    const routeId = id(rawRouteId, 'AI worker manual routeId');
+    if (!routeIds.has(routeId)) throw new Error(`AI worker manual route is unknown: ${routeId}`);
+    const count = strictInteger(value, `AI worker manualRouteWorkers.${routeId}`, 0, MAX_PARALLEL_WORKERS);
+    const route = pool.find(item => item.routeId === routeId);
+    if (route.maxWorkers > 0 && count > route.maxWorkers) throw new Error(`AI worker manual allocation exceeds maxWorkers for route: ${routeId}`);
+    Object.defineProperty(manualRouteWorkers, routeId, { value:count, enumerable:true, writable:true, configurable:true });
+    manualTotal += count;
+  }
+  if (allocationMode === AiWorkerAllocationMode.MANUAL && manualTotal > maxParallelWorkers) {
+    throw new Error('AI worker manual allocation exceeds maxParallelWorkers');
+  }
+  return Object.freeze({ allocationMode, maxParallelWorkers, manualRouteWorkers: Object.freeze(manualRouteWorkers) });
+}
+
 function stateNumber(value) { const out = Number(value); return Number.isFinite(out) && out >= 0 ? out : 0; }
 
 export function normalizeAiRouteStates(raw = {}, routes = []) {
@@ -120,7 +161,7 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
   const out = {};
   for (const [routeId, value] of Object.entries(source)) {
     if (!allowed.has(routeId) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
-    out[routeId] = {
+    Object.defineProperty(out, routeId, { value:{
       consecutiveFailures: Math.floor(stateNumber(value.consecutiveFailures)),
       successes: Math.floor(stateNumber(value.successes)),
       failures: Math.floor(stateNumber(value.failures)),
@@ -131,7 +172,7 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
       lastErrorAt: stateNumber(value.lastErrorAt),
       lastSuccessAt: stateNumber(value.lastSuccessAt),
       lastLatencyMs: stateNumber(value.lastLatencyMs),
-    };
+    }, enumerable:true, writable:true, configurable:true });
   }
   return out;
 }
@@ -178,19 +219,72 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   candidates.sort((a, b) => {
     const orderedA = order.has(a.routeId) ? order.get(a.routeId) : Number.MAX_SAFE_INTEGER;
     const orderedB = order.has(b.routeId) ? order.get(b.routeId) : Number.MAX_SAFE_INTEGER;
-    return orderedA - orderedB || b.priority - a.priority || (states[a.routeId]?.lastLatencyMs || Number.MAX_SAFE_INTEGER) - (states[b.routeId]?.lastLatencyMs || Number.MAX_SAFE_INTEGER) || a.routeId.localeCompare(b.routeId);
+    return orderedA - orderedB || b.priority - a.priority || (own(states, a.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER) - (own(states, b.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER) || a.routeId.localeCompare(b.routeId);
   });
-  const available = candidates.filter(route => Math.max(states[route.routeId]?.backoffUntil || 0, states[route.routeId]?.circuitOpenUntil || 0) <= now);
+  const available = candidates.filter(route => {
+    const state = own(states, route.routeId);
+    return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= now;
+  });
   const retryAt = candidates.length && !available.length
-    ? Math.min(...candidates.map(route => Math.max(states[route.routeId]?.backoffUntil || 0, states[route.routeId]?.circuitOpenUntil || 0)).filter(value => value > now))
+    ? Math.min(...candidates.map(route => {
+      const state = own(states, route.routeId);
+      return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
+    }).filter(value => value > now))
     : 0;
   return Object.freeze({ candidates: Object.freeze((normalizedPolicy.autoSwitch ? available : available.slice(0, 1))), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
+}
+
+export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy = {}, routeStates = {}, role = AiRouteRole.FAST_WORKER, capabilityIds = [], requiresVision = false, desiredWorkers = 0, now = Date.now() } = {}) {
+  const pool = normalizeAiRoutePool(routes);
+  const normalizedWorkerPolicy = normalizeAiWorkerPolicy(workerPolicy, pool);
+  const requested = strictInteger(desiredWorkers, 'AI worker desiredWorkers', 0, MAX_PARALLEL_WORKERS);
+  const target = Math.min(requested, normalizedWorkerPolicy.maxParallelWorkers);
+  const selected = selectAiRouteCandidates({
+    routes: pool,
+    policy: { ...normalizeAiRoutePolicy(routePolicy), autoSwitch: true },
+    routeStates,
+    role,
+    capabilityIds,
+    requiresVision,
+    now,
+  });
+  const candidates = selected.candidates;
+  const allocations = Object.fromEntries(pool.map(route => [route.routeId, 0]));
+  if (!target || !candidates.length) return Object.freeze({ allocations: Object.freeze(allocations), assignedWorkers: 0, unassignedWorkers: target, eligibleRouteIds: selected.eligibleRouteIds, retryAt: selected.retryAt });
+
+  if (normalizedWorkerPolicy.allocationMode === AiWorkerAllocationMode.MANUAL) {
+    let remaining = target;
+    for (const route of candidates) {
+      if (remaining <= 0) break;
+      const configured = own(normalizedWorkerPolicy.manualRouteWorkers, route.routeId) ?? 0;
+      const cap = route.maxWorkers > 0 ? Math.min(configured, route.maxWorkers) : configured;
+      const assigned = Math.min(remaining, cap);
+      allocations[route.routeId] = assigned;
+      remaining -= assigned;
+    }
+    return Object.freeze({ allocations: Object.freeze(allocations), assignedWorkers: target - remaining, unassignedWorkers: remaining, eligibleRouteIds: selected.eligibleRouteIds, retryAt: selected.retryAt });
+  }
+
+  let remaining = target;
+  let progressed = true;
+  while (remaining > 0 && progressed) {
+    progressed = false;
+    for (const route of candidates) {
+      if (remaining <= 0) break;
+      const cap = route.maxWorkers > 0 ? route.maxWorkers : normalizedWorkerPolicy.maxParallelWorkers;
+      if (allocations[route.routeId] >= cap) continue;
+      allocations[route.routeId] += 1;
+      remaining -= 1;
+      progressed = true;
+    }
+  }
+  return Object.freeze({ allocations: Object.freeze(allocations), assignedWorkers: target - remaining, unassignedWorkers: remaining, eligibleRouteIds: selected.eligibleRouteIds, retryAt: selected.retryAt });
 }
 
 export function recordAiRouteOutcome(routeStates, route, policy, { ok, classification = null, at = Date.now(), latencyMs = 0 } = {}) {
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const states = normalizeAiRouteStates(routeStates, [route]);
-  const current = states[route.routeId] || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
+  const current = own(states, route.routeId) || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
   if (ok) {
     return { ...current, consecutiveFailures:0, successes:current.successes + 1, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastSuccessAt:at, lastLatencyMs:Math.max(0, Number(latencyMs) || 0) };
   }

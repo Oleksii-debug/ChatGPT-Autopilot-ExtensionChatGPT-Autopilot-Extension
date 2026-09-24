@@ -18,6 +18,12 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # Collapse only superseded heads of the same pull request/workflow.
+  # Push/main and manual runs use a unique run_id so exact-main evidence is preserved.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   interaction-tests:
     runs-on: ubuntu-latest
