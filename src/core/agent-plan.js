@@ -134,15 +134,19 @@ export function reconcileAgentPlanV1(raw, { at = new Date().toISOString() } = {}
 
 /**
  * Appends newly discovered work to an already-live plan without rewriting the
- * existing graph. Optimistic revision matching prevents concurrent planners
- * from silently clobbering one another. resourceEnvelope is trusted caller
- * authority (never model-provided): aggregate existing + added node budgets
+ * existing graph. expectedRevision rejects a stale snapshot presented to this
+ * pure transformer; atomic compare-and-save remains the responsibility of the
+ * canonical durable plan/store authority and is not implemented here.
+ * resourceEnvelope is trusted caller authority (never model-provided):
+ * aggregate existing + added node budgets
  * must remain inside that same durable owner/job envelope on every extension.
  */
 export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelope, at = new Date().toISOString() } = {}) {
   const plan = structuredClone(normalizeAgentPlanV1(raw));
-  const expected = Number(expectedRevision);
-  if (!Number.isInteger(expected) || expected < 1) throw new Error('AgentPlan expectedRevision is invalid');
+  const expected = expectedRevision;
+  if (typeof expected !== 'number' || !Number.isSafeInteger(expected) || expected < 1) {
+    throw new Error('AgentPlan expectedRevision is invalid');
+  }
   if (plan.revision !== expected) throw new Error('AgentPlan revision conflict');
   if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 32) throw new Error('AgentPlan extension nodes must contain 1-32 nodes');
 
