@@ -27,6 +27,17 @@ function providerFixture() {
   return { provider, calls, releaseRecovery };
 }
 
+test('runtime admission requires a configured authenticated extension identity', () => {
+  const fixture = providerFixture();
+  for (const extensionId of [undefined, null, '', '   ', 1]) {
+    assert.throws(
+      () => createDeterministicWebRuntimeAdmissionV1({ provider: fixture.provider, extensionId }),
+      /authenticated extension identity/,
+    );
+  }
+  assert.deepEqual(fixture.calls, []);
+});
+
 test('runtime admission completes one cold-start recovery before first mutation dispatch', async () => {
   const fixture = providerFixture();
   const admission = createDeterministicWebRuntimeAdmissionV1({ provider: fixture.provider, extensionId: 'extension-1' });
