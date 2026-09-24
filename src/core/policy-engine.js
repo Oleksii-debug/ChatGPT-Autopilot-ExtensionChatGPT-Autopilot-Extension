@@ -46,15 +46,27 @@ function plainRecord(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
-  if (Object.getOwnPropertySymbols(value).length) {
-    throw new Error(`${label} must not contain symbol fields`);
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') {
+      throw new Error(`${label} must not contain symbol fields`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label}.${key} must be an enumerable data property`);
+    }
+    snapshot[key] = descriptor.value;
   }
-  return value;
+  return snapshot;
 }
 
 function exactKeys(value, allowed, label) {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
   }
 }
 
@@ -67,9 +79,8 @@ function exactVersion(value, label) {
 
 function id(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be a string`);
-  const normalized = value.trim();
-  if (!ID.test(normalized)) throw new Error(`${label} is invalid`);
-  return normalized;
+  if (value !== value.trim() || !ID.test(value)) throw new Error(`${label} is invalid`);
+  return value;
 }
 
 function timestamp(value, label) {
@@ -100,12 +111,64 @@ function sensitivity(value, label = 'dataSensitivity') {
   return value;
 }
 
-function idList(value, label, { optional = true, max = MAX_LIST } = {}) {
+function strictArray(value, label, { optional = false, max = MAX_LIST } = {}) {
   if (value == null && optional) return [];
-  if (!Array.isArray(value) || value.length > max) {
-    throw new Error(`${label} must be a bounded array`);
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+    throw new Error(`${label} must be a bounded plain array`);
   }
-  const normalized = value.map((item, index) => id(item, `${label}[${index}]`));
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
+      throw new Error(`${label} contains an invalid array property`);
+    }
+    const index = Number(key);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
+      throw new Error(`${label} contains an invalid array index`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} must not be sparse`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
+}
+
+function dataOnlyJson(value, label, depth = 0) {
+  if (depth > 64) throw new Error(`${label} is too deeply nested`);
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
+    return Object.is(value, -0) ? 0 : value;
+  }
+  if (Array.isArray(value)) {
+    return strictArray(value, label, { max: 4096 })
+      .map((item, index) => dataOnlyJson(item, `${label}[${index}]`, depth + 1));
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error(`${label} must contain JSON data only`);
+  }
+  const raw = plainRecord(value, label);
+  const keys = Reflect.ownKeys(raw);
+  if (keys.length > 4096) throw new Error(`${label} contains too many fields`);
+  const out = Object.create(null);
+  for (const key of keys) {
+    out[key] = dataOnlyJson(raw[key], `${label}.${key}`, depth + 1);
+  }
+  return out;
+}
+
+function idList(value, label, { optional = true, max = MAX_LIST } = {}) {
+  const input = strictArray(value, label, { optional, max });
+  const normalized = input.map((item, index) => id(item, `${label}[${index}]`));
   if (new Set(normalized).size !== normalized.length) throw new Error(`${label} contains duplicates`);
   return normalized;
 }
@@ -181,10 +244,7 @@ export function normalizeOwnerPolicyProfileV1(input) {
   const raw = plainRecord(input, 'OwnerPolicyProfileV1');
   exactKeys(raw, PROFILE_KEYS, 'OwnerPolicyProfileV1');
   exactVersion(raw.schemaVersion, 'OwnerPolicyProfileV1');
-  const rulesRaw = raw.rules == null ? [] : raw.rules;
-  if (!Array.isArray(rulesRaw) || rulesRaw.length > MAX_RULES) {
-    throw new Error('OwnerPolicyProfileV1.rules must be a bounded array');
-  }
+  const rulesRaw = strictArray(raw.rules, 'OwnerPolicyProfileV1.rules', { optional: true, max: MAX_RULES });
   const rules = rulesRaw.map(normalizeRule);
   const ruleIds = rules.map(item => item.ruleId);
   if (new Set(ruleIds).size !== ruleIds.length) throw new Error('OwnerPolicyProfileV1.rules contains duplicate ruleId');
@@ -202,46 +262,60 @@ export function normalizeOwnerPolicyProfileV1(input) {
   });
 }
 
-function strictUniversalAuthorityShape(raw, label, stringFields) {
-  plainRecord(raw, label);
+function strictUniversalAuthorityShape(input, label, stringFields) {
+  const raw = plainRecord(input, label);
   if (raw.schemaVersion !== CentralPolicySchemaVersion) throw new Error(`Unsupported ${label} schemaVersion`);
   for (const field of stringFields) {
     if (raw[field] != null && typeof raw[field] !== 'string') {
       throw new Error(`${label}.${field} must be a string`);
     }
   }
+  return raw;
 }
 
 function strictInvocation(input) {
-  strictUniversalAuthorityShape(input, 'ToolInvocationV1', [
+  const raw = strictUniversalAuthorityShape(input, 'ToolInvocationV1', [
     'invocationId', 'toolId', 'providerId', 'policyDecisionId', 'createdAt', 'parentInvocationId',
   ]);
-  if (!Array.isArray(input.requestedCapabilityIds)
-    || input.requestedCapabilityIds.some(item => typeof item !== 'string')) {
+  const requestedCapabilityIds = strictArray(
+    raw.requestedCapabilityIds,
+    'ToolInvocationV1.requestedCapabilityIds',
+    { max: MAX_LIST },
+  );
+  if (requestedCapabilityIds.some(item => typeof item !== 'string')) {
     throw new Error('ToolInvocationV1.requestedCapabilityIds must contain strings');
   }
-  return normalizeToolInvocationV1(input);
+  return normalizeToolInvocationV1({
+    ...raw,
+    requestedCapabilityIds,
+    arguments: dataOnlyJson(raw.arguments, 'ToolInvocationV1.arguments'),
+  });
 }
 
 function strictToolDescriptor(input) {
-  strictUniversalAuthorityShape(input, 'ToolDescriptorV1', [
+  const raw = strictUniversalAuthorityShape(input, 'ToolDescriptorV1', [
     'toolId', 'providerId', 'label', 'description', 'inputSchemaRef', 'outputSchemaRef',
   ]);
-  if (!Array.isArray(input.capabilityIds) || input.capabilityIds.some(item => typeof item !== 'string')) {
+  const capabilityIds = strictArray(raw.capabilityIds, 'ToolDescriptorV1.capabilityIds', { max: MAX_LIST });
+  if (capabilityIds.some(item => typeof item !== 'string')) {
     throw new Error('ToolDescriptorV1.capabilityIds must contain strings');
   }
-  return normalizeToolDescriptorV1(input);
+  return normalizeToolDescriptorV1({ ...raw, capabilityIds });
 }
 
 function strictCapability(input, index) {
-  strictUniversalAuthorityShape(input, `CapabilityV1[${index}]`, [
+  const label = `CapabilityV1[${index}]`;
+  const raw = strictUniversalAuthorityShape(input, label, [
     'capabilityId', 'description', 'riskClass',
   ]);
-  if (!RISK_ORDER.has(input.riskClass)) {
-    throw new Error(`CapabilityV1[${index}].riskClass must be R0, R1, R2, R3, or R4`);
+  if (!RISK_ORDER.has(raw.riskClass)) {
+    throw new Error(`${label}.riskClass must be R0, R1, R2, R3, or R4`);
   }
-  const normalized = normalizeCapabilityV1(input);
-  risk(normalized.riskClass, `CapabilityV1[${index}].riskClass`);
+  const normalized = normalizeCapabilityV1({
+    ...raw,
+    attributes: dataOnlyJson(raw.attributes, `${label}.attributes`),
+  });
+  risk(normalized.riskClass, `${label}.riskClass`);
   return normalized;
 }
 
@@ -338,10 +412,8 @@ export function evaluateOwnerPolicyV1({
     throw new Error('ToolInvocationV1.policyDecisionId must equal decisionId');
   }
 
-  if (!Array.isArray(capabilityDescriptors) || capabilityDescriptors.length > MAX_LIST) {
-    throw new Error('capabilityDescriptors must be a bounded array');
-  }
-  const capabilities = capabilityDescriptors.map(strictCapability);
+  const capabilityInputs = strictArray(capabilityDescriptors, 'capabilityDescriptors', { max: MAX_LIST });
+  const capabilities = capabilityInputs.map(strictCapability);
   const capabilityIds = capabilities.map(item => item.capabilityId);
   if (new Set(capabilityIds).size !== capabilityIds.length) {
     throw new Error('capabilityDescriptors contains duplicate capabilityId');
