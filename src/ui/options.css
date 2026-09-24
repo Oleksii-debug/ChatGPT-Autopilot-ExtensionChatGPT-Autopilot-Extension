@@ -277,6 +277,13 @@ button:hover:not(:disabled) { border-color: var(--accent); background: var(--sur
   overflow-wrap: anywhere;
 }
 
+#ai-router-route-list { display: grid; gap: 1rem; margin-block: .75rem; }
+.ai-route-card { border: 2px solid var(--border); border-radius: .65rem; background: var(--surface-subtle); }
+.ai-route-card > fieldset { margin-block: .75rem; }
+.ai-route-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.ai-route-actions button { margin: 0; }
+[data-route-health] { padding: .65rem; border: 1px solid var(--border); border-radius: .45rem; background: var(--surface); overflow-wrap: anywhere; }
+
 details { border-radius: .65rem; }
 details > summary { cursor: pointer; font-weight: 720; padding: .35rem 0; }
 details[open] > summary { margin-bottom: .65rem; }

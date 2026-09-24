@@ -854,6 +854,127 @@ function onLocalAiProviderChanged() {
   renderLocalAiModels([]);
 }
 
+const AI_ROUTE_ROLES = Object.freeze(['planner', 'coder', 'fast-worker', 'verifier', 'critic', 'vision']);
+
+function routeNumber(card, field, min, max, label) {
+  const value = Number(card.querySelector(`[data-route-field="${field}"]`).value);
+  if (!Number.isFinite(value) || value < min || value > max) throw new Error(`${label}: введіть число ${min}-${max}.`);
+  return value;
+}
+
+function selectedValues(id) {
+  return [...$(id).selectedOptions].map(option => option.value);
+}
+
+function aiRouterRoutesFromForm({ validate = true } = {}) {
+  return [...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map((card, index) => {
+    const text = field => card.querySelector(`[data-route-field="${field}"]`).value.trim();
+    const provider = text('provider');
+    const routeId = text('routeId');
+    const model = text('model');
+    if (validate && !routeId) throw new Error(`Маршрут ${index + 1}: введіть ID.`);
+    if (validate && !model) throw new Error(`Маршрут ${index + 1}: введіть модель.`);
+    const capabilityIds = text('capabilityIds').split(',').map(value => value.trim()).filter(Boolean);
+    if (new Set(capabilityIds).size !== capabilityIds.length) throw new Error(`Маршрут ${routeId}: capabilities містять дублікати.`);
+    return {
+      routeId,
+      provider,
+      model,
+      ...(provider === 'openai-compatible' && text('endpointId') ? { endpointId:text('endpointId') } : {}),
+      roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
+      capabilityIds,
+      priority:routeNumber(card, 'priority', 0, 1_000_000, `Маршрут ${routeId}, пріоритет`),
+      enabled:card.querySelector('[data-route-field="enabled"]').checked,
+      locality:text('locality'),
+      costClass:text('costClass'),
+      inputPricePerMillionUsd:routeNumber(card, 'inputPricePerMillionUsd', 0, 1_000_000, `Маршрут ${routeId}, input price`),
+      outputPricePerMillionUsd:routeNumber(card, 'outputPricePerMillionUsd', 0, 1_000_000, `Маршрут ${routeId}, output price`),
+      supportsVision:card.querySelector('[data-route-field="supportsVision"]').checked,
+    };
+  });
+}
+
+function renderAiRouterRouteSelects(policy = {}) {
+  const routeIds = [...$('ai-router-route-list').querySelectorAll('[data-route-field="routeId"]')].map(input => input.value.trim()).filter(Boolean);
+  const configs = [
+    ['ai-router-pinned-route', policy.pinnedRouteId ? [policy.pinnedRouteId] : []],
+    ['ai-router-allow-routes', policy.allowRouteIds || []],
+    ['ai-router-deny-routes', policy.denyRouteIds || []],
+  ];
+  for (const [id, selected] of configs) {
+    const select = $(id);
+    const prior = new Set(selected.length ? selected : selectedValues(id));
+    select.replaceChildren();
+    if (id === 'ai-router-pinned-route') {
+      const option = document.createElement('option'); option.value = ''; option.textContent = 'Не закріплювати'; select.append(option);
+    }
+    for (const routeId of routeIds) {
+      const option = document.createElement('option'); option.value = routeId; option.textContent = routeId; option.selected = prior.has(routeId); select.append(option);
+    }
+  }
+}
+
+function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
+  const list = $('ai-router-route-list');
+  list.replaceChildren();
+  for (const [index, route] of routes.entries()) {
+    const card = $('ai-router-route-template').content.firstElementChild.cloneNode(true);
+    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${route.routeId || 'без ID'}`;
+    for (const label of card.querySelectorAll('[data-label-for]')) {
+      const field = label.dataset.labelFor;
+      const control = card.querySelector(`[data-route-field="${field}"]`);
+      control.id = `ai-route-${index}-${field}`;
+      label.htmlFor = control.id;
+    }
+    const values = {
+      routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
+      capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
+      locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'paid'),
+      inputPricePerMillionUsd:route.inputPricePerMillionUsd ?? 0, outputPricePerMillionUsd:route.outputPricePerMillionUsd ?? 0,
+    };
+    for (const [field, value] of Object.entries(values)) card.querySelector(`[data-route-field="${field}"]`).value = String(value);
+    card.querySelector('[data-route-field="enabled"]').checked = route.enabled !== false;
+    card.querySelector('[data-route-field="supportsVision"]').checked = route.supportsVision === true;
+    for (const role of route.roles || []) card.querySelector(`[data-route-role="${role}"]`)?.setAttribute('checked', '');
+    const health = routeStates?.[route.routeId] || {};
+    card.querySelector('[data-route-health]').textContent = `Успіхів: ${Number(health.successes || 0)}; помилок: ${Number(health.failures || 0)}; поспіль: ${Number(health.consecutiveFailures || 0)}; backoff до: ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'немає'}; circuit до: ${health.circuitOpenUntil ? new Date(health.circuitOpenUntil).toLocaleString() : 'закритий'}; остання помилка: ${health.lastErrorCode || 'немає'}; latency: ${Number(health.lastLatencyMs || 0)} мс.`;
+    list.append(card);
+  }
+  renderAiRouterRouteSelects(policy);
+}
+
+function addAiRouterRoute() {
+  const current = aiRouterRoutesFromForm({ validate:false });
+  if (current.length >= 32) throw new Error('Пул маршрутів обмежено 32 записами.');
+  current.push({ routeId:`route-${current.length + 1}`, provider:'ollama', model:'', roles:['planner'], priority:Math.max(0, 100 - current.length), enabled:true, locality:'local', costClass:'free' });
+  renderAiRouterRoutes(current, {}, {
+    pinnedRouteId:$('ai-router-pinned-route').value,
+    allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
+  });
+  $('ai-router-route-list').lastElementChild?.querySelector('[data-route-field="routeId"]')?.focus();
+}
+
+function handleAiRouterRouteAction(event) {
+  const button = event.target.closest('[data-route-action]');
+  if (!button) return;
+  const card = button.closest('[data-ai-route]');
+  const list = $('ai-router-route-list');
+  const action = button.dataset.routeAction;
+  if (action === 'remove') {
+    const nextFocus = card.nextElementSibling?.querySelector('button, input, select') || card.previousElementSibling?.querySelector('button, input, select') || $('ai-router-add-route-button');
+    card.remove();
+    renderAiRouterRouteSelects();
+    nextFocus?.focus();
+    announce('Маршрут видалено з форми. Натисніть «Зберегти», щоб застосувати зміни.');
+    return;
+  }
+  if (action === 'up' && card.previousElementSibling) list.insertBefore(card, card.previousElementSibling);
+  if (action === 'down' && card.nextElementSibling) list.insertBefore(card.nextElementSibling, card);
+  renderAiRouterRouteSelects();
+  button.focus();
+  announce(action === 'up' ? 'Маршрут переміщено вище.' : 'Маршрут переміщено нижче.');
+}
+
 
 function aiRouterSettingsFromForm() {
   const integer = (id, min, max, label) => {
@@ -861,6 +982,10 @@ function aiRouterSettingsFromForm() {
     if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: введіть ціле число ${min}-${max}.`);
     return value;
   };
+  const routes = aiRouterRoutesFromForm();
+  const allowRouteIds = selectedValues('ai-router-allow-routes');
+  const denyRouteIds = selectedValues('ai-router-deny-routes');
+  if (allowRouteIds.some(routeId => denyRouteIds.includes(routeId))) throw new Error('Один маршрут не може одночасно бути в allowlist і denylist.');
   return {
     enabled: $('ai-router-enabled').checked,
     gatewayUrl: $('ai-router-gateway-url').value.trim(),
@@ -882,6 +1007,21 @@ function aiRouterSettingsFromForm() {
     fallbackToStrongOnPrimaryError: $('ai-router-fallback-strong').checked,
     keepPrimaryIfStrongFails: $('ai-router-keep-primary').checked,
     handoffMaxChars: integer('ai-router-handoff-max', 1000, 50000, 'Розмір handoff'),
+    routes,
+    routePolicy: {
+      autoSwitch:$('ai-router-auto-switch').checked,
+      pinnedRouteId:$('ai-router-pinned-route').value,
+      orderedRouteIds:routes.map(route => route.routeId),
+      allowRouteIds,
+      denyRouteIds,
+      freeOnly:$('ai-router-free-only').checked,
+      locality:$('ai-router-locality').value,
+      maxInputPricePerMillionUsd:Number($('ai-router-max-input-price').value),
+      maxOutputPricePerMillionUsd:Number($('ai-router-max-output-price').value),
+      retryBackoffSeconds:integer('ai-router-backoff-seconds', 1, 86400, 'Backoff'),
+      circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'Поріг circuit breaker'),
+      circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Тривалість circuit breaker'),
+    },
   };
 }
 
@@ -890,7 +1030,9 @@ function setAiRouterBusy(busy) {
     'save-ai-router-button', 'test-ai-gateway-button', 'reset-ai-router-runtime-button',
     'ai-router-primary-models-button', 'ai-router-strong-models-button',
     'run-ai-router-test-button', 'run-ai-router-strong-button',
+    'ai-router-add-route-button',
   ]) $(id).disabled = Boolean(busy);
+  $('ai-router-route-list').querySelectorAll('button, input, select').forEach(control => { control.disabled = Boolean(busy); });
 }
 
 function renderAiRouterRuntime(runtime = {}) {
@@ -899,7 +1041,8 @@ function renderAiRouterRuntime(runtime = {}) {
     ? new Date(runtime.lastStrongAt).toLocaleString()
     : 'ще не запускалась';
   const strongLastHour = (Array.isArray(runtime.strongHistoryAt) ? runtime.strongHistoryAt : []).filter(at => Date.now() - Number(at || 0) < 60 * 60_000).length;
-  $('ai-router-runtime').textContent = `Старт циклу: ${started}; запитів: ${Number(runtime.requestCount || 0)}; основна модель: ${Number(runtime.primaryCount || 0)}; сильна модель: ${Number(runtime.strongCount || 0)}; сильних за останню годину: ${strongLastHour}; останній маршрут: ${runtime.lastRoute || 'немає'}; остання сильна: ${lastStrong}.`;
+  const failover = (runtime.lastFailoverChain || []).map(item => `${item.routeId}: ${item.outcome}${item.code ? ` (${item.code})` : ''}`).join(' → ') || 'немає';
+  $('ai-router-runtime').textContent = `Старт циклу: ${started}; запитів: ${Number(runtime.requestCount || 0)}; основна модель: ${Number(runtime.primaryCount || 0)}; сильна модель: ${Number(runtime.strongCount || 0)}; сильних за останню годину: ${strongLastHour}; останній маршрут: ${runtime.lastRouteId || runtime.lastRoute || 'немає'}; failover: ${failover}; остання сильна: ${lastStrong}.`;
 }
 
 const OPENAI_MODEL_PRESETS = Object.freeze([
@@ -987,6 +1130,16 @@ async function loadAiRouterSettings() {
     $('ai-router-fallback-strong').checked = settings.fallbackToStrongOnPrimaryError !== false;
     $('ai-router-keep-primary').checked = settings.keepPrimaryIfStrongFails !== false;
     $('ai-router-handoff-max').value = String(settings.handoffMaxChars || 12000);
+    const policy = settings.routePolicy || {};
+    $('ai-router-auto-switch').checked = policy.autoSwitch !== false;
+    $('ai-router-free-only').checked = policy.freeOnly === true;
+    $('ai-router-locality').value = policy.locality || 'any';
+    $('ai-router-max-input-price').value = String(policy.maxInputPricePerMillionUsd ?? 0);
+    $('ai-router-max-output-price').value = String(policy.maxOutputPricePerMillionUsd ?? 0);
+    $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
+    $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
+    $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
+    renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy);
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
       ? 'AI-координатор увімкнено. Перевірте Gateway і моделі.'
@@ -3157,6 +3310,20 @@ $('ai-router-primary-provider').addEventListener('change', () => resetAiRouterMo
 $('ai-router-strong-provider').addEventListener('change', () => resetAiRouterModelSlot('strong'));
 $('ai-router-primary-models-button').addEventListener('click', () => loadAiRouterModels('primary'));
 $('ai-router-strong-models-button').addEventListener('click', () => loadAiRouterModels('strong'));
+$('ai-router-add-route-button').addEventListener('click', () => {
+  try { addAiRouterRoute(); }
+  catch (error) { $('ai-router-status').textContent = `Не вдалося додати маршрут: ${error.message}`; }
+});
+$('ai-router-route-list').addEventListener('click', handleAiRouterRouteAction);
+$('ai-router-route-list').addEventListener('change', event => {
+  if (event.target.matches('[data-route-field="routeId"]')) renderAiRouterRouteSelects();
+  if (event.target.matches('[data-route-field="provider"]')) {
+    const card = event.target.closest('[data-ai-route]');
+    const local = event.target.value === 'ollama';
+    card.querySelector('[data-route-field="locality"]').value = local ? 'local' : 'remote';
+    card.querySelector('[data-route-field="costClass"]').value = local ? 'free' : 'paid';
+  }
+});
 $('run-ai-router-test-button').addEventListener('click', () => runAiRouterPrompt(false));
 $('run-ai-router-strong-button').addEventListener('click', () => runAiRouterPrompt(true));
 $('save-ai-manager-button').addEventListener('click', saveAiManagerSettings);

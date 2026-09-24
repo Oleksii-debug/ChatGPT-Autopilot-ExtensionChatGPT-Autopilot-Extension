@@ -151,6 +151,24 @@ test('host hello, health and capabilities are versioned and caller-bound', async
   assert.equal(mismatch.error.code, 'PROTOCOL_MISMATCH');
 });
 
+test('host exposes only a configured Windows provider and forwards no arbitrary executable path', async () => {
+  const calls = [];
+  const windowsProvider = {
+    capabilities: () => [{ capabilityId: 'windows.process.execPinned', readOnly: false, scoped: true }],
+    execPinned: async payload => { calls.push(payload); return { executableId: 'git', exitCode: 0, stdout: 'ok', stderr: '' }; },
+    queryUia: async () => [],
+  };
+  const capabilities = await handleNativeCompanionRequest(request('capabilities'), { config: config(), callerOrigin: ORIGIN, windowsProvider });
+  assert.equal(capabilities.result.windowsProviderAvailable, true);
+  assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'windows.process.execPinned'));
+  const response = await handleNativeCompanionRequest(request('windows.execPinned', { executableId: 'git', args: ['status'] }), { config: config(), callerOrigin: ORIGIN, windowsProvider });
+  assert.equal(response.ok, true);
+  assert.deepEqual(calls, [{ executableId: 'git', args: ['status'] }]);
+  const unavailable = await handleNativeCompanionRequest(request('windows.execPinned', { executableId: 'git' }), { config: config(), callerOrigin: ORIGIN });
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.error.code, 'WINDOWS_PROVIDER_UNAVAILABLE');
+});
+
 test('Native Companion credential client and host keep listing opaque and resolve only on explicit request', async () => {
   const brokerCalls = [];
   const broker = {

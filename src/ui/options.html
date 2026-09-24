@@ -636,6 +636,57 @@
 
       <p class="field-help" id="ai-router-model-help">Для OpenAI спочатку показуються рекомендовані GPT-5.6 Sol / Terra / Luna. «Оновити моделі» звертається через локальний Gateway до вашого API-акаунта і додає моделі, які реально повертає OpenAI. Модель повинна підтримувати текстовий Responses API.</p>
 
+      <h3 id="ai-router-route-pool-heading">Пул маршрутів моделей</h3>
+      <p class="field-help" id="ai-router-route-pool-help">Необовʼязково. Якщо додано хоча б один маршрут, ролі planner, coder, fast-worker, verifier, critic і vision обираються з цього пулу. Порядок карток є порядком переваги. API keys тут не вводяться: OpenAI-compatible маршрут посилається лише на endpoint ID локального Gateway.</p>
+      <div id="ai-router-route-list" aria-labelledby="ai-router-route-pool-heading" aria-describedby="ai-router-route-pool-help"></div>
+      <button id="ai-router-add-route-button" type="button">Додати маршрут</button>
+
+      <fieldset id="ai-router-route-policy">
+        <legend>Політика власника для пулу маршрутів</legend>
+        <label><input id="ai-router-auto-switch" type="checkbox">Автоматично переходити на наступний маршрут після quota, rate limit, timeout або недоступності</label>
+        <label for="ai-router-pinned-route">Закріпити один маршрут</label>
+        <select id="ai-router-pinned-route"><option value="">Не закріплювати</option></select>
+        <label><input id="ai-router-free-only" type="checkbox">Дозволяти лише безкоштовні маршрути</label>
+        <label for="ai-router-locality">Розташування</label>
+        <select id="ai-router-locality"><option value="any">Будь-яке</option><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
+        <label for="ai-router-max-input-price">Макс. ціна input за 1M токенів, USD (0 = без межі)</label>
+        <input id="ai-router-max-input-price" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+        <label for="ai-router-max-output-price">Макс. ціна output за 1M токенів, USD (0 = без межі)</label>
+        <input id="ai-router-max-output-price" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+        <label for="ai-router-backoff-seconds">Backoff після тимчасової помилки, с</label>
+        <input id="ai-router-backoff-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric">
+        <label for="ai-router-circuit-failures">Помилок до відкриття circuit breaker</label>
+        <input id="ai-router-circuit-failures" type="number" min="1" max="100" step="1" inputmode="numeric">
+        <label for="ai-router-circuit-seconds">Circuit breaker, с</label>
+        <input id="ai-router-circuit-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric">
+        <label for="ai-router-allow-routes">Allowlist маршрутів (порожньо = усі)</label>
+        <select id="ai-router-allow-routes" multiple size="4" aria-describedby="ai-router-route-select-help"></select>
+        <label for="ai-router-deny-routes">Denylist маршрутів</label>
+        <select id="ai-router-deny-routes" multiple size="4" aria-describedby="ai-router-route-select-help"></select>
+        <p class="field-help" id="ai-router-route-select-help">У multi-select використовуйте Ctrl+Space для вибору кількох маршрутів. Один маршрут не може одночасно бути в allowlist і denylist.</p>
+      </fieldset>
+
+      <template id="ai-router-route-template">
+        <fieldset class="ai-route-card" data-ai-route>
+          <legend data-route-legend>Маршрут</legend>
+          <label data-label-for="routeId">ID маршруту</label><input data-route-field="routeId" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="provider">Провайдер</label><select data-route-field="provider"><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="openai-compatible">OpenAI-compatible endpoint</option></select>
+          <label data-label-for="endpointId">Endpoint ID (лише OpenAI-compatible)</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="model">Модель</label><input data-route-field="model" type="text" autocomplete="off" spellcheck="false">
+          <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>
+          <label data-label-for="capabilityIds">Capabilities через кому (порожньо = будь-які)</label><input data-route-field="capabilityIds" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="priority">Пріоритет</label><input data-route-field="priority" type="number" min="0" max="1000000" step="1" inputmode="numeric">
+          <label data-label-for="locality">Розташування</label><select data-route-field="locality"><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
+          <label data-label-for="costClass">Вартість</label><select data-route-field="costClass"><option value="free">Безкоштовний</option><option value="paid">Платний</option></select>
+          <label data-label-for="inputPricePerMillionUsd">Input USD / 1M</label><input data-route-field="inputPricePerMillionUsd" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+          <label data-label-for="outputPricePerMillionUsd">Output USD / 1M</label><input data-route-field="outputPricePerMillionUsd" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+          <label><input type="checkbox" data-route-field="enabled">Маршрут увімкнений</label>
+          <label><input type="checkbox" data-route-field="supportsVision">Підтримує vision</label>
+          <p data-route-health tabindex="0">Статистика маршруту ще відсутня.</p>
+          <div class="ai-route-actions"><button type="button" data-route-action="up">Вище</button><button type="button" data-route-action="down">Нижче</button><button type="button" data-route-action="remove">Видалити маршрут</button></div>
+        </fieldset>
+      </template>
+
       <label for="ai-router-every-n">Сильна кожні N запитів</label>
       <input id="ai-router-every-n" type="number" min="0" max="10000" step="1" inputmode="numeric">
 

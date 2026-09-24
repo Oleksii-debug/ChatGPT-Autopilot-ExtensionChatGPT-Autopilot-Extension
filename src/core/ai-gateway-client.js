@@ -27,7 +27,10 @@ async function parseJson(response) {
   catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
   if (!response.ok) {
     const detail = clean(body?.error?.message) || clean(body?.error) || clean(body?.message);
-    throw new Error(detail ? `AI Gateway error ${response.status}: ${detail}` : `AI Gateway error ${response.status}`);
+    const error = new Error(detail ? `AI Gateway error ${response.status}: ${detail}` : `AI Gateway error ${response.status}`);
+    error.status = response.status;
+    if (clean(body?.code)) error.code = clean(body.code);
+    throw error;
   }
   return body;
 }
@@ -75,20 +78,21 @@ export class AiGatewayClient {
     return this.request(gatewayUrl, timeoutSeconds, '/status');
   }
 
-  async listModels({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30, provider }) {
+  async listModels({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30, provider, endpointId = '' }) {
     const p = encodeURIComponent(clean(provider));
     if (!p) throw new Error('AI provider is required');
-    return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}`);
+    const endpoint = clean(endpointId);
+    return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}${endpoint ? `&endpointId=${encodeURIComponent(endpoint)}` : ''}`);
   }
 
-  async complete({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 180, provider, model, prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }) {
+  async complete({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 180, provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }) {
     const normalizedPrompt = clean(prompt);
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
     if (!clean(provider)) throw new Error('AI provider is required');
     if (!clean(model)) throw new Error('AI model is required');
     return this.request(gatewayUrl, timeoutSeconds, '/complete', {
       method: 'POST',
-      body: JSON.stringify({ provider: clean(provider), model: clean(model), prompt: normalizedPrompt, systemPrompt: clean(systemPrompt), ...(Number(maxOutputTokens) > 0 ? { maxOutputTokens: Math.floor(Number(maxOutputTokens)) } : {}), ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}) }),
+      body: JSON.stringify({ provider: clean(provider), model: clean(model), ...(clean(endpointId) ? { endpointId:clean(endpointId) } : {}), prompt: normalizedPrompt, systemPrompt: clean(systemPrompt), ...(Number(maxOutputTokens) > 0 ? { maxOutputTokens: Math.floor(Number(maxOutputTokens)) } : {}), ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}) }),
     });
   }
 }

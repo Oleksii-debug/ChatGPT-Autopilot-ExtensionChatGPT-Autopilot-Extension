@@ -6,6 +6,7 @@ import {
   TabStrategy,
   createSession,
   createTask,
+  isExclusiveConversationUrl,
   normalizeChatUrl,
 } from './schema.js';
 import {
@@ -271,7 +272,7 @@ export function projectHierarchyDeliveryEventsFromCore(
     const binding = session?.orchestrationHierarchy;
     if (!task || !binding) continue;
     if (binding.activationId !== activationId || binding.generation !== nodeRuntime.generation) continue;
-    if (!(Number(task.lastVerifiedSendAt || 0) > 0) || !task.lastConversationUrl) continue;
+    if (!(Number(task.lastVerifiedSendAt || 0) > 0) || !isExclusiveConversationUrl(task.lastConversationUrl)) continue;
 
     events.push({
       type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
@@ -387,6 +388,7 @@ export function hierarchyCompletionProbesFromCore(graphRaw, runtimeRaw, coreStat
 
   for (const nodeId of graph.nodeOrder) {
     const nodeRuntime = runtime.nodesById[nodeId];
+    if (nodeRuntime.scopeState !== 'RUNNING') continue;
     const activationId = nodeRuntime.currentActivationId;
     if (!activationId) continue;
     const ledger = nodeRuntime.activationLedger[activationId];
@@ -399,7 +401,7 @@ export function hierarchyCompletionProbesFromCore(graphRaw, runtimeRaw, coreStat
     const binding = session?.orchestrationHierarchy;
     if (!task || !binding) continue;
     if (binding.activationId !== activationId || binding.generation !== nodeRuntime.generation) continue;
-    if (!task.lastConversationUrl || task.lastAssistantBaselineKnown !== true) continue;
+    if (!isExclusiveConversationUrl(task.lastConversationUrl) || task.lastAssistantBaselineKnown !== true) continue;
 
     probes.push({
       nodeId,

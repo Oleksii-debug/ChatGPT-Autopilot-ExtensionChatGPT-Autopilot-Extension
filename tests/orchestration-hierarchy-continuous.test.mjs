@@ -6,6 +6,7 @@ import {
   compactOrchestrationEventId,
   createOrchestrationHierarchyRuntime,
   reduceOrchestrationHierarchyEvent,
+  validateOrchestrationHierarchyRuntimeV1,
 } from '../src/core/orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from '../src/core/orchestration-role-prompts.js';
 
@@ -125,4 +126,57 @@ test('internal hierarchy event ids stay bounded for long Accessible Chess identi
   );
   assert.ok(id.length <= 180);
   assert.match(id, /^core-hierarchy:[0-9a-f]{16}$/);
+});
+
+test('continuous history stays bounded and restart-deterministic beyond every pruning threshold', () => {
+  const graph=buildThreeLevelHierarchyTemplate({
+    graphId:'continuous-pruning-proof',projectId:'continuous-pruning-proof',targetRepository:'owner/repo',controlIssueNumber:1,
+    domains:[{id:'only',scope:'only'}],workersPerManager:1,loopMode:'CONTINUOUS',maxRounds:0,
+  });
+  let runtime=createOrchestrationHierarchyRuntime(graph,now++);
+  const seenEventIds=new Set();
+  const apply=(type,action,status='COMPLETED')=>{
+    const id=eventId(type==='NODE_EFFECT_CONFIRMED'?'fx':'terminal',action.nodeId,action.activationId);
+    assert.equal(seenEventIds.has(id),false,'generated event identity must never collide');
+    seenEventIds.add(id);
+    const result=reduce(graph,runtime,{type,eventId:id,nodeId:action.nodeId,generation:action.generation,activationId:action.activationId,effectRef:'stress',status});
+    runtime=result.runtime;
+    return result.actions;
+  };
+  const firstEvent={type:OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,eventId:eventId('start-pruning'),nodeId:'director',generation:1,activationId:'root:director:g1:r1',purpose:'DELEGATE'};
+  seenEventIds.add(firstEvent.eventId);
+  const started=reduce(graph,runtime,firstEvent);
+  let root=started.actions[0];
+  runtime=started.runtime;
+
+  for(let round=1;round<=510;round+=1){
+    let actions=apply(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,root);
+    actions=apply(OrchestrationHierarchyEventType.NODE_TERMINAL,root);
+    const manager=actions.find(action=>action.nodeId==='manager:only');assert.ok(manager);
+    apply(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,manager);
+    actions=apply(OrchestrationHierarchyEventType.NODE_TERMINAL,manager);
+    const worker=actions.find(action=>action.nodeId==='worker:only:01');assert.ok(worker);
+    apply(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,worker);
+    actions=apply(OrchestrationHierarchyEventType.NODE_TERMINAL,worker);
+    const managerReconcile=actions.find(action=>action.nodeId==='manager:only'&&action.purpose==='RECONCILE');assert.ok(managerReconcile);
+    apply(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,managerReconcile);
+    actions=apply(OrchestrationHierarchyEventType.NODE_TERMINAL,managerReconcile);
+    const directorReconcile=actions.find(action=>action.nodeId==='director'&&action.purpose==='RECONCILE');assert.ok(directorReconcile);
+    apply(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,directorReconcile);
+    actions=apply(OrchestrationHierarchyEventType.NODE_TERMINAL,directorReconcile);
+    root=actions.find(action=>action.nodeId==='director'&&action.purpose==='DELEGATE');assert.ok(root);
+    if(round%17===0)runtime=validateOrchestrationHierarchyRuntimeV1(graph,JSON.parse(JSON.stringify(runtime)));
+  }
+
+  assert.equal(runtime.nodesById.director.round,511);
+  assert.ok(Object.keys(runtime.processedEventIds).length<=5000);
+  for(const nodeId of runtime.nodeOrder){
+    assert.ok(Object.keys(runtime.nodesById[nodeId].activationLedger).length<=63);
+    assert.ok(Object.keys(runtime.nodesById[nodeId].completedBarrierKeys).length<=64);
+  }
+  const before=JSON.stringify(runtime);
+  const replay=reduce(graph,runtime,{...firstEvent,eventId:firstEvent.eventId});
+  assert.equal(replay.reason,'STALE_ROUND');
+  assert.deepEqual(replay.actions,[]);
+  assert.equal(JSON.stringify(replay.runtime),before,'pruned round replay must not mutate durable state');
 });

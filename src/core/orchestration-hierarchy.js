@@ -441,6 +441,13 @@ function activationIdForChild(parentActivationId, childId, generation, round) {
   return `${parentActivationId}:child:${childId}:g${generation}:r${round}`;
 }
 
+function activationRound(activationId) {
+  const match = String(activationId || '').match(/:r(\d+)$/u);
+  if (!match) return 0;
+  const round = Number(match[1]);
+  return Number.isSafeInteger(round) && round > 0 ? round : 0;
+}
+
 function reconciliationId(parentNodeId, generation, round) {
   return `reconcile:${parentNodeId}:g${generation}:r${round}`;
 }
@@ -719,6 +726,20 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
   const event = normalizeEvent(eventRaw);
   if (runtime.processedEventIds[event.eventId]) {
     return { runtime, actions: [], deduplicated: true, reason: 'DUPLICATE_EVENT' };
+  }
+  // A compacted event id can disappear from the bounded event ledger. The
+  // durable round is still authoritative, so reject an old activation before
+  // recording its id or moving updatedAt.
+  if (event.controlEpoch === runtime.controlEpoch
+      && event.type === OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED) {
+    const { nodeId, generation, activationId } = activationEventIdentity(event);
+    const current = runtime.nodesById[nodeId];
+    if (current && generation === current.generation) {
+      const requestedRound = activationRound(activationId);
+      if (requestedRound && requestedRound !== current.round) {
+        return { runtime, actions: [], deduplicated: false, reason: 'STALE_ROUND' };
+      }
+    }
   }
   runtime.processedEventIds[event.eventId] = nowMs;
   runtime.updatedAt = nowMs;

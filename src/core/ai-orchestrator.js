@@ -1,4 +1,15 @@
 import { DEFAULT_GATEWAY_URL, normalizeGatewayUrl } from './ai-gateway-client.js';
+import {
+  AiRouteRole,
+  DEFAULT_AI_ROUTE_POLICY,
+  classifyAiRouteError,
+  createAiRoutePoolExhaustedError,
+  normalizeAiRoutePolicy,
+  normalizeAiRoutePool,
+  normalizeAiRouteStates,
+  recordAiRouteOutcome,
+  selectAiRouteCandidates,
+} from './ai-route-pool.js';
 
 export const AiRouterMode = Object.freeze({
   PRIMARY: 'primary',
@@ -33,6 +44,8 @@ export const DEFAULT_AI_ROUTER_SETTINGS = Object.freeze({
   handoffMaxChars: 12_000,
   fallbackToStrongOnPrimaryError: true,
   keepPrimaryIfStrongFails: true,
+  routes: Object.freeze([]),
+  routePolicy: DEFAULT_AI_ROUTE_POLICY,
 });
 
 export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
@@ -44,6 +57,9 @@ export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
   lastRoute: '',
   lastStrongResult: '',
   strongHistoryAt: Object.freeze([]),
+  routeStates: Object.freeze({}),
+  lastRouteId: '',
+  lastFailoverChain: Object.freeze([]),
 });
 
 const clean = value => typeof value === 'string' ? value.trim() : '';
@@ -83,12 +99,15 @@ export function normalizeAiRouterSettings(raw = {}) {
     handoffMaxChars,
     fallbackToStrongOnPrimaryError: raw.fallbackToStrongOnPrimaryError !== false,
     keepPrimaryIfStrongFails: raw.keepPrimaryIfStrongFails !== false,
+    routes: normalizeAiRoutePool(raw.routes || []),
+    routePolicy: normalizeAiRoutePolicy(raw.routePolicy || DEFAULT_AI_ROUTE_POLICY),
   };
 }
 
 export function validateAiRouterReadiness(rawSettings = {}) {
   const settings = normalizeAiRouterSettings(rawSettings);
   if (!settings.enabled) return settings;
+  if (settings.routes.length) return settings;
 
   const requireModel = (slot, label) => {
     if (!slot?.model) throw new Error(`${label} AI model must be selected before enabling the AI coordinator`);
@@ -107,6 +126,7 @@ export function validateAiRouterReadiness(rawSettings = {}) {
 
 export function normalizeAiRouterRuntime(raw = {}) {
   const num = value => Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : 0;
+  const routes = Array.isArray(raw.__routesForNormalization) ? raw.__routesForNormalization : [];
   return {
     requestCount: Math.floor(num(raw.requestCount)),
     primaryCount: Math.floor(num(raw.primaryCount)),
@@ -116,6 +136,9 @@ export function normalizeAiRouterRuntime(raw = {}) {
     lastRoute: clean(raw.lastRoute),
     lastStrongResult: clean(raw.lastStrongResult).slice(0, MAX_HANDOFF_CHARS),
     strongHistoryAt: Array.isArray(raw.strongHistoryAt) ? raw.strongHistoryAt.map(num).filter(Boolean).slice(-1000) : [],
+    routeStates: normalizeAiRouteStates(raw.routeStates, routes.length ? routes : Object.keys(raw.routeStates || {}).map(routeId => ({ routeId }))),
+    lastRouteId: clean(raw.lastRouteId),
+    lastFailoverChain: Array.isArray(raw.lastFailoverChain) ? raw.lastFailoverChain.filter(item => item && typeof item === 'object' && !Array.isArray(item)).slice(-32).map(item => ({ routeId:clean(item.routeId), outcome:clean(item.outcome), code:clean(item.code), category:clean(item.category) })) : [],
   };
 }
 
@@ -172,7 +195,10 @@ export class AiOrchestrator {
     this.now = now;
   }
 
-  async run(rawSettings, rawRuntime, prompt, { systemPrompt = '', forceStrong = false, maxOutputTokens = 0, maxModelCallsForRequest = 0, imageDataUrl = '' } = {}) {
+  async run(rawSettings, rawRuntime, prompt, {
+    systemPrompt = '', forceStrong = false, maxOutputTokens = 0, maxModelCallsForRequest = 0, imageDataUrl = '',
+    taskRole = AiRouteRole.PLANNER, strongTaskRole = AiRouteRole.VERIFIER, capabilityIds = [],
+  } = {}) {
     const settings = normalizeAiRouterSettings(rawSettings);
     const runtime = normalizeAiRouterRuntime(rawRuntime);
     if (!settings.enabled) throw new Error('AI coordinator is disabled');
@@ -183,35 +209,76 @@ export class AiOrchestrator {
     const outputCeiling = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
     const callCeiling = Math.max(0, Math.floor(Number(maxModelCallsForRequest) || 0));
     let callsUsed = 0;
+    let routeStates = normalizeAiRouteStates(runtime.routeStates, settings.routes);
+    const routeAttempts = [];
+    let selectedRouteId = runtime.lastRouteId;
     const consumedOutput = () => Math.max(0, Number(primaryResult?.usage?.outputTokens || 0)) + Math.max(0, Number(strongResult?.usage?.outputTokens || 0));
     const remainingOutput = () => outputCeiling ? Math.max(0, outputCeiling - consumedOutput()) : 0;
-    const call = async (slot, callPrompt, callSystem, callOutputLimit = 0) => {
-      requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
+    const routeRuntimeSnapshot = () => normalizeAiRouterRuntime({ ...runtime, routeStates, lastRouteId:selectedRouteId, lastFailoverChain:routeAttempts });
+    const attachFailureRuntime = error => {
+      if (error && typeof error === 'object') {
+        error.modelCallsUsed = Math.max(Number(error.modelCallsUsed || 0), callsUsed);
+        error.routerRuntime = routeRuntimeSnapshot();
+        error.routeAttempts = structuredClone(routeAttempts);
+      }
+      return error;
+    };
+    const invoke = async (route, callPrompt, callSystem, bounded) => {
       if (callCeiling && callsUsed >= callCeiling) {
         const error = new Error('AI model-call budget exhausted before another provider call');
         error.code = 'AI_MODEL_CALL_BUDGET_EXHAUSTED';
         error.modelCallsUsed = callsUsed;
-        throw error;
+        throw attachFailureRuntime(error);
       }
-      const bounded = Math.max(0, Math.floor(Number(callOutputLimit) || 0));
       callsUsed += 1;
       try {
         return await this.gateway.complete({
-        gatewayUrl: settings.gatewayUrl,
-        timeoutSeconds: settings.timeoutSeconds,
-        provider: slot.provider,
-        model: slot.model,
-        prompt: callPrompt,
+          gatewayUrl: settings.gatewayUrl,
+          timeoutSeconds: settings.timeoutSeconds,
+          provider: route.provider,
+          model: route.model,
+          ...(route.endpointId ? { endpointId: route.endpointId } : {}),
+          prompt: callPrompt,
         systemPrompt: callSystem,
         ...(bounded ? { maxOutputTokens: bounded } : {}),
           ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}),
         });
       } catch (error) {
-        if (error && typeof error === 'object') {
-          error.modelCallsUsed = Math.max(Number(error.modelCallsUsed || 0), callsUsed);
-        }
-        throw error;
+        throw attachFailureRuntime(error);
       }
+    };
+    const call = async (slot, callPrompt, callSystem, callOutputLimit = 0, requestedRole = taskRole) => {
+      const bounded = Math.max(0, Math.floor(Number(callOutputLimit) || 0));
+      if (!settings.routes.length) {
+        requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
+        return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
+      }
+      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
+      if (!selected.candidates.length) {
+        throw attachFailureRuntime(createAiRoutePoolExhaustedError({
+          attempts:routeAttempts,
+          retryAt:selected.retryAt,
+          message:selected.retryAt ? 'Every eligible AI route is in durable backoff' : 'No AI route satisfies the requested role, capabilities, vision and owner policy',
+        }));
+      }
+      for (const route of selected.candidates) {
+        const started = this.now();
+        try {
+          const value = await invoke(route, callPrompt, callSystem, bounded);
+          routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
+          selectedRouteId = route.routeId;
+          routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
+          return { ...value, routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' } };
+        } catch (error) {
+          const classification = classifyAiRouteError(error);
+          if (error && typeof error === 'object') error.routeFailureClassification = classification;
+          routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:false, classification, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
+          routeAttempts.push({ routeId:route.routeId, outcome:'FAILED', code:classification.code, category:classification.category });
+          attachFailureRuntime(error);
+          if (!classification.retryable || !settings.routePolicy.autoSwitch) throw error;
+        }
+      }
+      throw attachFailureRuntime(createAiRoutePoolExhaustedError({ attempts:routeAttempts, message:'Every eligible AI route failed with a retryable provider error' }));
     };
 
     let primaryResult = null;
@@ -238,7 +305,7 @@ export class AiOrchestrator {
           trigger = `${why}-output-budget-blocked`;
           throw error;
         }
-        const value = await call(settings.strong, callPrompt, callSystem, strongLimit);
+        const value = await call(settings.strong, callPrompt, callSystem, strongLimit, strongTaskRole);
         trigger = why;
         return value;
       } catch (error) {
@@ -249,13 +316,14 @@ export class AiOrchestrator {
 
     if (forceStrong || settings.mode === AiRouterMode.STRONG) {
       trigger = forceStrong ? 'manual-force-strong' : 'strong-only';
-      strongResult = await call(settings.strong, userPrompt, clean(systemPrompt), outputCeiling);
+      strongResult = await call(settings.strong, userPrompt, clean(systemPrompt), outputCeiling, strongTaskRole);
     } else if (settings.mode === AiRouterMode.PRIMARY) {
       try {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (!settings.fallbackToStrongOnPrimaryError || !settings.strong.model) throw error;
+        if (error?.routeFailureClassification?.retryable === false) throw error;
+        if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
           `PRIMARY MODEL FAILED. Continue the original task directly.
 
@@ -277,7 +345,8 @@ ${userPrompt}`,
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (!settings.fallbackToStrongOnPrimaryError || !settings.strong.model) throw error;
+        if (error?.routeFailureClassification?.retryable === false) throw error;
+        if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
           `PRIMARY/LOCAL MODEL FAILED BEFORE PRODUCING A HANDOFF. Complete the original task.
 
@@ -325,6 +394,9 @@ ${userPrompt}`,
       strongHistoryAt: strongResult
         ? [...(runtime.strongHistoryAt || []).filter(at => now - at < 24 * 60 * 60_000), now].slice(-1000)
         : (runtime.strongHistoryAt || []).filter(at => now - at < 24 * 60 * 60_000),
+      routeStates,
+      lastRouteId: finalResult?.routeSelection?.routeId || selectedRouteId,
+      lastFailoverChain: routeAttempts,
     };
 
     const usageParts = [primaryResult?.usage, strongResult?.usage].filter(Boolean);
@@ -344,10 +416,11 @@ ${userPrompt}`,
       usage,
       route: strongResult ? 'strong' : 'primary',
       trigger: trigger || (strongResult ? 'strong-only' : 'primary-only'),
-      primary: primaryResult ? { provider: settings.primary.provider, model: settings.primary.model, text: primaryResult.text, usage: primaryResult.usage || null } : null,
-      strong: strongResult ? { provider: settings.strong.provider, model: settings.strong.model, text: strongResult.text, usage: strongResult.usage || null } : null,
+      primary: primaryResult ? { provider: primaryResult.routeSelection?.provider || settings.primary.provider, model: primaryResult.routeSelection?.model || settings.primary.model, routeId:primaryResult.routeSelection?.routeId || '', text: primaryResult.text, usage: primaryResult.usage || null } : null,
+      strong: strongResult ? { provider: strongResult.routeSelection?.provider || settings.strong.provider, model: strongResult.routeSelection?.model || settings.strong.model, routeId:strongResult.routeSelection?.routeId || '', text: strongResult.text, usage: strongResult.usage || null } : null,
       primaryError,
       strongError,
+      routing: { selectedRouteId:finalResult?.routeSelection?.routeId || '', reason:finalResult?.routeSelection?.reason || (strongResult ? 'legacy-strong' : 'legacy-primary'), failoverChain:structuredClone(routeAttempts) },
       runtime: nextRuntime,
     };
   }

@@ -56,6 +56,55 @@ function gatewayError(message, statusCode = 400, code = '') {
   return error;
 }
 
+export function normalizeCompatibleEndpointRegistry(raw = '') {
+  let source = raw;
+  if (typeof raw === 'string') {
+    const text = clean(raw);
+    if (!text) source = [];
+    else {
+      try { source = JSON.parse(text); }
+      catch (_) { throw gatewayError('AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON must be valid JSON', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY'); }
+    }
+  }
+  if (!Array.isArray(source)) throw gatewayError('OpenAI-compatible endpoint registry must be an array', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  const entries = source.length ? source : [{
+    endpointId: 'default',
+    baseUrl: COMPATIBLE_BASE_URL,
+    apiKeyEnv: 'COMPATIBLE_API_KEY',
+  }];
+  if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  const seen = new Set();
+  return Object.freeze(entries.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    const extra = Object.keys(item).filter(key => !['endpointId', 'baseUrl', 'apiKeyEnv'].includes(key));
+    if (extra.length) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has unsupported field: ${extra[0]}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    const endpointId = clean(item.endpointId);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(endpointId)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} has an invalid endpointId`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    if (seen.has(endpointId)) throw gatewayError(`Duplicate OpenAI-compatible endpointId: ${endpointId}`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    seen.add(endpointId);
+    const apiKeyEnv = clean(item.apiKeyEnv);
+    if (apiKeyEnv && !/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw gatewayError(`OpenAI-compatible endpoint ${endpointId} has an invalid apiKeyEnv`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+    return Object.freeze({ endpointId, baseUrl: normalizeCompatibleBaseUrl(item.baseUrl), apiKeyEnv });
+  }));
+}
+
+export function loadCompatibleEndpointRegistry({ env = process.env, configFile = path.join(CONFIG_DIR, 'gateway-settings.json') } = {}) {
+  if (clean(env.AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON)) return normalizeCompatibleEndpointRegistry(env.AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON);
+  const config = readJsonFile(configFile);
+  if (config.error) throw gatewayError('Could not parse Gateway endpoint settings', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
+  if (config.value?.compatibleEndpoints !== undefined) return normalizeCompatibleEndpointRegistry(config.value.compatibleEndpoints);
+  return normalizeCompatibleEndpointRegistry('');
+}
+
+const COMPATIBLE_ENDPOINTS = loadCompatibleEndpointRegistry();
+
+function resolveCompatibleEndpoint(endpointId = '', registry = COMPATIBLE_ENDPOINTS) {
+  const requested = clean(endpointId) || (registry.length === 1 ? registry[0].endpointId : 'default');
+  const endpoint = registry.find(item => item.endpointId === requested);
+  if (!endpoint) throw gatewayError(`Unknown OpenAI-compatible endpointId: ${requested}`, 404, 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND');
+  return endpoint;
+}
+
 export function createInferenceQueue({ maxPending = DEFAULT_MAX_PENDING_INFERENCE } = {}) {
   const limit = Math.min(256, Math.max(1, Number(maxPending) || DEFAULT_MAX_PENDING_INFERENCE));
   const pending = [];
@@ -248,17 +297,22 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
     response = await fetchFn(url, { ...init, signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
     text = await response.text();
   } catch (error) {
-    if (error?.name === 'AbortError') throw new Error(`Upstream request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`);
-    throw error;
+    if (error?.name === 'AbortError') throw gatewayError(`Upstream request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`, 504, 'AI_PROVIDER_TIMEOUT');
+    throw gatewayError(`Upstream provider is unavailable: ${clean(error?.message || error).slice(0, 500) || 'network failure'}`, 503, 'AI_PROVIDER_UNAVAILABLE');
   } finally {
     clearTimeout(timer);
   }
   let body;
   try { body = text ? JSON.parse(text) : {}; }
-  catch { throw new Error(`Upstream returned invalid JSON (HTTP ${response.status})`); }
+  catch { throw gatewayError(`Upstream returned invalid JSON (HTTP ${response.status})`, 502, 'AI_PROVIDER_INVALID_RESPONSE'); }
   if (!response.ok) {
     const detail = clean(body?.error?.message) || clean(body?.error) || clean(body?.message);
-    throw new Error(detail ? `Upstream ${response.status}: ${detail}` : `Upstream ${response.status}`);
+    const message = detail ? `Upstream ${response.status}: ${detail}` : `Upstream ${response.status}`;
+    if (response.status === 429) throw gatewayError(message, 429, 'AI_PROVIDER_RATE_LIMITED');
+    if ([408, 425].includes(response.status)) throw gatewayError(message, response.status, 'AI_PROVIDER_TIMEOUT');
+    if (response.status >= 500) throw gatewayError(message, response.status, 'AI_PROVIDER_UNAVAILABLE');
+    if ([401, 403].includes(response.status)) throw gatewayError(message, response.status, 'AI_PROVIDER_AUTH_REJECTED');
+    throw gatewayError(message, response.status, 'AI_PROVIDER_REJECTED');
   }
   return body;
 }
@@ -269,8 +323,8 @@ function openAiHeaders() {
   return { authorization: `Bearer ${key}` };
 }
 
-function compatibleHeaders() {
-  const key = clean(process.env.COMPATIBLE_API_KEY);
+function compatibleHeaders(endpoint, env = process.env) {
+  const key = endpoint?.apiKeyEnv ? clean(env[endpoint.apiKeyEnv]) : '';
   return key ? { authorization: `Bearer ${key}` } : {};
 }
 
@@ -293,7 +347,7 @@ function openAiText(body) {
   return parts.join('\n').trim();
 }
 
-export async function listProviderModels(provider, { fetchFn = globalThis.fetch } = {}) {
+export async function listProviderModels(provider, { fetchFn = globalThis.fetch, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
   if (provider === 'ollama') {
     const body = await fetchJson(fetchFn, `${OLLAMA_BASE_URL}/api/tags`);
@@ -303,11 +357,12 @@ export async function listProviderModels(provider, { fetchFn = globalThis.fetch 
     const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/models`, { headers: openAiHeaders() });
     return (body.data || []).map(item => clean(item?.id)).filter(Boolean).sort();
   }
-  const body = await fetchJson(fetchFn, `${COMPATIBLE_BASE_URL}/models`, { headers: compatibleHeaders() });
+  const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
+  const body = await fetchJson(fetchFn, `${endpoint.baseUrl}/models`, { headers: compatibleHeaders(endpoint, env) });
   return (body.data || body.models || []).map(item => clean(item?.id || item?.name || item?.model)).filter(Boolean).sort();
 }
 
-export async function completeProvider({ provider, model, prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }, { fetchFn = globalThis.fetch } = {}) {
+export async function completeProvider({ provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }, { fetchFn = globalThis.fetch, compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
   if (!clean(model)) throw new Error('Model is required');
   if (!clean(prompt)) throw new Error('Prompt is required');
@@ -346,13 +401,14 @@ export async function completeProvider({ provider, model, prompt, systemPrompt =
     return { provider, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
   }
 
+  const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
   const messages = [];
   if (clean(systemPrompt)) messages.push({ role: 'system', content: clean(systemPrompt) });
   messages.push({ role: 'user', content: visionImage ? [{ type: 'text', text: clean(prompt) }, { type: 'image_url', image_url: { url: visionImage } }] : clean(prompt) });
   const tokenLimit = Math.max(0, Math.floor(Number(maxOutputTokens) || 0));
-  const body = await fetchJson(fetchFn, `${COMPATIBLE_BASE_URL}/chat/completions`, {
+  const body = await fetchJson(fetchFn, `${endpoint.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: compatibleHeaders(),
+    headers: compatibleHeaders(endpoint, env),
     body: JSON.stringify({ model: clean(model), messages, stream: false, ...(tokenLimit ? { max_tokens: tokenLimit } : {}) }),
   });
   const text = clean(body?.choices?.[0]?.message?.content) || clean(body?.choices?.[0]?.text);
@@ -360,11 +416,11 @@ export async function completeProvider({ provider, model, prompt, systemPrompt =
   const inputTokens = Math.max(0, Number(body?.usage?.prompt_tokens || 0));
   const outputTokens = Math.max(0, Number(body?.usage?.completion_tokens || 0));
   const totalTokens = Math.max(inputTokens + outputTokens, Number(body?.usage?.total_tokens || 0));
-  return { provider, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
+  return { provider, endpointId: endpoint.endpointId, model: clean(model), text, usage: { inputTokens, outputTokens, totalTokens, modelCalls: 1 } };
 }
 
 
-export async function probeProvider(provider, { fetchFn = globalThis.fetch, timeoutMs = STATUS_PROBE_TIMEOUT_MS } = {}) {
+export async function probeProvider(provider, { fetchFn = globalThis.fetch, timeoutMs = STATUS_PROBE_TIMEOUT_MS, endpointId = '', compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   if (!PROVIDERS.has(provider)) throw new Error('Unsupported AI provider');
   if (provider === 'openai' && !clean(process.env.OPENAI_API_KEY)) {
     return { provider, configured: false, ok: false, models: 0, reason: 'api-key-not-configured' };
@@ -378,16 +434,17 @@ export async function probeProvider(provider, { fetchFn = globalThis.fetch, time
       const body = await fetchJson(fetchFn, `${OPENAI_BASE_URL}/models`, { headers: openAiHeaders() }, { timeoutMs });
       models = (body.data || []).map(item => clean(item?.id)).filter(Boolean);
     } else {
-      const body = await fetchJson(fetchFn, `${COMPATIBLE_BASE_URL}/models`, { headers: compatibleHeaders() }, { timeoutMs });
+      const endpoint = resolveCompatibleEndpoint(endpointId, compatibleEndpoints);
+      const body = await fetchJson(fetchFn, `${endpoint.baseUrl}/models`, { headers: compatibleHeaders(endpoint, env) }, { timeoutMs });
       models = (body.data || body.models || []).map(item => clean(item?.id || item?.name || item?.model)).filter(Boolean);
     }
-    return { provider, configured: true, ok: true, models: models.length, reason: '' };
+    return { provider, ...(provider === 'openai-compatible' ? { endpointId:resolveCompatibleEndpoint(endpointId, compatibleEndpoints).endpointId } : {}), configured: true, ok: true, models: models.length, reason: '' };
   } catch (error) {
-    return { provider, configured: true, ok: false, models: 0, reason: clean(error?.message || error).slice(0, 300) };
+    return { provider, ...(provider === 'openai-compatible' && clean(endpointId) ? { endpointId:clean(endpointId) } : {}), configured: true, ok: false, models: 0, reason: clean(error?.message || error).slice(0, 300) };
   }
 }
 
-export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue = createInferenceQueue(), pairingStore = createExtensionPairingStore() } = {}) {
+export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue = createInferenceQueue(), pairingStore = createExtensionPairingStore(), compatibleEndpoints = COMPATIBLE_ENDPOINTS, env = process.env } = {}) {
   return http.createServer(async (req, res) => {
     let corsOrigin = '';
     try {
@@ -406,9 +463,10 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
           version: GATEWAY_VERSION,
           providers: [...PROVIDERS],
           openaiConfigured: Boolean(clean(process.env.OPENAI_API_KEY)),
-          compatibleApiKeyConfigured: Boolean(clean(process.env.COMPATIBLE_API_KEY)),
-          compatibleBaseUrl: COMPATIBLE_BASE_URL,
-          compatibleTransport: new URL(COMPATIBLE_BASE_URL).protocol.replace(':', ''),
+          compatibleApiKeyConfigured: compatibleEndpoints.some(item => item.apiKeyEnv && clean(env[item.apiKeyEnv])),
+          compatibleBaseUrl: compatibleEndpoints[0].baseUrl,
+          compatibleTransport: new URL(compatibleEndpoints[0].baseUrl).protocol.replace(':', ''),
+          compatibleEndpoints: compatibleEndpoints.map(item => ({ endpointId:item.endpointId, baseUrl:item.baseUrl, transport:new URL(item.baseUrl).protocol.replace(':', ''), apiKeyConfigured:Boolean(item.apiKeyEnv && clean(env[item.apiKeyEnv])) })),
           ollamaBaseUrl: OLLAMA_BASE_URL,
           nodeVersion: process.version,
           pid: process.pid,
@@ -418,7 +476,11 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
         }, { corsOrigin });
       }
       if (req.method === 'GET' && url.pathname === '/status') {
-        const providerStatus = await Promise.all([...PROVIDERS].map(provider => probeProvider(provider, { fetchFn })));
+        const providerStatus = await Promise.all([
+          probeProvider('ollama', { fetchFn, env }),
+          probeProvider('openai', { fetchFn, env }),
+          ...compatibleEndpoints.map(endpoint => probeProvider('openai-compatible', { fetchFn, endpointId:endpoint.endpointId, compatibleEndpoints, env })),
+        ]);
         return json(res, 200, {
           ok: true,
           service: 'chatgpt-autopilot-ai-gateway',
@@ -430,12 +492,13 @@ export function createGatewayServer({ fetchFn = globalThis.fetch, inferenceQueue
       }
       if (req.method === 'GET' && url.pathname === '/models') {
         const provider = clean(url.searchParams.get('provider'));
-        const models = await listProviderModels(provider, { fetchFn });
-        return json(res, 200, { ok: true, provider, models }, { corsOrigin });
+        const endpointId = clean(url.searchParams.get('endpointId'));
+        const models = await listProviderModels(provider, { fetchFn, endpointId, compatibleEndpoints, env });
+        return json(res, 200, { ok: true, provider, ...(provider === 'openai-compatible' ? { endpointId:resolveCompatibleEndpoint(endpointId, compatibleEndpoints).endpointId } : {}), models }, { corsOrigin });
       }
       if (req.method === 'POST' && url.pathname === '/complete') {
         const body = await readBody(req);
-        const result = await inferenceQueue.run(() => completeProvider(body, { fetchFn }));
+        const result = await inferenceQueue.run(() => completeProvider(body, { fetchFn, compatibleEndpoints, env }));
         return json(res, 200, { ok: true, ...result }, { corsOrigin });
       }
       return json(res, 404, { error: 'Not found' }, { corsOrigin });

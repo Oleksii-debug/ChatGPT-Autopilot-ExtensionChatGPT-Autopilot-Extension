@@ -15,6 +15,7 @@ import {
   hierarchyCoreSessionId,
   hierarchyCoreTaskId,
   materializeHierarchyActionsIntoCore,
+  hierarchyCompletionProbesFromCore,
   projectHierarchyDeliveryEventsFromCore,
 } from '../src/core/orchestration-hierarchy-core.js';
 
@@ -116,6 +117,26 @@ test('L1-C materializes hierarchy activation through existing Core Session/Task 
     promptProfileId: 'manager-v1',
     actionType: OrchestrationHierarchyActionType.ACTIVATE_NODE,
   });
+});
+
+test('verified Send without an exclusive conversation binding cannot become hierarchy completion evidence', () => {
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+  const state = createEmptyState(START);
+  const request = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'exclusive-binding-request', {
+    nodeId: 'manager', generation: 1, activationId: 'exclusive-binding-activation', purpose:OrchestrationActivationPurpose.DELEGATE,
+  }), 1);
+  runtime = request.runtime;
+  materializeHierarchyActionsIntoCore(state, g, runtime, request.actions, { nowMs:START + 2 });
+  confirmCoreSend(state, g.graphId, 'manager', START + 3, 'https://chatgpt.com/');
+  assert.deepEqual(projectHierarchyDeliveryEventsFromCore(g, runtime, state), [], 'root launch URL is not exclusive proof');
+
+  confirmCoreSend(state, g.graphId, 'manager', START + 4, MANAGER_CHAT);
+  const projected = projectHierarchyDeliveryEventsFromCore(g, runtime, state);
+  assert.equal(projected.length, 1);
+  runtime = reduce(g, runtime, projected[0], 5).runtime;
+  state.sessionsById[hierarchyCoreSessionId(g.graphId, 'manager')].tasksById[hierarchyCoreTaskId(g.graphId, 'manager')].lastConversationUrl = 'https://chatgpt.com/';
+  assert.deepEqual(hierarchyCompletionProbesFromCore(g, runtime, state), [], 'non-exclusive URL cannot manufacture assistant completion');
 });
 
 test('L1-C verified Core Send projects deterministic reducer evidence', () => {
