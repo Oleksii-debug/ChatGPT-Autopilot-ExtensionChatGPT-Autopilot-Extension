@@ -141,7 +141,7 @@ function requestedIds(value) {
   const raw = boundedArray(value, 'requestedCapabilityIds', MAX_REQUESTED_CAPABILITIES);
   const out = raw.map((item, index) => id(item, `requestedCapabilityIds[${index}]`));
   if (new Set(out).size !== out.length) throw new Error('requestedCapabilityIds contains duplicates');
-  return out;
+  return out.sort();
 }
 
 function readinessRank(value) {
