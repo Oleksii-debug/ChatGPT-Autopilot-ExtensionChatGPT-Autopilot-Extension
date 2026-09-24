@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import {
   FILESYSTEM_PROVIDER_ID,
   FilesystemAgentProviderV1,
@@ -7,6 +8,21 @@ import {
 } from '../src/core/filesystem-agent-provider.js';
 
 const at = '2026-09-24T16:00:00.000Z';
+function digest(value) { return crypto.createHash('sha256').update(Buffer.from(value, 'utf8')).digest('hex'); }
+function artifactRef(text = 'x') {
+  return {
+    schemaVersion: 1,
+    artifactId: 'artifact-write-1',
+    kind: 'text',
+    uri: 'artifact://write-1',
+    mediaType: 'text/plain',
+    sha256: digest(text),
+    sizeBytes: Buffer.byteLength(text, 'utf8'),
+    createdAt: at,
+    producerInvocationId: null,
+    sensitive: false,
+  };
+}
 function invocation(toolId, capabilityId, args = {}, id = 'fs-inv-1') {
   return {
     schemaVersion: 1,
@@ -37,7 +53,7 @@ function nativeClient(overrides = {}) {
   return {
     readText: async payload => ({ ...payload, text: 'hello' }),
     searchFiles: async payload => ({ ...payload, items: ['docs/a.txt'], truncated: false }),
-    writeExistingText: async payload => ({ ...payload, sha256: 'a'.repeat(64), alreadyApplied: false }),
+    writeExistingText: async payload => ({ ...payload, sha256: digest(payload.text), alreadyApplied: false }),
     ...overrides,
   };
 }
@@ -60,14 +76,36 @@ test('filesystem provider registers read/search/write tools and enforces invocat
   assert.deepEqual(calls, [{ rootId: 'workspace', query: 'a' }]);
 });
 
-test('effectful filesystem transport uncertainty is not retry-safe while known pre-effect rejection is retry-safe', async () => {
-  const transport = Object.assign(new Error('native port closed'), { code: 'NATIVE_TRANSPORT_ERROR' });
-  const uncertain = new FilesystemAgentProviderV1({
-    nativeClient: nativeClient({ writeExistingText: async () => { throw transport; } }),
+test('write invocation persists only ArtifactRef identity while resolver supplies transient content', async () => {
+  const calls = [];
+  const ref = artifactRef('x');
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({ writeExistingText: async payload => { calls.push(structuredClone(payload)); return { sha256: digest(payload.text), alreadyApplied: false }; } }),
+    resolveArtifactText: async resolvedRef => {
+      assert.equal(resolvedRef.artifactId, ref.artifactId);
+      return 'x';
+    },
     grantedCapabilityIds: ['filesystem.writeExistingText'],
   });
   const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
-    rootId: 'workspace', relativePath: 'a.txt', text: 'x', expectedSha256: 'b'.repeat(64),
+    rootId: 'workspace', relativePath: 'a.txt', contentArtifactRef: ref, expectedSha256: 'b'.repeat(64),
+  });
+  const result = await provider.invoke({ invocation: inv, policyDecision: allow() });
+  assert.equal(result.result.sha256, digest('x'));
+  assert.deepEqual(calls, [{ rootId: 'workspace', relativePath: 'a.txt', text: 'x', expectedSha256: 'b'.repeat(64) }]);
+  assert.equal(JSON.stringify(inv).includes('"text":"x"'), false);
+});
+
+test('effectful filesystem transport uncertainty is not retry-safe while known pre-effect rejection is retry-safe', async () => {
+  const transport = Object.assign(new Error('native port closed'), { code: 'NATIVE_TRANSPORT_ERROR' });
+  const common = {
+    nativeClient: nativeClient({ writeExistingText: async () => { throw transport; } }),
+    resolveArtifactText: async () => 'x',
+    grantedCapabilityIds: ['filesystem.writeExistingText'],
+  };
+  const uncertain = new FilesystemAgentProviderV1(common);
+  const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
+    rootId: 'workspace', relativePath: 'a.txt', contentArtifactRef: artifactRef('x'), expectedSha256: 'b'.repeat(64),
   });
   await assert.rejects(() => uncertain.invoke({ invocation: inv, policyDecision: allow() }), error => {
     assert.equal(error.effectMayHaveOccurred, true);
@@ -77,8 +115,8 @@ test('effectful filesystem transport uncertainty is not retry-safe while known p
 
   const denied = Object.assign(new Error('root is read only'), { code: 'ROOT_NOT_WRITABLE' });
   const preEffect = new FilesystemAgentProviderV1({
+    ...common,
     nativeClient: nativeClient({ writeExistingText: async () => { throw denied; } }),
-    grantedCapabilityIds: ['filesystem.writeExistingText'],
   });
   await assert.rejects(() => preEffect.invoke({ invocation: inv, policyDecision: allow() }), error => {
     assert.equal(error.effectMayHaveOccurred, false);
@@ -86,4 +124,22 @@ test('effectful filesystem transport uncertainty is not retry-safe while known p
     assert.equal(error.code, 'ROOT_NOT_WRITABLE');
     return true;
   });
+});
+
+test('artifact resolver mismatch fails before Native Companion mutation', async () => {
+  let calls = 0;
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({ writeExistingText: async () => { calls += 1; return {}; } }),
+    resolveArtifactText: async () => 'tampered',
+    grantedCapabilityIds: ['filesystem.writeExistingText'],
+  });
+  const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
+    rootId: 'workspace', relativePath: 'a.txt', contentArtifactRef: artifactRef('x'), expectedSha256: 'b'.repeat(64),
+  });
+  await assert.rejects(() => provider.invoke({ invocation: inv, policyDecision: allow() }), error => {
+    assert.equal(error.code, 'ARTIFACT_CONTENT_INVALID');
+    assert.equal(error.effectMayHaveOccurred, false);
+    return true;
+  });
+  assert.equal(calls, 0);
 });
