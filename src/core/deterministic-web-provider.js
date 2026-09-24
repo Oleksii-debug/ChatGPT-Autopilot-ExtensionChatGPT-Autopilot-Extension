@@ -17,8 +17,9 @@ const PROVIDER_ID = 'deterministic-web';
 const MAX_URL = 4096;
 const MAX_SELECTOR = 2000;
 const ACTIONS = new Set(['NAVIGATE', 'CLICK', 'FILL']);
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
-function plainMap(value, label) {
+function plainObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be a plain object`);
   }
@@ -27,6 +28,36 @@ function plainMap(value, label) {
     throw new Error(`${label} must be a plain object`);
   }
   return value;
+}
+
+function exactEnvelope(value, allowed, label) {
+  const raw = plainObject(value, label);
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} field ${key} must be an enumerable data property`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in raw && !Object.prototype.hasOwnProperty.call(raw, key)) {
+      throw new Error(`${label} contains inherited field: ${key}`);
+    }
+  }
+  return raw;
+}
+
+function idText(value, label) {
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
+  if (!ID.test(out)) throw new Error(`${label} is invalid`);
+  return out;
+}
+
+function plainMap(value, label) {
+  return plainObject(value, label);
 }
 
 function own(map, key) {
@@ -50,15 +81,14 @@ function normalizeUrl(value) {
 }
 
 export function normalizeDeterministicWebActionV1(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('web action must be an object');
-  const allowed = new Set(['kind', 'url', 'selector', 'value']);
-  for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`web action contains unknown field: ${key}`);
-  const kind = String(input.kind || '').trim().toUpperCase();
+  const raw = exactEnvelope(input, new Set(['kind', 'url', 'selector', 'value']), 'web action');
+  if (typeof raw.kind !== 'string') throw new Error('web action kind must be text');
+  const kind = raw.kind.trim().toUpperCase();
   if (!ACTIONS.has(kind)) throw new Error('web action kind is invalid');
-  if (kind === 'NAVIGATE') return Object.freeze({ kind, url: normalizeUrl(input.url) });
-  const selector = text(input.selector, 'selector', MAX_SELECTOR);
+  if (kind === 'NAVIGATE') return Object.freeze({ kind, url: normalizeUrl(raw.url) });
+  const selector = text(raw.selector, 'selector', MAX_SELECTOR);
   if (kind === 'CLICK') return Object.freeze({ kind, selector });
-  return Object.freeze({ kind, selector, value: text(input.value, 'value', 16_000) });
+  return Object.freeze({ kind, selector, value: text(raw.value, 'value', 16_000) });
 }
 
 export function verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now }) {
@@ -89,12 +119,12 @@ export function verifyDeterministicWebPostconditionV1({ invocationId, observatio
 }
 
 function normalizePostcondition(expected) {
-  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) throw new Error('independent verifier requires a postcondition');
-  const keys = Object.keys(expected);
+  const raw = exactEnvelope(expected, new Set(['url', 'selector']), 'web postcondition');
+  const keys = Object.keys(raw);
   if (keys.length !== 1 || !['url', 'selector'].includes(keys[0])) throw new Error('independent verifier requires exactly one url or selector postcondition');
   return Object.freeze(keys[0] === 'url'
-    ? { url: normalizeUrl(expected.url) }
-    : { selector: text(expected.selector, 'expected.selector', MAX_SELECTOR) });
+    ? { url: normalizeUrl(raw.url) }
+    : { selector: text(raw.selector, 'expected.selector', MAX_SELECTOR) });
 }
 
 export function createDeterministicWebProviderV1({ transport, store, reconcileVerify, now = () => new Date().toISOString(), leaseId = () => `web-${Date.now()}` } = {}) {
@@ -246,14 +276,18 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
         return Object.freeze({ status: 'AMBIGUOUS', reconcileRequired: true, lease: admitted.lease, effectState, error: 'WEB_DISPATCH_UNCERTAIN' });
       }
     },
-    async reconcile({ invocationId, outcome, reasonCode = 'WEB_RECONCILED' }) {
+    async reconcile(request = {}) {
+      const rawRequest = exactEnvelope(request, new Set(['invocationId', 'outcome', 'reasonCode']), 'web reconciliation request');
+      const invocationId = idText(rawRequest.invocationId, 'reconciliation invocationId');
+      if (typeof rawRequest.outcome !== 'string') throw new Error('reconciliation outcome must be text');
+      const normalizedOutcome = rawRequest.outcome.trim().toUpperCase();
+      if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('reconciliation outcome is invalid');
+      const reasonCode = rawRequest.reasonCode == null ? 'WEB_RECONCILED' : idText(rawRequest.reasonCode, 'reconciliation reasonCode');
       const snapshot = await atomic(draft => {
         const entry = own(draft.effectsById, invocationId);
         if (!entry || entry.state.phase !== ExactEffectPhase.RECONCILE) throw new Error('web effect is not awaiting reconciliation');
         return structuredClone(entry);
       });
-      const normalizedOutcome = String(outcome || '').toUpperCase();
-      if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('reconciliation outcome is invalid');
       let proof = null;
       if (typeof reconcileVerify !== 'function') throw new Error('independent web reconciliation verifier is required');
       let binding;
@@ -268,8 +302,12 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
         postcondition: structuredClone(binding.postcondition),
         ambiguity: structuredClone(snapshot.state.ambiguity),
       });
-      const observation = normalizeObservationV1(proof?.observation);
-      const verification = normalizeVerificationV1(proof?.verification);
+      exactEnvelope(proof, new Set(['verifierId', 'targetId', 'observation', 'verification']), 'independent web reconciliation proof');
+      if (typeof proof.verifierId !== 'string' || typeof proof.targetId !== 'string') {
+        throw new Error('independent web reconciliation proof identity must be text');
+      }
+      const observation = normalizeObservationV1(proof.observation);
+      const verification = normalizeVerificationV1(proof.verification);
       const proofAt = Date.parse(now());
       const observedAt = Date.parse(observation.observedAt);
       const verifiedAt = Date.parse(verification.verifiedAt);
