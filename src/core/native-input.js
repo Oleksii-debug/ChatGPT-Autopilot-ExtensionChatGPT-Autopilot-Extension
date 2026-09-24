@@ -66,6 +66,12 @@ export async function performNativeInput(chromeApi, repository, message, sender)
   const tabId = sender.tab.id;
   const tab = await chromeApi.tabs.get(tabId);
   if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('NATIVE_INPUT_URL_MISMATCH');
+  // A service-worker restart can reconcile and return owner focus after the
+  // content script received activation but before its native-submit message
+  // arrives. Never dispatch a native mouse effect into that now-background tab.
+  // This check happens before debugger attach and before the durable effect bit,
+  // so the caller can classify it as proven no effect and retry safely.
+  if (message.kind === 'submit' && tab.active !== true) fail('SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
   if (!chromeApi.debugger?.attach || !chromeApi.debugger?.sendCommand) fail('NATIVE_INPUT_PERMISSION_UNAVAILABLE');
   const target = { tabId };
   let attached = false;
