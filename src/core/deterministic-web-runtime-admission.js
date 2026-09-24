@@ -49,6 +49,13 @@ export function createDeterministicWebRuntimeAdmissionV1({ provider, extensionId
         reasonCode: message.payload?.reasonCode || 'CHROME_READBACK_VERIFIED',
       });
     }
+    if (message.command === 'RECONCILE_CLOSED_TARGET') {
+      return canonical.reconcile({
+        invocationId: message.payload?.invocationId,
+        outcome: 'MANUAL_REVIEW',
+        reasonCode: 'TARGET_CLOSED_QUIESCENT',
+      });
+    }
     throw new Error('deterministic web runtime command is not allowed');
   }
 
