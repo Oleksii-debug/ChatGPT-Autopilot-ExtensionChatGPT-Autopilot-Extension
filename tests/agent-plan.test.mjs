@@ -70,6 +70,86 @@ test('AgentPlan expectedRevision is a strict stale-snapshot guard, not a coercin
   }
 });
 
+test('AgentPlan extension boundary rejects coerced and inherited model authority', () => {
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  const call = rawNode => extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: [rawNode],
+    resourceEnvelope: { maxModelCalls: 10, maxRuntimeSeconds: 10, maxCostUsdMicros: 10 },
+    at: AT,
+  });
+
+  assert.throws(() => call({ ...node('numeric-id'), nodeId: 7 }), /nodeId is invalid/);
+  assert.throws(() => call({ ...node('boolean-state'), state: false }), /state must be PENDING/);
+  assert.throws(() => call({ ...node('numeric-plane'), executionPlane: 1 }), /executionPlane is invalid/);
+  assert.throws(() => call({ ...node('string-budget'), budget: { maxModelCalls: '1', maxRuntimeSeconds: 0, maxCostUsdMicros: 0 } }), /budget maxModelCalls is invalid/);
+
+  const inheritedNode = Object.create(node('inherited-node'));
+  assert.throws(() => call(inheritedNode), /plain data object/);
+
+  const inheritedBudget = Object.create({ maxModelCalls: 0, maxRuntimeSeconds: 0, maxCostUsdMicros: 0 });
+  assert.throws(() => call({ ...node('inherited-budget'), budget: inheritedBudget }), /plain data object/);
+
+  const symbolNode = node('symbol-node');
+  symbolNode[Symbol('hidden-authority')] = true;
+  assert.throws(() => call(symbolNode), /symbol fields/);
+});
+
+test('AgentPlan evolution boundary rejects coerced and inherited full-plan authority', () => {
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  const candidate = () => {
+    const out = structuredClone(current);
+    out.nodes.push(node('later', ['discover']));
+    return out;
+  };
+  const evolve = value => evolveAgentPlanV1(current, value, {
+    resourceEnvelope: { maxModelCalls: 10, maxRuntimeSeconds: 10, maxCostUsdMicros: 10 },
+    at: AT,
+  });
+
+  const stringSchema = candidate();
+  stringSchema.schemaVersion = '1';
+  assert.throws(() => evolve(stringSchema), /schemaVersion/);
+
+  const stringRevision = candidate();
+  stringRevision.revision = String(current.revision);
+  assert.throws(() => evolve(stringRevision), /revision is invalid/);
+
+  const numericPlanId = candidate();
+  numericPlanId.planId = 1;
+  assert.throws(() => evolve(numericPlanId), /planId is invalid/);
+
+  const falseState = candidate();
+  falseState.nodes.at(-1).state = false;
+  assert.throws(() => evolve(falseState), /state is invalid/);
+
+  const numericPlane = candidate();
+  numericPlane.nodes.at(-1).executionPlane = 1;
+  assert.throws(() => evolve(numericPlane), /executionPlane is invalid/);
+
+  const stringBudget = candidate();
+  stringBudget.nodes.at(-1).budget.maxCostUsdMicros = '0';
+  assert.throws(() => evolve(stringBudget), /budget maxCostUsdMicros is invalid/);
+
+  const inheritedPlan = Object.assign(Object.create({ schemaVersion: 1 }), candidate());
+  assert.throws(() => evolve(inheritedPlan), /plain data object/);
+
+  const inheritedNodeCandidate = candidate();
+  inheritedNodeCandidate.nodes[inheritedNodeCandidate.nodes.length - 1] = Object.assign(
+    Object.create({ ownerId: 'forged-owner' }),
+    node('inherited-node-candidate', ['discover']),
+  );
+  assert.throws(() => evolve(inheritedNodeCandidate), /plain data object/);
+
+  const inheritedBudgetCandidate = candidate();
+  inheritedBudgetCandidate.nodes.at(-1).budget = Object.create({
+    maxModelCalls: 0,
+    maxRuntimeSeconds: 0,
+    maxCostUsdMicros: 0,
+  });
+  assert.throws(() => evolve(inheritedBudgetCandidate), /plain data object/);
+});
+
 test('AgentPlan live extension retains canonical duplicate, dependency and cycle validation', () => {
   const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
   assert.throws(() => extendAgentPlanV1(current, { expectedRevision: current.revision, nodes: [node('discover')], resourceEnvelope: ZERO_ENVELOPE, at: AT }), /duplicate nodeId/);
