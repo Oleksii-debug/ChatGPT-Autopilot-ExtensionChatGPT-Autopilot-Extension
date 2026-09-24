@@ -190,7 +190,9 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           }
           return state;
         });
-        return Object.freeze({ status: 'AMBIGUOUS', reconcileRequired: true, lease: admitted.lease, effectState, error: String(error?.message || error) });
+        // Transport errors can contain page text, URLs or credentials. The
+        // durable state records only a stable code, never provider output.
+        return Object.freeze({ status: 'AMBIGUOUS', reconcileRequired: true, lease: admitted.lease, effectState, error: 'WEB_DISPATCH_UNCERTAIN' });
       }
     },
     async reconcile({ invocationId, outcome, reasonCode = 'WEB_RECONCILED' }) {

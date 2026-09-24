@@ -94,11 +94,12 @@ test('does not mutate a target with a live lease owned by another invocation', a
 
 test('post-effect observation failure is AMBIGUOUS and retains lease for reconciliation', async () => {
   const leaseState = { value: null };
-  const p = provider({ execute: async () => {}, observe: async () => { throw new Error('browser disconnected'); } }, leaseState);
+  const p = provider({ execute: async () => {}, observe: async () => { throw new Error('browser disconnected with private page text'); } }, leaseState);
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
   assert.equal(result.status, 'AMBIGUOUS');
   assert.equal(result.reconcileRequired, true);
-  assert.match(result.error, /disconnected/);
+  assert.equal(result.error, 'WEB_DISPATCH_UNCERTAIN');
+  assert.ok(!JSON.stringify(result).includes('private page text'));
   assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
 });
 
