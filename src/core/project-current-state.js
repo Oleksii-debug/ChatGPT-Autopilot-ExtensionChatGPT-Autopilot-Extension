@@ -87,6 +87,9 @@ export function deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRe
       }
     }
     if (snapshotSource && currentSource) {
+      if (snapshotSource.kind !== currentSource.kind) reasons.push('CURRENT_KIND_DIFFERS_FROM_SNAPSHOT');
+      if (snapshotSource.uri !== currentSource.uri) reasons.push('CURRENT_URI_DIFFERS_FROM_SNAPSHOT');
+      if (snapshotSource.authority !== currentSource.authority) reasons.push('CURRENT_AUTHORITY_DIFFERS_FROM_SNAPSHOT');
       if (snapshotSource.revisionId !== currentSource.revisionId) reasons.push('CURRENT_REVISION_DIFFERS_FROM_SNAPSHOT');
       if (snapshotSource.contentSha256 && snapshotSource.contentSha256 !== currentSource.contentSha256) {
         reasons.push('CURRENT_HASH_DIFFERS_FROM_SNAPSHOT');
