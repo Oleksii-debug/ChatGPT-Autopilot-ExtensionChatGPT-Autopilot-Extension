@@ -256,10 +256,31 @@ test('diff is deterministic, bounded to changed template window and never expose
     after: ['Return reproducible evidence only.'],
   });
   assert.equal(diff.variableChanges.length, 2);
+  assert.equal(diff.variableChanges.find(item => item.name === 'standard').defaultChanged, true);
   assert.equal(diff.sourceChanges[0].change, 'CHANGED');
   assert.equal(diff.cadenceChanged, true);
   assert.equal(JSON.stringify(diff).includes('North Star'), false, 'default values are represented only as hasDefault');
   assert.equal(JSON.stringify(diff).includes('Updated standard'), false, 'new default value must not enter diff metadata');
+});
+
+test('render options cannot inherit values, source evidence or cadence authority', () => {
+  const normalized = normalizePromptAssetV1(asset());
+  const inheritedOptions = Object.assign(Object.create({
+    values: { target: 'inherited' },
+    currentSourceBindings: [source()],
+  }), {});
+  assert.throws(
+    () => renderPromptAssetV1(normalized, inheritedOptions),
+    /render options must be a plain object/,
+  );
+  assert.throws(
+    () => renderPromptAssetV1(normalized, {
+      values: { target: 'main' },
+      currentSourceBindings: [source()],
+      extraAuthority: true,
+    }),
+    /unknown field: extraAuthority/,
+  );
 });
 
 test('plain value maps cannot smuggle inherited variable values', () => {
