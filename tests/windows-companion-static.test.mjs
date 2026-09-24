@@ -102,8 +102,9 @@ test('OpenAI-compatible API key can persist via DPAPI for one-click and autostar
     assert.match(script, /compatible-key\.dpapi/);
     assert.match(script, /ConvertTo-SecureString/);
     assert.match(script, /COMPATIBLE_API_KEY/);
-    assert.match(script, /Remove-Item Env:COMPATIBLE_API_KEY/);
   }
+  assert.match(launch, /Remove-Item -Path "Env:\$envName"/);
+  assert.match(auto, /Remove-Item Env:COMPATIBLE_API_KEY/);
   assert.match(interactive, /compatible-key\.dpapi/);
   assert.match(menu, /НАЛАШТУВАТИ OPENAI-COMPATIBLE API КЛЮЧ\.ps1/);
   assert.match(menu, /ВИДАЛИТИ ЗБЕРЕЖЕНИЙ OPENAI-COMPATIBLE КЛЮЧ\.ps1/);
