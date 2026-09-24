@@ -21,7 +21,7 @@ function source(sourceId = 'spec', revisionId = 'rev-1', contentSha256 = SHA_A) 
 function asset(overrides = {}) {
   return {
     schemaVersion: 1,
-    assetId: 'prompt/release-review',
+    assetId: 'prompt:release-review',
     projectId: 'autopilot',
     version: 1,
     parentVersion: null,
@@ -88,7 +88,7 @@ test('render binds exact fresh sources, declared variables and immutable identit
     currentSourceBindings: [source()],
   });
   assert.equal(result.rendered, 'Review PR #216 against North Star.\nReturn evidence only.');
-  assert.equal(result.assetId, 'prompt/release-review');
+  assert.equal(result.assetId, 'prompt:release-review');
   assert.equal(result.version, 1);
   assert.deepEqual(result.sourceBindings, [source()]);
   assert.equal(Object.isFrozen(result), true);
@@ -145,7 +145,7 @@ test('render fails closed on stale, missing, duplicate or type-aliased source re
 
 test('cadence is a reference-only execution gate and never invents scheduler authority', () => {
   const scheduled = normalizePromptAssetV1(asset({
-    cadence: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule/nightly' },
+    cadence: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
   }));
   assert.throws(
     () => renderPromptAssetV1(scheduled, {
@@ -158,7 +158,7 @@ test('cadence is a reference-only execution gate and never invents scheduler aut
     () => renderPromptAssetV1(scheduled, {
       values: { target: 'main' },
       currentSourceBindings: [source()],
-      trigger: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'schedule/nightly' },
+      trigger: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'schedule:nightly' },
     }),
     /trigger mode/,
   );
@@ -166,20 +166,20 @@ test('cadence is a reference-only execution gate and never invents scheduler aut
     () => renderPromptAssetV1(scheduled, {
       values: { target: 'main' },
       currentSourceBindings: [source()],
-      trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule/other' },
+      trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:other' },
     }),
     /referenceId/,
   );
   const result = renderPromptAssetV1(scheduled, {
     values: { target: 'main' },
     currentSourceBindings: [source()],
-    trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule/nightly' },
+    trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
   });
-  assert.equal(result.cadence.referenceId, 'schedule/nightly');
+  assert.equal(result.cadence.referenceId, 'schedule:nightly');
 
   assert.throws(
     () => normalizePromptAssetV1(asset({
-      cadence: { mode: PromptAssetCadenceMode.MANUAL, referenceId: 'schedule/hidden' },
+      cadence: { mode: PromptAssetCadenceMode.MANUAL, referenceId: 'schedule:hidden' },
     })),
     /MANUAL cadence cannot/,
   );
@@ -240,7 +240,7 @@ test('diff is deterministic, bounded to changed template window and never expose
       { name: 'standard', required: true, maxChars: 200, defaultValue: 'Updated standard', sensitive: false },
     ],
     sourceBindings: [source('spec', 'rev-2', SHA_B)],
-    cadence: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'event/source-change' },
+    cadence: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'event:source-change' },
     changeSummary: 'Tighten evidence and source revision.',
     changedAt: AT2,
   }));
