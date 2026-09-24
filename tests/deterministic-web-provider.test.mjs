@@ -47,6 +47,11 @@ test('normalizes bounded deterministic web actions and rejects unsafe URL protoc
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'navigate', url: 'https://user:secret@example.test/' }), /credentials/);
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'click', selector: '' }), /selector/);
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'click', selector: '#ok', surprise: true }), /unknown field/);
+  assert.throws(() => normalizeDeterministicWebActionV1({ kind: { toString: () => 'CLICK' }, selector: '#ok' }), /kind must be text/);
+  assert.throws(() => normalizeDeterministicWebActionV1(Object.assign(Object.create({ kind: 'CLICK' }), { selector: '#ok' })), /plain object/);
+  const symbolic = { kind: 'CLICK', selector: '#ok' };
+  symbolic[Symbol('authority')] = true;
+  assert.throws(() => normalizeDeterministicWebActionV1(symbolic), /unknown field/);
 });
 
 test('invalid actions and verification requirements cannot acquire a lease or execute', async () => {
@@ -292,4 +297,56 @@ test('prototype-named invocation ids are treated only as own durable entries', a
   assert.equal(result.status, 'VERIFIED');
   assert.equal(effects, 1);
   assert.equal(store.snapshot().effectsById.constructor.state.phase, 'COMMITTED');
+});
+
+
+test('malformed reconciliation request authority is rejected before durable state access', async t => {
+  let storeUpdates = 0;
+  const store = {
+    async update() {
+      storeUpdates += 1;
+      throw new Error('store must not be reached');
+    },
+  };
+  const p = createDeterministicWebProviderV1({
+    transport: { execute: async () => {}, observe: async () => ({ data: {} }) },
+    store,
+    now: () => at,
+  });
+
+  const inherited = Object.create({ invocationId: 'inv-1', outcome: 'VERIFIED' });
+  const symbolic = { invocationId: 'inv-1', outcome: 'VERIFIED' };
+  symbolic[Symbol('authority')] = true;
+  const cases = [
+    [{ invocationId: 7, outcome: 'VERIFIED' }, /invocationId must be text/],
+    [{ invocationId: 'inv-1', outcome: { toString: () => 'VERIFIED' } }, /outcome must be text/],
+    [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: true }, /reasonCode must be text/],
+    [inherited, /plain object/],
+    [symbolic, /unknown field/],
+  ];
+
+  for (const [request, expected] of cases) {
+    await t.test(expected.source, async () => {
+      await assert.rejects(() => p.reconcile(request), expected);
+      assert.equal(storeUpdates, 0);
+    });
+  }
+});
+
+test('exotic postcondition authority is rejected before target lease or browser effect', async () => {
+  let effects = 0;
+  const leaseState = { value: null };
+  const p = provider({
+    execute: async () => { effects += 1; },
+    observe: async () => ({ data: {} }),
+  }, leaseState);
+  const inherited = Object.create({ selector: '#done' });
+  await assert.rejects(() => p.invoke({
+    ...fixtures('exotic-postcondition'),
+    targetId: 'tab-1',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: inherited,
+  }), /plain object/);
+  assert.equal(effects, 0);
+  assert.equal(leaseState.value, null);
 });
