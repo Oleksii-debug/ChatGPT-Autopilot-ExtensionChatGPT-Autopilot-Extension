@@ -112,6 +112,31 @@ test('owner-scoped search is deterministic, bounded, and never follows symlinks'
   await assert.rejects(searchFilesystemV1(ioScope, outside, 'alpha'), /outside owner scope/);
 });
 
+test('search fails closed when a queued directory is swapped to an outside link before enumeration', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-search-race-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const owned = path.join(sandbox, 'owned');
+  const docs = path.join(owned, 'docs');
+  const parkedDocs = path.join(owned, 'docs-original');
+  const outside = path.join(sandbox, 'outside');
+  await fs.mkdir(docs, { recursive: true });
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(docs, 'alpha-inside.txt'), 'inside');
+  await fs.writeFile(path.join(outside, 'alpha-secret.txt'), 'secret');
+  const ioScope = createFilesystemScopeV1({ scopeId: 'search-race-owner', roots: [owned] });
+  let swapped = false;
+
+  await assert.rejects(searchFilesystemV1(ioScope, owned, 'alpha', {
+    beforeEnumerate: async current => {
+      if (swapped || path.resolve(current) !== path.resolve(docs)) return;
+      swapped = true;
+      await fs.rename(docs, parkedDocs);
+      await fs.symlink(outside, docs, process.platform === 'win32' ? 'junction' : 'dir');
+    },
+  }), /escapes owner scope|identity changed|symbolic link|reparse/i);
+  assert.equal(swapped, true);
+});
+
 test('write scope cannot exceed readable owner scope', () => {
   assert.throws(() => createFilesystemScopeV1({ scopeId: 'bad', roots: [root], writableRoots: [path.resolve('/other')] }), /Writable root/);
 });
