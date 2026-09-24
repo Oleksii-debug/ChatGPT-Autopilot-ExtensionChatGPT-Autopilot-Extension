@@ -131,7 +131,12 @@ function conservativeCostUsdMicros({ inputTokens, outputTokens, inputPricePerMil
   return Number(total);
 }
 
-function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillionUsd) {
+function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillionUsd, {
+  inputTokens = 0,
+  outputTokens = 0,
+  inputPriceKnown = true,
+  outputPriceKnown = true,
+} = {}) {
   if (costClass === AiRouteCostClass.FREE) {
     if (inputPricePerMillionUsd !== 0 || outputPricePerMillionUsd !== 0) {
       throw new Error('Free AI route cannot declare non-zero paid pricing');
@@ -139,8 +144,8 @@ function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillion
     return;
   }
   if (costClass !== AiRouteCostClass.PAID) throw new Error('AI costClass is invalid');
-  if (inputPricePerMillionUsd === 0 && outputPricePerMillionUsd === 0) {
-    const error = new Error('Paid AI route pricing is unknown');
+  if ((inputTokens > 0 && !inputPriceKnown) || (outputTokens > 0 && !outputPriceKnown)) {
+    const error = new Error('Paid AI route pricing is unknown for a billed token dimension');
     error.code = 'AI_ROUTE_PRICE_UNKNOWN';
     throw error;
   }
@@ -157,17 +162,7 @@ function normalizeRouteForMetering(route) {
   // Keep only own fields on a null-prototype object so Object.prototype
   // pollution can never become route identity, pricing, or authority.
   const ownOnly = Object.assign(Object.create(null), raw);
-  const normalized = normalizeAiRoutePool([ownOnly])[0];
-  if (normalized.costClass === AiRouteCostClass.PAID) {
-    const missingPricing = ['inputPricePerMillionUsd', 'outputPricePerMillionUsd']
-      .filter(key => !Object.hasOwn(raw, key));
-    if (missingPricing.length) {
-      const error = new Error(`Paid AI route requires explicit pricing: ${missingPricing.join(', ')}`);
-      error.code = 'AI_ROUTE_PRICE_UNKNOWN';
-      throw error;
-    }
-  }
-  return normalized;
+  return normalizeAiRoutePool([ownOnly])[0];
 }
 
 export function normalizeAiCostRecordV1(input) {
@@ -190,12 +185,22 @@ export function normalizeAiCostRecordV1(input) {
     modelCalls: integer(own(raw, 'modelCalls', undefined), 'AiCostRecordV1 modelCalls', { max: 1 }),
     inputPricePerMillionUsd: price(own(raw, 'inputPricePerMillionUsd', undefined), 'AiCostRecordV1 input price'),
     outputPricePerMillionUsd: price(own(raw, 'outputPricePerMillionUsd', undefined), 'AiCostRecordV1 output price'),
-    costUsdMicros: integer(own(raw, 'costUsdMicros', undefined), 'AiCostRecordV1 costUsdMicros'),
+    costUsdMicros: requiredInteger(own(raw, 'costUsdMicros', undefined), 'AiCostRecordV1 costUsdMicros'),
     observedAt: timestamp(own(raw, 'observedAt', undefined), 'AiCostRecordV1 observedAt'),
   };
 
   if (normalized.modelCalls !== 1) throw new Error('AiCostRecordV1 modelCalls must equal 1');
-  assertPricing(normalized.costClass, normalized.inputPricePerMillionUsd, normalized.outputPricePerMillionUsd);
+  assertPricing(
+    normalized.costClass,
+    normalized.inputPricePerMillionUsd,
+    normalized.outputPricePerMillionUsd,
+    {
+      inputTokens: normalized.inputTokens,
+      outputTokens: normalized.outputTokens,
+      inputPriceKnown: true,
+      outputPriceKnown: true,
+    },
+  );
   const expectedCost = normalized.costClass === AiRouteCostClass.FREE
     ? 0
     : conservativeCostUsdMicros(normalized);
@@ -213,6 +218,12 @@ export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTo
     normalizedRoute.costClass,
     normalizedRoute.inputPricePerMillionUsd,
     normalizedRoute.outputPricePerMillionUsd,
+    {
+      inputTokens: normalizedInputTokens,
+      outputTokens: normalizedOutputTokens,
+      inputPriceKnown: normalizedRoute.inputPriceKnown === true,
+      outputPriceKnown: normalizedRoute.outputPriceKnown === true,
+    },
   );
   const costUsdMicros = normalizedRoute.costClass === AiRouteCostClass.FREE
     ? 0
