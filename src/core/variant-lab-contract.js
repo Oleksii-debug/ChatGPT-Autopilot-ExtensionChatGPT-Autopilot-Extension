@@ -21,8 +21,8 @@ export const VariantEvaluationStatus = Object.freeze({
 });
 
 export const VariantQualificationState = Object.freeze({
-  QUALIFIED: 'QUALIFIED',
-  REJECTED: 'REJECTED',
+  EVIDENCE_COMPLETE: 'EVIDENCE_COMPLETE',
+  REPORTED_FAIL: 'REPORTED_FAIL',
   INCOMPLETE: 'INCOMPLETE',
 });
 
@@ -279,14 +279,16 @@ export function buildVariantComparisonV1(input) {
       });
     });
     const qualification = hasFailure
-      ? VariantQualificationState.REJECTED
-      : missing ? VariantQualificationState.INCOMPLETE : VariantQualificationState.QUALIFIED;
+      ? VariantQualificationState.REPORTED_FAIL
+      : missing ? VariantQualificationState.INCOMPLETE : VariantQualificationState.EVIDENCE_COMPLETE;
     return frozen({
       candidateId: candidate.candidateId,
       kind: candidate.kind,
       artifactIds: candidate.artifactIds,
       candidateSha256: candidate.candidateSha256,
       qualification,
+      advisoryOnly: true,
+      evaluationAuthority: 'UNVERIFIED_INPUT',
       results,
     });
   });
@@ -295,53 +297,8 @@ export function buildVariantComparisonV1(input) {
     baseRevisionId: lab.baseRevisionId,
     criteria: lab.criteria,
     candidates,
-  });
-}
-
-export function assertVariantSynthesisEligibleV1(input, selectedVariantIdsInput, { at } = {}) {
-  const lab = normalizeVariantLabV1(input);
-  const selectedVariantIds = idList(selectedVariantIdsInput, 'selectedVariantIds', { min: 1, max: MAX_CANDIDATES });
-  const candidateById = new Map(lab.candidates.map(item => [item.candidateId, item]));
-  for (const candidateId of selectedVariantIds) {
-    if (!candidateById.has(candidateId)) throw new Error(`selectedVariantIds contains unknown candidate: ${candidateId}`);
-  }
-  const comparison = buildVariantComparisonV1(lab);
-  const comparisonById = new Map(comparison.candidates.map(item => [item.candidateId, item]));
-  for (const candidateId of selectedVariantIds) {
-    const row = comparisonById.get(candidateId);
-    if (row.qualification !== VariantQualificationState.QUALIFIED) {
-      throw new Error(`variant is not synthesis-eligible: ${candidateId}:${row.qualification}`);
-    }
-  }
-  const decidedAt = timestamp(at, 'at');
-  if (Date.parse(decidedAt) < Date.parse(lab.updatedAt)) throw new Error('synthesis decision cannot predate lab updatedAt');
-  const artifactIds = [];
-  const evidenceArtifactIds = [];
-  const evidenceSet = new Set();
-  for (const candidateId of selectedVariantIds) {
-    const candidate = candidateById.get(candidateId);
-    artifactIds.push(...candidate.artifactIds);
-    for (const result of comparisonById.get(candidateId).results) {
-      for (const evidenceId of result.evidenceArtifactIds) {
-        if (!evidenceSet.has(evidenceId)) {
-          evidenceSet.add(evidenceId);
-          evidenceArtifactIds.push(evidenceId);
-        }
-      }
-    }
-  }
-  artifactIds.sort(asciiCompare);
-  evidenceArtifactIds.sort(asciiCompare);
-  return frozen({
-    labId: lab.labId,
-    baseRevisionId: lab.baseRevisionId,
-    selectedVariantIds,
-    candidateDigests: selectedVariantIds.map(candidateId => frozen({
-      candidateId,
-      candidateSha256: candidateById.get(candidateId).candidateSha256,
-    })),
-    artifactIds,
-    evidenceArtifactIds,
-    decidedAt,
+    advisoryOnly: true,
+    evaluationAuthority: 'UNVERIFIED_INPUT',
+    synthesisAuthorized: false,
   });
 }
