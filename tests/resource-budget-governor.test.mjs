@@ -155,3 +155,45 @@ test('projection overflow fails closed instead of wrapping or losing precision',
     request: { modelInputTokens: 1 },
   }), /projection is invalid/);
 });
+
+
+test('rejects accessor-backed, hidden and symbol fields without executing getters', () => {
+  let budgetGetterReads = 0;
+  const accessorBudget = {};
+  Object.defineProperty(accessorBudget, 'maxCostUsdMicros', {
+    enumerable: true,
+    get() {
+      budgetGetterReads += 1;
+      return 1;
+    },
+  });
+  assert.throws(() => normalizeResourceBudgetV1(accessorBudget), /own data properties/);
+  assert.equal(budgetGetterReads, 0);
+
+  let usageGetterReads = 0;
+  const accessorUsage = {};
+  Object.defineProperty(accessorUsage, 'costUsdMicros', {
+    enumerable: true,
+    get() {
+      usageGetterReads += 1;
+      return 1;
+    },
+  });
+  assert.throws(() => normalizeResourceUsageV1(accessorUsage), /own data properties/);
+  assert.equal(usageGetterReads, 0);
+
+  const hiddenUnknown = { maxModelCalls: 1 };
+  Object.defineProperty(hiddenUnknown, 'hiddenAuthority', {
+    enumerable: false,
+    value: 1,
+  });
+  assert.throws(() => normalizeResourceBudgetV1(hiddenUnknown), /unknown field: hiddenAuthority/);
+
+  const symbolBudget = { maxModelCalls: 1 };
+  symbolBudget[Symbol('authority')] = 1;
+  assert.throws(() => normalizeResourceBudgetV1(symbolBudget), /symbol field/);
+
+  const symbolUsage = { modelCalls: 1 };
+  symbolUsage[Symbol('usage')] = 1;
+  assert.throws(() => normalizeResourceUsageV1(symbolUsage), /symbol field/);
+});

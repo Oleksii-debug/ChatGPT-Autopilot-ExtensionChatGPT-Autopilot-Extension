@@ -21,15 +21,25 @@ function object(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be own data properties`);
+    }
+  }
   return value;
 }
 
 function exact(raw, allowed, label) {
-  for (const key of Object.keys(raw)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  for (const key of Object.getOwnPropertyNames(raw)) {
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  }
 }
 
 function own(raw, key) {
-  return Object.hasOwn(raw, key) ? raw[key] : undefined;
+  if (!Object.hasOwn(raw, key)) return undefined;
+  return Object.getOwnPropertyDescriptor(raw, key).value;
 }
 
 function integer(value, label, max, fallback = 0) {

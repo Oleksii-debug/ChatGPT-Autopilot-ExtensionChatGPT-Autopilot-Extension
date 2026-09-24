@@ -107,3 +107,29 @@ test('ordinary agent concurrency requests use the same owner envelope', () => {
   assert.equal(result.decision, 'DENY');
   assert.deepEqual(result.exceeded, ['concurrentAgents', 'childAgents']);
 });
+
+
+test('AgentPlan budget rejects accessor-backed, hidden and symbol fields without executing getters', () => {
+  let getterReads = 0;
+  const accessorBudget = {};
+  Object.defineProperty(accessorBudget, 'maxCostUsdMicros', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return 1;
+    },
+  });
+  assert.throws(() => normalizeAgentPlanBudgetCeilingV1(accessorBudget), /own data properties/);
+  assert.equal(getterReads, 0);
+
+  const hiddenUnknown = { maxModelCalls: 1 };
+  Object.defineProperty(hiddenUnknown, 'hiddenAuthority', {
+    enumerable: false,
+    value: 1,
+  });
+  assert.throws(() => normalizeAgentPlanBudgetCeilingV1(hiddenUnknown), /unknown field: hiddenAuthority/);
+
+  const symbolBudget = { maxModelCalls: 1 };
+  symbolBudget[Symbol('authority')] = 1;
+  assert.throws(() => normalizeAgentPlanBudgetCeilingV1(symbolBudget), /symbol field/);
+});
