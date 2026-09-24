@@ -69,33 +69,33 @@ function limitKey(dimension) {
 export function normalizeResourceBudgetV1(input = {}) {
   const raw = object(input, 'ResourceBudgetV1');
   exact(raw, LIMIT_KEYS, 'ResourceBudgetV1');
-  const budget = {};
+  const entries = [];
   for (const dimension of DIMENSIONS) {
     const key = limitKey(dimension);
-    budget[key] = boundedInteger(own(raw, key), `ResourceBudgetV1 ${key}`, MAX_BY_DIMENSION[dimension]);
+    entries.push([key, boundedInteger(own(raw, key), `ResourceBudgetV1 ${key}`, MAX_BY_DIMENSION[dimension])]);
   }
-  return frozen(budget);
+  return frozen(Object.fromEntries(entries));
 }
 
 export function normalizeResourceUsageV1(input = {}, { label = 'ResourceUsageV1' } = {}) {
   const raw = object(input, label);
   exact(raw, USAGE_KEYS, label);
-  const usage = {};
+  const entries = [];
   for (const dimension of DIMENSIONS) {
-    usage[dimension] = boundedInteger(own(raw, dimension), `${label} ${dimension}`, MAX_BY_DIMENSION[dimension]);
+    entries.push([dimension, boundedInteger(own(raw, dimension), `${label} ${dimension}`, MAX_BY_DIMENSION[dimension])]);
   }
-  return frozen(usage);
+  return frozen(Object.fromEntries(entries));
 }
 
 export function remainingResourceBudgetV1(budgetInput, usageInput = {}) {
   const budget = normalizeResourceBudgetV1(budgetInput);
   const usage = normalizeResourceUsageV1(usageInput);
-  const remaining = {};
+  const entries = [];
   for (const dimension of DIMENSIONS) {
     const key = limitKey(dimension);
-    remaining[dimension] = Math.max(0, budget[key] - usage[dimension]);
+    entries.push([dimension, Math.max(0, budget[key] - usage[dimension])]);
   }
-  return frozen(remaining);
+  return frozen(Object.fromEntries(entries));
 }
 
 export function evaluateResourceBudgetV1({ budget, usage = {}, request = {} } = {}) {
@@ -103,15 +103,15 @@ export function evaluateResourceBudgetV1({ budget, usage = {}, request = {} } = 
   const normalizedUsage = normalizeResourceUsageV1(usage);
   const normalizedRequest = normalizeResourceUsageV1(request, { label: 'ResourceRequestV1' });
   const exceeded = [];
-  const projected = {};
-  const remaining = {};
+  const projectedEntries = [];
+  const remainingEntries = [];
 
   for (const dimension of DIMENSIONS) {
     const key = limitKey(dimension);
     const next = normalizedUsage[dimension] + normalizedRequest[dimension];
     if (!Number.isSafeInteger(next)) throw new Error(`ResourceBudgetV1 ${dimension} projection is invalid`);
-    projected[dimension] = next;
-    remaining[dimension] = Math.max(0, normalizedBudget[key] - normalizedUsage[dimension]);
+    projectedEntries.push([dimension, next]);
+    remainingEntries.push([dimension, Math.max(0, normalizedBudget[key] - normalizedUsage[dimension])]);
     if (next > normalizedBudget[key]) exceeded.push(dimension);
   }
 
@@ -122,8 +122,8 @@ export function evaluateResourceBudgetV1({ budget, usage = {}, request = {} } = 
     budget: normalizedBudget,
     usage: normalizedUsage,
     request: normalizedRequest,
-    projected,
-    remaining,
+    projected: Object.fromEntries(projectedEntries),
+    remaining: Object.fromEntries(remainingEntries),
   });
 }
 
@@ -134,12 +134,12 @@ export function evaluateResourceBudgetV1({ budget, usage = {}, request = {} } = 
 export function deriveChildResourceBudgetV1({ parentBudget, parentUsage = {}, requestedBudget } = {}) {
   const remaining = remainingResourceBudgetV1(parentBudget, parentUsage);
   const requested = normalizeResourceBudgetV1(requestedBudget);
-  const grant = {};
+  const entries = [];
   for (const dimension of DIMENSIONS) {
     const key = limitKey(dimension);
-    grant[key] = Math.min(requested[key], remaining[dimension]);
+    entries.push([key, Math.min(requested[key], remaining[dimension])]);
   }
-  return frozen(grant);
+  return frozen(Object.fromEntries(entries));
 }
 
 export const ResourceBudgetDimensions = DIMENSIONS;
