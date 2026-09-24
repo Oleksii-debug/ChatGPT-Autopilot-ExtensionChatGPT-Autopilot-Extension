@@ -222,8 +222,15 @@
     return submit.length === 1 ? submit[0] : null;
   }
 
+  const activeSendIdentities = new WeakMap();
+
   function temporarilyExposeSendIdentity(button) {
     if (!button?.setAttribute) return () => {};
+    const active = activeSendIdentities.get(button);
+    if (active) {
+      active.count += 1;
+      return active.release();
+    }
     const originalTestId = button.getAttribute?.('data-testid');
     const alreadyRecognized = /(?:^|[-_])send-button(?:$|[-_])/.test(normalizeText(originalTestId));
     if (alreadyRecognized) return () => {};
@@ -234,13 +241,31 @@
       : 'autopilot-send-button';
     button.setAttribute('data-testid', compatibilityTestId);
 
-    return () => {
-      try {
-        button.removeAttribute?.('data-autopilot-send-compat');
-        if (originalTestId === null || originalTestId === undefined) button.removeAttribute?.('data-testid');
-        else button.setAttribute('data-testid', originalTestId);
-      } catch (_) {}
+    const lease = {
+      count: 1,
+      release() {
+        let released = false;
+        return () => {
+          if (released) return;
+          released = true;
+          if (--lease.count > 0) return;
+          activeSendIdentities.delete(button);
+          try {
+            if (button.getAttribute?.('data-autopilot-send-compat') === 'true') {
+              button.removeAttribute?.('data-autopilot-send-compat');
+            }
+            // A page rerender may change its own identity during the request.
+            // Never restore an old attribute over the site's new control.
+            if (button.getAttribute?.('data-testid') === compatibilityTestId) {
+              if (originalTestId === null || originalTestId === undefined) button.removeAttribute?.('data-testid');
+              else button.setAttribute('data-testid', originalTestId);
+            }
+          } catch (_) {}
+        };
+      },
     };
+    activeSendIdentities.set(button, lease);
+    return lease.release();
   }
 
   async function prepareSendControlCompatibility(doc, mode) {
