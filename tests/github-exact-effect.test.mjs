@@ -191,6 +191,86 @@ test('concurrent same-invocation contenders atomically admit exactly one GitHub 
   assert.equal(calls.filter(([name]) => name === 'invoke').length, 1);
 });
 
+test('cold-start recovery fences a still-running provider result from overwriting RECONCILE', async () => {
+  const fx = storeFixture();
+  let releaseDispatch;
+  let dispatchStarted;
+  const dispatchStartedGate = new Promise(resolve => { dispatchStarted = resolve; });
+  const dispatchGate = new Promise(resolve => { releaseDispatch = resolve; });
+  const provider = {
+    authorize({ invocation: input, policyDecision }) {
+      return { invocation: structuredClone(input), policyDecision: structuredClone(policyDecision) };
+    },
+    async invoke({ invocation: input }) {
+      dispatchStarted();
+      await dispatchGate;
+      return {
+        providerId: 'remote/github',
+        invocationId: input.invocationId,
+        observedAt: at,
+        result: { repository: input.arguments.repository, path: input.arguments.path, sha: '1'.repeat(40) },
+      };
+    },
+  };
+  const executor = new GitHubExactEffectExecutorV1({
+    provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async () => { throw new Error('verification must not run after recovery fenced execution'); },
+  });
+  const running = executor.invoke({ invocation: invocation('recovery-race'), policyDecision: policy('recovery-race') });
+  await dispatchStartedGate;
+  assert.equal(fx.snapshot('recovery-race').phase, 'EXECUTING');
+
+  const recovered = await executor.recoverInterrupted();
+  assert.deepEqual(recovered, [{ invocationId: 'recovery-race', phase: 'RECONCILE' }]);
+  releaseDispatch();
+
+  await assert.rejects(() => running, error => {
+    assert.equal(error.code, 'GITHUB_EXECUTION_FENCED');
+    assert.equal(error.effectState.phase, 'RECONCILE');
+    assert.equal(error.reconcileRequired, true);
+    return true;
+  });
+  assert.equal(fx.snapshot('recovery-race').phase, 'RECONCILE');
+  assert.equal(fx.snapshot('recovery-race').ambiguity.reasonCode, 'GITHUB_DISPATCH_INTERRUPTED');
+});
+
+test('cold-start recovery fences a stale independent verification result from overwriting RECONCILE', async () => {
+  const fx = storeFixture();
+  let verificationStarted;
+  let releaseVerification;
+  const verificationStartedGate = new Promise(resolve => { verificationStarted = resolve; });
+  const verificationGate = new Promise(resolve => { releaseVerification = resolve; });
+  const p = providerFixture();
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async ({ invocation: inv, observation }) => {
+      verificationStarted();
+      await verificationGate;
+      return verified(inv, observation);
+    },
+  });
+  const running = executor.invoke({ invocation: invocation('verification-race'), policyDecision: policy('verification-race') });
+  await verificationStartedGate;
+  assert.equal(fx.snapshot('verification-race').phase, 'OBSERVED');
+
+  const recovered = await executor.recoverInterrupted();
+  assert.deepEqual(recovered, [{ invocationId: 'verification-race', phase: 'RECONCILE' }]);
+  releaseVerification();
+
+  await assert.rejects(() => running, error => {
+    assert.equal(error.code, 'GITHUB_EXECUTION_FENCED');
+    assert.equal(error.effectState.phase, 'RECONCILE');
+    assert.equal(error.reconcileRequired, true);
+    return true;
+  });
+  assert.equal(fx.snapshot('verification-race').phase, 'RECONCILE');
+  assert.equal(fx.snapshot('verification-race').ambiguity.reasonCode, 'GITHUB_DISPATCH_INTERRUPTED');
+});
+
 test('ambiguous GitHub transport outcome becomes durable RECONCILE and blind retry is blocked', async () => {
   const fx = storeFixture();
   const p = providerFixture({ fail: true });
