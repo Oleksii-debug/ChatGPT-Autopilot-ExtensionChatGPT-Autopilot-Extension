@@ -361,6 +361,15 @@ export function normalizeIdentityGovernanceRegistryV1(input) {
     if (!roleById.has(grant.roleId)) {
       throw new Error(`grant ${grant.grantId} references unknown roleId`);
     }
+    const targetPrincipal = principalById.get(grant.principalId);
+    const grantingPrincipal = principalById.get(grant.grantedByPrincipalId);
+    const grantCreatedMillis = Date.parse(grant.createdAt);
+    if (!isPrincipalActiveAt(targetPrincipal, grantCreatedMillis)) {
+      throw new Error(`grant ${grant.grantId} target principal is not active at grant creation`);
+    }
+    if (!isPrincipalActiveAt(grantingPrincipal, grantCreatedMillis)) {
+      throw new Error(`grant ${grant.grantId} granting principal is not active at grant creation`);
+    }
     if (Date.parse(grant.createdAt) > Date.parse(updatedAt)) {
       throw new Error(`registry updatedAt predates grant: ${grant.grantId}`);
     }
@@ -372,6 +381,10 @@ export function normalizeIdentityGovernanceRegistryV1(input) {
   for (const binding of credentialOwnership) {
     if (!principalById.has(binding.ownerPrincipalId)) {
       throw new Error(`credential binding ${binding.bindingId} references unknown ownerPrincipalId`);
+    }
+    const credentialOwner = principalById.get(binding.ownerPrincipalId);
+    if (!isPrincipalActiveAt(credentialOwner, Date.parse(binding.createdAt))) {
+      throw new Error(`credential binding ${binding.bindingId} owner principal is not active at binding creation`);
     }
     if (Date.parse(binding.createdAt) > Date.parse(updatedAt)) {
       throw new Error(`registry updatedAt predates credential binding: ${binding.bindingId}`);
