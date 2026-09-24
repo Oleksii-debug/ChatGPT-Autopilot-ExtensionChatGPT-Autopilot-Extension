@@ -35,8 +35,27 @@ function relativePath(value, label = 'relativePath') {
 }
 
 function exactKeys(raw, allowed, label) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw nativeError('INVALID_REQUEST', `${label} must be an object`);
-  for (const key of Object.keys(raw)) if (!allowed.has(key)) throw nativeError('INVALID_REQUEST', `${label} contains unknown field: ${key}`);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw nativeError('INVALID_REQUEST', `${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw nativeError('INVALID_REQUEST', `${label} must be a plain object`);
+  }
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw nativeError('INVALID_REQUEST', `${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw nativeError('INVALID_REQUEST', `${label} field ${key} must be an enumerable data property`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in raw && !Object.prototype.hasOwnProperty.call(raw, key)) {
+      throw nativeError('INVALID_REQUEST', `${label} contains inherited field: ${key}`);
+    }
+  }
 }
 
 function configuredRoot(config, rootId, { write = false } = {}) {
@@ -81,8 +100,11 @@ export async function searchScopedFilesystemV1(payload, config) {
   exactKeys(payload, new Set(['rootId', 'query', 'maxResults', 'maxEntries']), 'filesystem.search payload');
   const root = configuredRoot(config, payload.rootId);
   if (typeof payload.query !== 'string' || !payload.query.trim()) throw nativeError('INVALID_REQUEST', 'query is required');
-  const maxResults = payload.maxResults == null ? Math.min(64, MAX_SEARCH_RESULTS) : Number(payload.maxResults);
-  const maxEntries = payload.maxEntries == null ? Math.min(2048, MAX_SEARCH_ENTRIES) : Number(payload.maxEntries);
+  const maxResults = payload.maxResults == null ? Math.min(64, MAX_SEARCH_RESULTS) : payload.maxResults;
+  const maxEntries = payload.maxEntries == null ? Math.min(2048, MAX_SEARCH_ENTRIES) : payload.maxEntries;
+  if (!Number.isInteger(maxResults) || !Number.isInteger(maxEntries)) {
+    throw nativeError('INVALID_REQUEST', 'filesystem.search bounds must be integers');
+  }
   try {
     const result = await searchFilesystemV1(scopeFor(root), root.path, payload.query, { maxResults, maxEntries });
     return { rootId: root.rootId, ...result };
@@ -107,7 +129,10 @@ export async function writeExistingTextScopedV1(payload, config, { beforeOpen = 
   if (typeof payload.text !== 'string') throw nativeError('INVALID_REQUEST', 'text must be text');
   const desired = Buffer.from(payload.text, 'utf8');
   if (desired.byteLength > MAX_WRITE_TEXT_BYTES) throw nativeError('FILE_TOO_LARGE', `text exceeds ${MAX_WRITE_TEXT_BYTES} bytes`);
-  const expectedSha256 = String(payload.expectedSha256 || '').trim().toLowerCase();
+  if (typeof payload.expectedSha256 !== 'string') {
+    throw nativeError('INVALID_REQUEST', 'expectedSha256 must be a lowercase SHA-256 digest');
+  }
+  const expectedSha256 = payload.expectedSha256.trim();
   if (!SHA256.test(expectedSha256)) throw nativeError('INVALID_REQUEST', 'expectedSha256 must be a lowercase SHA-256 digest');
   const desiredSha256 = sha256(desired);
   const target = path.resolve(root.path, rel);
