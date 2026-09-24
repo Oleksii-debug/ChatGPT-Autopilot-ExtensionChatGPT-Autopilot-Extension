@@ -142,6 +142,10 @@ export class FilesystemAgentProviderV1 {
         const args = normalizeWriteArguments(authorized.invocation.arguments);
         const resolved = await this.resolveArtifactText(args.contentArtifactRef);
         const text = typeof resolved === 'string' ? resolved : resolved?.text;
+        const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : null;
+        if (!bytes || bytes.byteLength !== args.contentArtifactRef.sizeBytes) {
+          throw providerError('ARTIFACT_CONTENT_INVALID', 'Resolved filesystem write artifact size did not match ArtifactRef identity');
+        }
         const actualSha256 = await sha256Text(text);
         if (actualSha256 !== args.contentArtifactRef.sha256) {
           throw providerError('ARTIFACT_DIGEST_MISMATCH', 'Resolved filesystem write artifact did not match its SHA-256 identity');
