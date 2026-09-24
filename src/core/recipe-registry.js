@@ -303,7 +303,12 @@ export function normalizeRecipeDefinitionV1(input) {
   if (new Set(steps.map(step => step.stepId)).size !== steps.length) throw new Error('steps contains duplicate stepId');
   assertAcyclic(steps);
   steps.sort((a, b) => asciiCompare(a.stepId, b.stepId));
+  const createdAt = timestamp(raw.createdAt, 'createdAt');
   const qualification = normalizeQualification(raw.qualification, producerId);
+  if (qualification.status !== RecipeQualificationStatus.UNQUALIFIED
+      && Date.parse(qualification.evaluatedAt) < Date.parse(createdAt)) {
+    throw new Error('qualification cannot predate recipe creation');
+  }
   if (lifecycle === RecipeLifecycleState.DRAFT && qualification.status !== RecipeQualificationStatus.UNQUALIFIED) {
     throw new Error('DRAFT recipe must be UNQUALIFIED');
   }
@@ -322,7 +327,7 @@ export function normalizeRecipeDefinitionV1(input) {
     sourceBindings: normalizeSourceBindings(raw.sourceBindings),
     steps,
     qualification,
-    createdAt: timestamp(raw.createdAt, 'createdAt'),
+    createdAt,
   });
 }
 
@@ -359,12 +364,18 @@ export function normalizeRecipeRegistryV1(input) {
     }
   }
 
+  const updatedAt = timestamp(raw.updatedAt, 'updatedAt');
+  for (const recipe of recipes) {
+    if (Date.parse(recipe.createdAt) > Date.parse(updatedAt)) {
+      throw new Error(`registry updatedAt predates recipe version: ${recipe.recipeId}@${recipe.version}`);
+    }
+  }
   return frozen({
     schemaVersion: RECIPE_REGISTRY_VERSION,
     registryId: id(raw.registryId, 'registryId'),
     revision: integer(raw.revision, 'revision', { min: 1, max: 1_000_000_000 }),
     recipes,
-    updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
+    updatedAt,
   });
 }
 
@@ -453,6 +464,12 @@ export function assertRecipeReplayEligibleV1(recipeInput, currentSourceBindingsI
     throw new Error(`recipe source binding is stale: ${evidence}`);
   }
   return recipe;
+}
+
+export function resolveReplayEligibleRecipeV1(registryInput, recipeIdInput, currentSourceBindingsInput) {
+  const recipe = resolvePromotedRecipeV1(registryInput, recipeIdInput);
+  if (!recipe) throw new Error('recipe has no active PROMOTED version');
+  return assertRecipeReplayEligibleV1(recipe, currentSourceBindingsInput);
 }
 
 export function recipeRequiredCapabilityIdsV1(recipeInput) {
