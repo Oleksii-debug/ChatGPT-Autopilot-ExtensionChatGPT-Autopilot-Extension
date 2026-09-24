@@ -1090,33 +1090,11 @@
       const representationVerified = evidence
         && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature);
 
-      let freshStructuralVerified = false;
-      let freshGenerationVerified = false;
-      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
-        const observedUrl = globalThis.location?.href || '';
-        const structuralFound = findVisibleComposer(doc);
-        const composerEmpty = !structuralFound.element || !compactPromptText(editorText(structuralFound.element));
-        const postBlocking = detectBlockingState(doc);
-        const generationStarted = postBlocking?.status === STATUS.BUSY
-          || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        const appendedOneOrMore = Array.isArray(beforeTextMessages)
-          && Array.isArray(afterTextMessages)
-          && afterTextMessages.length > beforeTextMessages.length;
-        // A fresh launch has no pre-existing conversation identity. If the exact
-        // extension-owned launch surface becomes a concrete conversation, the
-        // composer is consumed, and ChatGPT has positively entered generation,
-        // that combination is operation-bound proof that this Send was accepted.
-        // Do not require the user-message semantic tree to have rendered yet:
-        // real ChatGPT runs can expose the Stop control before the message history
-        // observer sees the newly appended user turn.
-        freshGenerationVerified = !structuralFound.ambiguous
-          && isExclusiveConversationLocation(observedUrl)
-          && composerEmpty
-          && generationStarted;
-        freshStructuralVerified = freshGenerationVerified && appendedOneOrMore;
-      }
-
-      if (!textVerified && !unlabeledVerified && !representationVerified && !freshGenerationVerified) continue;
+      // URL transition, composer clearing and generation/Stop state are useful
+      // diagnostics, but none identifies the submitted prompt. Exact-effect
+      // completion therefore requires an operation-local exact user-turn delta
+      // (semantic or unlabeled) or the separately bound representation proof.
+      if (!textVerified && !unlabeledVerified && !representationVerified) continue;
 
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
@@ -1165,21 +1143,14 @@
         });
       }
 
-      const freshGenerationOnly = freshGenerationVerified && !freshStructuralVerified && !textVerified && !unlabeledVerified;
       return resultBase(request, start, {
         status: STATUS.SENT_VERIFIED,
-        submissionEvidence: freshGenerationOnly
-          ? 'FRESH_CONVERSATION_GENERATION_STARTED'
-          : unlabeledVerified && !textVerified ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
-          : freshStructuralVerified && !textVerified
-            ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
-            : 'NEW_USER_MESSAGE_MATCH',
-        safeDiagnosticCode: freshGenerationOnly
-          ? 'SEND_VERIFIED_FRESH_GENERATION_STARTED'
-          : unlabeledVerified && !textVerified ? 'SEND_VERIFIED_MAIN_PROMPT_APPEND'
-          : freshStructuralVerified && !textVerified
-            ? 'SEND_VERIFIED_FRESH_STRUCTURAL_APPEND'
-            : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
+        submissionEvidence: unlabeledVerified && !textVerified
+          ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
+          : 'NEW_USER_MESSAGE_MATCH',
+        safeDiagnosticCode: unlabeledVerified && !textVerified
+          ? 'SEND_VERIFIED_MAIN_PROMPT_APPEND'
+          : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
         assistantBaselineCount
       });
     }
@@ -1240,28 +1211,17 @@
       const baselineCount = Number.isInteger(Number(textEvidence.assistantBaselineCount))
         ? Number(textEvidence.assistantBaselineCount)
         : 0;
-      const storedWasFreshLaunch = isFreshLaunchSurface(textEvidence.expectedUrl);
-      const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
-      const blockingNow = detectBlockingState(doc);
-      const generationOrAnswerObserved = blockingNow?.status === STATUS.BUSY
-        || semanticAssistantMessages(doc).length > baselineCount;
-      const structuralFreshRecovery = storedWasFreshLaunch
-        && !found.ambiguous
-        && isExclusiveConversationLocation(globalThis.location?.href || '')
-        && composerEmpty
-        && Array.isArray(textEvidence.beforeMessages)
-        && afterMessages.length > textEvidence.beforeMessages.length
-        && generationOrAnswerObserved;
-      if ((appended || unlabeledAppended || structuralFreshRecovery) && !pending) {
+      // Recovery may retain same-document operation-local baselines, but it still
+      // must identify the exact submitted prompt. A fresh /c/<id>, an empty
+      // composer, or generation/assistant progress cannot substitute for that.
+      if ((appended || unlabeledAppended) && !pending) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
-          submissionEvidence: unlabeledAppended && !appended ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
-            : structuralFreshRecovery && !appended
-            ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
+          submissionEvidence: unlabeledAppended && !appended
+            ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
             : 'NEW_USER_MESSAGE_MATCH',
-          safeDiagnosticCode: unlabeledAppended && !appended ? 'RECOVERY_MAIN_PROMPT_VERIFIED'
-            : structuralFreshRecovery && !appended
-            ? 'RECOVERY_FRESH_STRUCTURAL_VERIFIED'
+          safeDiagnosticCode: unlabeledAppended && !appended
+            ? 'RECOVERY_MAIN_PROMPT_VERIFIED'
             : 'RECOVERY_TEXT_OPERATION_VERIFIED',
           assistantBaselineCount: baselineCount
         });
