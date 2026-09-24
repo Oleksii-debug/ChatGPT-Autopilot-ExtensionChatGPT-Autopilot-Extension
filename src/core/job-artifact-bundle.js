@@ -14,6 +14,7 @@ const CATEGORIES = new Set(Object.values(JobArtifactCategory));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const FORBIDDEN_WINDOWS_CHARS = /[<>:"\\|?*\u0000-\u001f\u007f]/u;
+const FORBIDDEN_DISPLAY_CHARS = /[\u2028\u2029\u202a-\u202e\u2066-\u2069]/u;
 const RESERVED_WINDOWS_NAMES = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/iu;
 const MAX_PATH_LENGTH = 1024;
 const MAX_SEGMENT_LENGTH = 255;
@@ -44,6 +45,10 @@ const BUNDLE_KEYS = new Set([
 
 const ENTRY_KEYS = new Set(['path', 'category', 'artifactRef']);
 const DISCLOSURE_KEYS = new Set(['allowedSensitiveArtifactIds']);
+const ARTIFACT_REF_KEYS = new Set([
+  'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
+  'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
+]);
 
 function ownRecord(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -56,11 +61,17 @@ function ownRecord(value, label) {
   if (Object.getOwnPropertySymbols(value).length) {
     throw new Error(label + ' must not contain symbol fields');
   }
+  for (const key of Object.getOwnPropertyNames(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + ' must contain data properties only');
+    }
+  }
   return value;
 }
 
 function exactKeys(value, allowed, label) {
-  for (const key of Object.keys(value)) {
+  for (const key of Object.getOwnPropertyNames(value)) {
     if (!allowed.has(key)) throw new Error(label + ' contains unknown field: ' + key);
   }
 }
@@ -102,6 +113,7 @@ function normalizePath(value) {
   }
   if (value.includes('\\')) throw new Error('bundle path must use forward slashes');
   if (FORBIDDEN_WINDOWS_CHARS.test(value)) throw new Error('bundle path contains a Windows-forbidden character');
+  if (FORBIDDEN_DISPLAY_CHARS.test(value)) throw new Error('bundle path contains a display-control character');
 
   const segments = value.split('/');
   if (!segments.length) throw new Error('bundle path is invalid');
@@ -123,28 +135,32 @@ function pathKey(value) {
 
 function requireArtifactRef(input) {
   const raw = ownRecord(input, 'ArtifactRefV1');
+  exactKeys(raw, ARTIFACT_REF_KEYS, 'ArtifactRefV1');
   if (raw.schemaVersion !== 1) throw new Error('ArtifactRefV1 schemaVersion must be numeric 1');
-  for (const key of ['artifactId', 'kind', 'uri', 'sha256', 'createdAt']) {
-    if (typeof raw[key] !== 'string') throw new Error('ArtifactRefV1 ' + key + ' must be text');
+  requireId(raw.artifactId, 'ArtifactRefV1 artifactId');
+  requireId(raw.kind, 'ArtifactRefV1 kind');
+  if (typeof raw.uri !== 'string' || !raw.uri || raw.uri !== raw.uri.trim() || raw.uri.length > 4096) {
+    throw new Error('ArtifactRefV1 uri must be canonical bounded text');
   }
+  if (typeof raw.sha256 !== 'string' || raw.sha256 !== raw.sha256.trim() || !SHA256.test(raw.sha256)) {
+    throw new Error('ArtifactRefV1 sha256 is required and must be canonical lowercase SHA-256');
+  }
+  requireIsoTimestamp(raw.createdAt, 'ArtifactRefV1 createdAt');
   if (!Object.hasOwn(raw, 'sizeBytes') || !Number.isSafeInteger(raw.sizeBytes) || raw.sizeBytes < 0) {
     throw new Error('ArtifactRefV1 sizeBytes must be a non-negative safe integer');
   }
   if (!Object.hasOwn(raw, 'sensitive') || typeof raw.sensitive !== 'boolean') {
     throw new Error('ArtifactRefV1 sensitive must be an explicit boolean');
   }
-  if (Object.hasOwn(raw, 'mediaType') && typeof raw.mediaType !== 'string') {
-    throw new Error('ArtifactRefV1 mediaType must be text when present');
+  if (Object.hasOwn(raw, 'mediaType')) {
+    if (typeof raw.mediaType !== 'string' || !raw.mediaType || raw.mediaType !== raw.mediaType.trim()) {
+      throw new Error('ArtifactRefV1 mediaType must be canonical text when present');
+    }
   }
-  if (Object.hasOwn(raw, 'producerInvocationId') && typeof raw.producerInvocationId !== 'string') {
-    throw new Error('ArtifactRefV1 producerInvocationId must be text when present');
+  if (Object.hasOwn(raw, 'producerInvocationId')) {
+    requireId(raw.producerInvocationId, 'ArtifactRefV1 producerInvocationId');
   }
-
-  const normalized = normalizeArtifactRefV1(raw);
-  if (!SHA256.test(normalized.sha256)) {
-    throw new Error('ArtifactRefV1 sha256 is required for a materialized bundle entry');
-  }
-  return normalized;
+  return normalizeArtifactRefV1(raw);
 }
 
 function normalizeEntry(input) {
@@ -181,6 +197,11 @@ function normalizeDisclosure(input) {
   if (!Array.isArray(raw.allowedSensitiveArtifactIds) || raw.allowedSensitiveArtifactIds.length > MAX_JOB_ARTIFACT_BUNDLE_ENTRIES) {
     throw new Error('allowedSensitiveArtifactIds must be a bounded array');
   }
+  for (let index = 0; index < raw.allowedSensitiveArtifactIds.length; index += 1) {
+    if (!Object.hasOwn(raw.allowedSensitiveArtifactIds, index)) {
+      throw new Error('allowedSensitiveArtifactIds must not be sparse');
+    }
+  }
   const ids = raw.allowedSensitiveArtifactIds.map((value) => requireId(value, 'allowedSensitiveArtifactId'));
   const seen = new Set();
   for (const id of ids) {
@@ -202,6 +223,9 @@ export function buildJobArtifactBundleV1(input) {
 
   if (!Array.isArray(raw.entries) || raw.entries.length < REQUIRED_CONTROL_PATHS.length || raw.entries.length > MAX_JOB_ARTIFACT_BUNDLE_ENTRIES) {
     throw new Error('entries must be a bounded array containing canonical control files');
+  }
+  for (let index = 0; index < raw.entries.length; index += 1) {
+    if (!Object.hasOwn(raw.entries, index)) throw new Error('entries must not be sparse');
   }
 
   const entries = raw.entries.map(normalizeEntry);
