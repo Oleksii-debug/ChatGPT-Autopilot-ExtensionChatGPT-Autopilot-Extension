@@ -6,26 +6,29 @@ const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../src/interaction/chatgpt-adapter.js'), 'utf8');
 const prompt = 'Особистий промпт\nДругий рядок';
-function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=false, startUrl='https://chatgpt.com/c/test', expectedUrl=startUrl, redirectAfterSend='', deliveredTextOverride='', suppressMessage=false}={}) {
+function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=false, startUrl='https://chatgpt.com/c/test', expectedUrl=startUrl, redirectAfterSend='', deliveredTextOverride='', suppressMessage=false, messageShape='author-role'}={}) {
   let clock=1000, clicks=0, submits=0, nativeSubmits=0, sentAt=null, acknowledged=false, model='', sentText='';
   const messages=[];
   class Clock extends Date { static now() { return clock; } }
   class Event { constructor(type, init) { this.type=type;Object.assign(this,init); } }
-  const visible = {isConnected:true, getBoundingClientRect:()=>({width:200,height:40})};
+  const visible = {isConnected:true, getBoundingClientRect:()=>({left:0,top:0,width:200,height:40})};
   const form = {getAttribute:()=>null, querySelectorAll: s=>s==='button, [role="button"]'?[send]:[]};
   const composer = {...visible,tagName:'TEXTAREA',value:prompt,closest:()=>form,focus(){},getAttribute:n=>n==='aria-label'?'Message':null,dispatchEvent(e){if(e.type==='input') model=this.value;}};
-  const leaf=(text)=>({...visible,innerText:text,getAttribute:n=>n==='data-message-author-role'?'user':null,querySelectorAll:()=>[]});
+  const leaf=(text)=>({...visible,innerText:text,children:[],closest:()=>null,getAttribute:n=>messageShape==='unlabeled'?null:n===(messageShape==='testid'?'data-testid':'data-message-author-role')?(messageShape==='testid'?'user-message':'user'):null,querySelectorAll:()=>[]});
   if(stale)messages.push(leaf(prompt));
   function attempt(){ sentAt=clock; sentText=composer.value; if(redirectAfterSend) sandbox.location.href=redirectAfterSend; }
-  const send={...visible,tagName:'BUTTON',type:formSubmit?'submit':'button',form,
+  const send={...visible,tagName:'BUTTON',type:formSubmit?'submit':'button',form,scrollIntoView(){},setAttribute(){},removeAttribute(){},
     getAttribute:n=>n==='data-testid'?'send-button':null,click(){clicks++;if(!noOp)attempt();}};
   const stop={...visible,tagName:'BUTTON',type:'button',getAttribute:n=>n==='aria-label'&&sentAt!==null?'Stop generating':null};
   class Form { requestSubmit(button){assert.equal(this,form);assert.equal(button,send);submits++;attempt();} }
   const document={visibilityState:'hidden',defaultView:{HTMLFormElement:Form,Event,InputEvent:Event},
+    elementFromPoint:()=>send,
+    querySelector:s=>s==='main, [role="main"]'?{querySelectorAll:()=>messageShape==='unlabeled'?messages:[]}:null,
     querySelectorAll(s){
       if(s==='textarea, [contenteditable="true"], [role="textbox"], input[type="text"]')return [composer];
       if(s==='button, [role="button"]')return sentAt!==null?[send,stop]:[send];
-      if(s==='[data-message-author-role="user"], [data-author="user"], article')return messages;
+      if(s==='[data-message-author-role="user"], [data-author="user"], article')return messageShape==='testid'?[]:messages;
+      if(s==='[data-testid="user-message"]')return messageShape==='testid'?messages:[];
       return [];
     }};
   composer.ownerDocument=document;
@@ -48,7 +51,7 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   }
   async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt)acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
-  return {run,wait,acknowledge,composer,messages,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
+  return {run,wait,acknowledge,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
 }
 
 test('new-chat launch URL may transition from root to the created conversation after Send',async()=>{
@@ -98,6 +101,44 @@ test('late acknowledgement on a newly created conversation can be verified witho
 test('acknowledgement after 7 seconds verifies with exactly one click',async()=>{
   const f=fixture({ackAt:7000});const r=await f.run();assert.equal(r.status,'SENT_VERIFIED');assert.equal(f.clicks(),1);
 });
+
+test('testid-only user turn confirms one Send and recovery never clicks a second time',async()=>{
+  const f=fixture({messageShape:'testid',ackAt:25000});
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  assert.equal(f.clicks(),1);
+  f.acknowledge();
+  const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT');
+  assert.equal(recovered.status,'SENT_VERIFIED');
+  assert.equal(f.clicks(),1);
+});
+
+test('testid-only stale equal turn cannot confirm a no-op Send',async()=>{
+  const f=fixture({messageShape:'testid',stale:true,noOp:true});
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  assert.equal((await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT')).status,'SUBMISSION_UNCERTAIN');
+  assert.equal(f.clicks(),1);
+});
+test('unlabeled main user turn verifies the changed account UI with one Send',async()=>{
+  const f=fixture({messageShape:'unlabeled',startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/new-account'});
+  const r=await f.run();
+  assert.equal(r.status,'SENT_VERIFIED');
+  assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_MAIN_PROMPT_APPEND');
+  assert.equal(f.clicks(),1);
+});
+test('unlabeled main user turn recovers after navigation without resending',async()=>{
+  const f=fixture({messageShape:'unlabeled',ackAt:25000,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/new-account'});
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  f.acknowledge();
+  const r=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{recoveryLaunchUrl:'https://chatgpt.com/'});
+  assert.equal(r.status,'SENT_VERIFIED');
+  assert.equal(f.clicks(),1);
+});
+test('an old identical unlabeled turn cannot verify another Send',async()=>{
+  const f=fixture({messageShape:'unlabeled',stale:true,noOp:true});
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  assert.equal((await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT')).status,'SUBMISSION_UNCERTAIN');
+  assert.equal(f.clicks(),1);
+});
 test('late acknowledgement survives a recovery call with retained text baseline',async()=>{
   const f=fixture({ackAt:25000});assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
   f.acknowledge();const r=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT');assert.equal(r.status,'SENT_VERIFIED');assert.equal(r.safeDiagnosticCode,'RECOVERY_TEXT_OPERATION_VERIFIED');assert.equal(f.clicks(),1);
@@ -129,6 +170,30 @@ test('hidden tab bypasses Chrome native mouse submit and sends through DOM seman
   const f=fixture();let nativeCalls=0;
   const r=await f.run('SUBMIT_EXISTING',{}, {submit:async()=>{nativeCalls++;}});
   assert.equal(r.status,'SENT_VERIFIED');assert.equal(nativeCalls,0);assert.equal(f.clicks(),1);
+});
+
+test('hidden non-submit control activates before one native click and restores no second Send',async()=>{
+  const f=fixture();let activation=0,nativeCalls=0;
+  const result=await f.run('SUBMIT_EXISTING',{}, {
+    activate:async()=>{activation++;f.document.visibilityState='visible';return true;},
+    submit:async()=>{nativeCalls++;f.acknowledge();},
+  });
+  assert.equal(result.status,'SENT_VERIFIED');
+  assert.equal(activation,1);
+  assert.equal(nativeCalls,1);
+  assert.equal(f.clicks(),0);
+});
+
+test('activation failure has zero Send effects and returns a technical error',async()=>{
+  const f=fixture();let nativeCalls=0;
+  const result=await f.run('SUBMIT_EXISTING',{}, {
+    activate:async()=>false,
+    submit:async()=>{nativeCalls++;},
+  });
+  assert.equal(result.status,'TEMPORARY_ERROR');
+  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(nativeCalls,0);
+  assert.equal(f.clicks(),0);
 });
 
 test('repeated expected prompt is allowed to send and is not a stop condition',async()=>{

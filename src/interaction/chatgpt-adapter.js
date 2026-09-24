@@ -299,7 +299,8 @@
 
     const stop = findVisibleButton(doc, (b) => {
       const label = (accessibleName(b) + ' ' + textOf(b)).trim().toLowerCase();
-      return /stop generating|stop response|stop streaming|stop generation|stop-button/.test(label) || label === 'stop';
+      return /stop generating|stop response|stop streaming|stop generation|stop-button|зупинити (?:генерацію|відповідь|створення)|остановить (?:генерацию|ответ)/.test(label)
+        || /^(?:stop|зупинити|остановить)$/.test(label);
     });
     if (stop) return { status: STATUS.BUSY, code: 'STOP_CONTROL_VISIBLE' };
 
@@ -582,10 +583,14 @@
   }
 
   function semanticUserMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
+    const candidates = [...new Set([
+      ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
+      ...doc.querySelectorAll('[data-testid="user-message"]'),
+    ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'user' || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
+        return role === 'user' || el.getAttribute?.('data-testid') === 'user-message'
+          || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
     // A turn article and its author-role child are ONE message, not two.
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
@@ -603,10 +608,14 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'))
+    const candidates = [...new Set([
+      ...doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'),
+      ...doc.querySelectorAll('[data-testid="assistant-message"]'),
+    ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'assistant' || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
+        return role === 'assistant' || el.getAttribute?.('data-testid') === 'assistant-message'
+          || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
       });
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
   }
@@ -625,6 +634,24 @@
 
   function userMessageHistorySnapshot(doc) {
     return semanticUserMessages(doc).map(userMessageText);
+  }
+
+  // Some ChatGPT accounts render the conversation without author-role, article,
+  // or message test-id attributes. Observe only an exact prompt inside the main
+  // conversation surface, excluding the composer and all navigation. This is a
+  // supplementary operation-local delta, never a historical equality proof for
+  // an existing conversation after a page or worker restart.
+  function unlabeledPromptCount(doc, promptText) {
+    const main = doc.querySelector?.('main, [role="main"]');
+    if (!main || !promptText || typeof main.querySelectorAll !== 'function') return 0;
+    let count = 0;
+    for (const node of main.querySelectorAll('p, div, span, pre, li, blockquote')) {
+      if (!isVisible(node) || node.closest?.('form, [contenteditable="true"], nav, aside, [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
+      if (!promptTextMatches(textOf(node), promptText)) continue;
+      const nestedMatch = Array.from(node.children || []).some(child => promptTextMatches(textOf(child), promptText));
+      if (!nestedMatch) count += 1;
+    }
+    return count;
   }
 
   function userMessageRepresentationSnapshot(doc) {
@@ -945,6 +972,7 @@
 
     const submittedText = exactTextPending ? observedPendingText : '';
     const beforeTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
+    const beforeUnlabeledMatches = exactTextPending ? unlabeledPromptCount(doc, submittedText) : 0;
     const assistantBaselineCount = semanticAssistantMessages(doc).length;
     if (exactTextPending) {
       if (textSubmissionEvidence.size >= 100) {
@@ -955,6 +983,7 @@
         submittedText,
         expectedUrl: normalizeUrl(request.expectedUrl),
         beforeMessages: beforeTextMessages,
+        beforeUnlabeledMatches,
         assistantBaselineCount,
       });
     }
@@ -973,7 +1002,25 @@
       && String(send.type || '').toLowerCase() === 'submit';
     const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
     let submitMethod = 'CLICK';
-    const backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    if (backgroundDocument && !isFormSubmitter && typeof deps.activate === 'function') {
+      // Never issue a synthetic click into a hidden non-submit control when
+      // Chrome can select the owned tab before the first irreversible effect.
+      const activated = await deps.activate();
+      if (activated) {
+        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
+          await (deps.wait || wait)(100);
+        }
+      }
+      if (!activated || doc.visibilityState !== 'visible') {
+        return resultBase(request, start, {
+          status:STATUS.TEMPORARY_ERROR,
+          submissionEvidence:'PROVEN_NO_EFFECT',
+          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+        });
+      }
+      backgroundDocument = false;
+    }
     if (backgroundDocument && isFormSubmitter && typeof nativeSubmit === 'function') {
       // CDP mouse events are unreliable in a hidden background tab. A genuine
       // form submitter can be invoked through the page's own form semantics
@@ -1020,6 +1067,9 @@
       const afterTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
       const textVerified = exactTextPending
         && hasStrictAppendedPrompt(beforeTextMessages, afterTextMessages, submittedText);
+      const unlabeledVerified = exactTextPending && beforeUnlabeledMatches === 0
+        && unlabeledPromptCount(doc, submittedText) === 1
+        && !compactPromptText(editorText(findVisibleComposer(doc).element));
       const representationVerified = evidence
         && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature);
 
@@ -1049,7 +1099,7 @@
         freshStructuralVerified = freshGenerationVerified && appendedOneOrMore;
       }
 
-      if (!textVerified && !representationVerified && !freshGenerationVerified) continue;
+      if (!textVerified && !unlabeledVerified && !representationVerified && !freshGenerationVerified) continue;
 
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
@@ -1085,7 +1135,7 @@
         const postBlocking = detectBlockingState(doc);
         const generationStarted = postBlocking?.status === STATUS.BUSY
           || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        if (!isExclusiveConversationLocation(observedUrl) || !composerEmpty || !generationStarted) continue;
+        if (!isExclusiveConversationLocation(observedUrl) || !composerEmpty || (!generationStarted && !textVerified && !unlabeledVerified)) continue;
       }
 
       if (representationVerified) {
@@ -1098,16 +1148,18 @@
         });
       }
 
-      const freshGenerationOnly = freshGenerationVerified && !freshStructuralVerified && !textVerified;
+      const freshGenerationOnly = freshGenerationVerified && !freshStructuralVerified && !textVerified && !unlabeledVerified;
       return resultBase(request, start, {
         status: STATUS.SENT_VERIFIED,
         submissionEvidence: freshGenerationOnly
           ? 'FRESH_CONVERSATION_GENERATION_STARTED'
+          : unlabeledVerified && !textVerified ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
           : freshStructuralVerified && !textVerified
             ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
             : 'NEW_USER_MESSAGE_MATCH',
         safeDiagnosticCode: freshGenerationOnly
           ? 'SEND_VERIFIED_FRESH_GENERATION_STARTED'
+          : unlabeledVerified && !textVerified ? 'SEND_VERIFIED_MAIN_PROMPT_APPEND'
           : freshStructuralVerified && !textVerified
             ? 'SEND_VERIFIED_FRESH_STRUCTURAL_APPEND'
             : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
@@ -1133,6 +1185,7 @@
       `pendingMatch=${composer && promptTextMatches(editorText(composer), request.promptText) ? 'yes' : 'no'}`,
       `messagesBefore=${before?.length ?? 'unknown'}`,
       `messagesAfter=${userMessageHistorySnapshot(doc).length}`,
+      `mainPromptMatches=${unlabeledPromptCount(doc, request.promptText)}`,
       `block=${blocking?.code || 'none'}`,
       `visibility=${doc.visibilityState || 'unknown'}`
     ].join('; ');
@@ -1162,6 +1215,7 @@
       const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
       const singleMatchingTurn = afterMessages.length === 1
         && promptTextMatches(afterMessages[0], request.promptText);
+      const mainPromptMatched = unlabeledPromptCount(doc, request.promptText) === 1;
       const generationStarted = blocking?.status === STATUS.BUSY
         || semanticAssistantMessages(doc).length > 0;
       if (!found.ambiguous
@@ -1182,11 +1236,11 @@
       if (!found.ambiguous
           && isExclusiveConversationLocation(globalThis.location?.href || '')
           && composerEmpty
-          && singleMatchingTurn) {
+          && (singleMatchingTurn || mainPromptMatched)) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
-          submissionEvidence: 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN',
-          safeDiagnosticCode: 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED',
+          submissionEvidence: singleMatchingTurn ? 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN' : 'FRESH_LAUNCH_DURABLE_MAIN_PROMPT_MATCH',
+          safeDiagnosticCode: singleMatchingTurn ? 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED' : 'RECOVERY_FRESH_MAIN_PROMPT_VERIFIED',
           assistantBaselineCount: 0
         });
       }
@@ -1198,6 +1252,8 @@
       const pending = found.element && promptTextMatches(editorText(found.element), submittedText);
       const afterMessages = userMessageHistorySnapshot(doc);
       const appended = hasStrictAppendedPrompt(textEvidence.beforeMessages, afterMessages, submittedText);
+      const unlabeledAppended = textEvidence.beforeUnlabeledMatches === 0
+        && unlabeledPromptCount(doc, submittedText) === 1;
       const baselineCount = Number.isInteger(Number(textEvidence.assistantBaselineCount))
         ? Number(textEvidence.assistantBaselineCount)
         : 0;
@@ -1213,13 +1269,15 @@
         && Array.isArray(textEvidence.beforeMessages)
         && afterMessages.length > textEvidence.beforeMessages.length
         && generationOrAnswerObserved;
-      if ((appended || structuralFreshRecovery) && !pending) {
+      if ((appended || unlabeledAppended || structuralFreshRecovery) && !pending) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
-          submissionEvidence: structuralFreshRecovery && !appended
+          submissionEvidence: unlabeledAppended && !appended ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
+            : structuralFreshRecovery && !appended
             ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
             : 'NEW_USER_MESSAGE_MATCH',
-          safeDiagnosticCode: structuralFreshRecovery && !appended
+          safeDiagnosticCode: unlabeledAppended && !appended ? 'RECOVERY_MAIN_PROMPT_VERIFIED'
+            : structuralFreshRecovery && !appended
             ? 'RECOVERY_FRESH_STRUCTURAL_VERIFIED'
             : 'RECOVERY_TEXT_OPERATION_VERIFIED',
           assistantBaselineCount: baselineCount

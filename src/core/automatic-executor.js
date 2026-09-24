@@ -3,6 +3,7 @@ import { applyInteractionResult, RATE_LIMIT_BACKOFF_MS } from './execution.js';
 import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, isExclusiveConversationUrl } from './schema.js';
+import { restorePendingSendTabs } from './native-input.js';
 import { resolveTaskTab } from './tabs.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
@@ -247,6 +248,11 @@ export class AutomaticSessionExecutor {
         return draft;
       });
       throw error;
+    } finally {
+      if (mode === 'SUBMIT_EXISTING') {
+        try { await restorePendingSendTabs(this.chrome, this.repo, { sessionId }); }
+        catch (_) { /* Cold-start reconciliation retries the durable tab restoration. */ }
+      }
     }
   }
 
@@ -389,12 +395,14 @@ export class AutomaticSessionExecutor {
       let openedNewProfileGate = false;
       if (result?.status === InteractionResult.RATE_LIMITED) {
         const existingGate = Number(draft.profile?.rateLimitUntil || 0);
-        if (existingGate > now) {
+        if (rateLimitCooldownMs > 0 && existingGate > now) {
           rateLimitRetryAt = existingGate;
-        } else {
+        } else if (rateLimitCooldownMs > 0) {
           rateLimitRetryAt = now + rateLimitCooldownMs;
           draft.profile.rateLimitUntil = rateLimitRetryAt;
           openedNewProfileGate = true;
+        } else {
+          draft.profile.rateLimitUntil = 0;
         }
       }
 
@@ -406,11 +414,13 @@ export class AutomaticSessionExecutor {
       });
 
       if (result?.status === InteractionResult.RATE_LIMITED) {
-        session.lastError = 'ChatGPT тимчасово обмежив запити. Робота цього профілю автоматично продовжиться після спільної паузи.';
+        session.lastError = rateLimitCooldownMs > 0
+          ? 'ChatGPT тимчасово обмежив запити. Робота цього профілю автоматично продовжиться після налаштованої спільної паузи.'
+          : 'ChatGPT тимчасово обмежив запити. Резервна пауза профілю вимкнена; застосовано лише технічну затримку повторної перевірки.';
         session.lastActionAt = now;
         session.updatedAt = now;
         appendDiagnostic(draft, {
-          event: openedNewProfileGate
+          event: rateLimitCooldownMs === 0 ? 'RATE_LIMIT_БЕЗ_РЕЗЕРВНОЇ_ПАУЗИ' : openedNewProfileGate
             ? 'ГЛОБАЛЬНА_ПАУЗА_ЧЕРЕЗ_RATE_LIMIT'
             : 'RATE_LIMIT_ВЖЕ_ВРАХОВАНО',
           sessionId,

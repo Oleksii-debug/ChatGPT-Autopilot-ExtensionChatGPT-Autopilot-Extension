@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { performNativeInput } from '../../src/core/native-input.js';
+import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../../src/core/native-input.js';
 import { createEmptyState,createSession,createTask } from '../../src/core/schema.js';
 import { StorageRepository } from '../../src/core/storage.js';
 function setup(kind='submit'){
@@ -20,6 +20,38 @@ function setup(kind='submit'){
 test('native click persists effect checkpoint, presses and releases once, detaches',async()=>{
  const f=setup();await f.run();assert.deepEqual(f.calls.map(c=>typeof c==='string'?c:c.args.type),['attach','mousePressed','mouseReleased','detach']);
  await assert.rejects(f.run(),/NATIVE_SUBMIT_ALREADY_DISPATCHED/);assert.equal(f.calls.length,4);
+});
+
+test('owned tab activation occurs before Send and restores the prior tab after durable dispatch',async()=>{
+ const f=setup();let activeTabId=3;
+ f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true};};
+ assert.deepEqual(await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender),{previousTabId:3});
+ assert.equal(activeTabId,7);
+ await f.run();
+ await restoreOwnedSendTab(f.chrome,f.repo,{...f.message,previousTabId:3},f.sender);
+ assert.equal(activeTabId,3);
+});
+
+test('invalid sender cannot activate a tab and never reaches Chrome tab mutation',async()=>{
+ const f=setup();let touched=0;
+ f.chrome.tabs.update=async()=>{touched++;};
+ await assert.rejects(activateOwnedSendTab(f.chrome,f.repo,f.message,{...f.sender,id:'foreign'},),/NATIVE_INPUT_SENDER_INVALID/);
+ assert.equal(touched,0);
+});
+
+test('cold-start restoration reads the durable previous tab after a completed native click',async()=>{
+ const f=setup();let activeTabId=3;
+ f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true};};
+ await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender);
+ await f.run();
+ const restartedRepo=new StorageRepository(f.chrome);
+ await restorePendingSendTabs(f.chrome,restartedRepo);
+ assert.equal(activeTabId,3);
+ assert.equal((await restartedRepo.load()).sessionsById.s.operation.previousSendTabId,0);
 });
 test('native insertion replaces the focused composer and uses durable prompt text',async()=>{
  const f=setup('insert');

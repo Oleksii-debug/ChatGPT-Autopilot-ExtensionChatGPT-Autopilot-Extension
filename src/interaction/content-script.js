@@ -317,6 +317,7 @@
         }
 
         const restoreSendIdentity = await prepareSendControlCompatibility(root.document, request.mode);
+        let previousSendTabId = 0;
         try {
           const nativeInput = async (kind, point = {}) => {
             const response = await runtime.sendMessage({
@@ -335,9 +336,26 @@
           return await adapter.execute(request, {
             insert: () => nativeInput('insert'),
             submit: point => nativeInput('submit', point),
+            activate: async () => {
+              const response = await runtime.sendMessage({
+                channel:'autopilot-send-tab-activation', action:'activate',
+                requestId:request.requestId, taskId:request.taskId,
+              });
+              if (!response?.ok) return false;
+              previousSendTabId = Number(response.data?.previousTabId || 0);
+              return true;
+            },
           });
         } finally {
           restoreSendIdentity();
+          if (previousSendTabId) {
+            try {
+              await runtime.sendMessage({
+                channel:'autopilot-send-tab-activation', action:'restore',
+                requestId:request.requestId, taskId:request.taskId, previousTabId:previousSendTabId,
+              });
+            } catch (_) { /* The tab can navigate away after a real Send. */ }
+          }
         }
       })
       .then((result) => sendResponse({ ok: true, data: result }))

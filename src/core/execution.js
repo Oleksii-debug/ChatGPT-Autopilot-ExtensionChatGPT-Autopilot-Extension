@@ -106,8 +106,8 @@ export function applyInteractionResult(session, taskIndex, result, { now = Date.
     case InteractionResult.RATE_LIMITED: {
       task.status = 'RATE_LIMITED';
       // The acknowledgement button only dismisses ChatGPT's informational modal.
-      // Respect the notice itself ("wait a few minutes") instead of hammering the
-      // same account every 15-30 seconds. Five minutes is the minimum durable hold.
+      // The owner's reserve is optional. A zero reserve still permits the session's
+      // bounded technical retry delay, but never opens an account-wide gate.
       const retryAt = Number.isFinite(rateLimitRetryAt) && rateLimitRetryAt > now
         ? rateLimitRetryAt
         : now + Math.max(rateLimitBackoffMs, session.retryBackoffMs || 0);

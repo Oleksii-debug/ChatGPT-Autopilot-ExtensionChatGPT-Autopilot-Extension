@@ -7,7 +7,7 @@ import { AgentProviderId, getAgentProvider } from '../core/capability-registry.j
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
-import { performNativeInput } from '../core/native-input.js';
+import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
 import { AiOrchestrator } from '../core/ai-orchestrator.js';
@@ -225,6 +225,7 @@ function beginColdStartReconciliation() {
       executionAvailable: EXECUTION_AVAILABLE,
       syncDrivePrompts: syncSessionDrivePrompts,
     });
+    await restorePendingSendTabs(chrome, repo);
     await remoteDispatch.reconcileAlarm();
     // Reconstruct only deterministic alarms here. Ordinary MV3 service-worker
     // restarts are common and must not manufacture a coordinator reasoning tick.
@@ -631,6 +632,15 @@ chrome.alarms.onAlarm.addListener(alarm => {
   if (scenarioWork.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const scenario = await scenarioWork.cycleAll(); const state = await reconcileRuntime(); return { scenario, state }; })());
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.channel === 'autopilot-send-tab-activation') {
+    const action = message.action === 'activate' ? activateOwnedSendTab
+      : message.action === 'restore' ? restoreOwnedSendTab : null;
+    if (!action) { sendResponse({ ok:false, error:{ safeDiagnosticCode:'SEND_TAB_ACTION_INVALID' } }); return false; }
+    action(chrome, repo, message, _sender)
+      .then(data => sendResponse({ ok:true, data }))
+      .catch(error => sendResponse({ ok:false, error:{ safeDiagnosticCode:error?.safeDiagnosticCode || 'SEND_TAB_ACTIVATION_FAILED' } }));
+    return true;
+  }
   if (message?.channel === 'autopilot-native-input') {
     performNativeInput(chrome, repo, message, _sender)
       .then(() => sendResponse({ ok: true }))

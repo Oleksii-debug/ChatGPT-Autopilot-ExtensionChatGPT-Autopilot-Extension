@@ -111,7 +111,9 @@ const MAX_TASKS_PER_DECISION = 1000;
 const MAX_PENDING_EVENTS = 10000;
 const MAX_COORDINATOR_EVENTS_PER_TURN = 200;
 const MAX_WORKER_HISTORY = 10000;
-const MIN_RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000;
+// Technical probe delay only; the owner's optional shared reserve is applied
+// by Core. Never create a hidden five-minute hold in orchestration.
+const MIN_RATE_LIMIT_BACKOFF_MS = 30_000;
 const MAX_STORED_DIRECT_CONTROL_CHARS = 512000;
 
 function isObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
