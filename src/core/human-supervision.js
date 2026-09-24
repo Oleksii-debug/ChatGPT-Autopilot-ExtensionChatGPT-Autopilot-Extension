@@ -1,26 +1,20 @@
 export const HUMAN_SUPERVISION_SCHEMA_VERSION = 1;
 
 export const HumanSupervisionKind = Object.freeze({
-  POLICY_ASK: 'POLICY_ASK',
+  POLICY_APPROVAL: 'POLICY_APPROVAL',
   CLARIFICATION: 'CLARIFICATION',
 });
 
 export const HumanSupervisionState = Object.freeze({
   WAITING_APPROVAL: 'WAITING_APPROVAL',
+  WAITING_CLARIFICATION: 'WAITING_CLARIFICATION',
   TIMED_OUT: 'TIMED_OUT',
   RESOLVED: 'RESOLVED',
 });
 
-export const PolicyAskDecision = Object.freeze({
-  ALLOW: 'ALLOW',
-  DENY: 'DENY',
-});
-
 const KINDS = new Set(Object.values(HumanSupervisionKind));
-const POLICY_DECISIONS = new Set(Object.values(PolicyAskDecision));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_TEXT = 8_000;
-const MAX_REASON = 1_000;
 const MAX_STAGES = 8;
 const MAX_REVIEWERS = 32;
 const MAX_CHOICES = 64;
@@ -34,7 +28,7 @@ const REQUEST_KEYS = new Set([
   'kind',
   'question',
   'createdAt',
-  'policyDecisionId',
+  'approvalId',
   'reviewStages',
   'choices',
   'allowFreeText',
@@ -52,7 +46,7 @@ const CHOICE_KEYS = new Set([
   'label',
 ]);
 
-const RESPONSE_KEYS = new Set([
+const RESPONSE_COMMON_KEYS = [
   'schemaVersion',
   'responseId',
   'supervisionId',
@@ -62,7 +56,16 @@ const RESPONSE_KEYS = new Set([
   'respondedAt',
   'reasonCode',
   'evidenceArtifactIds',
-  'policyDecision',
+];
+
+const APPROVAL_ATTESTATION_KEYS = new Set([
+  ...RESPONSE_COMMON_KEYS,
+  'approvalId',
+  'approvalResolutionId',
+]);
+
+const CLARIFICATION_RESPONSE_KEYS = new Set([
+  ...RESPONSE_COMMON_KEYS,
   'selectedChoiceId',
   'clarificationText',
 ]);
@@ -237,14 +240,14 @@ export function normalizeHumanSupervisionRequestV1(input) {
   choices.sort((a, b) => asciiCompare(a.choiceId, b.choiceId));
 
   const allowFreeText = bool(raw.allowFreeText, 'allowFreeText');
-  const policyDecisionId = id(raw.policyDecisionId, 'policyDecisionId', { optional: true });
+  const approvalId = id(raw.approvalId, 'approvalId', { optional: true });
 
-  if (kind === HumanSupervisionKind.POLICY_ASK) {
-    if (!policyDecisionId) throw new Error('POLICY_ASK requires policyDecisionId');
-    if (choices.length) throw new Error('POLICY_ASK cannot declare clarification choices');
-    if (allowFreeText) throw new Error('POLICY_ASK cannot enable clarification free text');
+  if (kind === HumanSupervisionKind.POLICY_APPROVAL) {
+    if (!approvalId) throw new Error('POLICY_APPROVAL requires approvalId from the canonical approval contract');
+    if (choices.length) throw new Error('POLICY_APPROVAL cannot declare clarification choices');
+    if (allowFreeText) throw new Error('POLICY_APPROVAL cannot enable clarification free text');
   } else {
-    if (policyDecisionId) throw new Error('CLARIFICATION cannot carry policyDecisionId');
+    if (approvalId) throw new Error('CLARIFICATION cannot carry approvalId');
     if (!choices.length && !allowFreeText) {
       throw new Error('CLARIFICATION requires choices or allowFreeText');
     }
@@ -258,7 +261,7 @@ export function normalizeHumanSupervisionRequestV1(input) {
     kind,
     question: text(raw.question, 'question'),
     createdAt,
-    policyDecisionId,
+    approvalId,
     reviewStages: Object.freeze(stages),
     choices: Object.freeze(choices),
     allowFreeText,
@@ -308,7 +311,9 @@ export function projectHumanSupervisionV1(requestInput, atInput) {
     supervisionId: request.supervisionId,
     jobId: request.jobId,
     stepId: request.stepId,
-    state: HumanSupervisionState.WAITING_APPROVAL,
+    state: request.kind === HumanSupervisionKind.POLICY_APPROVAL
+      ? HumanSupervisionState.WAITING_APPROVAL
+      : HumanSupervisionState.WAITING_CLARIFICATION,
     activeStageId: active.stage.stageId,
     authorizedReviewerIds: active.stage.reviewerIds,
     nextEscalationAt: active.stage.expiresAt,
@@ -325,103 +330,112 @@ function ensureRequiredEvidence(request, provided) {
   }
 }
 
-export function normalizeHumanSupervisionResponseV1(requestInput, responseInput) {
-  const request = normalizeHumanSupervisionRequestV1(requestInput);
-  const raw = strictRecord(responseInput, RESPONSE_KEYS, 'HumanSupervisionResponseV1');
-  if (raw.schemaVersion !== HUMAN_SUPERVISION_SCHEMA_VERSION) {
-    throw new Error('Unsupported HumanSupervisionResponseV1 schemaVersion');
-  }
+function normalizeResponseCommon(request, raw, label) {
+  const supervisionId = id(raw.supervisionId, `${label}.supervisionId`);
+  const jobId = id(raw.jobId, `${label}.jobId`);
+  const stepId = id(raw.stepId, `${label}.stepId`);
+  if (supervisionId !== request.supervisionId) throw new Error(`${label} supervisionId mismatch`);
+  if (jobId !== request.jobId) throw new Error(`${label} jobId mismatch`);
+  if (stepId !== request.stepId) throw new Error(`${label} stepId mismatch`);
 
-  const supervisionId = id(raw.supervisionId, 'response.supervisionId');
-  const jobId = id(raw.jobId, 'response.jobId');
-  const stepId = id(raw.stepId, 'response.stepId');
-  if (supervisionId !== request.supervisionId) throw new Error('response supervisionId mismatch');
-  if (jobId !== request.jobId) throw new Error('response jobId mismatch');
-  if (stepId !== request.stepId) throw new Error('response stepId mismatch');
-
-  const respondedAt = timestamp(raw.respondedAt, 'respondedAt');
+  const respondedAt = timestamp(raw.respondedAt, `${label}.respondedAt`);
   const active = locateStage(request, respondedAt);
-  if (!active) throw new Error('response arrived after supervision timed out');
+  if (!active) throw new Error(`${label} arrived after supervision timed out`);
 
-  const responderId = id(raw.responderId, 'responderId');
+  const responderId = id(raw.responderId, `${label}.responderId`);
   if (!active.stage.reviewerIds.includes(responderId)) {
-    throw new Error('responder is not authorized for the active supervision stage');
+    throw new Error(`${label} responder is not authorized for the active supervision stage`);
   }
 
   const evidenceArtifactIds = normalizeIdList(
     raw.evidenceArtifactIds,
-    'evidenceArtifactIds',
+    `${label}.evidenceArtifactIds`,
     { min: 0, max: MAX_EVIDENCE },
   );
   ensureRequiredEvidence(request, evidenceArtifactIds);
 
-  const reasonCode = id(raw.reasonCode, 'reasonCode');
-  let policyDecision = '';
-  let selectedChoiceId = '';
-  let clarificationText = '';
-
-  if (request.kind === HumanSupervisionKind.POLICY_ASK) {
-    policyDecision = id(raw.policyDecision, 'policyDecision');
-    if (!POLICY_DECISIONS.has(policyDecision)) {
-      throw new Error('POLICY_ASK response must be ALLOW or DENY');
-    }
-    if (raw.selectedChoiceId != null && raw.selectedChoiceId !== '') {
-      throw new Error('POLICY_ASK response cannot select a clarification choice');
-    }
-    if (raw.clarificationText != null && raw.clarificationText !== '') {
-      throw new Error('POLICY_ASK response cannot carry clarification text');
-    }
-  } else {
-    if (raw.policyDecision != null && raw.policyDecision !== '') {
-      throw new Error('CLARIFICATION response cannot grant policy authority');
-    }
-    selectedChoiceId = id(raw.selectedChoiceId, 'selectedChoiceId', { optional: true });
-    clarificationText = text(raw.clarificationText, 'clarificationText', {
-      optional: true,
-      max: MAX_TEXT,
-    });
-    if (Boolean(selectedChoiceId) === Boolean(clarificationText)) {
-      throw new Error('CLARIFICATION response must provide exactly one choice or text answer');
-    }
-    if (selectedChoiceId && !request.choices.some((choice) => choice.choiceId === selectedChoiceId)) {
-      throw new Error('CLARIFICATION selectedChoiceId is not declared by the request');
-    }
-    if (clarificationText && !request.allowFreeText) {
-      throw new Error('CLARIFICATION free text is not allowed');
-    }
-  }
-
   return freezeDeep({
     schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    responseId: id(raw.responseId, 'responseId'),
+    responseId: id(raw.responseId, `${label}.responseId`),
     supervisionId,
     jobId,
     stepId,
     responderId,
     respondedAt,
-    reasonCode,
+    reasonCode: id(raw.reasonCode, `${label}.reasonCode`),
     evidenceArtifactIds,
-    policyDecision,
-    selectedChoiceId,
-    clarificationText,
     stageId: active.stage.stageId,
   });
 }
 
-export function resolveHumanSupervisionV1({ request: requestInput, response: responseInput } = {}) {
+export function normalizePolicyApprovalAttestationV1(requestInput, input) {
   const request = normalizeHumanSupervisionRequestV1(requestInput);
-  const response = normalizeHumanSupervisionResponseV1(request, responseInput);
-  const resolution = request.kind === HumanSupervisionKind.POLICY_ASK
-    ? freezeDeep({
-      kind: request.kind,
-      policyDecisionId: request.policyDecisionId,
-      policyDecision: response.policyDecision,
-    })
-    : freezeDeep({
-      kind: request.kind,
-      selectedChoiceId: response.selectedChoiceId,
-      clarificationText: response.clarificationText,
-    });
+  if (request.kind !== HumanSupervisionKind.POLICY_APPROVAL) {
+    throw new Error('approval attestation requires POLICY_APPROVAL supervision');
+  }
+  const raw = strictRecord(input, APPROVAL_ATTESTATION_KEYS, 'PolicyApprovalAttestationV1');
+  if (raw.schemaVersion !== HUMAN_SUPERVISION_SCHEMA_VERSION) {
+    throw new Error('Unsupported PolicyApprovalAttestationV1 schemaVersion');
+  }
+  const common = normalizeResponseCommon(request, raw, 'approval attestation');
+  const approvalId = id(raw.approvalId, 'approval attestation.approvalId');
+  if (approvalId !== request.approvalId) throw new Error('approval attestation approvalId mismatch');
+
+  return freezeDeep({
+    ...common,
+    approvalId,
+    approvalResolutionId: id(
+      raw.approvalResolutionId,
+      'approval attestation.approvalResolutionId',
+    ),
+  });
+}
+
+export function normalizeClarificationResponseV1(requestInput, input) {
+  const request = normalizeHumanSupervisionRequestV1(requestInput);
+  if (request.kind !== HumanSupervisionKind.CLARIFICATION) {
+    throw new Error('clarification response requires CLARIFICATION supervision');
+  }
+  const raw = strictRecord(input, CLARIFICATION_RESPONSE_KEYS, 'ClarificationResponseV1');
+  if (raw.schemaVersion !== HUMAN_SUPERVISION_SCHEMA_VERSION) {
+    throw new Error('Unsupported ClarificationResponseV1 schemaVersion');
+  }
+  const common = normalizeResponseCommon(request, raw, 'clarification response');
+
+  const selectedChoiceId = id(
+    raw.selectedChoiceId,
+    'clarification response.selectedChoiceId',
+    { optional: true },
+  );
+  const clarificationText = text(
+    raw.clarificationText,
+    'clarification response.clarificationText',
+    { optional: true, max: MAX_TEXT },
+  );
+
+  if (Boolean(selectedChoiceId) === Boolean(clarificationText)) {
+    throw new Error('CLARIFICATION response must provide exactly one choice or text answer');
+  }
+  if (selectedChoiceId && !request.choices.some((choice) => choice.choiceId === selectedChoiceId)) {
+    throw new Error('CLARIFICATION selectedChoiceId is not declared by the request');
+  }
+  if (clarificationText && !request.allowFreeText) {
+    throw new Error('CLARIFICATION free text is not allowed');
+  }
+
+  return freezeDeep({
+    ...common,
+    selectedChoiceId,
+    clarificationText,
+  });
+}
+
+export function resolveClarificationV1({ request: requestInput, response: responseInput } = {}) {
+  const request = normalizeHumanSupervisionRequestV1(requestInput);
+  if (request.kind !== HumanSupervisionKind.CLARIFICATION) {
+    throw new Error('resolveClarificationV1 requires CLARIFICATION supervision');
+  }
+  const response = normalizeClarificationResponseV1(request, responseInput);
 
   return freezeDeep({
     schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
@@ -434,7 +448,8 @@ export function resolveHumanSupervisionV1({ request: requestInput, response: res
     reasonCode: response.reasonCode,
     evidenceArtifactIds: response.evidenceArtifactIds,
     resolvedAt: response.respondedAt,
-    resolution,
+    selectedChoiceId: response.selectedChoiceId,
+    clarificationText: response.clarificationText,
     resume: freezeDeep({
       schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
       supervisionId: request.supervisionId,
