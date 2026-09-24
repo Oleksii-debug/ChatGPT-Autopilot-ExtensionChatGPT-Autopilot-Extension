@@ -69,8 +69,10 @@ test('timeline is bounded to newest entries without mutating canonical state', (
   assert.equal(timeline.totalEntries, 205);
   assert.equal(timeline.returnedEntries, 200);
   assert.equal(timeline.truncated, true);
-  assert.equal(timeline.entries[0].message, 'log-6');
-  assert.equal(timeline.entries.at(-1).message, 'log-205');
+  assert.equal(timeline.entries[0].at, 6);
+  assert.equal(timeline.entries.at(-1).at, 205);
+  assert.equal(timeline.entries[0].message, 'Подію Core log зафіксовано.');
+  assert.equal(timeline.entries.at(-1).message, 'Подію Core log зафіксовано.');
   assert.deepEqual(canonical, before);
 });
 
