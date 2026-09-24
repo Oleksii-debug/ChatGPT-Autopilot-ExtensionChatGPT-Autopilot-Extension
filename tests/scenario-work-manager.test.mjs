@@ -77,6 +77,81 @@ test('manager preserves a valid persisted scenario while omitting an invalid sib
   assert.equal(listed.scenarios[0].name, 'Valid');
 });
 
+
+test('manager recovery rejects persisted accessors without executing getters', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  let getterCalls = 0;
+  Object.defineProperty(stored, 'order', {
+    enumerable: true,
+    configurable: true,
+    get() { getterCalls += 1; return ['valid']; },
+  });
+
+  const listed = await manager.list();
+  assert.equal(getterCalls, 0);
+  assert.equal(listed.selectedId, '');
+  assert.deepEqual(listed.scenarios, []);
+});
+
+test('manager omits accessor-backed or hidden scenario records while preserving valid siblings', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  let getterCalls = 0;
+  const accessorItem = {};
+  Object.defineProperty(accessorItem, 'config', {
+    enumerable: true,
+    get() { getterCalls += 1; return stored.byId.valid.config; },
+  });
+  stored.order.push('accessor');
+  Object.defineProperty(stored.byId, 'accessor', {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: accessorItem,
+  });
+
+  const hiddenItem = structuredClone(stored.byId.valid);
+  Object.defineProperty(hiddenItem, 'config', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: hiddenItem.config,
+  });
+  stored.order.push('hidden');
+  Object.defineProperty(stored.byId, 'hidden', {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: hiddenItem,
+  });
+
+  const listed = await manager.list();
+  assert.equal(getterCalls, 0);
+  assert.equal(listed.selectedId, 'valid');
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+});
+
 test('manager materializes scenario turns only as canonical one-pass core sessions', async () => {
   let now = 1000;
   const chrome = chromeFake();
