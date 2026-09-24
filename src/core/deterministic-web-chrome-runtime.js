@@ -1,6 +1,14 @@
-import { createDeterministicWebProviderV1 } from './deterministic-web-provider.js';
+import {
+  createDeterministicWebProviderV1,
+  verifyDeterministicWebPostconditionV1,
+} from './deterministic-web-provider.js';
+import {
+  normalizeObservationV1,
+  normalizeVerificationV1,
+} from './universal-agent-contracts.js';
 
 export const DETERMINISTIC_WEB_RUNTIME_STORAGE_KEY = 'autopilot.deterministicWebRuntime.v1';
+export const DETERMINISTIC_WEB_RECONCILE_VERIFIER_ID = 'deterministic-web-chrome-readback-v1';
 
 export function normalizeChromeDeterministicWebTargetV1(targetId) {
   if (typeof targetId !== 'string') throw new Error('deterministic web targetId must be canonical tab:<positive-safe-integer>');
@@ -18,6 +26,36 @@ function tabIdFromTarget(targetId) {
 }
 
 function clone(value) { return structuredClone(value); }
+
+async function readChromeTargetV1(chromeApi, targetId) {
+  const { tabId } = normalizeChromeDeterministicWebTargetV1(targetId);
+  const live = await chromeApi.tabs.get(tabId);
+  if (!live || live.id !== tabId) throw new Error('deterministic web target tab is unavailable');
+  const result = await chromeApi.scripting.executeScript({
+    target: { tabId, frameIds: [0] },
+    func: () => ({
+      url: location.href,
+      readyState: document.readyState,
+      visibleSelectors: Array.from(document.querySelectorAll('[id]')).filter(node => {
+        const style = getComputedStyle(node);
+        const rect = node.getBoundingClientRect();
+        return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
+      }).slice(0, 256).map(node => `#${CSS.escape(node.id)}`),
+    }),
+  });
+  return {
+    tabId,
+    live,
+    data: {
+      targetId,
+      tabId,
+      url: result?.[0]?.result?.url || live?.url || '',
+      readyState: result?.[0]?.result?.readyState || '',
+      tabStatus: live?.status || '',
+      visibleSelectors: result?.[0]?.result?.visibleSelectors || [],
+    },
+  };
+}
 
 export function createChromeDeterministicWebStoreV1(chromeApi, { storageKey = DETERMINISTIC_WEB_RUNTIME_STORAGE_KEY } = {}) {
   if (!chromeApi?.storage?.local?.get || !chromeApi?.storage?.local?.set) throw new Error('deterministic web runtime requires Chrome local storage');
@@ -74,28 +112,53 @@ export function createChromeDeterministicWebTransportV1(chromeApi) {
       if (!result?.[0]?.result?.ok) throw new Error(result?.[0]?.result?.code || 'WEB_ACTION_REJECTED');
     },
     async observe({ targetId }) {
-      const tabId = tabIdFromTarget(targetId);
-      const live = await chromeApi.tabs.get(tabId);
-      const result = await script().executeScript({
-        target: { tabId, frameIds: [0] },
-        func: () => ({
-          url: location.href,
-          visibleSelectors: Array.from(document.querySelectorAll('[id]')).filter(node => {
-            const style = getComputedStyle(node);
-            const rect = node.getBoundingClientRect();
-            return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
-          }).slice(0, 256).map(node => `#${CSS.escape(node.id)}`),
-        }),
-      });
-      return {
-        data: {
-          url: result?.[0]?.result?.url || live?.url || '',
-          visibleSelectors: result?.[0]?.result?.visibleSelectors || [],
-        },
-        artifactRefs: [],
-      };
+      const readback = await readChromeTargetV1(chromeApi, targetId);
+      return { data: readback.data, artifactRefs: [] };
     },
   });
+}
+
+export function createChromeDeterministicWebReconcileVerifierV1(chromeApi, { now = () => new Date().toISOString() } = {}) {
+  if (!chromeApi?.tabs?.get || !chromeApi?.scripting?.executeScript) throw new Error('independent deterministic web readback requires Chrome tabs and scripting APIs');
+  return async ({ invocation, executionId, attempt, outcome, targetId, postcondition }) => {
+    if (String(outcome || '').toUpperCase() !== 'VERIFIED') {
+      throw new Error('automatic Chrome reconciliation only proves VERIFIED outcomes');
+    }
+    const normalizedTarget = normalizeChromeDeterministicWebTargetV1(targetId);
+    const observedAt = now();
+    const readback = await readChromeTargetV1(chromeApi, normalizedTarget.targetId);
+    const observation = normalizeObservationV1({
+      schemaVersion: 1,
+      observationId: `web-reconcile-observe-${invocation.invocationId}`,
+      invocationId: invocation.invocationId,
+      status: 'OK',
+      summary: 'Fresh independent Chrome readback captured for reconciliation.',
+      data: readback.data,
+      artifactRefs: [],
+      observedAt,
+    });
+    const base = verifyDeterministicWebPostconditionV1({
+      invocationId: invocation.invocationId,
+      observation,
+      expected: postcondition,
+      now: observedAt,
+    });
+    const verification = normalizeVerificationV1({
+      ...base,
+      verificationId: `web-reconcile-verify-${invocation.invocationId}`,
+      verifierId: DETERMINISTIC_WEB_RECONCILE_VERIFIER_ID,
+      verificationAuthorityId: invocation.policyDecisionId,
+      effectId: invocation.invocationId,
+      executionId,
+      attempt,
+    });
+    return Object.freeze({
+      verifierId: DETERMINISTIC_WEB_RECONCILE_VERIFIER_ID,
+      targetId: normalizedTarget.targetId,
+      observation,
+      verification,
+    });
+  };
 }
 
 export function createChromeDeterministicWebProviderV1({ chromeApi, reconcileVerify, now, leaseId } = {}) {
