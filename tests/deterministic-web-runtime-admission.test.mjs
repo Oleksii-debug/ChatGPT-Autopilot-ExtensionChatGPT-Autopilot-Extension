@@ -49,6 +49,28 @@ test('runtime admission completes one cold-start recovery before first mutation 
   assert.equal(fixture.calls.filter(([name]) => name === 'recover').length, 1);
 });
 
+test('runtime admission rejects missing malformed and foreign sender identity before recovery or effects', async () => {
+  const fixture = providerFixture();
+  const admission = createDeterministicWebRuntimeAdmissionV1({ provider: fixture.provider, extensionId: 'extension-1' });
+  const invalidSenders = [
+    {},
+    { id: '' },
+    { id: null },
+    { id: 1 },
+    { id: 'foreign-extension' },
+  ];
+
+  for (const sender of invalidSenders) {
+    await assert.rejects(() => admission.dispatch({
+      channel: DETERMINISTIC_WEB_RUNTIME_CHANNEL,
+      command: 'INVOKE',
+      payload: { targetId: 'tab:7' },
+    }, sender), /sender is not authorized/);
+  }
+
+  assert.deepEqual(fixture.calls, [], 'unauthenticated senders must not cross the recovery/effect boundary');
+});
+
 test('runtime admission rejects foreign senders and unsupported reconciliation outcomes', async () => {
   const fixture = providerFixture();
   const admission = createDeterministicWebRuntimeAdmissionV1({ provider: fixture.provider, extensionId: 'extension-1' });
