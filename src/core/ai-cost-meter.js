@@ -1,0 +1,214 @@
+import { AiRouteCostClass, normalizeAiRoutePool } from './ai-route-pool.js';
+
+export const AI_COST_RECORD_VERSION = 1;
+export const MAX_AI_COST_RECORDS = 10_000;
+
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const COST_RECORD_KEYS = new Set([
+  'schemaVersion',
+  'invocationId',
+  'routeId',
+  'provider',
+  'model',
+  'endpointId',
+  'costClass',
+  'inputTokens',
+  'outputTokens',
+  'modelCalls',
+  'inputPricePerMillionUsd',
+  'outputPricePerMillionUsd',
+  'costUsdMicros',
+  'observedAt',
+]);
+
+function plainObject(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  return value;
+}
+
+function exactKeys(value, allowed, label) {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  }
+}
+
+function own(value, key, fallback) {
+  return Object.hasOwn(value, key) ? value[key] : fallback;
+}
+
+function id(value, label, { optional = false } = {}) {
+  if (optional && (value == null || value === '')) return '';
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
+  if (!ID.test(out)) throw new Error(`${label} is invalid`);
+  return out;
+}
+
+function text(value, label, max, { optional = false } = {}) {
+  if (optional && (value == null || value === '')) return '';
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
+  if ((!optional && !out) || out.length > max) throw new Error(`${label} is invalid`);
+  return out;
+}
+
+function integer(value, label, { fallback = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  const candidate = value == null ? fallback : value;
+  if (typeof candidate !== 'number' || !Number.isSafeInteger(candidate) || candidate < 0 || candidate > max) {
+    throw new Error(`${label} must be a non-negative safe integer`);
+  }
+  return candidate;
+}
+
+function price(value, label) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function timestamp(value, label) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds)) throw new Error(`${label} must be a timestamp`);
+  return new Date(milliseconds).toISOString();
+}
+
+function frozen(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) frozen(child);
+  return Object.freeze(value);
+}
+
+function conservativeCostUsdMicros({ inputTokens, outputTokens, inputPricePerMillionUsd, outputPricePerMillionUsd }) {
+  const raw = (inputTokens * inputPricePerMillionUsd) + (outputTokens * outputPricePerMillionUsd);
+  if (!Number.isFinite(raw) || raw < 0 || raw > Number.MAX_SAFE_INTEGER) {
+    throw new Error('AI usage cost projection is outside the safe integer range');
+  }
+  const rounded = Math.ceil(raw);
+  if (!Number.isSafeInteger(rounded)) throw new Error('AI usage cost projection is unsafe');
+  return rounded;
+}
+
+function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillionUsd) {
+  if (costClass === AiRouteCostClass.FREE) {
+    if (inputPricePerMillionUsd !== 0 || outputPricePerMillionUsd !== 0) {
+      throw new Error('Free AI route cannot declare non-zero paid pricing');
+    }
+    return;
+  }
+  if (costClass !== AiRouteCostClass.PAID) throw new Error('AI costClass is invalid');
+  if (inputPricePerMillionUsd === 0 && outputPricePerMillionUsd === 0) {
+    const error = new Error('Paid AI route pricing is unknown');
+    error.code = 'AI_ROUTE_PRICE_UNKNOWN';
+    throw error;
+  }
+}
+
+export function normalizeAiCostRecordV1(input) {
+  const raw = plainObject(input, 'AiCostRecordV1');
+  exactKeys(raw, COST_RECORD_KEYS, 'AiCostRecordV1');
+  if (own(raw, 'schemaVersion', AI_COST_RECORD_VERSION) !== AI_COST_RECORD_VERSION) {
+    throw new Error('Unsupported AiCostRecordV1 schemaVersion');
+  }
+
+  const normalized = {
+    schemaVersion: AI_COST_RECORD_VERSION,
+    invocationId: id(own(raw, 'invocationId', undefined), 'AiCostRecordV1 invocationId'),
+    routeId: id(own(raw, 'routeId', undefined), 'AiCostRecordV1 routeId'),
+    provider: text(own(raw, 'provider', undefined), 'AiCostRecordV1 provider', 80),
+    model: text(own(raw, 'model', undefined), 'AiCostRecordV1 model', 300),
+    endpointId: id(own(raw, 'endpointId', ''), 'AiCostRecordV1 endpointId', { optional: true }),
+    costClass: text(own(raw, 'costClass', undefined), 'AiCostRecordV1 costClass', 20),
+    inputTokens: integer(own(raw, 'inputTokens', undefined), 'AiCostRecordV1 inputTokens'),
+    outputTokens: integer(own(raw, 'outputTokens', undefined), 'AiCostRecordV1 outputTokens'),
+    modelCalls: integer(own(raw, 'modelCalls', undefined), 'AiCostRecordV1 modelCalls', { max: 1 }),
+    inputPricePerMillionUsd: price(own(raw, 'inputPricePerMillionUsd', undefined), 'AiCostRecordV1 input price'),
+    outputPricePerMillionUsd: price(own(raw, 'outputPricePerMillionUsd', undefined), 'AiCostRecordV1 output price'),
+    costUsdMicros: integer(own(raw, 'costUsdMicros', undefined), 'AiCostRecordV1 costUsdMicros'),
+    observedAt: timestamp(own(raw, 'observedAt', undefined), 'AiCostRecordV1 observedAt'),
+  };
+
+  if (normalized.modelCalls !== 1) throw new Error('AiCostRecordV1 modelCalls must equal 1');
+  assertPricing(normalized.costClass, normalized.inputPricePerMillionUsd, normalized.outputPricePerMillionUsd);
+  const expectedCost = normalized.costClass === AiRouteCostClass.FREE
+    ? 0
+    : conservativeCostUsdMicros(normalized);
+  if (normalized.costUsdMicros !== expectedCost) {
+    throw new Error('AiCostRecordV1 costUsdMicros does not match the recorded usage and pricing');
+  }
+  return frozen(normalized);
+}
+
+export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTokens, observedAt } = {}) {
+  const normalizedRoute = normalizeAiRoutePool([plainObject(route, 'AI route for metering')])[0];
+  const normalizedInputTokens = integer(inputTokens, 'AI usage inputTokens');
+  const normalizedOutputTokens = integer(outputTokens, 'AI usage outputTokens');
+  assertPricing(
+    normalizedRoute.costClass,
+    normalizedRoute.inputPricePerMillionUsd,
+    normalizedRoute.outputPricePerMillionUsd,
+  );
+  const costUsdMicros = normalizedRoute.costClass === AiRouteCostClass.FREE
+    ? 0
+    : conservativeCostUsdMicros({
+      inputTokens: normalizedInputTokens,
+      outputTokens: normalizedOutputTokens,
+      inputPricePerMillionUsd: normalizedRoute.inputPricePerMillionUsd,
+      outputPricePerMillionUsd: normalizedRoute.outputPricePerMillionUsd,
+    });
+
+  return normalizeAiCostRecordV1({
+    schemaVersion: AI_COST_RECORD_VERSION,
+    invocationId,
+    routeId: normalizedRoute.routeId,
+    provider: normalizedRoute.provider,
+    model: normalizedRoute.model,
+    endpointId: normalizedRoute.endpointId,
+    costClass: normalizedRoute.costClass,
+    inputTokens: normalizedInputTokens,
+    outputTokens: normalizedOutputTokens,
+    modelCalls: 1,
+    inputPricePerMillionUsd: normalizedRoute.inputPricePerMillionUsd,
+    outputPricePerMillionUsd: normalizedRoute.outputPricePerMillionUsd,
+    costUsdMicros,
+    observedAt,
+  });
+}
+
+export function resourceUsageFromAiCostRecordV1(input) {
+  const record = normalizeAiCostRecordV1(input);
+  return frozen({
+    modelCalls: record.modelCalls,
+    modelInputTokens: record.inputTokens,
+    modelOutputTokens: record.outputTokens,
+    costUsdMicros: record.costUsdMicros,
+  });
+}
+
+export function aggregateAiCostRecordsV1(records) {
+  if (!Array.isArray(records) || records.length > MAX_AI_COST_RECORDS) {
+    throw new Error(`AI cost records must be an array of at most ${MAX_AI_COST_RECORDS} items`);
+  }
+  const total = {
+    modelCalls: 0,
+    modelInputTokens: 0,
+    modelOutputTokens: 0,
+    costUsdMicros: 0,
+  };
+  for (const input of records) {
+    const usage = resourceUsageFromAiCostRecordV1(input);
+    for (const key of Object.keys(total)) {
+      const next = total[key] + usage[key];
+      if (!Number.isSafeInteger(next)) throw new Error(`AI cost aggregate ${key} overflow`);
+      total[key] = next;
+    }
+  }
+  return frozen({ recordCount: records.length, ...total });
+}
