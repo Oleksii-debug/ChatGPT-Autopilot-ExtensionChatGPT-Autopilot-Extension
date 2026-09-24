@@ -1,6 +1,7 @@
 import {
   OrchestrationBarrierMode,
   OrchestrationChatMode,
+  OrchestrationLoopMode,
   validateOrchestrationGraphV1,
 } from './orchestration-hierarchy.js';
 import {
@@ -324,12 +325,17 @@ export function buildThreeLevelHierarchyTemplate({
   driveScalarPollIntervalMs = DRIVE_SCALAR_DEFAULT_POLL_INTERVAL_MS,
   driveFolderSources = null,
   driveFolderPollIntervalMs = DRIVE_FOLDER_DEFAULT_POLL_INTERVAL_MS,
+  loopMode = OrchestrationLoopMode.CONTINUOUS,
+  maxRounds = 0,
 } = {}) {
   const graph = stableId(graphId, 'graphId');
   const epoch = integer(controlEpoch, 'controlEpoch', 1, Number.MAX_SAFE_INTEGER);
   const project = required(projectId, 'projectId', 180);
   const target = repository(targetRepository);
   const issue = integer(controlIssueNumber || 0, 'controlIssueNumber', 0, Number.MAX_SAFE_INTEGER);
+  const normalizedLoopMode = required(loopMode, 'loopMode', 40).toUpperCase();
+  if (!Object.values(OrchestrationLoopMode).includes(normalizedLoopMode)) throw new Error('Invalid loopMode');
+  const normalizedMaxRounds = integer(maxRounds, 'maxRounds', 0, 1000000);
   const domainList = normalizeDomains(domains);
   const workerCount = integer(workersPerManager, 'workersPerManager', 1, MAX_WORKERS_PER_MANAGER);
   const domainIds = domainList.map(domain => domain.id);
@@ -481,6 +487,10 @@ export function buildThreeLevelHierarchyTemplate({
     schemaVersion: 1,
     graphId: graph,
     controlEpoch: epoch,
+    loopPolicy: {
+      mode: normalizedLoopMode,
+      maxRounds: normalizedMaxRounds,
+    },
     promptProfiles,
     nodes,
   });
