@@ -51,6 +51,10 @@ function repositoryPath(value) {
   return repositoryName(value).split('/').map(encodeURIComponent).join('/');
 }
 
+function refPath(value) {
+  return refName(value).split('/').map(encodeURIComponent).join('/');
+}
+
 function filePath(value) {
   if (typeof value !== 'string') throw githubError('GITHUB_INVALID_REQUEST', 'path must be text', { safeToRetry: true });
   const normalized = value.replace(/\\/gu, '/').trim();
@@ -251,6 +255,53 @@ export class GitHubRestClientV1 {
     });
   }
 
+  async readBranch({ repositoryFullName, branch } = {}) {
+    const repository = this.assertRepositoryAllowed(repositoryFullName);
+    const branchName = refName(branch, 'branch');
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/git/ref/heads/${refPath(branchName)}`);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || payload.object?.type !== 'commit') {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub branch response is not a commit ref');
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      branch: branchName,
+      ref: clean(payload.ref, 300),
+      commitSha: sha(payload.object?.sha, 'branch commit sha'),
+    });
+  }
+
+  async findPullRequests({ repositoryFullName, head, base } = {}) {
+    const repository = this.assertRepositoryAllowed(repositoryFullName);
+    const [owner] = repository.split('/');
+    const headRef = refName(head, 'head');
+    const baseRef = refName(base, 'base');
+    const query = new URLSearchParams({ state: 'all', head: `${owner}:${headRef}`, base: baseRef, per_page: '10' });
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/pulls?${query.toString()}`);
+    if (!Array.isArray(payload) || payload.length > 10) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request reconciliation response is invalid or too large');
+    }
+    const matches = payload.map(item => {
+      const number = Number(item?.number);
+      if (!Number.isInteger(number) || number < 1 || !['open', 'closed'].includes(item?.state)) {
+        throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request reconciliation item is invalid');
+      }
+      return Object.freeze({
+        number,
+        state: item.state,
+        title: clean(item?.title, 1000),
+        url: clean(item?.html_url, 4096),
+        headSha: sha(item?.head?.sha, 'pull request head sha'),
+        baseSha: sha(item?.base?.sha, 'pull request base sha'),
+      });
+    });
+    return Object.freeze({
+      repositoryFullName: repository,
+      head: headRef,
+      base: baseRef,
+      matches: Object.freeze(matches),
+    });
+  }
+
   async createBranch({ repositoryFullName, branch, fromSha } = {}) {
     const repository = this.assertRepositoryAllowed(repositoryFullName);
     const branchName = refName(branch, 'branch');
@@ -260,7 +311,15 @@ export class GitHubRestClientV1 {
       expectedStatuses: [201],
       body: { ref: `refs/heads/${branchName}`, sha: commitSha },
     });
-    return Object.freeze({ repositoryFullName: repository, branch: branchName, ref: clean(payload.ref, 300), sha: sha(payload.object?.sha || commitSha, 'created branch sha') });
+    if (payload?.object?.type !== 'commit') {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub create branch response is not a commit ref', { effectMayHaveOccurred: true });
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      branch: branchName,
+      ref: clean(payload.ref, 300),
+      sha: sha(payload.object?.sha, 'created branch sha'),
+    });
   }
 
   async putFile({ repositoryFullName, path, branch, message, contentUtf8, mode = GitHubFileWriteMode.CREATE, expectedBlobSha = '' } = {}) {
