@@ -1,3 +1,5 @@
+import './scenario-work-import-rollback-guard.js';
+
 const SAVE_WAIT_TIMEOUT_MS = 3000;
 const SAVE_POLL_INTERVAL_MS = 50;
 
