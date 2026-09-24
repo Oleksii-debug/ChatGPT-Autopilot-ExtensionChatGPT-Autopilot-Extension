@@ -13,6 +13,7 @@ import {
   OrchestrationChatMode,
   OrchestrationHierarchyActionType,
   OrchestrationHierarchyEventType,
+  compactOrchestrationEventId,
   validateOrchestrationGraphV1,
   validateOrchestrationHierarchyRuntimeV1,
 } from './orchestration-hierarchy.js';
@@ -274,7 +275,15 @@ export function projectHierarchyDeliveryEventsFromCore(
 
     events.push({
       type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
-      eventId: `${eventPrefix}:${graph.graphId}:${nodeId}:${activationId}:${task.lastVerifiedSendAt}`,
+      eventId: compactOrchestrationEventId(
+        eventPrefix,
+        graph.graphId,
+        nodeId,
+        activationId,
+        nodeRuntime.generation,
+        task.lastVerifiedSendAt,
+        task.lastVerifiedFingerprint || '',
+      ),
       controlEpoch: runtime.controlEpoch,
       nodeId,
       generation: nodeRuntime.generation,
