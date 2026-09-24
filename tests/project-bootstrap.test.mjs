@@ -7,6 +7,7 @@ import {
   buildProjectBootstrapV1,
 } from '../src/core/project-bootstrap.js';
 import { createProjectWorkspace } from '../src/core/project-workspace.js';
+import { normalizeArtifactRefV1 } from '../src/core/universal-agent-contracts.js';
 
 const AT = '2026-09-25T00:00:00.000Z';
 const SHA_A = 'a'.repeat(64);
@@ -245,6 +246,40 @@ test('identity, digest, timestamp and boolean aliases are rejected instead of co
   assert.throws(() => buildProjectBootstrapV1(input({
     artifactRefs:[artifact('inventory', SHA_B, { sensitive:'false' })],
   })), /sensitive must be boolean/);
+});
+
+test('rejects future source/artifact evidence relative to the bootstrap snapshot', () => {
+  const future = '2026-09-25T00:00:01.000Z';
+  assert.throws(
+    () => buildProjectBootstrapV1(input({
+      sourceRefs:[source('repo', SHA_A, { observedAt:future })],
+      requiredSourceIds:['repo'],
+    })),
+    /source observedAt is after bootstrap createdAt: repo/,
+  );
+  assert.throws(
+    () => buildProjectBootstrapV1(input({
+      artifactRefs:[artifact('inventory', SHA_B, { createdAt:future })],
+    })),
+    /artifact createdAt is after bootstrap createdAt: inventory/,
+  );
+});
+
+test('accepts the exact normalized canonical ArtifactRefV1 representation', () => {
+  const canonical = normalizeArtifactRefV1({
+    schemaVersion:1,
+    artifactId:'inventory',
+    kind:'application/json',
+    uri:'artifact://inventory',
+    sha256:SHA_B,
+    sizeBytes:12,
+    createdAt:AT,
+    sensitive:false,
+  });
+  assert.equal(canonical.mediaType, '');
+  assert.equal(canonical.producerInvocationId, null);
+  const result = buildProjectBootstrapV1(input({ artifactRefs:[canonical] }));
+  assert.equal(result.status, ProjectBootstrapStatus.READY);
 });
 
 test('bootstrap requires at least one required source and at least one source record', () => {
