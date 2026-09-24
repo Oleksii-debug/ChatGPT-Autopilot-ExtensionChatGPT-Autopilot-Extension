@@ -235,14 +235,28 @@ function hiddenStaleSourceCount(state, allowedSourceIds) {
   return state.sources.filter(source => source.status !== 'FRESH' && !allowedSourceIds.has(source.sourceId)).length;
 }
 
-function artifactDriftEvidence(state, phase) {
+function sensitiveArtifactIds(snapshot, capsule) {
+  const ids = new Set();
+  for (const ref of [...snapshot.artifactRefs, ...capsule.artifactRefs]) {
+    if (ref.sensitive) ids.add(ref.artifactId);
+  }
+  return ids;
+}
+
+function artifactDriftEvidence(state, phase, hiddenArtifactIds) {
   return state.artifacts
-    .filter(artifact => artifact.status !== 'MATCH')
+    .filter(artifact => artifact.status !== 'MATCH' && !hiddenArtifactIds.has(artifact.artifactId))
     .map(artifact => frozen({
       phase,
       artifactId: artifact.artifactId,
       status: artifact.status,
     }));
+}
+
+function hiddenArtifactDriftCount(state, hiddenArtifactIds) {
+  return state.artifacts.filter(
+    artifact => artifact.status !== 'MATCH' && hiddenArtifactIds.has(artifact.artifactId),
+  ).length;
 }
 
 export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSourceIds } = {}) {
@@ -273,6 +287,8 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSo
     capsule: currentCapsule,
     currentSourceRefs: current.currentSourceRefs,
   });
+  const baselineSensitiveArtifacts = sensitiveArtifactIds(baselineSnapshot, baselineCapsule);
+  const currentSensitiveArtifacts = sensitiveArtifactIds(currentSnapshot, currentCapsule);
 
   const base = {
     schemaVersion: ProjectCurrentStateDigestVersion,
@@ -303,9 +319,12 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSo
         hiddenStaleSourceCount(baselineState, allowedIds)
         + hiddenStaleSourceCount(currentState, allowedIds),
       artifactDriftEvidence: [
-        ...artifactDriftEvidence(baselineState, 'BASELINE'),
-        ...artifactDriftEvidence(currentState, 'CURRENT'),
+        ...artifactDriftEvidence(baselineState, 'BASELINE', baselineSensitiveArtifacts),
+        ...artifactDriftEvidence(currentState, 'CURRENT', currentSensitiveArtifacts),
       ],
+      hiddenSensitiveArtifactDriftCount:
+        hiddenArtifactDriftCount(baselineState, baselineSensitiveArtifacts)
+        + hiddenArtifactDriftCount(currentState, currentSensitiveArtifacts),
     });
   }
 
@@ -345,6 +364,8 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSo
   const currentArtifacts = new Map(currentSnapshot.artifactRefs.map(ref => [ref.artifactId, ref]));
   const artifactIds = [...new Set([...baselineArtifacts.keys(), ...currentArtifacts.keys()])].sort();
   const artifactChanges = [];
+  let totalArtifactChangeCount = 0;
+  let hiddenSensitiveArtifactChangeCount = 0;
   for (const artifactId of artifactIds) {
     const before = baselineArtifacts.get(artifactId) || null;
     const after = currentArtifacts.get(artifactId) || null;
@@ -353,6 +374,11 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSo
     else if (!after) change = 'REMOVED';
     else if (artifactChangeIdentity(before) !== artifactChangeIdentity(after)) change = 'CHANGED';
     if (change === 'UNCHANGED') continue;
+    totalArtifactChangeCount += 1;
+    if (before?.sensitive || after?.sensitive) {
+      hiddenSensitiveArtifactChangeCount += 1;
+      continue;
+    }
     artifactChanges.push(frozen({
       artifactId,
       change,
@@ -363,15 +389,19 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSo
 
   return frozen({
     ...base,
-    status: base.projectRevisionChanged || totalSourceChangeCount || artifactChanges.length ? 'CHANGED' : 'UNCHANGED',
+    status: base.projectRevisionChanged || totalSourceChangeCount || totalArtifactChangeCount ? 'CHANGED' : 'UNCHANGED',
     changeViewAvailable: true,
     totalSourceChangeCount,
     visibleSourceChangeCount: sourceChanges.length,
     hiddenSourceChangeCount,
     sourceChanges,
+    totalArtifactChangeCount,
+    visibleArtifactChangeCount: artifactChanges.length,
+    hiddenSensitiveArtifactChangeCount,
     artifactChanges,
     staleEvidence: [],
     hiddenStaleSourceCount: 0,
     artifactDriftEvidence: [],
+    hiddenSensitiveArtifactDriftCount: 0,
   });
 }
