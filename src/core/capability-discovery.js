@@ -78,8 +78,33 @@ function optionalInteger(value, label, max) {
 }
 
 function boundedArray(value, label, max) {
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  return value;
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
+      throw new Error(`${label} contains non-index array data`);
+    }
+    const index = Number(key);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
+      throw new Error(`${label} contains an invalid array index`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} must not be sparse`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
 }
 
 function frozen(value) {
