@@ -252,3 +252,164 @@ test('tool/provider identity mismatch fails closed instead of authorizing anothe
   assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
   assert.equal(result.policyDecision.reasonCode, 'TOOL_DESCRIPTOR_MISMATCH');
 });
+
+
+test('authority records reject accessors before any getter can execute', () => {
+  let reads = 0;
+
+  const accessorProfile = profile();
+  Object.defineProperty(accessorProfile, 'defaultDecision', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return OwnerPolicyDecision.ALLOW;
+    },
+  });
+  assert.throws(() => normalizeOwnerPolicyProfileV1(accessorProfile), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const accessorClassification = classification();
+  Object.defineProperty(accessorClassification, 'dataSensitivity', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return DataSensitivityClass.S0;
+    },
+  });
+  assert.throws(() => normalizePolicyClassificationV1(accessorClassification), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const nestedArguments = invocation();
+  Object.defineProperty(nestedArguments.arguments, 'pathRef', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'workspace:forged';
+    },
+  });
+  assert.throws(() => evaluate({ invocation: nestedArguments }), /enumerable data property/);
+  assert.equal(reads, 0);
+});
+
+test('hidden schema-valid authority fields cannot affect policy decisions', () => {
+  const hiddenProfile = profile();
+  Object.defineProperty(hiddenProfile, 'defaultDecision', {
+    value: OwnerPolicyDecision.ALLOW,
+    enumerable: false,
+    configurable: true,
+  });
+  assert.throws(() => normalizeOwnerPolicyProfileV1(hiddenProfile), /enumerable data property/);
+
+  const hiddenClassification = classification();
+  Object.defineProperty(hiddenClassification, 'effectRisk', {
+    value: EffectRiskClass.R0,
+    enumerable: false,
+    configurable: true,
+  });
+  assert.throws(() => normalizePolicyClassificationV1(hiddenClassification), /enumerable data property/);
+
+  const hiddenRule = {
+    ruleId: 'hidden-rule',
+    priority: 100,
+    decision: OwnerPolicyDecision.ALLOW,
+    capabilityIds: ['filesystem.read'],
+    toolIds: [],
+    providerIds: [],
+    maxEffectRisk: EffectRiskClass.R4,
+    maxDataSensitivity: DataSensitivityClass.S3,
+  };
+  Object.defineProperty(hiddenRule, 'decision', {
+    value: OwnerPolicyDecision.ALLOW,
+    enumerable: false,
+    configurable: true,
+  });
+  assert.throws(() => normalizeOwnerPolicyProfileV1(profile({ rules: [hiddenRule] })), /enumerable data property/);
+});
+
+test('authority arrays are dense plain data and never execute accessor indices', () => {
+  let reads = 0;
+  const trusted = ['core-classifier'];
+  Object.defineProperty(trusted, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'core-classifier';
+    },
+  });
+  assert.throws(() => normalizeOwnerPolicyProfileV1(profile({ trustedClassifierIds: trusted })), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const sparse = new Array(1);
+  assert.throws(() => normalizeOwnerPolicyProfileV1(profile({ trustedClassifierIds: sparse })), /must not be sparse/);
+
+  const custom = ['core-classifier'];
+  Object.setPrototypeOf(custom, {});
+  assert.throws(() => normalizeOwnerPolicyProfileV1(profile({ trustedClassifierIds: custom })), /bounded plain array/);
+
+  const symbolArray = ['core-classifier'];
+  symbolArray[Symbol('authority')] = 'ALLOW';
+  assert.throws(() => normalizeOwnerPolicyProfileV1(profile({ trustedClassifierIds: symbolArray })), /invalid array property/);
+
+  const capabilities = [capability()];
+  Object.defineProperty(capabilities, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return capability({ riskClass: EffectRiskClass.R0 });
+    },
+  });
+  assert.throws(() => evaluate({ capabilityDescriptors: capabilities }), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const grants = ['filesystem.read'];
+  Object.defineProperty(grants, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'filesystem.read';
+    },
+  });
+  assert.throws(() => evaluate({ grantedCapabilityIds: grants }), /enumerable data property/);
+  assert.equal(reads, 0);
+});
+
+test('valid null-prototype policy/classification data remains supported', () => {
+  const nullProfile = Object.assign(Object.create(null), profile());
+  const nullClassification = Object.assign(Object.create(null), classification());
+  const result = evaluate({
+    profile: nullProfile,
+    classification: nullClassification,
+  });
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.REQUIRE_APPROVAL);
+});
+
+test('identity strings are exact and capability attributes remain optional but data-only', () => {
+  assert.throws(
+    () => normalizePolicyClassificationV1(classification({ classifierId: ' core-classifier' })),
+    /classifierId is invalid/,
+  );
+
+  const withoutAttributes = capability();
+  delete withoutAttributes.attributes;
+  const result = evaluate({ capabilityDescriptors: [withoutAttributes] });
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.REQUIRE_APPROVAL);
+
+  let reads = 0;
+  const guardedCapability = capability();
+  Object.defineProperty(guardedCapability.attributes, 'sensitivity', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'S0';
+    },
+  });
+  assert.throws(() => evaluate({ capabilityDescriptors: [guardedCapability] }), /enumerable data property/);
+  assert.equal(reads, 0);
+});
