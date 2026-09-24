@@ -9,7 +9,7 @@ function setup(kind='submit'){
  session.runState='RUNNING';session.operation={operationId:'op',sessionId:'s',taskId:'t',targetUrl:task.url,promptText:'canonical prompt',promptFingerprint:'fp',phase:kind==='submit'?'SUBMITTING':'INSERTING',createdAt:1,updatedAt:1,preSendDeadline:0,submitStartedAt:kind==='submit'?1:0,verificationDeadline:0};
  state.sessionsById.s=session;state.sessionOrder=['s'];state.tabHintsByTaskId.t={tabId:7,sessionId:'s',normalizedUrl:task.url,kind:'TASK'};
  let db=state;const calls=[];
- const chrome={runtime:{id:'ext'},storage:{local:{get:async()=>({autopilotState:structuredClone(db)}),set:async r=>{db=structuredClone(r.autopilotState);}}},tabs:{get:async()=>({id:7,url:task.url})},scripting:{executeScript:async()=>[{result:{url:task.url,x:20,y:30}}]},debugger:{attach:async()=>calls.push('attach'),detach:async()=>calls.push('detach'),sendCommand:async(_target,method,args)=>{
+ const chrome={runtime:{id:'ext'},storage:{local:{get:async()=>({autopilotState:structuredClone(db)}),set:async r=>{db=structuredClone(r.autopilotState);}}},tabs:{get:async()=>({id:7,url:task.url,active:true,windowId:9})},scripting:{executeScript:async()=>[{result:{url:task.url,x:20,y:30}}]},debugger:{attach:async()=>calls.push('attach'),detach:async()=>calls.push('detach'),sendCommand:async(_target,method,args)=>{
   if(method==='Input.dispatchMouseEvent')assert.equal(db.sessionsById.s.operation.nativeSubmitDispatched,true);
   calls.push({method,args});
  }}};
@@ -47,12 +47,83 @@ test('cold-start restoration reads the durable previous tab after a completed na
  f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
  f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true};};
  await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender);
+ const activated=await f.repo.load();
+ assert.equal(activated.sessionsById.s.operation.previousSendTabId,3);
+ assert.equal(activated.sessionsById.s.operation.previousSendWindowId,9);
  await f.run();
  const restartedRepo=new StorageRepository(f.chrome);
  await restorePendingSendTabs(f.chrome,restartedRepo);
  assert.equal(activeTabId,3);
- assert.equal((await restartedRepo.load()).sessionsById.s.operation.previousSendTabId,0);
+ const restored=await restartedRepo.load();
+ assert.equal(restored.sessionsById.s.operation.previousSendTabId,0);
+ assert.equal(restored.sessionsById.s.operation.previousSendWindowId,0);
 });
+test('same-window parallel activation preserves original owner focus across restart reconciliation',async()=>{
+ const f=setup();
+ await f.repo.update(state=>{
+  const task=createTask({id:'t2',url:'https://chatgpt.com/c/native-two'});
+  const session=createSession({id:'s2',name:'Native two',tasks:[task],sharedPrompt:'second prompt',now:1});
+  session.runState='RUNNING';
+  session.operation={operationId:'op2',sessionId:'s2',taskId:'t2',targetUrl:task.url,promptText:'second prompt',promptFingerprint:'fp2',phase:'SUBMITTING',createdAt:1,updatedAt:1,preSendDeadline:0,submitStartedAt:1,verificationDeadline:0};
+  state.sessionsById.s2=session;
+  state.sessionOrder.push('s2');
+  state.tabHintsByTaskId.t2={tabId:8,sessionId:'s2',normalizedUrl:task.url,kind:'TASK'};
+  return state;
+ });
+ let activeTabId=3;
+ const urls={3:'https://example.com/',7:'https://chatgpt.com/c/native',8:'https://chatgpt.com/c/native-two'};
+ f.chrome.tabs.get=async id=>({id,url:urls[id],active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,url:urls[id],active:true,windowId:9};};
+ const sender2={id:'ext',frameId:0,tab:{id:8}};
+ const message2={kind:'submit',requestId:'op2',taskId:'t2'};
+
+ assert.deepEqual(await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender),{previousTabId:3});
+ assert.equal(activeTabId,7);
+ let state=await f.repo.load();
+ assert.equal(state.sessionsById.s.operation.previousSendTabId,3);
+ assert.equal(state.sessionsById.s.operation.previousSendWindowId,9);
+
+ // A service-worker restart has a new repository queue but the focus lease is
+ // durable. Session B cannot interpret A's active worker tab as the owner tab.
+ const restartedRepo=new StorageRepository(f.chrome);
+ await assert.rejects(
+  activateOwnedSendTab(f.chrome,restartedRepo,message2,sender2),
+  /SEND_TAB_WINDOW_BUSY/
+ );
+ assert.equal(activeTabId,7);
+
+ await restorePendingSendTabs(f.chrome,restartedRepo,{sessionId:'s'});
+ assert.equal(activeTabId,3);
+ state=await restartedRepo.load();
+ assert.equal(state.sessionsById.s.operation.previousSendTabId,0);
+ assert.equal(state.sessionsById.s.operation.previousSendWindowId,0);
+
+ assert.deepEqual(await activateOwnedSendTab(f.chrome,restartedRepo,message2,sender2),{previousTabId:3});
+ assert.equal(activeTabId,8);
+ await restoreOwnedSendTab(f.chrome,restartedRepo,{...message2,previousTabId:3},sender2);
+ assert.equal(activeTabId,3);
+});
+
+test('cold-start focus restoration before native submit proves zero effect and never attaches debugger',async()=>{
+ const f=setup();let activeTabId=3;
+ f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true,windowId:9};};
+
+ await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender);
+ assert.equal(activeTabId,7);
+ const restartedRepo=new StorageRepository(f.chrome);
+ await restorePendingSendTabs(f.chrome,restartedRepo,{sessionId:'s'});
+ assert.equal(activeTabId,3);
+
+ await assert.rejects(
+  performNativeInput(f.chrome,restartedRepo,f.message,f.sender),
+  /SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT/
+ );
+ assert.deepEqual(f.calls,[]);
+});
+
 test('native insertion replaces the focused composer and uses durable prompt text',async()=>{
  const f=setup('insert');
  f.message.promptText='injected different prompt';

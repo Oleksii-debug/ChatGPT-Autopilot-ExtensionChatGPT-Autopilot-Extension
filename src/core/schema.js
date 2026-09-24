@@ -171,6 +171,12 @@ function validateOperation(operation, session) {
       throw new Error(`Invalid session ${session.id} operation launchUrl`);
     }
   }
+  for (const field of ['previousSendTabId', 'previousSendWindowId']) {
+    if (operation[field] !== undefined
+        && (!Number.isInteger(operation[field]) || operation[field] < 0)) {
+      throw new Error(`Invalid session ${session.id} operation ${field}`);
+    }
+  }
 }
 
 function validateSession(session, id) {

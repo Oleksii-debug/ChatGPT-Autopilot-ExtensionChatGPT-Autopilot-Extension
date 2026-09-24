@@ -66,6 +66,12 @@ export async function performNativeInput(chromeApi, repository, message, sender)
   const tabId = sender.tab.id;
   const tab = await chromeApi.tabs.get(tabId);
   if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('NATIVE_INPUT_URL_MISMATCH');
+  // A service-worker restart can reconcile and return owner focus after the
+  // content script received activation but before its native-submit message
+  // arrives. Never dispatch a native mouse effect into that now-background tab.
+  // This check happens before debugger attach and before the durable effect bit,
+  // so the caller can classify it as proven no effect and retry safely.
+  if (message.kind === 'submit' && tab.active !== true) fail('SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
   if (!chromeApi.debugger?.attach || !chromeApi.debugger?.sendCommand) fail('NATIVE_INPUT_PERMISSION_UNAVAILABLE');
   const target = { tabId };
   let attached = false;
@@ -132,19 +138,52 @@ export async function performNativeInput(chromeApi, repository, message, sender)
   }
 }
 
+function hasOtherWindowFocusLease(state, windowId, operationId) {
+  return Object.values(state.sessionsById || {}).some(session => {
+    const candidate = session?.operation;
+    return candidate
+      && candidate.operationId !== operationId
+      && Number(candidate.previousSendTabId || 0) > 0
+      && Number(candidate.previousSendWindowId || 0) === windowId;
+  });
+}
+
 export async function activateOwnedSendTab(chromeApi, repository, message, sender) {
   const state = await repository.load();
   const { operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
   const tab = await chromeApi.tabs.get(sender.tab.id);
   if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('NATIVE_INPUT_URL_MISMATCH');
+
+  const alreadyPrevious = Number(operation.previousSendTabId || 0);
+  const alreadyWindow = Number(operation.previousSendWindowId || 0);
+  if (alreadyPrevious > 0) {
+    if (alreadyWindow && alreadyWindow !== tab.windowId) fail('SEND_TAB_ACTIVATION_STATE_INVALID');
+    if (!tab.active) fail('SEND_TAB_WINDOW_BUSY');
+    return { previousTabId:alreadyPrevious };
+  }
   if (tab.active) return { previousTabId:0 };
+
   const [previous] = await chromeApi.tabs.query({ active:true, windowId:tab.windowId });
   if (!previous || previous.id === tab.id || previous.windowId !== tab.windowId) fail('SEND_TAB_ACTIVATION_UNAVAILABLE');
+
   await repository.update(draft => {
     const live = authorizedOperation(draft, { ...message, kind:'submit' }, sender, chromeApi);
+    const priorTabId = Number(live.operation.previousSendTabId || 0);
+    const priorWindowId = Number(live.operation.previousSendWindowId || 0);
+    if (priorTabId > 0) {
+      if ((priorWindowId && priorWindowId !== tab.windowId) || priorTabId !== previous.id) {
+        fail('SEND_TAB_ACTIVATION_STATE_INVALID');
+      }
+      return draft;
+    }
+    if (hasOtherWindowFocusLease(draft, tab.windowId, live.operation.operationId)) {
+      fail('SEND_TAB_WINDOW_BUSY');
+    }
     live.operation.previousSendTabId = previous.id;
+    live.operation.previousSendWindowId = tab.windowId;
     return draft;
   });
+
   // This changes only tab selection; no click or keyboard effect has happened.
   await chromeApi.tabs.update(tab.id, { active:true });
   const current = await chromeApi.tabs.get(tab.id);
@@ -157,7 +196,22 @@ export async function restoreOwnedSendTab(chromeApi, repository, message, sender
   const { operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi, { allowSubmitted:true });
   const previousTabId = Number(message.previousTabId);
   if (!Number.isInteger(previousTabId) || previousTabId <= 0 || previousTabId !== operation.previousSendTabId) return;
-  await restorePendingSendTabs(chromeApi, repository, { sessionId:state.sessionOrder.find(id => state.sessionsById[id]?.operation?.operationId === message.requestId) });
+  await restorePendingSendTabs(chromeApi, repository, {
+    sessionId:state.sessionOrder.find(id => state.sessionsById[id]?.operation?.operationId === message.requestId),
+  });
+}
+
+async function clearPendingSendFocus(repository, sessionId, operationId, previousTabId, previousWindowId) {
+  await repository.update(draft => {
+    const live = draft.sessionsById[sessionId]?.operation;
+    if (live?.operationId === operationId
+        && Number(live.previousSendTabId || 0) === previousTabId
+        && Number(live.previousSendWindowId || 0) === previousWindowId) {
+      live.previousSendTabId = 0;
+      live.previousSendWindowId = 0;
+    }
+    return draft;
+  });
 }
 
 export async function restorePendingSendTabs(chromeApi, repository, { sessionId = '' } = {}) {
@@ -166,25 +220,51 @@ export async function restorePendingSendTabs(chromeApi, repository, { sessionId 
     const session = state.sessionsById[id];
     const operation = session?.operation;
     const previousTabId = Number(operation?.previousSendTabId || 0);
+    const previousWindowId = Number(operation?.previousSendWindowId || 0);
     if (!Number.isInteger(previousTabId) || previousTabId <= 0) continue;
+
     const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
       ? `__session_worker__:${session.id}` : operation.taskId;
     const ownedTabId = state.tabHintsByTaskId[hintKey]?.tabId;
-    if (!Number.isInteger(ownedTabId)) continue;
+    if (!Number.isInteger(ownedTabId)) {
+      await clearPendingSendFocus(repository, id, operation.operationId, previousTabId, previousWindowId);
+      continue;
+    }
+
+    let current;
+    let previous;
+    try { current = await chromeApi.tabs.get(ownedTabId); }
+    catch {
+      await clearPendingSendFocus(repository, id, operation.operationId, previousTabId, previousWindowId);
+      continue;
+    }
+    try { previous = await chromeApi.tabs.get(previousTabId); }
+    catch {
+      await clearPendingSendFocus(repository, id, operation.operationId, previousTabId, previousWindowId);
+      continue;
+    }
+
+    const expectedWindowId = previousWindowId || current.windowId;
+    if (current.windowId !== expectedWindowId || previous.windowId !== expectedWindowId) {
+      await clearPendingSendFocus(repository, id, operation.operationId, previousTabId, previousWindowId);
+      continue;
+    }
+
+    // A manual user tab switch/navigation wins. Another Autopilot Session cannot
+    // enter this window while the durable operation focus lease is present. Only
+    // restore owner focus when the still-active worker tab remains bound to this
+    // operation (including the legitimate fresh-launch -> /c/<id> transition).
+    let stillOperationTab = false;
     try {
-      const current = await chromeApi.tabs.get(ownedTabId);
-      const previous = await chromeApi.tabs.get(previousTabId);
-      if (previous.windowId !== current.windowId) continue;
       const currentUrl = normalizeChatUrl(current.url);
-      if (!(sameChatConversationUrl(currentUrl, operation.targetUrl)
-        || expectedPostSendConversationUrl(currentUrl, operation.targetUrl))) continue;
-      // A manual user tab switch wins; only restore if our tab remains selected.
-      if (current.active) await chromeApi.tabs.update(previousTabId, { active:true });
-      await repository.update(draft => {
-        const live = draft.sessionsById[id]?.operation;
-        if (live?.operationId === operation.operationId && live.previousSendTabId === previousTabId) live.previousSendTabId = 0;
-        return draft;
-      });
-    } catch (_) { /* Tab/window may have closed; next recovery may retry. */ }
+      stillOperationTab = sameChatConversationUrl(currentUrl, operation.targetUrl)
+        || expectedPostSendConversationUrl(currentUrl, operation.targetUrl);
+    } catch { /* An unrelated/invalid URL is treated as owner intervention. */ }
+    if (current.active && stillOperationTab) {
+      try { await chromeApi.tabs.update(previousTabId, { active:true }); }
+      catch { continue; }
+    }
+    await clearPendingSendFocus(repository, id, operation.operationId, previousTabId, previousWindowId);
   }
 }
+

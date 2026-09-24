@@ -51,7 +51,8 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   }
   async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt)acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
-  return {run,wait,acknowledge,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
+  function reloadAdapter(){ vm.runInContext(source,sandbox); }
+  return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
 }
 
 test('new-chat launch URL may transition from root to the created conversation after Send',async()=>{
@@ -63,30 +64,43 @@ test('new-chat launch URL may transition from root to the created conversation a
 });
 
 
-test('fresh launch verifies accepted Send from concrete conversation plus active generation before user history renders',async()=>{
+test('fresh launch generation without exact user-turn evidence remains uncertain',async()=>{
   const f=fixture({
     startUrl:'https://chatgpt.com/',
     redirectAfterSend:'https://chatgpt.com/c/generated-stop-proof',
     suppressMessage:true
   });
   const r=await f.run();
-  assert.equal(r.status,'SENT_VERIFIED');
-  assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_FRESH_GENERATION_STARTED');
-  assert.equal(r.submissionEvidence,'FRESH_CONVERSATION_GENERATION_STARTED');
-  assert.equal(f.messages.length,0,'semantic user-message history may legitimately lag generation');
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(r.safeDiagnosticCode,'SEND_CLICK_UNCERTAIN');
+  assert.equal(f.messages.length,0,'generation alone must not identify the submitted prompt');
   assert.equal(f.clicks(),1);
 });
 
-test('fresh launch accepts operation-bound structural append when ChatGPT re-renders user text',async()=>{
+test('fresh launch with a non-matching rendered user turn remains uncertain',async()=>{
   const f=fixture({
     startUrl:'https://chatgpt.com/',
     redirectAfterSend:'https://chatgpt.com/c/generated-structural',
     deliveredTextOverride:'Ви сказали: [rendered wrapper changed by UI]'
   });
   const r=await f.run();
-  assert.equal(r.status,'SENT_VERIFIED');
-  assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_FRESH_STRUCTURAL_APPEND');
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(r.safeDiagnosticCode,'SEND_CLICK_UNCERTAIN');
   assert.equal(f.clicks(),1);
+});
+
+test('same-document recovery cannot promote fresh launch without exact prompt evidence',async()=>{
+  const f=fixture({
+    startUrl:'https://chatgpt.com/',
+    redirectAfterSend:'https://chatgpt.com/c/generated-unrelated-shape',
+    deliveredTextOverride:'Інший текст, що не ідентифікує цей ефект'
+  });
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT');
+  assert.equal(recovered.status,'SUBMISSION_UNCERTAIN');
+  assert.notEqual(recovered.safeDiagnosticCode,'RECOVERY_TEXT_OPERATION_VERIFIED');
+  assert.notEqual(recovered.safeDiagnosticCode,'RECOVERY_MAIN_PROMPT_VERIFIED');
+  assert.equal(f.clicks(),1,'recovery remains verification-only');
 });
 
 test('late acknowledgement on a newly created conversation can be verified without resending',async()=>{
@@ -133,6 +147,22 @@ test('unlabeled main user turn recovers after navigation without resending',asyn
   assert.equal(r.status,'SENT_VERIFIED');
   assert.equal(f.clicks(),1);
 });
+test('fresh-launch restart cannot verify an unrelated conversation from historical prompt text',async()=>{
+  const f=fixture({messageShape:'unlabeled',noOp:true,startUrl:'https://chatgpt.com/'});
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  assert.equal(f.clicks(),1);
+  f.sandbox.location.href='https://chatgpt.com/c/unrelated';
+  f.acknowledge();
+  f.reloadAdapter();
+  const r=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{
+    expectedUrl:'https://chatgpt.com/',
+    recoveryLaunchUrl:'https://chatgpt.com/'
+  });
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.notEqual(r.safeDiagnosticCode,'RECOVERY_FRESH_MAIN_PROMPT_VERIFIED');
+  assert.notEqual(r.safeDiagnosticCode,'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED');
+  assert.equal(f.clicks(),1);
+});
 test('an old identical unlabeled turn cannot verify another Send',async()=>{
   const f=fixture({messageShape:'unlabeled',stale:true,noOp:true});
   assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
@@ -172,15 +202,37 @@ test('hidden tab bypasses Chrome native mouse submit and sends through DOM seman
   assert.equal(r.status,'SENT_VERIFIED');assert.equal(nativeCalls,0);assert.equal(f.clicks(),1);
 });
 
-test('hidden non-submit control activates before one native click and restores no second Send',async()=>{
-  const f=fixture();let activation=0,nativeCalls=0;
+test('focus reconciled away before native Send is reported as proven no effect',async()=>{
+  const f=fixture();let restores=0;
   const result=await f.run('SUBMIT_EXISTING',{}, {
-    activate:async()=>{activation++;f.document.visibilityState='visible';return true;},
-    submit:async()=>{nativeCalls++;f.acknowledge();},
+    activate:async()=>{f.document.visibilityState='visible';return true;},
+    submit:async()=>{
+      const error=new Error('owner focus already restored');
+      error.safeDiagnosticCode='SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT';
+      throw error;
+    },
+    restore:async()=>{restores++;f.document.visibilityState='hidden';return true;},
+  });
+  assert.equal(result.status,'TEMPORARY_ERROR');
+  assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
+  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(restores,1);
+  assert.equal(f.clicks(),0);
+});
+
+test('hidden non-submit control activates for native click and restores focus before acknowledgement completes',async()=>{
+  const f=fixture();let activation=0,nativeCalls=0,restores=0;
+  const order=[];
+  const result=await f.run('SUBMIT_EXISTING',{}, {
+    activate:async()=>{activation++;order.push('activate');f.document.visibilityState='visible';return true;},
+    submit:async()=>{nativeCalls++;order.push('submit');f.acknowledge();},
+    restore:async()=>{restores++;order.push('restore');f.document.visibilityState='hidden';return true;},
   });
   assert.equal(result.status,'SENT_VERIFIED');
   assert.equal(activation,1);
   assert.equal(nativeCalls,1);
+  assert.equal(restores,1);
+  assert.deepEqual(order,['activate','submit','restore']);
   assert.equal(f.clicks(),0);
 });
 
