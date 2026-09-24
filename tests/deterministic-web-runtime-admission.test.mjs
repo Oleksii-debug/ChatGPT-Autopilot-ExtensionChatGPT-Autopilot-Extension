@@ -115,3 +115,32 @@ test('verified reconciliation is pinned by admission to VERIFIED and ignores cal
     ['reconcile', { invocationId: 'effect-1', outcome: 'VERIFIED', reasonCode: 'FRESH_READBACK' }],
   ]);
 });
+
+
+test('closed-target reconciliation is authenticated and pinned to MANUAL_REVIEW', async () => {
+  const fixture = providerFixture();
+  const admission = createDeterministicWebRuntimeAdmissionV1({
+    provider: fixture.provider,
+    extensionId: 'extension-1',
+  });
+  fixture.releaseRecovery();
+
+  await admission.dispatch({
+    channel: DETERMINISTIC_WEB_RUNTIME_CHANNEL,
+    command: 'RECONCILE_CLOSED_TARGET',
+    payload: {
+      invocationId: 'effect-closed',
+      outcome: 'VERIFIED',
+      reasonCode: 'CALLER_CONTROLLED',
+    },
+  }, { id: 'extension-1' });
+
+  assert.deepEqual(fixture.calls, [
+    ['recover'],
+    ['reconcile', {
+      invocationId: 'effect-closed',
+      outcome: 'MANUAL_REVIEW',
+      reasonCode: 'TARGET_CLOSED_QUIESCENT',
+    }],
+  ]);
+});
