@@ -45,6 +45,8 @@ function normalizeBudget(raw = {}) {
 
 function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
   object(rawEnvelope, 'AgentPlan extension resourceEnvelope');
+  const prototype = Object.getPrototypeOf(rawEnvelope);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error('AgentPlan extension resourceEnvelope must be a plain data object');
   const envelope = normalizeBudget(rawEnvelope);
   const fields = ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros'];
   for (const field of fields) {
