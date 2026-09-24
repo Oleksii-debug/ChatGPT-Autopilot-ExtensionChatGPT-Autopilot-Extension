@@ -530,3 +530,70 @@ test('universal-agent contract objects reject exotic prototypes and symbol autho
   assert.equal(normalized.riskClass, 'R1');
 });
 
+
+
+test('universal-agent contract boundary rejects accessor-backed and hidden fields without executing getters', () => {
+  let decisionReads = 0;
+  const policy = {
+    schemaVersion: 1,
+    decisionId: 'decision-accessor',
+    invocationId: 'invoke-accessor',
+    reasonCode: 'POLICY_OK',
+    decidedAt: AT,
+  };
+  Object.defineProperty(policy, 'decision', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      decisionReads += 1;
+      return decisionReads === 1 ? 'DENY' : 'ALLOW';
+    },
+  });
+  assert.throws(() => normalizePolicyDecisionV1(policy), /own data properties/);
+  assert.equal(decisionReads, 0, 'decision getter must never execute at the authority boundary');
+
+  let statusReads = 0;
+  const observation = {
+    schemaVersion: 1,
+    observationId: 'obs-accessor',
+    invocationId: 'invoke-accessor',
+    observedAt: AT,
+  };
+  Object.defineProperty(observation, 'status', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      statusReads += 1;
+      return 'OK';
+    },
+  });
+  assert.throws(() => normalizeObservationV1(observation), /own data properties/);
+  assert.equal(statusReads, 0, 'status getter must never execute at the evidence boundary');
+
+  let digestReads = 0;
+  const artifactWithAccessor = artifact();
+  Object.defineProperty(artifactWithAccessor, 'sha256', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      digestReads += 1;
+      return '0'.repeat(64);
+    },
+  });
+  assert.throws(() => normalizeArtifactRefV1(artifactWithAccessor), /own data properties/);
+  assert.equal(digestReads, 0, 'evidence digest getter must never execute');
+
+  const hiddenAuthority = {
+    schemaVersion: 1,
+    capabilityId: 'filesystem.read',
+    description: 'Read',
+    riskClass: 'R1',
+    attributes: {},
+  };
+  Object.defineProperty(hiddenAuthority, 'hiddenAuthority', {
+    enumerable: false,
+    configurable: true,
+    value: 'filesystem.admin',
+  });
+  assert.throws(() => normalizeCapabilityV1(hiddenAuthority), /unknown field: hiddenAuthority/);
+});

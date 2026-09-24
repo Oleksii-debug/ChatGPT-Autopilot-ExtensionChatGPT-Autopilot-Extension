@@ -37,6 +37,15 @@ function plain(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
+  // Authority/evidence contracts are untrusted input. Inspect descriptors
+  // without evaluating accessors so a getter cannot change a value between
+  // validation and normalization (for example DENY -> ALLOW).
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} fields must be own data properties`);
+    }
+  }
   return value;
 }
 
