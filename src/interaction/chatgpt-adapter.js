@@ -1203,48 +1203,14 @@
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
-    // Durable fresh-launch recovery: a Send from / (or /g/<slug>) may
-    // navigate to a new /c/<id> and reload the document, which erases the
-    // in-memory pre-click evidence map. The operation carries its original
-    // launch surface durably. On that exact newly-created conversation, one
-    // matching user turn plus an empty composer is sufficient operation-bound
-    // evidence; a fresh launch had no prior user turns.
-    const recoveryLaunchUrl = request.recoveryLaunchUrl || '';
-    if (recoveryLaunchUrl && isFreshLaunchSurface(recoveryLaunchUrl)) {
-      const afterMessages = userMessageHistorySnapshot(doc);
-      const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
-      const singleMatchingTurn = afterMessages.length === 1
-        && promptTextMatches(afterMessages[0], request.promptText);
-      const mainPromptMatched = unlabeledPromptCount(doc, request.promptText) === 1;
-      const generationStarted = blocking?.status === STATUS.BUSY
-        || semanticAssistantMessages(doc).length > 0;
-      if (!found.ambiguous
-          && isExclusiveConversationLocation(globalThis.location?.href || '')
-          && composerEmpty
-          && generationStarted) {
-        return resultBase(request, start, {
-          status: STATUS.SENT_VERIFIED,
-          submissionEvidence: singleMatchingTurn
-            ? 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN'
-            : 'FRESH_LAUNCH_DURABLE_GENERATION_STARTED',
-          safeDiagnosticCode: singleMatchingTurn
-            ? 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED'
-            : 'RECOVERY_FRESH_GENERATION_STARTED',
-          assistantBaselineCount: 0
-        });
-      }
-      if (!found.ambiguous
-          && isExclusiveConversationLocation(globalThis.location?.href || '')
-          && composerEmpty
-          && (singleMatchingTurn || mainPromptMatched)) {
-        return resultBase(request, start, {
-          status: STATUS.SENT_VERIFIED,
-          submissionEvidence: singleMatchingTurn ? 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN' : 'FRESH_LAUNCH_DURABLE_MAIN_PROMPT_MATCH',
-          safeDiagnosticCode: singleMatchingTurn ? 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED' : 'RECOVERY_FRESH_MAIN_PROMPT_VERIFIED',
-          assistantBaselineCount: 0
-        });
-      }
-    }
+    // A page/service-worker restart destroys the operation-local pre-send DOM
+    // baseline. Historical content in a /c/<id> conversation is not proof that
+    // this operation created that conversation: the owned tab could have been
+    // manually or SPA-navigated to an unrelated thread during the ambiguous
+    // window. Therefore restart recovery must fail closed unless operation-local
+    // evidence below is still available. Core may keep the observed conversation
+    // as a no-blind-resend recovery target, but target location alone never
+    // upgrades an uncertain Send to SENT_VERIFIED.
 
     const textEvidence = textEvidenceFor(request);
     if (textEvidence) {
