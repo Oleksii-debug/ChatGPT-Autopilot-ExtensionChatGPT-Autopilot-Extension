@@ -366,6 +366,128 @@ test('durable GitHub exact-effect identities reject JavaScript coercion aliases'
   }
 });
 
+test('GitHub reconciliation request rejects inherited, accessor, symbol and coerced authority before proof or transition', async t => {
+  const fx = storeFixture();
+  const p = providerFixture({ fail: true });
+  let proofCalls = 0;
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async () => { throw new Error('must not verify'); },
+    reconcileVerify: async () => {
+      proofCalls += 1;
+      throw new Error('invalid request must not reach proof acquisition');
+    },
+  });
+  const inv = invocation('github-reconcile-request-boundary');
+  await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: policy(inv.invocationId) }));
+  assert.equal(fx.snapshot(inv.invocationId).phase, 'RECONCILE');
+
+  const inherited = Object.create({
+    invocationId: inv.invocationId,
+    outcome: 'MANUAL_REVIEW',
+    reasonCode: 'OWNER_REVIEW_REQUIRED',
+  });
+  const symbolAuthority = {
+    invocationId: inv.invocationId,
+    outcome: 'MANUAL_REVIEW',
+    reasonCode: 'OWNER_REVIEW_REQUIRED',
+  };
+  symbolAuthority[Symbol('authority')] = true;
+  const nonEnumerable = {
+    outcome: 'MANUAL_REVIEW',
+    reasonCode: 'OWNER_REVIEW_REQUIRED',
+  };
+  Object.defineProperty(nonEnumerable, 'invocationId', {
+    value: inv.invocationId,
+    enumerable: false,
+    configurable: true,
+  });
+
+  const cases = [
+    ['inherited authority', inherited, /plain object/],
+    ['symbol authority', symbolAuthority, /unknown field/],
+    ['non-enumerable identity', nonEnumerable, /enumerable data property/],
+    ['coerced outcome', { invocationId: inv.invocationId, outcome: true, reasonCode: 'OWNER_REVIEW_REQUIRED' }, /outcome is invalid/],
+    ['coerced summary', { invocationId: inv.invocationId, outcome: 'MANUAL_REVIEW', reasonCode: 'OWNER_REVIEW_REQUIRED', summary: 7 }, /summary must be text/],
+  ];
+
+  for (const [label, request, expected] of cases) {
+    await t.test(label, async () => {
+      const before = JSON.stringify(fx.snapshot(inv.invocationId));
+      await assert.rejects(() => executor.reconcile(request), expected);
+      assert.equal(JSON.stringify(fx.snapshot(inv.invocationId)), before);
+      assert.equal(proofCalls, 0);
+    });
+  }
+});
+
+test('GitHub reconciliation proof rejects exotic or non-data authority without changing durable RECONCILE state', async t => {
+  const fx = storeFixture();
+  const p = providerFixture({ fail: true });
+  let mutateProof = raw => raw;
+  const inv = invocation('github-reconcile-proof-boundary');
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async () => { throw new Error('must not verify'); },
+    reconcileVerify: async input => {
+      const observation = {
+        schemaVersion: 1,
+        observationId: `${input.effectId}:reconcile-observation`,
+        invocationId: input.effectId,
+        status: 'OK',
+        summary: '',
+        data: { committed: true },
+        artifactRefs: [],
+        observedAt: at,
+      };
+      const verification = {
+        ...verified(inv, observation, { verifierId: 'independent-github-readback' }),
+        executionId: input.executionId,
+        attempt: input.attempt,
+      };
+      return mutateProof({
+        verifierId: 'independent-github-readback',
+        verificationAuthorityId: input.policyDecisionId,
+        effectId: input.effectId,
+        executionId: input.executionId,
+        attempt: input.attempt,
+        observation,
+        verification,
+      });
+    },
+  });
+  await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: policy(inv.invocationId) }));
+  assert.equal(fx.snapshot(inv.invocationId).phase, 'RECONCILE');
+
+  const cases = [
+    ['string attempt', raw => ({ ...raw, attempt: '1' }), /current exact-effect attempt/],
+    ['symbol authority', raw => { raw[Symbol('authority')] = true; return raw; }, /unknown field/],
+    ['exotic prototype', raw => Object.assign(Object.create({ admin: true }), raw), /plain object/],
+    ['accessor effectId', raw => {
+      const value = raw.effectId;
+      Object.defineProperty(raw, 'effectId', { get: () => value, enumerable: true, configurable: true });
+      return raw;
+    }, /enumerable data property/],
+  ];
+
+  for (const [label, mutate, expected] of cases) {
+    await t.test(label, async () => {
+      mutateProof = mutate;
+      const before = JSON.stringify(fx.snapshot(inv.invocationId));
+      await assert.rejects(() => executor.reconcile({
+        invocationId: inv.invocationId,
+        outcome: 'VERIFIED',
+        reasonCode: 'READBACK_CONFIRMED',
+      }), expected);
+      assert.equal(JSON.stringify(fx.snapshot(inv.invocationId)), before);
+    });
+  }
+});
+
 test('fresh independently bound reconciliation can verify and commit without replaying the GitHub mutation', async () => {
   const fx = storeFixture();
   const p = providerFixture({ fail: true });
