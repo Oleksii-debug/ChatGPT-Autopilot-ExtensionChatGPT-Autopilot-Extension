@@ -134,11 +134,15 @@ test('an expired lease does not erase unresolved target ownership after a restar
   assert.equal(executed, false);
 });
 
-test('independent verifier fails when expected selector is absent', async () => {
-  const p = provider({ execute: async () => {}, observe: async () => ({ data: { visibleSelectors: ['#other'] }, artifactRefs: [] }) });
+test('failed postcondition is AMBIGUOUS and retains its target until reconciliation', async () => {
+  const leaseState = { value: null };
+  const p = provider({ execute: async () => {}, observe: async () => ({ data: { visibleSelectors: ['#other'] }, artifactRefs: [] }) }, leaseState);
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } });
-  assert.equal(result.status, 'FAILED');
+  assert.equal(result.status, 'AMBIGUOUS');
+  assert.equal(result.reconcileRequired, true);
   assert.equal(result.verification.reasonCode, 'SELECTOR_NOT_VISIBLE');
+  assert.equal(result.effectState.phase, 'RECONCILE');
+  assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
 });
 
 test('a restarted provider does not replay a durable EXECUTING effect; manual reconciliation frees its target', async () => {
