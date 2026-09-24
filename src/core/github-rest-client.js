@@ -39,6 +39,17 @@ function sha(value, label = 'sha') {
   return out.toLowerCase();
 }
 
+function responseSha(value, label = 'sha', { effectMayHaveOccurred = false } = {}) {
+  const out = clean(value, 80);
+  if (!GIT_SHA.test(out)) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned invalid ${label}`, {
+      effectMayHaveOccurred,
+      safeToRetry: !effectMayHaveOccurred,
+    });
+  }
+  return out.toLowerCase();
+}
+
 function refName(value, label = 'ref') {
   const out = clean(value, 240);
   if (!REF.test(out) || out.endsWith('/') || out.startsWith('.') || out.includes('//')) {
@@ -229,7 +240,7 @@ export class GitHubRestClientV1 {
     return Object.freeze({
       repositoryFullName: repository,
       path: clean(payload.path, MAX_PATH),
-      sha: sha(payload.sha, 'file sha'),
+      sha: responseSha(payload.sha, 'file sha'),
       sizeBytes: Number.isSafeInteger(payload.size) && payload.size >= 0 ? payload.size : 0,
       text: decodeBase64Utf8(payload.content),
     });
@@ -243,13 +254,13 @@ export class GitHubRestClientV1 {
     if (!Array.isArray(payload.tree) || payload.tree.length > 100_000) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub tree response is invalid or too large');
     return Object.freeze({
       repositoryFullName: repository,
-      sha: sha(payload.sha, 'tree sha'),
+      sha: responseSha(payload.sha, 'tree sha'),
       truncated: Boolean(payload.truncated),
       entries: Object.freeze(payload.tree.map(item => Object.freeze({
         path: clean(item?.path, MAX_PATH),
         mode: clean(item?.mode, 20),
         type: clean(item?.type, 20),
-        sha: item?.sha ? sha(item.sha, 'tree entry sha') : '',
+        sha: item?.sha ? responseSha(item.sha, 'tree entry sha') : '',
         sizeBytes: Number.isSafeInteger(item?.size) && item.size >= 0 ? item.size : 0,
       }))),
     });
@@ -266,7 +277,7 @@ export class GitHubRestClientV1 {
       repositoryFullName: repository,
       branch: branchName,
       ref: clean(payload.ref, 300),
-      commitSha: sha(payload.object?.sha, 'branch commit sha'),
+      commitSha: responseSha(payload.object?.sha, 'branch commit sha'),
     });
   }
 
@@ -290,8 +301,8 @@ export class GitHubRestClientV1 {
         state: item.state,
         title: clean(item?.title, 1000),
         url: clean(item?.html_url, 4096),
-        headSha: sha(item?.head?.sha, 'pull request head sha'),
-        baseSha: sha(item?.base?.sha, 'pull request base sha'),
+        headSha: responseSha(item?.head?.sha, 'pull request head sha'),
+        baseSha: responseSha(item?.base?.sha, 'pull request base sha'),
       });
     });
     return Object.freeze({
@@ -318,7 +329,7 @@ export class GitHubRestClientV1 {
       repositoryFullName: repository,
       branch: branchName,
       ref: clean(payload.ref, 300),
-      sha: sha(payload.object?.sha, 'created branch sha'),
+      sha: responseSha(payload.object?.sha, 'created branch sha', { effectMayHaveOccurred: true }),
     });
   }
 
@@ -338,8 +349,8 @@ export class GitHubRestClientV1 {
       repositoryFullName: repository,
       path: decodeURIComponent(encodedPath),
       branch: branchName,
-      blobSha: sha(payload.content?.sha, 'written blob sha'),
-      commitSha: sha(payload.commit?.sha, 'write commit sha'),
+      blobSha: responseSha(payload.content?.sha, 'written blob sha', { effectMayHaveOccurred: true }),
+      commitSha: responseSha(payload.commit?.sha, 'write commit sha', { effectMayHaveOccurred: true }),
       mode: normalizedMode,
     });
   }
@@ -355,7 +366,13 @@ export class GitHubRestClientV1 {
       expectedStatuses: [200],
       body: { message: commitMessage, sha: expectedSha, branch: branchName },
     });
-    return Object.freeze({ repositoryFullName: repository, path: decodeURIComponent(encodedPath), branch: branchName, deletedBlobSha: expectedSha, commitSha: sha(payload.commit?.sha, 'delete commit sha') });
+    return Object.freeze({
+      repositoryFullName: repository,
+      path: decodeURIComponent(encodedPath),
+      branch: branchName,
+      deletedBlobSha: expectedSha,
+      commitSha: responseSha(payload.commit?.sha, 'delete commit sha', { effectMayHaveOccurred: true }),
+    });
   }
 
   async createPullRequest({ repositoryFullName, title, body = '', head, base } = {}) {
