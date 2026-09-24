@@ -2,10 +2,19 @@ import { createDeterministicWebProviderV1 } from './deterministic-web-provider.j
 
 export const DETERMINISTIC_WEB_RUNTIME_STORAGE_KEY = 'autopilot.deterministicWebRuntime.v1';
 
+export function normalizeChromeDeterministicWebTargetV1(targetId) {
+  if (typeof targetId !== 'string') throw new Error('deterministic web targetId must be canonical tab:<positive-safe-integer>');
+  const match = /^tab:([1-9]\d*)$/.exec(targetId);
+  if (!match) throw new Error('deterministic web targetId must be canonical tab:<positive-safe-integer>');
+  const tabId = Number(match[1]);
+  if (!Number.isSafeInteger(tabId) || tabId <= 0 || String(tabId) !== match[1]) {
+    throw new Error('deterministic web targetId must be canonical tab:<positive-safe-integer>');
+  }
+  return Object.freeze({ targetId: `tab:${tabId}`, tabId });
+}
+
 function tabIdFromTarget(targetId) {
-  const match = /^tab:(\d+)$/.exec(String(targetId || ''));
-  if (!match) throw new Error('deterministic web targetId must be tab:<id>');
-  return Number(match[1]);
+  return normalizeChromeDeterministicWebTargetV1(targetId).tabId;
 }
 
 function clone(value) { return structuredClone(value); }
@@ -90,11 +99,18 @@ export function createChromeDeterministicWebTransportV1(chromeApi) {
 }
 
 export function createChromeDeterministicWebProviderV1({ chromeApi, reconcileVerify, now, leaseId } = {}) {
-  return createDeterministicWebProviderV1({
+  const provider = createDeterministicWebProviderV1({
     transport: createChromeDeterministicWebTransportV1(chromeApi),
     store: createChromeDeterministicWebStoreV1(chromeApi),
     reconcileVerify,
     now,
     leaseId,
+  });
+  return Object.freeze({
+    ...provider,
+    invoke(input = {}) {
+      const normalized = normalizeChromeDeterministicWebTargetV1(input.targetId);
+      return provider.invoke({ ...input, targetId: normalized.targetId });
+    },
   });
 }
