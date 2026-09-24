@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX,
   createPortableContextCapsuleV1,
+  normalizeContextCapsuleContentV1,
   normalizeContextCapsuleDisclosureV1,
+  renderContextCapsuleContentV1,
 } from '../src/core/project-context-capsule.js';
 import { assertContextCapsuleFreshV1 } from '../src/core/project-context-artifact.js';
 import {
@@ -74,15 +77,33 @@ function disclosure(overrides = {}) {
   };
 }
 
+function structuredContent(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    goal: 'Finish the current product slice without duplicating authority.',
+    currentState: 'Portable project context is being prepared from the canonical snapshot.',
+    constraints: ['Reuse existing ProjectWorkspace authority.', 'Do not disclose unapproved sensitive artifacts.'],
+    decisions: ['Represent large material through source bindings or ArtifactRefs.'],
+    unfinishedWork: ['Exact-head automated qualification remains required.'],
+    ownershipClaims: ['project-context-capsule-builder is owned by the current lineage.'],
+    recentEvidence: ['Current snapshot revision is project-revision-1.'],
+    nextActions: ['Run exact-head qualification.', 'Integrate only after fresh topology review.'],
+    ...overrides,
+  };
+}
+
 function build(overrides = {}) {
-  return createPortableContextCapsuleV1({
+  const base = {
     capsuleId: 'capsule-1',
     snapshot: snapshot(),
     summary: 'Bounded current project context.',
     disclosure: disclosure(),
     createdAt: AT,
-    ...overrides,
-  });
+  };
+  if (Object.hasOwn(overrides, 'content') && !Object.hasOwn(overrides, 'summary')) {
+    delete base.summary;
+  }
+  return createPortableContextCapsuleV1({ ...base, ...overrides });
 }
 
 test('portable capsule composes with existing freshness and ProjectWorkspace authorities', () => {
@@ -105,6 +126,89 @@ test('portable capsule composes with existing freshness and ProjectWorkspace aut
   const current = projectCurrentState(workspace, snap.projectId, capsule.capsuleId, snap.sourceRefs);
   assert.equal(current.status, 'FRESH');
   assert.equal(current.staleSourceCount, 0);
+});
+
+test('structured content covers the portable North Star handoff fields without changing ContextCapsuleV1', () => {
+  const contentInput = structuredContent();
+  const capsule = build({ content: contentInput });
+
+  assert.ok(capsule.summary.startsWith(CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX));
+  const encoded = capsule.summary.slice(CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX.length);
+  const decoded = JSON.parse(encoded);
+  assert.deepEqual(decoded, normalizeContextCapsuleContentV1(contentInput));
+  assert.equal(decoded.goal, contentInput.goal);
+  assert.deepEqual(decoded.constraints, contentInput.constraints);
+  assert.deepEqual(decoded.nextActions, contentInput.nextActions);
+  assert.deepEqual(Object.keys(capsule), [
+    'schemaVersion',
+    'capsuleId',
+    'projectId',
+    'projectRevisionId',
+    'summary',
+    'sourceBindings',
+    'artifactRefs',
+    'createdAt',
+  ]);
+});
+
+test('structured content rendering is deterministic and preserves ordered operational lists', () => {
+  const first = renderContextCapsuleContentV1(structuredContent());
+  const second = renderContextCapsuleContentV1(structuredContent());
+  assert.equal(first, second);
+  const decoded = JSON.parse(first.slice(CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX.length));
+  assert.deepEqual(decoded.nextActions, [
+    'Run exact-head qualification.',
+    'Integrate only after fresh topology review.',
+  ]);
+});
+
+test('structured content is exact, bounded, own-field only and rejects duplicate operational entries', () => {
+  assert.throws(
+    () => normalizeContextCapsuleContentV1({ schemaVersion: 1 }),
+    /goal must be provided as an own field/,
+  );
+  assert.throws(
+    () => normalizeContextCapsuleContentV1(structuredContent({ schemaVersion: '1' })),
+    /Unsupported ContextCapsuleContentV1 schemaVersion/,
+  );
+  assert.throws(
+    () => normalizeContextCapsuleContentV1(structuredContent({ constraints: ['same', 'same'] })),
+    /duplicate entries/,
+  );
+  assert.throws(
+    () => normalizeContextCapsuleContentV1(structuredContent({ nextActions: ['x'.repeat(2_001)] })),
+    /character bound/,
+  );
+  assert.throws(
+    () => normalizeContextCapsuleContentV1({ ...structuredContent(), unexpectedAuthority: 'ALLOW' }),
+    /unknown field/,
+  );
+
+  const inherited = Object.create(structuredContent());
+  assert.throws(() => normalizeContextCapsuleContentV1(inherited), /plain object/);
+});
+
+test('portable capsule requires exactly one raw summary or structured content source', () => {
+  assert.throws(
+    () => createPortableContextCapsuleV1({
+      capsuleId: 'capsule-none',
+      snapshot: snapshot(),
+      disclosure: disclosure(),
+      createdAt: AT,
+    }),
+    /exactly one of summary or content/,
+  );
+  assert.throws(
+    () => createPortableContextCapsuleV1({
+      capsuleId: 'capsule-both',
+      snapshot: snapshot(),
+      summary: 'one',
+      content: structuredContent(),
+      disclosure: disclosure(),
+      createdAt: AT,
+    }),
+    /exactly one of summary or content/,
+  );
 });
 
 test('portable capsule ordering is deterministic regardless of snapshot and disclosure order', () => {
@@ -138,10 +242,10 @@ test('portable capsule ordering is deterministic regardless of snapshot and disc
   assert.deepEqual(first.artifactRefs.map(item => item.artifactId), ['artifact-a', 'artifact-z']);
 });
 
-test('disclosure is explicit, strict and rejects aliases, inherited fields and unknown fields', () => {
+test('disclosure is explicit, strict and rejects aliases, inherited fields, symbols and unknown fields', () => {
   assert.throws(
     () => normalizeContextCapsuleDisclosureV1({ schemaVersion: 1 }),
-    /allowedSourceIds must be a bounded array/,
+    /allowedSourceIds must be provided as an own field/,
   );
   assert.throws(
     () => normalizeContextCapsuleDisclosureV1(disclosure({ schemaVersion: '1' })),
@@ -152,11 +256,18 @@ test('disclosure is explicit, strict and rejects aliases, inherited fields and u
     /unknown field/,
   );
 
+  const symbolAuthority = disclosure();
+  symbolAuthority[Symbol('authority')] = 'ALLOW';
+  assert.throws(() => normalizeContextCapsuleDisclosureV1(symbolAuthority), /unknown field/);
+
   const inherited = Object.create(disclosure());
   assert.throws(
     () => normalizeContextCapsuleDisclosureV1(inherited),
     /plain object/,
   );
+
+  const nullPrototype = Object.assign(Object.create(null), disclosure());
+  assert.deepEqual(normalizeContextCapsuleDisclosureV1(nullPrototype), disclosure());
 });
 
 test('duplicate, whitespace-aliased and unknown source or artifact identities fail closed', () => {
@@ -225,7 +336,7 @@ test('sensitive allowlist must be a subset and may not mark a public artifact as
   );
 });
 
-test('source, artifact, summary and serialized-byte budgets are enforced', () => {
+test('source, artifact, summary and serialized-byte budgets are enforced for raw or structured summaries', () => {
   assert.throws(
     () => build({ disclosure: disclosure({ maxSources: 0 }) }),
     /source count exceeds maxSources/,
@@ -238,6 +349,13 @@ test('source, artifact, summary and serialized-byte budgets are enforced', () =>
     () => build({
       summary: '12345',
       disclosure: disclosure({ maxSummaryChars: 4 }),
+    }),
+    /summary exceeds disclosure maxSummaryChars/,
+  );
+  assert.throws(
+    () => build({
+      content: structuredContent(),
+      disclosure: disclosure({ maxSummaryChars: 10 }),
     }),
     /summary exceeds disclosure maxSummaryChars/,
   );
@@ -281,7 +399,7 @@ test('a portable capsule cannot be an ungrounded summary with zero disclosed pro
   );
 });
 
-test('build envelope rejects exotic objects, unknown fields and non-string capsule ids', () => {
+test('build envelope rejects exotic objects, symbol fields, unknown fields and non-string capsule ids', () => {
   const inherited = Object.create({
     capsuleId: 'capsule-1',
     snapshot: snapshot(),
@@ -301,4 +419,14 @@ test('build envelope rejects exotic objects, unknown fields and non-string capsu
     () => build({ capsuleId: 1 }),
     /capsuleId must be an exact non-empty string id/,
   );
+
+  const symbolInput = {
+    capsuleId: 'capsule-symbol',
+    snapshot: snapshot(),
+    summary: 'bounded',
+    disclosure: disclosure(),
+    createdAt: AT,
+  };
+  symbolInput[Symbol('authority')] = true;
+  assert.throws(() => createPortableContextCapsuleV1(symbolInput), /unknown field/);
 });
