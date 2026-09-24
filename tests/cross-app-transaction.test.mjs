@@ -287,3 +287,35 @@ test('complete canonical effect chain projects COMPLETE while compensation remai
   assert.deepEqual(projected.blockedStepIds, []);
   assert.equal(projected.advisoryOnly, true);
 });
+
+
+test('canonical processed-event capacity is preserved without narrowing exact-effect compatibility', async () => {
+  const withinCanonicalLimit = exactEffectState(INV_RELEASE, 'PREPARED', {
+    overrides: {
+      processedEventIds:Array.from({ length:129 }, (_, index) => `event-${String(index).padStart(3, '0')}`),
+    },
+  });
+  const projected = await projectCrossAppTransactionV1(transaction(), [withinCanonicalLimit]);
+  assert.deepEqual(projected.readyStepIds, ['create-release']);
+
+  const aboveCanonicalLimit = exactEffectState(INV_RELEASE, 'PREPARED', {
+    overrides: {
+      processedEventIds:Array.from({ length:1025 }, (_, index) => `event-${String(index).padStart(4, '0')}`),
+    },
+  });
+  await assert.rejects(
+    () => projectCrossAppTransactionV1(transaction(), [aboveCanonicalLimit]),
+    /bounded plain array/,
+  );
+});
+
+test('exact-effect state timestamps preserve causal order before projection', async () => {
+  const regressed = exactEffectState(INV_RELEASE, 'PREPARED', {
+    createdAt:'2026-09-24T23:20:10.000Z',
+    updatedAt:'2026-09-24T23:20:09.999Z',
+  });
+  await assert.rejects(
+    () => projectCrossAppTransactionV1(transaction(), [regressed]),
+    /updatedAt cannot predate createdAt/,
+  );
+});
