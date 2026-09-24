@@ -7,6 +7,7 @@ import {
   normalizeAiCostRecordV1,
   resourceUsageFromAiCostRecordV1,
 } from '../src/core/ai-cost-meter.js';
+import { normalizeAiRoutePool } from '../src/core/ai-route-pool.js';
 
 const AT = '2026-09-24T16:30:00Z';
 
@@ -177,6 +178,64 @@ test('missing factual usage or paid pricing never becomes an authoritative zero'
       observedAt: AT,
     }), error => error?.code === 'AI_ROUTE_PRICE_UNKNOWN');
   }
+});
+
+test('canonical route normalization preserves unknown pricing and metering rejects a used unknown dimension', () => {
+  const missingOutput = route();
+  delete missingOutput.outputPricePerMillionUsd;
+  const [normalizedMissingOutput] = normalizeAiRoutePool([missingOutput]);
+  assert.equal(normalizedMissingOutput.outputPriceKnown, false);
+  assert.equal(normalizedMissingOutput.outputPricePerMillionUsd, 0);
+  assert.throws(() => meterAiRouteUsageV1({
+    route: normalizedMissingOutput,
+    invocationId: 'invoke-normalized-missing-output',
+    inputTokens: 1,
+    outputTokens: 1,
+    observedAt: AT,
+  }), error => error?.code === 'AI_ROUTE_PRICE_UNKNOWN');
+
+  const missingInput = route();
+  delete missingInput.inputPricePerMillionUsd;
+  const [normalizedMissingInput] = normalizeAiRoutePool([missingInput]);
+  assert.equal(normalizedMissingInput.inputPriceKnown, false);
+  assert.equal(normalizedMissingInput.inputPricePerMillionUsd, 0);
+  assert.throws(() => meterAiRouteUsageV1({
+    route: normalizedMissingInput,
+    invocationId: 'invoke-normalized-missing-input',
+    inputTokens: 1,
+    outputTokens: 1,
+    observedAt: AT,
+  }), error => error?.code === 'AI_ROUTE_PRICE_UNKNOWN');
+
+  const unusedUnknownOutput = meterAiRouteUsageV1({
+    route: normalizedMissingOutput,
+    invocationId: 'invoke-unused-unknown-output',
+    inputTokens: 1,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  assert.equal(unusedUnknownOutput.costUsdMicros, 2);
+});
+
+test('persisted zero-cost evidence must carry an explicit costUsdMicros field', () => {
+  const freeRecord = meterAiRouteUsageV1({
+    route: route({
+      routeId: 'ollama-zero-proof',
+      provider: 'ollama',
+      model: 'local-model',
+      locality: 'local',
+      costClass: 'free',
+      inputPricePerMillionUsd: 0,
+      outputPricePerMillionUsd: 0,
+    }),
+    invocationId: 'invoke-zero-proof',
+    inputTokens: 0,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  const truncated = { ...freeRecord };
+  delete truncated.costUsdMicros;
+  assert.throws(() => normalizeAiCostRecordV1(truncated), /costUsdMicros is required/);
 });
 
 test('hostile prototype-bearing evidence and inherited route pricing cannot become cost authority', () => {
