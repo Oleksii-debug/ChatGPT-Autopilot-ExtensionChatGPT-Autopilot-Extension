@@ -5,6 +5,7 @@ import {
   HUMAN_SUPERVISION_SCHEMA_VERSION,
   HumanSupervisionKind,
   HumanSupervisionState,
+  assertClarificationResumeBindingV1,
   normalizeHumanSupervisionRequestV1,
   normalizePolicyApprovalAttestationV1,
   normalizeClarificationResponseV1,
@@ -268,7 +269,17 @@ test('CLARIFICATION cannot carry approval authority and resolves to same-step an
     stepId: 'step-3',
     resumeStepId: 'step-3',
     resolvedAt: '2026-09-24T22:05:00.000Z',
+    responseBinding: {
+      responseId: 'clarification-response-1',
+      responderId: 'reviewer-owner',
+      reasonCode: 'OWNER_SELECTED_FORMAT',
+      evidenceArtifactIds: [],
+      respondedAt: '2026-09-24T22:05:00.000Z',
+      selectedChoiceId: 'pdf',
+      clarificationText: '',
+    },
   });
+  assert.deepEqual(assertClarificationResumeBindingV1(selected), selected.resume);
 
   assert.throws(
     () => normalizeHumanSupervisionRequestV1(clarificationRequest({
@@ -442,4 +453,25 @@ test('null-prototype records are accepted without widening authority', () => {
   assert.equal(normalized.kind, HumanSupervisionKind.POLICY_APPROVAL);
   assert.equal(normalized.approvalId, 'approval-1');
   assert.deepEqual(normalized.requiredEvidenceArtifactIds, ['artifact-before', 'artifact-policy']);
+});
+
+
+test('clarification resume self-binds exact owner response content', () => {
+  const request = clarificationRequest();
+  const pdf = resolveClarificationV1({ request, response:clarificationResponse() });
+  const docx = resolveClarificationV1({
+    request,
+    response:clarificationResponse({ selectedChoiceId:'docx' }),
+  });
+  assert.notDeepEqual(pdf.resume, docx.resume);
+  assert.equal(pdf.resume.responseBinding.selectedChoiceId, 'pdf');
+  assert.equal(docx.resume.responseBinding.selectedChoiceId, 'docx');
+
+  const tamperedAnswer = structuredClone(pdf);
+  tamperedAnswer.selectedChoiceId = 'docx';
+  assert.throws(() => assertClarificationResumeBindingV1(tamperedAnswer), /response binding mismatch/);
+
+  const tamperedReason = structuredClone(pdf);
+  tamperedReason.reasonCode = 'OWNER_CHANGED_REASON';
+  assert.throws(() => assertClarificationResumeBindingV1(tamperedReason), /response binding mismatch/);
 });
