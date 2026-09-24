@@ -6,6 +6,8 @@ export const GitHubToolId = Object.freeze({
   REPOSITORY_READ: 'remote/github/repository.read',
   FILE_READ: 'remote/github/file.read',
   TREE_READ: 'remote/github/tree.read',
+  BRANCH_READ: 'remote/github/branch.read',
+  PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
   BRANCH_CREATE: 'remote/github/branch.create',
   FILE_PUT: 'remote/github/file.put',
   FILE_DELETE: 'remote/github/file.delete',
@@ -16,6 +18,8 @@ export const GitHubCapabilityId = Object.freeze({
   REPOSITORY_READ: 'github.repository.read',
   FILE_READ: 'github.file.read',
   TREE_READ: 'github.tree.read',
+  BRANCH_READ: 'github.branch.read',
+  PULL_REQUEST_READ: 'github.pullRequest.read',
   BRANCH_CREATE: 'github.branch.create',
   FILE_WRITE: 'github.file.write',
   FILE_DELETE: 'github.file.delete',
@@ -54,6 +58,28 @@ const TOOLS = Object.freeze([
     capabilityIds: [GitHubCapabilityId.TREE_READ],
     inputSchemaRef: 'github-schema/tree.read/input',
     outputSchemaRef: 'github-schema/tree.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.BRANCH_READ,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Read exact GitHub branch commit',
+    description: 'Reads the exact commit SHA currently referenced by one owner-allowlisted branch for reconciliation.',
+    capabilityIds: [GitHubCapabilityId.BRANCH_READ],
+    inputSchemaRef: 'github-schema/branch.read/input',
+    outputSchemaRef: 'github-schema/branch.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_FIND,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Find GitHub pull request by refs',
+    description: 'Reads bounded pull request matches for an exact same-repository head and base pair for reconciliation.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_READ],
+    inputSchemaRef: 'github-schema/pullRequest.find/input',
+    outputSchemaRef: 'github-schema/pullRequest.find/output',
     readOnly: true,
   }),
   normalizeToolDescriptorV1({
@@ -132,6 +158,8 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.REPOSITORY_READ) return 'readRepository';
   if (toolId === GitHubToolId.FILE_READ) return 'readFile';
   if (toolId === GitHubToolId.TREE_READ) return 'readTree';
+  if (toolId === GitHubToolId.BRANCH_READ) return 'readBranch';
+  if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
   if (toolId === GitHubToolId.BRANCH_CREATE) return 'createBranch';
   if (toolId === GitHubToolId.FILE_PUT) return 'putFile';
   if (toolId === GitHubToolId.FILE_DELETE) return 'deleteFile';
