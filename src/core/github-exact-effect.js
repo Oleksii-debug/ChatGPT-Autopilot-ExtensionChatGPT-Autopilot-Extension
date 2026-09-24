@@ -128,16 +128,37 @@ export class GitHubExactEffectExecutorV1 {
     return result;
   }
 
-  async #save(state) {
-    const normalized = normalizeExactEffectStateV1(state);
+  async #advance(expectedState, expectedPhases, type, suffix, at, fields = {}) {
+    const expected = normalizeExactEffectStateV1(expectedState);
+    const phases = new Set(expectedPhases);
     return this.#atomic(effectsById => {
-      const prior = effectsById[normalized.effectId];
-      effectsById[normalized.effectId] = {
-        ...(prior && typeof prior === 'object' && !Array.isArray(prior) ? prior : {}),
-        state: normalized,
-      };
-      return normalized;
+      const entry = effectsById[expected.effectId];
+      if (!entry?.state) return Object.freeze({ applied: false, state: null, reason: 'MISSING_EFFECT' });
+      const current = normalizeExactEffectStateV1(entry.state);
+      if (current.executionId !== expected.executionId
+        || current.attempt !== expected.attempt
+        || canonical(current.invocation) !== canonical(expected.invocation)) {
+        return Object.freeze({ applied: false, state: current, reason: 'EXECUTION_CHANGED' });
+      }
+      if (!phases.has(current.phase)) {
+        return Object.freeze({ applied: false, state: current, reason: 'PHASE_CHANGED' });
+      }
+      const next = event(current, type, suffix, at, fields);
+      entry.state = next;
+      return Object.freeze({ applied: true, state: next, reason: 'APPLIED' });
     });
+  }
+
+  async #declareAmbiguity(state, suffix, reasonCode, summary) {
+    const advanced = await this.#advance(
+      state,
+      [ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED],
+      ExactEffectEventType.DECLARE_AMBIGUITY,
+      suffix,
+      this.#at(),
+      { reasonCode, summary },
+    );
+    return advanced.state || normalizeExactEffectStateV1(state);
   }
 
   async #loadById(invocationId) {
@@ -177,9 +198,25 @@ export class GitHubExactEffectExecutorV1 {
 
   async #commitVerified(state) {
     if (state.phase !== ExactEffectPhase.VERIFIED) throw new Error('Only a verified GitHub effect may be committed');
-    return this.#save(event(state, ExactEffectEventType.COMMIT, 'commit', this.#at(), {
-      commitId: `${state.effectId}:commit`,
-    }));
+    const advanced = await this.#advance(
+      state,
+      [ExactEffectPhase.VERIFIED],
+      ExactEffectEventType.COMMIT,
+      'commit',
+      this.#at(),
+      { commitId: `${state.effectId}:commit` },
+    );
+    if (advanced.applied) return advanced.state;
+    if (advanced.state?.phase === ExactEffectPhase.COMMITTED
+      && advanced.state.executionId === state.executionId
+      && advanced.state.attempt === state.attempt) {
+      return advanced.state;
+    }
+    const error = new Error('GitHub exact-effect commit was fenced by a newer durable transition');
+    error.code = 'GITHUB_EXECUTION_FENCED';
+    error.effectState = advanced.state;
+    error.safeToRetry = false;
+    throw error;
   }
 
   async invoke({ invocation, policyDecision } = {}) {
@@ -210,9 +247,23 @@ export class GitHubExactEffectExecutorV1 {
     try {
       const providerResult = await this.provider.invoke({ invocation, policyDecision });
       const observedAt = this.#at();
-      state = await this.#save(event(state, ExactEffectEventType.RECORD_OBSERVATION, 'observe', observedAt, {
-        observation: observationFor(state.effectId, providerResult.result, observedAt),
-      }));
+      const observationAdvance = await this.#advance(
+        state,
+        [ExactEffectPhase.EXECUTING],
+        ExactEffectEventType.RECORD_OBSERVATION,
+        'observe',
+        observedAt,
+        { observation: observationFor(state.effectId, providerResult.result, observedAt) },
+      );
+      state = observationAdvance.state || state;
+      if (!observationAdvance.applied) {
+        const error = new Error('GitHub provider completion was fenced by a newer durable exact-effect transition');
+        error.code = 'GITHUB_EXECUTION_FENCED';
+        error.effectState = state;
+        error.safeToRetry = false;
+        error.reconcileRequired = state.phase === ExactEffectPhase.RECONCILE;
+        throw error;
+      }
 
       const verification = normalizeVerificationV1(await this.verify({
         invocation: structuredClone(state.invocation),
@@ -221,7 +272,23 @@ export class GitHubExactEffectExecutorV1 {
         attempt: state.attempt,
         observation: structuredClone(state.observation),
       }));
-      state = await this.#save(event(state, ExactEffectEventType.RECORD_VERIFICATION, 'verify', this.#at(), { verification }));
+      const verificationAdvance = await this.#advance(
+        state,
+        [ExactEffectPhase.OBSERVED],
+        ExactEffectEventType.RECORD_VERIFICATION,
+        'verify',
+        this.#at(),
+        { verification },
+      );
+      state = verificationAdvance.state || state;
+      if (!verificationAdvance.applied) {
+        const error = new Error('GitHub verification completion was fenced by a newer durable exact-effect transition');
+        error.code = 'GITHUB_EXECUTION_FENCED';
+        error.effectState = state;
+        error.safeToRetry = false;
+        error.reconcileRequired = state.phase === ExactEffectPhase.RECONCILE;
+        throw error;
+      }
       if (state.phase !== ExactEffectPhase.VERIFIED) {
         const error = new Error('GitHub effect was not independently verified');
         error.code = state.phase === ExactEffectPhase.RECONCILE ? 'GITHUB_RECONCILE_REQUIRED' : 'GITHUB_EFFECT_VERIFICATION_FAILED';
@@ -234,10 +301,12 @@ export class GitHubExactEffectExecutorV1 {
       return Object.freeze({ providerResult, effectState: state, resumedCommit: false });
     } catch (error) {
       if ([ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) {
-        state = await this.#save(event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'dispatch-ambiguity', this.#at(), {
-          reasonCode: 'GITHUB_DISPATCH_UNCERTAIN',
-          summary: 'GitHub mutation did not reach a verified committed outcome; reconciliation is required before retry.',
-        }));
+        state = await this.#declareAmbiguity(
+          state,
+          'dispatch-ambiguity',
+          'GITHUB_DISPATCH_UNCERTAIN',
+          'GitHub mutation did not reach a verified committed outcome; reconciliation is required before retry.',
+        );
       }
       error.effectState = state;
       error.safeToRetry = false;
@@ -272,7 +341,8 @@ export class GitHubExactEffectExecutorV1 {
     let state = stored;
     if (state.phase !== ExactEffectPhase.RECONCILE) throw new Error('GitHub effect is not awaiting reconciliation');
 
-    const normalizedOutcome = String(outcome || '').trim().toUpperCase();
+    if (typeof outcome !== 'string') throw new Error('Reconciliation outcome is invalid');
+    const normalizedOutcome = outcome.trim().toUpperCase();
     if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('Reconciliation outcome is invalid');
 
     let observation;
@@ -299,7 +369,9 @@ export class GitHubExactEffectExecutorV1 {
       if (requireId(proof?.verificationAuthorityId, 'verificationAuthorityId') !== state.invocation.policyDecisionId
         || requireId(proof?.effectId, 'proof.effectId') !== state.effectId
         || requireId(proof?.executionId, 'proof.executionId') !== state.executionId
-        || Number(proof?.attempt) !== state.attempt) {
+        || typeof proof?.attempt !== 'number'
+        || !Number.isSafeInteger(proof.attempt)
+        || proof.attempt !== state.attempt) {
         throw new Error('GitHub reconciliation proof does not match the current exact-effect attempt');
       }
       observation = normalizeObservationV1(proof.observation);
@@ -333,13 +405,29 @@ export class GitHubExactEffectExecutorV1 {
       }
     }
 
-    state = await this.#save(event(state, ExactEffectEventType.RESOLVE_RECONCILIATION, 'reconcile', this.#at(), {
-      outcome: normalizedOutcome,
-      reasonCode: requireId(reasonCode, 'reasonCode'),
-      summary,
-      observation,
-      verification,
-    }));
+    const reconciliationAdvance = await this.#advance(
+      state,
+      [ExactEffectPhase.RECONCILE],
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'reconcile',
+      this.#at(),
+      {
+        outcome: normalizedOutcome,
+        reasonCode: requireId(reasonCode, 'reasonCode'),
+        summary,
+        observation,
+        verification,
+      },
+    );
+    state = reconciliationAdvance.state || state;
+    if (!reconciliationAdvance.applied) {
+      if (state.phase === ExactEffectPhase.COMMITTED) return state;
+      const error = new Error('GitHub reconciliation was fenced by a newer durable transition');
+      error.code = 'GITHUB_RECONCILIATION_FENCED';
+      error.effectState = state;
+      error.safeToRetry = false;
+      throw error;
+    }
     if (state.phase === ExactEffectPhase.VERIFIED) {
       state = await this.#commitVerified(state);
     }
