@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { normalizeCompatibleEndpointRegistry } from '../companion/ai-gateway/gateway.mjs';
+import { collectProductFiles, RELEASE_VERSION } from '../scripts/package-release.mjs';
 import {
   MISTRAL_ENDPOINT_PRESET,
   applyCompatibleEndpointPreset,
@@ -70,4 +71,25 @@ test('gateway launcher loads named DPAPI provider keys by apiKeyEnv and clears t
 test('local gateway runtime state and encrypted provider credentials are excluded from version control', () => {
   const ignore = fs.readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
   assert.match(ignore, /^companion\/ai-gateway\/config\/$/m);
+});
+
+test('release packaging fails closed when local AI gateway state exists even without an encrypted key', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-release-gateway-state-'));
+  try {
+    fs.mkdirSync(path.join(root, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'icons'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'companion', 'ai-gateway', 'config'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ manifest_version: 3, version: RELEASE_VERSION }), 'utf8');
+    fs.writeFileSync(path.join(root, 'README.txt'), 'readme', 'utf8');
+    fs.writeFileSync(path.join(root, `CHANGES-${RELEASE_VERSION}.txt`), 'changes', 'utf8');
+    fs.writeFileSync(path.join(root, `QA-${RELEASE_VERSION}.txt`), 'qa', 'utf8');
+    fs.writeFileSync(path.join(root, 'companion', 'ai-gateway', 'config', 'gateway-settings.json'), JSON.stringify({ compatibleEndpoints: [MISTRAL_ENDPOINT_PRESET] }), 'utf8');
+
+    await assert.rejects(
+      collectProductFiles(root),
+      /Forbidden private\/sensitive path in release package: companion\/ai-gateway\/config\/gateway-settings\.json/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
