@@ -126,7 +126,11 @@ function strictTimestamp(value, label) {
 }
 
 function strictSummary(value, maxChars) {
-  return strictText(value, 'summary', maxChars);
+  if (typeof value !== 'string') throw new Error('summary must be text');
+  const summary = value.trim();
+  if (!summary) throw new Error('summary must not be empty');
+  if (summary.length > maxChars) throw new Error('summary exceeds disclosure maxSummaryChars');
+  return summary;
 }
 
 function frozen(value) {
