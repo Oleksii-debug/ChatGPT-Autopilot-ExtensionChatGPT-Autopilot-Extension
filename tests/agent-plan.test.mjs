@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AgentPlanNodeState, extendAgentPlanV1, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from '../src/core/agent-plan.js';
+import { AgentPlanNodeState, evolveAgentPlanV1, extendAgentPlanV1, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from '../src/core/agent-plan.js';
 
 const AT = '2026-09-23T11:30:00.000Z';
 const ZERO_ENVELOPE = { maxModelCalls: 0, maxRuntimeSeconds: 0, maxCostUsdMicros: 0 };
@@ -83,4 +83,32 @@ test('AgentPlan live extension cannot mint aggregate resource authority across r
     resourceEnvelope: envelope,
     at: AT,
   }), /exceeds resourceEnvelope maxModelCalls/);
+});
+
+test('AgentPlan live evolution converts a full echoed candidate into append-only growth', () => {
+  let current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  current = transitionAgentPlanNodeV1(current, { nodeId: 'discover', state: 'RUNNING', at: AT });
+  const candidate = structuredClone(current);
+  candidate.nodes.push(node('audit', ['discover']));
+  const evolved = evolveAgentPlanV1(current, candidate, { resourceEnvelope: ZERO_ENVELOPE, at: AT });
+  assert.equal(evolved.nodes.length, 2);
+  assert.equal(evolved.nodes[0].state, AgentPlanNodeState.RUNNING);
+  assert.equal(evolved.nodes[1].state, AgentPlanNodeState.PENDING);
+  assert.equal(evolved.revision, current.revision + 1);
+});
+
+test('AgentPlan live evolution rejects stale, shrinking or mutating replacement candidates', () => {
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  const stale = structuredClone(current);
+  stale.revision -= 1;
+  stale.nodes.push(node('later', ['discover']));
+  assert.throws(() => evolveAgentPlanV1(current, stale, { resourceEnvelope: ZERO_ENVELOPE, at: AT }), /revision conflict/);
+
+  const shrinking = structuredClone(current);
+  assert.throws(() => evolveAgentPlanV1(current, shrinking, { resourceEnvelope: ZERO_ENVELOPE, at: AT }), /requires appended nodes/);
+
+  const mutating = structuredClone(current);
+  mutating.nodes[0].objective = 'Rewrite durable work';
+  mutating.nodes.push(node('later', ['discover']));
+  assert.throws(() => evolveAgentPlanV1(current, mutating, { resourceEnvelope: ZERO_ENVELOPE, at: AT }), /cannot replace existing nodes/);
 });
