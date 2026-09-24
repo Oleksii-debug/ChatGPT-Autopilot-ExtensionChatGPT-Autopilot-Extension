@@ -37,6 +37,21 @@ test('Mistral preset preserves other endpoints and deterministically replaces a 
   assert.doesNotThrow(() => normalizeCompatibleEndpointRegistry(settings.compatibleEndpoints));
 });
 
+test('Mistral preset migrates the legacy compatibleBaseUrl into the default endpoint instead of stealing default routing', () => {
+  const settings = applyCompatibleEndpointPreset({
+    compatibleBaseUrl: 'http://127.0.0.1:4321/v1',
+  });
+  assert.deepEqual(settings.compatibleEndpoints, [
+    {
+      endpointId: 'default',
+      baseUrl: 'http://127.0.0.1:4321/v1',
+      apiKeyEnv: 'COMPATIBLE_API_KEY',
+    },
+    MISTRAL_ENDPOINT_PRESET,
+  ]);
+  assert.doesNotThrow(() => normalizeCompatibleEndpointRegistry(settings.compatibleEndpoints));
+});
+
 test('Mistral preset writer keeps secrets out of gateway-settings.json', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-mistral-'));
   const file = path.join(dir, 'gateway-settings.json');
