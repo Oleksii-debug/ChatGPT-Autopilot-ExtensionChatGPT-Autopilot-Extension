@@ -31,7 +31,12 @@ export function applyCompatibleEndpointPreset(rawSettings = {}, preset = MISTRAL
   }
   if (!/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw new Error('Provider preset apiKeyEnv is invalid');
 
-  const source = settings.compatibleEndpoints ?? [];
+  const legacyBaseUrl = String(settings.compatibleBaseUrl || '').trim().replace(/\/+$/, '');
+  const source = settings.compatibleEndpoints ?? (legacyBaseUrl ? [{
+    endpointId: 'default',
+    baseUrl: legacyBaseUrl,
+    apiKeyEnv: 'COMPATIBLE_API_KEY',
+  }] : []);
   if (!Array.isArray(source)) throw new Error('Gateway compatibleEndpoints must be an array');
   const compatibleEndpoints = source.filter(item => String(item?.endpointId || '').trim() !== endpointId);
   compatibleEndpoints.push({ endpointId, baseUrl, apiKeyEnv });
