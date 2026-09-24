@@ -1533,8 +1533,14 @@ export function orchestrationSnapshot(runtime, configRaw) {
           activeActivationCount += 1;
         }
       }
+      const rootRounds = nodeIds
+        .filter(nodeId => !runtime.hierarchy.graph.nodesById?.[nodeId]?.parentId)
+        .map(nodeId => Number(runtime.hierarchy.state.nodesById?.[nodeId]?.round || 1));
       return {
       graphId: String(runtime.hierarchy.graph.graphId || ''),
+      loopMode: String(runtime.hierarchy.graph.loopPolicy?.mode || 'ONE_SHOT'),
+      maxRounds: Number(runtime.hierarchy.graph.loopPolicy?.maxRounds || 0),
+      currentRound: rootRounds.length ? Math.max(...rootRounds) : 1,
       nodeCount: nodeIds.length,
       rootCount,
       managerCount,
