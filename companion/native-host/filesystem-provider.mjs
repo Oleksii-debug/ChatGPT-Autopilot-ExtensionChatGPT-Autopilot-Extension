@@ -6,6 +6,7 @@ import { constants as fsConstants } from 'node:fs';
 export const FILESYSTEM_PROVIDER_VERSION = 1;
 export const MAX_READ_BYTES = 1024 * 1024;
 export const MAX_SEARCH_RESULTS = 256;
+export const MAX_SEARCH_ENTRIES = 4096;
 
 function fail(message) { throw new Error(message); }
 function nonEmpty(value, label) {
@@ -126,6 +127,47 @@ export async function readFilesystemFileV1(scope, requestedPath, { maxBytes = MA
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
     return boundReadV1(buffer.subarray(0, bytesRead), { maxBytes });
   });
+}
+
+// Search is metadata-only and never grants execution authority. It refuses link/reparse
+// traversal and bounds both work and output so an owner-scoped root cannot become an
+// unbounded filesystem crawler. Results are stable relative paths, never ambient paths.
+export async function searchFilesystemV1(scope, requestedRoot, query, {
+  maxResults = MAX_SEARCH_RESULTS,
+  maxEntries = MAX_SEARCH_ENTRIES,
+} = {}) {
+  const needle = nonEmpty(query, 'filesystem search query').toLocaleLowerCase('en-US');
+  if (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > MAX_SEARCH_ENTRIES) fail('Invalid filesystem search entry bound');
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > MAX_SEARCH_RESULTS) fail('Invalid filesystem search bound');
+  const lexicalRoot = authorizeFilesystemPathV1(scope, requestedRoot);
+  const admittedRoot = await authorizeFilesystemPathAtIoV1(scope, lexicalRoot, { allowMissingLeaf: false });
+  const realRoots = await realRootsFor(scope, false);
+  const pending = [lexicalRoot];
+  const matches = [];
+  let visited = 0;
+  let workTruncated = false;
+
+  while (pending.length) {
+    const current = pending.shift();
+    const currentReal = canonical(await fs.realpath(current));
+    requireContained(realRoots, currentReal, false);
+    if (!isWithin(admittedRoot, currentReal)) fail('Filesystem search escaped admitted root');
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    entries.sort((a, b) => a.name.localeCompare(b.name, 'en'));
+    for (const entry of entries) {
+      if (visited >= maxEntries) { workTruncated = true; pending.length = 0; break; }
+      visited += 1;
+      const candidate = path.join(current, entry.name);
+      if (entry.isSymbolicLink()) continue;
+      const relativePath = path.relative(lexicalRoot, candidate).split(path.sep).join('/');
+      if (relativePath.toLocaleLowerCase('en-US').includes(needle)) matches.push(relativePath);
+      if (entry.isDirectory()) pending.push(candidate);
+    }
+  }
+
+  matches.sort((a, b) => a.localeCompare(b, 'en'));
+  const bounded = boundSearchResultsV1(matches, { maxResults });
+  return Object.freeze({ ...bounded, truncated: bounded.truncated || workTruncated, visitedEntries: visited });
 }
 
 export function boundReadV1(buffer, { maxBytes = MAX_READ_BYTES } = {}) {
