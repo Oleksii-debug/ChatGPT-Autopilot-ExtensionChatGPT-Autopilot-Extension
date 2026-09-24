@@ -29,7 +29,9 @@ async function waitForHealth(url, timeoutMs = 5000) {
 test('direct Gateway process writes its own PID file and removes it on graceful stop', async t => {
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'autopilot-gateway-pid-'));
   const gateway = path.join(tmp, 'gateway.mjs');
+  const providerPresets = path.join(tmp, 'provider-presets.mjs');
   await copyFile(new URL('../companion/ai-gateway/gateway.mjs', import.meta.url), gateway);
+  await copyFile(new URL('../companion/ai-gateway/provider-presets.mjs', import.meta.url), providerPresets);
   const port = await freePort();
   const child = spawn(process.execPath, [gateway], {
     cwd: tmp,
