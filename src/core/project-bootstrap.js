@@ -4,7 +4,6 @@ import {
   normalizeProjectSourceRefV1,
 } from './project-context-artifact.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
-import { addProjectSnapshot, validateProjectWorkspace } from './project-workspace.js';
 
 export const PROJECT_BOOTSTRAP_SCHEMA_VERSION = 1;
 export const MAX_PROJECT_BOOTSTRAP_SOURCES = 128;
@@ -366,6 +365,9 @@ export function buildProjectBootstrapV1(input) {
     projectRevisionId: normalized.revisionId,
     createdAt: normalized.createdAt,
     status: blockers.length ? ProjectBootstrapStatus.BLOCKED : ProjectBootstrapStatus.READY,
+    advisoryOnly: true,
+    admissionAuthorized: false,
+    requiresTrustedSourceAdmission: true,
     requiredSourceIds: [...normalized.requiredSourceIds],
     requiredArtifactIds: [...normalized.requiredArtifactIds],
     blockers,
@@ -373,14 +375,3 @@ export function buildProjectBootstrapV1(input) {
   });
 }
 
-export function admitProjectBootstrapV1(workspace, input, { nowMs = Date.now() } = {}) {
-  validateProjectWorkspace(workspace);
-  if (!Number.isFinite(nowMs) || nowMs < 0) throw new Error('nowMs must be a non-negative finite number');
-  const bootstrap = buildProjectBootstrapV1(input);
-  if (bootstrap.status !== ProjectBootstrapStatus.READY) {
-    const codes = bootstrap.blockers.map((item) => `${item.code}:${item.resourceId}`).join(',');
-    throw new Error(`Project bootstrap is BLOCKED: ${codes}`);
-  }
-  const project = addProjectSnapshot(workspace, bootstrap.snapshot, { nowMs });
-  return Object.freeze({ bootstrap, project });
-}
