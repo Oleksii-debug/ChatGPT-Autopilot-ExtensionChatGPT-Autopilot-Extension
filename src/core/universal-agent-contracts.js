@@ -30,24 +30,42 @@ const MAX_DATA_JSON = 256_000;
 const MAX_LIST = 128;
 
 function plain(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
   return value;
 }
 
 function exactKeys(value, allowed, label) {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in value && !Object.prototype.hasOwnProperty.call(value, key)) {
+      throw new Error(`${label} contains inherited field: ${key}`);
+    }
   }
 }
 
 function version(value, label) {
-  if (Number(value) !== UniversalAgentContractVersion) throw new Error(`Unsupported ${label} schemaVersion`);
+  if (typeof value !== 'number'
+      || !Number.isInteger(value)
+      || value !== UniversalAgentContractVersion) {
+    throw new Error(`Unsupported ${label} schemaVersion`);
+  }
   return UniversalAgentContractVersion;
 }
 
 function id(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return null;
-  const out = String(value ?? '').trim();
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
   if (!ID.test(out)) throw new Error(`${label} is invalid`);
   return out;
 }
@@ -69,10 +87,15 @@ function timestamp(value, label, { optional = false } = {}) {
 }
 
 function integer(value, label, min, max, { optional = false, fallback = 0 } = {}) {
-  if ((value == null || value === '') && optional) return fallback;
-  const n = Number(value);
-  if (!Number.isInteger(n) || !Number.isFinite(n) || n < min || n > max) throw new Error(`${label} is invalid`);
-  return n;
+  if (value == null && optional) return fallback;
+  if (typeof value !== 'number'
+      || !Number.isInteger(value)
+      || !Number.isFinite(value)
+      || value < min
+      || value > max) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
 }
 
 function bool(value, label, fallback = false) {
@@ -127,7 +150,7 @@ export function normalizeCapabilityV1(input) {
     schemaVersion: version(raw.schemaVersion, 'CapabilityV1'),
     capabilityId: id(raw.capabilityId, 'capabilityId'),
     description: text(raw.description, 'description', { optional: true, max: 2000 }),
-    riskClass: id(raw.riskClass || 'R0', 'riskClass'),
+    riskClass: id(raw.riskClass == null ? 'R0' : raw.riskClass, 'riskClass'),
     attributes: jsonData(raw.attributes, 'attributes'),
   });
 }
@@ -159,7 +182,8 @@ const POLICY_KEYS = new Set([
 export function normalizePolicyDecisionV1(input) {
   const raw = plain(input, 'PolicyDecisionV1');
   exactKeys(raw, POLICY_KEYS, 'PolicyDecisionV1');
-  const decision = String(raw.decision || '').trim().toUpperCase();
+  if (typeof raw.decision !== 'string') throw new Error('decision must be text');
+  const decision = raw.decision.trim().toUpperCase();
   if (!POLICY_KINDS.has(decision)) throw new Error('decision is invalid');
   const approvalId = id(raw.approvalId, 'approvalId', { optional: true });
   if (decision === PolicyDecisionKind.REQUIRE_APPROVAL && !approvalId) {
@@ -207,7 +231,10 @@ const ARTIFACT_KEYS = new Set([
 export function normalizeArtifactRefV1(input) {
   const raw = plain(input, 'ArtifactRefV1');
   exactKeys(raw, ARTIFACT_KEYS, 'ArtifactRefV1');
-  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : String(raw.sha256).trim().toLowerCase();
+  if (raw.sha256 != null && raw.sha256 !== '' && typeof raw.sha256 !== 'string') {
+    throw new Error('sha256 must be text');
+  }
+  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : raw.sha256.trim().toLowerCase();
   if (digest && !SHA256.test(digest)) throw new Error('sha256 is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ArtifactRefV1'),
@@ -230,7 +257,8 @@ const OBSERVATION_KEYS = new Set([
 export function normalizeObservationV1(input) {
   const raw = plain(input, 'ObservationV1');
   exactKeys(raw, OBSERVATION_KEYS, 'ObservationV1');
-  const status = String(raw.status || '').trim().toUpperCase();
+  if (typeof raw.status !== 'string') throw new Error('status must be text');
+  const status = raw.status.trim().toUpperCase();
   if (!OBSERVATION_STATUSES.has(status)) throw new Error('status is invalid');
   const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1);
   return frozen({
@@ -253,7 +281,8 @@ const VERIFICATION_KEYS = new Set([
 export function normalizeVerificationV1(input) {
   const raw = plain(input, 'VerificationV1');
   exactKeys(raw, VERIFICATION_KEYS, 'VerificationV1');
-  const status = String(raw.status || '').trim().toUpperCase();
+  if (typeof raw.status !== 'string') throw new Error('status must be text');
+  const status = raw.status.trim().toUpperCase();
   if (!VERIFICATION_STATUSES.has(status)) throw new Error('status is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'VerificationV1'),
