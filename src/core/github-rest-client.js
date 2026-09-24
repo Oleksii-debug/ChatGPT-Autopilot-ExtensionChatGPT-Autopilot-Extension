@@ -70,6 +70,18 @@ function repositoryFromApiPath(pathname) {
     throw githubError('GITHUB_INVALID_REQUEST', 'GitHub path is outside the repository API boundary', { safeToRetry: true });
   }
   const pathOnly = pathname.split('?', 1)[0];
+  let parsed;
+  try {
+    parsed = new URL(`${GITHUB_API_ORIGIN}${pathname}`);
+  } catch {
+    throw githubError('GITHUB_INVALID_REQUEST', 'GitHub repository path is not a canonical URL path', { safeToRetry: true });
+  }
+  // WHATWG URL parsing normalizes raw and percent-encoded dot segments before
+  // transport. Admission must bind the exact path that fetch will send, not a
+  // pre-normalization spelling that could escape the admitted repository.
+  if (parsed.origin !== GITHUB_API_ORIGIN || parsed.pathname !== pathOnly) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'GitHub repository path is not canonical', { safeToRetry: true });
+  }
   const match = /^\/repos\/([^/]+)\/([^/]+)(?:\/|$)/u.exec(pathOnly);
   if (!match || match[1].includes('%') || match[2].includes('%')) {
     throw githubError('GITHUB_INVALID_REQUEST', 'GitHub repository path identity is invalid', { safeToRetry: true });
