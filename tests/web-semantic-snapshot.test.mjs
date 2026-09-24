@@ -157,6 +157,29 @@ test('duplicate semantic identities fail closed', () => {
   })), /duplicate semanticId/);
 });
 
+
+test('semantic snapshot strips query and fragment secrets from page and link URLs', () => {
+  const result = normalizeWebSemanticSnapshotV1(snapshot({
+    url: 'https://example.test/account?session=secret-session#token-fragment',
+    elements: [{
+      semanticId: 'reset-link',
+      role: 'link',
+      name: 'Reset account',
+      href: 'https://example.test/reset?token=secret-reset#continue',
+    }],
+  }));
+
+  assert.equal(result.url, 'https://example.test/account');
+  assert.equal(result.elements[0].href, 'https://example.test/reset');
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes('secret-session'), false);
+  assert.equal(serialized.includes('token-fragment'), false);
+  assert.equal(serialized.includes('secret-reset'), false);
+
+  const inspected = inspectWebSemanticSnapshotV1({ snapshot: result, query: 'secret-reset' });
+  assert.equal(inspected.resultCount, 0);
+});
+
 test('unsafe URLs and URL credentials are rejected before inspection', () => {
   assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({
     url: 'javascript:alert(1)',
