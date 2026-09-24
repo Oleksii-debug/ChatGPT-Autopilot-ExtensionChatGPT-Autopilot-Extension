@@ -3066,12 +3066,13 @@ async function refreshRunTimeline({ announceResult = false } = {}) {
     ui.runTimeline = data?.timeline || null;
     renderRunTimeline();
     if (announceResult) announce('Хронологію виконання оновлено.');
-  } catch (error) {
+  } catch {
     if (sessionId !== ui.selectedSessionId) return;
     ui.runTimeline = null;
     $('run-timeline-list').replaceChildren();
-    $('run-timeline-status').textContent = `Хронологію не завантажено: ${error.message}`;
-    if (announceResult) announce(`Хронологію не завантажено: ${error.message}`);
+    const safeMessage = 'Хронологію не завантажено. Оновіть ще раз або перевірте стан Core.';
+    $('run-timeline-status').textContent = safeMessage;
+    if (announceResult) announce(safeMessage);
   }
 }
 
