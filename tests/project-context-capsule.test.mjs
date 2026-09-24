@@ -96,7 +96,8 @@ test('portable capsule composes with existing freshness and ProjectWorkspace aut
   assert.equal(Object.isFrozen(capsule), true);
 
   const freshness = assertContextCapsuleFreshV1(capsule, snap.sourceRefs);
-  assert.equal(freshness.fresh, true);
+  assert.equal(freshness.capsuleId, capsule.capsuleId);
+  assert.equal(Object.isFrozen(freshness), true);
 
   const workspace = createProjectWorkspace(1);
   addProjectSnapshot(workspace, snap, { nowMs: 2 });
