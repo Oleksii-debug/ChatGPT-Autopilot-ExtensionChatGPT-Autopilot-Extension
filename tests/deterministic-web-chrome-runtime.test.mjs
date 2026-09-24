@@ -4,6 +4,7 @@ import {
   createChromeDeterministicWebProviderV1,
   createChromeDeterministicWebStoreV1,
   createChromeDeterministicWebTransportV1,
+  normalizeChromeDeterministicWebTargetV1,
 } from '../src/core/deterministic-web-chrome-runtime.js';
 
 const at = '2026-09-24T15:55:00.000Z';
@@ -117,8 +118,34 @@ test('Chrome runtime interoperates with canonical provider through VERIFIED to d
   assert.equal(saved.leasesByTargetId['tab:7'], undefined);
 });
 
-test('Chrome transport rejects ambiguous/non-tab target identities', async () => {
+test('Chrome target identity is one canonical positive safe-integer spelling', () => {
+  assert.deepEqual(normalizeChromeDeterministicWebTargetV1('tab:7'), { targetId: 'tab:7', tabId: 7 });
+  for (const targetId of ['window:7', 'tab:007', 'tab:0', 'tab:-1', 'tab:9007199254740992']) {
+    assert.throws(() => normalizeChromeDeterministicWebTargetV1(targetId), /canonical tab:<positive-safe-integer>/);
+  }
+});
+
+test('Chrome transport rejects aliased and non-safe tab identities before Chrome dispatch', async () => {
   const fixture = chromeFixture();
   const transport = createChromeDeterministicWebTransportV1(fixture.chrome);
-  await assert.rejects(() => transport.observe({ targetId: 'window:7' }), /tab:<id>/);
+  await assert.rejects(() => transport.observe({ targetId: 'tab:007' }), /canonical tab:<positive-safe-integer>/);
+  await assert.rejects(() => transport.execute({ targetId: 'tab:9007199254740992', action: { kind: 'CLICK', selector: '#go' } }), /canonical tab:<positive-safe-integer>/);
+  assert.deepEqual(fixture.calls, []);
+});
+
+test('provider rejects aliased tab identity before durable lease admission or physical dispatch', async () => {
+  const fixture = chromeFixture();
+  const provider = createChromeDeterministicWebProviderV1({
+    chromeApi: fixture.chrome,
+    now: () => at,
+    leaseId: () => 'must-not-be-used',
+  });
+  await assert.rejects(() => provider.invoke({
+    ...invocationFixtures('alias-invocation'),
+    targetId: 'tab:007',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: { selector: '#ready' },
+  }), /canonical tab:<positive-safe-integer>/);
+  assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
+  assert.deepEqual(fixture.calls, []);
 });
