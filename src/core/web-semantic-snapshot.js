@@ -70,6 +70,12 @@ function optionalBoolean(value, label) {
   return value;
 }
 
+function checkedState(value) {
+  if (value == null) return null;
+  if (value === true || value === false || value === 'mixed') return value;
+  throw new Error('checked must be boolean or mixed');
+}
+
 function headingLevel(value) {
   if (value == null) return null;
   if (!Number.isInteger(value) || value < 1 || value > 6) throw new Error('headingLevel is invalid');
@@ -93,7 +99,7 @@ export function normalizeWebSemanticElementV1(input) {
     href: httpUrl(raw.href, 'href', { optional: true }),
     disabled: optionalBoolean(raw.disabled, 'disabled'),
     selected: optionalBoolean(raw.selected, 'selected'),
-    checked: optionalBoolean(raw.checked, 'checked'),
+    checked: checkedState(raw.checked),
     expanded: optionalBoolean(raw.expanded, 'expanded'),
     focused: optionalBoolean(raw.focused, 'focused'),
     headingLevel: headingLevel(raw.headingLevel),
