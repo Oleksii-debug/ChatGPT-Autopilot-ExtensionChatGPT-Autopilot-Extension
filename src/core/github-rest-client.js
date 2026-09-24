@@ -28,8 +28,10 @@ function githubError(code, message, {
 }
 
 function repositoryName(value) {
-  const out = clean(value, 300);
-  if (!REPOSITORY.test(out) || out.includes('..')) throw githubError('GITHUB_INVALID_REQUEST', 'repositoryFullName is invalid', { safeToRetry: true });
+  const out = typeof value === 'string' ? value.trim() : '';
+  if (!out || out.length > 300 || !REPOSITORY.test(out) || out.includes('..')) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'repositoryFullName is invalid', { safeToRetry: true });
+  }
   return out;
 }
 
@@ -51,11 +53,28 @@ function responseSha(value, label = 'sha', { effectMayHaveOccurred = false } = {
 }
 
 function refName(value, label = 'ref') {
-  const out = clean(value, 240);
-  if (!REF.test(out) || out.endsWith('/') || out.startsWith('.') || out.includes('//')) {
+  const out = typeof value === 'string' ? value.trim() : '';
+  if (!out || out.length > 240 || !REF.test(out) || out.endsWith('/') || out.startsWith('.') || out.includes('//')) {
     throw githubError('GITHUB_INVALID_REQUEST', `${label} is invalid`, { safeToRetry: true });
   }
   return out;
+}
+
+function repositoryFromApiPath(pathname) {
+  if (typeof pathname !== 'string'
+    || pathname.length > 8192
+    || !pathname.startsWith('/repos/')
+    || pathname.includes('://')
+    || pathname.includes('\\')
+    || pathname.includes('#')) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'GitHub path is outside the repository API boundary', { safeToRetry: true });
+  }
+  const pathOnly = pathname.split('?', 1)[0];
+  const match = /^\/repos\/([^/]+)\/([^/]+)(?:\/|$)/u.exec(pathOnly);
+  if (!match || match[1].includes('%') || match[2].includes('%')) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'GitHub repository path identity is invalid', { safeToRetry: true });
+  }
+  return repositoryName(`${match[1]}/${match[2]}`);
 }
 
 function repositoryPath(value) {
@@ -146,11 +165,25 @@ function responseMessage(payload, status) {
 }
 
 export class GitHubRestClientV1 {
-  constructor({ nativeClient, credentialId, allowedRepositories = [], fetchImpl = globalThis.fetch } = {}) {
+  constructor({
+    nativeClient,
+    credentialId,
+    allowedRepositories = [],
+    fetchImpl = globalThis.fetch,
+    requestTimeoutMs = 30_000,
+    setTimeoutImpl = globalThis.setTimeout,
+    clearTimeoutImpl = globalThis.clearTimeout,
+  } = {}) {
     if (!nativeClient?.resolveCredential) throw new Error('Native Companion credential resolver is required');
     if (typeof fetchImpl !== 'function') throw new Error('fetch implementation is required');
-    const id = clean(credentialId, 128);
-    if (!id) throw new Error('GitHub credentialId is required');
+    if (!Number.isInteger(requestTimeoutMs) || requestTimeoutMs < 1_000 || requestTimeoutMs > 300_000) {
+      throw new Error('GitHub requestTimeoutMs must be an integer between 1000 and 300000');
+    }
+    if (typeof setTimeoutImpl !== 'function' || typeof clearTimeoutImpl !== 'function') {
+      throw new Error('GitHub timeout scheduler is required');
+    }
+    const id = typeof credentialId === 'string' ? credentialId.trim() : '';
+    if (!id || id.length > 128) throw new Error('GitHub credentialId is required');
     if (!Array.isArray(allowedRepositories) || !allowedRepositories.length || allowedRepositories.length > 128) {
       throw new Error('GitHub allowedRepositories must be a non-empty bounded array');
     }
@@ -161,6 +194,9 @@ export class GitHubRestClientV1 {
     this.allowedRepositories = Object.freeze(normalized);
     this.allowedRepositoryKeys = new Set(normalized.map(item => item.toLowerCase()));
     this.fetchImpl = fetchImpl;
+    this.requestTimeoutMs = requestTimeoutMs;
+    this.setTimeoutImpl = setTimeoutImpl;
+    this.clearTimeoutImpl = clearTimeoutImpl;
   }
 
   assertRepositoryAllowed(repositoryFullName) {
@@ -174,8 +210,9 @@ export class GitHubRestClientV1 {
   async request(method, pathname, { body = null, effectful = false, expectedStatuses = [200] } = {}) {
     const verb = String(method || '').toUpperCase();
     if (!['GET', 'POST', 'PUT', 'DELETE'].includes(verb)) throw githubError('GITHUB_INVALID_REQUEST', 'Unsupported GitHub HTTP method', { safeToRetry: true });
-    if (typeof pathname !== 'string' || !pathname.startsWith('/repos/') || pathname.includes('://')) {
-      throw githubError('GITHUB_INVALID_REQUEST', 'GitHub path is outside the repository API boundary', { safeToRetry: true });
+    const repository = repositoryFromApiPath(pathname);
+    if (!this.allowedRepositoryKeys.has(repository.toLowerCase())) {
+      throw githubError('GITHUB_REPOSITORY_NOT_ALLOWED', 'Repository is outside the owner-configured GitHub allowlist', { safeToRetry: true });
     }
     let credential;
     try {
@@ -187,10 +224,13 @@ export class GitHubRestClientV1 {
     if (!secret || secret.length > 100_000) throw githubError('GITHUB_CREDENTIAL_INVALID', 'GitHub credential secret is unavailable', { safeToRetry: true });
 
     let response;
+    const controller = new AbortController();
+    const timeout = this.setTimeoutImpl(() => controller.abort(), this.requestTimeoutMs);
     try {
       response = await this.fetchImpl(`${GITHUB_API_ORIGIN}${pathname}`, {
         method: verb,
         redirect: 'error',
+        signal: controller.signal,
         headers: {
           Accept: 'application/vnd.github+json',
           Authorization: `Bearer ${secret}`,
@@ -200,11 +240,14 @@ export class GitHubRestClientV1 {
         ...(body == null ? {} : { body: JSON.stringify(body) }),
       });
     } catch (error) {
-      throw githubError('GITHUB_TRANSPORT_ERROR', error?.message || 'GitHub transport failed', {
-        effectMayHaveOccurred: effectful,
-        safeToRetry: !effectful,
-      });
+      const timedOut = controller.signal.aborted || error?.name === 'AbortError';
+      throw githubError(timedOut ? 'GITHUB_REQUEST_TIMEOUT' : 'GITHUB_TRANSPORT_ERROR',
+        timedOut ? 'GitHub request timed out' : (error?.message || 'GitHub transport failed'), {
+          effectMayHaveOccurred: effectful,
+          safeToRetry: !effectful,
+        });
     } finally {
+      this.clearTimeoutImpl(timeout);
       credential = null;
     }
 
