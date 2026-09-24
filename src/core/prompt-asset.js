@@ -54,6 +54,35 @@ function exactKeys(value, allowed, label) {
   }
 }
 
+function dataArray(value, label, { min = 0, max } = {}) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a plain array`);
+  }
+  if (!Number.isInteger(value.length) || value.length < min || value.length > max) {
+    throw new Error(`${label} must contain ${min}..${max} entries`);
+  }
+  const allowed = new Set(['length']);
+  for (let index = 0; index < value.length; index += 1) allowed.add(String(index));
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains non-canonical array fields`);
+    }
+  }
+  const out = new Array(value.length);
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} must contain dense enumerable own data items`);
+    }
+    out[index] = descriptor.value;
+  }
+  return out;
+}
+
+function compareCodeUnits(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function id(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be a string`);
   const out = value.trim();
@@ -178,9 +207,9 @@ function normalizeTemplate(rawTemplate, variables) {
 }
 
 function compareSourceBinding(a, b) {
-  return a.sourceId.localeCompare(b.sourceId)
-    || a.revisionId.localeCompare(b.revisionId)
-    || a.contentSha256.localeCompare(b.contentSha256);
+  return compareCodeUnits(a.sourceId, b.sourceId)
+    || compareCodeUnits(a.revisionId, b.revisionId)
+    || compareCodeUnits(a.contentSha256, b.contentSha256);
 }
 
 export function normalizePromptAssetV1(input) {
@@ -198,18 +227,14 @@ export function normalizePromptAssetV1(input) {
     if (parentVersion >= version) throw new Error('parentVersion must be earlier than version');
   }
   const title = text(raw.title, 'title', 500);
-  if (!Array.isArray(raw.variables) || raw.variables.length > MAX_VARIABLES) {
-    throw new Error(`variables must be an array with at most ${MAX_VARIABLES} entries`);
-  }
-  const variables = raw.variables.map(normalizeVariable);
+  const variableInputs = dataArray(raw.variables, 'variables', { max: MAX_VARIABLES });
+  const variables = variableInputs.map(normalizeVariable);
   if (new Set(variables.map(item => item.name)).size !== variables.length) {
     throw new Error('variables contains duplicate names');
   }
   const template = normalizeTemplate(raw.template, variables);
-  if (!Array.isArray(raw.sourceBindings) || raw.sourceBindings.length > MAX_SOURCES) {
-    throw new Error(`sourceBindings must be an array with at most ${MAX_SOURCES} entries`);
-  }
-  const sourceBindings = raw.sourceBindings.map(normalizeSourceBinding).sort(compareSourceBinding);
+  const sourceInputs = dataArray(raw.sourceBindings, 'sourceBindings', { max: MAX_SOURCES });
+  const sourceBindings = sourceInputs.map(normalizeSourceBinding).sort(compareSourceBinding);
   if (new Set(sourceBindings.map(item => item.sourceId)).size !== sourceBindings.length) {
     throw new Error('sourceBindings contains duplicate sourceId');
   }
@@ -252,10 +277,8 @@ export function evolvePromptAssetV1(previousInput, nextInput) {
 }
 
 export function normalizePromptAssetHistoryV1(input) {
-  if (!Array.isArray(input) || input.length < 1 || input.length > MAX_HISTORY) {
-    throw new Error(`Prompt asset history must contain 1..${MAX_HISTORY} versions`);
-  }
-  const history = input.map(normalizePromptAssetV1);
+  const historyInputs = dataArray(input, 'Prompt asset history', { min: 1, max: MAX_HISTORY });
+  const history = historyInputs.map(normalizePromptAssetV1);
   const first = history[0];
   if (first.version !== 1 || first.parentVersion !== null) {
     throw new Error('Prompt asset history must start at version 1 with no parent');
@@ -271,10 +294,8 @@ function bindingKey(binding) {
 }
 
 function assertSourceFreshness(asset, currentBindingsRaw) {
-  if (!Array.isArray(currentBindingsRaw) || currentBindingsRaw.length > MAX_SOURCES) {
-    throw new Error('currentSourceBindings must be a bounded array');
-  }
-  const current = currentBindingsRaw.map(normalizeSourceBinding).sort(compareSourceBinding);
+  const currentInputs = dataArray(currentBindingsRaw, 'currentSourceBindings', { max: MAX_SOURCES });
+  const current = currentInputs.map(normalizeSourceBinding).sort(compareSourceBinding);
   if (current.length !== asset.sourceBindings.length) {
     throw new Error('Prompt asset source binding set is stale or incomplete');
   }
