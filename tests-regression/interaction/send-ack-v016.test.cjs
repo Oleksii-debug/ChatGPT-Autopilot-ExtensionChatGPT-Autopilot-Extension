@@ -64,29 +64,28 @@ test('new-chat launch URL may transition from root to the created conversation a
 });
 
 
-test('fresh launch verifies accepted Send from concrete conversation plus active generation before user history renders',async()=>{
+test('fresh launch generation without exact user-turn evidence remains uncertain',async()=>{
   const f=fixture({
     startUrl:'https://chatgpt.com/',
     redirectAfterSend:'https://chatgpt.com/c/generated-stop-proof',
     suppressMessage:true
   });
   const r=await f.run();
-  assert.equal(r.status,'SENT_VERIFIED');
-  assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_FRESH_GENERATION_STARTED');
-  assert.equal(r.submissionEvidence,'FRESH_CONVERSATION_GENERATION_STARTED');
-  assert.equal(f.messages.length,0,'semantic user-message history may legitimately lag generation');
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(r.safeDiagnosticCode,'SEND_CLICK_UNCERTAIN');
+  assert.equal(f.messages.length,0,'generation alone must not identify the submitted prompt');
   assert.equal(f.clicks(),1);
 });
 
-test('fresh launch accepts operation-bound structural append when ChatGPT re-renders user text',async()=>{
+test('fresh launch with a non-matching rendered user turn remains uncertain',async()=>{
   const f=fixture({
     startUrl:'https://chatgpt.com/',
     redirectAfterSend:'https://chatgpt.com/c/generated-structural',
     deliveredTextOverride:'Ви сказали: [rendered wrapper changed by UI]'
   });
   const r=await f.run();
-  assert.equal(r.status,'SENT_VERIFIED');
-  assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_FRESH_STRUCTURAL_APPEND');
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(r.safeDiagnosticCode,'SEND_CLICK_UNCERTAIN');
   assert.equal(f.clicks(),1);
 });
 
