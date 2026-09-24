@@ -53,6 +53,11 @@ test('Mistral preset writer keeps secrets out of gateway-settings.json', () => {
   }
 });
 
+test('Mistral preset writer rejects an empty settings path instead of resolving it to the working directory', () => {
+  assert.throws(() => writeCompatibleEndpointPreset(''), /settings path is required/i);
+  assert.throws(() => writeCompatibleEndpointPreset('   '), /settings path is required/i);
+});
+
 test('gateway launcher loads named DPAPI provider keys by apiKeyEnv and clears them after process creation', () => {
   const launcher = fs.readFileSync(new URL('../companion/ai-gateway/ЗАПУСТИТИ GATEWAY.ps1', import.meta.url), 'utf8');
   assert.match(launcher, /config\\provider-keys/);
@@ -60,4 +65,9 @@ test('gateway launcher loads named DPAPI provider keys by apiKeyEnv and clears t
   assert.match(launcher, /apiKeyEnv/);
   assert.match(launcher, /Import-DpapiEnvironmentKey/);
   assert.match(launcher, /Remove-Item -Path "Env:\$envName"/);
+});
+
+test('local gateway runtime state and encrypted provider credentials are excluded from version control', () => {
+  const ignore = fs.readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
+  assert.match(ignore, /^companion\/ai-gateway\/config\/$/m);
 });
