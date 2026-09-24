@@ -636,13 +636,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     const action = message.action === 'activate' ? activateOwnedSendTab
       : message.action === 'restore' ? restoreOwnedSendTab : null;
     if (!action) { sendResponse({ ok:false, error:{ safeDiagnosticCode:'SEND_TAB_ACTION_INVALID' } }); return false; }
-    action(chrome, repo, message, _sender)
+    ensureColdStartReconciled()
+      .then(() => action(chrome, repo, message, _sender))
       .then(data => sendResponse({ ok:true, data }))
       .catch(error => sendResponse({ ok:false, error:{ safeDiagnosticCode:error?.safeDiagnosticCode || 'SEND_TAB_ACTIVATION_FAILED' } }));
     return true;
   }
   if (message?.channel === 'autopilot-native-input') {
-    performNativeInput(chrome, repo, message, _sender)
+    ensureColdStartReconciled()
+      .then(() => performNativeInput(chrome, repo, message, _sender))
       .then(() => sendResponse({ ok: true }))
       .catch(error => sendResponse({ ok: false, error: {
         safeDiagnosticCode: error?.safeDiagnosticCode || 'NATIVE_INPUT_FAILED',
