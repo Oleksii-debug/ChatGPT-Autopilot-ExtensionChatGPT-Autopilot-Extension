@@ -8,6 +8,28 @@ function Gateway-IsRunning {
   } catch { return $false }
 }
 
+function Import-DpapiEnvironmentKey {
+  param(
+    [Parameter(Mandatory=$true)][string]$KeyFile,
+    [Parameter(Mandatory=$true)][string]$EnvName,
+    [Parameter(Mandatory=$true)][string]$Label
+  )
+  if ($EnvName -notmatch '^[A-Z_][A-Z0-9_]{0,127}$') { throw "Некоректне ім'я змінної середовища для ключа: $EnvName" }
+  if (-not (Test-Path -LiteralPath $KeyFile)) { return $false }
+  $encrypted = Get-Content -LiteralPath $KeyFile -Raw
+  $secure = ConvertTo-SecureString $encrypted
+  $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try {
+    $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+    Set-Item -Path "Env:$EnvName" -Value $plain
+  }
+  finally {
+    if ($ptr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+  }
+  Write-Host "$Label: ключ завантажено із Windows DPAPI."
+  return $true
+}
+
 if (Gateway-IsRunning) {
   Write-Host 'AI Gateway уже працює на 127.0.0.1:17621.'
   exit 0
@@ -15,43 +37,52 @@ if (Gateway-IsRunning) {
 
 $nodeExe = Ensure-AutopilotNodeExe
 $configFile = Join-Path $PSScriptRoot 'config\gateway-settings.json'
+$cfg = $null
 if (Test-Path $configFile) {
   try {
     $cfg = Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json
     if ($cfg.compatibleBaseUrl) { $env:COMPATIBLE_BASE_URL = [string]$cfg.compatibleBaseUrl }
-  } catch {}
+  } catch {
+    throw 'gateway-settings.json пошкоджений. Виправте або видаліть його перед запуском Gateway.'
+  }
 }
 
 $openAiKeyFile = Join-Path $PSScriptRoot 'config\openai-key.dpapi'
 $compatibleKeyFile = Join-Path $PSScriptRoot 'config\compatible-key.dpapi'
-$openAiPtr = [IntPtr]::Zero
-$compatiblePtr = [IntPtr]::Zero
+$providerKeysDir = Join-Path $PSScriptRoot 'config\provider-keys'
+$loadedEnvNames = New-Object 'System.Collections.Generic.HashSet[string]'
 try {
-  if (Test-Path $openAiKeyFile) {
-    $encrypted = Get-Content -LiteralPath $openAiKeyFile -Raw
-    $secure = ConvertTo-SecureString $encrypted
-    $openAiPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
-    $env:OPENAI_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($openAiPtr)
-    Write-Host 'OpenAI API key: завантажено із Windows DPAPI.'
+  if (Import-DpapiEnvironmentKey -KeyFile $openAiKeyFile -EnvName 'OPENAI_API_KEY' -Label 'OpenAI API') {
+    [void]$loadedEnvNames.Add('OPENAI_API_KEY')
   } else {
     Write-Host 'OpenAI API key: не збережений.'
   }
-  if (Test-Path $compatibleKeyFile) {
-    $encryptedCompatible = Get-Content -LiteralPath $compatibleKeyFile -Raw
-    $secureCompatible = ConvertTo-SecureString $encryptedCompatible
-    $compatiblePtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureCompatible)
-    $env:COMPATIBLE_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($compatiblePtr)
-    Write-Host 'OpenAI-compatible API key: завантажено із Windows DPAPI.'
+
+  if (Import-DpapiEnvironmentKey -KeyFile $compatibleKeyFile -EnvName 'COMPATIBLE_API_KEY' -Label 'OpenAI-compatible API') {
+    [void]$loadedEnvNames.Add('COMPATIBLE_API_KEY')
   } else {
     Write-Host 'OpenAI-compatible API key: не збережений. Локальна Ollama/LM Studio без ключа все одно можуть працювати.'
   }
+
+  if ($null -ne $cfg -and $null -ne $cfg.compatibleEndpoints) {
+    foreach ($endpoint in @($cfg.compatibleEndpoints)) {
+      $apiKeyEnv = ([string]$endpoint.apiKeyEnv).Trim()
+      if (-not $apiKeyEnv -or $loadedEnvNames.Contains($apiKeyEnv)) { continue }
+      if ($apiKeyEnv -notmatch '^[A-Z_][A-Z0-9_]{0,127}$') { throw "Gateway endpoint містить некоректне ім'я змінної ключа: $apiKeyEnv" }
+      $namedKeyFile = Join-Path $providerKeysDir ($apiKeyEnv + '.dpapi')
+      $endpointId = ([string]$endpoint.endpointId).Trim()
+      if (Import-DpapiEnvironmentKey -KeyFile $namedKeyFile -EnvName $apiKeyEnv -Label ("Постачальник " + $endpointId)) {
+        [void]$loadedEnvNames.Add($apiKeyEnv)
+      }
+    }
+  }
+
   Start-Process -FilePath $nodeExe -ArgumentList @((Join-Path $PSScriptRoot 'gateway.mjs')) -WorkingDirectory $PSScriptRoot -WindowStyle Hidden | Out-Null
 }
 finally {
-  if ($openAiPtr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($openAiPtr) }
-  if ($compatiblePtr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($compatiblePtr) }
-  Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
-  Remove-Item Env:COMPATIBLE_API_KEY -ErrorAction SilentlyContinue
+  foreach ($envName in $loadedEnvNames) {
+    Remove-Item -Path "Env:$envName" -ErrorAction SilentlyContinue
+  }
   Remove-Item Env:COMPATIBLE_BASE_URL -ErrorAction SilentlyContinue
 }
 
