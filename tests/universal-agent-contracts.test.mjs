@@ -199,8 +199,26 @@ test('ObservationV1 can reference normalized artifacts and VerificationV1 binds 
     summary: 'Expected postcondition observed.',
     evidenceArtifactIds: ['artifact-1'],
     verifiedAt: AT,
+    verifierId: 'independent-verifier-1',
+    verificationAuthorityId: 'decision-1',
+    effectId: 'invoke-1',
+    executionId: 'invoke-1:attempt:1',
+    attempt: 1,
   });
   assert.equal(verification.observationId, observation.observationId);
+  assert.deepEqual({
+    verifierId: verification.verifierId,
+    verificationAuthorityId: verification.verificationAuthorityId,
+    effectId: verification.effectId,
+    executionId: verification.executionId,
+    attempt: verification.attempt,
+  }, {
+    verifierId: 'independent-verifier-1',
+    verificationAuthorityId: 'decision-1',
+    effectId: 'invoke-1',
+    executionId: 'invoke-1:attempt:1',
+    attempt: 1,
+  });
 
   assert.throws(() => normalizeVerificationV1({
     schemaVersion: 1,
