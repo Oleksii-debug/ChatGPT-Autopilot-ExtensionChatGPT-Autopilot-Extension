@@ -59,6 +59,8 @@ function httpUrl(value, label, { optional = false } = {}) {
   try { parsed = new URL(raw); } catch { throw new Error(`${label} is invalid`); }
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(`${label} protocol is not allowed`);
   if (parsed.username || parsed.password) throw new Error(`${label} credentials are not allowed`);
+  parsed.search = '';
+  parsed.hash = '';
   return parsed.toString();
 }
 
