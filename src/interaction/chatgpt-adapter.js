@@ -1045,7 +1045,14 @@
       }
       send.setAttribute('data-autopilot-native-target', request.requestId);
       try { await deps.submit({ x, y }); }
-      finally { send.removeAttribute('data-autopilot-native-target'); }
+      finally {
+        send.removeAttribute('data-autopilot-native-target');
+        // Native input has crossed (or attempted) the irreversible effect
+        // boundary. The page may be observed safely in the background, so return
+        // keyboard focus immediately instead of holding the window lease through
+        // the acknowledgement loop.
+        if (typeof deps.restore === 'function') await deps.restore();
+      }
     } else if (isFormSubmitter && typeof nativeSubmit === 'function') {
       submitMethod = 'FORM_REQUEST_SUBMIT';
       nativeSubmit.call(form, send);
