@@ -8,10 +8,15 @@ import {
   DETERMINISTIC_WEB_RUNTIME_CHANNEL,
 } from '../core/deterministic-web-runtime-admission.js';
 
+const deterministicWebStorageReady = chrome.storage?.local?.setAccessLevel
+  ? chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+  : Promise.reject(new Error('Chrome storage access isolation is unavailable'));
+
 const reconcileVerify = createChromeDeterministicWebReconcileVerifierV1(chrome);
 const deterministicWebProvider = createChromeDeterministicWebProviderV1({
   chromeApi: chrome,
   reconcileVerify,
+  storageReady: deterministicWebStorageReady,
 });
 const deterministicWebAdmission = createDeterministicWebRuntimeAdmissionV1({
   provider: deterministicWebProvider,
