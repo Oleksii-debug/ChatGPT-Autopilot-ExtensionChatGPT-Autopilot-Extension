@@ -103,6 +103,13 @@ export function normalizeSubagentStructurePolicyV1(input = {}) {
   });
 }
 
+/**
+ * Pure trusted-snapshot helper. `graph` MUST already come from the canonical
+ * durable orchestration authority. This function validates graph consistency;
+ * it does not authenticate caller provenance. Executable admission must use
+ * OrchestrationV2Manager.evaluateSelectedSubagentStructureAdmission(), which
+ * loads the graph itself and rejects caller-supplied topology.
+ */
 export function deriveSubagentStructureFactsFromGraphV1({ graph, parentNodeId } = {}) {
   const canonicalGraph = validateOrchestrationGraphV1(graph);
   const parentId = requiredId(parentNodeId, 'parentNodeId');
@@ -170,6 +177,11 @@ export function remainingSubagentStructureCapacityV1(input = {}) {
   return capacityFromFacts(normalizedPolicy, normalizedInitiator, facts);
 }
 
+/**
+ * Pure policy evaluator for a trusted canonical graph snapshot. Do not expose
+ * this function directly as an untrusted spawn boundary; runtime callers must
+ * go through the manager-owned durable-graph admission path.
+ */
 export function evaluateSubagentStructureAdmissionV1(input = {}) {
   const {
     normalizedPolicy,
