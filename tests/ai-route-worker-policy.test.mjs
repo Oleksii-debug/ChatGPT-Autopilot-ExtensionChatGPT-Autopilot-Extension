@@ -58,6 +58,34 @@ test('manual allocation fails closed for unknown routes, over-cap routes and glo
   assert.throws(() => normalizeAiWorkerPolicy({ allocationMode:'manual', maxParallelWorkers:4, manualRouteWorkers:{ 'mistral-code':3, 'local-fast':2 } }, routes), /maxParallelWorkers/);
 });
 
+test('worker-count authority rejects numeric strings, booleans and coercing objects', () => {
+  for (const maxWorkers of ['3', true, { valueOf: () => 3 }]) {
+    assert.throws(() => normalizeAiRoutePool([{ ...routes[0], maxWorkers }]), /maxWorkers/);
+  }
+  for (const maxParallelWorkers of ['4', true, { valueOf: () => 4 }]) {
+    assert.throws(() => normalizeAiWorkerPolicy({
+      allocationMode:'auto',
+      maxParallelWorkers,
+      manualRouteWorkers:{},
+    }, routes), /maxParallelWorkers/);
+  }
+  for (const count of ['2', true, { valueOf: () => 2 }]) {
+    assert.throws(() => normalizeAiWorkerPolicy({
+      allocationMode:'manual',
+      maxParallelWorkers:4,
+      manualRouteWorkers:{ 'mistral-code':count },
+    }, routes), /manualRouteWorkers/);
+  }
+  for (const desiredWorkers of ['2', true, { valueOf: () => 2 }]) {
+    assert.throws(() => allocateAiRouteWorkers({
+      routes,
+      workerPolicy:{ allocationMode:'auto', maxParallelWorkers:4, manualRouteWorkers:{} },
+      role:AiRouteRole.FAST_WORKER,
+      desiredWorkers,
+    }), /desiredWorkers/);
+  }
+});
+
 test('backoff and route owner policy are respected before allocating workers', () => {
   const result = allocateAiRouteWorkers({
     routes,
