@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { completeProvider, listProviderModels, normalizeCompatibleBaseUrl, probeProvider } from '../companion/ai-gateway/gateway.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { completeProvider, listProviderModels, loadCompatibleEndpointRegistry, normalizeCompatibleBaseUrl, normalizeCompatibleEndpointRegistry, probeProvider } from '../companion/ai-gateway/gateway.mjs';
 
 function response(body, status = 200) { return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }); }
 
@@ -63,6 +66,63 @@ test('gateway supports local OpenAI-compatible servers without requiring an API 
     assert.equal(payload.messages[1].content, 'task');
   } finally {
     if (old === undefined) delete process.env.COMPATIBLE_API_KEY; else process.env.COMPATIBLE_API_KEY = old;
+  }
+});
+
+test('gateway selects bounded compatible endpoints by ID and resolves secrets only from named environment variables', async () => {
+  const endpoints = normalizeCompatibleEndpointRegistry([
+    { endpointId:'local', baseUrl:'http://127.0.0.1:1234/v1', apiKeyEnv:'' },
+    { endpointId:'team', baseUrl:'https://models.example.com/v1', apiKeyEnv:'TEAM_MODELS_KEY' },
+  ]);
+  const calls = [];
+  const fetchFn = async (url, init = {}) => {
+    calls.push([url, init]);
+    if (url.endsWith('/models')) return response({ data:[{ id:'team-coder' }] });
+    return response({ choices:[{ message:{ content:'team result' } }] });
+  };
+  assert.deepEqual(await listProviderModels('openai-compatible', {
+    fetchFn, endpointId:'team', compatibleEndpoints:endpoints, env:{ TEAM_MODELS_KEY:'secret-value' },
+  }), ['team-coder']);
+  const result = await completeProvider({ provider:'openai-compatible', endpointId:'team', model:'team-coder', prompt:'task' }, {
+    fetchFn, compatibleEndpoints:endpoints, env:{ TEAM_MODELS_KEY:'secret-value' },
+  });
+  assert.equal(result.endpointId, 'team');
+  assert.equal(result.text, 'team result');
+  assert.deepEqual(calls.map(([url]) => url), ['https://models.example.com/v1/models', 'https://models.example.com/v1/chat/completions']);
+  assert.deepEqual(calls.map(([, init]) => init.headers.authorization), ['Bearer secret-value', 'Bearer secret-value']);
+  await assert.rejects(
+    () => listProviderModels('openai-compatible', { fetchFn, endpointId:'missing', compatibleEndpoints:endpoints }),
+    error => error.statusCode === 404 && error.code === 'AI_COMPATIBLE_ENDPOINT_NOT_FOUND',
+  );
+});
+
+test('compatible endpoint registry rejects duplicate IDs, inline secrets and insecure remote HTTP', () => {
+  assert.throws(() => normalizeCompatibleEndpointRegistry([
+    { endpointId:'same', baseUrl:'https://one.example/v1' },
+    { endpointId:'same', baseUrl:'https://two.example/v1' },
+  ]), /Duplicate/);
+  assert.throws(() => normalizeCompatibleEndpointRegistry([
+    { endpointId:'leak', baseUrl:'https://one.example/v1', apiKey:'inline-secret' },
+  ]), /unsupported field: apiKey/);
+  assert.throws(() => normalizeCompatibleEndpointRegistry([
+    { endpointId:'unsafe', baseUrl:'http://models.example.com/v1' },
+  ]), /must use HTTPS/);
+  assert.throws(() => normalizeCompatibleEndpointRegistry('{bad json'), /must be valid JSON/);
+});
+
+test('compatible endpoint registry loads local non-secret settings unless an explicit env registry overrides them', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-endpoints-'));
+  const configFile = path.join(dir, 'gateway-settings.json');
+  try {
+    fs.writeFileSync(configFile, JSON.stringify({ compatibleEndpoints:[{ endpointId:'saved', baseUrl:'https://saved.example/v1', apiKeyEnv:'SAVED_KEY' }] }));
+    assert.equal(loadCompatibleEndpointRegistry({ env:{}, configFile })[0].endpointId, 'saved');
+    const overridden = loadCompatibleEndpointRegistry({
+      env:{ AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON:JSON.stringify([{ endpointId:'env', baseUrl:'https://env.example/v1' }]) },
+      configFile,
+    });
+    assert.equal(overridden[0].endpointId, 'env');
+  } finally {
+    fs.rmSync(dir, { recursive:true, force:true });
   }
 });
 

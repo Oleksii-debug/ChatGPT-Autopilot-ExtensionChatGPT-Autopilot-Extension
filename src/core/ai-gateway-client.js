@@ -78,10 +78,11 @@ export class AiGatewayClient {
     return this.request(gatewayUrl, timeoutSeconds, '/status');
   }
 
-  async listModels({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30, provider }) {
+  async listModels({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30, provider, endpointId = '' }) {
     const p = encodeURIComponent(clean(provider));
     if (!p) throw new Error('AI provider is required');
-    return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}`);
+    const endpoint = clean(endpointId);
+    return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}${endpoint ? `&endpointId=${encodeURIComponent(endpoint)}` : ''}`);
   }
 
   async complete({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 180, provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }) {
