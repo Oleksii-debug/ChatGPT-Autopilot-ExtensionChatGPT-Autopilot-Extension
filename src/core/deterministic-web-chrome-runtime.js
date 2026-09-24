@@ -78,7 +78,13 @@ export function createChromeDeterministicWebTransportV1(chromeApi) {
           }).slice(0, 256).map(node => `#${CSS.escape(node.id)}`),
         }),
       });
-      return { url: result?.[0]?.result?.url || live?.url || '', visibleSelectors: result?.[0]?.result?.visibleSelectors || [], artifactRefs: [] };
+      return {
+        data: {
+          url: result?.[0]?.result?.url || live?.url || '',
+          visibleSelectors: result?.[0]?.result?.visibleSelectors || [],
+        },
+        artifactRefs: [],
+      };
     },
   });
 }
