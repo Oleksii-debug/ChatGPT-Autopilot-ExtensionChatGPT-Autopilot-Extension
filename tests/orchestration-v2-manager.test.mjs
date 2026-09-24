@@ -356,7 +356,7 @@ test('hierarchy profile import persists the graph setup-only, exports it again, 
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState,'RUNNING');
 });
 
-test('executable subagent admission uses persisted owner policy and durable hierarchy, never caller topology', async()=>{
+test('subagent structural precheck uses persisted owner policy and durable hierarchy, never caller topology', async()=>{
   const {manager,core,chrome}=managerFixture();
   const ownerPolicy={
     schemaVersion:1,
@@ -372,7 +372,7 @@ test('executable subagent admission uses persisted owner policy and durable hier
   const imported=await manager.importProfile(profile);
   assert.deepEqual(imported.status.orchestra.subagentPolicy,ownerPolicy);
 
-  const denied=await manager.evaluateSelectedSubagentStructureAdmission({
+  const denied=await manager.previewSelectedSubagentStructureAdmission({
     initiator:'AGENT',
     parentNodeId:'manager',
     requestedChildren:1,
@@ -380,10 +380,12 @@ test('executable subagent admission uses persisted owner policy and durable hier
   assert.equal(denied.decision,'DENY');
   assert.equal(denied.reasonCode,'MAX_FANOUT_EXCEEDED');
   assert.equal(denied.availableDirectChildren,0);
+  assert.equal(denied.advisoryOnly,true);
+  assert.equal(denied.spawnAuthority,false);
 
   const spoofedGraph=hierarchyGraph('spoofed-shallow-graph');
   await assert.rejects(
-    ()=>manager.evaluateSelectedSubagentStructureAdmission({
+    ()=>manager.previewSelectedSubagentStructureAdmission({
       initiator:'AGENT',
       parentNodeId:'manager',
       requestedChildren:1,
@@ -392,7 +394,7 @@ test('executable subagent admission uses persisted owner policy and durable hier
     /unknown field: graph/,
   );
   await assert.rejects(
-    ()=>manager.evaluateSelectedSubagentStructureAdmission({
+    ()=>manager.previewSelectedSubagentStructureAdmission({
       initiator:'AGENT',
       parentNodeId:'manager',
       requestedChildren:1,
@@ -401,7 +403,7 @@ test('executable subagent admission uses persisted owner policy and durable hier
     /unknown field: policy/,
   );
 
-  const afterSpoof=await manager.evaluateSelectedSubagentStructureAdmission({
+  const afterSpoof=await manager.previewSelectedSubagentStructureAdmission({
     initiator:'AGENT',
     parentNodeId:'manager',
     requestedChildren:1,
@@ -414,7 +416,7 @@ test('executable subagent admission uses persisted owner policy and durable hier
     chromeApi:chrome,
     now:()=>1000,
   });
-  const afterRestart=await restartedManager.evaluateSelectedSubagentStructureAdmission({
+  const afterRestart=await restartedManager.previewSelectedSubagentStructureAdmission({
     initiator:'AGENT',
     parentNodeId:'manager',
     requestedChildren:1,
@@ -431,11 +433,48 @@ test('executable subagent admission uses persisted owner policy and durable hier
   assert.equal((await core.load()).sessionsById instanceof Object,true);
 });
 
-test('executable subagent admission defaults to deny and fails closed without durable hierarchy', async()=>{
+test('subagent structural precheck rejects accessor-backed intent without executing getters and grants no spawn authority', async()=>{
+  const {manager}=managerFixture();
+  const ownerPolicy={
+    schemaVersion:1,
+    allowAgentCreatedChildren:true,
+    maxDepth:4,
+    maxChildrenPerAgent:4,
+  };
+  const profile=exportOrchestrationProfile(cfg('subagent-accessor'),{
+    name:'Subagent Accessor',
+    hierarchy:subagentAdmissionGraph('subagent-accessor-graph'),
+    subagentPolicy:ownerPolicy,
+  });
+  await manager.importProfile(profile);
+
+  let reads=0;
+  const intent={initiator:'AGENT',parentNodeId:'root'};
+  Object.defineProperty(intent,'requestedChildren',{
+    enumerable:true,
+    get(){ reads+=1; return 1; },
+  });
+  await assert.rejects(
+    ()=>manager.previewSelectedSubagentStructureAdmission(intent),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads,0,'precheck must reject accessor intent without invoking the getter');
+
+  const decision=await manager.previewSelectedSubagentStructureAdmission({
+    initiator:'AGENT',
+    parentNodeId:'root',
+    requestedChildren:1,
+  });
+  assert.equal(decision.advisoryOnly,true);
+  assert.equal(decision.spawnAuthority,false);
+  assert.equal(Object.isFrozen(decision),true);
+});
+
+test('subagent structural precheck defaults to deny and fails closed without durable hierarchy', async()=>{
   const {manager}=managerFixture();
   await manager.create({name:'Default deny',config:cfg('default-deny')});
   await assert.rejects(
-    ()=>manager.evaluateSelectedSubagentStructureAdmission({
+    ()=>manager.previewSelectedSubagentStructureAdmission({
       initiator:'AGENT',
       parentNodeId:'root',
       requestedChildren:1,
@@ -444,7 +483,7 @@ test('executable subagent admission defaults to deny and fails closed without du
   );
 
   await manager.controllerFor('orch-1').configureHierarchy(hierarchyGraph('default-deny-graph'),{nowMs:1000});
-  const decision=await manager.evaluateSelectedSubagentStructureAdmission({
+  const decision=await manager.previewSelectedSubagentStructureAdmission({
     initiator:'AGENT',
     parentNodeId:'root',
     requestedChildren:1,

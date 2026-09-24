@@ -26,12 +26,18 @@ function plainIntent(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
+  const normalized = {};
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string' || !SUBAGENT_ADMISSION_INTENT_KEYS.has(key)) {
       throw new Error(`${label} contains unknown field: ${String(key)}`);
     }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    normalized[key] = descriptor.value;
   }
-  return value;
+  return normalized;
 }
 function storedSubagentPolicy(value) {
   return { ...normalizeSubagentStructurePolicyV1(value === undefined ? {} : value) };
@@ -499,23 +505,29 @@ export class OrchestrationV2Manager {
   }
 
   /**
-   * Executable structural admission. Caller supplies intent only; owner policy
-   * comes from manager metadata and topology comes from the selected orchestra's
-   * durable runtime repository. Caller-supplied graph/depth/fanout authority is
-   * rejected before any decision is evaluated.
+   * Advisory structural precheck only. Caller supplies intent; owner policy comes
+   * from manager metadata and topology comes from the selected orchestra's durable
+   * runtime repository. This method never reserves capacity or grants spawn
+   * authority. A future child-creation path must atomically re-read/revalidate
+   * canonical hierarchy state and the global resource budget at mutation time.
    */
-  async evaluateSelectedSubagentStructureAdmission(intent = {}) {
-    const raw = plainIntent(intent, 'Subagent executable admission intent');
+  async previewSelectedSubagentStructureAdmission(intent = {}) {
+    const raw = plainIntent(intent, 'Subagent structural precheck intent');
     const { item, controller } = await this.selectedController();
     const runtime = await controller.runtimeRepository.load();
     const graph = runtime?.hierarchy?.graph;
-    if (!graph) throw new Error('Configure a durable orchestration hierarchy before subagent admission.');
-    return evaluateSubagentStructureAdmissionV1({
+    if (!graph) throw new Error('Configure a durable orchestration hierarchy before subagent precheck.');
+    const decision = evaluateSubagentStructureAdmissionV1({
       policy: item.subagentPolicy,
       initiator: raw.initiator,
       graph,
       parentNodeId: raw.parentNodeId,
       requestedChildren: raw.requestedChildren,
+    });
+    return Object.freeze({
+      ...decision,
+      advisoryOnly: true,
+      spawnAuthority: false,
     });
   }
 

@@ -106,9 +106,11 @@ export function normalizeSubagentStructurePolicyV1(input = {}) {
 /**
  * Pure trusted-snapshot helper. `graph` MUST already come from the canonical
  * durable orchestration authority. This function validates graph consistency;
- * it does not authenticate caller provenance. Executable admission must use
- * OrchestrationV2Manager.evaluateSelectedSubagentStructureAdmission(), which
- * loads the graph itself and rejects caller-supplied topology.
+ * it does not authenticate caller provenance or grant spawn authority.
+ * OrchestrationV2Manager.previewSelectedSubagentStructureAdmission() provides
+ * only an advisory canonical-state precheck. Actual child creation must
+ * atomically re-read/revalidate canonical hierarchy state and the global
+ * resource governor at mutation time.
  */
 export function deriveSubagentStructureFactsFromGraphV1({ graph, parentNodeId } = {}) {
   const canonicalGraph = validateOrchestrationGraphV1(graph);
