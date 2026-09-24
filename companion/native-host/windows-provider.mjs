@@ -300,7 +300,7 @@ export function createPowerShellUiaAdapter({ execFile, powershellPath = null } =
       } catch {
         fail('WINDOWS_UIA_INVALID_RESPONSE', 'Windows UI Automation returned invalid JSON');
       }
-      return normalizeUiaRows(parsed, limit);
+      return normalizeUiaRows(parsed, request.limit);
     },
   });
 }
