@@ -100,6 +100,7 @@ export function normalizeWebSemanticElementV1(input) {
 
 const SNAPSHOT_KEYS = new Set([
   'schemaVersion', 'snapshotId', 'targetId', 'url', 'title', 'elements', 'observedAt',
+  'contentTrust', 'actionAuthority', 'advisoryOnly',
 ]);
 
 export function normalizeWebSemanticSnapshotV1(input) {
@@ -107,6 +108,15 @@ export function normalizeWebSemanticSnapshotV1(input) {
   exactKeys(raw, SNAPSHOT_KEYS, 'WebSemanticSnapshotV1');
   if (Number(raw.schemaVersion) !== WebSemanticSnapshotVersion) {
     throw new Error('Unsupported WebSemanticSnapshotV1 schemaVersion');
+  }
+  if (Object.hasOwn(raw, 'contentTrust') && raw.contentTrust !== 'UNTRUSTED_DATA') {
+    throw new Error('contentTrust must remain UNTRUSTED_DATA');
+  }
+  if (Object.hasOwn(raw, 'actionAuthority') && raw.actionAuthority !== 'NONE') {
+    throw new Error('actionAuthority must remain NONE');
+  }
+  if (Object.hasOwn(raw, 'advisoryOnly') && raw.advisoryOnly !== true) {
+    throw new Error('advisoryOnly must remain true');
   }
   if (!Array.isArray(raw.elements) || raw.elements.length > MAX_ELEMENTS) {
     throw new Error('elements must be a bounded array');
