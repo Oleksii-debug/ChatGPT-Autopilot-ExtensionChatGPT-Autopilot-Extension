@@ -103,12 +103,17 @@ async function readChromeTargetV1(chromeApi, targetId) {
   };
 }
 
-export function createChromeDeterministicWebStoreV1(chromeApi, { storageKey = DETERMINISTIC_WEB_RUNTIME_STORAGE_KEY } = {}) {
+export function createChromeDeterministicWebStoreV1(chromeApi, {
+  storageKey = DETERMINISTIC_WEB_RUNTIME_STORAGE_KEY,
+  ready = Promise.resolve(),
+} = {}) {
   if (!chromeApi?.storage?.local?.get || !chromeApi?.storage?.local?.set) throw new Error('deterministic web runtime requires Chrome local storage');
+  const readyBarrier = Promise.resolve(ready);
   let chain = Promise.resolve();
   return Object.freeze({
     update(mutator) {
       const operation = chain.then(async () => {
+        await readyBarrier;
         const record = await chromeApi.storage.local.get(storageKey);
         const hasStoredRecord = Boolean(record)
           && typeof record === 'object'
@@ -270,10 +275,10 @@ export function createChromeDeterministicWebReconcileVerifierV1(chromeApi, { now
   };
 }
 
-export function createChromeDeterministicWebProviderV1({ chromeApi, reconcileVerify, now, leaseId } = {}) {
+export function createChromeDeterministicWebProviderV1({ chromeApi, reconcileVerify, now, leaseId, storageReady } = {}) {
   const provider = createDeterministicWebProviderV1({
     transport: createChromeDeterministicWebTransportV1(chromeApi),
-    store: createChromeDeterministicWebStoreV1(chromeApi),
+    store: createChromeDeterministicWebStoreV1(chromeApi, { ready: storageReady }),
     reconcileVerify,
     now,
     leaseId,
