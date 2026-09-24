@@ -7,6 +7,7 @@ const RUN_STATES = new Set(Object.values(RunState));
 const OPERATION_PHASES = new Set(Object.values(OperationPhase));
 const SAFE_DIAGNOSTIC_LOCATION = /^(?:chatgpt\.com\/розмова: (?:немає ідентифікатора|…[A-Za-z0-9_-]{1,6})|не-ChatGPT-адреса|некоректна адреса ChatGPT)$/u;
 const LOG_LEVELS = new Set(['INFO', 'WARN', 'WARNING', 'ERROR']);
+const MAX_DATE_MILLIS = 8_640_000_000_000_000;
 
 function plainObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
@@ -43,7 +44,7 @@ function safeDiagnosticLocation(value) {
   return typeof value === 'string' && SAFE_DIAGNOSTIC_LOCATION.test(value) ? value : '';
 }
 function safeTime(value) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_DATE_MILLIS ? value : 0;
 }
 
 function freezeDeep(value) {
