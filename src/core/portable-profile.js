@@ -141,6 +141,8 @@ function buildSession(raw, index, now, version = 1) {
     now,
   });
   session.version = Math.max(1, Number(version) || 1);
+  if (raw.simplifiedSession !== undefined && typeof raw.simplifiedSession !== 'boolean') throw new Error(`Session ${name} simplifiedSession must be boolean`);
+  session.simplifiedSession = raw.simplifiedSession === true;
   session.promptCadence = normalizeSessionPromptCadence(raw.promptCadence);
   const portableDrive = normalizeSessionDrivePromptSources(raw.drivePromptSources);
   session.drivePromptSources = {
@@ -318,6 +320,7 @@ function sessionToPortable(session) {
   return {
     id: session.id,
     name: session.name,
+    simplifiedSession: session.simplifiedSession === true,
     autoStart: false,
     promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared',
     urlMode: session.urlMode === 'unique' ? 'unique' : 'shared',

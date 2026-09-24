@@ -85,3 +85,17 @@ test('ambiguous Send and duplicate UI reads never increment verified counter', (
   assert.equal(projectGlobalStatus(source).summary.verifiedSends, 1);
   assert.equal(projectGlobalStatus(source).summary.verifiedSends, 1);
 });
+
+test('simplified and ordinary sessions are separate rows with one shared verified total', () => {
+  const sessionsById = {
+    simple: { id: 'simple', name: 'Simple', simplifiedSession: true, runState: 'RUNNING', successfulSendCount: 4 },
+    full: { id: 'full', name: 'Full', runState: 'PAUSED', successfulSendCount: 2 },
+  };
+  const view = projectGlobalStatus({ coreState: { sessionOrder: ['simple', 'full'], sessionsById } });
+  assert.equal(view.summary.total, 2);
+  assert.equal(view.summary.verifiedSends, 6);
+  assert.equal(view.sessions.length, 1);
+  assert.equal(view.simplifiedSessions.length, 1);
+  assert.equal(view.summary.RUNNING, 1);
+  assert.equal(view.summary.PAUSED, 1);
+});

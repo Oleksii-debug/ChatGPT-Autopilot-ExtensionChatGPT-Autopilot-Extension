@@ -63,6 +63,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
   const sessionOrder = coreState.sessionOrder || [];
   const units = [];
   const sessions = [];
+  const simplifiedSessions = [];
   const scenarioSlots = [];
   const orchestration = [];
   const agents = [];
@@ -77,8 +78,9 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       verifiedSends: num(session.successfulSendCount),
       completedCycles: num(session.cycleCount ?? session.onePassCompletedCount),
     };
-    sessions.push(row);
-    add({ ...row, kind: 'SESSION' });
+    if (session.simplifiedSession === true) simplifiedSessions.push(row);
+    else sessions.push(row);
+    add({ ...row, kind: session.simplifiedSession === true ? 'SIMPLIFIED_SESSION' : 'SESSION' });
   }
 
   for (const scenario of scenarios) {
@@ -151,9 +153,9 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
   return {
     summary: {
       total: units.length, ...counts,
-      verifiedSends: sessions.reduce((n, row) => n + row.verifiedSends, managedSends),
+      verifiedSends: [...sessions, ...simplifiedSessions].reduce((n, row) => n + row.verifiedSends, managedSends),
       completedResponses: scenarios.reduce((n, scenario) => n + num(scenario.runtime?.totalCompletedTurns), 0),
     },
-    sessions, scenarioSlots, orchestration, agents, models,
+    sessions, simplifiedSessions, scenarioSlots, orchestration, agents, models,
   };
 }
