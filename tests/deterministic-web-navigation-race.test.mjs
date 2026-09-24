@@ -7,6 +7,7 @@ function auth(invocationId) { return { toolDescriptor: { schemaVersion: 1, toolI
 test('accepted navigation with stale first readback remains fenced until fresh reconciliation', async () => {
   const storage = {}; const updates = []; let settled = false; const oldUrl = 'https://example.test/old'; const newUrl = 'https://example.test/new';
   const chromeApi = {
+    permissions: { async contains() { return true; } },
     storage: { local: { async get(key) { return key in storage ? { [key]: structuredClone(storage[key]) } : {}; }, async set(record) { Object.assign(storage, structuredClone(record)); } } },
     tabs: { async get(id) { return { id, url: settled ? newUrl : oldUrl, status: settled ? 'complete' : 'loading' }; }, async update(id, update) { updates.push([id, structuredClone(update)]); return { id, ...update, status: 'loading' }; } },
     scripting: { async executeScript() { return [{ result: { url: settled ? newUrl : oldUrl, readyState: settled ? 'complete' : 'loading', visibleSelectors: [] } }]; } },
