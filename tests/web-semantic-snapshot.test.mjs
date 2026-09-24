@@ -148,6 +148,28 @@ test('inspection searches semantic role/name/description/href without generating
   }
 });
 
+
+test('tri-state checkbox preserves AX mixed checked state', () => {
+  const result = normalizeWebSemanticSnapshotV1(snapshot({
+    elements: [{
+      semanticId: 'select-all',
+      role: 'checkbox',
+      name: 'Select all',
+      checked: 'mixed',
+    }],
+  }));
+  assert.equal(result.elements[0].checked, 'mixed');
+
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({
+    elements: [{
+      semanticId: 'bad-check',
+      role: 'checkbox',
+      name: 'Bad',
+      checked: 'indeterminate',
+    }],
+  })), /checked must be boolean or mixed/);
+});
+
 test('duplicate semantic identities fail closed', () => {
   assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({
     elements: [
