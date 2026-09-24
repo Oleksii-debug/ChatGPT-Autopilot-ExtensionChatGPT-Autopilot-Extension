@@ -1,4 +1,4 @@
-import { VerificationStatus } from './universal-agent-contracts.js';
+import { VerificationStatus, normalizeArtifactRefV1 } from './universal-agent-contracts.js';
 import { ReconciliationOutcome } from './universal-agent-exact-effect.js';
 import { FILESYSTEM_PROVIDER_ID, FilesystemToolId } from './filesystem-agent-provider.js';
 
@@ -12,7 +12,7 @@ function requireId(value, label) {
 }
 
 async function sha256Text(value) {
-  if (typeof value !== 'string') throw new Error('Filesystem write verifier requires text content');
+  if (typeof value !== 'string') throw new Error('Filesystem write verifier requires UTF-8 readback text');
   if (!globalThis.crypto?.subtle) throw new Error('Web Crypto SHA-256 is unavailable');
   const bytes = new TextEncoder().encode(value);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
@@ -30,7 +30,8 @@ function verificationId(invocationId, suffix) {
 /**
  * Independent postcondition path for filesystem.writeExistingText.  It never trusts the
  * mutation response as proof: it performs a fresh read through Native Companion and keeps
- * only hashes/commit classification in exact-effect evidence (never the file text).
+ * only hashes/commit classification in exact-effect evidence. Desired bytes remain behind
+ * the durable hash-bound ArtifactRef carried by the invocation; raw content is not stored.
  */
 export class FilesystemWriteVerifierV1 {
   constructor({ nativeClient, verifierId = 'filesystem-readback-verifier', now = () => Date.now() } = {}) {
@@ -44,25 +45,26 @@ export class FilesystemWriteVerifierV1 {
   async #readback(invocation) {
     if (invocation?.toolId !== FilesystemToolId.WRITE_EXISTING_TEXT) throw new Error('Filesystem verifier accepts only writeExistingText');
     const args = invocation.arguments || {};
-    const desiredText = typeof args.text === 'string' ? args.text : (() => { throw new Error('Filesystem write text is missing'); })();
-    const desiredBytes = new TextEncoder().encode(desiredText).byteLength;
-    const desiredSha256 = await sha256Text(desiredText);
+    const artifactRef = normalizeArtifactRefV1(args.contentArtifactRef);
+    if (!SHA256.test(artifactRef.sha256)) throw new Error('Filesystem write ArtifactRef sha256 is required');
     const expectedBeforeSha256 = String(args.expectedSha256 || '').trim().toLowerCase();
     if (!SHA256.test(expectedBeforeSha256)) throw new Error('Filesystem expectedSha256 is invalid');
     const read = await this.nativeClient.readText({
       rootId: args.rootId,
       relativePath: args.relativePath,
-      maxBytes: Math.max(1, desiredBytes + 1),
+      maxBytes: Math.max(1, artifactRef.sizeBytes + 1),
     });
     const observedSha256 = await sha256Text(read.text);
+    const observedBytes = new TextEncoder().encode(read.text).byteLength;
     return Object.freeze({
       rootId: args.rootId,
       relativePath: args.relativePath,
-      desiredSha256,
+      desiredSha256: artifactRef.sha256,
+      desiredBytes: artifactRef.sizeBytes,
       expectedBeforeSha256,
       observedSha256,
-      sizeBytes: new TextEncoder().encode(read.text).byteLength,
-      desiredBytes,
+      sizeBytes: observedBytes,
+      artifactId: artifactRef.artifactId,
     });
   }
 
@@ -77,9 +79,9 @@ export class FilesystemWriteVerifierV1 {
       status: committed ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS,
       reasonCode: committed ? 'FILESYSTEM_POSTCONDITION_MATCHED' : 'FILESYSTEM_POSTCONDITION_MISMATCH',
       summary: committed
-        ? 'Fresh Native Companion readback matched the desired filesystem content digest.'
-        : 'Fresh Native Companion readback did not match the desired filesystem content digest.',
-      evidenceArtifactIds: [],
+        ? 'Fresh Native Companion readback matched the desired ArtifactRef digest and size.'
+        : 'Fresh Native Companion readback did not match the desired ArtifactRef digest and size.',
+      evidenceArtifactIds: [readback.artifactId],
       verifiedAt: new Date(this.now()).toISOString(),
       verifierId: this.verifierId,
       verificationAuthorityId: invocation.policyDecisionId,
@@ -99,7 +101,7 @@ export class FilesystemWriteVerifierV1 {
       observationId: observationId(invocation.invocationId, `reconcile-${attempt}`),
       invocationId: invocation.invocationId,
       status: 'OK',
-      summary: 'Fresh filesystem readback classified whether the desired effect is committed.',
+      summary: 'Fresh filesystem readback classified whether the desired ArtifactRef effect is committed.',
       data: {
         committed,
         unchanged,
@@ -108,6 +110,7 @@ export class FilesystemWriteVerifierV1 {
         observedSha256: readback.observedSha256,
         desiredSha256: readback.desiredSha256,
         expectedBeforeSha256: readback.expectedBeforeSha256,
+        desiredArtifactId: readback.artifactId,
       },
       artifactRefs: [],
       observedAt,
@@ -135,7 +138,7 @@ export class FilesystemWriteVerifierV1 {
       status,
       reasonCode,
       summary,
-      evidenceArtifactIds: [],
+      evidenceArtifactIds: [readback.artifactId],
       verifiedAt,
       verifierId: this.verifierId,
       verificationAuthorityId: policyDecisionId,
