@@ -42,6 +42,14 @@ function plain(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) throw new Error(`${label} must be a plain object`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} fields must be own data properties`);
+    }
+    if (!descriptor.enumerable) throw new Error(`${label} contains non-enumerable field: ${key}`);
+  }
   return value;
 }
 
@@ -197,13 +205,17 @@ function latencyRank(value) {
   return value > 0 ? value : Number.MAX_SAFE_INTEGER;
 }
 
+function asciiCompare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function compareCandidate(a, b) {
   return readinessRank(a.readiness) - readinessRank(b.readiness)
     || pathRank(a.pathKind) - pathRank(b.pathKind)
     || b.matchingCapabilityIds.length - a.matchingCapabilityIds.length
     || latencyRank(a.latencyMs) - latencyRank(b.latencyMs)
-    || a.providerId.localeCompare(b.providerId)
-    || a.toolId.localeCompare(b.toolId);
+    || asciiCompare(a.providerId, b.providerId)
+    || asciiCompare(a.toolId, b.toolId);
 }
 
 function comparePlanCandidate(a, b) {
@@ -211,8 +223,8 @@ function comparePlanCandidate(a, b) {
     || pathRank(a.candidate.pathKind) - pathRank(b.candidate.pathKind)
     || b.uncoveredIds.length - a.uncoveredIds.length
     || latencyRank(a.candidate.latencyMs) - latencyRank(b.candidate.latencyMs)
-    || a.candidate.providerId.localeCompare(b.candidate.providerId)
-    || a.candidate.toolId.localeCompare(b.candidate.toolId);
+    || asciiCompare(a.candidate.providerId, b.candidate.providerId)
+    || asciiCompare(a.candidate.toolId, b.candidate.toolId);
 }
 
 function providerFacts(providerId, toolId, statesByProviderTool) {

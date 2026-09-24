@@ -309,3 +309,57 @@ test('deterministic path class outranks broader visual coverage in the executabl
   ]);
   assert.equal(result.plan.every(step => step.permissionGranted === false), true);
 });
+
+
+test('provider readiness rejects accessors, symbols and hidden authority without executing getters', () => {
+  let healthReads = 0;
+  const accessor = state('provider/accessor');
+  Object.defineProperty(accessor, 'health', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      healthReads += 1;
+      return healthReads === 1 ? ProviderHealthStatus.UNAVAILABLE : ProviderHealthStatus.READY;
+    },
+  });
+  assert.throws(() => normalizeProviderReadinessV1(accessor), /own data properties/);
+  assert.equal(healthReads, 0, 'readiness getter must never execute');
+
+  const symbolic = state('provider/symbol');
+  symbolic[Symbol('authority')] = 'READY';
+  assert.throws(() => normalizeProviderReadinessV1(symbolic), /symbol field/);
+
+  const hidden = state('provider/hidden');
+  Object.defineProperty(hidden, 'authenticated', {
+    enumerable: false,
+    configurable: true,
+    value: true,
+  });
+  assert.throws(() => normalizeProviderReadinessV1(hidden), /non-enumerable field: authenticated/);
+});
+
+test('candidate tie-breaking uses locale-independent code-unit order regardless of inventory order', () => {
+  const caps = [capability('filesystem.read')];
+  const upper = tool('tool.same', 'Provider/A', ['filesystem.read'], true);
+  const lower = tool('tool.same2', 'provider/a', ['filesystem.read'], true);
+  const states = [
+    state('Provider/A', { toolId:'tool.same', latencyMs:10 }),
+    state('provider/a', { toolId:'tool.same2', latencyMs:10 }),
+  ];
+  const forward = discoverCapabilityPathsV1({
+    capabilities:caps,
+    tools:[lower, upper],
+    providerStates:[states[1], states[0]],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  const reverse = discoverCapabilityPathsV1({
+    capabilities:caps,
+    tools:[upper, lower],
+    providerStates:[states[0], states[1]],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.deepEqual(forward.candidates.map(item => item.providerId), ['Provider/A', 'provider/a']);
+  assert.deepEqual(reverse.candidates.map(item => item.providerId), ['Provider/A', 'provider/a']);
+  assert.equal(forward.plan[0].providerId, 'Provider/A');
+  assert.equal(reverse.plan[0].providerId, 'Provider/A');
+});
