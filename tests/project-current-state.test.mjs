@@ -151,7 +151,7 @@ function stateInput({ snapshotValue = snapshot(), capsuleValue = capsule(), curr
   return { snapshot: snapshotValue, capsule: capsuleValue, currentSourceRefs: currentSources };
 }
 
-function digest(args, allowedSourceIds = ['github-main']) {
+function deriveDigest(args, allowedSourceIds = ['github-main']) {
   return deriveProjectCurrentStateDigestV1({ allowedSourceIds, ...args });
 }
 
@@ -170,7 +170,7 @@ test('current-state rejects substituted source provenance even when revision and
 
 test('digest is deterministic and unchanged for the same fresh provenance-bound state', () => {
   const input = stateInput();
-  const digest = digest({ baseline: input, current: input });
+  const digest = deriveDigest({ baseline: input, current: input });
   assert.equal(digest.status, 'UNCHANGED');
   assert.equal(digest.changeViewAvailable, true);
   assert.equal(digest.advisoryOnly, true);
@@ -199,7 +199,7 @@ test('digest reports source revision movement across fresh project revisions', (
     }],
   });
 
-  const digest = digest({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: nextSnapshot,
@@ -252,7 +252,7 @@ test('digest reports artifact identity changes while both endpoint states remain
     artifactRefs: [nextArtifact],
   });
 
-  const digest = digest({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: nextSnapshot,
@@ -285,7 +285,7 @@ test('digest reports artifact identity changes while both endpoint states remain
 });
 
 test('digest fails closed instead of producing a what-changed view from stale substituted sources', () => {
-  const digest = digest({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       currentSources: [source({ uri: 'github://attacker/substituted' })],
@@ -308,7 +308,7 @@ test('digest fails closed instead of producing a what-changed view from stale su
 
 test('digest refuses cross-project comparison', () => {
   const otherSource = source({ projectId: 'other-project' });
-  assert.throws(() => digest({
+  assert.throws(() => deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: snapshot({ projectId: 'other-project', sourceRefs: [otherSource] }),
@@ -333,7 +333,7 @@ test('digest reports aligned source provenance changes even when revision and ha
     projectRevisionId: 'project-rev-2',
   });
 
-  const digest = digest({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: movedSnapshot,
@@ -353,7 +353,7 @@ test('digest reports aligned source provenance changes even when revision and ha
 });
 
 test('stale artifact identity suppresses what-changed and exposes explicit drift evidence', () => {
-  const digest = digest({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       capsuleValue: capsule({ artifactRefs: [artifact({ sha256: 'd'.repeat(64) })] }),
@@ -413,7 +413,7 @@ test('unadmitted source provenance changes are classified without disclosing sou
     currentSources: [currentSource],
   });
 
-  const result = digest({ baseline: baselineInput, current: currentInput }, []);
+  const result = deriveDigest({ baseline: baselineInput, current: currentInput }, []);
   assert.equal(result.status, 'CHANGED');
   assert.equal(result.totalSourceChangeCount, 1);
   assert.equal(result.visibleSourceChangeCount, 0);
@@ -439,7 +439,7 @@ test('sensitive artifact changes never expose location or producer identity', ()
     sensitive: true,
   });
 
-  const result = digest({
+  const result = deriveDigest({
     baseline: stateInput({
       snapshotValue: snapshot({ artifactRefs: [oldArtifact] }),
       capsuleValue: capsule({ artifactRefs: [oldArtifact] }),
@@ -467,7 +467,7 @@ test('sensitive artifact changes never expose location or producer identity', ()
 });
 
 test('unadmitted stale source evidence is hidden while staleness remains owner-visible', () => {
-  const result = digest({
+  const result = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       currentSources: [source({ uri: 'github://private.example/substituted' })],
