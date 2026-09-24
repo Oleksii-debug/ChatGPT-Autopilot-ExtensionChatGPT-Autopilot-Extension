@@ -86,6 +86,53 @@ test('worker-count authority rejects numeric strings, booleans and coercing obje
   }
 });
 
+
+test('schema-valid inherited Object.prototype route IDs remain exact worker-policy keys', () => {
+  const inheritedRoutes = [
+    { routeId:'constructor', provider:'ollama', model:'qwen3:8b', roles:['fast-worker'], priority:20, maxWorkers:2 },
+    { routeId:'toString', provider:'ollama', model:'qwen3:8b', roles:['fast-worker'], priority:10, maxWorkers:2 },
+  ];
+
+  const emptyManual = normalizeAiWorkerPolicy({
+    allocationMode:'manual',
+    maxParallelWorkers:2,
+    manualRouteWorkers:{},
+  }, inheritedRoutes);
+  assert.equal(Object.hasOwn(emptyManual.manualRouteWorkers, 'constructor'), false);
+  assert.equal(Object.hasOwn(emptyManual.manualRouteWorkers, 'toString'), false);
+
+  const noneAssigned = allocateAiRouteWorkers({
+    routes:inheritedRoutes,
+    workerPolicy:emptyManual,
+    role:AiRouteRole.FAST_WORKER,
+    desiredWorkers:2,
+  });
+  assert.deepEqual(noneAssigned.allocations, { constructor:0, toString:0 });
+  assert.equal(noneAssigned.assignedWorkers, 0);
+  assert.equal(noneAssigned.unassignedWorkers, 2);
+
+  const explicit = normalizeAiWorkerPolicy({
+    allocationMode:'manual',
+    maxParallelWorkers:2,
+    manualRouteWorkers:{ constructor:1, toString:1 },
+  }, inheritedRoutes);
+  assert.equal(Object.hasOwn(explicit.manualRouteWorkers, 'constructor'), true);
+  assert.equal(Object.hasOwn(explicit.manualRouteWorkers, 'toString'), true);
+  assert.equal(explicit.manualRouteWorkers.constructor, 1);
+  assert.equal(explicit.manualRouteWorkers.toString, 1);
+
+  const assigned = allocateAiRouteWorkers({
+    routes:inheritedRoutes,
+    workerPolicy:explicit,
+    routeStates:{},
+    role:AiRouteRole.FAST_WORKER,
+    desiredWorkers:2,
+  });
+  assert.deepEqual(assigned.allocations, { constructor:1, toString:1 });
+  assert.equal(assigned.assignedWorkers, 2);
+  assert.equal(assigned.unassignedWorkers, 0);
+});
+
 test('backoff and route owner policy are respected before allocating workers', () => {
   const result = allocateAiRouteWorkers({
     routes,
