@@ -1,5 +1,5 @@
 import { normalizeChatUrl, OperationPhase, RunState, TabStrategy } from './schema.js';
-import { sameChatConversationUrl } from './tabs.js';
+import { sameChatConversationUrl, expectedPostSendConversationUrl } from './tabs.js';
 
 function fail(code) {
   const error = new Error(code);
@@ -244,9 +244,17 @@ export async function restorePendingSendTabs(chromeApi, repository, { sessionId 
       continue;
     }
 
-    // A manual user tab switch wins. Another Autopilot Session cannot enter this
-    // window while the durable operation focus lease is present.
-    if (current.active) {
+    // A manual user tab switch/navigation wins. Another Autopilot Session cannot
+    // enter this window while the durable operation focus lease is present. Only
+    // restore owner focus when the still-active worker tab remains bound to this
+    // operation (including the legitimate fresh-launch -> /c/<id> transition).
+    let stillOperationTab = false;
+    try {
+      const currentUrl = normalizeChatUrl(current.url);
+      stillOperationTab = sameChatConversationUrl(currentUrl, operation.targetUrl)
+        || expectedPostSendConversationUrl(currentUrl, operation.targetUrl);
+    } catch { /* An unrelated/invalid URL is treated as owner intervention. */ }
+    if (current.active && stillOperationTab) {
       try { await chromeApi.tabs.update(previousTabId, { active:true }); }
       catch { continue; }
     }
