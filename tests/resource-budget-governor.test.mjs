@@ -182,6 +182,13 @@ test('rejects accessor-backed, hidden and symbol fields without executing getter
   assert.throws(() => normalizeResourceUsageV1(accessorUsage), /own data properties/);
   assert.equal(usageGetterReads, 0);
 
+  const hiddenKnown = {};
+  Object.defineProperty(hiddenKnown, 'maxCostUsdMicros', {
+    enumerable: false,
+    value: 1_000_000,
+  });
+  assert.throws(() => normalizeResourceBudgetV1(hiddenKnown), /own data properties/);
+
   const hiddenUnknown = { maxModelCalls: 1 };
   Object.defineProperty(hiddenUnknown, 'hiddenAuthority', {
     enumerable: false,
