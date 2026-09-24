@@ -189,6 +189,24 @@ test('hidden tab bypasses Chrome native mouse submit and sends through DOM seman
   assert.equal(r.status,'SENT_VERIFIED');assert.equal(nativeCalls,0);assert.equal(f.clicks(),1);
 });
 
+test('focus reconciled away before native Send is reported as proven no effect',async()=>{
+  const f=fixture();let restores=0;
+  const result=await f.run('SUBMIT_EXISTING',{}, {
+    activate:async()=>{f.document.visibilityState='visible';return true;},
+    submit:async()=>{
+      const error=new Error('owner focus already restored');
+      error.safeDiagnosticCode='SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT';
+      throw error;
+    },
+    restore:async()=>{restores++;f.document.visibilityState='hidden';return true;},
+  });
+  assert.equal(result.status,'TEMPORARY_ERROR');
+  assert.equal(result.submissionEvidence,'PROVEN_NO_EFFECT');
+  assert.equal(result.safeDiagnosticCode,'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT');
+  assert.equal(restores,1);
+  assert.equal(f.clicks(),0);
+});
+
 test('hidden non-submit control activates for native click and restores focus before acknowledgement completes',async()=>{
   const f=fixture();let activation=0,nativeCalls=0,restores=0;
   const order=[];
