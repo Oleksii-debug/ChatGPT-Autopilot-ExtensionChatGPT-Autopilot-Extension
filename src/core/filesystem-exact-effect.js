@@ -132,6 +132,36 @@ export class FilesystemExactEffectExecutorV1 {
     return this.#save(committed.state);
   }
 
+  #validateInitialVerification(state, raw, requestedAt, completedAt) {
+    const verification = normalizeVerificationV1(raw);
+    const verifierId = requireId(verification.verifierId, 'verifierId');
+    if ([this.actorId, this.parentActorId, state.invocation.providerId].filter(Boolean).includes(verifierId)) {
+      throw new Error('Filesystem verifier must be independent from the actor, parent controller, and effect provider');
+    }
+    if (requireId(verification.verificationAuthorityId, 'verificationAuthorityId') !== state.invocation.policyDecisionId) {
+      throw new Error('Filesystem verification authority must bind the admitted policy envelope');
+    }
+    if (requireId(verification.effectId, 'verification.effectId') !== state.effectId
+      || requireId(verification.executionId, 'verification.executionId') !== state.executionId
+      || requireAttempt(verification.attempt) !== state.attempt) {
+      throw new Error('Filesystem verification does not match the current exact-effect attempt');
+    }
+    if (verification.invocationId !== state.invocation.invocationId
+      || verification.observationId !== state.observation.observationId) {
+      throw new Error('Filesystem verification does not match the effect invocation and observation');
+    }
+
+    const observedAt = timestampMs(state.observation.observedAt, 'observation.observedAt');
+    const verifiedAt = timestampMs(verification.verifiedAt, 'verification.verifiedAt');
+    const earliestFreshAt = Math.max(observedAt, requestedAt - this.maxReconciliationEvidenceAgeMs);
+    if (verifiedAt < earliestFreshAt
+      || observedAt > requestedAt + MAX_CLOCK_SKEW_MS
+      || verifiedAt > completedAt + MAX_CLOCK_SKEW_MS) {
+      throw new Error('Filesystem verification evidence is stale or has an invalid chronology');
+    }
+    return verification;
+  }
+
   async #obtainReconciliationProof(state, outcome, requestedAt) {
     if (typeof this.reconcileVerify !== 'function') {
       throw new Error(`${outcome} requires the canonical independent reconciliation verifier`);
@@ -258,18 +288,30 @@ export class FilesystemExactEffectExecutorV1 {
       });
       state = await this.#save(observed.state);
 
-      const verification = await this.verify({
+      const verificationRequestedAt = this.now();
+      const rawVerification = await this.verify({
         invocation: structuredClone(state.invocation),
+        effectId: state.effectId,
         executionId: state.executionId,
+        attempt: state.attempt,
+        policyDecisionId: state.invocation.policyDecisionId,
         observation: structuredClone(state.observation),
+        requestedAt: new Date(verificationRequestedAt).toISOString(),
       });
+      const verificationCompletedAt = this.now();
+      const verification = this.#validateInitialVerification(
+        state,
+        rawVerification,
+        verificationRequestedAt,
+        verificationCompletedAt,
+      );
       const verified = reduceExactEffectV1(state, {
         schemaVersion: 1,
         eventId: eventId(state.effectId, `verify-${state.attempt}`),
         type: ExactEffectEventType.RECORD_VERIFICATION,
         effectId: state.effectId,
         executionId: state.executionId,
-        at: at(this.now),
+        at: new Date(verificationCompletedAt).toISOString(),
         verification,
       });
       state = await this.#save(verified.state);
