@@ -46,6 +46,7 @@ function exact(value, allowed, label) { for (const key of Object.keys(value)) if
 function clean(value, max = 4000) { const out = typeof value === 'string' ? value.trim() : ''; if (out.length > max) throw new Error('AI route text is too long'); return out; }
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
+function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
 function price(value, label) { const out = Number(value ?? 0); if (!Number.isFinite(out) || out < 0 || out > 1_000_000) throw new Error(`${label} is invalid`); return out; }
 function ids(value, label, max = MAX_ROUTES) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => id(item, `${label}[${index}]`)); if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
 
@@ -81,7 +82,7 @@ export function normalizeAiRoutePool(raw = []) {
       inputPricePerMillionUsd: price(item.inputPricePerMillionUsd, 'AI route input price'),
       outputPricePerMillionUsd: price(item.outputPricePerMillionUsd, 'AI route output price'),
       supportsVision: item.supportsVision === true,
-      maxWorkers: integer(item.maxWorkers ?? 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
+      maxWorkers: strictInteger(item.maxWorkers ?? 0, 'AI route maxWorkers', 0, MAX_PARALLEL_WORKERS),
     });
   });
   if (new Set(routes.map(route => route.routeId)).size !== routes.length) throw new Error('AI route pool contains duplicate routeId');
@@ -116,7 +117,7 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   exact(raw, new Set(['allocationMode','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
   const allocationMode = clean(raw.allocationMode || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
   if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
-  const maxParallelWorkers = integer(raw.maxParallelWorkers ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
+  const maxParallelWorkers = strictInteger(raw.maxParallelWorkers ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
   const pool = normalizeAiRoutePool(routes);
   const routeIds = new Set(pool.map(route => route.routeId));
   const source = raw.manualRouteWorkers ?? {};
@@ -127,7 +128,7 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   for (const [rawRouteId, value] of Object.entries(source)) {
     const routeId = id(rawRouteId, 'AI worker manual routeId');
     if (!routeIds.has(routeId)) throw new Error(`AI worker manual route is unknown: ${routeId}`);
-    const count = integer(value, `AI worker manualRouteWorkers.${routeId}`, 0, MAX_PARALLEL_WORKERS);
+    const count = strictInteger(value, `AI worker manualRouteWorkers.${routeId}`, 0, MAX_PARALLEL_WORKERS);
     const route = pool.find(item => item.routeId === routeId);
     if (route.maxWorkers > 0 && count > route.maxWorkers) throw new Error(`AI worker manual allocation exceeds maxWorkers for route: ${routeId}`);
     manualRouteWorkers[routeId] = count;
@@ -216,7 +217,7 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
 export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy = {}, routeStates = {}, role = AiRouteRole.FAST_WORKER, capabilityIds = [], requiresVision = false, desiredWorkers = 0, now = Date.now() } = {}) {
   const pool = normalizeAiRoutePool(routes);
   const normalizedWorkerPolicy = normalizeAiWorkerPolicy(workerPolicy, pool);
-  const requested = integer(desiredWorkers, 'AI worker desiredWorkers', 0, MAX_PARALLEL_WORKERS);
+  const requested = strictInteger(desiredWorkers, 'AI worker desiredWorkers', 0, MAX_PARALLEL_WORKERS);
   const target = Math.min(requested, normalizedWorkerPolicy.maxParallelWorkers);
   const selected = selectAiRouteCandidates({
     routes: pool,
