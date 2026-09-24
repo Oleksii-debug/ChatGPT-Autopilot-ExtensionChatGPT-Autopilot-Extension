@@ -164,6 +164,31 @@ export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelo
   return reconcileAgentPlanV1(plan, { at: updatedAt });
 }
 
+/**
+ * Converts a model-proposed full replacement into strict append-only growth.
+ * Existing top-level identity and every durable node must be echoed exactly;
+ * only a suffix of new PENDING nodes may be introduced.
+ */
+export function evolveAgentPlanV1(raw, rawCandidate, { resourceEnvelope, at = new Date().toISOString() } = {}) {
+  const current = normalizeAgentPlanV1(raw);
+  const candidate = normalizeAgentPlanV1(rawCandidate);
+  if (candidate.revision !== current.revision) throw new Error('AgentPlan revision conflict');
+  if (candidate.planId !== current.planId || candidate.jobId !== current.jobId || candidate.objective !== current.objective || candidate.createdAt !== current.createdAt) {
+    throw new Error('AgentPlan live evolution cannot replace plan identity');
+  }
+  if (JSON.stringify(candidate.successCriteria) !== JSON.stringify(current.successCriteria)) throw new Error('AgentPlan live evolution cannot replace success criteria');
+  if (candidate.nodes.length <= current.nodes.length) throw new Error('AgentPlan live evolution requires appended nodes');
+  for (let index = 0; index < current.nodes.length; index += 1) {
+    if (JSON.stringify(candidate.nodes[index]) !== JSON.stringify(current.nodes[index])) throw new Error('AgentPlan live evolution cannot replace existing nodes');
+  }
+  return extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: candidate.nodes.slice(current.nodes.length),
+    resourceEnvelope,
+    at,
+  });
+}
+
 export function transitionAgentPlanNodeV1(raw, { nodeId, state, evidence = '', at = new Date().toISOString() } = {}) {
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const node = plan.nodes.find(item => item.nodeId === nodeId);
