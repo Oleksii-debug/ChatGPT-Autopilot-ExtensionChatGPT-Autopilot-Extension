@@ -1044,8 +1044,18 @@
         });
       }
       send.setAttribute('data-autopilot-native-target', request.requestId);
-      try { await deps.submit({ x, y }); }
-      finally {
+      try {
+        await deps.submit({ x, y });
+      } catch (error) {
+        if (error?.safeDiagnosticCode === 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT') {
+          return resultBase(request, start, {
+            status: STATUS.TEMPORARY_ERROR,
+            submissionEvidence: 'PROVEN_NO_EFFECT',
+            safeDiagnosticCode: 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+          });
+        }
+        throw error;
+      } finally {
         send.removeAttribute('data-autopilot-native-target');
         // Native input has crossed (or attempted) the irreversible effect
         // boundary. The page may be observed safely in the background, so return
