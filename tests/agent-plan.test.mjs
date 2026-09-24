@@ -58,6 +58,18 @@ test('AgentPlan live extension fails closed on stale revisions and state/evidenc
   assert.throws(() => extendAgentPlanV1(current, { expectedRevision: current.revision, nodes: [{ ...node('later'), evidence: 'forged' }], resourceEnvelope: ZERO_ENVELOPE, at: AT }), /cannot inject evidence/);
 });
 
+test('AgentPlan expectedRevision is a strict stale-snapshot guard, not a coercing pseudo-CAS', () => {
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  for (const expectedRevision of [String(current.revision), true, { valueOf: () => current.revision }]) {
+    assert.throws(() => extendAgentPlanV1(current, {
+      expectedRevision,
+      nodes: [node('later')],
+      resourceEnvelope: ZERO_ENVELOPE,
+      at: AT,
+    }), /expectedRevision is invalid/);
+  }
+});
+
 test('AgentPlan live extension retains canonical duplicate, dependency and cycle validation', () => {
   const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
   assert.throws(() => extendAgentPlanV1(current, { expectedRevision: current.revision, nodes: [node('discover')], resourceEnvelope: ZERO_ENVELOPE, at: AT }), /duplicate nodeId/);
