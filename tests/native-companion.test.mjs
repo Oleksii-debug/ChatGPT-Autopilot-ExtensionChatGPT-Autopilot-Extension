@@ -151,6 +151,24 @@ test('host hello, health and capabilities are versioned and caller-bound', async
   assert.equal(mismatch.error.code, 'PROTOCOL_MISMATCH');
 });
 
+test('host exposes only a configured Windows provider and forwards no arbitrary executable path', async () => {
+  const calls = [];
+  const windowsProvider = {
+    capabilities: () => [{ capabilityId: 'windows.process.execPinned', readOnly: false, scoped: true }],
+    execPinned: async payload => { calls.push(payload); return { executableId: 'git', exitCode: 0, stdout: 'ok', stderr: '' }; },
+    queryUia: async () => [],
+  };
+  const capabilities = await handleNativeCompanionRequest(request('capabilities'), { config: config(), callerOrigin: ORIGIN, windowsProvider });
+  assert.equal(capabilities.result.windowsProviderAvailable, true);
+  assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'windows.process.execPinned'));
+  const response = await handleNativeCompanionRequest(request('windows.execPinned', { executableId: 'git', args: ['status'] }), { config: config(), callerOrigin: ORIGIN, windowsProvider });
+  assert.equal(response.ok, true);
+  assert.deepEqual(calls, [{ executableId: 'git', args: ['status'] }]);
+  const unavailable = await handleNativeCompanionRequest(request('windows.execPinned', { executableId: 'git' }), { config: config(), callerOrigin: ORIGIN });
+  assert.equal(unavailable.ok, false);
+  assert.equal(unavailable.error.code, 'WINDOWS_PROVIDER_UNAVAILABLE');
+});
+
 test('Native Companion credential client and host keep listing opaque and resolve only on explicit request', async () => {
   const brokerCalls = [];
   const broker = {
@@ -315,6 +333,40 @@ test('filesystem.readText rejects a symlink that escapes the configured root', a
   }), { config: config(root), callerOrigin: ORIGIN });
   assert.equal(response.ok, false);
   assert.equal(response.error.code, 'PATH_OUTSIDE_SCOPE');
+});
+
+test('native host read refuses a symlink swapped after scope admission', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-native-swap-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  const outside = path.join(temp, 'private.txt');
+  await fs.writeFile(target, 'allowed');
+  await fs.writeFile(outside, 'outside-secret');
+  const result = await handleNativeCompanionRequest(request('filesystem.readText', {
+    rootId: 'workspace', relativePath: 'note.txt',
+  }), {
+    config: config(root), callerOrigin: ORIGIN,
+    fsReadBeforeOpen: async () => {
+      await fs.rm(target);
+      await fs.symlink(outside, target, 'file');
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'PATH_OUTSIDE_SCOPE');
+  assert.equal(JSON.stringify(result).includes('outside-secret'), false);
+});
+
+test('Windows installer copies every local module imported by the Native Host', async () => {
+  const hostDir = path.join(repoRoot, 'companion', 'native-host');
+  const installer = await fs.readFile(path.join(hostDir, 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
+  for (const entry of ['host.mjs', 'host-core.mjs', 'filesystem-provider.mjs']) {
+    const source = await fs.readFile(path.join(hostDir, entry), 'utf8');
+    for (const [, localModule] of source.matchAll(/from ['"]\.\/([^'"]+\.mjs)['"]/gu)) {
+      assert.ok(installer.includes(`'${localModule}'`), `${entry} imports ${localModule}, but installer does not copy it`);
+    }
+  }
 });
 
 test('native message framing survives fragmented input and enforces response bound', () => {

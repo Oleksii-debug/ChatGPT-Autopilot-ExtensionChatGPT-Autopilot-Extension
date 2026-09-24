@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { createCredentialBroker } from './credential-broker.mjs';
 import { McpStdioBridge } from './mcp-stdio-bridge.mjs';
+import { createWindowsProvider } from './windows-provider.mjs';
 import {
   NativeMessageDecoder,
   encodeNativeMessage,
@@ -68,6 +70,7 @@ async function decryptDpapiSecret(secretPath) {
 let config;
 let credentialBroker;
 let mcpBridge;
+let windowsProvider;
 try {
   const configText = fs.readFileSync(configPath, 'utf8').replace(/^\uFEFF/u, '').replace(/^\\uFEFF/u, '');
   config = normalizeNativeCompanionConfig(JSON.parse(configText));
@@ -79,6 +82,9 @@ try {
   mcpBridge = new McpStdioBridge({
     registry: readJsonOrDefault(mcpRegistryPath, { schemaVersion: 1, commands: [] }),
   });
+  if (config.windowsProvider) {
+    windowsProvider = createWindowsProvider({ config: config.windowsProvider, execFile: promisify(execFile) });
+  }
 } catch (error) {
   process.stderr.write(`Native Companion configuration failed: ${error.message}\n`);
   process.exit(2);
@@ -108,6 +114,7 @@ process.stdin.on('data', chunk => {
         callerOrigin,
         credentialBroker,
         mcpBridge,
+        windowsProvider,
       });
       writeResponse(response);
     }).catch(error => {

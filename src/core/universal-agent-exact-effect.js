@@ -103,6 +103,15 @@ function assertVerificationBinding(verification, state) {
   if (!state.observation || verification.observationId !== state.observation.observationId) {
     throw new Error('Verification observationId does not match current effect observation');
   }
+  if (verification.effectId && verification.effectId !== state.effectId) {
+    throw new Error('Verification effectId does not match exact effect');
+  }
+  if (verification.executionId && verification.executionId !== state.executionId) {
+    throw new Error('Verification executionId does not match current exact-effect attempt');
+  }
+  if (verification.attempt && verification.attempt !== state.attempt) {
+    throw new Error('Verification attempt does not match current exact-effect attempt');
+  }
 }
 
 function normalizedState(raw) {
@@ -136,7 +145,13 @@ function normalizedState(raw) {
   const verification = raw.verification == null ? null : normalizeVerificationV1(raw.verification);
   if (verification) {
     if (!observation) throw new Error('Verification requires observation');
-    assertVerificationBinding(verification, { invocation, observation });
+    assertVerificationBinding(verification, {
+      invocation,
+      observation,
+      effectId,
+      executionId: expectedExecutionId,
+      attempt,
+    });
   }
   const processedEventIds = Array.isArray(raw.processedEventIds)
     ? raw.processedEventIds.map((value, index) => id(value, `processedEventIds[${index}]`))

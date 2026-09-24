@@ -545,13 +545,32 @@ export class CoreCommandDispatcher {
       const runtime = isolatedRuntime
         ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
         : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
-      const result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
-        systemPrompt: payload.systemPrompt || '',
-        forceStrong: payload.forceStrong === true,
-        maxOutputTokens: Number(payload.maxOutputTokens || 0),
-        maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
-        imageDataUrl: payload.imageDataUrl || '',
-      });
+      let result;
+      try {
+        result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
+          systemPrompt: payload.systemPrompt || '',
+          forceStrong: payload.forceStrong === true,
+          maxOutputTokens: Number(payload.maxOutputTokens || 0),
+          maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
+          imageDataUrl: payload.imageDataUrl || '',
+          taskRole: payload.taskRole || 'planner',
+          strongTaskRole: payload.strongTaskRole || 'verifier',
+          capabilityIds: Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
+        });
+      } catch (error) {
+        if (!isolatedRuntime && error?.routerRuntime) {
+          await this.repo.update(draft => {
+            const current = normalizeAiRouterRuntime(draft.profile.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
+            const failureRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+            current.routeStates = failureRuntime.routeStates;
+            current.lastRouteId = failureRuntime.lastRouteId;
+            current.lastFailoverChain = failureRuntime.lastFailoverChain;
+            draft.profile.aiRouterRuntime = current;
+            return draft;
+          });
+        }
+        throw error;
+      }
       if (isolatedRuntime) {
         result.runtime = normalizeAiRouterRuntime(result.runtime || runtime);
         return { result };
@@ -574,6 +593,9 @@ export class CoreCommandDispatcher {
           current.strongHistoryAt = mergedStrongHistory;
         }
         current.lastRoute = result.route || current.lastRoute;
+        current.routeStates = normalizeAiRouterRuntime(result.runtime).routeStates;
+        current.lastRouteId = result.runtime?.lastRouteId || current.lastRouteId;
+        current.lastFailoverChain = normalizeAiRouterRuntime(result.runtime).lastFailoverChain;
         draft.profile.aiRouterRuntime = current;
         result.runtime = structuredClone(current);
         return draft;

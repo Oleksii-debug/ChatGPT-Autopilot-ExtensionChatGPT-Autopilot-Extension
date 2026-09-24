@@ -182,6 +182,8 @@ test('hierarchy graph and role prompt profiles round-trip with orchestra profile
   assert.deepEqual(preview.hierarchy, {
     graphId: 'proj-main-hierarchy',
     controlEpoch: 3,
+    loopMode: 'ONE_SHOT',
+    maxRounds: 0,
     rootCount: 1,
     nodeCount: 3,
     promptProfileCount: 4,

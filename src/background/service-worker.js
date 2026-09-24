@@ -61,6 +61,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
+  'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
 const chatgptProvider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
@@ -545,12 +546,24 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.list();
   } else if (message.command === 'GET_BROWSER_AGENT_JOB') {
     result = await browserAgent.get(message.payload?.id || '');
+  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
+    result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.create(message.payload || {});
   } else if (message.command === 'SELECT_BROWSER_AGENT_JOB') {
     result = await browserAgent.select(message.payload?.id || '');
   } else if (message.command === 'UPDATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.updateConfig(message.payload?.id || '', message.payload?.config || {});
+  } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
+  } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
+    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', message.payload?.claim || {});
+  } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
+    result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
+  } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.completeSpecialistHandoff(message.payload?.id || '', message.payload?.completion || {});
+  } else if (message.command === 'VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF') {
+    result = await browserAgent.verifySpecialistHandoff(message.payload?.id || '', message.payload?.verification || {});
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
