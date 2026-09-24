@@ -116,6 +116,22 @@ test('inspection is deterministic, bounded and preserves semantic document order
   assert.equal(two.truncated, false);
 });
 
+
+test('page title does not create false element matches', () => {
+  const result = inspectWebSemanticSnapshotV1({
+    snapshot: snapshot({
+      title: 'Unique page title token',
+      elements: [
+        { semanticId: 'button-1', role: 'button', name: 'Save' },
+        { semanticId: 'link-1', role: 'link', name: 'Help' },
+      ],
+    }),
+    query: 'unique title token',
+  });
+  assert.equal(result.resultCount, 0);
+  assert.deepEqual(result.results, []);
+});
+
 test('inspection searches semantic role/name/description/href without generating execution targets', () => {
   const byRole = inspectWebSemanticSnapshotV1({ snapshot: snapshot(), query: 'heading account' });
   assert.deepEqual(byRole.results.map(item => item.semanticId), ['heading-1']);
