@@ -31,7 +31,7 @@ export function createDeterministicWebRuntimeAdmissionV1({ provider, extensionId
 
   async function dispatch(message, sender = {}) {
     if (message?.channel !== DETERMINISTIC_WEB_RUNTIME_CHANNEL) return null;
-    if (extensionId && sender?.id && sender.id !== extensionId) throw new Error('deterministic web runtime sender is not authorized');
+    if (extensionId && sender?.id !== extensionId) throw new Error('deterministic web runtime sender is not authorized');
     await ensureRecovered();
     if (message.command === 'INVOKE') return canonical.invoke(message.payload || {});
     if (message.command === 'RECONCILE_VERIFIED') {
