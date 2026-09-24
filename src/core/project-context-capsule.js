@@ -165,7 +165,7 @@ function selectSources(snapshot, disclosure) {
   }
   return disclosure.allowedSourceIds
     .map(sourceId => sourceById.get(sourceId))
-    .sort((a, b) => a.sourceId.localeCompare(b.sourceId));
+    .sort((a, b) => compareExactId(a.sourceId, b.sourceId));
 }
 
 function selectArtifacts(snapshot, disclosure) {
@@ -193,7 +193,13 @@ function selectArtifacts(snapshot, disclosure) {
     }
   }
 
-  return selected.sort((a, b) => a.artifactId.localeCompare(b.artifactId));
+  return selected.sort((a, b) => compareExactId(a.artifactId, b.artifactId));
+}
+
+function compareExactId(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 function serializedByteLength(value) {
