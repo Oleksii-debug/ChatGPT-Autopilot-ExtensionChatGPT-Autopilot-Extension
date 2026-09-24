@@ -149,3 +149,51 @@ test('provider rejects aliased tab identity before durable lease admission or ph
   assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
   assert.deepEqual(fixture.calls, []);
 });
+
+
+test('persisted malformed web journal fails closed instead of being replaced with a fresh effect store', async t => {
+  const storageKey = 'autopilot.deterministicWebRuntime.v1';
+  const malformedRecords = [
+    null,
+    [],
+    'corrupt',
+    { schemaVersion: 1, effectsById: {}, leasesByTargetId: null },
+    { schemaVersion: 1, effectsById: [], leasesByTargetId: {} },
+    { schemaVersion: 1, effectsById: {}, leasesByTargetId: {}, unexpected: true },
+  ];
+
+  for (const [index, malformed] of malformedRecords.entries()) {
+    await t.test(`malformed persisted record ${index + 1}`, async () => {
+      const fixture = chromeFixture();
+      fixture.storage[storageKey] = structuredClone(malformed);
+      const before = structuredClone(fixture.storage[storageKey]);
+      const provider = createChromeDeterministicWebProviderV1({
+        chromeApi: fixture.chrome,
+        now: () => at,
+        leaseId: () => 'must-not-be-used',
+      });
+
+      await assert.rejects(() => provider.invoke({
+        ...invocationFixtures(`corrupt-journal-${index + 1}`),
+        targetId: 'tab:7',
+        action: { kind: 'CLICK', selector: '#go' },
+        postcondition: { selector: '#ready' },
+      }), /storage|effectsById|leasesByTargetId/);
+
+      assert.deepEqual(fixture.storage[storageKey], before, 'corrupt durable evidence must not be overwritten');
+      assert.deepEqual(fixture.calls, [], 'corrupt journal must fail before physical browser dispatch');
+    });
+  }
+});
+
+test('absence of the web journal key is the only state that initializes a fresh durable store', async () => {
+  const fixture = chromeFixture();
+  const store = createChromeDeterministicWebStoreV1(fixture.chrome);
+  await store.update(draft => {
+    draft.effectsById.fresh = { state: 'prepared' };
+  });
+  const saved = fixture.storage['autopilot.deterministicWebRuntime.v1'];
+  assert.equal(saved.schemaVersion, 1);
+  assert.deepEqual(saved.effectsById.fresh, { state: 'prepared' });
+  assert.deepEqual(saved.leasesByTargetId, {});
+});
