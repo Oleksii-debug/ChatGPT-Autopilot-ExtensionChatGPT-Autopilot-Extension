@@ -113,6 +113,26 @@ test('secondary 403 with Retry-After becomes typed RATE_LIMITED before primary q
   }), error => error.code === 'RATE_LIMITED' && error.status === 403 && error.retryAfterSeconds === 60 && error.rateLimitRemaining === 42);
 });
 
+test('documented secondary-limit 403 payload is RATE_LIMITED when primary remaining is nonzero and Retry-After is absent', async () => {
+  await assert.rejects(() => fetchGitHubDispatchComments({
+    fetchFn: async () => response({
+      message: 'You have exceeded a secondary rate limit. Please wait a few minutes before you try again.',
+      documentation_url: 'https://docs.github.com/rest/using-the-rest-api/rate-limits-for-the-rest-api#about-secondary-rate-limits',
+    }, { status:403, headers:{ 'x-ratelimit-remaining':'42' } }),
+    repository:'owner/repo', issueNumber:121,
+  }), error => error.code === 'RATE_LIMITED' && error.status === 403 && error.retryAfterSeconds === 0 && error.rateLimitRemaining === 42);
+});
+
+test('ordinary permission 403 remains fail-closed HTTP_ERROR and is not misclassified as throttling', async () => {
+  await assert.rejects(() => fetchGitHubDispatchComments({
+    fetchFn: async () => response({
+      message: 'Resource not accessible by integration',
+      documentation_url: 'https://docs.github.com/rest/issues/comments',
+    }, { status:403, headers:{ 'x-ratelimit-remaining':'42' } }),
+    repository:'owner/repo', issueNumber:121,
+  }), error => error.code === 'HTTP_ERROR' && error.status === 403 && error.rateLimitRemaining === 42);
+});
+
 test('invalid repository and issue configuration fail before network call', async () => {
   let called = false;
   const fetchFn = async () => { called = true; return response({}); };
