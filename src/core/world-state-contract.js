@@ -348,11 +348,18 @@ function drift(resourceId, reason) {
   return frozen({ resourceId, reason });
 }
 
+const FRESHNESS_OPTIONS_KEYS = new Set(['at', 'requiredResourceIds']);
+
 export function assessWorldStateSnapshotFreshnessV1(
   snapshotInput,
   currentObservationsInput,
-  { at, requiredResourceIds = null } = {},
+  optionsInput = {},
 ) {
+  const options = strictRecord(optionsInput, FRESHNESS_OPTIONS_KEYS, 'WorldStateFreshnessOptionsV1');
+  const at = options.at;
+  const requiredResourceIds = Object.hasOwn(options, 'requiredResourceIds')
+    ? options.requiredResourceIds
+    : null;
   const snapshot = normalizeWorldStateSnapshotV1(snapshotInput);
   const checkedResourceIds = requestedResources(snapshot, requiredResourceIds);
   const current = normalizeObservationList(currentObservationsInput, 'currentObservations');
@@ -420,16 +427,21 @@ export function assertWorldStateSnapshotFreshV1(snapshotInput, currentObservatio
   return report;
 }
 
-export function assertWorldStatePreconditionFreshV1({
-  precondition: preconditionInput,
-  snapshot: snapshotInput,
-  currentObservations: currentObservationsInput,
-  invocationId: invocationIdInput,
-  at,
-} = {}) {
-  const precondition = normalizeWorldStatePreconditionV1(preconditionInput);
-  const snapshot = normalizeWorldStateSnapshotV1(snapshotInput);
-  const invocationId = id(invocationIdInput, 'invocationId');
+const PRECONDITION_ASSERTION_KEYS = new Set([
+  'precondition', 'snapshot', 'currentObservations', 'invocationId', 'at',
+]);
+
+export function assertWorldStatePreconditionFreshV1(input = {}) {
+  const request = strictRecord(
+    input,
+    PRECONDITION_ASSERTION_KEYS,
+    'WorldStatePreconditionAssertionV1',
+  );
+  const precondition = normalizeWorldStatePreconditionV1(request.precondition);
+  const snapshot = normalizeWorldStateSnapshotV1(request.snapshot);
+  const invocationId = id(request.invocationId, 'invocationId');
+  const currentObservationsInput = request.currentObservations;
+  const at = request.at;
   if (precondition.invocationId !== invocationId) throw new Error('precondition invocationId mismatch');
   if (precondition.snapshotId !== snapshot.snapshotId) throw new Error('precondition snapshotId mismatch');
   if (precondition.scopeId !== snapshot.scopeId) throw new Error('precondition scopeId mismatch');
