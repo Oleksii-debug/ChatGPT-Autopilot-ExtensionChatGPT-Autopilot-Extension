@@ -85,6 +85,17 @@ test('AgentPlan live extension cannot mint aggregate resource authority across r
   }), /exceeds resourceEnvelope maxModelCalls/);
 });
 
+test('AgentPlan live extension rejects inherited resource-envelope authority', () => {
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  const inheritedEnvelope = Object.create({ maxModelCalls: 1, maxRuntimeSeconds: 1, maxCostUsdMicros: 1 });
+  assert.throws(() => extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: [node('later', ['discover'], [], { maxModelCalls: 1, maxRuntimeSeconds: 1, maxCostUsdMicros: 1 })],
+    resourceEnvelope: inheritedEnvelope,
+    at: AT,
+  }), /resourceEnvelope must be a plain data object/);
+});
+
 test('AgentPlan live evolution converts a full echoed candidate into append-only growth', () => {
   let current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
   current = transitionAgentPlanNodeV1(current, { nodeId: 'discover', state: 'RUNNING', at: AT });
