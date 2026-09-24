@@ -287,3 +287,25 @@ test('tool-specific path readiness overrides provider-wide fallback for mixed-mo
   ]);
   assert.equal(result.plan[0].toolId, 'windows.uia');
 });
+
+
+test('deterministic path class outranks broader visual coverage in the executable plan', () => {
+  const result = discoverCapabilityPathsV1({
+    capabilities:[capability('a.read'), capability('b.read')],
+    tools:[
+      tool('api.a', 'api/provider', ['a.read']),
+      tool('visual.all', 'visual/provider', ['a.read', 'b.read']),
+    ],
+    providerStates:[
+      state('api/provider', { pathKind:'API', latencyMs:100 }),
+      state('visual/provider', { pathKind:'VISUAL', latencyMs:1 }),
+    ],
+    requestedCapabilityIds:['a.read', 'b.read'],
+  });
+
+  assert.deepEqual(result.plan.map(step => [step.toolId, step.capabilityIds]), [
+    ['api.a', ['a.read']],
+    ['visual.all', ['b.read']],
+  ]);
+  assert.equal(result.plan.every(step => step.permissionGranted === false), true);
+});
