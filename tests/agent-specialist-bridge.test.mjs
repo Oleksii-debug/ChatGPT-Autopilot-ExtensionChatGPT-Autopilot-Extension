@@ -15,6 +15,26 @@ function plan() { return { schemaVersion:1, planId:'plan-1', jobId:'job-1', obje
 function scope(overrides = {}) { return { nodeId:'local', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.read','filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00.000Z', priority:4, at:T0, ...overrides }; }
 function ownership(rawPlan = plan(), rawScope = scope()) { return prepareAgentPlanSpecialistExecutionOwnershipV1(rawPlan, rawScope); }
 
+function safeRetryVerification(leaseId, overrides = {}) {
+  return {
+    schemaVersion: 1,
+    verificationId: 'verification-no-effect-specialist',
+    invocationId: 'invoke-specialist-local',
+    observationId: 'observation-no-effect-specialist',
+    status: 'VERIFIED',
+    reasonCode: 'NO_EFFECT_OBSERVED',
+    summary: 'Fresh independent verifier proves the specialist effect did not commit.',
+    evidenceArtifactIds: ['artifact:no-effect-specialist'],
+    verifiedAt: '2026-09-23T12:01:01.000Z',
+    verifierId: 'reconciler-1',
+    verificationAuthorityId: 'policy:archive',
+    effectId: 'specialist-effect:plan-1:local',
+    executionId: leaseId,
+    attempt: 1,
+    ...overrides,
+  };
+}
+
 test('external AgentPlan node becomes a bounded child handoff only inside explicit parent scope', () => {
   const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
   assert.equal(assignment.state, 'READY');
@@ -37,21 +57,30 @@ test('claim is durable and never silently retries an expired external lease', ()
   assert.equal(repeated.executionOwnerships[0].state, 'RECONCILE');
 });
 
-test('expired handoff becomes retriable only after independent no-effect evidence bound to its policy', () => {
+test('expired handoff becomes retriable only after canonical independent no-effect verification', () => {
   const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
   const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), [assignment], { executionOwnerships:[ownership()], availableSlots:1, leaseSeconds:30, at:T0 });
   const expired = claimAgentPlanSpecialistHandoffsV1(claimed.plan, claimed.assignments, { executionOwnerships:claimed.executionOwnerships, availableSlots:1, at:T1 });
   const agentId = claimed.assignments[0].agentId;
   const leaseId = claimed.assignments[0].leaseId;
-  const payload = { executionOwnerships:expired.executionOwnerships, agentId, leaseId, verifierId:'reconciler-1', verificationAuthorityId:'policy:archive', evidence:'Fresh provider observation proves the archive does not exist.', at:'2026-09-23T12:01:01.000Z' };
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, evidence:'' }), /evidence/);
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verifierId:agentId }), /independent/);
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verificationAuthorityId:'policy:other' }), /policy envelope/);
+  const payload = {
+    executionOwnerships: expired.executionOwnerships,
+    agentId,
+    leaseId,
+    verification: safeRetryVerification(leaseId),
+    at:'2026-09-23T12:01:01.000Z',
+  };
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:null }), /canonical verification/);
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification(leaseId, { verifierId:agentId }) }), /independent/);
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification(leaseId, { verifierId:'browser-agent:job-1' }) }), /independent/);
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification(leaseId, { verificationAuthorityId:'policy:other' }) }), /policy envelope/);
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification('lease-other') }), /preserved lease/);
   const retriable = authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, payload);
   assert.equal(retriable.assignments[0].state, 'READY');
   assert.equal(retriable.assignments[0].leaseId, '');
   assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
   assert.equal(retriable.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId, 'effect identity must survive reconciliation');
+  assert.equal(retriable.safeRetryVerification.verificationId, 'verification-no-effect-specialist');
   assert.equal(retriable.plan.nodes.find(node => node.nodeId === 'local').state, 'READY');
   const reclaimed = claimAgentPlanSpecialistHandoffsV1(retriable.plan, retriable.assignments, { executionOwnerships:retriable.executionOwnerships, availableSlots:1, leaseSeconds:30, at:'2026-09-23T12:01:02.000Z' });
   assert.deepEqual(reclaimed.claimed, [agentId]);
