@@ -34,6 +34,17 @@ function unique(items, key, label) {
   return items;
 }
 
+function boundedVisibilityIds(value, label = 'allowedSourceIds') {
+  if (!Array.isArray(value) || value.length > MAX_SOURCES) {
+    throw new Error(`${label} must be an explicit bounded array`);
+  }
+  const ids = value.map(item => String(item ?? '').trim());
+  if (ids.some(item => !item) || new Set(ids).size !== ids.length) {
+    throw new Error(`${label} must contain unique non-empty ids`);
+  }
+  return new Set(ids);
+}
+
 function artifactIdentity(ref) {
   return `${ref.artifactId}:${ref.sha256 || ''}:${ref.sizeBytes}`;
 }
@@ -191,20 +202,25 @@ function artifactChangeIdentity(ref) {
 
 function digestArtifactView(ref) {
   if (!ref) return null;
+  if (ref.sensitive) {
+    return frozen({
+      sensitive: true,
+      redacted: true,
+    });
+  }
   return frozen({
     kind: ref.kind,
-    uri: ref.uri,
     mediaType: ref.mediaType,
     sha256: ref.sha256 || '',
     sizeBytes: ref.sizeBytes,
-    producerInvocationId: ref.producerInvocationId || '',
-    sensitive: Boolean(ref.sensitive),
+    sensitive: false,
+    redacted: false,
   });
 }
 
-function staleEvidence(state, phase) {
+function staleEvidence(state, phase, allowedSourceIds) {
   return state.sources
-    .filter(source => source.status !== 'FRESH')
+    .filter(source => source.status !== 'FRESH' && allowedSourceIds.has(source.sourceId))
     .map(source => frozen({
       phase,
       sourceId: source.sourceId,
@@ -213,6 +229,10 @@ function staleEvidence(state, phase) {
       capsuleRevisionId: source.capsuleRevisionId,
       currentRevisionId: source.currentRevisionId,
     }));
+}
+
+function hiddenStaleSourceCount(state, allowedSourceIds) {
+  return state.sources.filter(source => source.status !== 'FRESH' && !allowedSourceIds.has(source.sourceId)).length;
 }
 
 function artifactDriftEvidence(state, phase) {
@@ -225,7 +245,8 @@ function artifactDriftEvidence(state, phase) {
     }));
 }
 
-export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
+export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSourceIds } = {}) {
+  const allowedIds = boundedVisibilityIds(allowedSourceIds);
   if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) {
     throw new Error('baseline must be a project current-state input object');
   }
@@ -264,6 +285,7 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
     projectRevisionChanged: baselineSnapshot.revisionId !== currentSnapshot.revisionId,
     baselineStatus: baselineState.status,
     currentStatus: currentState.status,
+    visibilityBound: true,
   };
 
   if (baselineState.status !== 'FRESH' || currentState.status !== 'FRESH') {
@@ -274,9 +296,12 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
       sourceChanges: [],
       artifactChanges: [],
       staleEvidence: [
-        ...staleEvidence(baselineState, 'BASELINE'),
-        ...staleEvidence(currentState, 'CURRENT'),
+        ...staleEvidence(baselineState, 'BASELINE', allowedIds),
+        ...staleEvidence(currentState, 'CURRENT', allowedIds),
       ],
+      hiddenStaleSourceCount:
+        hiddenStaleSourceCount(baselineState, allowedIds)
+        + hiddenStaleSourceCount(currentState, allowedIds),
       artifactDriftEvidence: [
         ...artifactDriftEvidence(baselineState, 'BASELINE'),
         ...artifactDriftEvidence(currentState, 'CURRENT'),
@@ -290,6 +315,8 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
   const currentSourceRefs = new Map(currentSnapshot.sourceRefs.map(source => [source.sourceId, source]));
   const sourceIds = [...new Set([...baselineSources.keys(), ...currentSources.keys()])].sort();
   const sourceChanges = [];
+  let totalSourceChangeCount = 0;
+  let hiddenSourceChangeCount = 0;
   for (const sourceId of sourceIds) {
     const before = baselineSources.get(sourceId) || null;
     const after = currentSources.get(sourceId) || null;
@@ -301,6 +328,11 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
       !== sourceStateFingerprint(after, currentSourceRefs.get(sourceId))
     ) change = 'CHANGED';
     if (change === 'UNCHANGED') continue;
+    totalSourceChangeCount += 1;
+    if (!allowedIds.has(sourceId)) {
+      hiddenSourceChangeCount += 1;
+      continue;
+    }
     sourceChanges.push(frozen({
       sourceId,
       change,
@@ -331,11 +363,15 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
 
   return frozen({
     ...base,
-    status: base.projectRevisionChanged || sourceChanges.length || artifactChanges.length ? 'CHANGED' : 'UNCHANGED',
+    status: base.projectRevisionChanged || totalSourceChangeCount || artifactChanges.length ? 'CHANGED' : 'UNCHANGED',
     changeViewAvailable: true,
+    totalSourceChangeCount,
+    visibleSourceChangeCount: sourceChanges.length,
+    hiddenSourceChangeCount,
     sourceChanges,
     artifactChanges,
     staleEvidence: [],
+    hiddenStaleSourceCount: 0,
     artifactDriftEvidence: [],
   });
 }
