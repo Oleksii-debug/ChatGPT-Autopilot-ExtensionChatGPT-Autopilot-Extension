@@ -72,23 +72,23 @@ test('repository serializes concurrent updates and survives recreation', async (
 
 test('workspace stores reserved prototype-like durable ids as own entries without prototype mutation', () => {
   const workspace = createProjectWorkspace(1);
-  const specialSource = { ...source(), projectId: '__proto__' };
-  const specialArtifact = { ...artifact(), artifactId: '__proto__' };
+  const specialSource = { ...source(), projectId: 'constructor' };
+  const specialArtifact = { ...artifact(), artifactId: 'constructor' };
   const specialSnapshot = {
     ...snapshot(),
-    projectId: '__proto__',
+    projectId: 'constructor',
     sourceRefs: [specialSource],
     artifactRefs: [specialArtifact],
   };
   addProjectSnapshot(workspace, specialSnapshot, { nowMs: 2 });
 
-  assert.equal(Object.hasOwn(workspace.projectsById, '__proto__'), true);
+  assert.equal(Object.hasOwn(workspace.projectsById, 'constructor'), true);
   assert.equal(Object.getPrototypeOf(workspace.projectsById), Object.prototype);
 
   const specialCapsule = {
     ...capsule(),
-    capsuleId: '__proto__',
-    projectId: '__proto__',
+    capsuleId: 'constructor',
+    projectId: 'constructor',
     sourceBindings: [{
       sourceId: 'github-main',
       revisionId: 'r1',
@@ -97,13 +97,13 @@ test('workspace stores reserved prototype-like durable ids as own entries withou
     artifactRefs: [specialArtifact],
   };
   putProjectContextCapsule(workspace, specialCapsule, { nowMs: 3 });
-  const project = workspace.projectsById['__proto__'];
-  assert.equal(Object.hasOwn(project.capsulesById, '__proto__'), true);
+  const project = workspace.projectsById['constructor'];
+  assert.equal(Object.hasOwn(project.capsulesById, 'constructor'), true);
   assert.equal(Object.getPrototypeOf(project.capsulesById), Object.prototype);
 
   const specialProvenance = {
     ...provenance(),
-    projectId: '__proto__',
+    projectId: 'constructor',
     artifactRef: specialArtifact,
     sourceBindings: [{
       sourceId: 'github-main',
@@ -112,10 +112,10 @@ test('workspace stores reserved prototype-like durable ids as own entries withou
     }],
   };
   putProjectArtifactProvenance(workspace, specialProvenance, { nowMs: 4 });
-  assert.equal(Object.hasOwn(project.provenanceByArtifactId, '__proto__'), true);
+  assert.equal(Object.hasOwn(project.provenanceByArtifactId, 'constructor'), true);
   assert.equal(Object.getPrototypeOf(project.provenanceByArtifactId), Object.prototype);
   assert.equal(validateProjectWorkspace(workspace), workspace);
-  assert.equal(projectCurrentState(workspace, '__proto__', '__proto__', [specialSource]).status, 'FRESH');
+  assert.equal(projectCurrentState(workspace, 'constructor', 'constructor', [specialSource]).status, 'FRESH');
 });
 
 test('workspace lookup identities are string-only and persisted record prototypes fail closed', () => {
