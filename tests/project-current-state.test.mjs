@@ -426,13 +426,15 @@ test('unadmitted source provenance changes are classified without disclosing sou
   assert.equal(serialized.includes('secret-new'), false);
 });
 
-test('sensitive artifact changes never expose location or producer identity', () => {
+test('sensitive artifact changes never expose identity, location or producer provenance', () => {
   const oldArtifact = artifact({
+    artifactId: 'secret-artifact-id',
     uri: 'artifact://secret/location-old',
     producerInvocationId: 'secret-producer-old',
     sensitive: true,
   });
   const newArtifact = artifact({
+    artifactId: 'secret-artifact-id',
     uri: 'artifact://secret/location-new',
     producerInvocationId: 'secret-producer-new',
     sha256: 'd'.repeat(64),
@@ -455,13 +457,12 @@ test('sensitive artifact changes never expose location or producer identity', ()
   });
 
   assert.equal(result.status, 'CHANGED');
-  assert.deepEqual(result.artifactChanges, [{
-    artifactId: 'report',
-    change: 'CHANGED',
-    before: { sensitive: true, redacted: true },
-    after: { sensitive: true, redacted: true },
-  }]);
+  assert.equal(result.totalArtifactChangeCount, 1);
+  assert.equal(result.visibleArtifactChangeCount, 0);
+  assert.equal(result.hiddenSensitiveArtifactChangeCount, 1);
+  assert.deepEqual(result.artifactChanges, []);
   const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes('secret-artifact-id'), false);
   assert.equal(serialized.includes('artifact://secret'), false);
   assert.equal(serialized.includes('secret-producer'), false);
 });
@@ -479,4 +480,43 @@ test('unadmitted stale source evidence is hidden while staleness remains owner-v
   assert.deepEqual(result.staleEvidence, []);
   assert.equal(result.hiddenStaleSourceCount, 1);
   assert.equal(JSON.stringify(result).includes('private.example'), false);
+});
+
+
+test('sensitive artifact drift evidence is aggregated without artifact identity disclosure', () => {
+  const sensitiveSnapshotArtifact = artifact({
+    artifactId: 'secret-drift-artifact',
+    uri: 'artifact://secret/drift-snapshot',
+    producerInvocationId: 'secret-drift-producer',
+    sensitive: true,
+  });
+  const sensitiveCapsuleArtifact = {
+    ...sensitiveSnapshotArtifact,
+    sha256: 'e'.repeat(64),
+    uri: 'artifact://secret/drift-capsule',
+  };
+
+  const result = deriveDigest({
+    baseline: stateInput(),
+    current: stateInput({
+      snapshotValue: snapshot({
+        revisionId: 'project-rev-2',
+        artifactRefs: [sensitiveSnapshotArtifact],
+      }),
+      capsuleValue: capsule({
+        capsuleId: 'capsule-2',
+        projectRevisionId: 'project-rev-2',
+        artifactRefs: [sensitiveCapsuleArtifact],
+      }),
+    }),
+  });
+
+  assert.equal(result.status, 'STALE_INPUT');
+  assert.equal(result.changeViewAvailable, false);
+  assert.deepEqual(result.artifactDriftEvidence, []);
+  assert.equal(result.hiddenSensitiveArtifactDriftCount, 1);
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes('secret-drift-artifact'), false);
+  assert.equal(serialized.includes('artifact://secret'), false);
+  assert.equal(serialized.includes('secret-drift-producer'), false);
 });
