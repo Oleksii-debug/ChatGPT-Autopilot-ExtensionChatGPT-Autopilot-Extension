@@ -3050,7 +3050,7 @@ function renderRunTimeline() {
     ? ` Показано лише останні ${timeline.returnedEntries} із ${timeline.totalEntries} збережених подій.`
     : '';
   $('run-timeline-status').textContent =
-    `Показано ${entries.length} подій для сеансу «${timeline.session?.name || 'Без назви'}».${bounded}`;
+    `Показано ${entries.length} подій для вибраного сеансу.${bounded}`;
 }
 
 async function refreshRunTimeline({ announceResult = false } = {}) {

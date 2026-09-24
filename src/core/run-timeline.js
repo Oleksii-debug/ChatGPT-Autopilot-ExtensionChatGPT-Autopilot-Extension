@@ -1,7 +1,12 @@
+import { OperationPhase, RunState } from './schema.js';
+
 export const RUN_TIMELINE_VERSION = 1;
 export const MAX_RUN_TIMELINE_ENTRIES = 200;
 
-const CHATGPT_URL = /https:\/\/(?:www\.)?chatgpt\.com\/[^\s"'<>()[\]]+/giu;
+const RUN_STATES = new Set(Object.values(RunState));
+const OPERATION_PHASES = new Set(Object.values(OperationPhase));
+const SAFE_DIAGNOSTIC_LOCATION = /^(?:chatgpt\.com\/розмова: (?:немає ідентифікатора|…[A-Za-z0-9_-]{1,6})|не-ChatGPT-адреса|некоректна адреса ChatGPT)$/u;
+const LOG_LEVELS = new Set(['INFO', 'WARN', 'WARNING', 'ERROR']);
 
 function plainObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
@@ -24,16 +29,19 @@ function boundedLimit(value) {
   return value;
 }
 
-function safeText(value, maximum = 1000) {
-  if (value == null) return '';
-  const text = typeof value === 'string' ? value : String(value);
-  return text.replace(CHATGPT_URL, '[приховане посилання ChatGPT]')
-    .replace(/[\r\n\t]+/gu, ' ')
-    .replace(/\s{2,}/gu, ' ')
-    .trim()
-    .slice(0, maximum);
+function safeEnum(value, allowed, fallback = 'UNKNOWN') {
+  return typeof value === 'string' && allowed.has(value) ? value : fallback;
 }
 
+function safeLogLevel(value) {
+  if (typeof value !== 'string') return 'INFO';
+  const normalized = value.toUpperCase();
+  return LOG_LEVELS.has(normalized) ? normalized : 'INFO';
+}
+
+function safeDiagnosticLocation(value) {
+  return typeof value === 'string' && SAFE_DIAGNOSTIC_LOCATION.test(value) ? value : '';
+}
 function safeTime(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
 }
@@ -45,49 +53,36 @@ function freezeDeep(value) {
 }
 
 function logProjection(entry, ordinal) {
-  if (typeof entry === 'string') {
-    return {
-      entryId: `log:${ordinal}`, source: 'LOG', at: 0, level: 'INFO', event: 'CORE_LOG',
-      message: safeText(entry), taskLabel: '', phase: '', status: '', code: '', target: '',
-      observed: '', operationIdSuffix: '', promptFingerprint: '', ordinal,
-    };
-  }
   const raw = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {};
   return {
     entryId: `log:${ordinal}`, source: 'LOG', at: safeTime(raw.at),
-    level: safeText(raw.level || 'INFO', 40).toUpperCase() || 'INFO', event: 'CORE_LOG',
-    message: safeText(raw.message), taskLabel: '', phase: '', status: '', code: '', target: '',
+    level: safeLogLevel(raw.level), event: 'CORE_LOG',
+    message: 'Подію Core log зафіксовано.', taskLabel: '', phase: '', status: '', code: '', target: '',
     observed: '', operationIdSuffix: '', promptFingerprint: '', ordinal,
   };
 }
-
 function diagnosticProjection(entry, ordinal) {
   const raw = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : {};
   return {
     entryId: `diagnostic:${ordinal}`, source: 'DIAGNOSTIC', at: safeTime(raw.at),
-    level: raw.code ? 'WARNING' : 'INFO', event: safeText(raw.event || 'ПОДІЯ_ДІАГНОСТИКИ', 80),
-    message: safeText(raw.message), taskLabel: safeText(raw.taskLabel, 160),
-    phase: safeText(raw.phase, 80), status: safeText(raw.status, 120), code: safeText(raw.code, 120),
-    target: safeText(raw.target, 240), observed: safeText(raw.observed, 240),
-    operationIdSuffix: safeText(raw.operationIdSuffix, 80),
-    promptFingerprint: safeText(raw.promptFingerprint, 80), ordinal,
+    level: raw.code ? 'WARNING' : 'INFO', event: 'DIAGNOSTIC_EVENT',
+    message: 'Діагностичну подію зафіксовано.', taskLabel: '',
+    phase: safeEnum(raw.phase, OPERATION_PHASES, ''), status: '', code: '',
+    target: safeDiagnosticLocation(raw.target), observed: safeDiagnosticLocation(raw.observed),
+    operationIdSuffix: '', promptFingerprint: '', ordinal,
   };
 }
-
 function currentSessionSummary(session) {
-  const taskId = Array.isArray(session.taskOrder) ? session.taskOrder[session.currentTaskIndex] : '';
-  const task = taskId && session.tasksById && typeof session.tasksById === 'object' ? session.tasksById[taskId] : null;
   return {
-    name: safeText(session.name || 'Без назви', 160),
-    runState: safeText(session.runState, 80),
-    phase: safeText(session.operation?.phase, 80),
-    currentTaskLabel: safeText(task?.label || task?.id, 160),
-    lastError: safeText(session.lastError, 1000),
+    name: '',
+    runState: safeEnum(session.runState, RUN_STATES),
+    phase: safeEnum(session.operation?.phase, OPERATION_PHASES, OperationPhase.NONE),
+    currentTaskLabel: '',
+    lastError: '',
     lastActionAt: safeTime(session.lastActionAt),
     updatedAt: safeTime(session.updatedAt),
   };
 }
-
 /**
  * Read-only projection of already-canonical Core evidence.
  * This function never mutates state, creates effects, or stores a second log.

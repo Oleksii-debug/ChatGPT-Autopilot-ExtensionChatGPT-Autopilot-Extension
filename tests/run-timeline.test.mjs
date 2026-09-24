@@ -9,7 +9,7 @@ function state() {
       'session-a': {
         name: 'Основний', runState: 'RUNNING', currentTaskIndex: 0,
         taskOrder: ['task-a'], tasksById: { 'task-a': { id: 'task-a', label: 'Перевірка' } },
-        operation: { phase: 'READY_TO_SEND' }, lastError: '', lastActionAt: 30, updatedAt: 31,
+        operation: { phase: 'READY_TO_SEND' }, lastError: 'password=SECRET_ERROR_PASSWORD', lastActionAt: 30, updatedAt: 31,
       },
       'session-b': {
         name: 'Інший', runState: 'STOPPED', currentTaskIndex: 0,
@@ -18,17 +18,18 @@ function state() {
     },
     logs: {
       'session-a': [
-        { at: 10, level: 'info', message: 'Початок' },
-        { at: 30, level: 'warn', message: 'Відкрито https://chatgpt.com/c/private-secret?x=1' },
+        { at: 10, level: 'info', message: 'Authorization: Bearer SECRET_LOG_TOKEN' },
+        { at: 30, level: 'warn', message: 'Відкрито https://example.invalid/private?token=SECRET_URL_TOKEN' },
       ],
       'session-b': [{ at: 5, level: 'info', message: 'Не показувати' }],
     },
     diagnostics: [
       {
         at: 20, event: 'SEND_CHECK', sessionId: 'session-a', taskLabel: 'Перевірка',
-        phase: 'VERIFYING', status: 'READY', code: '', message: 'Перевірено',
-        target: 'chatgpt.com/розмова: …123456', promptFingerprint: 'fp-safe',
-        operationIdSuffix: 'op-safe', promptText: 'СЕКРЕТНИЙ ПРОМПТ НЕ МОЖНА ВИВОДИТИ',
+        phase: 'READY', status: 'SECRET_STATUS', code: 'SECRET_CODE', message: 'api_key=SECRET_DIAGNOSTIC_KEY',
+        target: 'chatgpt.com/розмова: …123456', observed: 'https://example.invalid/?token=SECRET_OBSERVED',
+        promptFingerprint: 'SECRET_FINGERPRINT', operationIdSuffix: 'SECRET_OPERATION',
+        promptText: 'СЕКРЕТНИЙ ПРОМПТ НЕ МОЖНА ВИВОДИТИ',
       },
       { at: 25, event: 'OTHER', sessionId: 'session-b', message: 'Чужий сеанс' },
     ],
@@ -42,12 +43,17 @@ test('timeline deterministically merges only selected-session logs and redacted 
     ['LOG', 10], ['DIAGNOSTIC', 20], ['LOG', 30],
   ]);
   assert.equal(timeline.session.runState, 'RUNNING');
-  assert.equal(timeline.session.currentTaskLabel, 'Перевірка');
+  assert.equal(timeline.session.currentTaskLabel, '');
+  assert.equal(timeline.session.lastError, '');
+  assert.equal(timeline.session.phase, 'READY');
   assert.deepEqual(timeline.sources, { logCount: 2, diagnosticCount: 1 });
   const serialized = JSON.stringify(timeline);
-  assert.doesNotMatch(serialized, /private-secret/u);
+  assert.doesNotMatch(serialized, /SECRET_/u);
+  assert.doesNotMatch(serialized, /example\.invalid/u);
   assert.doesNotMatch(serialized, /СЕКРЕТНИЙ ПРОМПТ/u);
-  assert.match(serialized, /приховане посилання ChatGPT/u);
+  assert.match(serialized, /Подію Core log зафіксовано/u);
+  assert.match(serialized, /Діагностичну подію зафіксовано/u);
+  assert.match(serialized, /chatgpt\.com\/розмова: …123456/u);
   assert.equal(Object.isFrozen(timeline), true);
   assert.equal(Object.isFrozen(timeline.entries), true);
 });
@@ -77,7 +83,7 @@ test('timeline preserves a canonical legacy text identity instead of imposing a 
   canonical.logs['legacy session 1'] = [{ at: 1, level: 'info', message: 'legacy' }];
   const timeline = buildRunTimelineV1(canonical, { sessionId: 'legacy session 1', limit: 10 });
   assert.equal(timeline.sessionId, 'legacy session 1');
-  assert.equal(timeline.entries[0].message, 'legacy');
+  assert.equal(timeline.entries[0].message, 'Подію Core log зафіксовано.');
 });
 
 test('timeline boundary rejects coerced identities, coerced limits and missing sessions', () => {
