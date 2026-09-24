@@ -66,6 +66,11 @@ function integer(value, label, { fallback = 0, max = Number.MAX_SAFE_INTEGER } =
   return candidate;
 }
 
+function requiredInteger(value, label, { max = Number.MAX_SAFE_INTEGER } = {}) {
+  if (value == null) throw new Error(`${label} is required`);
+  return integer(value, label, { max });
+}
+
 function price(value, label) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1_000_000) {
     throw new Error(`${label} is invalid`);
@@ -148,9 +153,21 @@ function normalizeRouteForMetering(route) {
       throw new Error(`AI route ${key} must be a number for cost metering`);
     }
   }
-  // Copy only own enumerable configuration fields so inherited prototype values
-  // can never become model identity, pricing, or authority inside cost evidence.
-  return normalizeAiRoutePool([Object.fromEntries(Object.entries(raw))])[0];
+
+  // Keep only own fields on a null-prototype object so Object.prototype
+  // pollution can never become route identity, pricing, or authority.
+  const ownOnly = Object.assign(Object.create(null), raw);
+  const normalized = normalizeAiRoutePool([ownOnly])[0];
+  if (normalized.costClass === AiRouteCostClass.PAID) {
+    const missingPricing = ['inputPricePerMillionUsd', 'outputPricePerMillionUsd']
+      .filter(key => !Object.hasOwn(raw, key));
+    if (missingPricing.length) {
+      const error = new Error(`Paid AI route requires explicit pricing: ${missingPricing.join(', ')}`);
+      error.code = 'AI_ROUTE_PRICE_UNKNOWN';
+      throw error;
+    }
+  }
+  return normalized;
 }
 
 export function normalizeAiCostRecordV1(input) {
@@ -168,8 +185,8 @@ export function normalizeAiCostRecordV1(input) {
     model: text(own(raw, 'model', undefined), 'AiCostRecordV1 model', 300),
     endpointId: id(own(raw, 'endpointId', ''), 'AiCostRecordV1 endpointId', { optional: true }),
     costClass: text(own(raw, 'costClass', undefined), 'AiCostRecordV1 costClass', 20),
-    inputTokens: integer(own(raw, 'inputTokens', undefined), 'AiCostRecordV1 inputTokens'),
-    outputTokens: integer(own(raw, 'outputTokens', undefined), 'AiCostRecordV1 outputTokens'),
+    inputTokens: requiredInteger(own(raw, 'inputTokens', undefined), 'AiCostRecordV1 inputTokens'),
+    outputTokens: requiredInteger(own(raw, 'outputTokens', undefined), 'AiCostRecordV1 outputTokens'),
     modelCalls: integer(own(raw, 'modelCalls', undefined), 'AiCostRecordV1 modelCalls', { max: 1 }),
     inputPricePerMillionUsd: price(own(raw, 'inputPricePerMillionUsd', undefined), 'AiCostRecordV1 input price'),
     outputPricePerMillionUsd: price(own(raw, 'outputPricePerMillionUsd', undefined), 'AiCostRecordV1 output price'),
@@ -190,8 +207,8 @@ export function normalizeAiCostRecordV1(input) {
 
 export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTokens, observedAt } = {}) {
   const normalizedRoute = normalizeRouteForMetering(route);
-  const normalizedInputTokens = integer(inputTokens, 'AI usage inputTokens');
-  const normalizedOutputTokens = integer(outputTokens, 'AI usage outputTokens');
+  const normalizedInputTokens = requiredInteger(inputTokens, 'AI usage inputTokens');
+  const normalizedOutputTokens = requiredInteger(outputTokens, 'AI usage outputTokens');
   assertPricing(
     normalizedRoute.costClass,
     normalizedRoute.inputPricePerMillionUsd,
@@ -244,8 +261,14 @@ export function aggregateAiCostRecordsV1(records) {
     modelOutputTokens: 0,
     costUsdMicros: 0,
   };
+  const seenInvocationIds = new Set();
   for (const input of records) {
-    const usage = resourceUsageFromAiCostRecordV1(input);
+    const record = normalizeAiCostRecordV1(input);
+    if (seenInvocationIds.has(record.invocationId)) {
+      throw new Error(`AI cost aggregate contains duplicate invocationId: ${record.invocationId}`);
+    }
+    seenInvocationIds.add(record.invocationId);
+    const usage = resourceUsageFromAiCostRecordV1(record);
     for (const key of Object.keys(total)) {
       const next = total[key] + usage[key];
       if (!Number.isSafeInteger(next)) throw new Error(`AI cost aggregate ${key} overflow`);
