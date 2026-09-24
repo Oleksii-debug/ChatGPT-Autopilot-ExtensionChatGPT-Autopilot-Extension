@@ -82,3 +82,25 @@ test('portable subagent policy fails closed on unknown, missing and out-of-range
   coercion.subagent_policy.max_children_per_agent = '7';
   assert.throws(() => importOrchestrationProfileDocument(coercion), /max_children_per_agent/);
 });
+
+
+test('portable subagent policy rejects inherited authority fields and accepts explicit null-prototype own fields', () => {
+  const profile = exportOrchestrationProfile(CONFIG, { subagentPolicy: SUBAGENT_POLICY });
+
+  const inherited = structuredClone(profile);
+  inherited.subagent_policy = Object.create({
+    allow_agent_created_children: true,
+    max_depth: 4,
+    max_children_per_agent: 7,
+  });
+  assert.throws(() => importOrchestrationProfileDocument(inherited), /Invalid subagent_policy/);
+
+  const nullPrototype = structuredClone(profile);
+  nullPrototype.subagent_policy = Object.assign(Object.create(null), {
+    allow_agent_created_children: true,
+    max_depth: 4,
+    max_children_per_agent: 7,
+  });
+  const parsed = importOrchestrationProfileDocument(nullPrototype);
+  assert.deepEqual(parsed.subagentPolicy, SUBAGENT_POLICY);
+});
