@@ -26,6 +26,7 @@ const SOURCE_KEYS = new Set(['sourceId', 'revisionId', 'contentSha256']);
 const CADENCE_KEYS = new Set(['mode', 'referenceId']);
 const TRIGGER_KEYS = new Set(['mode', 'referenceId']);
 const RENDER_KEYS = new Set(['values', 'currentSourceBindings', 'trigger']);
+const SENSITIVE_REF_KEYS = new Set(['schemaVersion', 'brokerId', 'credentialId']);
 const PLACEHOLDER = /\{\{\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*\}\}/gu;
 
 function plain(value, label) {
@@ -35,6 +36,12 @@ function plain(value, label) {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (typeof key !== 'string' || !descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
   }
   return value;
 }
@@ -293,6 +300,17 @@ function assertCadenceTrigger(asset, triggerRaw) {
   }
 }
 
+function normalizeSensitiveReference(raw, label) {
+  plain(raw, label);
+  exactKeys(raw, SENSITIVE_REF_KEYS, label);
+  if (raw.schemaVersion !== 1) throw new Error(`${label}.schemaVersion must be 1`);
+  return deepFreeze({
+    schemaVersion: 1,
+    brokerId: id(raw.brokerId, `${label}.brokerId`),
+    credentialId: id(raw.credentialId, `${label}.credentialId`),
+  });
+}
+
 function normalizeValues(asset, rawValues) {
   const raw = rawValues == null ? Object.create(null) : rawValues;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('values must be a plain object');
@@ -304,8 +322,19 @@ function normalizeValues(asset, rawValues) {
     if (typeof key !== 'string' || !definitions.has(key)) {
       throw new Error(`values contains unknown variable: ${String(key)}`);
     }
+    const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`values.${key} must be an enumerable own data property`);
+    }
     const definition = definitions.get(key);
-    const value = raw[key];
+    const value = descriptor.value;
+    if (definition.sensitive) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error(`values.${key} sensitive input must be an opaque credential reference`);
+      }
+      values.set(key, normalizeSensitiveReference(value, `values.${key}`));
+      continue;
+    }
     if (typeof value !== 'string' || value.length > definition.maxChars) {
       throw new Error(`values.${key} is invalid or exceeds maxChars`);
     }
@@ -315,7 +344,7 @@ function normalizeValues(asset, rawValues) {
     if (!values.has(definition.name)) {
       if (definition.defaultValue != null) values.set(definition.name, definition.defaultValue);
       else if (definition.required) throw new Error(`required variable is missing: ${definition.name}`);
-      else values.set(definition.name, '');
+      else values.set(definition.name, definition.sensitive ? null : '');
     }
   }
   return values;
@@ -331,8 +360,24 @@ export function renderPromptAssetV1(assetInput, options = {}) {
   assertSourceFreshness(asset, currentSourceBindings);
   assertCadenceTrigger(asset, trigger);
   const normalizedValues = normalizeValues(asset, values);
-  const rendered = asset.template.replace(PLACEHOLDER, (_match, name) => normalizedValues.get(name));
+  const definitions = new Map(asset.variables.map(item => [item.name, item]));
+  const sensitiveBindingsByName = new Map();
+  const rendered = asset.template.replace(PLACEHOLDER, (_match, name) => {
+    const definition = definitions.get(name);
+    const value = normalizedValues.get(name);
+    if (!definition.sensitive) return value;
+    if (!value) return '';
+    sensitiveBindingsByName.set(name, value);
+    // Generic prompt rendering must be non-secret by construction. The native
+    // CredentialBroker remains the sole authority that may resolve this opaque
+    // reference after destination/policy/scope checks.
+    return `{{SENSITIVE_REF:${name}}}`;
+  });
   if (utf8Bytes(rendered) > MAX_RENDERED_BYTES) throw new Error('Rendered prompt exceeds byte limit');
+  const sensitiveBindings = [...sensitiveBindingsByName.entries()].map(([variableName, credentialRef]) => ({
+    variableName,
+    credentialRef,
+  }));
   return deepFreeze({
     schemaVersion: 1,
     assetId: asset.assetId,
@@ -342,6 +387,7 @@ export function renderPromptAssetV1(assetInput, options = {}) {
     sourceBindings: asset.sourceBindings.map(item => ({ ...item })),
     cadence: { ...asset.cadence },
     sensitiveVariableNames: asset.variables.filter(item => item.sensitive).map(item => item.name),
+    sensitiveBindings,
   });
 }
 

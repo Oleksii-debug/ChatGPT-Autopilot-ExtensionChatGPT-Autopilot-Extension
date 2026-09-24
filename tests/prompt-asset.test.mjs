@@ -185,7 +185,7 @@ test('cadence is a reference-only execution gate and never invents scheduler aut
   );
 });
 
-test('sensitive values may render for execution but never enter diff/history metadata', () => {
+test('sensitive values remain opaque and generic render output never contains secret bytes', () => {
   const secretAsset = normalizePromptAssetV1(asset({
     template: 'Authenticate with {{secret}} then review {{target}}.',
     variables: [
@@ -193,16 +193,45 @@ test('sensitive values may render for execution but never enter diff/history met
       { name: 'target', required: true, maxChars: 200, defaultValue: null, sensitive: false },
     ],
   }));
-  const secret = 'owner-private-token-value';
+  const rawSecret = 'owner-private-token-value';
+  assert.throws(
+    () => renderPromptAssetV1(secretAsset, {
+      values: { secret: rawSecret, target: 'release' },
+      currentSourceBindings: [source()],
+    }),
+    /opaque credential reference/,
+  );
+
+  const credentialRef = {
+    schemaVersion: 1,
+    brokerId: 'native-companion',
+    credentialId: 'ais-main',
+  };
   const rendered = renderPromptAssetV1(secretAsset, {
-    values: { secret, target: 'release' },
+    values: { secret: credentialRef, target: 'release' },
     currentSourceBindings: [source()],
   });
-  assert.match(rendered.rendered, new RegExp(secret));
+  assert.equal(rendered.rendered, 'Authenticate with {{SENSITIVE_REF:secret}} then review release.');
+  assert.equal(rendered.rendered.includes(rawSecret), false);
+  assert.deepEqual(rendered.sensitiveBindings, [{ variableName: 'secret', credentialRef }]);
   assert.deepEqual(rendered.sensitiveVariableNames, ['secret']);
-  assert.equal(JSON.stringify(secretAsset).includes(secret), false);
-});
+  assert.equal(JSON.stringify(secretAsset).includes(rawSecret), false);
 
+  let reads = 0;
+  const values = { target: 'release' };
+  Object.defineProperty(values, 'secret', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return rawSecret;
+    },
+  });
+  assert.throws(
+    () => renderPromptAssetV1(secretAsset, { values, currentSourceBindings: [source()] }),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0, 'generic renderer must not execute secret-bearing accessors');
+});
 test('version lineage is exact and history cannot skip, reorder or change identity', () => {
   const v1 = normalizePromptAssetV1(asset());
   const v2 = evolvePromptAssetV1(v1, asset({
