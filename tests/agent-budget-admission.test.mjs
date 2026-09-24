@@ -134,7 +134,7 @@ test('AgentPlan budget rejects accessor-backed, hidden and symbol fields without
     enumerable: false,
     value: 1,
   });
-  assert.throws(() => normalizeAgentPlanBudgetCeilingV1(hiddenUnknown), /unknown field: hiddenAuthority/);
+  assert.throws(() => normalizeAgentPlanBudgetCeilingV1(hiddenUnknown), /own data properties/);
 
   const symbolBudget = { maxModelCalls: 1 };
   symbolBudget[Symbol('authority')] = 1;
