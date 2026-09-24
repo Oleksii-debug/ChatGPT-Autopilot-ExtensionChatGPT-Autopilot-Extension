@@ -7,6 +7,91 @@ const ZERO_ENVELOPE = { maxModelCalls: 0, maxRuntimeSeconds: 0, maxCostUsdMicros
 function plan(nodes) { return { schemaVersion: 1, planId: 'plan-1', jobId: 'job-1', objective: 'Book a verified course', successCriteria: ['Course is selected'], createdAt: AT, updatedAt: AT, revision: 1, nodes }; }
 function node(nodeId, dependsOn = [], conflictKeys = [], budget = {}) { return { nodeId, title: nodeId, objective: `Do ${nodeId}`, dependsOn, conflictKeys, ownerId: 'agent-1', executionPlane: 'BROWSER', acceptanceCriteria: ['Observed complete'], budget, state: 'PENDING', evidence: '', updatedAt: AT }; }
 
+test('AgentPlan array boundaries reject getters and non-canonical collections before reads', () => {
+  let reads = 0;
+
+  const accessorNodesPlan = plan([node('discover')]);
+  const originalNode = accessorNodesPlan.nodes[0];
+  Object.defineProperty(accessorNodesPlan.nodes, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalNode; },
+  });
+  assert.throws(() => normalizeAgentPlanV1(accessorNodesPlan), /AgentPlan nodes\[0\].*enumerable own data property/);
+  assert.equal(reads, 0);
+
+  const sparseNodesPlan = plan(new Array(1));
+  assert.throws(() => normalizeAgentPlanV1(sparseNodesPlan), /AgentPlan nodes\[0\].*enumerable own data property/);
+
+  const symbolNodesPlan = plan([node('discover')]);
+  symbolNodesPlan.nodes[Symbol('authority')] = 'ALLOW';
+  assert.throws(() => normalizeAgentPlanV1(symbolNodesPlan), /non-canonical array fields/);
+
+  const hiddenIndexPlan = plan([node('discover')]);
+  Object.defineProperty(hiddenIndexPlan.nodes, '0', { enumerable: false, configurable: true, value: hiddenIndexPlan.nodes[0] });
+  assert.throws(() => normalizeAgentPlanV1(hiddenIndexPlan), /enumerable own data property/);
+
+  const customPrototypePlan = plan([node('discover')]);
+  Object.setPrototypeOf(customPrototypePlan.nodes, Object.create(Array.prototype));
+  assert.throws(() => normalizeAgentPlanV1(customPrototypePlan), /canonical array/);
+
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  const extensionNodes = [node('later')];
+  const extensionOriginal = extensionNodes[0];
+  Object.defineProperty(extensionNodes, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return extensionOriginal; },
+  });
+  assert.throws(() => extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: extensionNodes,
+    resourceEnvelope: ZERO_ENVELOPE,
+    at: AT,
+  }), /AgentPlan extension nodes\[0\].*enumerable own data property/);
+  assert.equal(reads, 0);
+
+  const dependencyNode = node('later', ['discover']);
+  const originalDependency = dependencyNode.dependsOn[0];
+  Object.defineProperty(dependencyNode.dependsOn, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalDependency; },
+  });
+  assert.throws(() => extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: [dependencyNode],
+    resourceEnvelope: ZERO_ENVELOPE,
+    at: AT,
+  }), /AgentPlan node dependsOn\[0\].*enumerable own data property/);
+  assert.equal(reads, 0);
+
+  const candidate = structuredClone(current);
+  candidate.nodes.push(node('later'));
+  const originalCriterion = candidate.successCriteria[0];
+  Object.defineProperty(candidate.successCriteria, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalCriterion; },
+  });
+  assert.throws(() => evolveAgentPlanV1(current, candidate, {
+    resourceEnvelope: ZERO_ENVELOPE,
+    at: AT,
+  }), /AgentPlan successCriteria\[0\].*enumerable own data property/);
+  assert.equal(reads, 0);
+});
+
+test('AgentPlan duplicate text folding is locale-independent', () => {
+  const duplicate = plan([node('discover')]);
+  duplicate.successCriteria = ['ASCII', 'ascii'];
+  assert.throws(() => normalizeAgentPlanV1(duplicate), /successCriteria contains duplicates/);
+
+  const distinct = plan([node('discover')]);
+  distinct.successCriteria = ['I', 'ı'];
+  const normalized = normalizeAgentPlanV1(distinct);
+  assert.deepEqual(normalized.successCriteria, ['I', 'ı']);
+});
+
 test('AgentPlan validates durable DAG identity and rejects unknown dependencies or cycles', () => {
   assert.equal(normalizeAgentPlanV1(plan([node('discover'), node('enroll', ['discover'])])).nodes.length, 2);
   assert.throws(() => normalizeAgentPlanV1(plan([node('a', ['missing'])])), /unknown node/);
