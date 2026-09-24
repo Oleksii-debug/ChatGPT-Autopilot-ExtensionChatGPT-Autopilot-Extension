@@ -23,20 +23,48 @@ const DEFAULT_MAX_RECONCILIATION_EVIDENCE_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
 
 function requireId(value, label) {
-  const out = String(value ?? '').trim();
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
   if (!ID.test(out)) throw new Error(`${label} is invalid`);
   return out;
 }
 
 function exactKeys(value, allowed, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} field ${key} must be an enumerable data property`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in value && !Object.prototype.hasOwnProperty.call(value, key)) {
+      throw new Error(`${label} contains inherited field: ${key}`);
+    }
+  }
 }
 
 function requireAttempt(value) {
-  const attempt = Number(value);
-  if (!Number.isInteger(attempt) || attempt < 1 || attempt > 64) throw new Error('Reconciliation proof attempt is invalid');
-  return attempt;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 64) {
+    throw new Error('Reconciliation proof attempt is invalid');
+  }
+  return value;
+}
+
+function requireReconciliationOutcome(value) {
+  if (typeof value !== 'string') throw new Error('Reconciliation outcome must be text');
+  const outcome = value.trim().toUpperCase();
+  if (!Object.values(ReconciliationOutcome).includes(outcome)) throw new Error('Reconciliation outcome is invalid');
+  return outcome;
 }
 
 function timestampMs(value, label) {
@@ -397,8 +425,7 @@ export class FilesystemExactEffectExecutorV1 {
     exactKeys(request, RECONCILE_REQUEST_KEYS, 'Filesystem reconciliation request');
     const { invocationId, outcome, reasonCode, summary = '' } = request;
     const id = requireId(invocationId, 'invocationId');
-    const normalizedOutcome = String(outcome || '').trim().toUpperCase();
-    if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('Reconciliation outcome is invalid');
+    const normalizedOutcome = requireReconciliationOutcome(outcome);
     const stored = await this.#loadById(id);
     if (!stored) throw new Error('Exact-effect state was not found');
     let state = stored;
