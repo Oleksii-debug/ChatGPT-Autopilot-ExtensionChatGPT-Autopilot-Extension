@@ -301,3 +301,70 @@ test('successful primary-error fallback reports both actual provider attempts', 
   assert.equal(gateway.calls.length, 2);
   assert.equal(result.usage.modelCalls, 2);
 });
+
+test('three-route pool fails over on quota and unavailability without changing request identity or budget accounting', async () => {
+  const calls = [];
+  const gateway = {
+    async complete(req) {
+      calls.push(structuredClone(req));
+      if (req.model === 'route-a') throw Object.assign(new Error('quota exhausted'), { code:'AI_PROVIDER_QUOTA_EXHAUSTED', status:429 });
+      if (req.model === 'route-b') throw Object.assign(new Error('provider unavailable'), { code:'AI_PROVIDER_UNAVAILABLE', status:503 });
+      return { text:'route-c result', usage:{ inputTokens:7, outputTokens:3, totalTokens:10 } };
+    },
+  };
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 100_000 });
+  const result = await router.run(settings({
+    routes:[
+      { routeId:'a', provider:'openai-compatible', endpointId:'endpoint-a', model:'route-a', roles:['planner'], priority:30 },
+      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20 },
+      { routeId:'c', provider:'ollama', model:'route-c', roles:['planner'], priority:10 },
+    ],
+    routePolicy:{ retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
+  }), DEFAULT_AI_ROUTER_RUNTIME, 'same agent node prompt', { taskRole:'planner', maxModelCallsForRequest:3 });
+  assert.equal(result.text, 'route-c result');
+  assert.equal(result.primary.routeId, 'c');
+  assert.equal(result.routing.selectedRouteId, 'c');
+  assert.deepEqual(result.routing.failoverChain.map(item => `${item.routeId}:${item.outcome}`), ['a:FAILED','b:FAILED','c:SUCCESS']);
+  assert.equal(result.usage.modelCalls, 3);
+  assert.equal(result.usage.totalTokens, 10);
+  assert.deepEqual(calls.map(call => call.prompt), ['same agent node prompt','same agent node prompt','same agent node prompt']);
+  assert.equal(calls[0].endpointId, 'endpoint-a');
+  assert.equal(result.runtime.routeStates.a.backoffUntil, 160_000);
+  assert.equal(result.runtime.routeStates.b.backoffUntil, 160_000);
+});
+
+test('route pool restart skips durable backoff and keeps the same logical task prompt', async () => {
+  const calls = [];
+  const gateway = { async complete(req) { calls.push(req.model); return { text:`${req.model} result` }; } };
+  const configured = settings({
+    routes:[
+      { routeId:'a', provider:'openai', model:'route-a', roles:['planner'], priority:30 },
+      { routeId:'b', provider:'ollama', model:'route-b', roles:['planner'], priority:20 },
+    ],
+    routePolicy:{ retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
+  });
+  const runtime = { ...DEFAULT_AI_ROUTER_RUNTIME, routeStates:{ a:{ consecutiveFailures:1, failures:1, successes:0, backoffUntil:160_000, circuitOpenUntil:0, lastErrorCode:'HTTP_429', lastErrorCategory:'quota-or-rate', lastErrorAt:100_000, lastSuccessAt:0, lastLatencyMs:10 } } };
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 120_000 });
+  const result = await router.run(configured, runtime, 'same plan/node/effect context', { taskRole:'planner' });
+  assert.deepEqual(calls, ['route-b']);
+  assert.equal(result.routing.selectedRouteId, 'b');
+  assert.equal(result.runtime.routeStates.a.backoffUntil, 160_000);
+});
+
+test('non-retryable route rejection fails closed without calling another model', async () => {
+  const calls = [];
+  const gateway = { async complete(req) { calls.push(req.model); throw Object.assign(new Error('policy denied'), { code:'AI_POLICY_DENIED', status:403 }); } };
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 100_000 });
+  await assert.rejects(() => router.run(settings({
+    routes:[
+      { routeId:'a', provider:'openai', model:'route-a', roles:['planner'], priority:20 },
+      { routeId:'b', provider:'ollama', model:'route-b', roles:['planner'], priority:10 },
+    ],
+  }), DEFAULT_AI_ROUTER_RUNTIME, 'task', { taskRole:'planner' }), error => {
+    assert.equal(error.code, 'AI_POLICY_DENIED');
+    assert.equal(error.modelCallsUsed, 1);
+    assert.equal(error.routerRuntime.lastFailoverChain.length, 1);
+    return true;
+  });
+  assert.deepEqual(calls, ['route-a']);
+});

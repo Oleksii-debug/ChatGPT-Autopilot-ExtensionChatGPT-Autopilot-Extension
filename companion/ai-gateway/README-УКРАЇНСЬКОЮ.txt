@@ -30,6 +30,12 @@ OPENAI-COMPATIBLE ENDPOINT
 HTTP дозволений тільки для localhost/loopback (LM Studio та інші локальні сервери). Для будь-якого remote host Gateway вимагає HTTPS, щоб Bearer key не міг піти відкритим HTTP. URL із вбудованими credentials/query/fragment відхиляються.
 Старий «НАЛАШТУВАТИ LM STUDIO АДРЕСУ.ps1» залишено як wrapper для сумісності.
 
+КІЛЬКА OPENAI-COMPATIBLE ENDPOINT-ІВ
+«ДОДАТИ OPENAI-COMPATIBLE ENDPOINT.ps1» додає або оновлює до 16 endpoint-ів у локальному
+config\gateway-settings.json. Для кожного задаються endpointId, baseUrl та необовʼязкове імʼя env-змінної з Bearer key.
+Ключі у JSON не зберігаються. Extension і route pool використовують тільки endpointId. Після зміни перезапустіть Gateway.
+Для автоматизованого запуску той самий bounded registry можна передати через AUTOPILOT_COMPATIBLE_ENDPOINTS_JSON.
+
 ОДИН КЛІК
 Після встановлення «ЗАПУСТИТИ GATEWAY.cmd» запускає Gateway приховано.
 «ПЕРЕВІРИТИ GATEWAY.ps1» перевіряє localhost health.

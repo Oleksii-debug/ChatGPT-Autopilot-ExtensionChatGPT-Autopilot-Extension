@@ -16,6 +16,7 @@ import {
   verifyBrowserAgentOutcomeEvidence,
 } from '../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
+import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
 
 function makeChrome({ permission = true } = {}) {
   const storage = {};
@@ -1245,6 +1246,47 @@ test('last allowed model call may execute its returned action and pauses before 
   assert.equal(chrome._actionCalls.length, 1, 'the action from the permitted model call must execute');
   assert.equal(result.job.runtime.runState, 'PAUSED');
   assert.match(result.job.runtime.lastError, /maximum model-call budget reached/);
+});
+
+test('three-route model failover preserves Browser Agent job identity and executes the returned external effect exactly once', async () => {
+  const chrome = makeChrome();
+  const providerCalls = [];
+  const gateway = { async complete(request) {
+    providerCalls.push(structuredClone(request));
+    if (request.model === 'route-a') throw Object.assign(new Error('quota exhausted'), { status:429, code:'AI_PROVIDER_QUOTA_EXHAUSTED' });
+    if (request.model === 'route-b') throw Object.assign(new Error('provider unavailable'), { status:503, code:'AI_PROVIDER_UNAVAILABLE' });
+    return { text:JSON.stringify({ type:'click', frameId:0, ref:'r1' }), usage:{ inputTokens:10, outputTokens:5, totalTokens:15 } };
+  } };
+  let clock = 100_000;
+  const orchestrator = new AiOrchestrator({ gatewayClient:gateway, now:() => ++clock });
+  const settings = {
+    enabled:true,
+    mode:'primary',
+    routes:[
+      { routeId:'a', provider:'openai-compatible', endpointId:'team-a', model:'route-a', roles:['planner'], priority:30 },
+      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20 },
+      { routeId:'c', provider:'ollama', model:'route-c', roles:['planner'], priority:10 },
+    ],
+    routePolicy:{ autoSwitch:true, retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi:chrome,
+    now:() => ++clock,
+    routePrompt:payload => orchestrator.run(settings, payload.routerRuntime, payload.prompt, {
+      systemPrompt:payload.systemPrompt,
+      maxOutputTokens:payload.maxOutputTokens,
+      maxModelCallsForRequest:payload.maxModelCallsForRequest,
+      taskRole:payload.taskRole,
+    }),
+  });
+  await manager.create({ id:'job-failover-effect', goal:'Add a course safely', maxModelCalls:3, stepDelayMs:0 });
+  const result = await manager.start('job-failover-effect');
+  assert.deepEqual(providerCalls.map(call => call.model), ['route-a','route-b','route-c']);
+  assert.equal(new Set(providerCalls.map(call => call.prompt)).size, 1, 'the exact planner context must survive route failover');
+  assert.equal(chrome._actionCalls.length, 1, 'multiple model attempts must yield only one external browser effect');
+  assert.equal(result.job.config.id, 'job-failover-effect');
+  assert.equal(result.job.runtime.modelCalls, 3, 'all provider attempts consume one monotonic job budget');
+  assert.deepEqual(result.job.runtime.aiRouterRuntime.lastFailoverChain.map(item => item.routeId), ['a','b','c']);
 });
 
 test('USD budget caps output tokens before the provider call', async () => {

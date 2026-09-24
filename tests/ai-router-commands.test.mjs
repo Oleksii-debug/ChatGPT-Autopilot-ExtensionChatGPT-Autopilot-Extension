@@ -155,3 +155,37 @@ test('enabled hybrid modes require both primary and strong models', async () => 
     );
   }
 });
+
+test('route pool settings and successful route health persist in the existing router state', async () => {
+  const repo = new MemoryRepo();
+  const fakeOrchestrator = { async run(_settings, runtime) { return {
+    text:'done', route:'primary', primary:{ provider:'ollama', model:'local', routeId:'local' }, strong:null,
+    runtime:{ ...runtime, requestCount:runtime.requestCount + 1, primaryCount:runtime.primaryCount + 1, lastRoute:'primary', lastRouteId:'local', lastFailoverChain:[{ routeId:'local', outcome:'SUCCESS', code:'', category:'' }], routeStates:{ local:{ consecutiveFailures:0, successes:1, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:2000, lastLatencyMs:10 } } },
+  }; } };
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, { aiOrchestrator:fakeOrchestrator });
+  const settings = {
+    enabled:true, mode:'primary', primary:{ provider:'ollama', model:'' }, strong:{ provider:'openai', model:'' },
+    routes:[{ routeId:'local', provider:'ollama', model:'local', roles:['planner'], priority:10 }],
+    routePolicy:{ pinnedRouteId:'local', autoSwitch:true },
+  };
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings });
+  await dispatcher.execute('RUN_AI_ROUTED_PROMPT', { prompt:'task' });
+  const loaded = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(loaded.settings.routes[0].routeId, 'local');
+  assert.equal(loaded.settings.routePolicy.pinnedRouteId, 'local');
+  assert.equal(loaded.runtime.lastRouteId, 'local');
+  assert.equal(loaded.runtime.routeStates.local.successes, 1);
+});
+
+test('failed route health persists for restart without counting a completed request', async () => {
+  const repo = new MemoryRepo();
+  const failureRuntime = { requestCount:0, primaryCount:0, strongCount:0, routeStates:{ a:{ consecutiveFailures:1, successes:0, failures:1, backoffUntil:62_000, circuitOpenUntil:0, lastErrorCode:'HTTP_429', lastErrorCategory:'quota-or-rate', lastErrorAt:2000, lastSuccessAt:0, lastLatencyMs:5 } }, lastRouteId:'', lastFailoverChain:[{ routeId:'a', outcome:'FAILED', code:'HTTP_429', category:'quota-or-rate' }] };
+  const fakeOrchestrator = { async run() { const error = new Error('all routes exhausted'); error.routerRuntime = failureRuntime; error.modelCallsUsed = 1; throw error; } };
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, { aiOrchestrator:fakeOrchestrator });
+  await repo.update(draft => { draft.profile.aiRouter.enabled = true; draft.profile.aiRouter.primary.model = 'legacy'; return draft; });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', { prompt:'task' }), /exhausted/);
+  const loaded = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(loaded.runtime.requestCount, 0);
+  assert.equal(loaded.runtime.routeStates.a.backoffUntil, 62_000);
+  assert.equal(loaded.runtime.lastFailoverChain[0].routeId, 'a');
+});
