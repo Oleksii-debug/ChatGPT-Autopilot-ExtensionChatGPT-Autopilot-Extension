@@ -22,12 +22,41 @@ const EFFECTFUL_TOOLS = new Set([
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_EVIDENCE_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const RECONCILE_REQUEST_KEYS = new Set(['invocationId', 'outcome', 'reasonCode', 'summary']);
+const RECONCILE_PROOF_KEYS = new Set([
+  'verifierId', 'verificationAuthorityId', 'effectId', 'executionId', 'attempt',
+  'observation', 'verification',
+]);
 
 function requireId(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} is invalid`);
   const out = value.trim();
   if (!ID.test(out)) throw new Error(`${label} is invalid`);
   return out;
+}
+
+function exactDataKeys(value, allowed, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} field ${key} must be an enumerable data property`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in value && !Object.prototype.hasOwnProperty.call(value, key)) {
+      throw new Error(`${label} contains inherited field: ${key}`);
+    }
+  }
 }
 
 function requireStore(store) {
@@ -308,6 +337,7 @@ export class GitHubExactEffectExecutorV1 {
           'GitHub mutation did not reach a verified committed outcome; reconciliation is required before retry.',
         );
       }
+      if (error?.effectState) state = normalizeExactEffectStateV1(error.effectState);
       error.effectState = state;
       error.safeToRetry = false;
       error.reconcileRequired = state.phase === ExactEffectPhase.RECONCILE;
@@ -334,8 +364,11 @@ export class GitHubExactEffectExecutorV1 {
     });
   }
 
-  async reconcile({ invocationId, outcome, reasonCode = 'GITHUB_RECONCILED', summary = '' } = {}) {
+  async reconcile(request = {}) {
+    exactDataKeys(request, RECONCILE_REQUEST_KEYS, 'GitHub reconciliation request');
+    const { invocationId, outcome, reasonCode = 'GITHUB_RECONCILED', summary = '' } = request;
     const id = requireId(invocationId, 'invocationId');
+    if (typeof summary !== 'string') throw new Error('Reconciliation summary must be text');
     const stored = await this.#loadById(id);
     if (!stored) throw new Error('Exact-effect state was not found');
     let state = stored;
@@ -362,7 +395,8 @@ export class GitHubExactEffectExecutorV1 {
         requestedAt: new Date(requestedAtMs).toISOString(),
         expectedOutcome: normalizedOutcome,
       }));
-      const verifierId = requireId(proof?.verifierId, 'verifierId');
+      exactDataKeys(proof, RECONCILE_PROOF_KEYS, 'GitHub reconciliation proof');
+      const verifierId = requireId(proof.verifierId, 'verifierId');
       if ([this.actorId, this.parentActorId, state.invocation.providerId].filter(Boolean).includes(verifierId)) {
         throw new Error('Reconciliation verifier must be independent from the actor, parent controller, and GitHub provider');
       }
