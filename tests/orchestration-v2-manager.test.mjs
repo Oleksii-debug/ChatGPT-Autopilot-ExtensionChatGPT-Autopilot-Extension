@@ -460,6 +460,33 @@ test('subagent structural precheck rejects accessor-backed intent without execut
   );
   assert.equal(reads,0,'precheck must reject accessor intent without invoking the getter');
 
+  const hidden={initiator:'AGENT',parentNodeId:'root'};
+  Object.defineProperty(hidden,'requestedChildren',{
+    enumerable:false,
+    value:1,
+  });
+  await assert.rejects(
+    ()=>manager.previewSelectedSubagentStructureAdmission(hidden),
+    /enumerable own data properties/,
+  );
+
+  const symbolic={initiator:'AGENT',parentNodeId:'root',requestedChildren:1};
+  symbolic[Symbol('authority')]=true;
+  await assert.rejects(
+    ()=>manager.previewSelectedSubagentStructureAdmission(symbolic),
+    /unknown field/,
+  );
+
+  const exotic=Object.assign(Object.create({ requestedChildren:1 }),{
+    initiator:'AGENT',
+    parentNodeId:'root',
+    requestedChildren:1,
+  });
+  await assert.rejects(
+    ()=>manager.previewSelectedSubagentStructureAdmission(exotic),
+    /plain object/,
+  );
+
   const decision=await manager.previewSelectedSubagentStructureAdmission({
     initiator:'AGENT',
     parentNodeId:'root',
