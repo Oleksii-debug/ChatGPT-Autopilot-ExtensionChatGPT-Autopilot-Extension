@@ -9,13 +9,14 @@ import {
 
 const at = '2026-09-24T15:55:00.000Z';
 
-function chromeFixture() {
+function chromeFixture({ permissionAllowed = true } = {}) {
   const storage = {};
   const calls = [];
   return {
     storage,
     calls,
     chrome: {
+      permissions: { async contains() { return permissionAllowed; } },
       storage: { local: {
         async get(key) { return key in storage ? { [key]: structuredClone(storage[key]) } : {}; },
         async set(record) { Object.assign(storage, structuredClone(record)); },
@@ -196,4 +197,39 @@ test('absence of the web journal key is the only state that initializes a fresh 
   assert.equal(saved.schemaVersion, 1);
   assert.deepEqual(saved.effectsById.fresh, { state: 'prepared' });
   assert.deepEqual(saved.leasesByTargetId, {});
+});
+
+
+test('Chrome host permission denial happens before durable admission or navigation effect', async () => {
+  const fixture = chromeFixture({ permissionAllowed: false });
+  const provider = createChromeDeterministicWebProviderV1({
+    chromeApi: fixture.chrome,
+    now: () => at,
+    leaseId: () => 'must-not-be-used',
+  });
+  await assert.rejects(() => provider.invoke({
+    ...invocationFixtures('permission-denied-nav'),
+    targetId: 'tab:7',
+    action: { kind: 'NAVIGATE', url: 'https://denied.example/path' },
+    postcondition: { url: 'https://denied.example/path' },
+  }), /host permission is not granted/);
+  assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
+  assert.deepEqual(fixture.calls, []);
+});
+
+test('Chrome host permission denial happens before scripted click effect', async () => {
+  const fixture = chromeFixture({ permissionAllowed: false });
+  const provider = createChromeDeterministicWebProviderV1({
+    chromeApi: fixture.chrome,
+    now: () => at,
+    leaseId: () => 'must-not-be-used',
+  });
+  await assert.rejects(() => provider.invoke({
+    ...invocationFixtures('permission-denied-click'),
+    targetId: 'tab:7',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: { selector: '#ready' },
+  }), /host permission is not granted/);
+  assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
+  assert.deepEqual(fixture.calls, []);
 });
