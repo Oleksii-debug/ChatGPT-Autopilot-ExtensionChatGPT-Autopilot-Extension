@@ -7,8 +7,16 @@ function requireProvider(provider) {
   return provider;
 }
 
-export function createDeterministicWebRuntimeAdmissionV1({ provider, extensionId = '' } = {}) {
+function requireExtensionId(extensionId) {
+  if (typeof extensionId !== 'string' || !extensionId.trim()) {
+    throw new Error('deterministic web runtime admission requires authenticated extension identity');
+  }
+  return extensionId;
+}
+
+export function createDeterministicWebRuntimeAdmissionV1({ provider, extensionId } = {}) {
   const canonical = requireProvider(provider);
+  const authenticatedExtensionId = requireExtensionId(extensionId);
   let recovered = false;
   let recoveryBarrier = null;
 
@@ -31,7 +39,7 @@ export function createDeterministicWebRuntimeAdmissionV1({ provider, extensionId
 
   async function dispatch(message, sender = {}) {
     if (message?.channel !== DETERMINISTIC_WEB_RUNTIME_CHANNEL) return null;
-    if (extensionId && sender?.id !== extensionId) throw new Error('deterministic web runtime sender is not authorized');
+    if (sender?.id !== authenticatedExtensionId) throw new Error('deterministic web runtime sender is not authorized');
     await ensureRecovered();
     if (message.command === 'INVOKE') return canonical.invoke(message.payload || {});
     if (message.command === 'RECONCILE_VERIFIED') {
