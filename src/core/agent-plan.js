@@ -119,6 +119,37 @@ export function reconcileAgentPlanV1(raw, { at = new Date().toISOString() } = {}
   return normalizeAgentPlanV1(plan);
 }
 
+/**
+ * Appends newly discovered work to an already-live plan without rewriting the
+ * existing graph. Optimistic revision matching prevents concurrent planners
+ * from silently clobbering one another; all additions enter through PENDING
+ * and are then reconciled by the canonical dependency/conflict rules.
+ */
+export function extendAgentPlanV1(raw, { expectedRevision, nodes, at = new Date().toISOString() } = {}) {
+  const plan = structuredClone(normalizeAgentPlanV1(raw));
+  const expected = Number(expectedRevision);
+  if (!Number.isInteger(expected) || expected < 1) throw new Error('AgentPlan expectedRevision is invalid');
+  if (plan.revision !== expected) throw new Error('AgentPlan revision conflict');
+  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 32) throw new Error('AgentPlan extension nodes must contain 1-32 nodes');
+
+  const updatedAt = timestamp(at, 'at');
+  const existingIds = new Set(plan.nodes.map(node => node.nodeId));
+  const addedIds = new Set();
+  const additions = nodes.map((rawNode, index) => {
+    object(rawNode, `AgentPlan extension node[${index}]`);
+    if ('state' in rawNode && String(rawNode.state || '').toUpperCase() !== AgentPlanNodeState.PENDING) throw new Error('AgentPlan extension node state must be PENDING');
+    if ('evidence' in rawNode && rawNode.evidence != null && String(rawNode.evidence).trim() !== '') throw new Error('AgentPlan extension node cannot inject evidence');
+    const candidate = normalizeNode({ ...structuredClone(rawNode), state: AgentPlanNodeState.PENDING, evidence: '', updatedAt });
+    if (existingIds.has(candidate.nodeId) || addedIds.has(candidate.nodeId)) throw new Error('AgentPlan extension contains duplicate nodeId');
+    addedIds.add(candidate.nodeId);
+    return candidate;
+  });
+
+  plan.nodes.push(...additions);
+  plan.updatedAt = updatedAt;
+  return reconcileAgentPlanV1(plan, { at: updatedAt });
+}
+
 export function transitionAgentPlanNodeV1(raw, { nodeId, state, evidence = '', at = new Date().toISOString() } = {}) {
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const node = plan.nodes.find(item => item.nodeId === nodeId);
