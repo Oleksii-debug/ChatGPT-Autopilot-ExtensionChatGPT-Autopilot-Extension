@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  createChromeDeterministicWebProviderV1,
   createChromeDeterministicWebStoreV1,
   createChromeDeterministicWebTransportV1,
 } from '../src/core/deterministic-web-chrome-runtime.js';
+
+const at = '2026-09-24T15:55:00.000Z';
 
 function chromeFixture() {
   const storage = {};
@@ -31,6 +34,44 @@ function chromeFixture() {
   };
 }
 
+function invocationFixtures(invocationId = 'chrome-runtime-invocation') {
+  return {
+    toolDescriptor: {
+      schemaVersion: 1,
+      toolId: 'web.action',
+      providerId: 'deterministic-web',
+      label: 'Web action',
+      description: '',
+      capabilityIds: ['web.general'],
+      inputSchemaRef: null,
+      outputSchemaRef: null,
+      readOnly: false,
+    },
+    invocation: {
+      schemaVersion: 1,
+      invocationId,
+      toolId: 'web.action',
+      providerId: 'deterministic-web',
+      requestedCapabilityIds: ['web.general'],
+      policyDecisionId: `decision-${invocationId}`,
+      arguments: {},
+      createdAt: at,
+      parentInvocationId: null,
+    },
+    policyDecision: {
+      schemaVersion: 1,
+      decisionId: `decision-${invocationId}`,
+      invocationId,
+      decision: 'ALLOW',
+      reasonCode: 'OWNER_POLICY',
+      reason: '',
+      approvalId: null,
+      decidedAt: at,
+    },
+    grantedCapabilityIds: ['web.general'],
+  };
+}
+
 test('durable store serializes competing updates without losing target ownership', async () => {
   const fixture = chromeFixture();
   const store = createChromeDeterministicWebStoreV1(fixture.chrome);
@@ -51,8 +92,29 @@ test('Chrome transport binds navigation and scripted actions to exact tab target
   const observation = await transport.observe({ targetId: 'tab:7' });
   assert.deepEqual(fixture.calls[0], ['navigate', 7, { url: 'https://example.test/next' }]);
   assert.deepEqual(fixture.calls[1], ['script', 7, ['CLICK', '#go', '']]);
-  assert.equal(observation.url, 'https://example.test/start');
-  assert.deepEqual(observation.visibleSelectors, ['#ready']);
+  assert.equal(observation.data.url, 'https://example.test/start');
+  assert.deepEqual(observation.data.visibleSelectors, ['#ready']);
+  assert.deepEqual(observation.artifactRefs, []);
+});
+
+test('Chrome runtime interoperates with canonical provider through VERIFIED to durable COMMITTED', async () => {
+  const fixture = chromeFixture();
+  const provider = createChromeDeterministicWebProviderV1({
+    chromeApi: fixture.chrome,
+    now: () => at,
+    leaseId: () => 'chrome-runtime-lease',
+  });
+  const result = await provider.invoke({
+    ...invocationFixtures(),
+    targetId: 'tab:7',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: { selector: '#ready' },
+  });
+  assert.equal(result.status, 'VERIFIED');
+  assert.equal(result.verification.reasonCode, 'SELECTOR_VISIBLE');
+  const saved = fixture.storage['autopilot.deterministicWebRuntime.v1'];
+  assert.equal(saved.effectsById['chrome-runtime-invocation'].state.phase, 'COMMITTED');
+  assert.equal(saved.leasesByTargetId['tab:7'], undefined);
 });
 
 test('Chrome transport rejects ambiguous/non-tab target identities', async () => {
