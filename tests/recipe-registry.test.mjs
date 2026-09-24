@@ -13,6 +13,7 @@ import {
   normalizeRecipeRegistryV1,
   recipeRequiredCapabilityIdsV1,
   resolvePromotedRecipeV1,
+  resolveReplayEligibleRecipeV1,
 } from '../src/core/recipe-registry.js';
 
 const AT = '2026-09-24T22:21:00.000Z';
@@ -128,6 +129,11 @@ test('PROMOTED requires passing independent verifier evidence and a benchmark bi
   assert.throws(() => normalizeRecipeDefinitionV1(recipe({
     qualification: qualification('PASS', { benchmarkSuiteRevision: '' }),
   })), /benchmarkSuiteRevision/);
+
+  assert.throws(() => normalizeRecipeDefinitionV1(recipe({
+    createdAt: '2026-09-24T22:22:00.000Z',
+    qualification: qualification('PASS', { evaluatedAt: AT }),
+  })), /cannot predate recipe creation/);
 });
 
 test('DRAFT cannot smuggle successful qualification and tool steps cannot mint capability authority', () => {
@@ -200,15 +206,21 @@ test('registry canonicalizes ordering and enforces contiguous immutable version 
     version: 2,
     parentVersion: 1,
     title: 'Safe repository review v2',
+    qualification: qualification('PASS', { evaluatedAt: '2026-09-24T22:22:00.000Z' }),
     createdAt: '2026-09-24T22:22:00.000Z',
   });
-  const value = normalizeRecipeRegistryV1(registry([v2, v1]));
+  const value = normalizeRecipeRegistryV1(registry([v2, v1], {
+    updatedAt: '2026-09-24T22:22:00.000Z',
+  }));
   assert.deepEqual(value.recipes.map(item => item.version), [1, 2]);
   assert.equal(getCurrentRecipeVersionV1(value, v1.recipeId).version, 2);
 
   assert.throws(() => normalizeRecipeRegistryV1(registry([v2])), /must start at version 1/);
   assert.throws(() => normalizeRecipeRegistryV1(registry([v1, { ...v2, version: 3, parentVersion: 2 }])), /contiguous/);
   assert.throws(() => normalizeRecipeRegistryV1(registry([v1, { ...v1 }])), /duplicate version/);
+  assert.throws(() => normalizeRecipeRegistryV1(registry([v1, v2], {
+    updatedAt: '2026-09-24T22:21:30.000Z',
+  })), /updatedAt predates recipe version/);
 });
 
 test('registry extension is append-only and preserves existing version bytes', () => {
@@ -218,6 +230,7 @@ test('registry extension is append-only and preserves existing version bytes', (
     version: 2,
     parentVersion: 1,
     title: 'Safe repository review v2',
+    qualification: qualification('PASS', { evaluatedAt: '2026-09-24T22:22:00.000Z' }),
     createdAt: '2026-09-24T22:22:00.000Z',
   });
   const after = registry([v1, v2], {
@@ -247,11 +260,14 @@ test('promoted resolution keeps prior promoted version while a candidate is eval
     version: 2,
     parentVersion: 1,
     lifecycle: 'CANDIDATE',
-    qualification: qualification('FAIL'),
+    qualification: qualification('FAIL', { evaluatedAt: '2026-09-24T22:22:00.000Z' }),
     createdAt: '2026-09-24T22:22:00.000Z',
   });
-  const withCandidate = registry([promoted, candidate]);
+  const withCandidate = registry([promoted, candidate], {
+    updatedAt: '2026-09-24T22:22:00.000Z',
+  });
   assert.equal(resolvePromotedRecipeV1(withCandidate, promoted.recipeId).version, 1);
+  assert.equal(resolveReplayEligibleRecipeV1(withCandidate, promoted.recipeId, [binding()]).version, 1);
 
   const retired = recipe({
     version: 3,
@@ -260,7 +276,11 @@ test('promoted resolution keeps prior promoted version while a candidate is eval
     qualification: qualification('UNQUALIFIED'),
     createdAt: '2026-09-24T22:23:00.000Z',
   });
-  assert.equal(resolvePromotedRecipeV1(registry([promoted, candidate, retired]), promoted.recipeId), null);
+  const retiredRegistry = registry([promoted, candidate, retired], {
+    updatedAt: '2026-09-24T22:23:00.000Z',
+  });
+  assert.equal(resolvePromotedRecipeV1(retiredRegistry, promoted.recipeId), null);
+  assert.throws(() => resolveReplayEligibleRecipeV1(retiredRegistry, promoted.recipeId, [binding()]), /no active PROMOTED/);
 });
 
 test('source drift is explicit and replay eligibility fails closed on missing/revised/substituted bytes', () => {
