@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { URL, pathToFileURL, fileURLToPath } from 'node:url';
+import { PINNED_COMPATIBLE_CREDENTIAL_BINDINGS } from './provider-presets.mjs';
 
 const GATEWAY_VERSION = '0.7.0';
 const HOST = '127.0.0.1';
@@ -14,9 +15,6 @@ const DEFAULT_UPSTREAM_TIMEOUT_MS = Math.min(900_000, Math.max(5_000, Number(pro
 const STATUS_PROBE_TIMEOUT_MS = Math.min(15_000, Math.max(1_000, Number(process.env.AUTOPILOT_STATUS_TIMEOUT_MS || 3_000)));
 const DEFAULT_MAX_PENDING_INFERENCE = Math.min(256, Math.max(1, Number(process.env.AUTOPILOT_AI_MAX_PENDING || 32)));
 const PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
-const PINNED_COMPATIBLE_CREDENTIAL_BINDINGS = Object.freeze({
-  MISTRAL_API_KEY: Object.freeze({ endpointId: 'mistral', origin: 'https://api.mistral.ai' }),
-});
 const GATEWAY_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PID_DIR = path.join(GATEWAY_DIR, 'runtime-state');
 const PID_FILE = path.join(PID_DIR, 'gateway.pid');
