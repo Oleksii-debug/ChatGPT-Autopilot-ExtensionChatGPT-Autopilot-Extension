@@ -17,6 +17,7 @@ Write-Host '10 — Безпечно зберегти API key для OpenAI-compa
 Write-Host '11 — Видалити збережений OpenAI-compatible API key'
 Write-Host '12 — Відкрити 5-хвилинне вікно привязки Chrome-розширення'
 Write-Host '13 — Скинути привязку Chrome-розширення'
+Write-Host '14 — Додати або оновити OpenAI-compatible endpoint у route pool'
 Write-Host '0 — Вихід'
 $choice = Read-Host 'Виберіть режим'
 
@@ -34,6 +35,7 @@ switch ($choice.Trim()) {
   '11' { & (Join-Path $PSScriptRoot 'ВИДАЛИТИ ЗБЕРЕЖЕНИЙ OPENAI-COMPATIBLE КЛЮЧ.ps1'); Pause-End }
   '12' { & (Join-Path $PSScriptRoot 'ВІДКРИТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ.ps1'); Pause-End }
   '13' { & (Join-Path $PSScriptRoot 'СКИНУТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ.ps1'); Pause-End }
+  '14' { & (Join-Path $PSScriptRoot 'ДОДАТИ OPENAI-COMPATIBLE ENDPOINT.ps1'); Pause-End }
   '0' { exit 0 }
   default { Write-Host 'Невідомий пункт меню.'; Pause-End; exit 1 }
 }

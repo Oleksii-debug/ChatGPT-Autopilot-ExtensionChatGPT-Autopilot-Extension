@@ -41,6 +41,15 @@ import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orches
 import { NativeCompanionClient } from './native-companion.js';
 import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
+import {
+  prepareAgentPlanSpecialistHandoffV1,
+  prepareAgentPlanSpecialistExecutionOwnershipV1,
+  claimAgentPlanSpecialistHandoffsV1,
+  authorizeAgentPlanSpecialistSafeRetryV1,
+  completeAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffV1,
+  specialistAssignmentIdForPlanNodeV1,
+} from './agent-specialist-bridge.js';
 
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
@@ -108,9 +117,20 @@ function normalizeRuntime(raw, now) {
   if (!raw || typeof raw !== 'object') return base;
   const allowed = new Set(Object.values(BrowserAgentRunState));
   const runState = allowed.has(raw.runState) ? raw.runState : BrowserAgentRunState.STOPPED;
+  const plan = raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null;
+  // Handoffs live in the already-durable Browser Agent job record.  A corrupt
+  // record is ignored here and later actions fail closed against the plan.
+  const specialistHandoffs = plan && Array.isArray(raw.specialistHandoffs)
+    ? raw.specialistHandoffs.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
+    : [];
+  const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
+    ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
+    : [];
   return {
     ...base,
     ...clone(raw),
+    specialistHandoffs,
+    specialistExecutionOwnerships,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -196,7 +216,8 @@ function normalizeRuntime(raw, now) {
     } : null,
     ownerInstructions: (Array.isArray(raw.ownerInstructions) ? raw.ownerInstructions : []).map(value => clean(value, 5000)).filter(Boolean).slice(-MAX_OWNER_INSTRUCTIONS),
     history: (Array.isArray(raw.history) ? raw.history : []).slice(-MAX_HISTORY),
-    plan: raw.plan && typeof raw.plan === 'object' ? (() => { try { return normalizeAgentPlanV1(raw.plan); } catch { return null; } })() : null,
+    plan,
+    specialistHandoffs,
     verifiedOutcome: raw.verifiedOutcome && typeof raw.verifiedOutcome === 'object' ? {
       snapshotSignature: clean(raw.verifiedOutcome.snapshotSignature, 80),
       verifiedAt: Math.max(0, Number(raw.verifiedOutcome.verifiedAt || 0)),
@@ -298,6 +319,7 @@ export class BrowserAgentManager {
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
         routerOverride: browserAgentRouterOverride(job.config),
+        taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
       });
     } catch (error) { return { ok: false, error }; }
@@ -339,6 +361,181 @@ export class BrowserAgentManager {
     const store = await this.load();
     const target = id || store.selectedId;
     return { selectedId: target || '', job: target && store.byId[target] ? clone(store.byId[target]) : null };
+  }
+
+  async listSpecialistHandoffs(id = '') {
+    const current = await this.get(id);
+    if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
+    return {
+      selectedId: current.selectedId,
+      jobId: current.job.id,
+      planId: current.job.runtime.plan?.planId || '',
+      handoffs: clone(current.job.runtime.specialistHandoffs || []),
+      executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
+    };
+  }
+
+  async prepareSpecialistHandoff(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to hand off');
+      // Persist the reconciliation that made this external node READY before
+      // recording its handoff. Otherwise a restart/cycle could re-plan the
+      // already-admitted node and request the same specialist twice.
+      const plan = reconcileAgentPlanV1(job.runtime.plan, { at: payload.at || now });
+      const assignment = prepareAgentPlanSpecialistHandoffV1(plan, { ...payload, at: payload.at || now });
+      const executionOwnership = prepareAgentPlanSpecialistExecutionOwnershipV1(plan, { ...payload, at: payload.at || now });
+      const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+      const executionOwnerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const existing = handoffs.find(item => item?.agentId === assignment.agentId);
+      if (existing) {
+        const existingOwnership = executionOwnerships.find(item => item?.effectId === executionOwnership.effectId);
+        if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
+        result = { assignment: clone(existing), executionOwnership:clone(existingOwnership), reused: true };
+        return store;
+      }
+      job.runtime.plan = plan;
+      job.runtime.specialistHandoffs = [...handoffs, assignment];
+      job.runtime.specialistExecutionOwnerships = [...executionOwnerships, executionOwnership];
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-prepared', nodeId: payload.nodeId, agentId: assignment.agentId, message: `Bounded ${assignment.specialistId} handoff prepared; execution is not yet claimed.` });
+      result = { assignment: clone(assignment), executionOwnership:clone(executionOwnership), reused: false };
+      return store;
+    });
+    return result;
+  }
+
+  async claimSpecialistHandoffs(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
+      job.runtime.plan = claimed.plan;
+      job.runtime.specialistHandoffs = claimed.assignments;
+      job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
+      job.runtime.updatedAt = this.now();
+      for (const agentId of claimed.claimed) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease claimed; no provider effect was dispatched by this bridge.' });
+      for (const agentId of claimed.reconciliationRequired) appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+      result = clone(claimed);
+      return store;
+    });
+    return result;
+  }
+
+  /**
+   * Atomically admits specialist handoffs across every durable Browser Agent
+   * job.  The existing per-job claim contract still owns lease creation; this
+   * method only distributes one product-wide capacity budget, so service
+   * worker restart cannot briefly over-admit independent jobs.
+   */
+  async claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs, ...payload } = {}) {
+    const limit = Number(maxConcurrentHandoffs);
+    if (!Number.isInteger(limit) || limit < 0 || limit > 256) throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
+        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(payload.at || now));
+      let remaining = Math.max(0, limit - liveLeases.length);
+      const claimed = [];
+      const reconciliationRequired = [];
+      for (const jobId of store.order) {
+        const job = store.byId[jobId];
+        if (!job?.runtime?.plan) continue;
+        const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+          ...payload,
+          availableSlots: remaining,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at: payload.at || now,
+        });
+        job.runtime.plan = outcome.plan;
+        job.runtime.specialistHandoffs = outcome.assignments;
+        job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
+        job.runtime.updatedAt = this.now();
+        remaining -= outcome.claimed.length;
+        for (const agentId of outcome.claimed) {
+          claimed.push({ jobId, agentId });
+          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
+        }
+        for (const agentId of outcome.reconciliationRequired) {
+          reconciliationRequired.push({ jobId, agentId });
+          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
+        }
+      }
+      result = { maxConcurrentHandoffs: limit, activeLeases: liveLeases.length, remainingSlots: remaining, claimed, reconciliationRequired };
+      return store;
+    });
+    return result;
+  }
+
+  async authorizeSpecialistSafeRetry(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
+      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
+        ...payload,
+        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+        at: payload.at || now,
+      });
+      job.runtime.plan = retriable.plan;
+      job.runtime.specialistHandoffs = retriable.assignments;
+      job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-safe-retry-authorized',
+        agentId: retriable.retriableAgentId,
+        verifierId: retriable.safeRetryEvidence.verifierId,
+        verificationAuthorityId: retriable.safeRetryEvidence.verificationAuthorityId,
+        evidence: retriable.safeRetryEvidence.evidence,
+        message: 'Independent no-effect evidence authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+      });
+      result = clone(retriable);
+      return store;
+    });
+    return result;
+  }
+
+  async completeSpecialistHandoff(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to complete');
+      const completed = completeAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
+      job.runtime.plan = completed.plan;
+      job.runtime.specialistHandoffs = completed.assignments;
+      job.runtime.specialistExecutionOwnerships = completed.executionOwnerships;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-completed', agentId: completed.verificationRequired, message: 'Specialist result recorded; independent verification is required before plan completion.' });
+      result = clone(completed);
+      return store;
+    });
+    return result;
+  }
+
+  async verifySpecialistHandoff(id, payload = {}) {
+    const now = new Date(this.now()).toISOString();
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
+      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
+      job.runtime.plan = verified.plan;
+      job.runtime.specialistHandoffs = verified.assignments;
+      job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      result = clone(verified);
+      return store;
+    });
+    return result;
   }
 
   async create(raw = {}) {
@@ -1889,6 +2086,7 @@ export class BrowserAgentManager {
     if (!schedule.allowed) return this.applyScheduleGate(id);
     const externalNode = current.job.runtime.plan?.nodes?.find(node => node.state === AgentPlanNodeState.READY && node.executionPlane !== 'BROWSER');
     if (externalNode) {
+      const existingHandoff = (current.job.runtime.specialistHandoffs || []).find(item => item?.agentId === specialistAssignmentIdForPlanNodeV1(current.job.runtime.plan.planId, externalNode.nodeId));
       await this.update(store => {
         const job = store.byId[id];
         if (!job || job.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -1899,7 +2097,7 @@ export class BrowserAgentManager {
         job.runtime.updatedAt = now;
         return store;
       });
-      return { kind: 'SPECIALIST_REQUIRED', node: clone(externalNode) };
+      return { kind: existingHandoff ? 'SPECIALIST_PENDING' : 'SPECIALIST_REQUIRED', node: clone(externalNode), ...(existingHandoff ? { handoff: clone(existingHandoff) } : {}) };
     }
     const epoch = current.job.runtime.controlEpoch;
     if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
@@ -2160,6 +2358,7 @@ export class BrowserAgentManager {
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(current.job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
         routerOverride: browserAgentRouterOverride(current.job.config),
+        taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
       });
@@ -2170,6 +2369,15 @@ export class BrowserAgentManager {
           const job = store.byId[id];
           if (!job || job.runtime.controlEpoch !== epoch) return store;
           job.runtime.modelCalls += failedCalls;
+          if (error?.routerRuntime) job.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          job.runtime.updatedAt = this.now();
+          return store;
+        });
+      } else if (error?.routerRuntime) {
+        await this.update(store => {
+          const job = store.byId[id];
+          if (!job || job.runtime.controlEpoch !== epoch) return store;
+          job.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
           job.runtime.updatedAt = this.now();
           return store;
         });

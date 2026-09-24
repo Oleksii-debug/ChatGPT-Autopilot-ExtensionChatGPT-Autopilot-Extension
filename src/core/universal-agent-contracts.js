@@ -248,6 +248,7 @@ export function normalizeObservationV1(input) {
 const VERIFICATION_KEYS = new Set([
   'schemaVersion', 'verificationId', 'invocationId', 'observationId',
   'status', 'reasonCode', 'summary', 'evidenceArtifactIds', 'verifiedAt',
+  'verifierId', 'verificationAuthorityId', 'effectId', 'executionId', 'attempt',
 ]);
 export function normalizeVerificationV1(input) {
   const raw = plain(input, 'VerificationV1');
@@ -264,6 +265,11 @@ export function normalizeVerificationV1(input) {
     summary: text(raw.summary, 'summary', { optional: true, max: 8000 }),
     evidenceArtifactIds: idList(raw.evidenceArtifactIds, 'evidenceArtifactIds'),
     verifiedAt: timestamp(raw.verifiedAt, 'verifiedAt'),
+    verifierId: id(raw.verifierId, 'verifierId', { optional: true }),
+    verificationAuthorityId: id(raw.verificationAuthorityId, 'verificationAuthorityId', { optional: true }),
+    effectId: id(raw.effectId, 'effectId', { optional: true }),
+    executionId: id(raw.executionId, 'executionId', { optional: true }),
+    attempt: integer(raw.attempt, 'attempt', 0, 64, { optional: true, fallback: 0 }),
   });
 }
 

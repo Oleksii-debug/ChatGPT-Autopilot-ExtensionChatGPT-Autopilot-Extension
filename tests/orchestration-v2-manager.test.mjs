@@ -525,10 +525,14 @@ test('0.9.7 importing an existing project selects that orchestra instead of muta
 });
 
 
-test('delete purges managed hierarchy session logs and tab hints without orphan-owner validation failure', async()=>{
-  const {manager,core}=harness();
+test('delete purges only its hierarchy session logs and tab hints across a cold restart', async()=>{
+  const {manager,core,chrome}=managerFixture();
   await manager.create({name:'Hierarchy cleanup',config:cfg('cleanup')});
-  await manager.configureHierarchy({
+  await manager.create({name:'Other hierarchy',config:cfg('other')});
+  await manager.controllerFor('orch-2').configureHierarchy(hierarchyGraph('other-graph'),{nowMs:1000});
+  await manager.start('orch-2');
+  await manager.emergencyStop('orch-2');
+  await manager.controllerFor('orch-1').configureHierarchy({
     schemaVersion:1,
     graphId:'cleanup-graph',
     controlEpoch:1,
@@ -546,14 +550,17 @@ test('delete purges managed hierarchy session logs and tab hints without orphan-
         barrier:{mode:'NONE'},
       },
     ],
-  });
+  },{nowMs:1000});
   await manager.start('orch-1');
 
   const before=await core.load();
   const session=Object.values(before.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='cleanup-graph');
+  const other=Object.values(before.sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='other-graph');
   assert.ok(session);
+  assert.ok(other);
   await core.update(state=>{
     state.logs[session.id]=[{at:1000,level:'info',message:'managed hierarchy log'}];
+    state.logs[other.id]=[{at:1000,level:'info',message:'other hierarchy log'}];
     state.tabHintsByTaskId[session.taskOrder[0]]={
       tabId:77,
       sessionId:session.id,
@@ -563,25 +570,62 @@ test('delete purges managed hierarchy session logs and tab hints without orphan-
       retirePending:false,
       boundAt:1000,
     };
+    state.tabHintsByTaskId[other.taskOrder[0]]={
+      tabId:79,sessionId:other.id,normalizedUrl:'https://chatgpt.com/',kind:'TASK',
+      ownedByExtension:true,retirePending:false,boundAt:1000,
+    };
     return state;
   });
 
-  await manager.emergencyStop('orch-1');
-  await manager.delete('orch-1');
-
-  const after=await core.load();
+  const restartedCore=new StorageRepository(chrome);
+  const restartedManager=new OrchestrationV2Manager({coreRepository:restartedCore,chromeApi:chrome,now:()=>1000});
+  assert.equal((await restartedCore.load()).logs[session.id][0].message,'managed hierarchy log');
+  await restartedManager.emergencyStop('orch-1');
+  await restartedManager.delete('orch-1');
+  const after=await restartedCore.load();
   assert.equal(after.sessionsById[session.id],undefined);
   assert.equal(after.logs[session.id],undefined);
+  assert.ok(after.sessionsById[other.id]);
+  assert.equal(after.logs[other.id][0].message,'other hierarchy log');
+  assert.equal(after.tabHintsByTaskId[other.taskOrder[0]].sessionId,other.id);
+  assert.equal((await restartedManager.getStatus('orch-2')).config.projectId,'other');
   assert.equal(
     Object.values(after.tabHintsByTaskId||{}).some(hint=>hint?.sessionId===session.id),
     false,
   );
 });
 
+test('unresolved external Send prevents deletion and identity rebind without discarding its evidence', async()=>{
+  const {manager,core,chrome}=managerFixture();
+  await manager.create({name:'Unresolved',config:cfg('unresolved')});
+  await manager.controllerFor('orch-1').configureHierarchy(hierarchyGraph('unresolved-graph'),{nowMs:1000});
+  await manager.start('orch-1');
+  await manager.emergencyStop('orch-1');
+  const session=Object.values((await core.load()).sessionsById).find(s=>s.orchestrationHierarchy?.graphId==='unresolved-graph');
+  assert.ok(session);
+  await core.update(state=>{
+    const taskId=session.taskOrder[0];
+    state.sessionsById[session.id].operation={
+      operationId:'unresolved-send',sessionId:session.id,taskId,promptFingerprint:'sha256:test',
+      phase:'AMBIGUOUS',targetUrl:state.sessionsById[session.id].tasksById[taskId].normalizedUrl,
+      createdAt:1000,updatedAt:1000,preSendDeadline:0,submitStartedAt:1000,verificationDeadline:60000,
+    };
+    state.logs[session.id]=[{at:1000,level:'warn',message:'external Send uncertain'}];
+    return state;
+  });
+  await assert.rejects(()=>manager.delete('orch-1'),/unresolved Send/);
+  await manager.pause('orch-1');
+  await assert.rejects(()=>manager.updateConfig(cfg('replacement'),'orch-1'),/unresolved Send/);
+  const after=new StorageRepository(chrome);
+  assert.equal((await after.load()).sessionsById[session.id].operation.phase,'AMBIGUOUS');
+  assert.equal((await after.load()).logs[session.id][0].message,'external Send uncertain');
+  assert.equal((await manager.getStatus('orch-1')).config.projectId,'unresolved');
+});
+
 test('owner-paused project identity rebind purges managed session logs and tab hints', async()=>{
-  const {manager,core}=harness();
+  const {manager,core}=managerFixture();
   await manager.create({name:'Hierarchy rebind cleanup',config:cfg('rebind-a')});
-  await manager.configureHierarchy({
+  await manager.controllerFor('orch-1').configureHierarchy({
     schemaVersion:1,
     graphId:'rebind-cleanup-graph',
     controlEpoch:1,
@@ -599,7 +643,7 @@ test('owner-paused project identity rebind purges managed session logs and tab h
         barrier:{mode:'NONE'},
       },
     ],
-  });
+  },{nowMs:1000});
   await manager.start('orch-1');
   await manager.pause('orch-1');
 

@@ -2,7 +2,7 @@ import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { applyInteractionResult, RATE_LIMIT_BACKOFF_MS } from './execution.js';
 import { DurableSubmissionCoordinator } from './runner.js';
 import { selectNextTask } from './scheduler.js';
-import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy } from './schema.js';
+import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, isExclusiveConversationUrl } from './schema.js';
 import { resolveTaskTab } from './tabs.js';
 import { InteractionResult } from '../shared/protocol.js';
 import { appendDiagnostic } from './diagnostics.js';
@@ -339,6 +339,41 @@ export class AutomaticSessionExecutor {
       });
       return false;
     }
+  }
+
+  async persistVerifiedConversationBinding(sessionId, taskId, tabId, result) {
+    if (result?.status !== InteractionResult.SENT_VERIFIED) return { bound: false, url: '' };
+
+    let conversationUrl = typeof result?.normalizedObservedUrl === 'string'
+      ? result.normalizedObservedUrl.trim()
+      : '';
+
+    if (!isExclusiveConversationUrl(conversationUrl) && Number.isInteger(tabId) && this.chrome?.tabs?.get) {
+      try {
+        const tab = await this.chrome.tabs.get(tabId);
+        if (isExclusiveConversationUrl(tab?.url || '')) conversationUrl = tab.url;
+      } catch (_) {
+        // Keep the verified Send and fail closed for hierarchy completion if no
+        // concrete conversation identity can be proven.
+      }
+    }
+
+    if (!isExclusiveConversationUrl(conversationUrl)) return { bound: false, url: '' };
+
+    let bound = false;
+    await this.repo.update(draft => {
+      const live = requireSession(draft, sessionId);
+      const task = live.tasksById?.[taskId];
+      if (!task || Number(task.lastVerifiedSendAt || 0) <= 0) return draft;
+      task.lastConversationUrl = conversationUrl;
+      if (Number.isInteger(Number(result?.assistantBaselineCount)) && Number(result.assistantBaselineCount) >= 0) {
+        task.lastAssistantBaselineCount = Number(result.assistantBaselineCount);
+        task.lastAssistantBaselineKnown = true;
+      }
+      bound = true;
+      return draft;
+    });
+    return { bound, url: conversationUrl };
   }
 
   async applyResult(sessionId, taskId, result, promptFingerprint = '') {
@@ -769,6 +804,7 @@ export class AutomaticSessionExecutor {
       ),
     });
     if (result.status === InteractionResult.SENT_VERIFIED) {
+      await this.persistVerifiedConversationBinding(sessionId, task.id, tab.id, result);
       await this.markNormalWorkResumed(sessionId, task.id);
     }
     await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, result);
