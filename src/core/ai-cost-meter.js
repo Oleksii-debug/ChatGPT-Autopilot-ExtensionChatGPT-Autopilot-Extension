@@ -29,17 +29,49 @@ function plainObject(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+  }
   return value;
 }
 
 function exactKeys(value, allowed, label) {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
   }
 }
 
 function own(value, key, fallback) {
   return Object.hasOwn(value, key) ? value[key] : fallback;
+}
+
+function dataArray(value, label, maximum) {
+  if (!Array.isArray(value) || value.length > maximum) {
+    throw new Error(`${label} must be an array of at most ${maximum} items`);
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key) || Number(key) >= value.length) {
+      throw new Error(`${label} contains an invalid array field`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} entries must be enumerable own data properties`);
+    }
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} must be dense data-only evidence`);
+    }
+  }
+  return value;
 }
 
 function id(value, label, { optional = false } = {}) {
@@ -263,9 +295,7 @@ export function resourceUsageFromAiCostRecordV1(input) {
 }
 
 export function aggregateAiCostRecordsV1(records) {
-  if (!Array.isArray(records) || records.length > MAX_AI_COST_RECORDS) {
-    throw new Error(`AI cost records must be an array of at most ${MAX_AI_COST_RECORDS} items`);
-  }
+  const boundedRecords = dataArray(records, 'AI cost records', MAX_AI_COST_RECORDS);
   const total = {
     modelCalls: 0,
     modelInputTokens: 0,
@@ -273,7 +303,7 @@ export function aggregateAiCostRecordsV1(records) {
     costUsdMicros: 0,
   };
   const seenInvocationIds = new Set();
-  for (const input of records) {
+  for (const input of boundedRecords) {
     const record = normalizeAiCostRecordV1(input);
     if (seenInvocationIds.has(record.invocationId)) {
       throw new Error(`AI cost aggregate contains duplicate invocationId: ${record.invocationId}`);
@@ -286,5 +316,5 @@ export function aggregateAiCostRecordsV1(records) {
       total[key] = next;
     }
   }
-  return frozen({ recordCount: records.length, ...total });
+  return frozen({ recordCount: boundedRecords.length, ...total });
 }
