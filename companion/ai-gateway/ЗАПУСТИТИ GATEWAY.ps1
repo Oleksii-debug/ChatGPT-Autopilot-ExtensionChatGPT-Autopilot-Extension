@@ -26,7 +26,7 @@ function Import-DpapiEnvironmentKey {
   finally {
     if ($ptr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
   }
-  Write-Host "$Label: ключ завантажено із Windows DPAPI."
+  Write-Host "${Label}: ключ завантажено із Windows DPAPI."
   return $true
 }
 
