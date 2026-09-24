@@ -68,8 +68,45 @@ function strictInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } 
   }
   return value;
 }
-function uniqueIds(value, label, max = 128) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => id(item, `${label}[${index}]`)); if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
-function uniqueText(value, label, max = 32) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => text(item, `${label}[${index}]`, { max: 1000 })); if (new Set(out.map(item => item.toLocaleLowerCase())).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
+
+function dataArray(value, label, { min = 0, max = 128 } = {}) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a canonical array`);
+  }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  const length = lengthDescriptor?.value;
+  if (!Number.isSafeInteger(length) || length < min || length > max) {
+    throw new Error(`${label} must contain ${min}-${max} items`);
+  }
+  const expected = new Set(['length']);
+  for (let index = 0; index < length; index += 1) expected.add(String(index));
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(`${label} contains non-canonical array fields`);
+    }
+  }
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !descriptor.enumerable) {
+      throw new Error(`${label}[${index}] must be an enumerable own data property`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
+}
+
+function uniqueIds(value, label, max = 128) {
+  const out = dataArray(value, label, { max }).map((item, index) => id(item, `${label}[${index}]`));
+  if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
+  return out;
+}
+function uniqueText(value, label, max = 32) {
+  const out = dataArray(value, label, { max }).map((item, index) => text(item, `${label}[${index}]`, { max: 1000 }));
+  // String#toLowerCase is locale-independent; avoid toLocaleLowerCase host-locale drift.
+  if (new Set(out.map(item => item.toLowerCase())).size !== out.length) throw new Error(`${label} contains duplicates`);
+  return out;
+}
 function frozen(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) frozen(child); return Object.freeze(value); }
 
 function normalizeBudget(raw = {}) {
@@ -134,8 +171,7 @@ export function normalizeAgentPlanV1(raw) {
   object(raw, 'AgentPlanV1');
   exact(raw, new Set(['schemaVersion', 'planId', 'jobId', 'objective', 'successCriteria', 'nodes', 'createdAt', 'updatedAt', 'revision']), 'AgentPlanV1');
   if (raw.schemaVersion !== AGENT_PLAN_VERSION) throw new Error('Unsupported AgentPlanV1 schemaVersion');
-  if (!Array.isArray(raw.nodes) || raw.nodes.length < 1 || raw.nodes.length > 128) throw new Error('AgentPlan nodes must contain 1-128 nodes');
-  const nodes = raw.nodes.map(normalizeNode);
+  const nodes = dataArray(raw.nodes, 'AgentPlan nodes', { min: 1, max: 128 }).map(normalizeNode);
   if (new Set(nodes.map(node => node.nodeId)).size !== nodes.length) throw new Error('AgentPlan contains duplicate nodeId');
   assertAcyclic(nodes);
   const revision = strictInteger(raw.revision, 'AgentPlan revision', { min: 1 });
@@ -186,12 +222,12 @@ export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelo
     throw new Error('AgentPlan expectedRevision is invalid');
   }
   if (plan.revision !== expected) throw new Error('AgentPlan revision conflict');
-  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 32) throw new Error('AgentPlan extension nodes must contain 1-32 nodes');
+  const extensionNodes = dataArray(nodes, 'AgentPlan extension nodes', { min: 1, max: 32 });
 
   const updatedAt = timestamp(at, 'at');
   const existingIds = new Set(plan.nodes.map(node => node.nodeId));
   const addedIds = new Set();
-  const additions = nodes.map((rawNode, index) => {
+  const additions = extensionNodes.map((rawNode, index) => {
     object(rawNode, `AgentPlan extension node[${index}]`);
     if (Object.hasOwn(rawNode, 'state') && rawNode.state !== AgentPlanNodeState.PENDING) {
       throw new Error('AgentPlan extension node state must be PENDING');
