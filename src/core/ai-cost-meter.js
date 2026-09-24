@@ -86,14 +86,44 @@ function frozen(value) {
   return Object.freeze(value);
 }
 
-function conservativeCostUsdMicros({ inputTokens, outputTokens, inputPricePerMillionUsd, outputPricePerMillionUsd }) {
-  const raw = (inputTokens * inputPricePerMillionUsd) + (outputTokens * outputPricePerMillionUsd);
-  if (!Number.isFinite(raw) || raw < 0 || raw > Number.MAX_SAFE_INTEGER) {
+function decimalFraction(value, label) {
+  const normalized = price(value, label);
+  const source = normalized.toString().toLowerCase();
+  const match = source.match(/^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/u);
+  if (!match) throw new Error(`${label} cannot be represented exactly`);
+  const integerDigits = match[1];
+  const fractionalDigits = match[2] || '';
+  const exponent = Number(match[3] || 0);
+  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 1_000) {
+    throw new Error(`${label} exponent is invalid`);
+  }
+  let numerator = BigInt(`${integerDigits}${fractionalDigits}` || '0');
+  let scale = fractionalDigits.length - exponent;
+  if (scale < 0) {
+    numerator *= 10n ** BigInt(-scale);
+    scale = 0;
+  }
+  return { numerator, denominator: 10n ** BigInt(scale) };
+}
+
+function billedUsdMicros(tokens, rate, label) {
+  const { numerator, denominator } = decimalFraction(rate, label);
+  const rawNumerator = BigInt(tokens) * numerator;
+  const rounded = rawNumerator === 0n ? 0n : (rawNumerator + denominator - 1n) / denominator;
+  if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) {
     throw new Error('AI usage cost projection is outside the safe integer range');
   }
-  const rounded = Math.ceil(raw);
-  if (!Number.isSafeInteger(rounded)) throw new Error('AI usage cost projection is unsafe');
   return rounded;
+}
+
+function conservativeCostUsdMicros({ inputTokens, outputTokens, inputPricePerMillionUsd, outputPricePerMillionUsd }) {
+  const input = billedUsdMicros(inputTokens, inputPricePerMillionUsd, 'AI input price');
+  const output = billedUsdMicros(outputTokens, outputPricePerMillionUsd, 'AI output price');
+  const total = input + output;
+  if (total > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('AI usage cost projection is outside the safe integer range');
+  }
+  return Number(total);
 }
 
 function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillionUsd) {
@@ -109,6 +139,18 @@ function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillion
     error.code = 'AI_ROUTE_PRICE_UNKNOWN';
     throw error;
   }
+}
+
+function normalizeRouteForMetering(route) {
+  const raw = plainObject(route, 'AI route for metering');
+  for (const key of ['inputPricePerMillionUsd', 'outputPricePerMillionUsd']) {
+    if (Object.hasOwn(raw, key) && typeof raw[key] !== 'number') {
+      throw new Error(`AI route ${key} must be a number for cost metering`);
+    }
+  }
+  // Copy only own enumerable configuration fields so inherited prototype values
+  // can never become model identity, pricing, or authority inside cost evidence.
+  return normalizeAiRoutePool([Object.fromEntries(Object.entries(raw))])[0];
 }
 
 export function normalizeAiCostRecordV1(input) {
@@ -147,7 +189,7 @@ export function normalizeAiCostRecordV1(input) {
 }
 
 export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTokens, observedAt } = {}) {
-  const normalizedRoute = normalizeAiRoutePool([plainObject(route, 'AI route for metering')])[0];
+  const normalizedRoute = normalizeRouteForMetering(route);
   const normalizedInputTokens = integer(inputTokens, 'AI usage inputTokens');
   const normalizedOutputTokens = integer(outputTokens, 'AI usage outputTokens');
   assertPricing(
