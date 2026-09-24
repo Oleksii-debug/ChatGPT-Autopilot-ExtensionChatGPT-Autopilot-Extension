@@ -442,3 +442,91 @@ test('Specialist handoff cannot amplify parent capability grant', () => {
     /exceeds granted capabilities: workspace.write/,
   );
 });
+
+test('untrusted universal-agent contracts fail closed on type-coerced authority and evidence fields', () => {
+  for (const schemaVersion of ['1', true]) {
+    assert.throws(() => normalizeCapabilityV1({
+      schemaVersion,
+      capabilityId: 'filesystem.read',
+      description: 'Read',
+      riskClass: 'R1',
+      attributes: {},
+    }), /schemaVersion/);
+  }
+
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  }), /invocationId must be text/);
+
+  assert.throws(() => normalizePolicyDecisionV1({
+    schemaVersion: 1,
+    decisionId: 'decision-1',
+    invocationId: 'invoke-1',
+    decision: true,
+    reasonCode: 'POLICY_OK',
+    decidedAt: AT,
+  }), /decision must be text/);
+
+  assert.throws(() => normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'obs-1',
+    invocationId: 'invoke-1',
+    status: true,
+    observedAt: AT,
+  }), /status must be text/);
+
+  assert.throws(() => normalizeArtifactRefV1(artifact({ sha256: 123 })), /sha256 must be text/);
+  assert.throws(() => normalizeArtifactRefV1(artifact({ sizeBytes: '123' })), /sizeBytes is invalid/);
+  assert.throws(() => normalizeArtifactRefV1(artifact({ sizeBytes: '' })), /sizeBytes is invalid/);
+
+  assert.throws(() => normalizeVerificationV1({
+    schemaVersion: 1,
+    verificationId: 'verify-1',
+    invocationId: 'invoke-1',
+    observationId: 'obs-1',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    verifiedAt: AT,
+    attempt: '1',
+  }), /attempt is invalid/);
+});
+
+test('universal-agent contract objects reject exotic prototypes and symbol authority while allowing null-prototype data records', () => {
+  const exotic = Object.create({
+    schemaVersion: 1,
+    capabilityId: 'filesystem.admin',
+    riskClass: 'R0',
+  });
+  exotic.description = 'Inherited authority must not be trusted.';
+  exotic.attributes = {};
+  assert.throws(() => normalizeCapabilityV1(exotic), /plain object/);
+
+  const symbolAuthority = {
+    schemaVersion: 1,
+    capabilityId: 'filesystem.read',
+    description: 'Read',
+    riskClass: 'R1',
+    attributes: {},
+  };
+  symbolAuthority[Symbol('admin')] = true;
+  assert.throws(() => normalizeCapabilityV1(symbolAuthority), /unknown field/);
+
+  const nullPrototype = Object.assign(Object.create(null), {
+    schemaVersion: 1,
+    capabilityId: 'filesystem.read',
+    description: 'Read',
+    riskClass: 'R1',
+    attributes: {},
+  });
+  const normalized = normalizeCapabilityV1(nullPrototype);
+  assert.equal(normalized.capabilityId, 'filesystem.read');
+  assert.equal(normalized.riskClass, 'R1');
+});
+
