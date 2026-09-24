@@ -118,6 +118,7 @@ test('rejects traversal, Windows aliases, forbidden characters and non-canonical
     'artifacts/trailing.',
     'artifacts/bad?.txt',
     'artifacts/Cafe\u0301.txt',
+    'artifacts/bidi-\u202Etxt',
   ];
 
   for (let i = 0; i < invalidPaths.length; i += 1) {
@@ -219,4 +220,67 @@ test('requires canonical ISO timestamps and exact known fields', () => {
   const entryUnknown = validInput();
   entryUnknown.entries[0].permission = 'ALLOW';
   assert.throws(() => buildJobArtifactBundleV1(entryUnknown), /unknown field/);
+});
+
+
+test('rejects accessor and hidden non-enumerable contract fields', () => {
+  const accessor = validInput();
+  Object.defineProperty(accessor, 'bundleId', {
+    enumerable: true,
+    configurable: true,
+    get() { return 'bundle-1'; },
+  });
+  assert.throws(() => buildJobArtifactBundleV1(accessor), /data properties only/);
+
+  const hiddenUnknown = validInput();
+  Object.defineProperty(hiddenUnknown, 'hiddenPolicy', {
+    enumerable: false,
+    configurable: true,
+    value: 'ALLOW',
+  });
+  assert.throws(() => buildJobArtifactBundleV1(hiddenUnknown), /unknown field: hiddenPolicy/);
+
+  const artifactAccessor = validInput();
+  Object.defineProperty(artifactAccessor.entries[0].artifactRef, 'sha256', {
+    enumerable: true,
+    configurable: true,
+    get() { return 'c'.repeat(64); },
+  });
+  assert.throws(() => buildJobArtifactBundleV1(artifactAccessor), /data properties only/);
+});
+
+test('requires exact canonical ArtifactRef identity, digest, URI and timestamp fields', () => {
+  const upperDigest = validInput();
+  upperDigest.entries[0].artifactRef.sha256 = 'C'.repeat(64);
+  assert.throws(() => buildJobArtifactBundleV1(upperDigest), /canonical lowercase SHA-256/);
+
+  const looseArtifactTime = validInput();
+  looseArtifactTime.entries[0].artifactRef.createdAt = '2026-09-24T21:33:00Z';
+  assert.throws(() => buildJobArtifactBundleV1(looseArtifactTime), /canonical ISO timestamp/);
+
+  const spacedId = validInput();
+  spacedId.entries[0].artifactRef.artifactId = ' summary ';
+  assert.throws(() => buildJobArtifactBundleV1(spacedId), /artifactId is invalid/);
+
+  const spacedUri = validInput();
+  spacedUri.entries[0].artifactRef.uri = ' artifact://job-1/timeline ';
+  assert.throws(() => buildJobArtifactBundleV1(spacedUri), /uri must be canonical bounded text/);
+
+  const unknownArtifactField = validInput();
+  Object.defineProperty(unknownArtifactField.entries[0].artifactRef, 'permission', {
+    enumerable: false,
+    configurable: true,
+    value: 'ALLOW',
+  });
+  assert.throws(() => buildJobArtifactBundleV1(unknownArtifactField), /unknown field: permission/);
+});
+
+test('rejects sparse entry and disclosure arrays instead of silently skipping holes', () => {
+  const sparseEntries = validInput();
+  delete sparseEntries.entries[1];
+  assert.throws(() => buildJobArtifactBundleV1(sparseEntries), /entries must not be sparse/);
+
+  const sparseDisclosure = validInput();
+  sparseDisclosure.disclosure.allowedSensitiveArtifactIds.length = 2;
+  assert.throws(() => buildJobArtifactBundleV1(sparseDisclosure), /allowedSensitiveArtifactIds must not be sparse/);
 });
