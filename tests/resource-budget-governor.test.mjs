@@ -52,6 +52,14 @@ test('missing ceilings and usage ignore inherited prototype values', () => {
     Object.defineProperty(Object.prototype, 'modelCalls', { value: 999, configurable: true, enumerable: false });
     assert.equal(normalizeResourceBudgetV1({}).maxModelCalls, 0);
     assert.equal(normalizeResourceUsageV1({}).modelCalls, 0);
+    const decision = evaluateResourceBudgetV1({
+      budget: { maxModelCalls: 1 },
+      usage: {},
+      request: { modelCalls: 1 },
+    });
+    assert.equal(decision.decision, ResourceBudgetDecisionKind.ALLOW);
+    assert.equal(decision.projected.modelCalls, 1);
+    assert.equal(decision.remaining.modelCalls, 1);
   } finally {
     if (previousBudget) Object.defineProperty(Object.prototype, 'maxModelCalls', previousBudget);
     else delete Object.prototype.maxModelCalls;
