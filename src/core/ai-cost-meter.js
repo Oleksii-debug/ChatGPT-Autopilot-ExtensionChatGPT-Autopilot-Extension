@@ -57,7 +57,7 @@ function dataArray(value, label, maximum) {
   }
   for (const key of Reflect.ownKeys(value)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key) || Number(key) >= value.length) {
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= value.length) {
       throw new Error(`${label} contains an invalid array field`);
     }
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
