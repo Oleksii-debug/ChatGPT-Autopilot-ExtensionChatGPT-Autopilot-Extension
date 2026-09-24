@@ -97,7 +97,7 @@ test('input ordering does not change recommendation or plan ordering', () => {
     capabilities:[...capabilities].reverse(),
     tools:[...tools].reverse(),
     providerStates:[state('remote/github'), state('local/fs')],
-    requestedCapabilityIds:['artifact.write', 'filesystem.read', 'github.code'],
+    requestedCapabilityIds:['github.code', 'filesystem.read', 'artifact.write'],
   });
   assert.deepEqual(second, first);
 });
