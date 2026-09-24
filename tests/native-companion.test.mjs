@@ -335,6 +335,15 @@ test('filesystem.readText rejects a symlink that escapes the configured root', a
   assert.equal(response.error.code, 'PATH_OUTSIDE_SCOPE');
 });
 
+test('Windows installer includes each module imported by the Native Host entrypoint', async () => {
+  const hostDir = path.join(repoRoot, 'companion', 'native-host');
+  const host = await fs.readFile(path.join(hostDir, 'host.mjs'), 'utf8');
+  const installer = await fs.readFile(path.join(hostDir, 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
+  for (const [, localModule] of host.matchAll(/from ['"]\.\/([^'"]+\.mjs)['"]/gu)) {
+    assert.ok(installer.includes(`'${localModule}'`), `Installer omits ${localModule}`);
+  }
+});
+
 test('native message framing survives fragmented input and enforces response bound', () => {
   const value = { protocolVersion: 1, requestId: 'r1', type: 'health', ok: true, result: { status: 'ok' } };
   const encoded = encodeNativeMessage(value);
