@@ -28,3 +28,15 @@ test('run timeline renders text through DOM textContent and semantic time/list/e
   const renderer = js.slice(timelineStart, timelineEnd);
   assert.doesNotMatch(renderer, /innerHTML|insertAdjacentHTML|outerHTML/u);
 });
+
+
+test('run timeline error path never renders or announces arbitrary runtime error text', async () => {
+  const js = await readFile(new URL('src/ui/options.js', root), 'utf8');
+  const start = js.indexOf('async function refreshRunTimeline');
+  const end = js.indexOf('function onTaskConfigurationModeChange', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = js.slice(start, end);
+  assert.doesNotMatch(handler, /error\.message/u);
+  assert.match(handler, /Хронологію не завантажено\. Оновіть ще раз або перевірте стан Core\./u);
+  assert.match(handler, /announce\(safeMessage\)/u);
+});
