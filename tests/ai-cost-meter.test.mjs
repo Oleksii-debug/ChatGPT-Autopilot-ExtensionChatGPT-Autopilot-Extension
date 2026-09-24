@@ -60,6 +60,29 @@ test('fractional microdollar estimates round upward so budget accounting never u
   assert.equal(record.costUsdMicros, 1);
 });
 
+test('decimal arithmetic stays exact at large safe token counts where binary floats can undercount', () => {
+  const record = meterAiRouteUsageV1({
+    route: route({ inputPricePerMillionUsd: 2.3, outputPricePerMillionUsd: 0 }),
+    invocationId: 'invoke-large-exact',
+    inputTokens: 1_125_899_906_842_624,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  assert.equal(record.costUsdMicros, 2_589_569_785_738_036);
+});
+
+test('each metered provider invocation always consumes exactly one model call', () => {
+  const record = meterAiRouteUsageV1({
+    route: route(),
+    invocationId: 'invoke-call-count',
+    inputTokens: 0,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  assert.equal(resourceUsageFromAiCostRecordV1(record).modelCalls, 1);
+  assert.throws(() => normalizeAiCostRecordV1({ ...record, modelCalls: 0 }), /must equal 1/);
+});
+
 test('paid routes with entirely unknown pricing fail closed', () => {
   assert.throws(() => meterAiRouteUsageV1({
     route: route({ inputPricePerMillionUsd: 0, outputPricePerMillionUsd: 0 }),
@@ -110,7 +133,7 @@ test('persisted cost evidence is self-consistent and tampering fails closed', ()
   assert.throws(() => normalizeAiCostRecordV1({ ...record, surprise: true }), /unknown field/);
 });
 
-test('usage inputs are strict numbers and hostile prototype-bearing records are rejected', () => {
+test('usage and route price inputs reject implicit numeric coercion', () => {
   assert.throws(() => meterAiRouteUsageV1({
     route: route(),
     invocationId: 'invoke-string-token',
@@ -119,6 +142,16 @@ test('usage inputs are strict numbers and hostile prototype-bearing records are 
     observedAt: AT,
   }), /safe integer/);
 
+  assert.throws(() => meterAiRouteUsageV1({
+    route: route({ inputPricePerMillionUsd: '1.5' }),
+    invocationId: 'invoke-string-price',
+    inputTokens: 100,
+    outputTokens: 0,
+    observedAt: AT,
+  }), /must be a number/);
+});
+
+test('hostile prototype-bearing evidence and inherited route pricing cannot become cost authority', () => {
   const polluted = Object.create({ costUsdMicros: 1 });
   Object.assign(polluted, {
     schemaVersion: 1,
@@ -136,6 +169,28 @@ test('usage inputs are strict numbers and hostile prototype-bearing records are 
     observedAt: AT,
   });
   assert.throws(() => normalizeAiCostRecordV1(polluted), /plain object/);
+
+  const inheritedPriceRoute = route({ inputPricePerMillionUsd: 0, outputPricePerMillionUsd: 0 });
+  delete inheritedPriceRoute.inputPricePerMillionUsd;
+  delete inheritedPriceRoute.outputPricePerMillionUsd;
+  const priorInput = Object.getOwnPropertyDescriptor(Object.prototype, 'inputPricePerMillionUsd');
+  const priorOutput = Object.getOwnPropertyDescriptor(Object.prototype, 'outputPricePerMillionUsd');
+  try {
+    Object.defineProperty(Object.prototype, 'inputPricePerMillionUsd', { value: 100, configurable: true, enumerable: false });
+    Object.defineProperty(Object.prototype, 'outputPricePerMillionUsd', { value: 100, configurable: true, enumerable: false });
+    assert.throws(() => meterAiRouteUsageV1({
+      route: inheritedPriceRoute,
+      invocationId: 'invoke-inherited-price',
+      inputTokens: 1,
+      outputTokens: 1,
+      observedAt: AT,
+    }), error => error?.code === 'AI_ROUTE_PRICE_UNKNOWN');
+  } finally {
+    if (priorInput) Object.defineProperty(Object.prototype, 'inputPricePerMillionUsd', priorInput);
+    else delete Object.prototype.inputPricePerMillionUsd;
+    if (priorOutput) Object.defineProperty(Object.prototype, 'outputPricePerMillionUsd', priorOutput);
+    else delete Object.prototype.outputPricePerMillionUsd;
+  }
 });
 
 test('cost records convert directly into the resource-usage dimensions required by budget admission', () => {
