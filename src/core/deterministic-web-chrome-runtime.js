@@ -25,6 +25,26 @@ function tabIdFromTarget(targetId) {
   return normalizeChromeDeterministicWebTargetV1(targetId).tabId;
 }
 
+function chromeOriginPattern(urlValue) {
+  if (typeof urlValue !== 'string') throw new Error('deterministic web target origin is unavailable');
+  let url;
+  try { url = new URL(urlValue); } catch { throw new Error('deterministic web target origin is invalid'); }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new Error('deterministic web target origin is not scriptable');
+  }
+  return `${url.protocol}//${url.hostname}/*`;
+}
+
+async function requireChromeHostAccessV1(chromeApi, urlValue) {
+  if (!chromeApi?.permissions?.contains) {
+    throw new Error('deterministic web runtime requires Chrome permissions API');
+  }
+  const origin = chromeOriginPattern(urlValue);
+  const granted = await chromeApi.permissions.contains({ origins: [origin] });
+  if (granted !== true) throw new Error('deterministic web host permission is not granted');
+  return origin;
+}
+
 function clone(value) { return structuredClone(value); }
 
 function plainRecord(value, label) {
@@ -56,6 +76,7 @@ async function readChromeTargetV1(chromeApi, targetId) {
   const { tabId } = normalizeChromeDeterministicWebTargetV1(targetId);
   const live = await chromeApi.tabs.get(tabId);
   if (!live || live.id !== tabId) throw new Error('deterministic web target tab is unavailable');
+  await requireChromeHostAccessV1(chromeApi, live.url);
   const result = await chromeApi.scripting.executeScript({
     target: { tabId, frameIds: [0] },
     func: () => ({
@@ -107,15 +128,23 @@ export function createChromeDeterministicWebStoreV1(chromeApi, { storageKey = DE
 }
 
 export function createChromeDeterministicWebTransportV1(chromeApi) {
-  if (!chromeApi?.tabs?.get || !chromeApi?.tabs?.update || !chromeApi?.scripting?.executeScript) {
-    throw new Error('deterministic web runtime requires Chrome tabs and scripting APIs');
+  if (!chromeApi?.tabs?.get || !chromeApi?.tabs?.update || !chromeApi?.scripting?.executeScript || !chromeApi?.permissions?.contains) {
+    throw new Error('deterministic web runtime requires Chrome tabs, scripting, and permissions APIs');
   }
   const script = () => chromeApi.scripting;
+  async function preflight({ targetId, action }) {
+    const tabId = tabIdFromTarget(targetId);
+    const live = await chromeApi.tabs.get(tabId);
+    if (!live || live.id !== tabId) throw new Error('deterministic web target tab is unavailable');
+    await requireChromeHostAccessV1(chromeApi, action.kind === 'NAVIGATE' ? action.url : live.url);
+  }
   return Object.freeze({
+    preflight,
     async execute({ targetId, action }) {
       const tabId = tabIdFromTarget(targetId);
       const live = await chromeApi.tabs.get(tabId);
-      if (!live?.id) throw new Error('deterministic web target tab is unavailable');
+      if (!live || live.id !== tabId) throw new Error('deterministic web target tab is unavailable');
+      await requireChromeHostAccessV1(chromeApi, action.kind === 'NAVIGATE' ? action.url : live.url);
       if (action.kind === 'NAVIGATE') {
         await chromeApi.tabs.update(tabId, { url: action.url });
         return;
@@ -147,7 +176,9 @@ export function createChromeDeterministicWebTransportV1(chromeApi) {
 }
 
 export function createChromeDeterministicWebReconcileVerifierV1(chromeApi, { now = () => new Date().toISOString() } = {}) {
-  if (!chromeApi?.tabs?.get || !chromeApi?.scripting?.executeScript) throw new Error('independent deterministic web readback requires Chrome tabs and scripting APIs');
+  if (!chromeApi?.tabs?.get || !chromeApi?.scripting?.executeScript || !chromeApi?.permissions?.contains) {
+    throw new Error('independent deterministic web readback requires Chrome tabs, scripting, and permissions APIs');
+  }
   return async ({ invocation, executionId, attempt, outcome, targetId, postcondition }) => {
     if (String(outcome || '').toUpperCase() !== 'VERIFIED') {
       throw new Error('automatic Chrome reconciliation only proves VERIFIED outcomes');
