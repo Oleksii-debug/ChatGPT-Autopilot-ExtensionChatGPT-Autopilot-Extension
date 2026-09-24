@@ -29,6 +29,55 @@ function plainRecord(value) {
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 }
+function enumerableDataValue(record, key) {
+  if (!plainRecord(record)) return { ok: false, value: undefined };
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    return { ok: false, value: undefined };
+  }
+  return { ok: true, value: descriptor.value };
+}
+function denseDataArray(value, seen = new Set()) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || seen.has(value)) return false;
+  seen.add(value);
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some(key => typeof key === 'symbol')) return false;
+  const names = ownKeys.filter(key => key !== 'length');
+  if (names.length !== value.length) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
+  }
+  return true;
+}
+function persistedDataOnly(value, seen = new Set()) {
+  if (value === null) return true;
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') return true;
+  if (type !== 'object' || seen.has(value)) return false;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) return false;
+    const ownKeys = Reflect.ownKeys(value);
+    if (ownKeys.some(key => typeof key === 'symbol')) return false;
+    const names = ownKeys.filter(key => key !== 'length');
+    if (names.length !== value.length) return false;
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
+      if (!persistedDataOnly(descriptor.value, seen)) return false;
+    }
+    return true;
+  }
+  if (!plainRecord(value)) return false;
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key === 'symbol') return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
+    if (!persistedDataOnly(descriptor.value, seen)) return false;
+  }
+  return true;
+}
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
@@ -57,17 +106,31 @@ function isTabAlreadyGoneError(error) {
   return /no tab with id|invalid tab id|tab not found/i.test(String(error?.message || error || ''));
 }
 function normalizeStore(raw, now = Date.now()) {
-  if (!plainRecord(raw) || raw.schemaVersion !== STORAGE_SCHEMA_VERSION || !Array.isArray(raw.order) || !plainRecord(raw.byId)) return freshStore();
+  if (!plainRecord(raw)) return freshStore();
+  const schemaVersion = enumerableDataValue(raw, 'schemaVersion');
+  const selectedId = enumerableDataValue(raw, 'selectedId');
+  const order = enumerableDataValue(raw, 'order');
+  const byId = enumerableDataValue(raw, 'byId');
+  if (
+    !schemaVersion.ok || schemaVersion.value !== STORAGE_SCHEMA_VERSION
+    || !selectedId.ok || typeof selectedId.value !== 'string'
+    || !order.ok || !denseDataArray(order.value)
+    || !byId.ok || !plainRecord(byId.value)
+  ) return freshStore();
+
   const out = freshStore();
-  for (const id of raw.order) {
+  for (const id of order.value) {
+    if (typeof id !== 'string' || Object.hasOwn(out.byId, id)) continue;
+    const itemDescriptor = Object.getOwnPropertyDescriptor(byId.value, id);
     if (
-      typeof id !== 'string'
-      || !Object.hasOwn(raw.byId, id)
-      || Object.hasOwn(out.byId, id)
-      || !plainRecord(raw.byId[id])
+      !itemDescriptor
+      || itemDescriptor.enumerable !== true
+      || !Object.hasOwn(itemDescriptor, 'value')
+      || !plainRecord(itemDescriptor.value)
+      || !persistedDataOnly(itemDescriptor.value)
     ) continue;
     try {
-      const item = raw.byId[id];
+      const item = itemDescriptor.value;
       const config = normalizeScenarioWorkConfig({ ...item.config, id });
       const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
         ? clone(item.runtime)
@@ -90,8 +153,8 @@ function normalizeStore(raw, now = Date.now()) {
       // Corrupt individual scenarios are omitted rather than poisoning all others.
     }
   }
-  out.selectedId = typeof raw.selectedId === 'string' && Object.hasOwn(out.byId, raw.selectedId)
-    ? raw.selectedId
+  out.selectedId = Object.hasOwn(out.byId, selectedId.value)
+    ? selectedId.value
     : (out.order[0] || '');
   return out;
 }
