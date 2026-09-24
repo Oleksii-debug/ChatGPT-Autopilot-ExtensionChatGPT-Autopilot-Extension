@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveProjectCurrentStateV1 } from '../src/core/project-current-state.js';
+import { deriveProjectCurrentStateDigestV1, deriveProjectCurrentStateV1 } from '../src/core/project-current-state.js';
 
 const AT = '2026-09-20T19:37:00Z';
 
@@ -144,4 +144,159 @@ test('duplicate current source identity fails closed', () => {
     capsule: capsule(),
     currentSourceRefs: [source(), source()],
   }), /duplicate sourceId/);
+});
+
+
+function stateInput({ snapshotValue = snapshot(), capsuleValue = capsule(), currentSources = [source()] } = {}) {
+  return { snapshot: snapshotValue, capsule: capsuleValue, currentSourceRefs: currentSources };
+}
+
+test('current-state rejects substituted source provenance even when revision and hash match', () => {
+  const state = deriveProjectCurrentStateV1({
+    snapshot: snapshot(),
+    capsule: capsule(),
+    currentSourceRefs: [source({ uri: 'github://attacker/substituted', authority: 'ADVISORY' })],
+  });
+  assert.equal(state.status, 'STALE');
+  assert.deepEqual(state.sources[0].reasons, [
+    'CURRENT_URI_DIFFERS_FROM_SNAPSHOT',
+    'CURRENT_AUTHORITY_DIFFERS_FROM_SNAPSHOT',
+  ]);
+});
+
+test('digest is deterministic and unchanged for the same fresh provenance-bound state', () => {
+  const input = stateInput();
+  const digest = deriveProjectCurrentStateDigestV1({ baseline: input, current: input });
+  assert.equal(digest.status, 'UNCHANGED');
+  assert.equal(digest.changeViewAvailable, true);
+  assert.equal(digest.advisoryOnly, true);
+  assert.equal(digest.projectRevisionChanged, false);
+  assert.deepEqual(digest.sourceChanges, []);
+  assert.deepEqual(digest.artifactChanges, []);
+  assert.deepEqual(digest.staleEvidence, []);
+  assert.equal(Object.isFrozen(digest), true);
+  assert.equal(Object.isFrozen(digest.sourceChanges), true);
+});
+
+test('digest reports source revision movement across fresh project revisions', () => {
+  const nextSource = source({ revisionId: 'commit-2', contentSha256: 'c'.repeat(64) });
+  const nextSnapshot = snapshot({
+    revisionId: 'project-rev-2',
+    sourceRefs: [nextSource],
+  });
+  const nextCapsule = capsule({
+    capsuleId: 'capsule-2',
+    projectRevisionId: 'project-rev-2',
+    sourceBindings: [{
+      sourceId: 'github-main',
+      revisionId: 'commit-2',
+      contentSha256: 'c'.repeat(64),
+    }],
+  });
+
+  const digest = deriveProjectCurrentStateDigestV1({
+    baseline: stateInput(),
+    current: stateInput({
+      snapshotValue: nextSnapshot,
+      capsuleValue: nextCapsule,
+      currentSources: [nextSource],
+    }),
+  });
+
+  assert.equal(digest.status, 'CHANGED');
+  assert.equal(digest.projectRevisionChanged, true);
+  assert.deepEqual(digest.sourceChanges, [{
+    sourceId: 'github-main',
+    change: 'CHANGED',
+    before: {
+      status: 'FRESH',
+      snapshotRevisionId: 'commit-1',
+      capsuleRevisionId: 'commit-1',
+      currentRevisionId: 'commit-1',
+    },
+    after: {
+      status: 'FRESH',
+      snapshotRevisionId: 'commit-2',
+      capsuleRevisionId: 'commit-2',
+      currentRevisionId: 'commit-2',
+    },
+  }]);
+});
+
+test('digest reports artifact identity changes while both endpoint states remain fresh', () => {
+  const nextArtifact = artifact({
+    sha256: 'd'.repeat(64),
+    sizeBytes: 12,
+    producerInvocationId: 'invoke-2',
+  });
+  const nextSnapshot = snapshot({
+    revisionId: 'project-rev-2',
+    artifactRefs: [nextArtifact],
+  });
+  const nextCapsule = capsule({
+    capsuleId: 'capsule-2',
+    projectRevisionId: 'project-rev-2',
+    artifactRefs: [nextArtifact],
+  });
+
+  const digest = deriveProjectCurrentStateDigestV1({
+    baseline: stateInput(),
+    current: stateInput({
+      snapshotValue: nextSnapshot,
+      capsuleValue: nextCapsule,
+    }),
+  });
+
+  assert.equal(digest.status, 'CHANGED');
+  assert.equal(digest.sourceChanges.length, 0);
+  assert.deepEqual(digest.artifactChanges, [{
+    artifactId: 'report',
+    change: 'CHANGED',
+    before: {
+      kind: 'report',
+      uri: 'artifact://report',
+      sha256: 'b'.repeat(64),
+      sizeBytes: 10,
+    },
+    after: {
+      kind: 'report',
+      uri: 'artifact://report',
+      sha256: 'd'.repeat(64),
+      sizeBytes: 12,
+    },
+  }]);
+});
+
+test('digest fails closed instead of producing a what-changed view from stale substituted sources', () => {
+  const digest = deriveProjectCurrentStateDigestV1({
+    baseline: stateInput(),
+    current: stateInput({
+      currentSources: [source({ uri: 'github://attacker/substituted' })],
+    }),
+  });
+
+  assert.equal(digest.status, 'STALE_INPUT');
+  assert.equal(digest.changeViewAvailable, false);
+  assert.deepEqual(digest.sourceChanges, []);
+  assert.deepEqual(digest.artifactChanges, []);
+  assert.deepEqual(digest.staleEvidence, [{
+    phase: 'CURRENT',
+    sourceId: 'github-main',
+    reasons: ['CURRENT_URI_DIFFERS_FROM_SNAPSHOT'],
+    snapshotRevisionId: 'commit-1',
+    capsuleRevisionId: 'commit-1',
+    currentRevisionId: 'commit-1',
+  }]);
+});
+
+test('digest refuses cross-project comparison', () => {
+  const otherSource = source({ projectId: 'other-project' });
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: stateInput(),
+    current: stateInput({
+      snapshotValue: snapshot({ projectId: 'other-project', sourceRefs: [otherSource] }),
+      capsuleValue: capsule({ projectId: 'other-project' }),
+      currentSources: [otherSource],
+    }),
+  }), /projectId must match/);
 });
