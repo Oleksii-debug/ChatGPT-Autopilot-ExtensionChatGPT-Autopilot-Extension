@@ -101,6 +101,57 @@ test('file update requires exact expected blob SHA and sends it as GitHub precon
   assert.equal(Buffer.from(requests[0].body.content, 'base64').toString('utf8'), 'const value = 1;\n');
 });
 
+test('read-only branch and pull-request lookups reconcile ambiguous creation effects', async () => {
+  const urls = [];
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async (url) => {
+      urls.push(url);
+      if (url.includes('/git/ref/heads/')) {
+        return jsonResponse(200, { ref: 'refs/heads/work/new', object: { type: 'commit', sha: commitSha } });
+      }
+      return jsonResponse(200, [{
+        number: 7,
+        state: 'open',
+        title: 'change',
+        html_url: 'https://github.com/Oleksii-debug/example/pull/7',
+        head: { sha: commitSha },
+        base: { sha: 'c'.repeat(40) },
+      }]);
+    },
+  });
+
+  const branch = await client.readBranch({ repositoryFullName: repo, branch: 'work/new' });
+  assert.equal(branch.commitSha, commitSha);
+  assert.equal(urls[0], `${GITHUB_API_ORIGIN}/repos/Oleksii-debug/example/git/ref/heads/work/new`);
+
+  const pulls = await client.findPullRequests({ repositoryFullName: repo, head: 'work/new', base: 'main' });
+  assert.equal(pulls.matches.length, 1);
+  assert.equal(pulls.matches[0].number, 7);
+  assert.equal(pulls.matches[0].headSha, commitSha);
+  assert.equal(urls[1], `${GITHUB_API_ORIGIN}/repos/Oleksii-debug/example/pulls?state=all&head=Oleksii-debug%3Awork%2Fnew&base=main&per_page=10`);
+});
+
+test('successful branch creation requires server-confirmed commit identity', async () => {
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]), credentialId: 'github-main', allowedRepositories: [repo],
+    fetchImpl: async () => jsonResponse(201, { ref: 'refs/heads/work/new', object: { type: 'commit', sha: commitSha } }),
+  });
+  const created = await client.createBranch({ repositoryFullName: repo, branch: 'work/new', fromSha: commitSha });
+  assert.equal(created.sha, commitSha);
+
+  const malformed = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]), credentialId: 'github-main', allowedRepositories: [repo],
+    fetchImpl: async () => jsonResponse(201, { ref: 'refs/heads/work/new', object: { type: 'tag', sha: commitSha } }),
+  });
+  await assert.rejects(
+    () => malformed.createBranch({ repositoryFullName: repo, branch: 'work/new', fromSha: commitSha }),
+    error => error.code === 'GITHUB_RESPONSE_INVALID' && error.effectMayHaveOccurred === true && error.safeToRetry === false,
+  );
+});
+
 test('mutating transport or server uncertainty is ambiguous while deterministic rejection is safe', async () => {
   const transportClient = new GitHubRestClientV1({
     nativeClient: nativeCredential([]), credentialId: 'github-main', allowedRepositories: [repo],
