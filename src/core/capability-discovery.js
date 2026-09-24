@@ -206,6 +206,15 @@ function compareCandidate(a, b) {
     || a.toolId.localeCompare(b.toolId);
 }
 
+function comparePlanCandidate(a, b) {
+  return readinessRank(a.candidate.readiness) - readinessRank(b.candidate.readiness)
+    || pathRank(a.candidate.pathKind) - pathRank(b.candidate.pathKind)
+    || b.uncoveredIds.length - a.uncoveredIds.length
+    || latencyRank(a.candidate.latencyMs) - latencyRank(b.candidate.latencyMs)
+    || a.candidate.providerId.localeCompare(b.candidate.providerId)
+    || a.candidate.toolId.localeCompare(b.candidate.toolId);
+}
+
 function providerFacts(providerId, toolId, statesByProviderTool) {
   const toolSpecific = statesByProviderTool.get(`${providerId}\u0000${toolId}`);
   if (toolSpecific) return toolSpecific;
@@ -237,7 +246,7 @@ function buildPlan(candidates, knownRequestedIds) {
         uncoveredIds: candidate.matchingCapabilityIds.filter(capabilityId => uncovered.has(capabilityId)),
       }))
       .filter(item => item.uncoveredIds.length)
-      .sort((a, b) => b.uncoveredIds.length - a.uncoveredIds.length || compareCandidate(a.candidate, b.candidate));
+      .sort(comparePlanCandidate);
     if (!eligible.length) break;
     const selected = eligible[0];
     const capabilityIds = [...selected.uncoveredIds].sort();
