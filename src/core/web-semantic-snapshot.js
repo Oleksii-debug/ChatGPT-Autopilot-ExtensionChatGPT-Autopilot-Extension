@@ -155,9 +155,8 @@ function queryTokens(query) {
   return tokens;
 }
 
-function searchableText(snapshot, element) {
+function searchableText(element) {
   return [
-    snapshot.title,
     element.role,
     element.name,
     element.description,
@@ -201,7 +200,7 @@ export function inspectWebSemanticSnapshotV1({ snapshot, query, limit = 8 } = {}
   const matches = [];
   for (let index = 0; index < normalized.elements.length; index += 1) {
     const element = normalized.elements[index];
-    const matchScore = score(searchableText(normalized, element), tokens);
+    const matchScore = score(searchableText(element), tokens);
     if (!matchScore) continue;
     matches.push({ index, result: resultView(element, matchScore) });
   }
