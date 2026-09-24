@@ -38,7 +38,10 @@ function boundedVisibilityIds(value, label = 'allowedSourceIds') {
   if (!Array.isArray(value) || value.length > MAX_SOURCES) {
     throw new Error(`${label} must be an explicit bounded array`);
   }
-  const ids = value.map(item => String(item ?? '').trim());
+  const ids = value.map(item => {
+    if (typeof item !== 'string') throw new Error(`${label} must contain string ids`);
+    return item.trim();
+  });
   if (ids.some(item => !item) || new Set(ids).size !== ids.length) {
     throw new Error(`${label} must contain unique non-empty ids`);
   }
