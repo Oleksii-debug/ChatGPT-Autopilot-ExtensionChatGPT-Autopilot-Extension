@@ -2,11 +2,13 @@ import { DEFAULT_GATEWAY_URL, normalizeGatewayUrl } from './ai-gateway-client.js
 import {
   AiRouteRole,
   DEFAULT_AI_ROUTE_POLICY,
+  DEFAULT_AI_WORKER_POLICY,
   classifyAiRouteError,
   createAiRoutePoolExhaustedError,
   normalizeAiRoutePolicy,
   normalizeAiRoutePool,
   normalizeAiRouteStates,
+  normalizeAiWorkerPolicy,
   recordAiRouteOutcome,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
@@ -46,6 +48,7 @@ export const DEFAULT_AI_ROUTER_SETTINGS = Object.freeze({
   keepPrimaryIfStrongFails: true,
   routes: Object.freeze([]),
   routePolicy: DEFAULT_AI_ROUTE_POLICY,
+  workerPolicy: DEFAULT_AI_WORKER_POLICY,
 });
 
 export const DEFAULT_AI_ROUTER_RUNTIME = Object.freeze({
@@ -84,6 +87,7 @@ export function normalizeAiRouterSettings(raw = {}) {
   if (!Number.isInteger(handoffMaxChars) || handoffMaxChars < 1000 || handoffMaxChars > MAX_HANDOFF_CHARS) throw new Error(`AI handoff size must be 1000-${MAX_HANDOFF_CHARS} characters`);
   if (!Number.isInteger(strongMinGapMinutes) || strongMinGapMinutes < 0 || strongMinGapMinutes > 1440) throw new Error('Strong-model minimum gap must be 0-1440 minutes');
   if (!Number.isInteger(strongMaxPerHour) || strongMaxPerHour < 0 || strongMaxPerHour > 1000) throw new Error('Strong-model hourly limit must be 0-1000 calls');
+  const routes = normalizeAiRoutePool(raw.routes || []);
   return {
     enabled: raw.enabled === true,
     gatewayUrl: normalizeGatewayUrl(raw.gatewayUrl),
@@ -99,8 +103,9 @@ export function normalizeAiRouterSettings(raw = {}) {
     handoffMaxChars,
     fallbackToStrongOnPrimaryError: raw.fallbackToStrongOnPrimaryError !== false,
     keepPrimaryIfStrongFails: raw.keepPrimaryIfStrongFails !== false,
-    routes: normalizeAiRoutePool(raw.routes || []),
+    routes,
     routePolicy: normalizeAiRoutePolicy(raw.routePolicy || DEFAULT_AI_ROUTE_POLICY),
+    workerPolicy: normalizeAiWorkerPolicy(raw.workerPolicy || DEFAULT_AI_WORKER_POLICY, routes),
   };
 }
 
@@ -325,13 +330,7 @@ export class AiOrchestrator {
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
-          `PRIMARY MODEL FAILED. Continue the original task directly.
-
-PRIMARY ERROR:
-${primaryError}
-
-ORIGINAL TASK:
-${userPrompt}`,
+          `PRIMARY MODEL FAILED. Continue the original task directly.\n\nPRIMARY ERROR:\n${primaryError}\n\nORIGINAL TASK:\n${userPrompt}`,
           clean(systemPrompt),
           'primary-error-fallback-to-strong',
           { respectAutomaticGuard: true },
@@ -348,13 +347,7 @@ ${userPrompt}`,
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
-          `PRIMARY/LOCAL MODEL FAILED BEFORE PRODUCING A HANDOFF. Complete the original task.
-
-PRIMARY ERROR:
-${primaryError}
-
-ORIGINAL TASK:
-${userPrompt}`,
+          `PRIMARY/LOCAL MODEL FAILED BEFORE PRODUCING A HANDOFF. Complete the original task.\n\nPRIMARY ERROR:\n${primaryError}\n\nORIGINAL TASK:\n${userPrompt}`,
           clean(systemPrompt),
           'primary-error-fallback-to-strong',
           { respectAutomaticGuard: true },
