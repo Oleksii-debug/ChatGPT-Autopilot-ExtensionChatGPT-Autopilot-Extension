@@ -68,6 +68,18 @@ test('timeline is bounded to newest entries without mutating canonical state', (
   assert.deepEqual(canonical, before);
 });
 
+test('timeline preserves a canonical legacy text identity instead of imposing a new ID alphabet', () => {
+  const canonical = state();
+  canonical.sessionsById['legacy session 1'] = {
+    name: 'Legacy', runState: 'STOPPED', currentTaskIndex: 0,
+    taskOrder: [], tasksById: {}, operation: null, lastError: '', lastActionAt: 0, updatedAt: 0,
+  };
+  canonical.logs['legacy session 1'] = [{ at: 1, level: 'info', message: 'legacy' }];
+  const timeline = buildRunTimelineV1(canonical, { sessionId: 'legacy session 1', limit: 10 });
+  assert.equal(timeline.sessionId, 'legacy session 1');
+  assert.equal(timeline.entries[0].message, 'legacy');
+});
+
 test('timeline boundary rejects coerced identities, coerced limits and missing sessions', () => {
   const canonical = state();
   for (const sessionId of [1, true, {}, '']) {
