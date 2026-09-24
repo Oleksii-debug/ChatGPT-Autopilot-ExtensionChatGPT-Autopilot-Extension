@@ -151,6 +151,34 @@ test('usage and route price inputs reject implicit numeric coercion', () => {
   }), /must be a number/);
 });
 
+test('missing factual usage or paid pricing never becomes an authoritative zero', () => {
+  assert.throws(() => meterAiRouteUsageV1({
+    route: route(),
+    invocationId: 'invoke-missing-input',
+    outputTokens: 1,
+    observedAt: AT,
+  }), /inputTokens is required/);
+
+  assert.throws(() => meterAiRouteUsageV1({
+    route: route(),
+    invocationId: 'invoke-missing-output',
+    inputTokens: 1,
+    observedAt: AT,
+  }), /outputTokens is required/);
+
+  for (const missingPrice of ['inputPricePerMillionUsd', 'outputPricePerMillionUsd']) {
+    const incomplete = route();
+    delete incomplete[missingPrice];
+    assert.throws(() => meterAiRouteUsageV1({
+      route: incomplete,
+      invocationId: `invoke-missing-${missingPrice}`,
+      inputTokens: 1,
+      outputTokens: 1,
+      observedAt: AT,
+    }), error => error?.code === 'AI_ROUTE_PRICE_UNKNOWN');
+  }
+});
+
 test('hostile prototype-bearing evidence and inherited route pricing cannot become cost authority', () => {
   const polluted = Object.create({ costUsdMicros: 1 });
   Object.assign(polluted, {
@@ -207,6 +235,27 @@ test('cost records convert directly into the resource-usage dimensions required 
     modelOutputTokens: 500,
     costUsdMicros: 6_000,
   });
+});
+
+test('aggregation is exact-once by invocation identity and rejects replay or conflicting duplicates', () => {
+  const record = meterAiRouteUsageV1({
+    route: route(),
+    invocationId: 'invoke-exact-once',
+    inputTokens: 100,
+    outputTokens: 10,
+    observedAt: AT,
+  });
+
+  assert.throws(() => aggregateAiCostRecordsV1([record, record]), /duplicate invocationId/);
+  const conflicting = meterAiRouteUsageV1({
+    route: route({ routeId: 'openai-backup', inputPricePerMillionUsd: 2, outputPricePerMillionUsd: 8 }),
+    invocationId: 'invoke-exact-once',
+    inputTokens: 101,
+    outputTokens: 10,
+    observedAt: AT,
+  });
+  assert.throws(() => aggregateAiCostRecordsV1([record, conflicting]), /duplicate invocationId/);
+  assert.deepEqual(aggregateAiCostRecordsV1([record]), aggregateAiCostRecordsV1([structuredClone(record)]));
 });
 
 test('bounded aggregation is deterministic and fails closed on unsafe evidence', () => {
