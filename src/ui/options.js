@@ -26,7 +26,6 @@ const ui = {
   scenarioWorkScenarios: [],
   selectedScenarioWorkId: '',
   selectedScenarioWork: null,
-  pendingScenarioWorkBundle: null,
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
@@ -1416,8 +1415,7 @@ function setScenarioWorkBusy(busy) {
     'new-scenario-cycle-button', 'new-scenario-pairs-button', 'new-scenario-group-button', 'new-scenario-pipeline-button',
     'save-scenario-work-button', 'start-scenario-work-button', 'pause-scenario-work-button',
     'resume-scenario-work-button', 'stop-scenario-work-button', 'delete-scenario-work-button',
-    'scenario-work-run-now', 'import-scenario-work-profile-button',
-    'import-start-scenario-work-profile-button', 'export-scenario-work-profile-button',
+    'scenario-work-run-now',
   ]) {
     const element = $(id);
     if (element) element.disabled = busy;
@@ -1733,130 +1731,6 @@ function renderScenarioWorkList(data = {}) {
   list.value = selected;
   if (!selected) clearScenarioWorkState();
   return selected;
-}
-
-
-const SCENARIO_WORK_BUNDLE_KIND = 'chatgpt-autopilot-scenario-work-bundle';
-
-function normalizeScenarioWorkBundle(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('JSON має містити об’єкт сценарної роботи.');
-  if (raw.kind !== SCENARIO_WORK_BUNDLE_KIND) throw new Error('Невідомий тип файла сценарної роботи.');
-  if (Number(raw.version) !== 1) throw new Error('Підтримується лише version 1.');
-  if (!Array.isArray(raw.scenarios) || raw.scenarios.length < 1 || raw.scenarios.length > 100) {
-    throw new Error('Файл має містити від 1 до 100 сценаріїв.');
-  }
-  const allowedModes = new Set(Object.keys(SCENARIO_WORK_MODE_LABELS));
-  const scenarios = raw.scenarios.map((entry, index) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error(`Сценарій ${index + 1}: некоректний запис.`);
-    const config = entry.config && typeof entry.config === 'object' && !Array.isArray(entry.config) ? clone(entry.config) : {};
-    const mode = String(entry.mode || config.mode || '').trim();
-    if (!allowedModes.has(mode)) throw new Error(`Сценарій ${index + 1}: невідомий mode.`);
-    const name = String(entry.name || config.name || `Сценарій ${index + 1}`).trim();
-    if (!name || name.length > 120) throw new Error(`Сценарій ${index + 1}: назва має містити 1–120 символів.`);
-    delete config.id;
-    return { name, mode, config: { ...config, name, mode } };
-  });
-  return {
-    kind: SCENARIO_WORK_BUNDLE_KIND,
-    version: 1,
-    name: String(raw.name || 'Сценарна робота').trim() || 'Сценарна робота',
-    scenarios,
-  };
-}
-
-function syncScenarioWorkImportButtons() {
-  const ready = Boolean(ui.pendingScenarioWorkBundle);
-  $('import-scenario-work-profile-button').disabled = !ready;
-  $('import-start-scenario-work-profile-button').disabled = !ready;
-}
-
-async function onScenarioWorkProfileFileChange() {
-  ui.pendingScenarioWorkBundle = null;
-  syncScenarioWorkImportButtons();
-  const file = $('scenario-work-profile-file').files?.[0];
-  if (!file) {
-    $('scenario-work-profile-preview').textContent = 'Файл не вибрано.';
-    return;
-  }
-  try {
-    const bundle = normalizeScenarioWorkBundle(JSON.parse(await file.text()));
-    ui.pendingScenarioWorkBundle = bundle;
-    const cycles = bundle.scenarios.filter(item => item.mode === 'CHAT_CYCLE').length;
-    $('scenario-work-profile-preview').textContent = `${bundle.name}: сценаріїв ${bundle.scenarios.length}; циклів у чаті ${cycles}. Імпорт створить новий чистий runtime.`;
-    syncScenarioWorkImportButtons();
-    $('scenario-work-profile-preview').focus();
-  } catch (error) {
-    $('scenario-work-profile-preview').textContent = `Помилка JSON: ${error.message}`;
-    $('scenario-work-profile-preview').focus();
-  }
-}
-
-async function cleanupImportedScenarioWork(ids = []) {
-  for (const id of [...ids].reverse()) {
-    try { await core('STOP_SCENARIO_WORK', { id }); } catch (_) {}
-    try { await core('DELETE_SCENARIO_WORK', { id }); } catch (_) {}
-  }
-}
-
-async function importScenarioWorkBundle(startAfterImport = false) {
-  const bundle = ui.pendingScenarioWorkBundle;
-  if (!bundle) return;
-  const createdIds = [];
-  try {
-    setScenarioWorkBusy(true);
-    for (const item of bundle.scenarios) {
-      const created = await core('CREATE_SCENARIO_WORK', { name: item.name, mode: item.mode });
-      const id = created?.scenario?.id;
-      if (!id) throw new Error(`Не вдалося створити сценарій «${item.name}».`);
-      createdIds.push(id);
-      await core('UPDATE_SCENARIO_WORK', {
-        id,
-        config: { ...item.config, id, name: item.name, mode: item.mode },
-      });
-    }
-    if (startAfterImport) {
-      for (const id of createdIds) await core('START_SCENARIO_WORK', { id });
-    }
-    ui.pendingScenarioWorkBundle = null;
-    $('scenario-work-profile-file').value = '';
-    $('scenario-work-profile-preview').textContent = `Імпортовано ${createdIds.length} сценаріїв.${startAfterImport ? ' Усі запущено.' : ' Автоматичного запуску не було.'}`;
-    await loadScenarioWork({ preservePanel: !startAfterImport });
-    if (createdIds[0]) await openScenarioWork(createdIds[0]);
-    if (startAfterImport) setScenarioWorkPanel('state');
-    announce(`Імпортовано ${createdIds.length} сценаріїв${startAfterImport ? ' і запущено' : ''}.`);
-  } catch (error) {
-    await cleanupImportedScenarioWork(createdIds);
-    $('scenario-work-profile-preview').textContent = `Імпорт не виконано; часткові сценарії прибрано: ${error.message}`;
-    announce('Помилка імпорту сценарної роботи.');
-  } finally {
-    setScenarioWorkBusy(false);
-    syncScenarioWorkImportButtons();
-  }
-}
-
-async function exportScenarioWorkBundle() {
-  try {
-    const data = await core('LIST_SCENARIO_WORK');
-    const scenarios = Array.isArray(data?.scenarios) ? data.scenarios : [];
-    if (!scenarios.length) throw new Error('Немає сценаріїв для експорту.');
-    const bundle = {
-      kind: SCENARIO_WORK_BUNDLE_KIND,
-      version: 1,
-      name: 'ChatGPT Автопілот — сценарна робота',
-      exportedAt: new Date().toISOString(),
-      scenarios: scenarios.map(item => ({
-        name: item.name,
-        mode: item.config?.mode,
-        config: { ...(item.config || {}), id: undefined },
-      })),
-    };
-    for (const item of bundle.scenarios) delete item.config.id;
-    downloadJson(bundle, 'ChatGPT-Autopilot-Scenario-Work.json');
-    $('scenario-work-profile-preview').textContent = `Експортовано ${scenarios.length} сценаріїв.`;
-    announce(`Експортовано ${scenarios.length} сценаріїв.`);
-  } catch (error) {
-    $('scenario-work-profile-preview').textContent = `Експорт не виконано: ${error.message}`;
-  }
 }
 
 async function loadScenarioWork({ preservePanel = true } = {}) {
@@ -3357,10 +3231,6 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
   setScenarioWorkPanel(SCENARIO_WORK_PANELS[index], { focus: true });
 });
 $('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
-$('scenario-work-profile-file').addEventListener('change', onScenarioWorkProfileFileChange);
-$('import-scenario-work-profile-button').addEventListener('click', () => importScenarioWorkBundle(false));
-$('import-start-scenario-work-profile-button').addEventListener('click', () => importScenarioWorkBundle(true));
-$('export-scenario-work-profile-button').addEventListener('click', exportScenarioWorkBundle);
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
 $('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
 $('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
