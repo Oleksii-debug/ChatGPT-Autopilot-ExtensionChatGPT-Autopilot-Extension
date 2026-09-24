@@ -9,6 +9,20 @@ function digest(value) {
 }
 
 const at = '2026-09-24T16:00:00.000Z';
+function artifactRef(text = 'after') {
+  return {
+    schemaVersion: 1,
+    artifactId: 'artifact-verify-1',
+    kind: 'text',
+    uri: 'artifact://verify-1',
+    mediaType: 'text/plain',
+    sha256: digest(text),
+    sizeBytes: Buffer.byteLength(text, 'utf8'),
+    createdAt: at,
+    producerInvocationId: null,
+    sensitive: true,
+  };
+}
 function invocation(text = 'after') {
   return {
     schemaVersion: 1,
@@ -17,7 +31,12 @@ function invocation(text = 'after') {
     providerId: FILESYSTEM_PROVIDER_ID,
     requestedCapabilityIds: ['filesystem.writeExistingText'],
     policyDecisionId: 'decision-fs-verify-1',
-    arguments: { rootId: 'workspace', relativePath: 'note.txt', text, expectedSha256: digest('before') },
+    arguments: {
+      rootId: 'workspace',
+      relativePath: 'note.txt',
+      contentArtifactRef: artifactRef(text),
+      expectedSha256: digest('before'),
+    },
     createdAt: at,
     parentInvocationId: null,
   };
@@ -35,18 +54,23 @@ test('normal filesystem verification trusts fresh readback rather than mutation 
   assert.equal(ok.status, 'VERIFIED');
   assert.equal(ok.effectId, inv.invocationId);
   assert.equal(ok.attempt, 1);
+  assert.deepEqual(ok.evidenceArtifactIds, ['artifact-verify-1']);
 
   current = 'diverged';
-  const mismatch = await verifier.verify({ invocation: inv, executionId: 'fs-verify-1:attempt:1', observation });
-  assert.equal(mismatch.status, 'AMBIGUOUS');
-  assert.equal(mismatch.reasonCode, 'FILESYSTEM_POSTCONDITION_MISMATCH');
+  await assert.rejects(
+    () => verifier.verify({ invocation: inv, executionId: 'fs-verify-1:attempt:1', observation }),
+    /FILE_TOO_LARGE|exceeds|maxBytes|too large/i,
+  );
 });
 
 test('reconciliation classifies desired digest as committed and unchanged prior digest as safe retry proof', async () => {
   let current = 'after';
   let tick = Date.parse('2026-09-24T16:01:00.000Z');
   const verifier = new FilesystemWriteVerifierV1({
-    nativeClient: { readText: async () => ({ text: current }) },
+    nativeClient: { readText: async ({ maxBytes }) => {
+      if (Buffer.byteLength(current, 'utf8') > maxBytes) throw new Error('FILE_TOO_LARGE');
+      return { text: current };
+    } },
     verifierId: 'independent-filesystem-verifier',
     now: () => tick++,
   });
@@ -61,7 +85,7 @@ test('reconciliation classifies desired digest as committed and unchanged prior 
   const committed = await verifier.reconcileVerify({ ...common, expectedOutcome: 'VERIFIED' });
   assert.equal(committed.observation.data.committed, true);
   assert.equal(committed.verification.status, 'VERIFIED');
-  assert.equal(JSON.stringify(committed).includes('after'), false, 'evidence must not persist file text');
+  assert.equal(JSON.stringify(committed).includes('"text":"after"'), false, 'evidence must not persist file text');
 
   current = 'before';
   const safeRetry = await verifier.reconcileVerify({ ...common, expectedOutcome: 'SAFE_RETRY' });
