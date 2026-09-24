@@ -189,15 +189,19 @@ test('hidden tab bypasses Chrome native mouse submit and sends through DOM seman
   assert.equal(r.status,'SENT_VERIFIED');assert.equal(nativeCalls,0);assert.equal(f.clicks(),1);
 });
 
-test('hidden non-submit control activates before one native click and restores no second Send',async()=>{
-  const f=fixture();let activation=0,nativeCalls=0;
+test('hidden non-submit control activates for native click and restores focus before acknowledgement completes',async()=>{
+  const f=fixture();let activation=0,nativeCalls=0,restores=0;
+  const order=[];
   const result=await f.run('SUBMIT_EXISTING',{}, {
-    activate:async()=>{activation++;f.document.visibilityState='visible';return true;},
-    submit:async()=>{nativeCalls++;f.acknowledge();},
+    activate:async()=>{activation++;order.push('activate');f.document.visibilityState='visible';return true;},
+    submit:async()=>{nativeCalls++;order.push('submit');f.acknowledge();},
+    restore:async()=>{restores++;order.push('restore');f.document.visibilityState='hidden';return true;},
   });
   assert.equal(result.status,'SENT_VERIFIED');
   assert.equal(activation,1);
   assert.equal(nativeCalls,1);
+  assert.equal(restores,1);
+  assert.deepEqual(order,['activate','submit','restore']);
   assert.equal(f.clicks(),0);
 });
 
