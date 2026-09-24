@@ -318,6 +318,21 @@
 
         const restoreSendIdentity = await prepareSendControlCompatibility(root.document, request.mode);
         let previousSendTabId = 0;
+        const restoreActivatedSendTab = async () => {
+          const previous = previousSendTabId;
+          if (!previous) return true;
+          try {
+            const response = await runtime.sendMessage({
+              channel:'autopilot-send-tab-activation', action:'restore',
+              requestId:request.requestId, taskId:request.taskId, previousTabId:previous,
+            });
+            if (response?.ok) {
+              previousSendTabId = 0;
+              return true;
+            }
+          } catch (_) { /* Cold-start/executor reconciliation retries durable restoration. */ }
+          return false;
+        };
         try {
           const nativeInput = async (kind, point = {}) => {
             const response = await runtime.sendMessage({
@@ -345,17 +360,11 @@
               previousSendTabId = Number(response.data?.previousTabId || 0);
               return true;
             },
+            restore: restoreActivatedSendTab,
           });
         } finally {
           restoreSendIdentity();
-          if (previousSendTabId) {
-            try {
-              await runtime.sendMessage({
-                channel:'autopilot-send-tab-activation', action:'restore',
-                requestId:request.requestId, taskId:request.taskId, previousTabId:previousSendTabId,
-              });
-            } catch (_) { /* The tab can navigate away after a real Send. */ }
-          }
+          await restoreActivatedSendTab();
         }
       })
       .then((result) => sendResponse({ ok: true, data: result }))
