@@ -367,7 +367,7 @@ test('filesystem reconciliation request rejects coerced, inherited and non-data 
 
   const cases = [
     ['numeric invocationId', { invocationId: 123, outcome: 'MANUAL_REVIEW', reasonCode: 'OWNER_REVIEW_REQUIRED' }, /invocationId must be text/],
-    ['boolean outcome', { invocationId: inv.invocationId, outcome: true, reasonCode: 'OWNER_REVIEW_REQUIRED' }, /outcome must be text/],
+    ['boolean outcome', { invocationId: inv.invocationId, outcome: true, reasonCode: 'OWNER_REVIEW_REQUIRED' }, /Reconciliation outcome must be text/],
     ['numeric reasonCode', { invocationId: inv.invocationId, outcome: 'MANUAL_REVIEW', reasonCode: 7 }, /reasonCode must be text/],
     ['inherited request authority', inherited, /plain object/],
     ['symbol request authority', symbolAuthority, /unknown field/],
