@@ -18,6 +18,21 @@ const MAX_URL = 4096;
 const MAX_SELECTOR = 2000;
 const ACTIONS = new Set(['NAVIGATE', 'CLICK', 'FILL']);
 
+function plainMap(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  return value;
+}
+
+function own(map, key) {
+  return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+}
+
 function text(value, label, max) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
   const out = value.trim();
@@ -98,15 +113,15 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
     let result;
     await store.update(draft => {
       if (!draft || typeof draft !== 'object' || Array.isArray(draft)) throw new Error('exact-effect store is invalid');
-      draft.effectsById ||= {};
-      draft.leasesByTargetId ||= {};
+      plainMap(draft.effectsById, 'exact-effect store effectsById');
+      plainMap(draft.leasesByTargetId, 'exact-effect store leasesByTargetId');
       result = mutator(draft);
       return draft;
     });
     return result;
   }
   function release(draft, targetId, invocationId) {
-    const lease = draft.leasesByTargetId[targetId];
+    const lease = own(draft.leasesByTargetId, targetId);
     if (!lease || lease.ownerInvocationId !== invocationId) throw new Error('web effect target lease ownership changed');
     draft.leasesByTargetId[targetId] = releaseBrowserTargetLeaseV1(lease, {
       ownerInvocationId: invocationId, leaseId: lease.leaseId,
@@ -140,9 +155,9 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
       // The lease and canonical EXECUTING state share ONE atomic durable write.
       // A crashed dispatch remains fenced even when its lease timestamp expires.
       const admitted = await atomic(draft => {
-        let entry = draft.effectsById[invocationId];
+        let entry = own(draft.effectsById, invocationId);
         if (entry && entry.binding !== binding) throw new Error('web invocation binding changed');
-        const current = draft.leasesByTargetId[targetId];
+        const current = own(draft.leasesByTargetId, targetId);
         if (entry && [ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(entry.state.phase)) {
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.DECLARE_AMBIGUITY, 'restart-ambiguity', {
             reasonCode: 'WEB_DISPATCH_INTERRUPTED', summary: 'Interrupted browser dispatch requires independent reconciliation.',
@@ -179,13 +194,13 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           observedAt: now(),
         });
         await atomic(draft => {
-          const entry = draft.effectsById[invocationId];
+          const entry = own(draft.effectsById, invocationId);
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_OBSERVATION, 'observe', { observation });
         });
         const verification = verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now: now() });
         if (verification.status !== VerificationStatus.VERIFIED) {
           const effectState = await atomic(draft => {
-            const entry = draft.effectsById[invocationId];
+            const entry = own(draft.effectsById, invocationId);
             const state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.DECLARE_AMBIGUITY, 'postcondition-ambiguity', {
               reasonCode: verification.reasonCode,
               summary: 'The browser action may have occurred, but its postcondition was not independently verified.',
@@ -204,7 +219,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           });
         }
         const effectState = await atomic(draft => {
-          const entry = draft.effectsById[invocationId];
+          const entry = own(draft.effectsById, invocationId);
           let state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_VERIFICATION, 'verify', { verification });
           if (state.phase === ExactEffectPhase.VERIFIED) {
             state = event(state, ExactEffectEventType.COMMIT, 'commit', { commitId: `${invocationId}:commit` });
@@ -216,7 +231,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
         return Object.freeze({ status: verification.status, observation, verification, effectState });
       } catch (error) {
         const effectState = await atomic(draft => {
-          const entry = draft.effectsById[invocationId];
+          const entry = own(draft.effectsById, invocationId);
           let state = normalizeExactEffectStateV1(entry.state);
           if ([ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) {
             state = event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'dispatch-ambiguity', {
@@ -233,7 +248,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
     },
     async reconcile({ invocationId, outcome, reasonCode = 'WEB_RECONCILED' }) {
       const snapshot = await atomic(draft => {
-        const entry = draft.effectsById[invocationId];
+        const entry = own(draft.effectsById, invocationId);
         if (!entry || entry.state.phase !== ExactEffectPhase.RECONCILE) throw new Error('web effect is not awaiting reconciliation');
         return structuredClone(entry);
       });
@@ -285,7 +300,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
       }
       proof = { observation, verification };
       return atomic(draft => {
-        const entry = draft.effectsById[invocationId];
+        const entry = own(draft.effectsById, invocationId);
         const state = normalizeExactEffectStateV1(entry?.state);
         if (state.phase !== ExactEffectPhase.RECONCILE || state.executionId !== snapshot.state.executionId) throw new Error('web effect changed during reconciliation');
         let next = event(state, ExactEffectEventType.RESOLVE_RECONCILIATION, 'reconcile', {
