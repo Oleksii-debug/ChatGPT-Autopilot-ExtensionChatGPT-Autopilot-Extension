@@ -27,6 +27,31 @@ function tabIdFromTarget(targetId) {
 
 function clone(value) { return structuredClone(value); }
 
+function plainRecord(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  return value;
+}
+
+function normalizeRuntimeStoreRecordV1(value) {
+  const raw = plainRecord(value, 'deterministic web runtime storage');
+  const allowed = new Set(['schemaVersion', 'effectsById', 'leasesByTargetId']);
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`deterministic web runtime storage contains unknown field: ${String(key)}`);
+    }
+  }
+  if (raw.schemaVersion !== 1) throw new Error('deterministic web runtime storage schema is unsupported');
+  plainRecord(raw.effectsById, 'deterministic web runtime effectsById');
+  plainRecord(raw.leasesByTargetId, 'deterministic web runtime leasesByTargetId');
+  return clone(raw);
+}
+
 async function readChromeTargetV1(chromeApi, targetId) {
   const { tabId } = normalizeChromeDeterministicWebTargetV1(targetId);
   const live = await chromeApi.tabs.get(tabId);
@@ -64,13 +89,16 @@ export function createChromeDeterministicWebStoreV1(chromeApi, { storageKey = DE
     update(mutator) {
       const operation = chain.then(async () => {
         const record = await chromeApi.storage.local.get(storageKey);
-        const current = record?.[storageKey];
-        const draft = current && typeof current === 'object' && !Array.isArray(current)
-          ? clone(current) : { schemaVersion: 1, effectsById: {}, leasesByTargetId: {} };
-        if (draft.schemaVersion !== 1) throw new Error('deterministic web runtime storage schema is unsupported');
+        const hasStoredRecord = Boolean(record)
+          && typeof record === 'object'
+          && Object.prototype.hasOwnProperty.call(record, storageKey);
+        const draft = hasStoredRecord
+          ? normalizeRuntimeStoreRecordV1(record[storageKey])
+          : { schemaVersion: 1, effectsById: {}, leasesByTargetId: {} };
         const next = await mutator(draft) || draft;
-        await chromeApi.storage.local.set({ [storageKey]: next });
-        return clone(next);
+        const normalizedNext = normalizeRuntimeStoreRecordV1(next);
+        await chromeApi.storage.local.set({ [storageKey]: normalizedNext });
+        return clone(normalizedNext);
       });
       chain = operation.catch(() => undefined);
       return operation;
