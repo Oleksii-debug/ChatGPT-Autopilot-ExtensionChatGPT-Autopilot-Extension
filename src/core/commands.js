@@ -459,21 +459,23 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.LIST_SESSIONS) {
       const state = await this.repo.load();
-      return { sessions: state.sessionOrder.map(id => { const s=state.sessionsById[id]; const progress=sessionProgress(s); const managedKind = s.orchestrationCoordinator?.managed ? 'orchestration-coordinator' : s.orchestrationWorker?.managed ? 'orchestration-worker' : s.remoteDispatch?.managed ? 'remote-dispatch' : ''; return { id, name:s.name, runState:s.runState, displayRunState:progress.displayRunState, enabledTaskCount:progress.enabledTaskCount, completedTaskCount:progress.completedTaskCount, remainingTaskCount:progress.remainingTaskCount, successfulSendCount:progress.successfulSendCount, isCompleted:progress.isCompleted, managedKind }; }) };
+      return { sessions: state.sessionOrder.map(id => { const s=state.sessionsById[id]; const progress=sessionProgress(s); const managedKind = s.scenarioWork?.managed ? 'scenario-work' : s.orchestrationCoordinator?.managed ? 'orchestration-coordinator' : s.orchestrationWorker?.managed ? 'orchestration-worker' : s.remoteDispatch?.managed ? 'remote-dispatch' : ''; return { id, name:s.name, runState:s.runState, displayRunState:progress.displayRunState, enabledTaskCount:progress.enabledTaskCount, completedTaskCount:progress.completedTaskCount, remainingTaskCount:progress.remainingTaskCount, successfulSendCount:progress.successfulSendCount, isCompleted:progress.isCompleted, managedKind }; }) };
     }
     if (command === CoreCommand.GET_PROFILE_SETTINGS) {
       const state = await this.repo.load();
-      const ms = Number(state.profile?.rateLimitCooldownMs || DEFAULT_RATE_LIMIT_COOLDOWN_MS);
+      const ms = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
       return { rateLimitCooldownMinutes: Math.round(ms / 60000) };
     }
     if (command === CoreCommand.UPDATE_PROFILE_SETTINGS) {
       const minutes = Number(payload.rateLimitCooldownMinutes);
       const ms = minutes * 60000;
       if (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS) {
-        throw new Error('Rate-limit pause must be a whole number from 1 to 120 minutes');
+        throw new Error('Rate-limit pause must be a whole number from 0 to 120 minutes');
       }
       await this.repo.update(draft => {
         draft.profile.rateLimitCooldownMs = ms;
+        draft.profile.rateLimitReservePolicyVersion = 1;
+        if (ms === 0) draft.profile.rateLimitUntil = 0;
         return draft;
       });
       return { rateLimitCooldownMinutes: minutes };

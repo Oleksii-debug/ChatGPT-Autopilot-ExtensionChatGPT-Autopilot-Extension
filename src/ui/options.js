@@ -93,7 +93,7 @@ function setUiMode(mode, { focus = false } = {}) {
 async function loadProfileSettings() {
   try {
     const data = await core('GET_PROFILE_SETTINGS');
-    const minutes = Number(data?.rateLimitCooldownMinutes || 5);
+    const minutes = Number(data?.rateLimitCooldownMinutes ?? 0);
     $('rate-limit-cooldown-minutes').value = String(minutes);
     $('rate-limit-setting-status').textContent = `Current fallback rate-limit pause: ${minutes} minute${minutes === 1 ? '' : 's'}.`;
   } catch (error) {
@@ -103,14 +103,16 @@ async function loadProfileSettings() {
 
 async function saveProfileSettings() {
   const minutes = Number($('rate-limit-cooldown-minutes').value);
-  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
-    $('rate-limit-setting-status').textContent = 'Enter a whole number from 1 to 120 minutes.';
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+    $('rate-limit-setting-status').textContent = 'Enter a whole number from 0 to 120 minutes.';
     $('rate-limit-cooldown-minutes').focus();
     return;
   }
   try {
     const data = await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
-    $('rate-limit-setting-status').textContent = `Saved fallback: if “Too many requests” remains after acknowledgement, this Chrome profile waits ${data.rateLimitCooldownMinutes} minute${data.rateLimitCooldownMinutes === 1 ? '' : 's'} and then retries automatically.`;
+    $('rate-limit-setting-status').textContent = data.rateLimitCooldownMinutes === 0
+      ? 'Збережено: додаткову спільну паузу після rate-limit вимкнено. Обмеження сервера діють.'
+      : `Збережено резервну паузу: ${data.rateLimitCooldownMinutes} хв.`;
     announce('Rate-limit pause saved.');
   } catch (error) {
     $('rate-limit-setting-status').textContent = `Could not save fallback rate-limit pause: ${error.message}`;
@@ -2304,6 +2306,35 @@ function sessionListSignature(sessions) {
   return JSON.stringify((sessions || []).map(session => [session.id, session.name, session.displayRunState || session.runState, session.enabledTaskCount, session.completedTaskCount, session.successfulSendCount]));
 }
 
+function renderGlobalStatus(data) {
+  const summary = data.summary || {};
+  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених Send: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
+  const lists = [
+    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених Send ${row.verifiedSends}; стан ${row.category}`],
+    ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
+    ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
+    ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
+  ];
+  for (const [id, rows, describe] of lists) {
+    const list = $(id);
+    const signature = JSON.stringify((rows || []).map(describe));
+    if (list.dataset.signature === signature) continue;
+    list.dataset.signature = signature;
+    list.replaceChildren();
+    for (const row of rows || []) {
+      const li = document.createElement('li');
+      li.textContent = describe(row);
+      list.append(li);
+    }
+  }
+}
+
+async function loadGlobalStatus() {
+  if (document.visibilityState !== 'visible') return;
+  try { renderGlobalStatus(await core('GET_GLOBAL_STATUS')); }
+  catch (error) { $('global-runtime-summary').textContent = `Не вдалося прочитати стан Autopilot: ${error.message}`; }
+}
+
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
   const activeId = preserveFocus ? active?.id || null : null;
@@ -2356,7 +2387,7 @@ function renderSessionList() {
   const paused = ui.sessions.filter(s => s.runState === 'PAUSED').length;
   const errors = ui.sessions.filter(s => s.runState === 'ERROR').length;
   const sent = ui.sessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
-  if ($('session-overview')) $('session-overview').textContent = `Sessions: ${total}. Running: ${running}. Completed: ${completed}. Paused: ${paused}. Errors: ${errors}. Successfully sent total: ${sent}.`;
+  if ($('session-overview')) $('session-overview').textContent = `Звичайних сеансів: ${total}. Працює: ${running}. Завершено: ${completed}. Призупинено: ${paused}. Помилки: ${errors}. Підтверджених Send: ${sent}.`;
   syncCurrentSessionMarker();
 }
 
@@ -3422,6 +3453,7 @@ async function initialLoad() {
   await loadAiRouterSettings();
   await loadAiManagerSettings();
   await loadSessions({ preserveFocus: false });
+  await loadGlobalStatus();
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
@@ -3434,5 +3466,6 @@ window.setInterval(() => { void recordDashboardDiagnosticSnapshot(); }, DIAGNOST
 window.setInterval(() => {
   if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
 }, 2000);
+window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') void loadGlobalStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };

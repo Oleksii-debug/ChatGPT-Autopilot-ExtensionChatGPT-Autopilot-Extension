@@ -299,7 +299,8 @@
 
     const stop = findVisibleButton(doc, (b) => {
       const label = (accessibleName(b) + ' ' + textOf(b)).trim().toLowerCase();
-      return /stop generating|stop response|stop streaming|stop generation|stop-button/.test(label) || label === 'stop';
+      return /stop generating|stop response|stop streaming|stop generation|stop-button|зупинити (?:генерацію|відповідь|створення)|остановить (?:генерацию|ответ)/.test(label)
+        || /^(?:stop|зупинити|остановить)$/.test(label);
     });
     if (stop) return { status: STATUS.BUSY, code: 'STOP_CONTROL_VISIBLE' };
 
@@ -582,10 +583,14 @@
   }
 
   function semanticUserMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'))
+    const candidates = [...new Set([
+      ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
+      ...doc.querySelectorAll('[data-testid="user-message"]'),
+    ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'user' || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
+        return role === 'user' || el.getAttribute?.('data-testid') === 'user-message'
+          || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
     // A turn article and its author-role child are ONE message, not two.
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
@@ -603,10 +608,14 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'))
+    const candidates = [...new Set([
+      ...doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'),
+      ...doc.querySelectorAll('[data-testid="assistant-message"]'),
+    ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'assistant' || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
+        return role === 'assistant' || el.getAttribute?.('data-testid') === 'assistant-message'
+          || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
       });
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
   }
@@ -625,6 +634,24 @@
 
   function userMessageHistorySnapshot(doc) {
     return semanticUserMessages(doc).map(userMessageText);
+  }
+
+  // Some ChatGPT accounts render the conversation without author-role, article,
+  // or message test-id attributes. Observe only an exact prompt inside the main
+  // conversation surface, excluding the composer and all navigation. This is a
+  // supplementary operation-local delta, never a historical equality proof for
+  // an existing conversation after a page or worker restart.
+  function unlabeledPromptCount(doc, promptText) {
+    const main = doc.querySelector?.('main, [role="main"]');
+    if (!main || !promptText || typeof main.querySelectorAll !== 'function') return 0;
+    let count = 0;
+    for (const node of main.querySelectorAll('p, div, span, pre, li, blockquote')) {
+      if (!isVisible(node) || node.closest?.('form, [contenteditable="true"], nav, aside, [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
+      if (!promptTextMatches(textOf(node), promptText)) continue;
+      const nestedMatch = Array.from(node.children || []).some(child => promptTextMatches(textOf(child), promptText));
+      if (!nestedMatch) count += 1;
+    }
+    return count;
   }
 
   function userMessageRepresentationSnapshot(doc) {
@@ -945,6 +972,7 @@
 
     const submittedText = exactTextPending ? observedPendingText : '';
     const beforeTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
+    const beforeUnlabeledMatches = exactTextPending ? unlabeledPromptCount(doc, submittedText) : 0;
     const assistantBaselineCount = semanticAssistantMessages(doc).length;
     if (exactTextPending) {
       if (textSubmissionEvidence.size >= 100) {
@@ -955,6 +983,7 @@
         submittedText,
         expectedUrl: normalizeUrl(request.expectedUrl),
         beforeMessages: beforeTextMessages,
+        beforeUnlabeledMatches,
         assistantBaselineCount,
       });
     }
@@ -973,7 +1002,25 @@
       && String(send.type || '').toLowerCase() === 'submit';
     const nativeSubmit = doc.defaultView?.HTMLFormElement?.prototype?.requestSubmit;
     let submitMethod = 'CLICK';
-    const backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    let backgroundDocument = doc.visibilityState === 'hidden' || doc.visibilityState === 'prerender';
+    if (backgroundDocument && !isFormSubmitter && typeof deps.activate === 'function') {
+      // Never issue a synthetic click into a hidden non-submit control when
+      // Chrome can select the owned tab before the first irreversible effect.
+      const activated = await deps.activate();
+      if (activated) {
+        for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
+          await (deps.wait || wait)(100);
+        }
+      }
+      if (!activated || doc.visibilityState !== 'visible') {
+        return resultBase(request, start, {
+          status:STATUS.TEMPORARY_ERROR,
+          submissionEvidence:'PROVEN_NO_EFFECT',
+          safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+        });
+      }
+      backgroundDocument = false;
+    }
     if (backgroundDocument && isFormSubmitter && typeof nativeSubmit === 'function') {
       // CDP mouse events are unreliable in a hidden background tab. A genuine
       // form submitter can be invoked through the page's own form semantics
@@ -997,8 +1044,25 @@
         });
       }
       send.setAttribute('data-autopilot-native-target', request.requestId);
-      try { await deps.submit({ x, y }); }
-      finally { send.removeAttribute('data-autopilot-native-target'); }
+      try {
+        await deps.submit({ x, y });
+      } catch (error) {
+        if (error?.safeDiagnosticCode === 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT') {
+          return resultBase(request, start, {
+            status: STATUS.TEMPORARY_ERROR,
+            submissionEvidence: 'PROVEN_NO_EFFECT',
+            safeDiagnosticCode: 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT',
+          });
+        }
+        throw error;
+      } finally {
+        send.removeAttribute('data-autopilot-native-target');
+        // Native input has crossed (or attempted) the irreversible effect
+        // boundary. The page may be observed safely in the background, so return
+        // keyboard focus immediately instead of holding the window lease through
+        // the acknowledgement loop.
+        if (typeof deps.restore === 'function') await deps.restore();
+      }
     } else if (isFormSubmitter && typeof nativeSubmit === 'function') {
       submitMethod = 'FORM_REQUEST_SUBMIT';
       nativeSubmit.call(form, send);
@@ -1020,36 +1084,17 @@
       const afterTextMessages = exactTextPending ? userMessageHistorySnapshot(doc) : null;
       const textVerified = exactTextPending
         && hasStrictAppendedPrompt(beforeTextMessages, afterTextMessages, submittedText);
+      const unlabeledVerified = exactTextPending && beforeUnlabeledMatches === 0
+        && unlabeledPromptCount(doc, submittedText) === 1
+        && !compactPromptText(editorText(findVisibleComposer(doc).element));
       const representationVerified = evidence
         && hasStrictAppendedRepresentation(evidence.beforeMessages, userMessageRepresentationSnapshot(doc), evidence.signature);
 
-      let freshStructuralVerified = false;
-      let freshGenerationVerified = false;
-      if (exactTextPending && isFreshLaunchSurface(request.expectedUrl)) {
-        const observedUrl = globalThis.location?.href || '';
-        const structuralFound = findVisibleComposer(doc);
-        const composerEmpty = !structuralFound.element || !compactPromptText(editorText(structuralFound.element));
-        const postBlocking = detectBlockingState(doc);
-        const generationStarted = postBlocking?.status === STATUS.BUSY
-          || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        const appendedOneOrMore = Array.isArray(beforeTextMessages)
-          && Array.isArray(afterTextMessages)
-          && afterTextMessages.length > beforeTextMessages.length;
-        // A fresh launch has no pre-existing conversation identity. If the exact
-        // extension-owned launch surface becomes a concrete conversation, the
-        // composer is consumed, and ChatGPT has positively entered generation,
-        // that combination is operation-bound proof that this Send was accepted.
-        // Do not require the user-message semantic tree to have rendered yet:
-        // real ChatGPT runs can expose the Stop control before the message history
-        // observer sees the newly appended user turn.
-        freshGenerationVerified = !structuralFound.ambiguous
-          && isExclusiveConversationLocation(observedUrl)
-          && composerEmpty
-          && generationStarted;
-        freshStructuralVerified = freshGenerationVerified && appendedOneOrMore;
-      }
-
-      if (!textVerified && !representationVerified && !freshGenerationVerified) continue;
+      // URL transition, composer clearing and generation/Stop state are useful
+      // diagnostics, but none identifies the submitted prompt. Exact-effect
+      // completion therefore requires an operation-local exact user-turn delta
+      // (semantic or unlabeled) or the separately bound representation proof.
+      if (!textVerified && !unlabeledVerified && !representationVerified) continue;
 
       const postFound = findVisibleComposer(doc);
       if (postFound.ambiguous) {
@@ -1085,7 +1130,7 @@
         const postBlocking = detectBlockingState(doc);
         const generationStarted = postBlocking?.status === STATUS.BUSY
           || semanticAssistantMessages(doc).length > assistantBaselineCount;
-        if (!isExclusiveConversationLocation(observedUrl) || !composerEmpty || !generationStarted) continue;
+        if (!isExclusiveConversationLocation(observedUrl) || !composerEmpty || (!generationStarted && !textVerified && !unlabeledVerified)) continue;
       }
 
       if (representationVerified) {
@@ -1098,19 +1143,14 @@
         });
       }
 
-      const freshGenerationOnly = freshGenerationVerified && !freshStructuralVerified && !textVerified;
       return resultBase(request, start, {
         status: STATUS.SENT_VERIFIED,
-        submissionEvidence: freshGenerationOnly
-          ? 'FRESH_CONVERSATION_GENERATION_STARTED'
-          : freshStructuralVerified && !textVerified
-            ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
-            : 'NEW_USER_MESSAGE_MATCH',
-        safeDiagnosticCode: freshGenerationOnly
-          ? 'SEND_VERIFIED_FRESH_GENERATION_STARTED'
-          : freshStructuralVerified && !textVerified
-            ? 'SEND_VERIFIED_FRESH_STRUCTURAL_APPEND'
-            : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
+        submissionEvidence: unlabeledVerified && !textVerified
+          ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
+          : 'NEW_USER_MESSAGE_MATCH',
+        safeDiagnosticCode: unlabeledVerified && !textVerified
+          ? 'SEND_VERIFIED_MAIN_PROMPT_APPEND'
+          : 'SEND_VERIFIED_OPERATION_LOCAL_APPEND',
         assistantBaselineCount
       });
     }
@@ -1133,6 +1173,7 @@
       `pendingMatch=${composer && promptTextMatches(editorText(composer), request.promptText) ? 'yes' : 'no'}`,
       `messagesBefore=${before?.length ?? 'unknown'}`,
       `messagesAfter=${userMessageHistorySnapshot(doc).length}`,
+      `mainPromptMatches=${unlabeledPromptCount(doc, request.promptText)}`,
       `block=${blocking?.code || 'none'}`,
       `visibility=${doc.visibilityState || 'unknown'}`
     ].join('; ');
@@ -1150,47 +1191,14 @@
     const found = findVisibleComposer(doc);
     if (found.ambiguous) return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'COMPOSER_AMBIGUOUS' });
 
-    // Durable fresh-launch recovery: a Send from / (or /g/<slug>) may
-    // navigate to a new /c/<id> and reload the document, which erases the
-    // in-memory pre-click evidence map. The operation carries its original
-    // launch surface durably. On that exact newly-created conversation, one
-    // matching user turn plus an empty composer is sufficient operation-bound
-    // evidence; a fresh launch had no prior user turns.
-    const recoveryLaunchUrl = request.recoveryLaunchUrl || '';
-    if (recoveryLaunchUrl && isFreshLaunchSurface(recoveryLaunchUrl)) {
-      const afterMessages = userMessageHistorySnapshot(doc);
-      const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
-      const singleMatchingTurn = afterMessages.length === 1
-        && promptTextMatches(afterMessages[0], request.promptText);
-      const generationStarted = blocking?.status === STATUS.BUSY
-        || semanticAssistantMessages(doc).length > 0;
-      if (!found.ambiguous
-          && isExclusiveConversationLocation(globalThis.location?.href || '')
-          && composerEmpty
-          && generationStarted) {
-        return resultBase(request, start, {
-          status: STATUS.SENT_VERIFIED,
-          submissionEvidence: singleMatchingTurn
-            ? 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN'
-            : 'FRESH_LAUNCH_DURABLE_GENERATION_STARTED',
-          safeDiagnosticCode: singleMatchingTurn
-            ? 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED'
-            : 'RECOVERY_FRESH_GENERATION_STARTED',
-          assistantBaselineCount: 0
-        });
-      }
-      if (!found.ambiguous
-          && isExclusiveConversationLocation(globalThis.location?.href || '')
-          && composerEmpty
-          && singleMatchingTurn) {
-        return resultBase(request, start, {
-          status: STATUS.SENT_VERIFIED,
-          submissionEvidence: 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN',
-          safeDiagnosticCode: 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED',
-          assistantBaselineCount: 0
-        });
-      }
-    }
+    // A page/service-worker restart destroys the operation-local pre-send DOM
+    // baseline. Historical content in a /c/<id> conversation is not proof that
+    // this operation created that conversation: the owned tab could have been
+    // manually or SPA-navigated to an unrelated thread during the ambiguous
+    // window. Therefore restart recovery must fail closed unless operation-local
+    // evidence below is still available. Core may keep the observed conversation
+    // as a no-blind-resend recovery target, but target location alone never
+    // upgrades an uncertain Send to SENT_VERIFIED.
 
     const textEvidence = textEvidenceFor(request);
     if (textEvidence) {
@@ -1198,29 +1206,22 @@
       const pending = found.element && promptTextMatches(editorText(found.element), submittedText);
       const afterMessages = userMessageHistorySnapshot(doc);
       const appended = hasStrictAppendedPrompt(textEvidence.beforeMessages, afterMessages, submittedText);
+      const unlabeledAppended = textEvidence.beforeUnlabeledMatches === 0
+        && unlabeledPromptCount(doc, submittedText) === 1;
       const baselineCount = Number.isInteger(Number(textEvidence.assistantBaselineCount))
         ? Number(textEvidence.assistantBaselineCount)
         : 0;
-      const storedWasFreshLaunch = isFreshLaunchSurface(textEvidence.expectedUrl);
-      const composerEmpty = !found.element || !compactPromptText(editorText(found.element));
-      const blockingNow = detectBlockingState(doc);
-      const generationOrAnswerObserved = blockingNow?.status === STATUS.BUSY
-        || semanticAssistantMessages(doc).length > baselineCount;
-      const structuralFreshRecovery = storedWasFreshLaunch
-        && !found.ambiguous
-        && isExclusiveConversationLocation(globalThis.location?.href || '')
-        && composerEmpty
-        && Array.isArray(textEvidence.beforeMessages)
-        && afterMessages.length > textEvidence.beforeMessages.length
-        && generationOrAnswerObserved;
-      if ((appended || structuralFreshRecovery) && !pending) {
+      // Recovery may retain same-document operation-local baselines, but it still
+      // must identify the exact submitted prompt. A fresh /c/<id>, an empty
+      // composer, or generation/assistant progress cannot substitute for that.
+      if ((appended || unlabeledAppended) && !pending) {
         return resultBase(request, start, {
           status: STATUS.SENT_VERIFIED,
-          submissionEvidence: structuralFreshRecovery && !appended
-            ? 'FRESH_OPERATION_STRUCTURAL_APPEND'
+          submissionEvidence: unlabeledAppended && !appended
+            ? 'OPERATION_LOCAL_MAIN_PROMPT_APPEND'
             : 'NEW_USER_MESSAGE_MATCH',
-          safeDiagnosticCode: structuralFreshRecovery && !appended
-            ? 'RECOVERY_FRESH_STRUCTURAL_VERIFIED'
+          safeDiagnosticCode: unlabeledAppended && !appended
+            ? 'RECOVERY_MAIN_PROMPT_VERIFIED'
             : 'RECOVERY_TEXT_OPERATION_VERIFIED',
           assistantBaselineCount: baselineCount
         });

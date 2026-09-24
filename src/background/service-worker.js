@@ -7,7 +7,7 @@ import { AgentProviderId, getAgentProvider } from '../core/capability-registry.j
 import { reconcileRuntimeColdStart, runRuntimeCycle } from '../core/runtime-execution.js';
 import { applyBundledBootstrapProfile } from '../core/bootstrap.js';
 import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
-import { performNativeInput } from '../core/native-input.js';
+import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
 import { AiOrchestrator } from '../core/ai-orchestrator.js';
@@ -15,6 +15,7 @@ import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
+import { projectGlobalStatus } from '../core/global-status.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
@@ -58,6 +59,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'PREVIEW_ORCHESTRATION_V2_PROFILE',
   'EXPORT_ORCHESTRATION_V2_PROFILE',
   'LIST_SCENARIO_WORK',
+  'GET_GLOBAL_STATUS',
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
@@ -225,6 +227,7 @@ function beginColdStartReconciliation() {
       executionAvailable: EXECUTION_AVAILABLE,
       syncDrivePrompts: syncSessionDrivePrompts,
     });
+    await restorePendingSendTabs(chrome, repo);
     await remoteDispatch.reconcileAlarm();
     // Reconstruct only deterministic alarms here. Ordinary MV3 service-worker
     // restarts are common and must not manufacture a coordinator reasoning tick.
@@ -456,7 +459,17 @@ export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
   let result;
-  if (message.command === 'LIST_ORCHESTRATION_V2_ORCHESTRAS') {
+  if (message.command === 'GET_GLOBAL_STATUS') {
+    const [coreState, scenarioState, orchestraState, agentState] = await Promise.all([
+      repo.load(), scenarioWork.list(), orchestrationV2.list(), browserAgent.list(),
+    ]);
+    result = projectGlobalStatus({
+      coreState,
+      scenarios: scenarioState.scenarios,
+      orchestras: orchestraState.orchestras,
+      agentJobs: agentState.jobs,
+    });
+  } else if (message.command === 'LIST_ORCHESTRATION_V2_ORCHESTRAS') {
     result = await orchestrationV2.list();
   } else if (message.command === 'CREATE_ORCHESTRATION_V2_ORCHESTRA') {
     result = await orchestrationV2.create(message.payload || {});
@@ -631,8 +644,19 @@ chrome.alarms.onAlarm.addListener(alarm => {
   if (scenarioWork.isAlarm(alarm.name)) runSafely((async () => { await ensureColdStartReconciled(); const scenario = await scenarioWork.cycleAll(); const state = await reconcileRuntime(); return { scenario, state }; })());
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.channel === 'autopilot-send-tab-activation') {
+    const action = message.action === 'activate' ? activateOwnedSendTab
+      : message.action === 'restore' ? restoreOwnedSendTab : null;
+    if (!action) { sendResponse({ ok:false, error:{ safeDiagnosticCode:'SEND_TAB_ACTION_INVALID' } }); return false; }
+    ensureColdStartReconciled()
+      .then(() => action(chrome, repo, message, _sender))
+      .then(data => sendResponse({ ok:true, data }))
+      .catch(error => sendResponse({ ok:false, error:{ safeDiagnosticCode:error?.safeDiagnosticCode || 'SEND_TAB_ACTIVATION_FAILED' } }));
+    return true;
+  }
   if (message?.channel === 'autopilot-native-input') {
-    performNativeInput(chrome, repo, message, _sender)
+    ensureColdStartReconciled()
+      .then(() => performNativeInput(chrome, repo, message, _sender))
       .then(() => sendResponse({ ok: true }))
       .catch(error => sendResponse({ ok: false, error: {
         safeDiagnosticCode: error?.safeDiagnosticCode || 'NATIVE_INPUT_FAILED',

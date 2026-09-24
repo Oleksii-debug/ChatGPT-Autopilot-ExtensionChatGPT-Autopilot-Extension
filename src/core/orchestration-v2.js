@@ -111,7 +111,9 @@ const MAX_TASKS_PER_DECISION = 1000;
 const MAX_PENDING_EVENTS = 10000;
 const MAX_COORDINATOR_EVENTS_PER_TURN = 200;
 const MAX_WORKER_HISTORY = 10000;
-const MIN_RATE_LIMIT_BACKOFF_MS = 5 * 60 * 1000;
+// Technical probe delay only; the owner's optional shared reserve is applied
+// by Core. Never create a hidden five-minute hold in orchestration.
+const MIN_RATE_LIMIT_BACKOFF_MS = 30_000;
 const MAX_STORED_DIRECT_CONTROL_CHARS = 512000;
 
 function isObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
@@ -1521,14 +1523,28 @@ export function orchestrationSnapshot(runtime, configRaw) {
         return Boolean(node?.parentId) && (!Array.isArray(node?.childIds) || node.childIds.length === 0);
       }).length;
       const lifecycleCounts = {};
+      const roleCounts = { director: {}, manager: {}, worker: {} };
+      const effectCounts = {};
+      const roleEffectCounts = { director: {}, manager: {}, worker: {} };
       let activeActivationCount = 0;
       for (const nodeId of nodeIds) {
+        const graphNode = runtime.hierarchy.graph.nodesById?.[nodeId] || {};
+        const role = !graphNode.parentId ? 'director' : graphNode.childIds?.length ? 'manager' : 'worker';
         const nodeState = runtime.hierarchy.state.nodesById?.[nodeId] || {};
         const lifecycle = String(nodeState.lifecycle || 'IDLE');
         lifecycleCounts[lifecycle] = Number(lifecycleCounts[lifecycle] || 0) + 1;
+        roleCounts[role][lifecycle] = Number(roleCounts[role][lifecycle] || 0) + 1;
         const current = nodeState.currentActivationId
           ? nodeState.activationLedger?.[nodeState.currentActivationId]
           : null;
+        const category = lifecycle === 'PAUSED' ? 'PAUSED'
+          : lifecycle === 'STOPPED' ? 'STOPPED'
+          : lifecycle === 'MANUAL_REVIEW' || current?.phase === 'AMBIGUOUS' ? 'AMBIGUOUS_EFFECT'
+          : current?.phase === 'EFFECT_CONFIRMED' ? 'WAITING_RESPONSE'
+          : current?.phase === 'PREPARED' || lifecycle === 'PREPARING_EFFECT' ? 'RUNNING'
+          : lifecycle === 'TERMINAL' || lifecycle === 'IDLE' ? 'READY' : 'RUNNING';
+        effectCounts[category] = Number(effectCounts[category] || 0) + 1;
+        roleEffectCounts[role][category] = Number(roleEffectCounts[role][category] || 0) + 1;
         if (current && current.phase && current.phase !== 'TERMINAL' && current.phase !== 'SUPERSEDED') {
           activeActivationCount += 1;
         }
@@ -1547,6 +1563,9 @@ export function orchestrationSnapshot(runtime, configRaw) {
       workerCount,
       activeActivationCount,
       lifecycleCounts,
+      roleCounts,
+      effectCounts,
+      roleEffectCounts,
       providers: nodeIds
         .map(nodeId => {
           const node = runtime.hierarchy.graph.nodesById?.[nodeId];

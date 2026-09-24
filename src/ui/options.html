@@ -30,6 +30,14 @@
   <nav id="session-navigation" aria-label="Сеанси" data-app-mode="sessions">
     <h2>Сеанси</h2>
     <button id="create-session-button" type="button">Новий сеанс</button>
+    <section id="global-runtime-panel" aria-labelledby="global-runtime-heading">
+      <h3 id="global-runtime-heading">Весь Autopilot зараз</h3>
+      <p id="global-runtime-summary" tabindex="0">Завантаження стану…</p>
+      <h4>Сценарні чати</h4><ul id="global-scenario-slots"></ul>
+      <h4>Оркестрація</h4><ul id="global-orchestration"></ul>
+      <h4>Агент</h4><ul id="global-agents"></ul>
+      <h4>Моделі</h4><ul id="global-models"></ul>
+    </section>
     <p id="session-overview" tabindex="0"></p>
     <ul id="session-list"></ul>
   </nav>
@@ -37,7 +45,7 @@
     <section aria-labelledby="rate-limit-settings-heading" data-app-mode="sessions">
       <h2 id="rate-limit-settings-heading">Rate-limit recovery</h2>
       <label for="rate-limit-cooldown-minutes">Rate-limit пауза, хв</label>
-      <input id="rate-limit-cooldown-minutes" type="number" min="1" max="120" step="1" inputmode="numeric">
+      <input id="rate-limit-cooldown-minutes" type="number" min="0" max="120" step="1" inputmode="numeric">
       <button id="save-rate-limit-cooldown-button" type="button">Зберегти</button>
       <p id="rate-limit-setting-status" role="status">Завантаження…</p>
     </section>
