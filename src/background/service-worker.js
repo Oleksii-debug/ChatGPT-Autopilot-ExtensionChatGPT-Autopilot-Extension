@@ -15,6 +15,7 @@ import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
+import { projectGlobalStatus } from '../core/global-status.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
@@ -58,6 +59,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'PREVIEW_ORCHESTRATION_V2_PROFILE',
   'EXPORT_ORCHESTRATION_V2_PROFILE',
   'LIST_SCENARIO_WORK',
+  'GET_GLOBAL_STATUS',
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
@@ -457,7 +459,17 @@ export async function dispatchUiMessage(message) {
   if (message?.channel !== 'autopilot-ui' || typeof message.command !== 'string') return null;
   await ensureColdStartReconciled();
   let result;
-  if (message.command === 'LIST_ORCHESTRATION_V2_ORCHESTRAS') {
+  if (message.command === 'GET_GLOBAL_STATUS') {
+    const [coreState, scenarioState, orchestraState, agentState] = await Promise.all([
+      repo.load(), scenarioWork.list(), orchestrationV2.list(), browserAgent.list(),
+    ]);
+    result = projectGlobalStatus({
+      coreState,
+      scenarios: scenarioState.scenarios,
+      orchestras: orchestraState.orchestras,
+      agentJobs: agentState.jobs,
+    });
+  } else if (message.command === 'LIST_ORCHESTRATION_V2_ORCHESTRAS') {
     result = await orchestrationV2.list();
   } else if (message.command === 'CREATE_ORCHESTRATION_V2_ORCHESTRA') {
     result = await orchestrationV2.create(message.payload || {});
