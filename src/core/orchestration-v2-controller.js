@@ -39,6 +39,7 @@ import { exportOrchestrationProfile, importOrchestrationProfileDocument, preview
 import {
   OrchestrationActivationPurpose,
   OrchestrationHierarchyEventType,
+  compactOrchestrationEventId,
   createOrchestrationHierarchyRuntime,
   reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
@@ -230,7 +231,7 @@ export class OrchestrationV2Controller {
       const activationId = hierarchyRootActivationId(nodeId, nodeRuntime);
       const result = await this.dispatchHierarchyEvent({
         type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
-        eventId: `start:${activationId}`,
+        eventId: compactOrchestrationEventId('start', latest.graph.graphId, nodeId, activationId, nodeRuntime.generation),
         controlEpoch: latest.state.controlEpoch,
         nodeId,
         generation: nodeRuntime.generation,
@@ -268,7 +269,7 @@ export class OrchestrationV2Controller {
     const activationId = `recovery:${nodeId}:g${newGeneration}:r${nextRound}`;
     const result = await this.dispatchHierarchyEvent({
       type: OrchestrationHierarchyEventType.GENERATION_RECOVERY_REQUESTED,
-      eventId: `generation-recovery:${hierarchy.graph.graphId}:${nodeId}:g${currentGeneration}-to-g${newGeneration}`,
+      eventId: compactOrchestrationEventId('generation-recovery', hierarchy.graph.graphId, nodeId, currentGeneration, newGeneration, activationId),
       controlEpoch: hierarchy.state.controlEpoch,
       nodeId,
       generation: currentGeneration,
@@ -477,7 +478,7 @@ export class OrchestrationV2Controller {
       if (snapshot?.providerId === 'drive-folder-dispatch-v1' && snapshot?.kind === 'READY') {
         providerEvent = {
           type: OrchestrationHierarchyEventType.PROVIDER_FOLDER_DISPATCH_REQUESTED,
-          eventId: `provider-folder:${snapshot.snapshotHash}`,
+          eventId: compactOrchestrationEventId('provider-folder', hierarchy.graph.graphId, item.nodeId, snapshot.snapshotHash, snapshot.providerRevision),
           controlEpoch: hierarchy.state.controlEpoch,
           nodeId: item.nodeId,
           providerId: snapshot.providerId,
@@ -489,7 +490,7 @@ export class OrchestrationV2Controller {
       } else {
         providerEvent = {
           type: OrchestrationHierarchyEventType.PROVIDER_SLOT_COUNT_REQUESTED,
-          eventId: `provider:${snapshot.providerId}:${item.nodeId}:revision:${snapshot.providerRevision}`,
+          eventId: compactOrchestrationEventId('provider', hierarchy.graph.graphId, snapshot.providerId, item.nodeId, snapshot.providerRevision),
           controlEpoch: hierarchy.state.controlEpoch,
           nodeId: item.nodeId,
           providerId: snapshot.providerId,
@@ -548,7 +549,13 @@ export class OrchestrationV2Controller {
       if (status === 'READY' && result?.assistantComplete === true) {
         const dispatched = await this.dispatchHierarchyEvent({
           type: OrchestrationHierarchyEventType.NODE_TERMINAL,
-          eventId: `hierarchy-terminal:${hierarchy.graph.graphId}:${probe.nodeId}:${probe.activationId}`,
+          eventId: compactOrchestrationEventId(
+            'hierarchy-terminal',
+            hierarchy.graph.graphId,
+            probe.nodeId,
+            probe.activationId,
+            probe.generation,
+          ),
           controlEpoch: hierarchy.state.controlEpoch,
           nodeId: probe.nodeId,
           generation: probe.generation,
