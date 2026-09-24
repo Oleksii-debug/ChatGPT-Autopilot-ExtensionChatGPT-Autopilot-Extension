@@ -6,6 +6,7 @@
  */
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import { SpecialistAssignmentState, claimEligibleSpecialistAssignmentsV1, normalizeSpecialistAssignmentV1 } from './specialist-assignment.js';
+import { normalizeVerificationV1 } from './universal-agent-contracts.js';
 import {
   ExecutionOwnershipState,
   createExecutionOwnershipV1,
@@ -157,7 +158,7 @@ export function claimAgentPlanSpecialistHandoffsV1(rawPlan, rawAssignments, { ex
  * not dispatch the retry: normal bounded admission must claim it again.
  */
 export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments, {
-  executionOwnerships = [], agentId, leaseId, verifierId, verificationAuthorityId, evidence,
+  executionOwnerships = [], agentId, leaseId, verification,
   at = new Date().toISOString(),
 } = {}) {
   let plan = normalizeAgentPlanV1(rawPlan);
@@ -167,8 +168,14 @@ export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments,
   if (!assignment || assignment.state !== SpecialistAssignmentState.LEASED || assignment.leaseId !== preservedLeaseId) {
     throw new Error('SAFE_RETRY requires the preserved specialist lease identity');
   }
-  const verifier = id(verifierId, 'verifierId');
-  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) {
+  let normalizedVerification;
+  try {
+    normalizedVerification = normalizeVerificationV1(verification);
+  } catch (error) {
+    throw new Error(`SAFE_RETRY requires canonical verification: ${error.message}`);
+  }
+  const verifier = normalizedVerification.verifierId;
+  if (!verifier || [assignment.agentId, assignment.parentAgentId].includes(verifier)) {
     throw new Error('SAFE_RETRY verifier must be independent from specialist and parent');
   }
   const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
@@ -179,13 +186,10 @@ export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments,
   if (ownership.state !== ExecutionOwnershipState.RECONCILE || ownership.leaseId !== preservedLeaseId) {
     throw new Error('SAFE_RETRY requires matching canonical execution reconciliation');
   }
-  const authority = id(verificationAuthorityId, 'verificationAuthorityId');
-  if (authority !== ownership.policyEnvelopeId) throw new Error('SAFE_RETRY authority must bind the execution policy envelope');
-  const noEffectEvidence = text(evidence, 'SAFE_RETRY no-effect evidence', 1000);
   const availableOwnership = resolveExecutionReconciliationV1(ownership, {
     leaseId: preservedLeaseId,
     outcome: 'SAFE_RETRY',
-    evidence: noEffectEvidence,
+    verification: normalizedVerification,
     at,
   });
   assignment.state = SpecialistAssignmentState.READY;
@@ -199,7 +203,7 @@ export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments,
     assignments: assignments.map(normalizeSpecialistAssignmentV1),
     executionOwnerships: ownerships.map(item => item.effectId === effectId ? availableOwnership : item),
     retriableAgentId: assignment.agentId,
-    safeRetryEvidence: { verifierId: verifier, verificationAuthorityId: authority, evidence: noEffectEvidence },
+    safeRetryVerification: normalizedVerification,
   });
 }
 
