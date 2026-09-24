@@ -618,7 +618,6 @@ function maybePrepareParentReconciliation(graph, runtime, parentId, nowMs) {
     ? `provider:${parent.providerBinding.providerId}:revision:${providerState.activeRevision}`
     : `g${parentRuntime.generation}:r${parentRuntime.round}`;
   if (parentRuntime.completedBarrierKeys[key]) return null;
-  parentRuntime.completedBarrierKeys[key] = true;
   const activationId = providerState?.activeRevision
     ? `reconcile:${parentId}:provider:${parent.providerBinding.providerId}:revision:${providerState.activeRevision}:g${parentRuntime.generation}:r${parentRuntime.round}`
     : reconciliationId(parentId, parentRuntime.generation, parentRuntime.round);
@@ -629,6 +628,7 @@ function maybePrepareParentReconciliation(graph, runtime, parentId, nowMs) {
     purpose: OrchestrationActivationPurpose.RECONCILE,
     nowMs,
   });
+  if (prepared.action) parentRuntime.completedBarrierKeys[key] = true;
   return prepared.action;
 }
 
@@ -926,7 +926,6 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     if (dispatches.length === 0) {
       const key = `provider:${binding.providerId}:revision:${providerRevision}`;
       if (!nodeRuntime.completedBarrierKeys[key]) {
-        nodeRuntime.completedBarrierKeys[key] = true;
         const activationId = `reconcile:${nodeId}:provider:${binding.providerId}:revision:${providerRevision}:g${nodeRuntime.generation}:r${nodeRuntime.round}`;
         const prepared = prepareActivation(graph, runtime, {
           nodeId,
@@ -935,7 +934,10 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
           purpose: OrchestrationActivationPurpose.RECONCILE,
           nowMs,
         });
-        if (prepared.action) actions.push(prepared.action);
+        if (prepared.action) {
+          nodeRuntime.completedBarrierKeys[key] = true;
+          actions.push(prepared.action);
+        }
       }
     }
 
@@ -1039,7 +1041,6 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     if (requestedSlotCount === 0) {
       const key = `provider:${binding.providerId}:revision:${providerRevision}`;
       if (!nodeRuntime.completedBarrierKeys[key]) {
-        nodeRuntime.completedBarrierKeys[key] = true;
         const activationId = `reconcile:${nodeId}:provider:${binding.providerId}:revision:${providerRevision}:g${nodeRuntime.generation}:r${nodeRuntime.round}`;
         const prepared = prepareActivation(graph, runtime, {
           nodeId,
@@ -1048,7 +1049,10 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
           purpose: OrchestrationActivationPurpose.RECONCILE,
           nowMs,
         });
-        if (prepared.action) actions.push(prepared.action);
+        if (prepared.action) {
+          nodeRuntime.completedBarrierKeys[key] = true;
+          actions.push(prepared.action);
+        }
       }
     }
 
@@ -1203,7 +1207,7 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     ledger.phase = OrchestrationActivationPhase.EFFECT_CONFIRMED;
     ledger.effectConfirmedAt = nowMs;
     ledger.effectRef = text(event.effectRef ?? event.effect_ref);
-    nodeRuntime.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+    if (nodeRuntime.scopeState === 'RUNNING') nodeRuntime.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
     return { runtime, actions, deduplicated: false, reason: 'EFFECT_CONFIRMED' };
   }
 
@@ -1230,8 +1234,14 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     ledger.phase = OrchestrationActivationPhase.TERMINAL;
     ledger.terminalAt = nowMs;
     ledger.terminalStatus = status;
-    nodeRuntime.lifecycle = OrchestrationNodeLifecycle.TERMINAL;
+    if (nodeRuntime.scopeState === 'RUNNING') nodeRuntime.lifecycle = OrchestrationNodeLifecycle.TERMINAL;
     nodeRuntime.lastTerminalStatus = status;
+
+    // Record late external truth, but a paused/stopped scope cannot delegate or
+    // reconcile. Resume may re-evaluate its preserved barrier evidence.
+    if (ancestorScopeState(graph, runtime, nodeId) !== 'RUNNING') {
+      return { runtime, actions, deduplicated: false, reason: `SCOPE_${nodeRuntime.scopeState}` };
+    }
 
     if ([OrchestrationActivationPurpose.DELEGATE, OrchestrationActivationPurpose.RECOVERY].includes(ledger.purpose)
         && node.childIds.length
