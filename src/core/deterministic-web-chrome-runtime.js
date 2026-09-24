@@ -180,11 +180,61 @@ export function createChromeDeterministicWebReconcileVerifierV1(chromeApi, { now
     throw new Error('independent deterministic web readback requires Chrome tabs, scripting, and permissions APIs');
   }
   return async ({ invocation, executionId, attempt, outcome, targetId, postcondition }) => {
-    if (String(outcome || '').toUpperCase() !== 'VERIFIED') {
-      throw new Error('automatic Chrome reconciliation only proves VERIFIED outcomes');
-    }
+    if (typeof outcome !== 'string') throw new Error('Chrome reconciliation outcome must be text');
+    const normalizedOutcome = outcome.trim().toUpperCase();
     const normalizedTarget = normalizeChromeDeterministicWebTargetV1(targetId);
     const observedAt = now();
+
+    if (normalizedOutcome === 'MANUAL_REVIEW') {
+      if (typeof chromeApi.tabs.query !== 'function') {
+        throw new Error('closed-target reconciliation requires Chrome tabs.query');
+      }
+      const liveTabs = await chromeApi.tabs.query({});
+      if (!Array.isArray(liveTabs) || liveTabs.some(tab => tab?.id === normalizedTarget.tabId)) {
+        throw new Error('MANUAL_REVIEW requires the deterministic web target tab to be closed');
+      }
+      const observation = normalizeObservationV1({
+        schemaVersion: 1,
+        observationId: `web-reconcile-closed-${invocation.invocationId}`,
+        invocationId: invocation.invocationId,
+        status: 'OK',
+        summary: 'Fresh Chrome tab inventory proves the original target is closed.',
+        data: {
+          targetId: normalizedTarget.targetId,
+          tabId: normalizedTarget.tabId,
+          quiescent: true,
+          targetClosed: true,
+        },
+        artifactRefs: [],
+        observedAt,
+      });
+      const verification = normalizeVerificationV1({
+        schemaVersion: 1,
+        verificationId: `web-reconcile-closed-verify-${invocation.invocationId}`,
+        invocationId: invocation.invocationId,
+        observationId: observation.observationId,
+        status: 'AMBIGUOUS',
+        reasonCode: 'TARGET_CLOSED_QUIESCENT',
+        summary: 'The prior effect remains semantically unresolved, but the closed target can no longer receive it.',
+        evidenceArtifactIds: [],
+        verifiedAt: observedAt,
+        verifierId: DETERMINISTIC_WEB_RECONCILE_VERIFIER_ID,
+        verificationAuthorityId: invocation.policyDecisionId,
+        effectId: invocation.invocationId,
+        executionId,
+        attempt,
+      });
+      return Object.freeze({
+        verifierId: DETERMINISTIC_WEB_RECONCILE_VERIFIER_ID,
+        targetId: normalizedTarget.targetId,
+        observation,
+        verification,
+      });
+    }
+
+    if (normalizedOutcome !== 'VERIFIED') {
+      throw new Error('automatic Chrome reconciliation only proves VERIFIED or closed-target MANUAL_REVIEW outcomes');
+    }
     const readback = await readChromeTargetV1(chromeApi, normalizedTarget.targetId);
     const observation = normalizeObservationV1({
       schemaVersion: 1,
