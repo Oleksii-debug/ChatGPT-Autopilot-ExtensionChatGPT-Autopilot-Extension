@@ -112,6 +112,39 @@ test('owner-scoped search is deterministic, bounded, and never follows symlinks'
   await assert.rejects(searchFilesystemV1(ioScope, outside, 'alpha'), /outside owner scope/);
 });
 
+test('search enumeration itself never reads beyond maxEntries budget', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-search-budget-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const owned = path.join(sandbox, 'owned');
+  await fs.mkdir(owned);
+  for (let index = 0; index < 32; index += 1) {
+    await fs.writeFile(path.join(owned, `item-${String(index).padStart(2, '0')}.txt`), String(index));
+  }
+  const ioScope = createFilesystemScopeV1({ scopeId: 'search-budget-owner', roots: [owned] });
+  let readCalls = 0;
+  let opens = 0;
+  const result = await searchFilesystemV1(ioScope, owned, 'item', {
+    maxEntries: 1,
+    maxResults: 1,
+    openDirectory: async current => {
+      opens += 1;
+      const real = await fs.opendir(current, { bufferSize: 1 });
+      return {
+        async read() {
+          readCalls += 1;
+          return real.read();
+        },
+        async close() { return real.close(); },
+      };
+    },
+  });
+  assert.equal(opens, 1);
+  assert.equal(readCalls, 1, 'maxEntries=1 must perform exactly one directory read, not materialize the directory');
+  assert.equal(result.visitedEntries, 1);
+  assert.equal(result.truncated, true);
+  assert.equal(result.items.length, 1);
+});
+
 test('search fails closed when a queued directory is swapped to an outside link before enumeration', async t => {
   const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-search-race-'));
   t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
