@@ -138,6 +138,7 @@ test('reconciliation verifier receives the exact durable target, action, postcon
       context = structuredClone(input);
       return {
         verifierId: 'independent-chrome-readback',
+        targetId: input.targetId,
         observation: {
           schemaVersion: 1,
           observationId: 'reconcile-context-observation',
