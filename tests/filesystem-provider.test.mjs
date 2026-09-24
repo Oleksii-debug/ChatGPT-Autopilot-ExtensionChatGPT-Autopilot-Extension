@@ -10,6 +10,7 @@ import {
   boundSearchResultsV1,
   createFilesystemScopeV1,
   readFilesystemFileV1,
+  searchFilesystemV1,
   withAuthorizedExistingFileV1,
 } from '../companion/native-host/filesystem-provider.mjs';
 
@@ -84,6 +85,31 @@ test('existing-file write boundary checks object identity before invoking effect
   }, async () => { effectCalled = true; }), /symbolic link|escapes owner scope|identity changed|ELOOP/i);
   assert.equal(effectCalled, false);
   assert.equal(await fs.readFile(secret, 'utf8'), 'secret');
+});
+
+test('owner-scoped search is deterministic, bounded, and never follows symlinks', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-search-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const owned = path.join(sandbox, 'owned');
+  const outside = path.join(sandbox, 'outside');
+  await fs.mkdir(path.join(owned, 'docs'), { recursive: true });
+  await fs.mkdir(outside);
+  await fs.writeFile(path.join(owned, 'docs', 'alpha-note.txt'), 'a');
+  await fs.writeFile(path.join(owned, 'docs', 'alpha-two.txt'), 'b');
+  await fs.writeFile(path.join(outside, 'alpha-secret.txt'), 'secret');
+  await fs.symlink(outside, path.join(owned, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+  const ioScope = createFilesystemScopeV1({ scopeId: 'search-owner', roots: [owned] });
+
+  const found = await searchFilesystemV1(ioScope, owned, 'ALPHA', { maxResults: 1 });
+  assert.deepEqual(found.items, ['docs/alpha-note.txt']);
+  assert.equal(found.truncated, true);
+  assert.ok(found.visitedEntries >= 3);
+  assert.equal(found.items.some(item => item.includes('secret')), false);
+
+  const workBound = await searchFilesystemV1(ioScope, owned, 'alpha', { maxEntries: 1 });
+  assert.equal(workBound.truncated, true);
+  assert.equal(workBound.visitedEntries, 1);
+  await assert.rejects(searchFilesystemV1(ioScope, outside, 'alpha'), /outside owner scope/);
 });
 
 test('write scope cannot exceed readable owner scope', () => {
