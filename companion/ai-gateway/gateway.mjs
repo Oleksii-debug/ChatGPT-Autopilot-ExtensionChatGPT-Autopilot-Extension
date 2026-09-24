@@ -345,6 +345,10 @@ function compatibleHeaders(endpoint, env = process.env) {
   if (!apiKeyEnv) return {};
   const key = clean(env[apiKeyEnv]);
   if (!key) {
+    let loopback = false;
+    try { loopback = isLoopbackHostname(new URL(clean(endpoint?.baseUrl)).hostname); }
+    catch (_) {}
+    if (loopback) return {};
     throw gatewayError(
       `Credential ${apiKeyEnv} is not configured for OpenAI-compatible endpoint ${clean(endpoint?.endpointId) || 'unknown'}`,
       428,
