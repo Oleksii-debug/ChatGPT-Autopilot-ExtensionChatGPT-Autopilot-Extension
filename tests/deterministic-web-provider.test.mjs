@@ -23,8 +23,20 @@ function provider(transport, leaseState = { value: null }) {
 test('normalizes bounded deterministic web actions and rejects unsafe URL protocols', () => {
   assert.deepEqual(normalizeDeterministicWebActionV1({ kind: 'navigate', url: 'https://example.test/path' }), { kind: 'NAVIGATE', url: 'https://example.test/path' });
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'navigate', url: 'javascript:alert(1)' }), /protocol/);
+  assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'navigate', url: 'https://user:secret@example.test/' }), /credentials/);
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'click', selector: '' }), /selector/);
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'click', selector: '#ok', surprise: true }), /unknown field/);
+});
+
+test('invalid actions and verification requirements cannot acquire a lease or execute', async () => {
+  let effects = 0;
+  const leaseState = { value: null };
+  const p = provider({ execute: async () => { effects += 1; }, observe: async () => ({ data: {} }) }, leaseState);
+  await assert.rejects(() => p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '' }, postcondition: { selector: '#done' } }), /selector/);
+  await assert.rejects(() => p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: {} }), /postcondition/);
+  await assert.rejects(() => p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#done', url: 'https://example.test/' } }), /exactly one/);
+  assert.equal(leaseState.value, null);
+  assert.equal(effects, 0);
 });
 
 test('executes only authorized invocation and independently verifies URL postcondition', async () => {
@@ -82,6 +94,22 @@ test('effectful dispatch rejection is AMBIGUOUS and fences a competing invocatio
   const blocked = await competitor.invoke({ ...fixtures('inv-2'), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
   assert.equal(blocked.status, 'TARGET_CONFLICT');
   assert.equal(competingExecuted, false);
+});
+
+test('an expired lease does not erase unresolved target ownership after a restart', async () => {
+  let executed = false;
+  const leaseState = { value: {
+    schemaVersion: 1, targetId: 'tab-1', ownerInvocationId: 'inv-1', leaseId: 'old-lease',
+    acquiredAt: '2026-09-23T15:18:00.000Z', expiresAt: '2026-09-23T15:19:00.000Z',
+  } };
+  const restarted = provider({ execute: async () => { executed = true; }, observe: async () => ({ data: {} }) }, leaseState);
+  const result = await restarted.invoke({ ...fixtures('inv-2'), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
+  assert.equal(result.status, 'TARGET_CONFLICT');
+  assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
+  assert.equal(executed, false);
+  const sameOwner = await restarted.invoke({ ...fixtures('inv-1'), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#buy' }, postcondition: { selector: '#receipt' } });
+  assert.equal(sameOwner.status, 'TARGET_CONFLICT');
+  assert.equal(executed, false);
 });
 
 test('independent verifier fails when expected selector is absent', async () => {

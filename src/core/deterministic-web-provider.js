@@ -26,8 +26,7 @@ function normalizeUrl(value) {
   let url;
   try { url = new URL(raw); } catch { throw new Error('url is invalid'); }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('url protocol is not allowed');
-  url.username = '';
-  url.password = '';
+  if (url.username || url.password) throw new Error('url credentials are not allowed');
   return url.toString();
 }
 
@@ -70,6 +69,15 @@ function verifyPostcondition({ invocationId, observation, expected, now }) {
   });
 }
 
+function normalizePostcondition(expected) {
+  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) throw new Error('independent verifier requires a postcondition');
+  const keys = Object.keys(expected);
+  if (keys.length !== 1 || !['url', 'selector'].includes(keys[0])) throw new Error('independent verifier requires exactly one url or selector postcondition');
+  return Object.freeze(keys[0] === 'url'
+    ? { url: normalizeUrl(expected.url) }
+    : { selector: text(expected.selector, 'expected.selector', MAX_SELECTOR) });
+}
+
 export function createDeterministicWebProviderV1({ transport, readLease = () => null, writeLease = () => {}, now = () => new Date().toISOString(), leaseId = () => `web-${Date.now()}` } = {}) {
   if (!transport || typeof transport.execute !== 'function' || typeof transport.observe !== 'function') throw new Error('deterministic web transport is required');
   return Object.freeze({
@@ -78,11 +86,17 @@ export function createDeterministicWebProviderV1({ transport, readLease = () => 
       const authorized = assertToolInvocationAuthorizedV1({ invocation, policyDecision, toolDescriptor, grantedCapabilityIds });
       if (authorized.invocation.providerId !== PROVIDER_ID) throw new Error('invocation provider is not deterministic-web');
       const invocationId = authorized.invocation.invocationId;
+      const normalizedAction = normalizeDeterministicWebActionV1(action);
+      const expected = normalizePostcondition(postcondition);
       const current = await readLease(targetId);
+      // Expiry alone is not independent proof that the previous external effect
+      // did not happen. Recovery must explicitly clear an unresolved hold.
+      if (current) {
+        return Object.freeze({ status: 'TARGET_CONFLICT', lease: current });
+      }
       const acquired = acquireBrowserTargetLeaseV1({ current, targetId, ownerInvocationId: invocationId, leaseId: leaseId(), now: now() });
       if (acquired.status === 'CONFLICT') return Object.freeze({ status: 'TARGET_CONFLICT', lease: acquired.lease });
       await writeLease(targetId, acquired.lease);
-      const normalizedAction = normalizeDeterministicWebActionV1(action);
       let dispatchStarted = false;
       let terminal = false;
       try {
@@ -102,7 +116,7 @@ export function createDeterministicWebProviderV1({ transport, readLease = () => 
           artifactRefs: raw?.artifactRefs || [],
           observedAt: now(),
         });
-        const verification = verifyPostcondition({ invocationId, observation, expected: postcondition || {}, now: now() });
+        const verification = verifyPostcondition({ invocationId, observation, expected, now: now() });
         terminal = true;
         return Object.freeze({ status: verification.status, observation, verification });
       } catch (error) {
