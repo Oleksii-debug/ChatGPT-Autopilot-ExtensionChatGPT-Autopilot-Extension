@@ -22,6 +22,11 @@ export const OrchestrationBarrierMode = Object.freeze({
   REQUIRED_DIRECT_CHILDREN: 'REQUIRED_DIRECT_CHILDREN',
 });
 
+export const OrchestrationLoopMode = Object.freeze({
+  ONE_SHOT: 'ONE_SHOT',
+  CONTINUOUS: 'CONTINUOUS',
+});
+
 export const OrchestrationTerminalStatus = Object.freeze({
   COMPLETED: 'COMPLETED',
   NO_ACTION: 'NO_ACTION',
@@ -73,6 +78,7 @@ export const OrchestrationHierarchyActionType = Object.freeze({
 
 const CHAT_MODES = new Set(Object.values(OrchestrationChatMode));
 const BARRIER_MODES = new Set(Object.values(OrchestrationBarrierMode));
+const LOOP_MODES = new Set(Object.values(OrchestrationLoopMode));
 const TERMINAL_STATUSES = new Set(Object.values(OrchestrationTerminalStatus));
 const PURPOSES = new Set(Object.values(OrchestrationActivationPurpose));
 const EVENT_TYPES = new Set(Object.values(OrchestrationHierarchyEventType));
@@ -99,6 +105,31 @@ function requireInteger(value, label, min, max) {
     throw new Error(`Invalid ${label}`);
   }
   return parsed;
+}
+
+function stableHash64(value) {
+  const input = String(value ?? '');
+  let left = 0x811c9dc5;
+  let right = 0x9e3779b9;
+  for (let index = 0; index < input.length; index += 1) {
+    const code = input.charCodeAt(index);
+    left = Math.imul(left ^ code, 0x01000193) >>> 0;
+    right = Math.imul(right ^ (code + index), 0x85ebca6b) >>> 0;
+  }
+  return `${left.toString(16).padStart(8, '0')}${right.toString(16).padStart(8, '0')}`;
+}
+
+export function compactOrchestrationEventId(prefix, ...parts) {
+  const safePrefix = requireId(prefix, 'event prefix');
+  return `${safePrefix}:${stableHash64(parts.map(part => String(part ?? '')).join('\u001f'))}`;
+}
+
+function normalizeLoopPolicy(raw) {
+  const source = isObject(raw) ? raw : {};
+  const mode = text(source.mode || OrchestrationLoopMode.ONE_SHOT).toUpperCase();
+  if (!LOOP_MODES.has(mode)) throw new Error('Invalid loopPolicy.mode');
+  const maxRounds = requireInteger(source.maxRounds ?? source.max_rounds ?? 0, 'loopPolicy.maxRounds', 0, 1000000);
+  return { mode, maxRounds };
 }
 
 function clone(value) {
@@ -274,11 +305,13 @@ export function validateOrchestrationGraphV1(raw) {
   assertAcyclic(nodesById, nodeOrder);
   const rootIds = nodeOrder.filter(nodeId => nodesById[nodeId].parentId === null);
   if (!rootIds.length) throw new Error('Orchestration graph requires at least one root');
+  const loopPolicy = normalizeLoopPolicy(raw.loopPolicy ?? raw.loop_policy);
 
   return {
     schemaVersion: ORCHESTRATION_GRAPH_SCHEMA_VERSION,
     graphId,
     controlEpoch,
+    loopPolicy,
     promptProfiles,
     rootIds,
     nodeOrder,
@@ -406,6 +439,13 @@ function ancestorScopeState(graph, runtime, nodeId) {
 
 function activationIdForChild(parentActivationId, childId, generation, round) {
   return `${parentActivationId}:child:${childId}:g${generation}:r${round}`;
+}
+
+function activationRound(activationId) {
+  const match = String(activationId || '').match(/:r(\d+)$/u);
+  if (!match) return 0;
+  const round = Number(match[1]);
+  return Number.isSafeInteger(round) && round > 0 ? round : 0;
 }
 
 function reconciliationId(parentNodeId, generation, round) {
@@ -544,26 +584,29 @@ function terminalForCurrentRound(runtimeNode, childId) {
   return childRuntime === true;
 }
 
+function childSubtreeTerminalForBarrier(graph, runtime, childId) {
+  const child = graph.nodesById[childId];
+  const childRuntime = runtime.nodesById[childId];
+  const current = currentActivation(childRuntime);
+  if (!current || current.phase !== OrchestrationActivationPhase.TERMINAL) return false;
+  if (child.childIds.length) {
+    return current.purpose === OrchestrationActivationPurpose.RECONCILE;
+  }
+  return true;
+}
+
 function barrierSatisfied(graph, runtime, parentId) {
   const parent = graph.nodesById[parentId];
   const parentRuntime = runtime.nodesById[parentId];
   if (parent.providerBinding) {
     const providerState = providerStateFor(parentRuntime);
     if (!providerState.activeRevision) return false;
-    return providerState.activeChildIds.every(childId => {
-      const childRuntime = runtime.nodesById[childId];
-      const current = currentActivation(childRuntime);
-      return Boolean(current && current.phase === OrchestrationActivationPhase.TERMINAL);
-    });
+    return providerState.activeChildIds.every(childId => childSubtreeTerminalForBarrier(graph, runtime, childId));
   }
   const barrier = parent.barrier;
   if (barrier.mode === OrchestrationBarrierMode.NONE) return false;
   const required = barrier.childIds;
-  return required.every(childId => {
-    const childRuntime = runtime.nodesById[childId];
-    const current = currentActivation(childRuntime);
-    return Boolean(current && current.phase === OrchestrationActivationPhase.TERMINAL);
-  });
+  return required.every(childId => childSubtreeTerminalForBarrier(graph, runtime, childId));
 }
 
 function maybePrepareParentReconciliation(graph, runtime, parentId, nowMs) {
@@ -584,6 +627,67 @@ function maybePrepareParentReconciliation(graph, runtime, parentId, nowMs) {
     activationId,
     generation: parentRuntime.generation,
     purpose: OrchestrationActivationPurpose.RECONCILE,
+    nowMs,
+  });
+  return prepared.action;
+}
+
+function pruneContinuousRuntimeHistory(runtime, {
+  maxProcessedEvents = 5000,
+  maxActivationsPerNode = 62,
+  maxBarrierKeysPerNode = 64,
+} = {}) {
+  const eventEntries = Object.entries(runtime.processedEventIds || {});
+  if (eventEntries.length > maxProcessedEvents) {
+    eventEntries.sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0));
+    runtime.processedEventIds = Object.fromEntries(eventEntries.slice(0, maxProcessedEvents));
+  }
+  for (const nodeId of runtime.nodeOrder) {
+    const nodeRuntime = runtime.nodesById[nodeId];
+    const activations = Object.values(nodeRuntime.activationLedger || {});
+    if (activations.length > maxActivationsPerNode) {
+      const keep = new Set(
+        activations.slice().sort((left, right) => Number(right.preparedAt || 0) - Number(left.preparedAt || 0))
+          .slice(0, maxActivationsPerNode).map(entry => entry.activationId),
+      );
+      for (const activationId of Object.keys(nodeRuntime.activationLedger)) {
+        if (activationId === nodeRuntime.currentActivationId) continue;
+        if (!keep.has(activationId)) delete nodeRuntime.activationLedger[activationId];
+      }
+    }
+    const barrierKeys = Object.keys(nodeRuntime.completedBarrierKeys || {});
+    if (barrierKeys.length > maxBarrierKeysPerNode) {
+      const keepKeys = new Set(barrierKeys.slice(-maxBarrierKeysPerNode));
+      for (const key of barrierKeys) {
+        if (!keepKeys.has(key)) delete nodeRuntime.completedBarrierKeys[key];
+      }
+    }
+  }
+}
+
+function prepareNextContinuousRound(graph, runtime, rootNodeId, nowMs) {
+  if (graph.loopPolicy.mode !== OrchestrationLoopMode.CONTINUOUS) return null;
+  const rootRuntime = runtime.nodesById[rootNodeId];
+  const completedRound = rootRuntime.round;
+  if (graph.loopPolicy.maxRounds > 0 && completedRound >= graph.loopPolicy.maxRounds) return null;
+
+  const nextRound = completedRound + 1;
+  for (const nodeId of runtime.nodeOrder) {
+    const nodeRuntime = runtime.nodesById[nodeId];
+    nodeRuntime.round = nextRound;
+    nodeRuntime.currentActivationId = '';
+    nodeRuntime.lastTerminalStatus = '';
+    if (nodeRuntime.scopeState === 'RUNNING') nodeRuntime.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  }
+  pruneContinuousRuntimeHistory(runtime);
+
+  const root = graph.nodesById[rootNodeId];
+  const activationId = `loop:${rootNodeId}:g${rootRuntime.generation}:r${nextRound}`;
+  const prepared = prepareActivation(graph, runtime, {
+    nodeId: rootNodeId,
+    activationId,
+    generation: rootRuntime.generation,
+    purpose: root.childIds.length ? OrchestrationActivationPurpose.DELEGATE : OrchestrationActivationPurpose.WORK,
     nowMs,
   });
   return prepared.action;
@@ -622,6 +726,20 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
   const event = normalizeEvent(eventRaw);
   if (runtime.processedEventIds[event.eventId]) {
     return { runtime, actions: [], deduplicated: true, reason: 'DUPLICATE_EVENT' };
+  }
+  // A compacted event id can disappear from the bounded event ledger. The
+  // durable round is still authoritative, so reject an old activation before
+  // recording its id or moving updatedAt.
+  if (event.controlEpoch === runtime.controlEpoch
+      && event.type === OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED) {
+    const { nodeId, generation, activationId } = activationEventIdentity(event);
+    const current = runtime.nodesById[nodeId];
+    if (current && generation === current.generation) {
+      const requestedRound = activationRound(activationId);
+      if (requestedRound && requestedRound !== current.round) {
+        return { runtime, actions: [], deduplicated: false, reason: 'STALE_ROUND' };
+      }
+    }
   }
   runtime.processedEventIds[event.eventId] = nowMs;
   runtime.updatedAt = nowMs;
@@ -1137,6 +1255,13 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     if (!node.childIds.length || ledger.purpose === OrchestrationActivationPurpose.RECONCILE) {
       const parentAction = maybePrepareParentReconciliation(graph, runtime, node.parentId, nowMs);
       if (parentAction) actions.push(parentAction);
+    }
+    if (!node.parentId && ledger.purpose === OrchestrationActivationPurpose.RECONCILE) {
+      const nextRoundAction = prepareNextContinuousRound(graph, runtime, nodeId, nowMs);
+      if (nextRoundAction) {
+        actions.push(nextRoundAction);
+        return { runtime, actions, deduplicated: false, reason: 'CONTINUOUS_ROUND_PREPARED' };
+      }
     }
     return { runtime, actions, deduplicated: false, reason: 'TERMINAL' };
   }
