@@ -170,6 +170,11 @@ test('manual and autostart Gateway launch share one fail-closed named-provider c
   assert.match(launch, /if \(\$LASTEXITCODE -ne 0\)[\s\S]*throw/);
   assert.match(launch, /Import-DpapiEnvironmentKey/);
   assert.match(launch, /Start-Process[\s\S]*gateway\.mjs/);
+  const planAt = launch.indexOf("$planOutput = @(& $nodeExe $presetTool '--credential-plan'");
+  const firstSecretReleaseAt = launch.indexOf("if (Import-DpapiEnvironmentKey -KeyFile $openAiKeyFile");
+  const childStartAt = launch.indexOf('Start-Process -FilePath $nodeExe');
+  assert.ok(planAt >= 0 && firstSecretReleaseAt > planAt, 'credential plan must validate before any DPAPI secret release');
+  assert.ok(childStartAt > firstSecretReleaseAt, 'Gateway child must start only after validated credential loading');
   assert.match(auto, /ЗАПУСТИТИ GATEWAY\.ps1/);
   assert.match(auto, /-NonInteractive/);
   assert.doesNotMatch(auto, /provider-keys|ConvertTo-SecureString|SecureStringToBSTR/);
