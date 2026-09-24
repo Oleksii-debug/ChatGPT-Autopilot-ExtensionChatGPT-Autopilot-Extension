@@ -117,11 +117,27 @@ function decodeBase64Utf8(value) {
   catch { throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub file is not valid UTF-8 text'); }
 }
 
-function safeJson(text) {
+function safeJson(text, {
+  effectMayHaveOccurred = false,
+  safeToRetry = true,
+  status = 0,
+} = {}) {
   if (!text) return {};
-  if (text.length > MAX_TEXT) throw githubError('GITHUB_RESPONSE_TOO_LARGE', 'GitHub response exceeds the bounded response size');
+  if (text.length > MAX_TEXT) {
+    throw githubError('GITHUB_RESPONSE_TOO_LARGE', 'GitHub response exceeds the bounded response size', {
+      effectMayHaveOccurred,
+      safeToRetry,
+      status,
+    });
+  }
   try { return JSON.parse(text); }
-  catch { throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid JSON'); }
+  catch {
+    throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid JSON', {
+      effectMayHaveOccurred,
+      safeToRetry,
+      status,
+    });
+  }
 }
 
 function responseMessage(payload, status) {
@@ -201,10 +217,15 @@ export class GitHubRestClientV1 {
         status: Number(response?.status) || 0,
       });
     }
-    const payload = safeJson(text);
     const status = Number(response?.status) || 0;
-    if (!expectedStatuses.includes(status)) {
-      const definitelyRejected = SAFE_HTTP_FAILURES.has(status);
+    const accepted = expectedStatuses.includes(status);
+    const definitelyRejected = !accepted && SAFE_HTTP_FAILURES.has(status);
+    const payload = safeJson(text, {
+      effectMayHaveOccurred: effectful && !definitelyRejected,
+      safeToRetry: !effectful || definitelyRejected,
+      status,
+    });
+    if (!accepted) {
       throw githubError(`GITHUB_HTTP_${status || 'ERROR'}`, responseMessage(payload, status || 'ERROR'), {
         effectMayHaveOccurred: effectful && !definitelyRejected,
         safeToRetry: !effectful || definitelyRejected,
