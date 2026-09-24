@@ -129,16 +129,37 @@ export async function readFilesystemFileV1(scope, requestedPath, { maxBytes = MA
   });
 }
 
+async function snapshotSearchDirectory(scope, admittedRoot, current, realRoots) {
+  const [real, stat] = await Promise.all([
+    fs.realpath(current).then(canonical),
+    fs.lstat(current),
+  ]);
+  requireContained(realRoots, real, false);
+  if (!isWithin(admittedRoot, real)) fail('Filesystem search escaped admitted root');
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('Filesystem search directory identity changed during enumeration');
+  return Object.freeze({ real, stat });
+}
+
+function requireSameSearchDirectory(before, after) {
+  if (before.real !== after.real || !sameFileIdentity(before.stat, after.stat)) {
+    fail('Filesystem search directory identity changed during enumeration');
+  }
+}
+
 // Search is metadata-only and never grants execution authority. It refuses link/reparse
 // traversal and bounds both work and output so an owner-scoped root cannot become an
-// unbounded filesystem crawler. Results are stable relative paths, never ambient paths.
+// unbounded filesystem crawler. Directory and entry identities are revalidated before
+// any observed names are committed, so a pathname swap fails closed instead of leaking
+// metadata from an object outside the admitted root. Results are stable relative paths.
 export async function searchFilesystemV1(scope, requestedRoot, query, {
   maxResults = MAX_SEARCH_RESULTS,
   maxEntries = MAX_SEARCH_ENTRIES,
+  beforeEnumerate = null,
 } = {}) {
   const needle = nonEmpty(query, 'filesystem search query').toLocaleLowerCase('en-US');
   if (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > MAX_SEARCH_ENTRIES) fail('Invalid filesystem search entry bound');
   if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > MAX_SEARCH_RESULTS) fail('Invalid filesystem search bound');
+  if (beforeEnumerate != null && typeof beforeEnumerate !== 'function') fail('Invalid filesystem beforeEnumerate hook');
   const lexicalRoot = authorizeFilesystemPathV1(scope, requestedRoot);
   const admittedRoot = await authorizeFilesystemPathAtIoV1(scope, lexicalRoot, { allowMissingLeaf: false });
   const realRoots = await realRootsFor(scope, false);
@@ -149,19 +170,41 @@ export async function searchFilesystemV1(scope, requestedRoot, query, {
 
   while (pending.length) {
     const current = pending.shift();
-    const currentReal = canonical(await fs.realpath(current));
-    requireContained(realRoots, currentReal, false);
-    if (!isWithin(admittedRoot, currentReal)) fail('Filesystem search escaped admitted root');
+    const admittedDirectory = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+    if (beforeEnumerate != null) await beforeEnumerate(current, admittedDirectory);
+
+    // Revalidate immediately before pathname-based enumeration, then again afterwards.
+    // Node currently exposes no portable openat/readdir-by-handle API, so the search also
+    // validates every returned entry before exposing its name or traversing it.
+    const before = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+    requireSameSearchDirectory(admittedDirectory, before);
     const entries = await fs.readdir(current, { withFileTypes: true });
+    const after = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+    requireSameSearchDirectory(before, after);
+
     entries.sort((a, b) => a.name.localeCompare(b.name, 'en'));
     for (const entry of entries) {
       if (visited >= maxEntries) { workTruncated = true; pending.length = 0; break; }
       visited += 1;
       const candidate = path.join(current, entry.name);
-      if (entry.isSymbolicLink()) continue;
+      const candidateStat = await fs.lstat(candidate).catch(error => {
+        if (error?.code === 'ENOENT') fail('Filesystem search entry identity changed during enumeration');
+        throw error;
+      });
+      if (candidateStat.isSymbolicLink()) continue;
+      const candidateReal = canonical(await fs.realpath(candidate));
+      requireContained(realRoots, candidateReal, false);
+      if (!isWithin(admittedRoot, candidateReal)) fail('Filesystem search escaped admitted root');
+      const postCandidateStat = await fs.lstat(candidate).catch(error => {
+        if (error?.code === 'ENOENT') fail('Filesystem search entry identity changed during enumeration');
+        throw error;
+      });
+      if (postCandidateStat.isSymbolicLink() || !sameFileIdentity(candidateStat, postCandidateStat)) {
+        fail('Filesystem search entry identity changed during enumeration');
+      }
       const relativePath = path.relative(lexicalRoot, candidate).split(path.sep).join('/');
       if (relativePath.toLocaleLowerCase('en-US').includes(needle)) matches.push(relativePath);
-      if (entry.isDirectory()) pending.push(candidate);
+      if (postCandidateStat.isDirectory()) pending.push(candidate);
     }
   }
 
