@@ -16,7 +16,18 @@ function invocation(id = 'fs-effect-1') {
     arguments: {
       rootId: 'workspace',
       relativePath: 'note.txt',
-      text: 'after',
+      contentArtifactRef: {
+        schemaVersion: 1,
+        artifactId: 'artifact-effect-1',
+        kind: 'text',
+        uri: 'artifact://effect-1',
+        mediaType: 'text/plain',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 5,
+        createdAt: new Date(baseMs).toISOString(),
+        producerInvocationId: null,
+        sensitive: true,
+      },
       expectedSha256: 'b'.repeat(64),
     },
     createdAt: new Date(baseMs).toISOString(),
@@ -54,14 +65,15 @@ function verified({ invocation: inv, observation }) {
     status: 'VERIFIED',
     reasonCode: 'POSTCONDITION_MATCHED',
     summary: 'Independent readback matched the expected filesystem digest.',
-    evidenceArtifactIds: [],
+    evidenceArtifactIds: ['artifact-effect-1'],
     verifiedAt: new Date(baseMs + 2000).toISOString(),
   };
 }
 
 test('filesystem write persists EXECUTING before dispatch, verifies, commits, and never replays a committed effect', async () => {
   const savedPhases = [];
-  const store = memoryStore(state => savedPhases.push(state.phase));
+  const persisted = [];
+  const store = memoryStore(state => { savedPhases.push(state.phase); persisted.push(JSON.stringify(state)); });
   let calls = 0;
   const provider = {
     authorize: ({ invocation: inv, policyDecision }) => ({ invocation: inv, policyDecision }),
@@ -82,6 +94,7 @@ test('filesystem write persists EXECUTING before dispatch, verifies, commits, an
   assert.equal(result.effectState.phase, ExactEffectPhase.COMMITTED);
   assert.equal(calls, 1);
   assert.ok(savedPhases.indexOf(ExactEffectPhase.EXECUTING) < savedPhases.indexOf(ExactEffectPhase.OBSERVED));
+  assert.equal(persisted.some(serialized => serialized.includes('"text":"after"')), false);
   await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: policy() }), /cannot execute from COMMITTED/);
   assert.equal(calls, 1);
 });
