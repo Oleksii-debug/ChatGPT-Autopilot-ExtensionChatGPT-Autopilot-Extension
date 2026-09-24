@@ -5,27 +5,27 @@ import {
   HUMAN_SUPERVISION_SCHEMA_VERSION,
   HumanSupervisionKind,
   HumanSupervisionState,
-  PolicyAskDecision,
   normalizeHumanSupervisionRequestV1,
-  normalizeHumanSupervisionResponseV1,
+  normalizePolicyApprovalAttestationV1,
+  normalizeClarificationResponseV1,
   projectHumanSupervisionV1,
-  resolveHumanSupervisionV1,
+  resolveClarificationV1,
 } from '../src/core/human-supervision.js';
 
 const CREATED = '2026-09-24T22:00:00.000Z';
 const FIRST_EXPIRES = '2026-09-24T22:10:00.000Z';
 const SECOND_EXPIRES = '2026-09-24T22:20:00.000Z';
 
-function policyRequest(overrides = {}) {
+function approvalRequest(overrides = {}) {
   return {
     schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
     supervisionId: 'supervision-1',
     jobId: 'job-1',
     stepId: 'step-7',
-    kind: HumanSupervisionKind.POLICY_ASK,
-    question: 'Allow the exact requested external action?',
+    kind: HumanSupervisionKind.POLICY_APPROVAL,
+    question: 'Review the exact approval ticket.',
     createdAt: CREATED,
-    policyDecisionId: 'policy-decision-1',
+    approvalId: 'approval-1',
     reviewStages: [
       {
         stageId: 'owner',
@@ -45,18 +45,19 @@ function policyRequest(overrides = {}) {
   };
 }
 
-function policyResponse(overrides = {}) {
+function approvalAttestation(overrides = {}) {
   return {
     schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    responseId: 'response-1',
+    responseId: 'attestation-1',
     supervisionId: 'supervision-1',
     jobId: 'job-1',
     stepId: 'step-7',
     responderId: 'reviewer-owner',
     respondedAt: '2026-09-24T22:05:00.000Z',
-    reasonCode: 'OWNER_APPROVED',
+    reasonCode: 'OWNER_REVIEWED',
     evidenceArtifactIds: ['artifact-policy', 'artifact-before'],
-    policyDecision: PolicyAskDecision.ALLOW,
+    approvalId: 'approval-1',
+    approvalResolutionId: 'resolution-1',
     ...overrides,
   };
 }
@@ -70,7 +71,7 @@ function clarificationRequest(overrides = {}) {
     kind: HumanSupervisionKind.CLARIFICATION,
     question: 'Which output format should be used?',
     createdAt: CREATED,
-    policyDecisionId: '',
+    approvalId: '',
     reviewStages: [
       {
         stageId: 'owner',
@@ -105,8 +106,8 @@ function clarificationResponse(overrides = {}) {
   };
 }
 
-test('POLICY_ASK projects deterministic reviewer escalation and terminal timeout', () => {
-  const request = policyRequest();
+test('policy approval routing projects deterministic reviewer escalation without granting approval', () => {
+  const request = approvalRequest();
 
   const first = projectHumanSupervisionV1(request, CREATED);
   assert.equal(first.state, HumanSupervisionState.WAITING_APPROVAL);
@@ -126,43 +127,76 @@ test('POLICY_ASK projects deterministic reviewer escalation and terminal timeout
   assert.equal(timedOut.state, HumanSupervisionState.TIMED_OUT);
   assert.equal(timedOut.activeStageId, '');
   assert.deepEqual(timedOut.authorizedReviewerIds, []);
-  assert.equal(timedOut.nextEscalationAt, '');
-  assert.equal(timedOut.escalationPending, false);
 });
 
-test('POLICY_ASK resolution binds exact request, evidence and same-step resume', () => {
-  const result = resolveHumanSupervisionV1({
-    request: policyRequest(),
-    response: policyResponse(),
-  });
-
-  assert.equal(result.state, HumanSupervisionState.RESOLVED);
-  assert.equal(result.supervisionId, 'supervision-1');
-  assert.equal(result.jobId, 'job-1');
-  assert.equal(result.stepId, 'step-7');
-  assert.equal(result.responseId, 'response-1');
-  assert.equal(result.resolution.kind, HumanSupervisionKind.POLICY_ASK);
-  assert.equal(result.resolution.policyDecisionId, 'policy-decision-1');
-  assert.equal(result.resolution.policyDecision, PolicyAskDecision.ALLOW);
-  assert.deepEqual(result.evidenceArtifactIds, ['artifact-before', 'artifact-policy']);
-  assert.deepEqual(result.resume, {
-    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    supervisionId: 'supervision-1',
-    responseId: 'response-1',
-    jobId: 'job-1',
-    stepId: 'step-7',
-    resumeStepId: 'step-7',
-    resolvedAt: '2026-09-24T22:05:00.000Z',
-  });
-  assert.equal(Object.isFrozen(result), true);
-  assert.equal(Object.isFrozen(result.resume), true);
+test('clarification routing exposes WAITING_CLARIFICATION rather than policy authority', () => {
+  const projected = projectHumanSupervisionV1(
+    clarificationRequest(),
+    '2026-09-24T22:01:00.000Z',
+  );
+  assert.equal(projected.state, HumanSupervisionState.WAITING_CLARIFICATION);
+  assert.equal(projected.activeStageId, 'owner');
+  assert.equal(Object.hasOwn(projected, 'approvalId'), false);
 });
 
-test('active stage authorization is exact and late responses fail closed', () => {
+test('policy approval attestation binds routing identity, evidence and external approval resolution reference', () => {
+  const attestation = normalizePolicyApprovalAttestationV1(
+    approvalRequest(),
+    approvalAttestation(),
+  );
+
+  assert.equal(attestation.approvalId, 'approval-1');
+  assert.equal(attestation.approvalResolutionId, 'resolution-1');
+  assert.equal(attestation.stageId, 'owner');
+  assert.deepEqual(attestation.evidenceArtifactIds, ['artifact-before', 'artifact-policy']);
+  assert.equal(Object.hasOwn(attestation, 'decision'), false);
+  assert.equal(Object.hasOwn(attestation, 'resume'), false);
+  assert.equal(Object.isFrozen(attestation), true);
+});
+
+test('approval routing cannot mint, carry or imitate approval decision/resume authority', () => {
   assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      policyRequest(),
-      policyResponse({
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({
+      choices: [{ choiceId: 'allow', label: 'Allow' }],
+    })),
+    /cannot declare clarification choices/,
+  );
+  assert.throws(
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({ allowFreeText: true })),
+    /cannot enable clarification free text/,
+  );
+  assert.throws(
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({ approvalId: '' })),
+    /requires approvalId/,
+  );
+
+  assert.throws(
+    () => normalizePolicyApprovalAttestationV1(
+      approvalRequest(),
+      {
+        ...approvalAttestation(),
+        decision: 'APPROVE',
+      },
+    ),
+    /unknown field/,
+  );
+  assert.throws(
+    () => normalizePolicyApprovalAttestationV1(
+      approvalRequest(),
+      {
+        ...approvalAttestation(),
+        resume: { stepId: 'step-7' },
+      },
+    ),
+    /unknown field/,
+  );
+});
+
+test('active-stage reviewer authorization is exact and late attestations fail closed', () => {
+  assert.throws(
+    () => normalizePolicyApprovalAttestationV1(
+      approvalRequest(),
+      approvalAttestation({
         responderId: 'reviewer-owner',
         respondedAt: '2026-09-24T22:15:00.000Z',
       }),
@@ -170,10 +204,10 @@ test('active stage authorization is exact and late responses fail closed', () =>
     /not authorized/,
   );
 
-  const escalated = normalizeHumanSupervisionResponseV1(
-    policyRequest(),
-    policyResponse({
-      responseId: 'response-backup',
+  const escalated = normalizePolicyApprovalAttestationV1(
+    approvalRequest(),
+    approvalAttestation({
+      responseId: 'attestation-backup',
       responderId: 'reviewer-backup',
       respondedAt: '2026-09-24T22:15:00.000Z',
     }),
@@ -181,9 +215,9 @@ test('active stage authorization is exact and late responses fail closed', () =>
   assert.equal(escalated.stageId, 'backup');
 
   assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      policyRequest(),
-      policyResponse({
+    () => normalizePolicyApprovalAttestationV1(
+      approvalRequest(),
+      approvalAttestation({
         responderId: 'reviewer-backup',
         respondedAt: SECOND_EXPIRES,
       }),
@@ -192,11 +226,11 @@ test('active stage authorization is exact and late responses fail closed', () =>
   );
 });
 
-test('required evidence and exact job/step/supervision identity cannot be bypassed', () => {
+test('required evidence and exact job/step/supervision/approval identity cannot be bypassed', () => {
   assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      policyRequest(),
-      policyResponse({ evidenceArtifactIds: ['artifact-before'] }),
+    () => normalizePolicyApprovalAttestationV1(
+      approvalRequest(),
+      approvalAttestation({ evidenceArtifactIds: ['artifact-before'] }),
     ),
     /missing required evidence artifact: artifact-policy/,
   );
@@ -205,59 +239,58 @@ test('required evidence and exact job/step/supervision identity cannot be bypass
     ['supervisionId', 'supervision-other', /supervisionId mismatch/],
     ['jobId', 'job-other', /jobId mismatch/],
     ['stepId', 'step-other', /stepId mismatch/],
+    ['approvalId', 'approval-other', /approvalId mismatch/],
   ]) {
     assert.throws(
-      () => normalizeHumanSupervisionResponseV1(
-        policyRequest(),
-        policyResponse({ [field]: value }),
+      () => normalizePolicyApprovalAttestationV1(
+        approvalRequest(),
+        approvalAttestation({ [field]: value }),
       ),
       expected,
     );
   }
 });
 
-test('POLICY_ASK cannot be confused with clarification or nonterminal policy choices', () => {
-  assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({
-      choices: [{ choiceId: 'yes', label: 'Yes' }],
-    })),
-    /cannot declare clarification choices/,
-  );
-  assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({ allowFreeText: true })),
-    /cannot enable clarification free text/,
-  );
-  assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({ policyDecisionId: '' })),
-    /requires policyDecisionId/,
-  );
-  assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      policyRequest(),
-      policyResponse({ policyDecision: 'ASK' }),
-    ),
-    /must be ALLOW or DENY/,
-  );
-  assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      policyRequest(),
-      policyResponse({ clarificationText: 'yes' }),
-    ),
-    /cannot carry clarification text/,
-  );
-});
-
-test('CLARIFICATION remains data-only and cannot grant policy authority', () => {
-  const selected = resolveHumanSupervisionV1({
+test('CLARIFICATION cannot carry approval authority and resolves to same-step answer resume only', () => {
+  const selected = resolveClarificationV1({
     request: clarificationRequest(),
     response: clarificationResponse(),
   });
-  assert.equal(selected.resolution.kind, HumanSupervisionKind.CLARIFICATION);
-  assert.equal(selected.resolution.selectedChoiceId, 'pdf');
-  assert.equal(selected.resolution.clarificationText, '');
-  assert.equal(Object.hasOwn(selected.resolution, 'policyDecision'), false);
+  assert.equal(selected.state, HumanSupervisionState.RESOLVED);
+  assert.equal(selected.selectedChoiceId, 'pdf');
+  assert.equal(selected.clarificationText, '');
+  assert.equal(Object.hasOwn(selected, 'approvalId'), false);
+  assert.deepEqual(selected.resume, {
+    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
+    supervisionId: 'clarification-1',
+    responseId: 'clarification-response-1',
+    jobId: 'job-2',
+    stepId: 'step-3',
+    resumeStepId: 'step-3',
+    resolvedAt: '2026-09-24T22:05:00.000Z',
+  });
 
-  const textAnswer = normalizeHumanSupervisionResponseV1(
+  assert.throws(
+    () => normalizeHumanSupervisionRequestV1(clarificationRequest({
+      approvalId: 'approval-evil',
+    })),
+    /cannot carry approvalId/,
+  );
+
+  assert.throws(
+    () => normalizeClarificationResponseV1(
+      clarificationRequest(),
+      {
+        ...clarificationResponse(),
+        approvalResolutionId: 'resolution-evil',
+      },
+    ),
+    /unknown field/,
+  );
+});
+
+test('CLARIFICATION supports one declared choice or allowed free text, never both', () => {
+  const textAnswer = normalizeClarificationResponseV1(
     clarificationRequest(),
     clarificationResponse({
       responseId: 'clarification-response-2',
@@ -269,45 +302,21 @@ test('CLARIFICATION remains data-only and cannot grant policy authority', () => 
   assert.equal(textAnswer.clarificationText, 'Use the existing project template.');
 
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(clarificationRequest({
-      policyDecisionId: 'policy-decision-evil',
-    })),
-    /cannot carry policyDecisionId/,
-  );
-  assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      clarificationRequest(),
-      clarificationResponse({ policyDecision: PolicyAskDecision.ALLOW }),
-    ),
-    /cannot grant policy authority/,
-  );
-  assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
+    () => normalizeClarificationResponseV1(
       clarificationRequest(),
       clarificationResponse({ selectedChoiceId: 'unknown' }),
     ),
     /not declared/,
   );
   assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
+    () => normalizeClarificationResponseV1(
       clarificationRequest(),
       clarificationResponse({ clarificationText: 'also text' }),
     ),
     /exactly one choice or text answer/,
   );
-});
-
-test('CLARIFICATION request requires an answer surface and respects free-text policy', () => {
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(clarificationRequest({
-      choices: [],
-      allowFreeText: false,
-    })),
-    /requires choices or allowFreeText/,
-  );
-
-  assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
+    () => normalizeClarificationResponseV1(
       clarificationRequest({ allowFreeText: false }),
       clarificationResponse({
         selectedChoiceId: '',
@@ -316,11 +325,18 @@ test('CLARIFICATION request requires an answer surface and respects free-text po
     ),
     /free text is not allowed/,
   );
+  assert.throws(
+    () => normalizeHumanSupervisionRequestV1(clarificationRequest({
+      choices: [],
+      allowFreeText: false,
+    })),
+    /requires choices or allowFreeText/,
+  );
 });
 
 test('stage deadlines are canonical, strictly increasing and after creation', () => {
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({
       reviewStages: [
         { stageId: 'owner', reviewerIds: ['reviewer-owner'], expiresAt: CREATED },
       ],
@@ -329,7 +345,7 @@ test('stage deadlines are canonical, strictly increasing and after creation', ()
   );
 
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({
       reviewStages: [
         { stageId: 'owner', reviewerIds: ['reviewer-owner'], expiresAt: SECOND_EXPIRES },
         { stageId: 'backup', reviewerIds: ['reviewer-backup'], expiresAt: FIRST_EXPIRES },
@@ -339,51 +355,53 @@ test('stage deadlines are canonical, strictly increasing and after creation', ()
   );
 
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({
       createdAt: '2026-09-24T22:00:00Z',
     })),
     /canonical ISO timestamp/,
   );
 
   assert.throws(
-    () => projectHumanSupervisionV1(policyRequest(), '2026-09-24T21:59:59.999Z'),
+    () => projectHumanSupervisionV1(approvalRequest(), '2026-09-24T21:59:59.999Z'),
     /cannot predate/,
   );
 });
 
-test('request and response contracts reject coercion, exotic objects, symbols and sparse arrays', () => {
+test('request and response boundaries reject coercion, exotic objects, symbols and sparse arrays', () => {
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({ schemaVersion: '1' })),
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({ schemaVersion: '1' })),
     /schemaVersion/,
   );
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({ allowFreeText: 0 })),
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({ allowFreeText: 0 })),
     /must be boolean/,
   );
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({ supervisionId: 1 })),
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({ supervisionId: 1 })),
     /supervisionId is invalid/,
   );
 
-  const exotic = Object.create({ policyDecisionId: 'policy-inherited' });
-  Object.assign(exotic, policyRequest());
-  delete exotic.policyDecisionId;
+  const exotic = Object.create({ approvalId: 'approval-inherited' });
+  Object.assign(exotic, approvalRequest());
+  delete exotic.approvalId;
   assert.throws(
     () => normalizeHumanSupervisionRequestV1(exotic),
     /plain object/,
   );
 
-  const symbol = policyRequest();
-  symbol[Symbol('authority')] = PolicyAskDecision.ALLOW;
+  const symbol = approvalRequest();
+  symbol[Symbol('authority')] = 'APPROVE';
   assert.throws(
     () => normalizeHumanSupervisionRequestV1(symbol),
     /unknown field/,
   );
 
-  const accessor = policyRequest();
+  const accessor = approvalRequest();
+  let getterExecuted = false;
   Object.defineProperty(accessor, 'question', {
     enumerable: true,
     get() {
+      getterExecuted = true;
       throw new Error('getter must never execute');
     },
   });
@@ -391,6 +409,7 @@ test('request and response contracts reject coercion, exotic objects, symbols an
     () => normalizeHumanSupervisionRequestV1(accessor),
     /data properties only/,
   );
+  assert.equal(getterExecuted, false);
 
   const sparseStages = new Array(2);
   sparseStages[0] = {
@@ -399,28 +418,28 @@ test('request and response contracts reject coercion, exotic objects, symbols an
     expiresAt: FIRST_EXPIRES,
   };
   assert.throws(
-    () => normalizeHumanSupervisionRequestV1(policyRequest({ reviewStages: sparseStages })),
+    () => normalizeHumanSupervisionRequestV1(approvalRequest({ reviewStages: sparseStages })),
     /must not be sparse/,
   );
 
   assert.throws(
-    () => normalizeHumanSupervisionResponseV1(
-      policyRequest(),
-      policyResponse({ reasonCode: { toString: () => 'OWNER_APPROVED' } }),
+    () => normalizePolicyApprovalAttestationV1(
+      approvalRequest(),
+      approvalAttestation({ reasonCode: { toString: () => 'OWNER_REVIEWED' } }),
     ),
     /reasonCode is invalid/,
   );
 });
 
 test('null-prototype records are accepted without widening authority', () => {
-  const request = Object.assign(Object.create(null), policyRequest());
-  request.reviewStages = policyRequest().reviewStages.map((stage) => (
+  const request = Object.assign(Object.create(null), approvalRequest());
+  request.reviewStages = approvalRequest().reviewStages.map((stage) => (
     Object.assign(Object.create(null), stage)
   ));
   request.choices = [];
 
   const normalized = normalizeHumanSupervisionRequestV1(request);
-  assert.equal(normalized.kind, HumanSupervisionKind.POLICY_ASK);
-  assert.equal(normalized.policyDecisionId, 'policy-decision-1');
+  assert.equal(normalized.kind, HumanSupervisionKind.POLICY_APPROVAL);
+  assert.equal(normalized.approvalId, 'approval-1');
   assert.deepEqual(normalized.requiredEvidenceArtifactIds, ['artifact-before', 'artifact-policy']);
 });
