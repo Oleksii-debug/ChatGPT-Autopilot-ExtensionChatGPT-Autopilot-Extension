@@ -89,6 +89,20 @@ test('fresh launch with a non-matching rendered user turn remains uncertain',asy
   assert.equal(f.clicks(),1);
 });
 
+test('same-document recovery cannot promote fresh launch without exact prompt evidence',async()=>{
+  const f=fixture({
+    startUrl:'https://chatgpt.com/',
+    redirectAfterSend:'https://chatgpt.com/c/generated-unrelated-shape',
+    deliveredTextOverride:'Інший текст, що не ідентифікує цей ефект'
+  });
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  const recovered=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT');
+  assert.equal(recovered.status,'SUBMISSION_UNCERTAIN');
+  assert.notEqual(recovered.safeDiagnosticCode,'RECOVERY_TEXT_OPERATION_VERIFIED');
+  assert.notEqual(recovered.safeDiagnosticCode,'RECOVERY_MAIN_PROMPT_VERIFIED');
+  assert.equal(f.clicks(),1,'recovery remains verification-only');
+});
+
 test('late acknowledgement on a newly created conversation can be verified without resending',async()=>{
   const f=fixture({ackAt:25000,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/generated-late'});
   assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
