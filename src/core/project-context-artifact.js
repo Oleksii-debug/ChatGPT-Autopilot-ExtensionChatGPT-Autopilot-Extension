@@ -91,7 +91,7 @@ function dataArray(value, label, max) {
   const out = [];
   for (const key of Reflect.ownKeys(value)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key)) {
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains a non-index field`);
     }
     const index = Number(key);
