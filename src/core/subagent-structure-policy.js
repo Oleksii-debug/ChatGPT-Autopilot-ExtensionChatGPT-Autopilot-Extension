@@ -181,8 +181,10 @@ export function remainingSubagentStructureCapacityV1(input = {}) {
 
 /**
  * Pure policy evaluator for a trusted canonical graph snapshot. Do not expose
- * this function directly as an untrusted spawn boundary; runtime callers must
- * go through the manager-owned durable-graph admission path.
+ * this function directly as an untrusted spawn boundary. The manager-owned
+ * preview path is advisory only; actual child creation must atomically re-read
+ * and revalidate canonical hierarchy state plus the global resource governor
+ * at the mutation that commits the child.
  */
 export function evaluateSubagentStructureAdmissionV1(input = {}) {
   const {
