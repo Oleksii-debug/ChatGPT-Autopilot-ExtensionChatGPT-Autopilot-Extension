@@ -38,6 +38,14 @@ function clean(value, max = 4000) { const out = typeof value === 'string' ? valu
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function price(value, label) { const out = Number(value ?? 0); if (!Number.isFinite(out) || out < 0 || out > 1_000_000) throw new Error(`${label} is invalid`); return out; }
+function knownPriceDimension(item, priceKey, knownKey, label) {
+  if (Object.hasOwn(item, knownKey)) {
+    if (typeof item[knownKey] !== 'boolean') throw new Error(`${label} must be boolean`);
+    if (item[knownKey] && !Object.hasOwn(item, priceKey)) throw new Error(`${label} cannot be true without an explicit price`);
+    return item[knownKey];
+  }
+  return Object.hasOwn(item, priceKey);
+}
 function ids(value, label, max = MAX_ROUTES) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => id(item, `${label}[${index}]`)); if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
 
 export function normalizeAiRoutePool(raw = []) {
@@ -45,7 +53,7 @@ export function normalizeAiRoutePool(raw = []) {
   if (!Array.isArray(raw) || raw.length > MAX_ROUTES) throw new Error(`AI route pool must contain at most ${MAX_ROUTES} routes`);
   const routes = raw.map((item, index) => {
     object(item, `AI route ${index + 1}`);
-    exact(item, new Set(['schemaVersion','routeId','provider','model','endpointId','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','supportsVision']), `AI route ${index + 1}`);
+    exact(item, new Set(['schemaVersion','routeId','provider','model','endpointId','roles','capabilityIds','priority','enabled','locality','costClass','inputPricePerMillionUsd','outputPricePerMillionUsd','inputPriceKnown','outputPriceKnown','supportsVision']), `AI route ${index + 1}`);
     if (Number(item.schemaVersion ?? AI_ROUTE_POOL_VERSION) !== AI_ROUTE_POOL_VERSION) throw new Error('Unsupported AI route schemaVersion');
     const provider = clean(item.provider, 40);
     if (!PROVIDERS.has(provider)) throw new Error('AI route provider is invalid');
@@ -57,6 +65,8 @@ export function normalizeAiRoutePool(raw = []) {
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
     const costClass = clean(item.costClass || (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.PAID), 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
+    const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
+    const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
     return Object.freeze({
       schemaVersion: AI_ROUTE_POOL_VERSION,
       routeId: id(item.routeId, 'AI route routeId'),
@@ -71,6 +81,8 @@ export function normalizeAiRoutePool(raw = []) {
       costClass,
       inputPricePerMillionUsd: price(item.inputPricePerMillionUsd, 'AI route input price'),
       outputPricePerMillionUsd: price(item.outputPricePerMillionUsd, 'AI route output price'),
+      inputPriceKnown,
+      outputPriceKnown,
       supportsVision: item.supportsVision === true,
     });
   });
