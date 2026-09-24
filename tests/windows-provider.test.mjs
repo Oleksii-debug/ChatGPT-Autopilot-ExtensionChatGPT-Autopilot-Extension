@@ -310,6 +310,37 @@ test('PowerShell UIA adapter rejects non-canonical window identities before proc
   assert.equal(calls, 0);
 });
 
+test('PowerShell UIA adapter requires an own plain request envelope before process launch', async () => {
+  let calls = 0;
+  const adapter = createPowerShellUiaAdapter({
+    powershellPath: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    execFile: async () => {
+      calls += 1;
+      return { stdout: '[]', stderr: '' };
+    },
+  });
+  await assert.rejects(
+    () => adapter.query(Object.assign(Object.create({ windowId: 'desktop' }), { limit: 2 })),
+    /plain object/,
+  );
+  await assert.rejects(
+    () => adapter.query({ windowId: 'desktop', limit: 2, command: 'Get-Process' }),
+    /unknown field: command/,
+  );
+  assert.equal(calls, 0);
+});
+
+test('UIA capability truth follows callable adapter availability', () => {
+  const unavailable = createWindowsProvider({
+    config,
+    platform: 'win32',
+    execFile: async () => ({}),
+    uiaAdapter: {},
+  });
+  const capability = unavailable.capabilities().find(item => item.capabilityId === 'windows.uia.query');
+  assert.equal(capability.available, false);
+});
+
 test('PowerShell UIA adapter treats malformed output and process failure as fail-closed', async () => {
   const powershellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
   const invalid = createPowerShellUiaAdapter({
