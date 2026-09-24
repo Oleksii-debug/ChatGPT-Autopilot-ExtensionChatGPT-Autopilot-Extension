@@ -16,6 +16,7 @@ const ui = {
   sessionListSignature: '',
   selectedSessionId: null,
   selected: null,
+  runTimeline: null,
   deleteReturnFocus: null,
   pendingPortableProfile: null,
   pendingPortablePreview: null,
@@ -2455,7 +2456,10 @@ async function openSession(sessionId) {
     syncCurrentSessionMarker();
     const canonical = clone(data.session);
     ui.selected = restoreDraft(canonical);
+    ui.runTimeline = null;
     renderEditor();
+    renderRunTimeline();
+    await refreshRunTimeline({ announceResult: false });
     $('session-heading').focus();
   } catch (error) { setAppStatus(error.message); announce(error.message); }
 }
@@ -2497,6 +2501,7 @@ async function refreshSelectedSessionStatus(sessionId) {
       renderStatus();
       renderLog();
       renderActions();
+      await refreshRunTimeline({ announceResult: false });
     }
   } catch (error) {
     setAppStatus(error.message);
@@ -2839,7 +2844,7 @@ async function saveSession() {
   try {
     const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session });
     clearDraft(session.id);
-    ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor();
+    ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor(); await refreshRunTimeline({ announceResult: false });
   } catch (error) { persistCurrentDraft(); setAppStatus(error.message); announce(error.message); }
 }
 
@@ -2912,6 +2917,7 @@ async function action(command, label) {
     const data = await core(command, { sessionId: ui.selectedSessionId });
     ui.selected = clone(data.session);
     renderEditor();
+    await refreshRunTimeline({ announceResult: false });
     const state = ui.selected?.runState || 'UNKNOWN';
     reportCommandResult(`Core acknowledged ${label}. Current state: ${state}.`);
     focusAfterLifecycleSuccess(command, $);
@@ -2977,6 +2983,96 @@ function renderLog() {
   const visible = entries.slice(-VISIBLE_LOG_LIMIT);
   $('session-log-count').textContent = `${visible.length} of ${entries.length} Core log entr${entries.length === 1 ? 'y' : 'ies'} shown.`;
   $('session-log-region').textContent = visible.map((entry) => typeof entry === 'string' ? translateText(entry) : `${formatTime(entry.at)} — ${translateText(entry.message)}`).join('\n');
+}
+
+function appendTimelineField(list, label, value) {
+  if (!value) return;
+  const term = document.createElement('dt');
+  term.textContent = label;
+  const description = document.createElement('dd');
+  description.textContent = value;
+  list.append(term, description);
+}
+
+function renderRunTimeline() {
+  const timeline = ui.runTimeline;
+  const list = $('run-timeline-list');
+  if (!list) return;
+  list.replaceChildren();
+
+  if (!timeline) {
+    $('run-timeline-status').textContent = 'Хронологію ще не завантажено.';
+    return;
+  }
+
+  const source = $('run-timeline-source-filter').value || 'ALL';
+  const entries = (timeline.entries || []).filter((entry) => source === 'ALL' || entry.source === source);
+  for (const entry of entries) {
+    const item = document.createElement('li');
+    item.className = 'run-timeline-entry';
+
+    const heading = document.createElement('p');
+    heading.className = 'run-timeline-entry-heading';
+    const time = document.createElement('time');
+    if (entry.at > 0) time.dateTime = new Date(entry.at).toISOString();
+    time.textContent = formatTime(entry.at);
+    const sourceLabel = document.createElement('strong');
+    sourceLabel.textContent = entry.source === 'DIAGNOSTIC' ? 'Діагностика' : 'Core log';
+    heading.append(time, document.createTextNode(' — '), sourceLabel);
+    if (entry.event && entry.event !== 'CORE_LOG') {
+      heading.append(document.createTextNode(` — ${entry.event}`));
+    }
+    item.append(heading);
+
+    if (entry.message) {
+      const message = document.createElement('p');
+      message.textContent = translateText(entry.message);
+      item.append(message);
+    }
+
+    const details = document.createElement('dl');
+    details.className = 'run-timeline-evidence';
+    appendTimelineField(details, 'Рівень', entry.level);
+    appendTimelineField(details, 'Завдання', entry.taskLabel);
+    appendTimelineField(details, 'Етап', entry.phase);
+    appendTimelineField(details, 'Результат', entry.status);
+    appendTimelineField(details, 'Код', entry.code);
+    appendTimelineField(details, 'Ціль', entry.target);
+    appendTimelineField(details, 'Спостережено', entry.observed);
+    appendTimelineField(details, 'Операція', entry.operationIdSuffix);
+    appendTimelineField(details, 'Відбиток промпту', entry.promptFingerprint);
+    if (details.children.length) item.append(details);
+
+    list.append(item);
+  }
+
+  const bounded = timeline.truncated
+    ? ` Показано лише останні ${timeline.returnedEntries} із ${timeline.totalEntries} збережених подій.`
+    : '';
+  $('run-timeline-status').textContent =
+    `Показано ${entries.length} подій для сеансу «${timeline.session?.name || 'Без назви'}».${bounded}`;
+}
+
+async function refreshRunTimeline({ announceResult = false } = {}) {
+  const sessionId = ui.selectedSessionId;
+  if (!sessionId) {
+    ui.runTimeline = null;
+    renderRunTimeline();
+    return;
+  }
+  try {
+    const data = await core('GET_RUN_TIMELINE', { sessionId, limit: 200 });
+    if (sessionId !== ui.selectedSessionId) return;
+    ui.runTimeline = data?.timeline || null;
+    renderRunTimeline();
+    if (announceResult) announce('Хронологію виконання оновлено.');
+  } catch (error) {
+    if (sessionId !== ui.selectedSessionId) return;
+    ui.runTimeline = null;
+    $('run-timeline-list').replaceChildren();
+    $('run-timeline-status').textContent = `Хронологію не завантажено: ${error.message}`;
+    if (announceResult) announce(`Хронологію не завантажено: ${error.message}`);
+  }
 }
 
 function onTaskConfigurationModeChange() {
@@ -3367,6 +3463,8 @@ $('pause-session-button').addEventListener('click', () => action('PAUSE_SESSION'
 $('resume-session-button').addEventListener('click', () => action('RESUME_SESSION', 'Resume'));
 $('stop-session-button').addEventListener('click', () => action('STOP_SESSION', 'Stop'));
 $('clear-log-button').addEventListener('click', () => action('CLEAR_LOG', 'Clear log'));
+$('refresh-run-timeline-button').addEventListener('click', () => refreshRunTimeline({ announceResult: true }));
+$('run-timeline-source-filter').addEventListener('change', renderRunTimeline);
 $('confirm-delete-button').addEventListener('click', confirmDelete);
 $('cancel-delete-button').addEventListener('click', closeDeleteDialog);
 $('portable-profile-file').addEventListener('change', onPortableProfileFileChange);
