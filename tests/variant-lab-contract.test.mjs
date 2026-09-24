@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 
 import {
   VariantQualificationState,
-  assertVariantSynthesisEligibleV1,
   buildVariantComparisonV1,
   normalizeVariantCandidateV1,
   normalizeVariantEvaluationV1,
@@ -178,55 +177,33 @@ test('comparison is deterministic and reports INCOMPLETE without inventing a win
   assert.deepEqual(comparison.candidates.map(item => item.candidateId), ['variant-a', 'variant-b']);
   assert.equal(comparison.candidates[0].qualification, VariantQualificationState.INCOMPLETE);
   assert.equal(comparison.candidates[1].qualification, VariantQualificationState.INCOMPLETE);
+  assert.equal(comparison.advisoryOnly, true);
+  assert.equal(comparison.evaluationAuthority, 'UNVERIFIED_INPUT');
+  assert.equal(comparison.synthesisAuthorized, false);
   assert.equal('winner' in comparison, false);
   assert.equal('score' in comparison, false);
 });
 
-test('any FAIL rejects candidate while complete independent PASS evidence qualifies it', () => {
+test('reported FAIL and complete PASS sets remain advisory and never authorize synthesis', () => {
   const evaluations = fullPassEvaluations();
   evaluations[0] = evaluation('variant-a', 'correctness', 'FAIL');
   let comparison = buildVariantComparisonV1(lab({ evaluations }));
-  assert.equal(comparison.candidates.find(item => item.candidateId === 'variant-a').qualification, 'REJECTED');
-  assert.equal(comparison.candidates.find(item => item.candidateId === 'variant-b').qualification, 'QUALIFIED');
+  assert.equal(
+    comparison.candidates.find(item => item.candidateId === 'variant-a').qualification,
+    VariantQualificationState.REPORTED_FAIL,
+  );
+  assert.equal(
+    comparison.candidates.find(item => item.candidateId === 'variant-b').qualification,
+    VariantQualificationState.EVIDENCE_COMPLETE,
+  );
+  assert.equal(comparison.synthesisAuthorized, false);
 
   comparison = buildVariantComparisonV1(lab({ evaluations: fullPassEvaluations() }));
-  assert.deepEqual(comparison.candidates.map(item => item.qualification), ['QUALIFIED', 'QUALIFIED']);
-});
-
-test('synthesis eligibility fails closed for incomplete, failed, duplicate or unknown selections', () => {
-  assert.throws(() => assertVariantSynthesisEligibleV1(lab(), ['variant-a'], { at: '2026-09-24T22:51:00Z' }), /INCOMPLETE/);
-
-  const failed = fullPassEvaluations();
-  failed[0] = evaluation('variant-a', 'correctness', 'FAIL');
-  assert.throws(() => assertVariantSynthesisEligibleV1(lab({ evaluations: failed }), ['variant-a'], { at: '2026-09-24T22:51:00Z' }), /REJECTED/);
-
-  assert.throws(() => assertVariantSynthesisEligibleV1(lab({ evaluations: fullPassEvaluations() }), ['variant-a', 'variant-a'], { at: '2026-09-24T22:51:00Z' }), /duplicates/);
-  assert.throws(() => assertVariantSynthesisEligibleV1(lab({ evaluations: fullPassEvaluations() }), ['missing'], { at: '2026-09-24T22:51:00Z' }), /unknown candidate/);
-});
-
-test('qualified synthesis envelope binds common base, selected outputs and evaluation evidence but executes nothing', () => {
-  const envelope = assertVariantSynthesisEligibleV1(
-    lab({ evaluations: fullPassEvaluations() }),
-    ['variant-b', 'variant-a'],
-    { at: '2026-09-24T22:51:00Z' },
+  assert.deepEqual(
+    comparison.candidates.map(item => item.qualification),
+    [VariantQualificationState.EVIDENCE_COMPLETE, VariantQualificationState.EVIDENCE_COMPLETE],
   );
-  assert.deepEqual(envelope.selectedVariantIds, ['variant-a', 'variant-b']);
-  assert.equal(envelope.baseRevisionId, 'base-5d213cd');
-  assert.deepEqual(envelope.candidateDigests, [
-    { candidateId: 'variant-a', candidateSha256: HASH_A },
-    { candidateId: 'variant-b', candidateSha256: HASH_B },
-  ]);
-  assert.deepEqual(envelope.artifactIds, ['artifact:variant-a', 'artifact:variant-b']);
-  assert.equal(envelope.evidenceArtifactIds.length, 4);
-  assert.equal('mergeCommand' in envelope, false);
-  assert.equal('policyDecision' in envelope, false);
-  assert.equal(Object.isFrozen(envelope), true);
-});
-
-test('synthesis decision time cannot be backdated behind lab evidence', () => {
-  assert.throws(() => assertVariantSynthesisEligibleV1(
-    lab({ evaluations: fullPassEvaluations() }),
-    ['variant-a'],
-    { at: '2026-09-24T22:49:30Z' },
-  ), /cannot predate lab updatedAt/);
+  assert.equal(comparison.synthesisAuthorized, false);
+  assert.equal(comparison.candidates.every(item => item.advisoryOnly), true);
+  assert.equal(comparison.candidates.every(item => item.evaluationAuthority === 'UNVERIFIED_INPUT'), true);
 });
