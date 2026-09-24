@@ -147,7 +147,7 @@ export function deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRe
 }
 
 
-function sourceStateFingerprint(source) {
+function sourceStateFingerprint(source, sourceRef) {
   if (!source) return null;
   return JSON.stringify([
     source.status,
@@ -155,7 +155,25 @@ function sourceStateFingerprint(source) {
     source.snapshotRevisionId,
     source.capsuleRevisionId,
     source.currentRevisionId,
+    sourceRef?.kind || null,
+    sourceRef?.uri || null,
+    sourceRef?.authority || null,
+    sourceRef?.contentSha256 || '',
   ]);
+}
+
+function digestSourceView(source, sourceRef) {
+  if (!source) return null;
+  return frozen({
+    status: source.status,
+    kind: sourceRef?.kind || null,
+    uri: sourceRef?.uri || null,
+    authority: sourceRef?.authority || null,
+    contentSha256: sourceRef?.contentSha256 || '',
+    snapshotRevisionId: source.snapshotRevisionId,
+    capsuleRevisionId: source.capsuleRevisionId,
+    currentRevisionId: source.currentRevisionId,
+  });
 }
 
 function artifactChangeIdentity(ref) {
@@ -176,8 +194,11 @@ function digestArtifactView(ref) {
   return frozen({
     kind: ref.kind,
     uri: ref.uri,
+    mediaType: ref.mediaType,
     sha256: ref.sha256 || '',
     sizeBytes: ref.sizeBytes,
+    producerInvocationId: ref.producerInvocationId || '',
+    sensitive: Boolean(ref.sensitive),
   });
 }
 
@@ -191,6 +212,16 @@ function staleEvidence(state, phase) {
       snapshotRevisionId: source.snapshotRevisionId,
       capsuleRevisionId: source.capsuleRevisionId,
       currentRevisionId: source.currentRevisionId,
+    }));
+}
+
+function artifactDriftEvidence(state, phase) {
+  return state.artifacts
+    .filter(artifact => artifact.status !== 'MATCH')
+    .map(artifact => frozen({
+      phase,
+      artifactId: artifact.artifactId,
+      status: artifact.status,
     }));
 }
 
@@ -246,11 +277,17 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
         ...staleEvidence(baselineState, 'BASELINE'),
         ...staleEvidence(currentState, 'CURRENT'),
       ],
+      artifactDriftEvidence: [
+        ...artifactDriftEvidence(baselineState, 'BASELINE'),
+        ...artifactDriftEvidence(currentState, 'CURRENT'),
+      ],
     });
   }
 
   const baselineSources = new Map(baselineState.sources.map(source => [source.sourceId, source]));
   const currentSources = new Map(currentState.sources.map(source => [source.sourceId, source]));
+  const baselineSourceRefs = new Map(baselineSnapshot.sourceRefs.map(source => [source.sourceId, source]));
+  const currentSourceRefs = new Map(currentSnapshot.sourceRefs.map(source => [source.sourceId, source]));
   const sourceIds = [...new Set([...baselineSources.keys(), ...currentSources.keys()])].sort();
   const sourceChanges = [];
   for (const sourceId of sourceIds) {
@@ -259,23 +296,16 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
     let change = 'UNCHANGED';
     if (!before) change = 'ADDED';
     else if (!after) change = 'REMOVED';
-    else if (sourceStateFingerprint(before) !== sourceStateFingerprint(after)) change = 'CHANGED';
+    else if (
+      sourceStateFingerprint(before, baselineSourceRefs.get(sourceId))
+      !== sourceStateFingerprint(after, currentSourceRefs.get(sourceId))
+    ) change = 'CHANGED';
     if (change === 'UNCHANGED') continue;
     sourceChanges.push(frozen({
       sourceId,
       change,
-      before: before ? frozen({
-        status: before.status,
-        snapshotRevisionId: before.snapshotRevisionId,
-        capsuleRevisionId: before.capsuleRevisionId,
-        currentRevisionId: before.currentRevisionId,
-      }) : null,
-      after: after ? frozen({
-        status: after.status,
-        snapshotRevisionId: after.snapshotRevisionId,
-        capsuleRevisionId: after.capsuleRevisionId,
-        currentRevisionId: after.currentRevisionId,
-      }) : null,
+      before: digestSourceView(before, baselineSourceRefs.get(sourceId)),
+      after: digestSourceView(after, currentSourceRefs.get(sourceId)),
     }));
   }
 
@@ -306,5 +336,6 @@ export function deriveProjectCurrentStateDigestV1({ baseline, current } = {}) {
     sourceChanges,
     artifactChanges,
     staleEvidence: [],
+    artifactDriftEvidence: [],
   });
 }
