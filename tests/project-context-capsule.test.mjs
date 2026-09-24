@@ -6,6 +6,7 @@ import {
   createPortableContextCapsuleV1,
   normalizeContextCapsuleContentV1,
   normalizeContextCapsuleDisclosureV1,
+  parseContextCapsuleContentV1,
   renderContextCapsuleContentV1,
 } from '../src/core/project-context-capsule.js';
 import { assertContextCapsuleFreshV1 } from '../src/core/project-context-artifact.js';
@@ -162,6 +163,30 @@ test('structured content rendering is deterministic and preserves ordered operat
   ]);
 });
 
+test('structured content parser round-trips only canonical bounded summaries', () => {
+  const rendered = renderContextCapsuleContentV1(structuredContent());
+  const parsed = parseContextCapsuleContentV1(rendered);
+  assert.deepEqual(parsed, normalizeContextCapsuleContentV1(structuredContent()));
+  assert.equal(Object.isFrozen(parsed), true);
+
+  assert.throws(() => parseContextCapsuleContentV1(7), /must be text/);
+  assert.throws(() => parseContextCapsuleContentV1('wrong-prefix:{}'), /prefix is invalid/);
+  assert.throws(
+    () => parseContextCapsuleContentV1(CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX),
+    /payload is empty/,
+  );
+  assert.throws(
+    () => parseContextCapsuleContentV1(`${CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX}{`),
+    /JSON is invalid/,
+  );
+
+  const nonCanonical = `${CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX}${JSON.stringify({
+    ...structuredContent(),
+    goal: `  ${structuredContent().goal}  `,
+  })}`;
+  assert.throws(() => parseContextCapsuleContentV1(nonCanonical), /not canonical/);
+});
+
 test('structured content is exact, bounded, own-field only and rejects duplicate operational entries', () => {
   assert.throws(
     () => normalizeContextCapsuleContentV1({ schemaVersion: 1 }),
@@ -259,6 +284,22 @@ test('disclosure is explicit, strict and rejects aliases, inherited fields, symb
   const symbolAuthority = disclosure();
   symbolAuthority[Symbol('authority')] = 'ALLOW';
   assert.throws(() => normalizeContextCapsuleDisclosureV1(symbolAuthority), /unknown field/);
+
+  const accessorAuthority = disclosure();
+  let touched = false;
+  Object.defineProperty(accessorAuthority, 'maxSources', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      touched = true;
+      return 8;
+    },
+  });
+  assert.throws(
+    () => normalizeContextCapsuleDisclosureV1(accessorAuthority),
+    /enumerable data property/,
+  );
+  assert.equal(touched, false);
 
   const inherited = Object.create(disclosure());
   assert.throws(
