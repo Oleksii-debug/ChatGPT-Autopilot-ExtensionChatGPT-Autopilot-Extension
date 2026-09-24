@@ -52,17 +52,23 @@ function policy(id) {
   };
 }
 function durableStore({ failFirstCommit = false } = {}) {
-  const rows = new Map();
+  let root = { effectsById: {} };
   let failCommit = failFirstCommit;
   return {
-    rows,
-    async load(id) { return rows.has(id) ? structuredClone(rows.get(id)) : null; },
-    async save(id, state) {
-      if (failCommit && state.phase === 'COMMITTED') {
+    async update(mutator) {
+      const draft = structuredClone(root);
+      const returned = mutator(draft);
+      const next = structuredClone(returned === undefined ? draft : returned);
+      if (failCommit && Object.values(next.effectsById || {}).some(entry => entry?.state?.phase === 'COMMITTED')) {
         failCommit = false;
         throw new Error('simulated durable commit-save crash');
       }
-      rows.set(id, structuredClone(state));
+      root = next;
+      return structuredClone(root);
+    },
+    async load(id) {
+      const state = root.effectsById?.[id]?.state;
+      return state ? structuredClone(state) : null;
     },
   };
 }
