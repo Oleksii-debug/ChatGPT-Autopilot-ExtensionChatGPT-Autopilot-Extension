@@ -422,3 +422,16 @@ test('hidden schema-valid bundle and ArtifactRef fields fail closed', () => {
   });
   assert.throws(() => buildJobArtifactBundleV1(hiddenSensitive), /non-enumerable field: sensitive/);
 });
+
+
+test('bundle creation cannot predate contained artifacts', () => {
+  const futureArtifact = validInput();
+  futureArtifact.entries[0].artifactRef.createdAt = '2026-09-24T21:33:00.001Z';
+  assert.throws(
+    () => buildJobArtifactBundleV1(futureArtifact),
+    /bundle createdAt cannot predate artifact: timeline/,
+  );
+
+  const sameInstant = validInput();
+  assert.equal(buildJobArtifactBundleV1(sameInstant).createdAt, AT);
+});
