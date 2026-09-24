@@ -241,7 +241,7 @@ test('uncertain write becomes RECONCILE and blind replay is blocked', async () =
 
 test('initial verification must be independently identity-bound to policy, effect, execution, attempt and observation', async t => {
   const cases = [
-    ['missing verifier identity', raw => { delete raw.verifierId; }, /verifierId is invalid/],
+    ['missing verifier identity', raw => { delete raw.verifierId; }, /verifierId must be text/],
     ['effect provider posing as verifier', raw => { raw.verifierId = FILESYSTEM_PROVIDER_ID; }, /verifier must be independent/],
     ['actor posing as verifier', raw => { raw.verifierId = 'filesystem-exact-effect-executor'; }, /verifier must be independent/],
     ['wrong policy authority', raw => { raw.verificationAuthorityId = 'decision-other'; }, /authority must bind/],
