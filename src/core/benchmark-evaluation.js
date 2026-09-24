@@ -1,3 +1,5 @@
+import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
+
 export const BENCHMARK_EVALUATION_SCHEMA_VERSION = 1;
 
 export const BenchmarkAssertionOperator = Object.freeze({
@@ -22,6 +24,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_CASES = 500;
 const MAX_ASSERTIONS_PER_CASE = 64;
 const MAX_EVIDENCE_PER_CASE = 128;
+const MAX_TRUSTED_EVIDENCE = MAX_CASES * MAX_EVIDENCE_PER_CASE;
 const MAX_TEXT = 4_000;
 
 const SUITE_KEYS = new Set([
@@ -50,16 +53,18 @@ function record(value, label) {
   if (proto !== Object.prototype && proto !== null) {
     throw new Error(label + ' must be a plain object');
   }
-  if (Object.getOwnPropertySymbols(value).length) {
-    throw new Error(label + ' must not contain symbol fields');
-  }
-  for (const key of Object.getOwnPropertyNames(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(label + ' must contain data properties only');
+  const normalized = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      throw new Error(label + ' must not contain symbol fields');
     }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(label + ' must contain enumerable own data properties only');
+    }
+    normalized[key] = descriptor.value;
   }
-  return value;
+  return normalized;
 }
 
 function exactKeys(value, allowed, label) {
@@ -72,10 +77,38 @@ function denseArray(value, label, { min = 0, max } = {}) {
   if (!Array.isArray(value) || value.length < min || value.length > max) {
     throw new Error(label + ' must be a bounded array');
   }
-  for (let index = 0; index < value.length; index += 1) {
-    if (!Object.hasOwn(value, index)) throw new Error(label + ' must not be sparse');
+  if (Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(label + ' must be a plain array');
   }
-  return value;
+
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(0|[1-9]\d*)$/u.test(key)) {
+      throw new Error(label + ' must contain canonical own enumerable data indices only');
+    }
+    const index = Number(key);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!Number.isSafeInteger(index)
+      || index < 0
+      || index >= value.length
+      || String(index) !== key
+      || !descriptor
+      || !Object.hasOwn(descriptor, 'value')
+      || descriptor.enumerable !== true) {
+      throw new Error(label + ' must contain canonical own enumerable data indices only');
+    }
+  }
+
+  const normalized = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor) throw new Error(label + ' must not be sparse');
+    if (!Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(label + ' must contain canonical own enumerable data indices only');
+    }
+    normalized.push(descriptor.value);
+  }
+  return normalized;
 }
 
 function id(value, label) {
@@ -117,8 +150,8 @@ function freeze(value) {
 }
 
 function uniqueIds(values, label, { min = 0, max = MAX_EVIDENCE_PER_CASE } = {}) {
-  denseArray(values, label, { min, max });
-  const normalized = values.map((value, index) => id(value, label + '[' + index + ']'));
+  const items = denseArray(values, label, { min, max });
+  const normalized = items.map((value, index) => id(value, label + '[' + index + ']'));
   const seen = new Set();
   for (const value of normalized) {
     if (seen.has(value)) throw new Error(label + ' contains duplicate ID: ' + value);
@@ -126,6 +159,34 @@ function uniqueIds(values, label, { min = 0, max = MAX_EVIDENCE_PER_CASE } = {})
   }
   normalized.sort();
   return Object.freeze(normalized);
+}
+
+function normalizeTrustedEvidenceArtifacts(value) {
+  const rawArtifacts = denseArray(
+    value,
+    'TrustedBenchmarkEvidenceV1 artifacts',
+    { min: 1, max: MAX_TRUSTED_EVIDENCE },
+  );
+  const byId = new Map();
+  for (let index = 0; index < rawArtifacts.length; index += 1) {
+    const strict = record(
+      rawArtifacts[index],
+      'TrustedBenchmarkEvidenceV1 artifact[' + index + ']',
+    );
+    const artifact = normalizeArtifactRefV1(strict);
+    if (!artifact.sha256) {
+      throw new Error(
+        'TrustedBenchmarkEvidenceV1 artifact ' + artifact.artifactId + ' must include sha256',
+      );
+    }
+    if (byId.has(artifact.artifactId)) {
+      throw new Error(
+        'TrustedBenchmarkEvidenceV1 contains duplicate artifactId: ' + artifact.artifactId,
+      );
+    }
+    byId.set(artifact.artifactId, artifact);
+  }
+  return byId;
 }
 
 function normalizeAssertion(input, label) {
@@ -217,7 +278,7 @@ function normalizeMetrics(input, expectedMetricIds, label, { required }) {
   return freeze(Object.fromEntries(entries));
 }
 
-function normalizeCaseResult(input, suiteCase) {
+function normalizeCaseResult(input, suiteCase, trustedEvidenceById) {
   const label = 'BenchmarkCaseResultV1 ' + suiteCase.caseId;
   const raw = record(input, label);
   exactKeys(raw, RESULT_KEYS, label);
@@ -240,6 +301,13 @@ function normalizeCaseResult(input, suiteCase) {
     label + ' evidenceArtifactIds',
     { min: 1 },
   );
+  for (const evidenceArtifactId of evidenceArtifactIds) {
+    if (!trustedEvidenceById.has(evidenceArtifactId)) {
+      throw new Error(
+        label + ' references unknown trusted evidence artifact: ' + evidenceArtifactId,
+      );
+    }
+  }
   let reasonCode = '';
   if (outcome === BenchmarkCaseOutcome.ERROR) {
     reasonCode = id(raw.reasonCode, label + ' reasonCode');
@@ -261,7 +329,12 @@ function assertionPasses(operator, observed, threshold) {
   return observed === threshold;
 }
 
-export function evaluateBenchmarkRunV1({ suite, run, expectedSubject } = {}) {
+export function evaluateBenchmarkRunV1({
+  suite,
+  run,
+  expectedSubject,
+  trustedEvidenceArtifacts,
+} = {}) {
   const normalizedSuite = normalizeBenchmarkSuiteV1(suite);
   const subject = record(expectedSubject, 'ExpectedBenchmarkSubjectV1');
   exactKeys(subject, SUBJECT_KEYS, 'ExpectedBenchmarkSubjectV1');
@@ -270,6 +343,7 @@ export function evaluateBenchmarkRunV1({ suite, run, expectedSubject } = {}) {
     subject.subjectRevisionId,
     'ExpectedBenchmarkSubjectV1 subjectRevisionId',
   );
+  const trustedEvidenceById = normalizeTrustedEvidenceArtifacts(trustedEvidenceArtifacts);
 
   const rawRun = record(run, 'BenchmarkRunV1');
   exactKeys(rawRun, RUN_KEYS, 'BenchmarkRunV1');
@@ -321,7 +395,7 @@ export function evaluateBenchmarkRunV1({ suite, run, expectedSubject } = {}) {
   let passedCaseCount = 0;
 
   for (const suiteCase of normalizedSuite.cases) {
-    const result = normalizeCaseResult(byCase.get(suiteCase.caseId), suiteCase);
+    const result = normalizeCaseResult(byCase.get(suiteCase.caseId), suiteCase, trustedEvidenceById);
     const assertionResults = [];
 
     if (result.outcome === BenchmarkCaseOutcome.MEASURED) {

@@ -5,7 +5,7 @@ import {
   BenchmarkAssertionOperator,
   BenchmarkCaseOutcome,
   BenchmarkEvaluationStatus,
-  evaluateBenchmarkRunV1,
+  evaluateBenchmarkRunV1 as evaluateBenchmarkRunV1Raw,
   normalizeBenchmarkSuiteV1,
 } from '../src/core/benchmark-evaluation.js';
 
@@ -83,6 +83,37 @@ const expectedSubject = {
   subjectId: 'autopilot',
   subjectRevisionId: 'commit-abc123',
 };
+
+const DEFAULT_TRUSTED_EVIDENCE_IDS = Object.freeze([
+  'evidence-latency',
+  'evidence-quality',
+  'evidence-quality-2',
+  'diagnostic-crash-1',
+  'proof-1',
+  'proof-error',
+]);
+
+function trustedEvidenceArtifacts(ids = DEFAULT_TRUSTED_EVIDENCE_IDS) {
+  return ids.map((artifactId, index) => ({
+    schemaVersion: 1,
+    artifactId,
+    kind: 'benchmark-evidence',
+    uri: 'artifact://benchmark/' + artifactId,
+    mediaType: 'application/json',
+    sha256: (index + 1).toString(16).padStart(64, '0'),
+    sizeBytes: 1,
+    createdAt: END,
+    producerInvocationId: 'benchmark-runner-1',
+    sensitive: false,
+  }));
+}
+
+function evaluateBenchmarkRunV1(args = {}) {
+  return evaluateBenchmarkRunV1Raw({
+    ...args,
+    trustedEvidenceArtifacts: args.trustedEvidenceArtifacts ?? trustedEvidenceArtifacts(),
+  });
+}
 
 test('evaluates a complete run deterministically against exact suite and subject revisions', () => {
   const report = evaluateBenchmarkRunV1({
@@ -365,12 +396,161 @@ test('fails closed on accessors, exotic prototypes, symbols, hidden fields and s
   });
   assert.throws(
     () => evaluateBenchmarkRunV1({ suite: suite(), run: hiddenRun, expectedSubject }),
-    /unknown field: callerPassedCount/,
+    /enumerable own data properties/,
   );
 
   const sparseCases = suite();
   delete sparseCases.cases[0];
   assert.throws(() => normalizeBenchmarkSuiteV1(sparseCases), /must not be sparse/);
+});
+
+test('binds every case evidence ID to a trusted immutable ArtifactRefV1 inventory', () => {
+  const fabricated = run({
+    results: [
+      result('quality', { accuracyMilli: 950, errorCount: 0 }, {
+        evidenceArtifactIds: ['fabricated-proof'],
+      }),
+      result('latency', { latencyMs: 800 }),
+    ],
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: fabricated,
+      expectedSubject,
+      trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+    }),
+    /unknown trusted evidence artifact: fabricated-proof/,
+  );
+
+  const noDigest = trustedEvidenceArtifacts();
+  noDigest[0] = { ...noDigest[0], sha256: '' };
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: noDigest,
+    }),
+    /must include sha256/,
+  );
+
+  const duplicated = trustedEvidenceArtifacts();
+  duplicated.push(structuredClone(duplicated[0]));
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: duplicated,
+    }),
+    /duplicate artifactId/,
+  );
+});
+
+test('rejects accessor-backed bounded array entries without executing getters', () => {
+  let reads = 0;
+  const accessorCases = suite();
+  const originalCase = accessorCases.cases[0];
+  Object.defineProperty(accessorCases.cases, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalCase; },
+  });
+  assert.throws(
+    () => normalizeBenchmarkSuiteV1(accessorCases),
+    /own enumerable data indices/,
+  );
+  assert.equal(reads, 0);
+
+  const accessorResults = run();
+  const originalResult = accessorResults.results[0];
+  Object.defineProperty(accessorResults.results, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalResult; },
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: accessorResults,
+      expectedSubject,
+    }),
+    /own enumerable data indices/,
+  );
+  assert.equal(reads, 0);
+
+  const accessorEvidence = run();
+  const evidenceIds = accessorEvidence.results[0].evidenceArtifactIds;
+  const originalEvidenceId = evidenceIds[0];
+  Object.defineProperty(evidenceIds, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalEvidenceId; },
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: accessorEvidence,
+      expectedSubject,
+    }),
+    /own enumerable data indices/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('rejects hidden allowed authority fields and trusted-artifact accessors', () => {
+  const hiddenSuite = suite();
+  Object.defineProperty(hiddenSuite, 'suiteRevisionId', {
+    enumerable: false,
+    configurable: true,
+    value: 'suite-rev-a1',
+  });
+  assert.throws(
+    () => normalizeBenchmarkSuiteV1(hiddenSuite),
+    /enumerable own data properties/,
+  );
+
+  const hiddenRun = run();
+  Object.defineProperty(hiddenRun, 'runId', {
+    enumerable: false,
+    configurable: true,
+    value: 'run-1',
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1({ suite: suite(), run: hiddenRun, expectedSubject }),
+    /enumerable own data properties/,
+  );
+
+  const hiddenMetric = run();
+  Object.defineProperty(hiddenMetric.results[1].metrics, 'latencyMs', {
+    enumerable: false,
+    configurable: true,
+    value: 800,
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1({ suite: suite(), run: hiddenMetric, expectedSubject }),
+    /enumerable own data properties/,
+  );
+
+  let reads = 0;
+  const trusted = trustedEvidenceArtifacts();
+  const originalSha = trusted[0].sha256;
+  Object.defineProperty(trusted[0], 'sha256', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalSha; },
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: trusted,
+    }),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
 });
 
 test('rejects non-canonical timestamps and completed-before-started runs', () => {
