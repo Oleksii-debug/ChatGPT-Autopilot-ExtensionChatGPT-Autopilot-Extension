@@ -181,8 +181,18 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
       const invocationId = authorized.invocation.invocationId;
       const normalizedAction = normalizeDeterministicWebActionV1(action);
       const expected = normalizePostcondition(postcondition);
+      if (transport.preflight != null) {
+        if (typeof transport.preflight !== 'function') throw new Error('deterministic web transport preflight is invalid');
+        await transport.preflight({
+          targetId,
+          action: normalizedAction,
+          postcondition: expected,
+          invocationId,
+        });
+      }
       const binding = JSON.stringify({ targetId, action: normalizedAction, postcondition: expected });
-      // The lease and canonical EXECUTING state share ONE atomic durable write.
+      // Permission/target preflight above is side-effect-free; this atomic write is
+      // still the sole authority to cross into physical browser execution.
       // A crashed dispatch remains fenced even when its lease timestamp expires.
       const admitted = await atomic(draft => {
         let entry = own(draft.effectsById, invocationId);
