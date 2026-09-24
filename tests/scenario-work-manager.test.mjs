@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ScenarioWorkManager } from '../src/core/scenario-work-manager.js';
+import { ScenarioWorkManager, SCENARIO_WORK_STORAGE_KEY } from '../src/core/scenario-work-manager.js';
 import { ScenarioWorkMode, ScenarioWorkRunState } from '../src/core/scenario-work.js';
 import { createEmptyState } from '../src/core/schema.js';
 
@@ -26,6 +26,56 @@ function chromeFake() {
   const alarms = { created: [], async create(name, info) { this.created.push({ name, ...info }); }, async clear() { return true; } };
   return { storage: { local: storage }, alarms };
 }
+
+test('manager fails safe on malformed persisted Scenario Work stores and prototype-key selection', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'unused',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+
+  const corruptStores = [
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: null },
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: [] },
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: { ghost: [] } },
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: { ghost: 'not-a-record' } },
+    { schemaVersion: 1, selectedId: '__proto__', order: [], byId: {} },
+  ];
+
+  for (const stored of corruptStores) {
+    await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: stored });
+    const listed = await manager.list();
+    assert.equal(listed.selectedId, '');
+    assert.deepEqual(listed.scenarios, []);
+  }
+});
+
+test('manager preserves a valid persisted scenario while omitting an invalid sibling record', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  stored.order.push('corrupt');
+  stored.byId.corrupt = [];
+  stored.selectedId = 'valid';
+
+  const listed = await manager.list();
+  assert.equal(listed.selectedId, 'valid');
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+  assert.equal(listed.scenarios[0].name, 'Valid');
+});
 
 test('manager materializes scenario turns only as canonical one-pass core sessions', async () => {
   let now = 1000;

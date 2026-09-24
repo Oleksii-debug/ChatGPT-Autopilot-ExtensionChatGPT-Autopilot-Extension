@@ -24,6 +24,11 @@ const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPh
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function safeName(value, fallback = 'Сценарна робота') { return text(value).slice(0, 120) || fallback; }
+function plainRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
@@ -52,29 +57,42 @@ function isTabAlreadyGoneError(error) {
   return /no tab with id|invalid tab id|tab not found/i.test(String(error?.message || error || ''));
 }
 function normalizeStore(raw, now = Date.now()) {
-  if (!raw || raw.schemaVersion !== STORAGE_SCHEMA_VERSION || !Array.isArray(raw.order) || typeof raw.byId !== 'object') return freshStore();
+  if (!plainRecord(raw) || raw.schemaVersion !== STORAGE_SCHEMA_VERSION || !Array.isArray(raw.order) || !plainRecord(raw.byId)) return freshStore();
   const out = freshStore();
   for (const id of raw.order) {
-    if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
+    if (
+      typeof id !== 'string'
+      || !Object.hasOwn(raw.byId, id)
+      || Object.hasOwn(out.byId, id)
+      || !plainRecord(raw.byId[id])
+    ) continue;
     try {
-      const config = normalizeScenarioWorkConfig({ ...raw.byId[id].config, id });
-      const runtime = ensureManagerRuntimeFields(raw.byId[id].runtime && raw.byId[id].runtime.mode === config.mode
-        ? clone(raw.byId[id].runtime)
+      const item = raw.byId[id];
+      const config = normalizeScenarioWorkConfig({ ...item.config, id });
+      const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
+        ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
-      out.byId[id] = {
-        id,
-        name: safeName(raw.byId[id].name || config.name),
-        config,
-        runtime,
-        createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
-        updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
-      };
+      Object.defineProperty(out.byId, id, {
+        value: {
+          id,
+          name: safeName(item.name || config.name),
+          config,
+          runtime,
+          createdAt: Math.max(0, Number(item.createdAt || now)),
+          updatedAt: Math.max(0, Number(item.updatedAt || now)),
+        },
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       out.order.push(id);
     } catch {
       // Corrupt individual scenarios are omitted rather than poisoning all others.
     }
   }
-  out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  out.selectedId = typeof raw.selectedId === 'string' && Object.hasOwn(out.byId, raw.selectedId)
+    ? raw.selectedId
+    : (out.order[0] || '');
   return out;
 }
 
