@@ -231,3 +231,65 @@ test('safe retry needs fresh independently bound no-effect evidence', async () =
   assert.equal((await safe.invoke(request)).status, 'VERIFIED');
   assert.equal(dispatches, 2);
 });
+
+
+test('provider rejects malformed canonical durable maps before browser dispatch', async t => {
+  const malformedRoots = [
+    { effectsById: null, leasesByTargetId: {} },
+    { effectsById: {}, leasesByTargetId: null },
+    { effectsById: [], leasesByTargetId: {} },
+    { effectsById: {}, leasesByTargetId: [] },
+  ];
+
+  for (const [index, root] of malformedRoots.entries()) {
+    await t.test(`malformed durable maps ${index + 1}`, async () => {
+      let effects = 0;
+      const store = {
+        async update(mutator) {
+          const draft = structuredClone(root);
+          return mutator(draft);
+        },
+      };
+      const p = createDeterministicWebProviderV1({
+        transport: {
+          execute: async () => { effects += 1; },
+          observe: async () => ({ data: { visibleSelectors: ['#done'] }, artifactRefs: [] }),
+        },
+        store,
+        now: () => at,
+        leaseId: () => 'must-not-be-used',
+      });
+      await assert.rejects(() => p.invoke({
+        ...fixtures(`malformed-store-${index + 1}`),
+        targetId: 'tab-1',
+        action: { kind: 'CLICK', selector: '#go' },
+        postcondition: { selector: '#done' },
+      }), /effectsById|leasesByTargetId/);
+      assert.equal(effects, 0);
+    });
+  }
+});
+
+test('prototype-named invocation ids are treated only as own durable entries', async () => {
+  const leaseState = { value: null };
+  const store = durableStore(leaseState);
+  let effects = 0;
+  const p = createDeterministicWebProviderV1({
+    transport: {
+      execute: async () => { effects += 1; },
+      observe: async () => ({ data: { visibleSelectors: ['#done'] }, artifactRefs: [] }),
+    },
+    store,
+    now: () => at,
+    leaseId: () => 'constructor-lease',
+  });
+  const result = await p.invoke({
+    ...fixtures('constructor'),
+    targetId: 'tab-1',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: { selector: '#done' },
+  });
+  assert.equal(result.status, 'VERIFIED');
+  assert.equal(effects, 1);
+  assert.equal(store.snapshot().effectsById.constructor.state.phase, 'COMMITTED');
+});
