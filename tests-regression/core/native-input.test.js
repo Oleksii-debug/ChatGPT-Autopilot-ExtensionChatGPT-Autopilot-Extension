@@ -9,7 +9,7 @@ function setup(kind='submit'){
  session.runState='RUNNING';session.operation={operationId:'op',sessionId:'s',taskId:'t',targetUrl:task.url,promptText:'canonical prompt',promptFingerprint:'fp',phase:kind==='submit'?'SUBMITTING':'INSERTING',createdAt:1,updatedAt:1,preSendDeadline:0,submitStartedAt:kind==='submit'?1:0,verificationDeadline:0};
  state.sessionsById.s=session;state.sessionOrder=['s'];state.tabHintsByTaskId.t={tabId:7,sessionId:'s',normalizedUrl:task.url,kind:'TASK'};
  let db=state;const calls=[];
- const chrome={runtime:{id:'ext'},storage:{local:{get:async()=>({autopilotState:structuredClone(db)}),set:async r=>{db=structuredClone(r.autopilotState);}}},tabs:{get:async()=>({id:7,url:task.url})},scripting:{executeScript:async()=>[{result:{url:task.url,x:20,y:30}}]},debugger:{attach:async()=>calls.push('attach'),detach:async()=>calls.push('detach'),sendCommand:async(_target,method,args)=>{
+ const chrome={runtime:{id:'ext'},storage:{local:{get:async()=>({autopilotState:structuredClone(db)}),set:async r=>{db=structuredClone(r.autopilotState);}}},tabs:{get:async()=>({id:7,url:task.url,active:true,windowId:9})},scripting:{executeScript:async()=>[{result:{url:task.url,x:20,y:30}}]},debugger:{attach:async()=>calls.push('attach'),detach:async()=>calls.push('detach'),sendCommand:async(_target,method,args)=>{
   if(method==='Input.dispatchMouseEvent')assert.equal(db.sessionsById.s.operation.nativeSubmitDispatched,true);
   calls.push({method,args});
  }}};
@@ -103,6 +103,25 @@ test('same-window parallel activation preserves original owner focus across rest
  assert.equal(activeTabId,8);
  await restoreOwnedSendTab(f.chrome,restartedRepo,{...message2,previousTabId:3},sender2);
  assert.equal(activeTabId,3);
+});
+
+test('cold-start focus restoration before native submit proves zero effect and never attaches debugger',async()=>{
+ const f=setup();let activeTabId=3;
+ f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true,windowId:9};};
+
+ await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender);
+ assert.equal(activeTabId,7);
+ const restartedRepo=new StorageRepository(f.chrome);
+ await restorePendingSendTabs(f.chrome,restartedRepo,{sessionId:'s'});
+ assert.equal(activeTabId,3);
+
+ await assert.rejects(
+  performNativeInput(f.chrome,restartedRepo,f.message,f.sender),
+  /SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT/
+ );
+ assert.deepEqual(f.calls,[]);
 });
 
 test('native insertion replaces the focused composer and uses durable prompt text',async()=>{
