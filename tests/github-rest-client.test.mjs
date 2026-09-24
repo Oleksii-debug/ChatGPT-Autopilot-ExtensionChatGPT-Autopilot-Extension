@@ -67,6 +67,100 @@ test('repository outside owner allowlist is rejected before credential resolutio
   assert.deepEqual(credentialCalls, []);
 });
 
+test('credential-bearing request boundary independently enforces repository allowlist and rejects path confusion', async () => {
+  const credentialCalls = [];
+  let fetchCount = 0;
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential(credentialCalls),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => { fetchCount += 1; return jsonResponse(200, {}); },
+  });
+
+  for (const pathname of [
+    '/repos/other/secret',
+    '/repos/Oleksii-debug%2Fother/example',
+    '/repos/Oleksii-debug/example%2Fother',
+    '/repos/Oleksii-debug\\example/contents/a.txt',
+    '/repos/Oleksii-debug/example#other',
+  ]) {
+    await assert.rejects(
+      () => client.request('GET', pathname),
+      error => ['GITHUB_REPOSITORY_NOT_ALLOWED', 'GITHUB_INVALID_REQUEST'].includes(error.code),
+    );
+  }
+  assert.deepEqual(credentialCalls, [], 'secret resolution must stay behind repository admission');
+  assert.equal(fetchCount, 0, 'network must stay behind repository admission');
+});
+
+test('repository and ref identities reject overlength input instead of truncating into another identity', async () => {
+  assert.throws(() => new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [`owner/${'r'.repeat(295)}extra`],
+    fetchImpl: async () => jsonResponse(200, {}),
+  }), /allowedRepositories|repositoryFullName|invalid/i);
+
+  let fetchCount = 0;
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => { fetchCount += 1; return jsonResponse(201, {}); },
+  });
+  await assert.rejects(
+    () => client.createBranch({ repositoryFullName: repo, branch: 'a'.repeat(241), fromSha: commitSha }),
+    error => error.code === 'GITHUB_INVALID_REQUEST',
+  );
+  assert.equal(fetchCount, 0);
+});
+
+test('bounded timeout is retry-safe for reads and ambiguous for mutations without real waiting', async () => {
+  const immediateTimer = callback => {
+    callback();
+    return 1;
+  };
+  const noTimerCleanup = () => {};
+  const abortingFetch = async (_url, options) => {
+    assert.equal(options.signal.aborted, true);
+    const error = new Error('aborted by deterministic test scheduler');
+    error.name = 'AbortError';
+    throw error;
+  };
+
+  const readClient = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: abortingFetch,
+    requestTimeoutMs: 1000,
+    setTimeoutImpl: immediateTimer,
+    clearTimeoutImpl: noTimerCleanup,
+  });
+  await assert.rejects(
+    () => readClient.readRepository({ repositoryFullName: repo }),
+    error => error.code === 'GITHUB_REQUEST_TIMEOUT'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+
+  const mutationClient = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: abortingFetch,
+    requestTimeoutMs: 1000,
+    setTimeoutImpl: immediateTimer,
+    clearTimeoutImpl: noTimerCleanup,
+  });
+  await assert.rejects(
+    () => mutationClient.createBranch({ repositoryFullName: repo, branch: 'work/timeout', fromSha: commitSha }),
+    error => error.code === 'GITHUB_REQUEST_TIMEOUT'
+      && error.effectMayHaveOccurred === true
+      && error.safeToRetry === false,
+  );
+});
+
 test('file update requires exact expected blob SHA and sends it as GitHub precondition', async () => {
   const requests = [];
   const client = new GitHubRestClientV1({
