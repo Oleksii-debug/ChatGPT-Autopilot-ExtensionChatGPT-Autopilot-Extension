@@ -257,6 +257,21 @@ test('duplicate exact-effect state or commit identity is rejected', async () => 
   await assert.rejects(() => projectCrossAppTransactionV1(transaction(), [release, drive]), /duplicate commitId/);
 });
 
+
+test('exact-effect envelope rejects coerced authority fields before canonical normalizer can widen them', async () => {
+  const numericEffect = exactEffectState(INV_RELEASE, 'PREPARED', { overrides: { effectId: 7 } });
+  await assert.rejects(() => projectCrossAppTransactionV1(transaction(), [numericEffect]), /effectId/);
+
+  const coercedAttempt = exactEffectState(INV_RELEASE, 'PREPARED', { overrides: { attempt: '0' } });
+  await assert.rejects(() => projectCrossAppTransactionV1(transaction(), [coercedAttempt]), /attempt/);
+
+  const coercedInvocation = exactEffectState({ ...INV_RELEASE, invocationId: 7 }, 'PREPARED', { overrides: { effectId: '7' } });
+  await assert.rejects(() => projectCrossAppTransactionV1(transaction(), [coercedInvocation]), /invocationId/);
+
+  const numericCommit = exactEffectState(INV_RELEASE, 'COMMITTED', { overrides: { commitId: 7 } });
+  await assert.rejects(() => projectCrossAppTransactionV1(transaction(), [numericCommit]), /commitId/);
+});
+
 test('complete canonical effect chain projects COMPLETE while compensation remains inert', async () => {
   const states = [
     exactEffectState(INV_RELEASE, 'COMMITTED', { updatedAt: '2026-09-24T23:21:00.000Z' }),
