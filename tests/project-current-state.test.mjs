@@ -174,6 +174,7 @@ test('digest is deterministic and unchanged for the same fresh provenance-bound 
   assert.deepEqual(digest.sourceChanges, []);
   assert.deepEqual(digest.artifactChanges, []);
   assert.deepEqual(digest.staleEvidence, []);
+  assert.deepEqual(digest.artifactDriftEvidence, []);
   assert.equal(Object.isFrozen(digest), true);
   assert.equal(Object.isFrozen(digest.sourceChanges), true);
 });
@@ -210,12 +211,20 @@ test('digest reports source revision movement across fresh project revisions', (
     change: 'CHANGED',
     before: {
       status: 'FRESH',
+      kind: 'github-repository',
+      uri: 'github://Oleksii-debug/autopilot/main',
+      authority: 'CANONICAL',
+      contentSha256: 'a'.repeat(64),
       snapshotRevisionId: 'commit-1',
       capsuleRevisionId: 'commit-1',
       currentRevisionId: 'commit-1',
     },
     after: {
       status: 'FRESH',
+      kind: 'github-repository',
+      uri: 'github://Oleksii-debug/autopilot/main',
+      authority: 'CANONICAL',
+      contentSha256: 'c'.repeat(64),
       snapshotRevisionId: 'commit-2',
       capsuleRevisionId: 'commit-2',
       currentRevisionId: 'commit-2',
@@ -255,14 +264,20 @@ test('digest reports artifact identity changes while both endpoint states remain
     before: {
       kind: 'report',
       uri: 'artifact://report',
+      mediaType: 'text/plain',
       sha256: 'b'.repeat(64),
       sizeBytes: 10,
+      producerInvocationId: 'invoke-1',
+      sensitive: false,
     },
     after: {
       kind: 'report',
       uri: 'artifact://report',
+      mediaType: 'text/plain',
       sha256: 'd'.repeat(64),
       sizeBytes: 12,
+      producerInvocationId: 'invoke-2',
+      sensitive: false,
     },
   }]);
 });
@@ -299,4 +314,56 @@ test('digest refuses cross-project comparison', () => {
       currentSources: [otherSource],
     }),
   }), /projectId must match/);
+});
+
+
+test('digest reports aligned source provenance changes even when revision and hash stay the same', () => {
+  const movedSource = source({
+    uri: 'github://Oleksii-debug/autopilot/renamed-main',
+    authority: 'DERIVED',
+  });
+  const movedSnapshot = snapshot({
+    revisionId: 'project-rev-2',
+    sourceRefs: [movedSource],
+  });
+  const movedCapsule = capsule({
+    capsuleId: 'capsule-2',
+    projectRevisionId: 'project-rev-2',
+  });
+
+  const digest = deriveProjectCurrentStateDigestV1({
+    baseline: stateInput(),
+    current: stateInput({
+      snapshotValue: movedSnapshot,
+      capsuleValue: movedCapsule,
+      currentSources: [movedSource],
+    }),
+  });
+
+  assert.equal(digest.status, 'CHANGED');
+  assert.equal(digest.changeViewAvailable, true);
+  assert.equal(digest.sourceChanges.length, 1);
+  assert.equal(digest.sourceChanges[0].change, 'CHANGED');
+  assert.equal(digest.sourceChanges[0].before.uri, 'github://Oleksii-debug/autopilot/main');
+  assert.equal(digest.sourceChanges[0].after.uri, 'github://Oleksii-debug/autopilot/renamed-main');
+  assert.equal(digest.sourceChanges[0].before.authority, 'CANONICAL');
+  assert.equal(digest.sourceChanges[0].after.authority, 'DERIVED');
+});
+
+test('stale artifact identity suppresses what-changed and exposes explicit drift evidence', () => {
+  const digest = deriveProjectCurrentStateDigestV1({
+    baseline: stateInput(),
+    current: stateInput({
+      capsuleValue: capsule({ artifactRefs: [artifact({ sha256: 'd'.repeat(64) })] }),
+    }),
+  });
+
+  assert.equal(digest.status, 'STALE_INPUT');
+  assert.equal(digest.changeViewAvailable, false);
+  assert.deepEqual(digest.artifactChanges, []);
+  assert.deepEqual(digest.artifactDriftEvidence, [{
+    phase: 'CURRENT',
+    artifactId: 'report',
+    status: 'IDENTITY_DRIFT',
+  }]);
 });
