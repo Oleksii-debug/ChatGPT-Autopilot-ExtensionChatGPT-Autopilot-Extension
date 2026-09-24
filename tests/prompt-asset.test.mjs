@@ -323,3 +323,83 @@ test('plain value maps cannot smuggle inherited variable values', () => {
     /values must be a plain object/,
   );
 });
+
+test('authority-bearing prompt asset arrays reject accessors before reading values', () => {
+  for (const field of ['variables', 'sourceBindings']) {
+    let reads = 0;
+    const values = field === 'variables'
+      ? [{ name: 'target', required: true, maxChars: 400, defaultValue: null, sensitive: false }]
+      : [source()];
+    Object.defineProperty(values, '0', {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return field === 'variables'
+          ? { name: 'target', required: true, maxChars: 400, defaultValue: null, sensitive: false }
+          : source();
+      },
+    });
+    assert.throws(
+      () => normalizePromptAssetV1(asset({ [field]: values })),
+      /dense enumerable own data items/,
+    );
+    assert.equal(reads, 0, field + ' getter must never execute');
+  }
+});
+
+test('prompt asset array boundaries reject sparse, custom, symbol, hidden and exotic arrays', () => {
+  const sparse = new Array(1);
+  assert.throws(
+    () => normalizePromptAssetV1(asset({ variables: sparse })),
+    /dense enumerable own data items/,
+  );
+
+  const custom = [source()];
+  custom.extra = source('other', 'rev-2', SHA_B);
+  assert.throws(
+    () => normalizePromptAssetV1(asset({ sourceBindings: custom })),
+    /non-canonical array fields/,
+  );
+
+  const symbol = [source()];
+  symbol[Symbol('authority')] = source('other', 'rev-2', SHA_B);
+  assert.throws(
+    () => normalizePromptAssetV1(asset({ sourceBindings: symbol })),
+    /non-canonical array fields/,
+  );
+
+  const hidden = [source()];
+  Object.defineProperty(hidden, '0', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: source(),
+  });
+  assert.throws(
+    () => normalizePromptAssetV1(asset({ sourceBindings: hidden })),
+    /dense enumerable own data items/,
+  );
+
+  const exotic = [source()];
+  Object.setPrototypeOf(exotic, null);
+  assert.throws(
+    () => normalizePromptAssetV1(asset({ sourceBindings: exotic })),
+    /plain array/,
+  );
+});
+
+test('source binding normalization uses locale-independent code-unit ordering', () => {
+  const bindings = [
+    source('a_', 'rev-1', SHA_A),
+    source('a-', 'rev-1', SHA_A),
+    source('a', 'rev-1', SHA_A),
+    source('A', 'rev-1', SHA_A),
+  ];
+  const left = normalizePromptAssetV1(asset({ sourceBindings: bindings }));
+  const right = normalizePromptAssetV1(asset({ sourceBindings: [...bindings].reverse() }));
+  const expected = ['A', 'a', 'a-', 'a_'];
+  assert.deepEqual(left.sourceBindings.map(item => item.sourceId), expected);
+  assert.deepEqual(right.sourceBindings.map(item => item.sourceId), expected);
+});
+
