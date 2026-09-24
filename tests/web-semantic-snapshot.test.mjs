@@ -176,6 +176,18 @@ test('snapshot and query bounds fail closed', () => {
 test('snapshot contract rejects authority-bearing or mutable top-level extensions', () => {
   assert.throws(() => normalizeWebSemanticSnapshotV1({
     ...snapshot(),
+    actionAuthority: 'ALLOW',
+  }), /actionAuthority must remain NONE/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1({
+    ...snapshot(),
+    contentTrust: 'TRUSTED',
+  }), /contentTrust must remain UNTRUSTED_DATA/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1({
+    ...snapshot(),
+    advisoryOnly: false,
+  }), /advisoryOnly must remain true/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1({
+    ...snapshot(),
     policyDecision: 'ALLOW',
   }), /unknown field: policyDecision/);
   assert.throws(() => normalizeWebSemanticSnapshotV1({
