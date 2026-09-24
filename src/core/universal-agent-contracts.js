@@ -37,16 +37,23 @@ function plain(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
-  // Authority/evidence contracts are untrusted input. Inspect descriptors
-  // without evaluating accessors so a getter cannot change a value between
-  // validation and normalization (for example DENY -> ALLOW).
+  // Authority/evidence contracts are untrusted input. Snapshot descriptor
+  // values without evaluating accessors so validation and normalization read
+  // the exact same immutable input view.
+  const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-      throw new Error(`${label} fields must be own data properties`);
+    if (typeof key !== 'string') {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
     }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    out[key] = descriptor.value;
   }
-  return value;
+  return out;
 }
 
 function exactKeys(value, allowed, label) {
@@ -113,24 +120,90 @@ function bool(value, label, fallback = false) {
   return value;
 }
 
+function dataArray(value, label, max) {
+  if (!Array.isArray(value) || value.length > max || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const out = [];
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key)) {
+      throw new Error(`${label} contains a non-index field`);
+    }
+    const index = Number(key);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!Number.isSafeInteger(index)
+        || index < 0
+        || index >= value.length
+        || String(index) !== key
+        || !descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} entries must be enumerable own data properties`);
+    }
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} must be a dense data-only array`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
+}
+
 function idList(value, label, { optional = true, max = MAX_LIST } = {}) {
   if (value == null && optional) return [];
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  const out = value.map((item, index) => id(item, `${label}[${index}]`));
+  const items = dataArray(value, label, max);
+  const out = items.map((item, index) => id(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
 }
 
 function stringList(value, label, { optional = true, max = MAX_LIST, itemMax = 500 } = {}) {
   if (value == null && optional) return [];
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  return value.map((item, index) => text(item, `${label}[${index}]`, { max: itemMax }));
+  const items = dataArray(value, label, max);
+  return items.map((item, index) => text(item, `${label}[${index}]`, { max: itemMax }));
+}
+
+function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
+  if (depth > 64) throw new Error(`${label} exceeds maximum nesting depth`);
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
+    return value;
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error(`${label} must contain JSON-compatible data only`);
+  }
+  if (stack.has(value)) throw new Error(`${label} must not contain cycles`);
+  stack.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const items = dataArray(value, label, MAX_DATA_JSON);
+      return items.map((item, index) => cloneJsonData(item, `${label}[${index}]`, stack, depth + 1));
+    }
+    const raw = plain(value, label);
+    const out = {};
+    for (const key of Object.keys(raw)) {
+      Object.defineProperty(out, key, {
+        value: cloneJsonData(raw[key], `${label}.${key}`, stack, depth + 1),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+    return out;
+  } finally {
+    stack.delete(value);
+  }
 }
 
 function jsonData(value, label, { optional = true } = {}) {
   if (value == null && optional) return {};
-  plain(value, label);
-  const cloned = structuredClone(value);
+  const cloned = cloneJsonData(value, label);
   const serialized = JSON.stringify(cloned);
   if (serialized.length > MAX_DATA_JSON) throw new Error(`${label} is too large`);
   return cloned;
@@ -144,8 +217,8 @@ function frozen(value) {
 
 function normalizedObjectList(value, label, normalizeItem, { max = MAX_LIST } = {}) {
   if (value == null) return [];
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  return value.map((item, index) => {
+  const items = dataArray(value, label, max);
+  return items.map((item, index) => {
     try { return normalizeItem(item); }
     catch (error) { throw new Error(`${label}[${index}]: ${error.message}`); }
   });

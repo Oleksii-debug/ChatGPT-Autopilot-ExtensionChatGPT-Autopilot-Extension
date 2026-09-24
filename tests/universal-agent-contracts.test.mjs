@@ -55,6 +55,111 @@ function credential(overrides = {}) {
   };
 }
 
+test('nested contract data and list boundaries reject accessors without executing them', () => {
+  let reads = 0;
+
+  const capabilities = ['filesystem.read'];
+  Object.defineProperty(capabilities, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'filesystem.read';
+    },
+  });
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-array-accessor',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: capabilities,
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  }), /data properties/);
+  assert.equal(reads, 0, 'array entry getter must never execute');
+
+  const nested = {};
+  Object.defineProperty(nested, 'pathRef', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'workspace:README.md';
+    },
+  });
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-nested-accessor',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: { request: nested },
+    createdAt: AT,
+  }), /enumerable own data properties/);
+  assert.equal(reads, 0, 'nested JSON getter must never execute');
+
+  const hiddenKnown = {
+    schemaVersion: 1,
+    decisionId: 'decision-hidden',
+    invocationId: 'invoke-1',
+    decision: PolicyDecisionKind.DENY,
+    reasonCode: 'OWNER_DENY',
+    decidedAt: AT,
+  };
+  Object.defineProperty(hiddenKnown, 'decision', {
+    enumerable: false,
+    configurable: true,
+    value: PolicyDecisionKind.ALLOW,
+  });
+  assert.throws(() => normalizePolicyDecisionV1(hiddenKnown), /enumerable own data properties/);
+
+  const sparse = [];
+  sparse.length = 1;
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-sparse-capabilities',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: sparse,
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  }), /dense data-only array/);
+
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-nonfinite-json',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: { score: Number.NaN },
+    createdAt: AT,
+  }), /non-finite number/);
+
+  const protoNamedArguments = {};
+  Object.defineProperty(protoNamedArguments, '__proto__', {
+    enumerable: true,
+    configurable: true,
+    value: { marker: 'data-not-prototype' },
+  });
+  const normalizedProtoNamed = normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-proto-named-json',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: protoNamedArguments,
+    createdAt: AT,
+  });
+  assert.equal(Object.getPrototypeOf(normalizedProtoNamed.arguments), Object.prototype);
+  assert.equal(Object.hasOwn(normalizedProtoNamed.arguments, '__proto__'), true);
+  assert.deepEqual(normalizedProtoNamed.arguments.__proto__, { marker: 'data-not-prototype' });
+});
+
 test('CapabilityV1 and ToolDescriptorV1 adapt existing registry truth without creating a second registry', () => {
   const provider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
   const tool = toolDescriptorV1FromAgentProvider(provider, {
