@@ -66,6 +66,17 @@ function mapPathError(error) {
   return error;
 }
 
+async function writeAll(handle, bytes) {
+  let offset = 0;
+  while (offset < bytes.byteLength) {
+    const { bytesWritten } = await handle.write(bytes, offset, bytes.byteLength - offset, offset);
+    if (!Number.isInteger(bytesWritten) || bytesWritten <= 0) {
+      throw nativeError('WRITE_VERIFICATION_FAILED', 'Filesystem write made no forward progress');
+    }
+    offset += bytesWritten;
+  }
+}
+
 export async function searchScopedFilesystemV1(payload, config) {
   exactKeys(payload, new Set(['rootId', 'query', 'maxResults', 'maxEntries']), 'filesystem.search payload');
   const root = configuredRoot(config, payload.rootId);
@@ -124,7 +135,7 @@ export async function writeExistingTextScopedV1(payload, config, { beforeOpen = 
       }
 
       await handle.truncate(0);
-      if (desired.byteLength) await handle.write(desired, 0, desired.byteLength, 0);
+      if (desired.byteLength) await writeAll(handle, desired);
       await handle.sync();
       const postStat = await handle.stat();
       if (!postStat.isFile() || postStat.size !== desired.byteLength) throw nativeError('WRITE_VERIFICATION_FAILED', 'Written file size did not match desired content');
