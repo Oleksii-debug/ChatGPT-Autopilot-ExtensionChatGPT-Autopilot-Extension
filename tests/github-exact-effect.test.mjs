@@ -46,18 +46,31 @@ function policy(id = 'github-effect-1') {
 }
 
 function storeFixture(initial = {}) {
-  const states = new Map(Object.entries(initial).map(([key, value]) => [key, structuredClone(value)]));
+  let root = {
+    effectsById: Object.fromEntries(Object.entries(initial).map(([id, state]) => [id, { state: structuredClone(state) }])),
+  };
   const writes = [];
   return {
     writes,
     store: {
-      async load(id) { return states.has(id) ? structuredClone(states.get(id)) : null; },
-      async save(id, state) {
-        states.set(id, structuredClone(state));
-        writes.push({ id, phase: state.phase, attempt: state.attempt });
+      async update(mutator) {
+        const before = structuredClone(root);
+        const draft = structuredClone(root);
+        const returned = mutator(draft);
+        root = structuredClone(returned === undefined ? draft : returned);
+        for (const [id, entry] of Object.entries(root.effectsById || {})) {
+          const previous = before.effectsById?.[id]?.state;
+          if (entry?.state && JSON.stringify(entry.state) !== JSON.stringify(previous)) {
+            writes.push({ id, phase: entry.state.phase, attempt: entry.state.attempt });
+          }
+        }
+        return structuredClone(root);
       },
     },
-    snapshot(id) { return structuredClone(states.get(id)); },
+    snapshot(id) {
+      const state = root.effectsById?.[id]?.state;
+      return state ? structuredClone(state) : undefined;
+    },
   };
 }
 
@@ -127,8 +140,55 @@ test('effectful GitHub mutation persists EXECUTING before provider dispatch and 
   const result = await executor.invoke({ invocation: invocation(), policyDecision: policy() });
   assert.equal(phaseAtDispatch, 'EXECUTING');
   assert.equal(result.effectState.phase, 'COMMITTED');
-  assert.deepEqual(fx.writes.map(item => item.phase), ['PREPARED', 'EXECUTING', 'OBSERVED', 'VERIFIED', 'COMMITTED']);
+  assert.deepEqual(fx.writes.map(item => item.phase), ['EXECUTING', 'OBSERVED', 'VERIFIED', 'COMMITTED']);
   assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+});
+
+test('concurrent same-invocation contenders atomically admit exactly one GitHub mutation', async () => {
+  const fx = storeFixture();
+  const calls = [];
+  let releaseDispatch;
+  const gate = new Promise(resolve => { releaseDispatch = resolve; });
+  const provider = {
+    authorize({ invocation: input, policyDecision }) {
+      calls.push(['authorize', input.invocationId]);
+      return { invocation: structuredClone(input), policyDecision: structuredClone(policyDecision) };
+    },
+    async invoke({ invocation: input }) {
+      calls.push(['invoke', input.invocationId]);
+      await gate;
+      return {
+        providerId: 'remote/github',
+        invocationId: input.invocationId,
+        observedAt: at,
+        result: { repository: input.arguments.repository, path: input.arguments.path, sha: '1'.repeat(40) },
+      };
+    },
+  };
+  const executor = new GitHubExactEffectExecutorV1({
+    provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async ({ invocation: inv, observation }) => verified(inv, observation),
+  });
+  const inv = invocation('github-effect-concurrent');
+  const decision = policy(inv.invocationId);
+
+  const first = executor.invoke({ invocation: inv, policyDecision: decision });
+  await Promise.resolve();
+  const second = executor.invoke({ invocation: structuredClone(inv), policyDecision: structuredClone(decision) });
+
+  await assert.rejects(() => second, error => {
+    assert.equal(error.code, 'GITHUB_EFFECT_NOT_EXECUTABLE');
+    assert.equal(error.effectState.phase, 'EXECUTING');
+    return true;
+  });
+  assert.equal(calls.filter(([name]) => name === 'invoke').length, 1);
+
+  releaseDispatch();
+  const result = await first;
+  assert.equal(result.effectState.phase, 'COMMITTED');
+  assert.equal(calls.filter(([name]) => name === 'invoke').length, 1);
 });
 
 test('ambiguous GitHub transport outcome becomes durable RECONCILE and blind retry is blocked', async () => {
@@ -172,6 +232,8 @@ test('restart recovery converts a durable EXECUTING mutation to RECONCILE before
     verify: async () => { throw new Error('must not verify'); },
   });
 
+  const recovered = await executor.recoverInterrupted();
+  assert.deepEqual(recovered, [{ invocationId: 'interrupted', phase: 'RECONCILE' }]);
   await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: policy('interrupted') }), /requires reconciliation/);
   assert.equal(fx.snapshot('interrupted').phase, 'RECONCILE');
   assert.equal(fx.snapshot('interrupted').ambiguity.reasonCode, 'GITHUB_DISPATCH_INTERRUPTED');
@@ -194,6 +256,34 @@ test('same invocation id cannot be rebound to a different GitHub mutation after 
     policyDecision: policy(),
   }), /binding changed/);
   assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+});
+
+test('durable GitHub exact-effect identities reject JavaScript coercion aliases', async () => {
+  const fx = storeFixture();
+  const p = providerFixture();
+
+  for (const actorId of [1, true, { toString: () => 'actor' }]) {
+    assert.throws(() => new GitHubExactEffectExecutorV1({
+      provider: p.provider,
+      store: fx.store,
+      actorId,
+      now: () => Date.parse(at),
+      verify: async ({ invocation: inv, observation }) => verified(inv, observation),
+    }), /actorId is invalid/);
+  }
+
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async ({ invocation: inv, observation }) => verified(inv, observation),
+  });
+  for (const invocationId of [1, true, { toString: () => 'github-effect-1' }]) {
+    await assert.rejects(
+      () => executor.reconcile({ invocationId, outcome: 'MANUAL_REVIEW' }),
+      /invocationId is invalid/,
+    );
+  }
 });
 
 test('fresh independently bound reconciliation can verify and commit without replaying the GitHub mutation', async () => {
