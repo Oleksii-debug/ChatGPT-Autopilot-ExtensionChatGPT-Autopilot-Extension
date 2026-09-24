@@ -155,3 +155,28 @@ test('sourceBindingFromRefV1 strips source metadata and authority down to immuta
   assert.equal(binding.sourceId, 'github-main');
   assert.equal(binding.contentSha256, 'a'.repeat(64));
 });
+
+
+test('Project/Context contracts reject type-coerced identities, versions and authority', () => {
+  assert.throws(() => normalizeProjectSourceRefV1(source({ schemaVersion: '1' })), /schemaVersion/);
+  assert.throws(() => normalizeProjectSourceRefV1(source({ schemaVersion: true })), /schemaVersion/);
+  assert.throws(() => normalizeProjectSourceRefV1(source({ sourceId: 1 })), /sourceId must be text/);
+  assert.throws(() => normalizeProjectSourceRefV1(source({ projectId: true })), /projectId must be text/);
+  assert.throws(() => normalizeProjectSourceRefV1(source({ revisionId: 1 })), /revisionId must be text/);
+  assert.throws(() => normalizeProjectSourceRefV1(source({ authority: 1 })), /authority must be text/);
+  assert.throws(() => normalizeProjectSourceRefV1(source({ contentSha256: 1 })), /contentSha256 must be text/);
+  assert.throws(() => normalizeContextCapsuleV1(capsule({ schemaVersion: '1' })), /schemaVersion/);
+});
+
+test('Project/Context contracts reject exotic prototype authority and identity inheritance', () => {
+  const inherited = Object.create(source());
+  assert.throws(() => normalizeProjectSourceRefV1(inherited), /plain object/);
+
+  const inheritedCapsule = Object.create(capsule());
+  assert.throws(() => normalizeContextCapsuleV1(inheritedCapsule), /plain object/);
+
+  const nullPrototype = Object.assign(Object.create(null), source());
+  const normalized = normalizeProjectSourceRefV1(nullPrototype);
+  assert.equal(normalized.sourceId, 'github-main');
+  assert.equal(normalized.authority, 'CANONICAL');
+});
