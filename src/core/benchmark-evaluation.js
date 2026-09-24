@@ -40,6 +40,7 @@ const RUN_KEYS = new Set([
 const RESULT_KEYS = new Set([
   'caseId', 'outcome', 'metrics', 'evidenceArtifactIds', 'reasonCode',
 ]);
+const SUBJECT_KEYS = new Set(['subjectId', 'subjectRevisionId']);
 
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -159,7 +160,7 @@ function normalizeCase(input, index) {
     }
     metrics.add(assertion.metricId);
   }
-  assertions.sort((a, b) => a.metricId.localeCompare(b.metricId, 'en'));
+  assertions.sort((a, b) => a.metricId < b.metricId ? -1 : a.metricId > b.metricId ? 1 : 0);
   return freeze({
     caseId: id(raw.caseId, label + ' caseId'),
     title: text(raw.title, label + ' title'),
@@ -182,7 +183,7 @@ export function normalizeBenchmarkSuiteV1(input) {
     if (seen.has(item.caseId)) throw new Error('BenchmarkSuiteV1 contains duplicate caseId: ' + item.caseId);
     seen.add(item.caseId);
   }
-  cases.sort((a, b) => a.caseId.localeCompare(b.caseId, 'en'));
+  cases.sort((a, b) => a.caseId < b.caseId ? -1 : a.caseId > b.caseId ? 1 : 0);
   return freeze({
     schemaVersion: BENCHMARK_EVALUATION_SCHEMA_VERSION,
     suiteId: id(raw.suiteId, 'BenchmarkSuiteV1 suiteId'),
@@ -211,7 +212,7 @@ function normalizeMetrics(input, expectedMetricIds, label, { required }) {
   }
 
   const entries = names
-    .sort((a, b) => a.localeCompare(b, 'en'))
+    .sort((a, b) => a < b ? -1 : a > b ? 1 : 0)
     .map((name) => [name, raw[name]]);
   return freeze(Object.fromEntries(entries));
 }
@@ -260,8 +261,16 @@ function assertionPasses(operator, observed, threshold) {
   return observed === threshold;
 }
 
-export function evaluateBenchmarkRunV1({ suite, run } = {}) {
+export function evaluateBenchmarkRunV1({ suite, run, expectedSubject } = {}) {
   const normalizedSuite = normalizeBenchmarkSuiteV1(suite);
+  const subject = record(expectedSubject, 'ExpectedBenchmarkSubjectV1');
+  exactKeys(subject, SUBJECT_KEYS, 'ExpectedBenchmarkSubjectV1');
+  const expectedSubjectId = id(subject.subjectId, 'ExpectedBenchmarkSubjectV1 subjectId');
+  const expectedSubjectRevisionId = id(
+    subject.subjectRevisionId,
+    'ExpectedBenchmarkSubjectV1 subjectRevisionId',
+  );
+
   const rawRun = record(run, 'BenchmarkRunV1');
   exactKeys(rawRun, RUN_KEYS, 'BenchmarkRunV1');
   if (rawRun.schemaVersion !== BENCHMARK_EVALUATION_SCHEMA_VERSION) {
@@ -272,6 +281,12 @@ export function evaluateBenchmarkRunV1({ suite, run } = {}) {
   const suiteRevisionId = id(rawRun.suiteRevisionId, 'BenchmarkRunV1 suiteRevisionId');
   if (suiteId !== normalizedSuite.suiteId || suiteRevisionId !== normalizedSuite.suiteRevisionId) {
     throw new Error('BenchmarkRunV1 suite identity/revision mismatch');
+  }
+
+  const subjectId = id(rawRun.subjectId, 'BenchmarkRunV1 subjectId');
+  const subjectRevisionId = id(rawRun.subjectRevisionId, 'BenchmarkRunV1 subjectRevisionId');
+  if (subjectId !== expectedSubjectId || subjectRevisionId !== expectedSubjectRevisionId) {
+    throw new Error('BenchmarkRunV1 subject identity/revision mismatch');
   }
 
   const startedAt = timestamp(rawRun.startedAt, 'BenchmarkRunV1 startedAt');
@@ -345,8 +360,8 @@ export function evaluateBenchmarkRunV1({ suite, run } = {}) {
     runId: id(rawRun.runId, 'BenchmarkRunV1 runId'),
     suiteId: normalizedSuite.suiteId,
     suiteRevisionId: normalizedSuite.suiteRevisionId,
-    subjectId: id(rawRun.subjectId, 'BenchmarkRunV1 subjectId'),
-    subjectRevisionId: id(rawRun.subjectRevisionId, 'BenchmarkRunV1 subjectRevisionId'),
+    subjectId,
+    subjectRevisionId,
     startedAt,
     completedAt,
     status: failedCaseCount === 0
