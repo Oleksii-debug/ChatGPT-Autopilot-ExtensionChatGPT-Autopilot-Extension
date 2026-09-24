@@ -28,12 +28,13 @@ function repository(value, label) {
 
 function portableHierarchyGraph(raw) {
   const source = object(raw, 'hierarchy');
-  exactKeys(source, ['schemaVersion','graphId','controlEpoch','promptProfiles','nodes','rootIds','nodeOrder','nodesById'], 'hierarchy');
+  exactKeys(source, ['schemaVersion','graphId','controlEpoch','loopPolicy','promptProfiles','nodes','rootIds','nodeOrder','nodesById'], 'hierarchy');
   const graph = validateOrchestrationGraphV1(source);
   return {
     schemaVersion: graph.schemaVersion,
     graphId: graph.graphId,
     controlEpoch: graph.controlEpoch,
+    loopPolicy: { ...graph.loopPolicy },
     promptProfiles: graph.promptProfiles.map(profile => ({ ...profile })),
     nodes: graph.nodeOrder.map(nodeId => {
       const node = graph.nodesById[nodeId];
@@ -199,6 +200,8 @@ export function previewOrchestrationProfile(raw) {
     preview.hierarchy = {
       graphId: parsed.hierarchy.graphId,
       controlEpoch: parsed.hierarchy.controlEpoch,
+      loopMode: parsed.hierarchy.loopPolicy?.mode || 'ONE_SHOT',
+      maxRounds: parsed.hierarchy.loopPolicy?.maxRounds || 0,
       rootCount: parsed.hierarchy.nodes.filter(node => node.parentId === null).length,
       nodeCount: parsed.hierarchy.nodes.length,
       promptProfileCount: parsed.hierarchy.promptProfiles.length,

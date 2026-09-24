@@ -17,6 +17,7 @@ import {
   hierarchyCoreSessionId,
   hierarchyCoreTaskId,
 } from '../src/core/orchestration-hierarchy-core.js';
+import { buildThreeLevelHierarchyTemplate } from '../src/core/orchestration-role-prompts.js';
 
 const START = Date.parse('2026-09-19T00:00:00Z');
 const MANAGER_CHAT = 'https://chatgpt.com/c/11111111-1111-4111-8111-111111111111';
@@ -128,11 +129,17 @@ class MemoryCoreRepository {
 }
 
 function chromeFake() {
+  let currentAlarm = null;
   return {
     alarms: {
       calls: [],
-      async create(name, options) { this.calls.push({ name, options }); },
-      async clear() { return true; },
+      async get(name) { return currentAlarm?.name === name ? structuredClone(currentAlarm) : null; },
+      async create(name, options) {
+        this.calls.push({ name, options });
+        currentAlarm = { name, scheduledTime:options.when };
+      },
+      async clear() { currentAlarm = null; return true; },
+      current() { return currentAlarm ? structuredClone(currentAlarm) : null; },
     },
   };
 }
@@ -164,11 +171,11 @@ function harness({ collector = async () => ({ status: 'BUSY', assistantComplete:
   };
 }
 
-async function confirmSend(h, nodeId, conversationUrl) {
+async function confirmSend(h, nodeId, conversationUrl, hierarchyGraph = graph()) {
   const at = h.advance(1000);
   await h.coreRepository.update(state => {
-    const sid = hierarchyCoreSessionId(graph().graphId, nodeId);
-    const tid = hierarchyCoreTaskId(graph().graphId, nodeId);
+    const sid = hierarchyCoreSessionId(hierarchyGraph.graphId, nodeId);
+    const tid = hierarchyCoreTaskId(hierarchyGraph.graphId, nodeId);
     const session = state.sessionsById[sid];
     const task = session.tasksById[tid];
     task.lastVerifiedSendAt = at;
@@ -181,6 +188,21 @@ async function confirmSend(h, nodeId, conversationUrl) {
     return state;
   });
   return at;
+}
+
+function fiveManagerGraph() {
+  return buildThreeLevelHierarchyTemplate({
+    graphId:'controller-starvation-proof',
+    projectId:'controller-proof',
+    targetRepository:'owner/repo',
+    controlIssueNumber:1,
+    domains:[
+      { id:'one', scope:'one' }, { id:'two', scope:'two' }, { id:'three', scope:'three' },
+      { id:'four', scope:'four' }, { id:'five', scope:'five' },
+    ],
+    workersPerManager:1,
+    loopMode:'ONE_SHOT',
+  });
 }
 
 test('hierarchy state survives existing OrchestrationRuntimeRepository normalization authority', async () => {
@@ -262,6 +284,71 @@ test('full automatic L1-C controller vertical survives service-worker-style cont
   assert.equal(manager.activationLedger[manager.currentActivationId].phase, 'TERMINAL');
   assert.equal(Object.keys(runtime.hierarchy.state.nodesById['worker-1'].activationLedger).length, 1);
   assert.equal(Object.keys(runtime.hierarchy.state.nodesById['worker-2'].activationLedger).length, 1);
+});
+
+test('preserved due alarm survives unrelated reconciliations and restart, then launches five Managers exactly once', async () => {
+  const directorChat='https://chatgpt.com/c/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const g=fiveManagerGraph();
+  const h=harness({collector:async probe=>probe.nodeId==='director'
+    ? {status:'READY',assistantComplete:true,assistantText:'Director complete'}
+    : {status:'BUSY',assistantComplete:false}});
+  let c=h.controller();
+  await c.configureHierarchy(g,{nowMs:h.now()});
+  await c.startHierarchy({nowMs:h.advance(1)});
+  const originalWake=h.chrome.alarms.current().scheduledTime;
+  await confirmSend(h,'director',directorChat,g);
+
+  for(let index=0;index<20;index+=1){
+    await c.syncAfterCoreCycle({nowMs:h.advance(1000)});
+    assert.equal(h.chrome.alarms.current().scheduledTime,originalWake,'unrelated reconcile must preserve the earlier probe');
+    if(index===9)c=h.controller();
+  }
+
+  h.advance(originalWake-h.now());
+  c=h.controller();
+  const due=await c.cycle({nowMs:h.now()});
+  assert.equal(due.hierarchyProbe.terminal.length,1);
+  let core=await h.coreRepository.load();
+  const managers=Object.values(core.sessionsById).filter(session=>String(session.orchestrationHierarchy?.nodeId||'').startsWith('manager:'));
+  assert.equal(managers.length,5);
+
+  await c.cycle({nowMs:h.advance(1)});
+  core=await h.coreRepository.load();
+  assert.equal(Object.values(core.sessionsById).filter(session=>String(session.orchestrationHierarchy?.nodeId||'').startsWith('manager:')).length,5,'repeated due reconciliation must not duplicate fan-out');
+});
+
+test('Pause and Stop before a pending hierarchy probe fence fan-out; Resume consumes preserved evidence once', async () => {
+  const directorChat='https://chatgpt.com/c/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const g=fiveManagerGraph();
+
+  for(const scopeEvent of [OrchestrationHierarchyEventType.PAUSE_SCOPE,OrchestrationHierarchyEventType.STOP_SCOPE]){
+    const h=harness({collector:async()=>({status:'READY',assistantComplete:true,assistantText:'Director complete'})});
+    const c=h.controller();
+    await c.configureHierarchy(g,{nowMs:h.now()});
+    await c.startHierarchy({nowMs:h.advance(1)});
+    await confirmSend(h,'director',directorChat,g);
+    await c.syncAfterCoreCycle({nowMs:h.advance(1)});
+    const wake=h.chrome.alarms.current().scheduledTime;
+    await c.dispatchHierarchyEvent({type:scopeEvent,eventId:`fence-${scopeEvent.toLowerCase()}`,controlEpoch:1,nodeId:'director'},{nowMs:h.advance(1)});
+    h.advance(Math.max(0,wake-h.now()));
+    const fenced=await c.cycle({nowMs:h.now()});
+    assert.equal(fenced.hierarchyProbe.terminal.length,0);
+    let core=await h.coreRepository.load();
+    assert.equal(Object.values(core.sessionsById).filter(session=>String(session.orchestrationHierarchy?.nodeId||'').startsWith('manager:')).length,0);
+
+    await c.dispatchHierarchyEvent({type:OrchestrationHierarchyEventType.RESUME_SCOPE,eventId:`resume-${scopeEvent.toLowerCase()}`,controlEpoch:1,nodeId:'director'},{nowMs:h.advance(1)});
+    if(scopeEvent===OrchestrationHierarchyEventType.STOP_SCOPE){
+      await c.cycle({nowMs:h.advance(1)});
+      core=await h.coreRepository.load();
+      assert.equal(Object.values(core.sessionsById).filter(session=>String(session.orchestrationHierarchy?.nodeId||'').startsWith('manager:')).length,0);
+    }else{
+      const afterResume=await c.cycle({nowMs:h.advance(1)});
+      assert.equal(afterResume.hierarchyProbe.terminal.length,1);
+      await c.cycle({nowMs:h.advance(1)});
+      core=await h.coreRepository.load();
+      assert.equal(Object.values(core.sessionsById).filter(session=>String(session.orchestrationHierarchy?.nodeId||'').startsWith('manager:')).length,5);
+    }
+  }
 });
 
 test('hierarchy restart never overwrites an ambiguous Core Send operation', async () => {

@@ -102,6 +102,22 @@ test('capsule summary is neither indexed nor returned without separate content v
   assert.equal(JSON.stringify(identityQuery).includes('needle-private-summary'), false);
 });
 
+test('a source permission cannot disclose unapproved artifact locations', () => {
+  const record = candidate();
+  record.capsule.artifactRefs = [{
+    schemaVersion: 1, artifactId: 'private-report', kind: 'report',
+    uri: 'artifact://private/needle-secret-location', mediaType: 'application/json',
+    sha256: H2, sizeBytes: 17, createdAt: '2026-09-23T15:00:00Z',
+    producerInvocationId: 'invoke-1', sensitive: true,
+  }];
+  record.snapshot.artifactRefs = structuredClone(record.capsule.artifactRefs);
+  assert.equal(search('needle-secret-location', [record]).resultCount, 0);
+  const out = search('runtime', [record]);
+  assert.equal(out.resultCount, 1);
+  assert.equal(Object.hasOwn(out.results[0], 'artifactRefs'), false);
+  assert.equal(JSON.stringify(out).includes('needle-secret-location'), false);
+});
+
 test('mixed permission capsule cannot launder content through one authorized binding', () => {
   const second = source({ sourceId: 'src-2', revisionId: 'rev-2', contentSha256: H2, uri: 'https://example.invalid/private' });
   const mixed = candidate({

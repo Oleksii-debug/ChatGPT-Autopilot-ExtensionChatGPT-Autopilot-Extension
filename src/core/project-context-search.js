@@ -137,7 +137,6 @@ export function searchProjectContextV1({
       score,
       authorityFloor,
       sourceBindings: capsule.sourceBindings,
-      artifactRefs: capsule.artifactRefs,
       advisoryOnly: true,
     }));
   }

@@ -43,14 +43,27 @@ function retryAfterSeconds(response) {
   return Number.isFinite(value) && value > 0 ? Math.ceil(value) : 0;
 }
 
+function isGitHubSecondaryRateLimitPayload(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const message = typeof value.message === 'string' ? value.message.slice(0, 1000) : '';
+  const documentationUrl = typeof value.documentation_url === 'string' ? value.documentation_url.slice(0, 1000) : '';
+  return /\bsecondary rate limit\b/i.test(message)
+    || /\babuse detection mechanism\b/i.test(message)
+    || (/rate-limits-for-the-rest-api/i.test(documentationUrl) && /secondary/i.test(`${message} ${documentationUrl}`));
+}
+
 async function readJson(response, label) {
   if (!response?.ok) {
     const status = Number(response?.status || 0);
     const remaining = rateLimitRemaining(response);
-    const code = status === 403 && remaining === 0 ? 'RATE_LIMITED' : status === 404 ? 'NOT_FOUND' : 'HTTP_ERROR';
+    const retryAfter = retryAfterSeconds(response);
+    let errorPayload = null;
+    try { errorPayload = await response.json(); } catch {}
+    const rateLimited = status === 429 || (status === 403 && (remaining === 0 || retryAfter > 0 || isGitHubSecondaryRateLimitPayload(errorPayload)));
+    const code = rateLimited ? 'RATE_LIMITED' : status === 404 ? 'NOT_FOUND' : 'HTTP_ERROR';
     throw new RemoteDispatchGitHubError(code, `${label} failed with HTTP ${status || 'unknown'}`, {
       status,
-      retryAfterSeconds: retryAfterSeconds(response),
+      retryAfterSeconds: retryAfter,
       rateLimitRemaining: remaining,
     });
   }
