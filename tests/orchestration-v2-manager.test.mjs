@@ -48,6 +48,23 @@ function hierarchyGraph(graphId) {
   };
 }
 
+function subagentAdmissionGraph(graphId) {
+  return {
+    schemaVersion: 1,
+    graphId,
+    controlEpoch: 1,
+    promptProfiles: [
+      { id: 'root-v1', role: 'GLOBAL_DIRECTOR', version: 1, prompt: `ROOT ${graphId}` },
+    ],
+    nodes: [
+      { id: 'root', parentId: null, childIds: ['manager'], promptProfileId: 'root-v1', chatMode: 'PERSISTENT_CHAT' },
+      { id: 'manager', parentId: 'root', childIds: ['worker-a', 'worker-b'], promptProfileId: 'root-v1', chatMode: 'PERSISTENT_CHAT' },
+      { id: 'worker-a', parentId: 'manager', childIds: [], promptProfileId: 'root-v1', chatMode: 'PERSISTENT_CHAT' },
+      { id: 'worker-b', parentId: 'manager', childIds: [], promptProfileId: 'root-v1', chatMode: 'PERSISTENT_CHAT' },
+    ],
+  };
+}
+
 function managerFixture(){
   const chrome = chromeFake();
   const core = new StorageRepository(chrome);
@@ -337,6 +354,103 @@ test('hierarchy profile import persists the graph setup-only, exports it again, 
 
   runtime=await manager.controllerFor(result.status.selectedId).runtimeRepository.load();
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState,'RUNNING');
+});
+
+test('executable subagent admission uses persisted owner policy and durable hierarchy, never caller topology', async()=>{
+  const {manager,core,chrome}=managerFixture();
+  const ownerPolicy={
+    schemaVersion:1,
+    allowAgentCreatedChildren:true,
+    maxDepth:4,
+    maxChildrenPerAgent:2,
+  };
+  const profile=exportOrchestrationProfile(cfg('subagent-authority'),{
+    name:'Subagent Authority',
+    hierarchy:subagentAdmissionGraph('subagent-authority-graph'),
+    subagentPolicy:ownerPolicy,
+  });
+  const imported=await manager.importProfile(profile);
+  assert.deepEqual(imported.status.orchestra.subagentPolicy,ownerPolicy);
+
+  const denied=await manager.evaluateSelectedSubagentStructureAdmission({
+    initiator:'AGENT',
+    parentNodeId:'manager',
+    requestedChildren:1,
+  });
+  assert.equal(denied.decision,'DENY');
+  assert.equal(denied.reasonCode,'MAX_FANOUT_EXCEEDED');
+  assert.equal(denied.availableDirectChildren,0);
+
+  const spoofedGraph=hierarchyGraph('spoofed-shallow-graph');
+  await assert.rejects(
+    ()=>manager.evaluateSelectedSubagentStructureAdmission({
+      initiator:'AGENT',
+      parentNodeId:'manager',
+      requestedChildren:1,
+      graph:spoofedGraph,
+    }),
+    /unknown field: graph/,
+  );
+  await assert.rejects(
+    ()=>manager.evaluateSelectedSubagentStructureAdmission({
+      initiator:'AGENT',
+      parentNodeId:'manager',
+      requestedChildren:1,
+      policy:{schemaVersion:1,allowAgentCreatedChildren:true,maxDepth:64,maxChildrenPerAgent:1000},
+    }),
+    /unknown field: policy/,
+  );
+
+  const afterSpoof=await manager.evaluateSelectedSubagentStructureAdmission({
+    initiator:'AGENT',
+    parentNodeId:'manager',
+    requestedChildren:1,
+  });
+  assert.equal(afterSpoof.reasonCode,'MAX_FANOUT_EXCEEDED');
+
+  const restartedCore=new StorageRepository(chrome);
+  const restartedManager=new OrchestrationV2Manager({
+    coreRepository:restartedCore,
+    chromeApi:chrome,
+    now:()=>1000,
+  });
+  const afterRestart=await restartedManager.evaluateSelectedSubagentStructureAdmission({
+    initiator:'AGENT',
+    parentNodeId:'manager',
+    requestedChildren:1,
+  });
+  assert.equal(afterRestart.reasonCode,'MAX_FANOUT_EXCEEDED');
+  assert.deepEqual((await restartedManager.getStatus()).orchestra.subagentPolicy,ownerPolicy);
+
+  const exported=await restartedManager.exportProfile('Authority Export');
+  assert.deepEqual(exported.subagent_policy,{
+    allow_agent_created_children:true,
+    max_depth:4,
+    max_children_per_agent:2,
+  });
+  assert.equal((await core.load()).sessionsById instanceof Object,true);
+});
+
+test('executable subagent admission defaults to deny and fails closed without durable hierarchy', async()=>{
+  const {manager}=managerFixture();
+  await manager.create({name:'Default deny',config:cfg('default-deny')});
+  await assert.rejects(
+    ()=>manager.evaluateSelectedSubagentStructureAdmission({
+      initiator:'AGENT',
+      parentNodeId:'root',
+      requestedChildren:1,
+    }),
+    /durable orchestration hierarchy/,
+  );
+
+  await manager.controllerFor('orch-1').configureHierarchy(hierarchyGraph('default-deny-graph'),{nowMs:1000});
+  const decision=await manager.evaluateSelectedSubagentStructureAdmission({
+    initiator:'AGENT',
+    parentNodeId:'root',
+    requestedChildren:1,
+  });
+  assert.equal(decision.decision,'DENY');
+  assert.equal(decision.reasonCode,'AGENT_CHILD_CREATION_DISABLED');
 });
 
 test('hierarchy profile import fails closed after the first Start even when the orchestra is owner-paused', async()=>{
