@@ -73,20 +73,62 @@ test('Mistral preset reaches the expected model and chat endpoints with environm
   assert.equal(JSON.stringify(endpoints).includes('test-mistral-secret'), false);
 });
 
-test('Mistral profile sends no authorization header when its environment key is absent', async () => {
+test('Mistral model listing fails locally with zero network calls when its declared key is absent', async () => {
   const endpoints = normalizeCompatibleEndpointRegistry([MISTRAL_ENDPOINT_PRESET]);
-  let seenAuthorization = 'not-called';
-  const fetchFn = async (_url, init = {}) => {
-    seenAuthorization = init.headers?.authorization;
+  let calls = 0;
+  const fetchFn = async () => {
+    calls += 1;
     return jsonResponse({ data: [] });
   };
 
-  await listProviderModels('openai-compatible', {
+  await assert.rejects(() => listProviderModels('openai-compatible', {
     fetchFn,
     endpointId: 'mistral',
     compatibleEndpoints: endpoints,
     env: {},
-  });
+  }), error => error?.code === 'AI_PROVIDER_API_KEY_NOT_CONFIGURED');
 
-  assert.equal(seenAuthorization, undefined);
+  assert.equal(calls, 0);
+});
+
+test('Mistral completion fails locally with zero network calls when its declared key is absent', async () => {
+  const endpoints = normalizeCompatibleEndpointRegistry([MISTRAL_ENDPOINT_PRESET]);
+  let calls = 0;
+  const fetchFn = async () => {
+    calls += 1;
+    return jsonResponse({ choices: [{ message: { content: 'must-not-arrive' } }] });
+  };
+
+  await assert.rejects(() => completeProvider({
+    provider: 'openai-compatible',
+    endpointId: 'mistral',
+    model: 'mistral-large-latest',
+    prompt: 'private prompt must not leave the machine without the configured credential',
+    maxOutputTokens: 64,
+  }, {
+    fetchFn,
+    compatibleEndpoints: endpoints,
+    env: {},
+  }), error => error?.code === 'AI_PROVIDER_API_KEY_NOT_CONFIGURED');
+
+  assert.equal(calls, 0);
+});
+
+test('Mistral credential cannot be retargeted to another endpoint identity or HTTPS origin', () => {
+  assert.throws(() => normalizeCompatibleEndpointRegistry([
+    {
+      endpointId: 'mistral',
+      baseUrl: 'https://other.example/v1',
+      apiKeyEnv: 'MISTRAL_API_KEY',
+    },
+  ]), error => error?.code === 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
+
+  assert.throws(() => normalizeCompatibleEndpointRegistry([
+    MISTRAL_ENDPOINT_PRESET,
+    {
+      endpointId: 'other',
+      baseUrl: 'https://other.example/v1',
+      apiKeyEnv: 'MISTRAL_API_KEY',
+    },
+  ]), error => error?.code === 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
 });
