@@ -115,7 +115,7 @@ test('Chrome runtime interoperates with canonical provider through VERIFIED to d
   assert.equal(result.verification.reasonCode, 'SELECTOR_VISIBLE');
   const saved = fixture.storage['autopilot.deterministicWebRuntime.v1'];
   assert.equal(saved.effectsById['chrome-runtime-invocation'].state.phase, 'COMMITTED');
-  assert.equal(saved.leasesByTargetId['tab:7'], undefined);
+  assert.equal(saved.leasesByTargetId['tab:7'], null);
 });
 
 test('Chrome target identity is one canonical positive safe-integer spelling', () => {
@@ -133,14 +133,14 @@ test('Chrome transport rejects aliased and non-safe tab identities before Chrome
   assert.deepEqual(fixture.calls, []);
 });
 
-test('provider rejects aliased tab identity before durable lease admission or physical dispatch', async () => {
+test('provider rejects aliased tab identity before durable lease admission or physical dispatch', () => {
   const fixture = chromeFixture();
   const provider = createChromeDeterministicWebProviderV1({
     chromeApi: fixture.chrome,
     now: () => at,
     leaseId: () => 'must-not-be-used',
   });
-  await assert.rejects(() => provider.invoke({
+  assert.throws(() => provider.invoke({
     ...invocationFixtures('alias-invocation'),
     targetId: 'tab:007',
     action: { kind: 'CLICK', selector: '#go' },
