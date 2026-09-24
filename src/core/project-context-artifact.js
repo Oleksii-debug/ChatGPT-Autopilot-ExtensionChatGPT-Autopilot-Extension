@@ -17,6 +17,10 @@ const MAX_METADATA_JSON = 64_000;
 
 function plain(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
   return value;
 }
 
@@ -27,12 +31,15 @@ function exactKeys(value, allowed, label) {
 }
 
 function version(value, label) {
-  if (Number(value) !== ProjectContextContractVersion) throw new Error(`Unsupported ${label} schemaVersion`);
+  if (typeof value !== 'number' || !Number.isInteger(value) || value !== ProjectContextContractVersion) {
+    throw new Error(`Unsupported ${label} schemaVersion`);
+  }
   return ProjectContextContractVersion;
 }
 
 function id(value, label) {
-  const out = String(value ?? '').trim();
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
   if (!ID.test(out)) throw new Error(`${label} is invalid`);
   return out;
 }
@@ -54,7 +61,8 @@ function timestamp(value, label) {
 
 function digest(value, label, { optional = true } = {}) {
   if ((value == null || value === '') && optional) return '';
-  const out = String(value ?? '').trim().toLowerCase();
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim().toLowerCase();
   if (!SHA256.test(out)) throw new Error(`${label} is invalid`);
   return out;
 }
@@ -99,7 +107,8 @@ const SOURCE_KEYS = new Set([
 export function normalizeProjectSourceRefV1(input) {
   const raw = plain(input, 'ProjectSourceRefV1');
   exactKeys(raw, SOURCE_KEYS, 'ProjectSourceRefV1');
-  const authority = String(raw.authority || '').trim().toUpperCase();
+  if (typeof raw.authority !== 'string') throw new Error('authority must be text');
+  const authority = raw.authority.trim().toUpperCase();
   if (!AUTHORITY.has(authority)) throw new Error('authority is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ProjectSourceRefV1'),

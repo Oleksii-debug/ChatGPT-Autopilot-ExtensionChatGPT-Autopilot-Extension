@@ -215,6 +215,37 @@ export function normalizeWorldStateSnapshotV1(input) {
   });
 }
 
+/**
+ * Collision-free canonical structural fingerprint for the complete normalized
+ * snapshot.  It deliberately binds observation identity and evidence IDs in
+ * addition to provider/resource revision and content hashes.  The value is
+ * bounded by the WorldStateV1 observation/list limits and is compared byte-for-
+ * byte; no new persistence or trust authority is introduced here.
+ */
+export function worldStateSnapshotFingerprintV1(snapshotInput) {
+  const snapshot = normalizeWorldStateSnapshotV1(snapshotInput);
+  return JSON.stringify([
+    'world-state-snapshot-v1',
+    snapshot.schemaVersion,
+    snapshot.snapshotId,
+    snapshot.scopeId,
+    snapshot.revision,
+    snapshot.capturedAt,
+    snapshot.observations.map(observation => [
+      observation.schemaVersion,
+      observation.observationId,
+      observation.scopeId,
+      observation.providerId,
+      observation.resourceId,
+      observation.revisionId,
+      observation.contentSha256,
+      observation.observedAt,
+      observation.validUntil,
+      [...observation.evidenceArtifactIds],
+    ]),
+  ]);
+}
+
 const RESOURCE_BINDING_KEYS = new Set([
   'providerId', 'resourceId', 'revisionId', 'contentSha256', 'observedAt', 'validUntil',
 ]);
@@ -260,7 +291,7 @@ function normalizeResourceBindings(input, label = 'requiredBindings') {
 
 const PRECONDITION_KEYS = new Set([
   'schemaVersion', 'guardId', 'invocationId', 'snapshotId', 'scopeId',
-  'snapshotRevision', 'requiredBindings', 'createdAt', 'expiresAt',
+  'snapshotRevision', 'snapshotFingerprint', 'requiredBindings', 'createdAt', 'expiresAt',
 ]);
 
 export function normalizeWorldStatePreconditionV1(input) {
@@ -280,6 +311,14 @@ export function normalizeWorldStatePreconditionV1(input) {
     snapshotId: id(raw.snapshotId, 'snapshotId'),
     scopeId: id(raw.scopeId, 'scopeId'),
     snapshotRevision: integer(raw.snapshotRevision, 'snapshotRevision', { min: 1, max: 1_000_000_000 }),
+    snapshotFingerprint: (() => {
+      if (typeof raw.snapshotFingerprint !== 'string'
+          || !raw.snapshotFingerprint
+          || raw.snapshotFingerprint.length > 1_000_000) {
+        throw new Error('snapshotFingerprint is invalid');
+      }
+      return raw.snapshotFingerprint;
+    })(),
     requiredBindings: normalizeResourceBindings(raw.requiredBindings),
     createdAt,
     expiresAt,
@@ -395,6 +434,9 @@ export function assertWorldStatePreconditionFreshV1({
   if (precondition.snapshotId !== snapshot.snapshotId) throw new Error('precondition snapshotId mismatch');
   if (precondition.scopeId !== snapshot.scopeId) throw new Error('precondition scopeId mismatch');
   if (precondition.snapshotRevision !== snapshot.revision) throw new Error('precondition snapshotRevision mismatch');
+  if (precondition.snapshotFingerprint !== worldStateSnapshotFingerprintV1(snapshot)) {
+    throw new Error('precondition snapshot fingerprint mismatch');
+  }
   if (Date.parse(precondition.createdAt) < Date.parse(snapshot.capturedAt)) {
     throw new Error('precondition createdAt cannot predate snapshot capturedAt');
   }

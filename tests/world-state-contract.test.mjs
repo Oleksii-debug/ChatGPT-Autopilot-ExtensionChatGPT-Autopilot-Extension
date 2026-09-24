@@ -10,6 +10,7 @@ import {
   normalizeWorldStateObservationV1,
   normalizeWorldStatePreconditionV1,
   normalizeWorldStateSnapshotV1,
+  worldStateSnapshotFingerprintV1,
 } from '../src/core/world-state-contract.js';
 
 const OBSERVED = '2026-09-24T22:40:00.000Z';
@@ -68,6 +69,7 @@ function precondition(overrides = {}) {
     snapshotId: 'world-snapshot-1',
     scopeId: 'project-autopilot',
     snapshotRevision: 7,
+    snapshotFingerprint: worldStateSnapshotFingerprintV1(snapshot()),
     requiredBindings: [{
       providerId: 'github',
       resourceId: 'repo-main',
@@ -322,4 +324,49 @@ test('precondition and freshness clocks cannot be backdated or reused after expi
     at: '2026-09-24T22:39:00.000Z',
     requiredResourceIds: ['repo-main'],
   }), /cannot predate snapshot/);
+});
+
+
+test('precondition fingerprint rejects same-ID/revision snapshots with substituted evidence or unrelated observations', () => {
+  const basePrecondition = precondition();
+  const evidenceSubstitution = snapshot({
+    observations: [
+      secondObservation(),
+      observation({ evidenceArtifactIds:['artifact-substituted-response'] }),
+    ],
+  });
+  assert.throws(() => assertWorldStatePreconditionFreshV1({
+    precondition: basePrecondition,
+    snapshot: evidenceSubstitution,
+    currentObservations: [current()],
+    invocationId: 'invoke-1',
+    at: ASSESSED,
+  }), /snapshot fingerprint mismatch/);
+
+  const unrelatedMutation = snapshot({
+    observations: [
+      secondObservation({
+        revisionId:'settings-r8',
+        contentSha256:'c'.repeat(64),
+        evidenceArtifactIds:['artifact-settings-r8'],
+      }),
+      observation(),
+    ],
+  });
+  assert.throws(() => assertWorldStatePreconditionFreshV1({
+    precondition: basePrecondition,
+    snapshot: unrelatedMutation,
+    currentObservations: [current()],
+    invocationId: 'invoke-1',
+    at: ASSESSED,
+  }), /snapshot fingerprint mismatch/);
+
+  const equivalentReordered = snapshot({
+    observations:[observation(), secondObservation()],
+  });
+  assert.equal(
+    worldStateSnapshotFingerprintV1(equivalentReordered),
+    worldStateSnapshotFingerprintV1(snapshot()),
+    'canonical normalization must make semantically identical observation order stable',
+  );
 });

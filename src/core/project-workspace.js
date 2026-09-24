@@ -12,9 +12,34 @@ export const MAX_PROJECTS = 64;
 export const MAX_CAPSULES_PER_PROJECT = 128;
 export const MAX_PROVENANCE_PER_PROJECT = 512;
 
+const WORKSPACE_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid ${label}`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`Invalid ${label} prototype`);
   return value;
+}
+
+function workspaceId(value, label) {
+  if (typeof value !== 'string') throw new Error(`Invalid ${label}`);
+  const normalized = value.trim();
+  if (!WORKSPACE_ID.test(normalized)) throw new Error(`Invalid ${label}`);
+  return normalized;
+}
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function setOwn(value, key, entry) {
+  Object.defineProperty(value, key, {
+    value: entry,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+  return entry;
 }
 
 function timestamp(value, label) {
@@ -87,9 +112,9 @@ export function createProjectRecord(snapshot, { nowMs = Date.now() } = {}) {
 }
 
 function requireProject(workspace, projectId) {
-  const project = workspace.projectsById?.[projectId];
-  if (!project) throw new Error('Project not found');
-  return project;
+  const key = workspaceId(projectId, 'projectId');
+  if (!workspace.projectsById || !hasOwn(workspace.projectsById, key)) throw new Error('Project not found');
+  return workspace.projectsById[key];
 }
 
 function assertCapsuleMatchesSnapshot(capsule, snapshot) {
@@ -130,10 +155,9 @@ function assertProvenanceMatchesSnapshot(provenance, snapshot) {
 export function addProjectSnapshot(workspace, snapshot, { nowMs = Date.now() } = {}) {
   validateProjectWorkspace(workspace);
   const normalized = normalizeProjectSnapshotV1(snapshot);
-  if (workspace.projectsById[normalized.projectId]) throw new Error('Project already exists');
+  if (hasOwn(workspace.projectsById, normalized.projectId)) throw new Error('Project already exists');
   if (Object.keys(workspace.projectsById).length >= MAX_PROJECTS) throw new Error('Project workspace project limit exceeded');
-  workspace.projectsById[normalized.projectId] = createProjectRecord(normalized, { nowMs });
-  return workspace.projectsById[normalized.projectId];
+  return setOwn(workspace.projectsById, normalized.projectId, createProjectRecord(normalized, { nowMs }));
 }
 
 export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now() } = {}) {
@@ -152,8 +176,8 @@ export function putProjectContextCapsule(workspace, capsule, { nowMs = Date.now(
   const normalized = normalizeContextCapsuleV1(capsule);
   const project = requireProject(workspace, normalized.projectId);
   assertCapsuleMatchesSnapshot(normalized, project.snapshot);
-  if (!project.capsulesById[normalized.capsuleId] && Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
-  project.capsulesById[normalized.capsuleId] = normalized;
+  if (!hasOwn(project.capsulesById, normalized.capsuleId) && Object.keys(project.capsulesById).length >= MAX_CAPSULES_PER_PROJECT) throw new Error('Project workspace capsule limit exceeded');
+  setOwn(project.capsulesById, normalized.capsuleId, normalized);
   project.updatedAt = nowMs;
   return normalized;
 }
@@ -164,8 +188,8 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
   const project = requireProject(workspace, normalized.projectId);
   assertProvenanceMatchesSnapshot(normalized, project.snapshot);
   const artifactId = normalized.artifactRef.artifactId;
-  if (!project.provenanceByArtifactId[artifactId] && Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
-  project.provenanceByArtifactId[artifactId] = normalized;
+  if (!hasOwn(project.provenanceByArtifactId, artifactId) && Object.keys(project.provenanceByArtifactId).length >= MAX_PROVENANCE_PER_PROJECT) throw new Error('Project workspace provenance limit exceeded');
+  setOwn(project.provenanceByArtifactId, artifactId, normalized);
   project.updatedAt = nowMs;
   return normalized;
 }
@@ -173,8 +197,9 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
 export function projectCurrentState(workspace, projectId, capsuleId, currentSourceRefs = []) {
   validateProjectWorkspace(workspace);
   const project = requireProject(workspace, projectId);
-  const capsule = project.capsulesById[capsuleId];
-  if (!capsule) throw new Error('Context capsule not found');
+  const capsuleKey = workspaceId(capsuleId, 'capsuleId');
+  if (!hasOwn(project.capsulesById, capsuleKey)) throw new Error('Context capsule not found');
+  const capsule = project.capsulesById[capsuleKey];
   // A newer project snapshot deliberately does not erase prior capsules. The
   // core digest rejects cross-revision pairs, so adapt only the comparison
   // envelope and return an explicit stale marker rather than hiding evidence
