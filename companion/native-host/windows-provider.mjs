@@ -120,6 +120,20 @@ function systemPowerShellPath(explicitPath = null) {
   return root.replace(/[\\/]+$/u, '') + '\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
 }
 
+function canonicalPowerShellWindowId(value) {
+  const windowId = id(value, 'windowId');
+  if (windowId === 'desktop') return windowId;
+  const match = /^hwnd:([1-9][0-9]{0,18})$/u.exec(windowId);
+  if (!match) {
+    fail('WINDOWS_INVALID_REQUEST', 'windowId must be desktop or canonical hwnd:<decimal>');
+  }
+  const handle = BigInt(match[1]);
+  if (handle > 9223372036854775807n) {
+    fail('WINDOWS_INVALID_REQUEST', 'windowId exceeds the supported Windows handle range');
+  }
+  return 'hwnd:' + match[1];
+}
+
 function windowsChildEnvironment() {
   const keys = [
     'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'PATH', 'PATHEXT', 'COMSPEC',
@@ -252,7 +266,12 @@ export function createPowerShellUiaAdapter({ execFile, powershellPath = null } =
   if (typeof execFile !== 'function') fail('WINDOWS_CONFIG_INVALID', 'execFile adapter is required');
   return Object.freeze({
     async query({ windowId, role = '', name = '', limit = 64 } = {}) {
-      const request = { windowId, role, name, limit };
+      const request = {
+        windowId: canonicalPowerShellWindowId(windowId),
+        role: boundedOptionalText(role, 'role', 120),
+        name: boundedOptionalText(name, 'name', 512),
+        limit: strictInteger(limit, 'limit', 1, MAX_UIA_RESULTS, 64),
+      };
       const encoded = encodePowerShellUiaScript(request);
       let result;
       try {
