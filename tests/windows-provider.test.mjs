@@ -283,6 +283,33 @@ test('production UIA fallback uses fixed encoded PowerShell and returns reusable
   assert.equal(calls[0][2].maxBuffer, 256 * 1024);
 });
 
+test('PowerShell UIA adapter rejects non-canonical window identities before process launch', async () => {
+  let calls = 0;
+  const adapter = createPowerShellUiaAdapter({
+    powershellPath: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    execFile: async () => {
+      calls += 1;
+      return { stdout: '[]', stderr: '' };
+    },
+  });
+
+  for (const windowId of ['window-1', 'hwnd:01', 'hwnd:9999999999999999999']) {
+    await assert.rejects(
+      () => adapter.query({ windowId, role: '', name: '', limit: 2 }),
+      /windowId/,
+    );
+  }
+  await assert.rejects(
+    () => adapter.query({ windowId: 'desktop', role: 7, name: '', limit: 2 }),
+    /role must be text/,
+  );
+  await assert.rejects(
+    () => adapter.query({ windowId: 'desktop', role: '', name: '', limit: '2' }),
+    /limit must be/,
+  );
+  assert.equal(calls, 0);
+});
+
 test('PowerShell UIA adapter treats malformed output and process failure as fail-closed', async () => {
   const powershellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
   const invalid = createPowerShellUiaAdapter({
