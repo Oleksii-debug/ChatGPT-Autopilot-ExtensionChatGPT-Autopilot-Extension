@@ -47,6 +47,7 @@ function clean(value, max = 4000) { const out = typeof value === 'string' ? valu
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
+function own(record, key) { return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined; }
 function price(value, label) { const out = Number(value ?? 0); if (!Number.isFinite(out) || out < 0 || out > 1_000_000) throw new Error(`${label} is invalid`); return out; }
 function ids(value, label, max = MAX_ROUTES) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => id(item, `${label}[${index}]`)); if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
 
@@ -131,7 +132,7 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
     const count = strictInteger(value, `AI worker manualRouteWorkers.${routeId}`, 0, MAX_PARALLEL_WORKERS);
     const route = pool.find(item => item.routeId === routeId);
     if (route.maxWorkers > 0 && count > route.maxWorkers) throw new Error(`AI worker manual allocation exceeds maxWorkers for route: ${routeId}`);
-    manualRouteWorkers[routeId] = count;
+    Object.defineProperty(manualRouteWorkers, routeId, { value:count, enumerable:true, writable:true, configurable:true });
     manualTotal += count;
   }
   if (allocationMode === AiWorkerAllocationMode.MANUAL && manualTotal > maxParallelWorkers) {
@@ -148,7 +149,7 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
   const out = {};
   for (const [routeId, value] of Object.entries(source)) {
     if (!allowed.has(routeId) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
-    out[routeId] = {
+    Object.defineProperty(out, routeId, { value:{
       consecutiveFailures: Math.floor(stateNumber(value.consecutiveFailures)),
       successes: Math.floor(stateNumber(value.successes)),
       failures: Math.floor(stateNumber(value.failures)),
@@ -159,7 +160,7 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
       lastErrorAt: stateNumber(value.lastErrorAt),
       lastSuccessAt: stateNumber(value.lastSuccessAt),
       lastLatencyMs: stateNumber(value.lastLatencyMs),
-    };
+    }, enumerable:true, writable:true, configurable:true });
   }
   return out;
 }
@@ -205,11 +206,17 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   candidates.sort((a, b) => {
     const orderedA = order.has(a.routeId) ? order.get(a.routeId) : Number.MAX_SAFE_INTEGER;
     const orderedB = order.has(b.routeId) ? order.get(b.routeId) : Number.MAX_SAFE_INTEGER;
-    return orderedA - orderedB || b.priority - a.priority || (states[a.routeId]?.lastLatencyMs || Number.MAX_SAFE_INTEGER) - (states[b.routeId]?.lastLatencyMs || Number.MAX_SAFE_INTEGER) || a.routeId.localeCompare(b.routeId);
+    return orderedA - orderedB || b.priority - a.priority || (own(states, a.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER) - (own(states, b.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER) || a.routeId.localeCompare(b.routeId);
   });
-  const available = candidates.filter(route => Math.max(states[route.routeId]?.backoffUntil || 0, states[route.routeId]?.circuitOpenUntil || 0) <= now);
+  const available = candidates.filter(route => {
+    const state = own(states, route.routeId);
+    return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= now;
+  });
   const retryAt = candidates.length && !available.length
-    ? Math.min(...candidates.map(route => Math.max(states[route.routeId]?.backoffUntil || 0, states[route.routeId]?.circuitOpenUntil || 0)).filter(value => value > now))
+    ? Math.min(...candidates.map(route => {
+      const state = own(states, route.routeId);
+      return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
+    }).filter(value => value > now))
     : 0;
   return Object.freeze({ candidates: Object.freeze((normalizedPolicy.autoSwitch ? available : available.slice(0, 1))), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
 }
@@ -236,7 +243,7 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
     let remaining = target;
     for (const route of candidates) {
       if (remaining <= 0) break;
-      const configured = normalizedWorkerPolicy.manualRouteWorkers[route.routeId] ?? 0;
+      const configured = own(normalizedWorkerPolicy.manualRouteWorkers, route.routeId) ?? 0;
       const cap = route.maxWorkers > 0 ? Math.min(configured, route.maxWorkers) : configured;
       const assigned = Math.min(remaining, cap);
       allocations[route.routeId] = assigned;
@@ -264,7 +271,7 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
 export function recordAiRouteOutcome(routeStates, route, policy, { ok, classification = null, at = Date.now(), latencyMs = 0 } = {}) {
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const states = normalizeAiRouteStates(routeStates, [route]);
-  const current = states[route.routeId] || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
+  const current = own(states, route.routeId) || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
   if (ok) {
     return { ...current, consecutiveFailures:0, successes:current.successes + 1, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastSuccessAt:at, lastLatencyMs:Math.max(0, Number(latencyMs) || 0) };
   }
