@@ -313,7 +313,7 @@ function strictCapability(input, index) {
   }
   const normalized = normalizeCapabilityV1({
     ...raw,
-    attributes: dataOnlyJson(raw.attributes, `${label}.attributes`),
+    attributes: raw.attributes == null ? {} : dataOnlyJson(raw.attributes, `${label}.attributes`),
   });
   risk(normalized.riskClass, `${label}.riskClass`);
   return normalized;
