@@ -180,3 +180,179 @@ test('Project/Context contracts reject exotic prototype authority and identity i
   assert.equal(normalized.sourceId, 'github-main');
   assert.equal(normalized.authority, 'CANONICAL');
 });
+
+
+test('Project/Context optional list fields reject falsy type aliases instead of erasing caller intent', () => {
+  const snapshotBase = {
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    revisionId: 'project-rev-1',
+    title: 'ChatGPT Autopilot Extension',
+    sourceRefs: [source()],
+    createdAt: AT,
+  };
+  for (const bad of [false, 0, '']) {
+    assert.throws(
+      () => normalizeProjectSnapshotV1({ ...snapshotBase, artifactRefs: bad }),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeContextCapsuleV1(capsule({ artifactRefs: bad })),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeArtifactProvenanceV1({
+        schemaVersion: 1,
+        projectId: 'autopilot',
+        artifactRef: artifact(),
+        sourceBindings: bad,
+        inputArtifactIds: [],
+        createdAt: AT,
+      }),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeArtifactProvenanceV1({
+        schemaVersion: 1,
+        projectId: 'autopilot',
+        artifactRef: artifact(),
+        sourceBindings: [],
+        inputArtifactIds: bad,
+        createdAt: AT,
+      }),
+      /bounded plain array/,
+    );
+  }
+
+  assert.doesNotThrow(() => normalizeProjectSnapshotV1(snapshotBase));
+  assert.doesNotThrow(() => normalizeProjectSnapshotV1({ ...snapshotBase, artifactRefs: null }));
+  assert.doesNotThrow(() => normalizeContextCapsuleV1(capsule({ artifactRefs: null })));
+  assert.doesNotThrow(() => normalizeArtifactProvenanceV1({
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    artifactRef: artifact(),
+    createdAt: AT,
+  }));
+});
+
+test('Project/Context record accessors are rejected without executing getter authority', () => {
+  let reads = 0;
+  const raw = source();
+  Object.defineProperty(raw, 'authority', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return SourceAuthorityKind.CANONICAL;
+    },
+  });
+
+  assert.throws(
+    () => normalizeProjectSourceRefV1(raw),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('Project/Context hidden and symbol fields fail closed even when the field name is otherwise allowed', () => {
+  const hidden = source();
+  Object.defineProperty(hidden, 'authority', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: SourceAuthorityKind.CANONICAL,
+  });
+  assert.throws(
+    () => normalizeProjectSourceRefV1(hidden),
+    /enumerable own data properties/,
+  );
+
+  const symbolic = source();
+  symbolic[Symbol('authority')] = SourceAuthorityKind.CANONICAL;
+  assert.throws(
+    () => normalizeProjectSourceRefV1(symbolic),
+    /unknown field/,
+  );
+});
+
+test('Project/Context arrays reject accessor indices and side fields without executing getters', () => {
+  let reads = 0;
+  const refs = [source()];
+  Object.defineProperty(refs, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return source();
+    },
+  });
+  assert.throws(
+    () => normalizeProjectSnapshotV1({
+      schemaVersion: 1,
+      projectId: 'autopilot',
+      revisionId: 'project-rev-1',
+      title: 'ChatGPT Autopilot Extension',
+      sourceRefs: refs,
+      artifactRefs: [],
+      createdAt: AT,
+    }),
+    /data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const withSideField = [source()];
+  Object.defineProperty(withSideField, 'authority', {
+    enumerable: false,
+    configurable: true,
+    value: 'ALLOW',
+  });
+  assert.throws(
+    () => normalizeProjectSnapshotV1({
+      schemaVersion: 1,
+      projectId: 'autopilot',
+      revisionId: 'project-rev-1',
+      title: 'ChatGPT Autopilot Extension',
+      sourceRefs: withSideField,
+      artifactRefs: [],
+      createdAt: AT,
+    }),
+    /non-index field/,
+  );
+});
+
+test('Project source metadata recursively rejects accessors without executing them', () => {
+  let reads = 0;
+  const nested = {};
+  Object.defineProperty(nested, 'secret', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'must-not-run';
+    },
+  });
+  const raw = source({ metadata: { nested } });
+  assert.throws(
+    () => normalizeProjectSourceRefV1(raw),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('nested ArtifactRef is descriptor-snapshotted before canonical normalization', () => {
+  let reads = 0;
+  const ref = artifact();
+  Object.defineProperty(ref, 'sensitive', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return false;
+    },
+  });
+  assert.throws(
+    () => normalizeContextCapsuleV1(capsule({ artifactRefs: [ref] })),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
