@@ -1,4 +1,8 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param(
+  [switch]$NonInteractive
+)
+
+$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'NODE-HELPER.ps1')
 
 function Gateway-IsRunning {
@@ -35,10 +39,16 @@ if (Gateway-IsRunning) {
   exit 0
 }
 
-$nodeExe = Ensure-AutopilotNodeExe
+if ($NonInteractive) {
+  $nodeExe = Ensure-AutopilotNodeExe -NonInteractive
+  if (-not $nodeExe) { exit 2 }
+} else {
+  $nodeExe = Ensure-AutopilotNodeExe
+}
+
 $configFile = Join-Path $PSScriptRoot 'config\gateway-settings.json'
 $cfg = $null
-if (Test-Path $configFile) {
+if (Test-Path -LiteralPath $configFile) {
   try {
     $cfg = Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json
     if ($cfg.compatibleBaseUrl) { $env:COMPATIBLE_BASE_URL = [string]$cfg.compatibleBaseUrl }
@@ -50,6 +60,29 @@ if (Test-Path $configFile) {
 $openAiKeyFile = Join-Path $PSScriptRoot 'config\openai-key.dpapi'
 $compatibleKeyFile = Join-Path $PSScriptRoot 'config\compatible-key.dpapi'
 $providerKeysDir = Join-Path $PSScriptRoot 'config\provider-keys'
+$presetTool = Join-Path $PSScriptRoot 'provider-presets.mjs'
+
+# Validate every stored named-provider credential binding before decrypting any secret.
+# The Node helper owns the same binding registry used by gateway.mjs.
+$namedCredentialPlan = @()
+if (Test-Path -LiteralPath $providerKeysDir) {
+  $planOutput = @(& $nodeExe $presetTool '--credential-plan' $configFile $providerKeysDir 2>&1)
+  if ($LASTEXITCODE -ne 0) {
+    $detail = (($planOutput | ForEach-Object { [string]$_ }) -join ' ').Trim()
+    if (-not $detail) { $detail = 'невідома помилка перевірки credential binding' }
+    throw "Збережені ключі постачальників не пройшли перевірку прив'язки: $detail"
+  }
+  try {
+    $planText = (($planOutput | ForEach-Object { [string]$_ }) -join [Environment]::NewLine).Trim()
+    if ($planText) {
+      $parsedPlan = $planText | ConvertFrom-Json
+      if ($null -ne $parsedPlan) { $namedCredentialPlan = @($parsedPlan) }
+    }
+  } catch {
+    throw 'Не вдалося прочитати перевірений план завантаження ключів постачальників.'
+  }
+}
+
 $loadedEnvNames = New-Object 'System.Collections.Generic.HashSet[string]'
 try {
   if (Import-DpapiEnvironmentKey -KeyFile $openAiKeyFile -EnvName 'OPENAI_API_KEY' -Label 'OpenAI API') {
@@ -64,16 +97,14 @@ try {
     Write-Host 'OpenAI-compatible API key: не збережений. Локальна Ollama/LM Studio без ключа все одно можуть працювати.'
   }
 
-  if ($null -ne $cfg -and $null -ne $cfg.compatibleEndpoints) {
-    foreach ($endpoint in @($cfg.compatibleEndpoints)) {
-      $apiKeyEnv = ([string]$endpoint.apiKeyEnv).Trim()
-      if (-not $apiKeyEnv -or $loadedEnvNames.Contains($apiKeyEnv)) { continue }
-      if ($apiKeyEnv -notmatch '^[A-Z_][A-Z0-9_]{0,127}$') { throw "Gateway endpoint містить некоректне ім'я змінної ключа: $apiKeyEnv" }
-      $namedKeyFile = Join-Path $providerKeysDir ($apiKeyEnv + '.dpapi')
-      $endpointId = ([string]$endpoint.endpointId).Trim()
-      if (Import-DpapiEnvironmentKey -KeyFile $namedKeyFile -EnvName $apiKeyEnv -Label ("Постачальник " + $endpointId)) {
-        [void]$loadedEnvNames.Add($apiKeyEnv)
-      }
+  foreach ($binding in $namedCredentialPlan) {
+    $apiKeyEnv = ([string]$binding.apiKeyEnv).Trim()
+    $endpointId = ([string]$binding.endpointId).Trim()
+    if ($apiKeyEnv -notmatch '^[A-Z_][A-Z0-9_]{0,127}$') { throw "Перевірений план містить некоректне ім'я змінної ключа: $apiKeyEnv" }
+    if ($loadedEnvNames.Contains($apiKeyEnv)) { throw "Перевірений план дублює credential ref: $apiKeyEnv" }
+    $namedKeyFile = Join-Path $providerKeysDir ($apiKeyEnv + '.dpapi')
+    if (Import-DpapiEnvironmentKey -KeyFile $namedKeyFile -EnvName $apiKeyEnv -Label ("Постачальник " + $endpointId)) {
+      [void]$loadedEnvNames.Add($apiKeyEnv)
     }
   }
 
