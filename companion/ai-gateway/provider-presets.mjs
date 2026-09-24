@@ -42,8 +42,9 @@ export function applyCompatibleEndpointPreset(rawSettings = {}, preset = MISTRAL
 }
 
 export function writeCompatibleEndpointPreset(configFile, preset = MISTRAL_ENDPOINT_PRESET) {
-  const target = path.resolve(String(configFile || '').trim());
-  if (!target) throw new Error('Gateway settings path is required');
+  const requestedPath = String(configFile || '').trim();
+  if (!requestedPath) throw new Error('Gateway settings path is required');
+  const target = path.resolve(requestedPath);
   let existing = {};
   try {
     const text = fs.readFileSync(target, 'utf8').replace(/^\uFEFF/, '');
