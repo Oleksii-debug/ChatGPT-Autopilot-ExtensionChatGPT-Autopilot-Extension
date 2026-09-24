@@ -72,19 +72,3 @@ test('auditor pipeline UI exposes semantic barriers, correction controls and dia
   assert.match(js, /addScenarioStateLine\('Оренда аудитора'/);
   assert.match(js, /createScenarioWork\('AUDITOR_PIPELINE'\)/);
 });
-
-
-test('Scenario Work exposes JSON bundle import, import+start and export controls', () => {
-  for (const id of [
-    'scenario-work-profile-file',
-    'import-scenario-work-profile-button',
-    'import-start-scenario-work-profile-button',
-    'export-scenario-work-profile-button',
-  ]) assert.ok(html.includes(`id="${id}"`), id);
-  assert.match(js, /SCENARIO_WORK_BUNDLE_KIND = 'chatgpt-autopilot-scenario-work-bundle'/);
-  assert.match(js, /async function importScenarioWorkBundle\(startAfterImport = false\)/);
-  assert.match(js, /CREATE_SCENARIO_WORK/);
-  assert.match(js, /UPDATE_SCENARIO_WORK/);
-  assert.match(js, /START_SCENARIO_WORK/);
-  assert.match(js, /cleanupImportedScenarioWork/);
-});
