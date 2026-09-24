@@ -8,10 +8,11 @@ const invocation={schemaVersion:1,invocationId:'win-effect-1',toolId:WindowsTool
 const policyDecision={schemaVersion:1,decisionId:'decision-1',invocationId:'win-effect-1',decision:'ALLOW',reasonCode:'OWNER_POLICY',reason:'',approvalId:null,decidedAt:AT};
 function store(){const rows=new Map();return {rows,async load(id){return rows.has(id)?structuredClone(rows.get(id)):null;},async save(id,state){rows.set(id,structuredClone(state));}};}
 function clock(){let n=Date.parse(AT);return()=>++n;}
+function authorize({invocation,policyDecision}){return {invocation:structuredClone(invocation),policyDecision:structuredClone(policyDecision)};}
 
 test('effect-then-disconnect persists RECONCILE and a restarted executor cannot blind replay',async()=>{
   const durable=store();let dispatches=0;
-  const provider={async invoke(){dispatches++;throw Object.assign(new Error('native channel ended after dispatch'),{code:'NATIVE_TRANSPORT_ERROR',effectMayHaveOccurred:true});}};
+  const provider={authorize,async invoke(){dispatches++;throw Object.assign(new Error('native channel ended after dispatch'),{code:'NATIVE_TRANSPORT_ERROR',effectMayHaveOccurred:true});}};
   const first=new WindowsExactEffectExecutorV1({provider,store:durable,verify:async()=>{throw new Error('not reached');},now:clock()});
   await assert.rejects(()=>first.invoke({invocation,policyDecision}),e=>e.reconcileRequired===true&&e.safeToRetry===false&&e.effectState.phase==='RECONCILE');
   assert.equal(dispatches,1);
@@ -22,7 +23,7 @@ test('effect-then-disconnect persists RECONCILE and a restarted executor cannot 
 
 test('SAFE_RETRY requires independent FAILED verification proving no committed effect',async()=>{
   const durable=store();let dispatches=0;
-  const provider={async invoke(){dispatches++;if(dispatches===1)throw Object.assign(new Error('disconnect'),{code:'NATIVE_TRANSPORT_ERROR'});return {result:{exitCode:0}};}};
+  const provider={authorize,async invoke(){dispatches++;if(dispatches===1)throw Object.assign(new Error('disconnect'),{code:'NATIVE_TRANSPORT_ERROR'});return {result:{exitCode:0}};}};
   const now=clock();
   const executor=new WindowsExactEffectExecutorV1({provider,store:durable,verify:async({observation})=>({schemaVersion:1,verificationId:'verified-2',invocationId:'win-effect-1',observationId:observation.observationId,status:'VERIFIED',reasonCode:'POSTCONDITION_MATCH',summary:'Effect independently verified.',evidenceArtifactIds:[],verifiedAt:new Date(now()).toISOString()}),now});
   await assert.rejects(()=>executor.invoke({invocation,policyDecision}),e=>e.reconcileRequired===true);
@@ -37,7 +38,16 @@ test('SAFE_RETRY requires independent FAILED verification proving no committed e
 
 test('SAFE_RETRY reconciliation rejects missing no-effect evidence',async()=>{
   const durable=store();
-  const executor=new WindowsExactEffectExecutorV1({provider:{async invoke(){throw new Error('lost');}},store:durable,verify:async()=>{},now:clock()});
+  const executor=new WindowsExactEffectExecutorV1({provider:{authorize,async invoke(){throw new Error('lost');}},store:durable,verify:async()=>{},now:clock()});
   await assert.rejects(()=>executor.invoke({invocation,policyDecision}));
   await assert.rejects(()=>executor.reconcile({invocationId:'win-effect-1',outcome:'SAFE_RETRY',reasonCode:'UNPROVEN'}),/requires observation and failed verification evidence/);
+});
+
+test('authorization rejection occurs before durable effect state or provider dispatch',async()=>{
+  const durable=store();let dispatches=0;
+  const provider={authorize(){const error=new Error('Policy decision does not authorize this invocation');error.code='POLICY_DENIED';throw error;},async invoke(){dispatches++;}};
+  const executor=new WindowsExactEffectExecutorV1({provider,store:durable,verify:async()=>{},now:clock()});
+  await assert.rejects(()=>executor.invoke({invocation,policyDecision}),/does not authorize/);
+  assert.equal(dispatches,0);
+  assert.equal(durable.rows.size,0,'denied or mismatched admission must not persist PREPARED/EXECUTING state');
 });
