@@ -7,7 +7,7 @@ import {
 } from './orchestration-v2-storage.js';
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
-import { OrchestrationHierarchyEventType } from './orchestration-hierarchy.js';
+import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 
@@ -37,7 +37,7 @@ async function setHierarchyRootScopes(controller, runtime, eventType, eventPrefi
     const nodeId = graph.rootIds[index];
     results.push(await controller.dispatchHierarchyEvent({
       type: eventType,
-      eventId: `owner-${eventPrefix}:${orchestraId}:${state.controlEpoch}:${eventBase + index + 1}:${nodeId}`,
+      eventId: compactOrchestrationEventId(`owner-${eventPrefix}`, orchestraId, graph.graphId, state.controlEpoch, eventBase + index + 1, nodeId),
       controlEpoch: state.controlEpoch,
       nodeId,
     }, { nowMs }));
