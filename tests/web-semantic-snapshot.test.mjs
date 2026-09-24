@@ -55,6 +55,26 @@ test('normalizes a bounded read-only semantic snapshot with explicit non-authori
   assert.equal(Object.isFrozen(result.elements[0]), true);
 });
 
+test('untrusted semantic snapshots reject coerced versions, identities, and exotic prototypes', () => {
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({ schemaVersion: '1' })), /schemaVersion/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({ schemaVersion: true })), /schemaVersion/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({ snapshotId: 7 })), /snapshotId must be text/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({ targetId: true })), /targetId must be text/);
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({
+    elements: [{ semanticId: 7, role: 'button', name: 'Save' }],
+  })), /semanticId must be text/);
+
+  const exoticSnapshot = Object.assign(Object.create({ inherited: true }), snapshot());
+  assert.throws(() => normalizeWebSemanticSnapshotV1(exoticSnapshot), /must be a plain object/);
+
+  const exoticElement = Object.assign(Object.create({ semanticId: 'inherited-id' }), {
+    semanticId: 'own-id',
+    role: 'button',
+    name: 'Save',
+  });
+  assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({ elements: [exoticElement] })), /must be a plain object/);
+});
+
 test('semantic content cannot smuggle selector, action or permission authority into the snapshot', () => {
   assert.throws(() => normalizeWebSemanticSnapshotV1(snapshot({
     elements: [{
