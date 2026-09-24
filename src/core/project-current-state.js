@@ -5,6 +5,7 @@ import {
 } from './project-context-artifact.js';
 
 export const ProjectCurrentStateVersion = 1;
+export const ProjectCurrentStateDigestVersion = 1;
 
 const MAX_SOURCES = 128;
 const MAX_ARTIFACTS = 128;
@@ -31,6 +32,17 @@ function unique(items, key, label) {
     seen.add(value);
   }
   return items;
+}
+
+function boundedVisibilityIds(value, label = 'allowedSourceIds') {
+  if (!Array.isArray(value) || value.length > MAX_SOURCES) {
+    throw new Error(`${label} must be an explicit bounded array`);
+  }
+  const ids = value.map(item => String(item ?? '').trim());
+  if (ids.some(item => !item) || new Set(ids).size !== ids.length) {
+    throw new Error(`${label} must contain unique non-empty ids`);
+  }
+  return new Set(ids);
 }
 
 function artifactIdentity(ref) {
@@ -86,6 +98,9 @@ export function deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRe
       }
     }
     if (snapshotSource && currentSource) {
+      if (snapshotSource.kind !== currentSource.kind) reasons.push('CURRENT_KIND_DIFFERS_FROM_SNAPSHOT');
+      if (snapshotSource.uri !== currentSource.uri) reasons.push('CURRENT_URI_DIFFERS_FROM_SNAPSHOT');
+      if (snapshotSource.authority !== currentSource.authority) reasons.push('CURRENT_AUTHORITY_DIFFERS_FROM_SNAPSHOT');
       if (snapshotSource.revisionId !== currentSource.revisionId) reasons.push('CURRENT_REVISION_DIFFERS_FROM_SNAPSHOT');
       if (snapshotSource.contentSha256 && snapshotSource.contentSha256 !== currentSource.contentSha256) {
         reasons.push('CURRENT_HASH_DIFFERS_FROM_SNAPSHOT');
@@ -139,5 +154,254 @@ export function deriveProjectCurrentStateV1({ snapshot, capsule, currentSourceRe
     artifactDriftCount,
     sources,
     artifacts,
+  });
+}
+
+
+function sourceStateFingerprint(source, sourceRef) {
+  if (!source) return null;
+  return JSON.stringify([
+    source.status,
+    source.reasons,
+    source.snapshotRevisionId,
+    source.capsuleRevisionId,
+    source.currentRevisionId,
+    sourceRef?.kind || null,
+    sourceRef?.uri || null,
+    sourceRef?.authority || null,
+    sourceRef?.contentSha256 || '',
+  ]);
+}
+
+function digestSourceView(source, sourceRef) {
+  if (!source) return null;
+  return frozen({
+    status: source.status,
+    kind: sourceRef?.kind || null,
+    uri: sourceRef?.uri || null,
+    authority: sourceRef?.authority || null,
+    contentSha256: sourceRef?.contentSha256 || '',
+    snapshotRevisionId: source.snapshotRevisionId,
+    capsuleRevisionId: source.capsuleRevisionId,
+    currentRevisionId: source.currentRevisionId,
+  });
+}
+
+function artifactChangeIdentity(ref) {
+  if (!ref) return null;
+  return JSON.stringify([
+    ref.kind,
+    ref.uri,
+    ref.mediaType,
+    ref.sha256 || '',
+    ref.sizeBytes,
+    ref.producerInvocationId || '',
+    Boolean(ref.sensitive),
+  ]);
+}
+
+function digestArtifactView(ref) {
+  if (!ref) return null;
+  if (ref.sensitive) {
+    return frozen({
+      sensitive: true,
+      redacted: true,
+    });
+  }
+  return frozen({
+    kind: ref.kind,
+    mediaType: ref.mediaType,
+    sha256: ref.sha256 || '',
+    sizeBytes: ref.sizeBytes,
+    sensitive: false,
+    redacted: false,
+  });
+}
+
+function staleEvidence(state, phase, allowedSourceIds) {
+  return state.sources
+    .filter(source => source.status !== 'FRESH' && allowedSourceIds.has(source.sourceId))
+    .map(source => frozen({
+      phase,
+      sourceId: source.sourceId,
+      reasons: source.reasons,
+      snapshotRevisionId: source.snapshotRevisionId,
+      capsuleRevisionId: source.capsuleRevisionId,
+      currentRevisionId: source.currentRevisionId,
+    }));
+}
+
+function hiddenStaleSourceCount(state, allowedSourceIds) {
+  return state.sources.filter(source => source.status !== 'FRESH' && !allowedSourceIds.has(source.sourceId)).length;
+}
+
+function sensitiveArtifactIds(snapshot, capsule) {
+  const ids = new Set();
+  for (const ref of [...snapshot.artifactRefs, ...capsule.artifactRefs]) {
+    if (ref.sensitive) ids.add(ref.artifactId);
+  }
+  return ids;
+}
+
+function artifactDriftEvidence(state, phase, hiddenArtifactIds) {
+  return state.artifacts
+    .filter(artifact => artifact.status !== 'MATCH' && !hiddenArtifactIds.has(artifact.artifactId))
+    .map(artifact => frozen({
+      phase,
+      artifactId: artifact.artifactId,
+      status: artifact.status,
+    }));
+}
+
+function hiddenArtifactDriftCount(state, hiddenArtifactIds) {
+  return state.artifacts.filter(
+    artifact => artifact.status !== 'MATCH' && hiddenArtifactIds.has(artifact.artifactId),
+  ).length;
+}
+
+export function deriveProjectCurrentStateDigestV1({ baseline, current, allowedSourceIds } = {}) {
+  const allowedIds = boundedVisibilityIds(allowedSourceIds);
+  if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) {
+    throw new Error('baseline must be a project current-state input object');
+  }
+  if (!current || typeof current !== 'object' || Array.isArray(current)) {
+    throw new Error('current must be a project current-state input object');
+  }
+
+  const baselineSnapshot = normalizeProjectSnapshotV1(baseline.snapshot);
+  const baselineCapsule = normalizeContextCapsuleV1(baseline.capsule);
+  const currentSnapshot = normalizeProjectSnapshotV1(current.snapshot);
+  const currentCapsule = normalizeContextCapsuleV1(current.capsule);
+
+  if (baselineSnapshot.projectId !== currentSnapshot.projectId) {
+    throw new Error('baseline and current projectId must match');
+  }
+
+  const baselineState = deriveProjectCurrentStateV1({
+    snapshot: baselineSnapshot,
+    capsule: baselineCapsule,
+    currentSourceRefs: baseline.currentSourceRefs,
+  });
+  const currentState = deriveProjectCurrentStateV1({
+    snapshot: currentSnapshot,
+    capsule: currentCapsule,
+    currentSourceRefs: current.currentSourceRefs,
+  });
+  const baselineSensitiveArtifacts = sensitiveArtifactIds(baselineSnapshot, baselineCapsule);
+  const currentSensitiveArtifacts = sensitiveArtifactIds(currentSnapshot, currentCapsule);
+
+  const base = {
+    schemaVersion: ProjectCurrentStateDigestVersion,
+    projectId: currentSnapshot.projectId,
+    advisoryOnly: true,
+    fromProjectRevisionId: baselineSnapshot.revisionId,
+    toProjectRevisionId: currentSnapshot.revisionId,
+    fromCapsuleId: baselineCapsule.capsuleId,
+    toCapsuleId: currentCapsule.capsuleId,
+    projectRevisionChanged: baselineSnapshot.revisionId !== currentSnapshot.revisionId,
+    baselineStatus: baselineState.status,
+    currentStatus: currentState.status,
+    visibilityBound: true,
+  };
+
+  if (baselineState.status !== 'FRESH' || currentState.status !== 'FRESH') {
+    return frozen({
+      ...base,
+      status: 'STALE_INPUT',
+      changeViewAvailable: false,
+      sourceChanges: [],
+      artifactChanges: [],
+      staleEvidence: [
+        ...staleEvidence(baselineState, 'BASELINE', allowedIds),
+        ...staleEvidence(currentState, 'CURRENT', allowedIds),
+      ],
+      hiddenStaleSourceCount:
+        hiddenStaleSourceCount(baselineState, allowedIds)
+        + hiddenStaleSourceCount(currentState, allowedIds),
+      artifactDriftEvidence: [
+        ...artifactDriftEvidence(baselineState, 'BASELINE', baselineSensitiveArtifacts),
+        ...artifactDriftEvidence(currentState, 'CURRENT', currentSensitiveArtifacts),
+      ],
+      hiddenSensitiveArtifactDriftCount:
+        hiddenArtifactDriftCount(baselineState, baselineSensitiveArtifacts)
+        + hiddenArtifactDriftCount(currentState, currentSensitiveArtifacts),
+    });
+  }
+
+  const baselineSources = new Map(baselineState.sources.map(source => [source.sourceId, source]));
+  const currentSources = new Map(currentState.sources.map(source => [source.sourceId, source]));
+  const baselineSourceRefs = new Map(baselineSnapshot.sourceRefs.map(source => [source.sourceId, source]));
+  const currentSourceRefs = new Map(currentSnapshot.sourceRefs.map(source => [source.sourceId, source]));
+  const sourceIds = [...new Set([...baselineSources.keys(), ...currentSources.keys()])].sort();
+  const sourceChanges = [];
+  let totalSourceChangeCount = 0;
+  let hiddenSourceChangeCount = 0;
+  for (const sourceId of sourceIds) {
+    const before = baselineSources.get(sourceId) || null;
+    const after = currentSources.get(sourceId) || null;
+    let change = 'UNCHANGED';
+    if (!before) change = 'ADDED';
+    else if (!after) change = 'REMOVED';
+    else if (
+      sourceStateFingerprint(before, baselineSourceRefs.get(sourceId))
+      !== sourceStateFingerprint(after, currentSourceRefs.get(sourceId))
+    ) change = 'CHANGED';
+    if (change === 'UNCHANGED') continue;
+    totalSourceChangeCount += 1;
+    if (!allowedIds.has(sourceId)) {
+      hiddenSourceChangeCount += 1;
+      continue;
+    }
+    sourceChanges.push(frozen({
+      sourceId,
+      change,
+      before: digestSourceView(before, baselineSourceRefs.get(sourceId)),
+      after: digestSourceView(after, currentSourceRefs.get(sourceId)),
+    }));
+  }
+
+  const baselineArtifacts = new Map(baselineSnapshot.artifactRefs.map(ref => [ref.artifactId, ref]));
+  const currentArtifacts = new Map(currentSnapshot.artifactRefs.map(ref => [ref.artifactId, ref]));
+  const artifactIds = [...new Set([...baselineArtifacts.keys(), ...currentArtifacts.keys()])].sort();
+  const artifactChanges = [];
+  let totalArtifactChangeCount = 0;
+  let hiddenSensitiveArtifactChangeCount = 0;
+  for (const artifactId of artifactIds) {
+    const before = baselineArtifacts.get(artifactId) || null;
+    const after = currentArtifacts.get(artifactId) || null;
+    let change = 'UNCHANGED';
+    if (!before) change = 'ADDED';
+    else if (!after) change = 'REMOVED';
+    else if (artifactChangeIdentity(before) !== artifactChangeIdentity(after)) change = 'CHANGED';
+    if (change === 'UNCHANGED') continue;
+    totalArtifactChangeCount += 1;
+    if (before?.sensitive || after?.sensitive) {
+      hiddenSensitiveArtifactChangeCount += 1;
+      continue;
+    }
+    artifactChanges.push(frozen({
+      artifactId,
+      change,
+      before: digestArtifactView(before),
+      after: digestArtifactView(after),
+    }));
+  }
+
+  return frozen({
+    ...base,
+    status: base.projectRevisionChanged || totalSourceChangeCount || totalArtifactChangeCount ? 'CHANGED' : 'UNCHANGED',
+    changeViewAvailable: true,
+    totalSourceChangeCount,
+    visibleSourceChangeCount: sourceChanges.length,
+    hiddenSourceChangeCount,
+    sourceChanges,
+    totalArtifactChangeCount,
+    visibleArtifactChangeCount: artifactChanges.length,
+    hiddenSensitiveArtifactChangeCount,
+    artifactChanges,
+    staleEvidence: [],
+    hiddenStaleSourceCount: 0,
+    artifactDriftEvidence: [],
+    hiddenSensitiveArtifactDriftCount: 0,
   });
 }

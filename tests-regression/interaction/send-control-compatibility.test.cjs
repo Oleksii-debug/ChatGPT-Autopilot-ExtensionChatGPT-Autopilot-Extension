@@ -37,7 +37,7 @@ function element(attributes = {}) {
   };
 }
 
-function harness({ buttonAttributes = {}, initiallyDisabled = false } = {}) {
+function harness({ buttonAttributes = {}, initiallyDisabled = false, executeOverride = null } = {}) {
   let listener = null;
   let observedTestId = null;
   let clicks = 0;
@@ -62,6 +62,7 @@ function harness({ buttonAttributes = {}, initiallyDisabled = false } = {}) {
 
   const adapter = {
     async execute(request) {
+      if (executeOverride) return executeOverride({ request, button });
       observedTestId = button.getAttribute('data-testid');
       if (request.mode === 'SUBMIT_EXISTING' && /send-button/.test(observedTestId || '')) {
         button.click();
@@ -176,4 +177,46 @@ test('compatibility polling waits for a localized Send control to become enabled
   assert.equal(response.data.status, 'SENT_VERIFIED');
   assert.equal(h.clicks, 1);
   assert.ok(Date.now() - started >= 100, 'request should wait for the Send button to enable');
+});
+
+test('overlapping requests retain the Send identity until both have finished', async () => {
+  let enteredFirst;
+  const firstStarted = new Promise(resolve => { enteredFirst = resolve; });
+  let finishFirst;
+  const firstGate = new Promise(resolve => { finishFirst = resolve; });
+  let calls = 0;
+  const h = harness({
+    buttonAttributes: { 'aria-label': 'Надіслати запит' },
+    executeOverride: async ({ button }) => {
+      calls += 1;
+      if (calls === 1) {
+        enteredFirst();
+        await firstGate;
+      }
+      assert.match(button.getAttribute('data-testid') || '', /autopilot-send-button/);
+      return { status: 'READY' };
+    },
+  });
+  const first = h.invoke('PREPARE_SEND');
+  await firstStarted;
+  const second = await h.invoke('PREPARE_SEND');
+  assert.equal(second.data.status, 'READY');
+  assert.match(h.button.getAttribute('data-testid') || '', /autopilot-send-button/);
+  finishFirst();
+  assert.equal((await first).data.status, 'READY');
+  assert.equal(h.button.getAttribute('data-testid'), null);
+  assert.equal(h.button.getAttribute('data-autopilot-send-compat'), null);
+});
+
+test('compatibility cleanup does not overwrite a site identity changed during the request', async () => {
+  const h = harness({
+    buttonAttributes: { 'aria-label': 'Надіслати запит' },
+    executeOverride: async ({ button }) => {
+      button.setAttribute('data-testid', 'site-new-control');
+      return { status: 'UNKNOWN_UI' };
+    },
+  });
+  await h.invoke('PREPARE_SEND');
+  assert.equal(h.button.getAttribute('data-testid'), 'site-new-control');
+  assert.equal(h.button.getAttribute('data-autopilot-send-compat'), null);
 });
