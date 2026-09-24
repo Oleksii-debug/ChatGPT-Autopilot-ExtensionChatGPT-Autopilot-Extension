@@ -51,7 +51,8 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
   }
   async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt)acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
-  return {run,wait,acknowledge,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
+  function reloadAdapter(){ vm.runInContext(source,sandbox); }
+  return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
 }
 
 test('new-chat launch URL may transition from root to the created conversation after Send',async()=>{
@@ -131,6 +132,22 @@ test('unlabeled main user turn recovers after navigation without resending',asyn
   f.acknowledge();
   const r=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{recoveryLaunchUrl:'https://chatgpt.com/'});
   assert.equal(r.status,'SENT_VERIFIED');
+  assert.equal(f.clicks(),1);
+});
+test('fresh-launch restart cannot verify an unrelated conversation from historical prompt text',async()=>{
+  const f=fixture({messageShape:'unlabeled',noOp:true,startUrl:'https://chatgpt.com/'});
+  assert.equal((await f.run()).status,'SUBMISSION_UNCERTAIN');
+  assert.equal(f.clicks(),1);
+  f.sandbox.location.href='https://chatgpt.com/c/unrelated';
+  f.acknowledge();
+  f.reloadAdapter();
+  const r=await f.run('VERIFY_AFTER_UNCERTAIN_SUBMIT',{
+    expectedUrl:'https://chatgpt.com/',
+    recoveryLaunchUrl:'https://chatgpt.com/'
+  });
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.notEqual(r.safeDiagnosticCode,'RECOVERY_FRESH_MAIN_PROMPT_VERIFIED');
+  assert.notEqual(r.safeDiagnosticCode,'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED');
   assert.equal(f.clicks(),1);
 });
 test('an old identical unlabeled turn cannot verify another Send',async()=>{
