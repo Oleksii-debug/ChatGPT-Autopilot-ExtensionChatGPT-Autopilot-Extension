@@ -194,14 +194,33 @@ test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handof
   const expired = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1 });
   assert.deepEqual(expired.claimed, []);
   assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
-  const reconciliation = { agentId, leaseId, verifierId:'provider-observer', verificationAuthorityId:'policy:retry', evidence:'A fresh provider query proves no archive exists.' };
-  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', { ...reconciliation, evidence:'' }), /evidence/);
+  const verification = {
+    schemaVersion:1,
+    verificationId:'verification-no-effect-job-retry',
+    invocationId:'invoke-safe-retry-job-retry',
+    observationId:'observation-no-effect-job-retry',
+    status:'VERIFIED',
+    reasonCode:'NO_EFFECT_OBSERVED',
+    summary:'A fresh provider query proves no archive exists.',
+    evidenceArtifactIds:['artifact:no-effect-job-retry'],
+    verifiedAt:'2026-09-23T12:01:01.000Z',
+    verifierId:'provider-observer',
+    verificationAuthorityId:'policy:retry',
+    effectId:claimed.executionOwnerships[0].effectId,
+    executionId:leaseId,
+    attempt:1,
+  };
+  const reconciliation = { agentId, leaseId, verification };
+  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', { ...reconciliation, verification:null }), /canonical verification/);
   const retriable = await manager.authorizeSpecialistSafeRetry('job-retry', reconciliation);
   assert.equal(retriable.assignments[0].state, 'READY');
   assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
   const durable = await manager.get('job-retry');
   assert.equal(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
-  assert.equal(durable.job.runtime.history.at(-1).evidence, reconciliation.evidence);
+  assert.equal(durable.job.runtime.history.at(-1).verificationId, verification.verificationId);
+  assert.equal(durable.job.runtime.history.at(-1).observationId, verification.observationId);
+  assert.deepEqual(durable.job.runtime.history.at(-1).evidenceArtifactIds, verification.evidenceArtifactIds);
+  assert.equal(durable.job.runtime.history.at(-1).evidence, verification.summary);
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock + 2_000 });
   const beforeAdmission = await restarted.listSpecialistHandoffs('job-retry');
   assert.equal(beforeAdmission.handoffs[0].state, 'READY', 'restart must preserve explicit SAFE_RETRY authorization');
