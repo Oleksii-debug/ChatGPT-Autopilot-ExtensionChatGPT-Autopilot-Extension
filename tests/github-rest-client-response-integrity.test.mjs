@@ -9,6 +9,10 @@ function jsonResponse(status, payload) {
   return { status, text: async () => JSON.stringify(payload) };
 }
 
+function rawResponse(status, text) {
+  return { status, text: async () => text };
+}
+
 function nativeCredential() {
   return {
     resolveCredential: async request => ({
@@ -63,6 +67,30 @@ test('malformed identities after successful file mutation remain ambiguous and n
     error => error.code === 'GITHUB_RESPONSE_INVALID'
       && error.effectMayHaveOccurred === true
       && error.safeToRetry === false,
+  );
+});
+
+test('malformed JSON after a successful mutation is ambiguous and cannot be blindly retried', async () => {
+  const subject = client(async () => rawResponse(201, '{broken'));
+
+  await assert.rejects(
+    () => subject.createBranch({ repositoryFullName: repo, branch: 'work/new', fromSha: commitSha }),
+    error => error.code === 'GITHUB_RESPONSE_INVALID'
+      && error.status === 201
+      && error.effectMayHaveOccurred === true
+      && error.safeToRetry === false,
+  );
+});
+
+test('malformed JSON on a deterministic rejection remains pre-effect and retry-safe', async () => {
+  const subject = client(async () => rawResponse(422, '{broken'));
+
+  await assert.rejects(
+    () => subject.createBranch({ repositoryFullName: repo, branch: 'work/new', fromSha: commitSha }),
+    error => error.code === 'GITHUB_RESPONSE_INVALID'
+      && error.status === 422
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
   );
 });
 
