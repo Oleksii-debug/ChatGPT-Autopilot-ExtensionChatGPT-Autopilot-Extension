@@ -9,6 +9,7 @@ import {
   putProjectArtifactProvenance,
   putProjectContextCapsule,
   replaceProjectSnapshot,
+  validateProjectWorkspace,
 } from '../src/core/project-workspace.js';
 
 const hash = char => char.repeat(64);
@@ -66,4 +67,66 @@ test('repository serializes concurrent updates and survives recreation', async (
   assert.equal(workspace.revision, 3);
   assert.ok(chrome.data[PROJECT_WORKSPACE_STORAGE_KEY]);
   assert.equal(workspace.projectsById['project-a'].capsulesById['capsule-1'].summary, 'Current state.');
+});
+
+
+test('workspace stores reserved prototype-like durable ids as own entries without prototype mutation', () => {
+  const workspace = createProjectWorkspace(1);
+  const specialSource = { ...source(), projectId: '__proto__' };
+  const specialArtifact = { ...artifact(), artifactId: '__proto__' };
+  const specialSnapshot = {
+    ...snapshot(),
+    projectId: '__proto__',
+    sourceRefs: [specialSource],
+    artifactRefs: [specialArtifact],
+  };
+  addProjectSnapshot(workspace, specialSnapshot, { nowMs: 2 });
+
+  assert.equal(Object.hasOwn(workspace.projectsById, '__proto__'), true);
+  assert.equal(Object.getPrototypeOf(workspace.projectsById), Object.prototype);
+
+  const specialCapsule = {
+    ...capsule(),
+    capsuleId: '__proto__',
+    projectId: '__proto__',
+    sourceBindings: [{
+      sourceId: 'github-main',
+      revisionId: 'r1',
+      contentSha256: hash('a'),
+    }],
+    artifactRefs: [specialArtifact],
+  };
+  putProjectContextCapsule(workspace, specialCapsule, { nowMs: 3 });
+  const project = workspace.projectsById['__proto__'];
+  assert.equal(Object.hasOwn(project.capsulesById, '__proto__'), true);
+  assert.equal(Object.getPrototypeOf(project.capsulesById), Object.prototype);
+
+  const specialProvenance = {
+    ...provenance(),
+    projectId: '__proto__',
+    artifactRef: specialArtifact,
+    sourceBindings: [{
+      sourceId: 'github-main',
+      revisionId: 'r1',
+      contentSha256: hash('a'),
+    }],
+  };
+  putProjectArtifactProvenance(workspace, specialProvenance, { nowMs: 4 });
+  assert.equal(Object.hasOwn(project.provenanceByArtifactId, '__proto__'), true);
+  assert.equal(Object.getPrototypeOf(project.provenanceByArtifactId), Object.prototype);
+  assert.equal(validateProjectWorkspace(workspace), workspace);
+  assert.equal(projectCurrentState(workspace, '__proto__', '__proto__', [specialSource]).status, 'FRESH');
+});
+
+test('workspace lookup identities are string-only and persisted record prototypes fail closed', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+
+  assert.throws(() => projectCurrentState(workspace, 1, 'capsule-1', [source()]), /Invalid projectId/);
+  assert.throws(() => projectCurrentState(workspace, 'project-a', true, [source()]), /Invalid capsuleId/);
+
+  const poisoned = structuredClone(workspace);
+  Object.setPrototypeOf(poisoned.projectsById, { hidden: true });
+  assert.throws(() => validateProjectWorkspace(poisoned), /projectsById prototype/);
 });
