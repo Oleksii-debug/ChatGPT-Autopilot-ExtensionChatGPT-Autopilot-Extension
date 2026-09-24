@@ -53,3 +53,14 @@ test('gateway client preserves typed HTTP failure evidence and compatible endpoi
   );
   assert.equal(body.endpointId, 'team-a');
 });
+
+test('gateway client includes compatible endpoint identity in model discovery', async () => {
+  let requestedUrl = '';
+  const client = new AiGatewayClient({ fetchFn:async url => {
+    requestedUrl = String(url);
+    return new Response(JSON.stringify({ ok:true, models:['coder'] }), { status:200 });
+  } });
+  const result = await client.listModels({ gatewayUrl:'http://127.0.0.1:17621', timeoutSeconds:30, provider:'openai-compatible', endpointId:'team a' });
+  assert.deepEqual(result.models, ['coder']);
+  assert.match(requestedUrl, /provider=openai-compatible&endpointId=team%20a$/);
+});
