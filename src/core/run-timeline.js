@@ -12,11 +12,8 @@ function plainObject(value, label) {
 
 function requiredSessionId(value) {
   if (typeof value !== 'string') throw new Error('Run timeline sessionId must be text');
-  const sessionId = value.trim();
-  if (!sessionId || sessionId.length > 180 || !/^[A-Za-z0-9._:@/+~-]+$/u.test(sessionId)) {
-    throw new Error('Run timeline sessionId is invalid');
-  }
-  return sessionId;
+  if (!value.trim() || value.length > 512) throw new Error('Run timeline sessionId is invalid');
+  return value;
 }
 
 function boundedLimit(value) {
@@ -99,10 +96,17 @@ export function buildRunTimelineV1(state, { sessionId, limit } = {}) {
   const root = plainObject(state, 'Run timeline state');
   const id = requiredSessionId(sessionId);
   const maxEntries = boundedLimit(limit);
-  const session = root.sessionsById?.[id];
+  const sessionsById = root.sessionsById;
+  if (!sessionsById || typeof sessionsById !== 'object' || Array.isArray(sessionsById)
+      || !Object.hasOwn(sessionsById, id)) {
+    throw new Error('Run timeline session not found');
+  }
+  const session = sessionsById[id];
   if (!session || typeof session !== 'object' || Array.isArray(session)) throw new Error('Run timeline session not found');
 
-  const logs = Array.isArray(root.logs?.[id]) ? root.logs[id] : [];
+  const logs = root.logs && typeof root.logs === 'object' && Object.hasOwn(root.logs, id) && Array.isArray(root.logs[id])
+    ? root.logs[id]
+    : [];
   const diagnostics = Array.isArray(root.diagnostics) ? root.diagnostics : [];
   const entries = [];
 
