@@ -43,6 +43,17 @@ function normalizeBudget(raw = {}) {
   return { maxModelCalls: bounded(raw.maxModelCalls, 'maxModelCalls', 1_000_000), maxRuntimeSeconds: bounded(raw.maxRuntimeSeconds, 'maxRuntimeSeconds', 31_536_000), maxCostUsdMicros: bounded(raw.maxCostUsdMicros, 'maxCostUsdMicros', Number.MAX_SAFE_INTEGER) };
 }
 
+function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
+  object(rawEnvelope, 'AgentPlan extension resourceEnvelope');
+  const envelope = normalizeBudget(rawEnvelope);
+  const fields = ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros'];
+  for (const field of fields) {
+    const total = nodes.reduce((sum, node) => sum + BigInt(node.budget[field]), 0n);
+    if (total > BigInt(envelope[field])) throw new Error(`AgentPlan extension exceeds resourceEnvelope ${field}`);
+  }
+  return envelope;
+}
+
 function normalizeNode(raw) {
   object(raw, 'AgentPlan node');
   exact(raw, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
@@ -122,10 +133,11 @@ export function reconcileAgentPlanV1(raw, { at = new Date().toISOString() } = {}
 /**
  * Appends newly discovered work to an already-live plan without rewriting the
  * existing graph. Optimistic revision matching prevents concurrent planners
- * from silently clobbering one another; all additions enter through PENDING
- * and are then reconciled by the canonical dependency/conflict rules.
+ * from silently clobbering one another. resourceEnvelope is trusted caller
+ * authority (never model-provided): aggregate existing + added node budgets
+ * must remain inside that same durable owner/job envelope on every extension.
  */
-export function extendAgentPlanV1(raw, { expectedRevision, nodes, at = new Date().toISOString() } = {}) {
+export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelope, at = new Date().toISOString() } = {}) {
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const expected = Number(expectedRevision);
   if (!Number.isInteger(expected) || expected < 1) throw new Error('AgentPlan expectedRevision is invalid');
@@ -145,7 +157,9 @@ export function extendAgentPlanV1(raw, { expectedRevision, nodes, at = new Date(
     return candidate;
   });
 
-  plan.nodes.push(...additions);
+  const nextNodes = [...plan.nodes, ...additions];
+  assertAggregateBudgetWithinEnvelope(nextNodes, resourceEnvelope);
+  plan.nodes = nextNodes;
   plan.updatedAt = updatedAt;
   return reconcileAgentPlanV1(plan, { at: updatedAt });
 }
