@@ -62,6 +62,10 @@ function exactKeys(value, allowed, label) {
     if (typeof key !== 'string' || !allowed.has(key)) {
       throw new Error(`${label} contains unknown field: ${String(key)}`);
     }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} field ${key} must be an enumerable data property`);
+    }
   }
 }
 
@@ -225,6 +229,29 @@ export function normalizeContextCapsuleContentV1(input) {
 export function renderContextCapsuleContentV1(input) {
   const content = normalizeContextCapsuleContentV1(input);
   return `${CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX}${JSON.stringify(content)}`;
+}
+
+export function parseContextCapsuleContentV1(summary) {
+  if (typeof summary !== 'string') throw new Error('structured context capsule summary must be text');
+  if (summary.length > CONTEXT_CAPSULE_MAX_SUMMARY_CHARS) {
+    throw new Error('structured context capsule summary exceeds its character bound');
+  }
+  if (!summary.startsWith(CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX)) {
+    throw new Error('structured context capsule summary prefix is invalid');
+  }
+  const payload = summary.slice(CONTEXT_CAPSULE_STRUCTURED_SUMMARY_PREFIX.length);
+  if (!payload) throw new Error('structured context capsule summary payload is empty');
+  let parsed;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    throw new Error('structured context capsule summary JSON is invalid');
+  }
+  const normalized = normalizeContextCapsuleContentV1(parsed);
+  if (renderContextCapsuleContentV1(normalized) !== summary) {
+    throw new Error('structured context capsule summary is not canonical');
+  }
+  return normalized;
 }
 
 function selectSources(snapshot, disclosure) {
