@@ -233,3 +233,38 @@ test('Chrome host permission denial happens before scripted click effect', async
   assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
   assert.deepEqual(fixture.calls, []);
 });
+
+
+test('durable web store waits for storage isolation before any journal access', async () => {
+  const fixture = chromeFixture();
+  let releaseIsolation;
+  const ready = new Promise(resolve => { releaseIsolation = resolve; });
+  const store = createChromeDeterministicWebStoreV1(fixture.chrome, { ready });
+  let mutated = false;
+  const pending = store.update(draft => {
+    mutated = true;
+    draft.effectsById.isolated = { state: 'prepared' };
+  });
+
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(mutated, false);
+  assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
+
+  releaseIsolation();
+  await pending;
+  assert.equal(mutated, true);
+  assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'].effectsById.isolated.state, 'prepared');
+});
+
+test('rejected storage isolation barrier never falls back to a fresh web journal', async () => {
+  const fixture = chromeFixture();
+  const ready = Promise.reject(new Error('storage isolation denied'));
+  const store = createChromeDeterministicWebStoreV1(fixture.chrome, { ready });
+  await assert.rejects(
+    () => store.update(draft => { draft.effectsById.unsafe = { state: 'prepared' }; }),
+    /storage isolation denied/,
+  );
+  assert.equal(fixture.storage['autopilot.deterministicWebRuntime.v1'], undefined);
+  assert.deepEqual(fixture.calls, []);
+});
