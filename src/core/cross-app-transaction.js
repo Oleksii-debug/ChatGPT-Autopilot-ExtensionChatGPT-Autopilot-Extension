@@ -291,7 +291,11 @@ export async function createCrossAppTransactionFingerprintV1(transactionInput, c
 
 function assertDeepDataOnly(value, label, depth = 0) {
   if (depth > MAX_JSON_DEPTH) throw new Error(`${label} is too deeply nested`);
-  if (value === null || ['string', 'boolean', 'number'].includes(typeof value)) return;
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
+    return;
+  }
   if (Array.isArray(value)) {
     denseArray(value, label, 4096);
     for (let index = 0; index < value.length; index += 1) {
@@ -312,6 +316,29 @@ function assertDeepDataOnly(value, label, depth = 0) {
   }
 }
 
+async function assertExactEffectEnvelope(input, label, cryptoApi) {
+  if (typeof input.schemaVersion !== 'number'
+      || !Number.isInteger(input.schemaVersion)
+      || input.schemaVersion !== CrossAppTransactionContractVersion) {
+    throw new Error(`Unsupported ${label} schemaVersion`);
+  }
+  id(input.effectId, `${label}.effectId`);
+  if (typeof input.phase !== 'string' || !Object.values(ExactEffectPhase).includes(input.phase)) {
+    throw new Error(`${label}.phase is invalid`);
+  }
+  if (typeof input.attempt !== 'number' || !Number.isInteger(input.attempt) || input.attempt < 0 || input.attempt > 64) {
+    throw new Error(`${label}.attempt is invalid`);
+  }
+  if (typeof input.executionId !== 'string') throw new Error(`${label}.executionId must be text`);
+  if (input.executionId) id(input.executionId, `${label}.executionId`);
+  if (typeof input.commitId !== 'string') throw new Error(`${label}.commitId must be text`);
+  if (input.commitId) id(input.commitId, `${label}.commitId`);
+  timestamp(input.createdAt, `${label}.createdAt`);
+  timestamp(input.updatedAt, `${label}.updatedAt`);
+  idList(input.processedEventIds, `${label}.processedEventIds`);
+  return createCrossAppInvocationFingerprintV1(input.invocation, cryptoApi);
+}
+
 function projectionStatus({ complete, attention, active, ready }) {
   if (complete) return CrossAppTransactionProjectionStatus.COMPLETE;
   if (attention) return CrossAppTransactionProjectionStatus.ATTENTION;
@@ -330,9 +357,11 @@ export async function projectCrossAppTransactionV1(
   const states = [];
   for (let index = 0; index < inputStates.length; index += 1) {
     const input = inputStates[index];
-    assertDeepDataOnly(input, `exactEffectStates[${index}]`);
+    const label = `exactEffectStates[${index}]`;
+    assertDeepDataOnly(input, label);
+    const rawInvocationSha256 = await assertExactEffectEnvelope(input, label, cryptoApi);
     const state = normalizeExactEffectStateV1(input);
-    states.push(state);
+    states.push({ state, rawInvocationSha256 });
   }
 
   const byStep = new Map(transaction.steps.map(step => [step.stepId, step]));
@@ -340,7 +369,7 @@ export async function projectCrossAppTransactionV1(
   const stateByStep = new Map();
   const commitIds = new Set();
 
-  for (const state of states) {
+  for (const { state, rawInvocationSha256 } of states) {
     const step = stepByInvocation.get(state.invocation.invocationId);
     if (!step) throw new Error(`exact-effect state ${state.effectId} is not part of transaction`);
     if (stateByStep.has(step.stepId)) throw new Error(`duplicate exact-effect state for step ${step.stepId}`);
@@ -348,7 +377,7 @@ export async function projectCrossAppTransactionV1(
       throw new Error(`exact-effect provider binding does not match step ${step.stepId}`);
     }
     const invocationSha256 = await createCrossAppInvocationFingerprintV1(state.invocation, cryptoApi);
-    if (invocationSha256 !== step.invocationSha256) {
+    if (rawInvocationSha256 !== step.invocationSha256 || invocationSha256 !== step.invocationSha256) {
       throw new Error(`exact-effect invocation binding does not match step ${step.stepId}`);
     }
     if (Date.parse(state.createdAt) < Date.parse(transaction.createdAt)) {
