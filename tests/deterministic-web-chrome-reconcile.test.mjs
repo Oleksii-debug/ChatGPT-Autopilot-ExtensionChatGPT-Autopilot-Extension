@@ -21,6 +21,7 @@ function chromeFixture({ closeBeforeReconcile = false } = {}) {
   return {
     storage,
     chrome: {
+      permissions: { async contains() { return true; } },
       storage: { local: { async get(key) { return key in storage ? { [key]: structuredClone(storage[key]) } : {}; }, async set(record) { Object.assign(storage, structuredClone(record)); } } },
       tabs: { async get(id) { tabGets += 1; if (closeBeforeReconcile && tabGets > 1) throw new Error('tab closed'); return { id, url: 'https://example.test/start', status: 'complete' }; }, async update(id, update) { return { id, ...update }; } },
       scripting: { async executeScript(request) { if ((request.args || [])[0] === 'CLICK') { clickAttempts += 1; if (clickAttempts === 1) throw new Error('connection lost after click dispatch'); return [{ result: { ok: true } }]; } return [{ result: { url: 'https://example.test/start', readyState: 'complete', visibleSelectors: ['#ready'] } }]; } },
