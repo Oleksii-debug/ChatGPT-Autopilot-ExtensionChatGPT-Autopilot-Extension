@@ -194,7 +194,7 @@ test('rejects accessor-backed, hidden and symbol fields without executing getter
     enumerable: false,
     value: 1,
   });
-  assert.throws(() => normalizeResourceBudgetV1(hiddenUnknown), /unknown field: hiddenAuthority/);
+  assert.throws(() => normalizeResourceBudgetV1(hiddenUnknown), /own data properties/);
 
   const symbolBudget = { maxModelCalls: 1 };
   symbolBudget[Symbol('authority')] = 1;
