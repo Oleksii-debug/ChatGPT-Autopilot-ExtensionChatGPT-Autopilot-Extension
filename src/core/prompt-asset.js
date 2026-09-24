@@ -26,7 +26,7 @@ const SOURCE_KEYS = new Set(['sourceId', 'revisionId', 'contentSha256']);
 const CADENCE_KEYS = new Set(['mode', 'referenceId']);
 const TRIGGER_KEYS = new Set(['mode', 'referenceId']);
 const RENDER_KEYS = new Set(['values', 'currentSourceBindings', 'trigger']);
-const PLACEHOLDER = /{{\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*}}/gu;
+const PLACEHOLDER = /\{\{\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*\}\}/gu;
 
 function plain(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
