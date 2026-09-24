@@ -1,0 +1,38 @@
+name: apply-autopilot-0.9.20
+on:
+  push:
+    branches:
+      - autopilot/0.9.20-routed-workers
+permissions:
+  contents: write
+jobs:
+  apply-and-verify:
+    if: contains(github.event.head_commit.message, '[stage-autopilot-0.9.20]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply exact reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          gzip -dc .autopilot/staging-0.9.20.patch.gz > /tmp/autopilot-0.9.20.patch
+          patch -p1 --batch --forward < /tmp/autopilot-0.9.20.patch
+      - name: Verify syntax and full automated suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          find src companion -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+          npm test
+      - name: Commit verified product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .autopilot/staging-0.9.20.patch.gz .github/workflows/apply-autopilot-0.9.20.yml
+          rmdir .autopilot 2>/dev/null || true
+          git config user.name 'autopilot-release-worker'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m '0.9.20: паралельні моделі та автономні виконавці'
+          git push origin HEAD:autopilot/0.9.20-routed-workers
