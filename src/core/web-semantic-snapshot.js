@@ -22,6 +22,10 @@ function plain(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
   return value;
 }
 
@@ -32,7 +36,8 @@ function exactKeys(value, allowed, label) {
 }
 
 function id(value, label) {
-  const out = String(value ?? '').trim();
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
   if (!ID.test(out) || out.length > MAX_ID) throw new Error(`${label} is invalid`);
   return out;
 }
@@ -114,7 +119,7 @@ const SNAPSHOT_KEYS = new Set([
 export function normalizeWebSemanticSnapshotV1(input) {
   const raw = plain(input, 'WebSemanticSnapshotV1');
   exactKeys(raw, SNAPSHOT_KEYS, 'WebSemanticSnapshotV1');
-  if (Number(raw.schemaVersion) !== WebSemanticSnapshotVersion) {
+  if (raw.schemaVersion !== WebSemanticSnapshotVersion) {
     throw new Error('Unsupported WebSemanticSnapshotV1 schemaVersion');
   }
   if (Object.hasOwn(raw, 'contentTrust') && raw.contentTrust !== 'UNTRUSTED_DATA') {
