@@ -32,6 +32,12 @@ const CATEGORY_PREFIX = Object.freeze({
   DIAGNOSTIC: 'diagnostics/',
 });
 
+const CONTROL_MEDIA_ESSENCE = Object.freeze({
+  'SUMMARY.md': 'text/markdown',
+  'REPORT.json': 'application/json',
+  'timeline.jsonl': 'application/x-ndjson',
+});
+
 const BUNDLE_KEYS = new Set([
   'schemaVersion',
   'bundleId',
@@ -73,7 +79,44 @@ function ownRecord(value, label) {
 function exactKeys(value, allowed, label) {
   for (const key of Object.getOwnPropertyNames(value)) {
     if (!allowed.has(key)) throw new Error(label + ' contains unknown field: ' + key);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable) {
+      throw new Error(label + ' contains non-enumerable field: ' + key);
+    }
   }
+}
+
+function strictArray(value, label, { min = 0, max }) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(label + ' must be a bounded plain array');
+  }
+  if (value.length < min || value.length > max) {
+    throw new Error(label + ' must be a bounded plain array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
+      throw new Error(label + ' contains non-index array data');
+    }
+    const index = Number(key);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
+      throw new Error(label + ' contains an invalid array index');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + '[' + index + '] must be an enumerable data property');
+    }
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + ' must not be sparse');
+    }
+    out.push(descriptor.value);
+  }
+  return out;
 }
 
 function requireVersion(value) {
@@ -153,12 +196,14 @@ function requireArtifactRef(input) {
   if (!Object.hasOwn(raw, 'sensitive') || typeof raw.sensitive !== 'boolean') {
     throw new Error('ArtifactRefV1 sensitive must be an explicit boolean');
   }
-  if (Object.hasOwn(raw, 'mediaType')) {
-    if (typeof raw.mediaType !== 'string' || !raw.mediaType || raw.mediaType !== raw.mediaType.trim()) {
+  if (Object.hasOwn(raw, 'mediaType') && raw.mediaType !== '') {
+    if (typeof raw.mediaType !== 'string' || raw.mediaType !== raw.mediaType.trim()) {
       throw new Error('ArtifactRefV1 mediaType must be canonical text when present');
     }
   }
-  if (Object.hasOwn(raw, 'producerInvocationId')) {
+  if (Object.hasOwn(raw, 'producerInvocationId')
+      && raw.producerInvocationId != null
+      && raw.producerInvocationId !== '') {
     requireId(raw.producerInvocationId, 'ArtifactRefV1 producerInvocationId');
   }
   return normalizeArtifactRefV1(raw);
@@ -174,9 +219,15 @@ function normalizeEntry(input) {
   if (typeof raw.category !== 'string' || !CATEGORIES.has(raw.category)) {
     throw new Error('entry category is invalid');
   }
+  const artifactRef = requireArtifactRef(raw.artifactRef);
   const requiredControl = REQUIRED_CONTROL_PATHS.includes(path);
   if (raw.category === JobArtifactCategory.CONTROL) {
     if (!requiredControl) throw new Error('CONTROL entries are limited to canonical control files');
+    const expectedMedia = CONTROL_MEDIA_ESSENCE[path];
+    const actualMedia = artifactRef.mediaType.split(';', 1)[0].trim().toLowerCase();
+    if (actualMedia !== expectedMedia) {
+      throw new Error(path + ' requires mediaType ' + expectedMedia);
+    }
   } else {
     if (requiredControl) throw new Error('canonical control file has the wrong category');
     const prefix = CATEGORY_PREFIX[raw.category];
@@ -188,22 +239,19 @@ function normalizeEntry(input) {
   return Object.freeze({
     path,
     category: raw.category,
-    artifactRef: requireArtifactRef(raw.artifactRef),
+    artifactRef,
   });
 }
 
 function normalizeDisclosure(input) {
   const raw = ownRecord(input, 'JobArtifactBundleDisclosureV1');
   exactKeys(raw, DISCLOSURE_KEYS, 'JobArtifactBundleDisclosureV1');
-  if (!Array.isArray(raw.allowedSensitiveArtifactIds) || raw.allowedSensitiveArtifactIds.length > MAX_JOB_ARTIFACT_BUNDLE_ENTRIES) {
-    throw new Error('allowedSensitiveArtifactIds must be a bounded array');
-  }
-  for (let index = 0; index < raw.allowedSensitiveArtifactIds.length; index += 1) {
-    if (!Object.hasOwn(raw.allowedSensitiveArtifactIds, index)) {
-      throw new Error('allowedSensitiveArtifactIds must not be sparse');
-    }
-  }
-  const ids = raw.allowedSensitiveArtifactIds.map((value) => requireId(value, 'allowedSensitiveArtifactId'));
+  const allowedSensitiveArtifactIds = strictArray(
+    raw.allowedSensitiveArtifactIds,
+    'allowedSensitiveArtifactIds',
+    { max: MAX_JOB_ARTIFACT_BUNDLE_ENTRIES },
+  );
+  const ids = allowedSensitiveArtifactIds.map((value) => requireId(value, 'allowedSensitiveArtifactId'));
   const seen = new Set();
   for (const id of ids) {
     if (seen.has(id)) throw new Error('allowedSensitiveArtifactIds contains duplicate artifactId: ' + id);
@@ -222,14 +270,12 @@ export function buildJobArtifactBundleV1(input) {
   exactKeys(raw, BUNDLE_KEYS, 'JobArtifactBundleV1');
   requireVersion(raw.schemaVersion);
 
-  if (!Array.isArray(raw.entries) || raw.entries.length < REQUIRED_CONTROL_PATHS.length || raw.entries.length > MAX_JOB_ARTIFACT_BUNDLE_ENTRIES) {
-    throw new Error('entries must be a bounded array containing canonical control files');
-  }
-  for (let index = 0; index < raw.entries.length; index += 1) {
-    if (!Object.hasOwn(raw.entries, index)) throw new Error('entries must not be sparse');
-  }
+  const entryInputs = strictArray(raw.entries, 'entries', {
+    min: REQUIRED_CONTROL_PATHS.length,
+    max: MAX_JOB_ARTIFACT_BUNDLE_ENTRIES,
+  });
 
-  const entries = raw.entries.map(normalizeEntry);
+  const entries = entryInputs.map(normalizeEntry);
   const disclosure = normalizeDisclosure(raw.disclosure);
   const seenPaths = new Map();
   const seenArtifactIds = new Set();
