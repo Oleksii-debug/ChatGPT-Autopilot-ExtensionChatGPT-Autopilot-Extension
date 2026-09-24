@@ -8,6 +8,10 @@ import {
   acquireBrowserTargetLeaseV1,
   releaseBrowserTargetLeaseV1,
 } from './browser-target-lease.js';
+import {
+  ExactEffectEventType, ExactEffectPhase, ReconciliationOutcome,
+  createExactEffectStateV1, normalizeExactEffectStateV1, reduceExactEffectV1,
+} from './universal-agent-exact-effect.js';
 
 const PROVIDER_ID = 'deterministic-web';
 const MAX_URL = 4096;
@@ -78,8 +82,36 @@ function normalizePostcondition(expected) {
     : { selector: text(expected.selector, 'expected.selector', MAX_SELECTOR) });
 }
 
-export function createDeterministicWebProviderV1({ transport, readLease = () => null, writeLease = () => {}, now = () => new Date().toISOString(), leaseId = () => `web-${Date.now()}` } = {}) {
+export function createDeterministicWebProviderV1({ transport, store, reconcileVerify, now = () => new Date().toISOString(), leaseId = () => `web-${Date.now()}` } = {}) {
   if (!transport || typeof transport.execute !== 'function' || typeof transport.observe !== 'function') throw new Error('deterministic web transport is required');
+  if (!store || typeof store.update !== 'function') throw new Error('atomic durable exact-effect store is required');
+  const event = (state, type, suffix, fields = {}) => {
+    const reduced = reduceExactEffectV1(state, {
+      schemaVersion: 1, eventId: `${state.effectId}:${suffix}-${state.attempt || 0}`,
+      type, effectId: state.effectId, executionId: state.executionId || undefined,
+      at: now(), ...fields,
+    });
+    if (!reduced.accepted || reduced.deduplicated) throw new Error(`web exact-effect transition rejected: ${reduced.reason}`);
+    return reduced.state;
+  };
+  async function atomic(mutator) {
+    let result;
+    await store.update(draft => {
+      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) throw new Error('exact-effect store is invalid');
+      draft.effectsById ||= {};
+      draft.leasesByTargetId ||= {};
+      result = mutator(draft);
+      return draft;
+    });
+    return result;
+  }
+  function release(draft, targetId, invocationId) {
+    const lease = draft.leasesByTargetId[targetId];
+    if (!lease || lease.ownerInvocationId !== invocationId) throw new Error('web effect target lease ownership changed');
+    draft.leasesByTargetId[targetId] = releaseBrowserTargetLeaseV1(lease, {
+      ownerInvocationId: invocationId, leaseId: lease.leaseId,
+    }).lease;
+  }
   return Object.freeze({
     id: PROVIDER_ID,
     async invoke({ invocation, policyDecision, toolDescriptor, grantedCapabilityIds, targetId, action, postcondition }) {
@@ -88,22 +120,36 @@ export function createDeterministicWebProviderV1({ transport, readLease = () => 
       const invocationId = authorized.invocation.invocationId;
       const normalizedAction = normalizeDeterministicWebActionV1(action);
       const expected = normalizePostcondition(postcondition);
-      const current = await readLease(targetId);
-      // Expiry alone is not independent proof that the previous external effect
-      // did not happen. Recovery must explicitly clear an unresolved hold.
-      if (current) {
-        return Object.freeze({ status: 'TARGET_CONFLICT', lease: current });
-      }
-      const acquired = acquireBrowserTargetLeaseV1({ current, targetId, ownerInvocationId: invocationId, leaseId: leaseId(), now: now() });
-      if (acquired.status === 'CONFLICT') return Object.freeze({ status: 'TARGET_CONFLICT', lease: acquired.lease });
-      await writeLease(targetId, acquired.lease);
-      let dispatchStarted = false;
-      let terminal = false;
+      const binding = JSON.stringify({ targetId, action: normalizedAction, postcondition: expected });
+      // The lease and canonical EXECUTING state share ONE atomic durable write.
+      // A crashed dispatch remains fenced even when its lease timestamp expires.
+      const admitted = await atomic(draft => {
+        let entry = draft.effectsById[invocationId];
+        if (entry && entry.binding !== binding) throw new Error('web invocation binding changed');
+        const current = draft.leasesByTargetId[targetId];
+        if (entry && [ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(entry.state.phase)) {
+          entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.DECLARE_AMBIGUITY, 'restart-ambiguity', {
+            reasonCode: 'WEB_DISPATCH_INTERRUPTED', summary: 'Interrupted browser dispatch requires independent reconciliation.',
+          });
+        }
+        if (entry && ![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(entry.state.phase)) {
+          return {
+            status: entry.state.phase === ExactEffectPhase.COMMITTED ? 'ALREADY_COMMITTED'
+              : entry.state.phase === ExactEffectPhase.MANUAL_REVIEW ? 'MANUAL_REVIEW' : 'RECONCILE_REQUIRED',
+            effectState: entry.state,
+          };
+        }
+        if (current) return { status: 'TARGET_CONFLICT', lease: current };
+        const state = entry ? normalizeExactEffectStateV1(entry.state)
+          : createExactEffectStateV1(authorized.invocation, { createdAt: authorized.invocation.createdAt });
+        const acquired = acquireBrowserTargetLeaseV1({ current: null, targetId, ownerInvocationId: invocationId, leaseId: leaseId(), now: now() });
+        const executing = event(state, ExactEffectEventType.BEGIN_EXECUTION, 'begin');
+        draft.effectsById[invocationId] = { binding, targetId, state: executing };
+        draft.leasesByTargetId[targetId] = acquired.lease;
+        return { status: 'EXECUTING', lease: acquired.lease, effectState: executing };
+      });
+      if (admitted.status !== 'EXECUTING') return Object.freeze(admitted);
       try {
-        // Once an effectful dispatch begins, a rejection is not proof that no effect
-        // happened. Treat every failure from dispatch through verification as
-        // ambiguous and keep the target fenced until canonical reconciliation.
-        dispatchStarted = true;
         await transport.execute({ targetId, action: normalizedAction, invocationId });
         const raw = await transport.observe({ targetId, invocationId });
         const observation = normalizeObservationV1({
@@ -116,28 +162,91 @@ export function createDeterministicWebProviderV1({ transport, readLease = () => 
           artifactRefs: raw?.artifactRefs || [],
           observedAt: now(),
         });
+        await atomic(draft => {
+          const entry = draft.effectsById[invocationId];
+          entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_OBSERVATION, 'observe', { observation });
+        });
         const verification = verifyPostcondition({ invocationId, observation, expected, now: now() });
-        terminal = true;
-        return Object.freeze({ status: verification.status, observation, verification });
+        const effectState = await atomic(draft => {
+          const entry = draft.effectsById[invocationId];
+          let state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_VERIFICATION, 'verify', { verification });
+          if (state.phase === ExactEffectPhase.VERIFIED) {
+            state = event(state, ExactEffectEventType.COMMIT, 'commit', { commitId: `${invocationId}:commit` });
+          }
+          entry.state = state;
+          release(draft, targetId, invocationId);
+          return state;
+        });
+        return Object.freeze({ status: verification.status, observation, verification, effectState });
       } catch (error) {
-        if (dispatchStarted) {
-          return Object.freeze({
-            status: 'AMBIGUOUS',
-            reconcileRequired: true,
-            lease: acquired.lease,
-            error: String(error?.message || error),
-          });
-        }
-        throw error;
-      } finally {
-        // Unresolved ambiguity deliberately retains the live lease. A competing
-        // invocation must not mutate the same target until reconciliation reaches
-        // a terminal VERIFIED/SAFE_RETRY/MANUAL_REVIEW outcome.
-        if (terminal || !dispatchStarted) {
-          const released = releaseBrowserTargetLeaseV1(acquired.lease, { ownerInvocationId: invocationId, leaseId: acquired.lease.leaseId });
-          await writeLease(targetId, released.lease);
-        }
+        const effectState = await atomic(draft => {
+          const entry = draft.effectsById[invocationId];
+          let state = normalizeExactEffectStateV1(entry.state);
+          if ([ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) {
+            state = event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'dispatch-ambiguity', {
+              reasonCode: 'WEB_DISPATCH_UNCERTAIN', summary: 'Browser action might have occurred; independent reconciliation is required.',
+            });
+            entry.state = state;
+          }
+          return state;
+        });
+        return Object.freeze({ status: 'AMBIGUOUS', reconcileRequired: true, lease: admitted.lease, effectState, error: String(error?.message || error) });
       }
+    },
+    async reconcile({ invocationId, outcome, reasonCode = 'WEB_RECONCILED' }) {
+      const snapshot = await atomic(draft => {
+        const entry = draft.effectsById[invocationId];
+        if (!entry || entry.state.phase !== ExactEffectPhase.RECONCILE) throw new Error('web effect is not awaiting reconciliation');
+        return structuredClone(entry);
+      });
+      const normalizedOutcome = String(outcome || '').toUpperCase();
+      if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('reconciliation outcome is invalid');
+      let proof = null;
+      if (typeof reconcileVerify !== 'function') throw new Error('independent web reconciliation verifier is required');
+      proof = await reconcileVerify({ invocation: snapshot.state.invocation, executionId: snapshot.state.executionId, outcome: normalizedOutcome });
+      const observation = normalizeObservationV1(proof?.observation);
+      const verification = normalizeVerificationV1(proof?.verification);
+      const proofAt = Date.parse(now());
+      const observedAt = Date.parse(observation.observedAt);
+      const verifiedAt = Date.parse(verification.verifiedAt);
+      if (proof?.verifierId === PROVIDER_ID || !proof?.verifierId
+        || verification.verifierId !== proof.verifierId
+        || verification.verificationAuthorityId !== snapshot.state.invocation.policyDecisionId
+        || verification.effectId !== invocationId
+        || verification.executionId !== snapshot.state.executionId
+        || verification.attempt !== snapshot.state.attempt
+        || observation.invocationId !== invocationId || verification.invocationId !== invocationId
+        || verification.observationId !== observation.observationId
+        || observedAt < Math.max(Date.parse(snapshot.state.ambiguity.declaredAt), proofAt - 5 * 60_000)
+        || observedAt > proofAt + 60_000 || verifiedAt > proofAt + 60_000
+        || verifiedAt < observedAt) {
+        throw new Error('independent web reconciliation proof is invalid');
+      }
+      if (normalizedOutcome === ReconciliationOutcome.SAFE_RETRY
+        && (observation.data?.committed !== false || verification.status !== VerificationStatus.FAILED
+          || verification.reasonCode !== 'NO_COMMITTED_EFFECT')) throw new Error('SAFE_RETRY requires proof of no committed effect');
+      if (normalizedOutcome === ReconciliationOutcome.VERIFIED && verification.status !== VerificationStatus.VERIFIED) {
+        throw new Error('VERIFIED requires independent verified evidence');
+      }
+      // Even manual settlement cannot free a browser target while the
+      // original dispatch might still be running in another provider.
+      if (normalizedOutcome === ReconciliationOutcome.MANUAL_REVIEW && observation.data?.quiescent !== true) {
+        throw new Error('MANUAL_REVIEW requires independent proof that the target is quiescent');
+      }
+      proof = { observation, verification };
+      return atomic(draft => {
+        const entry = draft.effectsById[invocationId];
+        const state = normalizeExactEffectStateV1(entry?.state);
+        if (state.phase !== ExactEffectPhase.RECONCILE || state.executionId !== snapshot.state.executionId) throw new Error('web effect changed during reconciliation');
+        let next = event(state, ExactEffectEventType.RESOLVE_RECONCILIATION, 'reconcile', {
+          outcome: normalizedOutcome, reasonCode,
+          observation: proof?.observation, verification: proof?.verification,
+        });
+        if (next.phase === ExactEffectPhase.VERIFIED) next = event(next, ExactEffectEventType.COMMIT, 'reconcile-commit', { commitId: `${invocationId}:commit` });
+        entry.state = next;
+        release(draft, entry.targetId, invocationId);
+        return next;
+      });
     },
   });
 }

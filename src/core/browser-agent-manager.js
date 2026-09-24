@@ -1378,14 +1378,22 @@ export class BrowserAgentManager {
   async nativeClick(tabId, frameId, snapshotId, ref) {
     if (frameId !== 0) return false;
     if (!this.chrome.debugger?.attach || !this.chrome.debugger?.sendCommand) return false;
-    const proof = await this.requireScripting().executeScript({ target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref] });
-    const point = proof?.[0]?.result;
-    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+    const prove = async () => (await this.requireScripting().executeScript({
+      target: { tabId, frameIds: [0] }, func: proveBrowserNativeClick, args: [snapshotId, ref],
+    }))?.[0]?.result;
+    const beforeAttach = await prove();
+    if (!beforeAttach || !Number.isFinite(beforeAttach.x) || !Number.isFinite(beforeAttach.y)) return false;
     const target = { tabId };
     let attached = false;
     try {
       await this.chrome.debugger.attach(target, '1.3');
       attached = true;
+      // Debugger attach may resize the viewport. The original coordinates may
+      // now hit a different control, so bind the click to the same snapshot ref
+      // again after attach and use its newly measured position.
+      const point = await prove();
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)
+        || point.x < 0 || point.y < 0 || (beforeAttach.url && point.url !== beforeAttach.url)) return false;
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', buttons: 1, clickCount: 1 });
       await this.chrome.debugger.sendCommand(target, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', buttons: 0, clickCount: 1 });
       return true;
