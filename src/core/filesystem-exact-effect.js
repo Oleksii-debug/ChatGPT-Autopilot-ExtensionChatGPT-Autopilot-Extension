@@ -75,7 +75,7 @@ function observationFor(invocationId, result, observedAt) {
 
 /**
  * Filesystem-specific transport binding over the one canonical UniversalExactEffectV1
- * reducer and the caller-supplied canonical durable store.  This module intentionally
+ * reducer and the caller-supplied canonical durable store. This module intentionally
  * owns no scheduler, persistence implementation, retry ledger, recovery engine, or
  * policy authority; it only binds the effectful filesystem tool to those authorities.
  */
@@ -117,6 +117,19 @@ export class FilesystemExactEffectExecutorV1 {
     const stored = await this.store.load(invocationId);
     if (stored) return normalizeExactEffectStateV1(stored);
     return this.#save(createExactEffectStateV1(invocation, { createdAt: invocation.createdAt }));
+  }
+
+  async #commitVerified(state) {
+    if (state.phase !== ExactEffectPhase.VERIFIED) throw new Error('Only a verified filesystem effect may be committed');
+    const committed = reduceExactEffectV1(state, {
+      schemaVersion: 1,
+      eventId: eventId(state.effectId, `commit-${state.attempt}`),
+      type: ExactEffectEventType.COMMIT,
+      effectId: state.effectId,
+      at: at(this.now),
+      commitId: `${state.effectId}:commit`,
+    });
+    return this.#save(committed.state);
   }
 
   async #obtainReconciliationProof(state, outcome, requestedAt) {
@@ -200,12 +213,18 @@ export class FilesystemExactEffectExecutorV1 {
       throw new Error('FilesystemExactEffectExecutorV1 accepts only effectful filesystem write invocations');
     }
 
-    // Policy/capability admission is side-effect-free and happens before PREPARED/EXECUTING.
+    // Policy/capability admission is side-effect-free and happens before a fresh
+    // PREPARED/EXECUTING transition. A VERIFIED durable state may only need the
+    // non-I/O COMMIT bookkeeping step after a crash; no provider dispatch occurs.
     const authorized = this.provider.authorize({ invocation, policyDecision });
     invocation = authorized.invocation;
     policyDecision = authorized.policyDecision;
 
     let state = await this.#load(invocation);
+    if (state.phase === ExactEffectPhase.VERIFIED) {
+      state = await this.#commitVerified(state);
+      return Object.freeze({ providerResult: null, effectState: state, resumedCommit: true });
+    }
     if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(state.phase)) {
       const error = new Error(state.phase === ExactEffectPhase.RECONCILE
         ? 'Filesystem effect requires reconciliation before retry'
@@ -261,16 +280,8 @@ export class FilesystemExactEffectExecutorV1 {
         throw error;
       }
 
-      const committed = reduceExactEffectV1(state, {
-        schemaVersion: 1,
-        eventId: eventId(state.effectId, `commit-${state.attempt}`),
-        type: ExactEffectEventType.COMMIT,
-        effectId: state.effectId,
-        at: at(this.now),
-        commitId: `${state.effectId}:commit`,
-      });
-      state = await this.#save(committed.state);
-      return Object.freeze({ providerResult, effectState: state });
+      state = await this.#commitVerified(state);
+      return Object.freeze({ providerResult, effectState: state, resumedCommit: false });
     } catch (error) {
       if (state.phase !== ExactEffectPhase.EXECUTING && state.phase !== ExactEffectPhase.OBSERVED) throw error;
       const ambiguous = reduceExactEffectV1(state, {
@@ -295,12 +306,22 @@ export class FilesystemExactEffectExecutorV1 {
     exactKeys(request, RECONCILE_REQUEST_KEYS, 'Filesystem reconciliation request');
     const { invocationId, outcome, reasonCode, summary = '' } = request;
     const id = requireId(invocationId, 'invocationId');
+    const normalizedOutcome = String(outcome || '').trim().toUpperCase();
+    if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('Reconciliation outcome is invalid');
     const stored = await this.store.load(id);
     if (!stored) throw new Error('Exact-effect state was not found');
     let state = normalizeExactEffectStateV1(stored);
+
+    // A crash may occur after durable reconciliation verification but before the
+    // deterministic COMMIT save. Resuming that commit is safe because it performs
+    // no filesystem I/O and its canonical event/commit ids are deterministic.
+    if (state.phase === ExactEffectPhase.VERIFIED
+      && state.reconciliation.outcome === ReconciliationOutcome.VERIFIED
+      && normalizedOutcome === ReconciliationOutcome.VERIFIED) {
+      return this.#commitVerified(state);
+    }
     if (state.phase !== ExactEffectPhase.RECONCILE) throw new Error('Filesystem effect is not awaiting reconciliation');
-    const normalizedOutcome = String(outcome || '').trim().toUpperCase();
-    if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('Reconciliation outcome is invalid');
+
     const reconciliationAt = this.now();
     const evidence = normalizedOutcome === ReconciliationOutcome.MANUAL_REVIEW
       ? { observation: undefined, verification: undefined }
@@ -319,6 +340,7 @@ export class FilesystemExactEffectExecutorV1 {
       summary,
     });
     state = await this.#save(resolved.state);
+    if (state.phase === ExactEffectPhase.VERIFIED) state = await this.#commitVerified(state);
     return state;
   }
 }
