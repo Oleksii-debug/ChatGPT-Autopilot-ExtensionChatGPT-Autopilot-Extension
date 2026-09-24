@@ -83,6 +83,10 @@ test('credential-bearing request boundary independently enforces repository allo
     '/repos/Oleksii-debug/example%2Fother',
     '/repos/Oleksii-debug\\example/contents/a.txt',
     '/repos/Oleksii-debug/example#other',
+    '/repos/Oleksii-debug/project/../other/private',
+    '/repos/Oleksii-debug/project/%2e%2e/other/private',
+    '/repos/Oleksii-debug/project/%2E%2E/other/private',
+    '/repos/Oleksii-debug/project/a/../../other/private',
   ]) {
     await assert.rejects(
       () => client.request('GET', pathname),
