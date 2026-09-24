@@ -8,6 +8,8 @@ export const ORCHESTRATION_PROFILE_VERSION = 1;
 function clean(value) { return typeof value === 'string' ? value.trim() : ''; }
 function seconds(ms) { return Math.round(Number(ms || 0) / 1000); }
 function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid ${label}`); return value; }
+function plainObject(value, label) { const source = object(value, label); const prototype = Object.getPrototypeOf(source); if (prototype !== Object.prototype && prototype !== null) throw new Error(`Invalid ${label}`); return source; }
+function requiredOwn(value, key, label) { if (!Object.hasOwn(value, key)) throw new Error(`Invalid ${label}`); return value[key]; }
 function exactKeys(value, allowed, label) {
   const extras = Object.keys(value).filter((key) => !allowed.includes(key));
   if (extras.length) throw new Error(`Unknown ${label} field: ${extras[0]}`);
@@ -59,12 +61,25 @@ function portableHierarchyGraph(raw) {
 }
 
 function portableSubagentPolicy(raw) {
-  const source = object(raw, 'subagent_policy');
+  const source = plainObject(raw, 'subagent_policy');
   exactKeys(source, ['allow_agent_created_children','max_depth','max_children_per_agent'], 'subagent_policy');
   return normalizeSubagentStructurePolicyV1({
-    allowAgentCreatedChildren: strictBoolean(source.allow_agent_created_children, 'subagent_policy.allow_agent_created_children'),
-    maxDepth: strictInteger(source.max_depth, 'subagent_policy.max_depth', 0, 64),
-    maxChildrenPerAgent: strictInteger(source.max_children_per_agent, 'subagent_policy.max_children_per_agent', 0, 1000),
+    allowAgentCreatedChildren: strictBoolean(
+      requiredOwn(source, 'allow_agent_created_children', 'subagent_policy.allow_agent_created_children'),
+      'subagent_policy.allow_agent_created_children',
+    ),
+    maxDepth: strictInteger(
+      requiredOwn(source, 'max_depth', 'subagent_policy.max_depth'),
+      'subagent_policy.max_depth',
+      0,
+      64,
+    ),
+    maxChildrenPerAgent: strictInteger(
+      requiredOwn(source, 'max_children_per_agent', 'subagent_policy.max_children_per_agent'),
+      'subagent_policy.max_children_per_agent',
+      0,
+      1000,
+    ),
   });
 }
 
