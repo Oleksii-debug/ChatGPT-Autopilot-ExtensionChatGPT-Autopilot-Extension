@@ -31,6 +31,8 @@ test('extension client talks over real localhost HTTP to gateway which routes Ol
     assert.equal(typeof health.compatibleApiKeyConfigured, 'boolean');
     assert.match(health.compatibleBaseUrl, /^http:\/\/127\.0\.0\.1:/);
     assert.equal(health.compatibleTransport, 'http');
+    assert.deepEqual(health.compatibleEndpoints.map(item => item.endpointId), ['default']);
+    assert.equal(JSON.stringify(health).includes('e2e-secret'), false);
     assert.deepEqual((await client.listModels({ gatewayUrl, timeoutSeconds: 30, provider: 'ollama' })).models, ['local-qwen']);
     assert.deepEqual((await client.listModels({ gatewayUrl, timeoutSeconds: 30, provider: 'openai' })).models, ['remote-strong', 'remote-weak']);
     assert.equal((await client.complete({ gatewayUrl, timeoutSeconds: 30, provider: 'ollama', model: 'local-qwen', prompt: 'x' })).text, 'local-answer');

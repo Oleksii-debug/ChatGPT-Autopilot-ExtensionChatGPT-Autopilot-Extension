@@ -685,6 +685,7 @@ export class AiAutonomyManager {
         routed = await this.routePrompt({
           prompt,
           systemPrompt: 'Return only the JSON decision requested by the user prompt. Be conservative with state-changing actions.',
+          taskRole: 'critic',
         });
       } catch (error) {
         await this.repo.update(draft => {

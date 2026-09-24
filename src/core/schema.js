@@ -158,6 +158,13 @@ function validateOperation(operation, session) {
     throw new Error(`Invalid session ${session.id} operation generation`);
   }
   if (operation.promptText !== undefined) requireString(operation.promptText, `session ${session.id} operation promptText`);
+  if (operation.calendarOccurrence !== undefined) {
+    requireRecord(operation.calendarOccurrence, `session ${session.id} operation calendarOccurrence`);
+    requireString(operation.calendarOccurrence.id, `session ${session.id} operation calendarOccurrence id`);
+    requireString(operation.calendarOccurrence.revision, `session ${session.id} operation calendarOccurrence revision`);
+    requireNonNegativeNumber(operation.calendarOccurrence.scheduledAt, `session ${session.id} operation calendarOccurrence scheduledAt`);
+    if (operation.calendarOccurrence.catchUp !== undefined) requireBoolean(operation.calendarOccurrence.catchUp, `session ${session.id} operation calendarOccurrence catchUp`);
+  }
   if (operation.launchUrl !== undefined) {
     requireString(operation.launchUrl, `session ${session.id} operation launchUrl`);
     if (operation.launchUrl && normalizeChatUrl(operation.launchUrl) !== operation.launchUrl) {
@@ -257,6 +264,8 @@ export function validateState(state) {
     requireString(normalizedAiRouter.mode, 'profile aiRouter mode');
     requireRecord(normalizedAiRouter.primary, 'profile aiRouter primary');
     requireRecord(normalizedAiRouter.strong, 'profile aiRouter strong');
+    if (!Array.isArray(normalizedAiRouter.routes)) throw new Error('Invalid profile aiRouter routes');
+    requireRecord(normalizedAiRouter.routePolicy, 'profile aiRouter routePolicy');
   }
   if (state.profile.aiRouterRuntime !== undefined) {
     requireRecord(state.profile.aiRouterRuntime, 'profile aiRouterRuntime');
@@ -269,6 +278,9 @@ export function validateState(state) {
     requireString(runtime.lastRoute, 'profile aiRouterRuntime lastRoute');
     requireString(runtime.lastStrongResult, 'profile aiRouterRuntime lastStrongResult');
     if (!Array.isArray(runtime.strongHistoryAt)) throw new Error('Invalid profile aiRouterRuntime strongHistoryAt');
+    requireRecord(runtime.routeStates, 'profile aiRouterRuntime routeStates');
+    requireString(runtime.lastRouteId, 'profile aiRouterRuntime lastRouteId');
+    if (!Array.isArray(runtime.lastFailoverChain)) throw new Error('Invalid profile aiRouterRuntime lastFailoverChain');
   }
   if (state.profile.aiManager !== undefined) {
     requireRecord(state.profile.aiManager, 'profile aiManager');

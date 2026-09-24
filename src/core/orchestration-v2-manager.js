@@ -7,7 +7,7 @@ import {
 } from './orchestration-v2-storage.js';
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
-import { OrchestrationHierarchyEventType } from './orchestration-hierarchy.js';
+import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 
@@ -24,6 +24,15 @@ function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
 function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
 function alarmName(id) { return `${ORCHESTRATION_V2_ALARM_PREFIX}${id}`; }
 function isUnresolvedOperation(session) { return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase)); }
+function purgeManagedSessionState(state, sessionId) {
+  delete state.sessionsById[sessionId];
+  state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
+  if (state.logs && typeof state.logs === 'object') delete state.logs[sessionId];
+  for (const [hintKey, hint] of Object.entries(state.tabHintsByTaskId || {})) {
+    if (hint?.sessionId === sessionId) delete state.tabHintsByTaskId[hintKey];
+  }
+}
+
 function hierarchyGraphId(runtime) {
   return text(runtime?.hierarchy?.graph?.graphId);
 }
@@ -37,7 +46,7 @@ async function setHierarchyRootScopes(controller, runtime, eventType, eventPrefi
     const nodeId = graph.rootIds[index];
     results.push(await controller.dispatchHierarchyEvent({
       type: eventType,
-      eventId: `owner-${eventPrefix}:${orchestraId}:${state.controlEpoch}:${eventBase + index + 1}:${nodeId}`,
+      eventId: compactOrchestrationEventId(`owner-${eventPrefix}`, orchestraId, graph.graphId, state.controlEpoch, eventBase + index + 1, nodeId),
       controlEpoch: state.controlEpoch,
       nodeId,
     }, { nowMs }));
@@ -401,8 +410,7 @@ export class OrchestrationV2Manager {
           for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
             if (!isManagedSession(session, current.projectId, currentGraphId)) continue;
             if (isUnresolvedOperation(session)) throw new Error('Unresolved Send prevents project identity change.');
-            delete state.sessionsById[sessionId];
-            state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
+            purgeManagedSessionState(state, sessionId);
           }
           return state;
         });
@@ -451,8 +459,7 @@ export class OrchestrationV2Manager {
     await this.coreRepository.update(state => {
       for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
         if (!isManagedSession(session, config.projectId, graphId)) continue;
-        delete state.sessionsById[sessionId];
-        state.sessionOrder = (state.sessionOrder || []).filter(value => value !== sessionId);
+        purgeManagedSessionState(state, sessionId);
       }
       return state;
     });

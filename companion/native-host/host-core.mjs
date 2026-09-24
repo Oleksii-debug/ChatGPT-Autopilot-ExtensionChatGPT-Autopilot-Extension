@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
+import { normalizeWindowsProviderConfig } from './windows-provider.mjs';
 
 export const HOST_NAME = 'org.chatgpt_autopilot.companion';
 export const PROTOCOL_VERSION = 1;
@@ -15,6 +16,10 @@ export const RequestType = Object.freeze({
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
   CREDENTIALS_LIST: 'credentials.list',
   CREDENTIALS_RESOLVE: 'credentials.resolve',
+  MCP_REQUEST: 'mcp.request',
+  MCP_CLOSE: 'mcp.close',
+  WINDOWS_EXEC_PINNED: 'windows.execPinned',
+  WINDOWS_UIA_QUERY: 'windows.uia.query',
 });
 
 const REQUEST_TYPES = new Set(Object.values(RequestType));
@@ -71,12 +76,13 @@ function normalizeRoot(raw, index) {
 
 export function normalizeNativeCompanionConfig(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companionError('CONFIG_INVALID', 'Native Companion config must be an object');
-  for (const key of Object.keys(raw)) if (!['schemaVersion', 'allowedOrigin', 'roots'].includes(key)) throw companionError('CONFIG_INVALID', `Native Companion config contains unknown field: ${key}`);
+  for (const key of Object.keys(raw)) if (!['schemaVersion', 'allowedOrigin', 'roots', 'windowsProvider'].includes(key)) throw companionError('CONFIG_INVALID', `Native Companion config contains unknown field: ${key}`);
   if (Number(raw.schemaVersion) !== 1) throw companionError('CONFIG_INVALID', 'Native Companion config schemaVersion must be 1');
   if (!Array.isArray(raw.roots) || raw.roots.length > 64) throw companionError('CONFIG_INVALID', 'roots must be a bounded array');
   const roots = raw.roots.map(normalizeRoot);
   if (new Set(roots.map(item => item.rootId)).size !== roots.length) throw companionError('CONFIG_INVALID', 'rootId values must be unique');
-  return Object.freeze({ schemaVersion: 1, allowedOrigin: normalizeAllowedOrigin(raw.allowedOrigin), roots: Object.freeze(roots) });
+  const windowsProvider = raw.windowsProvider == null ? null : normalizeWindowsProviderConfig(raw.windowsProvider);
+  return Object.freeze({ schemaVersion: 1, allowedOrigin: normalizeAllowedOrigin(raw.allowedOrigin), roots: Object.freeze(roots), windowsProvider });
 }
 
 function response(request, result) {
@@ -152,7 +158,7 @@ async function readScopedText(payload, config, fsApi) {
   };
 }
 
-export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now(), credentialBroker = null } = {}) {
+export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, now = () => Date.now(), credentialBroker = null, mcpBridge = null, windowsProvider = null } = {}) {
   let request;
   try {
     const normalizedConfig = normalizeNativeCompanionConfig(config);
@@ -176,9 +182,13 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
           { capabilityId: 'credentials.list', readOnly: true, scoped: true },
           { capabilityId: 'credentials.resolve', readOnly: false, scoped: true, sensitive: true },
+          { capabilityId: 'mcp.localStdio', readOnly: false, scoped: true },
+          ...(windowsProvider ? windowsProvider.capabilities() : []),
         ],
         roots: normalizedConfig.roots.map(item => ({ rootId: item.rootId })),
         credentialBrokerAvailable: Boolean(credentialBroker),
+        mcpBridgeAvailable: Boolean(mcpBridge),
+        windowsProviderAvailable: Boolean(windowsProvider),
       });
     }
     if (request.type === RequestType.FILESYSTEM_READ_TEXT) {
@@ -194,6 +204,22 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
         credentialId: request.payload.credentialId,
         targetOrigin: request.payload.targetOrigin,
       }));
+    }
+    if (request.type === RequestType.MCP_REQUEST) {
+      if (!mcpBridge) throw companionError('MCP_BRIDGE_UNAVAILABLE', 'MCP local-stdio bridge is unavailable');
+      return response(request, await mcpBridge.request(request.payload));
+    }
+    if (request.type === RequestType.MCP_CLOSE) {
+      if (!mcpBridge) throw companionError('MCP_BRIDGE_UNAVAILABLE', 'MCP local-stdio bridge is unavailable');
+      return response(request, await mcpBridge.close(request.payload));
+    }
+    if (request.type === RequestType.WINDOWS_EXEC_PINNED) {
+      if (!windowsProvider) throw companionError('WINDOWS_PROVIDER_UNAVAILABLE', 'Windows provider is not configured');
+      return response(request, await windowsProvider.execPinned(request.payload));
+    }
+    if (request.type === RequestType.WINDOWS_UIA_QUERY) {
+      if (!windowsProvider) throw companionError('WINDOWS_PROVIDER_UNAVAILABLE', 'Windows provider is not configured');
+      return response(request, await windowsProvider.queryUia(request.payload));
     }
     throw companionError('UNSUPPORTED_REQUEST', 'Unsupported Native Companion request');
   } catch (error) {

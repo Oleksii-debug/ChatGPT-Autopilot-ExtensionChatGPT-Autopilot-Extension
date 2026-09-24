@@ -13,6 +13,7 @@ import {
   createOrchestrationHierarchyRuntime,
   reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
+  validateOrchestrationHierarchyRuntimeV1,
 } from '../src/core/orchestration-hierarchy.js';
 
 const START = Date.parse('2026-09-22T20:30:00Z');
@@ -64,6 +65,95 @@ test('OWNER-ACCEPTANCE: manager and worker counts are configurable, not a fixed 
       }
     }
   }
+});
+
+test('Director fans out managers once and reconciles once after a partially completed barrier survives restart', () => {
+  const graph = template(3, 1);
+  let runtime = createOrchestrationHierarchyRuntime(graph, START);
+  let clock = START;
+  let serial = 0;
+  const dispatch = (type, fields) => {
+    const result = reduceOrchestrationHierarchyEvent(graph, runtime, event(type, `acceptance-${++serial}`, fields), ++clock);
+    runtime = result.runtime;
+    return result.actions;
+  };
+  const settle = action => {
+    const identity = { nodeId: action.nodeId, generation: action.generation, activationId: action.activationId };
+    dispatch(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, identity);
+    return dispatch(OrchestrationHierarchyEventType.NODE_TERMINAL, { ...identity, status: 'COMPLETED' });
+  };
+
+  dispatch(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, {
+    nodeId: 'director', generation: 1, activationId: 'director-g1', purpose: OrchestrationActivationPurpose.DELEGATE,
+  });
+  const managers = settle({ nodeId: 'director', generation: 1, activationId: 'director-g1' });
+  assert.deepEqual(managers.map(a => a.nodeId).sort(), graph.nodesById.director.childIds.slice().sort());
+  assert.equal(new Set(managers.map(a => a.activationId)).size, 3);
+
+  const finishManager = manager => {
+    const workers = settle(manager);
+    assert.equal(workers.length, 1);
+    const reconcile = settle(workers[0]);
+    assert.equal(reconcile.length, 1);
+    assert.equal(reconcile[0].nodeId, manager.nodeId);
+    assert.equal(reconcile[0].purpose, OrchestrationActivationPurpose.RECONCILE);
+    return settle(reconcile[0]);
+  };
+  assert.deepEqual(finishManager(managers[0]), []);
+  runtime = validateOrchestrationHierarchyRuntimeV1(graph, JSON.parse(JSON.stringify(runtime)));
+  assert.deepEqual(finishManager(managers[1]), []);
+  const directorReconcile = finishManager(managers[2]);
+  assert.equal(directorReconcile.length, 1);
+  assert.equal(directorReconcile[0].nodeId, 'director');
+  assert.equal(directorReconcile[0].purpose, OrchestrationActivationPurpose.RECONCILE);
+  assert.deepEqual(dispatch(OrchestrationHierarchyEventType.BARRIER_REEVALUATE, { nodeId: 'director', generation: 1 }), []);
+  assert.deepEqual(dispatch(OrchestrationHierarchyEventType.NODE_TERMINAL, {
+    nodeId: managers[2].nodeId, generation: managers[2].generation,
+    activationId: managers[2].activationId, status: 'COMPLETED',
+  }), []);
+});
+
+test('PAUSE retains in-flight worker evidence; STOP fences late terminal events after restart', () => {
+  const graph = template(1, 1);
+  const managerId = 'manager:d01';
+  let runtime = createOrchestrationHierarchyRuntime(graph, START);
+  let clock = START;
+  let serial = 0;
+  const dispatch = (type, fields) => {
+    const result = reduceOrchestrationHierarchyEvent(graph, runtime, event(type, `scope-${++serial}`, fields), ++clock);
+    runtime = result.runtime;
+    return result.actions;
+  };
+  dispatch(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, {
+    nodeId: managerId, generation: 1, activationId: 'manager-g1', purpose: OrchestrationActivationPurpose.DELEGATE,
+  });
+  const manager = { nodeId: managerId, generation: 1, activationId: 'manager-g1' };
+  dispatch(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, manager);
+  const [worker] = dispatch(OrchestrationHierarchyEventType.NODE_TERMINAL, { ...manager, status: 'COMPLETED' });
+  assert.ok(worker);
+  dispatch(OrchestrationHierarchyEventType.PAUSE_SCOPE, { nodeId: managerId });
+  assert.deepEqual(dispatch(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, {
+    nodeId: worker.nodeId, generation: worker.generation, activationId: worker.activationId,
+  }), []);
+  assert.deepEqual(dispatch(OrchestrationHierarchyEventType.NODE_TERMINAL, {
+    nodeId: worker.nodeId, generation: worker.generation, activationId: worker.activationId, status: 'COMPLETED',
+  }), []);
+  runtime = validateOrchestrationHierarchyRuntimeV1(graph, JSON.parse(JSON.stringify(runtime)));
+  const resumed = dispatch(OrchestrationHierarchyEventType.RESUME_SCOPE, { nodeId: managerId });
+  assert.deepEqual(resumed, []);
+  const resumedBarrier = dispatch(OrchestrationHierarchyEventType.BARRIER_REEVALUATE, { nodeId: managerId, generation: 1 });
+  assert.equal(resumedBarrier.filter(action => action.nodeId === worker.nodeId).length, 0);
+  assert.equal(resumedBarrier.filter(action => action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT).length, 1);
+
+  dispatch(OrchestrationHierarchyEventType.STOP_SCOPE, { nodeId: managerId });
+  runtime = validateOrchestrationHierarchyRuntimeV1(graph, JSON.parse(JSON.stringify(runtime)));
+  assert.deepEqual(dispatch(OrchestrationHierarchyEventType.NODE_TERMINAL, {
+    nodeId: resumedBarrier[0].nodeId, generation: resumedBarrier[0].generation,
+    activationId: resumedBarrier[0].activationId, status: 'COMPLETED',
+  }), []);
+  assert.deepEqual(dispatch(OrchestrationHierarchyEventType.BARRIER_REEVALUATE, { nodeId: managerId, generation: 1 }), []);
+  assert.equal(runtime.nodesById[managerId].scopeState, 'STOPPED');
+  assert.equal(runtime.nodesById[worker.nodeId].scopeState, 'STOPPED');
 });
 
 test('OWNER-ACCEPTANCE: configured safety bounds fail closed instead of silently truncating topology', () => {

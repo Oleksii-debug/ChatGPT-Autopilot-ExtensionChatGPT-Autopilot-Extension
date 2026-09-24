@@ -53,3 +53,15 @@ test('OpenAI API UI exposes real model selection and keeps the secret out of ext
   assert.doesNotMatch(html, /type="password"[^>]*openai/i);
   assert.doesNotMatch(optionsJs, /OPENAI_API_KEY/);
 });
+
+test('route-pool owner controls are native, keyboard accessible and persist every safety policy', () => {
+  for (const id of ['ai-router-route-list','ai-router-add-route-button','ai-router-auto-switch','ai-router-pinned-route','ai-router-free-only','ai-router-locality','ai-router-max-input-price','ai-router-max-output-price','ai-router-backoff-seconds','ai-router-circuit-failures','ai-router-circuit-seconds','ai-router-allow-routes','ai-router-deny-routes']) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  for (const role of ['planner','coder','fast-worker','verifier','critic','vision']) assert.match(html, new RegExp(`data-route-role="${role}"`));
+  for (const action of ['up','down','remove']) assert.match(html, new RegExp(`data-route-action="${action}"`));
+  assert.match(optionsJs, /orderedRouteIds:routes\.map/);
+  assert.match(optionsJs, /lastFailoverChain/);
+  assert.match(optionsJs, /routeStates/);
+  assert.doesNotMatch(html, /textarea[^>]+route-pool/i);
+});

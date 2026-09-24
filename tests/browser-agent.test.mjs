@@ -13,8 +13,10 @@ import {
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
   browserSnapshotSignature,
+  verifyBrowserAgentOutcomeEvidence,
 } from '../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
+import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
 
 function makeChrome({ permission = true } = {}) {
   const storage = {};
@@ -100,6 +102,107 @@ test('prompt-first config allows empty URL and keeps policy as optional ceilings
   assert.equal(value.startFromActiveTab, true);
   assert.equal(value.maxSteps, 20);
   assert.equal(value.allowCrossOriginNavigation, true);
+});
+
+test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00Z') });
+  await manager.create({ id:'job-1', goal:'Complete a mixed-plane task' });
+  await manager.update(store => {
+    store.byId['job-1'].runtime.plan = {
+      schemaVersion:1, planId:'plan-1', jobId:'job-1', objective:'Complete safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      nodes:[
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+      ],
+    };
+    return store;
+  });
+  const prepared = await manager.prepareSpecialistHandoff('job-1', {
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00Z', priority:5,
+  });
+  assert.equal(prepared.reused, false);
+  assert.equal((await manager.listSpecialistHandoffs('job-1')).handoffs.length, 1);
+  await manager.update(store => { store.byId['job-1'].runtime.runState = 'RUNNING'; return store; });
+  const pending = await manager.cycleOne('job-1');
+  assert.equal(pending.kind, 'SPECIALIST_PENDING', 'a durable handoff prevents duplicate external-dispatch requests');
+  const claimed = await manager.claimSpecialistHandoffs('job-1', { availableSlots:1, leaseSeconds:60 });
+  assert.equal(claimed.claimed.length, 1);
+  const completed = await manager.completeSpecialistHandoff('job-1', { agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:1'] });
+  assert.equal(completed.verificationRequired, claimed.claimed[0]);
+  await assert.rejects(() => manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', verificationAuthorityId:'policy:archive', evidence:'self verified' }), /independent/);
+  const verified = await manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:archive', evidence:'Fresh artifact hash and current-state observation match.' });
+  assert.equal(verified.plan.nodes.find(node => node.nodeId === 'archive').state, 'VERIFIED');
+  assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
+});
+
+test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handoff only through normal capacity', async () => {
+  const chrome = makeChrome();
+  let clock = Date.parse('2026-09-23T12:00:00Z');
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
+  await manager.create({ id:'job-retry', goal:'Recover an ambiguous specialist effect' });
+  await manager.update(store => {
+    store.byId['job-retry'].runtime.plan = {
+      schemaVersion:1, planId:'plan-retry', jobId:'job-retry', objective:'Recover safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      nodes:[
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web:retry'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files:retry'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+      ],
+    };
+    return store;
+  });
+  await manager.prepareSpecialistHandoff('job-retry', {
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:retry', deadlineAt:'2026-09-23T13:00:00Z',
+  });
+  const claimed = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  clock = Date.parse('2026-09-23T12:01:00Z');
+  const expired = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1 });
+  assert.deepEqual(expired.claimed, []);
+  assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
+  const reconciliation = { agentId, leaseId, verifierId:'provider-observer', verificationAuthorityId:'policy:retry', evidence:'A fresh provider query proves no archive exists.' };
+  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', { ...reconciliation, evidence:'' }), /evidence/);
+  const retriable = await manager.authorizeSpecialistSafeRetry('job-retry', reconciliation);
+  assert.equal(retriable.assignments[0].state, 'READY');
+  assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
+  const durable = await manager.get('job-retry');
+  assert.equal(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
+  assert.equal(durable.job.runtime.history.at(-1).evidence, reconciliation.evidence);
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock + 2_000 });
+  const beforeAdmission = await restarted.listSpecialistHandoffs('job-retry');
+  assert.equal(beforeAdmission.handoffs[0].state, 'READY', 'restart must preserve explicit SAFE_RETRY authorization');
+  const reclaimed = await restarted.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
+  assert.deepEqual(reclaimed.claimed, [agentId]);
+  assert.notEqual(reclaimed.assignments[0].leaseId, leaseId);
+  assert.equal(reclaimed.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId);
+});
+
+test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
+  const chrome = makeChrome();
+  const at = '2026-09-23T12:00:00Z';
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse(at) });
+  for (const jobId of ['job-1', 'job-2']) {
+    await manager.create({ id:jobId, goal:`Complete ${jobId}` });
+    await manager.update(store => {
+      store.byId[jobId].runtime.plan = {
+        schemaVersion:1, planId:`plan-${jobId}`, jobId, objective:'Complete safely', successCriteria:['Verified'], createdAt:at, updatedAt:at, revision:1,
+        nodes:[
+          { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:[`web:${jobId}`], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:at },
+          { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:[`files:${jobId}`], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:at },
+        ],
+      };
+      return store;
+    });
+    await manager.prepareSpecialistHandoff(jobId, { nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:`policy:${jobId}`, deadlineAt:'2026-09-23T13:00:00Z' });
+  }
+  const first = await manager.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at });
+  assert.deepEqual(first.claimed.map(item => item.jobId), ['job-1']);
+  assert.equal((await manager.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30Z') });
+  const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30Z' });
+  assert.equal(afterRestart.claimed.length, 0, 'a restart must retain the product-wide lease fence');
+  assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
 });
 
 test('per-Agent AI routing is optional, isolated, and explicit provider overrides require an explicit model', () => {
@@ -852,6 +955,147 @@ test('monetary budget is rejected when no token pricing exists', () => {
   assert.throws(() => config({ maxCostUsd: 5 }), /requires input and\/or output token pricing/);
 });
 
+test('owner outcome contract is normalized and completion evidence must bind every criterion to the fresh snapshot', () => {
+  const config = normalizeBrowserAgentConfig({ id: 'job-contract', goal: 'Verify selected course', acceptanceCriteria: ['The selected course is visible', 'The timetable has no conflict'] });
+  assert.deepEqual(config.acceptanceCriteria, ['The selected course is visible', 'The timetable has no conflict']);
+  assert.throws(() => normalizeBrowserAgentConfig({ id: 'job-contract', goal: 'x', acceptanceCriteria: ['same', 'Same'] }), /Duplicate Browser Agent acceptance criterion/);
+  const snapshot = { url: 'https://ais.example.edu/app', frames: [{ frameId: 0, url: 'https://ais.example.edu/app', text: 'Course A selected; no conflicts', elements: [] }] };
+  const signature = browserSnapshotSignature(snapshot);
+  const complete = { type: 'done', evidence: { snapshotSignature: signature, checks: [{ criterion: 1, detail: 'Course A is selected.' }, { criterion: 2, detail: 'No conflict marker is present.' }] } };
+  assert.equal(verifyBrowserAgentOutcomeEvidence(config, complete, snapshot).ok, true);
+  assert.match(verifyBrowserAgentOutcomeEvidence(config, { ...complete, evidence: { ...complete.evidence, checks: [complete.evidence.checks[0]] } }, snapshot).reason, /incomplete/);
+  assert.match(verifyBrowserAgentOutcomeEvidence(config, { ...complete, evidence: { ...complete.evidence, snapshotSignature: 'stale' } }, snapshot).reason, /current semantic page snapshot/);
+});
+
+test('Browser Agent does not complete an explicit outcome contract on model assertion alone', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'done', summary: 'I think it is complete' }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-contract', goal: 'Verify course', acceptanceCriteria: ['Course A is selected'] });
+  await manager.start('job-contract', { runInitial: false });
+  await manager.cycleOne('job-contract');
+  const live = await manager.get('job-contract');
+  assert.equal(live.job.runtime.runState, 'RUNNING');
+  assert.equal(live.job.runtime.completedAt, 0);
+  assert.match(live.job.runtime.lastError, /Outcome contract requires evidence/);
+});
+
+test('Browser Agent requires a separate read-only verifier before completing an explicit outcome contract', async () => {
+  const chrome = makeChrome();
+  let verifierCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        verifierCalls += 1;
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'Current semantic page shows page version 0.' }] }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+      }
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({ type: 'done', summary: 'Verified', evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'page version 0' }] } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+    },
+  });
+  await manager.create({ id: 'job-contract-independent', goal: 'Verify page', acceptanceCriteria: ['The current page is observed'] });
+  await manager.start('job-contract-independent', { runInitial: false });
+  const result = await manager.cycleOne('job-contract-independent');
+  const live = await manager.get('job-contract-independent');
+  assert.equal(result.kind, 'COMPLETED');
+  assert.equal(verifierCalls, 1);
+  assert.equal(live.job.runtime.verifiedOutcome.checks[0].detail, 'Current semantic page shows page version 0.');
+  assert.equal(live.job.runtime.modelCalls, 2);
+});
+
+test('Browser Agent persists a planner-proposed DAG without treating planning as a browser effect', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'plan', plan: {
+      schemaVersion: 1, planId: 'plan-1', jobId: 'job-plan', objective: 'Inspect course', successCriteria: ['Course is visible'], createdAt: at, updatedAt: at, revision: 1,
+      nodes: [{ nodeId: 'inspect', title: 'Inspect course', objective: 'Read the course page', dependsOn: [], conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER', acceptanceCriteria: ['Course text observed'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+    } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-plan', goal: 'Inspect course' });
+  await manager.start('job-plan', { runInitial: false });
+  const result = await manager.cycleOne('job-plan');
+  const live = await manager.get('job-plan');
+  assert.equal(result.kind, 'PLAN_UPDATED');
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'READY');
+  assert.equal(live.job.runtime.stepCount, 0);
+});
+
+test('Browser Agent independently verifies a READY Browser plan node and unblocks durable completion', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  let phase = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        return { text: JSON.stringify({ verified: true, checks: [{ criterion: 1, detail: 'page version 0 is visible in the current semantic snapshot.' }] }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+      }
+      if (phase++ === 0) return { text: JSON.stringify({ type: 'plan', plan: {
+        schemaVersion: 1, planId: 'plan-node', jobId: 'job-plan-node', objective: 'Inspect page', successCriteria: ['Page inspected'], createdAt: at, updatedAt: at, revision: 1,
+        nodes: [{ nodeId: 'inspect', title: 'Inspect page', objective: 'Read the page', dependsOn: [], conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER', acceptanceCriteria: ['page version 0 is visible'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+      } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+      const marker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(marker) + marker.length));
+      return { text: JSON.stringify({ type: 'verify_plan_node', nodeId: 'inspect', evidence: { snapshotSignature: browserSnapshotSignature(snapshot), checks: [{ criterion: 1, detail: 'page version 0' }] } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } };
+    },
+  });
+  await manager.create({ id: 'job-plan-node', goal: 'Inspect page' });
+  await manager.start('job-plan-node', { runInitial: false });
+  assert.equal((await manager.cycleOne('job-plan-node')).kind, 'PLAN_UPDATED');
+  const result = await manager.cycleOne('job-plan-node');
+  const live = await manager.get('job-plan-node');
+  assert.equal(result.kind, 'PLAN_NODE_VERIFIED');
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'VERIFIED');
+  assert.match(live.job.runtime.plan.nodes[0].evidence, /page version 0/);
+});
+
+test('Browser Agent atomically claims the referenced READY plan node before a physical action', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  let phase = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => phase++ === 0
+      ? ({ text: JSON.stringify({ type: 'plan', plan: {
+        schemaVersion: 1, planId: 'plan-claim', jobId: 'job-plan-claim', objective: 'Act once', successCriteria: ['Clicked'], createdAt: at, updatedAt: at, revision: 1,
+        nodes: [{ nodeId: 'act', title: 'Act', objective: 'Click Add course', dependsOn: [], conflictKeys: ['ais-page'], ownerId: 'browser-agent', executionPlane: 'BROWSER', acceptanceCriteria: ['Page changes'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+      } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } })
+      : ({ text: JSON.stringify({ type: 'click', frameId: 0, ref: 'r1', planNodeId: 'act' }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-plan-claim', goal: 'Act once', approvalMode: 'ALLOW_ALL' });
+  await manager.start('job-plan-claim', { runInitial: false });
+  await manager.cycleOne('job-plan-claim');
+  const result = await manager.cycleOne('job-plan-claim');
+  const live = await manager.get('job-plan-claim');
+  assert.equal(result.kind, 'ACTION');
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'RUNNING');
+  assert.equal(chrome._actionCalls[0].planNodeId, 'act');
+});
+
+test('Browser Agent exposes ready non-Browser work as a bounded specialist handoff instead of pretending to execute it', async () => {
+  const chrome = makeChrome();
+  const at = new Date().toISOString();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'plan', plan: {
+      schemaVersion: 1, planId: 'plan-specialist', jobId: 'job-specialist', objective: 'Inspect remote source', successCriteria: ['Source inspected'], createdAt: at, updatedAt: at, revision: 1,
+      nodes: [{ nodeId: 'remote-inspect', title: 'Inspect source', objective: 'Read remote source', dependsOn: [], conflictKeys: ['repo:main'], ownerId: 'specialist', executionPlane: 'REMOTE', acceptanceCriteria: ['Evidence returned'], budget: {}, state: 'PENDING', evidence: '', updatedAt: at }],
+    } }), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 } }),
+  });
+  await manager.create({ id: 'job-specialist', goal: 'Inspect remote source' });
+  await manager.start('job-specialist', { runInitial: false });
+  assert.equal((await manager.cycleOne('job-specialist')).kind, 'PLAN_UPDATED');
+  const result = await manager.cycleOne('job-specialist');
+  assert.equal(result.kind, 'SPECIALIST_REQUIRED');
+  assert.equal(result.node.executionPlane, 'REMOTE');
+});
+
 test('schedule policy validates paired active-window fields and ordered absolute bounds', () => {
   assert.throws(() => config({ activeWindowStart: '08:00' }), /requires both start and end times/);
   assert.throws(() => config({ scheduleStartAt: 20_000, scheduleEndAt: 10_000 }), /schedule end must be after start/);
@@ -1002,6 +1246,47 @@ test('last allowed model call may execute its returned action and pauses before 
   assert.equal(chrome._actionCalls.length, 1, 'the action from the permitted model call must execute');
   assert.equal(result.job.runtime.runState, 'PAUSED');
   assert.match(result.job.runtime.lastError, /maximum model-call budget reached/);
+});
+
+test('three-route model failover preserves Browser Agent job identity and executes the returned external effect exactly once', async () => {
+  const chrome = makeChrome();
+  const providerCalls = [];
+  const gateway = { async complete(request) {
+    providerCalls.push(structuredClone(request));
+    if (request.model === 'route-a') throw Object.assign(new Error('quota exhausted'), { status:429, code:'AI_PROVIDER_QUOTA_EXHAUSTED' });
+    if (request.model === 'route-b') throw Object.assign(new Error('provider unavailable'), { status:503, code:'AI_PROVIDER_UNAVAILABLE' });
+    return { text:JSON.stringify({ type:'click', frameId:0, ref:'r1' }), usage:{ inputTokens:10, outputTokens:5, totalTokens:15 } };
+  } };
+  let clock = 100_000;
+  const orchestrator = new AiOrchestrator({ gatewayClient:gateway, now:() => ++clock });
+  const settings = {
+    enabled:true,
+    mode:'primary',
+    routes:[
+      { routeId:'a', provider:'openai-compatible', endpointId:'team-a', model:'route-a', roles:['planner'], priority:30 },
+      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20 },
+      { routeId:'c', provider:'ollama', model:'route-c', roles:['planner'], priority:10 },
+    ],
+    routePolicy:{ autoSwitch:true, retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi:chrome,
+    now:() => ++clock,
+    routePrompt:payload => orchestrator.run(settings, payload.routerRuntime, payload.prompt, {
+      systemPrompt:payload.systemPrompt,
+      maxOutputTokens:payload.maxOutputTokens,
+      maxModelCallsForRequest:payload.maxModelCallsForRequest,
+      taskRole:payload.taskRole,
+    }),
+  });
+  await manager.create({ id:'job-failover-effect', goal:'Add a course safely', maxModelCalls:3, stepDelayMs:0 });
+  const result = await manager.start('job-failover-effect');
+  assert.deepEqual(providerCalls.map(call => call.model), ['route-a','route-b','route-c']);
+  assert.equal(new Set(providerCalls.map(call => call.prompt)).size, 1, 'the exact planner context must survive route failover');
+  assert.equal(chrome._actionCalls.length, 1, 'multiple model attempts must yield only one external browser effect');
+  assert.equal(result.job.config.id, 'job-failover-effect');
+  assert.equal(result.job.runtime.modelCalls, 3, 'all provider attempts consume one monotonic job budget');
+  assert.deepEqual(result.job.runtime.aiRouterRuntime.lastFailoverChain.map(item => item.routeId), ['a','b','c']);
 });
 
 test('USD budget caps output tokens before the provider call', async () => {
