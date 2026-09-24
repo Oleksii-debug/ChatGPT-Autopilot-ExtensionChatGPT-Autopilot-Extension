@@ -107,6 +107,56 @@ test('ambiguous VERIFIED resolution also requires matching fresh canonical verif
   assert.equal(verified.ownerId, '');
 });
 
+test('positive VERIFIED reconciliation rejects no-effect proof and coercive outcomes', () => {
+  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
+  const at = '2026-09-23T13:31:00Z';
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome:'VERIFIED',
+    verification:reconciliationVerification(),
+    at,
+  }), /POSTCONDITION_MATCH/);
+  let coerced = 0;
+  const outcome = { toString() { coerced += 1; return 'SAFE_RETRY'; } };
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome,
+    verification:reconciliationVerification(),
+    at,
+  }), /outcome must be text/);
+  assert.equal(coerced, 0);
+});
+
+test('execution ownership normalization is strict data-only without hidden or accessor authority', () => {
+  let reads = 0;
+  const accessor = structuredClone(base());
+  Object.defineProperty(accessor, 'state', {
+    enumerable:true,
+    get() { reads += 1; return 'AVAILABLE'; },
+  });
+  assert.throws(() => normalizeExecutionOwnershipV1(accessor), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const hidden = structuredClone(base());
+  Object.defineProperty(hidden, 'state', { value:'AVAILABLE', enumerable:false });
+  assert.throws(() => normalizeExecutionOwnershipV1(hidden), /enumerable data property/);
+
+  const symbol = structuredClone(base());
+  symbol[Symbol('authority')] = 'OWNED';
+  assert.throws(() => normalizeExecutionOwnershipV1(symbol), /symbol fields/);
+
+  const exotic = Object.create({ inheritedAuthority:'ALLOW' });
+  Object.assign(exotic, structuredClone(base()));
+  assert.throws(() => normalizeExecutionOwnershipV1(exotic), /plain object/);
+
+  assert.throws(() => normalizeExecutionOwnershipV1({ ...structuredClone(base()), schemaVersion:'1' }), /schemaVersion/);
+  assert.throws(() => normalizeExecutionOwnershipV1({ ...structuredClone(base()), revision:'1' }), /revision/);
+  assert.throws(() => normalizeExecutionOwnershipV1({ ...structuredClone(base()), effectId:7 }), /effectId/);
+
+  const nullPrototype = Object.assign(Object.create(null), structuredClone(base()));
+  assert.equal(normalizeExecutionOwnershipV1(nullPrototype).state, ExecutionOwnershipState.AVAILABLE);
+});
+
 test('manual review is terminal to automation and carries ambiguity reason', () => {
   const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3, reason:'write may have committed remotely' });
   const manual = resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'MANUAL_REVIEW', at:'2026-09-23T13:31:00Z' });
