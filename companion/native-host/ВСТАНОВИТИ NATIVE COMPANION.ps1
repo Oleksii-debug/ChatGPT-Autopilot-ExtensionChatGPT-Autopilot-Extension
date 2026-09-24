@@ -16,6 +16,8 @@ $copyNames = @(
   'host.mjs',
   'host-core.mjs',
   'credential-broker.mjs',
+  'mcp-stdio-bridge.mjs',
+  'windows-provider.mjs',
   'NativeHostLauncher.cs',
   'НАЛАШТУВАТИ ДОЗВОЛЕНУ ПАПКУ.ps1',
   'ДОДАТИ CREDENTIAL.ps1',
