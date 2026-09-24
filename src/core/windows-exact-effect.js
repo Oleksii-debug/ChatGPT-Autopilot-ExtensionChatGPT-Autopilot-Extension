@@ -26,7 +26,9 @@ function assertStore(store) {
 }
 
 function assertProvider(provider) {
-  if (!provider || typeof provider.invoke !== 'function') throw new Error('Windows provider is required');
+  if (!provider || typeof provider.invoke !== 'function' || typeof provider.authorize !== 'function') {
+    throw new Error('Windows provider with side-effect-free authorization preflight is required');
+  }
 }
 
 function observationFor(invocationId, result, observedAt) {
@@ -75,6 +77,14 @@ export class WindowsExactEffectExecutorV1 {
     if (invocation?.toolId !== WindowsToolId.EXEC_PINNED) {
       throw new Error('WindowsExactEffectExecutorV1 accepts only effectful process.execPinned invocations');
     }
+
+    // Admission must fail closed before PREPARED/EXECUTING is persisted.  The provider
+    // owns the canonical ToolDescriptor/capability/policy binding and this preflight
+    // performs no Native Companion dispatch.
+    const authorized = this.provider.authorize({ invocation, policyDecision });
+    invocation = authorized.invocation;
+    policyDecision = authorized.policyDecision;
+
     let state = await this.#load(invocation);
     if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(state.phase)) {
       const error = new Error(state.phase === ExactEffectPhase.RECONCILE
@@ -142,7 +152,6 @@ export class WindowsExactEffectExecutorV1 {
       state = await this.#save(committed.state);
       return Object.freeze({ providerResult, effectState: state });
     } catch (error) {
-      // If verification already transitioned the durable state, preserve that proof.
       if (state.phase !== ExactEffectPhase.EXECUTING && state.phase !== ExactEffectPhase.OBSERVED) throw error;
       const ambiguous = reduceExactEffectV1(state, {
         schemaVersion: 1,
