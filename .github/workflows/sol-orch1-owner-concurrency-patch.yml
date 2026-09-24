@@ -1,0 +1,158 @@
+name: sol-orch1 owner concurrency patch
+
+on:
+  push:
+    branches:
+      - sol-orch1/owner-concurrency-policy-001
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[sol-orch1-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol-orch1/owner-concurrency-policy-001
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply owner concurrency policy
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          core = Path('src/core/orchestration-v2.js')
+          text = core.read_text(encoding='utf-8')
+          replacements = [
+            ("  masterPromptVersion: 1,\n  defaultDesiredWorkers: 5,\n  absoluteMaxWorkers: 8,", "  masterPromptVersion: 1,\n  ownerFixedDesiredWorkers: false,\n  defaultDesiredWorkers: 5,\n  absoluteMaxWorkers: 8,"),
+            ("    masterPromptVersion: boundedInt(raw.masterPromptVersion, 1, 100000, 1),\n    defaultDesiredWorkers,", "    masterPromptVersion: boundedInt(raw.masterPromptVersion, 1, 100000, 1),\n    ownerFixedDesiredWorkers: raw.ownerFixedDesiredWorkers === true,\n    defaultDesiredWorkers,"),
+            ("  runtime.desiredActiveWorkers = boundedInt(runtime.desiredActiveWorkers, 0, config.absoluteMaxWorkers, config.defaultDesiredWorkers);", "  runtime.desiredActiveWorkers = config.ownerFixedDesiredWorkers\n    ? config.defaultDesiredWorkers\n    : boundedInt(runtime.desiredActiveWorkers, 0, config.absoluteMaxWorkers, config.defaultDesiredWorkers);"),
+            ("    if (action.type === ControlActionType.SET_DESIRED_CONCURRENCY) {\n      runtime.lastRequestedDesiredWorkers = action.value;\n      const next = Math.min(config.absoluteMaxWorkers, action.value);\n      result.concurrencyChanged ||= next !== runtime.desiredActiveWorkers;\n      runtime.desiredActiveWorkers = next;\n      continue;\n    }", "    if (action.type === ControlActionType.SET_DESIRED_CONCURRENCY) {\n      runtime.lastRequestedDesiredWorkers = action.value;\n      if (config.ownerFixedDesiredWorkers) {\n        const next = config.defaultDesiredWorkers;\n        result.concurrencyChanged ||= next !== runtime.desiredActiveWorkers;\n        runtime.desiredActiveWorkers = next;\n        result.notes.push(`Owner-fixed worker count retained at ${next}; coordinator requested ${action.value}.`);\n        continue;\n      }\n      const next = Math.min(config.absoluteMaxWorkers, action.value);\n      result.concurrencyChanged ||= next !== runtime.desiredActiveWorkers;\n      runtime.desiredActiveWorkers = next;\n      continue;\n    }"),
+            ("Coordinator may propose a large backlog; Autopilot independently enforces the owner's local concurrency and launch-rate limits. Never assume requested concurrency equals executable capacity.\nNever create tasks merely because a periodic watchdog tick occurred.", "Coordinator may propose a large backlog; Autopilot independently enforces the owner's local concurrency and launch-rate limits. Never assume requested concurrency equals executable capacity.\nWhen owner_fixed_desired_workers=true, SET_DESIRED_CONCURRENCY is advisory only: Autopilot records the requested value but retains the owner's fixed desired worker count.\nNever create tasks merely because a periodic watchdog tick occurred."),
+            ("      desired_active_workers: runtime.desiredActiveWorkers,\n      absolute_max_workers: config.absoluteMaxWorkers,", "      desired_active_workers: runtime.desiredActiveWorkers,\n      owner_fixed_desired_workers: config.ownerFixedDesiredWorkers,\n      absolute_max_workers: config.absoluteMaxWorkers,"),
+            ("      policy: { watchdog_interval_seconds: config.watchdogIntervalSeconds, max_coordinator_turns: config.maxCoordinatorTurns, max_active_workers: config.absoluteMaxWorkers, max_launches_per_window: config.maxLaunchesPerWindow, launch_window_seconds: config.launchWindowSeconds, minimum_worker_launch_interval_seconds: config.minimumWorkerLaunchIntervalMs / 1000 },", "      policy: { owner_fixed_desired_workers: config.ownerFixedDesiredWorkers, watchdog_interval_seconds: config.watchdogIntervalSeconds, max_coordinator_turns: config.maxCoordinatorTurns, max_active_workers: config.absoluteMaxWorkers, max_launches_per_window: config.maxLaunchesPerWindow, launch_window_seconds: config.launchWindowSeconds, minimum_worker_launch_interval_seconds: config.minimumWorkerLaunchIntervalMs / 1000 },"),
+            ("    desired_active_workers: runtime.desiredActiveWorkers,\n    agent_providers:", "    desired_active_workers: runtime.desiredActiveWorkers,\n    owner_fixed_desired_workers: config.ownerFixedDesiredWorkers,\n    agent_providers:"),
+            ("    hardMaxWorkers: config.absoluteMaxWorkers,\n    requestedActiveWorkers:", "    hardMaxWorkers: config.absoluteMaxWorkers,\n    ownerFixedDesiredWorkers: config.ownerFixedDesiredWorkers,\n    requestedActiveWorkers:")
+          ]
+          for old, new in replacements:
+            if old not in text:
+              raise SystemExit(f'core patch anchor missing: {old[:100]}')
+            text = text.replace(old, new, 1)
+          core.write_text(text, encoding='utf-8')
+
+          js = Path('src/ui/options.js')
+          text = js.read_text(encoding='utf-8')
+          replacements = [
+            ("    fallbackUniversalPromptEnabled: false,\n    defaultDesiredWorkers,", "    fallbackUniversalPromptEnabled: false,\n    ownerFixedDesiredWorkers: $('orchestration-v2-owner-fixed-workers').checked,\n    defaultDesiredWorkers,"),
+            ("  $('orchestration-v2-prompt-version').value = String(config.masterPromptVersion ?? 1);\n  $('orchestration-v2-desired-workers').value", "  $('orchestration-v2-prompt-version').value = String(config.masterPromptVersion ?? 1);\n  $('orchestration-v2-owner-fixed-workers').checked = config.ownerFixedDesiredWorkers === true;\n  $('orchestration-v2-desired-workers').value")
+          ]
+          for old, new in replacements:
+            if old not in text:
+              raise SystemExit(f'options.js patch anchor missing: {old[:100]}')
+            text = text.replace(old, new, 1)
+          js.write_text(text, encoding='utf-8')
+
+          html = Path('src/ui/options.html')
+          text = html.read_text(encoding='utf-8')
+          old = '        <legend>Локальні ліміти</legend>\n        <label for="orchestration-v2-desired-workers">Start workers</label>'
+          new = '        <legend>Локальні ліміти</legend>\n        <label><input id="orchestration-v2-owner-fixed-workers" type="checkbox" aria-describedby="orchestration-v2-owner-fixed-workers-help">Фіксувати кількість workers за значенням власника</label>\n        <p class="field-help" id="orchestration-v2-owner-fixed-workers-help">Коли увімкнено, координатор може запропонувати іншу кількість, але Autopilot лише фіксує запит і не змінює Start workers.</p>\n        <label for="orchestration-v2-desired-workers">Start workers</label>'
+          if old not in text:
+            raise SystemExit('options.html patch anchor missing')
+          html.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          Path('tests/orchestration-v2-owner-concurrency-policy.test.mjs').write_text(r'''import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import { readFile } from 'node:fs/promises';
+          import {
+            ControlActionType,
+            applyControlDecision,
+            createOrchestrationRuntime,
+            normalizeOrchestrationRuntime,
+            orchestrationSnapshot,
+            validateOrchestrationConfig,
+          } from '../src/core/orchestration-v2.js';
+
+          const NOW = Date.parse('2026-09-24T16:20:00Z');
+          const BASE = {
+            projectId: 'proj',
+            targetRepository: 'owner/repo',
+            controlRepository: 'owner/repo',
+            controlIssueNumber: 150,
+            defaultDesiredWorkers: 3,
+            absoluteMaxWorkers: 8,
+          };
+
+          function control(value, revision = 1) {
+            return {
+              schema_version: 2,
+              project_id: 'proj',
+              revision,
+              coordinator_generation: 1,
+              generated_at: new Date(NOW).toISOString(),
+              expires_at: new Date(NOW + 60_000).toISOString(),
+              mode: 'RUN',
+              actions: [{ type: ControlActionType.SET_DESIRED_CONCURRENCY, value }],
+            };
+          }
+
+          test('owner fixed concurrency defaults off for backward compatibility', () => {
+            const config = validateOrchestrationConfig(BASE);
+            assert.equal(config.ownerFixedDesiredWorkers, false);
+          });
+
+          test('owner fixed concurrency restores owner desired count during normalization', () => {
+            const config = { ...BASE, ownerFixedDesiredWorkers: true };
+            const runtime = createOrchestrationRuntime(config, NOW);
+            runtime.desiredActiveWorkers = 7;
+            const normalized = normalizeOrchestrationRuntime(runtime, config, NOW + 1);
+            assert.equal(normalized.desiredActiveWorkers, 3);
+            assert.equal(orchestrationSnapshot(normalized, config).ownerFixedDesiredWorkers, true);
+          });
+
+          test('owner fixed concurrency records coordinator request without changing effective desired workers', () => {
+            const config = { ...BASE, ownerFixedDesiredWorkers: true };
+            const runtime = createOrchestrationRuntime(config, NOW);
+            const { result } = applyControlDecision(runtime, control(7), config, NOW + 1, { consumeCoordinatorLease: false, source: 'test' });
+            assert.equal(runtime.lastRequestedDesiredWorkers, 7);
+            assert.equal(runtime.desiredActiveWorkers, 3);
+            assert.equal(result.concurrencyChanged, false);
+            assert.match(result.notes.join('\n'), /Owner-fixed worker count retained at 3/);
+          });
+
+          test('adaptive concurrency remains unchanged when owner fixed mode is off', () => {
+            const runtime = createOrchestrationRuntime(BASE, NOW);
+            const { result } = applyControlDecision(runtime, control(7), BASE, NOW + 1, { consumeCoordinatorLease: false, source: 'test' });
+            assert.equal(runtime.lastRequestedDesiredWorkers, 7);
+            assert.equal(runtime.desiredActiveWorkers, 7);
+            assert.equal(result.concurrencyChanged, true);
+          });
+
+          test('options UI persists and renders owner fixed worker policy', async () => {
+            const [html, js] = await Promise.all([
+              readFile(new URL('../src/ui/options.html', import.meta.url), 'utf8'),
+              readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8'),
+            ]);
+            assert.match(html, /id="orchestration-v2-owner-fixed-workers"/);
+            assert.match(js, /ownerFixedDesiredWorkers: \$\('orchestration-v2-owner-fixed-workers'\)\.checked/);
+            assert.match(js, /\$\('orchestration-v2-owner-fixed-workers'\)\.checked = config\.ownerFixedDesiredWorkers === true/);
+          });
+          ''', encoding='utf-8')
+          PY
+      - name: Verify targeted orchestration behavior
+        run: |
+          node --check src/core/orchestration-v2.js
+          node --check src/ui/options.js
+          node --test tests/orchestration-v2-owner-concurrency-policy.test.mjs tests/orchestration-v2.test.mjs tests/orchestration-v2-profile.test.mjs tests/ui-dom-contract.test.mjs
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "sol-orch1"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/core/orchestration-v2.js src/ui/options.js src/ui/options.html tests/orchestration-v2-owner-concurrency-policy.test.mjs
+          git commit -m "feat: add owner fixed worker concurrency policy [sol-orch1-patched]"
+          git push origin HEAD:sol-orch1/owner-concurrency-policy-001
