@@ -38,10 +38,15 @@ export class WindowsAgentProviderV1 {
 
   tools() { return TOOLS; }
 
-  async invoke({ invocation, policyDecision } = {}) {
+  authorize({ invocation, policyDecision } = {}) {
     const tool = TOOLS.find(item => item.toolId === invocation?.toolId);
     if (!tool) throw new Error('Windows tool is not registered');
-    const authorized = assertToolInvocationAuthorizedV1({ invocation, policyDecision, toolDescriptor: tool, grantedCapabilityIds: this.grantedCapabilityIds });
+    return assertToolInvocationAuthorizedV1({ invocation, policyDecision, toolDescriptor: tool, grantedCapabilityIds: this.grantedCapabilityIds });
+  }
+
+  async invoke({ invocation, policyDecision } = {}) {
+    const authorized = this.authorize({ invocation, policyDecision });
+    const tool = TOOLS.find(item => item.toolId === authorized.invocation.toolId);
     try {
       const result = tool.toolId === WindowsToolId.EXEC_PINNED
         ? await this.nativeClient.windowsExecPinned(authorized.invocation.arguments)
