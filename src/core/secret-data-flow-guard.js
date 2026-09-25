@@ -391,7 +391,7 @@ function normalizeRequest(value) {
   }
 
   const transforms = strictArray(
-    raw.transforms ?? [],
+    raw.transforms,
     'SecretDataFlowV1.transforms',
     { max: MAX_TRANSFORMS },
   ).map(normalizeTransform);
@@ -406,7 +406,7 @@ function normalizeRequest(value) {
   }
 
   const egresses = strictArray(
-    raw.egresses ?? [],
+    raw.egresses,
     'SecretDataFlowV1.egresses',
     { max: MAX_EGRESSES },
   ).map(normalizeEgress);
