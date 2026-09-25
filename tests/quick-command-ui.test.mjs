@@ -14,7 +14,7 @@ test('manifest routes the existing keyboard action to the quick command popup wi
 });
 
 test('quick command popup uses native keyboard-accessible controls with explicit labels and status', () => {
-  for (const id of ['source-kind', 'source-text', 'source-uri', 'operation', 'owner-instruction']) {
+  for (const id of ['source-kind', 'source-text', 'source-uri', 'operation']) {
     assert.match(html, new RegExp('<label for="' + id + '">', 'u'));
   }
   assert.match(html, /<select id="source-kind">/u);
@@ -22,6 +22,7 @@ test('quick command popup uses native keyboard-accessible controls with explicit
   assert.match(html, /<button id="capture-source" type="button">/u);
   assert.match(html, /<button id="run-command" type="button">/u);
   assert.match(html, /id="status" role="status" aria-live="polite"/u);
+  assert.doesNotMatch(html, /owner-instruction/u);
 });
 
 test('surface exposes only read-only SelectionAction operations', () => {

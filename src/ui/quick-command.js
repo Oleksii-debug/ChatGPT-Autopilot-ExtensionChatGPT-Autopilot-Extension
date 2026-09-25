@@ -9,7 +9,6 @@ const sourceKind = document.getElementById('source-kind');
 const sourceText = document.getElementById('source-text');
 const sourceUri = document.getElementById('source-uri');
 const operation = document.getElementById('operation');
-const ownerInstruction = document.getElementById('owner-instruction');
 const captureButton = document.getElementById('capture-source');
 const runButton = document.getElementById('run-command');
 const optionsButton = document.getElementById('open-options');
@@ -134,7 +133,7 @@ runButton.addEventListener('click', async () => {
       requestId: crypto.randomUUID(),
       source: rawSource,
       operation: operation.value,
-      ownerInstruction: ownerInstruction.value,
+      ownerInstruction: '',
       target: {},
       createdAt: capturedAt,
     });
