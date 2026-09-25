@@ -316,7 +316,7 @@ function normalizeTrustedBenchmarkEvaluationV1(input) {
     throw new Error('TrustedRecipeEvaluationV1.report status is invalid');
   }
 
-  const caseCount = integer(report.caseCount, 'TrustedRecipeEvaluationV1.report.caseCount', { min: 1, max: 100000 });
+  const caseCount = integer(report.caseCount, 'TrustedRecipeEvaluationV1.report.caseCount', { min: 1, max: 500 });
   const passedCaseCount = integer(
     report.passedCaseCount,
     'TrustedRecipeEvaluationV1.report.passedCaseCount',
@@ -330,6 +330,13 @@ function normalizeTrustedBenchmarkEvaluationV1(input) {
   if (passedCaseCount + failedCaseCount !== caseCount) {
     throw new Error('TrustedRecipeEvaluationV1.report case counts are inconsistent');
   }
+  if (report.status === RecipeQualificationStatus.PASS
+      && (failedCaseCount !== 0 || passedCaseCount !== caseCount)) {
+    throw new Error('TrustedRecipeEvaluationV1.report PASS status conflicts with case counts');
+  }
+  if (report.status === RecipeQualificationStatus.FAIL && failedCaseCount === 0) {
+    throw new Error('TrustedRecipeEvaluationV1.report FAIL status conflicts with case counts');
+  }
 
   const rawResults = strictArray(
     report.results,
@@ -338,6 +345,7 @@ function normalizeTrustedBenchmarkEvaluationV1(input) {
   );
   const caseIds = new Set();
   const evidence = new Set();
+  let observedPassedCaseCount = 0;
   for (let index = 0; index < rawResults.length; index += 1) {
     const result = strictRecord(
       rawResults[index],
@@ -350,12 +358,19 @@ function normalizeTrustedBenchmarkEvaluationV1(input) {
     if (typeof result.passed !== 'boolean') {
       throw new Error(`TrustedRecipeEvaluationV1.report.results[${index}].passed must be boolean`);
     }
+    if (result.passed) observedPassedCaseCount += 1;
     const ids = normalizeIdList(
       result.evidenceArtifactIds,
       `TrustedRecipeEvaluationV1.report.results[${index}].evidenceArtifactIds`,
       { max: MAX_IDS, min: 1 },
     );
     for (const evidenceArtifactId of ids) evidence.add(evidenceArtifactId);
+    if (evidence.size > MAX_IDS) {
+      throw new Error('TrustedRecipeEvaluationV1.report references too many distinct evidence artifacts');
+    }
+  }
+  if (observedPassedCaseCount !== passedCaseCount) {
+    throw new Error('TrustedRecipeEvaluationV1.report passedCaseCount does not match results');
   }
 
   return frozen({
