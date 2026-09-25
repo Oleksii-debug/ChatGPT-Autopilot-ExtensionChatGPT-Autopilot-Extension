@@ -144,6 +144,33 @@ test('Drive verifier rejects actor/provider identity and hostile mutation argume
   assert.equal(getterReads, 0);
 });
 
+test('Drive verifier rejects accessor-backed readback data without executing getters', async () => {
+  let getterReads = 0;
+  const hostileFile = {};
+  Object.defineProperty(hostileFile, 'id', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return 'file_1';
+    },
+  });
+  Object.defineProperty(hostileFile, 'name', { enumerable: true, value: 'new.txt' });
+  Object.defineProperty(hostileFile, 'parents', { enumerable: true, value: ['folder_2'] });
+  Object.defineProperty(hostileFile, 'trashed', { enumerable: true, value: false });
+  const verifier = new DriveFileUpdateVerifierV1({
+    workspaceClient: { getDriveFile: async () => hostileFile },
+  });
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: invocation(),
+      executionId: 'drive-update-effect-1:attempt:1',
+      observation: observation(),
+    }),
+    /enumerable data property/i,
+  );
+  assert.equal(getterReads, 0);
+});
+
 test('Drive verifier preserves exact Unicode/spaces in requested name', async () => {
   const exactName = '  Звіт — готово  ';
   const verifier = new DriveFileUpdateVerifierV1({
