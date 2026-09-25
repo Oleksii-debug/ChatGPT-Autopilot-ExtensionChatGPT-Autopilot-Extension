@@ -186,8 +186,11 @@ function snapshotDenseDataArray(value, label, max = MAX_ARRAY_ITEMS) {
   const snapshot = new Array(length);
   for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
-    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+    if (!descriptor) {
       throw new Error(`${label} must be a dense data array`);
+    }
+    if (!descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
     }
     snapshot[index] = descriptor.value;
   }
