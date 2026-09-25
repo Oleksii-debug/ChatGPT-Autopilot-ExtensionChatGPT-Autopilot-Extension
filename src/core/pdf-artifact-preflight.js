@@ -305,20 +305,70 @@ function keywordBoundary(bytes, start, length) {
   return beforeOk && afterOk;
 }
 
-function findEndstream(bytes, start) {
-  for (let cursor = start; cursor + 9 <= bytes.length; cursor += 1) {
-    if (!asciiAt(bytes, cursor, 'endstream') || !keywordBoundary(bytes, cursor, 9)) continue;
-    if (cursor > 0 && bytes[cursor - 1] !== 10 && bytes[cursor - 1] !== 13) continue;
-    return cursor;
+function skipWhitespaceAndComments(bytes, start) {
+  let cursor = start;
+  while (cursor < bytes.length) {
+    if (isPdfWhitespace(bytes[cursor])) {
+      cursor += 1;
+      continue;
+    }
+    if (bytes[cursor] === 37) {
+      while (cursor < bytes.length && bytes[cursor] !== 10 && bytes[cursor] !== 13) cursor += 1;
+      continue;
+    }
+    break;
   }
-  return -1;
+  return cursor;
+}
+
+function parseDirectLengthValue(bytes, afterName) {
+  let cursor = skipWhitespaceAndComments(bytes, afterName);
+  const start = cursor;
+  let value = 0;
+  while (cursor < bytes.length && bytes[cursor] >= 48 && bytes[cursor] <= 57) {
+    value = value * 10 + bytes[cursor] - 48;
+    if (!Number.isSafeInteger(value) || value > MAX_PDF_ARTIFACT_BYTES) {
+      return Object.freeze({ kind: 'UNSUPPORTED', value: null });
+    }
+    cursor += 1;
+  }
+  if (cursor === start || (cursor < bytes.length && !isDelimiter(bytes[cursor]))) {
+    return Object.freeze({ kind: 'UNSUPPORTED', value: null });
+  }
+
+  const next = skipWhitespaceAndComments(bytes, cursor);
+  if (next < bytes.length && bytes[next] >= 48 && bytes[next] <= 57) {
+    // /Length 12 0 R is an indirect object reference. Resolving it would require
+    // a qualified PDF object/xref parser, so this lightweight screen stops.
+    return Object.freeze({ kind: 'INDIRECT', value: null });
+  }
+  if (next < bytes.length
+      && bytes[next] !== 47
+      && !(bytes[next] === 62 && bytes[next + 1] === 62)) {
+    return Object.freeze({ kind: 'UNSUPPORTED', value: null });
+  }
+  return Object.freeze({ kind: 'DIRECT', value });
+}
+
+function unsupportedFeature(name, reason) {
+  return Object.freeze({ name, reason });
 }
 
 function scanPassiveStructuralNames(bytes) {
   const findings = new Map();
   const unsupported = new Map();
+  const dictionaries = [];
+  let lastClosedDictionary = null;
   let streamCount = 0;
   let cursor = 0;
+
+  const stopForUnsupportedStreamLength = (reason) => {
+    unsupported.set(
+      '~stream-length',
+      unsupportedFeature('stream:/Length', reason),
+    );
+    cursor = bytes.length;
+  };
 
   while (cursor < bytes.length) {
     const byte = bytes[cursor];
@@ -330,26 +380,51 @@ function scanPassiveStructuralNames(bytes) {
       while (cursor < bytes.length && bytes[cursor] !== 10 && bytes[cursor] !== 13) cursor += 1;
       continue;
     }
+    if (byte === 60 && bytes[cursor + 1] === 60) {
+      lastClosedDictionary = null;
+      dictionaries.push({ directLength: null, lengthKind: 'MISSING' });
+      cursor += 2;
+      continue;
+    }
+    if (byte === 62 && bytes[cursor + 1] === 62) {
+      if (!dictionaries.length) throw new Error('PDF contains an unmatched dictionary close');
+      lastClosedDictionary = dictionaries.pop();
+      cursor += 2;
+      continue;
+    }
     if (byte === 40) {
+      lastClosedDictionary = null;
       cursor = skipLiteralString(bytes, cursor);
       continue;
     }
-    if (byte === 60 && bytes[cursor + 1] !== 60) {
+    if (byte === 60) {
+      lastClosedDictionary = null;
       cursor = skipHexString(bytes, cursor);
       continue;
     }
     if (byte === 47) {
+      lastClosedDictionary = null;
       const parsed = readName(bytes, cursor);
       if (parsed.name && ACTIVE_NAMES.has(parsed.name)) {
         findings.set(parsed.name, ACTIVE_NAMES.get(parsed.name));
       }
       if (parsed.name && UNSUPPORTED_SAFETY_NAMES.has(parsed.name)) {
-        unsupported.set(parsed.name, UNSUPPORTED_SAFETY_NAMES.get(parsed.name));
+        unsupported.set(
+          parsed.name,
+          unsupportedFeature('/' + parsed.name, UNSUPPORTED_SAFETY_NAMES.get(parsed.name)),
+        );
+      }
+      if (parsed.name === 'Length' && dictionaries.length) {
+        const length = parseDirectLengthValue(bytes, parsed.next);
+        const current = dictionaries[dictionaries.length - 1];
+        current.lengthKind = length.kind;
+        current.directLength = length.value;
       }
       cursor = parsed.next;
       continue;
     }
     if (isDelimiter(byte)) {
+      lastClosedDictionary = null;
       cursor += 1;
       continue;
     }
@@ -358,23 +433,51 @@ function scanPassiveStructuralNames(bytes) {
     while (cursor < bytes.length && !isDelimiter(bytes[cursor])) cursor += 1;
     const tokenLength = cursor - tokenStart;
     if (tokenLength === 6 && asciiAt(bytes, tokenStart, 'stream')) {
+      const dictionary = lastClosedDictionary;
+      lastClosedDictionary = null;
+      if (!dictionary || dictionary.lengthKind !== 'DIRECT'
+          || !Number.isSafeInteger(dictionary.directLength)) {
+        stopForUnsupportedStreamLength(
+          dictionary?.lengthKind === 'INDIRECT'
+            ? 'INDIRECT_STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER'
+            : 'STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER',
+        );
+        break;
+      }
+
       if (cursor >= bytes.length) throw new Error('PDF stream keyword lacks end-of-line');
       if (bytes[cursor] === 13 && bytes[cursor + 1] === 10) cursor += 2;
       else if (bytes[cursor] === 10 || bytes[cursor] === 13) cursor += 1;
       else throw new Error('PDF stream keyword must be followed by end-of-line');
-      const endstream = findEndstream(bytes, cursor);
-      if (endstream < 0) throw new Error('PDF stream is not terminated by endstream');
+
+      const dataEnd = cursor + dictionary.directLength;
+      if (!Number.isSafeInteger(dataEnd) || dataEnd > bytes.length) {
+        throw new Error('PDF direct stream length exceeds material bounds');
+      }
+      cursor = dataEnd;
+
+      if (bytes[cursor] === 13 && bytes[cursor + 1] === 10) cursor += 2;
+      else if (bytes[cursor] === 10 || bytes[cursor] === 13) cursor += 1;
+      else throw new Error('PDF direct stream payload must be followed by end-of-line');
+      if (!asciiAt(bytes, cursor, 'endstream') || !keywordBoundary(bytes, cursor, 9)) {
+        throw new Error('PDF direct stream length does not resolve to endstream');
+      }
       streamCount += 1;
-      cursor = endstream + 9;
+      cursor += 9;
+      continue;
     }
+
+    lastClosedDictionary = null;
   }
+
+  if (dictionaries.length) throw new Error('PDF contains an unterminated dictionary');
 
   const activeContentFindings = [...findings.entries()]
     .sort((left, right) => left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0)
     .map(([name, risk]) => Object.freeze({ name: '/' + name, risk }));
   const unsupportedSafetyFeatures = [...unsupported.entries()]
     .sort((left, right) => left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0)
-    .map(([name, reason]) => Object.freeze({ name: '/' + name, reason }));
+    .map(([, item]) => item);
 
   return Object.freeze({
     streamCount,
