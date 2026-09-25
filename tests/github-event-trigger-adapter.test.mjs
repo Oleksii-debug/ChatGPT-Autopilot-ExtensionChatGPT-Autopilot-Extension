@@ -233,6 +233,71 @@ test('stale, pre-binding and noncanonical GitHub deliveries fail before schedule
   assert.equal(schedulerCalls, 0);
 });
 
+test('extended-year chronology uses time order instead of ISO string order', async () => {
+  const triggerAt = '9999-12-31T23:59:59.000Z';
+  const bindingAt = '+010000-01-01T00:00:00.000Z';
+  const receivedAt = '+010000-01-01T00:00:01.000Z';
+  const verifiedAt = '+010000-01-01T00:00:02.000Z';
+  const admittedAt = '+010000-01-01T00:00:03.000Z';
+
+  const out = await admitVerifiedGitHubDeliveryV1(
+    request({ admittedAt }),
+    deps({
+      trustedTrigger: trigger({ createdAt: triggerAt }),
+      trustedBinding: binding({ createdAt: bindingAt }),
+      trustedDelivery: delivery({
+        receivedAt,
+        verifiedAt,
+        payloadArtifactRef: artifact({ createdAt: receivedAt }),
+      }),
+    }),
+  );
+  assert.equal(out.status, EventTriggerRuntimeStatus.ACCEPTED);
+
+  let schedulerCalls = 0;
+  await assert.rejects(
+    admitVerifiedGitHubDeliveryV1(
+      request({ admittedAt }),
+      deps({
+        trustedTrigger: trigger({ createdAt: bindingAt }),
+        trustedBinding: binding({ createdAt: triggerAt }),
+        trustedDelivery: delivery({
+          receivedAt,
+          verifiedAt,
+          payloadArtifactRef: artifact({ createdAt: receivedAt }),
+        }),
+        admitCanonicalOccurrence: async () => {
+          schedulerCalls += 1;
+          throw new Error('must not run');
+        },
+      }),
+    ),
+    /binding cannot predate/u,
+  );
+  assert.equal(schedulerCalls, 0);
+
+  await assert.rejects(
+    admitVerifiedGitHubDeliveryV1(
+      request({ admittedAt }),
+      deps({
+        trustedTrigger: trigger({ createdAt: triggerAt }),
+        trustedBinding: binding({ createdAt: bindingAt }),
+        trustedDelivery: delivery({
+          receivedAt,
+          verifiedAt,
+          payloadArtifactRef: artifact({ createdAt: '+010000-01-01T00:00:04.000Z' }),
+        }),
+        admitCanonicalOccurrence: async () => {
+          schedulerCalls += 1;
+          throw new Error('must not run');
+        },
+      }),
+    ),
+    /payload artifact cannot postdate receipt/u,
+  );
+  assert.equal(schedulerCalls, 0);
+});
+
 test('binding requires a GITHUB trigger and exact bounded event allowlist', async () => {
   let schedulerCalls = 0;
   await assert.rejects(
