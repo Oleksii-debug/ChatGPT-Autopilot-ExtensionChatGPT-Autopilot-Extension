@@ -182,6 +182,8 @@ function inspectText(text) {
     }
     if (code === 0x09) {
       containsTabs = true;
+    } else if (code === 0x2028 || code === 0x2029) {
+      throw new Error('Text artifact contains a non-portable Unicode line separator');
     } else if (code < 0x20 || (code >= 0x7f && code <= 0x9f)) {
       throw new Error('Text artifact contains a non-text control character');
     }
