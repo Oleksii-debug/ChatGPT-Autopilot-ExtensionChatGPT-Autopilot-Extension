@@ -171,7 +171,7 @@ function exactOpaqueToken(value, label) {
   if (typeof value !== 'string'
       || value !== value.trim()
       || !TOKEN.test(value)
-      || value.includes('\\\\')
+      || value.includes('\\')
       || value.includes('"')
       || value.includes("'")) {
     throw new Error(`${label} must be bounded opaque ASCII without quotes or backslashes`);
