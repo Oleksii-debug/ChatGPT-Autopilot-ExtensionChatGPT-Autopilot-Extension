@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   SelectionActionOperation,
   SelectionActionSourceKind,
+  normalizeSelectionActionRequestV1,
 } from '../src/core/selection-action.js';
 import { buildQuickCommandSessionPlanV1 } from '../src/core/quick-command-runtime.js';
 import { sessionFromUi, validateRunnableSession } from '../src/core/commands.js';
@@ -104,20 +105,28 @@ test('caller-supplied ownerInstruction is rejected until trusted instruction adm
   );
 });
 
-test('current-page quick action preserves exact URI and original capture time across delayed execution', () => {
-  const plan = buildQuickCommandSessionPlanV1(request({
+test('current-page quick action preserves exact URI locally but excludes URL secrets from remote prompt', () => {
+  const raw = request({
     source: {
       schemaVersion: 1,
       sourceId: 'source-page',
       kind: SelectionActionSourceKind.CURRENT_PAGE,
       capturedAt: AT,
       text: 'Visible page content.',
-      uri: 'https://example.test/path?q=1',
+      uri: 'https://user:pass@example.test/path?token=SECRET#code=PRIVATE',
     },
     createdAt: '2026-09-25T16:15:00.000Z',
-  }));
-  assert.match(plan.sessionConfig.sharedPrompt, /https:\/\/example\.test\/path\?q=1/u);
+  });
+  const normalized = normalizeSelectionActionRequestV1(raw);
+  const plan = buildQuickCommandSessionPlanV1(raw);
+
+  assert.equal(normalized.source.uri, raw.source.uri);
   assert.match(plan.sessionConfig.sharedPrompt, /2026-09-25T16:10:00\.000Z/u);
+  assert.match(plan.sessionConfig.sharedPrompt, /Visible page content\./u);
+  assert.equal(plan.sessionConfig.sharedPrompt.includes('SECRET'), false);
+  assert.equal(plan.sessionConfig.sharedPrompt.includes('PRIVATE'), false);
+  assert.equal(plan.sessionConfig.sharedPrompt.includes('user:pass'), false);
+  assert.equal(plan.sessionConfig.sharedPrompt.includes(raw.source.uri), false);
 });
 
 test('artifact-only source is rejected because the quick surface has no artifact resolver authority', () => {
