@@ -323,7 +323,8 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
     && (!allow.size || allow.has(route.routeId))
     && !deny.has(route.routeId)
     && (!normalizedPolicy.freeOnly || route.costClass === AiRouteCostClass.FREE)
-    && (route.costClass === AiRouteCostClass.FREE || (route.inputPriceKnown && route.outputPriceKnown))
+    && (route.costClass === AiRouteCostClass.FREE
+      || (route.costClass === AiRouteCostClass.PAID && route.inputPriceKnown && route.outputPriceKnown))
     && (normalizedPolicy.locality === 'any' || route.locality === normalizedPolicy.locality)
     && (normalizedPolicy.maxInputPricePerMillionUsd === null
       || route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd)
