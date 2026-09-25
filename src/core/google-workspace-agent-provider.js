@@ -114,7 +114,7 @@ const CANONICAL_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function strictIdValue(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return;
-  if (typeof value !== 'string' || !CANONICAL_ID.test(value.trim())) fail(`${label} must be a canonical text identity`);
+  if (typeof value !== 'string' || !CANONICAL_ID.test(value)) fail(`${label} must be an exact canonical text identity`);
 }
 
 function validateCanonicalInvocationShape(invocation, policyDecision) {
