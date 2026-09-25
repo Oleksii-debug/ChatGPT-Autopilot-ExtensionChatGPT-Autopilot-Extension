@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSimplifiedSessionConfig } from '../src/ui/simplified-session-config.js';
+import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from '../src/ui/simplified-session-config.js';
 import { sessionFromUi } from '../src/core/commands.js';
 import { createEmptyState, validateState } from '../src/core/schema.js';
 import { applyPortableProfile, exportPortableProfile } from '../src/core/portable-profile.js';
@@ -54,4 +54,34 @@ test('invalid unequal lists and cycle bounds fail before persistent mutation', (
     urls: 'https://chatgpt.com/c/one\nhttps://chatgpt.com/c/two', prompts: 'Лише один' }), null, id), /Кількість/);
   assert.throws(() => buildSimplifiedSessionConfig(fields({ cycles: '1000001' }), null, id), /Цикли/);
   assert.throws(() => buildSimplifiedSessionConfig(fields({ prompt: '' }), null, id), /промпт/);
+});
+
+
+test('simplified import rejects generic or mixed portable profiles before Core mutation', () => {
+  const simplified = { id: 'simplified-1', simplifiedSession: true };
+  const profile = { sessions: [simplified] };
+  assert.equal(assertSimplifiedPortableProfile(profile), profile);
+
+  assert.throws(
+    () => assertSimplifiedPortableProfile({ sessions: [{ id: 'ordinary-1' }] }),
+    /лише сесії з explicit simplifiedSession=true/,
+  );
+  assert.throws(
+    () => assertSimplifiedPortableProfile({
+      sessions: [simplified, { id: 'ordinary-2', simplifiedSession: false }],
+    }),
+    /лише сесії з explicit simplifiedSession=true/,
+  );
+
+  let reads = 0;
+  const accessor = { id: 'accessor-1' };
+  Object.defineProperty(accessor, 'simplifiedSession', {
+    enumerable: true,
+    get() { reads += 1; return true; },
+  });
+  assert.throws(
+    () => assertSimplifiedPortableProfile({ sessions: [accessor] }),
+    /explicit simplifiedSession=true/,
+  );
+  assert.equal(reads, 0);
 });
