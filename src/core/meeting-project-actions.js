@@ -525,9 +525,15 @@ function bindingIdentity(binding) {
   ]);
 }
 
-export function assertMeetingProjectActionsMatchesEvidenceV1({ result, evidenceBundle } = {}) {
-  const normalizedResult = normalizeMeetingProjectActionsV1(result);
-  const expected = normalizeMeetingEvidenceBindingV1(meetingEvidenceBindingFromBundleV1(evidenceBundle));
+const ACTIONS_MATCH_REQUEST_KEYS = new Set(['result', 'evidenceBundle']);
+
+export function assertMeetingProjectActionsMatchesEvidenceV1(request = {}) {
+  const raw = record(request, 'MeetingProjectActionsMatchRequest');
+  exact(raw, ACTIONS_MATCH_REQUEST_KEYS, 'MeetingProjectActionsMatchRequest');
+  requireOwn(raw, 'result', 'MeetingProjectActionsMatchRequest');
+  requireOwn(raw, 'evidenceBundle', 'MeetingProjectActionsMatchRequest');
+  const normalizedResult = normalizeMeetingProjectActionsV1(raw.result);
+  const expected = normalizeMeetingEvidenceBindingV1(meetingEvidenceBindingFromBundleV1(raw.evidenceBundle));
   if (bindingIdentity(normalizedResult.meetingBinding) !== bindingIdentity(expected)) {
     throw new Error('MeetingProjectActionsV1 does not bind the exact MeetingEvidenceBundleV1');
   }
@@ -561,9 +567,15 @@ function strictProjectSnapshotForComposition(input) {
   return normalizeProjectSnapshotV1(safe);
 }
 
-export function assertMeetingEvidenceMatchesProjectSnapshotV1({ evidenceBundle, projectSnapshot } = {}) {
-  const evidence = normalizeMeetingEvidenceBundleV1(evidenceBundle);
-  const project = strictProjectSnapshotForComposition(projectSnapshot);
+const EVIDENCE_PROJECT_REQUEST_KEYS = new Set(['evidenceBundle', 'projectSnapshot']);
+
+export function assertMeetingEvidenceMatchesProjectSnapshotV1(request = {}) {
+  const raw = record(request, 'MeetingEvidenceProjectMatchRequest');
+  exact(raw, EVIDENCE_PROJECT_REQUEST_KEYS, 'MeetingEvidenceProjectMatchRequest');
+  requireOwn(raw, 'evidenceBundle', 'MeetingEvidenceProjectMatchRequest');
+  requireOwn(raw, 'projectSnapshot', 'MeetingEvidenceProjectMatchRequest');
+  const evidence = normalizeMeetingEvidenceBundleV1(raw.evidenceBundle);
+  const project = strictProjectSnapshotForComposition(raw.projectSnapshot);
   if (project.projectId !== evidence.projectId) throw new Error('meeting evidence projectId does not match ProjectSnapshotV1');
 
   const projectSources = new Map(project.sourceRefs.map(source => [source.sourceId, source]));
