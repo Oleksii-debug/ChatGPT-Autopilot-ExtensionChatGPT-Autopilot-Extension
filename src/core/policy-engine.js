@@ -286,16 +286,20 @@ function strictInvocation(input) {
   const raw = strictUniversalAuthorityShape(input, 'ToolInvocationV1', [
     'invocationId', 'toolId', 'providerId', 'policyDecisionId', 'createdAt', 'parentInvocationId',
   ]);
-  const requestedCapabilityIds = strictArray(
+  const requestedCapabilityIds = idList(
     raw.requestedCapabilityIds,
     'ToolInvocationV1.requestedCapabilityIds',
-    { max: MAX_LIST },
+    { optional: false, max: MAX_LIST },
   );
-  if (requestedCapabilityIds.some(item => typeof item !== 'string')) {
-    throw new Error('ToolInvocationV1.requestedCapabilityIds must contain strings');
-  }
   return normalizeToolInvocationV1({
     ...raw,
+    invocationId: id(raw.invocationId, 'ToolInvocationV1.invocationId'),
+    toolId: id(raw.toolId, 'ToolInvocationV1.toolId'),
+    providerId: id(raw.providerId, 'ToolInvocationV1.providerId'),
+    policyDecisionId: id(raw.policyDecisionId, 'ToolInvocationV1.policyDecisionId'),
+    parentInvocationId: raw.parentInvocationId == null
+      ? null
+      : id(raw.parentInvocationId, 'ToolInvocationV1.parentInvocationId'),
     requestedCapabilityIds,
     arguments: dataOnlyJson(raw.arguments, 'ToolInvocationV1.arguments'),
   });
@@ -332,11 +336,23 @@ function strictToolDescriptor(input) {
   const raw = strictUniversalAuthorityShape(input, 'ToolDescriptorV1', [
     'toolId', 'providerId', 'label', 'description', 'inputSchemaRef', 'outputSchemaRef',
   ]);
-  const capabilityIds = strictArray(raw.capabilityIds, 'ToolDescriptorV1.capabilityIds', { max: MAX_LIST });
-  if (capabilityIds.some(item => typeof item !== 'string')) {
-    throw new Error('ToolDescriptorV1.capabilityIds must contain strings');
-  }
-  return normalizeToolDescriptorV1({ ...raw, capabilityIds });
+  const capabilityIds = idList(
+    raw.capabilityIds,
+    'ToolDescriptorV1.capabilityIds',
+    { optional: false, max: MAX_LIST },
+  );
+  return normalizeToolDescriptorV1({
+    ...raw,
+    toolId: id(raw.toolId, 'ToolDescriptorV1.toolId'),
+    providerId: id(raw.providerId, 'ToolDescriptorV1.providerId'),
+    inputSchemaRef: raw.inputSchemaRef == null
+      ? null
+      : id(raw.inputSchemaRef, 'ToolDescriptorV1.inputSchemaRef'),
+    outputSchemaRef: raw.outputSchemaRef == null
+      ? null
+      : id(raw.outputSchemaRef, 'ToolDescriptorV1.outputSchemaRef'),
+    capabilityIds,
+  });
 }
 
 function strictCapability(input, index) {
@@ -349,6 +365,7 @@ function strictCapability(input, index) {
   }
   const normalized = normalizeCapabilityV1({
     ...raw,
+    capabilityId: id(raw.capabilityId, `${label}.capabilityId`),
     attributes: raw.attributes == null ? {} : dataOnlyJson(raw.attributes, `${label}.attributes`),
   });
   risk(normalized.riskClass, `${label}.riskClass`);
