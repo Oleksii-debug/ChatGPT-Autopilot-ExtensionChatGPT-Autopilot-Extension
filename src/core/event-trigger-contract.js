@@ -37,6 +37,7 @@ const OBSERVATION_KEYS = new Set([
   'sourceBindingId', 'sourceEventId', 'payloadArtifactRef', 'observedAt',
 ]);
 const ADMISSION_KEYS = new Set(['trigger', 'observation', 'admittedAt']);
+const ADMISSION_DEPENDENCY_KEYS = new Set(['resolveTriggerDefinition']);
 
 function strictRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -195,10 +196,7 @@ function canonicalTriggerDefinition(trigger) {
   ]);
 }
 
-async function bindTrustedTriggerDefinition(trigger, {
-  resolveTriggerDefinition,
-  cryptoApi = globalThis.crypto,
-} = {}) {
+async function bindTrustedTriggerDefinition(trigger, { resolveTriggerDefinition } = {}) {
   if (typeof resolveTriggerDefinition !== 'function') {
     throw new Error('Event trigger admission requires a trusted trigger definition resolver');
   }
@@ -211,7 +209,6 @@ async function bindTrustedTriggerDefinition(trigger, {
   }
   const triggerDefinitionFingerprint = await createSha256FingerprintV1(
     canonicalTriggerDefinition(trusted),
-    { cryptoApi },
   );
   return { triggerDefinitionFingerprint };
 }
@@ -262,7 +259,7 @@ export function normalizeEventTriggerObservationV1(value) {
   });
 }
 
-async function fingerprints(trigger, observation, triggerDefinitionFingerprint, { cryptoApi = globalThis.crypto } = {}) {
+async function fingerprints(trigger, observation, triggerDefinitionFingerprint) {
   const sourceIdentityCanonical = JSON.stringify([
     'chatgpt-autopilot-event-trigger-source-v1',
     triggerDefinitionFingerprint,
@@ -290,14 +287,19 @@ async function fingerprints(trigger, observation, triggerDefinitionFingerprint, 
     observation.payloadArtifactRef.sensitive,
   ]);
   const [sourceIdentityFingerprint, materialFingerprint] = await Promise.all([
-    createSha256FingerprintV1(sourceIdentityCanonical, { cryptoApi }),
-    createSha256FingerprintV1(materialCanonical, { cryptoApi }),
+    createSha256FingerprintV1(sourceIdentityCanonical),
+    createSha256FingerprintV1(materialCanonical),
   ]);
   return { sourceIdentityFingerprint, materialFingerprint };
 }
 
 export async function createEventTriggerAdmissionV1(value, options = {}) {
   const request = strictRecord(value, 'Event trigger admission request', ADMISSION_KEYS);
+  const dependencies = strictRecord(
+    options,
+    'Event trigger admission dependencies',
+    ADMISSION_DEPENDENCY_KEYS,
+  );
   const trigger = normalizeEventTriggerDefinitionV1(request.trigger);
   const observation = normalizeEventTriggerObservationV1(request.observation);
   const admittedAt = canonicalTimestamp(request.admittedAt, 'Event trigger admittedAt');
@@ -314,7 +316,7 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
     throw new Error('Event trigger admission predates observation');
   }
 
-  const { triggerDefinitionFingerprint } = await bindTrustedTriggerDefinition(trigger, options);
+  const { triggerDefinitionFingerprint } = await bindTrustedTriggerDefinition(trigger, dependencies);
 
   if (!trigger.enabled) {
     return freezeDeep({
@@ -346,7 +348,6 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
     trigger,
     observation,
     triggerDefinitionFingerprint,
-    options,
   );
   return freezeDeep({
     schemaVersion: EVENT_TRIGGER_VERSION,

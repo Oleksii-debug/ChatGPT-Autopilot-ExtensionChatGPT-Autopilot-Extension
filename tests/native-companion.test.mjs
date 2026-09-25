@@ -358,15 +358,40 @@ test('native host read refuses a symlink swapped after scope admission', async t
   assert.equal(JSON.stringify(result).includes('outside-secret'), false);
 });
 
-test('Windows installer copies every local module imported by the Native Host', async () => {
+test('Windows installer copies the full transitive local module closure of the Native Host', async () => {
   const hostDir = path.join(repoRoot, 'companion', 'native-host');
   const installer = await fs.readFile(path.join(hostDir, 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
-  for (const entry of ['host.mjs', 'host-core.mjs', 'filesystem-provider.mjs']) {
+  const pending = ['host.mjs'];
+  const visited = new Set();
+  const importPatterns = [
+    /\bfrom\s+['"]\.\/([^'"]+\.mjs)['"]/gu,
+    /\bimport\s+['"]\.\/([^'"]+\.mjs)['"]/gu,
+    /\bimport\s*\(\s*['"]\.\/([^'"]+\.mjs)['"]\s*\)/gu,
+  ];
+
+  while (pending.length > 0) {
+    const entry = pending.shift();
+    if (visited.has(entry)) continue;
+    visited.add(entry);
+    assert.ok(installer.includes(`'${entry}'`), `Native Host installer does not copy ${entry}`);
+
     const source = await fs.readFile(path.join(hostDir, entry), 'utf8');
-    for (const [, localModule] of source.matchAll(/from ['"]\.\/([^'"]+\.mjs)['"]/gu)) {
-      assert.ok(installer.includes(`'${localModule}'`), `${entry} imports ${localModule}, but installer does not copy it`);
+    for (const pattern of importPatterns) {
+      for (const match of source.matchAll(pattern)) {
+        const localModule = match[1];
+        assert.ok(
+          installer.includes(`'${localModule}'`),
+          `${entry} imports ${localModule}, but installer does not copy it`,
+        );
+        if (!visited.has(localModule)) pending.push(localModule);
+      }
     }
   }
+
+  assert.ok(
+    visited.has('filesystem-read-surface.mjs'),
+    'recursive closure regression must reach the FS-003 read-surface dependency',
+  );
 });
 
 test('native message framing survives fragmented input and enforces response bound', () => {

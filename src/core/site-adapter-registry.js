@@ -14,6 +14,15 @@ const DESCRIPTORS = Object.freeze({
   }),
 });
 
+function requireExactSiteAdapterId(adapterId) {
+  if (typeof adapterId !== 'string'
+      || adapterId.length === 0
+      || adapterId !== adapterId.trim()) {
+    throw new Error('Site adapter ID must use exact canonical text representation');
+  }
+  return adapterId;
+}
+
 function cloneDescriptor(descriptor) {
   return {
     ...descriptor,
@@ -27,10 +36,11 @@ export function listSiteAdapters() {
 }
 
 export function getSiteAdapter(adapterId) {
-  const id = String(adapterId || '').trim();
-  const descriptor = DESCRIPTORS[id];
-  if (!descriptor) throw new Error(`Unsupported site adapter: ${id || '(empty)'}`);
-  return cloneDescriptor(descriptor);
+  const id = requireExactSiteAdapterId(adapterId);
+  if (!Object.hasOwn(DESCRIPTORS, id)) {
+    throw new Error(`Unsupported site adapter: ${id}`);
+  }
+  return cloneDescriptor(DESCRIPTORS[id]);
 }
 
 export function siteAdapterAcceptsUrl(adapterId, value) {
