@@ -119,6 +119,17 @@ const VERIFICATION_KEYS = new Set([
   'attempt',
 ]);
 
+const TRUSTED_OPTIONS_KEYS = new Set(['resolveSubjectEvidence']);
+const TRUSTED_SUBJECT_EVIDENCE_KEYS = new Set([
+  'schemaVersion',
+  'projectId',
+  'subjectId',
+  'subjectRevisionId',
+  'artifactRefs',
+  'verificationRefs',
+  'effectIds',
+]);
+
 function snapshotRecord(value, allowed, label, { requireAll = true } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be a plain object`);
@@ -128,12 +139,13 @@ function snapshotRecord(value, allowed, label, { requireAll = true } = {}) {
     throw new Error(`${label} must be a plain or null-prototype object`);
   }
 
+  const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = Object.create(null);
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
       throw new Error(`${label} contains unknown field: ${String(key)}`);
     }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor
         || descriptor.enumerable !== true
         || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
@@ -156,22 +168,30 @@ function denseArray(value, label, { max = MAX_DIFF_REVIEW_ITEMS, min = 0 } = {})
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a canonical array`);
   }
-  if (!Number.isSafeInteger(value.length) || value.length < min || value.length > max) {
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < min
+      || lengthDescriptor.value > max) {
     throw new Error(`${label} must contain between ${min} and ${max} items`);
   }
+  const length = lengthDescriptor.value;
 
   const expected = new Set(['length']);
-  for (let index = 0; index < value.length; index += 1) expected.add(String(index));
+  for (let index = 0; index < length; index += 1) expected.add(String(index));
 
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !expected.has(key)) {
       throw new Error(`${label} contains non-canonical array fields`);
     }
   }
 
   const out = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor
         || descriptor.enumerable !== true
         || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
@@ -373,6 +393,107 @@ function normalizeUniqueRecords(input, label, normalize, identityKey) {
   return values.sort((a, b) => compareCodeUnit(a[identityKey], b[identityKey]));
 }
 
+function normalizeTrustedSubjectEvidenceV1(input) {
+  const raw = snapshotRecord(
+    input,
+    TRUSTED_SUBJECT_EVIDENCE_KEYS,
+    'TrustedDiffReviewSubjectEvidenceV1',
+  );
+  if (raw.schemaVersion !== 1) {
+    throw new Error('TrustedDiffReviewSubjectEvidenceV1.schemaVersion must be numeric 1');
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    projectId: canonicalId(raw.projectId, 'trusted projectId'),
+    subjectId: canonicalId(raw.subjectId, 'trusted subjectId'),
+    subjectRevisionId: canonicalId(raw.subjectRevisionId, 'trusted subjectRevisionId'),
+    artifactRefs: Object.freeze(normalizeUniqueRecords(
+      raw.artifactRefs,
+      'trusted artifactRefs',
+      canonicalArtifactRef,
+      'artifactId',
+    )),
+    verificationRefs: Object.freeze(normalizeUniqueRecords(
+      raw.verificationRefs,
+      'trusted verificationRefs',
+      canonicalVerificationRef,
+      'verificationId',
+    )),
+    effectIds: Object.freeze(uniqueIds(raw.effectIds, 'trusted effectIds')),
+  });
+}
+
+function canonicalRecordFingerprint(value) {
+  return JSON.stringify(value);
+}
+
+function bindTrustedSubjectEvidence({
+  projectId,
+  subjectId,
+  subjectRevisionId,
+  artifactRefs,
+  verificationRefs,
+  effectIds,
+}, options) {
+  if (options == null) {
+    throw new Error('trusted subject evidence resolver is required');
+  }
+  const trustedOptions = snapshotRecord(
+    options,
+    TRUSTED_OPTIONS_KEYS,
+    'DiffReviewTrustedOptions',
+  );
+  const resolver = trustedOptions.resolveSubjectEvidence;
+  if (typeof resolver !== 'function') {
+    throw new Error('resolveSubjectEvidence must be a trusted function');
+  }
+
+  const query = Object.freeze({ projectId, subjectId, subjectRevisionId });
+  const resolved = resolver(query);
+  if (resolved && typeof resolved.then === 'function') {
+    throw new Error('resolveSubjectEvidence must resolve synchronously');
+  }
+  const trusted = normalizeTrustedSubjectEvidenceV1(resolved);
+
+  if (trusted.projectId !== projectId
+      || trusted.subjectId !== subjectId
+      || trusted.subjectRevisionId !== subjectRevisionId) {
+    throw new Error('trusted subject evidence does not match exact project/subject/revision');
+  }
+
+  const trustedArtifacts = new Map(
+    trusted.artifactRefs.map((item) => [item.artifactId, canonicalRecordFingerprint(item)]),
+  );
+  for (const artifact of artifactRefs) {
+    if (trustedArtifacts.get(artifact.artifactId) !== canonicalRecordFingerprint(artifact)) {
+      throw new Error(
+        `artifact ${artifact.artifactId} is not bound to the exact trusted subject revision`,
+      );
+    }
+  }
+
+  const trustedVerifications = new Map(
+    trusted.verificationRefs.map(
+      (item) => [item.verificationId, canonicalRecordFingerprint(item)],
+    ),
+  );
+  for (const verification of verificationRefs) {
+    if (trustedVerifications.get(verification.verificationId)
+        !== canonicalRecordFingerprint(verification)) {
+      throw new Error(
+        `verification ${verification.verificationId} is not bound to the exact trusted subject revision`,
+      );
+    }
+  }
+
+  const trustedEffects = new Set(trusted.effectIds);
+  for (const effectId of effectIds) {
+    if (!trustedEffects.has(effectId)) {
+      throw new Error(`effect ${effectId} is not bound to the exact trusted subject revision`);
+    }
+  }
+}
+
 function requireKnownIds(values, known, label) {
   for (const value of values) {
     if (!known.has(value)) throw new Error(`${label} references unknown identity: ${value}`);
@@ -395,6 +516,7 @@ function buildPlainText(review) {
     `Review: ${review.reviewId}`,
     `Generated: ${review.generatedAt}`,
     `Summary: ${review.summary}`,
+    'Subject evidence binding: exact trusted project/subject/revision resolver',
     '',
     `What changed (${review.changes.length})`,
   ];
@@ -502,7 +624,7 @@ function freezeDeep(value) {
   return Object.freeze(value);
 }
 
-export function buildDiffFirstOwnerReviewV1(input) {
+export function buildDiffFirstOwnerReviewV1(input, trustedOptions = null) {
   const raw = snapshotRecord(input, REVIEW_KEYS, 'DiffFirstOwnerReviewV1');
   if (raw.schemaVersion !== DIFF_FIRST_OWNER_REVIEW_VERSION) {
     throw new Error('DiffFirstOwnerReviewV1.schemaVersion must be numeric 1');
@@ -563,6 +685,15 @@ export function buildDiffFirstOwnerReviewV1(input) {
       );
     }
   }
+
+  bindTrustedSubjectEvidence({
+    projectId,
+    subjectId,
+    subjectRevisionId,
+    artifactRefs,
+    verificationRefs,
+    effectIds,
+  }, trustedOptions);
 
   const changes = normalizeUniqueRecords(raw.changes, 'changes', normalizeChange, 'changeId');
   const risks = normalizeUniqueRecords(raw.risks, 'risks', normalizeRisk, 'riskId')
@@ -628,6 +759,7 @@ export function buildDiffFirstOwnerReviewV1(input) {
     subjectRevisionId,
     generatedAt,
     summary,
+    subjectEvidenceBound: true,
     advisoryOnly: true,
     approvalAuthorized: false,
     executionAuthorized: false,
