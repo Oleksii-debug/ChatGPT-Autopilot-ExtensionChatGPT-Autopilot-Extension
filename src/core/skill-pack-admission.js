@@ -19,7 +19,7 @@ const EVALUATION_PROOF_KEYS = new Set([
   'subjectSha256', 'status', 'completedAt', 'evidenceKinds', 'verificationAuthorityId',
 ]);
 const SIGNATURE_PROOF_KEYS = new Set([
-  'signatureId', 'scheme', 'keyId', 'signatureArtifactId', 'signedSha256', 'status',
+  'signatureId', 'scheme', 'keyId', 'signatureArtifactId', 'signatureArtifactSha256', 'signedSha256', 'status',
   'verifiedAt', 'verificationAuthorityId',
 ]);
 const DEPENDENCY_PROOF_KEYS = new Set([
@@ -211,6 +211,7 @@ async function bindSignature(reference, source, signatureArtifact, admittedAt, r
       keyId: reference.keyId,
       signedSha256: reference.signedSha256,
       signatureArtifactId: reference.signatureArtifactId,
+      signatureArtifactSha256: signatureArtifact.sha256,
     }),
     'TrustedSkillSignatureV1',
     SIGNATURE_PROOF_KEYS,
@@ -220,6 +221,7 @@ async function bindSignature(reference, source, signatureArtifact, admittedAt, r
     scheme: id(raw.scheme, 'scheme'),
     keyId: id(raw.keyId, 'keyId'),
     signatureArtifactId: id(raw.signatureArtifactId, 'signatureArtifactId'),
+    signatureArtifactSha256: digest(raw.signatureArtifactSha256, 'signatureArtifactSha256'),
     signedSha256: digest(raw.signedSha256, 'signedSha256'),
     status: raw.status,
     verifiedAt: timestamp(raw.verifiedAt, 'verifiedAt'),
@@ -230,6 +232,7 @@ async function bindSignature(reference, source, signatureArtifact, admittedAt, r
       || proof.scheme !== reference.scheme
       || proof.keyId !== reference.keyId
       || proof.signatureArtifactId !== reference.signatureArtifactId
+      || proof.signatureArtifactSha256 !== signatureArtifact.sha256
       || proof.signedSha256 !== reference.signedSha256
       || proof.signedSha256 !== source.sha256) {
     throw new Error('Skill pack signature proof does not match signature/source identity');
@@ -353,10 +356,15 @@ export async function createSkillPackAdmissionV1(input = {}, options = {}) {
     ...trustedManifest.requiredPermissionIds,
     ...entrypoint.requiredPermissionIds,
   ])].sort();
+  const trustedManifestFingerprint = await createSha256FingerprintV1(JSON.stringify([
+    'chatgpt-autopilot-skill-pack-trusted-manifest-v1',
+    trustedManifest,
+  ]));
   const admissionFingerprint = await createSha256FingerprintV1(JSON.stringify([
     'chatgpt-autopilot-skill-pack-admission-v1',
     trustedManifest.skillPackId,
     trustedManifest.version,
+    trustedManifestFingerprint,
     source.sha256,
     entrypoint.entrypointId,
     dependencyProofs.map(item => item.admissionId),

@@ -115,6 +115,7 @@ function deps(inputManifest = manifest(), hooks = {}) {
           scheme: query.scheme,
           keyId: query.keyId,
           signatureArtifactId: query.signatureArtifactId,
+          signatureArtifactSha256: query.signatureArtifactSha256,
           signedSha256: query.signedSha256,
           status: 'VERIFIED',
           verifiedAt: T2,
@@ -191,6 +192,31 @@ test('fails closed on entrypoint material drift and never resolves unrelated art
   assert.deepEqual(runtime.artifactCalls, ['source', 'entry']);
 });
 
+test('same-version selected entrypoint material drift changes durable admission identity', async () => {
+  const original = manifest();
+  const changed = manifest({
+    artifactRefs: manifest().artifactRefs.map(item =>
+      item.artifactId === 'entry' ? { ...item, sha256: C } : item),
+  });
+
+  const firstRuntime = deps(original);
+  const changedRuntime = deps(changed);
+  const first = await createSkillPackAdmissionV1({
+    manifest: original,
+    entrypointId: 'run-report',
+    admittedAt: T3,
+  }, firstRuntime.options);
+  const second = await createSkillPackAdmissionV1({
+    manifest: changed,
+    entrypointId: 'run-report',
+    admittedAt: T3,
+  }, changedRuntime.options);
+
+  assert.notEqual(second.admissionId, first.admissionId);
+  assert.equal(first.loadArtifactRefs.find(item => item.artifactId === 'entry').sha256, B);
+  assert.equal(second.loadArtifactRefs.find(item => item.artifactId === 'entry').sha256, C);
+});
+
 test('requires trusted PASS evaluation with exact suite subject and evidence kinds', async () => {
   const m = manifest();
   for (const proof of [
@@ -225,6 +251,7 @@ test('requires exact VERIFIED signature including signature artifact binding', a
     { status: 'UNVERIFIED' },
     { signedSha256: B },
     { signatureArtifactId: 'unused' },
+    { signatureArtifactSha256: C },
     { keyId: 'different-key' },
   ]) {
     const runtime = deps(m, {
@@ -352,6 +379,7 @@ test('signature verification cannot predate the materialized signature artifact'
       scheme: query.scheme,
       keyId: query.keyId,
       signatureArtifactId: query.signatureArtifactId,
+      signatureArtifactSha256: query.signatureArtifactSha256,
       signedSha256: query.signedSha256,
       status: 'VERIFIED',
       verifiedAt: T0,
