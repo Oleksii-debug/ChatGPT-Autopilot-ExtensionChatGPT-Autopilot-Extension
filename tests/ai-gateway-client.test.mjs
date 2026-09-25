@@ -201,3 +201,21 @@ test('gateway client counts request size in UTF-8 bytes before fetch', async () 
   );
   assert.equal(calls, 0);
 });
+
+
+test('gateway client rejects non-string request bodies before fetch', async () => {
+  let calls = 0;
+  const client = new AiGatewayClient({ fetchFn: async () => {
+    calls += 1;
+    return new Response('{"ok":true}', { status: 200 });
+  } });
+
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, '/complete', {
+      method: 'POST',
+      body: new Uint8Array([123, 125]),
+    }),
+    error => error?.code === 'AI_GATEWAY_INVALID_REQUEST_BODY',
+  );
+  assert.equal(calls, 0);
+});
