@@ -216,6 +216,7 @@ export function normalizeGovernanceRoleBindingV1(input) {
 const CREDENTIAL_KEYS = new Set([
   'schemaVersion', 'ownershipId', 'credentialRefId', 'ownerPrincipalId',
   'delegatePrincipalIds', 'createdAt', 'revokedAt',
+  'secretMaterialPresent', 'credentialUseAuthorized',
 ]);
 
 export function normalizeCredentialOwnershipRefV1(input) {
@@ -230,6 +231,12 @@ export function normalizeCredentialOwnershipRefV1(input) {
   const delegatePrincipalIds = ids(raw.delegatePrincipalIds, 'CredentialOwnershipRefV1.delegatePrincipalIds');
   if (delegatePrincipalIds.includes(ownerPrincipalId)) {
     throw new Error('Credential owner cannot also be a delegate');
+  }
+  if (raw.secretMaterialPresent != null && raw.secretMaterialPresent !== false) {
+    throw new Error('CredentialOwnershipRefV1 cannot contain secret material');
+  }
+  if (raw.credentialUseAuthorized != null && raw.credentialUseAuthorized !== false) {
+    throw new Error('CredentialOwnershipRefV1 cannot authorize credential use');
   }
   return freeze({
     schemaVersion: 1,
@@ -247,6 +254,7 @@ export function normalizeCredentialOwnershipRefV1(input) {
 const SNAPSHOT_KEYS = new Set([
   'schemaVersion', 'organizationId', 'revision', 'ownerPrincipalId',
   'principals', 'roles', 'bindings', 'credentialOwnerships', 'capturedAt',
+  'advisoryOnly', 'authorizationGranted', 'credentialUseAuthorized', 'policyAuthority',
 ]);
 
 function assertNoCycles(byId) {
@@ -266,6 +274,18 @@ export function normalizeAgentGovernanceSnapshotV1(input) {
   version(raw.schemaVersion, 'AgentGovernanceSnapshotV1');
   const organizationId = id(raw.organizationId, 'AgentGovernanceSnapshotV1.organizationId');
   const capturedAt = time(raw.capturedAt, 'AgentGovernanceSnapshotV1.capturedAt');
+  if (raw.advisoryOnly != null && raw.advisoryOnly !== true) {
+    throw new Error('AgentGovernanceSnapshotV1 must remain advisoryOnly');
+  }
+  if (raw.authorizationGranted != null && raw.authorizationGranted !== false) {
+    throw new Error('AgentGovernanceSnapshotV1 cannot grant authorization');
+  }
+  if (raw.credentialUseAuthorized != null && raw.credentialUseAuthorized !== false) {
+    throw new Error('AgentGovernanceSnapshotV1 cannot authorize credential use');
+  }
+  if (raw.policyAuthority != null && raw.policyAuthority !== 'EXTERNAL_OWNER_POLICY') {
+    throw new Error('AgentGovernanceSnapshotV1 policyAuthority is invalid');
+  }
   const principals = unique(
     array(raw.principals, 'principals', LIMITS.principals, 1).map(normalizeAgentPrincipalV1),
     'principalId',
