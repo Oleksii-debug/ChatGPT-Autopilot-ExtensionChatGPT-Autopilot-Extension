@@ -564,3 +564,69 @@ test('request deadline stays armed through streamed response body consumption', 
   assert.equal(releaseCalls, 1);
   assert.equal(clearCalls, 1);
 });
+
+
+test('Gmail draft create uses the exact owner principal, fixed POST endpoint, and bounded canonical body', async () => {
+  const calls = [];
+  const raw = 'RnJvbTogb3duZXJAZXhhbXBsZS5jb20NClRvOiB0b0BleGFtcGxlLmNvbQ0KU3ViamVjdDogVGVzdA0KDQpCb2R5';
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return response(200, { id: 'draft_1', message: { id: 'msg_1', threadId: 'thread_1', labelIds: ['DRAFT'] } });
+    },
+  }));
+  const result = await client.createGmailDraft({ userId, rawMessageBase64Url: raw });
+  assert.equal(result.userId, userId);
+  assert.equal(result.draftId, 'draft_1');
+  assert.equal(calls.length, 1);
+  const url = new URL(calls[0].url);
+  assert.equal(url.origin, GMAIL_API_ORIGIN);
+  assert.equal(url.pathname, `/gmail/v1/users/${encodeURIComponent(userId)}/drafts`);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(JSON.parse(calls[0].options.body).message.raw, raw);
+  assert.equal(String(calls[0].options.body).includes('oauth-super-secret'), false);
+});
+
+test('Gmail draft create rejects aliases before network and treats post-dispatch transport loss as ambiguous', async () => {
+  let calls = 0;
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    fetchImpl: async () => {
+      calls += 1;
+      throw new Error('response lost after POST');
+    },
+  }));
+  await assert.rejects(
+    () => client.createGmailDraft({ userId: 'me', rawMessageBase64Url: 'QUJD' }),
+    error => error.code === 'GOOGLE_GMAIL_USER_NOT_ALLOWED' && error.effectMayHaveOccurred === false,
+  );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    () => client.createGmailDraft({ userId, rawMessageBase64Url: 'QUJD=' }),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID' && error.effectMayHaveOccurred === false,
+  );
+  assert.equal(calls, 0);
+  await assert.rejects(
+    () => client.createGmailDraft({ userId, rawMessageBase64Url: 'QUJD' }),
+    error => error.code === 'GOOGLE_MUTATION_TRANSPORT_UNCERTAIN'
+      && error.effectMayHaveOccurred === true
+      && error.safeToRetry === false,
+  );
+  assert.equal(calls, 1);
+});
+
+test('Gmail draft readback returns exact raw bytes only for the admitted principal and draft identity', async () => {
+  const raw = 'QUJD';
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    fetchImpl: async (url, options) => {
+      assert.equal(options.method, 'GET');
+      const parsed = new URL(url);
+      assert.equal(parsed.pathname, `/gmail/v1/users/${encodeURIComponent(userId)}/drafts/draft_1`);
+      assert.equal(parsed.searchParams.get('format'), 'raw');
+      return response(200, { id: 'draft_1', message: { id: 'msg_1', threadId: 'thread_1', labelIds: ['DRAFT'], raw } });
+    },
+  }));
+  const result = await client.getGmailDraft({ userId, draftId: 'draft_1' });
+  assert.equal(result.rawMessageBase64Url, raw);
+  assert.equal(result.draftId, 'draft_1');
+});
