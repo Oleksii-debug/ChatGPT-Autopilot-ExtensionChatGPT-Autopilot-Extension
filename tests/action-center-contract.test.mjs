@@ -174,6 +174,43 @@ test('resolved and superseded lifecycle is causal and exact', () => {
   );
 });
 
+test('supersession graph rejects time travel and cycles', () => {
+  assert.throws(
+    () => buildActionCenterProjectionV1([
+      item('old', {
+        status: ActionCenterItemStatus.SUPERSEDED,
+        ownerActionKind: ActionCenterOwnerActionKind.NONE,
+        createdAt: T1,
+        updatedAt: T1,
+        closedAt: T2,
+        supersededByItemId: 'earlier',
+      }),
+      item('earlier', { createdAt: T0, updatedAt: T0 }),
+    ]),
+    /predates superseded item/,
+  );
+
+  assert.throws(
+    () => buildActionCenterProjectionV1([
+      item('a', {
+        status: ActionCenterItemStatus.SUPERSEDED,
+        ownerActionKind: ActionCenterOwnerActionKind.NONE,
+        updatedAt: T1,
+        closedAt: T2,
+        supersededByItemId: 'b',
+      }),
+      item('b', {
+        status: ActionCenterItemStatus.SUPERSEDED,
+        ownerActionKind: ActionCenterOwnerActionKind.NONE,
+        updatedAt: T1,
+        closedAt: T2,
+        supersededByItemId: 'a',
+      }),
+    ]),
+    /supersession graph contains a cycle/,
+  );
+});
+
 test('duplicate item identity and evidence aliases fail closed', () => {
   assert.throws(
     () => buildActionCenterProjectionV1([item('dup'), item('dup')]),
