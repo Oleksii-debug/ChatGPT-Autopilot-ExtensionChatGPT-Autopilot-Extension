@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { createFilesystemScopeV1, withAuthorizedExistingFileV1 } from './filesystem-provider.mjs';
+import { searchScopedFilesystemV1, writeExistingTextScopedV1 } from './filesystem-host-provider.mjs';
 import { normalizeWindowsProviderConfig } from './windows-provider.mjs';
 
 export const HOST_NAME = 'org.chatgpt_autopilot.companion';
@@ -15,6 +16,8 @@ export const RequestType = Object.freeze({
   HEALTH: 'health',
   CAPABILITIES: 'capabilities',
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
+  FILESYSTEM_SEARCH: 'filesystem.search',
+  FILESYSTEM_WRITE_EXISTING_TEXT: 'filesystem.writeExistingText',
   CREDENTIALS_LIST: 'credentials.list',
   CREDENTIALS_RESOLVE: 'credentials.resolve',
   MCP_REQUEST: 'mcp.request',
@@ -68,11 +71,12 @@ function normalizeAllowedOrigin(value) {
 function normalizeRoot(raw, index) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companionError('CONFIG_INVALID', `roots[${index}] must be an object`);
   const keys = Object.keys(raw);
-  if (keys.some(key => !['rootId', 'path'].includes(key))) throw companionError('CONFIG_INVALID', `roots[${index}] contains unknown field`);
+  if (keys.some(key => !['rootId', 'path', 'writable'].includes(key))) throw companionError('CONFIG_INVALID', `roots[${index}] contains unknown field`);
   const rootId = normalizeId(raw.rootId, `roots[${index}].rootId`);
   const rootPath = clean(raw.path, 32000);
   if (!rootPath || !path.isAbsolute(rootPath)) throw companionError('CONFIG_INVALID', `roots[${index}].path must be absolute`);
-  return { rootId, path: path.resolve(rootPath) };
+  if (raw.writable != null && typeof raw.writable !== 'boolean') throw companionError('CONFIG_INVALID', `roots[${index}].writable must be boolean`);
+  return { rootId, path: path.resolve(rootPath), writable: raw.writable === true };
 }
 
 export function normalizeNativeCompanionConfig(raw) {
@@ -171,7 +175,17 @@ async function readScopedText(payload, config, fsApi, beforeOpen = null) {
   };
 }
 
-export async function handleNativeCompanionRequest(input, { config, callerOrigin, fsApi = fs, fsReadBeforeOpen = null, now = () => Date.now(), credentialBroker = null, mcpBridge = null, windowsProvider = null } = {}) {
+export async function handleNativeCompanionRequest(input, {
+  config,
+  callerOrigin,
+  fsApi = fs,
+  fsReadBeforeOpen = null,
+  fsWriteBeforeOpen = null,
+  now = () => Date.now(),
+  credentialBroker = null,
+  mcpBridge = null,
+  windowsProvider = null,
+} = {}) {
   let request;
   try {
     const normalizedConfig = normalizeNativeCompanionConfig(config);
@@ -193,12 +207,13 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
         capabilities: [
           { capabilityId: 'native.health', readOnly: true },
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
+          { capabilityId: 'filesystem.search', readOnly: true, scoped: true },
           { capabilityId: 'credentials.list', readOnly: true, scoped: true },
           { capabilityId: 'credentials.resolve', readOnly: false, scoped: true, sensitive: true },
           { capabilityId: 'mcp.localStdio', readOnly: false, scoped: true },
           ...(windowsProvider ? windowsProvider.capabilities() : []),
         ],
-        roots: normalizedConfig.roots.map(item => ({ rootId: item.rootId })),
+        roots: normalizedConfig.roots.map(item => ({ rootId: item.rootId, writable: item.writable })),
         credentialBrokerAvailable: Boolean(credentialBroker),
         mcpBridgeAvailable: Boolean(mcpBridge),
         windowsProviderAvailable: Boolean(windowsProvider),
@@ -206,6 +221,12 @@ export async function handleNativeCompanionRequest(input, { config, callerOrigin
     }
     if (request.type === RequestType.FILESYSTEM_READ_TEXT) {
       return response(request, await readScopedText(request.payload, normalizedConfig, fsApi, fsReadBeforeOpen));
+    }
+    if (request.type === RequestType.FILESYSTEM_SEARCH) {
+      return response(request, await searchScopedFilesystemV1(request.payload, normalizedConfig));
+    }
+    if (request.type === RequestType.FILESYSTEM_WRITE_EXISTING_TEXT) {
+      return response(request, await writeExistingTextScopedV1(request.payload, normalizedConfig, { beforeOpen: fsWriteBeforeOpen }));
     }
     if (request.type === RequestType.CREDENTIALS_LIST) {
       if (!credentialBroker) throw companionError('CREDENTIAL_BROKER_UNAVAILABLE', 'CredentialBroker is not configured');
