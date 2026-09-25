@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RELEASE_VERSION } from './package-release.mjs';
 
-export const SOURCE_VERSION = '0.9.19';
+export const SOURCE_VERSION = RELEASE_VERSION;
 export const SOURCE_NAME = `ChatGPT-Autopilot-${SOURCE_VERSION}-SOURCE`;
 const FIXED_DOS_DATE = 0x0021;
 const FIXED_DOS_TIME = 0x0000;
