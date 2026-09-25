@@ -2,20 +2,58 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   GITHUB_INCREMENTAL_OVERLAP_MS,
+  GITHUB_REQUEST_TIMEOUT_MS,
+  GITHUB_RESPONSE_MAX_BYTES,
   RemoteDispatchGitHubError,
   fetchGitHubDispatchComments,
   fetchLatestGitHubRemoteDispatch,
 } from '../src/core/remote-dispatch-github.js';
 import { REMOTE_DISPATCH_MARKER } from '../src/core/remote-dispatch.js';
 
-function response(json, { status = 200, headers = {} } = {}) {
+const encoder = new TextEncoder();
+
+function rawResponse(text, {
+  status = 200,
+  headers = {},
+  chunks = null,
+  state = null,
+} = {}) {
   const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), String(v)]));
+  const streamState = state || { reads: 0, cancelled: false, released: false, bodyCancelled: false };
+  const streamChunks = chunks || [encoder.encode(text)];
+  let index = 0;
+  const body = {
+    async cancel() {
+      streamState.bodyCancelled = true;
+    },
+    getReader() {
+      return {
+        async read() {
+          streamState.reads += 1;
+          if (index >= streamChunks.length) return { done: true, value: undefined };
+          const value = streamChunks[index];
+          index += 1;
+          return { done: false, value };
+        },
+        async cancel() {
+          streamState.cancelled = true;
+        },
+        releaseLock() {
+          streamState.released = true;
+        },
+      };
+    },
+  };
   return {
     ok: status >= 200 && status < 300,
     status,
     headers: { get(name) { return lower[String(name).toLowerCase()] ?? null; } },
-    async json() { return structuredClone(json); },
+    body,
   };
+}
+
+function response(json, options = {}) {
+  return rawResponse(JSON.stringify(json), options);
 }
 
 function dispatchBody({ id = 'd1', revision = 1, projectId = 'project-a' } = {}) {
@@ -42,8 +80,8 @@ function dispatchBody({ id = 'd1', revision = 1, projectId = 'project-a' } = {})
 
 test('initial fetch reads issue metadata then only the latest comments page', async () => {
   const calls = [];
-  const fetchFn = async url => {
-    calls.push(url);
+  const fetchFn = async (url, options) => {
+    calls.push({ url, options });
     if (!url.includes('/comments')) return response({ comments: 245 });
     return response([{ id: 201, body: 'a' }, { id: 245, body: 'b' }], { headers: { 'x-ratelimit-remaining': '57' } });
   };
@@ -53,7 +91,11 @@ test('initial fetch reads issue metadata then only the latest comments page', as
   assert.deepEqual(result.comments.map(x => x.id), ['201', '245']);
   assert.equal(result.rateLimitRemaining, 57);
   assert.equal(calls.length, 2);
-  assert.match(calls[1], /[?&]page=3(?:&|$)/);
+  assert.match(calls[1].url, /[?&]page=3(?:&|$)/);
+  assert.equal(calls[0].options.redirect, 'error');
+  assert.equal(calls[1].options.redirect, 'error');
+  assert.equal(calls[0].options.signal instanceof AbortSignal, true);
+  assert.equal(calls[0].options.signal.aborted, false);
 });
 
 test('empty issue returns without a comments request', async () => {
@@ -164,4 +206,159 @@ test('wrong-project dispatch is diagnostic only and never selected', async () =>
   const result = await fetchLatestGitHubRemoteDispatch({ fetchFn, repository: 'owner/repo', issueNumber: 121, projectId: 'project-a', nowMs: Date.parse('2026-09-11T18:30:00Z') });
   assert.equal(result.selected, null);
   assert.equal(result.diagnostics[0].reason, 'WRONG_PROJECT');
+});
+
+
+test('Remote Dispatch response admits the exact byte ceiling and rejects declared overflow before reading', async () => {
+  const prefix = '[{"id":1,"body":"';
+  const suffix = '"}]';
+  const overhead = encoder.encode(prefix + suffix).byteLength;
+  const remaining = GITHUB_RESPONSE_MAX_BYTES - overhead;
+  const wideCount = Math.floor(remaining / 3);
+  const tail = 'a'.repeat(remaining - (wideCount * 3));
+  const exactText = prefix + '界'.repeat(wideCount) + tail + suffix;
+  assert.equal(encoder.encode(exactText).byteLength, GITHUB_RESPONSE_MAX_BYTES);
+
+  let call = 0;
+  const exact = await fetchGitHubDispatchComments({
+    fetchFn: async url => {
+      call += 1;
+      if (!url.includes('/comments')) return response({ comments: 1 });
+      return rawResponse(exactText);
+    },
+    repository: 'owner/repo',
+    issueNumber: 121,
+  });
+  assert.equal(exact.comments.length, 1);
+  assert.equal(exact.comments[0].id, '1');
+
+  const state = { reads: 0, cancelled: false, released: false, bodyCancelled: false };
+  await assert.rejects(
+    () => fetchGitHubDispatchComments({
+      fetchFn: async () => response({ comments: 1 }, {
+        headers: { 'content-length': String(GITHUB_RESPONSE_MAX_BYTES + 1) },
+        state,
+      }),
+      repository: 'owner/repo',
+      issueNumber: 121,
+    }),
+    error => error.code === 'RESPONSE_TOO_LARGE',
+  );
+  assert.equal(state.reads, 0);
+  assert.equal(state.bodyCancelled, true);
+});
+
+test('chunked Remote Dispatch overflow cancels before unbounded JSON materialization', async () => {
+  const state = { reads: 0, cancelled: false, released: false, bodyCancelled: false };
+  await assert.rejects(
+    () => fetchGitHubDispatchComments({
+      fetchFn: async () => rawResponse('', {
+        chunks: [new Uint8Array(2_000_000), new Uint8Array(2_000_001)],
+        state,
+      }),
+      repository: 'owner/repo',
+      issueNumber: 121,
+    }),
+    error => error.code === 'RESPONSE_TOO_LARGE',
+  );
+  assert.equal(state.reads, 2);
+  assert.equal(state.cancelled, true);
+  assert.equal(state.released, true);
+});
+
+test('Remote Dispatch owns a bounded request+body timeout even when controller supplies no AbortSignal', async () => {
+  const fetchFn = async (_url, options) => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader() {
+        return {
+          async read() {
+            return await new Promise((resolve, reject) => {
+              if (options.signal.aborted) {
+                const error = new Error('aborted');
+                error.name = 'AbortError';
+                reject(error);
+                return;
+              }
+              options.signal.addEventListener('abort', () => {
+                const error = new Error('aborted');
+                error.name = 'AbortError';
+                reject(error);
+              }, { once: true });
+            });
+          },
+          async cancel() {},
+          releaseLock() {},
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => fetchGitHubDispatchComments({
+      fetchFn,
+      repository: 'owner/repo',
+      issueNumber: 121,
+      requestTimeoutMs: 5,
+    }),
+    error => error.code === 'REQUEST_TIMEOUT',
+  );
+  assert.equal(GITHUB_REQUEST_TIMEOUT_MS, 30_000);
+});
+
+test('caller abort remains distinct from the internal Remote Dispatch timeout', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let fetchCount = 0;
+  await assert.rejects(
+    () => fetchGitHubDispatchComments({
+      fetchFn: async (_url, options) => {
+        fetchCount += 1;
+        assert.equal(options.signal.aborted, true);
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        throw error;
+      },
+      repository: 'owner/repo',
+      issueNumber: 121,
+      signal: controller.signal,
+    }),
+    error => error.code === 'REQUEST_ABORTED',
+  );
+  assert.equal(fetchCount, 1);
+});
+
+test('fractional, non-finite and unsafe GitHub comment ids never enter Remote Dispatch identity', async () => {
+  const result = await fetchGitHubDispatchComments({
+    fetchFn: async url => url.includes('/comments')
+      ? response([
+        { id: 1.5, body: 'fractional' },
+        { id: Number.NaN, body: 'nan' },
+        { id: Number.MAX_SAFE_INTEGER + 1, body: 'unsafe' },
+        { id: 2, body: 'valid' },
+      ])
+      : response({ comments: 4 }),
+    repository: 'owner/repo',
+    issueNumber: 121,
+  });
+  assert.deepEqual(result.comments.map(item => item.id), ['2']);
+});
+
+test('invalid trusted timeout override fails before Remote Dispatch network activity', async () => {
+  let called = false;
+  await assert.rejects(
+    () => fetchGitHubDispatchComments({
+      fetchFn: async () => {
+        called = true;
+        return response({ comments: 0 });
+      },
+      repository: 'owner/repo',
+      issueNumber: 121,
+      requestTimeoutMs: 0,
+    }),
+    error => error.code === 'INVALID_CONFIG',
+  );
+  assert.equal(called, false);
 });
