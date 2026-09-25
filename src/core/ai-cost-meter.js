@@ -207,8 +207,8 @@ function assertPricing(costClass, inputPricePerMillionUsd, outputPricePerMillion
 function normalizeRouteForMetering(route) {
   const raw = plainObject(route, 'AI route for metering');
   for (const key of ['inputPricePerMillionUsd', 'outputPricePerMillionUsd']) {
-    if (Object.hasOwn(raw, key) && typeof raw[key] !== 'number') {
-      throw new Error(`AI route ${key} must be a number for cost metering`);
+    if (Object.hasOwn(raw, key) && (typeof raw[key] !== 'number' || Object.is(raw[key], -0))) {
+      throw new Error(`AI route ${key} must be a canonical number for cost metering`);
     }
   }
 
