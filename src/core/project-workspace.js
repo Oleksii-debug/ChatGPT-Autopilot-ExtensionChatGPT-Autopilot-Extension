@@ -194,6 +194,18 @@ export function putProjectArtifactProvenance(workspace, provenance, { nowMs = Da
   return normalized;
 }
 
+export function getProjectArtifactProvenance(workspace, projectId, artifactId) {
+  validateProjectWorkspace(workspace);
+  const project = requireProject(workspace, projectId);
+  const artifactKey = workspaceId(artifactId, 'artifactId');
+  if (!hasOwn(project.provenanceByArtifactId, artifactKey)) {
+    throw new Error('Artifact provenance not found');
+  }
+  const provenance = normalizeArtifactProvenanceV1(project.provenanceByArtifactId[artifactKey]);
+  assertProvenanceMatchesSnapshot(provenance, project.snapshot);
+  return provenance;
+}
+
 export function projectCurrentState(workspace, projectId, capsuleId, currentSourceRefs = []) {
   validateProjectWorkspace(workspace);
   const project = requireProject(workspace, projectId);

@@ -187,7 +187,7 @@ test('cadence matching is comparison-only and never invents scheduler authority'
       sourceBindingAssertions: [source()],
       triggerAssertion: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'schedule:nightly' },
     }),
-    /trigger mode/,
+    /trigger assertion mode/,
   );
   assert.throws(
     () => renderPromptAssetV1(scheduled, {

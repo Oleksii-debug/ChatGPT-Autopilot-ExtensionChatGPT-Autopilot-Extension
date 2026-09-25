@@ -1,5 +1,6 @@
 import { DEFAULT_ORCHESTRATION_CONFIG, validateOrchestrationConfig } from './orchestration-v2.js';
 import { validateOrchestrationGraphV1 } from './orchestration-hierarchy.js';
+import { normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
 
 export const ORCHESTRATION_PROFILE_KIND = 'chatgpt-autopilot-orchestration-v2';
 export const ORCHESTRATION_PROFILE_VERSION = 1;
@@ -7,6 +8,8 @@ export const ORCHESTRATION_PROFILE_VERSION = 1;
 function clean(value) { return typeof value === 'string' ? value.trim() : ''; }
 function seconds(ms) { return Math.round(Number(ms || 0) / 1000); }
 function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid ${label}`); return value; }
+function plainObject(value, label) { const source = object(value, label); const prototype = Object.getPrototypeOf(source); if (prototype !== Object.prototype && prototype !== null) throw new Error(`Invalid ${label}`); return source; }
+function requiredOwn(value, key, label) { if (!Object.hasOwn(value, key)) throw new Error(`Invalid ${label}`); return value[key]; }
 function exactKeys(value, allowed, label) {
   const extras = Object.keys(value).filter((key) => !allowed.includes(key));
   if (extras.length) throw new Error(`Unknown ${label} field: ${extras[0]}`);
@@ -57,9 +60,32 @@ function portableHierarchyGraph(raw) {
   };
 }
 
+function portableSubagentPolicy(raw) {
+  const source = plainObject(raw, 'subagent_policy');
+  exactKeys(source, ['allow_agent_created_children','max_depth','max_children_per_agent'], 'subagent_policy');
+  return normalizeSubagentStructurePolicyV1({
+    allowAgentCreatedChildren: strictBoolean(
+      requiredOwn(source, 'allow_agent_created_children', 'subagent_policy.allow_agent_created_children'),
+      'subagent_policy.allow_agent_created_children',
+    ),
+    maxDepth: strictInteger(
+      requiredOwn(source, 'max_depth', 'subagent_policy.max_depth'),
+      'subagent_policy.max_depth',
+      0,
+      64,
+    ),
+    maxChildrenPerAgent: strictInteger(
+      requiredOwn(source, 'max_children_per_agent', 'subagent_policy.max_children_per_agent'),
+      'subagent_policy.max_children_per_agent',
+      0,
+      1000,
+    ),
+  });
+}
+
 function parseProfile(raw) {
   const root = object(raw, 'orchestration configuration file');
-  exactKeys(root, ['kind','version','name','project','github_control','providers','coordinator','safety','local_limits','timing','hierarchy'], 'root');
+  exactKeys(root, ['kind','version','name','project','github_control','providers','coordinator','safety','local_limits','timing','hierarchy','subagent_policy'], 'root');
   if (root.kind !== ORCHESTRATION_PROFILE_KIND || root.version !== ORCHESTRATION_PROFILE_VERSION) throw new Error('Unsupported orchestration configuration format');
   if (typeof root.name !== 'string' || root.name.trim().length > 120) throw new Error('Invalid name');
 
@@ -113,10 +139,13 @@ function parseProfile(raw) {
     coordinatorRetryBackoffMs: strictInteger(timing.coordinator_retry_seconds, 'timing.coordinator_retry_seconds', 5, 3600) * 1000,
   });
   const hierarchy = root.hierarchy === undefined ? null : portableHierarchyGraph(root.hierarchy);
-  return { config, hierarchy };
+  const subagentPolicy = root.subagent_policy === undefined
+    ? normalizeSubagentStructurePolicyV1({})
+    : portableSubagentPolicy(root.subagent_policy);
+  return { config, hierarchy, subagentPolicy };
 }
 
-export function exportOrchestrationProfile(configRaw, { name = 'Orchestration', hierarchy = null } = {}) {
+export function exportOrchestrationProfile(configRaw, { name = 'Orchestration', hierarchy = null, subagentPolicy = null } = {}) {
   const config = validateOrchestrationConfig(configRaw || {});
   const profile = {
     kind: ORCHESTRATION_PROFILE_KIND,
@@ -165,6 +194,14 @@ export function exportOrchestrationProfile(configRaw, { name = 'Orchestration', 
     },
   };
   if (hierarchy) profile.hierarchy = portableHierarchyGraph(hierarchy);
+  if (subagentPolicy !== null) {
+    const normalized = normalizeSubagentStructurePolicyV1(subagentPolicy);
+    profile.subagent_policy = {
+      allow_agent_created_children: normalized.allowAgentCreatedChildren,
+      max_depth: normalized.maxDepth,
+      max_children_per_agent: normalized.maxChildrenPerAgent,
+    };
+  }
   return profile;
 }
 
@@ -205,6 +242,13 @@ export function previewOrchestrationProfile(raw) {
       rootCount: parsed.hierarchy.nodes.filter(node => node.parentId === null).length,
       nodeCount: parsed.hierarchy.nodes.length,
       promptProfileCount: parsed.hierarchy.promptProfiles.length,
+    };
+  }
+  if (raw.subagent_policy !== undefined) {
+    preview.subagentPolicy = {
+      allowAgentCreatedChildren: parsed.subagentPolicy.allowAgentCreatedChildren,
+      maxDepth: parsed.subagentPolicy.maxDepth,
+      maxChildrenPerAgent: parsed.subagentPolicy.maxChildrenPerAgent,
     };
   }
   return preview;

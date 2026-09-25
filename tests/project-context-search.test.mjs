@@ -8,7 +8,7 @@ function source(overrides = {}) {
   return {
     schemaVersion: 1, sourceId: 'src-1', projectId: 'proj-1', kind: 'github',
     uri: 'https://example.invalid/repo', revisionId: 'rev-1', contentSha256: H,
-    observedAt: '2026-09-23T15:00:00Z', authority: 'CANONICAL', metadata: { branch: 'main' },
+    observedAt: '2026-09-23T15:00:00.000Z', authority: 'CANONICAL', metadata: { branch: 'main' },
     ...overrides,
   };
 }
@@ -17,13 +17,13 @@ function candidate(overrides = {}) {
   return {
     snapshot: {
       schemaVersion: 1, projectId: 'proj-1', revisionId: 'project-rev-1', title: 'Autopilot runtime',
-      sourceRefs: [s], artifactRefs: [], createdAt: '2026-09-23T15:00:00Z',
+      sourceRefs: [s], artifactRefs: [], createdAt: '2026-09-23T15:00:00.000Z',
     },
     capsule: {
       schemaVersion: 1, capsuleId: overrides.capsuleId || 'cap-1', projectId: 'proj-1',
       projectRevisionId: 'project-rev-1', summary: overrides.summary || 'Deterministic runtime recovery context',
       sourceBindings: overrides.sourceBindings || [{ sourceId: 'src-1', revisionId: 'rev-1', contentSha256: H }],
-      artifactRefs: [], createdAt: '2026-09-23T15:00:00Z',
+      artifactRefs: [], createdAt: '2026-09-23T15:00:00.000Z',
     },
   };
 }
@@ -107,7 +107,7 @@ test('a source permission cannot disclose unapproved artifact locations', () => 
   record.capsule.artifactRefs = [{
     schemaVersion: 1, artifactId: 'private-report', kind: 'report',
     uri: 'artifact://private/needle-secret-location', mediaType: 'application/json',
-    sha256: H2, sizeBytes: 17, createdAt: '2026-09-23T15:00:00Z',
+    sha256: H2, sizeBytes: 17, createdAt: '2026-09-23T15:00:00.000Z',
     producerInvocationId: 'invoke-1', sensitive: true,
   }];
   record.snapshot.artifactRefs = structuredClone(record.capsule.artifactRefs);

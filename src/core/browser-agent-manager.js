@@ -50,11 +50,19 @@ import {
   verifyAgentPlanSpecialistHandoffV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
+import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
 
+export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const SPECIALIST_CAPACITY_STATES = new Set([
+  ExecutionOwnershipState.OWNED,
+  ExecutionOwnershipState.HANDOFF_PENDING,
+  ExecutionOwnershipState.RECONCILE,
+  ExecutionOwnershipState.MANUAL_REVIEW,
+]);
 const PLAN_BOUND_ACTIONS = new Set([
   BrowserAgentActionType.CLICK, BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.DRAG_AT, BrowserAgentActionType.TYPE_AT,
   BrowserAgentActionType.TRUSTED_SCRIPT, BrowserAgentActionType.FILL, BrowserAgentActionType.FILL_CREDENTIAL, BrowserAgentActionType.SELECT,
@@ -70,6 +78,31 @@ function isHttpUrl(value) {
 }
 
 function clone(value) { return structuredClone(value); }
+function snapshotOwnDataRequest(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}.${key} must be an enumerable data property`);
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+function specialistRequestTimestamp(value, fallback, label = 'Specialist request at') {
+  const candidate = value === undefined ? fallback : value;
+  if (typeof candidate !== 'string' || candidate !== candidate.trim() || !candidate) {
+    throw new Error(`${label} must be a timestamp`);
+  }
+  const millis = Date.parse(candidate);
+  if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
+  return new Date(millis).toISOString();
+}
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
 function freshStore() { return { schemaVersion: BROWSER_AGENT_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -363,6 +396,34 @@ export class BrowserAgentManager {
     return { selectedId: target || '', job: target && store.byId[target] ? clone(store.byId[target]) : null };
   }
 
+  /**
+   * Canonical read-only job -> Project identity edge. Project context and
+   * artifact provenance resolvers must consume this persisted binding instead
+   * of accepting caller-supplied job/project pairs.
+   */
+  async resolveJobProjectBinding(id = '') {
+    const current = await this.get(id);
+    if (!current.job) throw new Error('Browser Agent job not found');
+    const projectId = current.job.config?.projectId || '';
+    if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+
+    let planId = '';
+    if (current.job.runtime?.plan) {
+      const plan = normalizeAgentPlanV1(current.job.runtime.plan);
+      if (plan.jobId !== current.job.id) {
+        throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+      }
+      planId = plan.planId;
+    }
+
+    return Object.freeze({
+      schemaVersion: BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION,
+      jobId: current.job.id,
+      projectId,
+      planId,
+    });
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -376,7 +437,9 @@ export class BrowserAgentManager {
   }
 
   async prepareSpecialistHandoff(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist prepare request');
     const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(store => {
       const job = store.byId[id];
@@ -384,9 +447,9 @@ export class BrowserAgentManager {
       // Persist the reconciliation that made this external node READY before
       // recording its handoff. Otherwise a restart/cycle could re-plan the
       // already-admitted node and request the same specialist twice.
-      const plan = reconcileAgentPlanV1(job.runtime.plan, { at: payload.at || now });
-      const assignment = prepareAgentPlanSpecialistHandoffV1(plan, { ...payload, at: payload.at || now });
-      const executionOwnership = prepareAgentPlanSpecialistExecutionOwnershipV1(plan, { ...payload, at: payload.at || now });
+      const plan = reconcileAgentPlanV1(job.runtime.plan, { at });
+      const assignment = prepareAgentPlanSpecialistHandoffV1(plan, { ...request, at });
+      const executionOwnership = prepareAgentPlanSpecialistExecutionOwnershipV1(plan, { ...request, at });
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
       const executionOwnerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
@@ -400,7 +463,7 @@ export class BrowserAgentManager {
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...executionOwnerships, executionOwnership];
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-prepared', nodeId: payload.nodeId, agentId: assignment.agentId, message: `Bounded ${assignment.specialistId} handoff prepared; execution is not yet claimed.` });
+      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-prepared', nodeId: request.nodeId, agentId: assignment.agentId, message: `Bounded ${assignment.specialistId} handoff prepared; execution is not yet claimed.` });
       result = { assignment: clone(assignment), executionOwnership:clone(executionOwnership), reused: false };
       return store;
     });
@@ -408,12 +471,14 @@ export class BrowserAgentManager {
   }
 
   async claimSpecialistHandoffs(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist claim request');
     const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
+      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
@@ -432,25 +497,45 @@ export class BrowserAgentManager {
    * method only distributes one product-wide capacity budget, so service
    * worker restart cannot briefly over-admit independent jobs.
    */
-  async claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs, ...payload } = {}) {
-    const limit = Number(maxConcurrentHandoffs);
-    if (!Number.isInteger(limit) || limit < 0 || limit > 256) throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+  async claimSpecialistHandoffsAcrossJobs(payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
+    const limit = request.maxConcurrentHandoffs;
+    if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
+      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+    }
     const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
+    const claimRequest = Object.create(null);
+    for (const [key, value] of Object.entries(request)) {
+      if (key !== 'maxConcurrentHandoffs') claimRequest[key] = value;
+    }
+    claimRequest.at = at;
     let result = null;
     await this.update(store => {
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
-        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(payload.at || now));
-      let remaining = Math.max(0, limit - liveLeases.length);
+        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
+      const specialistOwnerships = store.order
+        .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
+        .map(normalizeExecutionOwnershipV1);
+      const effectIds = new Set();
+      for (const ownership of specialistOwnerships) {
+        if (effectIds.has(ownership.effectId)) {
+          throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
+        }
+        effectIds.add(ownership.effectId);
+      }
+      const capacityOwnerships = specialistOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state));
+      let remaining = Math.max(0, limit - capacityOwnerships.length);
       const claimed = [];
       const reconciliationRequired = [];
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
         const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...payload,
+          ...claimRequest,
           availableSlots: remaining,
           executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-          at: payload.at || now,
+          at,
         });
         job.runtime.plan = outcome.plan;
         job.runtime.specialistHandoffs = outcome.assignments;
@@ -466,22 +551,31 @@ export class BrowserAgentManager {
           appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
         }
       }
-      result = { maxConcurrentHandoffs: limit, activeLeases: liveLeases.length, remainingSlots: remaining, claimed, reconciliationRequired };
+      result = {
+        maxConcurrentHandoffs: limit,
+        activeLeases: liveLeases.length,
+        capacityObligations: capacityOwnerships.length,
+        remainingSlots: remaining,
+        claimed,
+        reconciliationRequired,
+      };
       return store;
     });
     return result;
   }
 
   async authorizeSpecialistSafeRetry(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
     const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
       const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...payload,
+        ...request,
         executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at: payload.at || now,
+        at,
       });
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
@@ -491,10 +585,13 @@ export class BrowserAgentManager {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryEvidence.verifierId,
-        verificationAuthorityId: retriable.safeRetryEvidence.verificationAuthorityId,
-        evidence: retriable.safeRetryEvidence.evidence,
-        message: 'Independent no-effect evidence authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+        verifierId: retriable.safeRetryVerification.verifierId,
+        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
+        verificationId: retriable.safeRetryVerification.verificationId,
+        observationId: retriable.safeRetryVerification.observationId,
+        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
+        evidence: retriable.safeRetryVerification.summary,
+        message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
       });
       result = clone(retriable);
       return store;
@@ -503,12 +600,14 @@ export class BrowserAgentManager {
   }
 
   async completeSpecialistHandoff(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist completion request');
     const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to complete');
-      const completed = completeAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
+      const completed = completeAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = completed.plan;
       job.runtime.specialistHandoffs = completed.assignments;
       job.runtime.specialistExecutionOwnerships = completed.executionOwnerships;
@@ -521,12 +620,14 @@ export class BrowserAgentManager {
   }
 
   async verifySpecialistHandoff(id, payload = {}) {
+    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
     const now = new Date(this.now()).toISOString();
+    const at = specialistRequestTimestamp(request.at, now);
     let result = null;
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...payload, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at: payload.at || now });
+      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
@@ -543,6 +644,7 @@ export class BrowserAgentManager {
     const now = this.now();
     const config = normalizeBrowserAgentConfig({
       id,
+      projectId: raw.projectId ?? '',
       name: raw.name || 'Нове завдання агента',
       startUrl: raw.startUrl || '',
       startFromActiveTab: raw.startFromActiveTab !== false,
@@ -603,8 +705,38 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+
+      let nextProjectId = job.config.projectId || '';
+      if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
+        const descriptor = Object.getOwnPropertyDescriptor(rawConfig, 'projectId');
+        if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+          throw new Error('Browser Agent projectId must be an enumerable own data property');
+        }
+        nextProjectId = normalizeBrowserAgentConfig({ ...job.config, projectId: descriptor.value, id }, { id }).projectId;
+        if (job.config.projectId && nextProjectId !== job.config.projectId) {
+          throw new Error('Browser Agent projectId is immutable; create a new job for another Project');
+        }
+        if (!job.config.projectId && nextProjectId) {
+          const runtime = job.runtime || {};
+          const alreadyExecuted = Boolean(
+            runtime.plan
+            || Number(runtime.stepCount || 0) > 0
+            || Number(runtime.modelCalls || 0) > 0
+            || Number(runtime.startedAt || 0) > 0
+            || Number(runtime.completedCycles || 0) > 0
+            || runtime.verifiedOutcome
+            || (runtime.specialistHandoffs || []).length
+            || (runtime.specialistExecutionOwnerships || []).length
+            || (runtime.history || []).length
+          );
+          if (alreadyExecuted) {
+            throw new Error('Browser Agent projectId must be bound before the job produces execution history');
+          }
+        }
+      }
+
       const previousCriteria = JSON.stringify(job.config.acceptanceCriteria || []);
-      job.config = normalizeBrowserAgentConfig({ ...job.config, ...rawConfig, id }, { id });
+      job.config = normalizeBrowserAgentConfig({ ...job.config, ...rawConfig, projectId: nextProjectId, id }, { id });
       if (JSON.stringify(job.config.acceptanceCriteria || []) !== previousCriteria) job.runtime.verifiedOutcome = null;
       job.updatedAt = now;
       return store;
