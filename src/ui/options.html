@@ -754,6 +754,9 @@
           <label data-label-for="provider">Провайдер</label><select data-route-field="provider"><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="openai-compatible">OpenAI-compatible endpoint</option></select>
           <label data-label-for="endpointId">Endpoint ID (лише OpenAI-compatible)</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="model">Модель</label><input data-route-field="model" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="displayName">Назва профілю моделі</label><input data-route-field="displayName" type="text" maxlength="160" autocomplete="off">
+          <label data-label-for="systemPrompt">Системний промпт цієї моделі</label><textarea data-route-field="systemPrompt" rows="3" maxlength="8000"></textarea>
+          <label data-label-for="workerPrompt">Інструкція воркеру цієї моделі</label><textarea data-route-field="workerPrompt" rows="3" maxlength="8000"></textarea>
           <button type="button" data-route-action="discover-models">Отримати моделі цього постачальника</button>
           <label data-label-for="discoveredModel">Моделі постачальника</label><select data-route-field="discoveredModel"><option value="">Оберіть модель після оновлення</option></select>
           <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>
