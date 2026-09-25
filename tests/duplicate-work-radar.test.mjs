@@ -13,6 +13,7 @@ function policy(overrides = {}) {
     schemaVersion:1,
     policyId:'radar.default',
     highOverlapBasisPoints:6500,
+    minHighOverlapDimensions:2,
     weights:{
       conflictKeys:1000,
       subsystems:800,
@@ -395,4 +396,32 @@ test('duplicate work analysis never grants claim, cancellation, reassignment, de
   assert.equal('cancelWorkId' in result.pairs[0], false);
   assert.equal('assignWorkerId' in result.pairs[0], false);
   assert.equal('lease' in result, false);
+});
+
+
+test('one matching sparse semantic tag cannot alone trigger HIGH_OVERLAP when policy requires multiple evidence dimensions', () => {
+  const result = analyzeDuplicateWorkV1({
+    schemaVersion:1,
+    policy:policy({ highOverlapBasisPoints:5000, minHighOverlapDimensions:2 }),
+    workItems:[
+      work('a', 'worker.a', { semanticTags:['same.tag'] }),
+      work('b', 'worker.b', { semanticTags:['same.tag'] }),
+    ],
+  });
+  assert.equal(result.pairs.length, 1);
+  assert.equal(result.pairs[0].scoreBasisPoints, 10_000);
+  assert.equal(result.pairs[0].matchedDimensionCount, 1);
+  assert.equal(result.pairs[0].classification, WorkOverlapClassification.RELATED);
+});
+
+test('shared conflict key remains a strong mutation/review convergence signal even with one matched dimension', () => {
+  const result = analyzeDuplicateWorkV1({
+    schemaVersion:1,
+    policy:policy({ minHighOverlapDimensions:5 }),
+    workItems:[
+      work('mutate', 'worker.a', { conflictKeys:['authority.key'] }),
+      work('review', 'worker.b', { mode:'REVIEW', conflictKeys:['authority.key'] }),
+    ],
+  });
+  assert.equal(result.pairs[0].classification, WorkOverlapClassification.COMPLEMENTARY_REVIEW);
 });
