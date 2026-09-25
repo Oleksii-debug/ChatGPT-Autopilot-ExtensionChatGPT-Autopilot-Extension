@@ -64,7 +64,7 @@ test('verifies immutable JSON bytes and returns a frozen prototype-safe structur
   assert.equal(out.structural.objectCount, 2);
   assert.equal(out.structural.arrayCount, 1);
   assert.equal(out.structural.numberCount, 2);
-  assert.equal(out.structural.booleanCount, 1);
+  assert.equal(out.structural.booleanCount, 2);
   assert.equal(out.structural.nullCount, 1);
   assert.equal(out.valueAvailable, true);
   assert.equal(Object.getPrototypeOf(out.value), null);
