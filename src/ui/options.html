@@ -100,7 +100,7 @@
 
           <div id="simplified-url-group">
             <label for="simplified-url">Посилання ChatGPT для всіх завдань</label>
-            <input id="simplified-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://chatgpt.com/">
+            <input id="simplified-url" type="url" autocomplete="off" spellcheck="false">
           </div>
           <div id="simplified-prompt-group">
             <label for="simplified-prompt">Спільний промпт для всіх завдань</label>
@@ -220,7 +220,7 @@
       <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
 
       <label for="agent-prompt">Що потрібно зробити?</label>
-      <textarea id="agent-prompt" rows="9" spellcheck="true" placeholder="Наприклад: перевір предмети зимового семестру, підбери розклад без конфліктів і виконай задачу відповідно до вибраної нижче політики автономності."></textarea>
+      <textarea id="agent-prompt" rows="9" spellcheck="true"></textarea>
       <div class="agent-actions" aria-label="Основні дії агента">
         <button id="agent-run-prompt-button" type="button">Запустити агента</button>
         <button id="agent-pause-button" type="button" disabled>Пауза</button>
@@ -241,7 +241,7 @@
       </div>
 
       <label for="agent-follow-up">Уточнення під час роботи</label>
-      <textarea id="agent-follow-up" rows="3" spellcheck="true" placeholder="Наприклад: не обирай п’ятницю; якщо є два варіанти — вибирай ранковий."></textarea>
+      <textarea id="agent-follow-up" rows="3" spellcheck="true"></textarea>
       <button id="agent-send-follow-up-button" type="button" disabled>Надіслати уточнення агенту</button>
 
       <details id="agent-current-task-details" open>
@@ -258,7 +258,7 @@
 
       <fieldset class="settings-group" id="agent-native-companion-group">
         <legend>Windows Native Companion</legend>
-        <button id="agent-native-companion-check-button" type="button" aria-describedby="agent-native-companion-status">Перевірити Native Companion</button>
+        <button id="agent-native-companion-check-button" type="button">Перевірити Native Companion</button>
         <p id="agent-native-companion-status" role="status">Native Companion ще не перевіряли.</p>
       </fieldset>
 
@@ -276,7 +276,7 @@
         <fieldset class="settings-group">
           <legend>Старт і браузер</legend>
           <label for="agent-start-url">Стартова адреса, необов’язково</label>
-          <input id="agent-start-url" type="url" autocomplete="off" spellcheck="false" placeholder="Порожньо — використати активну вкладку">
+          <input id="agent-start-url" type="url" autocomplete="off" spellcheck="false">
           <label for="agent-max-steps">Safety ceiling дій</label>
           <input id="agent-max-steps" type="number" min="1" max="10000" step="1" inputmode="numeric" value="500">
           <label for="agent-step-delay-ms">Пауза між швидкими діями, мс</label>
@@ -295,11 +295,11 @@
             <option value="DENY">DENY — не використовувати credentials у цьому завданні</option>
           </select>
           <label for="agent-site-rules">Правила для окремих сайтів, необов’язково</label>
-          <textarea id="agent-site-rules" rows="6" spellcheck="false" placeholder="example.com | ALLOW&#10;bank.example | ASK | trusted_script=DENY,upload_download=ASK&#10;*.example.org | DENY"></textarea>
+          <textarea id="agent-site-rules" rows="6" spellcheck="false"></textarea>
           <label><input id="agent-vision-on-demand" type="checkbox" checked>Дозволяти Agent запитувати знімок видимої області для vision, коли DOM/ARIA недостатньо</label>
           <label><input id="agent-trusted-script-enabled" type="checkbox">Дозволяти Trusted Script fallback для складних сайтів. Потреба в підтвердженні визначається вибраною вище політикою; у режимі повної автономії окремого підтвердження немає.</label>
           <label for="agent-acceptance-criteria">Критерії завершеного результату, необов’язково</label>
-          <textarea id="agent-acceptance-criteria" rows="4" spellcheck="true" placeholder="Наприклад: На сторінці видно підтвердження бронювання&#10;Наприклад: Вибрано саме ранковий варіант"></textarea>
+          <textarea id="agent-acceptance-criteria" rows="4" spellcheck="true"></textarea>
         </fieldset>
         <fieldset class="settings-group">
           <legend>Розклад і повторення</legend>
@@ -338,7 +338,7 @@
             <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
           </select>
           <label for="agent-ai-primary-model">Primary model, необов’язково</label>
-          <input id="agent-ai-primary-model" type="text" autocomplete="off" spellcheck="false" placeholder="Порожньо — успадкувати глобальну модель">
+          <input id="agent-ai-primary-model" type="text" autocomplete="off" spellcheck="false">
           <label for="agent-ai-strong-provider">Strong provider</label>
           <select id="agent-ai-strong-provider">
             <option value="inherit">Успадкувати</option>
@@ -347,7 +347,7 @@
             <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
           </select>
           <label for="agent-ai-strong-model">Strong model, необов’язково</label>
-          <input id="agent-ai-strong-model" type="text" autocomplete="off" spellcheck="false" placeholder="Порожньо — успадкувати глобальну модель">
+          <input id="agent-ai-strong-model" type="text" autocomplete="off" spellcheck="false">
         </fieldset>
         <fieldset class="settings-group">
           <legend>AI budgets</legend>
@@ -384,15 +384,15 @@
 
       <div id="orchestration-v2-orchestras-panel" data-orchestration-panel="orchestras">
         <label for="orchestration-v2-orchestra-list">Оркестри</label>
-        <select id="orchestration-v2-orchestra-list" size="5" aria-describedby="orchestration-v2-orchestra-summary"></select>
+        <select id="orchestration-v2-orchestra-list" size="5"></select>
         <label for="orchestration-v2-orchestra-name">Назва</label>
         <input id="orchestration-v2-orchestra-name" type="text" maxlength="120" autocomplete="off">
         <div class="orchestra-actions" aria-label="Дії з вибраним оркестром">
           <button id="new-orchestration-v2-orchestra-button" type="button">Новий оркестр</button>
           <button id="rename-orchestration-v2-orchestra-button" type="button">Перейменувати</button>
-          <button id="start-orchestration-v2-orchestra-button" type="button" aria-describedby="orchestration-v2-start-help">Запустити оркестр</button>
-          <button id="pause-orchestration-v2-orchestra-button" type="button" aria-describedby="orchestration-v2-pause-help">Призупинити оркестр</button>
-          <button id="resume-orchestration-v2-orchestra-button" type="button" aria-describedby="orchestration-v2-pause-help">Продовжити оркестр</button>
+          <button id="start-orchestration-v2-orchestra-button" type="button">Запустити оркестр</button>
+          <button id="pause-orchestration-v2-orchestra-button" type="button">Призупинити оркестр</button>
+          <button id="resume-orchestration-v2-orchestra-button" type="button">Продовжити оркестр</button>
           <button id="delete-orchestration-v2-orchestra-button" type="button">Видалити оркестр</button>
         </div>
         <div class="notice" id="orchestration-v2-start-help"><strong>Запуск без очікування watchdog.</strong> «Запустити оркестр» одразу починає перший Coordinator-cycle. Фізичний Send відбувається після налаштованої Coordinator pre-send затримки.</div>
@@ -409,13 +409,13 @@
         <fieldset class="settings-group" id="orchestration-v2-hierarchy-template-group">
           <legend>Стандартна ієрархія Director → Managers → Workers</legend>
           <label for="orchestration-v2-hierarchy-domains">Managers та їхні області</label>
-          <textarea id="orchestration-v2-hierarchy-domains" rows="6" spellcheck="true" placeholder="runtime | Runtime, execution, recovery and reliability.&#10;science | Scientific model, evidence and validation."></textarea>
+          <textarea id="orchestration-v2-hierarchy-domains" rows="6" spellcheck="true"></textarea>
           <label for="orchestration-v2-hierarchy-workers">Workers на одного Manager</label>
           <input id="orchestration-v2-hierarchy-workers" type="number" min="1" max="40" step="1" inputmode="numeric" value="5">
           <label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково</label>
-          <textarea id="orchestration-v2-hierarchy-drive-sources" rows="4" spellcheck="false" placeholder="runtime | https://docs.google.com/document/d/FILE_ID/edit&#10;science | FILE_ID"></textarea>
+          <textarea id="orchestration-v2-hierarchy-drive-sources" rows="4" spellcheck="false"></textarea>
           <label for="orchestration-v2-hierarchy-drive-folders">Drive-папки з versioned dispatch, необов’язково</label>
-          <textarea id="orchestration-v2-hierarchy-drive-folders" rows="4" spellcheck="false" placeholder="runtime | https://drive.google.com/drive/folders/FOLDER_ID&#10;science | FOLDER_ID"></textarea>
+          <textarea id="orchestration-v2-hierarchy-drive-folders" rows="4" spellcheck="false"></textarea>
           <label for="orchestration-v2-hierarchy-drive-poll">Перевіряти Drive, хв</label>
           <input id="orchestration-v2-hierarchy-drive-poll" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3">
           <button id="authorize-orchestration-v2-drive-button" type="button">Авторизувати Google Drive</button>
@@ -426,7 +426,7 @@
           <p id="orchestration-v2-hierarchy-template-status" tabindex="0">Ієрархію ще не створено цим шаблоном.</p>
         </fieldset>
 
-        <p id="orchestration-v2-orchestra-summary" role="status">Оркестри ще не створені. Створіть новий оркестр або завантажте JSON-файл.</p>
+        <p id="orchestration-v2-orchestra-summary" role="status">Оркестри ще не створені.</p>
       </div>
 
       <div id="orchestration-v2-settings-panel" data-orchestration-panel="settings" hidden>
@@ -436,11 +436,11 @@
       <fieldset class="settings-group" id="orchestration-v2-project-group">
         <legend>Проєкт і control</legend>
         <label for="orchestration-v2-project-id">Проєкт</label>
-        <input id="orchestration-v2-project-id" type="text" autocomplete="off" spellcheck="false" placeholder="nika-main">
+        <input id="orchestration-v2-project-id" type="text" autocomplete="off" spellcheck="false">
         <label for="orchestration-v2-target-repository">Робочий репозиторій</label>
-        <input id="orchestration-v2-target-repository" type="text" autocomplete="off" spellcheck="false" placeholder="Oleksii-debug/project">
+        <input id="orchestration-v2-target-repository" type="text" autocomplete="off" spellcheck="false">
         <label for="orchestration-v2-control-repository">Control репозиторій</label>
-        <input id="orchestration-v2-control-repository" type="text" autocomplete="off" spellcheck="false" placeholder="Oleksii-debug/project">
+        <input id="orchestration-v2-control-repository" type="text" autocomplete="off" spellcheck="false">
         <label for="orchestration-v2-control-issue">Control Issue</label>
         <input id="orchestration-v2-control-issue" type="number" min="1" step="1" inputmode="numeric">
         <label for="orchestration-v2-control-comment">Control comment</label>
@@ -459,7 +459,7 @@
           <option value="chatgpt-browser">ChatGPT Browser</option>
         </select>
         <label for="orchestration-v2-coordinator-url">Coordinator URL</label>
-        <input id="orchestration-v2-coordinator-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://chatgpt.com/">
+        <input id="orchestration-v2-coordinator-url" type="url" autocomplete="off" spellcheck="false">
         <label for="orchestration-v2-master-prompt">Master prompt</label>
         <textarea id="orchestration-v2-master-prompt" rows="10" spellcheck="true"></textarea>
         <label for="orchestration-v2-tick-prompt">Tick prompt</label>
@@ -517,7 +517,7 @@
 
       <div id="orchestration-v2-state-panel" data-orchestration-panel="state" hidden>
         <button id="run-orchestration-v2-button" type="button">Оновити стан</button>
-        <button id="stop-orchestration-v2-button" type="button" aria-describedby="orchestration-v2-stop-help">Аварійно зупинити вибраний оркестр</button>
+        <button id="stop-orchestration-v2-button" type="button">Аварійно зупинити вибраний оркестр</button>
         <div class="notice" id="orchestration-v2-stop-help"><strong>Аварійна дія лише для вибраного оркестру.</strong> Стоп відкликає authority у цього оркестру. Інші оркестри не зупиняються.</div>
         <p id="orchestration-v2-status" role="status">Orchestration V2 ще не налаштовано.</p>
         <p id="orchestration-v2-runtime" tabindex="0">Coordinator і worker pool ще не запущені.</p>
@@ -530,9 +530,9 @@
       <label><input id="remote-dispatch-intake-paused" type="checkbox">Пауза intake</label>
 
       <label for="remote-dispatch-project-id">project_id цього Chrome-профілю</label>
-      <input id="remote-dispatch-project-id" type="text" autocomplete="off" spellcheck="false" placeholder="nika-main">
+      <input id="remote-dispatch-project-id" type="text" autocomplete="off" spellcheck="false">
       <label for="remote-dispatch-repository">GitHub repository, owner/name</label>
-      <input id="remote-dispatch-repository" type="text" autocomplete="off" spellcheck="false" placeholder="Oleksii-debug/project">
+      <input id="remote-dispatch-repository" type="text" autocomplete="off" spellcheck="false">
       <label for="remote-dispatch-issue">Номер GitHub Issue з dispatch-чергою</label>
       <input id="remote-dispatch-issue" type="number" min="1" step="1" inputmode="numeric">
 
@@ -557,7 +557,7 @@
       <h2 id="scenario-work-heading" tabindex="-1">Сценарна робота</h2>
 
       <label for="scenario-work-list">Сценарії</label>
-      <select id="scenario-work-list" size="6" aria-describedby="scenario-work-summary"></select>
+      <select id="scenario-work-list" size="6"></select>
       <div class="orchestra-actions" aria-label="Створення сценарію">
         <button id="new-scenario-cycle-button" type="button">Новий цикл у чаті</button>
         <button id="new-scenario-pairs-button" type="button">Нові двійки</button>
@@ -568,18 +568,18 @@
       <fieldset class="settings-group" id="scenario-work-portable-profile">
         <legend>Файл конфігурації сценарію</legend>
         <label for="scenario-work-profile-file">JSON-файл сценарію</label>
-        <input id="scenario-work-profile-file" type="file" accept=".json,application/json" aria-describedby="scenario-work-profile-status">
+        <input id="scenario-work-profile-file" type="file" accept=".json,application/json">
         <div class="orchestra-actions" aria-label="Імпорт та експорт конфігурації сценарію">
           <button id="scenario-work-template-button" type="button">Завантажити шаблон</button>
           <button id="scenario-work-import-button" type="button">Імпортувати файл</button>
           <button id="scenario-work-export-button" type="button">Експортувати вибраний сценарій</button>
         </div>
-        <p id="scenario-work-profile-status" role="status" tabindex="0">Шаблон містить приклад: стартовий промпт ×1 → «Продовжуй розробку.» ×10 → фінальний промпт ×1. Імпорт створює новий зупинений сценарій; запуск виконується окремо.</p>
+        <p id="scenario-work-profile-status" role="status" tabindex="0">Файл не вибрано.</p>
       </fieldset>
 
       <label for="scenario-work-name">Назва</label>
       <input id="scenario-work-name" type="text" maxlength="120" autocomplete="off">
-      <p id="scenario-work-mode-label" class="field-help">Формат не вибрано.</p>
+      <p id="scenario-work-mode-label" role="status">Формат не вибрано.</p>
       <div class="orchestra-actions" aria-label="Дії зі сценарієм">
         <button id="save-scenario-work-button" type="button">Зберегти</button>
         <button id="start-scenario-work-button" type="button">Запустити</button>
@@ -630,8 +630,8 @@
           <input id="scenario-cycle-url" type="url" autocomplete="off" spellcheck="false" value="https://chatgpt.com/">
           <label><input id="scenario-cycle-restart-round-timeout" type="checkbox" checked>Після зависання нового чату повторити поточне коло з першого промпта</label>
           <h3>Послідовність промптів</h3>
-          <p id="scenario-cycle-message-count" class="field-help" role="status">Повідомлень у кожному чаті: 1.</p>
-          <div id="scenario-cycle-steps" aria-describedby="scenario-cycle-message-count"></div>
+          <p id="scenario-cycle-message-count" role="status">Повідомлень у кожному чаті: 1.</p>
+          <div id="scenario-cycle-steps"></div>
           <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
           <label for="scenario-cycle-parallel-count">Скільки чатів тримати одночасно в пулі</label>
           <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="5">
@@ -728,7 +728,7 @@
 
     <section aria-labelledby="local-ai-heading" data-app-mode="ai">
       <h2 id="local-ai-heading">Локальний ШІ / модель</h2>
-      <label><input id="local-ai-enabled" type="checkbox" aria-describedby="local-ai-status">Увімкнути локальний ШІ</label>
+      <label><input id="local-ai-enabled" type="checkbox">Увімкнути локальний ШІ</label>
 
       <label for="local-ai-provider">Провайдер</label>
       <select id="local-ai-provider">
@@ -758,7 +758,7 @@
 
     <section aria-labelledby="ai-router-heading" data-app-mode="ai">
       <h2 id="ai-router-heading">AI Router</h2>
-      <label><input id="ai-router-enabled" type="checkbox" aria-describedby="ai-router-status">Увімкнути AI Router</label>
+      <label><input id="ai-router-enabled" type="checkbox">Увімкнути AI Router</label>
 
       <div class="notice" id="ai-router-openai-help">
         <strong>OpenAI API.</strong> Для безпеки API key не зберігається у Chrome-розширенні.
@@ -912,7 +912,7 @@
 
     <section aria-labelledby="ai-manager-heading" data-app-mode="ai">
       <h2 id="ai-manager-heading">AI Manager</h2>
-      <label><input id="ai-manager-enabled" type="checkbox" aria-describedby="ai-manager-status">Увімкнути AI Manager</label>
+      <label><input id="ai-manager-enabled" type="checkbox">Увімкнути AI Manager</label>
       <label><input id="ai-manager-auto-apply" type="checkbox">Автозастосування</label>
 
       <label for="ai-manager-every-n">Аналіз кожні N Send</label>
@@ -962,7 +962,7 @@
       <h2 id="portable-profile-heading">Файл сесій</h2>
       <a id="download-profile-template" href="../config/portable-profile-template.json" download="ChatGPT-Autopilot-profile-template.json">Шаблон JSON</a>
       <label for="portable-profile-file">Імпорт JSON</label>
-      <input id="portable-profile-file" type="file" accept="application/json,.json" aria-describedby="portable-profile-preview">
+      <input id="portable-profile-file" type="file" accept="application/json,.json">
       <p id="portable-profile-preview" tabindex="0">Файл не вибрано.</p>
       <button id="import-profile-button" type="button" disabled>Імпортувати</button>
       <button id="import-profile-start-button" type="button" disabled>Імпорт + старт</button>
@@ -1055,21 +1055,21 @@
 
           <div id="calendar-common-fields" hidden>
             <label for="calendar-time-zone">Часовий пояс IANA</label>
-            <input id="calendar-time-zone" type="text" autocomplete="off" spellcheck="false" placeholder="Europe/Bratislava">
+            <input id="calendar-time-zone" type="text" autocomplete="off" spellcheck="false">
             <label><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски</label>
             <label><input id="calendar-revision-confirm" type="checkbox"> Підтверджую зміну вже існуючого календарного розкладу</label>
           </div>
 
           <div id="calendar-one-time-fields" hidden>
             <label for="calendar-one-time-date">Дата запуску</label>
-            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25">
+            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off">
             <label for="calendar-one-time-time">Час запуску</label>
-            <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off" placeholder="21:00">
+            <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off">
           </div>
 
           <div id="calendar-recurring-fields" hidden>
             <label for="calendar-start-date">Дата початку повторення</label>
-            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25">
+            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off">
 
             <label for="calendar-times">Часи запуску, по одному в рядку</label>
             <textarea id="calendar-times" rows="4" spellcheck="false"></textarea>
@@ -1086,14 +1086,14 @@
             </fieldset>
 
             <label for="calendar-end-date">Необов’язкова кінцева дата</label>
-            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-12-31">
+            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off">
             <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
             <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
           </div>
 
           <div id="calendar-explicit-fields" hidden>
             <label for="calendar-explicit-occurrences">Явні дати й час, по одному запуску в рядку</label>
-            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="2026-09-25 09:00&#10;2026-09-25 14:00&#10;2026-09-25 21:00"></textarea>
+            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false"></textarea>
           </div>
 
           <p id="calendar-runtime-status" role="status" tabindex="0">Календарний розклад вимкнено.</p>
@@ -1203,14 +1203,14 @@
           <option value="LOG">Core log</option>
           <option value="DIAGNOSTIC">Діагностика</option>
         </select>
-        <button id="refresh-run-timeline-button" type="button" aria-describedby="run-timeline-status">Оновити хронологію</button>
+        <button id="refresh-run-timeline-button" type="button">Оновити хронологію</button>
         <p id="run-timeline-status" tabindex="0">Хронологію ще не завантажено.</p>
         <ol id="run-timeline-list" aria-label="Хронологія виконання вибраного сеансу"></ol>
       </section>
 
       <section aria-labelledby="diagnostics-heading">
         <h3 id="diagnostics-heading">Діагностика</h3>
-        <button id="download-diagnostic-report-button" type="button" aria-describedby="diagnostic-report-status">Діагностичний звіт</button>
+        <button id="download-diagnostic-report-button" type="button">Діагностичний звіт</button>
         <p id="diagnostic-report-status" tabindex="0">Діагностичний звіт ще не завантажували.</p>
       </section>
     </section>
