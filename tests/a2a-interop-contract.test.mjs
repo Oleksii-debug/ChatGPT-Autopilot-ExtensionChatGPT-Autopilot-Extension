@@ -24,6 +24,12 @@ function iface(overrides = {}) {
   };
 }
 
+function securityRequirement(scopeIds = ['agent.connect'], schemeId = 'oauth.main') {
+  return {
+    schemes: [{ schemeId, scopeIds }],
+  };
+}
+
 function card(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -34,6 +40,11 @@ function card(overrides = {}) {
     supportedInterfaces: [iface()],
     skillIds: ['research.deep', 'research.quick'],
     securitySchemeIds: ['oauth.main'],
+    securityRequirements: [securityRequirement(['agent.connect'])],
+    skillSecurityRequirements: [{
+      skillId: 'research.deep',
+      securityRequirements: [securityRequirement(['research.deep'])],
+    }],
     signatureEvidenceArtifactIds: ['artifact.card-signature'],
     discoveredAt: T0,
     ...overrides,
@@ -69,7 +80,7 @@ function delegation(overrides = {}) {
     remoteAgentId: 'remote.research',
     requestedSkillId: 'research.deep',
     requestedCapabilityIds: ['artifact.read', 'research.query'],
-    requiredSecuritySchemeIds: ['oauth.main'],
+    declaredSecurityRequirement: securityRequirement(['agent.connect', 'research.deep']),
     taskEnvelopeArtifactId: 'artifact.task-envelope',
     inputArtifactIds: ['artifact.source-1'],
     policyDecisionId: 'policy-decision-1',
@@ -111,7 +122,7 @@ test('same A2A URL may expose multiple bindings but exact duplicate tuples fail 
   );
 });
 
-test('A2A endpoints are HTTPS-only and custom bindings must be tokens or HTTPS URIs', () => {
+test('A2A transport endpoints follow binding-specific secure production forms', () => {
   assert.throws(
     () => normalizeA2ARemoteAgentCardRefV1(card({ cardUrl: 'http://agent.example.com/card.json' })),
     /HTTPS URL/,
@@ -124,12 +135,39 @@ test('A2A endpoints are HTTPS-only and custom bindings must be tokens or HTTPS U
   );
   assert.throws(
     () => normalizeA2ARemoteAgentCardRefV1(card({
-      supportedInterfaces: [iface({ protocolBinding: 'bad binding with spaces' })],
+      supportedInterfaces: [iface({ protocolBinding: 'CUSTOM' })],
     })),
     /protocolBinding is invalid/,
   );
+
+  const grpcCard = card({
+    supportedInterfaces: [iface({
+      url: 'grpc.example.com:443',
+      protocolBinding: 'GRPC',
+    })],
+  });
+  const normalizedGrpc = normalizeA2ARemoteAgentCardRefV1(grpcCard);
+  assert.equal(normalizedGrpc.supportedInterfaces[0].url, 'grpc.example.com:443');
+  assert.doesNotThrow(() => assessA2ADelegationV1({
+    card: grpcCard,
+    admission: admission({
+      interfaceUrl: 'grpc.example.com:443',
+      protocolBinding: 'GRPC',
+    }),
+    delegation: delegation(),
+  }));
+  assert.throws(
+    () => normalizeA2ARemoteAgentCardRefV1(card({
+      supportedInterfaces: [iface({ url: 'grpc.example.com', protocolBinding: 'GRPC' })],
+    })),
+    /gRPC host:port/,
+  );
+
   assert.doesNotThrow(() => normalizeA2ARemoteAgentCardRefV1(card({
-    supportedInterfaces: [iface({ protocolBinding: 'https://example.com/bindings/custom/v1' })],
+    supportedInterfaces: [iface({
+      url: 'wss://agent.example.com/a2a',
+      protocolBinding: 'https://example.com/bindings/websocket/v1',
+    })],
   })));
 });
 
@@ -199,6 +237,11 @@ test('exact admitted card, interface, skill, security and capability set reaches
   assert.equal(result.requiresPolicyDecision, true);
   assert.equal(result.credentialsOutOfBand, true);
   assert.equal(result.remoteTaskCreated, false);
+  assert.deepEqual(result.declaredSecuritySchemeIds, ['oauth.main']);
+  assert.deepEqual(result.declaredSecurityRequirement.schemes, [{
+    schemeId: 'oauth.main',
+    scopeIds: ['agent.connect', 'research.deep'],
+  }]);
 });
 
 test('card digest or selected interface drift blocks delegation before policy evaluation', () => {
@@ -242,17 +285,74 @@ test('unknown or non-admitted skills, capabilities and security schemes fail clo
     delegation: delegation({
       requestedSkillId: 'research.unlisted',
       requestedCapabilityIds: ['filesystem.write'],
-      requiredSecuritySchemeIds: ['mtls.private'],
+      declaredSecurityRequirement: securityRequirement([], 'mtls.private'),
     }),
   });
   assert.equal(result.status, 'BLOCKED');
   assert.deepEqual(result.reasons, [
+    'AGENT_SECURITY_REQUIREMENT_UNSATISFIED',
     'CAPABILITY_NOT_ADMITTED',
     'SECURITY_SCHEME_NOT_ADMITTED',
     'SECURITY_SCHEME_NOT_IN_CARD',
     'SKILL_NOT_ADMITTED',
     'SKILL_NOT_IN_CARD',
   ]);
+});
+
+test('agent and skill security requirements are enforced as OR-of-AND scheme/scope sets', () => {
+  const empty = assessA2ADelegationV1({
+    card: card(),
+    admission: admission(),
+    delegation: delegation({
+      declaredSecurityRequirement: { schemes: [] },
+    }),
+  });
+  assert.deepEqual(empty.reasons, [
+    'AGENT_SECURITY_REQUIREMENT_UNSATISFIED',
+    'SKILL_SECURITY_REQUIREMENT_UNSATISFIED',
+  ]);
+
+  const missingSkillScope = assessA2ADelegationV1({
+    card: card(),
+    admission: admission(),
+    delegation: delegation({
+      declaredSecurityRequirement: securityRequirement(['agent.connect']),
+    }),
+  });
+  assert.deepEqual(missingSkillScope.reasons, ['SKILL_SECURITY_REQUIREMENT_UNSATISFIED']);
+
+  const alternatives = card({
+    securitySchemeIds: ['mtls.main', 'oauth.main'],
+    securityRequirements: [
+      securityRequirement([], 'mtls.main'),
+      securityRequirement(['agent.connect'], 'oauth.main'),
+    ],
+  });
+  const viaOauth = assessA2ADelegationV1({
+    card: alternatives,
+    admission: admission({ allowedSecuritySchemeIds: ['mtls.main', 'oauth.main'] }),
+    delegation: delegation(),
+  });
+  assert.equal(viaOauth.status, 'READY_FOR_POLICY');
+
+  const unknownScheme = card({
+    securityRequirements: [securityRequirement(['agent.connect'], 'scheme.missing')],
+  });
+  assert.throws(
+    () => normalizeA2ARemoteAgentCardRefV1(unknownScheme),
+    /unknown security scheme/,
+  );
+
+  const unknownSkill = card({
+    skillSecurityRequirements: [{
+      skillId: 'research.missing',
+      securityRequirements: [securityRequirement(['research.deep'])],
+    }],
+  });
+  assert.throws(
+    () => normalizeA2ARemoteAgentCardRefV1(unknownSkill),
+    /unknown skill/,
+  );
 });
 
 test('delegation causality and admission expiry are deterministic fail-closed gates', () => {
@@ -284,6 +384,8 @@ test('card drift reports exact material changes and observation regression', () 
   const current = card({
     cardSha256: sha('b'),
     skillIds: ['research.deep'],
+    securityRequirements: [securityRequirement(['agent.changed'])],
+    skillSecurityRequirements: [],
     discoveredAt: '2026-09-24T23:59:59.000Z',
   });
   const drift = assessA2ARemoteCardDriftV1(card(), current);
@@ -291,6 +393,8 @@ test('card drift reports exact material changes and observation regression', () 
   assert.deepEqual(drift.signals, [
     'CARD_DIGEST_CHANGED',
     'SKILLS_CHANGED',
+    'SECURITY_REQUIREMENTS_CHANGED',
+    'SKILL_SECURITY_REQUIREMENTS_CHANGED',
     'OBSERVATION_REGRESSED',
   ]);
   assert.equal(drift.executionAuthorized, false);
