@@ -365,6 +365,85 @@ test('candidate tie-breaking uses locale-independent code-unit order regardless 
 });
 
 
+test('readiness records, array lengths and request envelopes are snapshot without ordinary Proxy reads', () => {
+  let readinessReads = 0;
+  const readinessProxy = new Proxy(state('proxy/provider'), {
+    get(target, key, receiver) {
+      readinessReads += 1;
+      if (key === 'health') return ProviderHealthStatus.UNAVAILABLE;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const normalized = normalizeProviderReadinessV1(readinessProxy);
+  assert.equal(readinessReads, 0, 'readiness Proxy get trap must never execute');
+  assert.equal(normalized.health, ProviderHealthStatus.READY);
+
+  let arrayReads = 0;
+  const providerStates = new Proxy([state('local/fs')], {
+    get(target, key, receiver) {
+      arrayReads += 1;
+      if (key === 'length') return 999999;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const fromArrayProxy = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates,
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(arrayReads, 0, 'array Proxy length/items must come only from descriptors');
+  assert.equal(fromArrayProxy.plan[0].toolId, 'fs.inspect');
+
+  let requestReads = 0;
+  const requestProxy = new Proxy({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs')],
+    requestedCapabilityIds:['filesystem.read'],
+  }, {
+    get(target, key, receiver) {
+      requestReads += 1;
+      if (key === 'providerStates') return [];
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const fromRequestProxy = discoverCapabilityPathsV1(requestProxy);
+  assert.equal(requestReads, 0, 'top-level discovery Proxy get trap must never execute');
+  assert.equal(fromRequestProxy.plan[0].toolId, 'fs.inspect');
+
+  let accessorReads = 0;
+  const accessorRequest = {
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    requestedCapabilityIds:['filesystem.read'],
+  };
+  Object.defineProperty(accessorRequest, 'providerStates', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      accessorReads += 1;
+      return [state('local/fs')];
+    },
+  });
+  assert.throws(
+    () => discoverCapabilityPathsV1(accessorRequest),
+    /own data properties/,
+  );
+  assert.equal(accessorReads, 0, 'top-level request accessor must never execute');
+
+  assert.throws(
+    () => discoverCapabilityPathsV1({
+      capabilities:[],
+      tools:[],
+      providerStates:[],
+      requestedCapabilityIds:[],
+      hiddenAuthority:true,
+    }),
+    /unknown field/,
+  );
+});
+
 test('collection boundaries reject accessor-backed inventory and request items without executing getters', () => {
   let providerStateReads = 0;
   const providerStates = [];
