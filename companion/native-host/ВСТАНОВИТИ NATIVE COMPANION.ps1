@@ -10,7 +10,6 @@ $target = Join-Path $env:LOCALAPPDATA 'ChatGPT-Autopilot\Native-Companion'
 $runtime = Join-Path $target 'runtime'
 $configDir = Join-Path $target 'config'
 $credentialsDir = Join-Path $configDir 'credentials'
-New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDir -Force | Out-Null
 
 $copyNames = @(
   'host.mjs',
@@ -28,12 +27,13 @@ $copyNames = @(
   'ВИДАЛИТИ NATIVE COMPANION.ps1',
   'README-УКРАЇНСЬКОЮ.txt'
 )
+
+# Preflight the complete packaged payload before touching an existing active installation.
 foreach ($name in $copyNames) {
   $src = Join-Path $source $name
   if (-not (Test-Path -LiteralPath $src -PathType Leaf)) {
     throw "Пакет Native Companion неповний: відсутній обов'язковий файл: $name"
   }
-  Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force
 }
 
 $nodeExe = $null
@@ -54,16 +54,23 @@ if (Test-Path -LiteralPath $portable) {
   }
 }
 if (-not $nodeExe) { throw 'Node.js 20+ не знайдено. Спочатку підготуйте portable Node через AI Gateway.' }
-$installedNode = Join-Path $runtime 'node.exe'
-Copy-Item -LiteralPath $nodeExe -Destination $installedNode -Force
 
 foreach ($name in @($copyNames | Where-Object { $_ -like '*.mjs' })) {
-  $installedModule = Join-Path $target $name
-  & $installedNode --check $installedModule
+  $sourceModule = Join-Path $source $name
+  & $nodeExe --check $sourceModule
   if ($LASTEXITCODE -ne 0) {
     throw "Перевірка синтаксису Native Companion не пройдена: $name"
   }
 }
+
+New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDir -Force | Out-Null
+foreach ($name in $copyNames) {
+  $src = Join-Path $source $name
+  Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force
+}
+
+$installedNode = Join-Path $runtime 'node.exe'
+Copy-Item -LiteralPath $nodeExe -Destination $installedNode -Force
 
 $launcherSource = Join-Path $target 'NativeHostLauncher.cs'
 $launcherExe = Join-Path $target 'autopilot-native-host.exe'
