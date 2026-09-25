@@ -405,6 +405,94 @@ test('same trusted change token keeps occurrence identity while changed evidence
   assert.equal(first.occurrenceId, changed.occurrenceId);
 });
 
+test('extended-year Drive chronology is ordered by epoch at every admission boundary', async () => {
+  const beforeBoundary = '9999-12-31T23:59:59.999Z';
+  const afterBoundary = '+010000-01-01T00:00:00.000Z';
+  const afterBoundaryLater = '+010000-01-01T00:00:00.001Z';
+
+  const valid = normalizeDriveChangeV1(change({
+    evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
+    observedAt: afterBoundary,
+  }));
+  assert.equal(valid.observedAt, afterBoundary);
+
+  assert.throws(
+    () => normalizeDriveChangeV1(change({
+      evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
+      observedAt: beforeBoundary,
+    })),
+    /evidence artifact cannot postdate observation/u,
+  );
+
+  let schedulerCalls = 0;
+  const stop = async () => {
+    schedulerCalls += 1;
+    throw new Error('must not run');
+  };
+
+  await assert.rejects(
+    admitDriveChangeV1(
+      request({ admittedAt: afterBoundaryLater }),
+      deps({
+        trustedTrigger: trigger({ createdAt: afterBoundary }),
+        trustedBinding: binding({ createdAt: beforeBoundary }),
+        trustedChange: change({
+          evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
+          observedAt: afterBoundary,
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /binding cannot predate its trusted trigger definition/u,
+  );
+
+  await assert.rejects(
+    admitDriveChangeV1(
+      request({ admittedAt: afterBoundaryLater }),
+      deps({
+        trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+        trustedBinding: binding({ createdAt: afterBoundary }),
+        trustedChange: change({
+          evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
+          observedAt: beforeBoundary,
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /Drive change predates trusted binding/u,
+  );
+
+  await assert.rejects(
+    admitDriveChangeV1(
+      request({ admittedAt: beforeBoundary }),
+      deps({
+        trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+        trustedBinding: binding({ createdAt: beforeBoundary }),
+        trustedChange: change({
+          evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
+          observedAt: afterBoundary,
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /Drive admission predates trusted change observation/u,
+  );
+
+  const accepted = await admitDriveChangeV1(
+    request({ admittedAt: afterBoundaryLater }),
+    deps({
+      trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+      trustedBinding: binding({ createdAt: beforeBoundary }),
+      trustedChange: change({
+        evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
+        observedAt: afterBoundary,
+      }),
+    }),
+  );
+  assert.equal(accepted.status, EventTriggerRuntimeStatus.ACCEPTED);
+  assert.equal(schedulerCalls, 0);
+});
+
 test('noncanonical timestamp and opaque-token aliases fail closed', async () => {
   await assert.rejects(
     admitDriveChangeV1(
