@@ -262,15 +262,15 @@ function assertPortableEntryPath(name, label) {
 }
 
 function assertEntryTypeMetadata(versionMadeBy, externalAttributes, directory, label) {
-  const hostSystem = versionMadeBy >>> 8;
-  if (hostSystem === 3) {
-    const unixMode = (externalAttributes >>> 16) & 0xffff;
-    const fileType = unixMode & 0xf000;
-    if (fileType !== 0) {
-      const expectedType = directory ? 0x4000 : 0x8000;
-      if (fileType !== expectedType) {
-        throw new Error(label + ' Unix symlink or special-file metadata is not admitted');
-      }
+  if (!Number.isSafeInteger(versionMadeBy)) {
+    throw new Error(label + ' versionMadeBy is invalid');
+  }
+  const unixMode = (externalAttributes >>> 16) & 0xffff;
+  const fileType = unixMode & 0xf000;
+  if (fileType !== 0) {
+    const expectedType = directory ? 0x4000 : 0x8000;
+    if (fileType !== expectedType) {
+      throw new Error(label + ' Unix symlink or special-file metadata is not admitted');
     }
   }
   if (!directory && (externalAttributes & 0x10) !== 0) {
