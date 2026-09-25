@@ -9,12 +9,15 @@ on:
       - "companion/**"
       - "tests/**"
       - "scripts/package-release.mjs"
+      - "scripts/package-source.mjs"
+      - "scripts/package-store.mjs"
       - "tests-regression/release/**"
       - "tests-regression/reliability/**"
       - "package.json"
       - "README.md"
       - "README.txt"
       - "CHANGES-*.txt"
+      - "QA-*.txt"
       - ".github/workflows/release-package.yml"
   pull_request:
     paths:
@@ -23,12 +26,15 @@ on:
       - "companion/**"
       - "tests/**"
       - "scripts/package-release.mjs"
+      - "scripts/package-source.mjs"
+      - "scripts/package-store.mjs"
       - "tests-regression/release/**"
       - "tests-regression/reliability/**"
       - "package.json"
       - "README.md"
       - "README.txt"
       - "CHANGES-*.txt"
+      - "QA-*.txt"
       - ".github/workflows/release-package.yml"
   workflow_dispatch:
 
