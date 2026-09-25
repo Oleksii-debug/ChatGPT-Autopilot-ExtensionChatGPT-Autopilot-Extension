@@ -4,7 +4,7 @@ import { GITHUB_PROVIDER_ID, GitHubToolId } from './github-agent-provider.js';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
-const SHA = /^[a-f0-9]{40,64}$/iu;
+const SHA = /^[a-f0-9]{40,64}$/u;
 const REVIEW_EVENTS = new Set(['APPROVE', 'REQUEST_CHANGES', 'COMMENT']);
 const REVIEW_STATE_BY_EVENT = Object.freeze({
   APPROVE: 'APPROVED',
@@ -65,7 +65,7 @@ function positiveInteger(value, label) {
 
 function exactSha(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !SHA.test(value)) throw new Error(label + ' is invalid');
-  return value.toLowerCase();
+  return value;
 }
 
 function reviewEvent(value) {
