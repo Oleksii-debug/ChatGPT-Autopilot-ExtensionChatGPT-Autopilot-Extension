@@ -394,6 +394,59 @@ test('Windows installer copies the full transitive local module closure of the N
   );
 });
 
+test('Windows installer fails closed before active-target mutation for missing or invalid Native Host modules', async () => {
+  const hostDir = path.join(repoRoot, 'companion', 'native-host');
+  const installer = await fs.readFile(path.join(hostDir, 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
+
+  const requiredFileGuard = "if (-not (Test-Path -LiteralPath $src -PathType Leaf))";
+  const requiredFileError = "Пакет Native Companion неповний: відсутній обов'язковий файл";
+  const targetCreate = 'New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDir -Force';
+  const activeTargetCopy = "Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force";
+  const sourceSyntaxCheck = '& $nodeExe --check $sourceModule';
+  const syntaxFailureGuard = 'if ($LASTEXITCODE -ne 0)';
+  const configParse = 'Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json';
+  const stagedLauncher = "$stagedLauncher = Join-Path $stagingDir 'autopilot-native-host.exe'";
+  const launcherPreflight = "Add-Type -Path (Join-Path $source 'NativeHostLauncher.cs') -OutputAssembly $stagedLauncher -OutputType ConsoleApplication";
+  const installedNode = "$installedNode = Join-Path $runtime 'node.exe'";
+  const registryMutation = "$regKey = 'HKCU:\\Software\\Google\\Chrome\\NativeMessagingHosts\\org.chatgpt_autopilot.companion'";
+
+  const guardIndex = installer.indexOf(requiredFileGuard);
+  const syntaxIndex = installer.indexOf(sourceSyntaxCheck);
+  const syntaxFailureIndex = installer.indexOf(syntaxFailureGuard);
+  const configIndex = installer.indexOf(configParse);
+  const stagedLauncherIndex = installer.indexOf(stagedLauncher);
+  const launcherPreflightIndex = installer.indexOf(launcherPreflight);
+  const targetCreateIndex = installer.indexOf(targetCreate);
+  const copyIndex = installer.indexOf(activeTargetCopy);
+  const nodeIndex = installer.indexOf(installedNode);
+  const registryIndex = installer.indexOf(registryMutation);
+
+  assert.ok(guardIndex >= 0, 'installer must require every packaged Native Companion file');
+  assert.ok(installer.includes(requiredFileError), 'missing required file must fail with an explicit error');
+  assert.equal(
+    installer.includes("if (Test-Path -LiteralPath $src) { Copy-Item"),
+    false,
+    'installer must not silently skip required files',
+  );
+  assert.ok(syntaxIndex > guardIndex, 'source syntax preflight must run after complete required-file validation');
+  assert.ok(syntaxFailureIndex > syntaxIndex, 'nonzero node --check status must fail installation');
+  assert.ok(configIndex > syntaxFailureIndex, 'existing config must be validated after source syntax and before active mutation');
+  assert.ok(stagedLauncherIndex > configIndex, 'launcher staging must begin only after existing config validation');
+  assert.ok(launcherPreflightIndex > stagedLauncherIndex, 'launcher must compile in staging before active mutation');
+  assert.equal(
+    installer.includes('Add-Type -Path $launcherSource -OutputAssembly $launcherExe'),
+    false,
+    'installer must not compile the launcher from the already-mutated active target',
+  );
+  assert.ok(
+    targetCreateIndex > launcherPreflightIndex,
+    'missing/syntax/config/launcher failure must occur before creating or mutating the active install target',
+  );
+  assert.ok(copyIndex > targetCreateIndex, 'active-target file copies must begin only after successful preflight');
+  assert.ok(nodeIndex > copyIndex, 'installed Node path must be established only after source payload preflight');
+  assert.ok(registryIndex > nodeIndex, 'Chrome Native Messaging registration must remain after payload publication');
+});
+
 test('native message framing survives fragmented input and enforces response bound', () => {
   const value = { protocolVersion: 1, requestId: 'r1', type: 'health', ok: true, result: { status: 'ok' } };
   const encoded = encodeNativeMessage(value);
