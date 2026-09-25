@@ -1,0 +1,34 @@
+ChatGPT Автопілот 0.9.9 — НІЧНИЙ MIXED-LOAD HARDENING
+
+Головна мета релізу:
+- виправити саме проблеми, виявлені у діагностичних звітах 0.1.15.3, для нічного запуску кількох Ordinary Sessions і кількох Scenario-managed Sessions в одному Chrome-профілі;
+- не повертати старий profile-wide Send lock, 90-секундний cross-session barrier або послідовне виконання всього профілю.
+
+Ключові гарантії mixed-load:
+- до 10 незалежних Session operations паралельно за замовчуванням; технічна межа 32;
+- Ordinary і Managed interleave-яться всередині concurrency window, тому великий managed queue не може витіснити Ordinary з першого batch;
+- 5 Ordinary + 5 Scenario-managed проходять один паралельний browser pipeline з окремими owned tabs;
+- одна повільна lane, COMPOSER_LOST_AFTER_INSERT або TAB_NAVIGATION_TIMEOUT не блокує інші healthy lanes;
+- Chrome tab create/query/update не тримає serialized StorageRepository.update;
+- launch URL / та /g/<slug> не успадковують випадкову вручну відкриту root-вкладку;
+- profile-wide rate limit лишається тільки для підтвердженого account-level ChatGPT rate limit; повторні паралельні детекції не продовжують перший deadline;
+- legacy PROFILE_BUSY/90s barrier не є сучасною scheduling authority.
+
+Критичне виправлення 0.9.9:
+- Scenario-managed Session при SEND_CLICK_UNCERTAIN / SUBMISSION_UNCERTAIN більше не переходить у blind unattended resend після acknowledgement timeout;
+- така Session зберігає exact durable AMBIGUOUS operation і робить лише VERIFY_AFTER_UNCERTAIN_SUBMIT;
+- інші Ordinary/Scenario lanes продовжують verified progress незалежно;
+- regression доводить, що для uncertain Scenario lane SUBMIT_EXISTING викликається рівно один раз.
+
+Scenario semantic safety, що вже входить у це дерево:
+- dependency-blocked downstream slot не матеріалізує Core Session/tab;
+- strict AUTOPILOT_SCENARIO_RESULT та AUTOPILOT_AUDITOR_ALLOCATION;
+- WAIT_ALL_TERMINAL/TIMEBOXED_AUDIT, durable auditor lease, dependency DAG, correction/replacement persistence;
+- це не змінює головний пріоритет 0.9.9: стабільний mixed Ordinary + Scenario нічний runtime.
+
+Physical verification boundary:
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+
+Автоматизовані Chromium gates не є фізичним Windows/NVDA тестом власника.

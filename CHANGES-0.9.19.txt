@@ -1,0 +1,13 @@
+ChatGPT Автопілот 0.9.19 — DIAGNOSTIC-DERIVED ORDINARY SESSION LIVENESS / POST-SEND EVIDENCE PRESERVATION
+
+FROZEN CHANGELOG — 2026-09-14
+
+- Виправлено реальний Ordinary Session stall, відтворений із діагностичних звітів 0.9.13: після SUBMISSION_UNCERTAIN transport/navigation/receiver faults могли повторно падати ДО старої перевірки verificationDeadline і фактично тримати Session у AMBIGUOUS необмежено довго.
+- Bounded verification deadline для safe Ordinary Session тепер перевіряється ДО будь-якого нового tab bind / navigation / content-script transport round-trip. Після deadline старий фізичний Send НЕ повторюється; operation переходить у FAILED_SAFE, Session повертається в RUNNING і наступний цикл планується за owner-selected cadence.
+- Post-submit AMBIGUOUS/SUBMITTING evidence tab більше не retire-иться лише через TAB_NAVIGATION_TIMEOUT, TAB_NAVIGATION_URL_MISMATCH або receiver-restore failure. Exact ownership зберігається до bounded recovery, замість tab churn/orphan risk.
+- Fresh-launch Send тепер може бути позитивно підтверджений ще до рендеру user-message history, якщо extension-owned fresh launch вже став exact /c/<conversation>, composer спожитий/порожній і ChatGPT позитивно показує active generation. Це відповідає фізичному diagnostic pattern STOP_CONTROL_VISIBLE.
+- Fresh-launch recovery після reload також приймає concrete conversation + empty composer + active generation як operation-bound proof; non-fresh recovery не отримує такої поблажки.
+- Додано permanent diagnostic-derived reliability gate: одна Ordinary fresh-chat Session проходить понад 230 verified sends із навмисними SEND_CLICK_UNCERTAIN, receiver restore failure, navigation timeout/mismatch, composer loss, rate-limit і transient tabs.remove faults; at-most-once physical Send і max one open-close tab перевіряються явно.
+- Старі tests, що вимагали ще один browser VERIFY уже ПІСЛЯ простроченого bounded deadline, оновлені до нового сильнішого контракту: після deadline liveness не залежить від здорової evidence tab або content script.
+- 0.9.18 Trusted Script / Browser Agent / Scenario Work / Orchestration V2 функції збережені без відкату.
+- User-selected Session timing/cadence не переписується. Seconds/minutes лишаються owner policy; 2-minute cadence у regression tests є лише fixture.
