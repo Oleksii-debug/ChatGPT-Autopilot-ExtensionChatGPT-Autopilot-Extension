@@ -392,6 +392,59 @@ test('plain value maps cannot smuggle inherited variable values', () => {
   );
 });
 
+test('prompt asset record boundaries snapshot descriptors before ordinary caller reads', () => {
+  let reads = 0;
+  const target = asset();
+  const proxiedAsset = new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      if (property === 'assetId') return 'prompt:swapped';
+      return Reflect.get(object, property, receiver);
+    },
+  });
+  const normalized = normalizePromptAssetV1(proxiedAsset);
+  assert.equal(reads, 0, 'PromptAssetV1 must not perform ordinary Proxy reads');
+  assert.equal(normalized.assetId, 'prompt:release-review');
+
+  let assetIdDescriptorReads = 0;
+  const descriptorProxy = new Proxy(asset(), {
+    getOwnPropertyDescriptor(object, property) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(object, property);
+      if (property === 'assetId') {
+        assetIdDescriptorReads += 1;
+        return {
+          ...descriptor,
+          value: assetIdDescriptorReads === 1 ? descriptor.value : 'prompt:swapped',
+        };
+      }
+      return descriptor;
+    },
+  });
+  const snapshotted = normalizePromptAssetV1(descriptorProxy);
+  assert.equal(assetIdDescriptorReads, 1, 'PromptAssetV1 fields must be snapshotted exactly once');
+  assert.equal(snapshotted.assetId, 'prompt:release-review');
+
+  const scheduled = normalizePromptAssetV1(asset({
+    cadence: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+  }));
+  const optionTarget = {
+    values: { target: 'main' },
+    sourceBindingAssertions: [source()],
+    triggerAssertion: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+  };
+  const proxiedOptions = new Proxy(optionTarget, {
+    get(object, property, receiver) {
+      reads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+  const rendered = renderPromptAssetV1(scheduled, proxiedOptions);
+  assert.equal(reads, 0, 'render options must not perform ordinary Proxy reads');
+  assert.equal(rendered.executionAuthorized, false);
+  assert.equal(rendered.sourceComparison.authority, 'UNVERIFIED_INPUT');
+  assert.equal(rendered.cadenceComparison.authority, 'UNVERIFIED_INPUT');
+});
+
 test('authority-bearing prompt asset arrays reject accessors before reading values', () => {
   for (const field of ['variables', 'sourceBindings']) {
     let reads = 0;
@@ -414,6 +467,38 @@ test('authority-bearing prompt asset arrays reject accessors before reading valu
     );
     assert.equal(reads, 0, field + ' getter must never execute');
   }
+});
+
+test('prompt asset authority arrays snapshot length and indices without ordinary Proxy reads', () => {
+  let reads = 0;
+  const variables = new Proxy(
+    [{ name: 'target', required: true, maxChars: 400, defaultValue: null, sensitive: false }],
+    {
+      get(target, property, receiver) {
+        reads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    },
+  );
+  const normalized = normalizePromptAssetV1(asset({
+    variables,
+    template: 'Use {{target}}',
+  }));
+  assert.equal(reads, 0, 'variables array must be descriptor-only');
+  assert.equal(normalized.variables[0].name, 'target');
+
+  const assertions = new Proxy([source()], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const rendered = renderPromptAssetV1(normalizePromptAssetV1(asset()), {
+    values: { target: 'main' },
+    sourceBindingAssertions: assertions,
+  });
+  assert.equal(reads, 0, 'sourceBindingAssertions array must be descriptor-only');
+  assert.equal(rendered.executionAuthorized, false);
 });
 
 test('prompt asset array boundaries reject sparse, custom, symbol, hidden and exotic arrays', () => {
