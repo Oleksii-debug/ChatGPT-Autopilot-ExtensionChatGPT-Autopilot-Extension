@@ -23,6 +23,21 @@ function planningEnvelopeFromNormalized(contract) {
     planningCriterion: criterionPlanningText(criterion),
     requiredEvidenceKinds: criterion.requiredEvidenceKinds,
   }));
+  if (contract.desiredResult.length > 8_000) {
+    throw new Error('Outcome Contract desired result exceeds the AgentPlan objective limit');
+  }
+  if (criterionBindings.length > 32) {
+    throw new Error('Outcome Contract has more criteria than AgentPlan successCriteria can represent');
+  }
+  for (const binding of criterionBindings) {
+    if (binding.planningCriterion.length > 1_000) {
+      throw new Error(`Outcome criterion exceeds the AgentPlan successCriteria text limit: ${binding.criterionId}`);
+    }
+  }
+  const foldedCriteria = criterionBindings.map(item => item.planningCriterion.toLowerCase());
+  if (new Set(foldedCriteria).size !== foldedCriteria.length) {
+    throw new Error('Outcome criteria are not uniquely representable in AgentPlan successCriteria');
+  }
 
   return freezeDeep({
     schemaVersion: OUTCOME_PLAN_BINDING_SCHEMA_VERSION,
