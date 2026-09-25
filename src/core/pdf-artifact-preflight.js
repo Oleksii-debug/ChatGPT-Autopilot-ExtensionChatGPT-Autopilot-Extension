@@ -14,15 +14,26 @@ const ACTIVE_NAMES = new Map([
   ['AA', 'ADDITIONAL_ACTIONS'],
   ['EmbeddedFile', 'EMBEDDED_FILE'],
   ['EmbeddedFiles', 'EMBEDDED_FILES'],
+  ['FileAttachment', 'FILE_ATTACHMENT'],
+  ['GoTo3DView', 'GOTO_3D_VIEW'],
+  ['GoToE', 'GOTO_EMBEDDED'],
+  ['GoToR', 'GOTO_REMOTE'],
+  ['Hide', 'HIDE_ACTION'],
   ['ImportData', 'IMPORT_DATA'],
   ['JavaScript', 'JAVASCRIPT'],
   ['JS', 'JAVASCRIPT_SHORT_NAME'],
   ['Launch', 'LAUNCH'],
   ['Movie', 'MOVIE'],
+  ['Named', 'NAMED_ACTION'],
   ['OpenAction', 'OPEN_ACTION'],
+  ['Rendition', 'RENDITION_ACTION'],
+  ['ResetForm', 'RESET_FORM'],
   ['RichMedia', 'RICH_MEDIA'],
+  ['SetOCGState', 'SET_OCG_STATE'],
   ['Sound', 'SOUND'],
   ['SubmitForm', 'SUBMIT_FORM'],
+  ['Thread', 'THREAD_ACTION'],
+  ['Trans', 'TRANSITION_ACTION'],
   ['URI', 'EXTERNAL_URI'],
   ['XFA', 'XFA'],
 ]);
@@ -31,6 +42,7 @@ const ACTIVE_NAMES = new Map([
 // structural screen incomplete. Fail closed rather than silently treating their
 // hidden/encrypted object material as inspected.
 const UNSUPPORTED_SAFETY_NAMES = new Map([
+  ['AcroForm', 'ACROFORM_REQUIRES_QUALIFIED_PARSER'],
   ['Encrypt', 'ENCRYPTED_PDF_REQUIRES_QUALIFIED_PARSER'],
   ['ObjStm', 'OBJECT_STREAM_REQUIRES_QUALIFIED_PARSER'],
 ]);
@@ -549,6 +561,7 @@ export async function buildPdfArtifactPreflightV1(raw, { cryptoApi = globalThis.
       && !requiresCanonicalDisclosureAuthorization,
     materialIdentityVerified: true,
     fullPdfParsePerformed: false,
+    xrefTargetVerified: false,
     extractionAuthorized: false,
     accessibilityVerified: false,
     requiresQualifiedParserOrRenderer: true,
