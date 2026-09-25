@@ -365,7 +365,7 @@ export class GitHubRestClientV1 {
     } catch (error) {
       throw githubError(error?.code || 'GITHUB_CREDENTIAL_UNAVAILABLE', error?.message || 'GitHub credential is unavailable', { safeToRetry: true });
     }
-    const secret = typeof credential?.secret === 'string' ? credential.secret : '';
+    let secret = typeof credential?.secret === 'string' ? credential.secret : '';
     if (!secret || secret.length > 100_000) throw githubError('GITHUB_CREDENTIAL_INVALID', 'GitHub credential secret is unavailable', { safeToRetry: true });
 
     let response;
@@ -394,6 +394,7 @@ export class GitHubRestClientV1 {
           });
       } finally {
         credential = null;
+        secret = '';
       }
 
       const status = Number(response?.status) || 0;
@@ -418,6 +419,7 @@ export class GitHubRestClientV1 {
       return payload;
     } finally {
       credential = null;
+      secret = '';
       this.clearTimeoutImpl(timeout);
     }
   }
