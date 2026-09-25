@@ -56,6 +56,9 @@ function proposal(overrides = {}) {
     agentId: 'agent-1',
     jobId: 'job-1',
     sourceId: 'source-web-1',
+    sourceArtifactId: 'artifact-untrusted-1',
+    sourceSha256: SHA,
+    sourceObservedAt: T0,
     requestedCapabilityIds: ['web.read'],
     requestedToolIds: ['browser.inspect'],
     requestedProviderIds: ['browser'],
@@ -92,6 +95,7 @@ test('untrusted content remains data and a within-ceiling proposal grants no aut
   assert.deepEqual(result.violations, []);
   assert.deepEqual(result.signals, []);
   assert.equal(result.sourceSha256, SHA);
+  assert.equal(result.sourceObservedAt, T0);
 });
 
 test('explicitly allowed cross-origin influence is surfaced but still only safe for policy', () => {
@@ -178,6 +182,7 @@ test('proposal identity, provenance and chronology are causally bound', () => {
   assert.throws(
     () => assessUntrustedContentInfluenceV1(request({
       source: source({ observedAt: T2 }),
+      proposal: proposal({ sourceObservedAt: T2 }),
     })),
     /proposal predates source observation/,
   );
@@ -190,6 +195,33 @@ test('proposal identity, provenance and chronology are causally bound', () => {
   assert.throws(
     () => assessUntrustedContentInfluenceV1(request({ assessedAt: T0 })),
     /assessment predates proposal/,
+  );
+});
+
+test('proposal is bound to exact source artifact, digest and observation boundary', () => {
+  assert.throws(
+    () => assessUntrustedContentInfluenceV1(request({
+      source: source({
+        artifactRef: { ...source().artifactRef, artifactId: 'artifact-untrusted-other' },
+      }),
+    })),
+    /exact source material observation/,
+  );
+
+  assert.throws(
+    () => assessUntrustedContentInfluenceV1(request({
+      source: source({
+        artifactRef: { ...source().artifactRef, sha256: 'c'.repeat(64) },
+      }),
+    })),
+    /exact source material observation/,
+  );
+
+  assert.throws(
+    () => assessUntrustedContentInfluenceV1(request({
+      source: source({ observedAt: T1 }),
+    })),
+    /exact source material observation/,
   );
 });
 
