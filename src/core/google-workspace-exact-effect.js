@@ -325,8 +325,12 @@ export class GoogleWorkspaceExactEffectExecutorV1 {
   }
 
   async invoke({ invocation, policyDecision } = {}) {
-    if (invocation?.toolId !== GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE) {
-      throw new Error('GoogleWorkspaceExactEffectExecutorV1 accepts only effectful Gmail draft creation invocations');
+    const effectfulToolIds = new Set([
+      GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+      GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
+    ]);
+    if (!effectfulToolIds.has(invocation?.toolId)) {
+      throw new Error('GoogleWorkspaceExactEffectExecutorV1 accepts only registered effectful Google Workspace invocations');
     }
 
     // Policy/capability admission is side-effect-free and happens before a fresh
