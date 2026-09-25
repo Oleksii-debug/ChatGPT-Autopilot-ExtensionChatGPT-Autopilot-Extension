@@ -1,5 +1,4 @@
 import { AgentExecutionPlane } from './agent-plan.js';
-import { normalizeVerificationV1, VerificationStatus } from './universal-agent-contracts.js';
 
 export const EXECUTION_OWNERSHIP_VERSION = 1;
 export const ExecutionOwnershipState = Object.freeze({
@@ -129,61 +128,34 @@ export function recoverExpiredExecutionOwnershipV1(raw, { at = new Date().toISOS
   return next(current, { state: ExecutionOwnershipState.RECONCILE, handoffToPlane: '', handoffId: '', ambiguityReason: boundedText(reason,'reason') }, at);
 }
 
-function reconciliationVerification(current, rawVerification, { at, requireNoEffect = false, requirePositiveEffect = false } = {}) {
-  let verification;
-  try {
-    verification = normalizeVerificationV1(rawVerification);
-  } catch (error) {
-    throw new Error(`reconciliation requires a valid VerificationV1: ${error.message}`);
-  }
-  if (verification.status !== VerificationStatus.VERIFIED) {
-    throw new Error('reconciliation verification must be VERIFIED');
-  }
-  if (!verification.verifierId || verification.verifierId === current.ownerId) {
-    throw new Error('reconciliation verifier must be independent from the effect owner');
-  }
-  if (verification.verificationAuthorityId !== current.policyEnvelopeId) {
-    throw new Error('reconciliation verification authority must bind the execution policy envelope');
-  }
-  if (verification.effectId !== current.effectId) {
-    throw new Error('reconciliation verification effectId does not match execution effect');
-  }
-  if (verification.executionId !== current.leaseId) {
-    throw new Error('reconciliation verification executionId must bind the preserved lease');
-  }
-  const resolvedAt = ts(at, 'at');
-  const verifiedAtMs = Date.parse(verification.verifiedAt);
-  if (verifiedAtMs < Date.parse(current.updatedAt) || verifiedAtMs > Date.parse(resolvedAt)) {
-    throw new Error('reconciliation verification must be fresh for the current reconciliation');
-  }
-  if (requireNoEffect && verification.reasonCode !== 'NO_EFFECT_OBSERVED') {
-    throw new Error('SAFE_RETRY requires NO_EFFECT_OBSERVED verification');
-  }
-  if (requirePositiveEffect && verification.reasonCode !== 'POSTCONDITION_MATCH') {
-    throw new Error('VERIFIED reconciliation requires POSTCONDITION_MATCH verification');
-  }
-  return verification;
-}
-
-export function resolveExecutionReconciliationV1(raw, {
-  leaseId,
-  outcome,
-  verification = null,
-  at = new Date().toISOString(),
-} = {}) {
+export function resolveExecutionReconciliationV1(raw, options = {}) {
+  const request = obj(options, 'Execution reconciliation request');
+  exact(request, new Set(['leaseId', 'outcome', 'verification', 'at']), 'Execution reconciliation request');
   const current = normalizeExecutionOwnershipV1(raw);
-  if (current.state !== ExecutionOwnershipState.RECONCILE || current.leaseId !== id(leaseId,'leaseId')) throw new Error('reconciliation requires the preserved owner lease identity');
+  const leaseId = request.leaseId;
+  const outcome = request.outcome;
+  const at = request.at === undefined ? new Date().toISOString() : request.at;
+  if (current.state !== ExecutionOwnershipState.RECONCILE || current.leaseId !== id(leaseId,'leaseId')) {
+    throw new Error('reconciliation requires the preserved owner lease identity');
+  }
   if (typeof outcome !== 'string') throw new Error('reconciliation outcome must be text');
   const normalized = outcome.trim().toUpperCase();
-  if (normalized === 'VERIFIED') {
-    reconciliationVerification(current, verification, { at, requirePositiveEffect: true });
-    return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', ambiguityReason: '' }, at);
+  if (normalized === 'MANUAL_REVIEW') {
+    return next(current, {
+      state: ExecutionOwnershipState.MANUAL_REVIEW,
+      ownerPlane: '',
+      ownerId: '',
+      leaseId: '',
+      leaseUntil: '',
+      ambiguityReason: current.ambiguityReason,
+    }, at);
   }
-  if (normalized === 'SAFE_RETRY') {
-    reconciliationVerification(current, verification, { at, requireNoEffect: true });
-    return next(current, { state: ExecutionOwnershipState.AVAILABLE, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', ambiguityReason: '' }, at);
+  if (normalized === 'VERIFIED' || normalized === 'SAFE_RETRY') {
+    // VerificationV1 normalization proves shape, not provenance. Until an
+    // independently resolved canonical verifier record is available, caller-
+    // supplied verification data cannot release or complete an ambiguous effect.
+    throw new Error('trusted verifier provenance is required before automated reconciliation');
   }
-  if (normalized === 'MANUAL_REVIEW') return next(current, { state: ExecutionOwnershipState.MANUAL_REVIEW, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', ambiguityReason: current.ambiguityReason }, at);
   throw new Error('reconciliation outcome must be VERIFIED, SAFE_RETRY, or MANUAL_REVIEW');
 }
 
