@@ -118,7 +118,7 @@ test('dataset snapshots bind materialized sources/artifact and normalize determi
   assert.throws(() => normalizeDataDatasetSnapshotV1({ ...raw, contentSha256: sha('f') }), /must match/);
   const noSourceHash = structuredClone(raw);
   noSourceHash.sourceRefs[0].contentSha256 = '';
-  assert.throws(() => normalizeDataDatasetSnapshotV1(noSourceHash), /materialized/);
+  assert.throws(() => normalizeDataDatasetSnapshotV1(noSourceHash), /contentSha256/);
 });
 
 test('analytics authority boundary rejects getters, hidden fields, symbols, exotic objects and sparse arrays without executing accessors', () => {
@@ -326,7 +326,7 @@ test('transform lineage is reproducible and exact-bound to every input/output re
     digest: sha('7'),
     artifactId: 'artifact-dataset-future',
   });
-  const earlyExecution = { ...raw, executedAt: T1, inputDatasets: [dataDatasetBindingFromSnapshotV1(futureInput), raw.inputDatasets[1]] };
+  const earlyExecution = { ...raw, executedAt: T1, inputDatasets: [raw.inputDatasets[0], dataDatasetBindingFromSnapshotV1(futureInput)] };
   assert.throws(() => assertDataTransformLineageMatchesSnapshotsV1({
     lineage: earlyExecution,
     inputSnapshots: [futureInput, inputB],
