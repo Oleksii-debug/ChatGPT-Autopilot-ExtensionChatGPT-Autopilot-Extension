@@ -527,3 +527,144 @@ test('fresh independently bound reconciliation can verify and commit without rep
   assert.equal(reconciled.phase, 'COMMITTED');
   assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1, 'reconciliation is readback-only and must not replay mutation');
 });
+
+
+test('normal GitHub verification fails closed unless proof binds an independent current attempt and valid chronology', async t => {
+  const cases = [
+    ['missing verifier identity', value => {
+      delete value.verifierId;
+      return value;
+    }, /verification\.verifierId is invalid/],
+    ['self verifier identity', value => ({ ...value, verifierId: 'github-exact-effect-executor' }), /must be independent/],
+    ['wrong policy authority', value => ({ ...value, verificationAuthorityId: 'decision-other' }), /does not match the current exact-effect attempt/],
+    ['wrong effect identity', value => ({ ...value, effectId: 'github-effect-other' }), /does not match the current exact-effect attempt/],
+    ['wrong execution identity', value => ({ ...value, executionId: 'github-effect-other:attempt:1' }), /does not match the current exact-effect attempt/],
+    ['wrong attempt', value => ({ ...value, attempt: 2 }), /does not match the current exact-effect attempt/],
+    ['verification predates current observation', value => ({
+      ...value,
+      verifiedAt: new Date(Date.parse(at) - 1000).toISOString(),
+    }), /invalid chronology/],
+    ['verification is implausibly in the future', value => ({
+      ...value,
+      verifiedAt: new Date(Date.parse(at) + 61_000).toISOString(),
+    }), /invalid chronology/],
+  ];
+
+  let ordinal = 0;
+  for (const [label, mutate, expected] of cases) {
+    await t.test(label, async () => {
+      ordinal += 1;
+      const id = `github-normal-verification-${ordinal}`;
+      const inv = invocation(id);
+      const fx = storeFixture();
+      const p = providerFixture();
+      const executor = new GitHubExactEffectExecutorV1({
+        provider: p.provider,
+        store: fx.store,
+        now: () => Date.parse(at),
+        verify: async ({ observation }) => mutate(verified(inv, observation)),
+      });
+
+      await assert.rejects(
+        () => executor.invoke({ invocation: inv, policyDecision: policy(id) }),
+        error => {
+          assert.match(error.message, expected);
+          assert.equal(error.effectState.phase, 'RECONCILE');
+          assert.equal(error.effectState.attempt, 1);
+          assert.equal(error.safeToRetry, false);
+          assert.equal(error.reconcileRequired, true);
+          return true;
+        },
+      );
+      assert.equal(fx.snapshot(id).phase, 'RECONCILE');
+      assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+      assert.equal(fx.writes.some(item => item.phase === 'COMMITTED'), false);
+    });
+  }
+});
+
+test('stale verification from a prior attempt cannot commit a later SAFE_RETRY attempt', async () => {
+  const id = 'github-stale-verification-attempt';
+  const inv = invocation(id);
+  let state = createExactEffectStateV1(inv, { createdAt: at });
+  state = reduceExactEffectV1(state, {
+    schemaVersion: 1,
+    eventId: `${id}:begin-1`,
+    type: ExactEffectEventType.BEGIN_EXECUTION,
+    effectId: id,
+    at,
+  }).state;
+  const priorObservation = {
+    schemaVersion: 1,
+    observationId: `${id}:prior-observation`,
+    invocationId: id,
+    status: 'OK',
+    summary: '',
+    data: { committed: false },
+    artifactRefs: [],
+    observedAt: at,
+  };
+  state = reduceExactEffectV1(state, {
+    schemaVersion: 1,
+    eventId: `${id}:observe-1`,
+    type: ExactEffectEventType.RECORD_OBSERVATION,
+    effectId: id,
+    executionId: state.executionId,
+    at,
+    observation: priorObservation,
+  }).state;
+  state = reduceExactEffectV1(state, {
+    schemaVersion: 1,
+    eventId: `${id}:ambiguous-1`,
+    type: ExactEffectEventType.DECLARE_AMBIGUITY,
+    effectId: id,
+    executionId: state.executionId,
+    at,
+    reasonCode: 'GITHUB_PRIOR_ATTEMPT_UNCERTAIN',
+    summary: '',
+  }).state;
+  state = reduceExactEffectV1(state, {
+    schemaVersion: 1,
+    eventId: `${id}:safe-retry-1`,
+    type: ExactEffectEventType.RESOLVE_RECONCILIATION,
+    effectId: id,
+    executionId: state.executionId,
+    at,
+    outcome: 'SAFE_RETRY',
+    reasonCode: 'NO_COMMITTED_EFFECT',
+    summary: '',
+    observation: priorObservation,
+    verification: verified(inv, priorObservation, {
+      status: 'FAILED',
+      reasonCode: 'NO_COMMITTED_EFFECT',
+      verifierId: 'prior-attempt-verifier',
+    }),
+  }).state;
+  assert.equal(state.phase, 'SAFE_RETRY');
+  assert.equal(state.attempt, 1);
+
+  const fx = storeFixture({ [id]: state });
+  const p = providerFixture();
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async ({ observation }) => verified(inv, observation, { verifierId: 'independent-github-readback' }),
+  });
+
+  await assert.rejects(
+    () => executor.invoke({ invocation: inv, policyDecision: policy(id) }),
+    error => {
+      assert.match(error.message, /does not match the current exact-effect attempt/);
+      assert.equal(error.effectState.phase, 'RECONCILE');
+      assert.equal(error.effectState.attempt, 2);
+      assert.equal(error.safeToRetry, false);
+      assert.equal(error.reconcileRequired, true);
+      return true;
+    },
+  );
+  assert.equal(fx.snapshot(id).phase, 'RECONCILE');
+  assert.equal(fx.snapshot(id).attempt, 2);
+  assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+  assert.equal(fx.writes.some(item => item.phase === 'COMMITTED'), false);
+});
