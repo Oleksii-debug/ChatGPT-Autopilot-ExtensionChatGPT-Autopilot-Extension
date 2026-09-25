@@ -372,6 +372,7 @@ export class BrowserAgentManager {
     const remainingCalls = job.config.maxModelCalls
       ? Math.max(0, job.config.maxModelCalls - Math.max(0, Number(job.runtime.modelCalls || 0)))
       : 0;
+    const modelCallsBeforeRoute = Math.max(0, Number(job.runtime.modelCalls || 0));
     let verifierReply;
     try {
       verifierReply = await this.routePrompt({
@@ -383,23 +384,31 @@ export class BrowserAgentManager {
         routerOverride: browserAgentRouterOverride(job.config),
         taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
-      });
-    } catch (error) { return { ok: false, error }; }
+      }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
+    } catch (error) {
+      if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
+      return { ok: false, error };
+    }
     const verifier = verifierReply?.result || verifierReply;
     const usage = verifier?.usage || verifierReply?.usage || {};
     const inputTokens = Math.max(1, Number(usage.inputTokens || usage.input_tokens || verifierInputTokens));
     const outputTokens = Math.max(1, Number(usage.outputTokens || usage.output_tokens || estimateAgentTokens(verifier?.text || '')));
     const totalTokens = Math.max(inputTokens + outputTokens, Number(usage.totalTokens || usage.total_tokens || 0));
     const modelCalls = Math.max(1, Number(usage.modelCalls || usage.calls || 1));
+    const afterProvider = await this.get(id);
+    const lifecycleAccounted = Math.max(0, Number(afterProvider.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+      || Boolean(afterProvider.job?.runtime?.modelBudgetReservation);
     await this.update(store => {
       const live = store.byId[id];
       if (!live || live.runtime.controlEpoch !== epoch) return store;
-      live.runtime.modelCalls += modelCalls;
+      if (!lifecycleAccounted) {
+        live.runtime.modelCalls += modelCalls;
+        live.runtime.inputTokens += inputTokens;
+        live.runtime.outputTokens += outputTokens;
+        live.runtime.totalTokens += totalTokens;
+        live.runtime.estimatedCostUsd += agentUsageCostUsd(live.config, { inputTokens, outputTokens });
+      }
       if (verifier?.runtime && typeof verifier.runtime === 'object') live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(verifier.runtime);
-      live.runtime.inputTokens += inputTokens;
-      live.runtime.outputTokens += outputTokens;
-      live.runtime.totalTokens += totalTokens;
-      live.runtime.estimatedCostUsd += agentUsageCostUsd(live.config, { inputTokens, outputTokens });
       live.runtime.updatedAt = this.now();
       return store;
     });
@@ -832,7 +841,6 @@ export class BrowserAgentManager {
     const runtime = job.runtime;
     const reservation = normalizeModelBudgetReservation(runtime.modelBudgetReservation);
     const reservedCalls = reservation?.modelCalls || 0;
-    const reservedInput = reservation?.inputTokens || 0;
     const reservedOutput = reservation?.outputTokens || 0;
     const reservedTotal = reservation?.totalTokens || 0;
     const reservedCost = reservation?.estimatedCostUsd || 0;
@@ -858,7 +866,7 @@ export class BrowserAgentManager {
     const reservedCost = reservation?.estimatedCostUsd || 0;
     let limit = Math.max(128, Number(job.config.maxOutputTokensPerCall || 4096));
     if (job.config.maxOutputTokens) limit = Math.min(limit, Math.max(0, job.config.maxOutputTokens - job.runtime.outputTokens - reservedOutput));
-    if (job.config.maxTotalTokens) limit = Math.min(limit, Math.max(0, job.config.maxTotalTokens - job.runtime.totalTokens - reservedTotal - reservedInput - pendingInputTokens));
+    if (job.config.maxTotalTokens) limit = Math.min(limit, Math.max(0, job.config.maxTotalTokens - job.runtime.totalTokens - reservedTotal - pendingInputTokens));
     if (job.config.maxCostUsd) {
       const remainingUsd = Math.max(0, Number(job.config.maxCostUsd) - Number(job.runtime.estimatedCostUsd || 0) - reservedCost);
       const inputCost = agentUsageCostUsd(job.config, { inputTokens: pendingInputTokens, outputTokens: 0 });
@@ -2392,6 +2400,11 @@ export class BrowserAgentManager {
     let current = await this.get(id);
     if (!current.job) return { kind: 'NOT_FOUND' };
     if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) return { kind: 'IDLE' };
+    if (await this.reconcileProviderModelBudgetReservation(id)) {
+      current = await this.get(id);
+      if (!current.job) return { kind: 'NOT_FOUND' };
+      if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) return { kind: 'IDLE' };
+    }
     const schedule = browserAgentScheduleDecision(current.job.config, now);
     if (!schedule.allowed) return this.applyScheduleGate(id);
     const externalNode = current.job.runtime.plan?.nodes?.find(node => node.state === AgentPlanNodeState.READY && node.executionPlane !== 'BROWSER');
@@ -2659,6 +2672,7 @@ export class BrowserAgentManager {
     const maxModelCallsForRequest = current.job.config.maxModelCalls
       ? Math.max(0, current.job.config.maxModelCalls - Math.max(0, Number(current.job.runtime.modelCalls || 0)))
       : 0;
+    const modelCallsBeforeRoute = Math.max(0, Number(current.job.runtime.modelCalls || 0));
     let routed;
     try {
       routed = await this.routePrompt({
@@ -2671,10 +2685,14 @@ export class BrowserAgentManager {
         taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
-      });
+      }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
+      if (error?.safeBudgetReason) return this.pauseForBudget(id, epoch, error.safeBudgetReason);
       const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
-      if (failedCalls) {
+      const afterFailure = await this.get(id);
+      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
+      if (failedCalls && !lifecycleAccounted) {
         await this.update(store => {
           const job = store.byId[id];
           if (!job || job.runtime.controlEpoch !== epoch) return store;
@@ -2700,17 +2718,22 @@ export class BrowserAgentManager {
     const outputTokens = Math.max(1, Number(reportedUsage.outputTokens || reportedUsage.output_tokens || estimateAgentTokens(planner?.text || '')));
     const totalTokens = Math.max(inputTokens + outputTokens, Number(reportedUsage.totalTokens || reportedUsage.total_tokens || 0));
     const modelCalls = Math.max(1, Number(reportedUsage.modelCalls || reportedUsage.calls || 1));
+    const afterProvider = await this.get(id);
+    const lifecycleAccounted = Math.max(0, Number(afterProvider.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+      || Boolean(afterProvider.job?.runtime?.modelBudgetReservation);
     await this.update(store => {
       const job = store.byId[id];
       if (!job) return store;
-      job.runtime.modelCalls += modelCalls;
+      if (!lifecycleAccounted) {
+        job.runtime.modelCalls += modelCalls;
+        job.runtime.inputTokens += inputTokens;
+        job.runtime.outputTokens += outputTokens;
+        job.runtime.totalTokens += totalTokens;
+        job.runtime.estimatedCostUsd += agentUsageCostUsd(job.config, { inputTokens, outputTokens });
+      }
       if (planner?.runtime && typeof planner.runtime === 'object') {
         job.runtime.aiRouterRuntime = normalizeAiRouterRuntime(planner.runtime);
       }
-      job.runtime.inputTokens += inputTokens;
-      job.runtime.outputTokens += outputTokens;
-      job.runtime.totalTokens += totalTokens;
-      job.runtime.estimatedCostUsd += agentUsageCostUsd(job.config, { inputTokens, outputTokens });
       if (imageDataUrl) job.runtime.visionPending = false;
       job.runtime.updatedAt = this.now();
       return store;
