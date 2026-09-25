@@ -268,7 +268,7 @@ export function normalizeA2ARemoteAdmissionRefV1(input) {
 }
 
 const DELEGATION_KEYS = new Set([
-  'schemaVersion', 'delegationId', 'localAgentId', 'remoteAgentId',
+  'schemaVersion', 'delegationId', 'localAgentId', 'localTaskId', 'effectId', 'remoteAgentId',
   'requestedSkillId', 'requestedCapabilityIds', 'requiredSecuritySchemeIds',
   'taskEnvelopeArtifactId', 'inputArtifactIds', 'policyDecisionId', 'createdAt',
   'credentialMaterialPresent', 'executionAuthorized',
@@ -287,6 +287,8 @@ export function normalizeA2ADelegationRequestV1(input) {
     schemaVersion: 1,
     delegationId: id(raw.delegationId, 'delegationId'),
     localAgentId: id(raw.localAgentId, 'localAgentId'),
+    localTaskId: id(raw.localTaskId, 'localTaskId'),
+    effectId: id(raw.effectId, 'effectId'),
     remoteAgentId: id(raw.remoteAgentId, 'remoteAgentId'),
     requestedSkillId: id(raw.requestedSkillId, 'requestedSkillId'),
     requestedCapabilityIds: ids(
@@ -359,6 +361,9 @@ export function assessA2ADelegationV1({
     cardSha256: card.cardSha256,
     admissionRefId: admission.admissionRefId,
     delegationId: delegation.delegationId,
+    localAgentId: delegation.localAgentId,
+    localTaskId: delegation.localTaskId,
+    effectId: delegation.effectId,
     requestedSkillId: delegation.requestedSkillId,
     selectedInterface,
     status: reasons.length ? 'BLOCKED' : 'READY_FOR_POLICY',
