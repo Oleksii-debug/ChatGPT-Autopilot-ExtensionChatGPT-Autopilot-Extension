@@ -24,17 +24,84 @@ test('BrowserTargetLease rejects every required field independently and unknown 
   assert.throws(() => acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW, ttlMs: 999 }), /ttlMs/);
 });
 
+test('BrowserTargetLease rejects representation aliases and coercion at the authority boundary', () => {
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, schemaVersion: '1' }), /schemaVersion/);
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, targetId: ' page:1' }), /targetId/);
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, ownerInvocationId: 'inv:1 ' }), /ownerInvocationId/);
+  assert.throws(() => normalizeBrowserTargetLeaseV1({ ...VALID, acquiredAt: '2026-09-21T02:16:00Z' }), /exact canonical UTC/);
+  assert.throws(() => normalizeBrowserTargetLeaseV1({
+    ...VALID,
+    acquiredAt: '2026-09-21T04:16:00.000+02:00',
+  }), /exact canonical UTC/);
+
+  let coerces = 0;
+  const coerciveOwner = {
+    toString() {
+      coerces += 1;
+      return 'inv:1';
+    },
+  };
+  assert.throws(() => acquireBrowserTargetLeaseV1({
+    targetId: 'page:1',
+    ownerInvocationId: coerciveOwner,
+    leaseId: 'lease:1',
+    now: NOW,
+  }), /ownerInvocationId/);
+  assert.equal(coerces, 0);
+
+  const lease = acquireBrowserTargetLeaseV1({
+    targetId: 'page:1',
+    ownerInvocationId: 'inv:1',
+    leaseId: 'lease:1',
+    now: NOW,
+  }).lease;
+  assert.throws(
+    () => releaseBrowserTargetLeaseV1(lease, { ownerInvocationId: ' inv:1', leaseId: 'lease:1' }),
+    /ownerInvocationId/,
+  );
+  assert.throws(
+    () => releaseBrowserTargetLeaseV1(lease, { ownerInvocationId: 'inv:1', leaseId: { toString: () => 'lease:1' } }),
+    /leaseId/,
+  );
+});
+
+test('BrowserTargetLease snapshots plain authority data without executing accessors', () => {
+  let reads = 0;
+  const accessor = { ...VALID };
+  Object.defineProperty(accessor, 'targetId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'page:1';
+    },
+  });
+  assert.throws(() => normalizeBrowserTargetLeaseV1(accessor), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const symbolic = { ...VALID };
+  symbolic[Symbol('authority')] = 'page:forged';
+  assert.throws(() => normalizeBrowserTargetLeaseV1(symbolic), /symbol fields/);
+
+  const inherited = Object.create({ targetId: 'page:forged' });
+  Object.assign(inherited, VALID);
+  assert.throws(() => normalizeBrowserTargetLeaseV1(inherited), /plain object/);
+
+  const nullPrototype = Object.assign(Object.create(null), VALID);
+  assert.deepEqual(normalizeBrowserTargetLeaseV1(nullPrototype), VALID);
+});
+
 test('BrowserTargetLease serializes conflicting invocation ownership', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW });
   assert.equal(first.status, 'ACQUIRED');
-  const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:1', ownerInvocationId: 'inv:2', leaseId: 'lease:2', now: '2026-09-21T02:16:01Z' });
+  const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:1', ownerInvocationId: 'inv:2', leaseId: 'lease:2', now: '2026-09-21T02:16:01.000Z' });
   assert.equal(conflict.status, 'CONFLICT');
   assert.equal(conflict.lease.ownerInvocationId, 'inv:1');
 });
 
 test('BrowserTargetLease preserves a live target when another target is requested', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW });
-  const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:2', ownerInvocationId: 'inv:1', leaseId: 'lease:2', now: '2026-09-21T02:16:01Z' });
+  const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:2', ownerInvocationId: 'inv:1', leaseId: 'lease:2', now: '2026-09-21T02:16:01.000Z' });
   assert.equal(conflict.status, 'CONFLICT');
   assert.deepEqual(conflict.lease, first.lease);
   assert.equal(conflict.lease.targetId, 'page:1');
@@ -44,10 +111,10 @@ test('BrowserTargetLease preserves a live target when another target is requeste
 test('BrowserTargetLease survives restart as data and only expires deterministically', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW, ttlMs: 2_000 });
   const restored = JSON.parse(JSON.stringify(first.lease));
-  const held = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'ignored', now: '2026-09-21T02:16:01Z' });
+  const held = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'ignored', now: '2026-09-21T02:16:01.000Z' });
   assert.equal(held.status, 'HELD');
   assert.equal(held.lease.leaseId, 'lease:1');
-  const reacquired = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:2', leaseId: 'lease:2', now: '2026-09-21T02:16:02Z' });
+  const reacquired = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:2', leaseId: 'lease:2', now: '2026-09-21T02:16:02.000Z' });
   assert.equal(reacquired.status, 'REACQUIRED');
   assert.equal(reacquired.lease.ownerInvocationId, 'inv:2');
 });
