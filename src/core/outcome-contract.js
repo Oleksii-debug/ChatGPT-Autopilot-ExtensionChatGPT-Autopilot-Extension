@@ -101,6 +101,11 @@ const ASSESSMENT_KEYS = new Set([
   'assessedAt',
 ]);
 
+const EVIDENCE_REQUEST_KEYS = new Set([
+  'contract',
+  'assessments',
+]);
+
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be a plain object`);
@@ -525,10 +530,14 @@ function normalizeAssessment(input) {
   };
 }
 
-export function projectOutcomeEvidenceV1({ contract, assessments } = {}) {
-  const normalized = normalizeOutcomeContractV1(contract);
+export function projectOutcomeEvidenceV1(input = {}) {
+  const raw = record(input, 'OutcomeEvidenceProjectionRequestV1');
+  exactKeys(raw, EVIDENCE_REQUEST_KEYS, 'OutcomeEvidenceProjectionRequestV1');
+  const normalized = normalizeOutcomeContractV1(
+    own(raw, 'contract', 'OutcomeEvidenceProjectionRequestV1'),
+  );
   const rows = objectList(
-    assessments,
+    own(raw, 'assessments', 'OutcomeEvidenceProjectionRequestV1'),
     'assessments',
     normalizeAssessment,
     { min: 1 },
