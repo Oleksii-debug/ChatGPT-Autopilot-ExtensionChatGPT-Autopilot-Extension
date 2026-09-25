@@ -78,6 +78,42 @@ test('chronology and canonical timestamps fail closed', async()=>{
  await assert.rejects(()=>admit(request({admittedAt:T0})),/predates observation/);
 });
 
+test('extended-year event chronology follows epoch order rather than ISO lexical order', async()=>{
+ const triggerAt='9999-12-31T23:59:59.000Z';
+ const observedAt='+010000-01-01T00:00:01.000Z';
+ const admittedAt='+010000-01-01T00:00:02.000Z';
+ const accepted=await admit(request({
+  trigger:trigger({createdAt:triggerAt}),
+  observation:observation({observedAt}),
+  admittedAt,
+ }),{trustedTrigger:trigger({createdAt:triggerAt})});
+ assert.equal(accepted.status,EventTriggerAdmissionStatus.READY_FOR_SCHEDULER);
+
+ await assert.rejects(
+  ()=>admit(request({
+   trigger:trigger({createdAt:observedAt}),
+   observation:observation({observedAt:triggerAt}),
+   admittedAt,
+  }),{trustedTrigger:trigger({createdAt:observedAt})}),
+  /predates trigger definition/,
+ );
+ await assert.rejects(
+  ()=>admit(request({
+   trigger:trigger({createdAt:triggerAt}),
+   observation:observation({observedAt}),
+   admittedAt:triggerAt,
+  }),{trustedTrigger:trigger({createdAt:triggerAt})}),
+  /predates observation/,
+ );
+ assert.throws(
+  ()=>normalizeEventTriggerObservationV1(observation({
+   observedAt,
+   payloadArtifactRef:{...observation().payloadArtifactRef,createdAt:'+010000-01-01T00:00:02.000Z'},
+  })),
+  /cannot postdate observation/,
+ );
+});
+
 test('event material requires exact non-empty sha-bound ArtifactRef',()=>{
  assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,sha256:''}})),/canonical lowercase SHA-256/);
  assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,sizeBytes:0}})),/requires non-empty material/);
