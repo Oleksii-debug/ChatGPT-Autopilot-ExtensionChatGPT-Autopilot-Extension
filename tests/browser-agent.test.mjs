@@ -260,7 +260,10 @@ test('job-to-Project resolver composes exact persisted AgentPlan identity and fa
   });
 
   await manager.update(store => {
-    store.byId['job-plan-project'].runtime.plan.jobId = 'other-job';
+    store.byId['job-plan-project'].runtime.plan = {
+      ...store.byId['job-plan-project'].runtime.plan,
+      jobId: 'other-job',
+    };
     return store;
   });
   await assert.rejects(
