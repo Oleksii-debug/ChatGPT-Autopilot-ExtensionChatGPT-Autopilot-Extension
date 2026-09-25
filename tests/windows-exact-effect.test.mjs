@@ -75,8 +75,11 @@ test('SAFE_RETRY fails closed for self-authored, wrong-authority, mismatched, an
 test('primary verifier cannot relabel an exact effect execution binding',async()=>{
   const variants=[
     ['effectId','win-effect-other'],
+    ['effectId',''],
     ['executionId','win-effect-1:attempt:2'],
+    ['executionId',''],
     ['attempt',2],
+    ['attempt',0],
   ];
   for(const [field,value] of variants){
     const durable=store();let dispatches=0;

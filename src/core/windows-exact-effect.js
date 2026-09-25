@@ -241,20 +241,22 @@ export class WindowsExactEffectExecutorV1 {
       });
       state = await this.#save(observed.state);
 
-      let verification = normalizeVerificationV1(await this.verify({
+      const rawVerification = await this.verify({
         invocation: structuredClone(state.invocation),
         effectId: state.effectId,
         executionId: state.executionId,
         attempt: state.attempt,
         policyDecisionId: state.invocation.policyDecisionId,
         observation: structuredClone(state.observation),
-      }));
+      });
+      let verification = normalizeVerificationV1(rawVerification);
       for (const [label, actual, expected] of [
         ['effectId', verification.effectId, state.effectId],
         ['executionId', verification.executionId, state.executionId],
         ['attempt', verification.attempt, state.attempt],
       ]) {
-        if (actual && actual !== expected) throw new Error(`Windows verification ${label} binding is mismatched`);
+        const supplied = Object.prototype.hasOwnProperty.call(rawVerification, label);
+        if (supplied && actual !== expected) throw new Error(`Windows verification ${label} binding is mismatched`);
       }
       verification = normalizeVerificationV1({
         ...verification,
