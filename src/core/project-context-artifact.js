@@ -343,9 +343,21 @@ export function normalizeContextCapsuleV1(input) {
   });
 }
 
+const INPUT_ARTIFACT_BINDING_KEYS = new Set(['artifactId', 'versionId', 'sha256']);
+
+function normalizeArtifactInputBindingV1(input) {
+  const raw = plain(input, 'ArtifactInputBindingV1');
+  exactKeys(raw, INPUT_ARTIFACT_BINDING_KEYS, 'ArtifactInputBindingV1');
+  return frozen({
+    artifactId: id(raw.artifactId, 'inputArtifactBinding.artifactId'),
+    versionId: id(raw.versionId, 'inputArtifactBinding.versionId'),
+    sha256: digest(raw.sha256, 'inputArtifactBinding.sha256', { optional: false }),
+  });
+}
+
 const PROVENANCE_KEYS = new Set([
   'schemaVersion', 'projectId', 'artifactRef', 'sourceBindings',
-  'inputArtifactIds', 'createdAt',
+  'inputArtifactIds', 'inputArtifactBindings', 'createdAt',
 ]);
 
 export function normalizeArtifactProvenanceV1(input) {
@@ -358,12 +370,34 @@ export function normalizeArtifactProvenanceV1(input) {
   );
   const ids = boundedArray(raw.inputArtifactIds, 'inputArtifactIds', value => id(value, 'artifactId'), { optional: true });
   if (new Set(ids).size !== ids.length) throw new Error('inputArtifactIds contains duplicates');
+  const inputArtifactBindings = uniqueBy(
+    boundedArray(
+      raw.inputArtifactBindings,
+      'inputArtifactBindings',
+      normalizeArtifactInputBindingV1,
+      { optional: true },
+    ),
+    'artifactId',
+    'inputArtifactBindings',
+  );
+  if (new Set(inputArtifactBindings.map(binding => binding.versionId)).size !== inputArtifactBindings.length) {
+    throw new Error('inputArtifactBindings contains duplicate versionId');
+  }
+  if (inputArtifactBindings.length) {
+    const boundIds = [...inputArtifactBindings.map(binding => binding.artifactId)].sort();
+    const declaredIds = [...ids].sort();
+    if (boundIds.length !== declaredIds.length
+        || boundIds.some((artifactId, index) => artifactId !== declaredIds[index])) {
+      throw new Error('inputArtifactBindings must exactly bind inputArtifactIds');
+    }
+  }
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ArtifactProvenanceV1'),
     projectId: id(raw.projectId, 'projectId'),
     artifactRef: normalizeNestedArtifactRefV1(raw.artifactRef),
     sourceBindings,
     inputArtifactIds: ids,
+    inputArtifactBindings,
     createdAt: timestamp(raw.createdAt, 'createdAt'),
   });
 }
