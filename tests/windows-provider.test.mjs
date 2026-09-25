@@ -628,3 +628,60 @@ test('UIA request object cannot inherit window authority', async () => {
   );
   assert.equal(called, false);
 });
+
+test('Windows provider array boundaries snapshot length without ordinary Proxy reads', async () => {
+  let reads = 0;
+  const countReads = target => new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+
+  const executables = countReads([
+    {
+      executableId: 'git',
+      path: 'C:\\Program Files\\Git\\cmd\\git.exe',
+      readOnly: false,
+    },
+  ]);
+  const normalized = normalizeWindowsProviderConfig({
+    schemaVersion: 1,
+    executables,
+  });
+  assert.equal(normalized.executables[0].executableId, 'git');
+  assert.equal(reads, 0, 'owner executable array must not perform ordinary caller reads');
+
+  reads = 0;
+  const args = countReads(['status']);
+  const provider = createWindowsProvider({
+    config,
+    platform: 'win32',
+    execFile: async () => ({ stdout: 'ok', stderr: '', exitCode: 0 }),
+    uiaAdapter: { query: async () => [] },
+  });
+  await provider.execPinned({ executableId: 'git', args });
+  assert.equal(reads, 0, 'pinned command args must not perform ordinary caller reads');
+
+  reads = 0;
+  const rows = countReads([
+    {
+      elementId: 'rid:42.7.-3',
+      processId: 77,
+      role: 'button',
+      name: 'Save',
+      enabled: true,
+      offscreen: false,
+    },
+  ]);
+  const resultProvider = createWindowsProvider({
+    config,
+    platform: 'win32',
+    execFile: async () => ({}),
+    uiaAdapter: { query: async () => rows },
+  });
+  const result = await resultProvider.queryUia({ windowId: 'window-1', limit: 2 });
+  assert.equal(result[0].elementId, 'rid:42.7.-3');
+  assert.equal(reads, 0, 'UIA result array must not perform ordinary caller reads');
+});
+
