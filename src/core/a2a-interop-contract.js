@@ -7,6 +7,10 @@ const MAX = Object.freeze({
   interfaces: 32,
   skills: 256,
   securitySchemes: 64,
+  securityRequirements: 64,
+  securityRequirementSchemes: 32,
+  securityScopes: 128,
+  skillSecurityRequirements: 256,
   evidence: 128,
   capabilities: 256,
   artifacts: 256,
@@ -132,6 +136,43 @@ function httpsUrl(value, label) {
   return parsed.toString();
 }
 
+function secureCustomUrl(value, label) {
+  if (typeof value !== 'string' || value.length > 4096 || value !== value.trim()) {
+    throw new Error(label + ' must be a secure URL');
+  }
+  let parsed;
+  try { parsed = new URL(value); } catch { throw new Error(label + ' must be a secure URL'); }
+  if (!['https:', 'wss:'].includes(parsed.protocol)
+      || parsed.username || parsed.password || parsed.hash) {
+    throw new Error(label + ' must be a secure URL');
+  }
+  return parsed.toString();
+}
+
+function grpcAddress(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 1024
+      || value.includes('://')) {
+    throw new Error(label + ' must be a canonical gRPC host:port');
+  }
+  let parsed;
+  try { parsed = new URL('grpc://' + value); } catch {
+    throw new Error(label + ' must be a canonical gRPC host:port');
+  }
+  const port = Number(parsed.port);
+  if (!parsed.hostname || !parsed.port || !Number.isInteger(port) || port < 1 || port > 65535
+      || parsed.username || parsed.password || parsed.search || parsed.hash
+      || (parsed.pathname && parsed.pathname !== '/')) {
+    throw new Error(label + ' must be a canonical gRPC host:port');
+  }
+  return parsed.hostname + ':' + parsed.port;
+}
+
+function interfaceEndpoint(value, binding, label) {
+  if (binding === 'GRPC') return grpcAddress(value, label);
+  if (binding === 'JSONRPC' || binding === 'HTTP+JSON') return httpsUrl(value, label);
+  return secureCustomUrl(value, label);
+}
+
 function ids(value, label, max, min = 0) {
   const out = array(value, label, max, min).map((item, index) => id(item, label + '[' + index + ']'));
   if (new Set(out).size !== out.length) throw new Error(label + ' contains duplicates');
@@ -140,6 +181,13 @@ function ids(value, label, max, min = 0) {
 
 function ascii(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function strings(value, label, max, min = 0) {
+  const out = array(value, label, max, min)
+    .map((item, index) => text(item, label + '[' + index + ']', 512));
+  if (new Set(out).size !== out.length) throw new Error(label + ' contains duplicates');
+  return out.sort(ascii);
 }
 
 function unique(items, field, label) {
@@ -160,17 +208,79 @@ const INTERFACE_KEYS = new Set(['url', 'protocolBinding', 'protocolVersion', 'te
 
 function normalizeInterface(input, label) {
   const raw = record(input, label, INTERFACE_KEYS);
+  const binding = protocolBinding(raw.protocolBinding, label + '.protocolBinding');
   return freeze({
-    url: httpsUrl(raw.url, label + '.url'),
-    protocolBinding: protocolBinding(raw.protocolBinding, label + '.protocolBinding'),
+    url: interfaceEndpoint(raw.url, binding, label + '.url'),
+    protocolBinding: binding,
     protocolVersion: protocolVersion(raw.protocolVersion, label + '.protocolVersion'),
     tenant: id(raw.tenant, label + '.tenant', true),
+  });
+}
+
+const SECURITY_SCHEME_REQUIREMENT_KEYS = new Set(['schemeId', 'scopeIds']);
+const SECURITY_REQUIREMENT_KEYS = new Set(['schemes']);
+const SKILL_SECURITY_REQUIREMENT_KEYS = new Set(['skillId', 'securityRequirements']);
+
+function normalizeSecurityRequirement(input, label) {
+  const raw = record(input, label, SECURITY_REQUIREMENT_KEYS);
+  const schemes = array(
+    raw.schemes,
+    label + '.schemes',
+    MAX.securityRequirementSchemes,
+  ).map((item, index) => {
+    const schemeLabel = label + '.schemes[' + index + ']';
+    const schemeRaw = record(item, schemeLabel, SECURITY_SCHEME_REQUIREMENT_KEYS);
+    return freeze({
+      schemeId: id(schemeRaw.schemeId, schemeLabel + '.schemeId'),
+      scopeIds: strings(schemeRaw.scopeIds, schemeLabel + '.scopeIds', MAX.securityScopes),
+    });
+  }).sort((left, right) => ascii(left.schemeId, right.schemeId));
+  unique(schemes, 'schemeId', label + '.schemes');
+  return freeze({ schemes });
+}
+
+function normalizeSecurityRequirements(input, label) {
+  const source = input == null ? [] : input;
+  const requirements = array(source, label, MAX.securityRequirements)
+    .map((item, index) => normalizeSecurityRequirement(item, label + '[' + index + ']'));
+  const seen = new Set();
+  for (const requirement of requirements) {
+    const key = JSON.stringify(requirement);
+    if (seen.has(key)) throw new Error(label + ' contains duplicate requirements');
+    seen.add(key);
+  }
+  return requirements;
+}
+
+function normalizeSkillSecurityRequirement(input, label) {
+  const raw = record(input, label, SKILL_SECURITY_REQUIREMENT_KEYS);
+  return freeze({
+    skillId: id(raw.skillId, label + '.skillId'),
+    securityRequirements: normalizeSecurityRequirements(
+      raw.securityRequirements,
+      label + '.securityRequirements',
+    ),
+  });
+}
+
+function requirementSchemeIds(requirement) {
+  return requirement.schemes.map(item => item.schemeId);
+}
+
+function requirementSatisfied(required, declared) {
+  const declaredByScheme = new Map(
+    declared.schemes.map(item => [item.schemeId, new Set(item.scopeIds)]),
+  );
+  return required.schemes.every((scheme) => {
+    const declaredScopes = declaredByScheme.get(scheme.schemeId);
+    return declaredScopes && scheme.scopeIds.every(scopeId => declaredScopes.has(scopeId));
   });
 }
 
 const CARD_KEYS = new Set([
   'schemaVersion', 'remoteAgentId', 'cardUrl', 'cardSha256', 'name',
   'supportedInterfaces', 'skillIds', 'securitySchemeIds',
+  'securityRequirements', 'skillSecurityRequirements',
   'signatureEvidenceArtifactIds', 'discoveredAt',
   'advisoryOnly', 'executionAuthorized', 'credentialMaterialPresent',
 ]);
@@ -197,6 +307,38 @@ export function normalizeA2ARemoteAgentCardRefV1(input) {
     interfaceKeys.add(key);
   }
 
+  const skillIds = ids(raw.skillIds, 'skillIds', MAX.skills, 1);
+  const securitySchemeIds = ids(raw.securitySchemeIds, 'securitySchemeIds', MAX.securitySchemes);
+  const securityRequirements = normalizeSecurityRequirements(
+    raw.securityRequirements,
+    'securityRequirements',
+  );
+  const skillSecurityRequirements = array(
+    raw.skillSecurityRequirements == null ? [] : raw.skillSecurityRequirements,
+    'skillSecurityRequirements',
+    MAX.skillSecurityRequirements,
+  ).map((item, index) => normalizeSkillSecurityRequirement(
+    item,
+    'skillSecurityRequirements[' + index + ']',
+  )).sort((left, right) => ascii(left.skillId, right.skillId));
+  unique(skillSecurityRequirements, 'skillId', 'skillSecurityRequirements');
+
+  for (const requirement of securityRequirements) {
+    if (!subset(requirementSchemeIds(requirement), securitySchemeIds)) {
+      throw new Error('securityRequirements references unknown security scheme');
+    }
+  }
+  for (const skillRequirement of skillSecurityRequirements) {
+    if (!skillIds.includes(skillRequirement.skillId)) {
+      throw new Error('skillSecurityRequirements references unknown skill');
+    }
+    for (const requirement of skillRequirement.securityRequirements) {
+      if (!subset(requirementSchemeIds(requirement), securitySchemeIds)) {
+        throw new Error('skillSecurityRequirements references unknown security scheme');
+      }
+    }
+  }
+
   return freeze({
     schemaVersion: 1,
     remoteAgentId: id(raw.remoteAgentId, 'remoteAgentId'),
@@ -204,8 +346,10 @@ export function normalizeA2ARemoteAgentCardRefV1(input) {
     cardSha256: digest(raw.cardSha256, 'cardSha256'),
     name: text(raw.name, 'name', 500),
     supportedInterfaces,
-    skillIds: ids(raw.skillIds, 'skillIds', MAX.skills, 1),
-    securitySchemeIds: ids(raw.securitySchemeIds, 'securitySchemeIds', MAX.securitySchemes),
+    skillIds,
+    securitySchemeIds,
+    securityRequirements,
+    skillSecurityRequirements,
     signatureEvidenceArtifactIds: ids(
       raw.signatureEvidenceArtifactIds,
       'signatureEvidenceArtifactIds',
@@ -243,13 +387,14 @@ export function normalizeA2ARemoteAdmissionRefV1(input) {
   if (expiresAt && Date.parse(expiresAt) <= Date.parse(decidedAt)) {
     throw new Error('expiresAt must be after decidedAt');
   }
+  const binding = protocolBinding(raw.protocolBinding, 'protocolBinding');
   return freeze({
     schemaVersion: 1,
     admissionRefId: id(raw.admissionRefId, 'admissionRefId'),
     remoteAgentId: id(raw.remoteAgentId, 'remoteAgentId'),
     cardSha256: digest(raw.cardSha256, 'cardSha256'),
-    interfaceUrl: httpsUrl(raw.interfaceUrl, 'interfaceUrl'),
-    protocolBinding: protocolBinding(raw.protocolBinding, 'protocolBinding'),
+    interfaceUrl: interfaceEndpoint(raw.interfaceUrl, binding, 'interfaceUrl'),
+    protocolBinding: binding,
     protocolVersion: protocolVersion(raw.protocolVersion, 'protocolVersion'),
     tenant: id(raw.tenant, 'tenant', true),
     allowedSkillIds: ids(raw.allowedSkillIds, 'allowedSkillIds', MAX.skills, 1),
@@ -269,7 +414,7 @@ export function normalizeA2ARemoteAdmissionRefV1(input) {
 
 const DELEGATION_KEYS = new Set([
   'schemaVersion', 'delegationId', 'localAgentId', 'localTaskId', 'effectId', 'remoteAgentId',
-  'requestedSkillId', 'requestedCapabilityIds', 'requiredSecuritySchemeIds',
+  'requestedSkillId', 'requestedCapabilityIds', 'declaredSecurityRequirement',
   'taskEnvelopeArtifactId', 'inputArtifactIds', 'policyDecisionId', 'createdAt',
   'credentialMaterialPresent', 'executionAuthorized',
 ]);
@@ -296,10 +441,9 @@ export function normalizeA2ADelegationRequestV1(input) {
       'requestedCapabilityIds',
       MAX.capabilities,
     ),
-    requiredSecuritySchemeIds: ids(
-      raw.requiredSecuritySchemeIds,
-      'requiredSecuritySchemeIds',
-      MAX.securitySchemes,
+    declaredSecurityRequirement: normalizeSecurityRequirement(
+      raw.declaredSecurityRequirement,
+      'declaredSecurityRequirement',
     ),
     taskEnvelopeArtifactId: id(raw.taskEnvelopeArtifactId, 'taskEnvelopeArtifactId'),
     inputArtifactIds: ids(raw.inputArtifactIds, 'inputArtifactIds', MAX.artifacts),
@@ -344,11 +488,27 @@ export function assessA2ADelegationV1({
   if (!subset(delegation.requestedCapabilityIds, admission.allowedCapabilityIds)) {
     reasons.push('CAPABILITY_NOT_ADMITTED');
   }
-  if (!subset(delegation.requiredSecuritySchemeIds, card.securitySchemeIds)) {
+  const declaredSecuritySchemeIds = requirementSchemeIds(delegation.declaredSecurityRequirement);
+  if (!subset(declaredSecuritySchemeIds, card.securitySchemeIds)) {
     reasons.push('SECURITY_SCHEME_NOT_IN_CARD');
   }
-  if (!subset(delegation.requiredSecuritySchemeIds, admission.allowedSecuritySchemeIds)) {
+  if (!subset(declaredSecuritySchemeIds, admission.allowedSecuritySchemeIds)) {
     reasons.push('SECURITY_SCHEME_NOT_ADMITTED');
+  }
+  if (card.securityRequirements.length
+      && !card.securityRequirements.some(
+        requirement => requirementSatisfied(requirement, delegation.declaredSecurityRequirement),
+      )) {
+    reasons.push('AGENT_SECURITY_REQUIREMENT_UNSATISFIED');
+  }
+  const skillSecurity = card.skillSecurityRequirements.find(
+    item => item.skillId === delegation.requestedSkillId,
+  );
+  if (skillSecurity && skillSecurity.securityRequirements.length
+      && !skillSecurity.securityRequirements.some(
+        requirement => requirementSatisfied(requirement, delegation.declaredSecurityRequirement),
+      )) {
+    reasons.push('SKILL_SECURITY_REQUIREMENT_UNSATISFIED');
   }
 
   const createdMs = Date.parse(delegation.createdAt);
@@ -376,7 +536,8 @@ export function assessA2ADelegationV1({
     taskEnvelopeArtifactId: delegation.taskEnvelopeArtifactId,
     inputArtifactIds: delegation.inputArtifactIds,
     requestedCapabilityIds: delegation.requestedCapabilityIds,
-    requiredSecuritySchemeIds: delegation.requiredSecuritySchemeIds,
+    declaredSecurityRequirement: delegation.declaredSecurityRequirement,
+    declaredSecuritySchemeIds,
     advisoryOnly: true,
     executionAuthorized: false,
     credentialUseAuthorized: false,
@@ -402,6 +563,13 @@ export function assessA2ARemoteCardDriftV1(baselineInput, currentInput) {
   if (JSON.stringify(baseline.skillIds) !== JSON.stringify(current.skillIds)) signals.push('SKILLS_CHANGED');
   if (JSON.stringify(baseline.securitySchemeIds) !== JSON.stringify(current.securitySchemeIds)) {
     signals.push('SECURITY_SCHEMES_CHANGED');
+  }
+  if (JSON.stringify(baseline.securityRequirements) !== JSON.stringify(current.securityRequirements)) {
+    signals.push('SECURITY_REQUIREMENTS_CHANGED');
+  }
+  if (JSON.stringify(baseline.skillSecurityRequirements)
+      !== JSON.stringify(current.skillSecurityRequirements)) {
+    signals.push('SKILL_SECURITY_REQUIREMENTS_CHANGED');
   }
   if (JSON.stringify(baseline.signatureEvidenceArtifactIds)
       !== JSON.stringify(current.signatureEvidenceArtifactIds)) {
