@@ -1518,7 +1518,7 @@ export class BrowserAgentManager {
 
       if (byOrigin.size && this.nativeCompanion) {
         const credentialIndex = new Map();
-        for (const target of [...byOrigin.values()].sort((a, b) => a.targetOrigin.localeCompare(b.targetOrigin)).slice(0, 8)) {
+        for (const target of [...byOrigin.values()].sort((a, b) => (a.targetOrigin < b.targetOrigin ? -1 : (a.targetOrigin > b.targetOrigin ? 1 : 0))).slice(0, 8)) {
           try {
             const listed = await this.nativeCompanion.listCredentials({ targetOrigin: target.targetOrigin });
             const refs = Array.isArray(listed?.credentialRefs) ? listed.credentialRefs.slice(0, 32) : [];
