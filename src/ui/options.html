@@ -31,6 +31,15 @@
   <nav id="session-navigation" aria-label="Сеанси" data-app-mode="sessions">
     <h2>Сеанси</h2>
     <button id="create-session-button" type="button">Новий сеанс</button>
+    <section id="global-runtime-panel" aria-labelledby="global-runtime-heading">
+      <h3 id="global-runtime-heading">Весь Autopilot зараз</h3>
+      <p id="global-runtime-summary" tabindex="0">Завантаження стану…</p>
+      <h4>Спрощені сеанси</h4><ul id="global-simplified-sessions"></ul>
+      <h4>Сценарні чати</h4><ul id="global-scenario-slots"></ul>
+      <h4>Оркестрація</h4><ul id="global-orchestration"></ul>
+      <h4>Агент</h4><ul id="global-agents"></ul>
+      <h4>Моделі</h4><ul id="global-models"></ul>
+    </section>
     <p id="session-overview" tabindex="0"></p>
     <ul id="session-list"></ul>
   </nav>
