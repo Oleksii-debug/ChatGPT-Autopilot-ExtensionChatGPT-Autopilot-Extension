@@ -11,7 +11,7 @@ import {
   sourceBindingFromRefV1,
 } from '../src/core/project-context-artifact.js';
 
-const AT = '2026-09-20T18:36:00Z';
+const AT = '2026-09-20T18:36:00.000Z';
 
 function source(overrides = {}) {
   return {
@@ -168,6 +168,57 @@ test('Project/Context contracts reject type-coerced identities, versions and aut
   assert.throws(() => normalizeContextCapsuleV1(capsule({ schemaVersion: '1' })), /schemaVersion/);
 });
 
+test('Project/Context provenance requires exact canonical primitive representations', () => {
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ sourceId: ' github-main' })),
+    /sourceId is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ revisionId: 'commit-7249c934 ' })),
+    /revisionId is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ contentSha256: 'A'.repeat(64) })),
+    /contentSha256 is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ authority: 'canonical' })),
+    /authority is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ observedAt: '2026-09-20T18:36:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  assert.throws(
+    () => normalizeProjectSnapshotV1({
+      schemaVersion: 1,
+      projectId: 'autopilot ',
+      revisionId: 'project-rev-1',
+      title: 'ChatGPT Autopilot Extension',
+      sourceRefs: [source()],
+      artifactRefs: [artifact()],
+      createdAt: AT,
+    }),
+    /projectId is invalid/,
+  );
+
+  assert.throws(
+    () => normalizeContextCapsuleV1(capsule({ projectRevisionId: 'project-rev-1 ' })),
+    /projectRevisionId is invalid/,
+  );
+  assert.throws(
+    () => normalizeContextCapsuleV1(capsule({ createdAt: '2026-09-20T18:36:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  const exact = normalizeProjectSourceRefV1(source());
+  assert.equal(exact.sourceId, 'github-main');
+  assert.equal(exact.contentSha256, 'a'.repeat(64));
+  assert.equal(exact.authority, SourceAuthorityKind.CANONICAL);
+  assert.equal(exact.observedAt, AT);
+});
+
 test('Project/Context contracts reject exotic prototype authority and identity inheritance', () => {
   const inherited = Object.create(source());
   assert.throws(() => normalizeProjectSourceRefV1(inherited), /plain object/);
@@ -179,4 +230,234 @@ test('Project/Context contracts reject exotic prototype authority and identity i
   const normalized = normalizeProjectSourceRefV1(nullPrototype);
   assert.equal(normalized.sourceId, 'github-main');
   assert.equal(normalized.authority, 'CANONICAL');
+});
+
+
+test('Project/Context optional list fields reject falsy type aliases instead of erasing caller intent', () => {
+  const snapshotBase = {
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    revisionId: 'project-rev-1',
+    title: 'ChatGPT Autopilot Extension',
+    sourceRefs: [source()],
+    createdAt: AT,
+  };
+  for (const bad of [false, 0, '']) {
+    assert.throws(
+      () => normalizeProjectSnapshotV1({ ...snapshotBase, artifactRefs: bad }),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeContextCapsuleV1(capsule({ artifactRefs: bad })),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeArtifactProvenanceV1({
+        schemaVersion: 1,
+        projectId: 'autopilot',
+        artifactRef: artifact(),
+        sourceBindings: bad,
+        inputArtifactIds: [],
+        createdAt: AT,
+      }),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeArtifactProvenanceV1({
+        schemaVersion: 1,
+        projectId: 'autopilot',
+        artifactRef: artifact(),
+        sourceBindings: [],
+        inputArtifactIds: bad,
+        createdAt: AT,
+      }),
+      /bounded plain array/,
+    );
+  }
+
+  assert.doesNotThrow(() => normalizeProjectSnapshotV1(snapshotBase));
+  assert.doesNotThrow(() => normalizeProjectSnapshotV1({ ...snapshotBase, artifactRefs: null }));
+  assert.doesNotThrow(() => normalizeContextCapsuleV1(capsule({ artifactRefs: null })));
+  assert.doesNotThrow(() => normalizeArtifactProvenanceV1({
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    artifactRef: artifact(),
+    createdAt: AT,
+  }));
+});
+
+test('Project/Context record accessors are rejected without executing getter authority', () => {
+  let reads = 0;
+  const raw = source();
+  Object.defineProperty(raw, 'authority', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return SourceAuthorityKind.CANONICAL;
+    },
+  });
+
+  assert.throws(
+    () => normalizeProjectSourceRefV1(raw),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('Project/Context hidden and symbol fields fail closed even when the field name is otherwise allowed', () => {
+  const hidden = source();
+  Object.defineProperty(hidden, 'authority', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: SourceAuthorityKind.CANONICAL,
+  });
+  assert.throws(
+    () => normalizeProjectSourceRefV1(hidden),
+    /enumerable own data properties/,
+  );
+
+  const symbolic = source();
+  symbolic[Symbol('authority')] = SourceAuthorityKind.CANONICAL;
+  assert.throws(
+    () => normalizeProjectSourceRefV1(symbolic),
+    /unknown field/,
+  );
+});
+
+test('Project/Context arrays reject accessor indices and side fields without executing getters', () => {
+  let reads = 0;
+  const refs = [source()];
+  Object.defineProperty(refs, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return source();
+    },
+  });
+  assert.throws(
+    () => normalizeProjectSnapshotV1({
+      schemaVersion: 1,
+      projectId: 'autopilot',
+      revisionId: 'project-rev-1',
+      title: 'ChatGPT Autopilot Extension',
+      sourceRefs: refs,
+      artifactRefs: [],
+      createdAt: AT,
+    }),
+    /data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const withSideField = [source()];
+  Object.defineProperty(withSideField, 'authority', {
+    enumerable: false,
+    configurable: true,
+    value: 'ALLOW',
+  });
+  assert.throws(
+    () => normalizeProjectSnapshotV1({
+      schemaVersion: 1,
+      projectId: 'autopilot',
+      revisionId: 'project-rev-1',
+      title: 'ChatGPT Autopilot Extension',
+      sourceRefs: withSideField,
+      artifactRefs: [],
+      createdAt: AT,
+    }),
+    /non-index field/,
+  );
+});
+
+test('Project source metadata recursively rejects accessors without executing them', () => {
+  let reads = 0;
+  const nested = {};
+  Object.defineProperty(nested, 'secret', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'must-not-run';
+    },
+  });
+  const raw = source({ metadata: { nested } });
+  assert.throws(
+    () => normalizeProjectSourceRefV1(raw),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('nested ArtifactRef is descriptor-snapshotted before canonical normalization', () => {
+  let reads = 0;
+  const ref = artifact();
+  Object.defineProperty(ref, 'sensitive', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return false;
+    },
+  });
+  assert.throws(
+    () => normalizeContextCapsuleV1(capsule({ artifactRefs: [ref] })),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+
+test('nested ArtifactRef and source URI require exact canonical representation', () => {
+  const aliases = [
+    artifact({ artifactId: ' artifact-report' }),
+    artifact({ kind: 'report ' }),
+    artifact({ uri: ' artifact://autopilot/report.json' }),
+    artifact({ sha256: 'B'.repeat(64) }),
+    artifact({ createdAt: '2026-09-20T18:36:00Z' }),
+    artifact({ producerInvocationId: 'invoke-1 ' }),
+    artifact({ sizeBytes: -0 }),
+  ];
+  for (const ref of aliases) {
+    assert.throws(
+      () => normalizeContextCapsuleV1(capsule({ artifactRefs: [ref] })),
+      /invalid|canonical ISO-8601 UTC representation/u,
+    );
+  }
+
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({
+      uri: ' github://Oleksii-debug/autopilot/main',
+    })),
+    /uri is invalid/u,
+  );
+
+  const exact = normalizeContextCapsuleV1(capsule());
+  assert.equal(exact.artifactRefs[0].artifactId, 'artifact-report');
+  assert.equal(exact.artifactRefs[0].sha256, 'b'.repeat(64));
+  assert.equal(exact.artifactRefs[0].createdAt, AT);
+});
+
+test('Project/Context array admission performs zero ordinary length/index getter reads', () => {
+  let reads = 0;
+  const refs = new Proxy([source()], {
+    get(target, key, receiver) {
+      reads += 1;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+
+  const normalized = normalizeProjectSnapshotV1({
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    revisionId: 'project-rev-1',
+    title: 'ChatGPT Autopilot Extension',
+    sourceRefs: refs,
+    artifactRefs: [],
+    createdAt: AT,
+  });
+
+  assert.equal(reads, 0);
+  assert.equal(normalized.sourceRefs[0].sourceId, 'github-main');
 });

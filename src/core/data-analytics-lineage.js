@@ -422,6 +422,9 @@ export function assertDataTransformLineageMatchesSnapshotsV1(request = {}) {
   if (output.observedAt < normalizedLineage.executedAt) {
     throw new Error('transform output dataset predates execution');
   }
+  if (output.artifactRef.createdAt < normalizedLineage.executedAt) {
+    throw new Error('transform output artifact predates execution');
+  }
   for (const source of output.sourceRefs) {
     if (source.observedAt > normalizedLineage.executedAt) {
       throw new Error(`transform output source observed after execution: ${source.sourceId}`);

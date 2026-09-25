@@ -3,6 +3,7 @@ import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRoute
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
+import { normalizeCalendarSchedule } from './calendar-schedule.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -15,8 +16,8 @@ export const RunState = Object.freeze({ STOPPED:'STOPPED', RUNNING:'RUNNING', PA
 export const PromptMode = Object.freeze({ SHARED:'SHARED', UNIQUE:'UNIQUE' });
 export const RunMode = Object.freeze({ ONE_PASS:'ONE_PASS', CONTINUOUS:'CONTINUOUS' });
 export const TabStrategy = Object.freeze({ KEEP_TASK_TABS_OPEN:'KEEP_TASK_TABS_OPEN', ONE_WORKER_TAB_PER_SESSION:'ONE_WORKER_TAB_PER_SESSION', OPEN_CLOSE_PER_TASK:'OPEN_CLOSE_PER_TASK' });
-export const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
-export const MIN_RATE_LIMIT_COOLDOWN_MS = 1 * 60 * 1000;
+export const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 0;
+export const MIN_RATE_LIMIT_COOLDOWN_MS = 0;
 export const MAX_RATE_LIMIT_COOLDOWN_MS = 120 * 60 * 1000;
 export const OperationPhase = Object.freeze({ NONE:'NONE', CHECKING:'CHECKING', READY:'READY', INSERTING:'INSERTING', INSERTED:'INSERTED', PRE_SEND_WAIT:'PRE_SEND_WAIT', SUBMITTING:'SUBMITTING', SENT_VERIFIED:'SENT_VERIFIED', AMBIGUOUS:'AMBIGUOUS', FAILED_SAFE:'FAILED_SAFE', MANUAL_REVIEW:'MANUAL_REVIEW' });
 
@@ -60,7 +61,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -171,6 +172,12 @@ function validateOperation(operation, session) {
       throw new Error(`Invalid session ${session.id} operation launchUrl`);
     }
   }
+  for (const field of ['previousSendTabId', 'previousSendWindowId']) {
+    if (operation[field] !== undefined
+        && (!Number.isInteger(operation[field]) || operation[field] < 0)) {
+      throw new Error(`Invalid session ${session.id} operation ${field}`);
+    }
+  }
 }
 
 function validateSession(session, id) {
@@ -183,6 +190,8 @@ function validateSession(session, id) {
   requireString(session.sharedPrompt, `session ${id} sharedPrompt`);
   if (session.promptCadence !== undefined) normalizeSessionPromptCadence(session.promptCadence);
   if (session.drivePromptSources !== undefined) normalizeSessionDrivePromptSources(session.drivePromptSources);
+  if (session.calendarSchedule !== undefined && session.calendarSchedule !== null) normalizeCalendarSchedule(session.calendarSchedule);
+  if (session.calendarRuntime !== undefined) requireRecord(session.calendarRuntime, `session ${id} calendarRuntime`);
   requireEnum(session.runMode, RUN_MODES, `session ${id} runMode`);
   requireUniqueStringArray(session.taskOrder, `session ${id} taskOrder`, { min: 1, max: MAX_PHYSICAL_TASKS });
   const configuredTaskCount = session.configuredTaskCount === undefined ? session.taskOrder.length : session.configuredTaskCount;
@@ -210,6 +219,7 @@ function validateSession(session, id) {
   requireUniqueStringArray(session.onePassCompletedTaskIds, `session ${id} onePassCompletedTaskIds`);
   if (session.version !== undefined && (!Number.isInteger(session.version) || session.version < 0)) throw new Error(`Invalid session ${id} version`);
   if (session.pausedByMaster !== undefined) requireBoolean(session.pausedByMaster, `session ${id} pausedByMaster`);
+  if (session.simplifiedSession !== undefined) requireBoolean(session.simplifiedSession, `session ${id} simplifiedSession`);
   if (session.urlMode !== undefined && !['shared', 'unique'].includes(session.urlMode)) throw new Error(`Invalid session ${id} urlMode`);
   if (session.aiCoordinatorHandoff !== undefined) requireString(session.aiCoordinatorHandoff, `session ${id} aiCoordinatorHandoff`);
   if (session.aiCoordinatorHandoffCreatedAt !== undefined) requireNonNegativeNumber(session.aiCoordinatorHandoffCreatedAt, `session ${id} aiCoordinatorHandoffCreatedAt`);

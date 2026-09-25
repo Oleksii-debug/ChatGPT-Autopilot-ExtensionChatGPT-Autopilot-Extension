@@ -473,6 +473,29 @@ test('transform lineage is reproducible and exact-bound to every input/output re
   assert.throws(() => normalizeDataTransformLineageV1(duplicate), /duplicate datasetId/);
 });
 
+test('transform lineage rejects an output artifact materialized before execution', () => {
+  const input = dataset();
+  const output = dataset({
+    datasetId: 'dataset-out-preexisting-artifact',
+    revisionId: 'dataset-out-preexisting-r1',
+    digest: sha('4'),
+    sourceRefs: [],
+    artifactId: 'artifact-dataset-out-preexisting',
+    observedAt: '2026-09-24T22:00:00.000Z',
+  });
+  output.artifactRef.createdAt = T1;
+  const raw = lineage({ inputs: [input], output });
+
+  assert.throws(
+    () => assertDataTransformLineageMatchesSnapshotsV1({
+      lineage: raw,
+      inputSnapshots: [input],
+      outputSnapshot: output,
+    }),
+    /transform output artifact predates execution/,
+  );
+});
+
 test('dataset delta is deterministic advisory structural change evidence and detects revision identity conflicts', () => {
   const before = dataset();
   const after = dataset({
@@ -511,6 +534,7 @@ test('dataset delta is deterministic advisory structural change evidence and det
 
   const observationAliasConflict = structuredClone(before);
   observationAliasConflict.sourceRefs[0].observedAt = T2;
+  observationAliasConflict.observedAt = T2;
   assert.throws(
     () => deriveDataDatasetDeltaV1({ baseline: before, current: observationAliasConflict }),
     /revision identity conflict/,

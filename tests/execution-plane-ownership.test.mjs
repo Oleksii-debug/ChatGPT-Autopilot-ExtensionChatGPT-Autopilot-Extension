@@ -9,6 +9,7 @@ import {
   recoverExpiredExecutionOwnershipV1,
   resolveExecutionReconciliationV1,
   verifyOwnedExecutionV1,
+  verifyExecutionByAuthorityV1,
   normalizeExecutionOwnershipV1,
 } from '../src/core/execution-plane-ownership.js';
 
@@ -19,6 +20,26 @@ const T3 = '2026-09-23T13:30:00.000Z';
 const base = () => createExecutionOwnershipV1({ taskId:'task-1', planId:'plan-1', nodeId:'node-1', effectId:'effect-1', policyEnvelopeId:'policy-1', at:T0 });
 
 function localOwned() { return claimExecutionOwnershipV1(base(), { plane:'LOCAL', ownerId:'local-worker', leaseId:'lease-local', leaseUntil:T2, at:T1 }); }
+
+function reconciliationVerification(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    verificationId: 'verification-no-effect-1',
+    invocationId: 'invoke-effect-1',
+    observationId: 'observation-no-effect-1',
+    status: 'VERIFIED',
+    reasonCode: 'NO_EFFECT_OBSERVED',
+    summary: 'Fresh independent observation proves the attempted effect did not commit.',
+    evidenceArtifactIds: ['artifact:no-effect-1'],
+    verifiedAt: '2026-09-23T13:31:00.000Z',
+    verifierId: 'independent-verifier',
+    verificationAuthorityId: 'policy-1',
+    effectId: 'effect-1',
+    executionId: 'lease-local',
+    attempt: 1,
+    ...overrides,
+  };
+}
 
 test('claim preserves durable causal identity and rejects a second execution owner', () => {
   const owned = localOwned();
@@ -49,19 +70,93 @@ test('expired ambiguous ownership enters RECONCILE and cannot be blindly reclaim
   assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
 });
 
-test('proven no-effect expiry is SAFE to make available again', () => {
-  const available = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3, observedNoEffect:true });
-  assert.equal(available.state, ExecutionOwnershipState.AVAILABLE);
-  const cloud = claimExecutionOwnershipV1(available, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 });
-  assert.equal(cloud.ownerPlane, 'CLOUD');
+test('expiry always enters RECONCILE even when a caller asserts observedNoEffect', () => {
+  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3, observedNoEffect:true });
+  assert.equal(reconcile.state, ExecutionOwnershipState.RECONCILE);
+  assert.equal(reconcile.leaseId, 'lease-local');
+  assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
 });
 
-test('reconciliation requires preserved lease identity and explicit safe-retry evidence', () => {
+test('caller-shaped verification cannot release or complete reconciliation without trusted provenance', () => {
   const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'other', outcome:'VERIFIED', at:'2026-09-23T13:31:00Z' }), /preserved owner lease/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', at:'2026-09-23T13:31:00Z' }), /evidence/);
-  const retry = resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', evidence:'remote verifier proves no effect', at:'2026-09-23T13:31:00Z' });
-  assert.equal(retry.state, ExecutionOwnershipState.AVAILABLE);
+  const at = '2026-09-23T13:31:00Z';
+
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'other',
+    outcome:'SAFE_RETRY',
+    verification:reconciliationVerification(),
+    at,
+  }), /preserved owner lease/);
+
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome:'SAFE_RETRY',
+    verification:reconciliationVerification(),
+    at,
+  }), /trusted verifier provenance/);
+
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome:'VERIFIED',
+    verification:reconciliationVerification({
+      reasonCode:'POSTCONDITION_MATCH',
+      verificationId:'verification-effect-1',
+    }),
+    at,
+  }), /trusted verifier provenance/);
+
+  assert.equal(reconcile.state, ExecutionOwnershipState.RECONCILE);
+  assert.equal(reconcile.leaseId, 'lease-local');
+  assert.throws(() => claimExecutionOwnershipV1(reconcile, {
+    plane:'CLOUD',
+    ownerId:'cloud',
+    leaseId:'cloud-1',
+    leaseUntil:'2026-09-23T13:40:00Z',
+    at,
+  }), /not available/);
+});
+
+test('reconciliation request rejects coercive outcomes without executing them', () => {
+  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
+  let coerced = 0;
+  const outcome = { toString() { coerced += 1; return 'SAFE_RETRY'; } };
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome,
+    verification:reconciliationVerification(),
+    at:'2026-09-23T13:31:00Z',
+  }), /outcome must be text/);
+  assert.equal(coerced, 0);
+});
+
+test('execution ownership normalization is strict data-only without hidden or accessor authority', () => {
+  let reads = 0;
+  const accessor = structuredClone(base());
+  Object.defineProperty(accessor, 'state', {
+    enumerable:true,
+    get() { reads += 1; return 'AVAILABLE'; },
+  });
+  assert.throws(() => normalizeExecutionOwnershipV1(accessor), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const hidden = structuredClone(base());
+  Object.defineProperty(hidden, 'state', { value:'AVAILABLE', enumerable:false });
+  assert.throws(() => normalizeExecutionOwnershipV1(hidden), /enumerable data property/);
+
+  const symbol = structuredClone(base());
+  symbol[Symbol('authority')] = 'OWNED';
+  assert.throws(() => normalizeExecutionOwnershipV1(symbol), /symbol fields/);
+
+  const exotic = Object.create({ inheritedAuthority:'ALLOW' });
+  Object.assign(exotic, structuredClone(base()));
+  assert.throws(() => normalizeExecutionOwnershipV1(exotic), /plain object/);
+
+  assert.throws(() => normalizeExecutionOwnershipV1({ ...structuredClone(base()), schemaVersion:'1' }), /schemaVersion/);
+  assert.throws(() => normalizeExecutionOwnershipV1({ ...structuredClone(base()), revision:'1' }), /revision/);
+  assert.throws(() => normalizeExecutionOwnershipV1({ ...structuredClone(base()), effectId:7 }), /effectId/);
+
+  const nullPrototype = Object.assign(Object.create(null), structuredClone(base()));
+  assert.equal(normalizeExecutionOwnershipV1(nullPrototype).state, ExecutionOwnershipState.AVAILABLE);
 });
 
 test('manual review is terminal to automation and carries ambiguity reason', () => {
@@ -72,12 +167,55 @@ test('manual review is terminal to automation and carries ambiguity reason', () 
   assert.throws(() => claimExecutionOwnershipV1(manual, { plane:'REMOTE', ownerId:'r', leaseId:'r1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
 });
 
-test('only current lease can verify completion', () => {
+test('current effect owner cannot self-mint canonical VERIFIED', () => {
   const owned = localOwned();
-  assert.throws(() => verifyOwnedExecutionV1(owned, { leaseId:'wrong', at:T2 }), /current execution owner/);
-  const verified = verifyOwnedExecutionV1(owned, { leaseId:'lease-local', at:T2 });
-  assert.equal(verified.state, ExecutionOwnershipState.VERIFIED);
-  assert.equal(verified.ownerPlane, '');
+  assert.throws(
+    () => verifyOwnedExecutionV1(owned, { leaseId:'wrong', at:T2 }),
+    /current execution owner/,
+  );
+  assert.throws(
+    () => verifyOwnedExecutionV1(owned, { leaseId:'lease-local', at:T2 }),
+    /trusted verifier provenance/,
+  );
+  assert.equal(owned.state, ExecutionOwnershipState.OWNED);
+  assert.equal(owned.ownerId, 'local-worker');
+  assert.equal(owned.leaseId, 'lease-local');
+});
+
+test('caller-shaped verifier authority cannot mint canonical VERIFIED', () => {
+  const owned = localOwned();
+  assert.throws(
+    () => verifyExecutionByAuthorityV1(owned, {
+      leaseId:'lease-local',
+      verifierId:'independent-verifier',
+      verificationAuthorityId:'policy-1',
+      evidence:'Caller claims an independent observation verified the effect.',
+      at:T2,
+    }),
+    /trusted verifier provenance/,
+  );
+  assert.equal(owned.state, ExecutionOwnershipState.OWNED);
+  assert.equal(owned.ownerId, 'local-worker');
+  assert.equal(owned.leaseId, 'lease-local');
+
+  let reads = 0;
+  const request = new Proxy({
+    leaseId:'lease-local',
+    verifierId:'independent-verifier',
+    verificationAuthorityId:'policy-1',
+    evidence:'Caller-shaped evidence.',
+    at:T2,
+  }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  assert.throws(
+    () => verifyExecutionByAuthorityV1(owned, request),
+    /trusted verifier provenance/,
+  );
+  assert.equal(reads, 0, 'verification request must use descriptor snapshots, not caller get traps');
 });
 
 test('normalization fails closed on unknown fields and inconsistent durable ownership', () => {
