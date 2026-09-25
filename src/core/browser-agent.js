@@ -619,6 +619,21 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
       || passwordElement?.sensitive !== true) {
       throw new Error('Browser Agent credential password target must be a current password input');
     }
+    let passwordOrigin = '';
+    try {
+      const parsed = new URL(clean(passwordFrame?.url, 4096));
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('unsupported');
+      passwordOrigin = parsed.origin;
+    } catch {
+      throw new Error('Browser Agent credential password frame requires a current HTTP(S) origin');
+    }
+    const credentialOrigin = clean(credential?.targetOrigin, 2048);
+    const credentialFrameIds = Array.isArray(credential?.frameIds)
+      ? credential.frameIds.map(Number).filter(Number.isInteger)
+      : [];
+    if (credentialOrigin !== passwordOrigin || !credentialFrameIds.includes(passwordFrameId)) {
+      throw new Error('Browser Agent credential is not bound to the current password frame origin');
+    }
 
     let usernameFrameId = null;
     let usernameRef = '';
@@ -639,6 +654,7 @@ function parseSingleAction(raw, snapshot, refs, { allowBatch = true } = {}) {
 
     action.credentialRef = credentialRef;
     action.credentialId = clean(credential.credentialId, 128);
+    action.credentialOrigin = passwordOrigin;
     action.frameId = passwordFrameId;
     action.ref = passwordRef;
     action.passwordFrameId = passwordFrameId;
@@ -1038,6 +1054,17 @@ export function executeBrowserPageAction(snapshotId, action) {
     return { ok: true, kind: 'scroll', url: location.href };
   }
   throw new Error('AGENT_DOM_ACTION_UNSUPPORTED');
+}
+
+export function readBrowserCredentialFrameOrigin() {
+  try {
+    const url = String(location.href || '');
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return { url, origin: parsed.origin };
+  } catch {
+    return null;
+  }
 }
 
 export function executeBrowserCredentialFill(snapshotId, action, username, secret) {
