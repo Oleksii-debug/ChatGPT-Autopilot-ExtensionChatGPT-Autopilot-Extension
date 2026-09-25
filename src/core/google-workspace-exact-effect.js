@@ -21,6 +21,11 @@ const RECONCILE_PROOF_KEYS = new Set([
 ]);
 const DEFAULT_MAX_RECONCILIATION_EVIDENCE_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const EFFECTFUL_GOOGLE_WORKSPACE_TOOL_IDS = new Set([
+  GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
+  GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+  GoogleWorkspaceToolId.GMAIL_DRAFT_SEND,
+]);
 
 function requireId(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
@@ -93,7 +98,7 @@ function observationFor(invocationId, result, observedAt) {
     observationId: `${invocationId}:observation`,
     invocationId,
     status: 'OK',
-    summary: 'Google Workspace API returned a bounded mutation result.',
+    summary: 'Google Workspace API returned a bounded mutation result awaiting independent readback verification.',
     data: structuredClone(result),
     artifactRefs: [],
     observedAt,
@@ -325,11 +330,7 @@ export class GoogleWorkspaceExactEffectExecutorV1 {
   }
 
   async invoke({ invocation, policyDecision } = {}) {
-    const effectfulToolIds = new Set([
-      GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
-      GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
-    ]);
-    if (!effectfulToolIds.has(invocation?.toolId)) {
+    if (!EFFECTFUL_GOOGLE_WORKSPACE_TOOL_IDS.has(invocation?.toolId)) {
       throw new Error('GoogleWorkspaceExactEffectExecutorV1 accepts only registered effectful Google Workspace invocations');
     }
 
