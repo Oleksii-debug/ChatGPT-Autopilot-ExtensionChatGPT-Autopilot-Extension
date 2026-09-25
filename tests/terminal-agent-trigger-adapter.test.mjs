@@ -166,7 +166,7 @@ test('trusted terminal fact must match every requested causal identity field', a
   ]) {
     const terminalFact = fact(drift);
     await assert.rejects(
-      () => createTerminalAgentTriggerObservationV1({
+      async () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
         payloadArtifactRef: await payload({}, terminalFact),
@@ -185,7 +185,7 @@ test('terminal status and timestamps are exact canonical trusted fact data', asy
     fact({ terminalAt: '2026-09-25T10:01:00Z' }),
   ]) {
     await assert.rejects(
-      () => createTerminalAgentTriggerObservationV1({
+      async () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
         payloadArtifactRef: await payload(),
@@ -198,7 +198,7 @@ test('terminal status and timestamps are exact canonical trusted fact data', asy
 test('payload artifact is byte-identity bound to canonical terminal fact material', async () => {
   const t = await trigger();
   await assert.rejects(
-    () => createTerminalAgentTriggerObservationV1({
+    async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
       payloadArtifactRef: await payload({ sha256: 'f'.repeat(64) }),
@@ -207,7 +207,7 @@ test('payload artifact is byte-identity bound to canonical terminal fact materia
     /does not match canonical terminal fact bytes/u,
   );
   await assert.rejects(
-    () => createTerminalAgentTriggerObservationV1({
+    async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
       payloadArtifactRef: await payload({ sizeBytes: 1 }),
@@ -226,7 +226,7 @@ test('payload representation and chronology fail closed', async () => {
     { createdAt: T0 },
   ]) {
     await assert.rejects(
-      () => createTerminalAgentTriggerObservationV1({
+      async () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
         payloadArtifactRef: await payload(artifactPatch),
@@ -236,7 +236,7 @@ test('payload representation and chronology fail closed', async () => {
   }
 
   await assert.rejects(
-    () => createTerminalAgentTriggerObservationV1({
+    async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
       payloadArtifactRef: await payload(),
@@ -254,7 +254,7 @@ test('trigger kind, provider and graph/node binding must be canonical', async ()
     await trigger({ sourceBindingId: 'terminal-binding:' + 'a'.repeat(64) }),
   ]) {
     await assert.rejects(
-      () => createTerminalAgentTriggerObservationV1({
+      async () => createTerminalAgentTriggerObservationV1({
         trigger: badTrigger,
         terminalIdentity: identity(),
         payloadArtifactRef: await payload(),
@@ -303,7 +303,7 @@ test('hostile request/dependency accessors are rejected without getter execution
     },
   });
   await assert.rejects(
-    () => createTerminalAgentTriggerObservationV1({
+    async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
       payloadArtifactRef: await payload(),
