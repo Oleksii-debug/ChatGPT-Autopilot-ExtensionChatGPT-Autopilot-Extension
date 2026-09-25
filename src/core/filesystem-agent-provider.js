@@ -88,6 +88,41 @@ const TOOLS = Object.freeze([
   }),
 ]);
 const KNOWN_TOOLS = Object.freeze([...TOOLS, WRITE_RECOVERY_TOOL]);
+const LEGACY_NATIVE_CAPABILITY_IDS = Object.freeze([
+  'filesystem.readText',
+  'filesystem.search',
+]);
+
+const NATIVE_METHOD_BY_TOOL_ID = Object.freeze({
+  [FilesystemToolId.READ_TEXT]: 'readText',
+  [FilesystemToolId.SEARCH]: 'searchFiles',
+  [FilesystemToolId.LIST]: 'listFiles',
+  [FilesystemToolId.STAT]: 'statPath',
+});
+
+function nativeCapabilityIdsFromSnapshot(snapshot) {
+  if (snapshot == null) return new Set(LEGACY_NATIVE_CAPABILITY_IDS);
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)
+      || !Array.isArray(snapshot.capabilities)) {
+    throw new Error('Native Companion capability snapshot is invalid');
+  }
+  const out = new Set();
+  for (const [index, capability] of snapshot.capabilities.entries()) {
+    if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
+      throw new Error(`Native Companion capabilities[${index}] is invalid`);
+    }
+    const capabilityId = capability.capabilityId;
+    if (typeof capabilityId !== 'string' || capabilityId !== capabilityId.trim() || !capabilityId) {
+      throw new Error(`Native Companion capabilities[${index}].capabilityId is invalid`);
+    }
+    if (out.has(capabilityId)) {
+      throw new Error(`Native Companion capability snapshot contains duplicate capabilityId: ${capabilityId}`);
+    }
+    out.add(capabilityId);
+  }
+  return out;
+}
+
 
 function providerError(code, message) {
   const error = new Error(message);
@@ -130,15 +165,23 @@ function wrapFailure(error, { readOnly, invocationId }) {
 }
 
 export class FilesystemAgentProviderV1 {
-  constructor({ nativeClient, resolveArtifactText = null, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
+  constructor({
+    nativeClient,
+    nativeCapabilities = null,
+    resolveArtifactText = null,
+    grantedCapabilityIds = [],
+    now = () => Date.now(),
+  } = {}) {
     if (!nativeClient?.readText || !nativeClient?.searchFiles) {
       throw new Error('Filesystem Native Companion read/search client is required');
     }
     this.nativeClient = nativeClient;
+    const nativeCapabilityIds = nativeCapabilityIdsFromSnapshot(nativeCapabilities);
     this.availableTools = Object.freeze(TOOLS.filter(tool => {
-      if (tool.toolId === FilesystemToolId.LIST) return typeof nativeClient.listFiles === 'function';
-      if (tool.toolId === FilesystemToolId.STAT) return typeof nativeClient.statPath === 'function';
-      return true;
+      const methodName = NATIVE_METHOD_BY_TOOL_ID[tool.toolId];
+      const capabilityId = tool.capabilityIds[0];
+      return nativeCapabilityIds.has(capabilityId)
+        && typeof nativeClient[methodName] === 'function';
     }));
     this.resolveArtifactText = typeof resolveArtifactText === 'function' ? resolveArtifactText : null;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
