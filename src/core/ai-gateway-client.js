@@ -174,6 +174,7 @@ export class AiGatewayClient {
       const response = await this.fetchFn(`${base}${path}`, {
         ...init,
         cache: 'no-store',
+        redirect: 'error',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
