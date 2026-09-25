@@ -5,7 +5,7 @@ import {
   DiffReviewChangeKind,
   DiffReviewRiskSeverity,
   DiffReviewRollbackKind,
-  buildDiffFirstOwnerReviewV1,
+  buildDiffFirstOwnerReviewV1 as buildDiffFirstOwnerReviewCoreV1,
 } from '../src/core/diff-first-owner-review.js';
 
 const GENERATED_AT = '2026-09-25T00:10:00.000Z';
@@ -113,9 +113,31 @@ function input(overrides = {}) {
   };
 }
 
+function trustedOptionsFor(raw) {
+  const trusted = {
+    schemaVersion: 1,
+    projectId: raw.projectId,
+    subjectId: raw.subjectId,
+    subjectRevisionId: raw.subjectRevisionId,
+    artifactRefs: raw.artifactRefs,
+    verificationRefs: raw.verificationRefs,
+    effectIds: raw.effectIds,
+  };
+  return {
+    resolveSubjectEvidence() {
+      return trusted;
+    },
+  };
+}
+
+function buildDiffFirstOwnerReviewV1(raw, options = trustedOptionsFor(raw)) {
+  return buildDiffFirstOwnerReviewCoreV1(raw, options);
+}
+
 test('builds a complete deterministic text-first owner review without granting authority', () => {
   const result = buildDiffFirstOwnerReviewV1(input());
 
+  assert.equal(result.subjectEvidenceBound, true);
   assert.equal(result.advisoryOnly, true);
   assert.equal(result.approvalAuthorized, false);
   assert.equal(result.executionAuthorized, false);
@@ -206,6 +228,125 @@ test('non-semantic collection ordering does not change the normalized review pac
   }));
 
   assert.deepEqual(second, first);
+});
+
+
+test('trusted subject evidence is mandatory and exact across subject and revision identity', () => {
+  const original = input({ risks: [], decisions: [] });
+  const trusted = trustedOptionsFor(original);
+
+  assert.throws(
+    () => buildDiffFirstOwnerReviewCoreV1(original),
+    /trusted subject evidence resolver is required/,
+  );
+
+  let query = null;
+  const capturing = {
+    resolveSubjectEvidence(value) {
+      query = value;
+      return {
+        schemaVersion: 1,
+        projectId: original.projectId,
+        subjectId: original.subjectId,
+        subjectRevisionId: original.subjectRevisionId,
+        artifactRefs: original.artifactRefs,
+        verificationRefs: original.verificationRefs,
+        effectIds: original.effectIds,
+      };
+    },
+  };
+  const exact = buildDiffFirstOwnerReviewCoreV1(original, capturing);
+  assert.deepEqual(query, {
+    projectId: 'project-1',
+    subjectId: 'run-1',
+    subjectRevisionId: 'revision-1',
+  });
+  assert.equal(exact.subjectEvidenceBound, true);
+  assert.equal(exact.requiresOwnerAttention, false);
+
+  assert.throws(
+    () => buildDiffFirstOwnerReviewCoreV1(
+      input({ subjectId: 'run-foreign', risks: [], decisions: [] }),
+      trusted,
+    ),
+    /does not match exact project\/subject\/revision/,
+  );
+  assert.throws(
+    () => buildDiffFirstOwnerReviewCoreV1(
+      input({ subjectRevisionId: 'revision-stale', risks: [], decisions: [] }),
+      trusted,
+    ),
+    /does not match exact project\/subject\/revision/,
+  );
+});
+
+test('trusted subject provenance rejects foreign artifact, verification, and effect evidence', () => {
+  const original = input({ risks: [], decisions: [] });
+  const trusted = trustedOptionsFor(original);
+
+  assert.throws(
+    () => buildDiffFirstOwnerReviewCoreV1(input({
+      risks: [],
+      decisions: [],
+      artifactRefs: [artifact('artifact-foreign')],
+      changes: [change('change-foreign-artifact', { artifactIds: ['artifact-foreign'] })],
+      verificationRefs: [verification('verify-foreign-artifact', {
+        evidenceArtifactIds: ['artifact-foreign'],
+      })],
+    }), trusted),
+    /artifact artifact-foreign is not bound to the exact trusted subject revision/,
+  );
+
+  assert.throws(
+    () => buildDiffFirstOwnerReviewCoreV1(input({
+      risks: [],
+      decisions: [],
+      verificationRefs: [verification('verify-foreign')],
+    }), trusted),
+    /verification verify-foreign is not bound to the exact trusted subject revision/,
+  );
+
+  assert.throws(
+    () => buildDiffFirstOwnerReviewCoreV1(input({
+      risks: [],
+      decisions: [],
+      effectIds: ['effect-foreign'],
+      changes: [change('change-foreign-effect', { effectIds: ['effect-foreign'] })],
+      verificationRefs: [verification('verify-foreign-effect', {
+        effectId: 'effect-foreign',
+      })],
+    }), trusted),
+    /verification verify-foreign-effect is not bound|effect effect-foreign is not bound/,
+  );
+});
+
+test('record and dense-array snapshots do not ordinary-read Proxy authority', () => {
+  const base = input({ risks: [], decisions: [] });
+  let arrayGets = 0;
+  const proxyEffects = new Proxy(base.effectIds, {
+    get(target, property, receiver) {
+      arrayGets += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const raw = { ...base, effectIds: proxyEffects };
+  const trusted = {
+    resolveSubjectEvidence() {
+      return {
+        schemaVersion: 1,
+        projectId: base.projectId,
+        subjectId: base.subjectId,
+        subjectRevisionId: base.subjectRevisionId,
+        artifactRefs: base.artifactRefs,
+        verificationRefs: base.verificationRefs,
+        effectIds: proxyEffects,
+      };
+    },
+  };
+
+  const result = buildDiffFirstOwnerReviewCoreV1(raw, trusted);
+  assert.equal(result.subjectEvidenceBound, true);
+  assert.equal(arrayGets, 0);
 });
 
 test('all artifact and effect cross-references must resolve exactly', () => {
