@@ -416,7 +416,7 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   const lifecycle = {
     async beforeProviderCall({ route }) {
       events.push(['before', route.model]);
-      return { reservationId:'reservation-failed' };
+      return { reservationId:`reservation-${route.model}` };
     },
     async afterProviderCall({ reservation, route, ok, error }) {
       events.push(['after', reservation.reservationId, route.model, ok, error.message]);
@@ -438,6 +438,9 @@ test('provider-call lifecycle conservatively settles an admitted failed gateway 
   assert.deepEqual(events, [
     ['before','qwen:8b'],
     ['gateway','qwen:8b'],
-    ['after','reservation-failed','qwen:8b',false,'provider failed'],
+    ['after','reservation-qwen:8b','qwen:8b',false,'provider failed'],
+    ['before','gpt-strong'],
+    ['gateway','gpt-strong'],
+    ['after','reservation-gpt-strong','gpt-strong',false,'provider failed'],
   ]);
 });
