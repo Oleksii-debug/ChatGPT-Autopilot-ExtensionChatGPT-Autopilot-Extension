@@ -238,25 +238,55 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   return Object.freeze({ allocationMode, maxParallelWorkers, manualRouteWorkers: Object.freeze(manualRouteWorkers) });
 }
 
-function stateNumber(value) { const out = Number(value); return Number.isFinite(out) && out >= 0 ? out : 0; }
+function stateNumber(value, label) {
+  if (value == null) return 0;
+  if (typeof value !== 'number' && typeof value !== 'string') {
+    throw new Error(`${label} is invalid`);
+  }
+  const out = Number(value);
+  if (!Number.isFinite(out) || out < 0) throw new Error(`${label} is invalid`);
+  return out;
+}
+
+const AI_ROUTE_STATE_FIELDS = new Set([
+  'consecutiveFailures',
+  'successes',
+  'failures',
+  'backoffUntil',
+  'circuitOpenUntil',
+  'lastErrorCode',
+  'lastErrorCategory',
+  'lastErrorAt',
+  'lastSuccessAt',
+  'lastLatencyMs',
+]);
 
 export function normalizeAiRouteStates(raw = {}, routes = []) {
-  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  if (raw == null) raw = {};
+  object(raw, 'AI route states');
+  const stateDescriptors = Object.getOwnPropertyDescriptors(raw);
   const allowed = new Set(routes.map(route => route.routeId));
   const out = {};
-  for (const [routeId, value] of Object.entries(source)) {
-    if (!allowed.has(routeId) || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+  for (const routeId of Reflect.ownKeys(stateDescriptors)) {
+    if (typeof routeId !== 'string') throw new Error('AI route states contains a symbol field');
+    const descriptor = stateDescriptors[routeId];
+    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`AI route state ${routeId} must be an enumerable own data property`);
+    }
+    if (!allowed.has(routeId)) continue;
+    const value = descriptor.value;
+    const state = dataRecord(value, AI_ROUTE_STATE_FIELDS, `AI route state ${routeId}`);
     Object.defineProperty(out, routeId, { value:{
-      consecutiveFailures: Math.floor(stateNumber(value.consecutiveFailures)),
-      successes: Math.floor(stateNumber(value.successes)),
-      failures: Math.floor(stateNumber(value.failures)),
-      backoffUntil: stateNumber(value.backoffUntil),
-      circuitOpenUntil: stateNumber(value.circuitOpenUntil),
-      lastErrorCode: clean(value.lastErrorCode, 120),
-      lastErrorCategory: clean(value.lastErrorCategory, 80),
-      lastErrorAt: stateNumber(value.lastErrorAt),
-      lastSuccessAt: stateNumber(value.lastSuccessAt),
-      lastLatencyMs: stateNumber(value.lastLatencyMs),
+      consecutiveFailures: Math.floor(stateNumber(own(state, 'consecutiveFailures'), `AI route state ${routeId}.consecutiveFailures`)),
+      successes: Math.floor(stateNumber(own(state, 'successes'), `AI route state ${routeId}.successes`)),
+      failures: Math.floor(stateNumber(own(state, 'failures'), `AI route state ${routeId}.failures`)),
+      backoffUntil: stateNumber(own(state, 'backoffUntil'), `AI route state ${routeId}.backoffUntil`),
+      circuitOpenUntil: stateNumber(own(state, 'circuitOpenUntil'), `AI route state ${routeId}.circuitOpenUntil`),
+      lastErrorCode: clean(own(state, 'lastErrorCode'), 120),
+      lastErrorCategory: clean(own(state, 'lastErrorCategory'), 80),
+      lastErrorAt: stateNumber(own(state, 'lastErrorAt'), `AI route state ${routeId}.lastErrorAt`),
+      lastSuccessAt: stateNumber(own(state, 'lastSuccessAt'), `AI route state ${routeId}.lastSuccessAt`),
+      lastLatencyMs: stateNumber(own(state, 'lastLatencyMs'), `AI route state ${routeId}.lastLatencyMs`),
     }, enumerable:true, writable:true, configurable:true });
   }
   return out;
