@@ -284,17 +284,175 @@ test('manager waits for assistant completion, preserves conversation URL, and la
   await manager.start('s1');
   let state = await core.load();
   let sid = state.sessionOrder.find(id => id.startsWith('scenario-work:'));
-  let session = state.sessionsById[sid];
-  let task = session.tasksById[session.taskOrder[0]];
-  task.lastVerifiedSendAt = 1200; task.lastConversationUrl = 'https://chatgpt.com/c/abc';
-  core.state.sessionsById[sid] = session;
+  await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/abc');
   now = 1300; assistantReady = true;
   await manager.cycleOne('s1');
   state = await core.load();
   const live = state.sessionOrder.map(id => state.sessionsById[id]).find(item => item?.scenarioWork?.managed);
   const liveTask = live.tasksById[live.taskOrder[0]];
+  assert.equal(live.id, sid, 'the same Core Session must own the next prompt');
+  assert.equal(live.successfulSendCount, 1, 'cumulative send proof survives the new turn');
+  assert.equal(liveTask.lastVerifiedSendAt, 0, 'old send proof must not complete the new turn');
   assert.equal(liveTask.normalizedUrl, 'https://chatgpt.com/c/abc');
   assert.equal(liveTask.promptOverride, 'TWO');
+});
+
+test('five independent chats each keep one Core Session and tab for 17 completed turns across restart', async () => {
+  let now = 20_000;
+  let ordinal = 0;
+  const chrome = chromeFake();
+  const retired = [];
+  chrome.tabs = {
+    async remove(id) { retired.push(id); },
+    async get(id) { return { id }; },
+  };
+  const core = new CoreRepo();
+  const build = () => new ScenarioWorkManager({
+    coreRepository: core, chromeApi: chrome, now: () => now,
+    createId: () => `slot-${++ordinal}`,
+    collectAssistantReport: async () => ({ status: 'READY', assistantComplete: true, assistantText: 'done' }),
+  });
+  let manager = build();
+  const ids = [];
+  const sessionIds = new Map();
+  for (let slot = 0; slot < 5; slot += 1) {
+    const id = `slot-${slot + 1}`;
+    ids.push(id);
+    await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: {
+      roundsPerGeneration: 1, maxGenerations: 0,
+      steps: [{ prompt: 'BOOT' }, { prompt: 'CONT', repeat: 15 }, { prompt: 'FINAL' }],
+    } });
+    await manager.start(id);
+    const session = (await core.load()).sessionOrder.find(sid => core.state.sessionsById[sid]?.scenarioWork?.scenarioId === id);
+    sessionIds.set(id, session);
+    const taskId = core.state.sessionsById[session].taskOrder[0];
+    core.state.tabHintsByTaskId[taskId] = { sessionId: session, kind: 'TASK', tabId: 100 + slot,
+      normalizedUrl: 'https://chatgpt.com/', ownedByExtension: true, retirePending: false };
+  }
+
+  for (let turn = 1; turn <= 17; turn += 1) {
+    for (const [slot, id] of ids.entries()) {
+      const sid = sessionIds.get(id);
+      const taskId = core.state.sessionsById[sid].taskOrder[0];
+      const expectedPrompt = turn === 1 ? 'BOOT' : turn === 17 ? 'FINAL' : 'CONT';
+      assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride, expectedPrompt);
+      const url = `https://chatgpt.com/c/slot-${slot + 1}`;
+      const session = core.state.sessionsById[sid];
+      session.tasksById[taskId].lastVerifiedSendAt = now + 1;
+      session.tasksById[taskId].lastConversationUrl = url;
+      session.operation = { phase: 'SENT_VERIFIED' };
+      session.successfulSendCount += 1;
+      session.onePassCompletedCount = 1;
+      session.onePassCompletedTaskIds = [taskId];
+      session.runState = 'COMPLETED';
+      now += 100;
+      if (turn === 9 && slot === 0) manager = build();
+      await manager.cycleOne(id);
+      const runtime = (await manager.get(id)).scenario.runtime;
+      assert.equal(runtime.totalCompletedTurns, turn);
+      if (turn < 17) {
+        const state = await core.load();
+        assert.equal(state.sessionsById[sid]?.successfulSendCount, turn);
+        assert.equal(state.sessionsById[sid]?.tasksById[taskId].lastVerifiedSendAt, 0);
+        assert.equal(state.tabHintsByTaskId[taskId]?.tabId, 100 + slot);
+        assert.equal(state.tabHintsByTaskId[taskId]?.normalizedUrl, url);
+        assert.equal(retired.length, 0, 'no physical tab may be retired before turn 17');
+      } else {
+        const state = await core.load();
+        assert.equal(runtime.generation, 2);
+        assert.equal(runtime.retiredVerifiedSends, 17);
+        assert.equal(runtime.generationRetiredVerifiedSends, 0);
+        assert.equal(runtime.verifiedSendHistoryComplete, true);
+        assert.equal(state.sessionsById[sid], undefined);
+        assert.equal(state.sessionOrder.filter(candidate => state.sessionsById[candidate]?.scenarioWork?.scenarioId === id).length, 1);
+      }
+    }
+  }
+  assert.deepEqual(retired, [100, 101, 102, 103, 104]);
+});
+
+test('timed-out verified Send remains in durable totals after its Core Session is retired', async () => {
+  let now = 11_000;
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const build = () => new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now,
+    createId: () => 'timeout-ledger', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
+  let manager = build();
+  await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: {
+    steps: [{ prompt: 'FIRST' }, { prompt: 'SECOND' }], responseTimeoutMinutes: 1,
+  } });
+  await manager.start('timeout-ledger');
+  const sid = core.state.sessionOrder[0];
+  await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/timeout-ledger', now + 1);
+  now += 61_000;
+  await manager.cycleOne('timeout-ledger');
+  let runtime = (await manager.get('timeout-ledger')).scenario.runtime;
+  assert.equal(runtime.totalCompletedTurns, 0);
+  assert.equal(runtime.retiredVerifiedSends, 1);
+  assert.equal(runtime.generationRetiredVerifiedSends, 1);
+  assert.equal(core.state.sessionsById[sid]?.successfulSendCount, 0,
+    'replacement chat starts a fresh Core Session after retiring the timed-out effect');
+  assert.equal(core.state.sessionsById[sid]?.createdAt, now);
+  manager = build();
+  await manager.cycleOne('timeout-ledger');
+  runtime = (await manager.get('timeout-ledger')).scenario.runtime;
+  assert.equal(runtime.retiredVerifiedSends, 1, 'restart cannot count the retired send twice');
+});
+
+test('replayed launch never resets verified send or unresolved operation', async () => {
+  let now = 9_000;
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now,
+    createId: () => 'replay', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
+  await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }, { prompt: 'TWO' }] } });
+  await manager.start('replay');
+  const sid = core.state.sessionOrder[0];
+  const taskId = core.state.sessionsById[sid].taskOrder[0];
+  const firstAction = { participantKey: 'chat', generation: 1, stage: 'STEP:0:0:0', url: 'https://chatgpt.com/', prompt: 'ONE' };
+  let snapshot = (await manager.get('replay')).scenario;
+  await manager.materializeLaunch(snapshot, firstAction, now);
+  assert.equal(core.state.sessionsById[sid].successfulSendCount, 0);
+
+  core.state.sessionsById[sid].operation = { phase: 'AMBIGUOUS' };
+  core.state.sessionsById[sid].runState = 'RECOVERING';
+  await manager.materializeLaunch(snapshot, firstAction, now);
+  assert.equal(core.state.sessionsById[sid].operation.phase, 'AMBIGUOUS');
+  assert.equal(core.state.sessionsById[sid].runState, 'RECOVERING');
+  const nextAction = { participantKey: 'chat', generation: 1, stage: 'STEP:0:1:0', url: 'https://chatgpt.com/c/replay', prompt: 'TWO' };
+  snapshot.runtime.chat.state = 'READY';
+  await assert.rejects(() => manager.materializeLaunch(snapshot, nextAction, now), /IDENTITY_COLLISION/);
+});
+
+test('restart between rearming a turn and its manager checkpoint reuses the same pending task', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const build = () => new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => 10_000,
+    createId: () => 'checkpoint', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
+  let manager = build();
+  await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'FIRST' }, { prompt: 'SECOND' }] } });
+  await manager.start('checkpoint');
+  const sid = core.state.sessionOrder[0];
+  const taskId = core.state.sessionsById[sid].taskOrder[0];
+  await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/checkpoint');
+  const scenario = (await manager.get('checkpoint')).scenario;
+  scenario.runtime.chat.state = 'READY'; // completion already durably checkpointed
+  const next = { participantKey: 'chat', generation: 1, stage: 'STEP:0:1:0',
+    url: 'https://chatgpt.com/c/checkpoint', prompt: 'SECOND' };
+  await manager.materializeLaunch(scenario, next, 10_000);
+  assert.equal(core.state.sessionsById[sid].successfulSendCount, 1);
+  assert.equal(core.state.sessionsById[sid].tasksById[taskId].lastVerifiedSendAt, 0);
+  manager = build();
+  await manager.materializeLaunch(scenario, next, 10_001);
+  assert.equal(core.state.sessionsById[sid].successfulSendCount, 1);
+  assert.equal(core.state.sessionsById[sid].tasksById[taskId].promptOverride, 'SECOND');
+  core.state.sessionsById[sid].tasksById[taskId].lastVerifiedSendAt = 10_002;
+  core.state.sessionsById[sid].onePassCompletedCount = 1;
+  core.state.sessionsById[sid].onePassCompletedTaskIds = [taskId];
+  core.state.sessionsById[sid].successfulSendCount = 2;
+  await manager.materializeLaunch(scenario, next, 10_003);
+  assert.equal(core.state.sessionsById[sid].tasksById[taskId].lastVerifiedSendAt, 10_002,
+    'a replay after a verified effect must never re-arm that send');
 });
 
 test('pause survives alarm reconciliation and resume launches pending work immediately', async () => {
@@ -329,6 +487,10 @@ async function markOnlyManagedSessionSent(core, url, at = 1200) {
   session.tasksById[taskId].lastVerifiedSendAt = at;
   session.tasksById[taskId].lastConversationUrl = url;
   session.operation = { phase: 'SENT_VERIFIED' };
+  session.successfulSendCount += 1;
+  session.onePassCompletedCount = 1;
+  session.onePassCompletedTaskIds = [taskId];
+  session.runState = 'COMPLETED';
   core.state.sessionsById[ids[0]] = session;
   return { sessionId: ids[0], participantKey: session.scenarioWork.participantKey };
 }
@@ -520,7 +682,7 @@ test('owner Pause racing assistant observation cannot be overwritten by stale Sc
   assert.equal(state.sessionsById[sid].runState, 'PAUSED');
 });
 
-test('completion checkpoint survives tab-close failure and blocks next launch until restart cleanup succeeds', async () => {
+test('generation completion checkpoint survives tab-close failure and blocks next launch until restart cleanup succeeds', async () => {
   let now = 30_000;
   const chrome = chromeFake();
   const liveTabs = new Set([55]);
@@ -533,14 +695,12 @@ test('completion checkpoint survives tab-close failure and blocks next launch un
   let ready = false;
   const build = () => new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now, createId: () => 'cleanup1', collectAssistantReport: async () => ({ status: ready ? 'READY' : 'WAITING', assistantComplete: ready, assistantText: ready ? 'done' : '' }) });
   let manager = build();
-  await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { roundsPerGeneration: 2, steps: [{ prompt: 'ONE' }, { prompt: 'TWO' }] } });
+  await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { roundsPerGeneration: 1, steps: [{ prompt: 'ONE' }] } });
   await manager.start('cleanup1');
   let state = await core.load();
   const sid = state.sessionOrder.find(id => state.sessionsById[id]?.scenarioWork?.managed);
   const taskId = state.sessionsById[sid].taskOrder[0];
-  core.state.sessionsById[sid].tasksById[taskId].lastVerifiedSendAt = now + 1;
-  core.state.sessionsById[sid].tasksById[taskId].lastConversationUrl = 'https://chatgpt.com/c/cleanup';
-  core.state.sessionsById[sid].operation = { phase: 'SENT_VERIFIED' };
+  await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/cleanup', now + 1);
   core.state.tabHintsByTaskId[taskId] = { sessionId: sid, kind: 'TASK', tabId: 55, normalizedUrl: 'https://chatgpt.com/c/cleanup', ownedByExtension: true, retirePending: false };
   ready = true;
   now += 100;
@@ -548,7 +708,7 @@ test('completion checkpoint survives tab-close failure and blocks next launch un
   assert.equal(first.kind, 'CLEANUP_PENDING');
   let scenario = (await manager.get('cleanup1')).scenario;
   assert.deepEqual(scenario.runtime.cleanupPendingSessionIds, [sid]);
-  assert.equal(scenario.runtime.stepIndex, 1, 'semantic completion must be durable before physical cleanup');
+  assert.equal(scenario.runtime.generation, 2, 'generation transition must be durable before physical cleanup');
   state = await core.load();
   assert.ok(state.sessionsById[sid]);
   assert.equal(state.tabHintsByTaskId[taskId].retirePending, true);
@@ -563,7 +723,8 @@ test('completion checkpoint survives tab-close failure and blocks next launch un
   assert.equal(state.sessionsById[sid], undefined, 'old managed Session is retired after restart');
   const active = state.sessionOrder.map(id => state.sessionsById[id]).filter(item => item?.scenarioWork?.managed && item.runState === 'RUNNING');
   assert.equal(active.length, 1);
-  assert.equal(active[0].tasksById[active[0].taskOrder[0]].promptOverride, 'TWO');
+  assert.equal(active[0].tasksById[active[0].taskOrder[0]].promptOverride, 'ONE');
+  assert.notEqual(active[0].id, sid, 'only the new generation gets a new Session');
 });
 
 test('deterministic managed Session replay fails closed on identity collision', async () => {
@@ -576,7 +737,7 @@ test('deterministic managed Session replay fails closed on identity collision', 
   const current = (await manager.get('identity1')).scenario;
   const replay = structuredClone(current);
   replay.runtime.totalLaunches = 0;
-  const action = { participantKey: 'chat', generation: 1, stage: 'STEP:0:0', url: 'https://chatgpt.com/', prompt: 'DIFFERENT' };
+  const action = { participantKey: 'chat', generation: 1, stage: 'STEP:0:0:0', url: 'https://chatgpt.com/', prompt: 'DIFFERENT' };
   await assert.rejects(() => manager.materializeLaunch(replay, action, now + 1), /SCENARIO_MANAGED_SESSION_IDENTITY_COLLISION/);
 });
 
