@@ -25,6 +25,7 @@ function record(value, label, allowed = null) {
 }
 function repository(value) { if (typeof value !== 'string' || value !== value.trim() || value.length > 300 || !REPOSITORY.test(value) || value.includes('..')) throw new Error('repositoryFullName is invalid'); return value; }
 function positiveInteger(value, label) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) throw new Error(label + ' is invalid'); return value; }
+function timestampMillis(value, label) { if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(label + ' is invalid'); const millis = Date.parse(value); if (!Number.isFinite(millis)) throw new Error(label + ' is invalid'); return millis; }
 function exactRef(value, label) { if (typeof value !== 'string' || value !== value.trim() || !REF.test(value) || value.endsWith('/') || value.startsWith('.') || value.includes('//')) throw new Error(label + ' is invalid'); return value; }
 function inputs(value) {
   if (value == null) return Object.freeze(Object.create(null));
@@ -54,19 +55,41 @@ function expectedMutation(invocation) {
   const admitted = record(invocation, 'GitHub workflow-dispatch invocation');
   if (admitted.providerId !== GITHUB_PROVIDER_ID || admitted.toolId !== GitHubToolId.WORKFLOW_DISPATCH) throw new Error('GitHub workflow dispatch verifier accepts only canonical workflow-dispatch invocations');
   const args = record(admitted.arguments, 'GitHub workflow-dispatch arguments', new Set(['repositoryFullName', 'workflowId', 'ref', 'inputs']));
-  return Object.freeze({ invocationId: requireId(admitted.invocationId, 'invocationId'), policyDecisionId: requireId(admitted.policyDecisionId, 'policyDecisionId'), repositoryFullName: repository(args.repositoryFullName), workflowId: positiveInteger(args.workflowId, 'workflowId'), ref: exactRef(args.ref, 'ref'), inputs: inputs(args.inputs) });
+  const createdAt = admitted.createdAt;
+  timestampMillis(createdAt, 'invocation.createdAt');
+  return Object.freeze({ invocationId: requireId(admitted.invocationId, 'invocationId'), policyDecisionId: requireId(admitted.policyDecisionId, 'policyDecisionId'), repositoryFullName: repository(args.repositoryFullName), workflowId: positiveInteger(args.workflowId, 'workflowId'), ref: exactRef(args.ref, 'ref'), inputs: inputs(args.inputs), createdAt });
 }
 function observedMutation(expected, observation) {
   const observed = record(observation, 'GitHub workflow-dispatch observation');
   if (requireId(observed.invocationId, 'observation.invocationId') !== expected.invocationId) throw new Error('GitHub workflow dispatch observation invocation identity mismatch');
+  if (observed.status !== 'OK') throw new Error('GitHub workflow dispatch observation status is not OK');
+  const observedAt = observed.observedAt;
+  const observedAtMs = timestampMillis(observedAt, 'observation.observedAt');
+  if (observedAtMs < timestampMillis(expected.createdAt, 'invocation.createdAt')) throw new Error('GitHub workflow dispatch observation predates invocation');
   const data = record(observed.data, 'GitHub workflow-dispatch observation data', new Set(['repositoryFullName', 'workflowId', 'ref', 'inputs', 'runId', 'runUrl', 'htmlUrl']));
   if (data.repositoryFullName !== expected.repositoryFullName || positiveInteger(data.workflowId, 'observed workflowId') !== expected.workflowId || exactRef(data.ref, 'observed ref') !== expected.ref || canonicalInputs(data.inputs) !== canonicalInputs(expected.inputs)) throw new Error('GitHub workflow dispatch observation request identity mismatch');
-  return Object.freeze({ ...expected, observationId: requireId(observed.observationId, 'observationId'), runId: positiveInteger(data.runId, 'observed runId') });
+  return Object.freeze({ ...expected, observationId: requireId(observed.observationId, 'observationId'), observedAt, runId: positiveInteger(data.runId, 'observed runId') });
 }
 
 export class GitHubWorkflowDispatchVerifierV1 {
   constructor({ githubClient, verifierId = 'github-workflow-dispatch-readback-verifier', now = () => Date.now() } = {}) { this.readWorkflowRun = bindDataMethod(githubClient, 'readWorkflowRun', 'GitHub workflow readback client'); this.verifierId = requireId(verifierId, 'verifierId'); if (this.verifierId === GITHUB_PROVIDER_ID) throw new Error('GitHub workflow dispatch verifier identity must differ from provider identity'); if (typeof now !== 'function') throw new Error('now must be a function'); this.now = now; }
-  async readback(identity) { const run = record(await this.readWorkflowRun({ repositoryFullName: identity.repositoryFullName, runId: identity.runId }), 'GitHub workflow dispatch readback', new Set(['repositoryFullName', 'id', 'workflowId', 'runNumber', 'runAttempt', 'event', 'status', 'conclusion', 'headBranch', 'headSha', 'createdAt', 'updatedAt', 'url'])); const matches = run.repositoryFullName === identity.repositoryFullName && positiveInteger(run.id, 'readback run id') === identity.runId && positiveInteger(run.workflowId, 'readback workflow id') === identity.workflowId && run.event === 'workflow_dispatch' && run.headBranch === identity.ref; return Object.freeze({ identity, matches, run }); }
+  async readback(identity) {
+    const run = record(await this.readWorkflowRun({ repositoryFullName: identity.repositoryFullName, runId: identity.runId }), 'GitHub workflow dispatch readback', new Set(['repositoryFullName', 'id', 'workflowId', 'runNumber', 'runAttempt', 'event', 'status', 'conclusion', 'headBranch', 'headSha', 'createdAt', 'updatedAt', 'url']));
+    const runCreatedAtMs = timestampMillis(run.createdAt, 'readback createdAt');
+    const runUpdatedAtMs = timestampMillis(run.updatedAt, 'readback updatedAt');
+    const invocationCreatedAtMs = timestampMillis(identity.createdAt, 'invocation.createdAt');
+    const observationObservedAtMs = timestampMillis(identity.observedAt, 'observation.observedAt');
+    const chronologyMatches = invocationCreatedAtMs <= runCreatedAtMs
+      && runCreatedAtMs <= observationObservedAtMs
+      && runCreatedAtMs <= runUpdatedAtMs;
+    const matches = run.repositoryFullName === identity.repositoryFullName
+      && positiveInteger(run.id, 'readback run id') === identity.runId
+      && positiveInteger(run.workflowId, 'readback workflow id') === identity.workflowId
+      && run.event === 'workflow_dispatch'
+      && run.headBranch === identity.ref
+      && chronologyMatches;
+    return Object.freeze({ identity, matches, run });
+  }
   verification(readback, executionId, attempt, observationId, suffix = '') { const verified = readback.matches; return { schemaVersion: 1, verificationId: readback.identity.invocationId + ':github-workflow-dispatch-verification' + suffix + ':' + attempt, invocationId: readback.identity.invocationId, observationId, status: verified ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS, reasonCode: verified ? 'GITHUB_WORKFLOW_DISPATCH_RUN_CONFIRMED' : 'GITHUB_WORKFLOW_DISPATCH_RUN_NOT_CONFIRMED', summary: verified ? 'Fresh independent GitHub Actions readback confirmed the exact workflow/ref run identity returned by dispatch.' : 'Fresh independent GitHub Actions readback did not confirm the exact workflow/ref run identity.', evidenceArtifactIds: [], verifiedAt: new Date(this.now()).toISOString(), verifierId: this.verifierId, verificationAuthorityId: readback.identity.policyDecisionId, effectId: readback.identity.invocationId, executionId, attempt }; }
   async verify({ invocation, executionId, observation } = {}) { const attempt = attemptFromExecutionId(executionId); const expected = expectedMutation(invocation); const identity = observedMutation(expected, observation); const readback = await this.readback(identity); return this.verification(readback, executionId, attempt, identity.observationId); }
   async reconcileVerify({ invocation, effectId, executionId, attempt, policyDecisionId, expectedOutcome, priorObservation } = {}) {
