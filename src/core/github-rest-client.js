@@ -10,6 +10,15 @@ const MAX_BODY_TEXT = 256_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_RESPONSE_CHUNKS = 8192;
 const SAFE_HTTP_FAILURES = new Set([400, 401, 403, 404, 405, 409, 412, 415, 422, 429]);
+const PULL_REQUEST_MERGE_METHODS = new Set(['merge', 'squash', 'rebase']);
+const WORKFLOW_RUN_STATUSES = new Set([
+  'completed', 'action_required', 'cancelled', 'failure', 'neutral', 'skipped',
+  'stale', 'success', 'timed_out', 'in_progress', 'queued', 'requested',
+  'waiting', 'pending',
+]);
+const WORKFLOW_JOB_FILTERS = new Set(['latest', 'all']);
+const MAX_ACTIONS_PAGE = 10_000;
+const MAX_WORKFLOW_STEPS_PER_JOB = 256;
 
 function clean(value, max = MAX_PATH) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -148,6 +157,109 @@ function responsePositiveInteger(value, label, { effectMayHaveOccurred = false }
     });
   }
   return value;
+}
+
+function responseNonNegativeInteger(value, label) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned invalid ${label}`, { safeToRetry: true });
+  }
+  return value;
+}
+
+function boundedIntegerInput(value, label, { defaultValue, min = 1, max } = {}) {
+  if (value == null) return defaultValue;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
+      || value < min || value > max) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must be an integer from ${min} to ${max}`, { safeToRetry: true });
+  }
+  return value;
+}
+
+function optionalExactRef(value, label) {
+  if (value == null || value === '') return '';
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must use exact canonical text`, { safeToRetry: true });
+  }
+  return refName(value, label);
+}
+
+function optionalExactSha(value, label) {
+  if (value == null || value === '') return '';
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must use exact canonical text`, { safeToRetry: true });
+  }
+  return sha(value, label);
+}
+
+function optionalExactEnum(value, label, allowed, defaultValue = '') {
+  if (value == null || value === '') return defaultValue;
+  if (typeof value !== 'string' || value !== value.trim() || !allowed.has(value)) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} is invalid`, { safeToRetry: true });
+  }
+  return value;
+}
+
+function strictInputRecord(value, allowed, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must be a plain data object`, { safeToRetry: true });
+  }
+  let prototype;
+  let descriptors;
+  try {
+    prototype = Object.getPrototypeOf(value);
+    descriptors = Object.getOwnPropertyDescriptors(value);
+  } catch {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must expose stable data descriptors`, { safeToRetry: true });
+  }
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must be a plain data object`, { safeToRetry: true });
+  }
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw githubError('GITHUB_INVALID_REQUEST', `${label} contains an unknown field`, { safeToRetry: true });
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw githubError('GITHUB_INVALID_REQUEST', `${label}.${String(key)} must be an enumerable data property`, { safeToRetry: true });
+    }
+    out[key] = descriptor.value;
+  }
+  return Object.freeze(out);
+}
+
+function pageEnvelope(payload, listKey, perPage, page, label) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned invalid ${label} response`, { safeToRetry: true });
+  }
+  const totalCount = responseNonNegativeInteger(payload.total_count, `${label} total count`);
+  const items = payload[listKey];
+  if (!Array.isArray(items) || items.length > perPage || items.length > 100) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned invalid or oversized ${label} page`, { safeToRetry: true });
+  }
+  if (totalCount < items.length) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned inconsistent ${label} total count`, { safeToRetry: true });
+  }
+  return Object.freeze({
+    totalCount,
+    items,
+    hasMore: (page * perPage) < totalCount,
+  });
+}
+
+function responseWorkflowStep(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid workflow job step', { safeToRetry: true });
+  }
+  return Object.freeze({
+    number: responsePositiveInteger(item.number, 'workflow job step number'),
+    name: responseText(item.name, 'workflow job step name', 1000),
+    status: responseText(item.status, 'workflow job step status', 80),
+    conclusion: responseText(item.conclusion, 'workflow job step conclusion', 80, { nullable: true }),
+    startedAt: responseText(item.started_at, 'workflow job step startedAt', 120, { nullable: true }),
+    completedAt: responseText(item.completed_at, 'workflow job step completedAt', 120, { nullable: true }),
+  });
 }
 
 function exactNonBlankText(value, label, max = MAX_BODY_TEXT) {
@@ -534,6 +646,174 @@ export class GitHubRestClientV1 {
     });
   }
 
+  async listWorkflows(input = {}) {
+    const args = strictInputRecord(input, new Set(['repositoryFullName', 'perPage', 'page']), 'workflow.list input');
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const perPage = boundedIntegerInput(args.perPage, 'perPage', { defaultValue: 30, min: 1, max: 100 });
+    const page = boundedIntegerInput(args.page, 'page', { defaultValue: 1, min: 1, max: MAX_ACTIONS_PAGE });
+    const query = new URLSearchParams({ per_page: String(perPage), page: String(page) });
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/actions/workflows?${query.toString()}`);
+    const envelope = pageEnvelope(payload, 'workflows', perPage, page, 'workflow');
+    const seen = new Set();
+    const workflows = envelope.items.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid workflow item', { safeToRetry: true });
+      }
+      const id = responsePositiveInteger(item.id, 'workflow id');
+      if (seen.has(id)) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned duplicate workflow id', { safeToRetry: true });
+      seen.add(id);
+      return Object.freeze({
+        id,
+        name: responseText(item.name, 'workflow name', 1000),
+        path: responseText(item.path, 'workflow path', MAX_PATH),
+        state: responseText(item.state, 'workflow state', 80),
+        createdAt: responseText(item.created_at, 'workflow createdAt', 120),
+        updatedAt: responseText(item.updated_at, 'workflow updatedAt', 120),
+        url: responseText(item.html_url, 'workflow URL', 4096),
+      });
+    });
+    return Object.freeze({
+      repositoryFullName: repository,
+      page,
+      perPage,
+      totalCount: envelope.totalCount,
+      hasMore: envelope.hasMore,
+      workflows: Object.freeze(workflows),
+    });
+  }
+
+  async listWorkflowRuns(input = {}) {
+    const args = strictInputRecord(
+      input,
+      new Set(['repositoryFullName', 'branch', 'status', 'headSha', 'perPage', 'page']),
+      'workflowRun.list input',
+    );
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const branch = optionalExactRef(args.branch, 'branch');
+    const status = optionalExactEnum(args.status, 'status', WORKFLOW_RUN_STATUSES);
+    const headSha = optionalExactSha(args.headSha, 'headSha');
+    const perPage = boundedIntegerInput(args.perPage, 'perPage', { defaultValue: 30, min: 1, max: 100 });
+    const page = boundedIntegerInput(args.page, 'page', { defaultValue: 1, min: 1, max: MAX_ACTIONS_PAGE });
+    const query = new URLSearchParams({
+      ...(branch ? { branch } : {}),
+      ...(status ? { status } : {}),
+      ...(headSha ? { head_sha: headSha } : {}),
+      per_page: String(perPage),
+      page: String(page),
+    });
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/actions/runs?${query.toString()}`);
+    const envelope = pageEnvelope(payload, 'workflow_runs', perPage, page, 'workflow run');
+    const seen = new Set();
+    const workflowRuns = envelope.items.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid workflow run item', { safeToRetry: true });
+      }
+      const id = responsePositiveInteger(item.id, 'workflow run id');
+      if (seen.has(id)) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned duplicate workflow run id', { safeToRetry: true });
+      seen.add(id);
+      return Object.freeze({
+        id,
+        workflowId: responsePositiveInteger(item.workflow_id, 'workflow id'),
+        runNumber: responsePositiveInteger(item.run_number, 'workflow run number'),
+        runAttempt: responsePositiveInteger(item.run_attempt ?? 1, 'workflow run attempt'),
+        name: responseText(item.name, 'workflow run name', 1000, { nullable: true }),
+        event: responseText(item.event, 'workflow run event', 120),
+        status: responseText(item.status, 'workflow run status', 80),
+        conclusion: responseText(item.conclusion, 'workflow run conclusion', 80, { nullable: true }),
+        headBranch: responseText(item.head_branch, 'workflow run head branch', 240, { nullable: true }),
+        headSha: responseSha(item.head_sha, 'workflow run head sha'),
+        createdAt: responseText(item.created_at, 'workflow run createdAt', 120),
+        updatedAt: responseText(item.updated_at, 'workflow run updatedAt', 120),
+        url: responseText(item.html_url, 'workflow run URL', 4096),
+      });
+    });
+    return Object.freeze({
+      repositoryFullName: repository,
+      filters: Object.freeze({ branch, status, headSha }),
+      page,
+      perPage,
+      totalCount: envelope.totalCount,
+      hasMore: envelope.hasMore,
+      workflowRuns: Object.freeze(workflowRuns),
+    });
+  }
+
+  async listWorkflowRunJobs(input = {}) {
+    const args = strictInputRecord(
+      input,
+      new Set(['repositoryFullName', 'runId', 'filter', 'perPage', 'page']),
+      'workflowRun.jobs.list input',
+    );
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const runId = positiveInteger(args.runId, 'runId');
+    const filter = optionalExactEnum(args.filter, 'filter', WORKFLOW_JOB_FILTERS, 'latest');
+    const perPage = boundedIntegerInput(args.perPage, 'perPage', { defaultValue: 30, min: 1, max: 100 });
+    const page = boundedIntegerInput(args.page, 'page', { defaultValue: 1, min: 1, max: MAX_ACTIONS_PAGE });
+    const query = new URLSearchParams({
+      filter,
+      per_page: String(perPage),
+      page: String(page),
+    });
+    const payload = await this.request(
+      'GET',
+      `/repos/${repositoryPath(repository)}/actions/runs/${runId}/jobs?${query.toString()}`,
+    );
+    const envelope = pageEnvelope(payload, 'jobs', perPage, page, 'workflow job');
+    const seen = new Set();
+    const jobs = envelope.items.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid workflow job item', { safeToRetry: true });
+      }
+      const id = responsePositiveInteger(item.id, 'workflow job id');
+      if (seen.has(id)) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned duplicate workflow job id', { safeToRetry: true });
+      seen.add(id);
+      const returnedRunId = responsePositiveInteger(item.run_id, 'workflow job run id');
+      if (returnedRunId !== runId) {
+        throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub workflow job parent run identity mismatch', { safeToRetry: true });
+      }
+      const rawSteps = item.steps == null ? [] : item.steps;
+      if (!Array.isArray(rawSteps) || rawSteps.length > MAX_WORKFLOW_STEPS_PER_JOB) {
+        throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub workflow job steps are invalid or too large', { safeToRetry: true });
+      }
+      const stepNumbers = new Set();
+      const steps = rawSteps.map(step => {
+        const normalized = responseWorkflowStep(step);
+        if (stepNumbers.has(normalized.number)) {
+          throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned duplicate workflow job step number', { safeToRetry: true });
+        }
+        stepNumbers.add(normalized.number);
+        return normalized;
+      });
+      return Object.freeze({
+        id,
+        runId,
+        name: responseText(item.name, 'workflow job name', 1000),
+        status: responseText(item.status, 'workflow job status', 80),
+        conclusion: responseText(item.conclusion, 'workflow job conclusion', 80, { nullable: true }),
+        headSha: responseSha(item.head_sha, 'workflow job head sha'),
+        workflowName: responseText(item.workflow_name, 'workflow job workflow name', 1000, { nullable: true }),
+        startedAt: responseText(item.started_at, 'workflow job startedAt', 120, { nullable: true }),
+        completedAt: responseText(item.completed_at, 'workflow job completedAt', 120, { nullable: true }),
+        url: responseText(item.html_url, 'workflow job URL', 4096),
+        steps: Object.freeze(steps),
+      });
+    });
+    return Object.freeze({
+      repositoryFullName: repository,
+      runId,
+      filter,
+      page,
+      perPage,
+      totalCount: envelope.totalCount,
+      hasMore: envelope.hasMore,
+      jobs: Object.freeze(jobs),
+    });
+  }
+
+
   async findPullRequests({ repositoryFullName, head, base } = {}) {
     const repository = this.assertRepositoryAllowed(repositoryFullName);
     const [owner] = repository.split('/');
@@ -584,8 +864,12 @@ export class GitHubRestClientV1 {
       title: responseText(payload.title, 'pull request title', 1000),
       body: responseText(payload.body, 'pull request body', 100_000, { nullable: true }),
       state: payload.state,
+      merged: payload.merged === true,
       headSha: responseSha(payload?.head?.sha, 'pull request head sha'),
       baseSha: responseSha(payload?.base?.sha, 'pull request base sha'),
+      mergeCommitSha: payload.merge_commit_sha
+        ? responseSha(payload.merge_commit_sha, 'pull request merge commit sha')
+        : '',
       url: responseText(payload.html_url, 'pull request URL', 4096),
     });
   }
@@ -736,6 +1020,58 @@ export class GitHubRestClientV1 {
     const number = Number(payload.number);
     if (!Number.isInteger(number) || number < 1) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request response is invalid', { effectMayHaveOccurred: true });
     return Object.freeze({ repositoryFullName: repository, number, head: headRef, base: baseRef, url: clean(payload.html_url, 4096) });
+  }
+
+
+  async mergePullRequest({
+    repositoryFullName,
+    pullRequestNumber,
+    expectedHeadSha,
+    mergeMethod,
+  } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const expectedHead = sha(expectedHeadSha, 'expectedHeadSha');
+    if (typeof mergeMethod !== 'string' || !PULL_REQUEST_MERGE_METHODS.has(mergeMethod)) {
+      throw githubError('GITHUB_INVALID_REQUEST', 'mergeMethod must be merge, squash, or rebase', { safeToRetry: true });
+    }
+
+    const before = await this.readPullRequest({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+    });
+    if (before.state !== 'open' || before.merged) {
+      throw githubError('GITHUB_PULL_REQUEST_NOT_OPEN', 'Pull request is not open for merge', { safeToRetry: true });
+    }
+    if (before.headSha !== expectedHead) {
+      throw githubError('GITHUB_PULL_REQUEST_HEAD_MISMATCH', 'Pull request head changed from expectedHeadSha', { safeToRetry: true });
+    }
+
+    const payload = await this.request(
+      'PUT',
+      `/repos/${repositoryPath(repository)}/pulls/${number}/merge`,
+      {
+        effectful: true,
+        expectedStatuses: [200],
+        body: { sha: expectedHead, merge_method: mergeMethod },
+      },
+    );
+    if (payload?.merged !== true) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub merge response did not confirm a merged pull request', {
+        effectMayHaveOccurred: true,
+        safeToRetry: false,
+      });
+    }
+    const mergeCommitSha = responseSha(payload?.sha, 'merge commit sha', { effectMayHaveOccurred: true });
+    return Object.freeze({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+      expectedHeadSha: expectedHead,
+      mergeMethod,
+      merged: true,
+      mergeCommitSha,
+    });
   }
 
 
