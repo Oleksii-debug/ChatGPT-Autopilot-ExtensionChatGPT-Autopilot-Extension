@@ -31,11 +31,9 @@ function validInput(overrides = {}) {
       issuedAt: ISSUED_AT,
       expiresAt: EXPIRES_AT,
     },
-    assessmentAt: ASSESSMENT_AT,
   };
 
   if (overrides.command) Object.assign(input.command, overrides.command);
-  if (Object.hasOwn(overrides, 'assessmentAt')) input.assessmentAt = overrides.assessmentAt;
   return input;
 }
 
@@ -52,9 +50,10 @@ function currentSnapshot(overrides = {}) {
   };
 }
 
-async function assess(input, snapshot = currentSnapshot(), onResolve = null) {
+async function assess(input, snapshot = currentSnapshot(), onResolve = null, assessmentAt = ASSESSMENT_AT) {
   return assessRemoteSteeringCommandV1(input, {
     cryptoApi: webcrypto,
+    assessmentAt,
     async resolveCurrentSnapshot(request) {
       if (onResolve) onResolve(request);
       return snapshot;
@@ -112,6 +111,21 @@ test('requires a trusted canonical current-state resolver and ignores no caller 
     () => assess(forged),
     /unknown field: currentSnapshot/u,
   );
+
+  const backdated = validInput();
+  backdated.assessmentAt = '2026-09-25T03:20:00.000Z';
+  await assert.rejects(
+    () => assess(backdated),
+    /unknown field: assessmentAt/u,
+  );
+
+  await assert.rejects(
+    () => assessRemoteSteeringCommandV1(validInput(), {
+      cryptoApi: webcrypto,
+      resolveCurrentSnapshot: async () => currentSnapshot(),
+    }),
+    /assessmentAt must be a canonical ISO timestamp/u,
+  );
 });
 
 test('fingerprint is deterministic and changes with command semantics', async () => {
@@ -151,7 +165,7 @@ test('rejects stale or mismatched canonical job, plan, revision and policy bindi
 
 test('fails closed on expiry, future chronology, oversized TTL and non-canonical timestamps', async () => {
   await assert.rejects(
-    () => assess(validInput({ assessmentAt: EXPIRES_AT })),
+    () => assess(validInput(), currentSnapshot(), null, EXPIRES_AT),
     /expired/u,
   );
 
@@ -390,6 +404,7 @@ test('rejects unknown and hidden redirect fields with exact target identity', as
 test('does not trust hidden or unknown dependency-injection option fields', async () => {
   const options = {
     cryptoApi: webcrypto,
+    assessmentAt: ASSESSMENT_AT,
     resolveCurrentSnapshot: async () => currentSnapshot(),
     authority: 'ALLOW',
   };
