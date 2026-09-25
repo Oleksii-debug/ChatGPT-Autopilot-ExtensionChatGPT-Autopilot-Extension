@@ -93,7 +93,7 @@ function observationFor(invocationId, result, observedAt) {
     observationId: `${invocationId}:observation`,
     invocationId,
     status: 'OK',
-    summary: 'Gmail API returned a bounded draft-creation result.',
+    summary: 'Google Workspace API returned a bounded mutation result.',
     data: structuredClone(result),
     artifactRefs: [],
     observedAt,
@@ -101,7 +101,7 @@ function observationFor(invocationId, result, observedAt) {
 }
 
 /**
- * Google Workspace Gmail-draft transport binding over the one canonical UniversalExactEffectV1
+ * Google Workspace mutation transport binding over the one canonical UniversalExactEffectV1
  * reducer and the caller-supplied canonical durable store. This module intentionally
  * owns no scheduler, persistence implementation, retry ledger, recovery engine, or
  * policy authority; it only binds the effectful google-workspace tool to those authorities.
