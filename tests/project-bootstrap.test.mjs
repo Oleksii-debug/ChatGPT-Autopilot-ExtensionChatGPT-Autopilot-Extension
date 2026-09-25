@@ -14,6 +14,7 @@ import {
 import { normalizeArtifactRefV1 } from '../src/core/universal-agent-contracts.js';
 
 const AT = '2026-09-25T00:00:00.000Z';
+const AT_MS = Date.parse(AT);
 const SHA_A = 'a'.repeat(64);
 const SHA_B = 'b'.repeat(64);
 const SHA_C = 'c'.repeat(64);
@@ -489,7 +490,7 @@ test('trusted bootstrap commits exactly once through canonical ProjectWorkspaceR
       },
     },
     repository,
-    { nowMs: 1234 },
+    { nowMs: AT_MS },
   );
 
   assert.deepEqual(result, {
@@ -529,15 +530,45 @@ test('workspace bootstrap is create-only: duplicate Project admission fails with
     },
   };
 
-  await commitTrustedProjectBootstrapToWorkspaceV1(raw, resolvers, repository, { nowMs: 100 });
+  await commitTrustedProjectBootstrapToWorkspaceV1(raw, resolvers, repository, { nowMs: AT_MS });
   await assert.rejects(
-    () => commitTrustedProjectBootstrapToWorkspaceV1(raw, resolvers, repository, { nowMs: 200 }),
+    () => commitTrustedProjectBootstrapToWorkspaceV1(raw, resolvers, repository, { nowMs: AT_MS + 1 }),
     /Project already exists/,
   );
 
   const restored = await new ProjectWorkspaceRepository(chrome).load();
   assert.equal(restored.revision, 1);
-  assert.equal(restored.updatedAt, 100);
+  assert.equal(restored.updatedAt, AT_MS);
+});
+
+test('workspace bootstrap rejects commit time before trusted snapshot and evidence without durable mutation', async () => {
+  const raw = input();
+  const sources = new Map(raw.sourceRefs.map(item => [item.sourceId, item]));
+  const artifacts = new Map(raw.artifactRefs.map(item => [item.artifactId, item]));
+  const chrome = fakeWorkspaceChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  await assert.rejects(
+    () => commitTrustedProjectBootstrapToWorkspaceV1(
+      raw,
+      {
+        async resolveSourceRef(query) {
+          return sources.get(query.sourceId);
+        },
+        async resolveArtifactRef(query) {
+          return artifacts.get(query.artifactId);
+        },
+      },
+      repository,
+      { nowMs: AT_MS - 1 },
+    ),
+    /must not predate trusted snapshot or evidence/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 0);
+  assert.deepEqual(restored.projectsById, {});
+  assert.equal(chrome.data[PROJECT_WORKSPACE_STORAGE_KEY], undefined);
 });
 
 test('workspace bootstrap rejects non-canonical repository and invalid commit clocks before trusted resolution', async () => {
@@ -588,7 +619,7 @@ test('workspace bootstrap does not save or claim success when trusted resolution
         },
       },
       repository,
-      { nowMs: 100 },
+      { nowMs: AT_MS },
     ),
     /does not exactly match bootstrap source: repo/,
   );
