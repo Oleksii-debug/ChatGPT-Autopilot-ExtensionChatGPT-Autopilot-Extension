@@ -162,6 +162,38 @@ function assertAtOrAfter(later, earlier, label) {
   }
 }
 
+function snapshotDenseDataArray(value, label, max = MAX_ARRAY_ITEMS) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
+  const expected = new Set(['length']);
+  for (let index = 0; index < length; index += 1) expected.add(String(index));
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(`${label} contains non-index array property`);
+    }
+  }
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} must be a dense data array`);
+    }
+    snapshot[index] = descriptor.value;
+  }
+  return snapshot;
+}
+
 function cloneDataOnly(value, label, budget = { nodes: 0 }, depth = 0) {
   budget.nodes += 1;
   if (budget.nodes > MAX_JSON_NODES) throw new Error(`${label} exceeds data node bound`);
@@ -174,32 +206,8 @@ function cloneDataOnly(value, label, budget = { nodes: 0 }, depth = 0) {
   }
 
   if (Array.isArray(value)) {
-    if (Object.getPrototypeOf(value) !== Array.prototype) {
-      throw new Error(`${label} must be a plain array`);
-    }
-    if (value.length > MAX_ARRAY_ITEMS) throw new Error(`${label} must be a bounded array`);
-    const keys = Reflect.ownKeys(value);
-    for (const key of keys) {
-      if (key === 'length') continue;
-      if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
-        throw new Error(`${label} contains non-index array property`);
-      }
-      const index = Number(key);
-      if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
-        throw new Error(`${label} contains invalid array index`);
-      }
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-        throw new Error(`${label}[${index}] must be an enumerable data property`);
-      }
-    }
-    for (let index = 0; index < value.length; index += 1) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-        throw new Error(`${label} must be a dense data array`);
-      }
-    }
-    return value.map((item, index) => cloneDataOnly(item, `${label}[${index}]`, budget, depth + 1));
+    const snapshot = snapshotDenseDataArray(value, label);
+    return snapshot.map((item, index) => cloneDataOnly(item, `${label}[${index}]`, budget, depth + 1));
   }
 
   const raw = strictRecord(value, label);
@@ -250,26 +258,9 @@ function exactStatus(value, allowed, label) {
 }
 
 function exactStringArray(value, label, max = MAX_ARRAY_ITEMS) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
-    throw new Error(`${label} must be a bounded plain array`);
-  }
-  const keys = Reflect.ownKeys(value);
-  for (const key of keys) {
-    if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
-      throw new Error(`${label} contains non-index array property`);
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} field ${key} must be an enumerable data property`);
-    }
-  }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} must be a dense data array`);
-    }
-    exactId(descriptor.value, `${label}[${index}]`);
+  const snapshot = snapshotDenseDataArray(value, label, max);
+  for (let index = 0; index < snapshot.length; index += 1) {
+    exactId(snapshot[index], `${label}[${index}]`);
   }
 }
 
@@ -301,15 +292,9 @@ function assertExactObservationTypes(raw, label) {
   exactStringField(raw, 'summary', label, { optional: true });
   const artifactRefs = ownValue(raw, 'artifactRefs', label, { optional: true });
   if (artifactRefs != null) {
-    if (!Array.isArray(artifactRefs) || Object.getPrototypeOf(artifactRefs) !== Array.prototype) {
-      throw new Error(`${label}.artifactRefs must be a plain array`);
-    }
-    for (let index = 0; index < artifactRefs.length; index += 1) {
-      const descriptor = Object.getOwnPropertyDescriptor(artifactRefs, String(index));
-      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-        throw new Error(`${label}.artifactRefs must be a dense data array`);
-      }
-      assertExactArtifactRefTypes(descriptor.value, `${label}.artifactRefs[${index}]`);
+    const snapshot = snapshotDenseDataArray(artifactRefs, `${label}.artifactRefs`);
+    for (let index = 0; index < snapshot.length; index += 1) {
+      assertExactArtifactRefTypes(snapshot[index], `${label}.artifactRefs[${index}]`);
     }
   }
 }

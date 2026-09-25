@@ -228,8 +228,17 @@ export function resolveBrowserAgentCredentialPolicy(config, url, { actionType = 
 
 const ALLOWED_KEYS = new Set(['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Space']);
 
+const BROWSER_AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+
 function clean(value, max = 20000) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+function optionalProjectId(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || value !== value.trim() || !BROWSER_AGENT_ID.test(value)) {
+    throw new Error('Browser Agent projectId is invalid');
+  }
+  return value;
 }
 function int(value, fallback, min, max) {
   const n = Number(value);
@@ -358,6 +367,7 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
   if (scheduleStartAt && scheduleEndAt && scheduleEndAt <= scheduleStartAt) throw new Error('Browser Agent schedule end must be after start');
   return {
     id: jobId,
+    projectId: optionalProjectId(raw.projectId),
     name,
     // Empty means: prefer the most recently used normal HTTP(S) browser tab,
     // otherwise create the neutral fallback page. The owner does not have to

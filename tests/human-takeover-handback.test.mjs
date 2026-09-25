@@ -315,6 +315,35 @@ test('top-level and nested accessors, hidden fields, symbols and sparse arrays f
   }), /dense data array/);
 });
 
+
+test('nested authority/evidence arrays use descriptor snapshots with zero ordinary Proxy gets', () => {
+  let ordinaryGets = 0;
+  const proxied = values => new Proxy(values, {
+    get(target, property, receiver) {
+      ordinaryGets += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const pending = throughHandback();
+  const fresh = observation({
+    data: proxied([{ state: 'fresh' }]),
+    artifactRefs: proxied([observation().artifactRefs[0]]),
+  });
+  const reobserved = recordHumanHandbackObservationV1(pending, {
+    observation: fresh,
+  });
+  assert.equal(ordinaryGets, 0);
+
+  const state = recordHumanHandbackVerificationV1(reobserved, {
+    verification: verification({
+      evidenceArtifactIds: proxied(['artifact-observation']),
+    }),
+  });
+  assert.equal(state.phase, HumanTakeoverPhase.EVIDENCE_READY);
+  assert.equal(ordinaryGets, 0);
+});
+
 test('all public takeover request envelopes reject accessors before field reads', () => {
   let reads = 0;
   const accessorField = (base, key, value) => {

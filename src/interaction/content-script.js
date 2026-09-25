@@ -317,6 +317,25 @@
         }
 
         const restoreSendIdentity = await prepareSendControlCompatibility(root.document, request.mode);
+        let previousSendTabId = 0;
+        const restoreActivatedSendTab = async () => {
+          const previous = previousSendTabId;
+          if (!previous) return true;
+          try {
+            const response = await runtime.sendMessage({
+              channel:'autopilot-send-tab-activation',
+              action:'restore',
+              requestId:request.requestId,
+              taskId:request.taskId,
+              previousTabId:previous,
+            });
+            if (response?.ok) {
+              previousSendTabId = 0;
+              return true;
+            }
+          } catch (_) { /* cold-start reconciliation retries durable restoration */ }
+          return false;
+        };
         try {
           const nativeInput = async (kind, point = {}) => {
             const response = await runtime.sendMessage({
@@ -335,9 +354,22 @@
           return await adapter.execute(request, {
             insert: () => nativeInput('insert'),
             submit: point => nativeInput('submit', point),
+            activate: async () => {
+              const response = await runtime.sendMessage({
+                channel:'autopilot-send-tab-activation',
+                action:'activate',
+                requestId:request.requestId,
+                taskId:request.taskId,
+              });
+              if (!response?.ok) return false;
+              previousSendTabId = Number(response.data?.previousTabId || 0);
+              return true;
+            },
+            restore: restoreActivatedSendTab,
           });
         } finally {
           restoreSendIdentity();
+          await restoreActivatedSendTab();
         }
       })
       .then((result) => sendResponse({ ok: true, data: result }))
