@@ -16,6 +16,7 @@ test('canonical AI router settings persist model-worker policy with route valida
   });
   assert.deepEqual(settings.workerPolicy, {
     allocationMode:'manual',
+    minWorkers:1,
     maxParallelWorkers:5,
     manualRouteWorkers:{ 'mistral-code':3, 'local-fast':2 },
   });
