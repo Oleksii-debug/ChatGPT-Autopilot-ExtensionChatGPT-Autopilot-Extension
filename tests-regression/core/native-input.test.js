@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../../src/core/native-input.js';
 import { createEmptyState,createSession,createTask } from '../../src/core/schema.js';
-import { StorageRepository } from '../../src/core/storage.js';
+import { StorageRepository } from '../../src/core/storage.js';\nimport { reconcileStateForStartup } from '../../src/core/recovery.js';
 function setup(kind='submit'){
  const state=createEmptyState(1); const task=createTask({id:'t',url:'https://chatgpt.com/c/native'});
  const session=createSession({id:'s',name:'Native',tasks:[task],sharedPrompt:'canonical prompt',now:1});
@@ -167,4 +167,38 @@ test('native insertion forwards a 50000-character prompt without truncation',asy
  assert.ok(insert);
  assert.equal(insert.args.text.length,50000);
  assert.equal(insert.args.text,huge);
+});
+
+
+test('actual cold-start order settles native pre-effect submit before focus restore and rejects late input',async()=>{
+ const f=setup();let activeTabId=3;
+ f.chrome.tabs.get=async id=>({id,url:id===7?'https://chatgpt.com/c/native':'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true,windowId:9};};
+
+ await activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender);
+ assert.equal(activeTabId,7);
+
+ // Mirror beginColdStartReconciliation(): reconcile durable runtime first,
+ // restore the owner tab second, then allow a late content-script message.
+ const restartedRepo=new StorageRepository(f.chrome);
+ await restartedRepo.update(state=>reconcileStateForStartup(state,100));
+ let state=await restartedRepo.load();
+ assert.equal(state.sessionsById.s.operation.phase,'FAILED_SAFE');
+ assert.equal(state.sessionsById.s.operation.submitStartedAt,0);
+ assert.notEqual(state.sessionsById.s.operation.nativeSubmitDispatched,true);
+ assert.equal(state.sessionsById.s.tasksById.t.status,'RETRY_WAIT');
+ assert.equal(state.sessionsById.s.operation.previousSendTabId,3);
+
+ await restorePendingSendTabs(f.chrome,restartedRepo,{sessionId:'s'});
+ assert.equal(activeTabId,3);
+ state=await restartedRepo.load();
+ assert.equal(state.sessionsById.s.operation.previousSendTabId,0);
+ assert.equal(state.sessionsById.s.operation.previousSendWindowId,0);
+
+ await assert.rejects(
+  performNativeInput(f.chrome,restartedRepo,f.message,f.sender),
+  /NATIVE_INPUT_PHASE_INVALID/
+ );
+ assert.deepEqual(f.calls,[]);
 });
