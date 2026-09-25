@@ -110,6 +110,7 @@ test('Local AI settings are descriptor-snapshotted and reject coercive/exotic au
   assert.throws(() => normalizeLocalAiSettings({ ...base, enabled: 'true' }), /enabled must be boolean/);
   assert.throws(() => normalizeLocalAiSettings({ ...base, baseUrl: 11434 }), /server URL must be text/);
   assert.throws(() => normalizeLocalAiSettings({ ...base, model: 8 }), /model must be text/);
+  assert.throws(() => normalizeLocalAiSettings({ ...base, model: ' qwen3:8b ' }), /exact trimmed spelling/);
   assert.throws(() => normalizeLocalAiBaseUrl(undefined, 'future-provider'), /provider type must be ollama or openai-compatible/);
   assert.throws(() => normalizeLocalAiBaseUrl(11434, 'ollama'), /server URL must be text/);
 
@@ -131,6 +132,49 @@ test('Local AI settings are descriptor-snapshotted and reject coercive/exotic au
 
   const nullProto = Object.assign(Object.create(null), base);
   assert.deepEqual(normalizeLocalAiSettings(nullProto), base);
+});
+
+test('padded owner-selected model fails before Local AI fetch', async () => {
+  let fetchCalls = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+  await assert.rejects(
+    () => client.complete({
+      enabled: true,
+      providerType: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434',
+      model: ' qwen3:8b ',
+      timeoutSeconds: 30,
+    }, 'hello'),
+    /exact trimmed spelling/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
+test('model discovery uses deterministic code-unit ordering', async () => {
+  const client = new LocalAiClient({
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: null,
+      async text() {
+        return JSON.stringify({ models: [{ name: 'ä-model' }, { name: 'a-model' }, { name: 'Z-model' }] });
+      },
+    }),
+  });
+  const result = await client.listModels({
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: '',
+    timeoutSeconds: 30,
+  });
+  assert.deepEqual(result.models, ['Z-model', 'a-model', 'ä-model']);
 });
 
 test('Ollama model discovery and completion work end to end', async () => {
