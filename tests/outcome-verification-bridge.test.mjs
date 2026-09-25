@@ -8,7 +8,10 @@ import {
 } from '../src/core/outcome-verification-bridge.js';
 
 const createdAt = '2026-09-25T08:00:00.000Z';
+const verifiedAt = '2026-09-25T08:05:00.000Z';
+const recordedAt = '2026-09-25T08:06:00.000Z';
 const evaluatedAt = '2026-09-25T08:10:00.000Z';
+const validThrough = '2026-09-25T09:00:00.000Z';
 
 function contract({ requiredEvidenceArtifactCount = 1 } = {}) {
   return createOutcomeContractV1({
@@ -68,38 +71,12 @@ function contract({ requiredEvidenceArtifactCount = 1 } = {}) {
   });
 }
 
-function verification({
-  criterionId,
-  status = 'VERIFIED',
-  verifierId = 'verifier-1',
-  authorityId = 'verification-authority-1',
-  verifiedAt = '2026-09-25T08:05:00.000Z',
-  evidenceArtifactIds,
-  invocationId,
-  reasonCode,
-} = {}) {
-  const short = criterionId === 'criterion-tests' ? 'tests' : 'artifact';
-  return {
-    schemaVersion: 1,
-    verificationId: 'verification-' + short,
-    invocationId: invocationId || 'verify-' + short,
-    observationId: 'observation-' + short,
-    status,
-    reasonCode: reasonCode || (status === 'VERIFIED' ? 'PASS' : 'CHECK_FAILED'),
-    summary: '',
-    evidenceArtifactIds: evidenceArtifactIds ?? (status === 'VERIFIED' ? ['evidence-' + short] : []),
-    verifiedAt,
-    verifierId,
-    verificationAuthorityId: authorityId,
-  };
-}
-
 function artifact({
   artifactId,
-  producerInvocationId,
-  kind = 'verification-evidence',
+  kind,
   sha256 = 'a'.repeat(64),
-  createdAt: artifactCreatedAt = '2026-09-25T08:04:00.000Z',
+  artifactCreatedAt = '2026-09-25T08:04:00.000Z',
+  producerInvocationId = 'actor-tool-invocation',
 } = {}) {
   return {
     schemaVersion: 1,
@@ -115,69 +92,260 @@ function artifact({
   };
 }
 
-function happyInput() {
+function verification({
+  criterionId,
+  status = 'VERIFIED',
+  verifierId = 'verifier-1',
+  authorityId = 'verification-authority-1',
+  at = verifiedAt,
+  evidenceArtifactIds,
+  reasonCode,
+} = {}) {
+  const short = criterionId === 'criterion-tests' ? 'tests' : 'artifact';
   return {
-    contract: contract(),
-    criterionVerifications: [
-      {
-        criterionId: 'criterion-tests',
-        verification: verification({ criterionId: 'criterion-tests' }),
-      },
-      {
-        criterionId: 'criterion-artifact',
-        verification: verification({ criterionId: 'criterion-artifact' }),
-      },
-    ],
-    evidenceArtifacts: [
-      artifact({ artifactId: 'evidence-tests', producerInvocationId: 'verify-tests', kind: 'TEST' }),
-      artifact({ artifactId: 'evidence-artifact', producerInvocationId: 'verify-artifact', kind: 'ARTIFACT' }),
-    ],
-    evaluatedAt,
+    schemaVersion: 1,
+    verificationId: 'verification-' + short,
+    invocationId: 'effect-' + short,
+    observationId: 'observation-' + short,
+    status,
+    reasonCode: reasonCode || (status === 'VERIFIED' ? 'PASS' : 'CHECK_FAILED'),
+    summary: '',
+    evidenceArtifactIds:
+      evidenceArtifactIds ?? (status === 'VERIFIED' ? ['evidence-' + short] : []),
+    verifiedAt: at,
+    verifierId,
+    verificationAuthorityId: authorityId,
   };
 }
 
-test('all criteria require canonical independent VerificationV1 plus hashed evidence', () => {
-  const result = adjudicateOutcomeVerificationV1(happyInput());
+function criterionFor(outcomeContract, criterionId) {
+  const item = outcomeContract.completionCriteria.find(
+    criterion => criterion.criterionId === criterionId,
+  );
+  return {
+    criterionId: item.criterionId,
+    description: item.description,
+    observable: item.observable,
+    requiredEvidenceKinds: [...item.requiredEvidenceKinds],
+  };
+}
+
+function trustedRecord({
+  outcomeContract,
+  criterionId,
+  status = 'VERIFIED',
+  verifierId = 'verifier-1',
+  authorityId = 'verification-authority-1',
+  verificationAt = verifiedAt,
+  recordAt = recordedAt,
+  expiresAt = validThrough,
+  evidenceKind,
+  evidenceArtifactIds,
+  evidenceArtifacts,
+  reasonCode,
+  recordId,
+} = {}) {
+  const short = criterionId === 'criterion-tests' ? 'tests' : 'artifact';
+  const verificationValue = verification({
+    criterionId,
+    status,
+    verifierId,
+    authorityId,
+    at: verificationAt,
+    evidenceArtifactIds,
+    reasonCode,
+  });
+  const defaultKind = evidenceKind
+    ?? (criterionId === 'criterion-tests' ? 'TEST' : 'ARTIFACT');
+  const artifacts = evidenceArtifacts
+    ?? verificationValue.evidenceArtifactIds.map(artifactId => artifact({
+      artifactId,
+      kind: defaultKind,
+    }));
+  return {
+    schemaVersion: 1,
+    recordId: recordId || 'trusted-record-' + short,
+    contractId: outcomeContract.contractId,
+    contractRevision: outcomeContract.revision,
+    verifierPlanId: outcomeContract.verifierPlan.planId,
+    criterion: criterionFor(outcomeContract, criterionId),
+    verifierId,
+    verificationAuthorityId: authorityId,
+    verification: verificationValue,
+    evidenceArtifacts: artifacts,
+    recordedAt: recordAt,
+    validThrough: expiresAt,
+  };
+}
+
+function happyFixture(options = {}) {
+  const outcomeContract = contract(options);
+  const records = new Map([
+    [
+      'verification-artifact',
+      trustedRecord({ outcomeContract, criterionId: 'criterion-artifact' }),
+    ],
+    [
+      'verification-tests',
+      trustedRecord({ outcomeContract, criterionId: 'criterion-tests' }),
+    ],
+  ]);
+  return {
+    input: {
+      contract: outcomeContract,
+      criterionVerifications: [
+        {
+          criterionId: 'criterion-tests',
+          verificationId: 'verification-tests',
+        },
+        {
+          criterionId: 'criterion-artifact',
+          verificationId: 'verification-artifact',
+        },
+      ],
+      evaluatedAt,
+    },
+    records,
+  };
+}
+
+function resolverFor(records, calls = []) {
+  return async lookup => {
+    calls.push(structuredClone(lookup));
+    const item = records.get(lookup.verificationId);
+    return item == null ? null : structuredClone(item);
+  };
+}
+
+async function adjudicate(fixture) {
+  return adjudicateOutcomeVerificationV1(fixture.input, {
+    resolveTrustedVerificationRecord: resolverFor(fixture.records),
+  });
+}
+
+test('all criteria require trusted ledger records with canonical verification and hashed artifacts', async () => {
+  const fixture = happyFixture();
+  const calls = [];
+  const result = await adjudicateOutcomeVerificationV1(fixture.input, {
+    resolveTrustedVerificationRecord: resolverFor(fixture.records, calls),
+  });
 
   assert.equal(result.verdict, OutcomeVerificationVerdict.VERIFIED);
   assert.equal(result.completionEvidenceReady, true);
   assert.equal(result.verifiedCriteria, 2);
   assert.deepEqual(result.reopenCriterionIds, []);
-  assert.equal(result.verificationProvenance, 'CANONICAL_VERIFICATION_V1_WITH_HASHED_ARTIFACT_REFS');
+  assert.equal(
+    result.verificationProvenance,
+    'TRUSTED_CANONICAL_VERIFICATION_RECORD_WITH_HASHED_ARTIFACT_REFS',
+  );
+  assert.equal(result.trustedVerificationResolverRequired, true);
   assert.equal(result.completionAuthorized, false);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.verificationAuthorityMinted, false);
   assert.equal(result.requiresCanonicalCompletionCommit, true);
-  assert.deepEqual(result.criteria.map(item => item.criterionId), [
-    'criterion-artifact',
-    'criterion-tests',
-  ]);
+  assert.deepEqual(
+    result.criteria.map(item => item.criterionId),
+    ['criterion-artifact', 'criterion-tests'],
+  );
+  assert.deepEqual(
+    calls.map(item => item.criterionId),
+    ['criterion-artifact', 'criterion-tests'],
+  );
+  assert.ok(calls.every(item => Object.isFrozen(item)));
   assert.ok(Object.isFrozen(result));
   assert.ok(Object.isFrozen(result.criteria));
 });
 
-test('FAILED or AMBIGUOUS verification deterministically reopens instead of authorizing completion', () => {
-  for (const status of ['FAILED', 'AMBIGUOUS']) {
-    const input = happyInput();
-    input.criterionVerifications = [
-      {
-        criterionId: 'criterion-artifact',
-        verification: verification({
-          criterionId: 'criterion-artifact',
-          status,
-          evidenceArtifactIds: [],
-        }),
-      },
-      {
-        criterionId: 'criterion-tests',
-        verification: verification({ criterionId: 'criterion-tests' }),
-      },
-    ];
-    input.evidenceArtifacts = [
-      artifact({ artifactId: 'evidence-tests', producerInvocationId: 'verify-tests' }),
-    ];
+test('missing trusted resolver or missing trusted record fails closed', async () => {
+  const fixture = happyFixture();
+  await assert.rejects(
+    () => adjudicateOutcomeVerificationV1(fixture.input),
+    /trusted verification record resolver is required/i,
+  );
 
-    const result = adjudicateOutcomeVerificationV1(input);
+  fixture.records.delete('verification-tests');
+  await assert.rejects(
+    () => adjudicate(fixture),
+    /trusted verification record was not found/i,
+  );
+});
+
+test('caller-forged verifier, authority and VERIFIED status cannot enter the trusted boundary', async () => {
+  const fixture = happyFixture();
+  fixture.input.criterionVerifications[0] = {
+    criterionId: 'criterion-tests',
+    verificationId: 'verification-tests',
+    verification: {
+      ...verification({
+        criterionId: 'criterion-tests',
+        verifierId: 'verifier-1',
+        authorityId: 'invented-authority',
+      }),
+      status: 'VERIFIED',
+    },
+  };
+
+  await assert.rejects(
+    () => adjudicate(fixture),
+    /contains unknown field: verification/,
+  );
+});
+
+test('trusted record binds exact verifier identity, authority, contract revision and verifier plan', async () => {
+  for (const [name, mutate, expected] of [
+    [
+      'record verifier mismatch',
+      record => { record.verifierId = 'verifier-other'; },
+      /verifierId binding is mismatched/,
+    ],
+    [
+      'record authority mismatch',
+      record => { record.verificationAuthorityId = 'authority-other'; },
+      /verificationAuthorityId binding is mismatched/,
+    ],
+    [
+      'wrong contract revision',
+      record => { record.contractRevision += 1; },
+      /exact outcome contract revision/,
+    ],
+    [
+      'wrong verifier plan',
+      record => { record.verifierPlanId = 'verifier-plan-other'; },
+      /verifierPlanId is mismatched/,
+    ],
+  ]) {
+    const fixture = happyFixture();
+    mutate(fixture.records.get('verification-tests'));
+    await assert.rejects(() => adjudicate(fixture), expected, name);
+  }
+});
+
+test('trusted criterion semantics are exact and cannot be rebound to changed completion criteria', async () => {
+  const fixture = happyFixture();
+  fixture.records.get('verification-tests').criterion.observable =
+    'Different observable that was never independently verified.';
+
+  await assert.rejects(
+    () => adjudicate(fixture),
+    /criterion does not match the exact outcome criterion/,
+  );
+});
+
+test('FAILED or AMBIGUOUS trusted verification reopens instead of authorizing completion', async () => {
+  for (const status of ['FAILED', 'AMBIGUOUS']) {
+    const fixture = happyFixture();
+    fixture.records.set(
+      'verification-artifact',
+      trustedRecord({
+        outcomeContract: fixture.input.contract,
+        criterionId: 'criterion-artifact',
+        status,
+        evidenceArtifactIds: [],
+        evidenceArtifacts: [],
+      }),
+    );
+
+    const result = await adjudicate(fixture);
     assert.equal(result.verdict, OutcomeVerificationVerdict.REOPEN);
     assert.equal(result.completionEvidenceReady, false);
     assert.deepEqual(result.reopenCriterionIds, ['criterion-artifact']);
@@ -186,14 +354,17 @@ test('FAILED or AMBIGUOUS verification deterministically reopens instead of auth
   }
 });
 
-test('VERIFIED without required evidence kinds or artifact count reopens as incomplete evidence', () => {
-  const kindInput = happyInput();
-  kindInput.evidenceArtifacts[0] = artifact({
-    artifactId: 'evidence-tests',
-    producerInvocationId: 'verify-tests',
-    kind: 'OTHER',
-  });
-  const kindResult = adjudicateOutcomeVerificationV1(kindInput);
+test('VERIFIED evidence kind and count derive only from trusted ArtifactRef records', async () => {
+  const kindFixture = happyFixture();
+  kindFixture.records.set(
+    'verification-tests',
+    trustedRecord({
+      outcomeContract: kindFixture.input.contract,
+      criterionId: 'criterion-tests',
+      evidenceKind: 'OTHER',
+    }),
+  );
+  const kindResult = await adjudicate(kindFixture);
   assert.equal(kindResult.verdict, OutcomeVerificationVerdict.REOPEN);
   assert.deepEqual(kindResult.reopenCriterionIds, ['criterion-tests']);
   assert.equal(
@@ -201,136 +372,118 @@ test('VERIFIED without required evidence kinds or artifact count reopens as inco
     'EVIDENCE_KIND_INCOMPLETE',
   );
 
-  const countInput = happyInput();
-  countInput.contract = contract({ requiredEvidenceArtifactCount: 2 });
-  const countResult = adjudicateOutcomeVerificationV1(countInput);
+  const countFixture = happyFixture({ requiredEvidenceArtifactCount: 2 });
+  const countResult = await adjudicate(countFixture);
   assert.equal(countResult.verdict, OutcomeVerificationVerdict.REOPEN);
-  assert.deepEqual(countResult.reopenCriterionIds, ['criterion-artifact', 'criterion-tests']);
-  assert.ok(countResult.criteria.every(item => item.reasonCode === 'EVIDENCE_ARTIFACT_COUNT_INSUFFICIENT'));
-});
-
-test('foreign verifier, missing verification authority, and self-verifier plans fail closed', () => {
-  const foreign = happyInput();
-  foreign.criterionVerifications[0].verification = verification({
-    criterionId: 'criterion-tests',
-    verifierId: 'verifier-other',
-  });
-  assert.throws(
-    () => adjudicateOutcomeVerificationV1(foreign),
-    /declared independent verifier/,
+  assert.deepEqual(
+    countResult.reopenCriterionIds,
+    ['criterion-artifact', 'criterion-tests'],
   );
-
-  const noAuthority = happyInput();
-  noAuthority.criterionVerifications[0].verification = verification({
-    criterionId: 'criterion-tests',
-    authorityId: null,
-  });
-  assert.throws(
-    () => adjudicateOutcomeVerificationV1(noAuthority),
-    /lacks external verificationAuthorityId/,
-  );
-
-  const selfPlan = {
-    ...contract(),
-    verifierPlan: {
-      ...contract().verifierPlan,
-      actorId: 'same-agent',
-      verifierId: 'same-agent',
-    },
-  };
-  assert.throws(
-    () => adjudicateOutcomeVerificationV1({
-      ...happyInput(),
-      contract: selfPlan,
-    }),
-    /independent from actor/,
+  assert.ok(
+    countResult.criteria.every(
+      item => item.reasonCode === 'EVIDENCE_ARTIFACT_COUNT_INSUFFICIENT',
+    ),
   );
 });
 
-test('evidence must be exact hashed ArtifactRefs explicitly referenced by verification and time-bounded', () => {
-  const missing = happyInput();
-  missing.evidenceArtifacts = [
-    artifact({ artifactId: 'evidence-artifact', producerInvocationId: 'verify-artifact' }),
-  ];
-  assert.throws(
-    () => adjudicateOutcomeVerificationV1(missing),
-    /unknown evidence artifact: evidence-tests/,
-  );
-
-  const unhashed = happyInput();
-  unhashed.evidenceArtifacts[0] = artifact({
-    artifactId: 'evidence-tests',
-    producerInvocationId: 'verify-tests',
-    sha256: '',
-  });
-  assert.throws(() => adjudicateOutcomeVerificationV1(unhashed), /must have sha256/);
-
-  const actorProduced = happyInput();
-  actorProduced.evidenceArtifacts[0] = artifact({
-    artifactId: 'evidence-tests',
-    producerInvocationId: 'actor-tool-invocation',
-  });
-  const actorProducedResult = adjudicateOutcomeVerificationV1(actorProduced);
-  assert.equal(actorProducedResult.verdict, OutcomeVerificationVerdict.VERIFIED);
-
-  const stale = happyInput();
-  stale.evidenceArtifacts[0] = artifact({
-    artifactId: 'evidence-tests',
-    producerInvocationId: 'verify-tests',
-    createdAt: '2026-09-25T07:59:59.000Z',
-  });
-  assert.throws(() => adjudicateOutcomeVerificationV1(stale), /predates the exact outcome contract/);
-
-  const future = happyInput();
-  future.evidenceArtifacts[0] = artifact({
-    artifactId: 'evidence-tests',
-    producerInvocationId: 'verify-tests',
-    createdAt: '2026-09-25T08:06:00.000Z',
-  });
-  assert.throws(() => adjudicateOutcomeVerificationV1(future), /future-dated relative to verification/);
+test('trusted record freshness and chronology fail closed', async () => {
+  for (const [name, mutate, expected] of [
+    [
+      'expired',
+      record => { record.validThrough = '2026-09-25T08:09:59.000Z'; },
+      /record is stale/,
+    ],
+    [
+      'recorded before verification',
+      record => { record.recordedAt = '2026-09-25T08:04:59.000Z'; },
+      /record predates its verification/,
+    ],
+    [
+      'future record',
+      record => { record.recordedAt = '2026-09-25T08:10:01.000Z'; },
+      /record chronology is invalid/,
+    ],
+    [
+      'future verification',
+      record => {
+        record.verification.verifiedAt = '2026-09-25T08:10:01.000Z';
+        record.recordedAt = '2026-09-25T08:10:02.000Z';
+      },
+      /verification is future-dated/,
+    ],
+  ]) {
+    const fixture = happyFixture();
+    mutate(fixture.records.get('verification-tests'));
+    await assert.rejects(() => adjudicate(fixture), expected, name);
+  }
 });
 
-test('future verification and extraneous unreferenced evidence fail closed', () => {
-  const future = happyInput();
-  future.criterionVerifications[0].verification = verification({
-    criterionId: 'criterion-tests',
-    verifiedAt: '2026-09-25T08:11:00.000Z',
-  });
-  assert.throws(() => adjudicateOutcomeVerificationV1(future), /verification is future-dated/);
+test('trusted ArtifactRefs must be hashed, exactly referenced and causally timed', async () => {
+  const unhashed = happyFixture();
+  unhashed.records.get('verification-tests').evidenceArtifacts[0].sha256 = '';
+  await assert.rejects(() => adjudicate(unhashed), /must have sha256/);
 
-  const extra = happyInput();
-  extra.evidenceArtifacts.push(artifact({
-    artifactId: 'evidence-unused',
-    producerInvocationId: 'verify-unused',
-  }));
-  assert.throws(
-    () => adjudicateOutcomeVerificationV1(extra),
-    /evidenceArtifacts must exactly cover/,
+  const extra = happyFixture();
+  extra.records.get('verification-tests').evidenceArtifacts.push(
+    artifact({ artifactId: 'evidence-extra', kind: 'TEST' }),
+  );
+  await assert.rejects(
+    () => adjudicate(extra),
+    /evidenceArtifactIds must exactly match trusted identity/,
+  );
+
+  const missing = happyFixture();
+  missing.records.get('verification-tests').evidenceArtifacts = [];
+  await assert.rejects(
+    () => adjudicate(missing),
+    /evidenceArtifactIds must exactly match trusted identity/,
+  );
+
+  const stale = happyFixture();
+  stale.records.get('verification-tests').evidenceArtifacts[0].createdAt =
+    '2026-09-25T07:59:59.000Z';
+  await assert.rejects(
+    () => adjudicate(stale),
+    /evidence predates the exact outcome contract/,
+  );
+
+  const future = happyFixture();
+  future.records.get('verification-tests').evidenceArtifacts[0].createdAt =
+    '2026-09-25T08:05:01.000Z';
+  await assert.rejects(
+    () => adjudicate(future),
+    /evidence is future-dated relative to verification/,
   );
 });
 
-test('criterion coverage is exact: duplicates, unknown IDs, and omissions reject', () => {
-  const duplicate = happyInput();
-  duplicate.criterionVerifications[1] = duplicate.criterionVerifications[0];
-  assert.throws(() => adjudicateOutcomeVerificationV1(duplicate), /duplicate criterionId/);
+test('criterion coverage and trusted record reuse are exact', async () => {
+  const duplicate = happyFixture();
+  duplicate.input.criterionVerifications[1] =
+    duplicate.input.criterionVerifications[0];
+  await assert.rejects(() => adjudicate(duplicate), /duplicate criterionId/);
 
-  const unknown = happyInput();
-  unknown.criterionVerifications[0] = {
-    ...unknown.criterionVerifications[0],
+  const unknown = happyFixture();
+  unknown.input.criterionVerifications[0] = {
     criterionId: 'criterion-unknown',
+    verificationId: 'verification-tests',
   };
-  assert.throws(() => adjudicateOutcomeVerificationV1(unknown), /exactly cover/);
+  await assert.rejects(
+    () => adjudicate(unknown),
+    /criterionVerifications must exactly match trusted identity/,
+  );
 
-  const missing = happyInput();
-  missing.criterionVerifications.pop();
-  assert.throws(() => adjudicateOutcomeVerificationV1(missing), /exactly cover/);
+  const reused = happyFixture();
+  reused.records.get('verification-tests').recordId =
+    reused.records.get('verification-artifact').recordId;
+  await assert.rejects(
+    () => adjudicate(reused),
+    /recordId cannot be reused/,
+  );
 });
 
-test('hostile accessors, symbols, sparse arrays, and authority-forging request fields reject without getter execution', () => {
+test('hostile accessors, symbols and sparse arrays reject without getter execution', async () => {
   let getterCalls = 0;
-  const accessorRow = {
-    verification: verification({ criterionId: 'criterion-tests' }),
-  };
+  const accessorRow = { verificationId: 'verification-tests' };
   Object.defineProperty(accessorRow, 'criterionId', {
     enumerable: true,
     configurable: true,
@@ -339,27 +492,42 @@ test('hostile accessors, symbols, sparse arrays, and authority-forging request f
       return 'criterion-tests';
     },
   });
-  const accessorInput = happyInput();
-  accessorInput.criterionVerifications[0] = accessorRow;
-  assert.throws(
-    () => adjudicateOutcomeVerificationV1(accessorInput),
+  const accessor = happyFixture();
+  accessor.input.criterionVerifications[0] = accessorRow;
+  await assert.rejects(
+    () => adjudicate(accessor),
     /enumerable own data properties/,
   );
   assert.equal(getterCalls, 0);
 
-  const symbolInput = happyInput();
-  symbolInput[Symbol('authority')] = true;
-  assert.throws(() => adjudicateOutcomeVerificationV1(symbolInput), /unknown field/);
+  const symbolInput = happyFixture();
+  symbolInput.input[Symbol('authority')] = true;
+  await assert.rejects(() => adjudicate(symbolInput), /unknown field/);
 
-  const sparseInput = happyInput();
+  const sparseInput = happyFixture();
   const sparse = new Array(2);
-  sparse[0] = sparseInput.criterionVerifications[0];
-  sparseInput.criterionVerifications = sparse;
-  assert.throws(() => adjudicateOutcomeVerificationV1(sparseInput), /dense data array/);
+  sparse[0] = sparseInput.input.criterionVerifications[0];
+  sparseInput.input.criterionVerifications = sparse;
+  await assert.rejects(() => adjudicate(sparseInput), /dense data array/);
+});
 
-  const forged = {
-    ...happyInput(),
-    completionAuthorized: true,
-  };
-  assert.throws(() => adjudicateOutcomeVerificationV1(forged), /unknown field/);
+test('hostile trusted resolver records reject without accessor execution', async () => {
+  const fixture = happyFixture();
+  let getterCalls = 0;
+  const hostile = structuredClone(fixture.records.get('verification-tests'));
+  Object.defineProperty(hostile, 'verificationAuthorityId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 'verification-authority-1';
+    },
+  });
+  fixture.records.set('verification-tests', hostile);
+
+  await assert.rejects(
+    () => adjudicate(fixture),
+    /enumerable own data properties/,
+  );
+  assert.equal(getterCalls, 0);
 });
