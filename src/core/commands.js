@@ -584,7 +584,7 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       const settings = normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
       const provider = payload.provider;
-      return { result: await this.aiGatewayClient.listModels({ gatewayUrl: settings.gatewayUrl, timeoutSeconds: settings.timeoutSeconds, provider }) };
+      return { result: await this.aiGatewayClient.listModels({ gatewayUrl: settings.gatewayUrl, timeoutSeconds: settings.timeoutSeconds, provider, endpointId: payload.endpointId }) };
     }
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
