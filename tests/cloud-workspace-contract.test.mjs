@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   CloudWorkspaceContinuityStatus,
   CloudWorkspaceHealth,
+  CloudWorkspaceObservationTrust,
   assessCloudWorkspaceContinuityV1,
   createCloudWorkspaceBindingV1,
   normalizeCloudWorkspaceBindingV1,
@@ -83,6 +84,9 @@ test('fresh persistent cloud workspace is ready only as non-authorizing runtime 
   assert.equal(result.status, CloudWorkspaceContinuityStatus.READY);
   assert.equal(result.workspaceReady, true);
   assert.equal(result.reasonCode, 'READY');
+  assert.equal(result.observationTrust, CloudWorkspaceObservationTrust.UNVERIFIED_INPUT);
+  assert.equal(result.providerObservationVerified, false);
+  assert.equal(result.requiresCanonicalProviderObservation, true);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.resumeAuthorized, false);
   assert.equal(result.requiresCanonicalRuntime, true);
@@ -284,8 +288,13 @@ test('hidden, accessor, symbol and secret-shaped fields are rejected without get
   }), /unknown field/);
 });
 
-test('binding authority flags cannot be forged', () => {
+test('binding trust and authority flags cannot be forged', () => {
   const { binding } = bindingAndOwnership();
+  assert.equal(binding.observationTrust, CloudWorkspaceObservationTrust.UNVERIFIED_INPUT);
+  assert.throws(() => normalizeCloudWorkspaceBindingV1({
+    ...binding,
+    observationTrust: 'VERIFIED_PROVIDER',
+  }), /cannot self-assert trusted provider observation/);
   assert.throws(() => normalizeCloudWorkspaceBindingV1({
     ...binding,
     executionAuthorized: true,
