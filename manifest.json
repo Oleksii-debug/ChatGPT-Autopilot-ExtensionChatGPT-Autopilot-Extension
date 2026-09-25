@@ -23,7 +23,7 @@
     "https://www.googleapis.com/*"
   ],
   "background": {
-    "service_worker": "src/background/service-worker.js",
+    "service_worker": "src/background/deterministic-web-service-worker.js",
     "type": "module"
   },
   "action": {
