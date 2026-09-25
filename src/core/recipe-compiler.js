@@ -58,6 +58,7 @@ const TRACE_STEP_KEYS = new Set([
   'outputContractRef',
   'verificationContractRef',
   'parameterIds',
+  'verificationEvidenceArtifactId',
   'verificationEvidenceSha256',
   'verifiedAt',
 ]);
@@ -293,18 +294,21 @@ function normalizeTraceStep(input, index, context) {
     providerId,
     toolId,
     requiredCapabilityIds: Object.freeze(requiredCapabilityIds),
-    inputContractRef: id(raw.inputContractRef, label + ' inputContractRef', { optional: true }),
-    outputContractRef: id(raw.outputContractRef, label + ' outputContractRef', { optional: true }),
+    inputContractRef: id(raw.inputContractRef, label + ' inputContractRef'),
+    outputContractRef: id(raw.outputContractRef, label + ' outputContractRef'),
     verificationContractRef: id(
       raw.verificationContractRef,
       label + ' verificationContractRef',
-      { optional: true },
     ),
     parameterIds: Object.freeze(uniqueIds(
       raw.parameterIds,
       label + ' parameterIds',
       { max: MAX_RECIPE_COMPILER_PARAMETERS },
     )),
+    verificationEvidenceArtifactId: id(
+      raw.verificationEvidenceArtifactId,
+      label + ' verificationEvidenceArtifactId',
+    ),
     verificationEvidenceSha256: sha256(
       raw.verificationEvidenceSha256,
       label + ' verificationEvidenceSha256',
@@ -462,6 +466,7 @@ function buildVerificationEvidence(steps) {
   return Object.freeze(
     steps.map((step) => freezeDeep({
       stepId: step.stepId,
+      evidenceArtifactId: step.verificationEvidenceArtifactId,
       evidenceSha256: step.verificationEvidenceSha256,
       verifiedAt: step.verifiedAt,
     })),
