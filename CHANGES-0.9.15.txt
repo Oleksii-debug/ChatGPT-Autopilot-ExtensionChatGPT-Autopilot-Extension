@@ -1,0 +1,18 @@
+ChatGPT Автопілот 0.9.15 — AGENT BODY EXPANSION / APPROVALS / FILES / VISION / MONITORING
+
+WIP CHANGELOG — 2026-09-14
+
+- Browser Agent consequential-action approval: фінальні/важливі click-и та file upload можуть чекати явного owner approval; ALLOW_ALL лишається opt-in policy.
+- Agent tab tools: new_tab / switch_tab / close_tab із ephemeral tabRef; adopted owner tabs не дозволено закривати як agent-owned.
+- Downloads: AI може завантажувати лише observed visible HTTP(S) link, Chrome download ids/local paths не потрапляють у model-visible snapshot/history.
+- Upload: лише completed file, раніше завантажений цим Agent; file upload default consequential і виконується після approval через CDP, без передачі local path моделі.
+- Vision: on-demand screenshot visible viewport; image bytes ephemeral і передаються тільки наступному model call через існуючий AI Router/Gateway.
+- Effect verification: fill/select/check перевіряють фактичний DOM state; click має DOM/native fallback + no-effect evidence.
+- Download waiting hardening: після Agent-started download runtime зберігає pendingDownloadId і poll-ить Chrome без нових model calls, доки download complete/interrupted; state переживає manager restart.
+- Monitoring notifications: додано bounded notify tool через optional Chrome notifications permission; без explicit permission системні сповіщення не створюються.
+- Ordinary/Scenario/Orchestration contracts та user-selected timing values не повинні змінюватися цим релізом.
+- Approval hardening: neutral submit controls require approval; same-URL SPA TOCTOU protection fingerprints target + form action/method and survives service-worker reconstruction.
+- Keyboard activation hardening: Enter/Space must name an exact current snapshot control; form-associated Enter cannot bypass consequential approval.
+- Owner-authority hardening: a newer follow-up instruction invalidates stale model output, interrupts page/download blocking, and supersedes old pending approval.
+- Deterministic monitoring: new wait_for_change tool polls semantic page state without model calls until change/timeout; watch state is durable across restart.
+- Action-ceiling hardening: maxSteps no longer aborts an already-authorized final download/page-watch before it settles; final DONE reasoning is allowed while any extra physical action is rejected.
