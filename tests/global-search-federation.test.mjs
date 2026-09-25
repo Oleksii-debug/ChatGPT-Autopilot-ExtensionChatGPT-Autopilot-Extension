@@ -156,7 +156,10 @@ test('different revisions never collapse into one result', () => {
   });
   const result = fuseGlobalSearchV1(fusion({
     providerResults: [batch(), second],
-    admittedProviderIds: ['provider-project', 'provider-index'],
+    admittedSearchScopes: [
+      { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+      { providerId: 'provider-index', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+    ],
   }));
   assert.equal(result.results.length, 2);
   assert.deepEqual(new Set(result.results.map(item => item.revisionId)), new Set(['rev-1', 'rev-2']));
