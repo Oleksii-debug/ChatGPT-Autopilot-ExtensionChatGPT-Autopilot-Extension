@@ -141,3 +141,76 @@ test('two equally plausible visible composers fail closed', () => {
   assert.equal(found.element, null);
   assert.equal(found.ambiguous, true);
 });
+
+// Minimal DOM surface copied from the Work UI's keyed turn structure. The
+// second/third sends matter: an existing assistant reply must be the baseline,
+// and a new user bubble must be appended rather than matched in old history.
+function workChat() {
+  const users = [];
+  const assistants = [];
+  let sends = 0;
+  const visible = { isConnected: true, hidden: false, disabled: false,
+    getBoundingClientRect: () => ({ width: 100, height: 20 }) };
+  const node = (attrs, innerText, children = {}) => ({
+    ...visible, innerText,
+    getAttribute: key => attrs[key] ?? null,
+    hasAttribute: key => Object.hasOwn(attrs, key),
+    querySelector: key => children[key] || null,
+    querySelectorAll: key => key.includes('data-markdown-text-style')
+      ? [children['[data-markdown-text-style="assistant-message"]']].filter(Boolean) : [],
+    contains: other => Object.values(children).includes(other),
+  });
+  const bubble = text => node({ 'data-user-message-bubble': 'true' }, text);
+  const reply = text => {
+    const heading = node({ 'data-conversation-role': 'assistant' }, 'ChatGPT сказал:');
+    const body = node({ 'data-markdown-text-style': 'assistant-message' }, text);
+    return node({ 'data-chatgpt-search-unit-key': 'fallback-turn:assistant' }, `ChatGPT сказал:\n${text}`, {
+      '[data-conversation-role="assistant"]': heading,
+      '[data-markdown-text-style="assistant-message"]': body,
+    });
+  };
+  const form = { querySelectorAll: key => key.includes('button') ? [send] : [] };
+  const composer = { ...visible, tagName: 'DIV', innerText: '',
+    getAttribute: key => ({ contenteditable: 'true', 'aria-label': 'Спросить ChatGPT' })[key] ?? null,
+    closest: key => key === 'form' ? form : null };
+  const send = { ...visible, tagName: 'BUTTON', type: 'button',
+    getAttribute: key => key === 'aria-label' ? 'Отправить' : null,
+    click() { sends += 1; users.push(bubble(composer.innerText)); composer.innerText = ''; } };
+  const main = { querySelector: key => key.includes('data-user-message-bubble') ? users[0] || null : null,
+    querySelectorAll: () => [] };
+  const document = { body: { innerText: '' }, visibilityState: 'visible',
+    querySelector: key => key.includes('main') ? main : null,
+    querySelectorAll(key) {
+      if (key === '[data-user-message-bubble="true"]') return users;
+      if (key.includes('[data-message-author-role="assistant"]')) return assistants;
+      if (key.includes('[contenteditable="true"]')) return [composer];
+      if (key === 'button, [role="button"]') return [send];
+      return [];
+    } };
+  return { document, users, assistants, composer, bubble, reply, get sends() { return sends; } };
+}
+
+test('Work UI verifies second and third prompts only after a new user bubble, then reads each new reply', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  chat.users.push(chat.bubble('START'));
+  chat.assistants.push(chat.reply('Перша відповідь.'));
+  for (let turn = 2; turn <= 3; turn++) {
+    const prompt = `Продовжуй ${turn}`;
+    chat.composer.innerText = prompt;
+    const request = validRequest({ requestId: `op-${turn}`, promptText: prompt, mode: 'SUBMIT_EXISTING' });
+    const sent = await adapter.execute(request, { document: chat.document, wait: async () => {} });
+    assert.equal(sent.status, adapter.STATUS.SENT_VERIFIED, `turn ${turn}: ${sent.safeDiagnosticCode}`);
+    assert.equal(sent.assistantBaselineCount, turn - 1);
+    assert.equal(chat.sends, turn - 1);
+    const reportRequest = validRequest({ mode: 'READ_ASSISTANT_REPORT',
+      assistantBaselineKnown: true, assistantBaselineCount: sent.assistantBaselineCount });
+    const beforeReply = await adapter.execute(reportRequest, { document: chat.document });
+    assert.equal(beforeReply.assistantComplete, false);
+    chat.assistants.push(chat.reply(`Відповідь ${turn}.`));
+    const afterReply = await adapter.execute(reportRequest, { document: chat.document });
+    assert.equal(afterReply.status, adapter.STATUS.READY);
+    assert.equal(afterReply.assistantText, `Відповідь ${turn}.`);
+    assert.equal(afterReply.assistantComplete, true);
+  }
+});
