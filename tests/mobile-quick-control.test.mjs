@@ -53,7 +53,6 @@ function statusInput() {
         planRevision: 2,
         policyEnvelopeId: 'policy-b',
         state: MobileJobState.PAUSED,
-        label: 'Другий агент',
         attentionCount: 1,
         observedAt: T0,
       },
@@ -65,7 +64,6 @@ function statusInput() {
         planRevision: 5,
         policyEnvelopeId: 'policy-a',
         state: MobileJobState.RUNNING,
-        label: 'Перший агент',
         attentionCount: 0,
         observedAt: T0,
       },
@@ -75,7 +73,6 @@ function statusInput() {
         notificationId: 'notification-b',
         jobId: 'job-b',
         kind: MobileNotificationKind.ASK,
-        label: 'Потрібне рішення',
         observedAt: T0,
         supervisionId: 'supervision-1',
         supervisionStepId: 'step-1',
@@ -84,7 +81,6 @@ function statusInput() {
         notificationId: 'notification-a',
         jobId: 'job-a',
         kind: MobileNotificationKind.ATTENTION,
-        label: 'Потрібна увага',
         observedAt: T0,
         supervisionId: '',
         supervisionStepId: '',
@@ -215,8 +211,12 @@ test('mobile status projection is deterministic, keyboard reachable and has non-
   const result = projectMobileQuickControlStatusV1(statusInput());
   assert.deepEqual(result.jobs.map(job => [job.focusOrdinal, job.jobId]), [[1, 'job-a'], [2, 'job-b']]);
   assert.deepEqual(result.jobs[0].controls, [MobileQuickIntentKind.PAUSE, MobileQuickIntentKind.STOP]);
+  assert.equal(result.jobs[0].label, 'Running job');
+  assert.equal(result.jobs[1].label, 'Paused job');
   assert.deepEqual(result.jobs[1].controls, [MobileQuickIntentKind.RESUME, MobileQuickIntentKind.STOP]);
   assert.deepEqual(result.notifications.map(item => item.notificationId), ['notification-a', 'notification-b']);
+  assert.equal(result.notifications[0].label, 'Attention required');
+  assert.equal(result.notifications[1].label, 'Owner decision required');
   assert.equal(result.notifications[1].semanticAction, MobileQuickIntentKind.RESOLVE_ASK);
   assert.deepEqual(result.globalControls, [MobileQuickIntentKind.CREATE_TASK]);
   assert.equal(result.semanticControlOrder, 'LINEAR');
@@ -234,6 +234,33 @@ test('WAITING status cannot offer RESUME before the blocking ASK or permission i
   assert.deepEqual(waiting.controls, [MobileQuickIntentKind.STOP]);
   const ask = result.notifications.find(item => item.jobId === 'job-b');
   assert.equal(ask.semanticAction, MobileQuickIntentKind.RESOLVE_ASK);
+});
+
+test('status display text is system-derived and caller free-form labels are rejected', () => {
+  const jobLabel = statusInput();
+  jobLabel.jobs[0].label = 'Bearer sk-secret-value MUST NOT LEAK';
+  assert.throws(() => projectMobileQuickControlStatusV1(jobLabel), /unknown field: label/);
+
+  const notificationLabel = statusInput();
+  notificationLabel.notifications[0].label = 'raw private evidence MUST NOT LEAK';
+  assert.throws(() => projectMobileQuickControlStatusV1(notificationLabel), /unknown field: label/);
+
+  const ordinary = projectMobileQuickControlStatusV1(statusInput());
+  assert.deepEqual(
+    ordinary.jobs.map(job => job.label),
+    ['Running job', 'Paused job'],
+  );
+  assert.deepEqual(
+    ordinary.notifications.map(item => item.label),
+    ['Attention required', 'Owner decision required'],
+  );
+  assert.equal(JSON.stringify(ordinary).includes('MUST NOT LEAK'), false);
+});
+
+test('attentionCount rejects negative zero rather than admitting a numeric alias', () => {
+  const input = statusInput();
+  input.jobs[0].attentionCount = -0;
+  assert.throws(() => projectMobileQuickControlStatusV1(input), /attentionCount is invalid/);
 });
 
 test('status schema refuses evidence/secret fields and dangling notifications', () => {

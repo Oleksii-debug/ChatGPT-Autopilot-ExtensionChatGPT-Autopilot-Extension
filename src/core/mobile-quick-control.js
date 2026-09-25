@@ -64,10 +64,10 @@ const INTENT_KEYS = new Set([
 const STATUS_KEYS = new Set(['schemaVersion', 'projectionId', 'generatedAt', 'jobs', 'notifications']);
 const JOB_KEYS = new Set([
   'jobId', 'planId', 'projectId', 'jobRevision', 'planRevision',
-  'policyEnvelopeId', 'state', 'label', 'attentionCount', 'observedAt',
+  'policyEnvelopeId', 'state', 'attentionCount', 'observedAt',
 ]);
 const NOTIFICATION_KEYS = new Set([
-  'notificationId', 'jobId', 'kind', 'label', 'observedAt', 'supervisionId', 'supervisionStepId',
+  'notificationId', 'jobId', 'kind', 'observedAt', 'supervisionId', 'supervisionStepId',
 ]);
 
 function fail(message) {
@@ -165,9 +165,27 @@ function positiveRevision(value, label) {
 }
 
 function boundedCount(value, label) {
-  if (!Number.isSafeInteger(value) || value < 0 || value > 1000000) fail(label + ' is invalid');
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0 || value > 1000000) {
+    fail(label + ' is invalid');
+  }
   return value;
 }
+
+const JOB_SAFE_LABELS = Object.freeze({
+  [MobileJobState.RUNNING]: 'Running job',
+  [MobileJobState.PAUSED]: 'Paused job',
+  [MobileJobState.WAITING]: 'Job needs attention',
+  [MobileJobState.STOPPED]: 'Stopped job',
+  [MobileJobState.COMPLETED]: 'Completed job',
+  [MobileJobState.FAILED]: 'Failed job',
+});
+
+const NOTIFICATION_SAFE_LABELS = Object.freeze({
+  [MobileNotificationKind.ATTENTION]: 'Attention required',
+  [MobileNotificationKind.ASK]: 'Owner decision required',
+  [MobileNotificationKind.COMPLETED]: 'Job completed',
+  [MobileNotificationKind.FAILED]: 'Job failed',
+});
 
 function enumValue(value, allowed, label) {
   if (typeof value !== 'string' || !allowed.has(value)) fail(label + ' is invalid');
@@ -355,6 +373,7 @@ function normalizeJob(input, index, generatedAt) {
   const source = strictRecord(input, JOB_KEYS, label);
   const observedAt = exactTimestamp(source.observedAt, label + '.observedAt');
   if (Date.parse(observedAt) > Date.parse(generatedAt)) fail(label + '.observedAt postdates generatedAt');
+  const state = enumValue(source.state, JOB_STATES, label + '.state');
   return Object.freeze({
     jobId: exactId(source.jobId, label + '.jobId'),
     planId: exactId(source.planId, label + '.planId'),
@@ -362,8 +381,8 @@ function normalizeJob(input, index, generatedAt) {
     jobRevision: positiveRevision(source.jobRevision, label + '.jobRevision'),
     planRevision: positiveRevision(source.planRevision, label + '.planRevision'),
     policyEnvelopeId: exactId(source.policyEnvelopeId, label + '.policyEnvelopeId'),
-    state: enumValue(source.state, JOB_STATES, label + '.state'),
-    label: exactText(source.label, label + '.label', 500),
+    state,
+    safeLabel: JOB_SAFE_LABELS[state],
     attentionCount: boundedCount(source.attentionCount, label + '.attentionCount'),
     observedAt,
   });
@@ -383,7 +402,7 @@ function normalizeNotification(input, index, generatedAt) {
     notificationId: exactId(source.notificationId, label + '.notificationId'),
     jobId: exactId(source.jobId, label + '.jobId'),
     kind,
-    label: exactText(source.label, label + '.label', 1000),
+    safeLabel: NOTIFICATION_SAFE_LABELS[kind],
     observedAt,
     supervisionId,
     supervisionStepId,
@@ -430,7 +449,7 @@ export function projectMobileQuickControlStatusV1(input) {
     planRevision: job.planRevision,
     policyEnvelopeId: job.policyEnvelopeId,
     state: job.state,
-    label: job.label,
+    label: job.safeLabel,
     attentionCount: job.attentionCount,
     observedAt: job.observedAt,
     controls: jobControls(job.state),
@@ -442,7 +461,7 @@ export function projectMobileQuickControlStatusV1(input) {
     notificationId: notification.notificationId,
     jobId: notification.jobId,
     kind: notification.kind,
-    label: notification.label,
+    label: notification.safeLabel,
     observedAt: notification.observedAt,
     supervisionId: notification.supervisionId,
     supervisionStepId: notification.supervisionStepId,
