@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../../src/core/native-input.js';
 import { createEmptyState,createSession,createTask } from '../../src/core/schema.js';
-import { StorageRepository } from '../../src/core/storage.js';\nimport { reconcileStateForStartup } from '../../src/core/recovery.js';
+import { StorageRepository } from '../../src/core/storage.js';
+import { reconcileStateForStartup } from '../../src/core/recovery.js';
 function setup(kind='submit'){
  const state=createEmptyState(1); const task=createTask({id:'t',url:'https://chatgpt.com/c/native'});
  const session=createSession({id:'s',name:'Native',tasks:[task],sharedPrompt:'canonical prompt',now:1});
