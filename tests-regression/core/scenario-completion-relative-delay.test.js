@@ -66,7 +66,7 @@ test('Scenario CHAT_CYCLE delay starts at actual assistant completion, not prior
   assert.deepEqual(planScenarioWorkActions(config, runtime, 80_999).actions, []);
   const due = planScenarioWorkActions(config, runtime, 81_000);
   assert.equal(due.actions.length, 1);
-  assert.equal(due.actions[0].stage, 'STEP:0:1');
+  assert.equal(due.actions[0].stage, 'STEP:0:0:1');
 });
 
 test('Scenario zero completion delay advances repeat immediately', () => {
@@ -81,7 +81,7 @@ test('Scenario zero completion delay advances repeat immediately', () => {
   assert.equal(runtime.nextLaunchAt, 0);
   const planned = planScenarioWorkActions(config, runtime, 21_000);
   assert.equal(planned.actions.length, 1);
-  assert.equal(planned.actions[0].stage, 'STEP:0:1');
+  assert.equal(planned.actions[0].stage, 'STEP:0:0:1');
 });
 
 test('Scenario PAIRS applies completion-relative delay before bootstrap worker', () => {

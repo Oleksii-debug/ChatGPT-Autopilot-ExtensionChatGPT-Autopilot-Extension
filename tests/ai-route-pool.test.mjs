@@ -551,3 +551,158 @@ test('policy and safety failures are never classified as blind-failover candidat
   assert.equal(classifyAiRouteError(Object.assign(new Error('quota exhausted'), { code:'AI_PROVIDER_QUOTA_EXHAUSTED' })).retryable, true);
   assert.equal(classifyAiRouteError(Object.assign(new Error('upstream unavailable'), { status:503 })).retryable, true);
 });
+
+
+test('durable route health state rejects numeric aliases instead of silently canonicalizing them', () => {
+  const [route] = normalizeAiRoutePool([
+    { routeId:'exact-state', provider:'ollama', model:'local', roles:['planner'], priority:1 },
+  ]);
+  const invalid = [
+    ['consecutiveFailures', '1'],
+    ['successes', 1.5],
+    ['failures', -0],
+    ['backoffUntil', '1000'],
+    ['circuitOpenUntil', 1.25],
+    ['lastErrorAt', Number.MAX_SAFE_INTEGER + 1],
+    ['lastSuccessAt', Infinity],
+    ['lastLatencyMs', '10'],
+    ['consecutiveFailures', null],
+    ['successes', undefined],
+  ];
+
+  for (const [field, value] of invalid) {
+    assert.throws(
+      () => normalizeAiRouteStates({ 'exact-state': { [field]:value } }, [route]),
+      new RegExp(`AI route state exact-state\\.${field} is invalid`, 'u'),
+      field,
+    );
+  }
+
+  assert.throws(
+    () => normalizeAiRouteStates(null, [route]),
+    /AI route states/u,
+  );
+
+  assert.deepEqual(
+    normalizeAiRouteStates({
+      'exact-state': {
+        consecutiveFailures:2,
+        successes:3,
+        failures:4,
+        backoffUntil:1000,
+        circuitOpenUntil:2000,
+        lastErrorAt:900,
+        lastSuccessAt:800,
+        lastLatencyMs:25,
+      },
+    }, [route])['exact-state'],
+    {
+      consecutiveFailures:2,
+      successes:3,
+      failures:4,
+      backoffUntil:1000,
+      circuitOpenUntil:2000,
+      lastErrorCode:'',
+      lastErrorCategory:'',
+      lastErrorAt:900,
+      lastSuccessAt:800,
+      lastLatencyMs:25,
+    },
+  );
+});
+
+test('route selection clock and outcome success flag reject coercive aliases', () => {
+  const [route] = normalizeAiRoutePool([
+    { routeId:'exact-boundary', provider:'ollama', model:'local', roles:['planner'], priority:1 },
+  ]);
+  const routeStates = {
+    'exact-boundary': {
+      backoffUntil:1001,
+      circuitOpenUntil:0,
+    },
+  };
+
+  for (const invalidNow of ['1000', 1000.5, -0, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => selectAiRouteCandidates({
+        routes:[route],
+        policy:{},
+        routeStates,
+        role:'planner',
+        now:invalidNow,
+      }),
+      /AI route selection now is invalid/u,
+    );
+  }
+
+  for (const invalidOk of ['false', 0, 1, null, undefined]) {
+    assert.throws(
+      () => recordAiRouteOutcome({}, route, {}, {
+        ok:invalidOk,
+        at:1000,
+        latencyMs:0,
+      }),
+      /AI route outcome ok must be boolean/u,
+    );
+  }
+
+  assert.equal(
+    selectAiRouteCandidates({
+      routes:[route],
+      policy:{},
+      routeStates,
+      role:'planner',
+      now:1000,
+    }).candidates.length,
+    0,
+  );
+});
+
+test('route outcome emission preserves exact integer durable state and rejects overflow or coercive numeric aliases', () => {
+  const [route] = normalizeAiRoutePool([
+    { routeId:'exact-outcome', provider:'ollama', model:'local', roles:['planner'], priority:1 },
+  ]);
+
+  assert.throws(
+    () => recordAiRouteOutcome({}, route, {}, { ok:true, at:'1000', latencyMs:10 }),
+    /AI route outcome at is invalid/u,
+  );
+  assert.throws(
+    () => recordAiRouteOutcome({}, route, {}, { ok:true, at:1000, latencyMs:1.5 }),
+    /AI route outcome latencyMs is invalid/u,
+  );
+  assert.throws(
+    () => recordAiRouteOutcome({}, route, {}, { ok:true, at:1000, latencyMs:-0 }),
+    /AI route outcome latencyMs is invalid/u,
+  );
+
+  const success = recordAiRouteOutcome({}, route, {}, { ok:true, at:1000, latencyMs:12 });
+  assert.equal(success.successes, 1);
+  assert.equal(success.lastSuccessAt, 1000);
+  assert.equal(success.lastLatencyMs, 12);
+
+  assert.throws(
+    () => recordAiRouteOutcome(
+      { 'exact-outcome': { successes:Number.MAX_SAFE_INTEGER } },
+      route,
+      {},
+      { ok:true, at:1000, latencyMs:0 },
+    ),
+    /successes exceeds the exact durable-state range/u,
+  );
+
+  assert.throws(
+    () => recordAiRouteOutcome(
+      {},
+      route,
+      { retryBackoffSeconds:60, circuitBreakerSeconds:300 },
+      {
+        ok:false,
+        at:Number.MAX_SAFE_INTEGER - 1,
+        latencyMs:0,
+        classification:{ retryable:true, code:'HTTP_429', category:'quota-or-rate' },
+      },
+    ),
+    /backoffUntil exceeds the exact durable-state range/u,
+  );
+});

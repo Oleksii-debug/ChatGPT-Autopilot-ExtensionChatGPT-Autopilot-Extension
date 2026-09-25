@@ -198,6 +198,12 @@ function exactTimestamp(value, label) {
   return value;
 }
 
+function compareCanonicalTimestamp(left, right) {
+  const leftMillis = Date.parse(left);
+  const rightMillis = Date.parse(right);
+  return leftMillis < rightMillis ? -1 : leftMillis > rightMillis ? 1 : 0;
+}
+
 function integer(value, label, min, max) {
   if (!Number.isSafeInteger(value)
     || Object.is(value, -0)
@@ -332,11 +338,11 @@ function normalizeTrustedRun(input, expectedRecordId, request) {
   const finishedAt = exactTimestamp(raw.finishedAt, label + '.finishedAt');
   const recordedAt = exactTimestamp(raw.recordedAt, label + '.recordedAt');
   const validThrough = exactTimestamp(raw.validThrough, label + '.validThrough');
-  if (finishedAt < startedAt) throw new Error(label + ' finishedAt predates startedAt');
-  if (recordedAt < finishedAt) throw new Error(label + ' recordedAt predates finishedAt');
-  if (validThrough < recordedAt) throw new Error(label + ' validThrough predates recordedAt');
-  if (recordedAt > request.evaluatedAt) throw new Error(label + ' is future-recorded');
-  if (validThrough < request.evaluatedAt) throw new Error(label + ' trusted evidence is stale');
+  if (compareCanonicalTimestamp(finishedAt, startedAt) < 0) throw new Error(label + ' finishedAt predates startedAt');
+  if (compareCanonicalTimestamp(recordedAt, finishedAt) < 0) throw new Error(label + ' recordedAt predates finishedAt');
+  if (compareCanonicalTimestamp(validThrough, recordedAt) < 0) throw new Error(label + ' validThrough predates recordedAt');
+  if (compareCanonicalTimestamp(recordedAt, request.evaluatedAt) > 0) throw new Error(label + ' is future-recorded');
+  if (compareCanonicalTimestamp(validThrough, request.evaluatedAt) < 0) throw new Error(label + ' trusted evidence is stale');
 
   const outcomeStatus = enumValue(raw.outcomeStatus, OUTCOMES, label + '.outcomeStatus');
   const verificationRecordId = exactId(raw.verificationRecordId, label + '.verificationRecordId');
