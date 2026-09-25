@@ -366,6 +366,19 @@ test('Unix symlink and special-file metadata cannot masquerade as regular archiv
     );
   }
 
+  const spoofedHostSymlink = makeZip([
+    {
+      name: 'spoofed-link',
+      data: '',
+      versionMadeBy: 20,
+      externalAttributes: 0xa1ff0000,
+    },
+  ]);
+  await assert.rejects(
+    preflightZipArtifactV1(requestFor(spoofedHostSymlink)),
+    /symlink or special-file metadata/u,
+  );
+
   const directoryBitOnFile = makeZip([
     {
       name: 'plain.txt',
