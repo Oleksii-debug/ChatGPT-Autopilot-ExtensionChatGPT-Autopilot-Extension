@@ -267,3 +267,46 @@ test('fails closed on Outcome fields that exceed AgentPlan schema limits instead
     /successCriteria text limit: criterion-a/u,
   );
 });
+
+
+test('rejects reversed AgentPlan chronology before reporting structural compatibility', () => {
+  const contract = outcome();
+  const candidate = plan(contract, {
+    createdAt: PLAN_AT,
+    updatedAt: CONTRACT_AT,
+    nodes: plan(contract).nodes.map(item => ({ ...item, updatedAt: PLAN_AT })),
+  });
+  assert.throws(
+    () => assessAgentPlanOutcomeBindingV1(contract, candidate),
+    /updatedAt cannot predate plan createdAt/u,
+  );
+});
+
+test('rejects AgentPlan nodes updated before plan creation', () => {
+  const contract = outcome();
+  const candidate = plan(contract, {
+    nodes: plan(contract).nodes.map((item, index) => ({
+      ...item,
+      updatedAt: index === 0 ? CONTRACT_AT : PLAN_AT,
+    })),
+  });
+  assert.throws(
+    () => assessAgentPlanOutcomeBindingV1(contract, candidate),
+    /node updatedAt is outside the plan causal window: node-a/u,
+  );
+});
+
+test('rejects AgentPlan nodes updated after plan updatedAt', () => {
+  const contract = outcome();
+  const later = '2026-09-25T12:02:00.000Z';
+  const candidate = plan(contract, {
+    nodes: plan(contract).nodes.map((item, index) => ({
+      ...item,
+      updatedAt: index === 0 ? later : PLAN_AT,
+    })),
+  });
+  assert.throws(
+    () => assessAgentPlanOutcomeBindingV1(contract, candidate),
+    /node updatedAt is outside the plan causal window: node-a/u,
+  );
+});
