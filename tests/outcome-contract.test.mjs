@@ -362,7 +362,7 @@ test('strict descriptor boundary rejects getters, hidden fields, symbols and spa
   });
   criteria.length = 1;
   nestedGetter.completionCriteria = criteria;
-  assert.throws(() => createOutcomeContractV1(nestedGetter), /enumerable data property/);
+  assert.throws(() => createOutcomeContractV1(nestedGetter), /dense data array/);
   assert.equal(getterReads, 0);
 });
 
