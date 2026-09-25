@@ -213,7 +213,7 @@ function publicInvocationIdentity(invocation) {
   });
 }
 
-export async function createShadowExecutionV1(input, { cryptoApi = globalThis.crypto } = {}) {
+export async function createShadowExecutionV1(input) {
   const raw = record(input, 'ShadowExecutionV1');
   exactKeys(raw, SHADOW_KEYS, 'ShadowExecutionV1');
   if (raw.schemaVersion !== SHADOW_EXECUTION_VERSION) {
@@ -231,9 +231,10 @@ export async function createShadowExecutionV1(input, { cryptoApi = globalThis.cr
   // from them: a durable hash can become an offline oracle for low-entropy
   // secrets. Bind only the non-secret canonical invocation identity here.
   const proposedInvocation = publicInvocationIdentity(invocation);
+  // Production fingerprinting authority is runtime-owned. Public callers cannot
+  // inject or replace the SHA-256 implementation at this trust boundary.
   const invocationIdentityFingerprint = await createSha256FingerprintV1(
     JSON.stringify(['shadow-tool-invocation-identity-v1', proposedInvocation]),
-    { cryptoApi },
   );
 
   return deepFreeze({
