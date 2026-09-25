@@ -280,8 +280,9 @@ function normalizeCompilerProposal(value) {
     throw new Error('compilerProposal trust markers are invalid');
   }
 
+  exactId(required(raw, 'proposalId', 'compilerProposal'), 'compilerProposal.proposalId');
+
   return freezeDeep({
-    proposalId: exactId(required(raw, 'proposalId', 'compilerProposal'), 'compilerProposal.proposalId'),
     recipeDefinition,
     parameters: normalizeParameters(required(raw, 'parameters', 'compilerProposal')),
     parameterBindings: normalizeParameterBindings(
@@ -495,8 +496,8 @@ export async function buildRecipeReplayAdmissionV1(input = {}) {
   return freezeDeep({
     schemaVersion: RECIPE_REPLAY_ADMISSION_VERSION,
     replayId,
-    proposalId: proposal.proposalId,
     recipeId: recipe.recipeId,
+    compilerProposalBindingScope: 'RECIPE_SUBJECT_AND_PARAMETER_SCHEMA_ONLY',
     recipeVersion: recipe.version,
     recipeSubjectSha256: promotedSubjectSha256,
     parameterSchemaSha256: proposal.parameterSchemaBinding.contentSha256,
