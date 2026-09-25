@@ -107,6 +107,7 @@ function integer(value, label, min, max, { optional = false, fallback = 0 } = {}
   if (typeof value !== 'number'
       || !Number.isInteger(value)
       || !Number.isFinite(value)
+      || Object.is(value, -0)
       || value < min
       || value > max) {
     throw new Error(`${label} is invalid`);

@@ -180,7 +180,11 @@ function normalizedState(input) {
   }
   const phase = raw.phase;
   const attempt = raw.attempt;
-  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 0 || attempt > MAX_ATTEMPTS) {
+  if (typeof attempt !== 'number'
+      || !Number.isInteger(attempt)
+      || Object.is(attempt, -0)
+      || attempt < 0
+      || attempt > MAX_ATTEMPTS) {
     throw new Error('Exact effect attempt is invalid');
   }
   const expectedExecutionId = attempt > 0 ? executionId(effectId, attempt) : '';

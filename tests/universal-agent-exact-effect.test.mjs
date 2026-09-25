@@ -867,3 +867,18 @@ test('null-prototype durable state and event records remain supported', () => {
   const result = reduceExactEffectV1(normalized, rawEvent);
   assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
 });
+
+
+test('exact-effect state rejects negative-zero attempt identity while preserving canonical zero', () => {
+  const prepared = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const canonical = normalizeExactEffectStateV1(prepared);
+  assert.equal(canonical.attempt, 0);
+  assert.equal(Object.is(canonical.attempt, -0), false);
+
+  const aliased = structuredClone(prepared);
+  aliased.attempt = -0;
+  assert.throws(
+    () => normalizeExactEffectStateV1(aliased),
+    /Exact effect attempt is invalid/u,
+  );
+});
