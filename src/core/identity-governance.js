@@ -497,6 +497,9 @@ export function derivePrincipalGovernanceCeilingV1(requestInput = {}) {
   const resourceKey = id(resourceKeyInput, 'resourceKey');
   const at = timestamp(atInput, 'at');
   const atMillis = Date.parse(at);
+  if (atMillis > Date.parse(registry.updatedAt)) {
+    throw new Error('governance ceiling evaluatedAt cannot be later than registry updatedAt');
+  }
   const principalById = new Map(registry.principals.map((principal) => [principal.principalId, principal]));
   const principal = principalById.get(principalId);
   if (!principal) throw new Error('principalId is not present in identity governance registry');
