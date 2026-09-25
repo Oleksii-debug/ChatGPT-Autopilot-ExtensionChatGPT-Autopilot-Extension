@@ -46,11 +46,11 @@ const BUNDLE_KEYS = new Set([
   'projectId',
   'createdAt',
   'entries',
-  'disclosure',
+  'sensitiveDisclosureRequest',
 ]);
 
 const ENTRY_KEYS = new Set(['path', 'category', 'artifactRef']);
-const DISCLOSURE_KEYS = new Set(['allowedSensitiveArtifactIds']);
+const DISCLOSURE_KEYS = new Set(['requestedSensitiveArtifactIds']);
 const ARTIFACT_REF_KEYS = new Set([
   'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
   'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
@@ -243,22 +243,22 @@ function normalizeEntry(input) {
   });
 }
 
-function normalizeDisclosure(input) {
-  const raw = ownRecord(input, 'JobArtifactBundleDisclosureV1');
-  exactKeys(raw, DISCLOSURE_KEYS, 'JobArtifactBundleDisclosureV1');
-  const allowedSensitiveArtifactIds = strictArray(
-    raw.allowedSensitiveArtifactIds,
-    'allowedSensitiveArtifactIds',
+function normalizeDisclosureRequest(input) {
+  const raw = ownRecord(input, 'JobArtifactBundleSensitiveDisclosureRequestV1');
+  exactKeys(raw, DISCLOSURE_KEYS, 'JobArtifactBundleSensitiveDisclosureRequestV1');
+  const requestedSensitiveArtifactIds = strictArray(
+    raw.requestedSensitiveArtifactIds,
+    'requestedSensitiveArtifactIds',
     { max: MAX_JOB_ARTIFACT_BUNDLE_ENTRIES },
   );
-  const ids = allowedSensitiveArtifactIds.map((value) => requireId(value, 'allowedSensitiveArtifactId'));
+  const ids = requestedSensitiveArtifactIds.map((value) => requireId(value, 'requestedSensitiveArtifactId'));
   const seen = new Set();
   for (const id of ids) {
-    if (seen.has(id)) throw new Error('allowedSensitiveArtifactIds contains duplicate artifactId: ' + id);
+    if (seen.has(id)) throw new Error('requestedSensitiveArtifactIds contains duplicate artifactId: ' + id);
     seen.add(id);
   }
   ids.sort();
-  return Object.freeze({ allowedSensitiveArtifactIds: Object.freeze(ids) });
+  return Object.freeze({ requestedSensitiveArtifactIds: Object.freeze(ids) });
 }
 
 function checksumLine(entry) {
@@ -282,7 +282,7 @@ export function buildJobArtifactBundleV1(input) {
       throw new Error('bundle createdAt cannot predate artifact: ' + entry.artifactRef.artifactId);
     }
   }
-  const disclosure = normalizeDisclosure(raw.disclosure);
+  const sensitiveDisclosureRequest = normalizeDisclosureRequest(raw.sensitiveDisclosureRequest);
   const seenPaths = new Map();
   const seenArtifactIds = new Set();
 
@@ -304,13 +304,17 @@ export function buildJobArtifactBundleV1(input) {
     }
   }
 
-  const sensitiveIds = new Set(entries.filter((entry) => entry.artifactRef.sensitive).map((entry) => entry.artifactRef.artifactId));
-  const allowedSensitive = new Set(disclosure.allowedSensitiveArtifactIds);
+  const sensitiveArtifactIds = entries
+    .filter((entry) => entry.artifactRef.sensitive)
+    .map((entry) => entry.artifactRef.artifactId)
+    .sort();
+  const sensitiveIds = new Set(sensitiveArtifactIds);
+  const requestedSensitive = new Set(sensitiveDisclosureRequest.requestedSensitiveArtifactIds);
   for (const id of sensitiveIds) {
-    if (!allowedSensitive.has(id)) throw new Error('sensitive artifact is not explicitly admitted: ' + id);
+    if (!requestedSensitive.has(id)) throw new Error('sensitive artifact is missing from disclosure request: ' + id);
   }
-  for (const id of allowedSensitive) {
-    if (!sensitiveIds.has(id)) throw new Error('sensitive disclosure grant does not match a sensitive bundle artifact: ' + id);
+  for (const id of requestedSensitive) {
+    if (!sensitiveIds.has(id)) throw new Error('sensitive disclosure request does not match a sensitive bundle artifact: ' + id);
   }
 
   entries.sort((a, b) => {
@@ -337,7 +341,11 @@ export function buildJobArtifactBundleV1(input) {
     planId: requireId(raw.planId, 'planId', { optional: true }),
     projectId: requireId(raw.projectId, 'projectId', { optional: true }),
     createdAt,
-    disclosure,
+    sensitiveDisclosureRequest,
+    sensitiveArtifactIds: Object.freeze(sensitiveArtifactIds),
+    disclosureAuthorized: false,
+    distributionAuthorized: false,
+    requiresCanonicalDisclosureAuthorization: sensitiveArtifactIds.length > 0,
     entries: frozenEntries,
     checksumFile,
     bundlePaths: Object.freeze([...frozenEntries.map((entry) => entry.path), CHECKSUM_PATH]),
