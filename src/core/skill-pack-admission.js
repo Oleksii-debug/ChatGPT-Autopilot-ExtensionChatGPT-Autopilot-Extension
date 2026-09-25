@@ -203,7 +203,7 @@ async function bindEvaluation(requirement, source, admittedAt, resolveEvaluation
   return frozen(proof);
 }
 
-async function bindSignature(reference, source, admittedAt, resolveSignature) {
+async function bindSignature(reference, source, signatureArtifact, admittedAt, resolveSignature) {
   const raw = strictRecord(
     await resolveSignature({
       signatureId: reference.signatureId,
@@ -234,9 +234,13 @@ async function bindSignature(reference, source, admittedAt, resolveSignature) {
       || proof.signedSha256 !== source.sha256) {
     throw new Error('Skill pack signature proof does not match signature/source identity');
   }
-  if (Date.parse(proof.verifiedAt) < Date.parse(source.createdAt)
+  const earliestVerificationAt = Math.max(
+    Date.parse(source.createdAt),
+    Date.parse(signatureArtifact.createdAt),
+  );
+  if (Date.parse(proof.verifiedAt) < earliestVerificationAt
       || Date.parse(proof.verifiedAt) > Date.parse(admittedAt)) {
-    throw new Error('Skill pack signature proof is outside the source/admission time boundary');
+    throw new Error('Skill pack signature proof is outside the artifact/admission time boundary');
   }
   return frozen(proof);
 }
@@ -320,9 +324,13 @@ export async function createSkillPackAdmissionV1(input = {}, options = {}) {
 
   const signatureProofs = [];
   for (const reference of trustedManifest.signatureRefs) {
+    const signatureArtifact = trustedManifest.artifactRefs.find(
+      item => item.artifactId === reference.signatureArtifactId,
+    );
     signatureProofs.push(await bindSignature(
       reference,
       source,
+      signatureArtifact,
       admittedAt,
       dependencies.resolveSignature,
     ));
