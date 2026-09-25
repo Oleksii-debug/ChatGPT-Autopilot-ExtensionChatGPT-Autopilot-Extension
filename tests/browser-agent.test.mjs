@@ -169,7 +169,7 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
 });
 
-test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handoff only through normal capacity', async () => {
+test('Browser Agent keeps ambiguous specialist effect fenced across forged proof and restart', async () => {
   const chrome = makeChrome();
   let clock = Date.parse('2026-09-23T12:00:00Z');
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
@@ -194,6 +194,7 @@ test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handof
   const expired = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1 });
   assert.deepEqual(expired.claimed, []);
   assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
+
   const verification = {
     schemaVersion:1,
     verificationId:'verification-no-effect-job-retry',
@@ -201,7 +202,7 @@ test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handof
     observationId:'observation-no-effect-job-retry',
     status:'VERIFIED',
     reasonCode:'NO_EFFECT_OBSERVED',
-    summary:'A fresh provider query proves no archive exists.',
+    summary:'Caller-shaped no-effect assertion.',
     evidenceArtifactIds:['artifact:no-effect-job-retry'],
     verifiedAt:'2026-09-23T12:01:01.000Z',
     verifierId:'provider-observer',
@@ -210,24 +211,24 @@ test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handof
     executionId:leaseId,
     attempt:1,
   };
-  const reconciliation = { agentId, leaseId, verification };
-  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', { ...reconciliation, verification:null }), /canonical verification/);
-  const retriable = await manager.authorizeSpecialistSafeRetry('job-retry', reconciliation);
-  assert.equal(retriable.assignments[0].state, 'READY');
-  assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
+  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', {
+    agentId,
+    leaseId,
+    verification,
+  }), /trusted verifier provenance/);
+
   const durable = await manager.get('job-retry');
-  assert.equal(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
-  assert.equal(durable.job.runtime.history.at(-1).verificationId, verification.verificationId);
-  assert.equal(durable.job.runtime.history.at(-1).observationId, verification.observationId);
-  assert.deepEqual(durable.job.runtime.history.at(-1).evidenceArtifactIds, verification.evidenceArtifactIds);
-  assert.equal(durable.job.runtime.history.at(-1).evidence, verification.summary);
+  assert.equal(durable.job.runtime.specialistHandoffs[0].state, 'LEASED');
+  assert.equal(durable.job.runtime.specialistHandoffs[0].leaseId, leaseId);
+  assert.equal(durable.job.runtime.specialistExecutionOwnerships[0].state, 'RECONCILE');
+  assert.notEqual(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
+
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock + 2_000 });
   const beforeAdmission = await restarted.listSpecialistHandoffs('job-retry');
-  assert.equal(beforeAdmission.handoffs[0].state, 'READY', 'restart must preserve explicit SAFE_RETRY authorization');
+  assert.equal(beforeAdmission.handoffs[0].state, 'LEASED');
   const reclaimed = await restarted.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
-  assert.deepEqual(reclaimed.claimed, [agentId]);
-  assert.notEqual(reclaimed.assignments[0].leaseId, leaseId);
-  assert.equal(reclaimed.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId);
+  assert.deepEqual(reclaimed.claimed, []);
+  assert.equal(reclaimed.executionOwnerships[0].state, 'RECONCILE');
 });
 
 test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
