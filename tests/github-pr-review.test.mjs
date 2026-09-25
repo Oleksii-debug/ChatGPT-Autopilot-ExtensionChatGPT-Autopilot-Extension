@@ -413,6 +413,13 @@ test('formal review stays RECONCILE when parent PR head drifts after dispatch an
       };
     },
     createPullRequestReview: async args => {
+      const before = await client.readPullRequest({
+        repositoryFullName: args.repositoryFullName,
+        pullRequestNumber: args.pullRequestNumber,
+      });
+      assert.equal(before.state, 'open');
+      assert.equal(before.merged, false);
+      assert.equal(before.headSha, args.expectedHeadSha);
       creates += 1;
       return {
         repositoryFullName: args.repositoryFullName,
