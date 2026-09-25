@@ -609,6 +609,7 @@ test('effect-free handback can resume without fabricating an exact-effect ledger
     handback: effectFreeHandback(),
     ...runtimeIdentity(),
     ...worldMaterial(),
+    exactEffectState: exactEffectState(),
     at: T7,
   }), /unknown field: exactEffectState/);
 });
