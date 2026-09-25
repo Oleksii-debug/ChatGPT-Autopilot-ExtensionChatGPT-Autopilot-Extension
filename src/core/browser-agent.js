@@ -1068,6 +1068,10 @@ export function readBrowserCredentialFrameOrigin() {
 }
 
 export function executeBrowserCredentialFill(snapshotId, action, username, secret) {
+  const expectedOrigin = String(action?.credentialOrigin || '');
+  if (!expectedOrigin || String(location.origin || '') !== expectedOrigin) {
+    throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+  }
   const marker = 'data-autopilot-agent-ref';
   const snapshotMarker = 'data-autopilot-agent-snapshot';
   const find = ref => Array.from(document.querySelectorAll(`[${marker}]`)).find(element =>
