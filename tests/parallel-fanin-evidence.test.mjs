@@ -426,6 +426,57 @@ test('duplicate participants, results and claims fail closed', () => {
   );
 });
 
+test('dependency resolver boundary snapshots descriptors before reads and supports null-prototype records', () => {
+  const input = request();
+  let getterCalls = 0;
+  const accessorDependencies = {};
+  Object.defineProperty(accessorDependencies, 'resolveTrustedVerification', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return trustedDependencies(input).resolveTrustedVerification;
+    },
+  });
+
+  assert.throws(
+    () => buildParallelFanInEvidenceV1(input, accessorDependencies),
+    /enumerable own data properties/u,
+  );
+  assert.equal(getterCalls, 0, 'dependency getter must not execute');
+
+  const unknownDependencies = {
+    ...trustedDependencies(input),
+    unexpectedAuthority: true,
+  };
+  assert.throws(
+    () => buildParallelFanInEvidenceV1(input, unknownDependencies),
+    /contains unknown field/u,
+  );
+
+  const symbolDependencies = trustedDependencies(input);
+  symbolDependencies[Symbol('authority')] = true;
+  assert.throws(
+    () => buildParallelFanInEvidenceV1(input, symbolDependencies),
+    /contains unknown field/u,
+  );
+
+  const hiddenDependencies = trustedDependencies(input);
+  Object.defineProperty(hiddenDependencies, 'hiddenAuthority', {
+    enumerable: false,
+    value: true,
+  });
+  assert.throws(
+    () => buildParallelFanInEvidenceV1(input, hiddenDependencies),
+    /contains unknown field/u,
+  );
+
+  const nullPrototypeDependencies = Object.create(null);
+  nullPrototypeDependencies.resolveTrustedVerification =
+    trustedDependencies(input).resolveTrustedVerification;
+  const out = buildParallelFanInEvidenceV1(input, nullPrototypeDependencies);
+  assert.equal(out.status, ParallelFanInStatus.EVIDENCE_COMPLETE);
+});
+
 test('descriptor/symbol/sparse boundaries fail closed without executing getters', () => {
   const baseInput = request();
   const trusted = trustedDependencies(baseInput);
