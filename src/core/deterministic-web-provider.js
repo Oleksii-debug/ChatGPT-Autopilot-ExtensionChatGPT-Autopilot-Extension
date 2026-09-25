@@ -91,7 +91,17 @@ export function normalizeDeterministicWebActionV1(input) {
   return Object.freeze({ kind, selector, value: text(raw.value, 'value', 16_000) });
 }
 
-export function verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now }) {
+export function verifyDeterministicWebPostconditionV1({
+  invocationId,
+  observation,
+  expected,
+  now,
+  verifierId = 'deterministic-web-postcondition-verifier',
+  verificationAuthorityId = '',
+  effectId = '',
+  executionId = '',
+  attempt = 0,
+}) {
   const observed = observation.data || {};
   let ok = false;
   let reasonCode = 'POSTCONDITION_FAILED';
@@ -115,6 +125,11 @@ export function verifyDeterministicWebPostconditionV1({ invocationId, observatio
     summary: ok ? 'Independent browser postcondition verified.' : 'Independent browser postcondition failed.',
     evidenceArtifactIds: observation.artifactRefs.map(ref => ref.artifactId),
     verifiedAt: now,
+    verifierId,
+    verificationAuthorityId,
+    effectId,
+    executionId,
+    attempt,
   });
 }
 
@@ -237,7 +252,16 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           const entry = own(draft.effectsById, invocationId);
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_OBSERVATION, 'observe', { observation });
         });
-        const verification = verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now: now() });
+        const verification = verifyDeterministicWebPostconditionV1({
+          invocationId,
+          observation,
+          expected,
+          now: now(),
+          verificationAuthorityId: authorized.invocation.policyDecisionId,
+          effectId: invocationId,
+          executionId: admitted.effectState.executionId,
+          attempt: admitted.effectState.attempt,
+        });
         if (verification.status !== VerificationStatus.VERIFIED) {
           const effectState = await atomic(draft => {
             const entry = own(draft.effectsById, invocationId);
