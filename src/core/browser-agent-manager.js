@@ -145,6 +145,33 @@ function appendHistory(runtime, entry) {
   runtime.history = [...(runtime.history || []), sanitizeHistoryValue(entry)].slice(-MAX_HISTORY);
 }
 
+function normalizeModelBudgetReservation(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const reservationId = clean(raw.reservationId, 240);
+  const controlEpoch = Math.max(0, Math.floor(Number(raw.controlEpoch || 0)));
+  const modelCalls = Math.max(1, Math.floor(Number(raw.modelCalls || 1)));
+  const inputTokens = Math.max(0, Math.floor(Number(raw.inputTokens || 0)));
+  const outputTokens = Math.max(0, Math.floor(Number(raw.outputTokens || 0)));
+  const totalTokens = Math.max(inputTokens + outputTokens, Math.floor(Number(raw.totalTokens || 0)));
+  const estimatedCostUsd = Math.max(0, Number(raw.estimatedCostUsd || 0));
+  const createdAt = Math.max(0, Number(raw.createdAt || 0));
+  if (!reservationId || !Number.isFinite(estimatedCostUsd)) return null;
+  return {
+    reservationId,
+    controlEpoch,
+    modelCalls,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostUsd,
+    createdAt,
+    routeId: clean(raw.routeId, 180),
+    provider: clean(raw.provider, 80),
+    model: clean(raw.model, 300),
+    callNumber: Math.max(1, Math.floor(Number(raw.callNumber || 1))),
+  };
+}
+
 function normalizeRuntime(raw, now) {
   const base = createBrowserAgentRuntime(now);
   if (!raw || typeof raw !== 'object') return base;
@@ -168,6 +195,8 @@ function normalizeRuntime(raw, now) {
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
     modelCalls: Math.max(0, Number(raw.modelCalls || 0)),
+    modelBudgetReservationSeq: Math.max(0, Math.floor(Number(raw.modelBudgetReservationSeq || 0))),
+    modelBudgetReservation: normalizeModelBudgetReservation(raw.modelBudgetReservation),
     aiRouterRuntime: normalizeAiRouterRuntime(raw.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
     inputTokens: Math.max(0, Number(raw.inputTokens || 0)),
     outputTokens: Math.max(0, Number(raw.outputTokens || 0)),
@@ -798,27 +827,40 @@ export class BrowserAgentManager {
     return false;
   }
 
-  budgetReason(job, { pendingInputTokens = 0, pendingOutputTokens = 0 } = {}) {
+  budgetReason(job, { pendingInputTokens = 0, pendingOutputTokens = 0, pendingModelCalls = 0 } = {}) {
     const config = job.config;
     const runtime = job.runtime;
+    const reservation = normalizeModelBudgetReservation(runtime.modelBudgetReservation);
+    const reservedCalls = reservation?.modelCalls || 0;
+    const reservedInput = reservation?.inputTokens || 0;
+    const reservedOutput = reservation?.outputTokens || 0;
+    const reservedTotal = reservation?.totalTokens || 0;
+    const reservedCost = reservation?.estimatedCostUsd || 0;
+    const calls = Math.max(0, Math.floor(Number(pendingModelCalls || 0)));
     const input = Math.max(0, Number(pendingInputTokens || 0));
     const output = Math.max(0, Number(pendingOutputTokens || 0));
-    if (config.maxModelCalls && runtime.modelCalls >= config.maxModelCalls) return 'maximum model-call budget reached';
-    if (config.maxInputTokens && runtime.inputTokens + input > config.maxInputTokens) return 'maximum input-token budget reached';
-    if (config.maxOutputTokens && runtime.outputTokens + output >= config.maxOutputTokens) return 'maximum output-token budget reached';
-    if (config.maxTotalTokens && runtime.totalTokens + input + output >= config.maxTotalTokens) return 'maximum total-token budget reached';
+    const effectiveCalls = Math.max(0, Number(runtime.modelCalls || 0)) + reservedCalls;
+    if (config.maxModelCalls && (effectiveCalls >= config.maxModelCalls || effectiveCalls + calls > config.maxModelCalls)) return 'maximum model-call budget reached';
+    if (config.maxInputTokens && runtime.inputTokens + reservedInput + input > config.maxInputTokens) return 'maximum input-token budget reached';
+    if (config.maxOutputTokens && runtime.outputTokens + reservedOutput + output >= config.maxOutputTokens) return 'maximum output-token budget reached';
+    if (config.maxTotalTokens && runtime.totalTokens + reservedTotal + input + output >= config.maxTotalTokens) return 'maximum total-token budget reached';
     if (config.maxRuntimeMinutes && runtime.startedAt && this.now() - runtime.startedAt >= config.maxRuntimeMinutes * 60_000) return 'maximum runtime duration reached';
     const pendingCost = agentUsageCostUsd(config, { inputTokens: input, outputTokens: output });
-    if (config.maxCostUsd && runtime.estimatedCostUsd + pendingCost >= config.maxCostUsd) return 'maximum monetary budget reached';
+    if (config.maxCostUsd && runtime.estimatedCostUsd + reservedCost + pendingCost >= config.maxCostUsd) return 'maximum monetary budget reached';
     return '';
   }
 
   outputBudgetForCall(job, pendingInputTokens) {
+    const reservation = normalizeModelBudgetReservation(job.runtime.modelBudgetReservation);
+    const reservedInput = reservation?.inputTokens || 0;
+    const reservedOutput = reservation?.outputTokens || 0;
+    const reservedTotal = reservation?.totalTokens || 0;
+    const reservedCost = reservation?.estimatedCostUsd || 0;
     let limit = Math.max(128, Number(job.config.maxOutputTokensPerCall || 4096));
-    if (job.config.maxOutputTokens) limit = Math.min(limit, Math.max(0, job.config.maxOutputTokens - job.runtime.outputTokens));
-    if (job.config.maxTotalTokens) limit = Math.min(limit, Math.max(0, job.config.maxTotalTokens - job.runtime.totalTokens - pendingInputTokens));
+    if (job.config.maxOutputTokens) limit = Math.min(limit, Math.max(0, job.config.maxOutputTokens - job.runtime.outputTokens - reservedOutput));
+    if (job.config.maxTotalTokens) limit = Math.min(limit, Math.max(0, job.config.maxTotalTokens - job.runtime.totalTokens - reservedTotal - reservedInput - pendingInputTokens));
     if (job.config.maxCostUsd) {
-      const remainingUsd = Math.max(0, Number(job.config.maxCostUsd) - Number(job.runtime.estimatedCostUsd || 0));
+      const remainingUsd = Math.max(0, Number(job.config.maxCostUsd) - Number(job.runtime.estimatedCostUsd || 0) - reservedCost);
       const inputCost = agentUsageCostUsd(job.config, { inputTokens: pendingInputTokens, outputTokens: 0 });
       const remainingAfterInput = Math.max(0, remainingUsd - inputCost);
       const outputPrice = Number(job.config.outputPricePerMillionUsd || 0);
@@ -826,6 +868,134 @@ export class BrowserAgentManager {
       else if (remainingAfterInput <= 0) limit = 0;
     }
     return Math.max(0, Math.floor(limit));
+  }
+
+  async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
+    const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
+    const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
+    if (pendingOutputTokens < 1) {
+      const error = new Error('Browser Agent model call requires a bounded output-token reservation');
+      error.code = 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED';
+      throw error;
+    }
+    let reservation = null;
+    await this.update(store => {
+      const job = store.byId[jobId];
+      if (!job) throw new Error('Browser Agent job not found');
+      if (job.runtime.controlEpoch !== Number(controlEpoch) || job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+        const error = new Error('Browser Agent owner authority changed before model budget reservation');
+        error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
+        throw error;
+      }
+      if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
+        const error = new Error('Browser Agent already has an unsettled model budget reservation');
+        error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
+        throw error;
+      }
+      const reason = this.budgetReason(job, {
+        pendingInputTokens,
+        pendingOutputTokens,
+        pendingModelCalls: 1,
+      });
+      if (reason) {
+        const error = new Error(`Browser Agent budget admission denied: ${reason}`);
+        error.code = 'AI_MODEL_BUDGET_EXHAUSTED';
+        error.safeBudgetReason = reason;
+        throw error;
+      }
+      const sequence = Math.max(0, Number(job.runtime.modelBudgetReservationSeq || 0)) + 1;
+      const estimatedCostUsd = agentUsageCostUsd(job.config, {
+        inputTokens: pendingInputTokens,
+        outputTokens: pendingOutputTokens,
+      });
+      reservation = {
+        reservationId: `${jobId}:model-budget:${sequence}`,
+        controlEpoch: Number(controlEpoch),
+        modelCalls: 1,
+        inputTokens: pendingInputTokens,
+        outputTokens: pendingOutputTokens,
+        totalTokens: pendingInputTokens + pendingOutputTokens,
+        estimatedCostUsd,
+        createdAt: this.now(),
+        routeId: clean(route?.routeId, 180),
+        provider: clean(route?.provider, 80),
+        model: clean(route?.model, 300),
+        callNumber: Math.max(1, Math.floor(Number(callNumber || 1))),
+      };
+      job.runtime.modelBudgetReservationSeq = sequence;
+      job.runtime.modelBudgetReservation = clone(reservation);
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'model-budget-reserved',
+        message: `Reserved bounded model budget before provider call ${reservation.callNumber}.`,
+      });
+      return store;
+    });
+    return Object.freeze(clone(reservation));
+  }
+
+  async settleProviderModelBudget({ jobId, reservationId, ok = false, result = null } = {}) {
+    let settled = false;
+    await this.update(store => {
+      const job = store.byId[jobId];
+      if (!job) return store;
+      const reservation = normalizeModelBudgetReservation(job.runtime.modelBudgetReservation);
+      if (!reservation || reservation.reservationId !== reservationId) return store;
+      let inputTokens = reservation.inputTokens;
+      let outputTokens = reservation.outputTokens;
+      let totalTokens = reservation.totalTokens;
+      let estimatedCostUsd = reservation.estimatedCostUsd;
+      if (ok) {
+        const usage = result?.usage || {};
+        inputTokens = Math.max(1, Math.floor(Number(usage.inputTokens || usage.input_tokens || reservation.inputTokens)));
+        outputTokens = Math.max(1, Math.floor(Number(usage.outputTokens || usage.output_tokens || estimateAgentTokens(result?.text || ''))));
+        totalTokens = Math.max(inputTokens + outputTokens, Math.floor(Number(usage.totalTokens || usage.total_tokens || 0)));
+        estimatedCostUsd = agentUsageCostUsd(job.config, { inputTokens, outputTokens });
+      }
+      job.runtime.modelCalls += reservation.modelCalls;
+      job.runtime.inputTokens += inputTokens;
+      job.runtime.outputTokens += outputTokens;
+      job.runtime.totalTokens += totalTokens;
+      job.runtime.estimatedCostUsd += estimatedCostUsd;
+      job.runtime.modelBudgetReservation = null;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: ok ? 'model-budget-settled' : 'model-budget-conservative-settlement',
+        message: ok
+          ? 'Provider call usage settled against its durable pre-dispatch reservation.'
+          : 'Provider call failed after admission; reserved budget was conservatively consumed.',
+      });
+      settled = true;
+      return store;
+    });
+    return { settled };
+  }
+
+  async reconcileProviderModelBudgetReservation(id) {
+    let reconciled = false;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job) return store;
+      const reservation = normalizeModelBudgetReservation(job.runtime.modelBudgetReservation);
+      if (!reservation) return store;
+      job.runtime.modelCalls += reservation.modelCalls;
+      job.runtime.inputTokens += reservation.inputTokens;
+      job.runtime.outputTokens += reservation.outputTokens;
+      job.runtime.totalTokens += reservation.totalTokens;
+      job.runtime.estimatedCostUsd += reservation.estimatedCostUsd;
+      job.runtime.modelBudgetReservation = null;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'model-budget-recovered-after-restart',
+        message: 'An unsettled pre-dispatch model reservation survived runtime interruption and was conservatively consumed before any retry.',
+      });
+      reconciled = true;
+      return store;
+    });
+    return reconciled;
   }
 
   async pauseForBudget(id, epoch, reason) {
