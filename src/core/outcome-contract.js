@@ -96,6 +96,7 @@ const ASSESSMENT_KEYS = new Set([
   'criterionId',
   'status',
   'evidenceArtifactIds',
+  'evidenceKinds',
   'assessedBy',
   'assessedAt',
 ]);
@@ -514,6 +515,11 @@ function normalizeAssessment(input) {
       'assessment evidenceArtifactIds',
       { min: status === OutcomeCriterionStatus.VERIFIED ? 1 : 0 },
     ),
+    evidenceKinds: idList(
+      own(raw, 'evidenceKinds', 'OutcomeCriterionAssessmentV1'),
+      'assessment evidenceKinds',
+      { min: status === OutcomeCriterionStatus.VERIFIED ? 1 : 0, max: 32 },
+    ),
     assessedBy: id(own(raw, 'assessedBy', 'OutcomeCriterionAssessmentV1'), 'assessedBy'),
     assessedAt: timestamp(own(raw, 'assessedAt', 'OutcomeCriterionAssessmentV1'), 'assessedAt'),
   };
@@ -535,6 +541,7 @@ export function projectOutcomeEvidenceV1({ contract, assessments } = {}) {
     'assessments',
   );
 
+  const criteriaById = new Map(normalized.completionCriteria.map(item => [item.criterionId, item]));
   for (const row of rows) {
     if (row.assessedBy !== normalized.verifierPlan.verifierId) {
       throw new Error(`Assessment ${row.criterionId} is not attributed to the declared verifier`);
@@ -542,6 +549,14 @@ export function projectOutcomeEvidenceV1({ contract, assessments } = {}) {
     if (row.status === OutcomeCriterionStatus.VERIFIED
         && row.evidenceArtifactIds.length < normalized.verifierPlan.requiredEvidenceArtifactCount) {
       throw new Error(`Assessment ${row.criterionId} lacks required evidence artifacts`);
+    }
+    if (row.status === OutcomeCriterionStatus.VERIFIED) {
+      const suppliedKinds = new Set(row.evidenceKinds);
+      for (const requiredKind of criteriaById.get(row.criterionId).requiredEvidenceKinds) {
+        if (!suppliedKinds.has(requiredKind)) {
+          throw new Error(`Assessment ${row.criterionId} lacks required evidence kind: ${requiredKind}`);
+        }
+      }
     }
   }
 
