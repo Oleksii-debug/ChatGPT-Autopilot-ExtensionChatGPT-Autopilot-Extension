@@ -431,6 +431,21 @@ test('handoff checkpoint binding time is causally bounded by ownership, checkpoi
       /binding chronology is invalid/i,
     );
   }
+
+  const laterCheckpoint = await checkpoint({ createdAt: '2026-09-25T13:09:30.000Z' });
+  await assert.rejects(
+    () => assessCrossDeviceContinuationV1(
+      request(),
+      await options({
+        resolveExecutionOwnership: async () => ownership,
+        resolveAgentCheckpoint: async () => laterCheckpoint,
+        resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(laterCheckpoint, ownership, {
+          boundAt: '2026-09-25T13:09:15.000Z',
+        }),
+      }),
+    ),
+    /binding chronology is invalid/i,
+  );
 });
 
 test('handoff checkpoint binding accepts exact causal boundary times', async () => {
