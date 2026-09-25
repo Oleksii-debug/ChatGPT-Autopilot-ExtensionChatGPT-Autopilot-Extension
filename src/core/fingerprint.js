@@ -4,8 +4,26 @@ function toHex(bytes) {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function assertWellFormedUnicode(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) {
+        throw new Error('Canonical fingerprint input must be well-formed Unicode');
+      }
+      index += 1;
+      continue;
+    }
+    if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      throw new Error('Canonical fingerprint input must be well-formed Unicode');
+    }
+  }
+}
+
 export async function createSha256FingerprintV1(canonical, { cryptoApi = globalThis.crypto } = {}) {
   if (typeof canonical !== 'string') throw new Error('Canonical fingerprint input must be a string');
+  assertWellFormedUnicode(canonical);
   if (!cryptoApi?.subtle?.digest) throw new Error('Web Crypto SHA-256 is unavailable');
   const digest = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
   return `sha256:${toHex(new Uint8Array(digest))}`;
