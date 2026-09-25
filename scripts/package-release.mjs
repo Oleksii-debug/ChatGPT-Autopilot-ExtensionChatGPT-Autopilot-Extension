@@ -80,22 +80,25 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
   const srcPath = path.join(root, 'src');
   const iconsPath = path.join(root, 'icons');
   const companionPath = path.join(root, 'companion');
-  const [manifestText, readmeStat, changesStat, qaStat, srcStat, iconsStat, companionStat] = await Promise.all([
-    fs.readFile(manifestPath, 'utf8'),
-    fs.stat(readmePath),
-    fs.stat(changesPath),
-    fs.stat(qaPath),
-    fs.stat(srcPath),
-    fs.stat(iconsPath),
-    fs.stat(companionPath),
-  ]);
-  if (!readmeStat.isFile()) throw new Error('README.txt must be a file');
-  if (!changesStat.isFile()) throw new Error(`CHANGES-${RELEASE_VERSION}.txt must be a file`);
-  if (!qaStat.isFile()) throw new Error(`QA-${RELEASE_VERSION}.txt must be a file`);
-  if (!srcStat.isDirectory()) throw new Error('src must be a directory');
-  if (!iconsStat.isDirectory()) throw new Error('icons must be a directory');
-  if (!companionStat.isDirectory()) throw new Error('companion must be a directory');
+  const requiredEntries = [
+    ['manifest.json', manifestPath, 'file'],
+    ['README.txt', readmePath, 'file'],
+    [`CHANGES-${RELEASE_VERSION}.txt`, changesPath, 'file'],
+    [`QA-${RELEASE_VERSION}.txt`, qaPath, 'file'],
+    ['src', srcPath, 'directory'],
+    ['icons', iconsPath, 'directory'],
+    ['companion', companionPath, 'directory'],
+  ];
+  const stats = await Promise.all(requiredEntries.map(([, absolutePath]) => fs.lstat(absolutePath)));
+  for (let index = 0; index < requiredEntries.length; index += 1) {
+    const [label, , kind] = requiredEntries[index];
+    const stat = stats[index];
+    if (stat.isSymbolicLink()) throw new Error(`Release source must not contain symlinks: ${label}`);
+    if (kind === 'file' && !stat.isFile()) throw new Error(`${label} must be a file`);
+    if (kind === 'directory' && !stat.isDirectory()) throw new Error(`${label} must be a directory`);
+  }
 
+  const manifestText = await fs.readFile(manifestPath, 'utf8');
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
   if (manifest.version !== RELEASE_VERSION) throw new Error(`v${RELEASE_VERSION} package requires manifest version ${RELEASE_VERSION}, found ${manifest.version || 'missing'}`);
