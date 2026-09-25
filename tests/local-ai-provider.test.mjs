@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {
   LocalAiClient,
+  MAX_RESPONSE_BYTES,
   normalizeLocalAiBaseUrl,
   normalizeLocalAiSettings,
 } from '../src/core/local-ai-provider.js';
@@ -57,6 +58,9 @@ test('Ollama model discovery and completion work end to end', async () => {
     const result = await client.complete(settings, 'привіт');
     assert.equal(result.text, 'ollama:qwen3:8b:привіт');
     assert.deepEqual(requests.map(r => [r.method, r.url]), [['GET', '/api/tags'], ['POST', '/api/chat']]);
+    const chatPayload = JSON.parse(requests[1].body);
+    assert.equal(chatPayload.stream, false);
+    assert.equal(chatPayload.think, false);
   });
 });
 
@@ -76,4 +80,163 @@ test('completion requires enabled integration and selected model', async () => {
   const client = new LocalAiClient({ fetchFn: async () => { throw new Error('should not fetch'); } });
   await assert.rejects(() => client.complete({ enabled: false, providerType: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'x', timeoutSeconds: 30 }, 'x'), /disabled/);
   await assert.rejects(() => client.complete({ enabled: true, providerType: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: '', timeoutSeconds: 30 }, 'x'), /Select a Local AI model/);
+});
+
+
+test('rejects oversized Content-Length before consuming a Local AI response body', async () => {
+  let bodyReads = 0;
+  let bodyCancels = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get(name) {
+          return String(name).toLowerCase() === 'content-length'
+            ? String(MAX_RESPONSE_BYTES + 1)
+            : null;
+        },
+      },
+      body: {
+        async cancel() { bodyCancels += 1; },
+        getReader() {
+          bodyReads += 1;
+          throw new Error('body reader must not be created');
+        },
+      },
+      async text() {
+        bodyReads += 1;
+        throw new Error('body text must not be read');
+      },
+    }),
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(() => client.complete(settings, 'test'), /response is too large/);
+  assert.equal(bodyReads, 0);
+  assert.equal(bodyCancels, 1);
+});
+
+test('counts streamed response bytes and cancels immediately after the size ceiling', async () => {
+  let readCalls = 0;
+  let cancelCalls = 0;
+  let releaseCalls = 0;
+  const first = new Uint8Array(MAX_RESPONSE_BYTES);
+  const overflow = new Uint8Array(1);
+  const client = new LocalAiClient({
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader() {
+          return {
+            async read() {
+              readCalls += 1;
+              if (readCalls === 1) return { done: false, value: first };
+              if (readCalls === 2) return { done: false, value: overflow };
+              return { done: true, value: undefined };
+            },
+            async cancel() { cancelCalls += 1; },
+            releaseLock() { releaseCalls += 1; },
+          };
+        },
+      },
+      async text() {
+        throw new Error('stream path must not fall back to response.text()');
+      },
+    }),
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(() => client.complete(settings, 'test'), /response is too large/);
+  assert.equal(readCalls, 2);
+  assert.equal(cancelCalls, 1);
+  assert.equal(releaseCalls, 1);
+});
+
+test('fallback response size guard counts UTF-8 bytes rather than JavaScript characters', async () => {
+  const multibyte = 'я'.repeat(Math.floor(MAX_RESPONSE_BYTES / 2) + 100);
+  const body = JSON.stringify({ message: { role: 'assistant', content: multibyte } });
+  assert.ok(body.length < MAX_RESPONSE_BYTES, 'fixture must remain below the old character-count limit');
+  assert.ok(Buffer.byteLength(body, 'utf8') > MAX_RESPONSE_BYTES, 'fixture must exceed the byte limit');
+
+  const client = new LocalAiClient({
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: null,
+      async text() { return body; },
+    }),
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(() => client.complete(settings, 'test'), /response is too large/);
+});
+
+test('Local AI deadline stays armed through response body consumption', async () => {
+  let deadline = null;
+  let timerCleared = false;
+  let bodyReadStarted = false;
+  const client = new LocalAiClient({
+    setTimeoutFn(callback) {
+      deadline = callback;
+      return 77;
+    },
+    clearTimeoutFn(timer) {
+      assert.equal(timer, 77);
+      timerCleared = true;
+    },
+    fetchFn: async (_url, init) => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader() {
+          return {
+            async read() {
+              bodyReadStarted = true;
+              assert.equal(typeof deadline, 'function', 'deadline must remain armed while body is read');
+              deadline();
+              assert.equal(init.signal.aborted, true);
+              const error = new Error('aborted during response body');
+              error.name = 'AbortError';
+              throw error;
+            },
+            releaseLock() {},
+          };
+        },
+      },
+    }),
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(() => client.complete(settings, 'test'), /timed out after 30 seconds/);
+  assert.equal(bodyReadStarted, true);
+  assert.equal(timerCleared, true);
 });
