@@ -333,3 +333,24 @@ test('checkpoint chronology uses epoch order across 9999 to extended year +01000
     /current observation predates checkpoint/u,
   );
 });
+
+
+test('checkpoint exact-effect ledger revision rejects signed zero while preserving canonical zero', async () => {
+  const checkpoint = await createAgentCheckpointV1(checkpointInput({ exactEffectLedgerRevision: 0 }));
+  assert.equal(Object.is(checkpoint.exactEffectLedgerRevision, 0), true);
+  assert.equal(Object.is(checkpoint.exactEffectLedgerRevision, -0), false);
+
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput({ exactEffectLedgerRevision: -0 })),
+    /exactEffectLedgerRevision must be a non-negative integer/,
+  );
+
+  const normalizedHead = normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: 0 }));
+  assert.equal(Object.is(normalizedHead.exactEffectLedgerRevision, 0), true);
+  assert.equal(Object.is(normalizedHead.exactEffectLedgerRevision, -0), false);
+
+  assert.throws(
+    () => normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: -0 })),
+    /exactEffectLedgerRevision must be a non-negative integer/,
+  );
+});
