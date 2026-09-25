@@ -2660,3 +2660,109 @@ test('Trusted Script consequential approval is invalidated if the approved brows
   assert.equal(evaluateCalls, 0);
   assert.match(after.job.runtime.lastError, /no longer available|stale|changed/i);
 });
+
+
+test('Browser Agent specialist wrappers snapshot caller payloads before authority reads', async () => {
+  const chrome = makeChrome();
+  const at = '2026-09-23T12:00:00Z';
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(at),
+  });
+  await manager.create({ id: 'job-wrapper-boundary', goal: 'Exercise specialist request boundary' });
+  await manager.update(store => {
+    store.byId['job-wrapper-boundary'].runtime.plan = {
+      schemaVersion: 1,
+      planId: 'plan-wrapper-boundary',
+      jobId: 'job-wrapper-boundary',
+      objective: 'Complete safely',
+      successCriteria: ['Verified'],
+      createdAt: at,
+      updatedAt: at,
+      revision: 1,
+      nodes: [
+        {
+          nodeId: 'inspect',
+          title: 'Inspect',
+          objective: 'Inspect page',
+          dependsOn: [],
+          conflictKeys: ['web:wrapper'],
+          ownerId: 'parent',
+          executionPlane: 'BROWSER',
+          acceptanceCriteria: [],
+          budget: {},
+          state: 'VERIFIED',
+          evidence: 'Observed',
+          updatedAt: at,
+        },
+        {
+          nodeId: 'archive',
+          title: 'Archive',
+          objective: 'Create archive',
+          dependsOn: ['inspect'],
+          conflictKeys: ['files:wrapper'],
+          ownerId: 'parent',
+          executionPlane: 'LOCAL',
+          acceptanceCriteria: ['Archive exists'],
+          budget: {},
+          state: 'PENDING',
+          evidence: '',
+          updatedAt: at,
+        },
+      ],
+    };
+    return store;
+  });
+
+  let reads = 0;
+  const payload = new Proxy({
+    nodeId: 'archive',
+    specialistId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.archive'],
+    parentCapabilityIds: ['filesystem.archive'],
+    policyEnvelopeId: 'policy:wrapper',
+    deadlineAt: '2026-09-23T13:00:00Z',
+    at,
+  }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const prepared = await manager.prepareSpecialistHandoff('job-wrapper-boundary', payload);
+  assert.equal(prepared.assignment.state, 'READY');
+  assert.equal(reads, 0, 'Browser Agent wrapper must not ordinary-read a caller Proxy payload');
+
+  let getterCalls = 0;
+  const hostileAcrossJobs = { at };
+  Object.defineProperty(hostileAcrossJobs, 'maxConcurrentHandoffs', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 1;
+    },
+  });
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs(hostileAcrossJobs),
+    /maxConcurrentHandoffs must be an enumerable data property/,
+  );
+  assert.equal(getterCalls, 0, 'cross-job capacity getter must never execute');
+
+  let coercions = 0;
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs({
+      maxConcurrentHandoffs: {
+        valueOf() {
+          coercions += 1;
+          return 1;
+        },
+      },
+      at,
+    }),
+    /maxConcurrentHandoffs must be an integer/,
+  );
+  assert.equal(coercions, 0, 'cross-job capacity must never be coerced');
+});
