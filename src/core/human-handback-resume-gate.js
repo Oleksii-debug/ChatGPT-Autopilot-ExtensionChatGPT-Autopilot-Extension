@@ -157,6 +157,9 @@ function assertEffectResolution(packet, rawEffectState, assessedAt) {
   if (effect.phase !== ExactEffectPhase.COMMITTED || !effect.commitId) {
     throw new Error('interrupted exact effect must be COMMITTED before handback resume');
   }
+  if (Date.parse(effect.updatedAt) < Date.parse(packet.handbackVerification.verifiedAt)) {
+    throw new Error('exact-effect resolution must not predate handback verification');
+  }
   if (Date.parse(effect.updatedAt) > Date.parse(assessedAt)) {
     throw new Error('exact-effect state cannot postdate resume assessment');
   }
