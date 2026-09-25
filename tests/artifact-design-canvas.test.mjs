@@ -356,6 +356,32 @@ test('layout values do not accept numeric aliases and visual coordinates do not 
   assert.deepEqual(twin.entries.map(entry => entry.itemId), ['item-b', 'item-a']);
 });
 
+test('freshness fails closed on same-byte current ArtifactRef representation or sensitivity substitution', () => {
+  const canvas = validCanvas();
+  canvas.items[0].artifactRef.sensitive = false;
+  canvas.items[0].preview.previewArtifactRef.sensitive = false;
+
+  const baseline = structuredClone(canvas.items[0].artifactRef);
+  const mutations = [
+    current => { current.sensitive = true; },
+    current => { current.uri = 'artifact://artifact-a-moved'; },
+    current => { current.kind = 'document'; },
+    current => { current.mediaType = 'application/octet-stream'; },
+    current => { current.sizeBytes = 129; },
+    current => { current.producerInvocationId = 'inv-2'; },
+    current => { current.createdAt = '2026-09-25T04:00:01.000Z'; },
+  ];
+
+  for (const mutate of mutations) {
+    const current = structuredClone(baseline);
+    mutate(current);
+    const result = assessArtifactDesignCanvasPreviewFreshnessV1(canvas, [current]);
+    const item = result.entries.find(entry => entry.itemId === 'item-a');
+    assert.equal(item.status, CanvasPreviewStatus.STALE_SOURCE);
+    assert.equal(item.livePreviewReady, false);
+  }
+});
+
 test('current artifact evidence rejects duplicate identities and coercive current-state aliases', () => {
   const canvas = validCanvas();
   const currentA = structuredClone(canvas.items[0].artifactRef);
