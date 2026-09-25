@@ -4,6 +4,7 @@ const MIN_TIMEOUT_SECONDS = 5;
 const MAX_TIMEOUT_SECONDS = 900;
 const MAX_REQUEST_BYTES = 4_000_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
+const MAX_RESPONSE_CHUNKS = 8_192;
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -99,9 +100,9 @@ async function readResponseTextBounded(response, controller) {
 
   if (response?.body && typeof response.body.getReader === 'function') {
     const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    const decoded = [];
+    const buffer = new Uint8Array(MAX_RESPONSE_BYTES);
     let bytes = 0;
+    let chunks = 0;
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -110,15 +111,20 @@ async function readResponseTextBounded(response, controller) {
           await cancelResponse(response, reader, controller);
           throw invalidResponseStreamError();
         }
-        bytes += value.byteLength;
-        if (bytes > MAX_RESPONSE_BYTES) {
+        chunks += 1;
+        if (chunks > MAX_RESPONSE_CHUNKS) {
+          await cancelResponse(response, reader, controller);
+          throw invalidResponseStreamError();
+        }
+        const nextBytes = bytes + value.byteLength;
+        if (nextBytes > MAX_RESPONSE_BYTES) {
           await cancelResponse(response, reader, controller);
           throw responseTooLargeError();
         }
-        decoded.push(decoder.decode(value, { stream: true }));
+        buffer.set(value, bytes);
+        bytes = nextBytes;
       }
-      decoded.push(decoder.decode());
-      return decoded.join('');
+      return new TextDecoder().decode(buffer.subarray(0, bytes));
     } finally {
       try { reader.releaseLock(); } catch (_) {}
     }
@@ -257,4 +263,4 @@ export class AiGatewayClient {
 
 }
 
-export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES };
+export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, MAX_RESPONSE_CHUNKS };
