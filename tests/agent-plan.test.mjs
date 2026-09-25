@@ -7,6 +7,49 @@ const ZERO_ENVELOPE = { maxModelCalls: 0, maxRuntimeSeconds: 0, maxCostUsdMicros
 function plan(nodes) { return { schemaVersion: 1, planId: 'plan-1', jobId: 'job-1', objective: 'Book a verified course', successCriteria: ['Course is selected'], createdAt: AT, updatedAt: AT, revision: 1, nodes }; }
 function node(nodeId, dependsOn = [], conflictKeys = [], budget = {}) { return { nodeId, title: nodeId, objective: `Do ${nodeId}`, dependsOn, conflictKeys, ownerId: 'agent-1', executionPlane: 'BROWSER', acceptanceCriteria: ['Observed complete'], budget, state: 'PENDING', evidence: '', updatedAt: AT }; }
 
+test('AgentPlan public option envelopes reject accessors before authority reads', () => {
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  let reads = 0;
+
+  const reconcileOptions = {};
+  Object.defineProperty(reconcileOptions, 'at', {
+    enumerable: true,
+    get() { reads += 1; return AT; },
+  });
+  assert.throws(() => reconcileAgentPlanV1(current, reconcileOptions), /own data properties/);
+  assert.equal(reads, 0);
+
+  const extensionOptions = {
+    nodes: [node('later')],
+    resourceEnvelope: ZERO_ENVELOPE,
+    at: AT,
+  };
+  Object.defineProperty(extensionOptions, 'expectedRevision', {
+    enumerable: true,
+    get() { reads += 1; return current.revision; },
+  });
+  assert.throws(() => extendAgentPlanV1(current, extensionOptions), /own data properties/);
+  assert.equal(reads, 0);
+
+  const candidate = structuredClone(current);
+  candidate.nodes.push(node('later'));
+  const evolutionOptions = { at: AT };
+  Object.defineProperty(evolutionOptions, 'resourceEnvelope', {
+    enumerable: true,
+    get() { reads += 1; return ZERO_ENVELOPE; },
+  });
+  assert.throws(() => evolveAgentPlanV1(current, candidate, evolutionOptions), /own data properties/);
+  assert.equal(reads, 0);
+
+  const transitionOptions = { nodeId: 'discover', at: AT };
+  Object.defineProperty(transitionOptions, 'state', {
+    enumerable: true,
+    get() { reads += 1; return AgentPlanNodeState.RUNNING; },
+  });
+  assert.throws(() => transitionAgentPlanNodeV1(current, transitionOptions), /own data properties/);
+  assert.equal(reads, 0);
+});
+
 test('AgentPlan array boundaries reject getters and non-canonical collections before reads', () => {
   let reads = 0;
 
