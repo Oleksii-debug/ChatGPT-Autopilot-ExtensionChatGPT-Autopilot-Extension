@@ -261,6 +261,23 @@ test('negative benchmark result blocks readiness and preserves failure counts', 
   assert.equal(report.benchmarkChecks[0].reasonCode, 'BENCHMARK_FAILED');
 });
 
+test('stale failing benchmark remains BLOCKED because known negative evidence does not expire into uncertainty', () => {
+  const staleEnd = '2026-09-25T09:00:01.000Z';
+  const staleStart = '2026-09-25T09:00:00.000Z';
+  const report = buildProductReadinessEvaluationV1(request({
+    benchmarkChecks: [benchmarkCheck(
+      { metric: 0, startedAt: staleStart, completedAt: staleEnd },
+      { maxAgeMs: 60 * 1000 },
+    )],
+  }));
+
+  assert.equal(report.status, ProductReadinessGateStatus.BLOCKED);
+  assert.equal(report.benchmarkChecks[0].evaluationStatus, 'FAIL');
+  assert.equal(report.benchmarkChecks[0].gateStatus, ProductReadinessGateStatus.BLOCKED);
+  assert.equal(report.benchmarkChecks[0].reasonCode, 'BENCHMARK_FAILED');
+  assert.ok(report.benchmarkChecks[0].ageMs > report.benchmarkChecks[0].maxAgeMs);
+});
+
 test('stale benchmark pass is UNKNOWN and cannot certify current revision readiness', () => {
   const staleEnd = '2026-09-25T09:00:01.000Z';
   const staleStart = '2026-09-25T09:00:00.000Z';
