@@ -464,17 +464,19 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.GET_PROFILE_SETTINGS) {
       const state = await this.repo.load();
-      const ms = Number(state.profile?.rateLimitCooldownMs || DEFAULT_RATE_LIMIT_COOLDOWN_MS);
+      const ms = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
       return { rateLimitCooldownMinutes: Math.round(ms / 60000) };
     }
     if (command === CoreCommand.UPDATE_PROFILE_SETTINGS) {
       const minutes = Number(payload.rateLimitCooldownMinutes);
       const ms = minutes * 60000;
       if (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS) {
-        throw new Error('Rate-limit pause must be a whole number from 1 to 120 minutes');
+        throw new Error('Rate-limit pause must be a whole number from 0 to 120 minutes');
       }
       await this.repo.update(draft => {
         draft.profile.rateLimitCooldownMs = ms;
+        draft.profile.rateLimitReservePolicyVersion = 1;
+        if (ms === 0) draft.profile.rateLimitUntil = 0;
         return draft;
       });
       return { rateLimitCooldownMinutes: minutes };
