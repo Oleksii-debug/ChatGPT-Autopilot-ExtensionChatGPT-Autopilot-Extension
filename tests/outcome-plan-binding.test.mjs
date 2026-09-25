@@ -229,3 +229,33 @@ test('rejects an AgentPlan created before its Outcome Contract', () => {
     /cannot predate/u,
   );
 });
+
+
+test('fails closed on Outcome fields that exceed AgentPlan schema limits instead of truncating', () => {
+  const longObjective = outcome({ desiredResult: 'x'.repeat(8_001) });
+  assert.throws(
+    () => projectOutcomePlanningEnvelopeV1(longObjective),
+    /AgentPlan objective limit/u,
+  );
+
+  const longCriterion = outcome({
+    completionCriteria: [
+      {
+        criterionId: 'criterion-b',
+        description: 'Second criterion.',
+        observable: 'Second canonical observation is present.',
+        requiredEvidenceKinds: ['test-report'],
+      },
+      {
+        criterionId: 'criterion-a',
+        description: 'First criterion.',
+        observable: 'x'.repeat(990),
+        requiredEvidenceKinds: ['artifact'],
+      },
+    ],
+  });
+  assert.throws(
+    () => projectOutcomePlanningEnvelopeV1(longCriterion),
+    /successCriteria text limit: criterion-a/u,
+  );
+});
