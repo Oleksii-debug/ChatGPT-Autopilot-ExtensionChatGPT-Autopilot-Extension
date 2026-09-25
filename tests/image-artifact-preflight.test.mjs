@@ -100,3 +100,29 @@ test('hostile descriptors and noncanonical numeric identity fail closed without 
   await assert.rejects(preflight({ schemaVersion: 1, artifactRef: { ...r, sizeBytes: -0 }, contentBase64: b64(bytes) }), /sizeBytes/u);
   await assert.rejects(preflight({ schemaVersion: 1, artifactRef: { ...r, sizeBytes: MAX_IMAGE_ARTIFACT_BYTES + 1 }, contentBase64: b64(bytes) }), /sizeBytes/u);
 });
+
+
+test('crypto options are descriptor-safe and never execute caller accessors', async () => {
+  const bytes = png();
+  let calls = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'cryptoImpl', {
+    enumerable: true,
+    get() { calls += 1; return webcrypto; },
+  });
+  await assert.rejects(
+    preflightImageArtifactV1(request(bytes, 'image/png'), hostile),
+    /enumerable own data property/u,
+  );
+  assert.equal(calls, 0);
+
+  await assert.rejects(
+    preflightImageArtifactV1(request(bytes, 'image/png'), { cryptoImpl: webcrypto, extra: true }),
+    /unknown field/u,
+  );
+
+  const nullPrototype = Object.create(null);
+  nullPrototype.cryptoImpl = webcrypto;
+  const out = await preflightImageArtifactV1(request(bytes, 'image/png'), nullPrototype);
+  assert.equal(out.materialIdentityVerified, true);
+});

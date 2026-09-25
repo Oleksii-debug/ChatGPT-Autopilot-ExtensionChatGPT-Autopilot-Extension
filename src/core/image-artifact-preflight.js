@@ -8,6 +8,7 @@ export const MAX_PNG_CHUNKS = 4_096;
 export const MAX_JPEG_SEGMENTS = 4_096;
 
 const REQUEST_KEYS = new Set(['schemaVersion', 'artifactRef', 'contentBase64']);
+const OPTIONS_KEYS = new Set(['cryptoImpl']);
 const ARTIFACT_KEYS = new Set([
   'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
   'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
@@ -36,6 +37,23 @@ function snapshot(value, allowed, label) {
     out[key] = d.value;
   }
   for (const key of allowed) if (!Object.prototype.hasOwnProperty.call(out, key)) throw new Error(label + ' is missing field: ' + key);
+  return out;
+}
+
+function snapshotOptional(value, allowed, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' must be a plain object');
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new Error(label + ' must be a plain or null-prototype object');
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(label + ' contains unknown field: ' + String(key));
+    const d = descriptors[key];
+    if (!d || d.enumerable !== true || !Object.prototype.hasOwnProperty.call(d, 'value')) {
+      throw new Error(label + '.' + String(key) + ' must be an enumerable own data property');
+    }
+    out[key] = d.value;
+  }
   return out;
 }
 
@@ -235,7 +253,9 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
-export async function preflightImageArtifactV1(input, { cryptoImpl = globalThis.crypto } = {}) {
+export async function preflightImageArtifactV1(input, options = {}) {
+  const opts = snapshotOptional(options, OPTIONS_KEYS, 'ImageArtifactPreflightV1 options');
+  const cryptoImpl = Object.prototype.hasOwnProperty.call(opts, 'cryptoImpl') ? opts.cryptoImpl : globalThis.crypto;
   const raw = snapshot(input, REQUEST_KEYS, 'ImageArtifactPreflightV1 request');
   if (raw.schemaVersion !== IMAGE_ARTIFACT_PREFLIGHT_VERSION) throw new Error('Unsupported ImageArtifactPreflightV1 schemaVersion');
   const artifactRef = exactArtifactRef(raw.artifactRef);
