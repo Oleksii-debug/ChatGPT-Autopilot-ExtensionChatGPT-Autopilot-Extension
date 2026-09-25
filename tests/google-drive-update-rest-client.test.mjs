@@ -49,7 +49,7 @@ function config(fetchImpl, overrides = {}) {
     nativeClient: nativeClient(),
     driveCredentialId: 'google-drive-main',
     allowedDriveRootIds: [rootId],
-    allowedDriveFileIds: [],
+    allowedDriveFileIds: [fileId, destinationFolderId],
     allowedGmailUsers: [],
     fetchImpl,
     ...overrides,
@@ -199,7 +199,7 @@ test('Drive folder move into its descendant is rejected before PATCH', async () 
     }
     if (parsed.pathname === `/drive/v3/files/${rootId}`) return response(200, file(rootId));
     return response(404, {});
-  }));
+  }, { allowedDriveFileIds: [folderToMove, descendant] }));
 
   await assert.rejects(
     () => client.updateDriveFile({ fileId: folderToMove, destinationParentId: descendant }),
@@ -234,6 +234,36 @@ test('Drive update request rejects empty/no-op schema and hostile accessor befor
   );
   assert.equal(getterReads, 0);
   assert.equal(fetchCalls, 0);
+});
+
+test('effectful Drive mutation requires exact owner allowlist even when the file is a root descendant', async () => {
+  let patchCalls = 0;
+  const client = new GoogleWorkspaceRestClientV1(config(async (url, options) => {
+    const parsed = new URL(url);
+    if (options?.method === 'PATCH') patchCalls += 1;
+    return stableMetadata(parsed) ?? response(404, {});
+  }, { allowedDriveFileIds: [destinationFolderId] }));
+
+  await assert.rejects(
+    () => client.updateDriveFile({ fileId, name: 'blocked.txt' }),
+    error => error.code === 'GOOGLE_DRIVE_MUTATION_IDENTITY_NOT_ALLOWED',
+  );
+  assert.equal(patchCalls, 0);
+});
+
+test('effectful Drive destination must be an exact owner-allowlisted identity, not merely an admitted descendant', async () => {
+  let patchCalls = 0;
+  const client = new GoogleWorkspaceRestClientV1(config(async (url, options) => {
+    const parsed = new URL(url);
+    if (options?.method === 'PATCH') patchCalls += 1;
+    return stableMetadata(parsed) ?? response(404, {});
+  }, { allowedDriveFileIds: [fileId] }));
+
+  await assert.rejects(
+    () => client.updateDriveFile({ fileId, destinationParentId: destinationFolderId }),
+    error => error.code === 'GOOGLE_DRIVE_MUTATION_IDENTITY_NOT_ALLOWED',
+  );
+  assert.equal(patchCalls, 0);
 });
 
 test('post-dispatch Drive transport loss is explicitly ambiguous and never retry-safe', async () => {
