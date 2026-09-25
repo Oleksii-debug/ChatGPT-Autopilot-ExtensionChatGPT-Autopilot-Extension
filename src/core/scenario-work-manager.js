@@ -603,7 +603,7 @@ export class ScenarioWorkManager {
           const hint = state.tabHintsByTaskId?.[target.key];
           if (hint?.sessionId === sessionId && hint?.tabId === target.tabId) hint.retirePending = true;
           const live = state.sessionsById?.[sessionId];
-          if (forceSafe && live) { live.enabled = false; live.runState = RunState.STOPPED; }
+          if (live) { live.enabled = false; live.runState = RunState.STOPPED; }
           return state;
         });
         return { removed: false, pending: true, reason: 'TAB_API_UNAVAILABLE' };
@@ -630,7 +630,7 @@ export class ScenarioWorkManager {
             hint.retirePending = true;
           }
           const live = state.sessionsById?.[sessionId];
-          if (forceSafe && live) { live.enabled = false; live.runState = RunState.STOPPED; }
+          if (live) { live.enabled = false; live.runState = RunState.STOPPED; }
           return state;
         });
         return { removed: false, pending: true, reason: 'TAB_RETIRE_PENDING' };
@@ -644,7 +644,8 @@ export class ScenarioWorkManager {
       if (!live?.scenarioWork?.managed) { removed = true; return state; }
       if (!isSafeToRemoveSession(live)) {
         unresolved = true;
-        if (forceSafe) { live.runState = RunState.STOPPED; live.enabled = false; }
+        live.runState = RunState.STOPPED;
+        live.enabled = false;
         return state;
       }
       delete state.sessionsById[sessionId];
@@ -670,6 +671,24 @@ export class ScenarioWorkManager {
       if (!result.removed) pending.push(sessionId);
     }
     return { pending };
+  }
+
+  // A completed generation can start its replacement while a failed tab
+  // close is retried, provided the retired Core Session is durably stopped.
+  async retiredCleanupCanRunInBackground(scenario) {
+    if (scenario?.config?.mode !== ScenarioWorkMode.CHAT_CYCLE
+        || scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) return false;
+    const pending = scenario.runtime.cleanupPendingSessionIds || [];
+    if (!pending.length) return false;
+    const core = await this.coreRepository.load();
+    return pending.every(id => {
+      const session = core.sessionsById?.[id];
+      return !session || (session.scenarioWork?.managed === true
+        && session.scenarioWork.scenarioId === scenario.id
+        && Number(session.scenarioWork.generation) < scenario.runtime.generation
+        && session.enabled === false && session.runState === RunState.STOPPED
+        && isSafeToRemoveSession(session));
+    });
   }
 
   async drainCleanupPending(id, { forceSafe = false } = {}) {
@@ -852,7 +871,7 @@ export class ScenarioWorkManager {
     const expectedOwnerEpoch = Math.max(0, Number(current.scenario.runtime.ownerEpoch || 0));
 
     const cleanupBefore = await this.drainCleanupPending(id);
-    if (cleanupBefore.pending.length) {
+    if (cleanupBefore.pending.length && !(await this.retiredCleanupCanRunInBackground(current.scenario))) {
       await this.reconcileAlarm();
       return { kind: 'CLEANUP_PENDING', pending: cleanupBefore.pending };
     }
@@ -877,7 +896,8 @@ export class ScenarioWorkManager {
       await this.reconcileAlarm();
       return { kind: runtime.runState === ScenarioWorkRunState.COMPLETED ? 'COMPLETED' : 'IDLE', launched: [], runtime: clone(runtime) };
     }
-    if ((runtime.cleanupPendingSessionIds || []).length) {
+    if ((runtime.cleanupPendingSessionIds || []).length
+        && !(await this.retiredCleanupCanRunInBackground(scenario))) {
       await this.reconcileAlarm();
       return { kind: 'CLEANUP_PENDING', pending: [...runtime.cleanupPendingSessionIds], runtime: clone(runtime) };
     }
@@ -981,7 +1001,7 @@ export class ScenarioWorkManager {
             await this.finalizeDelete(id);
             continue;
           }
-          if (cleanup.pending.length) continue;
+          if (cleanup.pending.length && !(await this.retiredCleanupCanRunInBackground(live.scenario))) continue;
         }
         if (live.scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) continue;
         results.push({ id, result: await this.cycleOne(id) });
