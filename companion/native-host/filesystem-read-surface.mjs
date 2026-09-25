@@ -133,7 +133,11 @@ export async function listFilesystemDirectoryV1(scope, requestedDirectory, {
     if (afterEnumeration.real !== rootBefore.real || !sameFileIdentity(afterEnumeration.stat, rootBefore.stat)) {
       fail('Filesystem list directory identity changed during enumeration');
     }
-    if (visitedEntries >= maxEntries) truncated = true;
+    if (visitedEntries >= maxEntries) {
+      // One bounded look-ahead distinguishes an exactly-full directory from a
+      // genuinely truncated enumeration without walking the remaining tree.
+      truncated = (await directory.read()) != null;
+    }
   } finally {
     await closeDirectoryQuietly(directory);
   }
@@ -166,7 +170,10 @@ async function hashAuthorizedFile(scope, requestedPath, maxHashBytes, beforeOpen
         || after.ctimeMs !== admitted.stat.ctimeMs) {
       fail('Filesystem file changed during hash read');
     }
-    return digest.digest('hex');
+    return Object.freeze({
+      sha256: digest.digest('hex'),
+      stat: after,
+    });
   });
 }
 
@@ -174,30 +181,42 @@ export async function statFilesystemPathV1(scope, requestedPath, {
   hash = false,
   maxHashBytes = MAX_HASH_BYTES,
   beforeHashOpen = null,
+  afterHashRead = null,
 } = {}) {
   if (typeof hash !== 'boolean') fail('Invalid filesystem stat hash flag');
   if (!Number.isInteger(maxHashBytes) || maxHashBytes < 1 || maxHashBytes > MAX_HASH_BYTES) {
     fail('Invalid filesystem hash byte bound');
   }
   if (beforeHashOpen != null && typeof beforeHashOpen !== 'function') fail('Invalid filesystem stat beforeHashOpen hook');
+  if (afterHashRead != null && typeof afterHashRead !== 'function') fail('Invalid filesystem stat afterHashRead hook');
 
   const before = await snapshotReadablePath(scope, requestedPath);
-  let sha256 = '';
+  let hashSnapshot = null;
   if (hash) {
     if (!before.stat.isFile()) fail('Filesystem hash requires a regular file');
-    sha256 = await hashAuthorizedFile(scope, before.lexical, maxHashBytes, beforeHashOpen);
+    hashSnapshot = await hashAuthorizedFile(scope, before.lexical, maxHashBytes, beforeHashOpen);
+    if (afterHashRead != null) await afterHashRead(before.lexical, hashSnapshot);
   }
   const after = await snapshotReadablePath(scope, before.lexical);
   if (after.real !== before.real || !sameFileIdentity(after.stat, before.stat)) {
     fail('Filesystem read path identity changed during observation');
   }
+  if (hashSnapshot) {
+    if (!sameFileIdentity(after.stat, hashSnapshot.stat)
+        || sizeOf(after.stat, 'Filesystem stat target') !== sizeOf(hashSnapshot.stat, 'Filesystem hashed target')
+        || after.stat.mtimeMs !== hashSnapshot.stat.mtimeMs
+        || after.stat.ctimeMs !== hashSnapshot.stat.ctimeMs) {
+      fail('Filesystem file changed after hash read');
+    }
+  }
 
+  const observedStat = hashSnapshot?.stat ?? after.stat;
   return Object.freeze({
     realPath: after.real,
-    kind: kindOf(after.stat),
-    sizeBytes: sizeOf(after.stat, 'Filesystem stat target'),
-    modifiedAt: modifiedAtOf(after.stat, 'Filesystem stat target'),
+    kind: kindOf(observedStat),
+    sizeBytes: sizeOf(observedStat, 'Filesystem stat target'),
+    modifiedAt: modifiedAtOf(observedStat, 'Filesystem stat target'),
     hashed: hash,
-    sha256,
+    sha256: hashSnapshot?.sha256 ?? '',
   });
 }
