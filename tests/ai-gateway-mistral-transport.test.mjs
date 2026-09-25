@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MAX_UPSTREAM_RESPONSE_BYTES,
   completeProvider,
   listProviderModels,
   normalizeCompatibleEndpointRegistry,
@@ -131,4 +132,98 @@ test('Mistral credential cannot be retargeted to another endpoint identity or HT
       apiKeyEnv: 'MISTRAL_API_KEY',
     },
   ]), error => error?.code === 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
+});
+
+
+function streamingJsonResponse(text, { status = 200, chunks = null, includeContentLength = true } = {}) {
+  const bytes = new TextEncoder().encode(text);
+  const parts = chunks || [bytes];
+  let cancelled = false;
+  const body = new ReadableStream({
+    start(controller) {
+      for (const part of parts) controller.enqueue(part);
+      controller.close();
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: new Headers(includeContentLength ? { 'content-length': String(bytes.byteLength) } : {}),
+    body,
+    async text() {
+      throw new Error('streaming response must not use text()');
+    },
+    get cancelled() {
+      return cancelled;
+    },
+  };
+}
+
+function modelListJsonWithExactBytes(byteLength) {
+  const prefix = '{"data":[{"id":"';
+  const suffix = '"}]}';
+  const overhead = Buffer.byteLength(prefix + suffix, 'utf8');
+  if (byteLength < overhead) throw new Error('requested fixture is too small');
+  return prefix + 'm'.repeat(byteLength - overhead) + suffix;
+}
+
+test('Mistral response reader accepts the exact byte ceiling through the streaming path', async () => {
+  const endpoints = normalizeCompatibleEndpointRegistry([MISTRAL_ENDPOINT_PRESET]);
+  const payload = modelListJsonWithExactBytes(MAX_UPSTREAM_RESPONSE_BYTES);
+  const response = streamingJsonResponse(payload);
+  const models = await listProviderModels('openai-compatible', {
+    fetchFn: async () => response,
+    endpointId: 'mistral',
+    compatibleEndpoints: endpoints,
+    env: { MISTRAL_API_KEY: 'test-mistral-secret' },
+  });
+  assert.equal(Buffer.byteLength(payload, 'utf8'), MAX_UPSTREAM_RESPONSE_BYTES);
+  assert.equal(models.length, 1);
+  assert.equal(response.cancelled, false);
+});
+
+test('Mistral response reader rejects Content-Length above the byte ceiling and cancels before reading', async () => {
+  const endpoints = normalizeCompatibleEndpointRegistry([MISTRAL_ENDPOINT_PRESET]);
+  const payload = modelListJsonWithExactBytes(MAX_UPSTREAM_RESPONSE_BYTES + 1);
+  const response = streamingJsonResponse(payload);
+  await assert.rejects(() => listProviderModels('openai-compatible', {
+    fetchFn: async () => response,
+    endpointId: 'mistral',
+    compatibleEndpoints: endpoints,
+    env: { MISTRAL_API_KEY: 'test-mistral-secret' },
+  }), error => error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE');
+  assert.equal(response.cancelled, true);
+});
+
+test('Mistral response reader detects multi-chunk overflow without trusting Content-Length', async () => {
+  const endpoints = normalizeCompatibleEndpointRegistry([MISTRAL_ENDPOINT_PRESET]);
+  const payload = modelListJsonWithExactBytes(MAX_UPSTREAM_RESPONSE_BYTES + 1);
+  const bytes = new TextEncoder().encode(payload);
+  const split = MAX_UPSTREAM_RESPONSE_BYTES - 7;
+  const response = streamingJsonResponse(payload, {
+    includeContentLength: false,
+    chunks: [bytes.subarray(0, split), bytes.subarray(split)],
+  });
+  await assert.rejects(() => listProviderModels('openai-compatible', {
+    fetchFn: async () => response,
+    endpointId: 'mistral',
+    compatibleEndpoints: endpoints,
+    env: { MISTRAL_API_KEY: 'test-mistral-secret' },
+  }), error => error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE');
+  assert.equal(response.cancelled, true);
+});
+
+test('bounded Mistral responses preserve upstream rate-limit classification', async () => {
+  const endpoints = normalizeCompatibleEndpointRegistry([MISTRAL_ENDPOINT_PRESET]);
+  const payload = JSON.stringify({ error: { message: 'slow down' } });
+  const response = streamingJsonResponse(payload, { status: 429 });
+  await assert.rejects(() => listProviderModels('openai-compatible', {
+    fetchFn: async () => response,
+    endpointId: 'mistral',
+    compatibleEndpoints: endpoints,
+    env: { MISTRAL_API_KEY: 'test-mistral-secret' },
+  }), error => error?.code === 'AI_PROVIDER_RATE_LIMITED' && error?.statusCode === 429);
 });

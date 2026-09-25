@@ -11,6 +11,7 @@ const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
 const COMPATIBLE_BASE_URL = normalizeCompatibleBaseUrl(process.env.COMPATIBLE_BASE_URL || 'http://127.0.0.1:1234/v1');
 const MAX_BODY_BYTES = 4_000_000;
+export const MAX_UPSTREAM_RESPONSE_BYTES = 4_000_000;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = Math.min(900_000, Math.max(5_000, Number(process.env.AUTOPILOT_UPSTREAM_TIMEOUT_MS || 180_000)));
 const STATUS_PROBE_TIMEOUT_MS = Math.min(15_000, Math.max(1_000, Number(process.env.AUTOPILOT_STATUS_TIMEOUT_MS || 3_000)));
 const DEFAULT_MAX_PENDING_INFERENCE = Math.min(256, Math.max(1, Number(process.env.AUTOPILOT_AI_MAX_PENDING || 32)));
@@ -305,6 +306,66 @@ async function readBody(req) {
   return text ? JSON.parse(text) : {};
 }
 
+function upstreamResponseTooLarge() {
+  return gatewayError(
+    `Upstream response exceeds ${MAX_UPSTREAM_RESPONSE_BYTES} bytes`,
+    502,
+    'AI_PROVIDER_RESPONSE_TOO_LARGE',
+  );
+}
+
+async function cancelUpstreamResponse(response, reader, controller) {
+  try {
+    if (reader?.cancel) await reader.cancel('response byte limit exceeded');
+    else if (response?.body?.cancel) await response.body.cancel('response byte limit exceeded');
+  } catch (_) {}
+  try { controller?.abort(); } catch (_) {}
+}
+
+async function readBoundedUpstreamText(response, controller) {
+  const contentLength = clean(response?.headers?.get?.('content-length'));
+  if (/^[0-9]+$/u.test(contentLength) && Number(contentLength) > MAX_UPSTREAM_RESPONSE_BYTES) {
+    await cancelUpstreamResponse(response, null, controller);
+    throw upstreamResponseTooLarge();
+  }
+
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const decoded = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!(value instanceof Uint8Array)) {
+          await cancelUpstreamResponse(response, reader, controller);
+          throw gatewayError('Upstream returned an invalid response body stream', 502, 'AI_PROVIDER_INVALID_RESPONSE');
+        }
+        size += value.byteLength;
+        if (size > MAX_UPSTREAM_RESPONSE_BYTES) {
+          await cancelUpstreamResponse(response, reader, controller);
+          throw upstreamResponseTooLarge();
+        }
+        decoded.push(decoder.decode(value, { stream: true }));
+      }
+      decoded.push(decoder.decode());
+      return decoded.join('');
+    } finally {
+      try { reader.releaseLock(); } catch (_) {}
+    }
+  }
+
+  // Compatibility for deterministic injected fetch shims that expose only text().
+  // Native production fetch responses use the streaming branch above.
+  const text = typeof response?.text === 'function' ? await response.text() : '';
+  if (Buffer.byteLength(text, 'utf8') > MAX_UPSTREAM_RESPONSE_BYTES) {
+    await cancelUpstreamResponse(response, null, controller);
+    throw upstreamResponseTooLarge();
+  }
+  return text;
+}
+
 async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -312,8 +373,9 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
   let text;
   try {
     response = await fetchFn(url, { ...init, signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
-    text = await response.text();
+    text = await readBoundedUpstreamText(response, controller);
   } catch (error) {
+    if (error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE' || error?.code === 'AI_PROVIDER_INVALID_RESPONSE') throw error;
     if (error?.name === 'AbortError') throw gatewayError(`Upstream request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`, 504, 'AI_PROVIDER_TIMEOUT');
     throw gatewayError(`Upstream provider is unavailable: ${clean(error?.message || error).slice(0, 500) || 'network failure'}`, 503, 'AI_PROVIDER_UNAVAILABLE');
   } finally {
