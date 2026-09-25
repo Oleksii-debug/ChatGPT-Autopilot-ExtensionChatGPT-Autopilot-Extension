@@ -203,6 +203,88 @@ test('gateway client counts request size in UTF-8 bytes before fetch', async () 
 });
 
 
+test('gateway client snapshots public request envelopes before authority reads', async () => {
+  const client = new AiGatewayClient({ fetchFn: async () => { throw new Error('transport should be stubbed'); } });
+  client.request = async (...args) => args;
+
+  let reads = 0;
+  const healthInput = new Proxy({
+    gatewayUrl: 'http://127.0.0.1:17621',
+    timeoutSeconds: 30,
+    mode: 'hybrid-auto',
+  }, {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'timeoutSeconds') return 900;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const healthArgs = await client.health(healthInput);
+  assert.equal(reads, 0, 'health request must not ordinary-read caller Proxy fields');
+  assert.equal(healthArgs[1], 30);
+  assert.equal(healthArgs[2], '/health');
+
+  const accessor = {
+    gatewayUrl: 'http://127.0.0.1:17621',
+    timeoutSeconds: 30,
+  };
+  Object.defineProperty(accessor, 'gatewayUrl', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'http://127.0.0.1:9999';
+    },
+  });
+  await assert.rejects(() => client.status(accessor), /enumerable own data properties/);
+  assert.equal(reads, 0, 'request accessor must never execute');
+
+  const completion = new Proxy({
+    gatewayUrl: 'http://127.0.0.1:17621',
+    timeoutSeconds: 30,
+    provider: 'ollama',
+    model: 'qwen3:8b',
+    prompt: 'test',
+    maxOutputTokens: 256,
+  }, {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'maxOutputTokens') return 999999;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const completionArgs = await client.complete(completion);
+  assert.equal(reads, 0, 'completion request must not ordinary-read caller Proxy fields');
+  assert.equal(JSON.parse(completionArgs[3].body).maxOutputTokens, 256);
+
+  await assert.rejects(
+    () => client.complete({
+      gatewayUrl: 'http://127.0.0.1:17621',
+      timeoutSeconds: 30,
+      provider: 'ollama',
+      model: 'qwen3:8b',
+      prompt: 'test',
+      maxOutputTokens: '256',
+    }),
+    /maxOutputTokens must be a number/,
+  );
+});
+
+test('gateway client rejects string timeout coercion before fetch', async () => {
+  let fetchCalls = 0;
+  const client = new AiGatewayClient({
+    fetchFn: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', '30', '/health'),
+    /timeout must be 5-900 seconds/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
 test('gateway client rejects non-string request bodies before fetch', async () => {
   let calls = 0;
   const client = new AiGatewayClient({ fetchFn: async () => {
