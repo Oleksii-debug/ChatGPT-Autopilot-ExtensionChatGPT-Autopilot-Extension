@@ -291,6 +291,16 @@ test('shared Recipe catalog composes canonical Project access and grants no auth
   assert.equal(Object.isFrozen(out.items), true);
 });
 
+test('empty share evidence fails closed instead of emitting blank canonical Project identity', async () => {
+  await assert.rejects(
+    buildSharedProjectRecipeCatalogV1(
+      await request({ shares: [] }),
+      trustedResolver(),
+    ),
+    /at least one canonical Project Recipe share evidence record/,
+  );
+});
+
 test('share creation fails closed when canonical Project ceiling lacks project.recipe.share', async () => {
   await assert.rejects(
     buildSharedProjectRecipeCatalogV1(
