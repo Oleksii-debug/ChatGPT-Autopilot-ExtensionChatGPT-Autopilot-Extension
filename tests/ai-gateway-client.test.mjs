@@ -5,6 +5,8 @@ import { AiGatewayClient, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, normalizeGatewa
 test('gateway URL is restricted to localhost', () => {
   assert.equal(normalizeGatewayUrl('http://127.0.0.1:17621/'), 'http://127.0.0.1:17621');
   assert.throws(() => normalizeGatewayUrl('https://api.openai.com/v1'), /localhost or 127\.0\.0\.1/);
+  assert.throws(() => normalizeGatewayUrl(17621), /URL must be text when supplied/);
+  assert.throws(() => normalizeGatewayUrl(null), /URL must be text when supplied/);
 });
 
 test('gateway client health, model list and completion use local HTTP API', async () => {
@@ -319,3 +321,57 @@ test('gateway client rejects non-string request bodies before fetch', async () =
   );
   assert.equal(calls, 0);
 });
+
+test('gateway client rejects endpoint and resource aliases before fetch', async () => {
+  let fetchCalls = 0;
+  let lastBody = null;
+  const client = new AiGatewayClient({
+    fetchFn: async (_url, init = {}) => {
+      fetchCalls += 1;
+      lastBody = init.body ? JSON.parse(init.body) : null;
+      return new Response(JSON.stringify({ ok: true, provider: 'ollama', model: 'qwen3:8b', text: 'ok', models: [] }), { status: 200 });
+    },
+  });
+  const base = {
+    gatewayUrl: 'http://127.0.0.1:17621',
+    timeoutSeconds: 30,
+    provider: 'ollama',
+    model: 'qwen3:8b',
+    prompt: 'test',
+  };
+
+  await assert.rejects(
+    () => client.health({ gatewayUrl: 17621, timeoutSeconds: 30 }),
+    /URL must be text when supplied/,
+  );
+  await assert.rejects(
+    () => client.listModels({ gatewayUrl: base.gatewayUrl, timeoutSeconds: 30, provider: 'ollama', endpointId: 7 }),
+    /endpointId must be text when supplied/,
+  );
+  await assert.rejects(
+    () => client.complete({ ...base, endpointId: 7 }),
+    /endpointId must be text when supplied/,
+  );
+  await assert.rejects(
+    () => client.complete({ ...base, systemPrompt: 7 }),
+    /systemPrompt must be text when supplied/,
+  );
+  await assert.rejects(
+    () => client.complete({ ...base, imageDataUrl: { value: 'data:image/png;base64,AA==' } }),
+    /imageDataUrl must be text when supplied/,
+  );
+  await assert.rejects(
+    () => client.complete({ ...base, maxOutputTokens: -1 }),
+    /maxOutputTokens must be 0 or at least 1/,
+  );
+  await assert.rejects(
+    () => client.complete({ ...base, maxOutputTokens: 0.5 }),
+    /maxOutputTokens must be 0 or at least 1/,
+  );
+  assert.equal(fetchCalls, 0);
+
+  await client.complete({ ...base, maxOutputTokens: 1.9 });
+  assert.equal(fetchCalls, 1);
+  assert.equal(lastBody.maxOutputTokens, 1);
+});
+
