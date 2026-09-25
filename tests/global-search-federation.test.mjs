@@ -46,9 +46,11 @@ function fusion(overrides = {}) {
     searchId: 'search-1',
     query: 'source one',
     providerResults: [batch()],
-    admittedProviderIds: ['provider-project'],
-    admittedDomains: ['PROJECT'],
-    admittedVisibilityScopeIds: ['scope-project'],
+    admittedSearchScopes: [{
+      providerId: 'provider-project',
+      domain: 'PROJECT',
+      visibilityScopeId: 'scope-project',
+    }],
     limit: 20,
     ...overrides,
   };
@@ -82,13 +84,27 @@ test('raw content and snippet fields are outside the contract', () => {
   assert.throws(() => normalizeGlobalSearchProviderResultV1({ ...batch(), rawResponse: 'secret' }), /unknown field: rawResponse/);
 });
 
-test('admission envelopes are explicit and fail closed', () => {
-  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedProviderIds: undefined }), /bounded plain array/);
-  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedDomains: [] }), /unique admitted values/);
-  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedVisibilityScopeIds: [] }), /unique admitted values/);
-  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedProviderIds: ['other'] }), /provider is not admitted/);
-  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedDomains: ['GITHUB'] }), /domain is not admitted/);
-  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedVisibilityScopeIds: ['scope-other'] }), /visibility scope is not admitted/);
+test('admission envelopes are exact provider/domain/scope tuples and fail closed', () => {
+  assert.throws(() => fuseGlobalSearchV1({ ...fusion(), admittedSearchScopes: undefined }), /bounded plain array/);
+  assert.throws(() => fuseGlobalSearchV1(fusion({ admittedSearchScopes: [] })), /must not be empty/);
+  assert.throws(() => fuseGlobalSearchV1(fusion({
+    admittedSearchScopes: [{ providerId: 'other', domain: 'PROJECT', visibilityScopeId: 'scope-project' }],
+  })), /tuple is not admitted/);
+  assert.throws(() => fuseGlobalSearchV1(fusion({
+    admittedSearchScopes: [{ providerId: 'provider-project', domain: 'GITHUB', visibilityScopeId: 'scope-project' }],
+  })), /tuple is not admitted/);
+  assert.throws(() => fuseGlobalSearchV1(fusion({
+    admittedSearchScopes: [{ providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-other' }],
+  })), /tuple is not admitted/);
+
+  const mixed = batch({ providerId: 'provider-a', domain: 'GMAIL', visibilityScopeId: 'scope-b' });
+  assert.throws(() => fuseGlobalSearchV1(fusion({
+    providerResults: [mixed],
+    admittedSearchScopes: [
+      { providerId: 'provider-a', domain: 'PROJECT', visibilityScopeId: 'scope-a' },
+      { providerId: 'provider-b', domain: 'GMAIL', visibilityScopeId: 'scope-b' },
+    ],
+  })), /tuple is not admitted/);
 });
 
 test('same exact source revision from multiple providers is fused deterministically', () => {
@@ -110,11 +126,17 @@ test('same exact source revision from multiple providers is fused deterministica
   });
   const first = fuseGlobalSearchV1(fusion({
     providerResults: [project, second],
-    admittedProviderIds: ['provider-project', 'provider-index'],
+    admittedSearchScopes: [
+      { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+      { providerId: 'provider-index', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+    ],
   }));
   const reversed = fuseGlobalSearchV1(fusion({
     providerResults: [second, project],
-    admittedProviderIds: ['provider-index', 'provider-project'],
+    admittedSearchScopes: [
+      { providerId: 'provider-index', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+      { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+    ],
   }));
   assert.deepEqual(first, reversed);
   const fusedSource = first.results.find(item => item.sourceId === 'source-1');
@@ -169,7 +191,10 @@ test('duplicate hit ids, ranks, source identities and provider/domain batches fa
   })), /ranks must be contiguous from 1/);
   assert.throws(() => fuseGlobalSearchV1(fusion({
     providerResults: [batch(), batch({ visibilityScopeId: 'scope-project-2' })],
-    admittedVisibilityScopeIds: ['scope-project', 'scope-project-2'],
+    admittedSearchScopes: [
+      { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+      { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project-2' },
+    ],
   })), /duplicate provider\/domain batch/);
 });
 
