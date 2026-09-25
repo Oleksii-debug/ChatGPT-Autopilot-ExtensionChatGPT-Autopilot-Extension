@@ -215,6 +215,12 @@ test('freshness is exact revision/hash/source identity evidence and never grants
   assert.equal(changed.status, 'STALE');
   assert.deepEqual(changed.sources[0].reasons, ['REVISION_CHANGED', 'CONTENT_CHANGED']);
 
+  const regressed = assessDataDatasetFreshnessV1(snap, [
+    source({ at: '2026-09-24T19:00:00.000Z' }),
+  ]);
+  assert.equal(regressed.status, 'STALE');
+  assert.deepEqual(regressed.sources[0].reasons, ['OBSERVATION_REGRESSED']);
+
   const missing = assessDataDatasetFreshnessV1(snap, []);
   assert.equal(missing.status, 'STALE');
   assert.deepEqual(missing.sources[0].reasons, ['CURRENT_SOURCE_MISSING']);
@@ -313,6 +319,33 @@ test('transform lineage is reproducible and exact-bound to every input/output re
     inputSnapshots: [inputA, inputB],
     outputSnapshot: wrongOutput,
   }), /output dataset revision mismatch/);
+
+  const futureInput = dataset({
+    observedAt: T2,
+    revisionId: 'dataset-future-r1',
+    digest: sha('7'),
+    artifactId: 'artifact-dataset-future',
+  });
+  const earlyExecution = { ...raw, executedAt: T1, inputDatasets: [dataDatasetBindingFromSnapshotV1(futureInput), raw.inputDatasets[1]] };
+  assert.throws(() => assertDataTransformLineageMatchesSnapshotsV1({
+    lineage: earlyExecution,
+    inputSnapshots: [futureInput, inputB],
+    outputSnapshot: output,
+  }), /input dataset observed after execution/);
+
+  const earlyOutput = dataset({
+    datasetId: 'dataset-out',
+    revisionId: 'dataset-out-r1',
+    digest: sha('f'),
+    sourceRefs: [],
+    artifactId: 'artifact-dataset-out',
+    observedAt: T1,
+  });
+  assert.throws(() => assertDataTransformLineageMatchesSnapshotsV1({
+    lineage: raw,
+    inputSnapshots: [inputA, inputB],
+    outputSnapshot: earlyOutput,
+  }), /output dataset predates execution/);
 
   const duplicate = { ...raw, inputDatasets: [raw.inputDatasets[0], raw.inputDatasets[0]] };
   assert.throws(() => normalizeDataTransformLineageV1(duplicate), /duplicate datasetId/);
