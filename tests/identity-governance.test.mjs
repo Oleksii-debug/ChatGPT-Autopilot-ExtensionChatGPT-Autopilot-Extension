@@ -529,6 +529,30 @@ test('strict trust boundary rejects coercion, symbols, accessors, exotic prototy
     /must not be sparse/,
   );
 
+  let arrayPropertyReads = 0;
+  const proxiedTopLevelArray = registry();
+  proxiedTopLevelArray.grants = new Proxy(proxiedTopLevelArray.grants, {
+    get(target, property, receiver) {
+      arrayPropertyReads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  normalizeIdentityGovernanceRegistryV1(proxiedTopLevelArray);
+  assert.equal(arrayPropertyReads, 0, 'top-level authority array must be descriptor-only');
+
+  const proxiedNestedArray = registry();
+  proxiedNestedArray.roles[0].capabilityCeilingIds = new Proxy(
+    proxiedNestedArray.roles[0].capabilityCeilingIds,
+    {
+      get(target, property, receiver) {
+        arrayPropertyReads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    },
+  );
+  normalizeIdentityGovernanceRegistryV1(proxiedNestedArray);
+  assert.equal(arrayPropertyReads, 0, 'nested authority array must be descriptor-only');
+
   const numericPrincipal = registry();
   numericPrincipal.principals[0] = { ...numericPrincipal.principals[0], principalId: 7 };
   assert.throws(
@@ -630,6 +654,13 @@ test('registry extension permits append and one-way revocation without rewriting
 test('registry extension rejects removal, rewrite, reactivation, retroactive revocation and backdated additions', () => {
   const previous = registry({ revision: 1, updatedAt: T2 });
 
+  const sameSnapshotTime = structuredClone(previous);
+  sameSnapshotTime.revision = 2;
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, sameSnapshotTime),
+    /updatedAt must advance strictly/,
+  );
+
   const removed = structuredClone(previous);
   removed.revision = 2;
   removed.updatedAt = T3;
@@ -676,6 +707,98 @@ test('registry extension rejects removal, rewrite, reactivation, retroactive rev
   assert.throws(
     () => assertIdentityGovernanceRegistryExtensionV1(previous, retroactive),
     /cannot rewrite prior history/,
+  );
+
+  const equalPrincipalRevocation = structuredClone(previous);
+  equalPrincipalRevocation.revision = 2;
+  equalPrincipalRevocation.updatedAt = T3;
+  equalPrincipalRevocation.principals = equalPrincipalRevocation.principals.map((principal) => (
+    principal.principalId === 'agent-child'
+      ? { ...principal, status: GovernancePrincipalStatus.REVOKED, revokedAt: T2 }
+      : principal
+  ));
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, equalPrincipalRevocation),
+    /cannot rewrite prior history/,
+  );
+
+  const equalGrantRevocation = structuredClone(previous);
+  equalGrantRevocation.revision = 2;
+  equalGrantRevocation.updatedAt = T3;
+  equalGrantRevocation.grants = equalGrantRevocation.grants.map((grant) => (
+    grant.grantId === 'grant-child' ? { ...grant, revokedAt: T2 } : grant
+  ));
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, equalGrantRevocation),
+    /cannot rewrite prior history/,
+  );
+
+  const equalCredentialRevocation = structuredClone(previous);
+  equalCredentialRevocation.revision = 2;
+  equalCredentialRevocation.updatedAt = T3;
+  equalCredentialRevocation.credentialOwnership = equalCredentialRevocation.credentialOwnership.map(
+    (binding) => (
+      binding.bindingId === 'binding-child'
+        ? { ...binding, status: CredentialOwnershipStatus.REVOKED, revokedAt: T2 }
+        : binding
+    ),
+  );
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, equalCredentialRevocation),
+    /cannot rewrite prior history/,
+  );
+
+  const equalPrincipalCreation = structuredClone(previous);
+  equalPrincipalCreation.revision = 2;
+  equalPrincipalCreation.updatedAt = T3;
+  equalPrincipalCreation.principals.push({
+    principalId: 'agent-equality',
+    organizationId: 'org-1',
+    kind: GovernancePrincipalKind.AGENT,
+    displayName: 'Equality agent',
+    parentPrincipalId: 'user-owner',
+    status: GovernancePrincipalStatus.ACTIVE,
+    createdAt: T2,
+    revokedAt: '',
+  });
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, equalPrincipalCreation),
+    /new principal cannot be backdated/,
+  );
+
+  const equalGrantCreation = structuredClone(previous);
+  equalGrantCreation.revision = 2;
+  equalGrantCreation.updatedAt = T3;
+  equalGrantCreation.grants.push({
+    grantId: 'grant-equality',
+    principalId: 'user-owner',
+    roleId: 'role-owner',
+    resourceKeys: [RESOURCE],
+    grantedByPrincipalId: 'user-owner',
+    createdAt: T2,
+    expiresAt: '',
+    revokedAt: '',
+  });
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, equalGrantCreation),
+    /new grant cannot be backdated/,
+  );
+
+  const equalCredentialCreation = structuredClone(previous);
+  equalCredentialCreation.revision = 2;
+  equalCredentialCreation.updatedAt = T3;
+  equalCredentialCreation.credentialOwnership.push({
+    bindingId: 'binding-equality',
+    credentialId: 'credential-equality',
+    brokerId: 'broker-local',
+    ownerPrincipalId: 'user-owner',
+    status: CredentialOwnershipStatus.ACTIVE,
+    createdAt: T2,
+    revokedAt: '',
+  });
+  assert.throws(
+    () => assertIdentityGovernanceRegistryExtensionV1(previous, equalCredentialCreation),
+    /new credential binding cannot be backdated/,
   );
 
   const backdated = structuredClone(previous);
