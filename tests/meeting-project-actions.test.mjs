@@ -333,6 +333,66 @@ test('decisions and actions cannot cite unknown evidence or sources and remain P
   assert.throws(() => normalizeMeetingProjectActionsV1(permissionInjection), /unknown field/);
 });
 
+test('public composition request envelopes reject accessors and noncanonical fields before reads', () => {
+  const bundle = evidenceBundle();
+  const project = projectSnapshot(bundle);
+  let reads = 0;
+
+  const actionRequest = { evidenceBundle: bundle };
+  Object.defineProperty(actionRequest, 'result', {
+    enumerable: true,
+    get() { reads += 1; return result(bundle); },
+  });
+  assert.throws(
+    () => assertMeetingProjectActionsMatchesEvidenceV1(actionRequest),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const projectRequest = { evidenceBundle: bundle };
+  Object.defineProperty(projectRequest, 'projectSnapshot', {
+    enumerable: true,
+    get() { reads += 1; return project; },
+  });
+  assert.throws(
+    () => assertMeetingEvidenceMatchesProjectSnapshotV1(projectRequest),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const hidden = { result: result(bundle), evidenceBundle: bundle };
+  Object.defineProperty(hidden, 'hiddenAuthority', {
+    enumerable: false,
+    value: 'ALLOW',
+  });
+  assert.throws(
+    () => assertMeetingProjectActionsMatchesEvidenceV1(hidden),
+    /enumerable own data property|unknown field/,
+  );
+
+  const symbol = { evidenceBundle: bundle, projectSnapshot: project };
+  symbol[Symbol('authority')] = 'ALLOW';
+  assert.throws(
+    () => assertMeetingEvidenceMatchesProjectSnapshotV1(symbol),
+    /symbol fields/,
+  );
+
+  assert.throws(
+    () => assertMeetingEvidenceMatchesProjectSnapshotV1({
+      evidenceBundle: bundle,
+      projectSnapshot: project,
+      permissionGranted: true,
+    }),
+    /unknown field/,
+  );
+
+  const nullProto = Object.assign(Object.create(null), {
+    result: result(bundle),
+    evidenceBundle: bundle,
+  });
+  assert.doesNotThrow(() => assertMeetingProjectActionsMatchesEvidenceV1(nullProto));
+});
+
 test('meeting source freshness fails closed on revision/hash/URI/authority drift or missing source', () => {
   const bundle = evidenceBundle();
   const fresh = assessMeetingEvidenceFreshnessV1(bundle, [source()]);
