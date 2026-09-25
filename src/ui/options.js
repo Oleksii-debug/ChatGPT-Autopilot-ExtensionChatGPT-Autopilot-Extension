@@ -1531,12 +1531,13 @@ function syncScenarioWorkButtons() {
   const has = Boolean(item);
   const running = state === 'RUNNING';
   const paused = state === 'PAUSED';
-  $('save-scenario-work-button').disabled = !has || running || paused;
+  $('save-scenario-work-button').disabled = !has || running || paused || Boolean(item?.pool);
   $('start-scenario-work-button').disabled = !has || running || paused;
   $('pause-scenario-work-button').disabled = !has || !running;
   $('resume-scenario-work-button').disabled = !has || !paused;
   $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running;
+  $('delete-scenario-work-button').disabled = !has || running || (Boolean(item?.pool)
+    && (ui.scenarioWorkPools || []).find(pool => pool.id === item.pool.id)?.active > 0);
   $('scenario-work-run-now').disabled = !has || !running;
   $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
 }
@@ -1583,6 +1584,12 @@ function renderScenarioWorkState(item) {
   const runtime = item.runtime || {};
   addScenarioStateLine('Стан', runtime.runState || 'STOPPED');
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
+  if (item.pool) {
+    const pool = (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
+    addScenarioStateLine('Пул: одночасних слотів', pool?.slots ?? '—');
+    addScenarioStateLine('Пул: виділено додаткових чатів', `${pool?.replacementsUsed ?? '—'}/${item.pool.replacementBudget}`);
+    addScenarioStateLine('Цей слот: виділено замін', runtime.poolReplacementsUsed || 0);
+  }
   addScenarioStateLine('Покоління', runtime.generation ?? 1);
   addScenarioStateLine('Фаза', runtime.phase || '—');
   if (runtime.mode === 'CHAT_CYCLE') {
@@ -1819,6 +1826,7 @@ function fillScenarioWorkForm(item) {
 
 function renderScenarioWorkList(data = {}) {
   const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
+  ui.scenarioWorkPools = Array.isArray(data.pools) ? data.pools.map(item => clone(item)) : [];
   ui.scenarioWorkScenarios = scenarios.map(item => clone(item));
   const list = $('scenario-work-list');
   list.replaceChildren();
@@ -1880,17 +1888,20 @@ async function startParallelScenarioChats() {
   let started = 0;
   let firstId = '';
   try {
-    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість незалежних чатів');
+    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів');
+    const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати');
+    const staggerSeconds = scenarioWorkInt('scenario-cycle-initial-stagger', 0, 60, 'Пауза між початковими чатами');
     const config = scenarioWorkConfigFromForm();
     const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
     setScenarioWorkBusy(true);
-    for (let index = 1; index <= count; index += 1) {
-      const result = await core('CREATE_SCENARIO_WORK', {
-        name: `${baseName} — чат ${index}`, mode: 'CHAT_CYCLE', config,
-      });
-      const id = result?.scenario?.id;
-      if (!id) throw new Error('Створений цикл не повернув ідентифікатор.');
-      created++;
+    const result = await core('CREATE_SCENARIO_CHAT_POOL', {
+      name: baseName, count, replacementBudget, config,
+    });
+    const ids = result?.ids || [];
+    if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
+    created = ids.length;
+    for (const [index, id] of ids.entries()) {
+      if (index && staggerSeconds) await new Promise(resolve => setTimeout(resolve, staggerSeconds * 1000));
       firstId ||= id;
       await core('START_SCENARIO_WORK', { id });
       started++;
@@ -1901,7 +1912,7 @@ async function startParallelScenarioChats() {
       await openScenarioWork(firstId);
     }
     setScenarioWorkPanel('state');
-    announce(`Запущено ${started} незалежних чатів. Кожен чекає своєї відповіді.`);
+    announce(`Запущено пул: ${started} одночасних чатів, спільний ліміт додаткових чатів ${replacementBudget}.`);
   } catch (error) {
     await loadScenarioWork();
     const message = `Створено ${created}, запущено ${started} чатів. Помилка: ${error.message}`;
@@ -1946,7 +1957,9 @@ async function deleteScenarioWork() {
   if (!id) return;
   try {
     setScenarioWorkBusy(true);
-    await core('DELETE_SCENARIO_WORK', { id });
+    if (ui.selectedScenarioWork?.pool?.id) {
+      await core('DELETE_SCENARIO_CHAT_POOL', { id: ui.selectedScenarioWork.pool.id });
+    } else await core('DELETE_SCENARIO_WORK', { id });
     await loadScenarioWork({ preservePanel: false });
     $('scenario-work-list').focus();
     announce('Сценарій видалено.');
