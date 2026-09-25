@@ -86,10 +86,18 @@ function strictArray(input, label, { min = 0, max } = {}) {
   if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) {
     throw new Error(`${label} must be a plain array`);
   }
-  if (!Number.isInteger(max) || input.length < min || input.length > max) {
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0) {
+    throw new Error(`${label} must expose a canonical data length`);
+  }
+  const length = lengthDescriptor.value;
+  if (!Number.isInteger(max) || length < min || length > max) {
     throw new Error(`${label} must contain ${min}-${max} items`);
   }
-  const descriptors = Object.getOwnPropertyDescriptors(input);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
@@ -97,7 +105,7 @@ function strictArray(input, label, { min = 0, max } = {}) {
     }
     const index = Number(key);
     const descriptor = descriptors[key];
-    if (!Number.isSafeInteger(index) || index < 0 || index >= input.length) {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length) {
       throw new Error(`${label} contains invalid index`);
     }
     if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
@@ -105,7 +113,7 @@ function strictArray(input, label, { min = 0, max } = {}) {
     }
   }
   const out = [];
-  for (let index = 0; index < input.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} must not be sparse`);
@@ -576,7 +584,7 @@ function assertRevocablePrincipal(previous, next, previousUpdatedAt) {
     return;
   }
   if (next.status === GovernancePrincipalStatus.REVOKED
-      && Date.parse(next.revokedAt) < Date.parse(previousUpdatedAt)) {
+      && Date.parse(next.revokedAt) <= Date.parse(previousUpdatedAt)) {
     throw new Error(`principal ${previous.principalId} revocation cannot rewrite prior history`);
   }
 }
@@ -589,7 +597,7 @@ function assertRevocableGrant(previous, next, previousUpdatedAt) {
     assertImmutableJson(previous, next, `revoked grant ${previous.grantId}`);
     return;
   }
-  if (next.revokedAt && Date.parse(next.revokedAt) < Date.parse(previousUpdatedAt)) {
+  if (next.revokedAt && Date.parse(next.revokedAt) <= Date.parse(previousUpdatedAt)) {
     throw new Error(`grant ${previous.grantId} revocation cannot rewrite prior history`);
   }
 }
@@ -603,7 +611,7 @@ function assertRevocableCredential(previous, next, previousUpdatedAt) {
     return;
   }
   if (next.status === CredentialOwnershipStatus.REVOKED
-      && Date.parse(next.revokedAt) < Date.parse(previousUpdatedAt)) {
+      && Date.parse(next.revokedAt) <= Date.parse(previousUpdatedAt)) {
     throw new Error(`credential binding ${previous.bindingId} revocation cannot rewrite prior history`);
   }
 }
@@ -615,8 +623,8 @@ export function assertIdentityGovernanceRegistryExtensionV1(previousInput, nextI
   if (next.registryId !== previous.registryId) throw new Error('registryId is immutable');
   if (next.organizationId !== previous.organizationId) throw new Error('organizationId is immutable');
   if (next.revision !== previous.revision + 1) throw new Error('registry revision must advance exactly once');
-  if (Date.parse(next.updatedAt) < Date.parse(previous.updatedAt)) {
-    throw new Error('registry updatedAt cannot move backwards');
+  if (Date.parse(next.updatedAt) <= Date.parse(previous.updatedAt)) {
+    throw new Error('registry updatedAt must advance strictly');
   }
 
   const previousRoles = new Map(previous.roles.map((item) => [item.roleId, item]));
@@ -636,7 +644,7 @@ export function assertIdentityGovernanceRegistryExtensionV1(previousInput, nextI
   }
   for (const principal of next.principals) {
     if (!previousPrincipals.has(principal.principalId)
-        && Date.parse(principal.createdAt) < Date.parse(previous.updatedAt)) {
+        && Date.parse(principal.createdAt) <= Date.parse(previous.updatedAt)) {
       throw new Error(`new principal cannot be backdated: ${principal.principalId}`);
     }
   }
@@ -650,7 +658,7 @@ export function assertIdentityGovernanceRegistryExtensionV1(previousInput, nextI
   }
   for (const grant of next.grants) {
     if (!previousGrants.has(grant.grantId)
-        && Date.parse(grant.createdAt) < Date.parse(previous.updatedAt)) {
+        && Date.parse(grant.createdAt) <= Date.parse(previous.updatedAt)) {
       throw new Error(`new grant cannot be backdated: ${grant.grantId}`);
     }
   }
@@ -664,7 +672,7 @@ export function assertIdentityGovernanceRegistryExtensionV1(previousInput, nextI
   }
   for (const binding of next.credentialOwnership) {
     if (!previousCredentials.has(binding.bindingId)
-        && Date.parse(binding.createdAt) < Date.parse(previous.updatedAt)) {
+        && Date.parse(binding.createdAt) <= Date.parse(previous.updatedAt)) {
       throw new Error(`new credential binding cannot be backdated: ${binding.bindingId}`);
     }
   }
