@@ -21,6 +21,22 @@ function exactDataRecord(value, allowed, label) {
   return out;
 }
 
+function bindDataMethod(target, method, label) {
+  if (!target || (typeof target !== 'object' && typeof target !== 'function')) throw new Error(`${label} is required`);
+  let current = target;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, method);
+    if (descriptor) {
+      if (!Object.prototype.hasOwnProperty.call(descriptor, 'value') || typeof descriptor.value !== 'function') {
+        throw new Error(`${label}.${method} must be a data method`);
+      }
+      return descriptor.value.bind(target);
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  throw new Error(`${label}.${method} is required`);
+}
+
 function requireVerifierId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !VERIFIER_ID.test(value)) throw new Error(`${label} is invalid`);
   return value;
@@ -77,10 +93,7 @@ function matchesExpected(file, expected) {
 
 export class DriveFileUpdateVerifierV1 {
   constructor({ workspaceClient, verifierId = 'google-drive-update-readback-verifier', now = () => Date.now() } = {}) {
-    if (!workspaceClient || typeof workspaceClient.getDriveFile !== 'function') {
-      throw new Error('Google Workspace Drive readback client is required');
-    }
-    this.workspaceClient = workspaceClient;
+    this.getDriveFile = bindDataMethod(workspaceClient, 'getDriveFile', 'workspaceClient');
     this.verifierId = requireVerifierId(verifierId, 'verifierId');
     if (this.verifierId === GOOGLE_WORKSPACE_PROVIDER_ID) {
       throw new Error('Drive verifier identity must differ from effect provider identity');
@@ -91,7 +104,7 @@ export class DriveFileUpdateVerifierV1 {
 
   async #readback(invocation) {
     const expected = expectedUpdate(invocation);
-    const file = await this.workspaceClient.getDriveFile({ fileId: expected.fileId });
+    const file = await this.getDriveFile({ fileId: expected.fileId });
     if (!file || file.id !== expected.fileId) throw new Error('Drive update readback identity mismatch');
     return Object.freeze({ expected, file, matches: matchesExpected(file, expected) });
   }
