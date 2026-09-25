@@ -189,7 +189,10 @@ export function normalizeAgentPlanV1(raw) {
 }
 
 /** Derives ready/blocked state from durable node terminals and conflict keys. */
-export function reconcileAgentPlanV1(raw, { at = new Date().toISOString() } = {}) {
+export function reconcileAgentPlanV1(raw, options = {}) {
+  object(options, 'AgentPlan reconcile options');
+  exact(options, new Set(['at']), 'AgentPlan reconcile options');
+  const at = options.at === undefined ? new Date().toISOString() : options.at;
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const byId = new Map(plan.nodes.map(node => [node.nodeId, node]));
   const runningKeys = new Set(plan.nodes.filter(node => node.state === AgentPlanNodeState.RUNNING).flatMap(node => node.conflictKeys));
@@ -215,7 +218,13 @@ export function reconcileAgentPlanV1(raw, { at = new Date().toISOString() } = {}
  * aggregate existing + added node budgets
  * must remain inside that same durable owner/job envelope on every extension.
  */
-export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelope, at = new Date().toISOString() } = {}) {
+export function extendAgentPlanV1(raw, options = {}) {
+  object(options, 'AgentPlan extension options');
+  exact(options, new Set(['expectedRevision', 'nodes', 'resourceEnvelope', 'at']), 'AgentPlan extension options');
+  const expectedRevision = options.expectedRevision;
+  const nodes = options.nodes;
+  const resourceEnvelope = options.resourceEnvelope;
+  const at = options.at === undefined ? new Date().toISOString() : options.at;
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const expected = expectedRevision;
   if (typeof expected !== 'number' || !Number.isSafeInteger(expected) || expected < 1) {
@@ -265,7 +274,11 @@ export function extendAgentPlanV1(raw, { expectedRevision, nodes, resourceEnvelo
  * Existing top-level identity and every durable node must be echoed exactly;
  * only a suffix of new PENDING nodes may be introduced.
  */
-export function evolveAgentPlanV1(raw, rawCandidate, { resourceEnvelope, at = new Date().toISOString() } = {}) {
+export function evolveAgentPlanV1(raw, rawCandidate, options = {}) {
+  object(options, 'AgentPlan evolution options');
+  exact(options, new Set(['resourceEnvelope', 'at']), 'AgentPlan evolution options');
+  const resourceEnvelope = options.resourceEnvelope;
+  const at = options.at === undefined ? new Date().toISOString() : options.at;
   const current = normalizeAgentPlanV1(raw);
   const candidate = normalizeAgentPlanV1(rawCandidate);
   if (candidate.revision !== current.revision) throw new Error('AgentPlan revision conflict');
@@ -285,7 +298,13 @@ export function evolveAgentPlanV1(raw, rawCandidate, { resourceEnvelope, at = ne
   });
 }
 
-export function transitionAgentPlanNodeV1(raw, { nodeId, state, evidence = '', at = new Date().toISOString() } = {}) {
+export function transitionAgentPlanNodeV1(raw, options = {}) {
+  object(options, 'AgentPlan transition options');
+  exact(options, new Set(['nodeId', 'state', 'evidence', 'at']), 'AgentPlan transition options');
+  const nodeId = options.nodeId;
+  const state = options.state;
+  const evidence = options.evidence === undefined ? '' : options.evidence;
+  const at = options.at === undefined ? new Date().toISOString() : options.at;
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const node = plan.nodes.find(item => item.nodeId === nodeId);
   if (!node) throw new Error('AgentPlan node not found');
