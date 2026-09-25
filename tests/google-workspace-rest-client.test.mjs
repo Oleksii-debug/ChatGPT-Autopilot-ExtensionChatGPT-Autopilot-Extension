@@ -225,6 +225,42 @@ test('Gmail principal must be an exact explicit owner email and never ambiguous 
   assert.deepEqual(credentialCalls, []);
 });
 
+test('public transport rejects malformed path and query objects before credential resolution', async () => {
+  let resolverCalls = 0;
+  let queryStringCalls = 0;
+  const nativeClient = {
+    resolveCredential: async () => {
+      resolverCalls += 1;
+      return { credentialId: 'google-drive-main', targetOrigin: GOOGLE_DRIVE_API_ORIGIN, secret: 'must-not-be-used' };
+    },
+  };
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({ nativeClient }));
+  await assert.rejects(
+    () => client.request(GOOGLE_DRIVE_API_ORIGIN, 7, null, 'google-drive-main', 1024),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
+  class HostileParams extends URLSearchParams {
+    toString() {
+      queryStringCalls += 1;
+      return 'x=1';
+    }
+  }
+  await assert.rejects(
+    () => client.request(GOOGLE_DRIVE_API_ORIGIN, '/drive/v3/files', new HostileParams(), 'google-drive-main', 1024),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
+  await assert.rejects(
+    () => client.request(GOOGLE_DRIVE_API_ORIGIN, '/drive/v3/files', null, 'google-drive-main', 0),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
+  await assert.rejects(
+    () => client.request(GOOGLE_DRIVE_API_ORIGIN, '/drive/v3/files', null, 'google-drive-main', 1024, 'application/json\r\nX-Leak: 1'),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
+  assert.equal(queryStringCalls, 0);
+  assert.equal(resolverCalls, 0);
+});
+
 test('resolved credential identity and target origin are exact-bound before fetch', async () => {
   const cases = [
     { credentialId: undefined, targetOrigin: GOOGLE_DRIVE_API_ORIGIN, secret: 'wrongly-unbound-secret' },
