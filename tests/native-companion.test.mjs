@@ -404,12 +404,18 @@ test('Windows installer fails closed before active-target mutation for missing o
   const activeTargetCopy = "Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force";
   const sourceSyntaxCheck = '& $nodeExe --check $sourceModule';
   const syntaxFailureGuard = 'if ($LASTEXITCODE -ne 0)';
+  const configParse = 'Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json';
+  const stagedLauncher = "$stagedLauncher = Join-Path $stagingDir 'autopilot-native-host.exe'";
+  const launcherPreflight = "Add-Type -Path (Join-Path $source 'NativeHostLauncher.cs') -OutputAssembly $stagedLauncher -OutputType ConsoleApplication";
   const installedNode = "$installedNode = Join-Path $runtime 'node.exe'";
   const registryMutation = "$regKey = 'HKCU:\\Software\\Google\\Chrome\\NativeMessagingHosts\\org.chatgpt_autopilot.companion'";
 
   const guardIndex = installer.indexOf(requiredFileGuard);
   const syntaxIndex = installer.indexOf(sourceSyntaxCheck);
   const syntaxFailureIndex = installer.indexOf(syntaxFailureGuard);
+  const configIndex = installer.indexOf(configParse);
+  const stagedLauncherIndex = installer.indexOf(stagedLauncher);
+  const launcherPreflightIndex = installer.indexOf(launcherPreflight);
   const targetCreateIndex = installer.indexOf(targetCreate);
   const copyIndex = installer.indexOf(activeTargetCopy);
   const nodeIndex = installer.indexOf(installedNode);
@@ -424,9 +430,17 @@ test('Windows installer fails closed before active-target mutation for missing o
   );
   assert.ok(syntaxIndex > guardIndex, 'source syntax preflight must run after complete required-file validation');
   assert.ok(syntaxFailureIndex > syntaxIndex, 'nonzero node --check status must fail installation');
+  assert.ok(configIndex > syntaxFailureIndex, 'existing config must be validated after source syntax and before active mutation');
+  assert.ok(stagedLauncherIndex > configIndex, 'launcher staging must begin only after existing config validation');
+  assert.ok(launcherPreflightIndex > stagedLauncherIndex, 'launcher must compile in staging before active mutation');
+  assert.equal(
+    installer.includes('Add-Type -Path $launcherSource -OutputAssembly $launcherExe'),
+    false,
+    'installer must not compile the launcher from the already-mutated active target',
+  );
   assert.ok(
-    targetCreateIndex > syntaxFailureIndex,
-    'missing/syntax failure must occur before creating or mutating the active install target',
+    targetCreateIndex > launcherPreflightIndex,
+    'missing/syntax/config/launcher failure must occur before creating or mutating the active install target',
   );
   assert.ok(copyIndex > targetCreateIndex, 'active-target file copies must begin only after successful preflight');
   assert.ok(nodeIndex > copyIndex, 'installed Node path must be established only after source payload preflight');
