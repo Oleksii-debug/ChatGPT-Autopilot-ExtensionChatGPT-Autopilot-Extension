@@ -338,9 +338,38 @@ async function responseTextBounded(response, maxBytes) {
       throw new Error('OpenHands response exceeds configured byte limit');
     }
   }
-  const text = await response.text();
-  if (byteLength(text) > maxBytes) throw new Error('OpenHands response exceeds configured byte limit');
-  return text;
+  if (!response?.body || typeof response.body.getReader !== 'function') {
+    throw new Error('OpenHands response body is not a readable byte stream');
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!(value instanceof Uint8Array)) throw new Error('OpenHands response stream returned non-byte data');
+      total += value.byteLength;
+      if (total > maxBytes) {
+        try { await reader.cancel(); } catch {}
+        throw new Error('OpenHands response exceeds configured byte limit');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    try { reader.releaseLock(); } catch {}
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error('OpenHands response is not valid UTF-8');
+  }
 }
 
 async function responseJsonBounded(response, maxBytes) {
@@ -439,9 +468,24 @@ export class OpenHandsCodingSpecialistClient {
     body = null,
     allowNotFound = false,
     effectDispatched = false,
+    deadlineMs = null,
   } = {}) {
+    const configuredTimeoutMs = prepared.config.requestTimeoutSeconds * 1000;
+    const remainingMs = deadlineMs == null ? configuredTimeoutMs : deadlineMs - this.nowFn();
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+      throw new OpenHandsCodingSpecialistError(
+        'OpenHands coding specialist execution window expired before request dispatch',
+        {
+          code: 'OPENHANDS_EXECUTION_WINDOW_EXPIRED',
+          conversationId: prepared.conversationId,
+          effectMayHaveOccurred: effectDispatched,
+          reconciliationRequired: effectDispatched,
+          safeToRetry: !effectDispatched,
+        },
+      );
+    }
     const controller = new AbortController();
-    const timeoutMs = prepared.config.requestTimeoutSeconds * 1000;
+    const timeoutMs = Math.max(1, Math.min(configuredTimeoutMs, remainingMs));
     const timer = this.setTimeoutFn(() => controller.abort(), timeoutMs);
     let fetchStarted = false;
     try {
@@ -493,8 +537,8 @@ export class OpenHandsCodingSpecialistClient {
     }
   }
 
-  async probe(prepared) {
-    const openapi = await this.request(prepared, '/openapi.json');
+  async probe(prepared, { deadlineMs = null } = {}) {
+    const openapi = await this.request(prepared, '/openapi.json', { deadlineMs });
     if (openapi?.info?.title !== 'OpenHands Agent Server') {
       throw new OpenHandsCodingSpecialistError('Local service is not an OpenHands Agent Server', {
         code: 'OPENHANDS_SERVER_IDENTITY_MISMATCH',
@@ -515,18 +559,27 @@ export class OpenHandsCodingSpecialistClient {
     });
   }
 
-  async getConversation(prepared, { allowNotFound = false, effectDispatched = false } = {}) {
+  async getConversation(prepared, {
+    allowNotFound = false,
+    effectDispatched = false,
+    deadlineMs = null,
+  } = {}) {
     const info = await this.request(prepared, prepared.conversationPath, {
       allowNotFound,
       effectDispatched,
+      deadlineMs,
     });
     return info == null ? null : validateConversationInfo(info, prepared);
   }
 
   async execute(preparedInput) {
     const prepared = prepareOpenHandsCodingSpecialistV1(preparedInput);
-    const probe = await this.probe(prepared);
-    let conversation = await this.getConversation(prepared, { allowNotFound: true });
+    const deadline = this.nowFn() + prepared.executionSeconds * 1000;
+    const probe = await this.probe(prepared, { deadlineMs: deadline });
+    let conversation = await this.getConversation(prepared, {
+      allowNotFound: true,
+      deadlineMs: deadline,
+    });
     let created = false;
     if (!conversation) {
       let createdInfo;
@@ -535,6 +588,7 @@ export class OpenHandsCodingSpecialistClient {
           method: 'POST',
           body: prepared.requestBody,
           effectDispatched: true,
+          deadlineMs: deadline,
         });
       } catch (error) {
         if (error instanceof OpenHandsCodingSpecialistError
@@ -547,7 +601,6 @@ export class OpenHandsCodingSpecialistClient {
       created = true;
     }
 
-    const deadline = this.nowFn() + prepared.executionSeconds * 1000;
     let stableTerminal = '';
     let stableTerminalCount = 0;
     let last = conversation;
@@ -611,9 +664,15 @@ export class OpenHandsCodingSpecialistClient {
         }
       }
 
-      await this.sleepFn(prepared.config.pollIntervalMs);
+      const remainingMs = deadline - this.nowFn();
+      if (remainingMs <= 0) break;
+      await this.sleepFn(Math.min(prepared.config.pollIntervalMs, remainingMs));
+      if (this.nowFn() >= deadline) break;
       try {
-        last = await this.getConversation(prepared, { effectDispatched: true });
+        last = await this.getConversation(prepared, {
+          effectDispatched: true,
+          deadlineMs: deadline,
+        });
       } catch (error) {
         if (error instanceof OpenHandsCodingSpecialistError) {
           error.effectMayHaveOccurred = true;
