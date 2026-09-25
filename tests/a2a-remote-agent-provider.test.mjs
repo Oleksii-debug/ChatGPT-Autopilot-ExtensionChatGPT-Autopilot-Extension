@@ -106,9 +106,10 @@ function policy(overrides = {}) {
 }
 
 function okResponse(effectId = 'effect-1', result = {
-  kind: 'task',
-  id: 'remote-task-1',
-  status: { state: 'submitted' },
+  task: {
+    id: 'remote-task-1',
+    status: { state: 'TASK_STATE_SUBMITTED' },
+  },
 }) {
   return {
     status: 200,
@@ -160,10 +161,11 @@ test('sends one exact JSON-RPC message/send through admitted interface without c
   assert.equal(call.request.jsonrpc, '2.0');
   assert.equal(call.request.id, 'effect-1');
   assert.equal(call.request.method, A2A_JSONRPC_METHOD_SEND_MESSAGE);
-  assert.equal(call.request.params.message.kind, 'message');
   assert.equal(call.request.params.message.messageId, 'delegation-1');
-  assert.equal(call.request.params.message.role, 'user');
+  assert.equal(call.request.params.message.role, 'ROLE_USER');
   assert.equal(call.request.params.message.parts[0].text, sendInput().messageText);
+  assert.equal(call.request.params.message.parts[0].mediaType, 'text/plain');
+  assert.equal(Object.hasOwn(call.request.params.message.parts[0], 'kind'), false);
   assert.deepEqual(call.request.params.message.metadata['autopilot/inputArtifactIds'], ['artifact-input-1']);
 
   const serialized = JSON.stringify(call);
@@ -181,7 +183,7 @@ test('sends one exact JSON-RPC message/send through admitted interface without c
   assert.equal(result.policyDecision, 'NONE');
   assert.equal(result.requiresIndependentVerification, true);
   assert.equal(result.requiresCanonicalExactEffectCommit, true);
-  assert.equal(result.remoteResult.id, 'remote-task-1');
+  assert.equal(result.remoteResult.task.id, 'remote-task-1');
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.remoteResult), true);
 });
@@ -257,6 +259,41 @@ test('only JSONRPC binding is executable in the first provider slice', async () 
     error => error.code === 'A2A_TRANSPORT_NOT_IMPLEMENTED',
   );
   assert.equal(calls.length, 0);
+});
+
+test('JSONRPC protocol versions other than v1.0 fail closed before transport', async () => {
+  const legacyInterface = {
+    url: 'https://agent.example.com/a2a',
+    protocolBinding: 'JSONRPC',
+    protocolVersion: '0.3',
+    tenant: null,
+  };
+  const { provider, calls } = harness();
+  await assert.rejects(
+    provider.sendMessage(sendInput({
+      card: card({ supportedInterfaces: [legacyInterface] }),
+      admission: admission({ protocolVersion: '0.3' }),
+    })),
+    error => error.code === 'A2A_PROTOCOL_VERSION_NOT_IMPLEMENTED',
+  );
+  assert.equal(calls.length, 0);
+});
+
+test('v1.0 tenant is transmitted inside SendMessageRequest params', async () => {
+  const tenantInterface = {
+    url: 'https://agent.example.com/a2a',
+    protocolBinding: 'JSONRPC',
+    protocolVersion: '1.0',
+    tenant: 'tenant-a',
+  };
+  const { provider, calls } = harness();
+  await provider.sendMessage(sendInput({
+    card: card({ supportedInterfaces: [tenantInterface] }),
+    admission: admission({ tenant: 'tenant-a' }),
+  }));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].tenant, 'tenant-a');
+  assert.equal(calls[0].request.params.tenant, 'tenant-a');
 });
 
 test('pre-dispatch transport failure is retryable only when transport explicitly proves it', async () => {
