@@ -329,6 +329,67 @@ test('pull-request merge commits only after independent closed+merged expected-h
   assert.equal(fx.snapshot(inv.invocationId).verification.reasonCode, 'GITHUB_PULL_REQUEST_MERGE_CONFIRMED');
 });
 
+test('independent verification rejects missing or different resulting merge commit SHA', async () => {
+  for (const [suffix, readbackMergeCommitSha] of [
+    ['different', 'd'.repeat(40)],
+    ['missing', ''],
+  ]) {
+    let merges = 0;
+    let reads = 0;
+    const client = fullClient({
+      mergePullRequest: async args => {
+        merges += 1;
+        return {
+          repositoryFullName: args.repositoryFullName,
+          pullRequestNumber: args.pullRequestNumber,
+          expectedHeadSha: args.expectedHeadSha,
+          mergeMethod: args.mergeMethod,
+          merged: true,
+          mergeCommitSha: mergeSha,
+        };
+      },
+      readPullRequest: async ({ repositoryFullName, pullRequestNumber }) => {
+        reads += 1;
+        return {
+          repositoryFullName,
+          number: pullRequestNumber,
+          title: 'Merge candidate',
+          body: '',
+          state: 'closed',
+          merged: true,
+          headSha,
+          baseSha,
+          mergeCommitSha: readbackMergeCommitSha,
+          url: 'https://example.invalid/pr',
+        };
+      },
+    });
+    const provider = new GitHubAgentProviderV1({
+      githubClient: client,
+      grantedCapabilityIds: [GitHubCapabilityId.PULL_REQUEST_MERGE],
+      now: () => Date.parse(at),
+    });
+    const verifier = new GitHubPullRequestMergeVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+    const fx = storeFixture();
+    const executor = new GitHubExactEffectExecutorV1({
+      provider,
+      store: fx.store,
+      verify: input => verifier.verify(input),
+      reconcileVerify: input => verifier.reconcileVerify(input),
+      now: () => Date.parse(at),
+    });
+    const inv = invocation(`github-pr-merge-result-${suffix}`);
+
+    await assert.rejects(
+      () => executor.invoke({ invocation: inv, policyDecision: policy(inv) }),
+      error => error.effectState?.phase === 'RECONCILE' && error.safeToRetry === false,
+    );
+    assert.equal(merges, 1);
+    assert.equal(reads, 1);
+    assert.equal(fx.snapshot(inv.invocationId).phase, 'RECONCILE');
+  }
+});
+
 test('successful merge response with temporarily divergent readback reconciles without replay', async () => {
   let merges = 0;
   let reads = 0;
@@ -352,10 +413,10 @@ test('successful merge response with temporarily divergent readback reconciles w
         title: 'Merge candidate',
         body: '',
         state: 'closed',
-        merged: reads > 1,
+        merged: true,
         headSha,
         baseSha,
-        mergeCommitSha: reads > 1 ? mergeSha : '',
+        mergeCommitSha: reads > 1 ? mergeSha : 'd'.repeat(40),
         url: 'https://example.invalid/pr',
       };
     },
