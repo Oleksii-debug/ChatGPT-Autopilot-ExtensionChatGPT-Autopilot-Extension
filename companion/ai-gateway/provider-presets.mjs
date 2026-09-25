@@ -144,6 +144,63 @@ export function applyCompatibleEndpointPreset(rawSettings = {}, preset = MISTRAL
   return { ...settings, compatibleEndpoints };
 }
 
+function normalizeDefaultCompatibleBaseUrl(value) {
+  const source = String(value ?? '').trim().replace(/\/+$/, '');
+  if (!source) throw new Error('OpenAI-compatible base URL is required');
+  let parsed;
+  try { parsed = new URL(source); }
+  catch (_) { throw new Error('OpenAI-compatible base URL must be an absolute URL'); }
+  if (!['http:', 'https:'].includes(parsed.protocol)
+    || parsed.username
+    || parsed.password
+    || parsed.search
+    || parsed.hash) {
+    throw new Error('OpenAI-compatible base URL must be credential-free HTTP(S) without query or fragment');
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  const loopback = ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(hostname);
+  if (parsed.protocol === 'http:' && !loopback) {
+    throw new Error('Remote OpenAI-compatible base URL must use HTTPS');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+}
+
+export function applyDefaultCompatibleEndpoint(rawSettings = {}, baseUrl) {
+  const settings = settingsObject(rawSettings);
+  const canonicalBaseUrl = normalizeDefaultCompatibleBaseUrl(baseUrl);
+  const source = settings.compatibleEndpoints ?? [];
+  if (!Array.isArray(source)) throw new Error('Gateway compatibleEndpoints must be an array');
+  const compatibleEndpoints = source.filter(item => String(item?.endpointId || '').trim() !== 'default');
+  compatibleEndpoints.unshift({
+    endpointId: 'default',
+    baseUrl: canonicalBaseUrl,
+    apiKeyEnv: 'COMPATIBLE_API_KEY',
+  });
+  if (compatibleEndpoints.length > MAX_COMPATIBLE_ENDPOINTS) {
+    throw new Error(`Gateway supports at most ${MAX_COMPATIBLE_ENDPOINTS} OpenAI-compatible endpoints`);
+  }
+  return {
+    ...settings,
+    compatibleBaseUrl: canonicalBaseUrl,
+    compatibleEndpoints,
+  };
+}
+
+export function writeDefaultCompatibleEndpoint(configFile, baseUrl) {
+  const { target, settings: existing } = readSettingsFile(configFile);
+  const next = applyDefaultCompatibleEndpoint(existing, baseUrl);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const temp = `${target}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    fs.writeFileSync(temp, `${JSON.stringify(next, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(temp, target);
+    try { fs.chmodSync(target, 0o600); } catch (_) {}
+  } finally {
+    try { if (fs.existsSync(temp)) fs.unlinkSync(temp); } catch (_) {}
+  }
+  return next;
+}
+
 export function writeCompatibleEndpointPreset(configFile, preset = MISTRAL_ENDPOINT_PRESET) {
   const { target, settings: existing } = readSettingsFile(configFile);
   const next = applyCompatibleEndpointPreset(existing, preset);
@@ -166,12 +223,18 @@ function main(argv) {
     process.stdout.write(`${JSON.stringify(endpoint)}\n`);
     return;
   }
+  if (argv[0] === '--apply-default' && argv[1] && argv[2] && argv.length === 3) {
+    const settings = writeDefaultCompatibleEndpoint(argv[1], argv[2]);
+    const endpoint = settings.compatibleEndpoints.find(item => item.endpointId === 'default');
+    process.stdout.write(`${JSON.stringify(endpoint)}\n`);
+    return;
+  }
   if (argv[0] === '--credential-plan' && argv[1] && argv[2] && argv.length === 3) {
     process.stdout.write(`${JSON.stringify(loadNamedProviderCredentialPlan(argv[1], argv[2]))}\n`);
     return;
   }
   throw new Error(
-    'Usage: node provider-presets.mjs --apply-mistral <gateway-settings.json> | --credential-plan <gateway-settings.json> <provider-keys-dir>',
+    'Usage: node provider-presets.mjs --apply-mistral <gateway-settings.json> | --apply-default <gateway-settings.json> <base-url> | --credential-plan <gateway-settings.json> <provider-keys-dir>',
   );
 }
 
