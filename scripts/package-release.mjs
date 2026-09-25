@@ -17,6 +17,7 @@ const FORBIDDEN_PATH_PATTERNS = [
   /(^|\/)(Cookies?|Login Data|Local State|Web Data)(\/|$)/i,
   /\.(?:sqlite|sqlite3|db|pem|key|p12|pfx|dpapi)$/i,
   /(^|\/)(?:credentials|secrets|private-data)(\/|$)/i,
+  /^companion\/ai-gateway\/config(?:\/|$)/i,
   /(^|\/)(?:(?:token(?:s)?|credentials)(?:[._-][^/]*)?|client[_-]?secrets?(?:[._-][^/]*)?|service[_-]?account(?:[._-][^/]*)?|oauth2?[_-]?(?:client|credentials)(?:[._-][^/]*)?)\.(?:json|ya?ml|txt)$/i,
 ];
 const FORBIDDEN_TEXT_PATTERNS = [
