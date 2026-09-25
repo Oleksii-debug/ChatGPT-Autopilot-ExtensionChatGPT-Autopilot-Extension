@@ -159,27 +159,42 @@ export function resolveExecutionReconciliationV1(raw, options = {}) {
   throw new Error('reconciliation outcome must be VERIFIED, SAFE_RETRY, or MANUAL_REVIEW');
 }
 
-export function verifyOwnedExecutionV1(raw, { leaseId, at = new Date().toISOString() } = {}) {
+export function verifyOwnedExecutionV1(raw, options = {}) {
+  const request = obj(options, 'Execution owner verification request');
+  exact(request, new Set(['leaseId', 'at']), 'Execution owner verification request');
   const current = normalizeExecutionOwnershipV1(raw);
-  if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) throw new Error('only the current execution owner may verify completion');
+  const leaseId = request.leaseId;
+  const at = request.at === undefined ? new Date().toISOString() : request.at;
+  if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) {
+    throw new Error('only the current execution owner may verify completion');
+  }
   assertLeaseLive(current, at);
-  return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '' }, at);
+  // Ownership proves who may perform the effect, not who may independently
+  // certify it.  Preserve this export for compatibility but never let an
+  // effect owner mint canonical VERIFIED without resolved verifier provenance.
+  throw new Error('canonical trusted verifier provenance is required before execution can be VERIFIED');
 }
 
 /**
- * Closes an owned effect only when a verifier is distinct from the effect
- * owner and explicitly binds its authority to the immutable policy envelope
- * that admitted that effect.  It is a contract boundary: callers must obtain
- * the envelope reference from the canonical owner-policy path, never from a
- * provider or specialist response.
+ * Compatibility boundary for callers that previously supplied verifier-shaped
+ * fields directly.  Verifier IDs, policy-envelope IDs and free-text evidence
+ * supplied by the caller are assertions, not independently resolved proof.
+ * Until the canonical verifier/evidence authority can supply provenance, this
+ * function must keep the live owned effect fenced rather than mint VERIFIED.
  */
-export function verifyExecutionByAuthorityV1(raw, { leaseId, verifierId, verificationAuthorityId, evidence, at = new Date().toISOString() } = {}) {
+export function verifyExecutionByAuthorityV1(raw, options = {}) {
+  const request = obj(options, 'Execution authority verification request');
+  exact(
+    request,
+    new Set(['leaseId', 'verifierId', 'verificationAuthorityId', 'evidence', 'at']),
+    'Execution authority verification request',
+  );
   const current = normalizeExecutionOwnershipV1(raw);
-  if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) throw new Error('only the current execution lease may be independently verified');
+  const leaseId = request.leaseId;
+  const at = request.at === undefined ? new Date().toISOString() : request.at;
+  if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== id(leaseId,'leaseId')) {
+    throw new Error('only the current execution lease may be independently verified');
+  }
   assertLeaseLive(current, at);
-  const verifier = id(verifierId, 'verifierId');
-  if (verifier === current.ownerId) throw new Error('execution verifier must be independent from the effect owner');
-  if (id(verificationAuthorityId, 'verificationAuthorityId') !== current.policyEnvelopeId) throw new Error('verification authority must bind the execution policy envelope');
-  boundedText(evidence, 'verification evidence', 8000);
-  return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '' }, at);
+  throw new Error('canonical trusted verifier provenance is required before execution can be VERIFIED');
 }
