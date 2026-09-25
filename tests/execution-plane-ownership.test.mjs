@@ -150,7 +150,7 @@ test('reconciliation request rejects coercive outcomes without executing them', 
     outcome,
     verification:reconciliationVerification(),
     at:'2026-09-23T13:31:00.000Z',
-  }), /outcome must be text/);
+  }), /reconciliation outcome must use exact canonical text/);
   assert.equal(coerced, 0);
 });
 
@@ -265,4 +265,176 @@ test('expired lease fences handoff and completion until reconciliation resolves 
 
   const pending = requestExecutionHandoffV1(owned, { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-before-expiry', at:'2026-09-23T13:11:00.000Z' });
   assert.throws(() => acceptExecutionHandoffV1(pending, { handoffId:'handoff-before-expiry', ownerId:'remote', leaseId:'lease-remote', leaseUntil:'2026-09-23T13:40:00.000Z', at:T3 }), /expired.*reconciliation/);
+});
+
+
+test('durable ownership enums reject case and whitespace aliases instead of canonicalizing them', () => {
+  const available = structuredClone(base());
+
+  for (const state of ['available', ' AVAILABLE ', 'Available']) {
+    assert.throws(
+      () => normalizeExecutionOwnershipV1({ ...available, state }),
+      /state is invalid/,
+      state,
+    );
+  }
+
+  assert.throws(
+    () => claimExecutionOwnershipV1(base(), {
+      plane:'local',
+      ownerId:'local-worker',
+      leaseId:'lease-local-alias',
+      leaseUntil:T2,
+      at:T1,
+    }),
+    /execution plane is invalid/,
+  );
+  assert.throws(
+    () => claimExecutionOwnershipV1(base(), {
+      plane:' LOCAL ',
+      ownerId:'local-worker',
+      leaseId:'lease-local-alias',
+      leaseUntil:T2,
+      at:T1,
+    }),
+    /execution plane is invalid/,
+  );
+
+  const owned = localOwned();
+  assert.throws(
+    () => requestExecutionHandoffV1(owned, {
+      leaseId:'lease-local',
+      toPlane:'remote',
+      handoffId:'handoff-alias',
+      at:'2026-09-23T13:11:00.000Z',
+    }),
+    /execution plane is invalid/,
+  );
+  assert.throws(
+    () => normalizeExecutionOwnershipV1({ ...owned, ownerPlane:' local ' }),
+    /execution plane is invalid/,
+  );
+});
+
+test('reconciliation outcome requires exact canonical spelling', () => {
+  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
+
+  for (const outcome of ['manual_review', ' MANUAL_REVIEW ', 'Manual_Review']) {
+    assert.throws(
+      () => resolveExecutionReconciliationV1(reconcile, {
+        leaseId:'lease-local',
+        outcome,
+        at:'2026-09-23T13:31:00.000Z',
+      }),
+      /exact canonical text|must be VERIFIED, SAFE_RETRY, or MANUAL_REVIEW/,
+      outcome,
+    );
+  }
+
+  const manual = resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome:'MANUAL_REVIEW',
+    at:'2026-09-23T13:31:00.000Z',
+  });
+  assert.equal(manual.state, ExecutionOwnershipState.MANUAL_REVIEW);
+});
+
+test('ownership revision is a safe exact integer and transition overflow fails closed', () => {
+  const available = structuredClone(base());
+
+  for (const revision of ['1', 1.5, Number.MAX_SAFE_INTEGER + 1, Infinity]) {
+    assert.throws(
+      () => normalizeExecutionOwnershipV1({ ...available, revision }),
+      /revision is invalid/,
+      String(revision),
+    );
+  }
+
+  const maximum = normalizeExecutionOwnershipV1({
+    ...available,
+    revision:Number.MAX_SAFE_INTEGER,
+  });
+  assert.equal(maximum.revision, Number.MAX_SAFE_INTEGER);
+  assert.throws(
+    () => claimExecutionOwnershipV1(maximum, {
+      plane:'LOCAL',
+      ownerId:'local-worker',
+      leaseId:'lease-overflow',
+      leaseUntil:T2,
+      at:T1,
+    }),
+    /revision exceeds exact durable-state range/,
+  );
+});
+
+
+test('durable ownership revision transitions cannot move updatedAt backwards', () => {
+  assert.throws(
+    () => claimExecutionOwnershipV1(base(), {
+      plane:'LOCAL',
+      ownerId:'stale-worker',
+      leaseId:'stale-lease',
+      leaseUntil:'2026-09-23T13:05:00.000Z',
+      at:'2026-09-23T12:59:00.000Z',
+    }),
+    /transition cannot predate current durable state/,
+  );
+
+  const owned = localOwned();
+  assert.throws(
+    () => requestExecutionHandoffV1(owned, {
+      leaseId:'lease-local',
+      toPlane:'REMOTE',
+      handoffId:'stale-handoff',
+      at:T0,
+    }),
+    /transition cannot predate current durable state/,
+  );
+
+  const reconcile = recoverExpiredExecutionOwnershipV1(owned, { at:T3 });
+  assert.throws(
+    () => resolveExecutionReconciliationV1(reconcile, {
+      leaseId:'lease-local',
+      outcome:'MANUAL_REVIEW',
+      at:T2,
+    }),
+    /transition cannot predate current durable state/,
+  );
+});
+
+test('same-timestamp durable ownership transitions remain valid and advance exact revision', () => {
+  const available = base();
+  const owned = claimExecutionOwnershipV1(available, {
+    plane:'LOCAL',
+    ownerId:'same-time-worker',
+    leaseId:'same-time-lease',
+    leaseUntil:T1,
+    at:T0,
+  });
+  assert.equal(owned.updatedAt, T0);
+  assert.equal(owned.revision, available.revision + 1);
+
+  const pending = requestExecutionHandoffV1(owned, {
+    leaseId:'same-time-lease',
+    toPlane:'REMOTE',
+    handoffId:'same-time-handoff',
+    at:T0,
+  });
+  assert.equal(pending.updatedAt, T0);
+  assert.equal(pending.revision, owned.revision + 1);
+});
+
+test('optional durable ownership fields reject falsy non-string aliases instead of treating them as absent', () => {
+  const available = structuredClone(base());
+  const fields = ['ownerPlane', 'handoffToPlane', 'ambiguityReason'];
+
+  for (const field of fields) {
+    for (const alias of [0, false]) {
+      assert.throws(
+        () => normalizeExecutionOwnershipV1({ ...available, [field]: alias }),
+        /execution plane is invalid|ambiguityReason is invalid/,
+        `${field}=${String(alias)}`,
+      );
+    }
+  }
 });
