@@ -287,6 +287,23 @@ test('secret/signature material is not part of accepted binding or delivery sche
   );
 });
 
+test('standalone verified-delivery normalizer rejects noncanonical or empty payload material', () => {
+  assert.throws(
+    () => normalizeVerifiedWebhookDeliveryV1({
+      ...delivery(),
+      payloadArtifactRef: artifact({ sha256: SHA_A.toUpperCase() }),
+    }),
+    /canonical lowercase SHA-256/,
+  );
+  assert.throws(
+    () => normalizeVerifiedWebhookDeliveryV1({
+      ...delivery(),
+      payloadArtifactRef: artifact({ sizeBytes: 0 }),
+    }),
+    /non-empty integer sizeBytes/,
+  );
+});
+
 test('payload artifact accessors fail closed without executing getters or scheduler', async () => {
   let getterReads = 0;
   let schedulerCalls = 0;
