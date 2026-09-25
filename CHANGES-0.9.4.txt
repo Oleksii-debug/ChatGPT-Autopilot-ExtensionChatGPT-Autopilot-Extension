@@ -1,0 +1,18 @@
+ChatGPT Автопілот 0.9.4 — VISIBLE JSON ORCHESTRA IMPORT / ZERO-STATE FIX
+
+ЗМІНИ ВІД 0.9.3
+
+1. JSON import тепер видно одразу
+- На вкладці «Оркестри» додано постійно видимий блок «Завантажити JSON оркестру».
+- Не потрібно спочатку створювати оркестр або шукати імпорт усередині «Налаштування».
+- NVDA/keyboard користувач отримує звичайний file input, текстовий preview та окрему кнопку «Імпортувати JSON».
+
+2. Zero-state import виправлено
+- Preview JSON більше не вимагає selectedController і є side-effect free.
+- Коли оркестрів немає, валідний JSON автоматично створює та вибирає новий оркестр.
+- Після імпорту UI перечитує повний manager status, тому новий оркестр одразу видно у списку.
+- Імпорт завжди примусово лишає config.enabled=false; автоматичного Start немає.
+
+3. Safety
+- Існуючі правила pause/identity rebinding, Core authority та exact orchestration runtime не послаблені.
+- Фізична Windows/Chrome/NVDA перевірка власником залишається окремою human gate.

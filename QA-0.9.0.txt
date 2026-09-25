@@ -1,0 +1,169 @@
+QA 0.9.0 — MULTI-AGENT ORCHESTRATION V2 CANDIDATE
+
+EXACT SOURCE QUALIFICATION — 2026-09-11
+- Version: manifest/package/release packager = 0.9.0.
+- Architecture: existing canonical Session/Task scheduler + Orchestration V2 control/runtime layer; no second browser-send scheduler.
+- Active coordination: GitHub Issue #121 + Drive 08_MULTI_AGENT_ORCHESTRATION_V2.
+
+FULL AUTOMATED MATRIX
+- AI + Orchestration/Remote: 228/228 PASS.
+- Legacy AI Manager regression: 18/18 PASS.
+- Core + integration regression: 235/235 PASS.
+- ChatGPT interaction regression: 111/111 PASS.
+- UI regression: 47/47 PASS.
+- Release gates: 8/8 PASS.
+- Reliability regression: 22/22 PASS using six isolated Node processes.
+- TOTAL: 669/669 PASS.
+
+FOCUSED ORCHESTRATION V2 GATE
+- 94/94 PASS across strict control schema, GitHub provider, coordinator controller vertical slice, completion-driven workers, event coalescing, watchdog/no-spawn, rotation, exact-once indexes, dependencies/conflicts, owner rate-window limits, 100-worker probe coverage, provider/capability contracts, profile JSON, service-worker wiring, accessible UI, recovery and the owner-policy end-to-end role play.
+
+RECOVERY ACCEPTANCE COVERED AUTOMATICALLY
+- worker terminal event survives restart before coordinator lease;
+- coordinator rate-limit survives restart with same turnId/deliveredTurnId and no duplicate prompt;
+- worker RATE_LIMITED state + queued work survive restart and block fan-out until retry boundary;
+- lost coordinator/worker tab hints preserve durable conversation URLs and do not duplicate Sessions/Sends;
+- pending completion events and exact_once indexes survive storage repository restart;
+- cold-start service-worker wiring reconciles V2 before allowing Core execution.
+
+SAFETY / BACKPRESSURE
+- Watchdog is reconciliation only, never a spawn command.
+- NO_ACTION with zero tasks is valid.
+- coordinator single-flight prevents concurrent reasoning turns per project/profile.
+- healthy BUSY worker is not declared stale from age alone.
+- repeated probe failure creates stale candidate event only; no blind replacement.
+- coordinator/worker rate limit blocks project fan-out until bounded retry deadline.
+- malformed/stale/wrong-project/wrong-generation/expired GitHub control fails closed.
+- remote control integer fields fail closed rather than silently clamping.
+- existing SUBMITTING/AMBIGUOUS duplicate-send recovery remains authoritative.
+- legacy Remote Dispatch V1 and Orchestration V2 are mutually exclusive when enabled.
+
+STATIC GATES
+- JS/MJS/CJS syntax: 172/172 PASS.
+- JSON parse: 6/6 PASS.
+
+PRACTICAL CHROMIUM GATES
+- Real Chromium DOM/JS engine: Sessions / Orchestration / AI mode isolation PASS.
+- Keyboard Arrow navigation/focus between mode tabs PASS.
+- Internal managed coordinator/worker Sessions do not appear in ordinary Session list.
+- Legacy block is collapsed by default and Orchestration control labels remain concise.
+- Invalid owner concurrency config is rejected in-browser.
+- ChatGPT-like DOM fixture using the production adapter completed CHECK_ONLY -> INSERT_ONLY -> PREPARE_SEND -> SUBMIT_EXISTING -> SENT_VERIFIED and produced operation-local new-user-message evidence.
+- These gates do not claim a logged-in owner ChatGPT account or physical Windows/NVDA acceptance.
+
+RELEASE PACKAGING GATES
+- post-hardening full matrix: 667/667 PASS; practical Chromium gates: PASS;
+- deterministic extension package built twice byte-identically: PASS;
+- ZIP integrity: PASS;
+- packaged-source sensitive-pattern scan: PASS;
+- final SHA256 is recorded in the external SHA256SUMS artifact so the package does not self-reference its own digest.
+- private/full/source companion artifacts are built only from this exact qualified tree.
+
+NOT PHYSICALLY CLAIMED
+- actual owner Chrome extension -> GitHub V2 control -> coordinator Send -> worker Send end-to-end;
+- actual ChatGPT coordinator successfully writing/updating the canonical GitHub comment on the owner account without manual confirmation;
+- overnight/multi-day Windows/Chrome multi-profile run;
+- physical NVDA acceptance;
+- real external GitHub/API availability guarantees.
+
+A successful automated candidate is not labeled HUMAN_TESTED or NVDA_VERIFIED until the owner performs the physical acceptance path.
+
+
+RUNTIME CONCURRENCY REGRESSION — 2026-09-12
+- Regression oracle: `worker materialization cannot overwrite a concurrent durable coordinator event`.
+- Failure class covered: stale orchestration snapshot overwriting a concurrent durable event while Core worker materialization is in flight.
+- Fix: materialization and launch-accounting now execute under serialized `runtimeRepository.update()` while Core remains the only Send scheduler/authority.
+- Controller-focused suite: 13/13 PASS.
+- Exact full automated matrix after fix: 667/667 PASS.
+- Practical Chromium UI/accessibility fixture: PASS.
+- Practical Chromium ChatGPT-like phased interaction fixture: PASS.
+
+INDEPENDENT RELIABILITY QA — QUEUED AUTHORIZATION EXPIRY — 2026-09-12
+- Acceptance defect found: a worker whose bounded control authorization expired before local launch could remain QUEUED forever. Selection correctly refused the expired Send, but runtime emitted no terminal/replanning event, leaving misleading backlog state and no coordinator wake-up.
+- Fix: before worker materialization, expired QUEUED authorizations are fail-closed to CANCELLED with durable WORKER_TERMINAL evidence. No Core Session is created and exact-once identity remains reserved; any replacement requires a newly justified coordinator task identity/generation.
+- Regression oracle: `queued worker whose launch authorization expires is terminalized and wakes coordinator without Send`.
+- Controller-focused suite after fix: 14/14 PASS.
+- Full automated matrix after fix: 669/669 PASS = 228 AI/Orchestration + 18 legacy AI + 235 Core/integration + 111 interaction + 47 UI + 8 release + 22 reliability.
+- JS/MJS/CJS syntax: 172/172 PASS; JSON parse: 6/6 PASS.
+- Native Chromium ChatGPT-like phased interaction: PASS.
+- Chromium Options keyboard/mode/accessibility + multi-role configuration smoke: PASS.
+- Attempted true unpacked-extension launch in this Linux Chromium runtime. Headless Chromium did not expose an MV3 extension target and the available Xvfb Chromium wrapper did not expose the requested remote-debug endpoint; therefore UNPACKED_EXTENSION_SMOKE is NOT claimed PASS in this environment.
+
+
+INTEGRATION CLOSER — SITE ADAPTER / MANIFEST CONSISTENCY — 2026-09-12
+- Found and fixed a fail-closed integration mismatch: the new ChatGPT site-adapter registry accepted `www.chatgpt.com`, while Manifest V3 host permissions/content-script matches authorize only `chatgpt.com`. An adapter-accepted URL could therefore reach a browser path where recovery injection was not authorized.
+- Canonical fix keeps the current production surface narrow: ChatGPT Web adapter accepts only `https://chatgpt.com/...`, matching the existing manifest and launch URL. No new host permission was added.
+- Added release regression oracle: every declared site-adapter host must be present in both manifest host permissions and content-script matches.
+- Qualification evidence is refreshed only after the full matrix/browser/static/determinism gates complete on this exact tree.
+
+SUPERSEDING INTEGRATION QUALIFICATION — SITE ADAPTER CLOSURE — 2026-09-12
+- AI / Orchestration: 230/230 PASS.
+- Legacy AI Manager: 18/18 PASS.
+- Core + integration: 235/235 PASS.
+- ChatGPT interaction: 111/111 PASS.
+- UI: 47/47 PASS.
+- Release: 9/9 PASS.
+- Reliability: 22/22 PASS across six isolated process groups.
+- TOTAL: 672/672 PASS.
+- JS/MJS/CJS syntax: 176/176 PASS.
+- JSON parse: 6/6 PASS.
+- Native Chromium ChatGPT-like phased interaction: PASS.
+- Chromium Options keyboard/mode/accessibility: PASS.
+- New release oracle proves every site-adapter host is covered by both Manifest V3 host permission and content-script match.
+- Candidate remains AUTOMATED only: owner authenticated Windows/Chrome/ChatGPT/GitHub connector E2E and physical NVDA acceptance are not claimed.
+
+UX / CONFIG SEMANTICS HARDENING — 2026-09-12
+- Scope: user-facing configuration/accessibility only; scheduler/runtime ownership unchanged.
+- Semantic Project/GitHub, Coordinator and Local limits groups: PASS in static contract and real Chromium DOM.
+- Control-comment and zero launch-window help relationships (`aria-describedby`): PASS.
+- Profile preview exposes providers, control comment, launch policy and minimum launch gap before applying configuration: PASS.
+- Existing strict JSON fail-closed import + `enabled=false` setup-only behavior: PASS.
+- Conservative / balanced / throughput UI role saves: PASS.
+- Regression qualification in this Linux extraction: 663/663 non-Windows-companion tests PASS; the known 10 Ukrainian Windows-companion filename-static cases fail at missing-path lookup before runtime logic because the current Library ZIP filenames are not reconstructed correctly by this extraction path. This pre-existing archive caveat is not relabeled as a full-matrix pass.
+- JS/MJS/CJS syntax: 176/176 PASS; JSON parse: 6/6 PASS.
+- Native Chromium phased interaction: PASS; Chromium Options keyboard/mode/accessibility: PASS.
+- No HUMAN_TESTED / OWNER_CHROME_VERIFIED / NVDA_VERIFIED claim.
+
+INDEPENDENT RELIABILITY QA — CLOSED/LOST TERMINAL WORKER TAB REVOCATION — 2026-09-12
+- Acceptance defect found: after Orchestration V2 had already revoked a managed worker's launch authority (for example SUPERSEDED/terminal), `closeManagedWorkerTabs()` retired the canonical Core Session only when `chrome.tabs.remove()` succeeded. If the user/Chrome had already closed the owned worker tab, the remove call failed with a missing-tab error and the safe Core one-task Session remained enabled/RUNNING. Core could later recreate/recover that Session and Send work whose V2 authority had already been revoked.
+- Canonical fail-closed fix: terminal/superseded managed work now retires its safe Core Session even when the owned tab is already gone. Matching stale tab hints are cleared for safe sessions. If a Core operation is unresolved, failed tab removal does not erase its recovery evidence; successful removal may clear only the now-invalid tab hint. Core remains the sole Send scheduler/authority.
+- Regression oracle: `closed managed worker tab still retires safe Core Session after orchestration authority is revoked`.
+- Controller-focused orchestration suite: 15/15 PASS.
+- Linux-executable regression matrix excluding the pre-existing 10 Ukrainian Windows-companion filename-static archive/extraction lookups: 664/664 PASS = 222 AI/Orchestration + 18 legacy AI + 235 Core/integration + 111 interaction + 47 UI + 9 release + 22 reliability.
+- The 10 excluded `windows-companion-static` cases still fail only at ENOENT filename lookup in this Linux extraction, as documented by the preceding runtime/UX checkpoints; they are not relabeled as PASS.
+- JS/MJS/CJS syntax: 176/176 PASS; JSON parse: 6/6 PASS.
+- Native Chromium ChatGPT-like phased interaction: PASS.
+- Chromium Options keyboard/mode/accessibility: PASS.
+- This checkpoint does not claim OWNER_CHATGPT_ACCOUNT_TESTED, REAL_WINDOWS_OWNER_CHROME_TESTED, UNPACKED_EXTENSION_SMOKE, HUMAN_TESTED or NVDA_VERIFIED.
+
+INTEGRATION CLOSER — SOURCE ZIP UTF-8 PORTABILITY CLOSURE — 2026-09-12
+- Release defect closed: the latest Library SOURCE lineage encoded Ukrainian Windows-companion entry names without the ZIP UTF-8 filename flag, so Linux extraction reconstructed mojibake names and the 10 `windows-companion-static` cases failed before reading code.
+- Recovery preserved all current Orchestration V2/event-action work and restored only the unchanged companion subtree from the last correctly encoded qualified source; no companion runtime behavior was rolled back.
+- Added canonical deterministic source packager `scripts/package-source.mjs` and `npm run package:source`. It excludes `.git`, `node_modules` and `dist`, fixes timestamps/order, and marks every ZIP entry name UTF-8.
+- Added two release oracles proving canonical Ukrainian companion filenames exist in the source tree and two independent SOURCE builds are byte-identical with UTF-8 flags on every entry.
+- AI / Orchestration: 237/237 PASS.
+- Legacy AI Manager: 18/18 PASS.
+- Core + integration: 235/235 PASS.
+- ChatGPT interaction: 111/111 PASS.
+- UI: 47/47 PASS.
+- Release: 11/11 PASS.
+- Reliability: 22/22 PASS across six isolated process groups.
+- TOTAL: 681/681 PASS.
+- JS/MJS/CJS syntax: 180/180 PASS; JSON parse: 6/6 PASS.
+- Native Chromium ChatGPT-like phased interaction: PASS.
+- Chromium Options keyboard/mode/accessibility: PASS.
+- Re-extraction of the generated SOURCE ZIP followed by `windows-companion-static`: 10/10 PASS.
+- Installable and SOURCE determinism/integrity are required before external candidate hashes are recorded.
+- Candidate remains AUTOMATED only: OWNER_CHATGPT_ACCOUNT_TESTED=false; REAL_WINDOWS_OWNER_CHROME_TESTED=false; HUMAN_TESTED=false; NVDA_VERIFIED=false.
+
+PROVIDER ↔ SITE-ADAPTER CONFIGURATION BINDING HARDENING — 2026-09-12
+- Closed a future-provider migration hazard: coordinator provider selection and browser launch URL are now validated as one contract rather than through separate provider and ChatGPT-specific URL truths.
+- `resolveAgentProviderLaunchUrl()` resolves provider defaults and validates the resulting browser URL through that provider's declared `siteAdapterId`.
+- Live Orchestration settings and JSON profile import therefore fail closed if a provider/launch-URL pair is incompatible with the registered site adapter.
+- The profile layer no longer hardcodes ChatGPT hostname validation; provider/site-adapter registry remains the single compatibility authority.
+- No scheduler, queue, retry loop, worker lifecycle, exact-once Send path, or Core execution ownership changed.
+- Full automated matrix: 685/685 PASS = 240 AI/Orchestration + 18 legacy AI + 235 Core/integration + 111 interaction + 48 UI + 11 release + 22 reliability.
+- Focused provider/profile/orchestration gate: 44/44 PASS.
+- JS/MJS/CJS syntax: 180/180 PASS; JSON parse: 6/6 PASS.
+- Native Chromium phased interaction: PASS; Chromium Options keyboard/mode/accessibility: PASS.
+- Physical owner ChatGPT/Windows Chrome/human/NVDA acceptance remains unclaimed.
