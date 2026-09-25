@@ -47,7 +47,13 @@ function array(value, label, max, min = 0) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(label + ' must be a plain dense array');
   }
-  if (value.length < min || value.length > max) throw new Error(label + ' has invalid length');
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  if (!lengthDescriptor || !('value' in lengthDescriptor)
+      || !Number.isSafeInteger(lengthDescriptor.value)) {
+    throw new Error(label + ' must have a data length');
+  }
+  const length = lengthDescriptor.value;
+  if (length < min || length > max) throw new Error(label + ' has invalid length');
   for (const key of Reflect.ownKeys(value)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)) {
@@ -55,7 +61,7 @@ function array(value, label, max, min = 0) {
     }
   }
   const out = [];
-  for (let index = 0; index < value.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(label + '[' + index + '] must be an enumerable own data item');
