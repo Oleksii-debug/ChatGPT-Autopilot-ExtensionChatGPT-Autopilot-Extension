@@ -7,7 +7,7 @@ import {
   nextCalendarOccurrence,
   normalizeCalendarSchedule,
 } from '../src/core/calendar-schedule.js';
-import { CalendarOccurrenceState, calendarAdmissionForSession } from '../src/core/calendar-runtime.js';
+import { CalendarOccurrenceState, calendarAdmissionForSession, commitVerifiedCalendarOccurrence } from '../src/core/calendar-runtime.js';
 
 const utc = value => Date.parse(value);
 
@@ -126,4 +126,77 @@ test('recurrence bounds reject invalid ranges and counts', () => {
   assert.throws(() => normalizeCalendarSchedule({
     kind: 'WEEKLY', startDate: '2026-09-21', weekdays: [], times: ['09:00'], timeZone: 'UTC',
   }), /1-7 unique weekdays/);
+});
+
+
+test('expired bounded DAILY with catch-up OFF durably records MISSED_SKIPPED instead of disappearing as exhausted', () => {
+  const session = {
+    id: 'expired-daily',
+    calendarSchedule: {
+      kind: 'DAILY',
+      startDate: '2026-01-01',
+      times: ['09:00'],
+      timeZone: 'UTC',
+      catchUp: 'OFF',
+      maxOccurrences: 3,
+    },
+    calendarRuntime: {},
+  };
+  const admission = calendarAdmissionForSession(session, utc('2026-09-25T12:00:00Z'));
+  assert.equal(admission.kind, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(session.calendarRuntime.lastOccurrence.state, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(new Date(session.calendarRuntime.lastOccurrence.scheduledFor).toISOString(), '2026-01-01T09:00:00.000Z');
+  assert.equal(calendarAdmissionForSession(session, utc('2026-09-25T12:00:00Z')).kind, 'EXHAUSTED');
+});
+
+test('expired end-dated WEEKLY with catch-up OFF records missed state and then exhausts', () => {
+  const session = {
+    id: 'expired-weekly',
+    calendarSchedule: {
+      kind: 'WEEKLY',
+      startDate: '2026-01-01',
+      weekdays: ['MO'],
+      times: ['09:00'],
+      timeZone: 'UTC',
+      catchUp: 'OFF',
+      endDate: '2026-01-31',
+    },
+    calendarRuntime: {},
+  };
+  const admission = calendarAdmissionForSession(session, utc('2026-09-25T12:00:00Z'));
+  assert.equal(admission.kind, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(session.calendarRuntime.lastOccurrence.state, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(calendarAdmissionForSession(session, utc('2026-09-25T12:00:00Z')).kind, 'EXHAUSTED');
+});
+
+test('WEEKLY catch-up ON exposes several missed occurrences in chronological order', () => {
+  const session = {
+    id: 'weekly-backlog',
+    calendarSchedule: {
+      kind: 'WEEKLY',
+      startDate: '2026-09-21',
+      weekdays: ['MO', 'WE'],
+      times: ['09:00', '14:00'],
+      timeZone: 'UTC',
+      catchUp: 'ON',
+    },
+    calendarRuntime: {},
+  };
+  const now = utc('2026-09-24T12:00:00Z');
+  const seen = [];
+  for (let index = 0; index < 4; index += 1) {
+    const admission = calendarAdmissionForSession(session, now);
+    assert.equal(admission.kind, CalendarOccurrenceState.MISSED_WAITING_CATCHUP);
+    seen.push(new Date(admission.occurrence.scheduledAt).toISOString());
+    commitVerifiedCalendarOccurrence(session, admission.occurrence, now + index);
+  }
+  assert.deepEqual(seen, [
+    '2026-09-21T09:00:00.000Z',
+    '2026-09-21T14:00:00.000Z',
+    '2026-09-23T09:00:00.000Z',
+    '2026-09-23T14:00:00.000Z',
+  ]);
+  const next = calendarAdmissionForSession(session, now);
+  assert.equal(next.kind, CalendarOccurrenceState.WAITING);
+  assert.equal(new Date(next.occurrence.scheduledAt).toISOString(), '2026-09-28T09:00:00.000Z');
 });

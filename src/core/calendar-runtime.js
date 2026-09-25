@@ -48,10 +48,18 @@ function catchUpProbeRuntime(runtime, schedule, probeSchedule, now) {
       reconciledThroughByRevision: { ...(runtime.reconciledThroughByRevision || {}), [probeRevision]: cursor },
     };
   }
-  // Recurring catch-up ON normally starts at startDate. For an OFF-policy
-  // missed/not-missed probe we only need to know whether a recent occurrence
-  // precedes now. Nine local days cover every selected WEEKLY weekday while
-  // also spanning DST transitions, bounding probe work independent of age.
+  // Bounded recurrence may have ended entirely before the lookback window.
+  // Probe it from its real start so OFF can durably record MISSED_SKIPPED.
+  // With the canonical direct candidate finder this is O(1) for DAILY and at
+  // most seven local dates for WEEKLY; it does not enumerate historical days.
+  if ((schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY')
+    && (schedule.endDate || schedule.maxOccurrences != null)) {
+    return runtime;
+  }
+  // Unbounded recurring catch-up ON normally starts at startDate. For an
+  // OFF-policy missed/not-missed probe we only need to know whether a recent
+  // occurrence precedes now. Nine local days cover every selected WEEKLY
+  // weekday while spanning DST transitions, bounding work independent of age.
   if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
     return {
       ...runtime,
