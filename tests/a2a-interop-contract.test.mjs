@@ -12,6 +12,7 @@ import {
 const T0 = '2026-09-25T00:00:00.000Z';
 const T1 = '2026-09-25T00:10:00.000Z';
 const T2 = '2026-09-25T00:20:00.000Z';
+const T3 = '2026-09-25T00:30:00.000Z';
 const sha = char => char.repeat(64);
 
 function iface(overrides = {}) {
@@ -149,6 +150,7 @@ test('A2A transport endpoints follow binding-specific secure production forms', 
   const normalizedGrpc = normalizeA2ARemoteAgentCardRefV1(grpcCard);
   assert.equal(normalizedGrpc.supportedInterfaces[0].url, 'grpc.example.com:443');
   const grpcAssessment = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: grpcCard,
     admission: admission({
       interfaceUrl: 'grpc.example.com:443',
@@ -210,6 +212,88 @@ test('descriptor boundaries reject getters, hidden fields, symbols and sparse ar
   assert.throws(() => normalizeA2ARemoteAgentCardRefV1(sparse), /enumerable own data item/);
 });
 
+test('assessment envelope is strict data-only and never executes caller getters', () => {
+  for (const field of ['card', 'admission', 'delegation', 'assessmentAt']) {
+    let reads = 0;
+    const request = {
+      card: card(),
+      admission: admission(),
+      delegation: delegation(),
+      assessmentAt: T2,
+    };
+    const replacement = field === 'card'
+      ? card()
+      : field === 'admission'
+        ? admission()
+        : field === 'delegation'
+          ? delegation()
+          : T2;
+    Object.defineProperty(request, field, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return replacement;
+      },
+    });
+    assert.throws(
+      () => assessA2ADelegationV1(request),
+      /enumerable own data property/,
+    );
+    assert.equal(reads, 0);
+  }
+
+  const hidden = {
+    card: card(),
+    admission: admission(),
+    delegation: delegation(),
+    assessmentAt: T2,
+  };
+  Object.defineProperty(hidden, 'assessmentAt', {
+    enumerable: false,
+    value: T2,
+  });
+  assert.throws(() => assessA2ADelegationV1(hidden), /enumerable own data property/);
+
+  const symbol = {
+    card: card(),
+    admission: admission(),
+    delegation: delegation(),
+    assessmentAt: T2,
+  };
+  symbol[Symbol('authority')] = true;
+  assert.throws(() => assessA2ADelegationV1(symbol), /symbol fields/);
+
+  const unknown = {
+    card: card(),
+    admission: admission(),
+    delegation: delegation(),
+    assessmentAt: T2,
+    trustedNow: T2,
+  };
+  assert.throws(() => assessA2ADelegationV1(unknown), /unknown field/);
+
+  const exotic = Object.assign(
+    Object.create({ inheritedAuthority: true }),
+    {
+      card: card(),
+      admission: admission(),
+      delegation: delegation(),
+      assessmentAt: T2,
+    },
+  );
+  assert.throws(() => assessA2ADelegationV1(exotic), /plain data object/);
+
+  const nullProto = Object.assign(Object.create(null), {
+    card: card(),
+    admission: admission(),
+    delegation: delegation(),
+    assessmentAt: T2,
+  });
+  const result = assessA2ADelegationV1(nullProto);
+  assert.equal(result.status, 'READY_FOR_POLICY');
+  assert.equal(result.assessmentTimeAuthority, 'UNVERIFIED_INPUT');
+});
+
 test('caller cannot inject credential material or execution authority', () => {
   assert.throws(
     () => normalizeA2ARemoteAgentCardRefV1(card({ credentialMaterialPresent: true })),
@@ -235,6 +319,7 @@ test('caller cannot inject credential material or execution authority', () => {
 
 test('exact admitted card, interface, skill, security and capability set reaches policy gate only', () => {
   const result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission(),
     delegation: delegation(),
@@ -250,6 +335,9 @@ test('exact admitted card, interface, skill, security and capability set reaches
   assert.equal(result.requiresPolicyDecision, true);
   assert.equal(result.credentialsOutOfBand, true);
   assert.equal(result.remoteTaskCreated, false);
+  assert.equal(result.assessmentAt, T2);
+  assert.equal(result.assessmentTimeAuthority, 'UNVERIFIED_INPUT');
+  assert.equal(result.admissionExpiryRecheckRequired, false);
   assert.deepEqual(result.declaredSecuritySchemeIds, ['oauth.main']);
   assert.deepEqual(result.declaredSecurityRequirement.schemes, [{
     schemeId: 'oauth.main',
@@ -259,6 +347,7 @@ test('exact admitted card, interface, skill, security and capability set reaches
 
 test('card digest or selected interface drift blocks delegation before policy evaluation', () => {
   let result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card({ cardSha256: sha('b') }),
     admission: admission(),
     delegation: delegation(),
@@ -267,6 +356,7 @@ test('card digest or selected interface drift blocks delegation before policy ev
   assert(result.reasons.includes('CARD_DIGEST_DRIFT'));
 
   result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission({ protocolBinding: 'JSONRPC' }),
     delegation: delegation(),
@@ -277,6 +367,7 @@ test('card digest or selected interface drift blocks delegation before policy ev
 
 test('stale admission sets outside the exact card fail closed even when the request itself is valid', () => {
   const result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission({
       allowedSkillIds: ['research.deep', 'research.removed'],
@@ -293,6 +384,7 @@ test('stale admission sets outside the exact card fail closed even when the requ
 
 test('unknown or non-admitted skills, capabilities and security schemes fail closed', () => {
   const result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission(),
     delegation: delegation({
@@ -314,6 +406,7 @@ test('unknown or non-admitted skills, capabilities and security schemes fail clo
 
 test('agent and skill security requirements are enforced as OR-of-AND scheme/scope sets', () => {
   const empty = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission(),
     delegation: delegation({
@@ -326,6 +419,7 @@ test('agent and skill security requirements are enforced as OR-of-AND scheme/sco
   ]);
 
   const missingSkillScope = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission(),
     delegation: delegation({
@@ -342,6 +436,7 @@ test('agent and skill security requirements are enforced as OR-of-AND scheme/sco
     ],
   });
   const viaOauth = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: alternatives,
     admission: admission({ allowedSecuritySchemeIds: ['mtls.main', 'oauth.main'] }),
     delegation: delegation(),
@@ -370,6 +465,7 @@ test('agent and skill security requirements are enforced as OR-of-AND scheme/sco
 
 test('delegation causality and admission expiry are deterministic fail-closed gates', () => {
   let result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card({ discoveredAt: T1 }),
     admission: admission({ decidedAt: T1 }),
     delegation: delegation({ createdAt: T0 }),
@@ -381,12 +477,42 @@ test('delegation causality and admission expiry are deterministic fail-closed ga
   ]);
 
   result = assessA2ADelegationV1({
+    assessmentAt: T3,
     card: card(),
-    admission: admission({ expiresAt: T1 }),
+    admission: admission({ expiresAt: T2 }),
     delegation: delegation({ createdAt: T1 }),
   });
   assert.equal(result.status, 'BLOCKED');
   assert.deepEqual(result.reasons, ['ADMISSION_EXPIRED']);
+
+  result = assessA2ADelegationV1({
+    assessmentAt: T2,
+    card: card(),
+    admission: admission({ expiresAt: T2 }),
+    delegation: delegation({ createdAt: T1 }),
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.deepEqual(result.reasons, ['ADMISSION_EXPIRED']);
+
+  result = assessA2ADelegationV1({
+    assessmentAt: T1,
+    card: card(),
+    admission: admission({ expiresAt: T2 }),
+    delegation: delegation({ createdAt: T1 }),
+  });
+  assert.equal(result.status, 'EXPIRY_UNVERIFIED');
+  assert.deepEqual(result.reasons, []);
+  assert.equal(result.assessmentTimeAuthority, 'UNVERIFIED_INPUT');
+  assert.equal(result.admissionExpiryRecheckRequired, true);
+
+  result = assessA2ADelegationV1({
+    assessmentAt: T0,
+    card: card(),
+    admission: admission(),
+    delegation: delegation({ createdAt: T1 }),
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.deepEqual(result.reasons, ['ASSESSMENT_PREDATES_DELEGATION']);
 });
 
 test('card drift reports exact material changes and observation regression', () => {
@@ -418,6 +544,7 @@ test('normalizers are safely composable and output safety flags cannot be upgrad
   const normalizedAdmission = normalizeA2ARemoteAdmissionRefV1(admission());
   const normalizedDelegation = normalizeA2ADelegationRequestV1(delegation());
   assert.doesNotThrow(() => assessA2ADelegationV1({
+    assessmentAt: T2,
     card: normalizedCard,
     admission: normalizedAdmission,
     delegation: normalizedDelegation,
@@ -440,6 +567,7 @@ test('delegation must carry canonical local task and exact-effect identity', () 
 
 test('remote Agent identity mismatch and malformed canonical fields fail closed', () => {
   const result = assessA2ADelegationV1({
+    assessmentAt: T2,
     card: card(),
     admission: admission({ remoteAgentId: 'remote.other' }),
     delegation: delegation({ remoteAgentId: 'remote.third' }),
