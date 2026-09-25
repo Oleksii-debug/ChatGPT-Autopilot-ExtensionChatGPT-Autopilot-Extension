@@ -103,7 +103,10 @@ function bool(value, label) {
 }
 
 function integer(value, label, min, max) {
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
+  if (!Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < min
+      || value > max) {
     throw new Error(`${label} is invalid`);
   }
   return value;
