@@ -31,6 +31,7 @@ import {
   verifyBrowserCoordinateTarget,
   focusBrowserAgentTarget,
   validateTrustedScriptSource,
+  readBrowserCredentialFrameOrigin,
   executeBrowserCredentialFill,
   verifyBrowserAgentOutcomeEvidence,
   buildBrowserAgentOutcomeVerifierPrompt,
@@ -1491,37 +1492,70 @@ export class BrowserAgentManager {
     const credentials = [];
     let credentialStatus = { policy: BrowserAgentPolicyDecision.DENY, available: false, errorCode: '' };
     if (job?.config && isHttpUrl(pageUrl)) {
-      const credentialPolicy = resolveBrowserAgentCredentialPolicy(job.config, pageUrl);
-      credentialStatus = { policy: credentialPolicy.decision, available: false, errorCode: '' };
-      const passwordTargetVisible = frames.some(frame => (frame.elements || []).some(element =>
-        String(element?.tag || '').toLowerCase() === 'input'
-        && String(element?.type || '').toLowerCase() === 'password'
-        && element?.sensitive === true));
-      if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && this.nativeCompanion && passwordTargetVisible) {
-        try {
-          const targetOrigin = new URL(pageUrl).origin;
-          const listed = await this.nativeCompanion.listCredentials({ targetOrigin });
-          const refs = Array.isArray(listed?.credentialRefs) ? listed.credentialRefs.slice(0, 32) : [];
-          for (const raw of refs) {
-            try {
-              const ref = normalizeCredentialRefV1(raw);
-              credentials.push({
-                ref: `c${credentials.length + 1}`,
-                credentialId: ref.credentialId,
-                brokerId: ref.brokerId,
-                kind: ref.kind,
-                scope: [...ref.scope],
-                expiresAt: ref.expiresAt,
-              });
-            } catch { /* malformed broker refs are omitted */ }
+      const passwordFrames = frames.filter(frame =>
+        isHttpUrl(frame?.url)
+        && (frame.elements || []).some(element =>
+          String(element?.tag || '').toLowerCase() === 'input'
+          && String(element?.type || '').toLowerCase() === 'password'
+          && element?.sensitive === true));
+      const decisions = passwordFrames.map(frame =>
+        resolveBrowserAgentCredentialPolicy(job.config, frame.url).decision);
+      credentialStatus.policy = decisions.includes(BrowserAgentPolicyDecision.ALLOW)
+        ? BrowserAgentPolicyDecision.ALLOW
+        : (decisions.includes(BrowserAgentPolicyDecision.ASK)
+          ? BrowserAgentPolicyDecision.ASK
+          : BrowserAgentPolicyDecision.DENY);
+
+      const byOrigin = new Map();
+      for (const frame of passwordFrames) {
+        const policy = resolveBrowserAgentCredentialPolicy(job.config, frame.url);
+        if (policy.decision === BrowserAgentPolicyDecision.DENY) continue;
+        const targetOrigin = new URL(frame.url).origin;
+        const current = byOrigin.get(targetOrigin) || { targetOrigin, frameIds: [] };
+        if (!current.frameIds.includes(frame.frameId)) current.frameIds.push(frame.frameId);
+        byOrigin.set(targetOrigin, current);
+      }
+
+      if (byOrigin.size && this.nativeCompanion) {
+        const credentialIndex = new Map();
+        for (const target of [...byOrigin.values()].sort((a, b) => a.targetOrigin.localeCompare(b.targetOrigin)).slice(0, 8)) {
+          try {
+            const listed = await this.nativeCompanion.listCredentials({ targetOrigin: target.targetOrigin });
+            const refs = Array.isArray(listed?.credentialRefs) ? listed.credentialRefs.slice(0, 32) : [];
+            for (const raw of refs) {
+              if (credentials.length >= 32) break;
+              try {
+                const ref = normalizeCredentialRefV1(raw);
+                const key = `${ref.credentialId}\u0000${target.targetOrigin}`;
+                const existing = credentialIndex.get(key);
+                if (existing) {
+                  existing.frameIds = [...new Set([...existing.frameIds, ...target.frameIds])].sort((a, b) => a - b);
+                  continue;
+                }
+                const visible = {
+                  ref: `c${credentials.length + 1}`,
+                  credentialId: ref.credentialId,
+                  brokerId: ref.brokerId,
+                  kind: ref.kind,
+                  scope: [...ref.scope],
+                  expiresAt: ref.expiresAt,
+                  targetOrigin: target.targetOrigin,
+                  frameIds: [...target.frameIds].sort((a, b) => a - b),
+                };
+                credentials.push(visible);
+                credentialIndex.set(key, visible);
+              } catch { /* malformed broker refs are omitted */ }
+            }
+          } catch (error) {
+            if (!credentialStatus.errorCode) {
+              credentialStatus.errorCode = clean(error?.code || 'CREDENTIAL_BROKER_UNAVAILABLE', 120);
+            }
           }
-          credentialStatus.available = true;
-        } catch (error) {
-          credentialStatus.errorCode = clean(error?.code || 'CREDENTIAL_BROKER_UNAVAILABLE', 120);
         }
-      } else if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && !this.nativeCompanion) {
+        credentialStatus.available = credentials.length > 0;
+      } else if (byOrigin.size && !this.nativeCompanion) {
         credentialStatus.errorCode = 'NATIVE_COMPANION_UNAVAILABLE';
-      } else if (credentialPolicy.decision !== BrowserAgentPolicyDecision.DENY && !passwordTargetVisible) {
+      } else if (!passwordFrames.length) {
         credentialStatus.errorCode = 'NO_PASSWORD_FIELD';
       } else {
         credentialStatus.errorCode = 'OWNER_POLICY_DENY';
@@ -2075,9 +2109,29 @@ export class BrowserAgentManager {
       const liveBefore = await this.chrome.tabs.get(tabId);
       const liveBeforeUrl = clean(liveBefore?.pendingUrl || liveBefore?.url, 4096);
       if (!isHttpUrl(liveBeforeUrl) || !isHttpUrl(snapshot?.url)) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
-      const targetOrigin = new URL(liveBeforeUrl).origin;
-      if (new URL(snapshot.url).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
-      const credentialPolicy = resolveBrowserAgentCredentialPolicy(job.config, liveBeforeUrl);
+      const pageOrigin = new URL(liveBeforeUrl).origin;
+      if (new URL(snapshot.url).origin !== pageOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+
+      const snapshotFrame = (snapshot?.frames || []).find(frame => Number(frame.frameId) === Number(action.passwordFrameId));
+      if (!snapshotFrame || !isHttpUrl(snapshotFrame.url)) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+      const snapshotFrameOrigin = new URL(snapshotFrame.url).origin;
+      if (snapshotFrameOrigin !== action.credentialOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+
+      const observeFrameOrigin = async () => {
+        const observed = await this.requireScripting().executeScript({
+          target: { tabId, frameIds: [Number(action.passwordFrameId)] },
+          func: readBrowserCredentialFrameOrigin,
+        });
+        const result = observed?.[0]?.result;
+        if (!result || !isHttpUrl(result.url) || clean(result.origin, 2048) !== action.credentialOrigin) {
+          throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+        }
+        return { url: clean(result.url, 4096), origin: clean(result.origin, 2048) };
+      };
+
+      const frameBefore = await observeFrameOrigin();
+      const targetOrigin = frameBefore.origin;
+      const credentialPolicy = resolveBrowserAgentCredentialPolicy(job.config, frameBefore.url);
       if (credentialPolicy.decision === BrowserAgentPolicyDecision.DENY) throw new Error('OWNER_CREDENTIAL_POLICY_DENY');
       const resolved = await this.nativeCompanion.resolveCredential({
         credentialId: action.credentialId,
@@ -2087,7 +2141,10 @@ export class BrowserAgentManager {
       let secret = '';
       try {
         if (!(await this.verifyOwnerAuthority(job.id, epoch))) return { kind: 'CANCELLED_BY_OWNER' };
-        if (!resolved || resolved.credentialId !== action.credentialId || resolved.kind !== 'username-password') {
+        if (!resolved
+          || resolved.credentialId !== action.credentialId
+          || resolved.kind !== 'username-password'
+          || clean(resolved.targetOrigin, 2048) !== targetOrigin) {
           throw new Error('AGENT_CREDENTIAL_RESPONSE_INVALID');
         }
         username = typeof resolved.username === 'string' ? resolved.username : '';
@@ -2096,7 +2153,8 @@ export class BrowserAgentManager {
 
         const liveAfter = await this.chrome.tabs.get(tabId);
         const liveAfterUrl = clean(liveAfter?.pendingUrl || liveAfter?.url, 4096);
-        if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== targetOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+        if (!isHttpUrl(liveAfterUrl) || new URL(liveAfterUrl).origin !== pageOrigin) throw new Error('AGENT_CREDENTIAL_ORIGIN_STALE');
+        await observeFrameOrigin();
 
         const execution = await this.requireScripting().executeScript({
           target: { tabId, frameIds: [Number(action.passwordFrameId)] },
@@ -2111,6 +2169,7 @@ export class BrowserAgentManager {
             type: action.type,
             credentialRef: action.credentialRef,
             credentialId: action.credentialId,
+            credentialOrigin: action.credentialOrigin,
             usernameFilled: Boolean(action.usernameRef),
             passwordFilled: true,
           },
@@ -2986,7 +3045,7 @@ export class BrowserAgentManager {
 
     const risk = classifyBrowserAgentActionRisk(snapshot, action);
     const ownerPolicy = action.type === BrowserAgentActionType.FILL_CREDENTIAL
-      ? resolveBrowserAgentCredentialPolicy(current.job.config, snapshot.url)
+      ? resolveBrowserAgentCredentialPolicy(current.job.config, action.credentialOrigin || snapshot.url)
       : resolveBrowserAgentOwnerPolicy(current.job.config, snapshot, action, {
         requiresApproval: risk.requiresApproval,
       });
@@ -3006,7 +3065,7 @@ export class BrowserAgentManager {
         requiresApproval: true,
         targetName: risk.targetName || (action.type === BrowserAgentActionType.FILL_CREDENTIAL ? 'credential-backed login fields' : ''),
         reason: action.type === BrowserAgentActionType.FILL_CREDENTIAL
-          ? `Owner credential policy requires confirmation before using ${action.credentialId} on ${clean(snapshot.url, 500)}`
+          ? `Owner credential policy requires confirmation before using ${action.credentialId} on ${clean(action.credentialOrigin || snapshot.url, 500)}`
           : ownerPolicy.reason,
       });
     }
