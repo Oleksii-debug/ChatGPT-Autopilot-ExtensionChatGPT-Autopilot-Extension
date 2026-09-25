@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DataLogicalType,
   assessDataDatasetFreshnessV1,
+  assertDataDatasetSourcesMatchProjectSnapshotV1,
   assertDataTransformLineageMatchesSnapshotsV1,
   dataDatasetBindingFromSnapshotV1,
   deriveDataDatasetDeltaV1,
@@ -223,6 +224,47 @@ test('freshness is exact revision/hash/source identity evidence and never grants
   assert.equal(derived.advisoryOnly, true);
 
   assert.throws(() => assessDataDatasetFreshnessV1(snap, [source({ projectId: 'project-other' })]), /projectId mismatch/);
+});
+
+test('dataset source admission composes with canonical ProjectSnapshotV1 instead of becoming source authority', () => {
+  const snap = dataset();
+  const projectSnapshot = {
+    schemaVersion: 1,
+    projectId: 'project-a',
+    revisionId: 'project-r1',
+    title: 'Project A',
+    sourceRefs: [source()],
+    artifactRefs: [],
+    createdAt: T1,
+  };
+  const admitted = assertDataDatasetSourcesMatchProjectSnapshotV1({ dataset: snap, projectSnapshot });
+  assert.equal(admitted.projectRevisionId, 'project-r1');
+  assert.equal(admitted.advisoryOnly, true);
+
+  const staleProject = structuredClone(projectSnapshot);
+  staleProject.sourceRefs[0].revisionId = 'source-r0';
+  assert.throws(() => assertDataDatasetSourcesMatchProjectSnapshotV1({
+    dataset: snap,
+    projectSnapshot: staleProject,
+  }), /not admitted/);
+
+  const wrongProject = { ...projectSnapshot, projectId: 'project-other', sourceRefs: [source({ projectId: 'project-other' })] };
+  assert.throws(() => assertDataDatasetSourcesMatchProjectSnapshotV1({
+    dataset: snap,
+    projectSnapshot: wrongProject,
+  }), /projectId does not match/);
+
+  let reads = 0;
+  const accessorProject = structuredClone(projectSnapshot);
+  Object.defineProperty(accessorProject.sourceRefs, '0', {
+    enumerable: true,
+    get() { reads += 1; return source(); },
+  });
+  assert.throws(() => assertDataDatasetSourcesMatchProjectSnapshotV1({
+    dataset: snap,
+    projectSnapshot: accessorProject,
+  }), /enumerable data item/);
+  assert.equal(reads, 0);
 });
 
 test('transform lineage is reproducible and exact-bound to every input/output revision', () => {

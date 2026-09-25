@@ -1,4 +1,5 @@
 import {
+  normalizeProjectSnapshotV1,
   normalizeProjectSourceRefV1,
 } from './project-context-artifact.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
@@ -388,6 +389,28 @@ function sourceIdentity(source) {
     source.contentSha256,
     source.authority,
   ]);
+}
+
+export function assertDataDatasetSourcesMatchProjectSnapshotV1({ dataset, projectSnapshot } = {}) {
+  const normalizedDataset = normalizeDataDatasetSnapshotV1(dataset);
+  guardJsonData(projectSnapshot, 'projectSnapshot');
+  const normalizedProject = normalizeProjectSnapshotV1(projectSnapshot);
+  if (normalizedProject.projectId !== normalizedDataset.projectId) {
+    throw new Error('dataset projectId does not match ProjectSnapshotV1');
+  }
+  const admittedById = new Map(normalizedProject.sourceRefs.map(source => [source.sourceId, source]));
+  for (const source of normalizedDataset.sourceRefs) {
+    const admitted = admittedById.get(source.sourceId);
+    if (!admitted || sourceIdentity(admitted) !== sourceIdentity(source)) {
+      throw new Error(`dataset source is not admitted by ProjectSnapshotV1: ${source.sourceId}`);
+    }
+  }
+  return frozen({
+    dataset: normalizedDataset,
+    projectId: normalizedProject.projectId,
+    projectRevisionId: normalizedProject.revisionId,
+    advisoryOnly: true,
+  });
 }
 
 export function assessDataDatasetFreshnessV1(snapshot, currentSourceRefs = []) {
