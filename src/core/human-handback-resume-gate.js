@@ -18,10 +18,14 @@ const REQUEST_KEYS = new Set([
   'worldStatePrecondition',
   'worldStateSnapshot',
   'currentWorldStateObservations',
+  'currentJobId',
+  'currentPlanId',
+  'currentNodeId',
   'exactEffectState',
   'at',
 ]);
 const MAX_CURRENT_OBSERVATIONS = 256;
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function strictRecord(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -82,6 +86,13 @@ function snapshotDenseArray(value, label, max = MAX_CURRENT_OBSERVATIONS) {
     out[index] = descriptor.value;
   }
   return out;
+}
+
+function exactId(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
+    throw new Error(label + ' must be an exact id');
+  }
+  return value;
 }
 
 function exactTimestamp(value, label) {
@@ -169,6 +180,21 @@ export function authorizeHumanHandbackResumeV1(input = {}) {
     ownRequired(raw, 'handback', 'HumanHandbackResumeGateRequestV1'),
   );
   const packet = buildHumanHandbackResumePacketV1(handback);
+  const currentJobId = exactId(
+    ownRequired(raw, 'currentJobId', 'HumanHandbackResumeGateRequestV1'),
+    'currentJobId',
+  );
+  const currentPlanId = exactId(
+    ownRequired(raw, 'currentPlanId', 'HumanHandbackResumeGateRequestV1'),
+    'currentPlanId',
+  );
+  const currentNodeId = exactId(
+    ownRequired(raw, 'currentNodeId', 'HumanHandbackResumeGateRequestV1'),
+    'currentNodeId',
+  );
+  if (currentJobId !== packet.jobId) throw new Error('handback jobId does not match current durable job');
+  if (currentPlanId !== packet.planId) throw new Error('handback planId does not match current durable plan');
+  if (currentNodeId !== packet.nodeId) throw new Error('handback nodeId does not match current durable node');
   const assessedAt = exactTimestamp(
     ownRequired(raw, 'at', 'HumanHandbackResumeGateRequestV1'),
     'at',

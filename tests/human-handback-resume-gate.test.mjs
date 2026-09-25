@@ -41,6 +41,15 @@ const VALID = '2026-09-25T01:00:00.000Z';
 const HASH = 'a'.repeat(64);
 const HASH2 = 'b'.repeat(64);
 
+function runtimeIdentity(overrides = {}) {
+  return {
+    currentJobId: 'job-1',
+    currentPlanId: 'plan-1',
+    currentNodeId: 'node-1',
+    ...overrides,
+  };
+}
+
 function humanObservation(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -446,6 +455,7 @@ function secondAttemptCommittedEffect(effectId = 'effect-1') {
 function gateInput(overrides = {}) {
   return {
     handback: effectfulHandback(),
+    ...runtimeIdentity(),
     ...worldMaterial(),
     exactEffectState: exactEffectState(),
     at: T7,
@@ -475,6 +485,7 @@ test('effectful handback resumes only after fresh world state and committed exac
 test('effect-free handback can resume without fabricating an exact-effect ledger', () => {
   const result = authorizeHumanHandbackResumeV1({
     handback: effectFreeHandback(),
+    ...runtimeIdentity(),
     ...worldMaterial(),
     at: T7,
   });
@@ -486,16 +497,30 @@ test('effect-free handback can resume without fabricating an exact-effect ledger
 
   assert.throws(() => authorizeHumanHandbackResumeV1({
     handback: effectFreeHandback(),
+    ...runtimeIdentity(),
     ...worldMaterial(),
     exactEffectState: exactEffectState(),
     at: T7,
   }), /effect-free handback cannot supply exactEffectState/);
 });
 
+test('handback identity must match the current durable job, plan and node', () => {
+  for (const [field, value, pattern] of [
+    ['currentJobId', 'job-other', /jobId does not match/],
+    ['currentPlanId', 'plan-other', /planId does not match/],
+    ['currentNodeId', 'node-other', /nodeId does not match/],
+  ]) {
+    assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+      ...runtimeIdentity({ [field]: value }),
+    })), pattern);
+  }
+});
+
 test('stale or substituted world state fails closed before resume', () => {
   const stale = worldMaterial({ currentRevisionId: 'revision-substituted' });
   assert.throws(() => authorizeHumanHandbackResumeV1({
     handback: effectfulHandback(),
+    ...runtimeIdentity(),
     ...stale,
     exactEffectState: exactEffectState(),
     at: T7,
@@ -506,6 +531,7 @@ test('world-state guard must bind the exact takeover resource', () => {
   const material = worldMaterial({ bindTakeoverResource: false });
   assert.throws(() => authorizeHumanHandbackResumeV1({
     handback: effectfulHandback(),
+    ...runtimeIdentity(),
     ...material,
     exactEffectState: exactEffectState(),
     at: T7,
@@ -520,6 +546,7 @@ test('world-state guard and resource observation must be causally newer than han
   });
   assert.throws(() => authorizeHumanHandbackResumeV1({
     handback: effectfulHandback(),
+    ...runtimeIdentity(),
     ...oldGuard,
     exactEffectState: exactEffectState(),
     at: T7,
@@ -532,6 +559,7 @@ test('world-state guard and resource observation must be causally newer than han
   });
   assert.throws(() => authorizeHumanHandbackResumeV1({
     handback: effectfulHandback(),
+    ...runtimeIdentity(),
     ...oldObservation,
     exactEffectState: exactEffectState(),
     at: T7,
@@ -607,6 +635,7 @@ test('current world-state arrays are consumed from descriptors without ordinary 
   });
   const result = authorizeHumanHandbackResumeV1({
     handback: effectfulHandback(),
+    ...runtimeIdentity(),
     ...material,
     currentWorldStateObservations: proxied,
     exactEffectState: exactEffectState(),
