@@ -28,6 +28,6 @@ test('Sessions UI loads Action Center without turning periodic refresh into a li
   assert.match(ui, /core\('GET_ACTION_CENTER'\)/u);
   assert.match(ui, /function renderActionCenter\(data\)/u);
   assert.match(ui, /void loadActionCenter\(\)/u);
-  assert.match(ui, /Action Center лише показує стан/u);
+  assert.match(ui, /Центр уваги лише показує стан/u);
   assert.doesNotMatch(html.match(/<section id="action-center-panel"[\s\S]*?<\/section>/u)?.[0] || '', /aria-live=/iu);
 });
