@@ -294,7 +294,9 @@ test('strict descriptor snapshots reject accessors and sparse data without ordin
     /invalid array property|must not be sparse/,
   );
 
-  const state = exactEffectState(INV_RELEASE, 'PREPARED');
+  // Canonical ExactEffect state is intentionally frozen. Clone trusted fixture data
+  // before injecting the hostile accessor so this regression reaches the consumer boundary.
+  const state = { ...exactEffectState(INV_RELEASE, 'PREPARED') };
   Object.defineProperty(state, 'phase', {
     enumerable: true,
     configurable: true,
