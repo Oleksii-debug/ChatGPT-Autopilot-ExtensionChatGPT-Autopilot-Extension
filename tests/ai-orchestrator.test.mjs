@@ -315,8 +315,8 @@ test('three-route pool fails over on quota and unavailability without changing r
   const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 100_000 });
   const result = await router.run(settings({
     routes:[
-      { routeId:'a', provider:'openai-compatible', endpointId:'endpoint-a', model:'route-a', roles:['planner'], priority:30, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
-      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+      { routeId:'a', provider:'openai-compatible', endpointId:'endpoint-a', model:'route-a', roles:['planner'], priority:30, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
       { routeId:'c', provider:'ollama', model:'route-c', roles:['planner'], priority:10 },
     ],
     routePolicy:{ retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
@@ -357,7 +357,7 @@ test('non-retryable route rejection fails closed without calling another model',
   const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 100_000 });
   await assert.rejects(() => router.run(settings({
     routes:[
-      { routeId:'a', provider:'openai', model:'route-a', roles:['planner'], priority:20, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+      { routeId:'a', provider:'openai', model:'route-a', roles:['planner'], priority:20, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
       { routeId:'b', provider:'ollama', model:'route-b', roles:['planner'], priority:10 },
     ],
   }), DEFAULT_AI_ROUTER_RUNTIME, 'task', { taskRole:'planner' }), error => {
