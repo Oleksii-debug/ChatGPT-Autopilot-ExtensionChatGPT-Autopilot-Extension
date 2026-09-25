@@ -1,4 +1,9 @@
 import { assertToolInvocationAuthorizedV1, normalizeToolDescriptorV1 } from './universal-agent-contracts.js';
+import { createSha256FingerprintV1 } from './fingerprint.js';
+import {
+  UntrustedContentSourceKind,
+  normalizeUntrustedContentSourceV1,
+} from './untrusted-content-guard.js';
 
 export const CMS_WORDPRESS_PROVIDER_ID = 'remote/cms-wordpress';
 
@@ -99,6 +104,75 @@ const POLICY_KEYS = new Set([
 const CANONICAL_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function fail(message) { throw new Error(message); }
+function canonicalSourceOrigin(value) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    fail('WordPress source origin must be canonical');
+  }
+  let parsed;
+  try { parsed = new URL(value); } catch { fail('WordPress source origin must be canonical'); }
+  if (!['http:', 'https:'].includes(parsed.protocol)
+      || parsed.username
+      || parsed.password
+      || parsed.pathname !== '/'
+      || parsed.search
+      || parsed.hash
+      || parsed.origin !== value) {
+    fail('WordPress source origin must be canonical');
+  }
+  return parsed.origin;
+}
+
+function bindOptionalDataFunction(value, label) {
+  if (value == null) return null;
+  if (typeof value !== 'function') fail(label + ' must be a function');
+  return value;
+}
+
+async function materializeUntrustedWordPressResult({
+  materialize,
+  invocation,
+  result,
+  observedAt,
+}) {
+  if (typeof materialize !== 'function') {
+    fail('Canonical untrusted-content artifact materializer is required');
+  }
+  const material = snapshotJson(result, 'WordPress provider result');
+  const bytes = JSON.stringify(material);
+  const encoded = new TextEncoder().encode(bytes);
+  const fingerprint = await createSha256FingerprintV1(bytes);
+  const expectedSha256 = fingerprint.slice('sha256:'.length);
+  const sourceOrigin = canonicalSourceOrigin(material.siteOrigin ?? invocation.arguments.siteOrigin);
+  const artifactRef = await materialize(Object.freeze({
+    schemaVersion: 1,
+    invocationId: invocation.invocationId,
+    toolId: invocation.toolId,
+    providerId: CMS_WORDPRESS_PROVIDER_ID,
+    sourceOrigin,
+    observedAt,
+    mediaType: 'application/json',
+    content: bytes,
+  }));
+  const source = normalizeUntrustedContentSourceV1({
+    schemaVersion: 1,
+    sourceId: 'wordpress:' + invocation.invocationId,
+    sourceKind: UntrustedContentSourceKind.TOOL_METADATA,
+    sourceOrigin,
+    artifactRef,
+    observedAt,
+  });
+  if (source.artifactRef.sha256 !== expectedSha256) {
+    fail('WordPress materialized artifact SHA-256 does not match exact provider result');
+  }
+  if (source.artifactRef.sizeBytes !== encoded.byteLength) {
+    fail('WordPress materialized artifact size does not match exact provider result');
+  }
+  if (source.artifactRef.producerInvocationId !== invocation.invocationId) {
+    fail('WordPress materialized artifact producerInvocationId mismatch');
+  }
+  return Object.freeze({ material: Object.freeze(material), source });
+}
+
 
 function snapshotRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(label + ' must be an object');
@@ -281,12 +355,20 @@ function wrapFailure(error, invocationId) {
 
 export class CmsWordPressAgentProviderV1 {
   constructor(config = {}) {
-    const raw = snapshotRecord(config, new Set(['wordpressClient', 'grantedCapabilityIds', 'now']), 'WordPress provider config');
+    const raw = snapshotRecord(
+      config,
+      new Set(['wordpressClient', 'grantedCapabilityIds', 'now', 'materializeUntrustedContent']),
+      'WordPress provider config',
+    );
     const methods = Object.values(CmsWordPressToolId).map(methodFor);
     const bound = Object.create(null);
     for (const method of methods) bound[method] = bindDataMethod(raw.wordpressClient, method, 'wordpressClient');
     this.wordpressMethods = Object.freeze(bound);
     this.grantedCapabilityIds = strictDenseCapabilities(raw.grantedCapabilityIds ?? []);
+    this.materializeUntrustedContent = bindOptionalDataFunction(
+      raw.materializeUntrustedContent,
+      'materializeUntrustedContent',
+    );
     this.now = raw.now ?? (() => Date.now());
     if (typeof this.now !== 'function') fail('now must be a function');
   }
@@ -313,11 +395,22 @@ export class CmsWordPressAgentProviderV1 {
       const result = await this.wordpressMethods[method](authorized.invocation.arguments);
       const observed = new Date(this.now());
       if (!Number.isFinite(observed.getTime())) fail('now returned an invalid timestamp');
+      const observedAt = observed.toISOString();
+      const materialized = await materializeUntrustedWordPressResult({
+        materialize: this.materializeUntrustedContent,
+        invocation: authorized.invocation,
+        result,
+        observedAt,
+      });
       return Object.freeze({
         providerId: CMS_WORDPRESS_PROVIDER_ID,
         invocationId: authorized.invocation.invocationId,
-        observedAt: observed.toISOString(),
-        result: structuredClone(result),
+        observedAt,
+        result: materialized.material,
+        source: materialized.source,
+        contentTrust: materialized.source.contentTrust,
+        instructionAuthority: materialized.source.instructionAuthority,
+        requiresCanonicalUntrustedContentGuardAssessment: true,
       });
     } catch (error) {
       throw wrapFailure(error, authorized.invocation.invocationId);
