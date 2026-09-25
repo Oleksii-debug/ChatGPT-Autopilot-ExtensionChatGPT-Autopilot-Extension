@@ -13,6 +13,7 @@ import {
   browserAgentScheduleDecision,
   classifyBrowserAgentActionRisk,
   browserSnapshotSignature,
+  executeBrowserCredentialFill,
   verifyBrowserAgentOutcomeEvidence,
 } from '../src/core/browser-agent.js';
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
@@ -539,6 +540,29 @@ test('fill_credential parser accepts only a current broker ref and current passw
     passwordFrameId: 0,
     passwordRef: 'r2',
   }), crossOrigin), /not bound to the current password frame origin/);
+});
+
+test('secret-bearing credential fill fails before DOM access when the executing frame origin drifted', () => {
+  const priorLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: { href: 'https://evil.example/phish', origin: 'https://evil.example' },
+  });
+  try {
+    assert.throws(() => executeBrowserCredentialFill(
+      'snapshot-1',
+      {
+        credentialOrigin: 'https://login.example.edu',
+        passwordFrameId: 7,
+        passwordRef: 'r2',
+      },
+      '',
+      'must-never-reach-dom',
+    ), /AGENT_CREDENTIAL_ORIGIN_STALE/);
+  } finally {
+    if (priorLocation) Object.defineProperty(globalThis, 'location', priorLocation);
+    else delete globalThis.location;
+  }
 });
 
 test('credential discovery is scoped to the exact password frame origin, not the top-level page', async () => {
