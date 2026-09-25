@@ -438,10 +438,10 @@ export function normalizeSelfRepairCycleV1(input) {
   const baselineRevisionId = id(raw.baselineRevisionId, 'SelfRepairCycleV1 baselineRevisionId');
   assertAttemptChain(attempts, baselineRevisionId);
 
+  if (Date.parse(attempts[0].failure.completedAt) > Date.parse(createdAt)) {
+    throw new Error('SelfRepairCycleV1 createdAt cannot predate initial failure evidence');
+  }
   for (const attempt of attempts) {
-    if (Date.parse(attempt.failure.completedAt) < Date.parse(createdAt)) {
-      throw new Error('SelfRepairCycleV1 failure evidence cannot predate cycle creation');
-    }
     if (Date.parse(latestEventAt(attempt)) > Date.parse(updatedAt)) {
       throw new Error('SelfRepairCycleV1 updatedAt cannot predate attempt evidence');
     }
@@ -488,6 +488,9 @@ export function assessSelfRepairCycleV1(input) {
     requiresCanonicalExecutor: true,
     requiresCanonicalPolicy: true,
     requiresIndependentVerifier: true,
-    verifiedOutcome: derived.state === SelfRepairCycleState.VERIFIED,
+    evidenceTrust: 'UNVERIFIED_INPUT',
+    requiresCanonicalEvidenceResolution: true,
+    completionAuthorized: false,
+    retestPassed: derived.state === SelfRepairCycleState.VERIFIED,
   });
 }
