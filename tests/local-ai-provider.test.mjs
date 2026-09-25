@@ -167,6 +167,46 @@ test('counts streamed response bytes and cancels immediately after the size ceil
   assert.equal(releaseCalls, 1);
 });
 
+test('rejects non-byte streamed Local AI chunks without coercion', async () => {
+  let cancelCalls = 0;
+  let releaseCalls = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader() {
+          let read = false;
+          return {
+            async read() {
+              if (read) return { done: true, value: undefined };
+              read = true;
+              return { done: false, value: { byteLength: 0, secret: 'not-bytes' } };
+            },
+            async cancel() { cancelCalls += 1; },
+            releaseLock() { releaseCalls += 1; },
+          };
+        },
+      },
+    }),
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(
+    () => client.complete(settings, 'test'),
+    /invalid response stream/,
+  );
+  assert.equal(cancelCalls, 1);
+  assert.equal(releaseCalls, 1);
+});
+
 test('fallback response size guard counts UTF-8 bytes rather than JavaScript characters', async () => {
   const multibyte = 'я'.repeat(Math.floor(MAX_RESPONSE_BYTES / 2) + 100);
   const body = JSON.stringify({ message: { role: 'assistant', content: multibyte } });
