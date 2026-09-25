@@ -283,6 +283,38 @@ test('hostile prototype-bearing evidence and inherited route pricing cannot beco
   }
 });
 
+test('cost authority snapshots Proxy data descriptors once and never trusts a later property get', () => {
+  let reads = 0;
+  const routeProxy = new Proxy(route(), {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'inputPricePerMillionUsd') return 999_999;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const record = meterAiRouteUsageV1({
+    route: routeProxy,
+    invocationId: 'invoke-proxy-snapshot',
+    inputTokens: 10,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  assert.equal(reads, 0, 'metering must consume snapshotted descriptors rather than Proxy get traps');
+  assert.equal(record.inputPricePerMillionUsd, 1.5);
+  assert.equal(record.costUsdMicros, 15);
+
+  const costProxy = new Proxy({ ...record }, {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'costUsdMicros') return 0;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const normalized = normalizeAiCostRecordV1(costProxy);
+  assert.equal(reads, 0, 'persisted cost evidence must not be re-read through Proxy get traps');
+  assert.equal(normalized.costUsdMicros, 15);
+});
+
 test('cost authority rejects accessors, hidden fields, symbols, and accessor-backed aggregate entries without executing getters', () => {
   const record = meterAiRouteUsageV1({
     route: route(),
