@@ -163,10 +163,19 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   assert.equal(claimed.claimed.length, 1);
   const completed = await manager.completeSpecialistHandoff('job-1', { agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:1'] });
   assert.equal(completed.verificationRequired, claimed.claimed[0]);
-  await assert.rejects(() => manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', verificationAuthorityId:'policy:archive', evidence:'self verified' }), /independent/);
-  const verified = await manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:archive', evidence:'Fresh artifact hash and current-state observation match.' });
-  assert.equal(verified.plan.nodes.find(node => node.nodeId === 'archive').state, 'VERIFIED');
-  assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job-1', {
+      agentId:claimed.claimed[0],
+      verifierId:'verifier-forged-but-distinct',
+      verificationAuthorityId:'policy:archive',
+      evidence:'Caller-created text claims fresh artifact evidence.',
+    }),
+    /trusted verifier provenance/,
+  );
+  const after = await manager.listSpecialistHandoffs('job-1');
+  assert.equal(after.plan.nodes.find(node => node.nodeId === 'archive').state, 'RUNNING');
+  assert.equal(after.handoffs[0].state, 'COMPLETED');
+  assert.equal(after.executionOwnerships[0].state, 'OWNED');
 });
 
 test('Browser Agent keeps ambiguous specialist effect fenced across forged proof and restart', async () => {
