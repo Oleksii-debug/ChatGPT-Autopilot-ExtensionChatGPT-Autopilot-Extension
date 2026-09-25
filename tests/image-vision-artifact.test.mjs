@@ -116,12 +116,7 @@ test('binds exact immutable image bytes before one canonical vision-router call'
   assert.match(router.calls[0].prompt, new RegExp(sha256(bytes), 'u'));
 
   assert.equal(result.analysisId, 'analysis-1');
-  assert.deepEqual(result.sourceArtifact, {
-    artifactId: 'image-1',
-    sha256: sha256(bytes),
-    mediaType: 'image/png',
-    sizeBytes: bytes.byteLength,
-  });
+  assert.deepEqual(result.sourceArtifact, artifactRef(bytes));
   assert.equal(result.model.altText, modelPayload().altText);
   assert.equal(result.sourceTrust, 'MODEL_OBSERVATION');
   assert.equal(result.advisoryOnly, true);
@@ -136,6 +131,33 @@ test('binds exact immutable image bytes before one canonical vision-router call'
   assert.ok(Object.isFrozen(result.model));
   assert.ok(Object.isFrozen(result.model.observations));
   assert.ok(Object.isFrozen(result.model.cropProposals[0]));
+});
+
+test('analysis provenance retains the full canonical ArtifactRef identity for same-byte variants', async () => {
+  const bytes = pngBytes();
+  const firstRouter = routerWith();
+  const secondRouter = routerWith();
+  const firstRef = artifactRef(bytes);
+  const secondRef = artifactRef(bytes, {
+    uri: 'artifact://image-1/rebound',
+    kind: 'image-derived',
+    createdAt: '2026-09-25T10:31:00.000Z',
+    producerInvocationId: 'invocation-2',
+  });
+
+  const first = await analyzeImageArtifactV1(request(bytes, { artifactRef: firstRef }), {
+    routeVision: firstRouter.routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+  const second = await analyzeImageArtifactV1(request(bytes, { artifactRef: secondRef }), {
+    routeVision: secondRouter.routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+
+  assert.deepEqual(first.sourceArtifact, firstRef);
+  assert.deepEqual(second.sourceArtifact, secondRef);
+  assert.notDeepEqual(first.sourceArtifact, second.sourceArtifact);
+  assert.equal(first.sourceArtifact.sha256, second.sourceArtifact.sha256);
 });
 
 test('hash mismatch fails before any model call', async () => {
