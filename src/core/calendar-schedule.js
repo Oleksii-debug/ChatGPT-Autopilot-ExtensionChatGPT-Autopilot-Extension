@@ -46,7 +46,7 @@ export function normalizeCalendarSchedule(input) {
   const occurrences = (input.occurrences || []).map(item => normalizeExplicitOccurrence(item, timeZone)).sort((a, b) => a.scheduledAt - b.scheduledAt); if (!occurrences.length || occurrences.length > 10000) throw new Error('Calendar EXPLICIT schedule requires 1-10000 occurrences'); const seen = new Set(); for (const item of occurrences) { const key = `${item.date}T${item.time}`; if (seen.has(key)) throw new Error('Calendar EXPLICIT schedule contains duplicate occurrence'); seen.add(key); } return { ...schedule, occurrences: occurrences.map(({ date, time }) => ({ date, time })) };
 }
 
-function hash32function hash32(value, seed) { let hash = seed >>> 0; for (let i = 0; i < value.length; i += 1) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(16).padStart(8, '0'); }
+function hash32(value, seed) { let hash = seed >>> 0; for (let i = 0; i < value.length; i += 1) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(16).padStart(8, '0'); }
 function legacyRevisionForNormalized(schedule) { return `v1-${hash32(JSON.stringify(schedule), 2166136261)}`; }
 export function calendarScheduleRevision(rawSchedule) { const schedule = normalizeCalendarSchedule(rawSchedule); const value = JSON.stringify(schedule); return `v2-${hash32(value, 2166136261)}${hash32(value, 3339675911)}${hash32(value, 668265263)}${hash32(value, 374761393)}`; }
 export function occurrenceId(sessionId, scheduledAt, revision = 'legacy') { if (!sessionId) throw new Error('Calendar occurrence sessionId required'); return `${sessionId}@${revision}@${new Date(scheduledAt).toISOString()}`; }
@@ -124,7 +124,7 @@ function nextRecurring(sessionId, schedule, revision, runtime, now, finder) {
 function nextDaily(sessionId, schedule, revision, runtime, now) { return nextRecurring(sessionId, schedule, revision, runtime, now, firstDailyCandidateOnOrAfter); }
 function nextWeekly(sessionId, schedule, revision, runtime, now) { return nextRecurring(sessionId, schedule, revision, runtime, now, firstWeeklyCandidateOnOrAfter); }
 
-export function nextCalendarOccurrenceexport function nextCalendarOccurrence({ sessionId, schedule: rawSchedule, runtime = {}, now = Date.now() }) {
+export function nextCalendarOccurrence({ sessionId, schedule: rawSchedule, runtime = {}, now = Date.now() }) {
   const schedule = normalizeCalendarSchedule(rawSchedule); const revision = calendarScheduleRevision(schedule);
   if (schedule.kind === CalendarScheduleKind.DAILY) return nextDaily(sessionId, schedule, revision, runtime, now);
   if (schedule.kind === CalendarScheduleKind.WEEKLY) return nextWeekly(sessionId, schedule, revision, runtime, now);
