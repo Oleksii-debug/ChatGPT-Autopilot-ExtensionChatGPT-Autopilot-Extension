@@ -78,6 +78,30 @@ test('manager preserves a valid persisted scenario while omitting an invalid sib
 });
 
 
+test('manager migrates only known legacy config defaults during recovery', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'legacy',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Legacy', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = structuredClone(chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY]);
+  delete stored.byId.legacy.config.schemaVersion;
+  delete stored.byId.legacy.config.timeoutPolicy;
+  await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: stored });
+
+  const listed = await manager.list();
+  assert.equal(listed.selectedId, 'legacy');
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['legacy']);
+  assert.equal(listed.scenarios[0].config.schemaVersion, 1);
+  assert.equal(listed.scenarios[0].config.timeoutPolicy, 'REPLACE_MEMBER');
+});
+
 test('manager recovery never turns malformed persisted config into runnable defaults or coercive aliases', async () => {
   const chrome = chromeFake();
   const core = new CoreRepo();
