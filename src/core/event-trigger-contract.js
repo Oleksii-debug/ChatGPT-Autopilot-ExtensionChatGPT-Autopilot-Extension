@@ -178,6 +178,44 @@ function freezeDeep(value) {
   return Object.freeze(value);
 }
 
+function canonicalTriggerDefinition(trigger) {
+  return JSON.stringify([
+    'chatgpt-autopilot-event-trigger-definition-v1',
+    trigger.schemaVersion,
+    trigger.triggerId,
+    trigger.triggerRevision,
+    trigger.agentId,
+    trigger.jobId,
+    trigger.kind,
+    trigger.providerId,
+    trigger.sourceBindingId,
+    trigger.requiredCapabilityIds,
+    trigger.enabled,
+    trigger.createdAt,
+  ]);
+}
+
+async function bindTrustedTriggerDefinition(trigger, {
+  resolveTriggerDefinition,
+  cryptoApi = globalThis.crypto,
+} = {}) {
+  if (typeof resolveTriggerDefinition !== 'function') {
+    throw new Error('Event trigger admission requires a trusted trigger definition resolver');
+  }
+  const trusted = normalizeEventTriggerDefinitionV1(await resolveTriggerDefinition({
+    triggerId: trigger.triggerId,
+    triggerRevision: trigger.triggerRevision,
+  }));
+  if (canonicalTriggerDefinition(trusted) !== canonicalTriggerDefinition(trigger)) {
+    throw new Error('Event trigger definition does not match trusted trigger revision');
+  }
+  const triggerDefinitionFingerprint = await createSha256FingerprintV1(
+    canonicalTriggerDefinition(trusted),
+    { cryptoApi },
+  );
+  return { triggerDefinitionFingerprint };
+}
+
 export function normalizeEventTriggerDefinitionV1(value) {
   const raw = strictRecord(value, 'EventTriggerDefinitionV1', TRIGGER_KEYS);
   exactVersion(raw.schemaVersion, 'EventTriggerDefinitionV1');
@@ -224,9 +262,10 @@ export function normalizeEventTriggerObservationV1(value) {
   });
 }
 
-async function fingerprints(trigger, observation, { cryptoApi = globalThis.crypto } = {}) {
+async function fingerprints(trigger, observation, triggerDefinitionFingerprint, { cryptoApi = globalThis.crypto } = {}) {
   const sourceIdentityCanonical = JSON.stringify([
     'chatgpt-autopilot-event-trigger-source-v1',
+    triggerDefinitionFingerprint,
     trigger.triggerId,
     trigger.triggerRevision,
     trigger.providerId,
@@ -235,6 +274,7 @@ async function fingerprints(trigger, observation, { cryptoApi = globalThis.crypt
   ]);
   const materialCanonical = JSON.stringify([
     'chatgpt-autopilot-event-trigger-material-v1',
+    triggerDefinitionFingerprint,
     trigger.triggerId,
     trigger.triggerRevision,
     trigger.agentId,
@@ -274,6 +314,8 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
     throw new Error('Event trigger admission predates observation');
   }
 
+  const { triggerDefinitionFingerprint } = await bindTrustedTriggerDefinition(trigger, options);
+
   if (!trigger.enabled) {
     return freezeDeep({
       schemaVersion: EVENT_TRIGGER_VERSION,
@@ -287,6 +329,8 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
       sourceBindingId: trigger.sourceBindingId,
       observationId: observation.observationId,
       sourceEventId: observation.sourceEventId,
+      triggerDefinitionFingerprint,
+      trustedTriggerDefinitionBound: true,
       advisoryOnly: true,
       executionAuthorized: false,
       policyDecisionGranted: false,
@@ -298,7 +342,12 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
     });
   }
 
-  const { sourceIdentityFingerprint, materialFingerprint } = await fingerprints(trigger, observation, options);
+  const { sourceIdentityFingerprint, materialFingerprint } = await fingerprints(
+    trigger,
+    observation,
+    triggerDefinitionFingerprint,
+    options,
+  );
   return freezeDeep({
     schemaVersion: EVENT_TRIGGER_VERSION,
     status: EventTriggerAdmissionStatus.READY_FOR_SCHEDULER,
@@ -312,6 +361,8 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
     requiredCapabilityIds: trigger.requiredCapabilityIds,
     observationId: observation.observationId,
     sourceEventId: observation.sourceEventId,
+    triggerDefinitionFingerprint,
+    trustedTriggerDefinitionBound: true,
     sourceIdentityFingerprint,
     materialFingerprint,
     occurrenceId: `event:${sourceIdentityFingerprint.slice('sha256:'.length)}`,
