@@ -4,9 +4,15 @@ import {
   normalizeA2ARemoteAdmissionRefV1,
 } from './a2a-interop-contract.js';
 import {
+  ObservationStatus,
   PolicyDecisionKind,
+  normalizeObservationV1,
   normalizePolicyDecisionV1,
 } from './universal-agent-contracts.js';
+import {
+  ExactEffectPhase,
+  normalizeExactEffectStateV1,
+} from './universal-agent-exact-effect.js';
 
 export const A2A_REMOTE_AGENT_PROVIDER_VERSION = 1;
 export const A2A_JSONRPC_METHOD_SEND_MESSAGE = 'SendMessage';
@@ -29,6 +35,37 @@ const EXECUTE_KEYS = new Set([
 
 const RESPONSE_KEYS = new Set(['status', 'contentType', 'body']);
 const JSONRPC_RESPONSE_KEYS = new Set(['jsonrpc', 'id', 'result', 'error']);
+const SEND_MESSAGE_RESULT_KEYS = new Set(['task', 'message']);
+const OBSERVATION_INPUT_KEYS = new Set(['providerResult', 'exactEffectState']);
+const PROVIDER_RESULT_KEYS = new Set([
+  'schemaVersion',
+  'providerId',
+  'remoteAgentId',
+  'delegationId',
+  'localAgentId',
+  'localTaskId',
+  'effectId',
+  'policyDecisionId',
+  'interfaceUrl',
+  'protocolBinding',
+  'protocolVersion',
+  'tenant',
+  'requestedSkillId',
+  'requestedCapabilityIds',
+  'remoteResult',
+  'observedAt',
+  'runtimeExpiryVerified',
+  'untrustedRemoteData',
+  'effectMayHaveOccurred',
+  'safeToRetry',
+  'executionAuthorized',
+  'credentialUseAuthorized',
+  'policyDecision',
+  'requiresIndependentVerification',
+  'requiresCanonicalExactEffectCommit',
+]);
+const MAX_REMOTE_ID_BYTES = 1024;
+const ISSUED_PROVIDER_RESULTS = new WeakMap();
 
 function fail(code, message, {
   effectMayHaveOccurred = false,
@@ -81,6 +118,174 @@ function exactString(value, label, maxBytes, { allowWhitespaceOnly = false } = {
     fail('A2A_PROVIDER_INPUT_INVALID', `${label} exceeds the byte limit`);
   }
   return value;
+}
+
+function dataObject(value, label, code = 'A2A_PROVIDER_INPUT_INVALID', effectMayHaveOccurred = false) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail(code, `${label} must be a plain data object`, { effectMayHaveOccurred });
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    fail(code, `${label} must be a plain data object`, { effectMayHaveOccurred });
+  }
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      fail(code, `${label} contains a symbol field`, { effectMayHaveOccurred });
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      fail(code, `${label} fields must be enumerable own data properties`, {
+        effectMayHaveOccurred,
+      });
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
+}
+
+function exactRemoteId(value, label, effectMayHaveOccurred = false) {
+  if (typeof value !== 'string'
+      || !value
+      || value !== value.trim()
+      || /[\u0000-\u001f\u007f]/u.test(value)
+      || new TextEncoder().encode(value).byteLength > MAX_REMOTE_ID_BYTES) {
+    fail('A2A_RESPONSE_INVALID', `${label} must be an exact bounded opaque identifier`, {
+      effectMayHaveOccurred,
+    });
+  }
+  return value;
+}
+
+function canonicalTimestamp(value, label) {
+  if (typeof value !== 'string' || !value) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must be a canonical timestamp`);
+  }
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must be a canonical timestamp`);
+  }
+  let canonical;
+  try {
+    canonical = new Date(ms).toISOString();
+  } catch (cause) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must be a canonical timestamp`, { cause });
+  }
+  if (value !== canonical) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must use exact canonical timestamp spelling`);
+  }
+  return value;
+}
+
+function exactStringArray(value, label) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must be a plain dense array`);
+  }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must have an exact data length`);
+  }
+  const length = lengthDescriptor.value;
+  const expectedKeys = new Set(['length']);
+  for (let index = 0; index < length; index += 1) expectedKeys.add(String(index));
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !expectedKeys.has(key)) {
+      fail('A2A_PROVIDER_RESULT_INVALID', `${label} must not contain extra array properties`);
+    }
+  }
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+        || typeof descriptor.value !== 'string'
+        || !descriptor.value
+        || descriptor.value !== descriptor.value.trim()) {
+      fail('A2A_PROVIDER_RESULT_INVALID', `${label} must contain exact string identifiers`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
+}
+
+function sameStringSet(left, right) {
+  if (left.length !== right.length) return false;
+  const leftSorted = [...left].sort();
+  const rightSorted = [...right].sort();
+  return leftSorted.every((item, index) => item === rightSorted[index]);
+}
+
+function normalizeSendMessageResult(value, {
+  effectMayHaveOccurred = false,
+} = {}) {
+  const raw = dataObject(
+    value,
+    'A2A SendMessageResponse',
+    'A2A_RESPONSE_INVALID',
+    effectMayHaveOccurred,
+  );
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !SEND_MESSAGE_RESULT_KEYS.has(key)) {
+      fail(
+        'A2A_RESPONSE_INVALID',
+        `A2A SendMessageResponse contains unknown field: ${String(key)}`,
+        { effectMayHaveOccurred },
+      );
+    }
+  }
+  const hasTask = Object.prototype.hasOwnProperty.call(raw, 'task');
+  const hasMessage = Object.prototype.hasOwnProperty.call(raw, 'message');
+  if (hasTask === hasMessage) {
+    fail(
+      'A2A_RESPONSE_INVALID',
+      'A2A SendMessageResponse must contain exactly one of task or message',
+      { effectMayHaveOccurred },
+    );
+  }
+
+  if (hasTask) {
+    const task = dataObject(
+      raw.task,
+      'A2A SendMessageResponse.task',
+      'A2A_RESPONSE_INVALID',
+      effectMayHaveOccurred,
+    );
+    const remoteTaskId = exactRemoteId(
+      task.id,
+      'A2A SendMessageResponse.task.id',
+      effectMayHaveOccurred,
+    );
+    return freeze({
+      resultKind: 'TASK',
+      remoteTaskId,
+      remoteMessageId: null,
+      remoteResult: value,
+    });
+  }
+
+  const message = dataObject(
+    raw.message,
+    'A2A SendMessageResponse.message',
+    'A2A_RESPONSE_INVALID',
+    effectMayHaveOccurred,
+  );
+  const remoteMessageId = exactRemoteId(
+    message.messageId,
+    'A2A SendMessageResponse.message.messageId',
+    effectMayHaveOccurred,
+  );
+  return freeze({
+    resultKind: 'MESSAGE',
+    remoteTaskId: null,
+    remoteMessageId,
+    remoteResult: value,
+  });
 }
 
 function timeout(value) {
@@ -259,7 +464,9 @@ function parseJsonRpcResponse(response, expectedId) {
       remoteError,
     });
   }
-  return boundedJson(parsed.result, 'A2A result');
+  const remoteResult = boundedJson(parsed.result, 'A2A result');
+  normalizeSendMessageResult(remoteResult, { effectMayHaveOccurred: true });
+  return remoteResult;
 }
 
 function transportFailure(error) {
@@ -315,6 +522,98 @@ function jsonRpcRequest(delegation, messageText, tenant) {
   });
 }
 
+function a2aSendResultToObservationV1(input = {}) {
+  const request = dataRecord(input, OBSERVATION_INPUT_KEYS, 'A2A observation request');
+  const state = normalizeExactEffectStateV1(request.exactEffectState);
+  if (state.phase !== ExactEffectPhase.EXECUTING || !state.executionId) {
+    fail(
+      'A2A_EXACT_EFFECT_STATE_INVALID',
+      'A2A observation requires the current canonical EXECUTING exact-effect attempt',
+    );
+  }
+
+  const raw = dataRecord(
+    request.providerResult,
+    PROVIDER_RESULT_KEYS,
+    'A2A provider result',
+  );
+  if (raw.schemaVersion !== A2A_REMOTE_AGENT_PROVIDER_VERSION
+      || raw.providerId !== 'a2a-remote-agent'
+      || raw.protocolBinding !== 'JSONRPC'
+      || raw.protocolVersion !== '1.0'
+      || raw.runtimeExpiryVerified !== true
+      || raw.untrustedRemoteData !== true
+      || raw.effectMayHaveOccurred !== true
+      || raw.safeToRetry !== false
+      || raw.executionAuthorized !== false
+      || raw.credentialUseAuthorized !== false
+      || raw.policyDecision !== 'NONE'
+      || raw.requiresIndependentVerification !== true
+      || raw.requiresCanonicalExactEffectCommit !== true) {
+    fail(
+      'A2A_PROVIDER_RESULT_INVALID',
+      'A2A provider result does not preserve the canonical non-authorizing execution contract',
+    );
+  }
+
+  if (typeof raw.effectId !== 'string' || raw.effectId !== state.effectId) {
+    fail('A2A_EXACT_EFFECT_BINDING_MISMATCH', 'A2A provider result effectId does not match exact effect');
+  }
+  if (state.invocation.providerId !== raw.providerId) {
+    fail(
+      'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      'A2A exact-effect invocation providerId does not match provider result',
+    );
+  }
+  if (state.invocation.policyDecisionId !== raw.policyDecisionId) {
+    fail(
+      'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      'A2A exact-effect invocation policyDecisionId does not match provider result',
+    );
+  }
+  const resultCapabilities = exactStringArray(
+    raw.requestedCapabilityIds,
+    'A2A provider result requestedCapabilityIds',
+  );
+  if (!sameStringSet(state.invocation.requestedCapabilityIds, resultCapabilities)) {
+    fail(
+      'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      'A2A exact-effect invocation capabilities do not match provider result',
+    );
+  }
+
+  const remoteAgentId = exactString(raw.remoteAgentId, 'remoteAgentId', MAX_REMOTE_ID_BYTES);
+  const delegationId = exactString(raw.delegationId, 'delegationId', MAX_REMOTE_ID_BYTES);
+  const result = normalizeSendMessageResult(raw.remoteResult);
+  const observedAt = canonicalTimestamp(raw.observedAt, 'observedAt');
+
+  return normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: state.executionId,
+    invocationId: state.effectId,
+    status: ObservationStatus.OK,
+    summary: result.resultKind === 'TASK'
+      ? 'A2A SendMessage task identity observed.'
+      : 'A2A SendMessage response message identity observed.',
+    data: {
+      protocol: 'A2A',
+      protocolVersion: '1.0',
+      providerId: 'a2a-remote-agent',
+      remoteAgentId,
+      delegationId,
+      resultKind: result.resultKind,
+      remoteTaskId: result.remoteTaskId,
+      remoteMessageId: result.remoteMessageId,
+      untrustedRemoteData: true,
+      executionAuthorized: false,
+      credentialUseAuthorized: false,
+      requiresIndependentVerification: true,
+    },
+    artifactRefs: [],
+    observedAt,
+  });
+}
+
 export class A2ARemoteAgentProviderV1 {
   constructor({ transport, now = () => Date.now() } = {}) {
     if (!transport || typeof transport !== 'object' || typeof transport.sendJsonRpc !== 'function') {
@@ -325,6 +624,19 @@ export class A2ARemoteAgentProviderV1 {
     }
     this.transport = transport;
     this.now = now;
+    ISSUED_PROVIDER_RESULTS.set(this, new WeakSet());
+  }
+
+  toObservation(input = {}) {
+    const request = dataRecord(input, OBSERVATION_INPUT_KEYS, 'A2A observation request');
+    const issuedResults = ISSUED_PROVIDER_RESULTS.get(this);
+    if (!issuedResults || !issuedResults.has(request.providerResult)) {
+      fail(
+        'A2A_PROVIDER_RESULT_UNTRUSTED',
+        'A2A observation requires the exact frozen result object issued by this provider instance',
+      );
+    }
+    return a2aSendResultToObservationV1(request);
   }
 
   async sendMessage(input = {}) {
@@ -410,7 +722,7 @@ export class A2ARemoteAgentProviderV1 {
         cause: error instanceof Error ? error : null,
       });
     }
-    return freeze({
+    const providerResult = freeze({
       schemaVersion: A2A_REMOTE_AGENT_PROVIDER_VERSION,
       providerId: 'a2a-remote-agent',
       remoteAgentId: assessment.remoteAgentId,
@@ -437,5 +749,7 @@ export class A2ARemoteAgentProviderV1 {
       requiresIndependentVerification: true,
       requiresCanonicalExactEffectCommit: true,
     });
+    ISSUED_PROVIDER_RESULTS.get(this).add(providerResult);
+    return providerResult;
   }
 }
