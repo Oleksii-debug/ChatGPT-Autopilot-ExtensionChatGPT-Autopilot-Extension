@@ -37,9 +37,12 @@ function buildPrompt(request) {
   if (!request.source.text) {
     throw new Error('Quick command requires materialized source text');
   }
+  // Keep exact URI in the local normalized SelectionAction provenance, but
+  // never send the raw page URL to the remote model. Query/fragment/userinfo
+  // may contain credentials or private identifiers unrelated to the requested
+  // read-only transformation.
   const sourceJson = JSON.stringify({
     kind: request.source.kind,
-    uri: request.source.uri || '',
     capturedAt: request.source.capturedAt,
     text: request.source.text,
   });
