@@ -74,7 +74,33 @@ const transport = new InteractionProviderRouter().register(AgentProviderId.CHATG
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
 const localAiClient = new LocalAiClient({ fetchFn: (...args) => fetch(...args) });
 const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...args) });
-const aiOrchestrator = new AiOrchestrator({ gatewayClient: aiGatewayClient });
+let browserAgent = null;
+const aiOrchestrator = new AiOrchestrator({
+  gatewayClient: aiGatewayClient,
+  providerCallLifecycle: {
+    beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
+      if (context?.kind !== 'browser-agent' || !browserAgent) return null;
+      return browserAgent.reserveProviderModelBudget({
+        jobId: context.jobId,
+        controlEpoch: context.controlEpoch,
+        route,
+        prompt,
+        systemPrompt,
+        maxOutputTokens,
+        callNumber,
+      });
+    },
+    afterProviderCall: async ({ context, reservation, ok, result }) => {
+      if (context?.kind !== 'browser-agent' || !browserAgent || !reservation?.reservationId) return;
+      await browserAgent.settleProviderModelBudget({
+        jobId: context.jobId,
+        reservationId: reservation.reservationId,
+        ok,
+        result,
+      });
+    },
+  },
+});
 const remoteDispatch = new RemoteDispatchController({ coreRepository: repo, chromeApi: chrome, fetchFn: (...args) => fetch(...args) });
 
 const orchestrationV2 = new OrchestrationV2Manager({
@@ -177,9 +203,9 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
-const browserAgent = new BrowserAgentManager({
+browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
-  routePrompt: payload => dispatchSerializedAiRoute(payload),
+  routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
 });
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
@@ -451,8 +477,12 @@ export async function reconcileRuntime() {
 }
 
 let aiRouteQueue = Promise.resolve();
-function dispatchSerializedAiRoute(payload) {
-  const run = aiRouteQueue.then(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', payload || {}));
+function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
+  const run = aiRouteQueue.then(() => dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    payload || {},
+    { providerCallBudgetContext },
+  ));
   aiRouteQueue = run.catch(() => undefined);
   return run;
 }
