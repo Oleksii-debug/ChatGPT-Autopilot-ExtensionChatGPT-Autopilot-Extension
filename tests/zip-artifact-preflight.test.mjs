@@ -124,7 +124,7 @@ function makeZip(entries, options = {}) {
 
     const header = Buffer.alloc(46);
     header.writeUInt32LE(0x02014b50, 0);
-    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(entry.versionMadeBy == null ? 20 : entry.versionMadeBy, 4);
     header.writeUInt16LE(centralVersionNeeded, 6);
     header.writeUInt16LE(centralFlags, 8);
     header.writeUInt16LE(centralMethod, 10);
@@ -138,7 +138,10 @@ function makeZip(entries, options = {}) {
     header.writeUInt16LE(centralComment.length, 32);
     header.writeUInt16LE(entry.diskStart == null ? 0 : entry.diskStart, 34);
     header.writeUInt16LE(0, 36);
-    header.writeUInt32LE(0, 38);
+    header.writeUInt32LE(
+      entry.externalAttributes == null ? 0 : entry.externalAttributes >>> 0,
+      38,
+    );
     header.writeUInt32LE(centralLocalOffset >>> 0, 42);
     centrals.push(header, centralNameBytes, centralExtra, centralComment);
   }
@@ -202,6 +205,7 @@ test('valid STORED and DEFLATE entries produce bounded read-only archive facts w
 
   assert.equal(out.materialIdentityVerified, true);
   assert.equal(out.structuralMetadataVerified, true);
+  assert.equal(out.localEntryRangesContiguous, true);
   assert.equal(out.payloadContentVerified, false);
   assert.equal(out.crcContentVerified, false);
   assert.equal(out.decompressionPerformed, false);
@@ -267,7 +271,7 @@ test('duplicate and case-folding path aliases are rejected', async () => {
   ]);
   await assert.rejects(
     preflightZipArtifactV1(requestFor(duplicate)),
-    /duplicate entry path/u,
+    /duplicate logical entry path/u,
   );
 
   const caseCollision = makeZip([
@@ -276,7 +280,27 @@ test('duplicate and case-folding path aliases are rejected', async () => {
   ]);
   await assert.rejects(
     preflightZipArtifactV1(requestFor(caseCollision)),
-    /case-folding path collision/u,
+    /case-folding logical path collision/u,
+  );
+});
+
+test('file-directory aliases and file ancestors are rejected independent of entry order', async () => {
+  const fileDirectoryAlias = makeZip([
+    { name: 'thing', data: 'file' },
+    { name: 'thing/', data: '' },
+  ]);
+  await assert.rejects(
+    preflightZipArtifactV1(requestFor(fileDirectoryAlias)),
+    /duplicate logical entry path|case-folding logical path collision/u,
+  );
+
+  const fileAncestor = makeZip([
+    { name: 'tree/child.txt', data: 'child' },
+    { name: 'tree', data: 'file' },
+  ]);
+  await assert.rejects(
+    preflightZipArtifactV1(requestFor(fileAncestor)),
+    /descends through a file entry/u,
   );
 });
 
@@ -326,6 +350,35 @@ test('encryption, data descriptors, unsupported methods, ZIP64, and multi-disk m
   );
 });
 
+test('Unix symlink and special-file metadata cannot masquerade as regular archive entries', async () => {
+  for (const externalAttributes of [0xa1ff0000, 0x21b60000]) {
+    const zip = makeZip([
+      {
+        name: 'link-or-device',
+        data: '',
+        versionMadeBy: 0x0314,
+        externalAttributes,
+      },
+    ]);
+    await assert.rejects(
+      preflightZipArtifactV1(requestFor(zip)),
+      /symlink or special-file metadata/u,
+    );
+  }
+
+  const directoryBitOnFile = makeZip([
+    {
+      name: 'plain.txt',
+      data: 'x',
+      externalAttributes: 0x10,
+    },
+  ]);
+  await assert.rejects(
+    preflightZipArtifactV1(requestFor(directoryBitOnFile)),
+    /conflicting directory attributes/u,
+  );
+});
+
 test('central and local metadata must agree exactly', async () => {
   const nameMismatch = makeZip([
     {
@@ -363,6 +416,19 @@ test('central and local metadata must agree exactly', async () => {
     preflightZipArtifactV1(requestFor(sizeMismatch)),
     /metadata does not match|STORED entry size/u,
   );
+
+  const versionMismatch = makeZip([
+    {
+      name: 'a.txt',
+      data: 'x',
+      versionNeeded: 20,
+      centralVersionNeeded: 10,
+    },
+  ]);
+  await assert.rejects(
+    preflightZipArtifactV1(requestFor(versionMismatch)),
+    /metadata does not match/u,
+  );
 });
 
 test('overlapping local payload declarations and executable prefixes are rejected', async () => {
@@ -380,13 +446,27 @@ test('overlapping local payload declarations and executable prefixes are rejecte
     /overlap|central directory/u,
   );
 
+  const hiddenGap = makeZip([
+    {
+      name: 'gap.txt',
+      data: 'abc',
+      declaredCompressedSize: 1,
+      declaredUncompressedSize: 1,
+    },
+    { name: 'next.txt', data: 'x' },
+  ]);
+  await assert.rejects(
+    preflightZipArtifactV1(requestFor(hiddenGap)),
+    /unclaimed bytes/u,
+  );
+
   const prefixed = makeZip(
     [{ name: 'a.txt', data: 'x' }],
     { prefix: Buffer.from('MZ') },
   );
   await assert.rejects(
     preflightZipArtifactV1(requestFor(prefixed)),
-    /prefix\/self-extracting/u,
+    /prefix\/self-extracting|unclaimed bytes/u,
   );
 });
 
