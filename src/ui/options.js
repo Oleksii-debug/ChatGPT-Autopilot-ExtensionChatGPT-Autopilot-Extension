@@ -1517,7 +1517,7 @@ function setScenarioWorkBusy(busy) {
     'new-scenario-cycle-button', 'new-scenario-pairs-button', 'new-scenario-group-button', 'new-scenario-pipeline-button',
     'save-scenario-work-button', 'start-scenario-work-button', 'pause-scenario-work-button',
     'resume-scenario-work-button', 'stop-scenario-work-button', 'delete-scenario-work-button',
-    'scenario-work-run-now',
+    'scenario-work-run-now', 'scenario-cycle-start-parallel',
   ]) {
     const element = $(id);
     if (element) element.disabled = busy;
@@ -1538,6 +1538,7 @@ function syncScenarioWorkButtons() {
   $('stop-scenario-work-button').disabled = !has || (!running && !paused);
   $('delete-scenario-work-button').disabled = !has || running;
   $('scenario-work-run-now').disabled = !has || !running;
+  $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
 }
 
 function clearScenarioWorkState() {
@@ -1870,6 +1871,42 @@ async function createScenarioWork(mode) {
     announce(`Створено сценарій: ${label}.`);
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося створити сценарій: ${error.message}`;
+  } finally { setScenarioWorkBusy(false); }
+}
+
+async function startParallelScenarioChats() {
+  if (ui.selectedScenarioWork?.config?.mode !== 'CHAT_CYCLE') return;
+  let created = 0;
+  let started = 0;
+  let firstId = '';
+  try {
+    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість незалежних чатів');
+    const config = scenarioWorkConfigFromForm();
+    const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
+    setScenarioWorkBusy(true);
+    for (let index = 1; index <= count; index += 1) {
+      const result = await core('CREATE_SCENARIO_WORK', {
+        name: `${baseName} — чат ${index}`, mode: 'CHAT_CYCLE', config,
+      });
+      const id = result?.scenario?.id;
+      if (!id) throw new Error('Створений цикл не повернув ідентифікатор.');
+      created++;
+      firstId ||= id;
+      await core('START_SCENARIO_WORK', { id });
+      started++;
+    }
+    await loadScenarioWork();
+    if (firstId) {
+      $('scenario-work-list').value = firstId;
+      await openScenarioWork(firstId);
+    }
+    setScenarioWorkPanel('state');
+    announce(`Запущено ${started} незалежних чатів. Кожен чекає своєї відповіді.`);
+  } catch (error) {
+    await loadScenarioWork();
+    const message = `Створено ${created}, запущено ${started} чатів. Помилка: ${error.message}`;
+    $('scenario-work-summary').textContent = message;
+    announce(message);
   } finally { setScenarioWorkBusy(false); }
 }
 
@@ -3906,6 +3943,7 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
 });
 $('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
+$('scenario-cycle-start-parallel').addEventListener('click', startParallelScenarioChats);
 $('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
 $('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
 $('new-scenario-pipeline-button').addEventListener('click', () => createScenarioWork('AUDITOR_PIPELINE'));
