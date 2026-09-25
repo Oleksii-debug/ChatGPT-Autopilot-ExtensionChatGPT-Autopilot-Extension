@@ -363,6 +363,7 @@ export function buildRunTraceProjectionV1(input) {
     },
     readOnly: true,
     advisoryOnly: true,
+    sourceTrust: 'UNVERIFIED_INPUT',
     hiddenReasoningIncluded: false,
     rawTranscriptIncluded: false,
     replayAuthorized: false,
