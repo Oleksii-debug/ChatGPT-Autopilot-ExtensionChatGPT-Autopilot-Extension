@@ -158,3 +158,33 @@ test('projection is deterministic across repeated reads and changing revision ch
   assert.equal(third.items[0].itemId, first.items[0].itemId);
   assert.notEqual(third.items[0].sourceRevisionId, first.items[0].sourceRevisionId);
 });
+
+
+test('runtime projection is deterministically bounded and reports truncation instead of failing above contract capacity', async () => {
+  const sessionsById = {};
+  const sessionOrder = [];
+  for (let index = 0; index < 300; index += 1) {
+    const id = `error-${String(index).padStart(3, '0')}`;
+    sessionOrder.push(id);
+    sessionsById[id] = coreSession(id, {
+      runState: 'ERROR',
+      createdAt: T0 + index,
+      updatedAt: T1 + index,
+      lastError: `diagnostic-${index}`,
+    });
+  }
+  sessionsById['blocking'] = coreSession('blocking', {
+    operation: { operationId: 'op-blocking', phase: 'AMBIGUOUS', createdAt: T2, updatedAt: T2 },
+  });
+  sessionOrder.push('blocking');
+
+  const projection = await projectRuntimeActionCenter({
+    coreState: { sessionOrder, sessionsById },
+  });
+
+  assert.equal(projection.items.length, 256);
+  assert.equal(projection.runtimeSummary.candidateCount, 301);
+  assert.equal(projection.runtimeSummary.projectedCount, 256);
+  assert.equal(projection.runtimeSummary.truncated, true);
+  assert.equal(projection.items.some(item => item.ownerActionKind === 'RECONCILE'), true, 'blocking attention must survive truncation');
+});
