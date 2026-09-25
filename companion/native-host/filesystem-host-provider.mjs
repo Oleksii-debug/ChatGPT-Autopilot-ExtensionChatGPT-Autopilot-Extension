@@ -85,12 +85,36 @@ function sha256(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
+const PUBLIC_FILESYSTEM_ERROR_CODES = new Set([
+  'INVALID_REQUEST',
+  'ROOT_NOT_ALLOWED',
+  'ROOT_NOT_WRITABLE',
+  'PATH_OUTSIDE_SCOPE',
+  'FILE_NOT_FOUND',
+  'NOT_A_FILE',
+  'FILE_TOO_LARGE',
+  'PRECONDITION_FAILED',
+  'UNSUPPORTED_ENCODING',
+  'ATOMIC_WRITE_UNAVAILABLE',
+  'WRITE_VERIFICATION_FAILED',
+]);
+
 function mapPathError(error) {
-  if (error?.code === 'ENOENT') return nativeError('FILE_NOT_FOUND', 'Requested file is unavailable');
-  if (error?.code === 'ELOOP' || /escapes owner scope|symbolic link|identity changed/iu.test(String(error?.message || ''))) {
-    return nativeError('PATH_OUTSIDE_SCOPE', 'Requested filesystem path escapes the configured root or changed identity');
+  if (error?.code === 'ENOENT') {
+    return nativeError('FILE_NOT_FOUND', 'Requested filesystem path is unavailable');
   }
-  return error;
+  if (error?.code === 'ELOOP'
+      || /escapes owner scope|symbolic link|identity changed/iu.test(String(error?.message || ''))) {
+    return nativeError(
+      'PATH_OUTSIDE_SCOPE',
+      'Requested filesystem path escapes the configured root or changed identity',
+    );
+  }
+  if (PUBLIC_FILESYSTEM_ERROR_CODES.has(error?.code)) return error;
+
+  // Never surface raw Node filesystem diagnostics across the Native Companion
+  // boundary: they commonly contain the owner-configured absolute root path.
+  return nativeError('FILESYSTEM_IO_ERROR', 'Filesystem operation failed');
 }
 
 const ATOMIC_WRITE_CHUNK_BYTES = 64 * 1024;
