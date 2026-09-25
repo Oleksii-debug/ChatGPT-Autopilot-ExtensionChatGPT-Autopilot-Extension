@@ -438,7 +438,7 @@ test('cost authority rejects accessors, hidden fields, symbols, and accessor-bac
     configurable: true,
     get() { reads += 1; return record; },
   });
-  assert.throws(() => aggregateAiCostRecordsV1(records), /data properties/);
+  assert.throws(() => aggregateAiCostRecordsV1(records), /dense data-only evidence/);
   assert.equal(reads, 0, 'aggregate element getter must never execute');
 });
 

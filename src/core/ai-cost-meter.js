@@ -78,7 +78,7 @@ function dataArray(value, label, maximum) {
   const length = lengthDescriptor.value;
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key) || Number(key) >= length) {
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= length) {
       throw new Error(`${label} contains an invalid array field`);
     }
   }
