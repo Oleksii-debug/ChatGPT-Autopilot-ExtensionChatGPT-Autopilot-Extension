@@ -383,3 +383,47 @@ test('oversized server response fails closed under the configured transport boun
     /exceeds configured byte limit/,
   );
 });
+
+
+test('streaming response without Content-Length is bounded before full materialization', async () => {
+  const oversized = 'x'.repeat(2_000);
+  const client = clientFor(async () => new Response(oversized, {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  }));
+  await assert.rejects(
+    () => client.execute(input({ config: config({ maxResponseBytes: 1024 }) })),
+    /exceeds configured byte limit/,
+  );
+});
+
+test('execution deadline covers probe and does not dispatch a conversation after expiry', async () => {
+  let now = 0;
+  const calls = [];
+  const client = new OpenHandsCodingSpecialistClient({
+    fetchFn: async (url, init) => {
+      calls.push({ url, method: init.method, at: now });
+      if (url.endsWith('/openapi.json')) {
+        now = 1_100;
+        return openapi();
+      }
+      throw new Error('conversation request must not be dispatched after deadline');
+    },
+    nowFn: () => now,
+    sleepFn: async ms => { now += ms; },
+    setTimeoutFn: () => 1,
+    clearTimeoutFn: () => {},
+  });
+
+  await assert.rejects(
+    () => client.execute(input({
+      config: config({ maxExecutionSeconds: 1 }),
+      handoff: handoff({ maxRuntimeSeconds: 1 }),
+    })),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_EXECUTION_WINDOW_EXPIRED'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+  assert.equal(calls.filter(call => call.url.includes('/api/conversations')).length, 0);
+});
