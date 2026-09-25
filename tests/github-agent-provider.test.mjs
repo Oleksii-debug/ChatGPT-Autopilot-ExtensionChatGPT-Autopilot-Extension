@@ -41,10 +41,14 @@ function githubClient(overrides = {}) {
     readTree: async args => ({ operation: 'readTree', args }),
     readBranch: async args => ({ operation: 'readBranch', args }),
     findPullRequests: async args => ({ operation: 'findPullRequests', args }),
+    readIssue: async args => ({ operation: 'readIssue', args }),
+    readIssueComment: async args => ({ operation: 'readIssueComment', args }),
     createBranch: async args => ({ operation: 'createBranch', args }),
     putFile: async args => ({ operation: 'putFile', args }),
     deleteFile: async args => ({ operation: 'deleteFile', args }),
     createPullRequest: async args => ({ operation: 'createPullRequest', args }),
+    createIssue: async args => ({ operation: 'createIssue', args }),
+    createIssueComment: async args => ({ operation: 'createIssueComment', args }),
     ...overrides,
   };
 }
@@ -182,5 +186,78 @@ test('read-only failure remains retry-safe and deterministic pre-effect rejectio
     error => error.code === 'GITHUB_REPOSITORY_NOT_ALLOWED'
       && error.effectMayHaveOccurred === false
       && error.safeToRetry === true,
+  );
+});
+
+
+test('GitHub issue and issue-comment operations are separately capability-gated', async () => {
+  const provider = new GitHubAgentProviderV1({
+    githubClient: githubClient(),
+    grantedCapabilityIds: [
+      GitHubCapabilityId.ISSUE_READ,
+      GitHubCapabilityId.ISSUE_COMMENT_READ,
+      GitHubCapabilityId.ISSUE_CREATE,
+      GitHubCapabilityId.ISSUE_COMMENT_CREATE,
+    ],
+    now: () => Date.parse(at),
+  });
+
+  const issueRead = await provider.invoke({
+    invocation: invocation(GitHubToolId.ISSUE_READ, GitHubCapabilityId.ISSUE_READ, {
+      repositoryFullName: 'owner/repo', issueNumber: 7,
+    }),
+    policyDecision: allow,
+  });
+  assert.equal(issueRead.result.operation, 'readIssue');
+
+  const commentReadInv = {
+    ...invocation(GitHubToolId.ISSUE_COMMENT_READ, GitHubCapabilityId.ISSUE_COMMENT_READ, {
+      repositoryFullName: 'owner/repo', issueNumber: 7, commentId: 99,
+    }),
+    invocationId: 'github-inv-comment-read',
+    policyDecisionId: 'decision-comment-read',
+  };
+  const commentRead = await provider.invoke({
+    invocation: commentReadInv,
+    policyDecision: { ...allow, decisionId: 'decision-comment-read', invocationId: 'github-inv-comment-read' },
+  });
+  assert.equal(commentRead.result.operation, 'readIssueComment');
+
+  const issueCreateInv = {
+    ...invocation(GitHubToolId.ISSUE_CREATE, GitHubCapabilityId.ISSUE_CREATE, {
+      repositoryFullName: 'owner/repo', title: 'Bounded issue', body: 'Body',
+    }),
+    invocationId: 'github-inv-issue-create',
+    policyDecisionId: 'decision-issue-create',
+  };
+  const issueCreated = await provider.invoke({
+    invocation: issueCreateInv,
+    policyDecision: { ...allow, decisionId: 'decision-issue-create', invocationId: 'github-inv-issue-create' },
+  });
+  assert.equal(issueCreated.result.operation, 'createIssue');
+
+  const commentCreateInv = {
+    ...invocation(GitHubToolId.ISSUE_COMMENT_CREATE, GitHubCapabilityId.ISSUE_COMMENT_CREATE, {
+      repositoryFullName: 'owner/repo', issueNumber: 7, body: 'Exact comment',
+    }),
+    invocationId: 'github-inv-comment-create',
+    policyDecisionId: 'decision-comment-create',
+  };
+  const commentCreated = await provider.invoke({
+    invocation: commentCreateInv,
+    policyDecision: { ...allow, decisionId: 'decision-comment-create', invocationId: 'github-inv-comment-create' },
+  });
+  assert.equal(commentCreated.result.operation, 'createIssueComment');
+
+  const underGranted = new GitHubAgentProviderV1({
+    githubClient: githubClient(),
+    grantedCapabilityIds: [GitHubCapabilityId.ISSUE_READ],
+  });
+  await assert.rejects(
+    () => underGranted.invoke({
+      invocation: issueCreateInv,
+      policyDecision: { ...allow, decisionId: 'decision-issue-create', invocationId: 'github-inv-issue-create' },
+    }),
+    /granted|capabilit/i,
   );
 });

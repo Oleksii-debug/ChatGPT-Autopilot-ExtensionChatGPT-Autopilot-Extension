@@ -18,6 +18,8 @@ const EFFECTFUL_TOOLS = new Set([
   GitHubToolId.FILE_PUT,
   GitHubToolId.FILE_DELETE,
   GitHubToolId.PULL_REQUEST_CREATE,
+  GitHubToolId.ISSUE_CREATE,
+  GitHubToolId.ISSUE_COMMENT_CREATE,
 ]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_EVIDENCE_AGE_MS = 5 * 60 * 1000;
@@ -431,6 +433,7 @@ export class GitHubExactEffectExecutorV1 {
         attempt: state.attempt,
         policyDecisionId: state.invocation.policyDecisionId,
         ambiguityDeclaredAt: state.ambiguity.declaredAt,
+        priorObservation: state.observation ? structuredClone(state.observation) : null,
         requestedAt: new Date(requestedAtMs).toISOString(),
         expectedOutcome: normalizedOutcome,
       }));

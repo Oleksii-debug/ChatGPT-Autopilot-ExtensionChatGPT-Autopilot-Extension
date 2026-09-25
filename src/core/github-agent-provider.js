@@ -8,10 +8,14 @@ export const GitHubToolId = Object.freeze({
   TREE_READ: 'remote/github/tree.read',
   BRANCH_READ: 'remote/github/branch.read',
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
+  ISSUE_READ: 'remote/github/issue.read',
+  ISSUE_COMMENT_READ: 'remote/github/issueComment.read',
   BRANCH_CREATE: 'remote/github/branch.create',
   FILE_PUT: 'remote/github/file.put',
   FILE_DELETE: 'remote/github/file.delete',
   PULL_REQUEST_CREATE: 'remote/github/pullRequest.create',
+  ISSUE_CREATE: 'remote/github/issue.create',
+  ISSUE_COMMENT_CREATE: 'remote/github/issueComment.create',
 });
 
 export const GitHubCapabilityId = Object.freeze({
@@ -20,10 +24,14 @@ export const GitHubCapabilityId = Object.freeze({
   TREE_READ: 'github.tree.read',
   BRANCH_READ: 'github.branch.read',
   PULL_REQUEST_READ: 'github.pullRequest.read',
+  ISSUE_READ: 'github.issue.read',
+  ISSUE_COMMENT_READ: 'github.issueComment.read',
   BRANCH_CREATE: 'github.branch.create',
   FILE_WRITE: 'github.file.write',
   FILE_DELETE: 'github.file.delete',
   PULL_REQUEST_CREATE: 'github.pullRequest.create',
+  ISSUE_CREATE: 'github.issue.create',
+  ISSUE_COMMENT_CREATE: 'github.issueComment.create',
 });
 
 const TOOLS = Object.freeze([
@@ -84,6 +92,28 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: GitHubToolId.ISSUE_READ,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Read exact GitHub issue',
+    description: 'Reads one exact non-pull-request issue for independent verification and agent context.',
+    capabilityIds: [GitHubCapabilityId.ISSUE_READ],
+    inputSchemaRef: 'github-schema/issue.read/input',
+    outputSchemaRef: 'github-schema/issue.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.ISSUE_COMMENT_READ,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Read exact GitHub issue comment',
+    description: 'Reads one exact issue comment and binds it to its repository and parent issue.',
+    capabilityIds: [GitHubCapabilityId.ISSUE_COMMENT_READ],
+    inputSchemaRef: 'github-schema/issueComment.read/input',
+    outputSchemaRef: 'github-schema/issueComment.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: GitHubToolId.BRANCH_CREATE,
     providerId: GITHUB_PROVIDER_ID,
     label: 'Create GitHub branch at exact commit',
@@ -126,6 +156,28 @@ const TOOLS = Object.freeze([
     outputSchemaRef: 'github-schema/pullRequest.create/output',
     readOnly: false,
   }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.ISSUE_CREATE,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Create GitHub issue',
+    description: 'Creates one bounded issue in an owner-allowlisted repository. Ambiguous outcomes require reconciliation.',
+    capabilityIds: [GitHubCapabilityId.ISSUE_CREATE],
+    inputSchemaRef: 'github-schema/issue.create/input',
+    outputSchemaRef: 'github-schema/issue.create/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.ISSUE_COMMENT_CREATE,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Create GitHub issue comment',
+    description: 'Adds one bounded comment to an exact issue. Ambiguous outcomes require reconciliation.',
+    capabilityIds: [GitHubCapabilityId.ISSUE_COMMENT_CREATE],
+    inputSchemaRef: 'github-schema/issueComment.create/input',
+    outputSchemaRef: 'github-schema/issueComment.create/output',
+    readOnly: false,
+  }),
 ]);
 
 const PRE_EFFECT_CODES = new Set([
@@ -160,10 +212,14 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.TREE_READ) return 'readTree';
   if (toolId === GitHubToolId.BRANCH_READ) return 'readBranch';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
+  if (toolId === GitHubToolId.ISSUE_READ) return 'readIssue';
+  if (toolId === GitHubToolId.ISSUE_COMMENT_READ) return 'readIssueComment';
   if (toolId === GitHubToolId.BRANCH_CREATE) return 'createBranch';
   if (toolId === GitHubToolId.FILE_PUT) return 'putFile';
   if (toolId === GitHubToolId.FILE_DELETE) return 'deleteFile';
   if (toolId === GitHubToolId.PULL_REQUEST_CREATE) return 'createPullRequest';
+  if (toolId === GitHubToolId.ISSUE_CREATE) return 'createIssue';
+  if (toolId === GitHubToolId.ISSUE_COMMENT_CREATE) return 'createIssueComment';
   return '';
 }
 
