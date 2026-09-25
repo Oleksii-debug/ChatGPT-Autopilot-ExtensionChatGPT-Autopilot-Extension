@@ -509,7 +509,7 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.LIST_SESSIONS) {
       const state = await this.repo.load();
-      return { sessions: state.sessionOrder.map(id => { const s=state.sessionsById[id]; const progress=sessionProgress(s); const managedKind = s.orchestrationCoordinator?.managed ? 'orchestration-coordinator' : s.orchestrationWorker?.managed ? 'orchestration-worker' : s.remoteDispatch?.managed ? 'remote-dispatch' : ''; return { id, name:s.name, runState:s.runState, displayRunState:progress.displayRunState, enabledTaskCount:progress.enabledTaskCount, completedTaskCount:progress.completedTaskCount, remainingTaskCount:progress.remainingTaskCount, successfulSendCount:progress.successfulSendCount, simplifiedSession:s.simplifiedSession===true, isCompleted:progress.isCompleted, managedKind }; }) };
+      return { sessions: state.sessionOrder.map(id => { const s=state.sessionsById[id]; const progress=sessionProgress(s); const managedKind = s.scenarioWork?.managed ? 'scenario-work' : s.orchestrationCoordinator?.managed ? 'orchestration-coordinator' : s.orchestrationWorker?.managed ? 'orchestration-worker' : s.remoteDispatch?.managed ? 'remote-dispatch' : ''; return { id, name:s.name, runState:s.runState, displayRunState:progress.displayRunState, enabledTaskCount:progress.enabledTaskCount, completedTaskCount:progress.completedTaskCount, remainingTaskCount:progress.remainingTaskCount, successfulSendCount:progress.successfulSendCount, simplifiedSession:s.simplifiedSession===true, isCompleted:progress.isCompleted, managedKind }; }) };
     }
     if (command === CoreCommand.GET_PROFILE_SETTINGS) {
       const state = await this.repo.load();
