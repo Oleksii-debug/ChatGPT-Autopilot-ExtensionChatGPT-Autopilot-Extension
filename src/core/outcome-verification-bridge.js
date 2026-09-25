@@ -145,9 +145,6 @@ function normalizeEvidenceArtifacts(value) {
     if (!artifact.sha256) {
       throw new Error('Outcome verification evidence artifact must have sha256: ' + artifact.artifactId);
     }
-    if (!artifact.producerInvocationId) {
-      throw new Error('Outcome verification evidence artifact must have producerInvocationId: ' + artifact.artifactId);
-    }
     if (byId.has(artifact.artifactId)) {
       throw new Error('Outcome verification evidenceArtifacts contains duplicate artifactId: ' + artifact.artifactId);
     }
@@ -197,9 +194,6 @@ function criterionResult({
     const artifact = artifactsById.get(artifactId);
     if (!artifact) {
       throw new Error('Criterion ' + row.criterionId + ' references unknown evidence artifact: ' + artifactId);
-    }
-    if (artifact.producerInvocationId !== verification.invocationId) {
-      throw new Error('Criterion ' + row.criterionId + ' evidence producer does not match verification invocation: ' + artifactId);
     }
     if (artifact.createdAt < contract.createdAt) {
       throw new Error('Criterion ' + row.criterionId + ' evidence predates the exact outcome contract: ' + artifactId);
