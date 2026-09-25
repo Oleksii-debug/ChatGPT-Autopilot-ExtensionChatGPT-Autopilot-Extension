@@ -54,7 +54,7 @@ function observedIdentity(invocation, observation) {
 
 export class GmailDraftSendVerifierV1 {
   constructor({ workspaceClient, verifierId = 'gmail-draft-send-readback-verifier', now = () => Date.now() } = {}) {
-    if (!workspaceClient || typeof workspaceClient.getGmailMessage !== 'function') {
+    if (!workspaceClient || typeof workspaceClient.getGmailSentMessage !== 'function') {
       throw new Error('Google Workspace sent-message readback client is required');
     }
     this.workspaceClient = workspaceClient;
@@ -66,11 +66,9 @@ export class GmailDraftSendVerifierV1 {
 
   async #readback(invocation, observation) {
     const identity = observedIdentity(invocation, observation);
-    const message = await this.workspaceClient.getGmailMessage({
+    const message = await this.workspaceClient.getGmailSentMessage({
       userId: identity.userId,
       messageId: identity.messageId,
-      format: 'METADATA',
-      metadataHeaders: [],
     });
     if (message?.id !== identity.messageId || message?.threadId !== identity.threadId) {
       throw new Error('Gmail sent-message readback identity mismatch');

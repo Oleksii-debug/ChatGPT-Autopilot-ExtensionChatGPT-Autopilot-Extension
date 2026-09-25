@@ -57,9 +57,9 @@ test('successful draft send is committed only after independent SENT readback', 
   let sends=0,reads=0,now=baseMs;
   const workspaceClient={
     searchDrive:async()=>({}),getDriveFile:async()=>({}),readDriveText:async()=>({}),searchGmail:async()=>({}),
-    getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
+    getGmailMessage:async()=>({}),getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
     sendGmailDraft:async()=>{sends+=1;return{userId,draftId:'draft_1',messageId:'sent_1',threadId:'thread_1',labelIds:['SENT']};},
-    getGmailMessage:async({userId:seen,messageId})=>{reads+=1;assert.equal(seen,userId);assert.equal(messageId,'sent_1');return{id:'sent_1',threadId:'thread_1',labelIds:['SENT']};},
+    getGmailSentMessage:async({userId:seen,messageId})=>{reads+=1;assert.equal(seen,userId);assert.equal(messageId,'sent_1');return{id:'sent_1',threadId:'thread_1',labelIds:['SENT']};},
   };
   const provider=new GoogleWorkspaceAgentProviderV1({workspaceClient,grantedCapabilityIds:[GoogleWorkspaceCapabilityId.GMAIL_DRAFT_SEND],now:()=>{now+=100;return now;}});
   const verifier=new GmailDraftSendVerifierV1({workspaceClient,now:()=>{now+=100;return now;}});
@@ -78,7 +78,7 @@ test('transport-ambiguous draft send never blind-retries and cannot auto-verify 
   let sends=0,now=baseMs;
   const workspaceClient={
     searchDrive:async()=>({}),getDriveFile:async()=>({}),readDriveText:async()=>({}),searchGmail:async()=>({}),
-    getGmailMessage:async()=>{throw new Error('must not read arbitrary candidates');},getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
+    getGmailMessage:async()=>({}),getGmailSentMessage:async()=>{throw new Error('must not read arbitrary candidates');},getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
     sendGmailDraft:async()=>{sends+=1;const e=new Error('lost response');e.effectMayHaveOccurred=true;e.safeToRetry=false;throw e;},
   };
   const provider=new GoogleWorkspaceAgentProviderV1({workspaceClient,grantedCapabilityIds:[GoogleWorkspaceCapabilityId.GMAIL_DRAFT_SEND],now:()=>{now+=100;return now;}});
@@ -100,9 +100,9 @@ test('send verifier rejects mismatched returned identity and missing SENT label'
   let now=baseMs;
   const inv=invocation('gmail-send-verifier');
   const observation={schemaVersion:1,observationId:'obs-1',invocationId:inv.invocationId,status:'OK',summary:'sent',data:{userId,draftId:'draft_1',messageId:'sent_1',threadId:'thread_1'},artifactRefs:[],observedAt:new Date(baseMs+100).toISOString()};
-  const noSent=new GmailDraftSendVerifierV1({workspaceClient:{getGmailMessage:async()=>({id:'sent_1',threadId:'thread_1',labelIds:['INBOX']})},now:()=>{now+=100;return now;}});
+  const noSent=new GmailDraftSendVerifierV1({workspaceClient:{getGmailSentMessage:async()=>({id:'sent_1',threadId:'thread_1',labelIds:['INBOX']})},now:()=>{now+=100;return now;}});
   const verification=await noSent.verify({invocation:inv,executionId:`${inv.invocationId}:attempt:1`,observation});
   assert.equal(verification.status,'AMBIGUOUS');
-  const mismatch=new GmailDraftSendVerifierV1({workspaceClient:{getGmailMessage:async()=>({id:'other',threadId:'thread_1',labelIds:['SENT']})}});
+  const mismatch=new GmailDraftSendVerifierV1({workspaceClient:{getGmailSentMessage:async()=>({id:'other',threadId:'thread_1',labelIds:['SENT']})}});
   await assert.rejects(()=>mismatch.verify({invocation:inv,executionId:`${inv.invocationId}:attempt:1`,observation}),/identity mismatch/i);
 });
