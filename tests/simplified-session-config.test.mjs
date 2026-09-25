@@ -64,13 +64,13 @@ test('simplified import rejects generic or mixed portable profiles before Core m
 
   assert.throws(
     () => assertSimplifiedPortableProfile({ sessions: [{ id: 'ordinary-1' }] }),
-    /лише сесії з explicit simplifiedSession=true/,
+    /явним прапорцем simplifiedSession=true/,
   );
   assert.throws(
     () => assertSimplifiedPortableProfile({
       sessions: [simplified, { id: 'ordinary-2', simplifiedSession: false }],
     }),
-    /лише сесії з explicit simplifiedSession=true/,
+    /явним прапорцем simplifiedSession=true/,
   );
 
   let reads = 0;
