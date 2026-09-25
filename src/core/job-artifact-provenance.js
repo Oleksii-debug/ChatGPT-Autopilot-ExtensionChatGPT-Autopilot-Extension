@@ -5,6 +5,8 @@ import { getProjectArtifactProvenance } from './project-workspace.js';
 export const JOB_ARTIFACT_PROVENANCE_SCHEMA_VERSION = 1;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const RESOLVE_KEYS = new Set(['jobId', 'artifactId']);
+const BINDING_KEYS = new Set(['schemaVersion', 'jobId', 'projectId', 'planId']);
 
 function dataRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -35,7 +37,9 @@ function dataRecord(value, allowed, label) {
 }
 
 function id(value, label) {
-  if (typeof value !== 'string' || !ID.test(value)) throw new Error(`${label} is invalid`);
+  if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
   return value;
 }
 
@@ -47,11 +51,7 @@ function time(value, label) {
 }
 
 function normalizeJobBindingV1(value) {
-  const raw = dataRecord(
-    value,
-    new Set(['schemaVersion', 'jobId', 'projectId', 'planId']),
-    'Browser Agent job/Project binding',
-  );
+  const raw = dataRecord(value, BINDING_KEYS, 'Browser Agent job/Project binding');
   if (raw.schemaVersion !== 1) throw new Error('Unsupported Browser Agent job/Project binding schemaVersion');
   return Object.freeze({
     schemaVersion: 1,
@@ -65,32 +65,19 @@ function artifactIdentity(value) {
   return JSON.stringify(normalizeArtifactRefV1(value));
 }
 
+function canonical(value) {
+  return JSON.stringify(value);
+}
+
 function frozen(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) frozen(child);
   return Object.freeze(value);
 }
 
-/**
- * Read-only evidence composition. jobBinding must come from the canonical
- * BrowserAgentManager.resolveJobProjectBinding() runtime authority; this
- * function never accepts a separate caller-owned jobId/projectId/planId.
- *
- * It does not authorize execution or verification. It only proves that the
- * current Project provenance record and one canonical ExactEffect observation
- * name the exact same produced artifact and producer invocation.
- */
-export function resolveJobArtifactProvenanceV1(input) {
-  const raw = dataRecord(
-    input,
-    new Set(['jobBinding', 'workspace', 'exactEffectState', 'artifactId']),
-    'JobArtifactProvenance request',
-  );
-  const binding = normalizeJobBindingV1(raw.jobBinding);
-  const artifactId = id(raw.artifactId, 'artifactId');
-
-  const provenance = getProjectArtifactProvenance(raw.workspace, binding.projectId, artifactId);
-  const effect = normalizeExactEffectStateV1(raw.exactEffectState);
+function composeJobArtifactProvenanceV1({ binding, workspace, effectState, artifactId }) {
+  const provenance = getProjectArtifactProvenance(workspace, binding.projectId, artifactId);
+  const effect = normalizeExactEffectStateV1(effectState);
   const observation = effect.observation;
   if (!observation) throw new Error('Artifact provenance requires an ExactEffect observation');
 
@@ -101,8 +88,7 @@ export function resolveJobArtifactProvenanceV1(input) {
     throw new Error('Artifact producerInvocationId does not match ExactEffect invocation');
   }
 
-  const observedMatches = observation.artifactRefs
-    .filter(item => item.artifactId === artifactId);
+  const observedMatches = observation.artifactRefs.filter(item => item.artifactId === artifactId);
   if (observedMatches.length !== 1) {
     throw new Error('ExactEffect observation must contain exactly one matching artifact');
   }
@@ -138,4 +124,93 @@ export function resolveJobArtifactProvenanceV1(input) {
       observedAt: observation.observedAt,
     },
   });
+}
+
+/**
+ * Authority-bound read-only resolver.
+ *
+ * The caller supplies only lookup identity (jobId + artifactId). Durable
+ * job/project/plan identity, current Project provenance, and ExactEffect state
+ * are loaded from injected canonical authorities. No caller-owned binding,
+ * workspace snapshot, or effect state can be substituted through resolve().
+ *
+ * loadExactEffect must be a side-effect-free adapter over the canonical durable
+ * exact-effect authority for the producer invocation. The resolver performs a
+ * before/after read fence across all three authorities and fails closed if
+ * identity, provenance, or exact-effect state changes during resolution.
+ *
+ * This resolver proves provenance only. It never grants execution,
+ * verification, disclosure, distribution, or retry authority.
+ */
+export class JobArtifactProvenanceResolverV1 {
+  constructor({ browserAgentManager, projectWorkspaceRepository, loadExactEffect } = {}) {
+    if (typeof browserAgentManager?.resolveJobProjectBinding !== 'function') {
+      throw new Error('Canonical Browser Agent job/Project resolver is required');
+    }
+    if (typeof projectWorkspaceRepository?.load !== 'function') {
+      throw new Error('Canonical Project workspace repository is required');
+    }
+    if (typeof loadExactEffect !== 'function') {
+      throw new Error('Canonical exact-effect loader is required');
+    }
+    this.browserAgentManager = browserAgentManager;
+    this.projectWorkspaceRepository = projectWorkspaceRepository;
+    this.loadExactEffect = loadExactEffect;
+  }
+
+  async resolve(input = {}) {
+    const request = dataRecord(input, RESOLVE_KEYS, 'JobArtifactProvenance resolve request');
+    const jobId = id(request.jobId, 'jobId');
+    const artifactId = id(request.artifactId, 'artifactId');
+
+    const bindingBefore = normalizeJobBindingV1(
+      await this.browserAgentManager.resolveJobProjectBinding(jobId),
+    );
+    if (bindingBefore.jobId !== jobId) {
+      throw new Error('Canonical Browser Agent binding jobId mismatch');
+    }
+
+    const workspaceBefore = await this.projectWorkspaceRepository.load();
+    const provenanceBefore = getProjectArtifactProvenance(
+      workspaceBefore,
+      bindingBefore.projectId,
+      artifactId,
+    );
+    const producerInvocationId = provenanceBefore.artifactRef.producerInvocationId;
+    if (!producerInvocationId) throw new Error('Artifact provenance lacks producerInvocationId');
+
+    const effectBeforeRaw = await this.loadExactEffect(producerInvocationId);
+    if (!effectBeforeRaw) throw new Error('Canonical exact-effect state was not found');
+    const effectBefore = normalizeExactEffectStateV1(effectBeforeRaw);
+
+    const bindingAfter = normalizeJobBindingV1(
+      await this.browserAgentManager.resolveJobProjectBinding(jobId),
+    );
+    const workspaceAfter = await this.projectWorkspaceRepository.load();
+    const provenanceAfter = getProjectArtifactProvenance(
+      workspaceAfter,
+      bindingAfter.projectId,
+      artifactId,
+    );
+    const effectAfterRaw = await this.loadExactEffect(producerInvocationId);
+    if (!effectAfterRaw) throw new Error('Canonical exact-effect state was not found');
+    const effectAfter = normalizeExactEffectStateV1(effectAfterRaw);
+
+    if (canonical(bindingBefore) !== canonical(bindingAfter)) {
+      throw new Error('Browser Agent job/Project binding changed during provenance resolution');
+    }
+    if (canonical(provenanceBefore) !== canonical(provenanceAfter)) {
+      throw new Error('Project artifact provenance changed during provenance resolution');
+    }
+    if (canonical(effectBefore) !== canonical(effectAfter)) {
+      throw new Error('Exact-effect state changed during provenance resolution');
+    }
+
+    return composeJobArtifactProvenanceV1({
+      binding: bindingAfter,
+      workspace: workspaceAfter,
+      effectState: effectAfter,
+      artifactId,
+    });
+  }
 }
