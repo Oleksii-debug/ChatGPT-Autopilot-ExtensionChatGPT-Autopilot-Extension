@@ -259,6 +259,45 @@ test('economic route and policy arrays must be dense own data arrays', () => {
   assert.throws(() => normalizeAiRoutePolicy({ allowRouteIds:symbolIds }), /dense data-only array/u);
 });
 
+test('economic route and policy arrays snapshot length without ordinary Proxy reads', () => {
+  let reads = 0;
+  const roles = new Proxy(['planner'], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const pool = new Proxy([
+    {
+      routeId:'proxy-safe',
+      provider:'ollama',
+      model:'qwen3:8b',
+      roles,
+      priority:1,
+    },
+  ], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalized = normalizeAiRoutePool(pool);
+  assert.equal(normalized[0].routeId, 'proxy-safe');
+  assert.deepEqual(normalized[0].roles, ['planner']);
+  assert.equal(reads, 0, 'route pool and nested authority arrays must not perform ordinary caller reads');
+
+  const ordered = new Proxy(['proxy-safe'], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const policy = normalizeAiRoutePolicy({ orderedRouteIds:ordered });
+  assert.deepEqual(policy.orderedRouteIds, ['proxy-safe']);
+  assert.equal(reads, 0, 'policy authority arrays must not perform ordinary caller reads');
+});
+
 test('route final tie-break uses locale-independent code-unit order', () => {
   const sameRank = normalizeAiRoutePool([
     { routeId:'alpha', provider:'ollama', model:'a', roles:['planner'], priority:1 },
