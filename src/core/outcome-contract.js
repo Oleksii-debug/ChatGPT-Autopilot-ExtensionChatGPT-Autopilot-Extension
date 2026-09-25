@@ -116,7 +116,9 @@ function record(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
-  return value;
+  const snapshot = Object.create(null);
+  Object.defineProperties(snapshot, Object.getOwnPropertyDescriptors(value));
+  return snapshot;
 }
 
 function exactKeys(value, allowed, label) {
@@ -178,27 +180,34 @@ function integer(value, label, min, max) {
 }
 
 function denseArray(value, label, max = MAX_ITEMS) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const keys = Reflect.ownKeys(value);
-  for (const key of keys) {
-    if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
-      throw new Error(`${label} contains non-index array property`);
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} field ${key} must be an enumerable data property`);
-    }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
   }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  const length = lengthDescriptor.value;
+  const keys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (keys.length !== expected.size
+      || keys.some(key => typeof key !== 'string' || !expected.has(key))) {
+    throw new Error(`${label} contains non-index array property`);
+  }
+  const snapshot = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} must be a dense data array`);
     }
+    snapshot.push(descriptor.value);
   }
-  return value;
+  return snapshot;
 }
 
 function compareCodeUnit(a, b) {
