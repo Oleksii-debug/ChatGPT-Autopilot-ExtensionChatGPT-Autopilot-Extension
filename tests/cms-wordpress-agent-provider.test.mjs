@@ -137,7 +137,8 @@ test('each WordPress read tool dispatches through the single client', async () =
       policyDecision: decision(id),
     });
     assert.equal(result.result.operation, operation);
-    assert.deepEqual(result.result.args, args);
+    assert.equal(Object.getPrototypeOf(result.result.args), null);
+    assert.deepEqual({ ...result.result.args }, args);
     assert.equal(result.contentTrust, 'UNTRUSTED_DATA');
     assert.equal(result.instructionAuthority, 'NONE');
     assert.equal(result.requiresCanonicalUntrustedContentGuardAssessment, true);
