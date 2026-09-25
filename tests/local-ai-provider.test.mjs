@@ -48,6 +48,64 @@ test('normalizes defaults and validates timeout', () => {
   assert.throws(() => normalizeLocalAiSettings({ timeoutSeconds: 4 }), /5 to 600/);
 });
 
+test('Local AI settings are descriptor-snapshotted and reject coercive/exotic authority', () => {
+  const base = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  let reads = 0;
+  const proxy = new Proxy(base, {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'timeoutSeconds') return 600;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const normalized = normalizeLocalAiSettings(proxy);
+  assert.equal(reads, 0, 'settings normalization must never ordinary-read caller Proxy fields');
+  assert.equal(normalized.timeoutSeconds, 30);
+
+  const accessor = { ...base };
+  Object.defineProperty(accessor, 'baseUrl', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'http://127.0.0.1:9999';
+    },
+  });
+  assert.throws(() => normalizeLocalAiSettings(accessor), /enumerable own data properties/);
+  assert.equal(reads, 0, 'settings accessors must never execute');
+
+  assert.throws(
+    () => normalizeLocalAiSettings({ ...base, timeoutSeconds: '30' }),
+    /whole number from 5 to 600 seconds/,
+  );
+
+  const hidden = { ...base };
+  Object.defineProperty(hidden, 'providerType', {
+    enumerable: false,
+    configurable: true,
+    value: 'ollama',
+  });
+  assert.throws(() => normalizeLocalAiSettings(hidden), /enumerable own data properties/);
+  assert.throws(
+    () => normalizeLocalAiSettings({ ...base, [Symbol('authority')]: true }),
+    /symbol fields/,
+  );
+  assert.throws(
+    () => normalizeLocalAiSettings(Object.assign(Object.create({ timeoutSeconds: 600 }), base)),
+    /plain data object/,
+  );
+
+  const nullProto = Object.assign(Object.create(null), base);
+  assert.deepEqual(normalizeLocalAiSettings(nullProto), base);
+});
+
 test('Ollama model discovery and completion work end to end', async () => {
   await withServer(async ({ port, requests }) => {
     const client = new LocalAiClient();
