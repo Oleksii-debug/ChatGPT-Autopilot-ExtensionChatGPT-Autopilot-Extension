@@ -2655,6 +2655,7 @@ function renderCalendarEditor() {
   $('calendar-mode').value = kind;
   $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
   $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
+  $('calendar-revision-confirm').checked = false;
   $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? (schedule.date || '') : '';
   $('calendar-one-time-time').value = schedule?.kind === 'ONE_TIME' ? (schedule.time || '') : '';
   $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.startDate || '') : '';
@@ -2985,7 +2986,7 @@ async function saveSession() {
   clearTimeout(draftSaveTimer);
   const session = collectEditor(); const errors = validate(session); if (errors.length) { persistCurrentDraft(); announce(`${errors.length} configuration error${errors.length === 1 ? '' : 's'}.`); return; }
   try {
-    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session });
+    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session, confirmCalendarRevisionChange: $('calendar-revision-confirm').checked });
     clearDraft(session.id);
     ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor(); await refreshRunTimeline({ announceResult: false });
   } catch (error) { persistCurrentDraft(); setAppStatus(error.message); announce(error.message); }

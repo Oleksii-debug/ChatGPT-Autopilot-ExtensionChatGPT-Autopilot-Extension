@@ -96,3 +96,39 @@ test('UPDATE_SESSION clears stale calendarRuntime when calendar is disabled', as
   assert.equal(result.session.calendarSchedule, null);
   assert.deepEqual(result.session.calendarRuntime, {});
 });
+
+
+test('UPDATE_SESSION rejects a changed calendar revision without explicit owner confirmation', async () => {
+  const schedule = {
+    kind: 'DAILY', startDate: '2026-09-21', times: ['09:00'],
+    timeZone: 'UTC', catchUp: 'ON',
+  };
+  const state = createEmptyState(1000);
+  const session = sessionFromUi(config(schedule), 1000);
+  session.calendarRuntime = { committedOccurrenceIds: ['proof'], reconciledThroughByRevision: { old: 1000 } };
+  state.sessionsById[session.id] = session;
+  state.sessionOrder.push(session.id);
+  const repo = new MemoryRepo(state);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  const changed = { ...schedule, timeZone: 'Europe/Bratislava' };
+
+  await assert.rejects(
+    dispatcher.execute('UPDATE_SESSION', {
+      sessionId: session.id,
+      expectedVersion: session.version,
+      config: config(changed),
+    }),
+    /Confirm the new calendar revision/,
+  );
+  const unchanged = await repo.load();
+  assert.equal(unchanged.sessionsById[session.id].calendarSchedule.timeZone, 'UTC');
+
+  const accepted = await dispatcher.execute('UPDATE_SESSION', {
+    sessionId: session.id,
+    expectedVersion: session.version,
+    config: config(changed),
+    confirmCalendarRevisionChange: true,
+  });
+  assert.equal(accepted.session.calendarSchedule.timeZone, 'Europe/Bratislava');
+  assert.deepEqual(accepted.session.calendarRuntime, session.calendarRuntime);
+});

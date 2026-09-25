@@ -1,6 +1,6 @@
 import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
-import { normalizeCalendarSchedule } from './calendar-schedule.js';
+import { calendarScheduleRevision, normalizeCalendarSchedule } from './calendar-schedule.js';
 import { calendarAdmissionForSession } from './calendar-runtime.js';
 import { CoreCommand } from '../shared/protocol.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, MAX_PHYSICAL_TASKS, MAX_LOGICAL_TASKS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, isExclusiveConversationUrl, normalizeChatUrl } from './schema.js';
@@ -768,6 +768,12 @@ export class CoreCommandDispatcher {
         if(ACTIVE_STATES.has(old.runState)||hasUnresolvedOperation(old)) throw new Error('Pause or stop the session and resolve uncertain work before editing');
         if(Number(payload.expectedVersion)!==Number(old.version||0)) throw new Error('This session changed in another view. Reload before saving');
         const replacement=sessionFromUi({...payload.config,id:old.id,version:(old.version||0)+1},this.now());
+        const oldCalendarRevision = old.calendarSchedule ? calendarScheduleRevision(old.calendarSchedule) : null;
+        const replacementCalendarRevision = replacement.calendarSchedule ? calendarScheduleRevision(replacement.calendarSchedule) : null;
+        if (oldCalendarRevision && replacementCalendarRevision && oldCalendarRevision !== replacementCalendarRevision
+          && payload.confirmCalendarRevisionChange !== true) {
+          throw new Error('Calendar schedule changed. Confirm the new calendar revision before saving.');
+        }
         replacement.runState=old.runState;
         const oldTaskId=old.taskOrder[old.currentTaskIndex];
         replacement.currentTaskIndex=Math.max(0,replacement.taskOrder.indexOf(oldTaskId));

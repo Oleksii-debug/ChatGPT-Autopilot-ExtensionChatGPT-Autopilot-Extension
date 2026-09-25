@@ -7,7 +7,7 @@ const js = fs.readFileSync(new URL('../src/ui/options.js', import.meta.url), 'ut
 
 test('Session calendar editor exposes keyboard-native labelled controls and owner-visible runtime status', () => {
   for (const id of [
-    'calendar-mode', 'calendar-time-zone', 'calendar-catch-up',
+    'calendar-mode', 'calendar-time-zone', 'calendar-catch-up', 'calendar-revision-confirm',
     'calendar-one-time-date', 'calendar-one-time-time',
     'calendar-start-date', 'calendar-times',
     'calendar-weekday-1', 'calendar-weekday-7',
@@ -20,6 +20,7 @@ test('Session calendar editor exposes keyboard-native labelled controls and owne
   assert.match(html, /<label for="calendar-time-zone">/);
   assert.match(html, /<label[^>]*><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски<\/label>/);
   assert.match(html, /id="calendar-runtime-status" role="status" tabindex="0"/);
+  assert.match(html, /id="calendar-revision-confirm" type="checkbox" aria-describedby="calendar-revision-help"/);
   assert.doesNotMatch(html, /calendar[^\n]*onclick=/i);
 });
 

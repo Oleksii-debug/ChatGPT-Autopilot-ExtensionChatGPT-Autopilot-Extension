@@ -873,6 +873,8 @@
             <label for="calendar-time-zone">Часовий пояс IANA</label>
             <input id="calendar-time-zone" type="text" autocomplete="off" spellcheck="false" placeholder="Europe/Bratislava" aria-describedby="calendar-help">
             <label><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски</label>
+            <label><input id="calendar-revision-confirm" type="checkbox" aria-describedby="calendar-revision-help"> Підтверджую зміну вже існуючого календарного розкладу</label>
+            <p id="calendar-revision-help">Зміна дати, часу, часового поясу, recurrence або catch-up створює нову revision occurrence identity. Для вже збереженого календаря Core не прийме таку зміну без цього явного підтвердження.</p>
           </div>
 
           <div id="calendar-one-time-fields" hidden>
