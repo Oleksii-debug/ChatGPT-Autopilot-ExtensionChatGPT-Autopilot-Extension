@@ -66,9 +66,72 @@ function endpointFor(settings, kind) {
   return base.toString();
 }
 
-async function readJsonResponse(response) {
+async function cancelResponseBody(response) {
+  try {
+    await response?.body?.cancel?.();
+  } catch {
+    // Best-effort transport cleanup only; the size guard remains authoritative.
+  }
+}
+
+function declaredResponseBytes(response) {
+  const raw = response?.headers?.get?.('content-length');
+  if (raw == null || raw === '') return null;
+  const value = String(raw).trim();
+  if (!/^\\d+$/.test(value)) return null;
+  const bytes = Number(value);
+  return Number.isSafeInteger(bytes) ? bytes : null;
+}
+
+async function readResponseTextBounded(response) {
+  const declaredBytes = declaredResponseBytes(response);
+  if (declaredBytes != null && declaredBytes > MAX_RESPONSE_BYTES) {
+    await cancelResponseBody(response);
+    throw new Error('Local AI response is too large');
+  }
+
+  const readable = response?.body;
+  if (readable && typeof readable.getReader === 'function') {
+    const reader = readable.getReader();
+    const decoder = new TextDecoder();
+    let totalBytes = 0;
+    let text = '';
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+        totalBytes += chunk.byteLength;
+        if (totalBytes > MAX_RESPONSE_BYTES) {
+          try {
+            await reader.cancel();
+          } catch {
+            // Best-effort cleanup; fail closed regardless of cancel outcome.
+          }
+          throw new Error('Local AI response is too large');
+        }
+        text += decoder.decode(chunk, { stream: true });
+      }
+      text += decoder.decode();
+      return text;
+    } finally {
+      try {
+        reader.releaseLock?.();
+      } catch {
+        // A released/cancelled reader needs no further cleanup.
+      }
+    }
+  }
+
   const text = await response.text();
-  if (text.length > MAX_RESPONSE_BYTES) throw new Error('Local AI response is too large');
+  if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
+    throw new Error('Local AI response is too large');
+  }
+  return text;
+}
+
+async function readJsonResponse(response) {
+  const text = await readResponseTextBounded(response);
   let body;
   try {
     body = text ? JSON.parse(text) : {};
@@ -110,17 +173,27 @@ function extractAssistantText(settings, body) {
 }
 
 export class LocalAiClient {
-  constructor({ fetchFn = globalThis.fetch } = {}) {
+  constructor({
+    fetchFn = globalThis.fetch,
+    setTimeoutFn = globalThis.setTimeout,
+    clearTimeoutFn = globalThis.clearTimeout,
+  } = {}) {
     if (typeof fetchFn !== 'function') throw new Error('Local AI fetch is unavailable');
+    if (typeof setTimeoutFn !== 'function' || typeof clearTimeoutFn !== 'function') {
+      throw new Error('Local AI timer functions are unavailable');
+    }
     this.fetchFn = fetchFn;
+    this.setTimeoutFn = setTimeoutFn;
+    this.clearTimeoutFn = clearTimeoutFn;
   }
 
-  async request(settings, url, init = {}) {
+  async request(settings, url, init = {}, consumeResponse = null) {
     const normalized = normalizeLocalAiSettings(settings);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), normalized.timeoutSeconds * 1000);
+    const timer = this.setTimeoutFn(() => controller.abort(), normalized.timeoutSeconds * 1000);
+    let responseReceived = false;
     try {
-      return await this.fetchFn(url, {
+      const response = await this.fetchFn(url, {
         ...init,
         cache: 'no-store',
         signal: controller.signal,
@@ -130,18 +203,24 @@ export class LocalAiClient {
           ...(init.headers || {}),
         },
       });
+      responseReceived = true;
+      return typeof consumeResponse === 'function'
+        ? await consumeResponse(response)
+        : response;
     } catch (error) {
-      if (error?.name === 'AbortError') throw new Error(`Local AI request timed out after ${normalized.timeoutSeconds} seconds`);
+      if (controller.signal.aborted || error?.name === 'AbortError') {
+        throw new Error(`Local AI request timed out after ${normalized.timeoutSeconds} seconds`);
+      }
+      if (responseReceived) throw error;
       throw new Error(`Could not reach Local AI server: ${error?.message || 'network error'}`);
     } finally {
-      clearTimeout(timer);
+      this.clearTimeoutFn(timer);
     }
   }
 
   async listModels(rawSettings) {
     const settings = normalizeLocalAiSettings(rawSettings);
-    const response = await this.request(settings, endpointFor(settings, 'models'));
-    const body = await readJsonResponse(response);
+    const body = await this.request(settings, endpointFor(settings, 'models'), {}, readJsonResponse);
     const models = [...new Set(modelNamesFromResponse(settings, body))].sort((a, b) => a.localeCompare(b));
     return {
       ok: true,
@@ -165,13 +244,12 @@ export class LocalAiClient {
     messages.push({ role: 'user', content: userPrompt });
 
     const payload = settings.providerType === LocalAiProviderType.OLLAMA
-      ? { model: settings.model, messages, stream: false }
+      ? { model: settings.model, messages, stream: false, think: false }
       : { model: settings.model, messages, stream: false };
-    const response = await this.request(settings, endpointFor(settings, 'chat'), {
+    const body = await this.request(settings, endpointFor(settings, 'chat'), {
       method: 'POST',
       body: JSON.stringify(payload),
-    });
-    const body = await readJsonResponse(response);
+    }, readJsonResponse);
     const text = extractAssistantText(settings, body);
     if (!text) throw new Error('Local AI server returned no assistant text');
     return {
@@ -183,4 +261,4 @@ export class LocalAiClient {
   }
 }
 
-export { MAX_PROMPT_LENGTH, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS };
+export { MAX_PROMPT_LENGTH, MAX_RESPONSE_BYTES, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS };
