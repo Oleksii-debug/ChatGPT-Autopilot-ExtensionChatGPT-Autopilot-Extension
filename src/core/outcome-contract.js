@@ -195,8 +195,7 @@ function denseArray(value, label, max = MAX_ITEMS) {
   const length = lengthDescriptor.value;
   const keys = Reflect.ownKeys(descriptors);
   const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
-  if (keys.length !== expected.size
-      || keys.some(key => typeof key !== 'string' || !expected.has(key))) {
+  if (keys.some(key => typeof key !== 'string' || !expected.has(key))) {
     throw new Error(`${label} contains non-index array property`);
   }
   const snapshot = [];
