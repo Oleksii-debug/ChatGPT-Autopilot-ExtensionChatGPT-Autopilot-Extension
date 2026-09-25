@@ -152,19 +152,48 @@ test('fresh equal-authority disagreement fails closed as one conflict and reques
   assert.equal(result.refreshRequests.every(item => item.executionAuthorized === false), true);
 });
 
-test('same top-authority value from multiple sources chooses newest observation deterministically', () => {
+test('same exact top-authority claim from multiple sources chooses newest observation deterministically', () => {
   const result = arbitrateTruthFactV1(request([
     source('git-primary', 'git.canonical', {
       observedAt:'2026-09-25T05:30:00.000Z',
     }),
     source('git-mirror', 'git.canonical', {
-      revisionId:'rev-2',
       observedAt:'2026-09-25T05:30:10.000Z',
       validUntil:'2026-09-25T05:31:10.000Z',
     }),
   ]));
   assert.equal(result.status, TruthResolutionStatus.RESOLVED);
   assert.equal(result.canonical.sourceId, 'git-mirror');
+});
+
+test('same digest with a different equal-authority revision is still a truth conflict', () => {
+  const result = arbitrateTruthFactV1(request([
+    source('git-primary', 'git.canonical', { revisionId:'rev-1', contentSha256:H1 }),
+    source('git-mirror', 'git.canonical', { revisionId:'rev-2', contentSha256:H1 }),
+  ]));
+  assert.equal(result.status, TruthResolutionStatus.CONFLICT);
+  assert.equal(result.canonical, null);
+  assert.deepEqual(result.conflicts.map(item => item.revisionId), ['rev-2', 'rev-1']);
+});
+
+test('a stale available peer at the selected authority rank must refresh before canonization', () => {
+  const result = arbitrateTruthFactV1(request([
+    source('git-primary', 'git.canonical'),
+    source('git-mirror', 'git.canonical', {
+      revisionId:'rev-old',
+      contentSha256:H2,
+      observedAt:'2026-09-25T05:28:00.000Z',
+      validUntil:'2026-09-25T05:29:00.000Z',
+    }),
+  ]));
+  assert.equal(result.status, TruthResolutionStatus.REFRESH_REQUIRED);
+  assert.equal(result.canonical, null);
+  assert.deepEqual(result.refreshRequests, [{
+    sourceId:'git-mirror',
+    authorityClass:'git.canonical',
+    reasonCode:'EQUAL_AUTHORITY_STALE_OR_MISSING',
+    executionAuthorized:false,
+  }]);
 });
 
 test('input ordering cannot change a resolution or conflict projection', () => {
