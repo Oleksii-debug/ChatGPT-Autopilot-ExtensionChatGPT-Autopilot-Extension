@@ -222,6 +222,29 @@ test('safe retry needs fresh independently bound no-effect evidence', async () =
   const initial = provider(transport, leaseState, store);
   const request = { ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } };
   assert.equal((await initial.invoke(request)).status, 'AMBIGUOUS');
+
+  const beforeAliasAttempt = store.snapshot();
+  const beforeAliasLease = structuredClone(leaseState.value);
+  let aliasVerifierCalls = 0;
+  const aliasGuard = createDeterministicWebProviderV1({
+    transport,
+    store,
+    now: () => at,
+    reconcileVerify: async () => {
+      aliasVerifierCalls += 1;
+      throw new Error('reconciliation verifier must not run for a noncanonical invocation identity');
+    },
+  });
+  for (const invocationId of [' inv-1', 'inv-1 ']) {
+    await assert.rejects(
+      () => aliasGuard.reconcile({ invocationId, outcome: 'SAFE_RETRY' }),
+      /reconciliation invocationId is invalid/,
+    );
+  }
+  assert.equal(aliasVerifierCalls, 0);
+  assert.deepEqual(store.snapshot(), beforeAliasAttempt);
+  assert.deepEqual(leaseState.value, beforeAliasLease);
+
   await assert.rejects(() => initial.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /independent web reconciliation verifier/);
   const bad = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
