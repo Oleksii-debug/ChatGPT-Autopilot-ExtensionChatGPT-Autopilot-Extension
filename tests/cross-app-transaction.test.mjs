@@ -164,7 +164,7 @@ function resolverForEntries(entries) {
   return {
     async loadExactEffectState(invocationId) {
       const state = byInvocationId.get(invocationId);
-      return state == null ? null : structuredClone(state);
+      return state == null ? null : state;
     },
   };
 }
