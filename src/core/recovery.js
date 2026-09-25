@@ -1,4 +1,4 @@
-import { OperationPhase, RunState } from './schema.js';
+import { OperationPhase, RunState, TabStrategy } from './schema.js';
 import { selectNextTask } from './scheduler.js';
 import { CalendarOccurrenceState, calendarAdmissionForSession } from './calendar-runtime.js';
 
@@ -72,14 +72,57 @@ export function healUnattendedManualHolds(session, now = Date.now(), { resumeMac
   return changed;
 }
 
+function hasDurableNativePreEffectFocusLease(state, session) {
+  const operation = session?.operation;
+  if (operation?.phase !== OperationPhase.SUBMITTING || operation.nativeSubmitDispatched === true) return false;
+
+  const previousTabId = Number(operation.previousSendTabId || 0);
+  const previousWindowId = Number(operation.previousSendWindowId || 0);
+  if (!Number.isInteger(previousTabId) || previousTabId <= 0
+      || !Number.isInteger(previousWindowId) || previousWindowId <= 0) return false;
+
+  const hintKey = session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION
+    ? `__session_worker__:${session.id}`
+    : operation.taskId;
+  const ownedTabId = Number(state.tabHintsByTaskId?.[hintKey]?.tabId || 0);
+  return Number.isInteger(ownedTabId) && ownedTabId > 0 && ownedTabId !== previousTabId;
+}
+
 export function reconcileStateForStartup(state, now = Date.now()) {
   for (const session of Object.values(state.sessionsById)) {
     healUnattendedManualHolds(session, now, { resumeMachinePause: !state.profile?.masterPaused });
     const wasActive = session.runState === RunState.RUNNING || session.runState === RunState.RECOVERING;
     if (session.runState === RunState.RUNNING) session.runState = RunState.RECOVERING;
     if (session.operation?.phase === OperationPhase.SUBMITTING) {
-      session.operation.phase = OperationPhase.AMBIGUOUS;
-      if (wasActive) session.runState = RunState.RECOVERING;
+      if (hasDurableNativePreEffectFocusLease(state, session)) {
+        // activateOwnedSendTab() persists this focus lease before any debugger
+        // attach/native click. If MV3 restarts in this exact window and the
+        // native effect checkpoint is still absent, durable state proves that
+        // no Send effect crossed the boundary. Settle fail-safe now; the
+        // service-worker startup sequence restores owner focus immediately
+        // afterwards and a later native-input message is rejected by phase.
+        const operation = session.operation;
+        const task = session.tasksById?.[operation.taskId];
+        const retryDelay = Math.max(1000, session.retryBackoffMs || 30000);
+        operation.phase = OperationPhase.FAILED_SAFE;
+        operation.submitStartedAt = 0;
+        operation.verificationDeadline = 0;
+        operation.updatedAt = now;
+        if (task) {
+          task.status = 'RETRY_WAIT';
+          task.retryAfterAt = Math.max(task.retryAfterAt || 0, now + retryDelay);
+        }
+        session.lastError = 'Native Send was interrupted before the effect boundary; a safe retry was scheduled.';
+        session.lastActionAt = now;
+        session.updatedAt = now;
+        if (wasActive) session.runState = RunState.RECOVERING;
+      } else {
+        // Once the native effect checkpoint exists, or when this is not the
+        // exact native focus-lease path, restart cannot prove zero effect.
+        // Preserve the no-blind-resend invariant.
+        session.operation.phase = OperationPhase.AMBIGUOUS;
+        if (wasActive) session.runState = RunState.RECOVERING;
+      }
     }
   }
   state.sendArbiter.lease = null;
