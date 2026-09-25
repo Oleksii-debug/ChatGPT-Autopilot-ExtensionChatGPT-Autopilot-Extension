@@ -522,6 +522,12 @@ export function buildDiffFirstOwnerReviewV1(input) {
     'artifactId',
   );
   const artifactIds = new Set(artifactRefs.map((artifact) => artifact.artifactId));
+  const artifactById = new Map(artifactRefs.map((artifact) => [artifact.artifactId, artifact]));
+  for (const artifact of artifactRefs) {
+    if (Date.parse(artifact.createdAt) > Date.parse(generatedAt)) {
+      throw new Error(`artifact ${artifact.artifactId} createdAt is after review generatedAt`);
+    }
+  }
 
   const effectIds = uniqueIds(raw.effectIds, 'effectIds');
 
@@ -538,6 +544,14 @@ export function buildDiffFirstOwnerReviewV1(input) {
       artifactIds,
       `verification ${verification.verificationId} evidenceArtifactIds`,
     );
+    for (const artifactId of verification.evidenceArtifactIds) {
+      const artifact = artifactById.get(artifactId);
+      if (Date.parse(artifact.createdAt) > Date.parse(verification.verifiedAt)) {
+        throw new Error(
+          `verification ${verification.verificationId} references evidence created after verifiedAt: ${artifactId}`,
+        );
+      }
+    }
     if (verification.effectId && !effectIds.includes(verification.effectId)) {
       throw new Error(
         `verification ${verification.verificationId} references unknown effectId: ${verification.effectId}`,
