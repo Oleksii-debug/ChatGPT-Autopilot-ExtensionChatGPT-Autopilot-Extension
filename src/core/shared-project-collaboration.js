@@ -22,7 +22,7 @@ const BINDING_KEYS = new Set([
   'ownerPrincipalId', 'resourceKey', 'createdAt',
 ]);
 const ACCESS_KEYS = new Set([
-  'binding', 'snapshot', 'governanceRegistry', 'principalId', 'at',
+  'bindingId', 'principalId', 'at',
   'requestedCapabilityIds', 'requestedProviderIds', 'requestedOutboundDataClassIds',
 ]);
 const EVENT_KEYS = new Set([
@@ -30,9 +30,7 @@ const EVENT_KEYS = new Set([
   'projectRevisionId', 'actorPrincipalId', 'recipientPrincipalId',
   'taskId', 'artifactIds', 'message', 'createdAt',
 ]);
-const EVENT_ASSESSMENT_KEYS = new Set([
-  'binding', 'snapshot', 'governanceRegistry', 'event', 'at',
-]);
+const EVENT_ASSESSMENT_KEYS = new Set(['event', 'at']);
 
 function asciiCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
@@ -163,11 +161,6 @@ function idList(input, label, { max = MAX_IDS } = {}) {
   return Object.freeze(values);
 }
 
-function isSubset(requested, ceiling) {
-  const allowed = new Set(ceiling);
-  return requested.every(value => allowed.has(value));
-}
-
 function missingFrom(requested, ceiling) {
   const allowed = new Set(ceiling);
   return requested.filter(value => !allowed.has(value));
@@ -175,6 +168,25 @@ function missingFrom(requested, ceiling) {
 
 function projectResourceKey(projectId) {
   return id('project:' + projectId, 'project resourceKey');
+}
+
+function bindTrustedMethod(resolver, methodName) {
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
+    throw new Error('Trusted shared-project resolver is required');
+  }
+  let owner = resolver;
+  let descriptor = null;
+  for (let depth = 0; owner && depth < 8; depth += 1) {
+    descriptor = Object.getOwnPropertyDescriptor(owner, methodName);
+    if (descriptor) break;
+    owner = Object.getPrototypeOf(owner);
+  }
+  if (!descriptor
+      || !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      || typeof descriptor.value !== 'function') {
+    throw new Error('Trusted resolver must expose ' + methodName + ' as a data method');
+  }
+  return descriptor.value.bind(resolver);
 }
 
 export function normalizeSharedProjectBindingV1(input) {
@@ -202,15 +214,15 @@ export function normalizeSharedProjectBindingV1(input) {
 function assertBindingAgainstCanonicalSources(binding, snapshot, registry) {
   if (snapshot.projectId !== binding.projectId
       || snapshot.revisionId !== binding.projectRevisionId) {
-    throw new Error('Shared project binding does not match canonical project snapshot');
+    throw new Error('Shared project binding does not match trusted project snapshot');
   }
   if (registry.organizationId !== binding.organizationId
       || registry.registryId !== binding.governanceRegistryId
       || registry.revision !== binding.governanceRegistryRevision) {
-    throw new Error('Shared project binding does not match canonical identity governance registry');
+    throw new Error('Shared project binding does not match trusted identity governance registry');
   }
   if (Date.parse(binding.createdAt) < Date.parse(snapshot.createdAt)) {
-    throw new Error('Shared project binding cannot predate canonical project snapshot');
+    throw new Error('Shared project binding cannot predate trusted project snapshot');
   }
   if (Date.parse(binding.createdAt) > Date.parse(registry.updatedAt)) {
     throw new Error('Shared project binding cannot postdate governance registry evidence');
@@ -230,12 +242,51 @@ function assertBindingAgainstCanonicalSources(binding, snapshot, registry) {
   }
 }
 
+async function resolveTrustedContext(bindingIdInput, trustedResolver) {
+  const bindingId = id(bindingIdInput, 'bindingId');
+  const resolveSharedProjectBinding = bindTrustedMethod(
+    trustedResolver,
+    'resolveSharedProjectBinding',
+  );
+  const resolveProjectSnapshot = bindTrustedMethod(
+    trustedResolver,
+    'resolveProjectSnapshot',
+  );
+  const resolveIdentityGovernanceRegistry = bindTrustedMethod(
+    trustedResolver,
+    'resolveIdentityGovernanceRegistry',
+  );
+
+  const bindingRaw = await resolveSharedProjectBinding(bindingId);
+  if (bindingRaw == null) throw new Error('Trusted shared-project binding was not found');
+  const binding = normalizeSharedProjectBindingV1(bindingRaw);
+  if (binding.bindingId !== bindingId) {
+    throw new Error('Trusted shared-project binding identity mismatch');
+  }
+
+  const snapshotRaw = await resolveProjectSnapshot({
+    projectId: binding.projectId,
+    projectRevisionId: binding.projectRevisionId,
+  });
+  if (snapshotRaw == null) throw new Error('Trusted project snapshot was not found');
+  const snapshot = normalizeProjectSnapshotV1(snapshotRaw);
+
+  const registryRaw = await resolveIdentityGovernanceRegistry({
+    governanceRegistryId: binding.governanceRegistryId,
+    governanceRegistryRevision: binding.governanceRegistryRevision,
+    organizationId: binding.organizationId,
+  });
+  if (registryRaw == null) throw new Error('Trusted identity governance registry was not found');
+  const registry = normalizeIdentityGovernanceRegistryV1(registryRaw);
+
+  assertBindingAgainstCanonicalSources(binding, snapshot, registry);
+  return freezeDeep({ binding, snapshot, registry });
+}
+
 function normalizeAccessRequest(input) {
   const raw = strictRecord(input, ACCESS_KEYS, 'SharedProjectAccessRequestV1');
   return {
-    binding: normalizeSharedProjectBindingV1(raw.binding),
-    snapshot: normalizeProjectSnapshotV1(raw.snapshot),
-    governanceRegistry: normalizeIdentityGovernanceRegistryV1(raw.governanceRegistry),
+    bindingId: id(raw.bindingId, 'bindingId'),
     principalId: id(raw.principalId, 'principalId'),
     at: timestamp(raw.at, 'at'),
     requestedCapabilityIds: idList(raw.requestedCapabilityIds, 'requestedCapabilityIds'),
@@ -247,12 +298,9 @@ function normalizeAccessRequest(input) {
   };
 }
 
-export function assessSharedProjectAccessV1(input) {
-  const request = normalizeAccessRequest(input);
+function assessResolvedAccess(context, request) {
+  const { binding, registry } = context;
   const {
-    binding,
-    snapshot,
-    governanceRegistry: registry,
     principalId,
     at,
     requestedCapabilityIds,
@@ -260,7 +308,6 @@ export function assessSharedProjectAccessV1(input) {
     requestedOutboundDataClassIds,
   } = request;
 
-  assertBindingAgainstCanonicalSources(binding, snapshot, registry);
   if (Date.parse(at) < Date.parse(binding.createdAt)) {
     throw new Error('Shared project access assessment cannot predate binding');
   }
@@ -316,6 +363,7 @@ export function assessSharedProjectAccessV1(input) {
     ownedCredentialBindingIds: Object.freeze(
       ceiling.ownedCredentialBindings.map(item => item.bindingId).sort(asciiCompare),
     ),
+    canonicalSourcesResolved: true,
     advisoryOnly: true,
     authorizationGranted: false,
     executionAuthorized: false,
@@ -323,6 +371,12 @@ export function assessSharedProjectAccessV1(input) {
     credentialUseAuthorized: false,
     requiresCanonicalPolicyDecision: true,
   });
+}
+
+export async function assessSharedProjectAccessV1(input, trustedResolver) {
+  const request = normalizeAccessRequest(input);
+  const context = await resolveTrustedContext(request.bindingId, trustedResolver);
+  return assessResolvedAccess(context, request);
 }
 
 export function normalizeSharedProjectCollaborationEventV1(input) {
@@ -358,36 +412,30 @@ export function normalizeSharedProjectCollaborationEventV1(input) {
   });
 }
 
-function emptyRequest(binding, snapshot, registry, principalId, at) {
+function emptyResolvedRequest(principalId, at) {
   return {
-    binding,
-    snapshot,
-    governanceRegistry: registry,
     principalId,
     at,
-    requestedCapabilityIds: [],
-    requestedProviderIds: [],
-    requestedOutboundDataClassIds: [],
+    requestedCapabilityIds: Object.freeze([]),
+    requestedProviderIds: Object.freeze([]),
+    requestedOutboundDataClassIds: Object.freeze([]),
   };
 }
 
-export function assessSharedProjectCollaborationEventV1(input) {
+export async function assessSharedProjectCollaborationEventV1(input, trustedResolver) {
   const raw = strictRecord(
     input,
     EVENT_ASSESSMENT_KEYS,
     'SharedProjectCollaborationEventAssessmentV1',
   );
-  const binding = normalizeSharedProjectBindingV1(raw.binding);
-  const snapshot = normalizeProjectSnapshotV1(raw.snapshot);
-  const registry = normalizeIdentityGovernanceRegistryV1(raw.governanceRegistry);
   const event = normalizeSharedProjectCollaborationEventV1(raw.event);
   const at = timestamp(raw.at, 'at');
+  const context = await resolveTrustedContext(event.bindingId, trustedResolver);
+  const { binding, snapshot } = context;
 
-  assertBindingAgainstCanonicalSources(binding, snapshot, registry);
-  if (event.bindingId !== binding.bindingId
-      || event.projectId !== binding.projectId
+  if (event.projectId !== binding.projectId
       || event.projectRevisionId !== binding.projectRevisionId) {
-    throw new Error('Collaboration event does not match shared project binding');
+    throw new Error('Collaboration event does not match trusted shared project binding');
   }
   if (event.createdAt !== at) {
     throw new Error('Collaboration event createdAt must equal admission assessment time');
@@ -399,17 +447,16 @@ export function assessSharedProjectCollaborationEventV1(input) {
   const knownArtifacts = new Set(snapshot.artifactRefs.map(item => item.artifactId));
   for (const artifactId of event.artifactIds) {
     if (!knownArtifacts.has(artifactId)) {
-      throw new Error('Collaboration event references artifact outside canonical project snapshot: ' + artifactId);
+      throw new Error('Collaboration event references artifact outside trusted project snapshot: ' + artifactId);
     }
   }
 
-  const actor = assessSharedProjectAccessV1(
-    emptyRequest(binding, snapshot, registry, event.actorPrincipalId, at),
+  const actor = assessResolvedAccess(
+    context,
+    emptyResolvedRequest(event.actorPrincipalId, at),
   );
   const recipient = event.recipientPrincipalId
-    ? assessSharedProjectAccessV1(
-      emptyRequest(binding, snapshot, registry, event.recipientPrincipalId, at),
-    )
+    ? assessResolvedAccess(context, emptyResolvedRequest(event.recipientPrincipalId, at))
     : null;
 
   const eventAdmissibleForCollaboration = actor.collaborationEligible
@@ -431,6 +478,7 @@ export function assessSharedProjectCollaborationEventV1(input) {
     recipientAccessReasonCode: recipient ? recipient.reasonCode : '',
     eventAdmissibleForCollaboration,
     reasonCode,
+    canonicalSourcesResolved: true,
     contentTrust: 'UNTRUSTED_DATA',
     advisoryOnly: true,
     auditAppendAuthorized: false,
