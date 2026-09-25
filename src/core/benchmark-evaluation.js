@@ -78,23 +78,30 @@ function exactKeys(value, allowed, label) {
 }
 
 function denseArray(value, label, { min = 0, max } = {}) {
-  if (!Array.isArray(value) || value.length < min || value.length > max) {
-    throw new Error(label + ' must be a bounded array');
-  }
-  if (Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(label + ' must be a plain array');
   }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < min
+      || lengthDescriptor.value > max) {
+    throw new Error(label + ' must be a bounded array');
+  }
+  const length = lengthDescriptor.value;
 
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(0|[1-9]\d*)$/u.test(key)) {
       throw new Error(label + ' must contain canonical own enumerable data indices only');
     }
     const index = Number(key);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!Number.isSafeInteger(index)
       || index < 0
-      || index >= value.length
+      || index >= length
       || String(index) !== key
       || !descriptor
       || !Object.hasOwn(descriptor, 'value')
@@ -103,18 +110,17 @@ function denseArray(value, label, { min = 0, max } = {}) {
     }
   }
 
-  const normalized = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  const normalized = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor) throw new Error(label + ' must not be sparse');
     if (!Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(label + ' must contain canonical own enumerable data indices only');
     }
-    normalized.push(descriptor.value);
+    normalized[index] = descriptor.value;
   }
   return normalized;
 }
-
 function id(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(label + ' is invalid');
