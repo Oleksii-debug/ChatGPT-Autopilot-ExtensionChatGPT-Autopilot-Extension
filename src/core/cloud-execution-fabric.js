@@ -433,6 +433,7 @@ function resultBase({
     workspaceProvisioningRequired: provisioningRequired,
     workspaceContinuityBindingRequired: recommendedPlane === AgentExecutionPlane.CLOUD,
     workspaceContinuityVerified: false,
+    isolationVerificationRequired: recommendedPlane === AgentExecutionPlane.CLOUD,
     checkpointVerificationRequired: request.requiresCheckpointResume,
     checkpointTransferRequired,
     artifactSyncRequired: recommendedPlane === AgentExecutionPlane.CLOUD || leavingCloud,
@@ -567,6 +568,15 @@ export function assessCloudExecutionFabricV1(input) {
       return blocked(
         baseArgs,
         'CLOUD_WORKSPACE_BINDING_REQUIRED',
+        CloudFabricDisposition.RECONCILE_REQUIRED,
+      );
+    }
+    if (request.checkpointArtifactId
+        && (existingBinding.checkpointArtifactId !== request.checkpointArtifactId
+          || existingBinding.checkpointSha256 !== request.checkpointSha256)) {
+      return blocked(
+        baseArgs,
+        'CLOUD_CHECKPOINT_BINDING_MISMATCH',
         CloudFabricDisposition.RECONCILE_REQUIRED,
       );
     }
