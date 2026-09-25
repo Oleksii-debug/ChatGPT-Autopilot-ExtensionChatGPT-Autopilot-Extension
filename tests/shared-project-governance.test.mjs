@@ -316,19 +316,19 @@ test('membership cannot predate principal creation or be created by an inactive 
   const registry = identityRegistry();
   registry.principals = registry.principals.map((item) => (
     item.principalId === 'owner'
-      ? { ...item, status: GovernancePrincipalStatus.REVOKED, revokedAt: T2 }
+      ? { ...item, status: GovernancePrincipalStatus.REVOKED, revokedAt: T3 }
       : item
   ));
   registry.grants = registry.grants.map((item) => (
     item.grantId === 'grant-owner'
-      ? { ...item, revokedAt: T2 }
+      ? { ...item, revokedAt: T3 }
       : item
   ));
 
   assert.throws(
     () => buildSharedProjectGovernanceV1(request({
       identityRegistry: registry,
-      memberships: [membership('m-agent', 'agent-a', 'owner', T3)],
+      memberships: [membership('m-agent', 'agent-a', 'owner', T4)],
       auditEvents: [],
     })),
     /inviting principal was inactive/,
