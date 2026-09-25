@@ -34,6 +34,30 @@ test('normalizes the existing AgentPlan budget shape exactly and fail closed', (
   assert.throws(() => normalizeAgentPlanBudgetCeilingV1(Object.create({ maxModelCalls: 5 })), /plain object/);
 });
 
+test('AgentPlan zero ceilings use one canonical numeric representation', () => {
+  const canonical = normalizeAgentPlanBudgetCeilingV1({
+    maxModelCalls:0,
+    maxRuntimeSeconds:0,
+    maxCostUsdMicros:0,
+  });
+  assert.equal(Object.is(canonical.maxModelCalls, -0), false);
+  assert.equal(Object.is(canonical.maxRuntimeSeconds, -0), false);
+  assert.equal(Object.is(canonical.maxCostUsdMicros, -0), false);
+
+  assert.throws(
+    () => normalizeAgentPlanBudgetCeilingV1({ maxModelCalls:-0 }),
+    /AgentPlan budget maxModelCalls is invalid/,
+  );
+  assert.throws(
+    () => normalizeAgentPlanBudgetCeilingV1({ maxRuntimeSeconds:-0 }),
+    /AgentPlan budget maxRuntimeSeconds is invalid/,
+  );
+  assert.throws(
+    () => normalizeAgentPlanBudgetCeilingV1({ maxCostUsdMicros:-0 }),
+    /AgentPlan budget maxCostUsdMicros is invalid/,
+  );
+});
+
 test('AgentPlan only narrows shared owner ceilings and leaves owner-only dimensions intact', () => {
   const narrowed = narrowResourceBudgetWithAgentPlanV1({ ownerBudget, agentPlanBudget });
   assert.equal(narrowed.maxConcurrentAgents, 12);
