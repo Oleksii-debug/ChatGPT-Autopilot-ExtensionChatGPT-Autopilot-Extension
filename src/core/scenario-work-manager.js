@@ -181,6 +181,13 @@ function compatiblePersistedConfig(persisted, canonical) {
   return migrated && samePersistedData(persisted, legacyCanonical);
 }
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
+function poolSummary(store, poolId) {
+  const members = store.order.map(id => store.byId[id]).filter(item => item?.pool?.id === poolId);
+  const budget = members[0]?.pool?.replacementBudget || 0;
+  return { id: poolId, slots: members.length, replacementBudget: budget,
+    replacementsUsed: members.reduce((sum, item) => sum + Number(item.runtime.poolReplacementsUsed || 0), 0),
+    active: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING).length };
+}
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
   return `scenario-work:${safe}:${ordinal}`;
@@ -202,6 +209,7 @@ function ensureManagerRuntimeFields(runtime) {
   if (!Number.isFinite(out.nextLaunchAt)) out.nextLaunchAt = 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
   out.deletePending = out.deletePending === true;
+  out.poolReplacementsUsed = Math.max(0, Math.floor(Number(out.poolReplacementsUsed || 0)));
   return out;
 }
 function scenarioDesiredCoreRunState(runtime) {
@@ -250,6 +258,18 @@ function normalizeStore(raw, now = Date.now()) {
       // after restart. Current-schema persisted bytes must already equal the
       // canonical config that this version itself writes.
       if (!compatiblePersistedConfig(item.config, config)) continue;
+      const pool = plainRecord(item.pool) && typeof item.pool.id === 'string'
+        && /^[A-Za-z0-9._:-]{1,120}$/u.test(item.pool.id)
+        && Number.isInteger(item.pool.replacementBudget)
+        && item.pool.replacementBudget >= 0 && item.pool.replacementBudget <= 100000
+        ? { id: item.pool.id, replacementBudget: item.pool.replacementBudget } : null;
+      // CHAT_CYCLE pools have one unambiguous contract: one physical chat runs
+      // the configured prompt sequence exactly once. Replacement generations
+      // are governed only by the shared pool replacement budget.
+      if (pool && config.mode === ScenarioWorkMode.CHAT_CYCLE) {
+        config.roundsPerGeneration = 1;
+        config.maxGenerations = 0;
+      }
       const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
         ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
@@ -259,6 +279,7 @@ function normalizeStore(raw, now = Date.now()) {
           name: safeName(item.name || config.name),
           config,
           runtime,
+          pool,
           createdAt: Math.max(0, Number(item.createdAt || now)),
           updatedAt: Math.max(0, Number(item.updatedAt || now)),
         },
@@ -328,6 +349,22 @@ export class ScenarioWorkManager {
         return store;
       }
       const next = ensureManagerRuntimeFields(runtime);
+      const replacingChat = item.pool && item.config.mode === ScenarioWorkMode.CHAT_CYCLE
+        && item.runtime.chat?.state === ScenarioParticipantState.WAITING
+        && next.chat?.state === ScenarioParticipantState.NEW
+        && !next.chat?.sessionId;
+      if (replacingChat) {
+        const summary = poolSummary(store, item.pool.id);
+        if (summary.replacementsUsed >= summary.replacementBudget) {
+          next.runState = ScenarioWorkRunState.COMPLETED;
+          next.phase = 'COMPLETE';
+          next.generation = item.runtime.generation;
+          next.chat.state = ScenarioParticipantState.RETIRED;
+          next.chat.chatUrl = '';
+        } else {
+          next.poolReplacementsUsed = item.runtime.poolReplacementsUsed + 1;
+        }
+      }
       next.ownerEpoch = Number(expectedOwnerEpoch || 0);
       item.runtime = next;
       item.updatedAt = now;
@@ -403,9 +440,10 @@ export class ScenarioWorkManager {
     const store = await this.load();
     return {
       selectedId: store.selectedId,
+      pools: [...new Set(store.order.map(id => store.byId[id]?.pool?.id).filter(Boolean))].map(id => poolSummary(store, id)),
       scenarios: store.order.map(id => {
         const item = store.byId[id];
-        return { id, name: item.name, config: clone(item.config), runtime: clone(item.runtime), selected: id === store.selectedId };
+        return { id, name: item.name, config: clone(item.config), runtime: clone(item.runtime), pool: item.pool ? clone(item.pool) : null, selected: id === store.selectedId };
       }),
     };
   }
@@ -422,7 +460,10 @@ export class ScenarioWorkManager {
     const now = this.now();
     await this.update(store => {
       if (store.byId[id]) throw new Error('Сценарій з таким ідентифікатором уже існує.');
-      const normalizedConfig = normalizeScenarioWorkConfig({ ...config, id, name, mode });
+      const cycleContract = mode === ScenarioWorkMode.CHAT_CYCLE
+        ? { roundsPerGeneration: 1, maxGenerations: 1 }
+        : {};
+      const normalizedConfig = normalizeScenarioWorkConfig({ ...config, ...cycleContract, id, name, mode });
       const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalizedConfig, now));
       runtime.verifiedSendHistoryComplete = true;
       store.byId[id] = { id, name: safeName(name), config: normalizedConfig, runtime, createdAt: now, updatedAt: now };
@@ -432,6 +473,34 @@ export class ScenarioWorkManager {
     });
     await this.reconcileAlarm();
     return this.get(id);
+  }
+
+  async createChatPool({ name = 'Пул чатів', count, replacementBudget, config = {} } = {}) {
+    if (!Number.isInteger(count) || count < 1 || count > 20) throw new Error('Кількість одночасних чатів: від 1 до 20.');
+    if (!Number.isInteger(replacementBudget) || replacementBudget < 0 || replacementBudget > 100000) {
+      throw new Error('Кількість нових чатів після початкових: від 0 до 100000.');
+    }
+    const poolId = this.createId();
+    const ids = Array.from({ length: count }, () => this.createId());
+    if (new Set([poolId, ...ids]).size !== count + 1) throw new Error('Повторний ідентифікатор пулу.');
+    const now = this.now();
+    await this.update(store => {
+      if (ids.some(id => store.byId[id])) throw new Error('Пул містить зайнятий ідентифікатор.');
+      for (const [index, id] of ids.entries()) {
+        const slotName = `${safeName(name).slice(0, 100)} — чат ${index + 1}`;
+        const normalized = normalizeScenarioWorkConfig({ ...config, id, name: slotName,
+          mode: ScenarioWorkMode.CHAT_CYCLE, roundsPerGeneration: 1, maxGenerations: 0 });
+        const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalized, now));
+        runtime.verifiedSendHistoryComplete = true;
+        store.byId[id] = { id, name: slotName, config: normalized, runtime,
+          pool: { id: poolId, replacementBudget }, createdAt: now, updatedAt: now };
+        store.order.push(id);
+      }
+      store.selectedId = ids[0];
+      return store;
+    });
+    await this.reconcileAlarm();
+    return { pool: { id: poolId, slots: count, replacementBudget, replacementsUsed: 0 }, ids };
   }
 
   async select(id) {
@@ -448,6 +517,7 @@ export class ScenarioWorkManager {
     await this.update(store => {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
+      if (item.pool) throw new Error('Налаштування створеного пулу не змінюються по одному чату. Створіть новий пул.');
       if ([ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.PAUSED].includes(item.runtime.runState)) {
         throw new Error('Перед зміною налаштувань зупиніть сценарій.');
       }
@@ -471,6 +541,9 @@ export class ScenarioWorkManager {
     await this.update(store => {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
+      if (item.pool && item.runtime.runState === ScenarioWorkRunState.COMPLETED) {
+        throw new Error('Ліміт чатів пулу вичерпано. Створіть новий пул.');
+      }
       let next = item.runtime;
       if (next.runState === ScenarioWorkRunState.COMPLETED) {
         next = ensureManagerRuntimeFields(createScenarioWorkRuntime(item.config, now));
@@ -544,9 +617,10 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async delete(id) {
+  async delete(id, { allowPoolDelete = false } = {}) {
     const target = await this.get(id);
     if (!target.scenario) return {};
+    if (target.scenario.pool && !allowPoolDelete) throw new Error('Чат належить пулу. Видаляйте весь пул після зупинки.');
     if (target.scenario.runtime.runState === ScenarioWorkRunState.RUNNING) throw new Error('Спочатку зупиніть сценарій.');
     const sessionIds = [...new Set([
       ...scenarioWorkParticipants(target.scenario.runtime).map(item => item.sessionId).filter(Boolean),
@@ -573,6 +647,16 @@ export class ScenarioWorkManager {
     await this.finalizeDelete(id);
     await this.reconcileAlarm();
     return {};
+  }
+
+  async deleteChatPool(poolId) {
+    const store = await this.load();
+    const ids = store.order.filter(id => store.byId[id]?.pool?.id === poolId);
+    if (!ids.length) throw new Error('Пул не знайдено.');
+    if (ids.some(id => [ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.WAITING_SCHEDULE]
+      .includes(store.byId[id].runtime.runState))) throw new Error('Спочатку зупиніть усі чати пулу.');
+    for (const id of ids) await this.delete(id, { allowPoolDelete: true });
+    return { id: poolId, removed: ids.length };
   }
 
   async finalizeDelete(id) {
@@ -603,7 +687,7 @@ export class ScenarioWorkManager {
           const hint = state.tabHintsByTaskId?.[target.key];
           if (hint?.sessionId === sessionId && hint?.tabId === target.tabId) hint.retirePending = true;
           const live = state.sessionsById?.[sessionId];
-          if (forceSafe && live) { live.enabled = false; live.runState = RunState.STOPPED; }
+          if (live) { live.enabled = false; live.runState = RunState.STOPPED; }
           return state;
         });
         return { removed: false, pending: true, reason: 'TAB_API_UNAVAILABLE' };
@@ -630,7 +714,7 @@ export class ScenarioWorkManager {
             hint.retirePending = true;
           }
           const live = state.sessionsById?.[sessionId];
-          if (forceSafe && live) { live.enabled = false; live.runState = RunState.STOPPED; }
+          if (live) { live.enabled = false; live.runState = RunState.STOPPED; }
           return state;
         });
         return { removed: false, pending: true, reason: 'TAB_RETIRE_PENDING' };
@@ -644,7 +728,8 @@ export class ScenarioWorkManager {
       if (!live?.scenarioWork?.managed) { removed = true; return state; }
       if (!isSafeToRemoveSession(live)) {
         unresolved = true;
-        if (forceSafe) { live.runState = RunState.STOPPED; live.enabled = false; }
+        live.runState = RunState.STOPPED;
+        live.enabled = false;
         return state;
       }
       delete state.sessionsById[sessionId];
@@ -670,6 +755,24 @@ export class ScenarioWorkManager {
       if (!result.removed) pending.push(sessionId);
     }
     return { pending };
+  }
+
+  // A completed generation can start its replacement while a failed tab
+  // close is retried, provided the retired Core Session is durably stopped.
+  async retiredCleanupCanRunInBackground(scenario) {
+    if (scenario?.config?.mode !== ScenarioWorkMode.CHAT_CYCLE
+        || scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) return false;
+    const pending = scenario.runtime.cleanupPendingSessionIds || [];
+    if (!pending.length) return false;
+    const core = await this.coreRepository.load();
+    return pending.every(id => {
+      const session = core.sessionsById?.[id];
+      return !session || (session.scenarioWork?.managed === true
+        && session.scenarioWork.scenarioId === scenario.id
+        && Number(session.scenarioWork.generation) < scenario.runtime.generation
+        && session.enabled === false && session.runState === RunState.STOPPED
+        && isSafeToRemoveSession(session));
+    });
   }
 
   async drainCleanupPending(id, { forceSafe = false } = {}) {
@@ -852,7 +955,7 @@ export class ScenarioWorkManager {
     const expectedOwnerEpoch = Math.max(0, Number(current.scenario.runtime.ownerEpoch || 0));
 
     const cleanupBefore = await this.drainCleanupPending(id);
-    if (cleanupBefore.pending.length) {
+    if (cleanupBefore.pending.length && !(await this.retiredCleanupCanRunInBackground(current.scenario))) {
       await this.reconcileAlarm();
       return { kind: 'CLEANUP_PENDING', pending: cleanupBefore.pending };
     }
@@ -877,7 +980,8 @@ export class ScenarioWorkManager {
       await this.reconcileAlarm();
       return { kind: runtime.runState === ScenarioWorkRunState.COMPLETED ? 'COMPLETED' : 'IDLE', launched: [], runtime: clone(runtime) };
     }
-    if ((runtime.cleanupPendingSessionIds || []).length) {
+    if ((runtime.cleanupPendingSessionIds || []).length
+        && !(await this.retiredCleanupCanRunInBackground(scenario))) {
       await this.reconcileAlarm();
       return { kind: 'CLEANUP_PENDING', pending: [...runtime.cleanupPendingSessionIds], runtime: clone(runtime) };
     }
@@ -981,7 +1085,7 @@ export class ScenarioWorkManager {
             await this.finalizeDelete(id);
             continue;
           }
-          if (cleanup.pending.length) continue;
+          if (cleanup.pending.length && !(await this.retiredCleanupCanRunInBackground(live.scenario))) continue;
         }
         if (live.scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) continue;
         results.push({ id, result: await this.cycleOne(id) });

@@ -597,6 +597,10 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.get(message.payload?.id || '');
   } else if (message.command === 'CREATE_SCENARIO_WORK') {
     result = await scenarioWork.create(message.payload || {});
+  } else if (message.command === 'CREATE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.createChatPool(message.payload || {});
+  } else if (message.command === 'DELETE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.deleteChatPool(message.payload?.id || '');
   } else if (message.command === 'SELECT_SCENARIO_WORK') {
     result = await scenarioWork.select(message.payload?.id || '');
   } else if (message.command === 'UPDATE_SCENARIO_WORK') {
