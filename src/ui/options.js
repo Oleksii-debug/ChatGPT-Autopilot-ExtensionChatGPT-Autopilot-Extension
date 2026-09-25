@@ -3833,27 +3833,29 @@ $('ai-router-add-route-button').addEventListener('click', () => {
   try { addAiRouterRoute(); }
   catch (error) { $('ai-router-status').textContent = `Не вдалося додати маршрут: ${error.message}`; }
 });
-$('ai-router-add-mistral-button').addEventListener('click', () => {
+function addNamedCompatibleRoute(endpointId, label) {
   try {
     const routes = aiRouterRoutesFromForm({ validate:false });
-    const existing = routes.findIndex(route => route.provider === 'openai-compatible' && route.endpointId === 'mistral');
+    const existing = routes.findIndex(route => route.provider === 'openai-compatible' && route.endpointId === endpointId);
     if (existing >= 0) {
       $('ai-router-route-list').children[existing]?.querySelector('[data-route-field="model"]')?.focus();
-      $('ai-router-status').textContent = 'Маршрут Містраль уже є. Отримайте моделі або оберіть існуючу.';
+      $('ai-router-status').textContent = `Маршрут ${label} уже є. Отримайте моделі або оберіть існуючу.`;
       return;
     }
     if (routes.length >= 32) throw new Error('Пул маршрутів обмежено 32 записами.');
     let number = 1;
-    while (routes.some(route => route.routeId === `mistral-${number}`)) number++;
-    routes.push({ routeId:`mistral-${number}`, provider:'openai-compatible', endpointId:'mistral', model:'', roles:['coder'], priority:50, enabled:false, locality:'remote', costClass:'unknown' });
+    while (routes.some(route => route.routeId === `${endpointId}-${number}`)) number++;
+    routes.push({ routeId:`${endpointId}-${number}`, provider:'openai-compatible', endpointId, model:'', roles:['coder'], priority:50, enabled:false, locality:'remote', costClass:'unknown' });
     renderAiRouterRoutes(routes, {}, {
       pinnedRouteId:$('ai-router-pinned-route').value,
       allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
     });
     $('ai-router-route-list').lastElementChild?.querySelector('[data-route-action="discover-models"]')?.focus();
-    $('ai-router-status').textContent = 'Маршрут Містраль додано до форми. Отримайте моделі, визначте вартість і збережіть налаштування.';
-  } catch (error) { $('ai-router-status').textContent = `Не вдалося додати Містраль: ${error.message}`; }
-});
+    $('ai-router-status').textContent = `Маршрут ${label} додано до форми. Отримайте моделі, визначте вартість і збережіть налаштування.`;
+  } catch (error) { $('ai-router-status').textContent = `Не вдалося додати ${label}: ${error.message}`; }
+}
+$('ai-router-add-mistral-button').addEventListener('click', () => addNamedCompatibleRoute('mistral', 'Містраль'));
+$('ai-router-add-openrouter-button').addEventListener('click', () => addNamedCompatibleRoute('openrouter', 'OpenRouter'));
 $('ai-router-route-list').addEventListener('click', handleAiRouterRouteAction);
 $('ai-model-free-tab').addEventListener('click', () => selectAiModelPriceTab('free', true));
 $('ai-model-paid-tab').addEventListener('click', () => selectAiModelPriceTab('paid', true));
