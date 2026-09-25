@@ -99,7 +99,9 @@ function boundedText(value, label, max, { optional = false } = {}) {
 
 function optionalUri(value) {
   if (value == null || value === '') return '';
-  return boundedText(value, 'uri', MAX_URI);
+  const uri = boundedText(value, 'uri', MAX_URI);
+  if (uri !== uri.trim()) throw new Error('uri is invalid');
+  return uri;
 }
 
 function timestamp(value, label) {
