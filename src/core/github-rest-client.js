@@ -592,6 +592,30 @@ export class GitHubRestClientV1 {
     });
   }
 
+  async readCommitObject({ repositoryFullName, commitSha } = {}) {
+    const repository = this.assertRepositoryAllowed(repositoryFullName);
+    const exactCommitSha = sha(commitSha, 'commitSha');
+    const payload = await this.request(
+      'GET',
+      `/repos/${repositoryPath(repository)}/git/commits/${encodeURIComponent(exactCommitSha)}`,
+    );
+    const returnedSha = responseSha(payload?.sha, 'commit sha');
+    if (returnedSha !== exactCommitSha) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned a different commit identity');
+    }
+    const treeSha = responseSha(payload?.tree?.sha, 'commit tree sha');
+    if (!Array.isArray(payload?.parents) || payload.parents.length > 128) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub commit parent list is invalid or too large');
+    }
+    const parentShas = payload.parents.map(parent => responseSha(parent?.sha, 'commit parent sha'));
+    return Object.freeze({
+      repositoryFullName: repository,
+      commitSha: returnedSha,
+      treeSha,
+      parentShas: Object.freeze(parentShas),
+    });
+  }
+
   async readFile({ repositoryFullName, path, ref = '' } = {}) {
     const repository = this.assertRepositoryAllowed(repositoryFullName);
     const encodedPath = filePath(path);
