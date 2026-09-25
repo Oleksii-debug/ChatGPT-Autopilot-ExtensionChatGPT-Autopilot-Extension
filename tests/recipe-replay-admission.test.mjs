@@ -191,6 +191,11 @@ test('admits exact promoted fresh recipe as a value-free non-authorizing replay 
   assert.equal(result.replayAdmissionReady, true);
   assert.equal(result.recipeId, fx.promoted.recipeId);
   assert.equal(result.recipeVersion, 1);
+  assert.equal('proposalId' in result, false);
+  assert.equal(
+    result.compilerProposalBindingScope,
+    'RECIPE_SUBJECT_AND_PARAMETER_SCHEMA_ONLY',
+  );
   assert.equal(result.recipeSubjectSha256, fx.promoted.qualification.subjectSha256);
   assert.equal(result.parameterSchemaSha256, fx.proposal.parameterSchemaBinding.contentSha256);
   assert.deepEqual(result.requiredCapabilityIds, ['repo.read', 'repo.write']);
