@@ -84,10 +84,10 @@ function compareCodeUnits(left, right) {
 }
 
 function id(value, label) {
-  if (typeof value !== 'string') throw new Error(`${label} must be a string`);
-  const out = value.trim();
-  if (!ID.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+  if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
+    throw new Error(`${label} must use exact canonical ID representation`);
+  }
+  return value;
 }
 
 function text(value, label, maxChars, { allowEmpty = false } = {}) {
@@ -156,6 +156,11 @@ function normalizeSourceBinding(raw, index) {
     throw new Error(`sourceBindings[${index}] identity fields must be strings`);
   }
   const normalized = normalizeSourceRevisionBindingV1(raw);
+  if (normalized.sourceId !== raw.sourceId
+    || normalized.revisionId !== raw.revisionId
+    || normalized.contentSha256 !== raw.contentSha256) {
+    throw new Error(`sourceBindings[${index}] must use exact canonical representation`);
+  }
   if (normalized.contentSha256 && !SHA256.test(normalized.contentSha256)) {
     throw new Error(`sourceBindings[${index}].contentSha256 is invalid`);
   }
