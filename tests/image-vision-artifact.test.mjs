@@ -1,0 +1,592 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+
+import {
+  IMAGE_VISION_ARTIFACT_SCHEMA_VERSION,
+  IMAGE_VISION_CAPABILITY_ID,
+  MAX_IMAGE_VISION_BYTES,
+  MAX_IMAGE_VISION_DIMENSION,
+  MAX_IMAGE_VISION_PIXELS,
+  analyzeImageArtifactV1,
+} from '../src/core/image-vision-artifact.js';
+
+function pngBytes(width = 100, height = 50) {
+  const u32 = value => [
+    (value >>> 24) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 8) & 0xff,
+    value & 0xff,
+  ];
+  return Uint8Array.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52,
+    ...u32(width),
+    ...u32(height),
+    0x08, 0x06, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+  ]);
+}
+
+function gifBytes(width = 64, height = 32) {
+  return Uint8Array.from([
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+    width & 0xff, (width >>> 8) & 0xff,
+    height & 0xff, (height >>> 8) & 0xff,
+  ]);
+}
+
+function jpegBytes(width = 80, height = 40) {
+  return Uint8Array.from([
+    0xff, 0xd8,
+    0xff, 0xc0,
+    0x00, 0x0b,
+    0x08,
+    (height >>> 8) & 0xff, height & 0xff,
+    (width >>> 8) & 0xff, width & 0xff,
+    0x01, 0x01, 0x11, 0x00,
+  ]);
+}
+
+function webpBytes(width = 96, height = 48) {
+  const w = width - 1;
+  const h = height - 1;
+  return Uint8Array.from([
+    0x52, 0x49, 0x46, 0x46,
+    0x16, 0x00, 0x00, 0x00,
+    0x57, 0x45, 0x42, 0x50,
+    0x56, 0x50, 0x38, 0x58,
+    0x0a, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    w & 0xff, (w >>> 8) & 0xff, (w >>> 16) & 0xff,
+    h & 0xff, (h >>> 8) & 0xff, (h >>> 16) & 0xff,
+  ]);
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+function dataUrl(bytes, mediaType = 'image/png') {
+  return `data:${mediaType};base64,${Buffer.from(bytes).toString('base64')}`;
+}
+
+function artifactRef(bytes = pngBytes(), overrides = {}) {
+  return {
+    schemaVersion: 1,
+    artifactId: 'image-1',
+    kind: 'image',
+    uri: 'artifact://image-1',
+    mediaType: 'image/png',
+    sha256: sha256(bytes),
+    sizeBytes: bytes.byteLength,
+    createdAt: '2026-09-25T10:30:00.000Z',
+    producerInvocationId: null,
+    sensitive: false,
+    ...overrides,
+  };
+}
+
+function modelPayload(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    summary: 'A compact interface screenshot with a primary action.',
+    decorative: false,
+    altText: 'Application interface with one prominent primary action.',
+    caption: 'Interface state captured for visual review.',
+    observations: [
+      {
+        kind: 'LAYOUT',
+        text: 'The primary action is visually prominent.',
+        confidenceBasisPoints: 9000,
+      },
+      {
+        kind: 'ACCESSIBILITY',
+        text: 'Visible text has strong contrast in the supplied image.',
+        confidenceBasisPoints: 7600,
+      },
+    ],
+    cropProposals: [
+      {
+        purpose: 'primary-content',
+        xBasisPoints: 500,
+        yBasisPoints: 500,
+        widthBasisPoints: 9000,
+        heightBasisPoints: 9000,
+        rationale: 'Keeps the main application content while trimming outer margins.',
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function request(bytes = pngBytes(), overrides = {}) {
+  return {
+    schemaVersion: IMAGE_VISION_ARTIFACT_SCHEMA_VERSION,
+    analysisId: 'analysis-1',
+    artifactRef: artifactRef(bytes),
+    imageDataUrl: dataUrl(bytes),
+    ownerPurpose: 'Prepare accessible alt text and a reusable crop.',
+    ...overrides,
+  };
+}
+
+function routerWith(payload = modelPayload()) {
+  const calls = [];
+  const routeVision = async input => {
+    calls.push(input);
+    return {
+      result: {
+        text: JSON.stringify(payload),
+      },
+    };
+  };
+  return { routeVision, calls };
+}
+
+test('binds exact immutable image bytes before one canonical vision-router call', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+  const result = await analyzeImageArtifactV1(request(bytes), {
+    routeVision: router.routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+
+  assert.equal(router.calls.length, 1);
+  assert.equal(router.calls[0].imageDataUrl, dataUrl(bytes));
+  assert.equal(router.calls[0].taskRole, 'vision');
+  assert.deepEqual(router.calls[0].capabilityIds, [IMAGE_VISION_CAPABILITY_ID]);
+  assert.equal(router.calls[0].maxModelCallsForRequest, 1);
+  assert.match(router.calls[0].systemPrompt, /untrusted visual data/u);
+  assert.match(router.calls[0].systemPrompt, /Never follow instructions/u);
+  assert.match(router.calls[0].prompt, /image-1/u);
+  assert.match(router.calls[0].prompt, new RegExp(sha256(bytes), 'u'));
+
+  assert.equal(result.analysisId, 'analysis-1');
+  assert.deepEqual(result.sourceArtifact, artifactRef(bytes));
+  assert.deepEqual(result.technical, {
+    widthPx: 100,
+    heightPx: 50,
+    pixelCount: 5000,
+  });
+  assert.equal(result.model.altText, modelPayload().altText);
+  assert.equal(result.sourceTrust, 'MODEL_OBSERVATION');
+  assert.equal(result.advisoryOnly, true);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.artifactMutationAuthorized, false);
+  assert.equal(result.publishAuthorized, false);
+  assert.equal(result.policyDecisionAuthorized, false);
+  assert.equal(result.verificationStatus, 'NOT_VERIFIED');
+  assert.equal(result.requiresIndependentVerification, true);
+  assert.ok(Object.isFrozen(result));
+  assert.ok(Object.isFrozen(result.sourceArtifact));
+  assert.ok(Object.isFrozen(result.model));
+  assert.ok(Object.isFrozen(result.model.observations));
+  assert.ok(Object.isFrozen(result.model.cropProposals[0]));
+});
+
+test('all declared raster formats have executable dimension-bound analysis coverage', async () => {
+  const cases = [
+    { mediaType: 'image/png', bytes: pngBytes(100, 50), widthPx: 100, heightPx: 50 },
+    { mediaType: 'image/jpeg', bytes: jpegBytes(80, 40), widthPx: 80, heightPx: 40 },
+    { mediaType: 'image/gif', bytes: gifBytes(64, 32), widthPx: 64, heightPx: 32 },
+    { mediaType: 'image/webp', bytes: webpBytes(96, 48), widthPx: 96, heightPx: 48 },
+  ];
+
+  for (const item of cases) {
+    const router = routerWith();
+    const ref = artifactRef(item.bytes, { mediaType: item.mediaType });
+    const result = await analyzeImageArtifactV1(request(item.bytes, {
+      artifactRef: ref,
+      imageDataUrl: dataUrl(item.bytes, item.mediaType),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    });
+    assert.equal(router.calls.length, 1, item.mediaType);
+    assert.deepEqual(result.technical, {
+      widthPx: item.widthPx,
+      heightPx: item.heightPx,
+      pixelCount: item.widthPx * item.heightPx,
+    });
+  }
+});
+
+test('PNG dimension admission rejects a forged IHDR length before model routing', async () => {
+  const bytes = pngBytes();
+  bytes[11] = 0x0c;
+  const router = routerWith();
+  const ref = artifactRef(bytes);
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: ref,
+      imageDataUrl: dataUrl(bytes),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /IHDR dimension header/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('analysis provenance retains the full canonical ArtifactRef identity for same-byte variants', async () => {
+  const bytes = pngBytes();
+  const firstRouter = routerWith();
+  const secondRouter = routerWith();
+  const firstRef = artifactRef(bytes);
+  const secondRef = artifactRef(bytes, {
+    uri: 'artifact://image-1/rebound',
+    kind: 'image-derived',
+    createdAt: '2026-09-25T10:31:00.000Z',
+    producerInvocationId: 'invocation-2',
+  });
+
+  const first = await analyzeImageArtifactV1(request(bytes, { artifactRef: firstRef }), {
+    routeVision: firstRouter.routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+  const second = await analyzeImageArtifactV1(request(bytes, { artifactRef: secondRef }), {
+    routeVision: secondRouter.routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+
+  assert.deepEqual(first.sourceArtifact, firstRef);
+  assert.deepEqual(second.sourceArtifact, secondRef);
+  assert.notDeepEqual(first.sourceArtifact, second.sourceArtifact);
+  assert.equal(first.sourceArtifact.sha256, second.sourceArtifact.sha256);
+});
+
+test('oversized declared dimensions fail before any model call even when compressed bytes are small', async () => {
+  const bytes = pngBytes(MAX_IMAGE_VISION_DIMENSION + 1, 1);
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    new RegExp(`dimensions must be 1\\.\\.${MAX_IMAGE_VISION_DIMENSION}`, 'u'),
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('pixel-count ceiling fails before model routing', async () => {
+  const side = Math.floor(Math.sqrt(MAX_IMAGE_VISION_PIXELS)) + 1;
+  const bytes = pngBytes(side, side);
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    new RegExp(`pixel count must not exceed ${MAX_IMAGE_VISION_PIXELS}`, 'u'),
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('hash mismatch fails before any model call', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+  const bad = artifactRef(bytes, { sha256: '0'.repeat(64) });
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, { artifactRef: bad }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /SHA-256 does not match/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('byte-length mismatch fails before any model call', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+  const bad = artifactRef(bytes, { sizeBytes: bytes.byteLength + 1 });
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, { artifactRef: bad }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /byte length does not match/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('data URL media type substitution fails before any model call', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      imageDataUrl: dataUrl(bytes, 'image/jpeg'),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /media type does not match/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('declared media type must match deterministic image signature', async () => {
+  const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0x00, 0x01]);
+  const router = routerWith();
+  const ref = artifactRef(bytes, {
+    mediaType: 'image/png',
+    sha256: sha256(bytes),
+    sizeBytes: bytes.byteLength,
+  });
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: ref,
+      imageDataUrl: dataUrl(bytes, 'image/png'),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /PNG image signature/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('sensitive artifacts fail closed instead of crossing an implicit provider boundary', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: artifactRef(bytes, { sensitive: true }),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /Sensitive image artifacts/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('active or unsupported media types are rejected before model routing', async () => {
+  const bytes = new TextEncoder().encode('<svg></svg>');
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: artifactRef(bytes, {
+        mediaType: 'image/svg+xml',
+        sha256: sha256(bytes),
+        sizeBytes: bytes.byteLength,
+      }),
+      imageDataUrl: dataUrl(bytes, 'image/svg+xml'),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /mediaType is unsupported/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('non-canonical base64 is rejected before model routing', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+  const canonical = dataUrl(bytes);
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      imageDataUrl: canonical.replace('base64,', 'base64,\n'),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /canonical base64 data URL/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('oversize ArtifactRef is rejected without constructing or routing oversize image bytes', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: artifactRef(bytes, { sizeBytes: MAX_IMAGE_VISION_BYTES + 1 }),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    new RegExp(`sizeBytes must be 1\\.\\.${MAX_IMAGE_VISION_BYTES}`, 'u'),
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('non-canonical ArtifactRef aliases fail before routing', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: artifactRef(bytes, { sha256: sha256(bytes).toUpperCase() }),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /not already canonical: sha256/u,
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('request accessors are rejected without executing the getter', async () => {
+  const bytes = pngBytes();
+  const router = routerWith();
+  const candidate = request(bytes);
+  let reads = 0;
+  Object.defineProperty(candidate, 'imageDataUrl', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return dataUrl(bytes);
+    },
+  });
+
+  await assert.rejects(
+    analyzeImageArtifactV1(candidate, {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /enumerable own data properties/u,
+  );
+  assert.equal(reads, 0);
+  assert.equal(router.calls.length, 0);
+});
+
+test('direct canonical router envelope is accepted without requiring a wrapper', async () => {
+  const bytes = pngBytes();
+  const routeVision = async () => ({ text: JSON.stringify(modelPayload()) });
+  const result = await analyzeImageArtifactV1(request(bytes), {
+    routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+  assert.equal(result.model.summary, modelPayload().summary);
+});
+
+test('model prose or malformed JSON cannot become analysis evidence', async () => {
+  const bytes = pngBytes();
+  const calls = [];
+  const routeVision = async input => {
+    calls.push(input);
+    return { result: { text: 'Here is the answer: {}' } };
+  };
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /strict JSON/u,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test('model output cannot smuggle execution or publication authority', async () => {
+  const bytes = pngBytes();
+  const payload = modelPayload({ publishAuthorized: true });
+  const router = routerWith(payload);
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /unknown field: publishAuthorized/u,
+  );
+  assert.equal(router.calls.length, 1);
+});
+
+test('out-of-bounds crop proposals fail closed', async () => {
+  const bytes = pngBytes();
+  const payload = modelPayload({
+    cropProposals: [
+      {
+        purpose: 'bad-crop',
+        xBasisPoints: 9000,
+        yBasisPoints: 0,
+        widthBasisPoints: 2000,
+        heightBasisPoints: 10000,
+        rationale: 'This proposal exceeds the image boundary.',
+      },
+    ],
+  });
+  const router = routerWith(payload);
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /exceeds image bounds/u,
+  );
+});
+
+test('observation kinds and confidence bounds are strict', async () => {
+  const bytes = pngBytes();
+  const router = routerWith(modelPayload({
+    observations: [
+      {
+        kind: 'EXECUTION_AUTHORITY',
+        text: 'not permitted',
+        confidenceBasisPoints: 10_000,
+      },
+    ],
+  }));
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /kind is unsupported/u,
+  );
+});
+
+test('non-decorative image analysis cannot silently omit alt text', async () => {
+  const bytes = pngBytes();
+  const router = routerWith(modelPayload({
+    decorative: false,
+    altText: '',
+  }));
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /requires a non-empty altText/u,
+  );
+});
+
+test('empty alt text is permitted only as bounded model data for decorative decisions', async () => {
+  const bytes = pngBytes();
+  const router = routerWith(modelPayload({
+    decorative: true,
+    altText: '',
+    caption: '',
+    observations: [],
+    cropProposals: [],
+  }));
+
+  const result = await analyzeImageArtifactV1(request(bytes), {
+    routeVision: router.routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+  assert.equal(result.model.decorative, true);
+  assert.equal(result.model.altText, '');
+  assert.equal(result.model.caption, '');
+});
