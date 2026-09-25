@@ -2,6 +2,7 @@ import {
   EventTriggerKind,
   normalizeEventTriggerDefinitionV1,
 } from './event-trigger-contract.js';
+import { createSha256FingerprintV1 } from './fingerprint.js';
 import {
   admitEventTriggerObservationV1,
 } from './event-trigger-runtime.js';
@@ -409,6 +410,18 @@ function assertFreshChange(binding, change, admittedAt) {
   }
 }
 
+async function canonicalFileSourceEventId(trigger, binding, change) {
+  const fingerprint = await createSha256FingerprintV1(JSON.stringify([
+    'chatgpt-autopilot-file-event-source-v1',
+    trigger.providerId,
+    trigger.sourceBindingId,
+    binding.watchId,
+    binding.scopeId,
+    change.changeId,
+  ]));
+  return 'file:' + fingerprint.slice('sha256:'.length);
+}
+
 /**
  * Thin trusted file-change ingress adapter.
  *
@@ -448,14 +461,15 @@ export async function admitTrustedFileChangeV1(value, dependencies) {
   assertChangeMatchesBinding(change, binding, request);
   assertFreshChange(binding, change, request.admittedAt);
 
+  const sourceEventId = await canonicalFileSourceEventId(trigger, binding, change);
   const observation = {
     schemaVersion: FILE_EVENT_TRIGGER_ADAPTER_VERSION,
-    observationId: change.changeId,
+    observationId: sourceEventId,
     triggerId: trigger.triggerId,
     triggerRevision: trigger.triggerRevision,
     providerId: trigger.providerId,
     sourceBindingId: trigger.sourceBindingId,
-    sourceEventId: change.changeId,
+    sourceEventId,
     payloadArtifactRef: change.evidenceArtifactRef,
     observedAt: change.recordedAt,
   };
