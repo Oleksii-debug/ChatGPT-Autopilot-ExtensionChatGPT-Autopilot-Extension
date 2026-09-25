@@ -14,6 +14,7 @@ import {
 import { appendLog } from './logger.js';
 import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
+import { normalizeCalendarSchedule } from './calendar-schedule.js';
 import { startSession } from './state-machine.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
@@ -159,6 +160,8 @@ function buildSession(raw, index, now, version = 1) {
       lastErrorCode: '',
     })),
   };
+  session.calendarSchedule = raw.calendarSchedule == null ? null : normalizeCalendarSchedule(raw.calendarSchedule);
+  session.calendarRuntime = {};
   session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`);
   session.retryPolicy = raw.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
@@ -337,6 +340,7 @@ function sessionToPortable(session) {
         })),
       };
     })(),
+    calendarSchedule: session.calendarSchedule ? normalizeCalendarSchedule(session.calendarSchedule) : null,
     runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
     configuredTaskCount: Number(session.configuredTaskCount || session.taskOrder.length),
     minimumSendIntervalValue: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? session.minimumSendIntervalMs / 60000 : session.minimumSendIntervalMs / 1000,
