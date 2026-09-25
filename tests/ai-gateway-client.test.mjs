@@ -28,6 +28,23 @@ test('gateway client health, model list and completion use local HTTP API', asyn
   assert.deepEqual(calls.map(x => [new URL(x[0]).pathname, x[1]]), [['/health','GET'],['/status','GET'],['/models','GET'],['/complete','POST']]);
 });
 
+test('gateway client blocks redirect egress even when caller requests follow', async () => {
+  let observedUrl = '';
+  let observedRedirect = '';
+  const client = new AiGatewayClient({ fetchFn: async (url, init = {}) => {
+    observedUrl = String(url);
+    observedRedirect = init.redirect;
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  } });
+
+  const result = await client.request('http://127.0.0.1:17621', 30, '/health', {
+    redirect: 'follow',
+  });
+  assert.equal(result.ok, true);
+  assert.equal(new URL(observedUrl).hostname, '127.0.0.1');
+  assert.equal(observedRedirect, 'error');
+});
+
 test('gateway client forwards optional vision image only to localhost gateway payload', async () => {
   let body;
   const client = new AiGatewayClient({ fetchFn: async (_url, init = {}) => {
