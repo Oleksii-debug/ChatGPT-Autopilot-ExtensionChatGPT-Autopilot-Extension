@@ -345,7 +345,7 @@ test('publish is admitted only from a canonically COMMITTED VERIFIED exact effec
   const qualified = qualify();
   const published = publish(qualified);
   assert.equal(published.phase, DeploymentPhase.PUBLISHED_UNVERIFIED);
-  assert.equal(published.publishedAt, at(9));
+  assert.equal(published.publishedAt, at(7));
   assert.equal(published.publishCommitId, 'publish-effect-1-commit-id');
   assert.equal(published.executionAuthorized, false);
 
@@ -679,6 +679,121 @@ test('event revision fence gives immediate idempotent retry and rejects stale di
       eventId: 'stale-distinct',
     }, resolvers([binding])),
     /previousRevision mismatch/,
+  );
+});
+
+test('last-event replay is payload-bound and conflicting reuse fails before resolver work', () => {
+  const initial = baseDeployment();
+  const binding = verificationBinding({
+    verificationId: 'test-pass',
+    checkKind: DeploymentCheckKind.TEST,
+    verifiedAt: at(3),
+  });
+  let resolverCalls = 0;
+  const resolution = {
+    resolveVerificationBinding(id) {
+      resolverCalls += 1;
+      assert.equal(id, binding.verificationId);
+      return binding;
+    },
+    resolveEffectBinding() {
+      throw new Error('effect resolver must not run');
+    },
+  };
+  const firstEvent = event(initial, {
+    eventId: 'payload-bound-event',
+    type: DeploymentEventType.RECORD_QUALIFICATION_VERIFICATION,
+    evidenceId: binding.verificationId,
+    at: at(3),
+  });
+  const first = reduceDeploymentLifecycleV1(initial, firstEvent, resolution);
+  assert.equal(resolverCalls, 1);
+
+  const replay = reduceDeploymentLifecycleV1(first.state, firstEvent, resolution);
+  assert.equal(replay.deduplicated, true);
+  assert.equal(resolverCalls, 1);
+
+  for (const conflicting of [
+    { ...firstEvent, evidenceId: 'different-evidence' },
+    { ...firstEvent, at: at(4) },
+    { ...firstEvent, type: DeploymentEventType.RECORD_HEALTH_VERIFICATION },
+    { ...firstEvent, previousRevision: firstEvent.previousRevision + 1 },
+  ]) {
+    assert.throws(
+      () => reduceDeploymentLifecycleV1(first.state, conflicting, resolution),
+      /idempotency conflict/u,
+    );
+  }
+  assert.equal(resolverCalls, 1);
+});
+
+test('publish and rollback gates bind to exact-effect occurrence time, not later commit time', () => {
+  const qualified = qualify();
+  const preQualificationObservation = committedEffect({
+    effectId: 'publish-effect-1',
+    artifactRef: candidate,
+    startedAt: at(3),
+    observedAt: at(4),
+    verifiedAt: at(6),
+    committedAt: at(7),
+  });
+  assert.throws(
+    () => reduceDeploymentLifecycleV1(qualified, event(qualified, {
+      eventId: 'publish-pre-gate-observation',
+      type: DeploymentEventType.RECORD_PUBLISH_EFFECT,
+      evidenceId: 'publish-effect-1',
+      at: at(8),
+    }), resolvers([], [effectBinding({
+      effectId: 'publish-effect-1',
+      kind: DeploymentEffectKind.PUBLISH,
+      artifactRef: candidate,
+      state: preQualificationObservation,
+    })])),
+    /observation predates completed qualification/u,
+  );
+
+  const preparedBeforeQualification = committedEffect({
+    effectId: 'publish-effect-1',
+    artifactRef: candidate,
+    startedAt: at(4),
+    observedAt: at(6),
+    verifiedAt: at(7),
+    committedAt: at(8),
+  });
+  const published = reduceDeploymentLifecycleV1(qualified, event(qualified, {
+    eventId: 'publish-post-gate-observation',
+    type: DeploymentEventType.RECORD_PUBLISH_EFFECT,
+    evidenceId: 'publish-effect-1',
+    at: at(9),
+  }), resolvers([], [effectBinding({
+    effectId: 'publish-effect-1',
+    kind: DeploymentEffectKind.PUBLISH,
+    artifactRef: candidate,
+    state: preparedBeforeQualification,
+  })])).state;
+  assert.equal(published.publishedAt, at(6));
+
+  const prePublishRollbackObservation = committedEffect({
+    effectId: 'rollback-effect-1',
+    artifactRef: rollback,
+    startedAt: at(5),
+    observedAt: at(5),
+    verifiedAt: at(10),
+    committedAt: at(11),
+  });
+  assert.throws(
+    () => reduceDeploymentLifecycleV1(published, event(published, {
+      eventId: 'rollback-pre-publish-observation',
+      type: DeploymentEventType.RECORD_ROLLBACK_EFFECT,
+      evidenceId: 'rollback-effect-1',
+      at: at(12),
+    }), resolvers([], [effectBinding({
+      effectId: 'rollback-effect-1',
+      kind: DeploymentEffectKind.ROLLBACK,
+      artifactRef: rollback,
+      state: prePublishRollbackObservation,
+    })])),
+    /observation predates current publish/u,
   );
 });
 
