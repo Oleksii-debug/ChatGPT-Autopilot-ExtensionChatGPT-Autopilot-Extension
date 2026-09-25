@@ -153,4 +153,116 @@ function assertExactAgentPlanTimestamps(rawPlan, normalized, label) {
   const createdAt = exactTimestamp(source.createdAt, `${label}.createdAt`);
   const updatedAt = exactTimestamp(source.updatedAt, `${label}.updatedAt`);
   if (Date.parse(updatedAt) < Date.parse(createdAt)) fail(`${label}.updatedAt predates createdAt`);
-  if (createdAt !== normalized.createdAt || updatedAt !== normalized.
+  if (createdAt !== normalized.createdAt || updatedAt !== normalized.updatedAt) {
+    fail(`${label} timestamps must already be canonical`);
+  }
+  const rawNodes = denseDataArray(source.nodes, `${label}.nodes`, { min: 1, max: 128 });
+  if (rawNodes.length !== normalized.nodes.length) fail(`${label}.nodes changed during normalization`);
+  for (let index = 0; index < rawNodes.length; index += 1) {
+    const rawNode = strictRecord(rawNodes[index], NODE_KEYS, `${label}.nodes[${index}]`);
+    const nodeUpdatedAt = exactTimestamp(rawNode.updatedAt, `${label}.nodes[${index}].updatedAt`);
+    if (nodeUpdatedAt !== normalized.nodes[index].updatedAt) {
+      fail(`${label}.nodes[${index}].updatedAt must already be canonical`);
+    }
+    if (Date.parse(nodeUpdatedAt) < Date.parse(createdAt) || Date.parse(nodeUpdatedAt) > Date.parse(updatedAt)) {
+      fail(`${label}.nodes[${index}].updatedAt is outside the plan lifetime`);
+    }
+  }
+}
+
+function normalizePlanSnapshot(input, index, board) {
+  const label = `planSnapshots[${index}]`;
+  const source = strictRecord(input, PLAN_SNAPSHOT_KEYS, label);
+  if (source.schemaVersion !== 1) fail(`${label}.schemaVersion must be 1`);
+  const projectId = exactId(source.projectId, `${label}.projectId`);
+  const projectRevisionId = exactId(source.projectRevisionId, `${label}.projectRevisionId`);
+  if (projectId !== board.projectId || projectRevisionId !== board.projectRevisionId) {
+    fail(`${label} is not bound to the workboard Project revision`);
+  }
+  const plan = normalizeAgentPlanV1(source.plan);
+  assertExactAgentPlanTimestamps(source.plan, plan, `${label}.plan`);
+  if (Date.parse(plan.updatedAt) > Date.parse(board.generatedAt)) {
+    fail(`${label}.plan postdates generatedAt`);
+  }
+  return Object.freeze({ projectId, projectRevisionId, plan });
+}
+
+function normalizeReview(input, index, generatedAt) {
+  const label = `reviews[${index}]`;
+  const source = strictRecord(input, REVIEW_KEYS, label);
+  if (source.schemaVersion !== 1) fail(`${label}.schemaVersion must be 1`);
+  if (typeof source.state !== 'string' || !REVIEW_STATES.has(source.state)) {
+    fail(`${label}.state is invalid`);
+  }
+  const evidenceIds = denseDataArray(source.evidenceIds, `${label}.evidenceIds`, { min: 0, max: 32 })
+    .map((value, evidenceIndex) => exactId(value, `${label}.evidenceIds[${evidenceIndex}]`));
+  if (new Set(evidenceIds).size !== evidenceIds.length) fail(`${label}.evidenceIds contains duplicates`);
+  if (source.state !== WorkboardReviewState.REQUESTED && evidenceIds.length === 0) {
+    fail(`${label}.evidenceIds is required for ${source.state}`);
+  }
+  const updatedAt = exactTimestamp(source.updatedAt, `${label}.updatedAt`);
+  if (Date.parse(updatedAt) > Date.parse(generatedAt)) fail(`${label}.updatedAt postdates generatedAt`);
+  return Object.freeze({
+    schemaVersion: 1,
+    planId: exactId(source.planId, `${label}.planId`),
+    nodeId: exactId(source.nodeId, `${label}.nodeId`),
+    state: source.state,
+    reviewerId: exactId(source.reviewerId, `${label}.reviewerId`),
+    evidenceIds: Object.freeze(evidenceIds),
+    updatedAt,
+  });
+}
+
+function deriveLane(task, review) {
+  if (task.state === AgentPlanNodeState.CANCELLED) return WorkboardLane.CANCELLED;
+  if (task.state === AgentPlanNodeState.FAILED || task.state === AgentPlanNodeState.BLOCKED) return WorkboardLane.BLOCKED;
+  if (task.state === AgentPlanNodeState.RUNNING) return WorkboardLane.ACTIVE;
+  if (task.state === AgentPlanNodeState.READY) return WorkboardLane.READY;
+  if (task.state === AgentPlanNodeState.PENDING) return WorkboardLane.WAITING;
+  if (task.state === AgentPlanNodeState.VERIFIED) {
+    return review && (review.state === WorkboardReviewState.APPROVED || review.state === WorkboardReviewState.MERGED)
+      ? WorkboardLane.DONE
+      : WorkboardLane.REVIEW;
+  }
+  fail(`Unsupported AgentPlan node state: ${task.state}`);
+}
+
+function sortedRefs(tasks) {
+  return Object.freeze(tasks
+    .slice()
+    .sort((a, b) => compareExact(a.planId, b.planId) || compareExact(a.nodeId, b.nodeId))
+    .map(publicTaskRef));
+}
+
+export function buildProjectSwarmWorkboardV1(input) {
+  const source = strictRecord(input, REQUEST_KEYS, 'ProjectSwarmWorkboardV1 request');
+  if (source.schemaVersion !== PROJECT_SWARM_WORKBOARD_VERSION) {
+    fail('ProjectSwarmWorkboardV1 request.schemaVersion must be 1');
+  }
+  const board = Object.freeze({
+    boardId: exactId(source.boardId, 'boardId'),
+    projectId: exactId(source.projectId, 'projectId'),
+    projectRevisionId: exactId(source.projectRevisionId, 'projectRevisionId'),
+    generatedAt: exactTimestamp(source.generatedAt, 'generatedAt'),
+  });
+
+  const snapshotInputs = denseDataArray(source.planSnapshots, 'planSnapshots', { min: 1, max: MAX_WORKBOARD_PLANS });
+  const snapshots = snapshotInputs.map((item, index) => normalizePlanSnapshot(item, index, board));
+  const planIds = new Set();
+  const jobIds = new Set();
+  let taskCount = 0;
+  for (const snapshot of snapshots) {
+    if (planIds.has(snapshot.plan.planId)) fail(`duplicate planId: ${snapshot.plan.planId}`);
+    if (jobIds.has(snapshot.plan.jobId)) fail(`duplicate current jobId: ${snapshot.plan.jobId}`);
+    planIds.add(snapshot.plan.planId);
+    jobIds.add(snapshot.plan.jobId);
+    taskCount += snapshot.plan.nodes.length;
+    if (taskCount > MAX_WORKBOARD_TASKS) fail(`workboard exceeds ${MAX_WORKBOARD_TASKS} tasks`);
+  }
+
+  const tasks = [];
+  const byKey = new Map();
+  for (const snapshot of snapshots) {
+    for (const node of snapshot.plan.nodes) {
+      const task = Object.freeze({
+        planId: s
