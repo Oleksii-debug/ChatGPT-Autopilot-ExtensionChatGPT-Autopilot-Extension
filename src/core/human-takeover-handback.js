@@ -26,6 +26,28 @@ const MAX_JSON_NODES = 8_192;
 const MAX_ARRAY_ITEMS = 512;
 const MAX_RECORD_FIELDS = 256;
 
+const CREATE_KEYS = new Set([
+  'takeoverId',
+  'jobId',
+  'planId',
+  'nodeId',
+  'resourceId',
+  'effectId',
+  'executionId',
+  'attempt',
+  'agentId',
+  'humanPrincipalId',
+  'verificationAuthorityId',
+  'reason',
+  'preTakeoverObservation',
+  'at',
+]);
+
+const START_KEYS = new Set(['quiescenceEvidenceId', 'at']);
+const HANDBACK_KEYS = new Set(['reobservationInvocationId', 'at']);
+const OBSERVATION_REQUEST_KEYS = new Set(['observation']);
+const VERIFICATION_REQUEST_KEYS = new Set(['verification']);
+
 const TAKEOVER_KEYS = new Set([
   'schemaVersion',
   'takeoverId',
@@ -512,43 +534,35 @@ export function normalizeHumanTakeoverV1(input) {
   return freezeDeep(state);
 }
 
-export function createHumanTakeoverV1({
-  takeoverId,
-  jobId,
-  planId,
-  nodeId,
-  resourceId,
-  effectId = '',
-  executionId = '',
-  attempt = 0,
-  agentId,
-  humanPrincipalId,
-  verificationAuthorityId,
-  reason,
-  preTakeoverObservation = null,
-  at,
-} = {}) {
+export function createHumanTakeoverV1(input = {}) {
+  const raw = strictRecord(input, 'HumanTakeoverCreateRequestV1');
+  strictRecordKeys(raw, CREATE_KEYS, 'HumanTakeoverCreateRequestV1');
   return normalizeHumanTakeoverV1({
     schemaVersion: HUMAN_TAKEOVER_VERSION,
-    takeoverId,
-    jobId,
-    planId,
-    nodeId,
-    resourceId,
-    effectId,
-    executionId,
-    attempt,
-    agentId,
-    humanPrincipalId,
-    verificationAuthorityId,
-    reason,
+    takeoverId: ownValue(raw, 'takeoverId', 'HumanTakeoverCreateRequestV1'),
+    jobId: ownValue(raw, 'jobId', 'HumanTakeoverCreateRequestV1'),
+    planId: ownValue(raw, 'planId', 'HumanTakeoverCreateRequestV1'),
+    nodeId: ownValue(raw, 'nodeId', 'HumanTakeoverCreateRequestV1'),
+    resourceId: ownValue(raw, 'resourceId', 'HumanTakeoverCreateRequestV1'),
+    effectId: ownValue(raw, 'effectId', 'HumanTakeoverCreateRequestV1', { optional: true }) ?? '',
+    executionId: ownValue(raw, 'executionId', 'HumanTakeoverCreateRequestV1', { optional: true }) ?? '',
+    attempt: ownValue(raw, 'attempt', 'HumanTakeoverCreateRequestV1', { optional: true }) ?? 0,
+    agentId: ownValue(raw, 'agentId', 'HumanTakeoverCreateRequestV1'),
+    humanPrincipalId: ownValue(raw, 'humanPrincipalId', 'HumanTakeoverCreateRequestV1'),
+    verificationAuthorityId: ownValue(raw, 'verificationAuthorityId', 'HumanTakeoverCreateRequestV1'),
+    reason: ownValue(raw, 'reason', 'HumanTakeoverCreateRequestV1'),
     phase: HumanTakeoverPhase.REQUESTED,
     quiescenceEvidenceId: '',
     reobservationInvocationId: '',
-    preTakeoverObservation,
+    preTakeoverObservation: ownValue(
+      raw,
+      'preTakeoverObservation',
+      'HumanTakeoverCreateRequestV1',
+      { optional: true },
+    ) ?? null,
     postTakeoverObservation: null,
     handbackVerification: null,
-    requestedAt: at,
+    requestedAt: ownValue(raw, 'at', 'HumanTakeoverCreateRequestV1'),
     controlStartedAt: '',
     handbackRequestedAt: '',
     reobservedAt: '',
@@ -574,42 +588,49 @@ function advance(raw, expectedPhase, patch) {
   });
 }
 
-export function recordHumanTakeoverStartedV1(raw, {
-  quiescenceEvidenceId,
-  at,
-} = {}) {
+export function recordHumanTakeoverStartedV1(raw, input = {}) {
+  const request = strictRecord(input, 'HumanTakeoverStartRequestV1');
+  strictRecordKeys(request, START_KEYS, 'HumanTakeoverStartRequestV1');
   const current = normalizeHumanTakeoverV1(raw);
-  const startedAt = exactTimestamp(at, 'at');
+  const startedAt = exactTimestamp(ownValue(request, 'at', 'HumanTakeoverStartRequestV1'), 'at');
   assertAtOrAfter(startedAt, current.requestedAt, 'takeover start');
   return advance(current, HumanTakeoverPhase.REQUESTED, {
     phase: HumanTakeoverPhase.OWNER_IN_CONTROL,
-    quiescenceEvidenceId: exactId(quiescenceEvidenceId, 'quiescenceEvidenceId'),
+    quiescenceEvidenceId: exactId(
+      ownValue(request, 'quiescenceEvidenceId', 'HumanTakeoverStartRequestV1'),
+      'quiescenceEvidenceId',
+    ),
     controlStartedAt: startedAt,
   });
 }
 
-export function requestHumanHandbackV1(raw, {
-  reobservationInvocationId,
-  at,
-} = {}) {
+export function requestHumanHandbackV1(raw, input = {}) {
+  const request = strictRecord(input, 'HumanHandbackRequestV1');
+  strictRecordKeys(request, HANDBACK_KEYS, 'HumanHandbackRequestV1');
   const current = normalizeHumanTakeoverV1(raw);
-  const requestedAt = exactTimestamp(at, 'at');
+  const requestedAt = exactTimestamp(ownValue(request, 'at', 'HumanHandbackRequestV1'), 'at');
   assertAtOrAfter(requestedAt, current.controlStartedAt, 'handback request');
   return advance(current, HumanTakeoverPhase.OWNER_IN_CONTROL, {
     phase: HumanTakeoverPhase.HANDBACK_PENDING,
-    reobservationInvocationId: exactId(reobservationInvocationId, 'reobservationInvocationId'),
+    reobservationInvocationId: exactId(
+      ownValue(request, 'reobservationInvocationId', 'HumanHandbackRequestV1'),
+      'reobservationInvocationId',
+    ),
     handbackRequestedAt: requestedAt,
   });
 }
 
-export function recordHumanHandbackObservationV1(raw, {
-  observation,
-} = {}) {
+export function recordHumanHandbackObservationV1(raw, input = {}) {
+  const request = strictRecord(input, 'HumanHandbackObservationRequestV1');
+  strictRecordKeys(request, OBSERVATION_REQUEST_KEYS, 'HumanHandbackObservationRequestV1');
   const current = normalizeHumanTakeoverV1(raw);
   if (current.phase !== HumanTakeoverPhase.HANDBACK_PENDING) {
     throw new Error('HumanTakeoverV1 must be HANDBACK_PENDING for reobservation');
   }
-  const observed = canonicalObservation(observation, 'postTakeoverObservation');
+  const observed = canonicalObservation(
+    ownValue(request, 'observation', 'HumanHandbackObservationRequestV1'),
+    'postTakeoverObservation',
+  );
   if (observed.invocationId !== current.reobservationInvocationId) {
     throw new Error('post-takeover observation invocation does not match handback reobservation invocation');
   }
@@ -625,14 +646,17 @@ export function recordHumanHandbackObservationV1(raw, {
   });
 }
 
-export function recordHumanHandbackVerificationV1(raw, {
-  verification,
-} = {}) {
+export function recordHumanHandbackVerificationV1(raw, input = {}) {
+  const request = strictRecord(input, 'HumanHandbackVerificationRequestV1');
+  strictRecordKeys(request, VERIFICATION_REQUEST_KEYS, 'HumanHandbackVerificationRequestV1');
   const current = normalizeHumanTakeoverV1(raw);
   if (current.phase !== HumanTakeoverPhase.REOBSERVED) {
     throw new Error('HumanTakeoverV1 must be REOBSERVED for verification');
   }
-  const verified = canonicalVerification(verification, 'handbackVerification');
+  const verified = canonicalVerification(
+    ownValue(request, 'verification', 'HumanHandbackVerificationRequestV1'),
+    'handbackVerification',
+  );
   if (verified.invocationId !== current.postTakeoverObservation.invocationId) {
     throw new Error('handback verification invocation does not match post-takeover observation');
   }
