@@ -1,0 +1,54 @@
+QA 0.9.15 — FINAL AUTOMATED QUALIFICATION
+
+Version: 0.9.15
+Date: 2026-09-14
+Status: automated release qualification PASS; physical owner Windows/NVDA/real UKF AIS acceptance is NOT claimed.
+
+EXACT NODE TEST MATRIX
+- AI / Browser Agent / Scenario / Orchestration: 414/414 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 272/272 PASS
+- ChatGPT interaction: 115/115 PASS
+- UI: 62/62 PASS
+- Release contracts: 14/14 PASS
+- Reliability constituent gates: 26/26 PASS
+- Aggregate Node tests: 921/921 PASS
+
+RELIABILITY EVIDENCE
+- 8 virtual hours / 6 Ordinary open-close Sessions with ambiguous Send, navigation faults and transient tab-close failures: PASS.
+- Exact 2-hour Ordinary / 2-minute cadence regression: 2/2 PASS, including forced stale-match ambiguity around the 30th cycle without freezing the remaining Session.
+- Mixed runtime long-run: Ordinary + Browser Agent + Scenario Work + Orchestration V2 progress together through cold restart and tab-close faults: PASS (run separately after the chained npm reliability command exceeded the external command timeout).
+- Scheduler / recovery arbiter / storage-tabs / unattended wake fuzz / exhaustive mode-strategy / agentic multi-session gates: PASS.
+
+BROWSER / STATIC GATES
+- Native Chromium UI + phased ChatGPT interaction + generic Browser Agent form E2E: PASS.
+- Chromium keyboard / mode / accessibility smoke: PASS.
+- JS/MJS/CJS syntax: 209/209 PASS.
+- JSON parse: 6/6 PASS.
+- Secret-prefix scan: 0 hits.
+
+BROWSER AGENT 0.9.15 HARDENING PROVED
+- Consequential-action approval and opt-in ALLOW_ALL policy.
+- Neutral submit controls are consequential even without risky visible wording.
+- Approval TOCTOU fingerprint covers target tag/role/type/name/href plus form association, effective form action and method.
+- Pending approval preserves the full form fingerprint across manager/service-worker reconstruction.
+- Approved submit/link clicks cannot be automatically repeated by native-click fallback.
+- Enter/Space activation requires an exact current snapshot frameId/ref; Enter on form-associated controls cannot bypass approval.
+- Owner follow-up invalidates stale in-flight model actions, interrupts deterministic wait/download blocking, and supersedes an armed pending approval.
+- Agent multi-tab refs hide raw Chrome tab IDs; adopted owner tabs cannot be closed as agent-owned.
+- Tracked downloads hide raw download IDs/local paths from the model; upload is restricted to a completed file downloaded by this Agent and remains consequential by default.
+- Download wait is durable and spends no model calls while Chrome is still downloading.
+- wait_for_change is a durable deterministic page-watch: semantic polling spends no model calls until change/timeout, survives manager restart and is owner-interruptible.
+- maxSteps is a physical/tool-action ceiling: an already-authorized durable final action may settle and AI may return DONE, but an additional browser action is blocked before execution.
+- notify requires explicit optional Chrome notifications permission.
+- on-demand vision screenshot is ephemeral and attached only to the next reasoning call.
+- Provider/planner/action failures have bounded durable retry instead of silent RUNNING stalls.
+
+ORDINARY SESSION INVARIANT
+0.9.15 does not rewrite user-selected Session timing/cadence. Seconds/minutes remain explicit user policy. The 2-minute regression remains a test fixture only, not a forced product setting.
+
+NOT CLAIMED
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+REAL_UKF_AIS_VERIFIED=false
