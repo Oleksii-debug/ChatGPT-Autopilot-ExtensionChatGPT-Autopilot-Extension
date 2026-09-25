@@ -117,6 +117,14 @@ function strictIdValue(value, label, { optional = false } = {}) {
   if (typeof value !== 'string' || !CANONICAL_ID.test(value)) fail(`${label} must be an exact canonical text identity`);
 }
 
+function exactTimestampValue(value, label) {
+  if (typeof value !== 'string') fail(`${label} must be an exact canonical timestamp`);
+  const milliseconds = Date.parse(value);
+  if (!Number.isFinite(milliseconds) || new Date(milliseconds).toISOString() !== value) {
+    fail(`${label} must be an exact canonical timestamp`);
+  }
+}
+
 function validateCanonicalInvocationShape(invocation, policyDecision) {
   if (invocation.schemaVersion !== 1) fail('ToolInvocationV1.schemaVersion must be numeric 1');
   strictIdValue(invocation.invocationId, 'ToolInvocationV1.invocationId');
@@ -124,7 +132,7 @@ function validateCanonicalInvocationShape(invocation, policyDecision) {
   strictIdValue(invocation.providerId, 'ToolInvocationV1.providerId');
   strictIdValue(invocation.policyDecisionId, 'ToolInvocationV1.policyDecisionId');
   strictIdValue(invocation.parentInvocationId, 'ToolInvocationV1.parentInvocationId', { optional: true });
-  if (typeof invocation.createdAt !== 'string' || !Number.isFinite(Date.parse(invocation.createdAt))) fail('ToolInvocationV1.createdAt must be a timestamp');
+  exactTimestampValue(invocation.createdAt, 'ToolInvocationV1.createdAt');
   if (!Array.isArray(invocation.requestedCapabilityIds) || invocation.requestedCapabilityIds.length > 128) fail('ToolInvocationV1.requestedCapabilityIds must be a bounded array');
   for (let index = 0; index < invocation.requestedCapabilityIds.length; index += 1) strictIdValue(invocation.requestedCapabilityIds[index], `ToolInvocationV1.requestedCapabilityIds[${index}]`);
   if (new Set(invocation.requestedCapabilityIds).size !== invocation.requestedCapabilityIds.length) fail('ToolInvocationV1.requestedCapabilityIds contains duplicates');
@@ -136,7 +144,7 @@ function validateCanonicalInvocationShape(invocation, policyDecision) {
   strictIdValue(policyDecision.approvalId, 'PolicyDecisionV1.approvalId', { optional: true });
   if (typeof policyDecision.decision !== 'string' || !['ALLOW', 'DENY', 'REQUIRE_APPROVAL'].includes(policyDecision.decision)) fail('PolicyDecisionV1.decision is invalid');
   if (policyDecision.reason != null && typeof policyDecision.reason !== 'string') fail('PolicyDecisionV1.reason must be text');
-  if (typeof policyDecision.decidedAt !== 'string' || !Number.isFinite(Date.parse(policyDecision.decidedAt))) fail('PolicyDecisionV1.decidedAt must be a timestamp');
+  exactTimestampValue(policyDecision.decidedAt, 'PolicyDecisionV1.decidedAt');
 }
 
 function fail(message) {
