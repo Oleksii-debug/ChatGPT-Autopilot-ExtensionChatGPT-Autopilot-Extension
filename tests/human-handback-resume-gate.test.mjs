@@ -421,6 +421,50 @@ function committedEffectBeforeHandbackVerification(effectId = 'effect-1') {
   )).state;
 }
 
+function committedEffectWithStaleProofButLateCommit(effectId = 'effect-1') {
+  let state = createExactEffectStateV1(effectInvocation(effectId), { createdAt: PRE0 });
+  state = reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'late-commit-begin',
+    PRE1,
+  )).state;
+  const observationId = 'late-commit-stale-observation';
+  const observedAt = '2026-09-25T00:03:10.000Z';
+  state = reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'late-commit-observe',
+    observedAt,
+    {
+      observation: {
+        ...effectObservation(effectId, observationId),
+        observedAt,
+      },
+    },
+  )).state;
+  const verifiedAt = '2026-09-25T00:03:20.000Z';
+  state = reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'late-commit-verify',
+    verifiedAt,
+    {
+      verification: {
+        ...effectVerification(effectId, observationId),
+        verifiedAt,
+      },
+    },
+  )).state;
+  return reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.COMMIT,
+    'late-commit-after-handback',
+    T4B,
+    { commitId: 'late-commit-proof' },
+  )).state;
+}
+
 function secondAttemptCommittedEffect(effectId = 'effect-1') {
   let state = createExactEffectStateV1(effectInvocation(effectId), { createdAt: PRE0 });
   state = reduceExactEffectV1(state, effectEvent(
@@ -700,6 +744,19 @@ test('exact-effect identity, execution and attempt drift fail closed', () => {
       attempt: 1,
     }),
   }), attempt2), /attempt mismatch/);
+});
+
+test('late commit cannot launder pre-handback exact-effect observation and verification', () => {
+  const staleProof = committedEffectWithStaleProofButLateCommit();
+  assert.equal(staleProof.phase, ExactEffectPhase.COMMITTED);
+  assert.ok(Date.parse(staleProof.updatedAt) > Date.parse(T4));
+  assert.ok(Date.parse(staleProof.observation.observedAt) < Date.parse(T4));
+  assert.ok(Date.parse(staleProof.verification.verifiedAt) < Date.parse(T4));
+
+  assert.throws(
+    () => authorize(gateInput(), staleProof),
+    /exact-effect observation must not predate handback verification/,
+  );
 });
 
 test('matching committed exact-effect state from before handback verification cannot authorize resume', () => {
