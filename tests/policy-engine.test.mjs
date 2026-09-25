@@ -331,6 +331,20 @@ test('hidden schema-valid authority fields cannot affect policy decisions', asyn
   assert.throws(() => normalizeOwnerPolicyProfileV1(profile({ rules: [hiddenRule] })), /enumerable data property/);
 });
 
+test('authority arrays are descriptor-snapshotted without ordinary length reads', () => {
+  let reads = 0;
+  const trusted = new Proxy(['core-classifier'], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalized = normalizeOwnerPolicyProfileV1(profile({ trustedClassifierIds: trusted }));
+  assert.deepEqual(normalized.trustedClassifierIds, ['core-classifier']);
+  assert.equal(reads, 0, 'authority arrays must not perform ordinary caller property reads');
+});
+
 test('authority arrays are dense plain data and never execute accessor indices', async () => {
   let reads = 0;
   const trusted = ['core-classifier'];
