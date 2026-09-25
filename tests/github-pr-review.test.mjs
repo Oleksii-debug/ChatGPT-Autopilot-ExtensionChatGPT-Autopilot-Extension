@@ -255,7 +255,19 @@ test('REST formal review fails closed on stale head and validates event/body bef
     }),
     error => error.code === 'GITHUB_INVALID_REQUEST' && error.safeToRetry === true,
   );
-  assert.equal(calls.length, 1, 'invalid event/body must fail before another remote call');
+  await assert.rejects(
+    () => client.createPullRequestReview({
+      repositoryFullName: repo,
+      pullRequestNumber: 7,
+      expectedHeadSha: headSha.toUpperCase(),
+      event: 'COMMENT',
+      body: reviewBody,
+    }),
+    error => error.code === 'GITHUB_INVALID_REQUEST'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+  assert.equal(calls.length, 1, 'invalid event/body/SHA aliases must fail before another remote call');
 });
 
 test('REST review readback binds immutable review to exact repository, pull request and commit', async () => {
@@ -602,6 +614,52 @@ test('ambiguous formal-review dispatch without immutable reviewId requires manua
   assert.equal(creates, 1);
   assert.equal(reads, 0);
   assert.equal(fx.snapshot(inv.invocationId).phase, 'RECONCILE');
+});
+
+test('review verifier rejects uppercase expected-head aliases before any remote readback', async () => {
+  let remoteReads = 0;
+  const client = fullClient({
+    readPullRequest: async () => {
+      remoteReads += 1;
+      return {};
+    },
+    readPullRequestReview: async () => {
+      remoteReads += 1;
+      return {};
+    },
+  });
+  const verifier = new GitHubPullRequestReviewVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const inv = invocation('github-pr-review-uppercase-head');
+  inv.arguments.expectedHeadSha = headSha.toUpperCase();
+
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: inv,
+      executionId: 'github-pr-review-uppercase-head:attempt:1',
+      observation: {
+        schemaVersion: 1,
+        observationId: 'github-pr-review-uppercase-head:obs',
+        invocationId: 'github-pr-review-uppercase-head',
+        status: 'OK',
+        summary: '',
+        data: {
+          repositoryFullName: repo,
+          pullRequestNumber: 7,
+          reviewId: 80,
+          expectedHeadSha: headSha,
+          event: 'COMMENT',
+          body: reviewBody,
+          state: 'COMMENTED',
+          commitId: headSha,
+          url: 'https://example.invalid/review',
+        },
+        artifactRefs: [],
+        observedAt: at,
+      },
+    }),
+    /expectedHeadSha is invalid/i,
+  );
+  assert.equal(remoteReads, 0);
 });
 
 test('review verifier rejects accessor-backed arguments before any remote readback', async () => {
