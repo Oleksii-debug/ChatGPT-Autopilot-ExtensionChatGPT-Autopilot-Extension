@@ -708,6 +708,8 @@
       <p class="field-help" id="ai-router-route-pool-help">Необовʼязково. Якщо додано хоча б один маршрут, ролі planner, coder, fast-worker, verifier, critic і vision обираються з цього пулу. Порядок карток є порядком переваги. API keys тут не вводяться: OpenAI-compatible маршрут посилається лише на endpoint ID локального Gateway.</p>
       <div id="ai-router-route-list" aria-labelledby="ai-router-route-pool-heading" aria-describedby="ai-router-route-pool-help"></div>
       <button id="ai-router-add-route-button" type="button">Додати маршрут</button>
+      <button id="ai-router-add-mistral-button" type="button">Додати Містраль</button>
+      <p class="field-help">Для Містраль ключ налаштовується локальним скриптом «НАЛАШТУВАТИ MISTRAL API.ps1» у папці companion/ai-gateway. Він зберігається захищено у Windows; у цю форму ключ не вставляйте. Після запуску Gateway натисніть «Отримати моделі цього постачальника» у маршруті Містраль.</p>
 
       <fieldset id="ai-router-route-policy">
         <legend>Політика власника для пулу маршрутів</legend>
@@ -741,6 +743,8 @@
           <label data-label-for="provider">Провайдер</label><select data-route-field="provider"><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="openai-compatible">OpenAI-compatible endpoint</option></select>
           <label data-label-for="endpointId">Endpoint ID (лише OpenAI-compatible)</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="model">Модель</label><input data-route-field="model" type="text" autocomplete="off" spellcheck="false">
+          <button type="button" data-route-action="discover-models">Отримати моделі цього постачальника</button>
+          <label data-label-for="discoveredModel">Моделі постачальника</label><select data-route-field="discoveredModel"><option value="">Оберіть модель після оновлення</option></select>
           <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>
           <label data-label-for="capabilityIds">Capabilities через кому (порожньо = будь-які)</label><input data-route-field="capabilityIds" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="priority">Пріоритет</label><input data-route-field="priority" type="number" min="0" max="1000000" step="1" inputmode="numeric">

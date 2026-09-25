@@ -1000,6 +1000,10 @@ function handleAiRouterRouteAction(event) {
   const card = button.closest('[data-ai-route]');
   const list = $('ai-router-route-list');
   const action = button.dataset.routeAction;
+  if (action === 'discover-models') {
+    void discoverAiRouteModels(card, button);
+    return;
+  }
   if (action === 'remove') {
     const nextFocus = card.nextElementSibling?.querySelector('button, input, select') || card.previousElementSibling?.querySelector('button, input, select') || $('ai-router-add-route-button');
     card.remove();
@@ -1013,6 +1017,38 @@ function handleAiRouterRouteAction(event) {
   renderAiRouterRouteSelects();
   button.focus();
   announce(action === 'up' ? 'Маршрут переміщено вище.' : 'Маршрут переміщено нижче.');
+}
+
+async function discoverAiRouteModels(card, button) {
+  const provider = card.querySelector('[data-route-field="provider"]').value;
+  const endpointId = card.querySelector('[data-route-field="endpointId"]').value.trim();
+  const picker = card.querySelector('[data-route-field="discoveredModel"]');
+  if (provider === 'openai-compatible' && !endpointId) {
+    $('ai-router-status').textContent = 'Укажіть Endpoint ID, наприклад mistral, перед отриманням моделей.';
+    return;
+  }
+  button.disabled = true;
+  try {
+    const data = await core('LIST_AI_ROUTER_MODELS', { provider, endpointId });
+    const models = [...new Set((data.result?.models || []).filter(model => typeof model === 'string' && model))];
+    picker.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Оберіть модель зі списку';
+    picker.append(placeholder);
+    for (const model of models) {
+      const option = document.createElement('option');
+      option.value = model;
+      option.textContent = model;
+      picker.append(option);
+    }
+    $('ai-router-status').textContent = `Постачальник ${endpointId || provider}: знайдено моделей ${models.length}. Оберіть модель і збережіть налаштування.`;
+    picker.focus();
+  } catch (error) {
+    $('ai-router-status').textContent = `Не вдалося отримати моделі ${endpointId || provider}: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
 }
 
 
@@ -3845,6 +3881,27 @@ $('ai-router-add-route-button').addEventListener('click', () => {
   try { addAiRouterRoute(); }
   catch (error) { $('ai-router-status').textContent = `Не вдалося додати маршрут: ${error.message}`; }
 });
+$('ai-router-add-mistral-button').addEventListener('click', () => {
+  try {
+    const routes = aiRouterRoutesFromForm({ validate:false });
+    const existing = routes.findIndex(route => route.provider === 'openai-compatible' && route.endpointId === 'mistral');
+    if (existing >= 0) {
+      $('ai-router-route-list').children[existing]?.querySelector('[data-route-field="model"]')?.focus();
+      $('ai-router-status').textContent = 'Маршрут Містраль уже є. Отримайте моделі або оберіть існуючу.';
+      return;
+    }
+    if (routes.length >= 32) throw new Error('Пул маршрутів обмежено 32 записами.');
+    let number = 1;
+    while (routes.some(route => route.routeId === `mistral-${number}`)) number++;
+    routes.push({ routeId:`mistral-${number}`, provider:'openai-compatible', endpointId:'mistral', model:'', roles:['coder'], priority:50, enabled:false, locality:'remote', costClass:'unknown' });
+    renderAiRouterRoutes(routes, {}, {
+      pinnedRouteId:$('ai-router-pinned-route').value,
+      allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
+    });
+    $('ai-router-route-list').lastElementChild?.querySelector('[data-route-action="discover-models"]')?.focus();
+    $('ai-router-status').textContent = 'Маршрут Містраль додано до форми. Отримайте моделі, визначте вартість і збережіть налаштування.';
+  } catch (error) { $('ai-router-status').textContent = `Не вдалося додати Містраль: ${error.message}`; }
+});
 $('ai-router-route-list').addEventListener('click', handleAiRouterRouteAction);
 $('ai-model-free-tab').addEventListener('click', () => selectAiModelPriceTab('free', true));
 $('ai-model-paid-tab').addEventListener('click', () => selectAiModelPriceTab('paid', true));
@@ -3854,6 +3911,10 @@ $('ai-model-price-tabs').addEventListener('keydown', event => {
   selectAiModelPriceTab(event.key === 'Home' ? 'free' : event.key === 'End' ? 'paid' : $('ai-model-free-tab').getAttribute('aria-selected') === 'true' ? 'paid' : 'free', true);
 });
 $('ai-router-route-list').addEventListener('change', event => {
+  if (event.target.matches('[data-route-field="discoveredModel"]') && event.target.value) {
+    event.target.closest('[data-ai-route]').querySelector('[data-route-field="model"]').value = event.target.value;
+    $('ai-router-status').textContent = `Обрано модель ${event.target.value}. Натисніть «Зберегти», щоб застосувати.`;
+  }
   if (event.target.matches('[data-route-field="routeId"]')) renderAiRouterRouteSelects();
   if (event.target.matches('[data-route-field="provider"]')) {
     const card = event.target.closest('[data-ai-route]');
