@@ -41,6 +41,7 @@ function client(overrides = {}) {
     searchDrive: async args => ({ operation: 'searchDrive', args }),
     getDriveFile: async args => ({ operation: 'getDriveFile', args }),
     readDriveText: async args => ({ operation: 'readDriveText', args }),
+    updateDriveFile: async args => ({ operation: 'updateDriveFile', args }),
     searchGmail: async args => ({ operation: 'searchGmail', args }),
     getGmailMessage: async args => ({ operation: 'getGmailMessage', args }),
     getGmailThread: async args => ({ operation: 'getGmailThread', args }),
@@ -53,15 +54,19 @@ function client(overrides = {}) {
 
 const allCapabilities = Object.values(GoogleWorkspaceCapabilityId);
 
-test('Google Workspace V1 advertises seven reads plus draft-create and draft-send mutations', () => {
+test('Google Workspace V1 advertises seven reads plus Drive-update, draft-create, and draft-send mutations', () => {
   const provider = new GoogleWorkspaceAgentProviderV1({ workspaceClient: client(), grantedCapabilityIds: allCapabilities });
   const tools = provider.tools();
-  assert.equal(tools.length, 9);
+  assert.equal(tools.length, 10);
   assert.equal(tools.filter(tool => tool.readOnly === true).length, 7);
   const effectful = tools.filter(tool => tool.readOnly === false);
-  assert.deepEqual(effectful.map(tool => tool.toolId), [GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE, GoogleWorkspaceToolId.GMAIL_DRAFT_SEND]);
+  assert.deepEqual(effectful.map(tool => tool.toolId), [
+    GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
+    GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+    GoogleWorkspaceToolId.GMAIL_DRAFT_SEND,
+  ]);
   assert.ok(tools.every(tool => tool.providerId === GOOGLE_WORKSPACE_PROVIDER_ID));
-  assert.ok(tools.every(tool => !/(trash|delete|update|reply|forward)/iu.test(tool.toolId)));
+  assert.ok(tools.every(tool => !/(trash|delete|reply|forward)/iu.test(tool.toolId)));
 });
 
 test('provider requires exact owner ALLOW and granted capability before client invocation', async () => {
@@ -95,6 +100,7 @@ test('each tool dispatches through the single workspace client without creating 
     [GoogleWorkspaceToolId.DRIVE_SEARCH, GoogleWorkspaceCapabilityId.DRIVE_SEARCH, 'searchDrive', { parentId: 'root_1' }],
     [GoogleWorkspaceToolId.DRIVE_FILE_GET, GoogleWorkspaceCapabilityId.DRIVE_FILE_READ, 'getDriveFile', { fileId: 'file_1' }],
     [GoogleWorkspaceToolId.DRIVE_FILE_READ_TEXT, GoogleWorkspaceCapabilityId.DRIVE_FILE_READ, 'readDriveText', { fileId: 'file_1' }],
+    [GoogleWorkspaceToolId.DRIVE_FILE_UPDATE, GoogleWorkspaceCapabilityId.DRIVE_FILE_UPDATE, 'updateDriveFile', { fileId: 'file_1', name: 'renamed.txt' }],
     [GoogleWorkspaceToolId.GMAIL_SEARCH, GoogleWorkspaceCapabilityId.GMAIL_SEARCH, 'searchGmail', { userId: 'me' }],
     [GoogleWorkspaceToolId.GMAIL_MESSAGE_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailMessage', { userId: 'me', messageId: 'msg_1' }],
     [GoogleWorkspaceToolId.GMAIL_THREAD_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailThread', { userId: 'me', threadId: 'thread_1' }],
