@@ -1,8 +1,13 @@
 import { scenarioWorkParticipants } from './scenario-work.js';
 
 const CATEGORIES = Object.freeze([
-  'RUNNING', 'WAITING_RESPONSE', 'READY', 'PAUSED', 'RECOVERING',
+  'RUNNING', 'WAITING_RESPONSE',
+  'WAITING_PERMISSION', 'WAITING_APPROVAL', 'WAITING_CAPABILITY', 'WAITING_SCHEDULE',
+  'READY', 'PAUSED', 'RECOVERING',
   'ERROR', 'AMBIGUOUS_EFFECT', 'COMPLETED', 'STOPPED',
+]);
+const AGENT_WAITING_STATES = new Set([
+  'WAITING_PERMISSION', 'WAITING_APPROVAL', 'WAITING_CAPABILITY', 'WAITING_SCHEDULE',
 ]);
 const MANAGED_FIELDS = ['scenarioWork', 'orchestrationCoordinator', 'orchestrationWorker', 'remoteDispatch'];
 const num = value => Math.max(0, Number(value) || 0);
@@ -53,7 +58,7 @@ function agentCategory(state) {
   if (state === 'PAUSED') return 'PAUSED';
   if (state === 'ERROR') return 'ERROR';
   if (state === 'STOPPED') return 'STOPPED';
-  if (state?.startsWith('WAITING_')) return 'READY';
+  if (AGENT_WAITING_STATES.has(state)) return state;
   return 'RUNNING';
 }
 
