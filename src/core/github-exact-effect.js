@@ -190,6 +190,38 @@ export class GitHubExactEffectExecutorV1 {
     return advanced.state || normalizeExactEffectStateV1(state);
   }
 
+  #validateIndependentVerification(state, rawVerification, acceptedAtMs) {
+    if (state.phase !== ExactEffectPhase.OBSERVED || !state.observation) {
+      throw new Error('GitHub verification requires the current observed exact-effect attempt');
+    }
+    if (!Number.isFinite(acceptedAtMs)) {
+      throw new Error('GitHub verification acceptance time is invalid');
+    }
+
+    const verification = normalizeVerificationV1(rawVerification);
+    const verifierId = requireId(verification.verifierId, 'verification.verifierId');
+    if ([this.actorId, this.parentActorId, state.invocation.providerId].filter(Boolean).includes(verifierId)) {
+      throw new Error('GitHub verification verifier must be independent from the actor, parent controller, and GitHub provider');
+    }
+    if (requireId(verification.verificationAuthorityId, 'verification.verificationAuthorityId') !== state.invocation.policyDecisionId
+      || requireId(verification.effectId, 'verification.effectId') !== state.effectId
+      || requireId(verification.executionId, 'verification.executionId') !== state.executionId
+      || typeof verification.attempt !== 'number'
+      || !Number.isSafeInteger(verification.attempt)
+      || verification.attempt !== state.attempt
+      || verification.invocationId !== state.effectId
+      || verification.observationId !== state.observation.observationId) {
+      throw new Error('GitHub verification proof does not match the current exact-effect attempt');
+    }
+
+    const observedAt = ms(state.observation.observedAt, 'observation.observedAt');
+    const verifiedAt = ms(verification.verifiedAt, 'verification.verifiedAt');
+    if (verifiedAt < observedAt || verifiedAt > acceptedAtMs + MAX_CLOCK_SKEW_MS) {
+      throw new Error('GitHub verification evidence has invalid chronology');
+    }
+    return verification;
+  }
+
   async #loadById(invocationId) {
     const id = requireId(invocationId, 'invocationId');
     return this.#atomic(effectsById => {
@@ -294,13 +326,14 @@ export class GitHubExactEffectExecutorV1 {
         throw error;
       }
 
-      const verification = normalizeVerificationV1(await this.verify({
+      const rawVerification = await this.verify({
         invocation: structuredClone(state.invocation),
         effectId: state.effectId,
         executionId: state.executionId,
         attempt: state.attempt,
         observation: structuredClone(state.observation),
-      }));
+      });
+      const verification = this.#validateIndependentVerification(state, rawVerification, this.now());
       const verificationAdvance = await this.#advance(
         state,
         [ExactEffectPhase.OBSERVED],
