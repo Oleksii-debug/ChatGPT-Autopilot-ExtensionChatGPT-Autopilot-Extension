@@ -93,6 +93,19 @@ function protocolVersion(value, label) {
   return value;
 }
 
+function protocolBinding(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 512) {
+    throw new Error(label + ' is invalid');
+  }
+  if (/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/u.test(value)) return value;
+  let parsed;
+  try { parsed = new URL(value); } catch { throw new Error(label + ' is invalid'); }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash) {
+    throw new Error(label + ' is invalid');
+  }
+  return parsed.toString();
+}
+
 function timestamp(value, label, optional = false) {
   if ((value === null || value === undefined) && optional) return null;
   if (typeof value !== 'string') throw new Error(label + ' must be a canonical timestamp');
@@ -149,7 +162,7 @@ function normalizeInterface(input, label) {
   const raw = record(input, label, INTERFACE_KEYS);
   return freeze({
     url: httpsUrl(raw.url, label + '.url'),
-    protocolBinding: text(raw.protocolBinding, label + '.protocolBinding', 512),
+    protocolBinding: protocolBinding(raw.protocolBinding, label + '.protocolBinding'),
     protocolVersion: protocolVersion(raw.protocolVersion, label + '.protocolVersion'),
     tenant: id(raw.tenant, label + '.tenant', true),
   });
@@ -175,12 +188,8 @@ export function normalizeA2ARemoteAgentCardRefV1(input) {
     throw new Error('A2ARemoteAgentCardRefV1 cannot contain credential material');
   }
 
-  const supportedInterfaces = unique(
-    array(raw.supportedInterfaces, 'supportedInterfaces', MAX.interfaces, 1)
-      .map((item, index) => normalizeInterface(item, 'supportedInterfaces[' + index + ']')),
-    'url',
-    'supportedInterfaces',
-  );
+  const supportedInterfaces = array(raw.supportedInterfaces, 'supportedInterfaces', MAX.interfaces, 1)
+    .map((item, index) => normalizeInterface(item, 'supportedInterfaces[' + index + ']'));
   const interfaceKeys = new Set();
   for (const iface of supportedInterfaces) {
     const key = [iface.url, iface.protocolBinding, iface.protocolVersion, iface.tenant || ''].join('\u0000');
@@ -240,7 +249,7 @@ export function normalizeA2ARemoteAdmissionRefV1(input) {
     remoteAgentId: id(raw.remoteAgentId, 'remoteAgentId'),
     cardSha256: digest(raw.cardSha256, 'cardSha256'),
     interfaceUrl: httpsUrl(raw.interfaceUrl, 'interfaceUrl'),
-    protocolBinding: text(raw.protocolBinding, 'protocolBinding', 512),
+    protocolBinding: protocolBinding(raw.protocolBinding, 'protocolBinding'),
     protocolVersion: protocolVersion(raw.protocolVersion, 'protocolVersion'),
     tenant: id(raw.tenant, 'tenant', true),
     allowedSkillIds: ids(raw.allowedSkillIds, 'allowedSkillIds', MAX.skills, 1),
