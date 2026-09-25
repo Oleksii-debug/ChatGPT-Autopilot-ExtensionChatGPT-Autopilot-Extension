@@ -40,7 +40,7 @@ function ts(value, label) {
   }
   return value;
 }
-function plane(value) { if (typeof value !== 'string') throw new Error('execution plane is invalid'); const out = value.trim().toUpperCase(); if (!PLANES.has(out)) throw new Error('execution plane is invalid'); return out; }
+function plane(value) { if (typeof value !== 'string' || value !== value.trim() || !PLANES.has(value)) throw new Error('execution plane is invalid'); return value; }
 function optionalId(value, label) { return value == null || value === '' ? '' : id(value, label); }
 function optionalTs(value, label) { return value == null || value === '' ? '' : ts(value, label); }
 function boundedText(value, label, max = 1000) { if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max) throw new Error(`${label} is invalid`); return value; }
@@ -61,9 +61,8 @@ export function normalizeExecutionOwnershipV1(raw) {
   raw = obj(raw, 'ExecutionOwnershipV1');
   exact(raw, new Set(['schemaVersion','taskId','planId','nodeId','effectId','policyEnvelopeId','state','ownerPlane','ownerId','leaseId','leaseUntil','handoffToPlane','handoffId','ambiguityReason','updatedAt','revision']), 'ExecutionOwnershipV1');
   if (raw.schemaVersion !== EXECUTION_OWNERSHIP_VERSION) throw new Error('Unsupported ExecutionOwnershipV1 schemaVersion');
-  if (typeof raw.state !== 'string') throw new Error('ExecutionOwnershipV1 state is invalid');
-  const state = raw.state.trim().toUpperCase();
-  if (!STATES.has(state)) throw new Error('ExecutionOwnershipV1 state is invalid');
+  if (typeof raw.state !== 'string' || raw.state !== raw.state.trim() || !STATES.has(raw.state)) throw new Error('ExecutionOwnershipV1 state is invalid');
+  const state = raw.state;
   const ownerPlane = raw.ownerPlane ? plane(raw.ownerPlane) : '';
   const ownerId = optionalId(raw.ownerId, 'ownerId');
   const leaseId = optionalId(raw.leaseId, 'leaseId');
@@ -78,13 +77,21 @@ export function normalizeExecutionOwnershipV1(raw) {
   if (state !== ExecutionOwnershipState.HANDOFF_PENDING && (handoffToPlane || handoffId)) throw new Error('handoff metadata is only valid while HANDOFF_PENDING');
   if ((state === ExecutionOwnershipState.RECONCILE || state === ExecutionOwnershipState.MANUAL_REVIEW) !== Boolean(ambiguityReason)) throw new Error('ambiguity reason must exist exactly for reconciliation/manual review');
   const revision = raw.revision;
-  if (typeof revision !== 'number' || !Number.isInteger(revision) || revision < 1) throw new Error('ExecutionOwnershipV1 revision is invalid');
+  if (typeof revision !== 'number' || !Number.isSafeInteger(revision) || Object.is(revision, -0) || revision < 1) throw new Error('ExecutionOwnershipV1 revision is invalid');
   return freeze({ schemaVersion: EXECUTION_OWNERSHIP_VERSION, taskId: id(raw.taskId,'taskId'), planId: id(raw.planId,'planId'), nodeId: id(raw.nodeId,'nodeId'), effectId: id(raw.effectId,'effectId'), policyEnvelopeId: id(raw.policyEnvelopeId,'policyEnvelopeId'), state, ownerPlane, ownerId, leaseId, leaseUntil, handoffToPlane, handoffId, ambiguityReason, updatedAt: ts(raw.updatedAt,'updatedAt'), revision });
+}
+
+function nextRevision(revision) {
+  const value = revision + 1;
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error('ExecutionOwnershipV1 revision exceeds exact durable-state range');
+  }
+  return value;
 }
 
 function next(raw, patch, at) {
   const current = normalizeExecutionOwnershipV1(raw);
-  return normalizeExecutionOwnershipV1({ ...current, ...patch, updatedAt: ts(at,'at'), revision: current.revision + 1 });
+  return normalizeExecutionOwnershipV1({ ...current, ...patch, updatedAt: ts(at,'at'), revision: nextRevision(current.revision) });
 }
 
 function assertLeaseDuration(at, leaseUntil) {
@@ -140,8 +147,8 @@ export function resolveExecutionReconciliationV1(raw, options = {}) {
   if (current.state !== ExecutionOwnershipState.RECONCILE || current.leaseId !== id(leaseId,'leaseId')) {
     throw new Error('reconciliation requires the preserved owner lease identity');
   }
-  if (typeof outcome !== 'string') throw new Error('reconciliation outcome must be text');
-  const normalized = outcome.trim().toUpperCase();
+  if (typeof outcome !== 'string' || outcome !== outcome.trim()) throw new Error('reconciliation outcome must use exact canonical text');
+  const normalized = outcome;
   if (normalized === 'MANUAL_REVIEW') {
     return next(current, {
       state: ExecutionOwnershipState.MANUAL_REVIEW,
