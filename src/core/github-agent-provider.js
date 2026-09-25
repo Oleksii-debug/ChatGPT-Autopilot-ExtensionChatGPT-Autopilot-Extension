@@ -16,6 +16,7 @@ export const GitHubToolId = Object.freeze({
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
   PULL_REQUEST_READ: 'remote/github/pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'remote/github/pullRequest.comment.read',
+  PULL_REQUEST_REVIEW_READ: 'remote/github/pullRequest.review.read',
   ISSUE_READ: 'remote/github/issue.read',
   ISSUE_COMMENT_READ: 'remote/github/issueComment.read',
   BRANCH_CREATE: 'remote/github/branch.create',
@@ -23,6 +24,7 @@ export const GitHubToolId = Object.freeze({
   FILE_DELETE: 'remote/github/file.delete',
   PULL_REQUEST_CREATE: 'remote/github/pullRequest.create',
   PULL_REQUEST_MERGE: 'remote/github/pullRequest.merge',
+  PULL_REQUEST_REVIEW_CREATE: 'remote/github/pullRequest.review.create',
   PULL_REQUEST_COMMENT_CREATE: 'remote/github/pullRequest.comment.create',
   ISSUE_CREATE: 'remote/github/issue.create',
   ISSUE_COMMENT_CREATE: 'remote/github/issueComment.create',
@@ -39,6 +41,7 @@ export const GitHubCapabilityId = Object.freeze({
   WORKFLOW_RUN_CANCEL: 'github.workflow.cancel',
   PULL_REQUEST_READ: 'github.pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'github.pullRequest.comment.read',
+  PULL_REQUEST_REVIEW_READ: 'github.pullRequest.review.read',
   ISSUE_READ: 'github.issue.read',
   ISSUE_COMMENT_READ: 'github.issueComment.read',
   BRANCH_CREATE: 'github.branch.create',
@@ -46,6 +49,7 @@ export const GitHubCapabilityId = Object.freeze({
   FILE_DELETE: 'github.file.delete',
   PULL_REQUEST_CREATE: 'github.pullRequest.create',
   PULL_REQUEST_MERGE: 'github.pullRequest.merge',
+  PULL_REQUEST_REVIEW_CREATE: 'github.pullRequest.review.create',
   PULL_REQUEST_COMMENT_CREATE: 'github.pullRequest.comment.create',
   ISSUE_CREATE: 'github.issue.create',
   ISSUE_COMMENT_CREATE: 'github.issueComment.create',
@@ -186,6 +190,17 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_REVIEW_READ,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Read exact GitHub pull request review',
+    description: 'Reads one immutable pull request review by exact repository, pull request and review identity.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_REVIEW_READ],
+    inputSchemaRef: 'github-schema/pullRequest.review.read/input',
+    outputSchemaRef: 'github-schema/pullRequest.review.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: GitHubToolId.PULL_REQUEST_COMMENT_READ,
     providerId: GITHUB_PROVIDER_ID,
     label: 'Read exact GitHub pull request timeline comment',
@@ -274,6 +289,17 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_REVIEW_CREATE,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Create formal GitHub pull request review',
+    description: 'Submits one formal APPROVE, REQUEST_CHANGES, or COMMENT review pinned to an exact pull request head. Ambiguous outcomes require reconciliation.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_REVIEW_CREATE],
+    inputSchemaRef: 'github-schema/pullRequest.review.create/input',
+    outputSchemaRef: 'github-schema/pullRequest.review.create/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
     providerId: GITHUB_PROVIDER_ID,
     label: 'Create GitHub pull request timeline comment',
@@ -346,6 +372,7 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.WORKFLOW_RUN_CANCEL) return 'cancelWorkflowRun';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
   if (toolId === GitHubToolId.PULL_REQUEST_READ) return 'readPullRequest';
+  if (toolId === GitHubToolId.PULL_REQUEST_REVIEW_READ) return 'readPullRequestReview';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_READ) return 'readPullRequestComment';
   if (toolId === GitHubToolId.ISSUE_READ) return 'readIssue';
   if (toolId === GitHubToolId.ISSUE_COMMENT_READ) return 'readIssueComment';
@@ -354,6 +381,7 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.FILE_DELETE) return 'deleteFile';
   if (toolId === GitHubToolId.PULL_REQUEST_CREATE) return 'createPullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_MERGE) return 'mergePullRequest';
+  if (toolId === GitHubToolId.PULL_REQUEST_REVIEW_CREATE) return 'createPullRequestReview';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) return 'createPullRequestComment';
   if (toolId === GitHubToolId.ISSUE_CREATE) return 'createIssue';
   if (toolId === GitHubToolId.ISSUE_COMMENT_CREATE) return 'createIssueComment';
@@ -366,6 +394,8 @@ export class GitHubAgentProviderV1 {
     const methods = Object.values(GitHubToolId)
       .filter(toolId => ![
         GitHubToolId.PULL_REQUEST_MERGE,
+        GitHubToolId.PULL_REQUEST_REVIEW_READ,
+        GitHubToolId.PULL_REQUEST_REVIEW_CREATE,
         GitHubToolId.WORKFLOW_LIST,
         GitHubToolId.WORKFLOW_RUN_LIST,
         GitHubToolId.WORKFLOW_RUN_JOBS_LIST,
@@ -380,6 +410,14 @@ export class GitHubAgentProviderV1 {
     if (grantedCapabilityIds.includes(GitHubCapabilityId.PULL_REQUEST_MERGE)
         && typeof githubClient.mergePullRequest !== 'function') {
       throw new Error('GitHub REST client with pull-request merge support is required for the granted merge capability');
+    }
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.PULL_REQUEST_REVIEW_READ)
+        && typeof githubClient.readPullRequestReview !== 'function') {
+      throw new Error('GitHub REST client with pull-request review read support is required for the granted review-read capability');
+    }
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.PULL_REQUEST_REVIEW_CREATE)
+        && typeof githubClient.createPullRequestReview !== 'function') {
+      throw new Error('GitHub REST client with formal pull-request review support is required for the granted review-create capability');
     }
     if (grantedCapabilityIds.includes(GitHubCapabilityId.WORKFLOW_READ)
         && ['listWorkflows', 'listWorkflowRuns', 'listWorkflowRunJobs']
