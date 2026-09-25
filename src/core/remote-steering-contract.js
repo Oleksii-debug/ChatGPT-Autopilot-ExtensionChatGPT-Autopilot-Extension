@@ -21,7 +21,7 @@ const ACTIONS = new Set(Object.values(RemoteSteeringAction));
 const REDIRECT_KINDS = new Set(Object.values(RemoteSteeringRedirectKind));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
-const REQUEST_KEYS = new Set(['command', 'assessmentAt']);
+const REQUEST_KEYS = new Set(['command']);
 const COMMAND_KEYS = new Set([
   'schemaVersion',
   'commandId',
@@ -48,7 +48,7 @@ const SNAPSHOT_KEYS = new Set([
   'observedAt',
 ]);
 const REDIRECT_KEYS = new Set(['kind', 'targetId']);
-const OPTIONS_KEYS = new Set(['cryptoApi', 'resolveCurrentSnapshot']);
+const OPTIONS_KEYS = new Set(['cryptoApi', 'resolveCurrentSnapshot', 'assessmentAt']);
 
 function snapshotRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -216,6 +216,10 @@ function normalizeOptions(options) {
   return Object.freeze({
     cryptoApi: Object.hasOwn(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto,
     resolveCurrentSnapshot: raw.resolveCurrentSnapshot,
+    assessmentAt: requireTimestamp(
+      raw.assessmentAt,
+      'RemoteSteering assessment options assessmentAt',
+    ),
   });
 }
 
@@ -290,11 +294,8 @@ function canonicalFingerprintInput(command) {
 export async function assessRemoteSteeringCommandV1(input, options = undefined) {
   const request = snapshotRecord(input, 'RemoteSteeringAssessmentRequestV1', REQUEST_KEYS);
   const command = normalizeCommand(request.command);
-  const assessmentAt = requireTimestamp(
-    request.assessmentAt,
-    'RemoteSteeringAssessmentRequestV1 assessmentAt',
-  );
   const trusted = normalizeOptions(options);
+  const assessmentAt = trusted.assessmentAt;
 
   const resolvedSnapshot = await trusted.resolveCurrentSnapshot(Object.freeze({
     jobId: command.jobId,
