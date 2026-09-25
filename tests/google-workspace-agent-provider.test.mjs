@@ -168,6 +168,23 @@ test('provider rejects coercive authority aliases before canonical contract norm
     () => provider.invoke({ invocation: { ...base, requestedCapabilityIds: [7] }, policyDecision: decision() }),
     /canonical text identity/i,
   );
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: {
+        ...base,
+        requestedCapabilityIds: [` ${GoogleWorkspaceCapabilityId.GMAIL_SEARCH}`],
+      },
+      policyDecision: decision(),
+    }),
+    /exact canonical text identity/i,
+  );
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: { ...base, toolId: ` ${GoogleWorkspaceToolId.GMAIL_SEARCH}` },
+      policyDecision: decision(),
+    }),
+    /exact canonical text identity/i,
+  );
 });
 
 
