@@ -105,7 +105,8 @@ test('each tool dispatches through the single workspace client without creating 
 });
 
 test('client read failures remain explicitly no-effect and retry-safe', async () => {
-  const failure = Object.assign(new Error('offline'), { code: 'GOOGLE_TRANSPORT_ERROR', status: 0 });
+  const leakedSecret = 'provider-secret-must-not-cross-boundary';
+  const failure = Object.assign(new Error(`offline ${leakedSecret}`), { code: 'GOOGLE_TRANSPORT_ERROR', status: 0, secret: leakedSecret });
   const provider = new GoogleWorkspaceAgentProviderV1({
     workspaceClient: client({ getDriveFile: async () => { throw failure; } }),
     grantedCapabilityIds: [GoogleWorkspaceCapabilityId.DRIVE_FILE_READ],
@@ -116,7 +117,9 @@ test('client read failures remain explicitly no-effect and retry-safe', async ()
     error => error.code === 'GOOGLE_TRANSPORT_ERROR'
       && error.effectMayHaveOccurred === false
       && error.safeToRetry === true
-      && error.invocationId === 'google-inv-1',
+      && error.invocationId === 'google-inv-1'
+      && !String(error.message).includes(leakedSecret)
+      && !Object.prototype.hasOwnProperty.call(error, 'cause'),
   );
 });
 
