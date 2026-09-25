@@ -456,37 +456,16 @@ function clarificationResponseBindingV1(response) {
   });
 }
 
-export function resolveClarificationV1({ request: requestInput, response: responseInput } = {}) {
-  const request = normalizeHumanSupervisionRequestV1(requestInput);
+export function resolveClarificationV1(input = {}) {
+  const raw = strictRecord(input, new Set(['request', 'response']), 'ResolveClarificationRequestV1');
+  const request = normalizeHumanSupervisionRequestV1(raw.request);
   if (request.kind !== HumanSupervisionKind.CLARIFICATION) {
     throw new Error('resolveClarificationV1 requires CLARIFICATION supervision');
   }
-  const response = normalizeClarificationResponseV1(request, responseInput);
-  const responseBinding = clarificationResponseBindingV1(response);
-  return freezeDeep({
-    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    supervisionId: request.supervisionId,
-    jobId: request.jobId,
-    stepId: request.stepId,
-    state: HumanSupervisionState.RESOLVED,
-    responseId: response.responseId,
-    responderId: response.responderId,
-    reasonCode: response.reasonCode,
-    evidenceArtifactIds: response.evidenceArtifactIds,
-    resolvedAt: response.respondedAt,
-    selectedChoiceId: response.selectedChoiceId,
-    clarificationText: response.clarificationText,
-    resume: freezeDeep({
-      schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-      supervisionId: request.supervisionId,
-      responseId: response.responseId,
-      jobId: request.jobId,
-      stepId: request.stepId,
-      resumeStepId: request.stepId,
-      resolvedAt: response.respondedAt,
-      responseBinding,
-    }),
-  });
+  normalizeClarificationResponseV1(request, raw.response);
+  throw new Error(
+    'trusted reviewer response provenance is required before clarification can resolve or resume',
+  );
 }
 
 function normalizeClarificationResponseBindingV1(input) {
@@ -508,57 +487,8 @@ function normalizeClarificationResponseBindingV1(input) {
 }
 
 export function assertClarificationResumeBindingV1(input) {
-  const raw = strictRecord(input, RESOLVED_CLARIFICATION_KEYS, 'ResolvedClarificationV1');
-  if (raw.schemaVersion !== HUMAN_SUPERVISION_SCHEMA_VERSION) throw new Error('Unsupported ResolvedClarificationV1 schemaVersion');
-  if (raw.state !== HumanSupervisionState.RESOLVED) throw new Error('ResolvedClarificationV1 state must be RESOLVED');
-  const resolved = freezeDeep({
-    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    supervisionId: id(raw.supervisionId, 'ResolvedClarificationV1.supervisionId'),
-    jobId: id(raw.jobId, 'ResolvedClarificationV1.jobId'),
-    stepId: id(raw.stepId, 'ResolvedClarificationV1.stepId'),
-    state: HumanSupervisionState.RESOLVED,
-    responseId: id(raw.responseId, 'ResolvedClarificationV1.responseId'),
-    responderId: id(raw.responderId, 'ResolvedClarificationV1.responderId'),
-    reasonCode: id(raw.reasonCode, 'ResolvedClarificationV1.reasonCode'),
-    evidenceArtifactIds: normalizeIdList(raw.evidenceArtifactIds, 'ResolvedClarificationV1.evidenceArtifactIds', { min: 0, max: MAX_EVIDENCE }),
-    resolvedAt: timestamp(raw.resolvedAt, 'ResolvedClarificationV1.resolvedAt'),
-    selectedChoiceId: id(raw.selectedChoiceId, 'ResolvedClarificationV1.selectedChoiceId', { optional: true }),
-    clarificationText: text(raw.clarificationText, 'ResolvedClarificationV1.clarificationText', { optional: true, max: MAX_TEXT }),
-  });
-  if (Boolean(resolved.selectedChoiceId) === Boolean(resolved.clarificationText)) {
-    throw new Error('ResolvedClarificationV1 must contain exactly one answer');
-  }
-  const resumeRaw = strictRecord(raw.resume, CLARIFICATION_RESUME_KEYS, 'ClarificationResumeV1');
-  if (resumeRaw.schemaVersion !== HUMAN_SUPERVISION_SCHEMA_VERSION) throw new Error('Unsupported ClarificationResumeV1 schemaVersion');
-  const resume = freezeDeep({
-    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    supervisionId: id(resumeRaw.supervisionId, 'ClarificationResumeV1.supervisionId'),
-    responseId: id(resumeRaw.responseId, 'ClarificationResumeV1.responseId'),
-    jobId: id(resumeRaw.jobId, 'ClarificationResumeV1.jobId'),
-    stepId: id(resumeRaw.stepId, 'ClarificationResumeV1.stepId'),
-    resumeStepId: id(resumeRaw.resumeStepId, 'ClarificationResumeV1.resumeStepId'),
-    resolvedAt: timestamp(resumeRaw.resolvedAt, 'ClarificationResumeV1.resolvedAt'),
-    responseBinding: normalizeClarificationResponseBindingV1(resumeRaw.responseBinding),
-  });
-  if (resume.supervisionId !== resolved.supervisionId
-      || resume.responseId !== resolved.responseId
-      || resume.jobId !== resolved.jobId
-      || resume.stepId !== resolved.stepId
-      || resume.resumeStepId !== resolved.stepId
-      || resume.resolvedAt !== resolved.resolvedAt) {
-    throw new Error('clarification resume identity does not match resolved clarification');
-  }
-  const expected = {
-    responseId: resolved.responseId,
-    responderId: resolved.responderId,
-    reasonCode: resolved.reasonCode,
-    evidenceArtifactIds: [...resolved.evidenceArtifactIds],
-    respondedAt: resolved.resolvedAt,
-    selectedChoiceId: resolved.selectedChoiceId,
-    clarificationText: resolved.clarificationText,
-  };
-  if (JSON.stringify(resume.responseBinding) !== JSON.stringify(expected)) {
-    throw new Error('clarification resume response binding mismatch');
-  }
-  return resume;
+  strictRecord(input, RESOLVED_CLARIFICATION_KEYS, 'ResolvedClarificationV1');
+  throw new Error(
+    'trusted reviewer response provenance is required before clarification resume can be authorized',
+  );
 }
