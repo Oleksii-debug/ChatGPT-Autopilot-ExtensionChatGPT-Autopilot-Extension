@@ -9,9 +9,9 @@ import {
 } from '../src/core/ai-route-pool.js';
 
 const routes = [
-  { routeId:'mistral-code', provider:'openai-compatible', endpointId:'mistral', model:'codestral-latest', roles:['fast-worker','coder'], priority:100, maxWorkers:3, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+  { routeId:'mistral-code', provider:'openai-compatible', endpointId:'mistral', model:'codestral-latest', roles:['fast-worker','coder'], priority:100, maxWorkers:3, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
   { routeId:'local-fast', provider:'ollama', model:'qwen3:8b', roles:['fast-worker'], priority:80, maxWorkers:2 },
-  { routeId:'review', provider:'openai', model:'gpt-5.6-sol', roles:['verifier'], priority:120, maxWorkers:1, inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
+  { routeId:'review', provider:'openai', model:'gpt-5.6-sol', roles:['verifier'], priority:120, maxWorkers:1, costClass:'paid', inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
 ];
 
 test('route pool persists a bounded per-model worker cap', () => {
