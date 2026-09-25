@@ -4,9 +4,11 @@ export const GitHubFileWriteMode = Object.freeze({ CREATE: 'create', UPDATE: 'up
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
 const GIT_SHA = /^[a-f0-9]{40,64}$/iu;
 const REF = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!.*\.lock(?:\/|$))[A-Za-z0-9._\/-]{1,240}$/u;
-const MAX_TEXT = 1_000_000;
+const MAX_TEXT = 1_500_000;
 const MAX_PATH = 4096;
 const MAX_BODY_TEXT = 256_000;
+const MAX_RESPONSE_BYTES = 4_000_000;
+const MAX_RESPONSE_CHUNKS = 8192;
 const SAFE_HTTP_FAILURES = new Set([400, 401, 403, 404, 405, 409, 412, 415, 422, 429]);
 
 function clean(value, max = MAX_PATH) {
@@ -176,6 +178,137 @@ function responseMessage(payload, status) {
   return message ? `GitHub HTTP ${status}: ${message}` : `GitHub HTTP ${status}`;
 }
 
+function responseReadError(code, message, {
+  effectMayHaveOccurred,
+  safeToRetry,
+  status,
+} = {}) {
+  return githubError(code, message, { effectMayHaveOccurred, safeToRetry, status });
+}
+
+async function readResponseTextBounded(response, {
+  controller,
+  effectMayHaveOccurred = false,
+  safeToRetry = true,
+  status = 0,
+} = {}) {
+  const errorOptions = { effectMayHaveOccurred, safeToRetry, status };
+  const timeoutError = () => responseReadError(
+    'GITHUB_REQUEST_TIMEOUT',
+    'GitHub request timed out while reading the response',
+    errorOptions,
+  );
+
+  if (controller?.signal?.aborted) throw timeoutError();
+  if (!response || typeof response !== 'object') {
+    throw responseReadError('GITHUB_RESPONSE_READ_FAILED', 'GitHub response is unavailable', errorOptions);
+  }
+
+  let declaredLength = null;
+  try {
+    const rawLength = response.headers?.get?.('content-length');
+    if (typeof rawLength === 'string' && /^\d+$/u.test(rawLength)) {
+      const parsed = BigInt(rawLength);
+      declaredLength = parsed > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(parsed);
+    }
+  } catch {
+    declaredLength = null;
+  }
+
+  if (declaredLength != null && declaredLength > MAX_RESPONSE_BYTES) {
+    try { await response.body?.cancel?.(); } catch {}
+    try { controller?.abort(); } catch {}
+    throw responseReadError(
+      'GITHUB_RESPONSE_TOO_LARGE',
+      'GitHub response exceeds the bounded response size',
+      errorOptions,
+    );
+  }
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    throw responseReadError(
+      'GITHUB_RESPONSE_READ_FAILED',
+      'GitHub response does not expose a bounded readable byte stream',
+      errorOptions,
+    );
+  }
+
+  let reader;
+  try {
+    reader = response.body.getReader();
+  } catch (error) {
+    throw responseReadError(
+      'GITHUB_RESPONSE_READ_FAILED',
+      error?.message || 'GitHub response stream could not be opened',
+      errorOptions,
+    );
+  }
+
+  const chunks = [];
+  let total = 0;
+  let chunkCount = 0;
+  try {
+    for (;;) {
+      if (controller?.signal?.aborted) throw timeoutError();
+      const next = await reader.read();
+      if (controller?.signal?.aborted) throw timeoutError();
+      if (next?.done) break;
+      if (!(next?.value instanceof Uint8Array)) {
+        throw responseReadError(
+          'GITHUB_RESPONSE_READ_FAILED',
+          'GitHub response stream returned invalid bytes',
+          errorOptions,
+        );
+      }
+      chunkCount += 1;
+      if (chunkCount > MAX_RESPONSE_CHUNKS) {
+        try { await reader.cancel(); } catch {}
+        try { controller?.abort(); } catch {}
+        throw responseReadError(
+          'GITHUB_RESPONSE_TOO_LARGE',
+          'GitHub response exceeds the bounded stream chunk count',
+          errorOptions,
+        );
+      }
+      if (next.value.byteLength > MAX_RESPONSE_BYTES - total) {
+        try { await reader.cancel(); } catch {}
+        try { controller?.abort(); } catch {}
+        throw responseReadError(
+          'GITHUB_RESPONSE_TOO_LARGE',
+          'GitHub response exceeds the bounded response size',
+          errorOptions,
+        );
+      }
+      total += next.value.byteLength;
+      chunks.push(next.value);
+    }
+  } catch (error) {
+    if (error?.name === 'GitHubRestClientError') throw error;
+    const timedOut = Boolean(controller?.signal?.aborted) || error?.name === 'AbortError';
+    throw timedOut
+      ? timeoutError()
+      : responseReadError(
+        'GITHUB_RESPONSE_READ_FAILED',
+        error?.message || 'GitHub response could not be read',
+        errorOptions,
+      );
+  } finally {
+    try { reader.releaseLock(); } catch {}
+  }
+
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw responseReadError('GITHUB_RESPONSE_INVALID', 'GitHub response is not valid UTF-8', errorOptions);
+  }
+}
+
 export class GitHubRestClientV1 {
   constructor({
     nativeClient,
@@ -239,55 +372,54 @@ export class GitHubRestClientV1 {
     const controller = new AbortController();
     const timeout = this.setTimeoutImpl(() => controller.abort(), this.requestTimeoutMs);
     try {
-      response = await this.fetchImpl(`${GITHUB_API_ORIGIN}${pathname}`, {
-        method: verb,
-        redirect: 'error',
-        signal: controller.signal,
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${secret}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-          ...(body == null ? {} : { 'Content-Type': 'application/json' }),
-        },
-        ...(body == null ? {} : { body: JSON.stringify(body) }),
-      });
-    } catch (error) {
-      const timedOut = controller.signal.aborted || error?.name === 'AbortError';
-      throw githubError(timedOut ? 'GITHUB_REQUEST_TIMEOUT' : 'GITHUB_TRANSPORT_ERROR',
-        timedOut ? 'GitHub request timed out' : (error?.message || 'GitHub transport failed'), {
-          effectMayHaveOccurred: effectful,
-          safeToRetry: !effectful,
+      try {
+        response = await this.fetchImpl(`${GITHUB_API_ORIGIN}${pathname}`, {
+          method: verb,
+          redirect: 'error',
+          signal: controller.signal,
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${secret}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            ...(body == null ? {} : { 'Content-Type': 'application/json' }),
+          },
+          ...(body == null ? {} : { body: JSON.stringify(body) }),
         });
-    } finally {
-      this.clearTimeoutImpl(timeout);
-      credential = null;
-    }
+      } catch (error) {
+        const timedOut = controller.signal.aborted || error?.name === 'AbortError';
+        throw githubError(timedOut ? 'GITHUB_REQUEST_TIMEOUT' : 'GITHUB_TRANSPORT_ERROR',
+          timedOut ? 'GitHub request timed out' : (error?.message || 'GitHub transport failed'), {
+            effectMayHaveOccurred: effectful,
+            safeToRetry: !effectful,
+          });
+      } finally {
+        credential = null;
+      }
 
-    let text;
-    try { text = await response.text(); }
-    catch (error) {
-      throw githubError('GITHUB_RESPONSE_READ_FAILED', error?.message || 'GitHub response could not be read', {
-        effectMayHaveOccurred: effectful,
-        safeToRetry: !effectful,
-        status: Number(response?.status) || 0,
-      });
-    }
-    const status = Number(response?.status) || 0;
-    const accepted = expectedStatuses.includes(status);
-    const definitelyRejected = !accepted && SAFE_HTTP_FAILURES.has(status);
-    const payload = safeJson(text, {
-      effectMayHaveOccurred: effectful && !definitelyRejected,
-      safeToRetry: !effectful || definitelyRejected,
-      status,
-    });
-    if (!accepted) {
-      throw githubError(`GITHUB_HTTP_${status || 'ERROR'}`, responseMessage(payload, status || 'ERROR'), {
-        effectMayHaveOccurred: effectful && !definitelyRejected,
-        safeToRetry: !effectful || definitelyRejected,
+      const status = Number(response?.status) || 0;
+      const accepted = expectedStatuses.includes(status);
+      const definitelyRejected = !accepted && SAFE_HTTP_FAILURES.has(status);
+      const effectMayHaveOccurred = effectful && !definitelyRejected;
+      const safeToRetry = !effectful || definitelyRejected;
+      const text = await readResponseTextBounded(response, {
+        controller,
+        effectMayHaveOccurred,
+        safeToRetry,
         status,
       });
+      const payload = safeJson(text, { effectMayHaveOccurred, safeToRetry, status });
+      if (!accepted) {
+        throw githubError(`GITHUB_HTTP_${status || 'ERROR'}`, responseMessage(payload, status || 'ERROR'), {
+          effectMayHaveOccurred,
+          safeToRetry,
+          status,
+        });
+      }
+      return payload;
+    } finally {
+      credential = null;
+      this.clearTimeoutImpl(timeout);
     }
-    return payload;
   }
 
   async readRepository({ repositoryFullName } = {}) {
