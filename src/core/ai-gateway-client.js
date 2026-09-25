@@ -19,9 +19,72 @@ export function normalizeGatewayUrl(value) {
   return parsed.toString().replace(/\/$/, '');
 }
 
-async function parseJson(response) {
-  const text = await response.text();
-  if (text.length > MAX_RESPONSE_BYTES) throw new Error('AI Gateway response is too large');
+function responseTooLargeError() {
+  const error = new Error('AI Gateway response is too large');
+  error.code = 'AI_GATEWAY_RESPONSE_TOO_LARGE';
+  return error;
+}
+
+function invalidResponseStreamError() {
+  const error = new Error('AI Gateway returned an invalid response body stream');
+  error.code = 'AI_GATEWAY_INVALID_RESPONSE';
+  return error;
+}
+
+async function cancelResponse(response, reader, controller) {
+  try {
+    if (reader?.cancel) await reader.cancel('response byte limit exceeded');
+    else if (response?.body?.cancel) await response.body.cancel('response byte limit exceeded');
+  } catch (_) {}
+  try { controller?.abort(); } catch (_) {}
+}
+
+async function readResponseTextBounded(response, controller) {
+  const contentLength = clean(response?.headers?.get?.('content-length'));
+  if (/^[0-9]+$/u.test(contentLength) && Number(contentLength) > MAX_RESPONSE_BYTES) {
+    await cancelResponse(response, null, controller);
+    throw responseTooLargeError();
+  }
+
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const decoded = [];
+    let bytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!(value instanceof Uint8Array)) {
+          await cancelResponse(response, reader, controller);
+          throw invalidResponseStreamError();
+        }
+        bytes += value.byteLength;
+        if (bytes > MAX_RESPONSE_BYTES) {
+          await cancelResponse(response, reader, controller);
+          throw responseTooLargeError();
+        }
+        decoded.push(decoder.decode(value, { stream: true }));
+      }
+      decoded.push(decoder.decode());
+      return decoded.join('');
+    } finally {
+      try { reader.releaseLock(); } catch (_) {}
+    }
+  }
+
+  // Compatibility fallback for deterministic fetch shims. Native browser fetch
+  // responses expose a ReadableStream and therefore use the bounded path above.
+  const text = typeof response?.text === 'function' ? await response.text() : '';
+  if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
+    await cancelResponse(response, null, controller);
+    throw responseTooLargeError();
+  }
+  return text;
+}
+
+async function parseJson(response, controller) {
+  const text = await readResponseTextBounded(response, controller);
   let body;
   try { body = text ? JSON.parse(text) : {}; }
   catch { throw new Error(`AI Gateway returned invalid JSON (HTTP ${response.status})`); }
@@ -60,8 +123,9 @@ export class AiGatewayClient {
           ...(init.headers || {}),
         },
       });
-      return await parseJson(response);
+      return await parseJson(response, controller);
     } catch (error) {
+      if (error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE' || error?.code === 'AI_GATEWAY_INVALID_RESPONSE') throw error;
       if (error?.name === 'AbortError') throw new Error(`AI Gateway request timed out after ${timeout} seconds`);
       if (/^AI Gateway (?:error|returned)/.test(error?.message || '')) throw error;
       throw new Error(`Could not reach AI Gateway: ${error?.message || 'network error'}`);
@@ -97,4 +161,4 @@ export class AiGatewayClient {
   }
 }
 
-export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS };
+export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, MAX_RESPONSE_BYTES };
