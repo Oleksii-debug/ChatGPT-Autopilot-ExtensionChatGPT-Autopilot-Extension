@@ -49,6 +49,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Resolve release version
+        id: release_meta
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Run deterministic Node qualification
         run: npm test
       - name: Build release candidate twice and verify deterministic bytes
@@ -57,7 +64,7 @@ jobs:
           set -euo pipefail
           rm -rf dist
           npm run package:release
-          candidate="dist/ChatGPT-Autopilot-0.9.19.zip"
+          candidate="dist/ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}.zip"
           test -f "$candidate"
           first_sha="$(sha256sum "$candidate" | awk '{print $1}')"
           cp "$candidate" /tmp/ChatGPT-Autopilot-first.zip
@@ -72,8 +79,8 @@ jobs:
       - name: Upload release candidate ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Autopilot-0.9.19-candidate
-          path: dist/ChatGPT-Autopilot-0.9.19.zip
+          name: ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}-candidate
+          path: dist/ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -87,6 +94,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Resolve release version
+        id: release_meta
+        shell: pwsh
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'package.json version is missing' }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Run release packaging regressions on Windows
         run: npm run test:release
       - name: Build release candidate twice on Windows
@@ -95,7 +109,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Remove-Item -LiteralPath dist -Recurse -Force -ErrorAction SilentlyContinue
           npm run package:release
-          $candidate = Join-Path $PWD 'dist/ChatGPT-Autopilot-0.9.19.zip'
+          $candidate = Join-Path $PWD 'dist/ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}.zip'
           if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
             throw "Windows release candidate was not created: $candidate"
           }
@@ -116,15 +130,15 @@ jobs:
           $extract = Join-Path $env:RUNNER_TEMP 'ChatGPT-Autopilot-windows-zip-check'
           Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive -LiteralPath $candidate -DestinationPath $extract -Force
-          if (-not (Test-Path -LiteralPath (Join-Path $extract 'ChatGPT-Autopilot-0.9.19/manifest.json') -PathType Leaf)) {
+          if (-not (Test-Path -LiteralPath (Join-Path $extract 'ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}/manifest.json') -PathType Leaf)) {
             throw 'Windows release ZIP is missing the canonical manifest path'
           }
           Write-Output "Windows release candidate deterministic SHA-256: $secondHash"
       - name: Upload Windows-built release candidate ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Autopilot-0.9.19-candidate-windows
-          path: dist/ChatGPT-Autopilot-0.9.19.zip
+          name: ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}-candidate-windows
+          path: dist/ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
