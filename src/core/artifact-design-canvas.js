@@ -338,10 +338,16 @@ export function buildArtifactDesignCanvasPreviewManifestV1(input) {
     return Object.freeze({
       schemaVersion: 1,
       itemId,
-      sourceArtifactRef: item.artifactRef,
-      previewArtifactRef: item.preview?.previewArtifactRef || null,
+      sourceArtifactId: item.artifactRef.artifactId,
       sourceSha256: item.artifactRef.sha256,
+      sourceMediaType: item.artifactRef.mediaType,
+      sourceSensitive: item.artifactRef.sensitive,
+      previewArtifactId: item.preview?.previewArtifactRef.artifactId || '',
+      previewSha256: item.preview?.previewArtifactRef.sha256 || '',
+      previewMediaType: item.preview?.previewArtifactRef.mediaType || '',
+      previewSensitive: item.preview?.previewArtifactRef.sensitive || false,
       previewBindingStatus: item.preview ? 'SOURCE_BOUND' : 'MISSING',
+      requiresArtifactResolver: true,
       requiresFreshSourceObservation: true,
       liveSourceFreshnessVerified: false,
     });
