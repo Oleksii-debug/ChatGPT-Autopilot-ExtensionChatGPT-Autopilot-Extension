@@ -1,5 +1,10 @@
 CHATGPT АВТОПІЛОТ 0.9.19 — DIAGNOSTIC-DERIVED ORDINARY SESSION LIVENESS / POST-SEND EVIDENCE PRESERVATION
 
+ЗАХИЩЕНІ ПОСТАЧАЛЬНИКИ МОДЕЛЕЙ
+- У Windows папці companion/ai-gateway запустіть «НАЛАШТУВАТИ MISTRAL API.ps1» або «НАЛАШТУВАТИ OPENROUTER API.ps1». Ключ вводиться через SecureString і зберігається локально через DPAPI; JSON Gateway та експорт розширення зберігають лише посилання на ключ.
+- У вкладці «Моделі» додайте відповідний маршрут. Після запуску Gateway натисніть «Отримати моделі цього постачальника», оберіть модель, перевірте вартість і збережіть конфігурацію. Нові маршрути вимкнені, доки їх явно не дозволено.
+- Безкоштовність віддаленої моделі не визначається за її назвою: до підтвердження умов вона має стан «вартість невідома» й не допускається до автоматичного виконання.
+
 СТАТУС 0.9.19
 - Реальні 0.9.13 diagnostics із TAB_NAVIGATION_URL_MISMATCH / receiver restore faults привели до нового bounded-recovery hardening: safe Ordinary AMBIGUOUS deadline перевіряється ДО нового browser bind/transport round-trip.
 - Після deadline той самий фізичний Send не повторюється; operation fail-safe завершується, Session продовжує наступний цикл за user-selected cadence.

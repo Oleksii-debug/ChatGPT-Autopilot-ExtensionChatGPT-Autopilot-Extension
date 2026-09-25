@@ -9,15 +9,24 @@ import {
 } from '../src/core/ai-route-pool.js';
 
 const routes = [
-  { routeId:'mistral-code', provider:'openai-compatible', endpointId:'mistral', model:'codestral-latest', roles:['fast-worker','coder'], priority:100, maxWorkers:3, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+  { routeId:'mistral-code', provider:'openai-compatible', endpointId:'mistral', model:'codestral-latest', roles:['fast-worker','coder'], priority:100, maxWorkers:3, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
   { routeId:'local-fast', provider:'ollama', model:'qwen3:8b', roles:['fast-worker'], priority:80, maxWorkers:2 },
-  { routeId:'review', provider:'openai', model:'gpt-5.6-sol', roles:['verifier'], priority:120, maxWorkers:1, inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
+  { routeId:'review', provider:'openai', model:'gpt-5.6-sol', roles:['verifier'], priority:120, maxWorkers:1, costClass:'paid', inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
 ];
 
 test('route pool persists a bounded per-model worker cap', () => {
   const pool = normalizeAiRoutePool(routes);
   assert.equal(pool[0].maxWorkers, 3);
   assert.throws(() => normalizeAiRoutePool([{ ...routes[0], maxWorkers:201 }]), /maxWorkers/);
+});
+
+test('automatic worker floor applies only to requested work and never exceeds caps', () => {
+  const policy = normalizeAiWorkerPolicy({ allocationMode:'auto', minWorkers:3, maxParallelWorkers:4 }, routes);
+  const one = allocateAiRouteWorkers({ routes, workerPolicy:policy, role:AiRouteRole.FAST_WORKER, desiredWorkers:1, now:1000 });
+  assert.equal(one.assignedWorkers, 3);
+  const none = allocateAiRouteWorkers({ routes, workerPolicy:policy, role:AiRouteRole.FAST_WORKER, desiredWorkers:0, now:1000 });
+  assert.equal(none.assignedWorkers, 0);
+  assert.throws(() => normalizeAiWorkerPolicy({ minWorkers:5, maxParallelWorkers:4 }, routes), /minWorkers/u);
 });
 
 test('automatic allocation spreads workers deterministically across eligible models and respects caps', () => {

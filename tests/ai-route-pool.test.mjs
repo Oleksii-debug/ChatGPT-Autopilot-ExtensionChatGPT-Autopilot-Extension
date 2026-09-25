@@ -24,7 +24,33 @@ test('remote route with unclassified pricing remains unknown and cannot silently
   assert.equal(remote.costClass, 'unknown');
   assert.equal(local.costClass, 'free');
   assert.deepEqual(selectAiRouteCandidates({ routes:[remote, local], role:'planner', now:1000 }).candidates.map(route => route.routeId), ['known-local']);
+  const pricedButUnclassified = normalizeAiRoutePool([{ routeId:'unclassified', provider:'openai-compatible', endpointId:'team-a', model:'worker', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 }]);
+  assert.deepEqual(selectAiRouteCandidates({ routes:pricedButUnclassified, role:'planner', now:1000 }).candidates, []);
   assert.equal(normalizeAiRoutePool([{ ...remote, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 }])[0].costClass, 'paid');
+});
+
+test('unknown pricing stays fail-closed even with UI-shaped numeric prices and route pinning', () => {
+  const unknown = normalizeAiRoutePool([{
+    routeId:'ui-unknown',
+    provider:'openai',
+    model:'unclassified',
+    roles:['planner'],
+    priority:50,
+    locality:'remote',
+    costClass:'unknown',
+    inputPricePerMillionUsd:0,
+    outputPricePerMillionUsd:0,
+  }]);
+  assert.equal(unknown[0].inputPriceKnown, true);
+  assert.equal(unknown[0].outputPriceKnown, true);
+  const selected = selectAiRouteCandidates({
+    routes:unknown,
+    policy:{ pinnedRouteId:'ui-unknown', allowRouteIds:['ui-unknown'] },
+    role:'planner',
+    now:1000,
+  });
+  assert.deepEqual(selected.candidates, []);
+  assert.deepEqual(selected.eligibleRouteIds, []);
 });
 
 test('route pool applies owner allow/deny, cost, locality, capability and deterministic order', () => {

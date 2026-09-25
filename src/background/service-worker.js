@@ -1,4 +1,5 @@
 import { projectGlobalStatus } from '../core/global-status.js';
+import { projectRuntimeActionCenter } from '../core/action-center-runtime.js';
 import { StorageRepository } from '../core/storage.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
 import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
@@ -60,6 +61,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'EXPORT_ORCHESTRATION_V2_PROFILE',
   'LIST_SCENARIO_WORK',
   'GET_GLOBAL_STATUS',
+  'GET_ACTION_CENTER',
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
@@ -469,6 +471,9 @@ export async function dispatchUiMessage(message) {
       orchestras: orchestraState.orchestras,
       agentJobs: agentState.jobs,
     });
+  } else if (message.command === 'GET_ACTION_CENTER') {
+    const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
+    result = await projectRuntimeActionCenter({ coreState, agentJobs: agentState.jobs });
   } else if (message.command === 'LIST_ORCHESTRATION_V2_ORCHESTRAS') {
     result = await orchestrationV2.list();
   } else if (message.command === 'CREATE_ORCHESTRATION_V2_ORCHESTRA') {

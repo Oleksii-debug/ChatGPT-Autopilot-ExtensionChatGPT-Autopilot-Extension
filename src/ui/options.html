@@ -40,6 +40,11 @@
       <h4>Агент</h4><ul id="global-agents"></ul>
       <h4>Моделі</h4><ul id="global-models"></ul>
     </section>
+    <section id="action-center-panel" aria-labelledby="action-center-heading">
+      <h3 id="action-center-heading">Потребує вашої уваги</h3>
+      <p id="action-center-summary" tabindex="0">Завантаження центру уваги…</p>
+      <ul id="action-center-list" aria-label="Питання, що потребують уваги"></ul>
+    </section>
     <p id="session-overview" tabindex="0"></p>
     <ul id="session-list"></ul>
   </nav>
@@ -100,6 +105,7 @@
 
     <section aria-labelledby="agent-heading" data-app-mode="agent" hidden>
       <h2 id="agent-heading">Агент</h2>
+      <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
       <p class="field-help">Опишіть результат звичайною мовою. AI сам планує роботу та керує браузерними інструментами Autopilot. Налаштування нижче є лише політикою й лімітами; для звичайного запуску їх заповнювати не потрібно.</p>
 
       <label for="agent-prompt">Що потрібно зробити?</label>
@@ -704,7 +710,9 @@
       <div id="ai-router-route-list" aria-labelledby="ai-router-route-pool-heading" aria-describedby="ai-router-route-pool-help"></div>
       <button id="ai-router-add-route-button" type="button">Додати маршрут</button>
       <button id="ai-router-add-mistral-button" type="button">Додати Містраль</button>
+      <button id="ai-router-add-openrouter-button" type="button">Додати OpenRouter</button>
       <p class="field-help">Для Містраль ключ налаштовується локальним скриптом «НАЛАШТУВАТИ MISTRAL API.ps1» у папці companion/ai-gateway. Він зберігається захищено у Windows; у цю форму ключ не вставляйте. Після запуску Gateway натисніть «Отримати моделі цього постачальника» у маршруті Містраль.</p>
+      <p class="field-help">Для OpenRouter використайте «НАЛАШТУВАТИ OPENROUTER API.ps1» у тій самій папці. Ключ зберігається локально через Windows DPAPI. Після запуску Gateway отримайте каталог моделей у маршруті OpenRouter. Новий маршрут вимкнений і має невідому вартість, доки ви не налаштуєте його явно.</p>
 
       <fieldset id="ai-router-route-policy">
         <legend>Політика власника для пулу маршрутів</legend>
@@ -731,6 +739,14 @@
         <p class="field-help" id="ai-router-route-select-help">У multi-select використовуйте Ctrl+Space для вибору кількох маршрутів. Один маршрут не може одночасно бути в allowlist і denylist.</p>
       </fieldset>
 
+      <fieldset id="ai-worker-allocation-policy"><legend>Кількість Agent workers</legend>
+        <label><input id="ai-worker-count-auto" type="radio" name="ai-worker-count-mode" value="auto" checked> Агент сам визначає кількість у межах політики</label>
+        <label><input id="ai-worker-count-manual" type="radio" name="ai-worker-count-mode" value="manual"> Задати кількість вручну за маршрутами</label>
+        <label for="ai-worker-min">Мінімум workers в автоматичному режимі</label><input id="ai-worker-min" type="number" min="1" max="200" step="1" inputmode="numeric" value="1">
+        <label for="ai-worker-max-parallel">Максимум одночасних workers</label><input id="ai-worker-max-parallel" type="number" min="1" max="200" step="1" inputmode="numeric" value="8">
+        <p class="field-help">У ручному режимі вкажіть кількість workers у кожному маршруті. Сума не може перевищувати загальну межу. Недоступні моделі не допускаються до запуску.</p>
+      </fieldset>
+
       <template id="ai-router-route-template">
         <fieldset class="ai-route-card" data-ai-route>
           <legend data-route-legend>Маршрут</legend>
@@ -743,6 +759,8 @@
           <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>
           <label data-label-for="capabilityIds">Capabilities через кому (порожньо = будь-які)</label><input data-route-field="capabilityIds" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="priority">Пріоритет</label><input data-route-field="priority" type="number" min="0" max="1000000" step="1" inputmode="numeric">
+          <label data-label-for="maxWorkers">Максимум workers цього маршруту, 0 = загальна межа</label><input data-route-field="maxWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
+          <label data-label-for="manualWorkers">Workers вручну для цього маршруту</label><input data-route-field="manualWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
           <label data-label-for="locality">Розташування</label><select data-route-field="locality"><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
           <label data-label-for="costClass">Вартість</label><select data-route-field="costClass"><option value="unknown">Невідомо</option><option value="free">Безкоштовний</option><option value="paid">Платний</option></select>
           <label data-label-for="inputPricePerMillionUsd">Input USD / 1M</label><input data-route-field="inputPricePerMillionUsd" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
