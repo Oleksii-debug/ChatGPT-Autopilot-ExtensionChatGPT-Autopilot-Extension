@@ -236,6 +236,19 @@ test('product-wide specialist admission is durable across Browser Agent jobs and
   const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30Z' });
   assert.equal(afterRestart.claimed.length, 0, 'a restart must retain the product-wide lease fence');
   assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
+
+  const afterExpiry = await restarted.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs:1,
+    leaseSeconds:60,
+    at:'2026-09-23T12:02:00Z',
+  });
+  assert.equal(afterExpiry.activeLeases, 0, 'expired lease labels are no longer the capacity authority');
+  assert.equal(afterExpiry.capacityObligations, 1, 'the unresolved canonical effect still consumes one slot');
+  assert.equal(afterExpiry.remainingSlots, 0);
+  assert.equal(afterExpiry.claimed.length, 0, 'RECONCILE must block admitting another effectful specialist job');
+  assert.deepEqual(afterExpiry.reconciliationRequired.map(item => item.jobId), ['job-1']);
+  assert.equal((await restarted.listSpecialistHandoffs('job-1')).executionOwnerships[0].state, 'RECONCILE');
+  assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
 });
 
 test('per-Agent AI routing is optional, isolated, and explicit provider overrides require an explicit model', () => {
