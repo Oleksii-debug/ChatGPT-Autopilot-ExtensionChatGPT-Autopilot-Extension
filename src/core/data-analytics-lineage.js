@@ -175,6 +175,12 @@ function asciiCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function compareCanonicalTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function frozen(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) frozen(child);
@@ -411,7 +417,7 @@ export function assertDataTransformLineageMatchesSnapshotsV1(request = {}) {
     if (bindingIdentity(dataDatasetBindingFromSnapshotV1(snapshot)) !== bindingIdentity(expected)) {
       throw new Error(`transform input dataset revision mismatch: ${expected.datasetId}`);
     }
-    if (snapshot.observedAt > normalizedLineage.executedAt) {
+    if (compareCanonicalTimestamp(snapshot.observedAt, normalizedLineage.executedAt) > 0) {
       throw new Error(`transform input dataset observed after execution: ${expected.datasetId}`);
     }
   }
@@ -419,14 +425,14 @@ export function assertDataTransformLineageMatchesSnapshotsV1(request = {}) {
   if (bindingIdentity(dataDatasetBindingFromSnapshotV1(output)) !== bindingIdentity(normalizedLineage.outputDataset)) {
     throw new Error('transform output dataset revision mismatch');
   }
-  if (output.observedAt < normalizedLineage.executedAt) {
+  if (compareCanonicalTimestamp(output.observedAt, normalizedLineage.executedAt) < 0) {
     throw new Error('transform output dataset predates execution');
   }
-  if (output.artifactRef.createdAt < normalizedLineage.executedAt) {
+  if (compareCanonicalTimestamp(output.artifactRef.createdAt, normalizedLineage.executedAt) < 0) {
     throw new Error('transform output artifact predates execution');
   }
   for (const source of output.sourceRefs) {
-    if (source.observedAt > normalizedLineage.executedAt) {
+    if (compareCanonicalTimestamp(source.observedAt, normalizedLineage.executedAt) > 0) {
       throw new Error(`transform output source observed after execution: ${source.sourceId}`);
     }
   }
@@ -506,7 +512,7 @@ export function assessDataDatasetFreshnessV1(snapshot, currentSourceRefs = []) {
       if (actual.kind !== expected.kind) reasons.push('KIND_CHANGED');
       if (actual.uri !== expected.uri) reasons.push('URI_CHANGED');
       if (actual.authority !== expected.authority) reasons.push('AUTHORITY_CHANGED');
-      if (actual.observedAt < expected.observedAt) reasons.push('OBSERVATION_REGRESSED');
+      if (compareCanonicalTimestamp(actual.observedAt, expected.observedAt) < 0) reasons.push('OBSERVATION_REGRESSED');
       if (actual.revisionId !== expected.revisionId) reasons.push('REVISION_CHANGED');
       if (actual.contentSha256 !== expected.contentSha256) reasons.push('CONTENT_CHANGED');
     }
