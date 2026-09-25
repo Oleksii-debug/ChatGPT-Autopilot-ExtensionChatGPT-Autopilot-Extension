@@ -301,6 +301,30 @@ test('ceiling derivation request envelope is strict data-only before authority r
   assert.equal(result.credentialUseAuthorized, false);
 });
 
+test('ceiling derivation rejects future evaluation from a stale registry snapshot', () => {
+  assert.throws(
+    () => derivePrincipalGovernanceCeilingV1({
+      registry: registry(),
+      principalId: 'user-owner',
+      resourceKey: RESOURCE,
+      at: '2026-09-24T23:00:00.001Z',
+    }),
+    /evaluatedAt cannot be later than registry updatedAt/,
+  );
+
+  const boundary = derivePrincipalGovernanceCeilingV1({
+    registry: registry(),
+    principalId: 'user-owner',
+    resourceKey: RESOURCE,
+    at: T3,
+  });
+  assert.equal(boundary.evaluatedAt, T3);
+  assert.equal(boundary.active, true);
+  assert.equal(boundary.policyDecision, 'NONE');
+  assert.equal(boundary.authorizationGranted, false);
+  assert.equal(boundary.credentialUseAuthorized, false);
+});
+
 test('root user ceiling is resource-scoped policy input and never an authorization decision', () => {
   const result = derivePrincipalGovernanceCeilingV1({
     registry: registry(),
