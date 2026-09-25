@@ -278,6 +278,18 @@ test('closed probe/status enums and canonical identities reject coercive aliases
   ), /canonical ISO-8601/);
 });
 
+test('zero latency uses one canonical numeric representation', () => {
+  const canonical = normalizeProviderCanaryObservationV1(
+    observation('zero.latency', 'github.read', 'github.read', 'PASS', { latencyMs:0 }),
+  );
+  assert.equal(canonical.latencyMs, 0);
+  assert.equal(Object.is(canonical.latencyMs, -0), false);
+
+  assert.throws(() => normalizeProviderCanaryObservationV1(
+    observation('negative.zero.latency', 'github.read', 'github.read', 'PASS', { latencyMs:-0 }),
+  ), /latencyMs is invalid/);
+});
+
 test('record and array boundaries execute zero caller getters', () => {
   let definitionReads = 0;
   const proxiedDefinition = new Proxy(definition('safe', 'github.read'), {
