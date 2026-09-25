@@ -477,6 +477,15 @@
         <button id="new-scenario-pipeline-button" type="button">Новий FIRST → аудитор → SECOND</button>
       </div>
 
+      <fieldset class="settings-group" id="scenario-work-portable-profile">
+        <legend>Імпорт конфігурації сценарію</legend>
+        <label for="scenario-work-profile-file">JSON-файл сценарію</label>
+        <input id="scenario-work-profile-file" type="file" accept=".json,application/json" aria-describedby="scenario-work-profile-status">
+        <button id="scenario-work-import-button" type="button">Імпортувати файл</button>
+        <button id="scenario-work-export-button" type="button">Експортувати вибраний сценарій</button>
+        <p id="scenario-work-profile-status" role="status" tabindex="0">Імпорт створює новий зупинений сценарій; виконання запускається окремо.</p>
+      </fieldset>
+
       <label for="scenario-work-name">Назва</label>
       <input id="scenario-work-name" type="text" maxlength="120" autocomplete="off">
       <p id="scenario-work-mode-label" class="field-help">Формат не вибрано.</p>

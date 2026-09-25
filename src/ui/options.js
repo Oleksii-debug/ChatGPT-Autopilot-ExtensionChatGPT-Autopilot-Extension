@@ -1,4 +1,5 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
+import { makeScenarioWorkProfile, parseScenarioWorkProfile } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
@@ -1880,6 +1881,34 @@ async function createScenarioWork(mode) {
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося створити сценарій: ${error.message}`;
   } finally { setScenarioWorkBusy(false); }
+}
+
+async function importScenarioWorkProfile() {
+  const status = $('scenario-work-profile-status');
+  const file = $('scenario-work-profile-file').files?.[0];
+  if (!file) { status.textContent = 'Виберіть JSON-файл сценарію.'; return; }
+  try {
+    if (file.size > 10_000_000) throw new Error('Файл сценарію перевищує 10 МБ.');
+    setScenarioWorkBusy(true);
+    const config = parseScenarioWorkProfile(await file.text());
+    const data = await core('CREATE_SCENARIO_WORK', { name: config.name, mode: config.mode, config });
+    await loadScenarioWork({ preservePanel: false });
+    if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
+    setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
+    status.textContent = `Імпортовано новий зупинений сценарій: ${config.name}.`;
+    $('scenario-work-list').focus();
+  } catch (error) { status.textContent = `Не вдалося імпортувати: ${error.message}`; }
+  finally { setScenarioWorkBusy(false); }
+}
+
+function exportScenarioWorkProfile() {
+  const status = $('scenario-work-profile-status');
+  if (!ui.selectedScenarioWork?.config) { status.textContent = 'Спочатку виберіть сценарій.'; return; }
+  try {
+    const profile = makeScenarioWorkProfile(ui.selectedScenarioWork.config);
+    downloadJson(profile, `${safeFileName(profile.config.name)}-сценарій.json`);
+    status.textContent = 'Конфігурацію сценарію експортовано.';
+  } catch (error) { status.textContent = `Не вдалося експортувати: ${error.message}`; }
 }
 
 async function startParallelScenarioChats() {
@@ -3956,6 +3985,8 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
 });
 $('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
+$('scenario-work-import-button').addEventListener('click', importScenarioWorkProfile);
+$('scenario-work-export-button').addEventListener('click', exportScenarioWorkProfile);
 $('scenario-cycle-start-parallel').addEventListener('click', startParallelScenarioChats);
 $('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
 $('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
