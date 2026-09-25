@@ -173,7 +173,8 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
     /trusted verifier provenance/,
   );
   const after = await manager.listSpecialistHandoffs('job-1');
-  assert.equal(after.plan.nodes.find(node => node.nodeId === 'archive').state, 'RUNNING');
+  const durable = await manager.get('job-1');
+  assert.equal(durable.job.runtime.plan.nodes.find(node => node.nodeId === 'archive').state, 'RUNNING');
   assert.equal(after.handoffs[0].state, 'COMPLETED');
   assert.equal(after.executionOwnerships[0].state, 'OWNED');
 });
