@@ -354,6 +354,22 @@ test('ObservationV1 conversion rejects cloned/cross-provider results and exact-e
     );
   }
 
+  let hostileProxyGets = 0;
+  const hostileProxy = new Proxy(providerResult, {
+    get() {
+      hostileProxyGets += 1;
+      throw new Error('untrusted provider-result proxy must not be read');
+    },
+  });
+  assert.throws(
+    () => provider.toObservation({
+      providerResult: hostileProxy,
+      exactEffectState: executing,
+    }),
+    error => error.code === 'A2A_PROVIDER_RESULT_UNTRUSTED',
+  );
+  assert.equal(hostileProxyGets, 0);
+
   const { provider: otherProvider } = harness();
   assert.throws(
     () => otherProvider.toObservation({
