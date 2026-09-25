@@ -175,6 +175,19 @@ function exactArtifactRef(input, label) {
   return normalized;
 }
 
+function sameArtifactRefIdentity(expected, current) {
+  return current.schemaVersion === expected.schemaVersion
+    && current.artifactId === expected.artifactId
+    && current.kind === expected.kind
+    && current.uri === expected.uri
+    && current.mediaType === expected.mediaType
+    && current.sha256 === expected.sha256
+    && current.sizeBytes === expected.sizeBytes
+    && current.createdAt === expected.createdAt
+    && current.producerInvocationId === expected.producerInvocationId
+    && current.sensitive === expected.sensitive;
+}
+
 function normalizeLayoutV1(input, label) {
   const raw = exactRecord(input, LAYOUT_KEYS, label);
   for (const key of LAYOUT_KEYS) {
@@ -384,7 +397,7 @@ export function assessArtifactDesignCanvasPreviewFreshnessV1(canvasInput, curren
     const current = currentById.get(item.artifactRef.artifactId);
     let status;
     if (!current) status = CanvasPreviewStatus.MISSING_SOURCE;
-    else if (current.sha256 !== item.artifactRef.sha256) status = CanvasPreviewStatus.STALE_SOURCE;
+    else if (!sameArtifactRefIdentity(item.artifactRef, current)) status = CanvasPreviewStatus.STALE_SOURCE;
     else if (!item.preview) status = CanvasPreviewStatus.PREVIEW_REQUIRED;
     else status = CanvasPreviewStatus.READY;
     return Object.freeze({
