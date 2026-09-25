@@ -27,6 +27,14 @@ const ACTIVE_NAMES = new Map([
   ['XFA', 'XFA'],
 ]);
 
+// These features are not inherently executable, but they make this lightweight
+// structural screen incomplete. Fail closed rather than silently treating their
+// hidden/encrypted object material as inspected.
+const UNSUPPORTED_SAFETY_NAMES = new Map([
+  ['Encrypt', 'ENCRYPTED_PDF_REQUIRES_QUALIFIED_PARSER'],
+  ['ObjStm', 'OBJECT_STREAM_REQUIRES_QUALIFIED_PARSER'],
+]);
+
 function snapshotRecord(value, allowedKeys, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain object');
@@ -308,6 +316,7 @@ function findEndstream(bytes, start) {
 
 function scanPassiveStructuralNames(bytes) {
   const findings = new Map();
+  const unsupported = new Map();
   let streamCount = 0;
   let cursor = 0;
 
@@ -333,6 +342,9 @@ function scanPassiveStructuralNames(bytes) {
       const parsed = readName(bytes, cursor);
       if (parsed.name && ACTIVE_NAMES.has(parsed.name)) {
         findings.set(parsed.name, ACTIVE_NAMES.get(parsed.name));
+      }
+      if (parsed.name && UNSUPPORTED_SAFETY_NAMES.has(parsed.name)) {
+        unsupported.set(parsed.name, UNSUPPORTED_SAFETY_NAMES.get(parsed.name));
       }
       cursor = parsed.next;
       continue;
@@ -360,10 +372,14 @@ function scanPassiveStructuralNames(bytes) {
   const activeContentFindings = [...findings.entries()]
     .sort((left, right) => left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0)
     .map(([name, risk]) => Object.freeze({ name: '/' + name, risk }));
+  const unsupportedSafetyFeatures = [...unsupported.entries()]
+    .sort((left, right) => left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0)
+    .map(([name, reason]) => Object.freeze({ name: '/' + name, reason }));
 
   return Object.freeze({
     streamCount,
     activeContentFindings: Object.freeze(activeContentFindings),
+    unsupportedSafetyFeatures: Object.freeze(unsupportedSafetyFeatures),
   });
 }
 
@@ -398,6 +414,8 @@ export async function buildPdfArtifactPreflightV1(raw, { cryptoApi = globalThis.
   const envelope = verifyEnvelope(bytes);
   const screen = scanPassiveStructuralNames(bytes);
   const activeContentDetected = screen.activeContentFindings.length > 0;
+  const passiveSafetyScreenComplete = screen.unsupportedSafetyFeatures.length === 0;
+  const requiresCanonicalDisclosureAuthorization = artifactRef.sensitive === true;
 
   return deepFreeze({
     schemaVersion: PDF_ARTIFACT_PREFLIGHT_VERSION,
@@ -413,13 +431,18 @@ export async function buildPdfArtifactPreflightV1(raw, { cryptoApi = globalThis.
     passiveSafetyScreenScope: PDF_PASSIVE_SCREEN_SCOPE,
     activeContentDetected,
     activeContentFindings: screen.activeContentFindings,
-    safePassiveReviewReady: !activeContentDetected,
+    unsupportedSafetyFeatures: screen.unsupportedSafetyFeatures,
+    passiveSafetyScreenComplete,
+    safePassiveReviewReady:
+      !activeContentDetected
+      && passiveSafetyScreenComplete
+      && !requiresCanonicalDisclosureAuthorization,
     materialIdentityVerified: true,
     fullPdfParsePerformed: false,
     extractionAuthorized: false,
     accessibilityVerified: false,
     requiresQualifiedParserOrRenderer: true,
-    requiresCanonicalDisclosureAuthorization: artifactRef.sensitive === true,
+    requiresCanonicalDisclosureAuthorization,
     disclosureAuthorized: false,
     readOnly: true,
     advisoryOnly: true,
