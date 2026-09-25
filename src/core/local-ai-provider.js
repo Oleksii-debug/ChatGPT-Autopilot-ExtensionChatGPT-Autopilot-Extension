@@ -100,7 +100,15 @@ async function readResponseTextBounded(response) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = value instanceof Uint8Array ? value : new Uint8Array(value);
+        if (!(value instanceof Uint8Array)) {
+          try {
+            await reader.cancel();
+          } catch {
+            // Best-effort cleanup; fail closed regardless of cancel outcome.
+          }
+          throw new Error('Local AI server returned an invalid response stream');
+        }
+        const chunk = value;
         totalBytes += chunk.byteLength;
         if (totalBytes > MAX_RESPONSE_BYTES) {
           try {
