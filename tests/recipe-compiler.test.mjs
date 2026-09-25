@@ -468,3 +468,52 @@ test('canonical ordering is independent from caller ordering', async () => {
   assert.deepEqual(left.parameters, right.parameters);
   assert.deepEqual(left.parameterBindings, right.parameterBindings);
 });
+
+
+test('public compiler boundary cannot be given caller-controlled hashing authority', async () => {
+  let cryptoReads = 0;
+  const hostileOptions = {};
+  Object.defineProperty(hostileOptions, 'cryptoApi', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      cryptoReads += 1;
+      return {
+        subtle: {
+          async digest() {
+            return new Uint8Array(32).buffer;
+          },
+        },
+      };
+    },
+  });
+
+  const baseline = await compileRecipeCandidateV1(input());
+  const attemptedOverride = await compileRecipeCandidateV1(input(), hostileOptions);
+
+  assert.equal(cryptoReads, 0);
+  assert.equal(
+    attemptedOverride.parameterSchemaBinding.contentSha256,
+    baseline.parameterSchemaBinding.contentSha256,
+  );
+  assert.equal(
+    attemptedOverride.traceBinding.contentSha256,
+    baseline.traceBinding.contentSha256,
+  );
+
+  const changedInput = input();
+  changedInput.parameters[1].sensitive = true;
+  const changed = await compileRecipeCandidateV1(changedInput, hostileOptions);
+  assert.equal(cryptoReads, 0);
+  assert.notEqual(
+    changed.parameterSchemaBinding.contentSha256,
+    baseline.parameterSchemaBinding.contentSha256,
+  );
+});
+
+test('durable numeric identity rejects negative zero', async () => {
+  await assert.rejects(
+    () => compileRecipeCandidateV1(input({ parentVersion: -0 })),
+    /parentVersion is out of bounds/u,
+  );
+});
