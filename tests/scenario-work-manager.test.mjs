@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ScenarioWorkManager } from '../src/core/scenario-work-manager.js';
+import { ScenarioWorkManager, SCENARIO_WORK_STORAGE_KEY } from '../src/core/scenario-work-manager.js';
 import { ScenarioWorkMode, ScenarioWorkRunState } from '../src/core/scenario-work.js';
 import { createEmptyState } from '../src/core/schema.js';
 
@@ -26,6 +26,170 @@ function chromeFake() {
   const alarms = { created: [], async create(name, info) { this.created.push({ name, ...info }); }, async clear() { return true; } };
   return { storage: { local: storage }, alarms };
 }
+
+test('manager fails safe on malformed persisted Scenario Work stores and prototype-key selection', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'unused',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+
+  const corruptStores = [
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: null },
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: [] },
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: { ghost: [] } },
+    { schemaVersion: 1, selectedId: 'ghost', order: ['ghost'], byId: { ghost: 'not-a-record' } },
+    { schemaVersion: 1, selectedId: '__proto__', order: [], byId: {} },
+  ];
+
+  for (const stored of corruptStores) {
+    await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: stored });
+    const listed = await manager.list();
+    assert.equal(listed.selectedId, '');
+    assert.deepEqual(listed.scenarios, []);
+  }
+});
+
+test('manager preserves a valid persisted scenario while omitting an invalid sibling record', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  stored.order.push('corrupt');
+  stored.byId.corrupt = [];
+  stored.selectedId = 'valid';
+
+  const listed = await manager.list();
+  assert.equal(listed.selectedId, 'valid');
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+  assert.equal(listed.scenarios[0].name, 'Valid');
+});
+
+
+test('manager recovery rejects persisted accessors without executing getters', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  let getterCalls = 0;
+  Object.defineProperty(stored, 'order', {
+    enumerable: true,
+    configurable: true,
+    get() { getterCalls += 1; return ['valid']; },
+  });
+  // Chrome storage serializes persisted values and cannot persist accessors.
+  // Return the adversarial object directly here so this regression measures
+  // ScenarioWork normalization itself rather than structuredClone invoking
+  // the getter inside the in-memory transport fake.
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
+
+  const listed = await manager.list();
+  assert.equal(getterCalls, 0);
+  assert.equal(listed.selectedId, '');
+  assert.deepEqual(listed.scenarios, []);
+});
+
+test('manager omits accessor-backed or hidden scenario records while preserving valid siblings', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  let getterCalls = 0;
+  const accessorItem = {};
+  Object.defineProperty(accessorItem, 'config', {
+    enumerable: true,
+    get() { getterCalls += 1; return stored.byId.valid.config; },
+  });
+  stored.order.push('accessor');
+  Object.defineProperty(stored.byId, 'accessor', {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: accessorItem,
+  });
+
+  const hiddenItem = structuredClone(stored.byId.valid);
+  Object.defineProperty(hiddenItem, 'config', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: hiddenItem.config,
+  });
+  stored.order.push('hidden');
+  Object.defineProperty(stored.byId, 'hidden', {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: hiddenItem,
+  });
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
+
+  const listed = await manager.list();
+  assert.equal(getterCalls, 0);
+  assert.equal(listed.selectedId, 'valid');
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+});
+
+test('manager accepts repeated persisted data references while still rejecting cycles', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  const shared = { evidence: 'same-object' };
+  stored.byId.valid.runtime.sharedAliasA = shared;
+  stored.byId.valid.runtime.sharedAliasB = shared;
+  let listed = await manager.list();
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+
+  const cyclic = {};
+  cyclic.self = cyclic;
+  stored.byId.valid.runtime.cyclic = cyclic;
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
+  listed = await manager.list();
+  assert.deepEqual(listed.scenarios, []);
+});
 
 test('manager materializes scenario turns only as canonical one-pass core sessions', async () => {
   let now = 1000;
@@ -349,3 +513,49 @@ test('deterministic managed Session replay fails closed on identity collision', 
   const action = { participantKey: 'chat', generation: 1, stage: 'STEP:0:0', url: 'https://chatgpt.com/', prompt: 'DIFFERENT' };
   await assert.rejects(() => manager.materializeLaunch(replay, action, now + 1), /SCENARIO_MANAGED_SESSION_IDENTITY_COLLISION/);
 });
+
+test('manager consumes persisted descriptor snapshots without Proxy get re-entry', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  let reads = 0;
+  const hostile = target => new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      if (property === '0') return 'ghost';
+      if (property === 'name') return 'Forged through get trap';
+      return Reflect.get(object, property, receiver);
+    },
+  });
+
+  const originalItem = stored.byId.valid;
+  originalItem.config = hostile(originalItem.config);
+  const itemProxy = hostile(originalItem);
+  Object.defineProperty(stored.byId, 'valid', {
+    value: itemProxy,
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+  stored.order = hostile(['valid']);
+
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
+
+  const listed = await manager.list();
+  assert.equal(reads, 0, 'recovery must consume descriptor snapshots, not caller get traps');
+  assert.equal(listed.selectedId, 'valid');
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+  assert.equal(listed.scenarios[0].name, 'Valid');
+});
+

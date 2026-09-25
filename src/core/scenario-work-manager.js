@@ -24,6 +24,116 @@ const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPh
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function safeName(value, fallback = 'Сценарна робота') { return text(value).slice(0, 120) || fallback; }
+function plainRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+function enumerableDataValue(record, key) {
+  if (!plainRecord(record)) return { ok: false, value: undefined };
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    return { ok: false, value: undefined };
+  }
+  return { ok: true, value: descriptor.value };
+}
+function snapshotDenseDataArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    return { ok: false, value: [] };
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (
+    !lengthDescriptor
+    || !Object.hasOwn(lengthDescriptor, 'value')
+    || !Number.isSafeInteger(lengthDescriptor.value)
+    || lengthDescriptor.value < 0
+  ) return { ok: false, value: [] };
+  const length = lengthDescriptor.value;
+  const ownKeys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (
+    ownKeys.length !== expected.size
+    || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))
+  ) return { ok: false, value: [] };
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      return { ok: false, value: [] };
+    }
+    out[index] = descriptor.value;
+  }
+  return { ok: true, value: out };
+}
+
+function snapshotPersistedData(value, ancestors = new Set(), memo = new Map()) {
+  if (value === null) return { ok: true, value: null };
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') {
+    return { ok: true, value };
+  }
+  if (type !== 'object' || ancestors.has(value)) return { ok: false, value: undefined };
+  if (memo.has(value)) return { ok: true, value: memo.get(value) };
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (Object.getPrototypeOf(value) !== Array.prototype) return { ok: false, value: undefined };
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const lengthDescriptor = descriptors.length;
+      if (
+        !lengthDescriptor
+        || !Object.hasOwn(lengthDescriptor, 'value')
+        || !Number.isSafeInteger(lengthDescriptor.value)
+        || lengthDescriptor.value < 0
+      ) return { ok: false, value: undefined };
+      const length = lengthDescriptor.value;
+      const ownKeys = Reflect.ownKeys(descriptors);
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      if (
+        ownKeys.length !== expected.size
+        || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))
+      ) return { ok: false, value: undefined };
+
+      const out = new Array(length);
+      memo.set(value, out);
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = descriptors[String(index)];
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+          return { ok: false, value: undefined };
+        }
+        const child = snapshotPersistedData(descriptor.value, ancestors, memo);
+        if (!child.ok) return { ok: false, value: undefined };
+        out[index] = child.value;
+      }
+      return { ok: true, value: out };
+    }
+
+    if (!plainRecord(value)) return { ok: false, value: undefined };
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const out = Object.create(null);
+    memo.set(value, out);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string') return { ok: false, value: undefined };
+      const descriptor = descriptors[key];
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        return { ok: false, value: undefined };
+      }
+      const child = snapshotPersistedData(descriptor.value, ancestors, memo);
+      if (!child.ok) return { ok: false, value: undefined };
+      Object.defineProperty(out, key, {
+        value: child.value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+    return { ok: true, value: out };
+  } finally {
+    ancestors.delete(value);
+  }
+}
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
@@ -52,29 +162,60 @@ function isTabAlreadyGoneError(error) {
   return /no tab with id|invalid tab id|tab not found/i.test(String(error?.message || error || ''));
 }
 function normalizeStore(raw, now = Date.now()) {
-  if (!raw || raw.schemaVersion !== STORAGE_SCHEMA_VERSION || !Array.isArray(raw.order) || typeof raw.byId !== 'object') return freshStore();
+  if (!plainRecord(raw)) return freshStore();
+  const schemaVersion = enumerableDataValue(raw, 'schemaVersion');
+  const selectedId = enumerableDataValue(raw, 'selectedId');
+  const order = enumerableDataValue(raw, 'order');
+  const byId = enumerableDataValue(raw, 'byId');
+  const orderSnapshot = order.ok
+    ? snapshotDenseDataArray(order.value)
+    : { ok: false, value: [] };
+  if (
+    !schemaVersion.ok || schemaVersion.value !== STORAGE_SCHEMA_VERSION
+    || !selectedId.ok || typeof selectedId.value !== 'string'
+    || !orderSnapshot.ok
+    || !byId.ok || !plainRecord(byId.value)
+  ) return freshStore();
+
   const out = freshStore();
-  for (const id of raw.order) {
-    if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
+  for (const id of orderSnapshot.value) {
+    if (typeof id !== 'string' || Object.hasOwn(out.byId, id)) continue;
+    const itemDescriptor = Object.getOwnPropertyDescriptor(byId.value, id);
+    if (
+      !itemDescriptor
+      || itemDescriptor.enumerable !== true
+      || !Object.hasOwn(itemDescriptor, 'value')
+      || !plainRecord(itemDescriptor.value)
+    ) continue;
+    const itemSnapshot = snapshotPersistedData(itemDescriptor.value);
+    if (!itemSnapshot.ok) continue;
     try {
-      const config = normalizeScenarioWorkConfig({ ...raw.byId[id].config, id });
-      const runtime = ensureManagerRuntimeFields(raw.byId[id].runtime && raw.byId[id].runtime.mode === config.mode
-        ? clone(raw.byId[id].runtime)
+      const item = itemSnapshot.value;
+      const config = normalizeScenarioWorkConfig({ ...item.config, id });
+      const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
+        ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
-      out.byId[id] = {
-        id,
-        name: safeName(raw.byId[id].name || config.name),
-        config,
-        runtime,
-        createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
-        updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
-      };
+      Object.defineProperty(out.byId, id, {
+        value: {
+          id,
+          name: safeName(item.name || config.name),
+          config,
+          runtime,
+          createdAt: Math.max(0, Number(item.createdAt || now)),
+          updatedAt: Math.max(0, Number(item.updatedAt || now)),
+        },
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       out.order.push(id);
     } catch {
       // Corrupt individual scenarios are omitted rather than poisoning all others.
     }
   }
-  out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  out.selectedId = Object.hasOwn(out.byId, selectedId.value)
+    ? selectedId.value
+    : (out.order[0] || '');
   return out;
 }
 
