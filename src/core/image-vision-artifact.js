@@ -289,6 +289,7 @@ function assertBoundedDimensions(widthPx, heightPx) {
 
 function pngDimensions(bytes) {
   if (bytes.length < 24
+      || readUint32Be(bytes, 8) !== 13
       || String.fromCharCode(...bytes.subarray(12, 16)) !== 'IHDR') {
     throw new Error('PNG image is missing a bounded IHDR dimension header');
   }
