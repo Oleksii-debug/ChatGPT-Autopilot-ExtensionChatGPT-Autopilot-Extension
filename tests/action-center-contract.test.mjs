@@ -209,6 +209,44 @@ test('supersession graph rejects time travel and cycles', () => {
 
   assert.throws(
     () => buildActionCenterProjectionV1([
+      item('predecessor', {
+        status: ActionCenterItemStatus.SUPERSEDED,
+        ownerActionKind: ActionCenterOwnerActionKind.NONE,
+        updatedAt: T1,
+        closedAt: T2,
+        supersededByItemId: 'already-closed-successor',
+      }),
+      item('already-closed-successor', {
+        status: ActionCenterItemStatus.RESOLVED,
+        ownerActionKind: ActionCenterOwnerActionKind.NONE,
+        createdAt: T0,
+        updatedAt: T1,
+        closedAt: T1,
+      }),
+    ]),
+    /closed before predecessor supersession/,
+  );
+
+  const boundarySuccessor = item('boundary-successor', {
+    status: ActionCenterItemStatus.RESOLVED,
+    ownerActionKind: ActionCenterOwnerActionKind.NONE,
+    createdAt: T0,
+    updatedAt: T1,
+    closedAt: T2,
+  });
+  assert.doesNotThrow(() => buildActionCenterProjectionV1([
+    boundarySuccessor,
+    item('boundary-predecessor', {
+      status: ActionCenterItemStatus.SUPERSEDED,
+      ownerActionKind: ActionCenterOwnerActionKind.NONE,
+      updatedAt: T1,
+      closedAt: T2,
+      supersededByItemId: 'boundary-successor',
+    }),
+  ]));
+
+  assert.throws(
+    () => buildActionCenterProjectionV1([
       item('a', {
         status: ActionCenterItemStatus.SUPERSEDED,
         ownerActionKind: ActionCenterOwnerActionKind.NONE,
