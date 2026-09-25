@@ -201,21 +201,6 @@ export function normalizeEventTriggerObservationV1(value) {
   });
 }
 
-function artifactMaterial(artifact) {
-  return [
-    artifact.schemaVersion,
-    artifact.artifactId,
-    artifact.kind,
-    artifact.uri,
-    artifact.mediaType,
-    artifact.sha256,
-    artifact.sizeBytes,
-    artifact.createdAt,
-    artifact.producerInvocationId,
-    artifact.sensitive,
-  ];
-}
-
 async function fingerprints(trigger, observation, { cryptoApi = globalThis.crypto } = {}) {
   const sourceIdentityCanonical = JSON.stringify([
     'chatgpt-autopilot-event-trigger-source-v1',
