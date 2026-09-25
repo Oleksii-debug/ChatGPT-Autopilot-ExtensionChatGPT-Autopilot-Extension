@@ -53,7 +53,6 @@ const CLAIM_KEYS = new Set([
   'valueDigest',
   'evidenceArtifactIds',
 ]);
-const DEPENDENCY_KEYS = new Set(['resolveTrustedVerification']);
 
 function asciiCompare(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -415,13 +414,9 @@ function deriveStatus({
   return ParallelFanInStatus.EVIDENCE_COMPLETE;
 }
 
-export function buildParallelFanInEvidenceV1(input, dependencies = {}) {
-  const normalizedDependencies = record(
-    dependencies,
-    DEPENDENCY_KEYS,
-    'ParallelFanInDependenciesV1',
-  );
-  const resolveTrustedVerification = normalizedDependencies.resolveTrustedVerification;
+export function buildParallelFanInEvidenceV1(input, {
+  resolveTrustedVerification,
+} = {}) {
   if (typeof resolveTrustedVerification !== 'function') {
     throw new Error('Canonical trusted verification resolver is required');
   }
