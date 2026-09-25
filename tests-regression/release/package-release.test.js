@@ -66,6 +66,46 @@ test('release allowlist contains release docs, extension files and complete comp
   assert.ok(!files.some(file => /(?:^|\/)(?:credentials|secrets|private-data)(?:\/|$)/i.test(file)));
 });
 
+
+test('release rejects top-level file and directory symlinks before source traversal', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-symlink-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const originalSrc = path.join(fixtureRoot, 'src');
+  const outsideSrc = path.join(temp, 'outside-src');
+  await fs.rename(originalSrc, outsideSrc);
+  try {
+    await fs.symlink(outsideSrc, originalSrc, 'dir');
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error?.code)) {
+      t.skip(`symbolic links are unavailable on this platform: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Release source must not contain symlinks: src/,
+  );
+
+  await fs.rm(originalSrc, { force: true });
+  await fs.rename(outsideSrc, originalSrc);
+
+  const originalReadme = path.join(fixtureRoot, 'README.txt');
+  const outsideReadme = path.join(temp, 'outside-readme.txt');
+  await fs.rename(originalReadme, outsideReadme);
+  await fs.symlink(outsideReadme, originalReadme, 'file');
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Release source must not contain symlinks: README\.txt/,
+  );
+});
+
 test('release ZIP is byte-for-byte reproducible and has one canonical root folder', async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
