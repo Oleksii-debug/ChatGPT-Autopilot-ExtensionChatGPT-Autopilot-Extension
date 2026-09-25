@@ -177,6 +177,7 @@ export class GitHubPullRequestMergeVerifierV1 {
     attempt,
     policyDecisionId,
     expectedOutcome,
+    priorObservation,
   } = {}) {
     if (expectedOutcome === ReconciliationOutcome.SAFE_RETRY) {
       throw new Error('GitHub pull-request merge cannot prove SAFE_RETRY after dispatch');
@@ -190,6 +191,10 @@ export class GitHubPullRequestMergeVerifierV1 {
     if (requireId(policyDecisionId, 'policyDecisionId') !== expected.policyDecisionId) throw new Error('policyDecisionId is invalid');
     const exactAttempt = attemptFromExecutionId(executionId);
     if (attempt !== exactAttempt) throw new Error('attempt does not match executionId');
+    if (!priorObservation) {
+      throw new Error('GitHub pull-request merge requires the immutable provider merge identity for automatic reconciliation; otherwise manual review is required');
+    }
+    observedMerge(expected, priorObservation);
 
     const readback = await this.#readback(expected);
     const observedAt = new Date(this.now()).toISOString();
