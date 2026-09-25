@@ -9,7 +9,7 @@ function state() {
       'session-a': {
         name: 'Основний', runState: 'RUNNING', currentTaskIndex: 0,
         taskOrder: ['task-a'], tasksById: { 'task-a': { id: 'task-a', label: 'Перевірка' } },
-        operation: { phase: 'READY_TO_SEND' }, lastError: 'password=SECRET_ERROR_PASSWORD', lastActionAt: 30, updatedAt: 31,
+        operation: { phase: 'READY' }, lastError: 'password=SECRET_ERROR_PASSWORD', lastActionAt: 30, updatedAt: 31,
       },
       'session-b': {
         name: 'Інший', runState: 'STOPPED', currentTaskIndex: 0,
