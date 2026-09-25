@@ -181,6 +181,70 @@ test('caller-supplied depth or child counts are rejected instead of overriding c
   assert.equal(result.reasonCode, 'MAX_DEPTH_EXCEEDED');
 });
 
+test('policy and admission authority records reject accessors and hidden known fields before reads', () => {
+  let reads = 0;
+
+  const getterPolicy = { ...policy };
+  Object.defineProperty(getterPolicy, 'allowAgentCreatedChildren', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return true;
+    },
+  });
+  assert.throws(
+    () => normalizeSubagentStructurePolicyV1(getterPolicy),
+    /allowAgentCreatedChildren.*enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const hiddenPolicy = {
+    schemaVersion: 1,
+    maxDepth: 4,
+    maxChildrenPerAgent: 5,
+  };
+  Object.defineProperty(hiddenPolicy, 'allowAgentCreatedChildren', {
+    enumerable: false,
+    value: true,
+  });
+  assert.throws(
+    () => evaluateSubagentStructureAdmissionV1({
+      policy: hiddenPolicy,
+      initiator: SubagentSpawnInitiator.AGENT,
+      graph: ROOT_ONLY,
+      parentNodeId: 'root',
+      requestedChildren: 1,
+    }),
+    /allowAgentCreatedChildren.*enumerable own data property/,
+  );
+
+  const request = {
+    policy,
+    initiator: SubagentSpawnInitiator.AGENT,
+    graph: ROOT_ONLY,
+    parentNodeId: 'root',
+    requestedChildren: 1,
+  };
+  Object.defineProperty(request, 'requestedChildren', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 1;
+    },
+  });
+  assert.throws(
+    () => evaluateSubagentStructureAdmissionV1(request),
+    /requestedChildren.*enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const symbolic = { ...policy };
+  symbolic[Symbol('authority')] = true;
+  assert.throws(() => normalizeSubagentStructurePolicyV1(symbolic), /symbol field/);
+});
+
 test('unknown fields, coercion, exotic objects and invalid identities fail closed', () => {
   assert.throws(() => normalizeSubagentStructurePolicyV1({ ...policy, maxDepth: '4' }), /invalid/);
   assert.throws(() => normalizeSubagentStructurePolicyV1({ ...policy, surprise: true }), /unknown field/);
