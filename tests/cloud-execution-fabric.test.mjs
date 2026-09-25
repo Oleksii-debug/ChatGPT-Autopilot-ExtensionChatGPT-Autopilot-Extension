@@ -130,7 +130,7 @@ function workspaceBinding(ownership, overrides = {}) {
     workspaceRevision: 'workspace-revision-1',
     environmentSha256: SHA_A,
     checkpointArtifactId: 'checkpoint-artifact-1',
-    checkpointSha256: SHA_B,
+    checkpointSha256: SHA_A,
     taskId: ownership.taskId,
     planId: ownership.planId,
     nodeId: ownership.nodeId,
@@ -288,6 +288,15 @@ test('a live CLOUD owner requires exact existing workspace continuity binding an
   assert.equal(mismatch.disposition, CloudFabricDisposition.BLOCKED);
   assert.equal(mismatch.reasonCode, 'NO_ELIGIBLE_CLOUD_SLOT');
   assert.equal(mismatch.candidateAssessments[0].reasonCode, 'CURRENT_CLOUD_WORKSPACE_MISMATCH');
+
+  const checkpointMismatch = assessCloudExecutionFabricV1(request({
+    affinity: CloudFabricAffinity.CLOUD_REQUIRED,
+    executionOwnership: ownership,
+    cloudSlots: [slot('slot-existing', { workspaceId: 'workspace-a' })],
+    workspaceBindings: [workspaceBinding(ownership, { checkpointSha256: SHA_B })],
+  }));
+  assert.equal(checkpointMismatch.disposition, CloudFabricDisposition.RECONCILE_REQUIRED);
+  assert.equal(checkpointMismatch.reasonCode, 'CLOUD_CHECKPOINT_BINDING_MISMATCH');
 });
 
 test('expired execution ownership always requires reconciliation before fabric routing', () => {
