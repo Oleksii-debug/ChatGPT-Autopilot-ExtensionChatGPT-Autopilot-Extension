@@ -266,6 +266,9 @@ function normalizeResult(input, index, context) {
     if (!evidenceById.has(artifactId)) {
       throw new Error(label + ' references unknown result artifact: ' + artifactId);
     }
+    if (!verificationEvidence.has(artifactId)) {
+      throw new Error(label + ' result artifact must be included in result verification evidence');
+    }
   }
 
   const claims = array(raw.claims, label + '.claims', { max: MAX_CLAIMS_PER_RESULT })
@@ -353,7 +356,8 @@ function deriveStatus({
   if (nonTerminalParticipantIds.length) return ParallelFanInStatus.WAITING;
   if (missingResultNodeIds.length) return ParallelFanInStatus.EVIDENCE_INCOMPLETE;
   if (results.some(result => (
-    result.verification.status !== VerificationStatus.VERIFIED
+    result.nodeState !== AgentPlanNodeState.VERIFIED
+    || result.verification.status !== VerificationStatus.VERIFIED
     || result.selfVerificationReported
     || result.verification.evidenceArtifactIds.length === 0
   ))) {
@@ -467,7 +471,13 @@ export function buildParallelFanInEvidenceV1(input) {
         result => result.verification.status === VerificationStatus.VERIFIED,
       ).length,
       reportedNegativeCount: results.filter(
-        result => result.verification.status !== VerificationStatus.VERIFIED,
+        result => (
+          result.nodeState !== AgentPlanNodeState.VERIFIED
+          || result.verification.status !== VerificationStatus.VERIFIED
+        ),
+      ).length,
+      negativeTerminalNodeCount: results.filter(
+        result => result.nodeState !== AgentPlanNodeState.VERIFIED,
       ).length,
       selfVerificationRiskCount: results.filter(
         result => result.selfVerificationReported,
