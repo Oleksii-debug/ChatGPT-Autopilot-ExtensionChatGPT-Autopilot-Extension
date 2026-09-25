@@ -103,7 +103,7 @@ test('operation-specific target requirements fail closed', () => {
 
 test('current-page source requires URI and exact content evidence', () => {
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ kind: 'CURRENT_PAGE' })), /requires uri/);
-  assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ text: '' })), /requires bounded text or an exact artifact binding/);
+  assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ text: '' })), /requires exactly one/);
 
   const artifactSource = normalizeSelectionActionSourceV1(selectionSource({
     sourceId: 'clipboard-artifact',
@@ -115,6 +115,11 @@ test('current-page source requires URI and exact content evidence', () => {
   assert.equal(artifactSource.artifactId, 'artifact-1');
   assert.equal(artifactSource.contentSha256, SHA);
   assert.equal(artifactSource.instructionAuthority, false);
+
+  assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({
+    artifactId: 'artifact-1',
+    contentSha256: SHA,
+  })), /requires exactly one/);
 
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ artifactId: 'artifact-1' })), /provided together/);
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ contentSha256: SHA })), /provided together/);
