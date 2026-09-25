@@ -83,6 +83,7 @@ function workspace({ onUpdate } = {}) {
       return structuredClone(current);
     },
     readDriveText: async () => ({ text: '' }),
+    readSheetsValues: async () => ({ values: [] }),
     updateDriveFile: async args => {
       updateCalls += 1;
       const next = {

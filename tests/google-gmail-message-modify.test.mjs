@@ -50,6 +50,7 @@ function fullClient(overrides = {}) {
     getDriveFile: async () => ({}),
     readDriveText: async () => ({}),
     updateDriveFile: async () => ({}),
+    readSheetsValues: async () => ({}),
     searchGmail: async () => ({}),
     getGmailMessage: async ({ messageId }) => ({
       id: messageId,
