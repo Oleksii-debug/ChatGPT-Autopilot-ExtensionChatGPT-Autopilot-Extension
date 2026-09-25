@@ -1,5 +1,6 @@
 import {
   SourceAuthorityKind,
+  normalizeProjectSnapshotV1,
   normalizeProjectSourceRefV1,
 } from './project-context-artifact.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
@@ -399,3 +400,153 @@ export function buildProjectBootstrapV1(input) {
   });
 }
 
+
+
+const TRUSTED_RESOLVER_KEYS = new Set(['resolveSourceRef', 'resolveArtifactRef']);
+
+function trustedResolverFunctions(input, { artifactsRequired }) {
+  const raw = strictRecord(input, 'ProjectBootstrapTrustedResolversV1');
+  exactKeys(raw, TRUSTED_RESOLVER_KEYS, 'ProjectBootstrapTrustedResolversV1');
+  const resolveSourceRef = ownValue(raw, 'resolveSourceRef');
+  const resolveArtifactRef = ownValue(raw, 'resolveArtifactRef');
+  if (typeof resolveSourceRef !== 'function') {
+    throw new Error('resolveSourceRef must be a trusted resolver function');
+  }
+  if (artifactsRequired && typeof resolveArtifactRef !== 'function') {
+    throw new Error('resolveArtifactRef must be a trusted resolver function when artifacts are present');
+  }
+  if (!artifactsRequired && resolveArtifactRef !== undefined && typeof resolveArtifactRef !== 'function') {
+    throw new Error('resolveArtifactRef must be a trusted resolver function when provided');
+  }
+  return { resolveSourceRef, resolveArtifactRef };
+}
+
+function sameCanonicalJson(left, right) {
+  if (left === right) return true;
+  if (left === null || right === null) return false;
+  if (typeof left !== typeof right) return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (!sameCanonicalJson(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  if (typeof left !== 'object') return Object.is(left, right);
+  const leftKeys = Object.keys(left).sort(compareIds);
+  const rightKeys = Object.keys(right).sort(compareIds);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) return false;
+    if (!sameCanonicalJson(left[leftKeys[index]], right[rightKeys[index]])) return false;
+  }
+  return true;
+}
+
+function trustedSourceMatchesRequested(requested, trusted) {
+  return trusted.schemaVersion === requested.schemaVersion
+    && trusted.sourceId === requested.sourceId
+    && trusted.projectId === requested.projectId
+    && trusted.kind === requested.kind
+    && trusted.uri === requested.uri
+    && trusted.revisionId === requested.revisionId
+    && trusted.contentSha256 === requested.contentSha256
+    && trusted.observedAt === requested.observedAt
+    && sameCanonicalJson(trusted.metadata, requested.metadata);
+}
+
+function trustedArtifactMatchesRequested(requested, trusted) {
+  return trusted.schemaVersion === requested.schemaVersion
+    && trusted.artifactId === requested.artifactId
+    && trusted.kind === requested.kind
+    && trusted.uri === requested.uri
+    && trusted.mediaType === requested.mediaType
+    && trusted.sha256 === requested.sha256
+    && trusted.sizeBytes === requested.sizeBytes
+    && trusted.createdAt === requested.createdAt
+    && trusted.producerInvocationId === requested.producerInvocationId
+    && trusted.sensitive === requested.sensitive;
+}
+
+export async function resolveTrustedProjectBootstrapSnapshotV1(input, resolversInput) {
+  const normalized = normalizeInput(input);
+  const blockers = deriveBlockers(normalized);
+  if (blockers.length) {
+    throw new Error('Project bootstrap is blocked and cannot be resolved into a trusted snapshot');
+  }
+  for (const sourceRef of normalized.sourceRefs) {
+    if (!sourceRef.contentSha256) {
+      throw new Error(`Trusted Project bootstrap requires source SHA-256: ${sourceRef.sourceId}`);
+    }
+  }
+  for (const artifactRef of normalized.artifactRefs) {
+    if (!artifactRef.sha256) {
+      throw new Error(`Trusted Project bootstrap requires artifact SHA-256: ${artifactRef.artifactId}`);
+    }
+  }
+
+  const { resolveSourceRef, resolveArtifactRef } = trustedResolverFunctions(
+    resolversInput,
+    { artifactsRequired: normalized.artifactRefs.length > 0 },
+  );
+
+  const trustedSourceRefs = [];
+  for (const requested of normalized.sourceRefs) {
+    const query = Object.freeze({
+      projectId: normalized.projectId,
+      sourceId: requested.sourceId,
+      kind: requested.kind,
+      uri: requested.uri,
+      revisionId: requested.revisionId,
+      contentSha256: requested.contentSha256,
+    });
+    const resolved = await resolveSourceRef(query);
+    const trusted = guardedSourceRef(resolved, normalized.projectId);
+    if (trusted.authority !== SourceAuthorityKind.CANONICAL) {
+      throw new Error(`Trusted source is not canonically admitted: ${requested.sourceId}`);
+    }
+    if (!trustedSourceMatchesRequested(requested, trusted)) {
+      throw new Error(`Trusted source does not exactly match bootstrap source: ${requested.sourceId}`);
+    }
+    trustedSourceRefs.push(trusted);
+  }
+
+  const trustedArtifactRefs = [];
+  for (const requested of normalized.artifactRefs) {
+    const query = Object.freeze({
+      artifactId: requested.artifactId,
+      kind: requested.kind,
+      uri: requested.uri,
+      sha256: requested.sha256,
+      sizeBytes: requested.sizeBytes,
+    });
+    const resolved = await resolveArtifactRef(query);
+    const trusted = guardedArtifactRef(resolved);
+    if (!trustedArtifactMatchesRequested(requested, trusted)) {
+      throw new Error(`Trusted artifact does not exactly match bootstrap artifact: ${requested.artifactId}`);
+    }
+    trustedArtifactRefs.push(trusted);
+  }
+
+  const snapshot = normalizeProjectSnapshotV1({
+    schemaVersion: PROJECT_BOOTSTRAP_SCHEMA_VERSION,
+    projectId: normalized.projectId,
+    revisionId: normalized.revisionId,
+    title: normalized.title,
+    sourceRefs: trustedSourceRefs,
+    artifactRefs: trustedArtifactRefs,
+    createdAt: normalized.createdAt,
+  });
+
+  return freezeDeep({
+    schemaVersion: PROJECT_BOOTSTRAP_SCHEMA_VERSION,
+    bootstrapId: normalized.bootstrapId,
+    projectId: normalized.projectId,
+    projectRevisionId: normalized.revisionId,
+    trustedSourceResolution: true,
+    trustedArtifactResolution: true,
+    workspaceAdmissionAuthorized: false,
+    requiresCanonicalProjectWorkspaceCommit: true,
+    snapshot,
+  });
+}
