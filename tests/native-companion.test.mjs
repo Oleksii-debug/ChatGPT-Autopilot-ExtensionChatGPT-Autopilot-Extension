@@ -394,6 +394,39 @@ test('Windows installer copies the full transitive local module closure of the N
   );
 });
 
+test('Windows installer fails closed before registration for missing or invalid Native Host modules', async () => {
+  const hostDir = path.join(repoRoot, 'companion', 'native-host');
+  const installer = await fs.readFile(path.join(hostDir, 'ВСТАНОВИТИ NATIVE COMPANION.ps1'), 'utf8');
+
+  const requiredFileGuard = "if (-not (Test-Path -LiteralPath $src -PathType Leaf))";
+  const requiredFileError = "Пакет Native Companion неповний: відсутній обов'язковий файл";
+  const unconditionalCopy = "Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force";
+  const installedNode = "$installedNode = Join-Path $runtime 'node.exe'";
+  const syntaxCheck = '& $installedNode --check $installedModule';
+  const syntaxFailureGuard = 'if ($LASTEXITCODE -ne 0)';
+  const registryMutation = "$regKey = 'HKCU:\\Software\\Google\\Chrome\\NativeMessagingHosts\\org.chatgpt_autopilot.companion'";
+
+  const guardIndex = installer.indexOf(requiredFileGuard);
+  const copyIndex = installer.indexOf(unconditionalCopy);
+  const nodeIndex = installer.indexOf(installedNode);
+  const syntaxIndex = installer.indexOf(syntaxCheck);
+  const syntaxFailureIndex = installer.indexOf(syntaxFailureGuard);
+  const registryIndex = installer.indexOf(registryMutation);
+
+  assert.ok(guardIndex >= 0, 'installer must require every packaged Native Companion file');
+  assert.ok(installer.includes(requiredFileError), 'missing required file must fail with an explicit error');
+  assert.ok(copyIndex > guardIndex, 'required-file guard must run before copying each entry');
+  assert.equal(
+    installer.includes("if (Test-Path -LiteralPath $src) { Copy-Item"),
+    false,
+    'installer must not silently skip required files',
+  );
+  assert.ok(nodeIndex > copyIndex, 'installed Node path must be established after required files are copied');
+  assert.ok(syntaxIndex > nodeIndex, 'installed modules must be syntax-checked with the installed Node runtime');
+  assert.ok(syntaxFailureIndex > syntaxIndex, 'nonzero node --check status must fail installation');
+  assert.ok(registryIndex > syntaxFailureIndex, 'Chrome Native Messaging registration must occur only after module preflight');
+});
+
 test('native message framing survives fragmented input and enforces response bound', () => {
   const value = { protocolVersion: 1, requestId: 'r1', type: 'health', ok: true, result: { status: 'ok' } };
   const encoded = encodeNativeMessage(value);
