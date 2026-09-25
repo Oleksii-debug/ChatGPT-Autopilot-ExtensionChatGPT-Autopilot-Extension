@@ -86,8 +86,7 @@ function exactOpaque(value, label, optional = false) {
   if (optional && (value === '' || value === null || value === undefined)) return '';
   if (typeof value !== 'string'
       || value !== value.trim()
-      || !OPAQUE.test(value)
-      || /[\\"']/u.test(value)) {
+      || !OPAQUE.test(value)) {
     throw new Error(label + ' must be bounded canonical opaque text');
   }
   return value;
