@@ -9,7 +9,7 @@ const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
 const UTF8_FLAG = 0x0800;
 const ZIP_STORE = 0;
-const NORMALIZED_TEXT_EXTENSIONS = new Set(['.cmd', '.cs', '.css', '.html', '.js', '.json', '.md', '.mjs', '.ps1', '.txt']);
+const NORMALIZED_TEXT_EXTENSIONS = new Set(['.cmd', '.cs', '.css', '.html', '.js', '.json', '.md', '.mjs', '.ps1', '.txt', '.yaml', '.yml']);
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FORBIDDEN_PATH_PATTERNS = [
