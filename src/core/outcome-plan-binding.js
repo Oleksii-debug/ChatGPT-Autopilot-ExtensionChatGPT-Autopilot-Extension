@@ -115,8 +115,20 @@ export function assessAgentPlanOutcomeBindingV1(contractInput, planInput) {
   if (!sameArray(plan.successCriteria, envelope.successCriteria)) {
     throw new Error('AgentPlan successCriteria do not match the exact Outcome Contract criteria');
   }
-  if (Date.parse(plan.createdAt) < Date.parse(contract.createdAt)) {
+  const contractCreatedAtMs = Date.parse(contract.createdAt);
+  const planCreatedAtMs = Date.parse(plan.createdAt);
+  const planUpdatedAtMs = Date.parse(plan.updatedAt);
+  if (planCreatedAtMs < contractCreatedAtMs) {
     throw new Error('AgentPlan cannot predate the Outcome Contract');
+  }
+  if (planUpdatedAtMs < planCreatedAtMs) {
+    throw new Error('AgentPlan updatedAt cannot predate plan createdAt');
+  }
+  for (const node of plan.nodes) {
+    const nodeUpdatedAtMs = Date.parse(node.updatedAt);
+    if (nodeUpdatedAtMs < planCreatedAtMs || nodeUpdatedAtMs > planUpdatedAtMs) {
+      throw new Error(`AgentPlan node updatedAt is outside the plan causal window: ${node.nodeId}`);
+    }
   }
 
   const coverage = envelope.criterionBindings.map(binding => {
