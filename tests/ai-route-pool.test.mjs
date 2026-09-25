@@ -16,6 +16,24 @@ const routes = () => normalizeAiRoutePool([
   { routeId:'compatible', provider:'openai-compatible', endpointId:'team-a', model:'worker', roles:['planner','coder'], capabilityIds:['code'], priority:10, locality:'remote', costClass:'paid', inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
 ]);
 
+test('unknown pricing never becomes executable merely because numeric prices are present', () => {
+  const [route] = normalizeAiRoutePool([{
+    routeId:'unknown-priced',
+    provider:'openai-compatible',
+    endpointId:'team-a',
+    model:'worker',
+    costClass:'unknown',
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:2,
+  }]);
+  assert.equal(route.costClass, 'unknown');
+  assert.equal(route.inputPriceKnown, true);
+  assert.equal(route.outputPriceKnown, true);
+  const selected = selectAiRouteCandidates({ routes:[route], role:'planner', now:1000 });
+  assert.deepEqual(selected.candidates, []);
+  assert.deepEqual(selected.eligibleRouteIds, []);
+});
+
 test('remote route with unclassified pricing remains unknown and cannot silently execute', () => {
   const [remote, local] = normalizeAiRoutePool([
     { routeId:'new-remote', provider:'openai-compatible', endpointId:'team-a', model:'worker' },
