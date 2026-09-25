@@ -332,7 +332,7 @@ export function buildProjectSwarmWorkboardV1(input) {
     const lane = deriveLane(task, review);
     const needsAttention = lane === WorkboardLane.BLOCKED
       || (review?.state === WorkboardReviewState.CHANGES_REQUESTED)
-      || (task.state === AgentPlanNodeState.RUNNING && conflictTasks.length > 0);
+      || conflictTasks.length > 0;
     return Object.freeze({
       schemaVersion: 1,
       focusOrdinal: index + 1,
