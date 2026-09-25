@@ -285,6 +285,16 @@ export function normalizeDataDatasetSnapshotV1(input) {
   const artifactRef = strictArtifactRef(raw.artifactRef);
   const contentSha256 = digest(raw.contentSha256, 'contentSha256');
   if (artifactRef.sha256 !== contentSha256) throw new Error('artifactRef.sha256 must match contentSha256');
+  const observedAt = timestamp(raw.observedAt, 'observedAt');
+  const observedAtMs = Date.parse(observedAt);
+  for (const source of sourceRefs) {
+    if (Date.parse(source.observedAt) > observedAtMs) {
+      throw new Error(`sourceRefs source observed after dataset snapshot: ${source.sourceId}`);
+    }
+  }
+  if (Date.parse(artifactRef.createdAt) > observedAtMs) {
+    throw new Error('artifactRef created after dataset snapshot');
+  }
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'DataDatasetSnapshotV1'),
     datasetId: id(raw.datasetId, 'datasetId'),
@@ -295,7 +305,7 @@ export function normalizeDataDatasetSnapshotV1(input) {
     artifactRef,
     columns,
     rowCount: integer(raw.rowCount, 'rowCount'),
-    observedAt: timestamp(raw.observedAt, 'observedAt'),
+    observedAt,
   });
 }
 
