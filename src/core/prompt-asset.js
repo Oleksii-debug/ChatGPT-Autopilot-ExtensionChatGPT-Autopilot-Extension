@@ -37,13 +37,20 @@ function plain(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
+  const snapshot = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (typeof key !== 'string' || !descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label} fields must be enumerable own data properties`);
     }
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 
 function exactKeys(value, allowed, label) {
@@ -58,19 +65,28 @@ function dataArray(value, label, { min = 0, max } = {}) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a plain array`);
   }
-  if (!Number.isInteger(value.length) || value.length < min || value.length > max) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0) {
+    throw new Error(`${label} must expose a canonical data length`);
+  }
+  const length = lengthDescriptor.value;
+  if (!Number.isInteger(max) || length < min || length > max) {
     throw new Error(`${label} must contain ${min}..${max} entries`);
   }
   const allowed = new Set(['length']);
-  for (let index = 0; index < value.length; index += 1) allowed.add(String(index));
-  for (const key of Reflect.ownKeys(value)) {
+  for (let index = 0; index < length; index += 1) allowed.add(String(index));
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
       throw new Error(`${label} contains non-canonical array fields`);
     }
   }
-  const out = new Array(value.length);
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} must contain dense enumerable own data items`);
     }
