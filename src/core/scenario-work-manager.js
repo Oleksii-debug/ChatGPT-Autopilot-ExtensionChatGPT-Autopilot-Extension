@@ -165,6 +165,21 @@ function samePersistedData(actual, canonical, depth = 0) {
   }
   return true;
 }
+function compatiblePersistedConfig(persisted, canonical) {
+  if (samePersistedData(persisted, canonical)) return true;
+  const legacyCanonical = clone(canonical);
+  let migrated = false;
+  for (const [key, defaultValue] of [
+    ['schemaVersion', 1],
+    ['timeoutPolicy', 'REPLACE_MEMBER'],
+  ]) {
+    if (!Object.hasOwn(persisted, key) && Object.is(legacyCanonical[key], defaultValue)) {
+      delete legacyCanonical[key];
+      migrated = true;
+    }
+  }
+  return migrated && samePersistedData(persisted, legacyCanonical);
+}
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
@@ -229,7 +244,7 @@ function normalizeStore(raw, now = Date.now()) {
       // malformed stored config must never gain executable defaults/coercions
       // after restart. Current-schema persisted bytes must already equal the
       // canonical config that this version itself writes.
-      if (!samePersistedData(item.config, config)) continue;
+      if (!compatiblePersistedConfig(item.config, config)) continue;
       const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
         ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
