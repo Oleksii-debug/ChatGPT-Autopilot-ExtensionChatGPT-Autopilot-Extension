@@ -205,8 +205,8 @@ test('ill-formed UTF-16 aliases are rejected before UTF-8 identity while valid s
     /fromText must be well-formed UTF-16 before UTF-8 encoding/u,
   );
 
-  const fromText = 'status 😀\\nready';
-  const toText = 'status 🧪\\nready';
+  const fromText = 'status 😀\nready';
+  const toText = 'status 🧪\nready';
   const validRegistry = await registryFor(fromText, toText);
   const out = await buildArtifactTextDiffV1(request(validRegistry, fromText, toText));
 
