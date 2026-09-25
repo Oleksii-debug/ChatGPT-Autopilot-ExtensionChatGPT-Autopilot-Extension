@@ -11,7 +11,7 @@ import {
   sourceBindingFromRefV1,
 } from '../src/core/project-context-artifact.js';
 
-const AT = '2026-09-20T18:36:00Z';
+const AT = '2026-09-20T18:36:00.000Z';
 
 function source(overrides = {}) {
   return {
@@ -166,6 +166,57 @@ test('Project/Context contracts reject type-coerced identities, versions and aut
   assert.throws(() => normalizeProjectSourceRefV1(source({ authority: 1 })), /authority must be text/);
   assert.throws(() => normalizeProjectSourceRefV1(source({ contentSha256: 1 })), /contentSha256 must be text/);
   assert.throws(() => normalizeContextCapsuleV1(capsule({ schemaVersion: '1' })), /schemaVersion/);
+});
+
+test('Project/Context provenance requires exact canonical primitive representations', () => {
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ sourceId: ' github-main' })),
+    /sourceId is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ revisionId: 'commit-7249c934 ' })),
+    /revisionId is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ contentSha256: 'A'.repeat(64) })),
+    /contentSha256 is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ authority: 'canonical' })),
+    /authority is invalid/,
+  );
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({ observedAt: '2026-09-20T18:36:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  assert.throws(
+    () => normalizeProjectSnapshotV1({
+      schemaVersion: 1,
+      projectId: 'autopilot ',
+      revisionId: 'project-rev-1',
+      title: 'ChatGPT Autopilot Extension',
+      sourceRefs: [source()],
+      artifactRefs: [artifact()],
+      createdAt: AT,
+    }),
+    /projectId is invalid/,
+  );
+
+  assert.throws(
+    () => normalizeContextCapsuleV1(capsule({ projectRevisionId: 'project-rev-1 ' })),
+    /projectRevisionId is invalid/,
+  );
+  assert.throws(
+    () => normalizeContextCapsuleV1(capsule({ createdAt: '2026-09-20T18:36:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  const exact = normalizeProjectSourceRefV1(source());
+  assert.equal(exact.sourceId, 'github-main');
+  assert.equal(exact.contentSha256, 'a'.repeat(64));
+  assert.equal(exact.authority, SourceAuthorityKind.CANONICAL);
+  assert.equal(exact.observedAt, AT);
 });
 
 test('Project/Context contracts reject exotic prototype authority and identity inheritance', () => {
