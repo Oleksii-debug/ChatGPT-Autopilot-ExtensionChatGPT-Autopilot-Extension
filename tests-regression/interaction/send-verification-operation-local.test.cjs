@@ -175,3 +175,46 @@ test('SPA navigation away after click cannot produce SENT_VERIFIED', async () =>
   assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
   assert.equal(result.safeDiagnosticCode, 'URL_CHANGED_AFTER_SEND_CLICK');
 });
+
+test('Work surface without author-role markers verifies an operation-local exact prompt in main', async () => {
+  const { adapter } = loadAdapter();
+  const fx = fixture(PROMPT, {
+    onClick({ composer }) {
+      composer.value = '';
+      visiblePrompt = true;
+    }
+  });
+  let visiblePrompt = false;
+  const message = {
+    isConnected: true, hidden: false, disabled: false, innerText: PROMPT,
+    closest() { return null; },
+    getBoundingClientRect() { return { width: 100, height: 20 }; },
+    children: []
+  };
+  const main = { querySelectorAll() { return visiblePrompt ? [message] : []; } };
+  fx.document.documentElement = { getAttribute(name) { return name === 'data-codex-window-type' ? 'browser' : null; } };
+  fx.document.querySelector = selector => selector === 'main, [role="main"]' ? main : null;
+  const result = await adapter.execute(request(), { document: fx.document, wait: async () => {} });
+  assert.equal(fx.clicks(), 1);
+  assert.equal(result.status, adapter.STATUS.SENT_VERIFIED);
+  assert.equal(result.submissionEvidence, 'OPERATION_LOCAL_MAIN_PROMPT_APPEND');
+  assert.equal(fx.messages.length, 0);
+});
+
+test('Work surface does not count an old identical prompt or composer clearing as Send', async () => {
+  const { adapter } = loadAdapter();
+  const fx = fixture(PROMPT, { onClick({ composer }) { composer.value = ''; } });
+  const oldMessage = {
+    isConnected: true, hidden: false, disabled: false, innerText: PROMPT,
+    closest() { return null; },
+    getBoundingClientRect() { return { width: 100, height: 20 }; },
+    children: []
+  };
+  const main = { querySelectorAll() { return [oldMessage]; } };
+  fx.document.documentElement = { getAttribute(name) { return name === 'data-codex-window-type' ? 'browser' : null; } };
+  fx.document.querySelector = selector => selector === 'main, [role="main"]' ? main : null;
+  const result = await adapter.execute(request(), { document: fx.document, wait: async () => {} });
+  assert.equal(fx.clicks(), 1);
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.match(result.safeDiagnosticMessage, /surface=chatgpt-work; mainExactMatches=1/);
+});
