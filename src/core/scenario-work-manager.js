@@ -258,6 +258,18 @@ function normalizeStore(raw, now = Date.now()) {
       // after restart. Current-schema persisted bytes must already equal the
       // canonical config that this version itself writes.
       if (!compatiblePersistedConfig(item.config, config)) continue;
+      const pool = plainRecord(item.pool) && typeof item.pool.id === 'string'
+        && /^[A-Za-z0-9._:-]{1,120}$/u.test(item.pool.id)
+        && Number.isInteger(item.pool.replacementBudget)
+        && item.pool.replacementBudget >= 0 && item.pool.replacementBudget <= 100000
+        ? { id: item.pool.id, replacementBudget: item.pool.replacementBudget } : null;
+      // CHAT_CYCLE pools have one unambiguous contract: one physical chat runs
+      // the configured prompt sequence exactly once. Replacement generations
+      // are governed only by the shared pool replacement budget.
+      if (pool && config.mode === ScenarioWorkMode.CHAT_CYCLE) {
+        config.roundsPerGeneration = 1;
+        config.maxGenerations = 0;
+      }
       const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
         ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
@@ -267,11 +279,7 @@ function normalizeStore(raw, now = Date.now()) {
           name: safeName(item.name || config.name),
           config,
           runtime,
-          pool: plainRecord(item.pool) && typeof item.pool.id === 'string'
-            && /^[A-Za-z0-9._:-]{1,120}$/u.test(item.pool.id)
-            && Number.isInteger(item.pool.replacementBudget)
-            && item.pool.replacementBudget >= 0 && item.pool.replacementBudget <= 100000
-            ? { id: item.pool.id, replacementBudget: item.pool.replacementBudget } : null,
+          pool,
           createdAt: Math.max(0, Number(item.createdAt || now)),
           updatedAt: Math.max(0, Number(item.updatedAt || now)),
         },
@@ -452,7 +460,10 @@ export class ScenarioWorkManager {
     const now = this.now();
     await this.update(store => {
       if (store.byId[id]) throw new Error('Сценарій з таким ідентифікатором уже існує.');
-      const normalizedConfig = normalizeScenarioWorkConfig({ ...config, id, name, mode });
+      const cycleContract = mode === ScenarioWorkMode.CHAT_CYCLE
+        ? { roundsPerGeneration: 1, maxGenerations: 1 }
+        : {};
+      const normalizedConfig = normalizeScenarioWorkConfig({ ...config, ...cycleContract, id, name, mode });
       const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalizedConfig, now));
       runtime.verifiedSendHistoryComplete = true;
       store.byId[id] = { id, name: safeName(name), config: normalizedConfig, runtime, createdAt: now, updatedAt: now };
@@ -478,7 +489,7 @@ export class ScenarioWorkManager {
       for (const [index, id] of ids.entries()) {
         const slotName = `${safeName(name).slice(0, 100)} — чат ${index + 1}`;
         const normalized = normalizeScenarioWorkConfig({ ...config, id, name: slotName,
-          mode: ScenarioWorkMode.CHAT_CYCLE, maxGenerations: 0 });
+          mode: ScenarioWorkMode.CHAT_CYCLE, roundsPerGeneration: 1, maxGenerations: 0 });
         const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalized, now));
         runtime.verifiedSendHistoryComplete = true;
         store.byId[id] = { id, name: slotName, config: normalized, runtime,
