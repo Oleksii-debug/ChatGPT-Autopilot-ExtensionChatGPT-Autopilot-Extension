@@ -185,6 +185,45 @@ test('authority arrays are descriptor-snapshotted without ordinary caller reads'
   assert.equal(reads, 0, 'requested capability normalization must not read caller properties');
 });
 
+test('provider rejects noncanonical authority timestamp aliases before canonical contract normalizers', async () => {
+  let calls = 0;
+  const provider = new GoogleWorkspaceAgentProviderV1({
+    workspaceClient: client({
+      searchGmail: async args => {
+        calls += 1;
+        return { operation: 'searchGmail', args };
+      },
+    }),
+    grantedCapabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_SEARCH],
+    now: () => Date.parse(at),
+  });
+  const base = invocation(
+    GoogleWorkspaceToolId.GMAIL_SEARCH,
+    GoogleWorkspaceCapabilityId.GMAIL_SEARCH,
+    { userId: 'me' },
+  );
+
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: { ...base, createdAt: '2026-09-25T00:10:00Z' },
+      policyDecision: decision(),
+    }),
+    /ToolInvocationV1\.createdAt must be an exact canonical timestamp/i,
+  );
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: base,
+      policyDecision: { ...decision(), decidedAt: '2026-09-25T00:10:00Z' },
+    }),
+    /PolicyDecisionV1\.decidedAt must be an exact canonical timestamp/i,
+  );
+  assert.equal(calls, 0);
+
+  const result = await provider.invoke({ invocation: base, policyDecision: decision() });
+  assert.equal(result.result.operation, 'searchGmail');
+  assert.equal(calls, 1);
+});
+
 test('provider rejects coercive authority aliases before canonical contract normalizers', async () => {
   const provider = new GoogleWorkspaceAgentProviderV1({
     workspaceClient: client(),
