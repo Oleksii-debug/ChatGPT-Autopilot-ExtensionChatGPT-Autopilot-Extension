@@ -2650,6 +2650,53 @@ async function loadActionCenter() {
   catch (error) { $('action-center-summary').textContent = `Не вдалося прочитати центр уваги: ${error.message}`; }
 }
 
+function renderProjectWorkspaceSummary(data) {
+  const projects = Array.isArray(data?.projects) ? data.projects : [];
+  const totals = data?.summary || {};
+  $('project-workspace-summary').textContent = projects.length
+    ? `Проєктів: ${projects.length}. Джерел: ${totals.sourceCount || 0}. Артефактів: ${totals.artifactCount || 0}. Капсул контексту: ${totals.capsuleCount || 0}. Застарілих за ревізією капсул: ${totals.staleRevisionCapsuleCount || 0}.`
+    : 'У сховищі проєктів ще немає збережених проєктів.';
+
+  const list = $('project-workspace-list');
+  const signature = JSON.stringify(projects.map(project => [
+    project.projectId,
+    project.projectRevisionId,
+    project.sourceCount,
+    project.artifactCount,
+    project.sensitiveArtifactCount,
+    project.capsuleCount,
+    project.staleRevisionCapsuleCount,
+    project.provenanceCount,
+  ]));
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  list.replaceChildren();
+  for (const project of projects) {
+    const li = document.createElement('li');
+    const capsuleState = project.capsuleRevisionStatus === 'HAS_STALE'
+      ? 'є капсули від попередньої ревізії'
+      : project.capsuleRevisionStatus === 'CURRENT'
+        ? 'капсули відповідають поточній ревізії'
+        : 'капсул ще немає';
+    li.textContent = `Проєкт ${project.projectId}; ревізія ${project.projectRevisionId}; джерел ${project.sourceCount}; артефактів ${project.artifactCount}; капсул ${project.capsuleCount}; provenance-записів ${project.provenanceCount}; ${capsuleState}.`;
+    list.append(li);
+  }
+}
+
+async function loadProjectWorkspace({ focusSummary = false } = {}) {
+  if (document.visibilityState !== 'visible') return;
+  const summary = $('project-workspace-summary');
+  try {
+    renderProjectWorkspaceSummary(await core('GET_PROJECT_WORKSPACE_SUMMARY'));
+  } catch (error) {
+    const list = $('project-workspace-list');
+    list.dataset.signature = '';
+    list.replaceChildren();
+    summary.textContent = `Не вдалося прочитати сховище проєктів: ${error.message}`;
+  }
+  if (focusSummary) summary.focus();
+}
+
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
   const activeId = preserveFocus ? active?.id || null : null;
@@ -3990,6 +4037,7 @@ $('run-ai-router-strong-button').addEventListener('click', () => runAiRouterProm
 $('save-ai-manager-button').addEventListener('click', saveAiManagerSettings);
 $('run-ai-manager-now-button').addEventListener('click', runAiManagerNow);
 $('reset-ai-manager-runtime-button').addEventListener('click', resetAiManagerRuntime);
+$('project-workspace-refresh-button').addEventListener('click', () => { void loadProjectWorkspace({ focusSummary: true }); });
 $('create-session-button').addEventListener('click', createSession);
 $('master-pause-button').addEventListener('click', () => masterAction('MASTER_PAUSE', 'master pause', true));
 $('master-resume-button').addEventListener('click', () => masterAction('MASTER_RESUME', 'master resume', false));
@@ -4091,6 +4139,7 @@ async function initialLoad() {
   else showSimplifiedSession(null);
   await loadGlobalStatus();
   await loadActionCenter();
+  await loadProjectWorkspace();
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
