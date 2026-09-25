@@ -39,6 +39,9 @@ function snapshotDataRecord(value, label) {
 }
 
 export function normalizeGatewayUrl(value) {
+  if (value !== undefined && typeof value !== 'string') {
+    throw new Error('AI Gateway URL must be text when supplied');
+  }
   const parsed = new URL(clean(value) || DEFAULT_GATEWAY_URL);
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('AI Gateway must use http:// or https://');
   if (!LOCAL_HOSTS.has(parsed.hostname.toLowerCase())) throw new Error('AI Gateway must use localhost or 127.0.0.1');
@@ -47,6 +50,12 @@ export function normalizeGatewayUrl(value) {
   parsed.search = '';
   parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
   return parsed.toString().replace(/\/$/, '');
+}
+
+function optionalText(value, label) {
+  if (value === undefined) return '';
+  if (typeof value !== 'string') throw new Error(`${label} must be text when supplied`);
+  return value;
 }
 
 function invalidRequestBodyError() {
@@ -202,7 +211,7 @@ export class AiGatewayClient {
     const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
     const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
     const provider = request.provider;
-    const endpointId = request.endpointId === undefined ? '' : request.endpointId;
+    const endpointId = optionalText(request.endpointId, 'AI Gateway endpointId');
     const p = encodeURIComponent(clean(provider));
     if (!p) throw new Error('AI provider is required');
     const endpoint = clean(endpointId);
@@ -215,14 +224,17 @@ export class AiGatewayClient {
     const timeoutSeconds = request.timeoutSeconds === undefined ? 180 : request.timeoutSeconds;
     const provider = request.provider;
     const model = request.model;
-    const endpointId = request.endpointId === undefined ? '' : request.endpointId;
+    const endpointId = optionalText(request.endpointId, 'AI Gateway endpointId');
     const prompt = request.prompt;
-    const systemPrompt = request.systemPrompt === undefined ? '' : request.systemPrompt;
+    const systemPrompt = optionalText(request.systemPrompt, 'AI Gateway systemPrompt');
     const maxOutputTokens = request.maxOutputTokens === undefined ? 0 : request.maxOutputTokens;
-    const imageDataUrl = request.imageDataUrl === undefined ? '' : request.imageDataUrl;
+    const imageDataUrl = optionalText(request.imageDataUrl, 'AI Gateway imageDataUrl');
     if (request.maxOutputTokens !== undefined
         && (typeof maxOutputTokens !== 'number' || !Number.isFinite(maxOutputTokens))) {
       throw new Error('AI Gateway maxOutputTokens must be a number');
+    }
+    if (maxOutputTokens < 0 || (maxOutputTokens > 0 && maxOutputTokens < 1)) {
+      throw new Error('AI Gateway maxOutputTokens must be 0 or at least 1');
     }
     const normalizedPrompt = clean(prompt);
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
