@@ -11,7 +11,9 @@ import {
 
 const CREATED_AT = '2026-09-25T02:40:00.000Z';
 const OBSERVED_AT = '2026-09-25T02:45:00.000Z';
-const SNAPSHOT_SHA = 'a'.repeat(64);
+const SNAPSHOT_UTF8 = '{"state":"checkpoint"}';
+const SNAPSHOT_SHA = '79ee8a1fe903094a276e18d5dff176e6de7a4260418b84ff5b2e37b41c8fd808';
+const SNAPSHOT_SIZE_BYTES = 22;
 
 function checkpointInput(overrides = {}) {
   return {
@@ -31,7 +33,7 @@ function checkpointInput(overrides = {}) {
       uri: 'artifact://agent-1/checkpoints/1',
       mediaType: 'application/json',
       sha256: SNAPSHOT_SHA,
-      sizeBytes: 4096,
+      sizeBytes: SNAPSHOT_SIZE_BYTES,
       createdAt: CREATED_AT,
       producerInvocationId: null,
       sensitive: true,
@@ -87,7 +89,7 @@ test('rewind assessment allows only an internal-state rewind and preserves newer
   const result = await assessAgentCheckpointRewindV1({
     checkpoint,
     current: head({ policyRevisionId: 'policy-newer' }),
-    snapshotSha256: SNAPSHOT_SHA,
+    snapshotUtf8: SNAPSHOT_UTF8,
   });
 
   assert.equal(result.status, AgentCheckpointRewindStatus.READY_FOR_RECONCILIATION);
@@ -106,7 +108,7 @@ test('rewind blocks when any external effect was admitted after the checkpoint',
   const result = await assessAgentCheckpointRewindV1({
     checkpoint,
     current: head({ exactEffectLedgerRevision: 8 }),
-    snapshotSha256: SNAPSHOT_SHA,
+    snapshotUtf8: SNAPSHOT_UTF8,
   });
 
   assert.equal(result.status, AgentCheckpointRewindStatus.BLOCKED);
@@ -120,7 +122,7 @@ test('rewind blocks unresolved external effects even when the durable ledger rev
   const result = await assessAgentCheckpointRewindV1({
     checkpoint,
     current: head({ unresolvedEffectIds: ['effect-ambiguous-1'] }),
-    snapshotSha256: SNAPSHOT_SHA,
+    snapshotUtf8: SNAPSHOT_UTF8,
   });
 
   assert.equal(result.status, AgentCheckpointRewindStatus.BLOCKED);
@@ -132,7 +134,7 @@ test('rewind is a NOOP at the exact checkpoint state and still grants no restore
   const result = await assessAgentCheckpointRewindV1({
     checkpoint,
     current: head({ planRevision: 4, internalStateRevision: 12 }),
-    snapshotSha256: SNAPSHOT_SHA,
+    snapshotUtf8: SNAPSHOT_UTF8,
   });
 
   assert.equal(result.status, AgentCheckpointRewindStatus.NOOP);
@@ -147,7 +149,7 @@ test('rewind rejects cross-identity, wrong snapshot bytes and regressed current 
     () => assessAgentCheckpointRewindV1({
       checkpoint,
       current: head({ agentId: 'agent-other' }),
-      snapshotSha256: SNAPSHOT_SHA,
+      snapshotUtf8: SNAPSHOT_UTF8,
     }),
     /agentId does not match checkpoint/,
   );
@@ -155,15 +157,24 @@ test('rewind rejects cross-identity, wrong snapshot bytes and regressed current 
     () => assessAgentCheckpointRewindV1({
       checkpoint,
       current: head(),
-      snapshotSha256: 'b'.repeat(64),
+      snapshotUtf8: '{"state":"checkpoinu"}',
     }),
     /snapshot bytes do not match checkpoint artifact/,
   );
   await assert.rejects(
     () => assessAgentCheckpointRewindV1({
       checkpoint,
-      current: head({ exactEffectLedgerRevision: 6 }),
+      current: head(),
+      snapshotUtf8: '{"state":"checkpoinu"}',
       snapshotSha256: SNAPSHOT_SHA,
+    }),
+    /unknown field: snapshotSha256/,
+  );
+  await assert.rejects(
+    () => assessAgentCheckpointRewindV1({
+      checkpoint,
+      current: head({ exactEffectLedgerRevision: 6 }),
+      snapshotUtf8: SNAPSHOT_UTF8,
     }),
     /current state regressed behind checkpoint/,
   );

@@ -10,10 +10,10 @@ export const AgentCheckpointRewindStatus = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
-const SHA256 = /^[a-f0-9]{64}$/u;
 const CHECKPOINT_DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const MAX_EVIDENCE_IDS = 128;
 const MAX_UNRESOLVED_EFFECTS = 128;
+const MAX_SNAPSHOT_UTF8_BYTES = 4 * 1024 * 1024;
 
 const CHECKPOINT_KEYS = new Set([
   'schemaVersion',
@@ -59,7 +59,7 @@ const ARTIFACT_KEYS = new Set([
   'sensitive',
 ]);
 
-const ASSESSMENT_KEYS = new Set(['checkpoint', 'current', 'snapshotSha256']);
+const ASSESSMENT_KEYS = new Set(['checkpoint', 'current', 'snapshotUtf8']);
 
 function strictRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -150,11 +150,6 @@ function digest(value, label) {
   return value;
 }
 
-function bareSha256(value, label) {
-  if (typeof value !== 'string' || !SHA256.test(value)) throw new Error(`${label} is invalid`);
-  return value;
-}
-
 function idList(value, label, { max }) {
   const raw = strictArray(value ?? [], label, { max });
   const out = raw.map((item, index) => exactId(item, `${label}[${index}]`));
@@ -170,6 +165,9 @@ function snapshotArtifact(value) {
   }
   if (!normalized.sha256) throw new Error('AgentCheckpointV1 snapshotArtifact requires sha256');
   if (normalized.sizeBytes < 1) throw new Error('AgentCheckpointV1 snapshotArtifact requires non-empty material');
+  if (normalized.sizeBytes > MAX_SNAPSHOT_UTF8_BYTES) {
+    throw new Error(`AgentCheckpointV1 snapshotArtifact exceeds ${MAX_SNAPSHOT_UTF8_BYTES} byte rewind bound`);
+  }
   return normalized;
 }
 
@@ -238,6 +236,24 @@ async function materialDigest(material, { cryptoApi = globalThis.crypto } = {}) 
   return createSha256FingerprintV1(canonicalCheckpointMaterial(material), { cryptoApi });
 }
 
+async function verifySnapshotUtf8(snapshotUtf8, artifact, { cryptoApi = globalThis.crypto } = {}) {
+  if (typeof snapshotUtf8 !== 'string') {
+    throw new Error('AgentCheckpoint rewind snapshotUtf8 must be text');
+  }
+  const bytes = new TextEncoder().encode(snapshotUtf8);
+  if (bytes.byteLength < 1 || bytes.byteLength > MAX_SNAPSHOT_UTF8_BYTES) {
+    throw new Error(`AgentCheckpoint rewind snapshotUtf8 must be between 1 and ${MAX_SNAPSHOT_UTF8_BYTES} UTF-8 bytes`);
+  }
+  if (bytes.byteLength !== artifact.sizeBytes) {
+    throw new Error('AgentCheckpoint rewind snapshot bytes do not match checkpoint artifact size');
+  }
+  const actualDigest = await createSha256FingerprintV1(snapshotUtf8, { cryptoApi });
+  const actualSha256 = actualDigest.slice('sha256:'.length);
+  if (actualSha256 !== artifact.sha256) {
+    throw new Error('AgentCheckpoint rewind snapshot bytes do not match checkpoint artifact');
+  }
+}
+
 export async function createAgentCheckpointV1(raw, options = {}) {
   const material = normalizeCheckpointMaterial(raw, CHECKPOINT_CREATE_KEYS);
   const checkpointDigest = await materialDigest(material, options);
@@ -301,16 +317,13 @@ export async function assessAgentCheckpointRewindV1(raw, options = {}) {
   const request = strictRecord(raw, 'AgentCheckpoint rewind request', ASSESSMENT_KEYS);
   const checkpoint = await verifyAgentCheckpointV1(request.checkpoint, options);
   const current = normalizeAgentCheckpointHeadV1(request.current);
-  const suppliedSnapshotSha256 = bareSha256(request.snapshotSha256, 'AgentCheckpoint rewind snapshotSha256');
 
   for (const key of ['agentId', 'jobId', 'planId']) {
     if (current[key] !== checkpoint[key]) {
       throw new Error(`AgentCheckpoint rewind ${key} does not match checkpoint`);
     }
   }
-  if (suppliedSnapshotSha256 !== checkpoint.snapshotArtifact.sha256) {
-    throw new Error('AgentCheckpoint rewind snapshot bytes do not match checkpoint artifact');
-  }
+  await verifySnapshotUtf8(request.snapshotUtf8, checkpoint.snapshotArtifact, options);
   if (current.planRevision < checkpoint.planRevision
       || current.internalStateRevision < checkpoint.internalStateRevision
       || current.exactEffectLedgerRevision < checkpoint.exactEffectLedgerRevision) {
