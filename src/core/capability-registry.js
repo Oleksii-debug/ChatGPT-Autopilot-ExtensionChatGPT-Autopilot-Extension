@@ -32,14 +32,23 @@ const DESCRIPTORS = Object.freeze({
   }),
 });
 
+function requireExactProviderId(providerId) {
+  if (typeof providerId !== 'string'
+      || providerId.length === 0
+      || providerId !== providerId.trim()) {
+    throw new Error('Agent provider ID must use exact canonical text representation');
+  }
+  return providerId;
+}
+
 export function listAgentProviders() {
   return Object.values(DESCRIPTORS).map(item => ({ ...item, capabilities: [...item.capabilities] }));
 }
 
 export function getAgentProvider(providerId) {
-  const id = String(providerId || '').trim();
+  const id = requireExactProviderId(providerId);
   const descriptor = DESCRIPTORS[id];
-  if (!descriptor) throw new Error(`Unsupported agent provider: ${id || '(empty)'}`);
+  if (!descriptor) throw new Error(`Unsupported agent provider: ${id}`);
   return { ...descriptor, capabilities: [...descriptor.capabilities] };
 }
 
