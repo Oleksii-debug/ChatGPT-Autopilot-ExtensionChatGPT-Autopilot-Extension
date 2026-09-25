@@ -10,6 +10,7 @@ export const GitHubToolId = Object.freeze({
   WORKFLOW_LIST: 'remote/github/workflow.list',
   WORKFLOW_RUN_LIST: 'remote/github/workflowRun.list',
   WORKFLOW_RUN_JOBS_LIST: 'remote/github/workflowRun.jobs.list',
+  WORKFLOW_DISPATCH: 'remote/github/workflow.dispatch',
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
   PULL_REQUEST_READ: 'remote/github/pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'remote/github/pullRequest.comment.read',
@@ -31,6 +32,7 @@ export const GitHubCapabilityId = Object.freeze({
   TREE_READ: 'github.tree.read',
   BRANCH_READ: 'github.branch.read',
   WORKFLOW_READ: 'github.workflow.read',
+  WORKFLOW_DISPATCH: 'github.workflow.dispatch',
   PULL_REQUEST_READ: 'github.pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'github.pullRequest.comment.read',
   ISSUE_READ: 'github.issue.read',
@@ -122,6 +124,17 @@ const TOOLS = Object.freeze([
     inputSchemaRef: 'github-schema/workflowRun.jobs.list/input',
     outputSchemaRef: 'github-schema/workflowRun.jobs.list/output',
     readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_DISPATCH,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Dispatch exact GitHub Actions workflow',
+    description: 'Dispatches one owner-allowlisted workflow at an exact branch or tag ref. Ambiguous transport outcomes require reconciliation before retry.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_DISPATCH],
+    inputSchemaRef: 'github-schema/workflow.dispatch/input',
+    outputSchemaRef: 'github-schema/workflow.dispatch/output',
+    readOnly: false,
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
@@ -302,6 +315,7 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.WORKFLOW_LIST) return 'listWorkflows';
   if (toolId === GitHubToolId.WORKFLOW_RUN_LIST) return 'listWorkflowRuns';
   if (toolId === GitHubToolId.WORKFLOW_RUN_JOBS_LIST) return 'listWorkflowRunJobs';
+  if (toolId === GitHubToolId.WORKFLOW_DISPATCH) return 'dispatchWorkflow';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
   if (toolId === GitHubToolId.PULL_REQUEST_READ) return 'readPullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_READ) return 'readPullRequestComment';
@@ -327,6 +341,7 @@ export class GitHubAgentProviderV1 {
         GitHubToolId.WORKFLOW_LIST,
         GitHubToolId.WORKFLOW_RUN_LIST,
         GitHubToolId.WORKFLOW_RUN_JOBS_LIST,
+        GitHubToolId.WORKFLOW_DISPATCH,
       ].includes(toolId))
       .map(methodFor);
     if (!githubClient || methods.some(method => typeof githubClient[method] !== 'function')) {
@@ -340,6 +355,10 @@ export class GitHubAgentProviderV1 {
         && ['listWorkflows', 'listWorkflowRuns', 'listWorkflowRunJobs']
           .some(method => typeof githubClient?.[method] !== 'function')) {
       throw new Error('GitHub REST client with complete workflow read support is required for the granted workflow capability');
+    }
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.WORKFLOW_DISPATCH)
+        && typeof githubClient?.dispatchWorkflow !== 'function') {
+      throw new Error('GitHub REST client with workflow dispatch support is required for the granted workflow dispatch capability');
     }
     this.githubClient = githubClient;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
