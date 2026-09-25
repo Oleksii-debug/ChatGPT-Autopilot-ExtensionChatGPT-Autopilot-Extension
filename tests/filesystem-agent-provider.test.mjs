@@ -53,12 +53,14 @@ function nativeClient(overrides = {}) {
   return {
     readText: async payload => ({ ...payload, text: 'hello' }),
     searchFiles: async payload => ({ ...payload, items: ['docs/a.txt'], truncated: false }),
+    listFiles: async payload => ({ ...payload, items: [], visitedEntries: 0, truncated: false }),
+    statPath: async payload => ({ ...payload, kind: 'FILE', sizeBytes: 1, modifiedAt: at, hashed: false, sha256: '' }),
     writeExistingText: async payload => ({ ...payload, sha256: digest(payload.text), alreadyApplied: false }),
     ...overrides,
   };
 }
 
-test('filesystem provider advertises only executable read/search tools while retaining hidden write recovery contract', async () => {
+test('filesystem provider advertises only executable read/search/list/stat tools while retaining hidden write recovery contract', async () => {
   const calls = [];
   const client = nativeClient({
     searchFiles: async payload => { calls.push(payload); return { items: ['docs/a.txt'], truncated: false }; },
@@ -69,10 +71,12 @@ test('filesystem provider advertises only executable read/search tools while ret
     grantedCapabilityIds: ['filesystem.search'],
     now: () => Date.parse(at),
   });
-  assert.equal(provider.tools().length, 2);
+  assert.equal(provider.tools().length, 4);
   assert.deepEqual(provider.tools().map(tool => tool.toolId), [
     FilesystemToolId.READ_TEXT,
     FilesystemToolId.SEARCH,
+    FilesystemToolId.LIST,
+    FilesystemToolId.STAT,
   ]);
   assert.equal(provider.tools().some(tool => tool.toolId === FilesystemToolId.WRITE_EXISTING_TEXT), false);
   const inv = invocation(FilesystemToolId.SEARCH, 'filesystem.search', { rootId: 'workspace', query: 'a' });
@@ -175,4 +179,49 @@ test('unavailable atomic filesystem publication is classified as a pre-effect fa
     return true;
   });
   assert.equal(calls, 1);
+});
+
+test('read-only filesystem list/stat dispatch through canonical policy authorization', async () => {
+  const calls = [];
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({
+      listFiles: async payload => {
+        calls.push(['list', structuredClone(payload)]);
+        return { rootId: payload.rootId, relativePath: payload.relativePath, items: [], visitedEntries: 0, truncated: false };
+      },
+      statPath: async payload => {
+        calls.push(['stat', structuredClone(payload)]);
+        return { rootId: payload.rootId, relativePath: payload.relativePath, kind: 'FILE', sizeBytes: 3, modifiedAt: at, hashed: true, sha256: digest('abc') };
+      },
+    }),
+    grantedCapabilityIds: ['filesystem.list', 'filesystem.stat'],
+    now: () => Date.parse(at),
+  });
+  const listInvocation = invocation(
+    FilesystemToolId.LIST,
+    'filesystem.list',
+    { rootId: 'workspace', relativePath: '.', maxEntries: 10 },
+    'fs-list-1',
+  );
+  const statInvocation = invocation(
+    FilesystemToolId.STAT,
+    'filesystem.stat',
+    { rootId: 'workspace', relativePath: 'a.txt', hash: true, maxHashBytes: 1024 },
+    'fs-stat-1',
+  );
+  const listed = await provider.invoke({ invocation: listInvocation, policyDecision: allow('fs-list-1') });
+  const stated = await provider.invoke({ invocation: statInvocation, policyDecision: allow('fs-stat-1') });
+  assert.equal(listed.result.truncated, false);
+  assert.equal(stated.result.sha256, digest('abc'));
+  assert.deepEqual(calls, [
+    ['list', { rootId: 'workspace', relativePath: '.', maxEntries: 10 }],
+    ['stat', { rootId: 'workspace', relativePath: 'a.txt', hash: true, maxHashBytes: 1024 }],
+  ]);
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: listInvocation,
+      policyDecision: { ...allow('fs-list-1'), decision: 'DENY' },
+    }),
+    /not authorized/u,
+  );
 });

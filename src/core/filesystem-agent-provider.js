@@ -8,6 +8,8 @@ export const FILESYSTEM_PROVIDER_ID = 'native/filesystem';
 export const FilesystemToolId = Object.freeze({
   READ_TEXT: 'native/filesystem/readText',
   SEARCH: 'native/filesystem/search',
+  LIST: 'native/filesystem/list',
+  STAT: 'native/filesystem/stat',
   WRITE_EXISTING_TEXT: 'native/filesystem/writeExistingText',
 });
 
@@ -62,6 +64,28 @@ const TOOLS = Object.freeze([
     outputSchemaRef: 'filesystem-schema/search/output',
     readOnly: true,
   }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: FilesystemToolId.LIST,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'List owner-scoped filesystem directory',
+    description: 'Enumerates one owner-scoped directory through a bounded streamed Native Companion read.',
+    capabilityIds: ['filesystem.list'],
+    inputSchemaRef: 'filesystem-schema/list/input',
+    outputSchemaRef: 'filesystem-schema/list/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: FilesystemToolId.STAT,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'Inspect owner-scoped filesystem metadata',
+    description: 'Reads metadata and, when explicitly requested, a bounded SHA-256 from an admitted regular file.',
+    capabilityIds: ['filesystem.stat'],
+    inputSchemaRef: 'filesystem-schema/stat/input',
+    outputSchemaRef: 'filesystem-schema/stat/output',
+    readOnly: true,
+  }),
 ]);
 const KNOWN_TOOLS = Object.freeze([...TOOLS, WRITE_RECOVERY_TOOL]);
 
@@ -107,8 +131,8 @@ function wrapFailure(error, { readOnly, invocationId }) {
 
 export class FilesystemAgentProviderV1 {
   constructor({ nativeClient, resolveArtifactText = null, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
-    if (!nativeClient?.readText || !nativeClient?.searchFiles) {
-      throw new Error('Filesystem Native Companion read/search client is required');
+    if (!nativeClient?.readText || !nativeClient?.searchFiles || !nativeClient?.listFiles || !nativeClient?.statPath) {
+      throw new Error('Filesystem Native Companion read/search/list/stat client is required');
     }
     this.nativeClient = nativeClient;
     this.resolveArtifactText = typeof resolveArtifactText === 'function' ? resolveArtifactText : null;
@@ -140,6 +164,10 @@ export class FilesystemAgentProviderV1 {
         result = await this.nativeClient.readText(authorized.invocation.arguments);
       } else if (tool.toolId === FilesystemToolId.SEARCH) {
         result = await this.nativeClient.searchFiles(authorized.invocation.arguments);
+      } else if (tool.toolId === FilesystemToolId.LIST) {
+        result = await this.nativeClient.listFiles(authorized.invocation.arguments);
+      } else if (tool.toolId === FilesystemToolId.STAT) {
+        result = await this.nativeClient.statPath(authorized.invocation.arguments);
       } else {
         if (!this.resolveArtifactText) throw providerError('ARTIFACT_RESOLVER_UNAVAILABLE', 'Canonical ArtifactRef text resolver is required for filesystem write');
         const args = normalizeWriteArguments(authorized.invocation.arguments);
