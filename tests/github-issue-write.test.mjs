@@ -87,9 +87,12 @@ function fullClient(overrides = {}) {
   return {
     readRepository: async args => args, readFile: async args => args, readTree: async args => args,
     readBranch: async args => args, findPullRequests: async args => args,
+    readPullRequest: async ({ repositoryFullName, pullRequestNumber }) => ({ repositoryFullName, number: pullRequestNumber, title: 'PR title', body: 'PR body', state: 'open', headSha: 'a'.repeat(40), baseSha: 'b'.repeat(40), url: 'https://example.invalid/pr' }),
+    readPullRequestComment: async ({ repositoryFullName, pullRequestNumber, commentId }) => ({ repositoryFullName, pullRequestNumber, commentId, body: 'Exact PR comment', url: 'https://example.invalid/pr-comment' }),
     readIssue: async ({ repositoryFullName, issueNumber }) => ({ repositoryFullName, number: issueNumber, title: 'Issue title', body: 'Issue body', state: 'open', url: 'https://example.invalid/issue' }),
     readIssueComment: async ({ repositoryFullName, issueNumber, commentId }) => ({ repositoryFullName, issueNumber, commentId, body: 'Exact comment', url: 'https://example.invalid/comment' }),
     createBranch: async args => args, putFile: async args => args, deleteFile: async args => args, createPullRequest: async args => args,
+    createPullRequestComment: async ({ repositoryFullName, pullRequestNumber, body }) => ({ repositoryFullName, pullRequestNumber, commentId: 99, body, url: 'https://example.invalid/pr-comment' }),
     createIssue: async ({ repositoryFullName, title, body }) => ({ repositoryFullName, number: 7, title, body, state: 'open', url: 'https://example.invalid/issue' }),
     createIssueComment: async ({ repositoryFullName, issueNumber, body }) => ({ repositoryFullName, issueNumber, commentId: 99, body, url: 'https://example.invalid/comment' }),
     ...overrides,
@@ -274,4 +277,104 @@ test('verifier rejects accessor-backed read dependency without executing getter'
   Object.defineProperty(client, 'readIssue', { enumerable: true, configurable: true, get() { getterReads += 1; return async () => ({}); } });
   assert.throws(() => new GitHubIssueWriteVerifierV1({ githubClient: client }), /data method/i);
   assert.equal(getterReads, 0);
+});
+
+
+test('REST pull request timeline comments use pull preflight plus issue-comment endpoint with exact parent binding', async () => {
+  const calls = [];
+  const pull = { number: 7, title: 'PR title', body: 'PR body', state: 'open',
+    head: { sha: 'a'.repeat(40) }, base: { sha: 'b'.repeat(40) },
+    html_url: 'https://github.com/owner/repo/pull/7' };
+  const comment = { id: 99, body: 'Exact PR comment',
+    issue_url: `${GITHUB_API_ORIGIN}/repos/owner/repo/issues/7`,
+    html_url: 'https://github.com/owner/repo/pull/7#issuecomment-99' };
+  const queue = [response(200, pull), response(200, pull), response(201, comment), response(200, pull), response(200, comment)];
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeClient(), credentialId: 'github-main', allowedRepositories: [repo],
+    fetchImpl: async (url, init) => { calls.push({ url, init }); const next = queue.shift(); if (!next) throw new Error('unexpected fetch'); return next; },
+  });
+  assert.equal((await client.readPullRequest({ repositoryFullName: repo, pullRequestNumber: 7 })).number, 7);
+  assert.equal((await client.createPullRequestComment({ repositoryFullName: repo, pullRequestNumber: 7, body: 'Exact PR comment' })).commentId, 99);
+  assert.equal((await client.readPullRequestComment({ repositoryFullName: repo, pullRequestNumber: 7, commentId: 99 })).body, 'Exact PR comment');
+  assert.deepEqual(calls.map(call => [call.init.method, new URL(call.url).pathname]), [
+    ['GET', '/repos/owner/repo/pulls/7'], ['GET', '/repos/owner/repo/pulls/7'],
+    ['POST', '/repos/owner/repo/issues/7/comments'], ['GET', '/repos/owner/repo/pulls/7'],
+    ['GET', '/repos/owner/repo/issues/comments/99'],
+  ]);
+  assert.deepEqual(JSON.parse(calls[2].init.body), { body: 'Exact PR comment' });
+});
+
+test('pull request timeline comment preflight fails closed before POST for a missing parent', async () => {
+  const calls = [];
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeClient(), credentialId: 'github-main', allowedRepositories: [repo],
+    fetchImpl: async (url, init) => { calls.push({ url, init }); return response(404, { message: 'Not Found' }); },
+  });
+  await assert.rejects(() => client.createPullRequestComment({
+    repositoryFullName: repo, pullRequestNumber: 7, body: 'must not post',
+  }), error => error.effectMayHaveOccurred === false);
+  assert.deepEqual(calls.map(call => call.init.method), ['GET']);
+});
+
+test('pull request timeline comment is independently read back and committed', async () => {
+  let creates = 0, reads = 0;
+  const client = fullClient({
+    createPullRequestComment: async ({ repositoryFullName, pullRequestNumber, body }) => {
+      creates += 1; return { repositoryFullName, pullRequestNumber, commentId: 99, body, url: 'https://example.invalid/pr-comment' };
+    },
+    readPullRequestComment: async ({ repositoryFullName, pullRequestNumber, commentId }) => {
+      reads += 1; return { repositoryFullName, pullRequestNumber, commentId, body: 'Exact PR comment', url: 'https://example.invalid/pr-comment' };
+    },
+  });
+  const provider = new GitHubAgentProviderV1({ githubClient: client, grantedCapabilityIds: [GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE], now: () => Date.parse(at) });
+  const verifier = new GitHubIssueWriteVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const fx = storeFixture();
+  const executor = new GitHubExactEffectExecutorV1({ provider, store: fx.store, now: () => Date.parse(at), verify: input => verifier.verify(input), reconcileVerify: input => verifier.reconcileVerify(input) });
+  const inv = invocation('github-pr-comment-create-1', GitHubToolId.PULL_REQUEST_COMMENT_CREATE, GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE,
+    { repositoryFullName: repo, pullRequestNumber: 7, body: 'Exact PR comment' });
+  const result = await executor.invoke({ invocation: inv, policyDecision: policy(inv) });
+  assert.equal(result.effectState.phase, 'COMMITTED'); assert.equal(creates, 1); assert.equal(reads, 1);
+  assert.equal(fx.snapshot(inv.invocationId).verification.reasonCode, 'GITHUB_CREATED_IDENTITY_CONFIRMED');
+});
+
+test('pull request timeline comment reconciliation never replays POST', async () => {
+  let creates = 0, reads = 0;
+  const client = fullClient({
+    createPullRequestComment: async ({ repositoryFullName, pullRequestNumber, body }) => {
+      creates += 1; return { repositoryFullName, pullRequestNumber, commentId: 99, body, url: 'https://example.invalid/pr-comment' };
+    },
+    readPullRequestComment: async ({ repositoryFullName, pullRequestNumber, commentId }) => {
+      reads += 1; return { repositoryFullName, pullRequestNumber, commentId,
+        body: reads === 1 ? 'temporarily divergent' : 'Exact PR comment', url: 'https://example.invalid/pr-comment' };
+    },
+  });
+  const provider = new GitHubAgentProviderV1({ githubClient: client, grantedCapabilityIds: [GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE], now: () => Date.parse(at) });
+  const verifier = new GitHubIssueWriteVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const fx = storeFixture();
+  const executor = new GitHubExactEffectExecutorV1({ provider, store: fx.store, now: () => Date.parse(at), verify: input => verifier.verify(input), reconcileVerify: input => verifier.reconcileVerify(input) });
+  const inv = invocation('github-pr-comment-reconcile', GitHubToolId.PULL_REQUEST_COMMENT_CREATE, GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE,
+    { repositoryFullName: repo, pullRequestNumber: 7, body: 'Exact PR comment' });
+  await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: policy(inv) }),
+    error => error.effectState?.phase === 'RECONCILE' && error.safeToRetry === false);
+  assert.equal(creates, 1); assert.equal(reads, 1);
+  const reconciled = await executor.reconcile({ invocationId: inv.invocationId, outcome: 'VERIFIED', reasonCode: 'READBACK_CONFIRMED' });
+  assert.equal(reconciled.phase, 'COMMITTED'); assert.equal(creates, 1); assert.equal(reads, 2);
+});
+
+test('pull request timeline comment verifier rejects accessor arguments before remote read', async () => {
+  let getterReads = 0, remoteReads = 0;
+  const client = fullClient({ readPullRequestComment: async () => { remoteReads += 1; return {}; } });
+  const verifier = new GitHubIssueWriteVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const args = { repositoryFullName: repo, body: 'Exact PR comment' };
+  Object.defineProperty(args, 'pullRequestNumber', { enumerable: true, get() { getterReads += 1; return 7; } });
+  const inv = invocation('github-pr-comment-hostile', GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
+    GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE, args);
+  await assert.rejects(() => verifier.verify({
+    invocation: inv, executionId: 'github-pr-comment-hostile:attempt:1',
+    observation: { schemaVersion: 1, observationId: 'github-pr-comment-hostile:obs',
+      invocationId: 'github-pr-comment-hostile', status: 'OK', summary: '',
+      data: { repositoryFullName: repo, pullRequestNumber: 7, commentId: 99, body: 'Exact PR comment' },
+      artifactRefs: [], observedAt: at },
+  }), /enumerable data property/i);
+  assert.equal(getterReads, 0); assert.equal(remoteReads, 0);
 });

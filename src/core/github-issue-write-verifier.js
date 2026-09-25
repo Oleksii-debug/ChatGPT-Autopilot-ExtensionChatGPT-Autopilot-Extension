@@ -76,8 +76,12 @@ function attemptFromExecutionId(value) {
 function expectedMutation(invocation) {
   const admitted = snapshotRecord(invocation, 'GitHub issue-write invocation');
   if (admitted.providerId !== GITHUB_PROVIDER_ID
-      || ![GitHubToolId.ISSUE_CREATE, GitHubToolId.ISSUE_COMMENT_CREATE].includes(admitted.toolId)) {
-    throw new Error('GitHub issue-write verifier accepts only canonical issue/comment create invocations');
+      || ![
+        GitHubToolId.ISSUE_CREATE,
+        GitHubToolId.ISSUE_COMMENT_CREATE,
+        GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
+      ].includes(admitted.toolId)) {
+    throw new Error('GitHub conversation-write verifier accepts only canonical issue/issue-comment/pull-request-comment create invocations');
   }
   const invocationId = requireId(admitted.invocationId, 'invocationId');
   const policyDecisionId = requireId(admitted.policyDecisionId, 'policyDecisionId');
@@ -91,6 +95,18 @@ function expectedMutation(invocation) {
       repositoryFullName: repository(args.repositoryFullName),
       title: exactTitle(args.title),
       body: exactBody(args.body ?? '', 'body', { allowEmpty: true }),
+    });
+  }
+
+  if (admitted.toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) {
+    const args = snapshotRecord(admitted.arguments, 'GitHub pull-request-comment-create arguments', new Set(['repositoryFullName', 'pullRequestNumber', 'body']));
+    return Object.freeze({
+      toolId: admitted.toolId,
+      invocationId,
+      policyDecisionId,
+      repositoryFullName: repository(args.repositoryFullName),
+      pullRequestNumber: positiveInteger(args.pullRequestNumber, 'pullRequestNumber'),
+      body: exactBody(args.body, 'body'),
     });
   }
 
@@ -119,6 +135,15 @@ function observedMutation(expected, observation) {
     return Object.freeze({ ...expected, observationId: requireId(observed.observationId, 'observationId'), issueNumber: number });
   }
 
+  if (expected.toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) {
+    const pullRequestNumber = positiveInteger(data.pullRequestNumber, 'observed pull request number');
+    const commentId = positiveInteger(data.commentId, 'observed comment id');
+    if (pullRequestNumber !== expected.pullRequestNumber || data.body !== expected.body) {
+      throw new Error('GitHub pull-request-comment observation parent/content mismatch');
+    }
+    return Object.freeze({ ...expected, observationId: requireId(observed.observationId, 'observationId'), commentId });
+  }
+
   const issueNumber = positiveInteger(data.issueNumber, 'observed issue number');
   const commentId = positiveInteger(data.commentId, 'observed comment id');
   if (issueNumber !== expected.issueNumber || data.body !== expected.body) {
@@ -131,6 +156,7 @@ export class GitHubIssueWriteVerifierV1 {
   constructor({ githubClient, verifierId = 'github-issue-write-readback-verifier', now = () => Date.now() } = {}) {
     this.readIssue = bindDataMethod(githubClient, 'readIssue', 'GitHub readback client');
     this.readIssueComment = bindDataMethod(githubClient, 'readIssueComment', 'GitHub readback client');
+    this.readPullRequestComment = bindDataMethod(githubClient, 'readPullRequestComment', 'GitHub readback client');
     this.verifierId = requireId(verifierId, 'verifierId');
     if (this.verifierId === GITHUB_PROVIDER_ID) throw new Error('GitHub issue-write verifier identity must differ from provider identity');
     if (typeof now !== 'function') throw new Error('now must be a function');
@@ -151,6 +177,18 @@ export class GitHubIssueWriteVerifierV1 {
         && issue.body === expected.body;
       return Object.freeze({ ...identity, matches, readback: issue });
     }
+    if (expected.toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) {
+      const comment = snapshotRecord(await this.readPullRequestComment({
+        repositoryFullName: expected.repositoryFullName,
+        pullRequestNumber: expected.pullRequestNumber,
+        commentId: identity.commentId,
+      }), 'GitHub pull request timeline comment readback');
+      const matches = comment.repositoryFullName === expected.repositoryFullName
+        && comment.pullRequestNumber === expected.pullRequestNumber
+        && comment.commentId === identity.commentId
+        && comment.body === expected.body;
+      return Object.freeze({ ...identity, matches, readback: comment });
+    }
     const comment = snapshotRecord(await this.readIssueComment({
       repositoryFullName: expected.repositoryFullName,
       issueNumber: expected.issueNumber,
@@ -164,7 +202,11 @@ export class GitHubIssueWriteVerifierV1 {
   }
 
   #verification(readback, executionId, attempt, observationId, suffix = '') {
-    const kind = readback.toolId === GitHubToolId.ISSUE_CREATE ? 'issue-create' : 'issue-comment-create';
+    const kind = readback.toolId === GitHubToolId.ISSUE_CREATE
+      ? 'issue-create'
+      : (readback.toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE
+        ? 'pull-request-comment-create'
+        : 'issue-comment-create');
     const verified = readback.matches;
     return {
       schemaVersion: 1,
@@ -196,10 +238,10 @@ export class GitHubIssueWriteVerifierV1 {
     invocation, effectId, executionId, attempt, policyDecisionId, expectedOutcome, priorObservation,
   } = {}) {
     if (expectedOutcome === ReconciliationOutcome.SAFE_RETRY) {
-      throw new Error('GitHub issue/comment create cannot prove SAFE_RETRY after dispatch');
+      throw new Error('GitHub conversation create cannot prove SAFE_RETRY after dispatch');
     }
     if (expectedOutcome !== ReconciliationOutcome.VERIFIED || !priorObservation) {
-      throw new Error('GitHub issue/comment create requires an observed immutable created identity for automatic reconciliation; otherwise manual review is required');
+      throw new Error('GitHub conversation create requires an observed immutable created identity for automatic reconciliation; otherwise manual review is required');
     }
     const safeInvocation = expectedMutation(invocation);
     if (requireId(effectId, 'effectId') !== safeInvocation.invocationId) throw new Error('effectId is invalid');
@@ -222,7 +264,9 @@ export class GitHubIssueWriteVerifierV1 {
         repositoryFullName: readback.repositoryFullName,
         ...(readback.toolId === GitHubToolId.ISSUE_CREATE
           ? { issueNumber: readback.issueNumber }
-          : { issueNumber: readback.issueNumber, commentId: readback.commentId }),
+          : (readback.toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE
+            ? { pullRequestNumber: readback.pullRequestNumber, commentId: readback.commentId }
+            : { issueNumber: readback.issueNumber, commentId: readback.commentId })),
       },
       artifactRefs: [],
       observedAt,
