@@ -215,6 +215,41 @@ test('AgentPlan array boundaries reject getters and non-canonical collections be
   assert.equal(reads, 0);
 });
 
+test('AgentPlan rejects non-canonical timestamp aliases across durable and transition boundaries', () => {
+  const missingMilliseconds = plan([node('discover')]);
+  missingMilliseconds.createdAt = '2026-09-23T11:30:00Z';
+  assert.throws(() => normalizeAgentPlanV1(missingMilliseconds), /canonical ISO-8601 UTC representation/);
+
+  const offsetNodeTime = plan([node('discover')]);
+  offsetNodeTime.nodes[0].updatedAt = '2026-09-23T13:30:00.000+02:00';
+  assert.throws(() => normalizeAgentPlanV1(offsetNodeTime), /canonical ISO-8601 UTC representation/);
+
+  const canonical = normalizeAgentPlanV1(plan([node('discover')]));
+  assert.equal(canonical.createdAt, AT);
+  assert.equal(canonical.nodes[0].updatedAt, AT);
+
+  const current = reconcileAgentPlanV1(canonical, { at: AT });
+  assert.throws(
+    () => reconcileAgentPlanV1(current, { at: '2026-09-23T11:30:00Z' }),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  const running = transitionAgentPlanNodeV1(current, {
+    nodeId: 'discover',
+    state: AgentPlanNodeState.RUNNING,
+    at: AT,
+  });
+  assert.throws(
+    () => transitionAgentPlanNodeV1(running, {
+      nodeId: 'discover',
+      state: AgentPlanNodeState.VERIFIED,
+      evidence: 'Verified evidence',
+      at: '2026-09-23T13:30:00.000+02:00',
+    }),
+    /canonical ISO-8601 UTC representation/,
+  );
+});
+
 test('AgentPlan duplicate text folding is locale-independent', () => {
   const duplicate = plan([node('discover')]);
   duplicate.successCriteria = ['ASCII', 'ascii'];
