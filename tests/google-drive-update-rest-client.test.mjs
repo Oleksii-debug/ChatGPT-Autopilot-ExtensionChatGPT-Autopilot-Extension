@@ -218,6 +218,14 @@ test('Drive update request rejects empty/no-op schema and hostile accessor befor
     () => client.updateDriveFile({ fileId }),
     error => error.code === 'GOOGLE_SCHEMA_INVALID',
   );
+  await assert.rejects(
+    () => client.updateDriveFile({ fileId: ` ${fileId}`, name: 'alias.txt' }),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
+  await assert.rejects(
+    () => client.updateDriveFile({ fileId, destinationParentId: `${destinationFolderId} ` }),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
 
   let getterReads = 0;
   const hostile = { fileId };
