@@ -162,6 +162,12 @@ function canonicalTimestamp(value, label) {
   return canonical;
 }
 
+function compareTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -279,7 +285,7 @@ export function normalizeDriveChangeV1(value) {
 
   const evidenceArtifactRef = normalizeEvidenceArtifactRef(raw.evidenceArtifactRef);
   const observedAt = canonicalTimestamp(raw.observedAt, 'DriveChangeV1 observedAt');
-  if (evidenceArtifactRef.createdAt > observedAt) {
+  if (compareTimestamp(evidenceArtifactRef.createdAt, observedAt) > 0) {
     throw new Error('DriveChangeV1 evidence artifact cannot postdate observation');
   }
 
@@ -314,7 +320,7 @@ function assertTriggerMatchesBinding(trigger, binding) {
       throw new Error(`Drive binding ${key} does not match trusted trigger definition`);
     }
   }
-  if (binding.createdAt < trigger.createdAt) {
+  if (compareTimestamp(binding.createdAt, trigger.createdAt) < 0) {
     throw new Error('Drive binding cannot predate its trusted trigger definition');
   }
 }
@@ -334,13 +340,13 @@ function assertChangeMatchesBinding(change, binding, request) {
   if (change.changeToken !== request.changeToken) {
     throw new Error('Resolved Drive change does not match requested changeToken');
   }
-  if (change.observedAt < binding.createdAt) {
+  if (compareTimestamp(change.observedAt, binding.createdAt) < 0) {
     throw new Error('Drive change predates trusted binding');
   }
 }
 
 function assertFreshChange(binding, change, admittedAt) {
-  if (admittedAt < change.observedAt) {
+  if (compareTimestamp(admittedAt, change.observedAt) < 0) {
     throw new Error('Drive admission predates trusted change observation');
   }
   const ageMillis = Date.parse(admittedAt) - Date.parse(change.observedAt);
