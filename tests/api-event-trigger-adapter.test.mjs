@@ -396,6 +396,94 @@ test('same trusted changeId keeps occurrence identity while changed material con
   assert.equal(first.occurrenceId, changed.occurrenceId);
 });
 
+test('extended-year API chronology is ordered by epoch at every admission boundary', async () => {
+  const beforeBoundary = '9999-12-31T23:59:59.999Z';
+  const afterBoundary = '+010000-01-01T00:00:00.000Z';
+  const afterBoundaryLater = '+010000-01-01T00:00:00.001Z';
+
+  const valid = normalizeApiResourceChangeV1(change({
+    evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
+    observedAt: afterBoundary,
+  }));
+  assert.equal(valid.observedAt, afterBoundary);
+
+  assert.throws(
+    () => normalizeApiResourceChangeV1(change({
+      evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
+      observedAt: beforeBoundary,
+    })),
+    /evidence artifact cannot postdate observation/u,
+  );
+
+  let schedulerCalls = 0;
+  const stop = async () => {
+    schedulerCalls += 1;
+    throw new Error('must not run');
+  };
+
+  await assert.rejects(
+    admitApiResourceChangeV1(
+      request({ admittedAt: afterBoundaryLater }),
+      deps({
+        trustedTrigger: trigger({ createdAt: afterBoundary }),
+        trustedBinding: binding({ createdAt: beforeBoundary }),
+        trustedChange: change({
+          evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
+          observedAt: afterBoundary,
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /binding cannot predate its trusted trigger definition/u,
+  );
+
+  await assert.rejects(
+    admitApiResourceChangeV1(
+      request({ admittedAt: afterBoundaryLater }),
+      deps({
+        trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+        trustedBinding: binding({ createdAt: afterBoundary }),
+        trustedChange: change({
+          evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
+          observedAt: beforeBoundary,
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /API change predates trusted binding/u,
+  );
+
+  await assert.rejects(
+    admitApiResourceChangeV1(
+      request({ admittedAt: beforeBoundary }),
+      deps({
+        trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+        trustedBinding: binding({ createdAt: beforeBoundary }),
+        trustedChange: change({
+          evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
+          observedAt: afterBoundary,
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /API admission predates trusted change observation/u,
+  );
+  assert.equal(schedulerCalls, 0);
+
+  const accepted = await admitApiResourceChangeV1(
+    request({ admittedAt: afterBoundaryLater }),
+    deps({
+      trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+      trustedBinding: binding({ createdAt: beforeBoundary }),
+      trustedChange: change({
+        evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
+        observedAt: afterBoundary,
+      }),
+    }),
+  );
+  assert.equal(accepted.status, EventTriggerRuntimeStatus.ACCEPTED);
+});
+
 test('noncanonical timestamps and representation aliases fail closed', async () => {
   await assert.rejects(
     admitApiResourceChangeV1(request({ admittedAt: '2026-09-25T10:02:00Z' }), deps()),
