@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveJobArtifactProvenanceV1 } from '../src/core/job-artifact-provenance.js';
+import { JobArtifactProvenanceResolverV1 } from '../src/core/job-artifact-provenance.js';
 import {
   addProjectSnapshot,
   createProjectWorkspace,
@@ -52,7 +52,7 @@ function source(overrides = {}) {
   };
 }
 
-function snapshot(artifactRef = artifact()) {
+function snapshot(artifactRef = artifact(), overrides = {}) {
   return {
     schemaVersion: 1,
     projectId: 'project-a',
@@ -61,6 +61,7 @@ function snapshot(artifactRef = artifact()) {
     sourceRefs: [source()],
     artifactRefs: [artifactRef],
     createdAt: PROVENANCE_AT,
+    ...overrides,
   };
 }
 
@@ -147,18 +148,52 @@ function binding(overrides = {}) {
   };
 }
 
-function request(overrides = {}) {
-  return {
-    jobBinding: binding(),
-    workspace: workspaceWithProvenance(),
-    exactEffectState: effectWithObservation(),
-    artifactId: 'artifact-out',
-    ...overrides,
+function sequence(values) {
+  let index = 0;
+  return () => {
+    const value = values[Math.min(index, values.length - 1)];
+    index += 1;
+    return structuredClone(value);
   };
 }
 
-test('resolver composes exact job/project/plan identity with current Project provenance and producer observation', () => {
-  const result = resolveJobArtifactProvenanceV1(request());
+function resolverFor({
+  bindings = [binding()],
+  workspaces = [workspaceWithProvenance()],
+  effects = [effectWithObservation()],
+} = {}) {
+  const nextBinding = sequence(bindings);
+  const nextWorkspace = sequence(workspaces);
+  const nextEffect = sequence(effects);
+  const effectLoads = [];
+  const resolver = new JobArtifactProvenanceResolverV1({
+    browserAgentManager: {
+      async resolveJobProjectBinding(jobId) {
+        assert.equal(jobId, 'job-1');
+        return nextBinding();
+      },
+    },
+    projectWorkspaceRepository: {
+      async load() {
+        return nextWorkspace();
+      },
+    },
+    async loadExactEffect(invocationId) {
+      effectLoads.push(invocationId);
+      return nextEffect();
+    },
+  });
+  return { resolver, effectLoads };
+}
+
+async function resolve(overrides = {}, dependencies = {}) {
+  const { resolver, effectLoads } = resolverFor(dependencies);
+  const result = await resolver.resolve({ jobId:'job-1', artifactId:'artifact-out', ...overrides });
+  return { result, effectLoads };
+}
+
+test('resolver loads canonical authorities and composes exact job/project/plan provenance', async () => {
+  const { result, effectLoads } = await resolve();
   assert.equal(result.schemaVersion, 1);
   assert.equal(result.jobId, 'job-1');
   assert.equal(result.projectId, 'project-a');
@@ -167,115 +202,181 @@ test('resolver composes exact job/project/plan identity with current Project pro
   assert.equal(result.producer.invocationId, 'invoke-1');
   assert.equal(result.producer.observationId, 'obs-1');
   assert.equal(result.producer.observationStatus, 'OK');
+  assert.deepEqual(effectLoads, ['invoke-1', 'invoke-1']);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.producer), true);
 });
 
-test('resolver rejects a caller job binding that points at another Project or has no exact plan identity', () => {
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ jobBinding: binding({ projectId:'project-other' }) })),
+test('public resolve boundary accepts only jobId and artifactId, not caller-owned authority snapshots', async () => {
+  const { resolver } = resolverFor();
+  await assert.rejects(
+    () => resolver.resolve({
+      jobId:'job-1',
+      artifactId:'artifact-out',
+      jobBinding:binding(),
+    }),
+    /unknown field: jobBinding/,
+  );
+  await assert.rejects(
+    () => resolver.resolve({
+      jobId:'job-1',
+      artifactId:'artifact-out',
+      workspace:workspaceWithProvenance(),
+    }),
+    /unknown field: workspace/,
+  );
+  await assert.rejects(
+    () => resolver.resolve({
+      jobId:'job-1',
+      artifactId:'artifact-out',
+      exactEffectState:effectWithObservation(),
+    }),
+    /unknown field: exactEffectState/,
+  );
+});
+
+test('resolver rejects canonical job binding pointed at another Project or without plan identity', async () => {
+  await assert.rejects(
+    () => resolve({}, { bindings:[binding({ projectId:'project-other' })] }),
     /Project not found/,
   );
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ jobBinding: binding({ planId:'' }) })),
+  await assert.rejects(
+    () => resolve({}, { bindings:[binding({ planId:'' })] }),
     /planId is invalid/,
   );
 });
 
-test('resolver rejects Project provenance made stale by a newer artifact identity', () => {
-  const workspace = workspaceWithProvenance();
-  replaceProjectSnapshot(workspace, {
-    ...snapshot(artifact({ sha256:hash('c') })),
-    revisionId:'project-r2',
-  }, { nowMs: 4 });
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ workspace })),
+test('resolver rejects Project provenance made stale by a newer current snapshot', async () => {
+  const current = workspaceWithProvenance();
+  const stale = structuredClone(current);
+  replaceProjectSnapshot(stale, snapshot(artifact({ sha256:hash('c') }), { revisionId:'project-r2' }), { nowMs:4 });
+  await assert.rejects(
+    () => resolve({}, { workspaces:[current, stale] }),
     /not current/,
   );
 });
 
-test('resolver rejects artifact substitution, duplicate observation aliases, and producer mismatch', () => {
+test('resolver rejects artifact substitution, duplicate observation aliases, and producer mismatch', async () => {
   const substituted = effectWithObservation(observation([artifact({ sha256:hash('c') })]));
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ exactEffectState:substituted })),
+  await assert.rejects(
+    () => resolve({}, { effects:[substituted] }),
     /does not match Project provenance/,
   );
 
   const duplicated = effectWithObservation(observation([artifact(), artifact()]));
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ exactEffectState:duplicated })),
+  await assert.rejects(
+    () => resolve({}, { effects:[duplicated] }),
     /exactly one matching artifact/,
   );
 
   const otherProducerArtifact = artifact({ producerInvocationId:'invoke-other' });
   const otherWorkspace = workspaceWithProvenance(otherProducerArtifact);
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ workspace:otherWorkspace })),
+  await assert.rejects(
+    () => resolve({}, { workspaces:[otherWorkspace] }),
     /producerInvocationId does not match/,
   );
 });
 
-test('resolver requires an ExactEffect observation instead of treating invocation metadata as result evidence', () => {
+test('resolver requires a canonical ExactEffect observation instead of treating invocation metadata as evidence', async () => {
   const state = createExactEffectStateV1(invocation(), { createdAt: INVOCATION_AT });
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ exactEffectState:state })),
+  await assert.rejects(
+    () => resolve({}, { effects:[state] }),
     /requires an ExactEffect observation/,
   );
 });
 
-test('resolver rejects invocation, artifact, observation and provenance causal inversions', () => {
+test('resolver rejects invocation, artifact, observation and provenance causal inversions', async () => {
   const earlyArtifact = artifact({ createdAt:'2026-09-25T02:59:58.000Z' });
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({
-      workspace:workspaceWithProvenance(earlyArtifact),
-      exactEffectState:effectWithObservation(observation([earlyArtifact])),
-    })),
+  await assert.rejects(
+    () => resolve({}, {
+      workspaces:[workspaceWithProvenance(earlyArtifact)],
+      effects:[effectWithObservation(observation([earlyArtifact]))],
+    }),
     /predates its producer invocation/,
   );
 
   const lateArtifact = artifact({ createdAt:'2026-09-25T03:00:04.000Z' });
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({
-      workspace:workspaceWithProvenance(lateArtifact, { createdAt:'2026-09-25T03:00:05.000Z' }),
-      exactEffectState:effectWithObservation(observation([lateArtifact])),
-    })),
+  await assert.rejects(
+    () => resolve({}, {
+      workspaces:[workspaceWithProvenance(lateArtifact, { createdAt:'2026-09-25T03:00:05.000Z' })],
+      effects:[effectWithObservation(observation([lateArtifact]))],
+    }),
     /Observation predates/,
   );
 
   const provenanceTooEarly = artifact({ createdAt:'2026-09-25T03:00:03.500Z' });
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({
-      workspace:workspaceWithProvenance(provenanceTooEarly, { createdAt:'2026-09-25T03:00:03.000Z' }),
-      exactEffectState:effectWithObservation(observation([provenanceTooEarly], { observedAt:'2026-09-25T03:00:04.000Z' })),
-    })),
+  await assert.rejects(
+    () => resolve({}, {
+      workspaces:[workspaceWithProvenance(provenanceTooEarly, { createdAt:'2026-09-25T03:00:03.000Z' })],
+      effects:[effectWithObservation(observation(
+        [provenanceTooEarly],
+        { observedAt:'2026-09-25T03:00:04.000Z' },
+      ))],
+    }),
     /provenance predates/,
   );
 });
 
-test('resolver request and binding identity fields are descriptor-safe', () => {
+test('resolver fails closed if job binding, Project provenance, or exact-effect state changes during read fence', async () => {
+  await assert.rejects(
+    () => resolve({}, {
+      bindings:[binding(), binding({ planId:'plan-2' })],
+    }),
+    /binding changed during provenance resolution/,
+  );
+
+  const artifactV2 = artifact({ sha256:hash('c') });
+  await assert.rejects(
+    () => resolve({}, {
+      workspaces:[workspaceWithProvenance(), workspaceWithProvenance(artifactV2)],
+      effects:[effectWithObservation(), effectWithObservation(observation([artifactV2]))],
+    }),
+    /Project artifact provenance changed during provenance resolution/,
+  );
+
+  const effectV2 = effectWithObservation(observation([artifact()], { observationId:'obs-2' }));
+  await assert.rejects(
+    () => resolve({}, {
+      effects:[effectWithObservation(), effectV2],
+    }),
+    /Exact-effect state changed during provenance resolution/,
+  );
+});
+
+test('resolver request identity is descriptor-safe and executes no accessor', async () => {
+  const { resolver } = resolverFor();
   let reads = 0;
-  const hostileRequest = request();
-  Object.defineProperty(hostileRequest, 'artifactId', {
+  const request = { jobId:'job-1' };
+  Object.defineProperty(request, 'artifactId', {
     enumerable:true,
     get() {
       reads += 1;
       return 'artifact-out';
     },
   });
-  assert.throws(() => resolveJobArtifactProvenanceV1(hostileRequest), /enumerable own data properties/);
-  assert.equal(reads, 0);
-
-  const hostileBinding = binding();
-  Object.defineProperty(hostileBinding, 'projectId', {
-    enumerable:true,
-    get() {
-      reads += 1;
-      return 'project-a';
-    },
-  });
-  assert.throws(
-    () => resolveJobArtifactProvenanceV1(request({ jobBinding:hostileBinding })),
+  await assert.rejects(
+    () => resolver.resolve(request),
     /enumerable own data properties/,
   );
   assert.equal(reads, 0);
+});
+
+test('resolver requires all canonical authority adapters', () => {
+  assert.throws(
+    () => new JobArtifactProvenanceResolverV1({}),
+    /Canonical Browser Agent/,
+  );
+  assert.throws(
+    () => new JobArtifactProvenanceResolverV1({
+      browserAgentManager:{ resolveJobProjectBinding() {} },
+    }),
+    /Project workspace repository/,
+  );
+  assert.throws(
+    () => new JobArtifactProvenanceResolverV1({
+      browserAgentManager:{ resolveJobProjectBinding() {} },
+      projectWorkspaceRepository:{ load() {} },
+    }),
+    /exact-effect loader/,
+  );
 });
