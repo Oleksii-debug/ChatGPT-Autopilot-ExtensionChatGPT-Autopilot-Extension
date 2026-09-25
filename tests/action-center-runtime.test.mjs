@@ -54,10 +54,13 @@ test('pending Browser Agent approval outranks an error and never exposes target 
     config: { name: 'Owner research agent' },
     runtime: {
       runState: 'WAITING_APPROVAL',
+      controlEpoch: 1,
       updatedAt: T2,
       lastError: secret,
       pendingApproval: {
+        snapshotId: 'snapshot-safe-id',
         snapshotSignature: 'snapshot-safe',
+        requestedAt: T1,
         targetName: secret,
         url: 'https://example.invalid/private',
         action: { type: 'CLICK', text: secret },
@@ -107,9 +110,15 @@ test('resolved or normal runtime states disappear instead of becoming stale inbo
     agentJobs: [agentJob('b', {
       runtime: {
         runState: 'WAITING_APPROVAL',
+        controlEpoch: 1,
         updatedAt: T1,
         lastError: '',
-        pendingApproval: { snapshotSignature: 's1', action: { type: 'CLICK' } },
+        pendingApproval: {
+          snapshotId: 'snapshot-s1',
+          snapshotSignature: 's1',
+          requestedAt: T0,
+          action: { type: 'CLICK' },
+        },
       },
     })],
   });
@@ -215,19 +224,35 @@ test('stale or malformed Browser Agent pendingApproval does not manufacture an o
       pendingApproval: { snapshotSignature: 'missing-action' },
     },
   });
-  const valid = agentJob('valid-approval', {
+  const malformedFence = agentJob('malformed-fence', {
     runtime: {
       runState: 'WAITING_APPROVAL',
       updatedAt: T2,
       lastError: '',
       pendingApproval: {
+        snapshotSignature: 'malformed-snapshot',
+        action: { type: 'CLICK', ref: 'control-malformed' },
+      },
+    },
+  });
+  const valid = agentJob('valid-approval', {
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      controlEpoch: 2,
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: {
+        snapshotId: 'snapshot-valid',
         snapshotSignature: 'valid-snapshot',
+        requestedAt: T1,
         action: { type: 'CLICK', ref: 'control-2' },
       },
     },
   });
 
-  const projection = await projectRuntimeActionCenter({ agentJobs: [stale, missingAction, valid] });
+  const projection = await projectRuntimeActionCenter({
+    agentJobs: [stale, missingAction, malformedFence, valid],
+  });
   assert.equal(projection.summary.openCount, 1);
   assert.equal(projection.items[0].ownerActionKind, 'APPROVE_OR_DENY');
   assert.match(projection.items[0].title, /valid-approval/u);
@@ -352,4 +377,41 @@ test('Action Center owner bridge refuses non-approval items and invalid decision
     }),
     /decision is invalid/i,
   );
+});
+
+
+test('malformed Browser Agent approval fences fail closed instead of manufacturing APPROVE_OR_DENY attention', async () => {
+  const baseRuntime = {
+    runState: 'WAITING_APPROVAL',
+    controlEpoch: 3,
+    updatedAt: T2,
+    lastError: '',
+    pendingApproval: {
+      snapshotId: 'snapshot-3',
+      snapshotSignature: 'signature-3',
+      requestedAt: T1,
+      action: { type: 'CLICK', ref: 'control-3' },
+    },
+  };
+  const mutations = [
+    runtime => { delete runtime.controlEpoch; },
+    runtime => { runtime.controlEpoch = -1; },
+    runtime => { runtime.updatedAt = '123'; },
+    runtime => { delete runtime.pendingApproval.requestedAt; },
+    runtime => { runtime.pendingApproval.requestedAt = -1; },
+    runtime => { delete runtime.pendingApproval.snapshotId; },
+    runtime => { runtime.pendingApproval.snapshotId = 7; },
+    runtime => { delete runtime.pendingApproval.snapshotSignature; },
+    runtime => { runtime.pendingApproval.snapshotSignature = 7; },
+  ];
+
+  for (const mutate of mutations) {
+    const runtime = structuredClone(baseRuntime);
+    mutate(runtime);
+    const projection = await projectRuntimeActionCenter({
+      agentJobs: [agentJob('malformed-approval', { runtime })],
+    });
+    assert.equal(projection.summary.openCount, 0);
+    assert.equal(projection.items.length, 0);
+  }
 });
