@@ -188,6 +188,40 @@ test('material diff verifies immutable bytes and returns deterministic multi-blo
   assert.deepEqual(repeat, out);
 });
 
+test('ill-formed UTF-16 aliases are rejected before UTF-8 identity while valid supplementary pairs remain exact', async () => {
+  const loneHighA = '\\uD800';
+  const loneHighB = '\\uD801';
+  const encodedA = new TextEncoder().encode(loneHighA);
+  const encodedB = new TextEncoder().encode(loneHighB);
+  assert.deepEqual(encodedA, encodedB);
+  assert.equal(
+    await createSha256FingerprintV1(loneHighA),
+    await createSha256FingerprintV1(loneHighB),
+  );
+
+  const aliasedRegistry = await registryFor(loneHighA, loneHighB);
+  await assert.rejects(
+    buildArtifactTextDiffV1(request(aliasedRegistry, loneHighA, loneHighB)),
+    /fromText must be well-formed UTF-16 before UTF-8 encoding/u,
+  );
+
+  const fromText = 'status 😀\\nready';
+  const toText = 'status 🧪\\nready';
+  const validRegistry = await registryFor(fromText, toText);
+  const out = await buildArtifactTextDiffV1(request(validRegistry, fromText, toText));
+
+  assert.equal(out.materialIdentitiesVerified, true);
+  assert.equal(out.stats.changed, true);
+  assert.deepEqual(
+    out.operations.filter(item => item.type !== ArtifactTextDiffOperation.EQUAL)
+      .map(item => [item.type, item.text]),
+    [
+      [ArtifactTextDiffOperation.REMOVE, 'status 😀'],
+      [ArtifactTextDiffOperation.ADD, 'status 🧪'],
+    ],
+  );
+});
+
 test('byte material must match immutable size and SHA-256 before any diff is emitted', async () => {
   const fromText = 'alpha\nbeta';
   const toText = 'alpha\ngamma';
