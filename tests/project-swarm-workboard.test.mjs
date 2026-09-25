@@ -167,4 +167,103 @@ test('workboard derives deterministic keyboard order, visual lanes, dependencies
   assert.equal(Object.isFrozen(board.entries[0].taskRef), true);
 });
 
-test('workboard does not disclose raw task ev
+test('workboard does not disclose raw task evidence, objectives, budgets, conflict keys or review evidence IDs', () => {
+  const board = buildProjectSwarmWorkboardV1(validInput());
+  const serialized = JSON.stringify(board);
+  assert.equal(serialized.includes('SUPER_SECRET_RESULT'), false);
+  assert.equal(serialized.includes('private-resource'), false);
+  assert.equal(serialized.includes('review-evidence-1'), false);
+  assert.equal(serialized.includes('Objective a-source'), false);
+  assert.equal(serialized.includes('maxCostUsdMicros'), false);
+  assert.equal(Object.hasOwn(board.entries[0], 'evidence'), false);
+  assert.equal(Object.hasOwn(board.entries[0], 'conflictKeys'), false);
+  assert.equal(Object.hasOwn(board.entries[0], 'objective'), false);
+  assert.equal(Object.hasOwn(board.entries[0], 'budget'), false);
+});
+
+test('verified work remains in review until an approved or merged review observation exists', () => {
+  const input = validInput();
+  input.reviews = [review('plan-a', 'a-source', {
+    state: WorkboardReviewState.CHANGES_REQUESTED,
+    evidenceIds: ['change-request-1'],
+  })];
+  let board = buildProjectSwarmWorkboardV1(input);
+  assert.equal(entry(board, 'plan-a', 'a-source').lane, WorkboardLane.REVIEW);
+  assert.equal(entry(board, 'plan-a', 'a-source').needsAttention, true);
+
+  input.reviews = [review('plan-a', 'a-source', {
+    state: WorkboardReviewState.REQUESTED,
+    evidenceIds: [],
+  })];
+  board = buildProjectSwarmWorkboardV1(input);
+  assert.equal(entry(board, 'plan-a', 'a-source').lane, WorkboardLane.REVIEW);
+
+  input.reviews = [];
+  board = buildProjectSwarmWorkboardV1(input);
+  assert.equal(entry(board, 'plan-a', 'a-source').reviewState, 'UNREVIEWED');
+  assert.equal(entry(board, 'plan-a', 'a-source').lane, WorkboardLane.REVIEW);
+});
+
+test('review observations fail closed unless they resolve to verified work with causal evidence', () => {
+  const nonVerified = validInput();
+  nonVerified.reviews = [review('plan-a', 'b-publish')];
+  assert.throws(() => buildProjectSwarmWorkboardV1(nonVerified), /review requires VERIFIED task/);
+
+  const missingEvidence = validInput();
+  missingEvidence.reviews = [review('plan-a', 'a-source', { evidenceIds: [] })];
+  assert.throws(() => buildProjectSwarmWorkboardV1(missingEvidence), /evidenceIds is required/);
+
+  const predatesTask = validInput();
+  predatesTask.reviews = [review('plan-a', 'a-source', { updatedAt: '2026-09-25T03:59:59.000Z' })];
+  assert.throws(() => buildProjectSwarmWorkboardV1(predatesTask), /predates task verification/);
+
+  const future = validInput();
+  future.reviews = [review('plan-a', 'a-source', { updatedAt: '2026-09-25T07:00:00.001Z' })];
+  assert.throws(() => buildProjectSwarmWorkboardV1(future), /postdates generatedAt/);
+
+  const unknown = validInput();
+  unknown.reviews = [review('plan-a', 'missing')];
+  assert.throws(() => buildProjectSwarmWorkboardV1(unknown), /unknown task/);
+});
+
+test('duplicate plans, jobs and review subjects are rejected', () => {
+  const duplicatePlan = validInput();
+  duplicatePlan.planSnapshots.push(structuredClone(duplicatePlan.planSnapshots[1]));
+  assert.throws(() => buildProjectSwarmWorkboardV1(duplicatePlan), /duplicate planId/);
+
+  const duplicateJob = validInput();
+  duplicateJob.planSnapshots[0].plan.jobId = 'job-a';
+  assert.throws(() => buildProjectSwarmWorkboardV1(duplicateJob), /duplicate current jobId/);
+
+  const duplicateReview = validInput();
+  duplicateReview.reviews.push(structuredClone(duplicateReview.reviews[0]));
+  assert.throws(() => buildProjectSwarmWorkboardV1(duplicateReview), /duplicate review subject/);
+});
+
+test('Project revision binding is exact and board rejects future plan state', () => {
+  const wrongProject = validInput();
+  wrongProject.planSnapshots[0].projectId = 'project-b';
+  assert.throws(() => buildProjectSwarmWorkboardV1(wrongProject), /not bound to the workboard Project revision/);
+
+  const wrongRevision = validInput();
+  wrongRevision.planSnapshots[0].projectRevisionId = 'project-r8';
+  assert.throws(() => buildProjectSwarmWorkboardV1(wrongRevision), /not bound to the workboard Project revision/);
+
+  const futurePlan = validInput();
+  futurePlan.planSnapshots[0].plan.updatedAt = '2026-09-25T07:00:00.001Z';
+  futurePlan.planSnapshots[0].plan.nodes[0].updatedAt = '2026-09-25T06:30:00.000Z';
+  futurePlan.planSnapshots[0].plan.nodes[1].updatedAt = '2026-09-25T06:30:00.000Z';
+  assert.throws(() => buildProjectSwarmWorkboardV1(futurePlan), /postdates generatedAt/);
+});
+
+test('exact timestamp representation is required at board, plan, node and review boundaries', () => {
+  const boardAlias = validInput();
+  boardAlias.generatedAt = '2026-09-25T07:00:00Z';
+  assert.throws(() => buildProjectSwarmWorkboardV1(boardAlias), /canonical ISO-8601/);
+
+  const planAlias = validInput();
+  planAlias.planSnapshots[0].plan.updatedAt = '2026-09-25T06:00:00Z';
+  assert.throws(() => buildProjectSwarmWorkboardV1(planAlias), /canonical ISO-8601/);
+
+  const nodeAlias = validInput();
+  nodeAlias.planSnapshots[0].plan.nodes[0]
