@@ -832,3 +832,67 @@ test('universal contract arrays consume descriptor snapshots without ordinary Pr
   assert.equal(reads, 0, 'evidence array must not perform ordinary caller reads');
 });
 
+
+
+test('canonical integer fields reject negative-zero aliases while preserving positive zero', () => {
+  const zeroArtifact = normalizeArtifactRefV1(artifact({ sizeBytes: 0 }));
+  assert.equal(zeroArtifact.sizeBytes, 0);
+  assert.equal(Object.is(zeroArtifact.sizeBytes, -0), false);
+  assert.throws(
+    () => normalizeArtifactRefV1(artifact({ sizeBytes: -0 })),
+    /sizeBytes is invalid/u,
+  );
+
+  const zeroVerification = normalizeVerificationV1({
+    schemaVersion: 1,
+    verificationId: 'verify-zero-attempt',
+    invocationId: 'invoke-1',
+    observationId: 'obs-1',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    verifiedAt: AT,
+    attempt: 0,
+  });
+  assert.equal(zeroVerification.attempt, 0);
+  assert.equal(Object.is(zeroVerification.attempt, -0), false);
+  assert.throws(
+    () => normalizeVerificationV1({
+      schemaVersion: 1,
+      verificationId: 'verify-negative-zero-attempt',
+      invocationId: 'invoke-1',
+      observationId: 'obs-1',
+      status: VerificationStatus.VERIFIED,
+      reasonCode: 'POSTCONDITION_MATCH',
+      verifiedAt: AT,
+      attempt: -0,
+    }),
+    /attempt is invalid/u,
+  );
+
+  const zeroBudget = normalizeSpecialistHandoffV1({
+    schemaVersion: 1,
+    handoffId: 'handoff-zero-budget',
+    specialistId: 'coding-specialist',
+    goal: 'Read existing project evidence.',
+    requestedCapabilityIds: ['workspace.read'],
+    maxModelCalls: 0,
+    maxRuntimeSeconds: 0,
+    maxCostUsdMicros: 0,
+    createdAt: AT,
+  });
+  assert.equal(zeroBudget.maxModelCalls, 0);
+  assert.equal(zeroBudget.maxRuntimeSeconds, 0);
+  assert.equal(zeroBudget.maxCostUsdMicros, 0);
+  assert.throws(
+    () => normalizeSpecialistHandoffV1({
+      schemaVersion: 1,
+      handoffId: 'handoff-negative-zero-budget',
+      specialistId: 'coding-specialist',
+      goal: 'Read existing project evidence.',
+      requestedCapabilityIds: ['workspace.read'],
+      maxModelCalls: -0,
+      createdAt: AT,
+    }),
+    /maxModelCalls is invalid/u,
+  );
+});
