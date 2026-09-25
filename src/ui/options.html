@@ -957,7 +957,7 @@
 
         <fieldset id="calendar-schedule-settings">
           <legend>Календарний розклад</legend>
-          <p id="calendar-help">Усі дати й час можна вводити без миші. Формат дати: YYYY-MM-DD. Формат часу: HH:MM. Для кількох часів або явних запусків використовуйте по одному запису в рядку.</p>
+          <p id="calendar-help">Усі дати й час вводяться звичайним текстом без миші. Рекомендований формат дати: ДД.ММ.РРРР, наприклад 25.09.2026. Формат часу: ГГ:ХХ, наприклад 09:15. Старий формат YYYY-MM-DD теж приймається. Для кількох часів або запусків використовуйте по одному запису в рядку.</p>
 
           <label for="calendar-mode">Режим календаря</label>
           <select id="calendar-mode" aria-describedby="calendar-help">
@@ -978,14 +978,14 @@
 
           <div id="calendar-one-time-fields" hidden>
             <label for="calendar-one-time-date">Дата запуску</label>
-            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026" aria-describedby="calendar-help">
             <label for="calendar-one-time-time">Час запуску</label>
             <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off" placeholder="21:00" aria-describedby="calendar-help">
           </div>
 
           <div id="calendar-recurring-fields" hidden>
             <label for="calendar-start-date">Дата початку повторення</label>
-            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026" aria-describedby="calendar-help">
 
             <label for="calendar-times">Часи запуску, по одному в рядку</label>
             <textarea id="calendar-times" rows="4" spellcheck="false" aria-describedby="calendar-times-help"></textarea>
@@ -1003,14 +1003,14 @@
             </fieldset>
 
             <label for="calendar-end-date">Необов’язкова кінцева дата</label>
-            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-12-31" aria-describedby="calendar-help">
+            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="31.12.2026" aria-describedby="calendar-help">
             <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
             <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
           </div>
 
           <div id="calendar-explicit-fields" hidden>
             <label for="calendar-explicit-occurrences">Явні дати й час, по одному запуску в рядку</label>
-            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="2026-09-25 09:00&#10;2026-09-25 14:00&#10;2026-09-25 21:00" aria-describedby="calendar-help"></textarea>
+            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="25.09.2026 09:00&#10;25.09.2026 14:00&#10;25.09.2026 21:00" aria-describedby="calendar-help"></textarea>
           </div>
 
           <p id="calendar-runtime-status" role="status" tabindex="0">Календарний розклад вимкнено.</p>
