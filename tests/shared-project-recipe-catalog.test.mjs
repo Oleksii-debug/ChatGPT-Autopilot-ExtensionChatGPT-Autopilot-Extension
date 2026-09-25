@@ -246,6 +246,7 @@ async function request(overrides = {}) {
   const recipe = await qualifiedRecipe();
   return {
     bindingId: 'shared-project-a',
+    viewerPrincipalId: 'owner',
     recipeRegistry: {
       schemaVersion: 1,
       registryId: 'recipe-registry-1',
@@ -268,6 +269,7 @@ test('shared Recipe catalog composes canonical Project access and grants no auth
 
   assert.equal(out.schemaVersion, SHARED_PROJECT_RECIPE_CATALOG_SCHEMA_VERSION);
   assert.equal(out.bindingId, 'shared-project-a');
+  assert.equal(out.viewerPrincipalId, 'owner');
   assert.equal(out.projectId, 'project-a');
   assert.equal(out.projectRevisionId, 'project-r1');
   assert.equal(out.organizationId, 'org-1');
@@ -291,13 +293,35 @@ test('shared Recipe catalog composes canonical Project access and grants no auth
   assert.equal(Object.isFrozen(out.items), true);
 });
 
-test('empty share evidence fails closed instead of emitting blank canonical Project identity', async () => {
+test('empty catalog still resolves exact canonical Project identity through viewer access', async () => {
+  const out = await buildSharedProjectRecipeCatalogV1(
+    await request({ shares: [] }),
+    trustedResolver(),
+  );
+
+  assert.equal(out.bindingId, 'shared-project-a');
+  assert.equal(out.viewerPrincipalId, 'owner');
+  assert.equal(out.projectId, 'project-a');
+  assert.equal(out.projectRevisionId, 'project-r1');
+  assert.equal(out.organizationId, 'org-1');
+  assert.equal(out.governanceRegistryId, 'identity-registry-1');
+  assert.equal(out.governanceRegistryRevision, 4);
+  assert.deepEqual(out.items, []);
+  assert.equal(out.admissionAuthorized, false);
+  assert.equal(out.executionAuthorized, false);
+  assert.equal(out.mutationAuthorized, false);
+});
+
+test('missing canonical shared Project binding fails closed even for an empty catalog', async () => {
   await assert.rejects(
     buildSharedProjectRecipeCatalogV1(
-      await request({ shares: [] }),
+      await request({
+        bindingId: 'missing-binding',
+        shares: [],
+      }),
       trustedResolver(),
     ),
-    /at least one canonical Project Recipe share evidence record/,
+    /Trusted shared-project binding was not found/,
   );
 });
 
