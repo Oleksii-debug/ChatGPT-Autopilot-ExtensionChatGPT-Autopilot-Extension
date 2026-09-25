@@ -340,3 +340,26 @@ test('unknown entrypoint fails before evaluation/signature/dependency resolution
   );
   assert.equal(expensiveCalls, 0);
 });
+
+
+test('signature verification cannot predate the materialized signature artifact', async () => {
+  const m = manifest();
+  m.artifactRefs = m.artifactRefs.map(item =>
+    item.artifactId === 'signature' ? { ...item, createdAt: T1 } : item);
+  const runtime = deps(m, {
+    resolveSignature: async query => ({
+      signatureId: query.signatureId,
+      scheme: query.scheme,
+      keyId: query.keyId,
+      signatureArtifactId: query.signatureArtifactId,
+      signedSha256: query.signedSha256,
+      status: 'VERIFIED',
+      verifiedAt: T0,
+      verificationAuthorityId: 'signature-authority',
+    }),
+  });
+  await assert.rejects(
+    createSkillPackAdmissionV1({ manifest: m, entrypointId: 'run-report', admittedAt: T3 }, runtime.options),
+    /artifact\/admission time boundary/u,
+  );
+});
