@@ -49,6 +49,7 @@ function steps() {
       outputContractRef: 'contract.fetch.output.v1',
       verificationContractRef: 'contract.fetch.verify.v1',
       parameterIds: ['owner.target', 'credential.github'],
+      verificationEvidenceArtifactId: 'evidence-fetch-1',
       verificationEvidenceSha256: SHA_C,
       verifiedAt: '2026-09-25T06:10:10.000Z',
     },
@@ -63,6 +64,7 @@ function steps() {
       outputContractRef: 'contract.summary.output.v1',
       verificationContractRef: 'contract.summary.verify.v1',
       parameterIds: [],
+      verificationEvidenceArtifactId: 'evidence-summary-1',
       verificationEvidenceSha256: SHA_D,
       verifiedAt: '2026-09-25T06:10:20.000Z',
     },
@@ -118,8 +120,14 @@ test('compiles a registry-compatible value-free CANDIDATE without granting autho
     parameterIds: ['credential.github', 'owner.target'],
   }]);
   assert.deepEqual(
-    compiled.verificationEvidence.map(item => item.stepId),
-    ['step.fetch', 'step.summarize'],
+    compiled.verificationEvidence.map(item => [
+      item.stepId,
+      item.evidenceArtifactId,
+    ]),
+    [
+      ['step.fetch', 'evidence-fetch-1'],
+      ['step.summarize', 'evidence-summary-1'],
+    ],
   );
 
   assert.equal(compiled.traceTrust, 'UNVERIFIED_INPUT');
@@ -239,6 +247,20 @@ test('step kind semantics reuse RecipeRegistry rules rather than minting tool au
     () => compileRecipeCandidateV1(toolWithoutCapability),
     /tool step requires provider, tool and capabilities/u,
   );
+});
+
+test('replay contracts and evidence artifact identity are mandatory for every recorded step', () => {
+  const noVerifyContract = input();
+  noVerifyContract.trace.steps[0].verificationContractRef = '';
+  assert.throws(() => compileRecipeCandidateV1(noVerifyContract), /verificationContractRef is invalid/u);
+
+  const noInputContract = input();
+  noInputContract.trace.steps[0].inputContractRef = '';
+  assert.throws(() => compileRecipeCandidateV1(noInputContract), /inputContractRef is invalid/u);
+
+  const noEvidenceArtifact = input();
+  noEvidenceArtifact.trace.steps[0].verificationEvidenceArtifactId = '';
+  assert.throws(() => compileRecipeCandidateV1(noEvidenceArtifact), /verificationEvidenceArtifactId is invalid/u);
 });
 
 test('trace evidence timestamps and hashes are causally and canonically bound', () => {
