@@ -566,6 +566,8 @@ test('durable route health state rejects numeric aliases instead of silently can
     ['lastErrorAt', Number.MAX_SAFE_INTEGER + 1],
     ['lastSuccessAt', Infinity],
     ['lastLatencyMs', '10'],
+    ['consecutiveFailures', null],
+    ['successes', undefined],
   ];
 
   for (const [field, value] of invalid) {
@@ -575,6 +577,11 @@ test('durable route health state rejects numeric aliases instead of silently can
       field,
     );
   }
+
+  assert.throws(
+    () => normalizeAiRouteStates(null, [route]),
+    /AI route states/u,
+  );
 
   assert.deepEqual(
     normalizeAiRouteStates({
