@@ -64,6 +64,8 @@ function delegation(overrides = {}) {
     schemaVersion: 1,
     delegationId: 'delegation-1',
     localAgentId: 'agent.local.research',
+    localTaskId: 'task.local-1',
+    effectId: 'effect.a2a-send-1',
     remoteAgentId: 'remote.research',
     requestedSkillId: 'research.deep',
     requestedCapabilityIds: ['artifact.read', 'research.query'],
@@ -189,6 +191,8 @@ test('exact admitted card, interface, skill, security and capability set reaches
   assert.equal(result.status, 'READY_FOR_POLICY');
   assert.deepEqual(result.reasons, []);
   assert.equal(result.selectedInterface.protocolBinding, 'HTTP+JSON');
+  assert.equal(result.localTaskId, 'task.local-1');
+  assert.equal(result.effectId, 'effect.a2a-send-1');
   assert.equal(result.advisoryOnly, true);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.credentialUseAuthorized, false);
@@ -289,6 +293,16 @@ test('normalizers are safely composable and output safety flags cannot be upgrad
   const forged = structuredClone(normalizedCard);
   forged.executionAuthorized = true;
   assert.throws(() => normalizeA2ARemoteAgentCardRefV1(forged), /cannot authorize execution/);
+});
+
+test('delegation must carry canonical local task and exact-effect identity', () => {
+  const missingTask = delegation();
+  delete missingTask.localTaskId;
+  assert.throws(() => normalizeA2ADelegationRequestV1(missingTask), /localTaskId is invalid/);
+
+  const missingEffect = delegation();
+  delete missingEffect.effectId;
+  assert.throws(() => normalizeA2ADelegationRequestV1(missingEffect), /effectId is invalid/);
 });
 
 test('remote Agent identity mismatch and malformed canonical fields fail closed', () => {
