@@ -89,11 +89,10 @@ export function acquireBrowserTargetLeaseV1(input = {}) {
   const requestedLeaseId = requiredId(raw.leaseId, 'leaseId');
   const existing = current === null ? null : normalizeBrowserTargetLeaseV1(current);
   if (existing && Date.parse(existing.expiresAt) > Date.parse(nowIso)) {
-    if (existing.targetId !== requestedTargetId) {
-      return Object.freeze({ status: 'CONFLICT', lease: existing });
-    }
-    if (existing.ownerInvocationId !== requestedOwnerInvocationId) {
-      return Object.freeze({ status: 'CONFLICT', lease: existing });
+    if (existing.targetId !== requestedTargetId
+        || existing.ownerInvocationId !== requestedOwnerInvocationId
+        || existing.leaseId !== requestedLeaseId) {
+      return Object.freeze({ status: 'CONFLICT', lease: null });
     }
     return Object.freeze({ status: 'HELD', lease: existing });
   }
@@ -119,7 +118,7 @@ export function releaseBrowserTargetLeaseV1(current, input = {}) {
   const requestedOwnerInvocationId = requiredId(raw.ownerInvocationId, 'ownerInvocationId');
   const requestedLeaseId = requiredId(raw.leaseId, 'leaseId');
   if (lease.ownerInvocationId !== requestedOwnerInvocationId || lease.leaseId !== requestedLeaseId) {
-    return Object.freeze({ status: 'NOT_OWNER', lease });
+    return Object.freeze({ status: 'NOT_OWNER', lease: null });
   }
   return Object.freeze({ status: 'RELEASED', lease: null });
 }
