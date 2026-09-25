@@ -58,6 +58,22 @@ test('closed historical blocker cannot create live blocking authority',()=>{
   assert.equal(projection.summary.blockingOpenCount,0);
 });
 
+test('Action Center rejects a successor created after supersession closure',()=>{
+  assert.throws(()=>buildActionCenterProjectionV1([
+    open('old',{
+      status:ActionCenterItemStatus.SUPERSEDED,
+      ownerActionKind:ActionCenterOwnerActionKind.NONE,
+      updatedAt:T1,
+      closedAt:T2,
+      supersededByItemId:'future',
+    }),
+    open('future',{
+      createdAt:'2026-09-25T00:03:00.000Z',
+      updatedAt:'2026-09-25T00:03:00.000Z',
+    }),
+  ]),/postdates superseded item closure/);
+});
+
 test('Action Center rejects accessor-backed authority before getter execution',()=>{
   let reads=0;
   const raw=open('getter');
