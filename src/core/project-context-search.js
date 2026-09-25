@@ -27,6 +27,9 @@ function frozen(value) {
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const AUTHORITIES = new Set(Object.values(SourceAuthorityKind));
 const CANDIDATE_KEYS = new Set(['snapshot', 'capsule', 'currentSourceRefs']);
+const REQUEST_KEYS = new Set([
+  'query', 'candidates', 'currentSourceRefs', 'allowedSourceIds', 'allowedAuthorities', 'limit',
+]);
 
 function denseDataArray(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
@@ -69,6 +72,28 @@ function denseDataArray(value, label, max) {
       throw new Error(`${label} must be a dense data-only array`);
     }
     out[index] = descriptor.value;
+  }
+  return out;
+}
+
+function snapshotRequest(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('ProjectContextSearchRequestV1 must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('ProjectContextSearchRequestV1 must be a plain object');
+  }
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !REQUEST_KEYS.has(key)) {
+      throw new Error(`ProjectContextSearchRequestV1 contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`ProjectContextSearchRequestV1.${key} must be an enumerable own data property`);
+    }
+    out[key] = descriptor.value;
   }
   return out;
 }
@@ -180,14 +205,17 @@ function currentSourceKey(source) {
   return `${source.projectId}\u001f${source.sourceId}`;
 }
 
-export function searchProjectContextV1({
-  query,
-  candidates = [],
-  currentSourceRefs,
-  allowedSourceIds,
-  allowedAuthorities = [SourceAuthorityKind.CANONICAL, SourceAuthorityKind.DERIVED, SourceAuthorityKind.ADVISORY],
-  limit = 8,
-} = {}) {
+export function searchProjectContextV1(input = {}) {
+  const rawRequest = snapshotRequest(input);
+  const query = rawRequest.query;
+  const candidates = Object.hasOwn(rawRequest, 'candidates') ? rawRequest.candidates : [];
+  const currentSourceRefs = rawRequest.currentSourceRefs;
+  const allowedSourceIds = rawRequest.allowedSourceIds;
+  const allowedAuthorities = Object.hasOwn(rawRequest, 'allowedAuthorities')
+    ? rawRequest.allowedAuthorities
+    : [SourceAuthorityKind.CANONICAL, SourceAuthorityKind.DERIVED, SourceAuthorityKind.ADVISORY];
+  const limit = Object.hasOwn(rawRequest, 'limit') ? rawRequest.limit : 8;
+
   const tokens = queryTokens(query);
   const candidateRows = denseDataArray(candidates, 'candidates', MAX_CANDIDATES);
   const currentRows = denseDataArray(
