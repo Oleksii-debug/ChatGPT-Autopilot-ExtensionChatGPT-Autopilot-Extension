@@ -87,7 +87,7 @@ export function acquireBrowserTargetLeaseV1(input = {}) {
   const requestedTargetId = requiredId(raw.targetId, 'targetId');
   const requestedOwnerInvocationId = requiredId(raw.ownerInvocationId, 'ownerInvocationId');
   const requestedLeaseId = requiredId(raw.leaseId, 'leaseId');
-  const existing = current ? normalizeBrowserTargetLeaseV1(current) : null;
+  const existing = current === null ? null : normalizeBrowserTargetLeaseV1(current);
   if (existing && Date.parse(existing.expiresAt) > Date.parse(nowIso)) {
     if (existing.targetId !== requestedTargetId) {
       return Object.freeze({ status: 'CONFLICT', lease: existing });
