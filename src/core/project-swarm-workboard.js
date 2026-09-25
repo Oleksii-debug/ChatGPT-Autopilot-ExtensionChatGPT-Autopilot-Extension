@@ -265,4 +265,120 @@ export function buildProjectSwarmWorkboardV1(input) {
   for (const snapshot of snapshots) {
     for (const node of snapshot.plan.nodes) {
       const task = Object.freeze({
-        planId: s
+        planId: snapshot.plan.planId,
+        jobId: snapshot.plan.jobId,
+        planUpdatedAt: snapshot.plan.updatedAt,
+        nodeId: node.nodeId,
+        title: node.title,
+        state: node.state,
+        ownerId: node.ownerId,
+        executionPlane: node.executionPlane,
+        dependsOn: node.dependsOn,
+        conflictKeys: node.conflictKeys,
+        updatedAt: node.updatedAt,
+      });
+      const key = refKey(task.planId, task.nodeId);
+      if (byKey.has(key)) fail(`duplicate workboard task reference: ${key}`);
+      byKey.set(key, task);
+      tasks.push(task);
+    }
+  }
+
+  const reviewInputs = denseDataArray(source.reviews, 'reviews', { min: 0, max: MAX_WORKBOARD_REVIEWS });
+  const reviews = reviewInputs.map((item, index) => normalizeReview(item, index, board.generatedAt));
+  const reviewByKey = new Map();
+  for (const review of reviews) {
+    const key = refKey(review.planId, review.nodeId);
+    const task = byKey.get(key);
+    if (!task) fail(`review references unknown task: ${review.planId}/${review.nodeId}`);
+    if (reviewByKey.has(key)) fail(`duplicate review subject: ${review.planId}/${review.nodeId}`);
+    if (task.state !== AgentPlanNodeState.VERIFIED) {
+      fail(`review requires VERIFIED task: ${review.planId}/${review.nodeId}`);
+    }
+    if (Date.parse(review.updatedAt) < Date.parse(task.updatedAt)) {
+      fail(`review predates task verification: ${review.planId}/${review.nodeId}`);
+    }
+    reviewByKey.set(key, review);
+  }
+
+  const activeByConflict = new Map();
+  for (const task of tasks) {
+    if (task.state !== AgentPlanNodeState.RUNNING) continue;
+    for (const conflictKey of task.conflictKeys) {
+      const active = activeByConflict.get(conflictKey) || [];
+      active.push(task);
+      activeByConflict.set(conflictKey, active);
+    }
+  }
+
+  const orderedTasks = tasks.slice().sort((a, b) => compareExact(a.planId, b.planId) || compareExact(a.nodeId, b.nodeId));
+  const entries = orderedTasks.map((task, index) => {
+    const key = refKey(task.planId, task.nodeId);
+    const review = reviewByKey.get(key) || null;
+    const dependencyTasks = task.dependsOn.map(nodeId => byKey.get(refKey(task.planId, nodeId)));
+    const unmetDependencies = dependencyTasks.filter(dependency => dependency.state !== AgentPlanNodeState.VERIFIED);
+    if ((task.state === AgentPlanNodeState.READY || task.state === AgentPlanNodeState.RUNNING)
+        && unmetDependencies.length > 0) {
+      fail(`task ${task.planId}/${task.nodeId} is ${task.state} with unmet dependencies`);
+    }
+    const activeConflicts = new Map();
+    for (const conflictKey of task.conflictKeys) {
+      for (const other of activeByConflict.get(conflictKey) || []) {
+        const otherKey = refKey(other.planId, other.nodeId);
+        if (otherKey !== key) activeConflicts.set(otherKey, other);
+      }
+    }
+    const conflictTasks = [...activeConflicts.values()];
+    const lane = deriveLane(task, review);
+    const needsAttention = lane === WorkboardLane.BLOCKED
+      || (review?.state === WorkboardReviewState.CHANGES_REQUESTED)
+      || (task.state === AgentPlanNodeState.RUNNING && conflictTasks.length > 0);
+    return Object.freeze({
+      schemaVersion: 1,
+      focusOrdinal: index + 1,
+      taskRef: publicTaskRef(task),
+      jobId: task.jobId,
+      title: task.title,
+      state: task.state,
+      lane,
+      ownerId: task.ownerId,
+      executionPlane: task.executionPlane,
+      reviewState: review?.state || 'UNREVIEWED',
+      reviewerId: review?.reviewerId || '',
+      reviewEvidenceCount: review?.evidenceIds.length || 0,
+      dependencyTaskRefs: sortedRefs(dependencyTasks),
+      unmetDependencyTaskRefs: sortedRefs(unmetDependencies),
+      activeConflictTaskRefs: sortedRefs(conflictTasks),
+      needsAttention,
+      keyboardReachable: true,
+    });
+  });
+
+  const laneGroups = LANE_ORDER.map(lane => Object.freeze({
+    lane,
+    taskRefs: Object.freeze(entries.filter(entry => entry.lane === lane).map(entry => entry.taskRef)),
+  }));
+
+  return freezeDeep({
+    schemaVersion: PROJECT_SWARM_WORKBOARD_VERSION,
+    boardId: board.boardId,
+    projectId: board.projectId,
+    projectRevisionId: board.projectRevisionId,
+    generatedAt: board.generatedAt,
+    planCount: snapshots.length,
+    taskCount: entries.length,
+    reviewCount: reviews.length,
+    keyboardModel: 'LINEAR_TASK_ORDER',
+    semanticTwinComplete: true,
+    coordinateNavigationRequired: false,
+    advisoryOnly: true,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    reviewDecisionAuthorized: false,
+    requiresCanonicalPlanAuthority: true,
+    requiresCanonicalProjectBinding: true,
+    requiresCanonicalReviewAuthority: true,
+    entries: Object.freeze(entries),
+    lanes: Object.freeze(laneGroups),
+  });
+}
