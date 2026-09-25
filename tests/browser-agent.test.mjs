@@ -2916,6 +2916,48 @@ test('Browser Agent specialist wrappers snapshot caller payloads before authorit
 });
 
 
+test('Browser Agent input-token admission includes an existing durable reservation without throwing', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text:'{}' }),
+    now: () => 49_000,
+  });
+  await manager.create({
+    id:'job-input-reservation-headroom',
+    goal:'Respect reserved input-token headroom',
+    maxInputTokens:12,
+  });
+  await manager.update(store => {
+    const job = store.byId['job-input-reservation-headroom'];
+    job.runtime.inputTokens = 3;
+    job.runtime.totalTokens = 3;
+    job.runtime.modelBudgetReservation = {
+      reservationId:'job-input-reservation-headroom:model-budget:1',
+      controlEpoch:0,
+      modelCalls:1,
+      inputTokens:4,
+      outputTokens:2,
+      totalTokens:6,
+      estimatedCostUsd:0,
+      createdAt:48_000,
+      routeId:'primary',
+      provider:'ollama',
+      model:'qwen:8b',
+      callNumber:1,
+    };
+    return store;
+  });
+
+  const current = await manager.get('job-input-reservation-headroom');
+  assert.doesNotThrow(() => manager.budgetReason(current.job, { pendingInputTokens:5 }));
+  assert.equal(manager.budgetReason(current.job, { pendingInputTokens:5 }), '');
+  assert.equal(
+    manager.budgetReason(current.job, { pendingInputTokens:6 }),
+    'maximum input-token budget reached',
+  );
+});
+
 test('Browser Agent persists provider-call budget before I/O and restart cannot regain the reservation', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 50_000 });
