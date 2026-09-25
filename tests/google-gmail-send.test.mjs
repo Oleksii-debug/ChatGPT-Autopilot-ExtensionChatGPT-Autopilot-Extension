@@ -96,6 +96,23 @@ test('transport-ambiguous draft send never blind-retries and cannot auto-verify 
   assert.equal(sends,1);
 });
 
+test('send verifier rejects coercive owner identity without invoking caller conversion hooks', async()=>{
+  let coercions=0;
+  const hostile={toString(){coercions+=1;return userId;}};
+  const inv=invocation('gmail-send-hostile-user');
+  inv.arguments={...inv.arguments,userId:hostile};
+  const verifier=new GmailDraftSendVerifierV1({workspaceClient:{getGmailSentMessage:async()=>{throw new Error('must not read Gmail');}}});
+  await assert.rejects(
+    ()=>verifier.verify({
+      invocation:inv,
+      executionId:`${inv.invocationId}:attempt:1`,
+      observation:{data:{userId,draftId:'draft_1',messageId:'sent_1',threadId:'thread_1'}},
+    }),
+    /requires exact userId/i,
+  );
+  assert.equal(coercions,0);
+});
+
 test('send verifier rejects mismatched returned identity and missing SENT label', async()=>{
   let now=baseMs;
   const inv=invocation('gmail-send-verifier');

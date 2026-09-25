@@ -32,8 +32,8 @@ function requireInvocation(invocation) {
       || invocation.providerId !== GOOGLE_WORKSPACE_PROVIDER_ID) {
     throw new Error('Gmail draft-send verifier accepts only canonical draft-send invocations');
   }
-  const userId = String(invocation.arguments?.userId ?? '');
-  if (!userId || userId !== userId.trim()) throw new Error('Gmail draft-send verifier requires exact userId');
+  const userId = invocation.arguments?.userId;
+  if (typeof userId !== 'string' || !userId || userId !== userId.trim()) throw new Error('Gmail draft-send verifier requires exact userId');
   const draftId = requireResourceId(invocation.arguments?.draftId, 'draftId');
   canonicalRaw(invocation.arguments?.rawMessageBase64Url);
   return { userId, draftId };
