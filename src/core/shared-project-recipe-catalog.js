@@ -219,6 +219,9 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProje
   const shares = strictArray(request.shares, 'shares', MAX_SHARES)
     .map((item, index) => normalizeShare(item, index, evaluatedAt));
   uniqueBy(shares, 'shareId', 'shares');
+  if (shares.length === 0) {
+    throw new Error('shares must contain at least one canonical Project Recipe share evidence record');
+  }
 
   const activeRecipeIdentities = new Set();
   const resolvedByRecipeId = new Map();
