@@ -343,3 +343,108 @@ test('fails closed when exact sums exceed safe integer range', async () => {
     /machine\/API spend exceeds exact safe-integer range/,
   );
 });
+
+test('trusted ROI chronology uses epoch order across 9999 to extended year +010000', async () => {
+  const before = '9999-12-31T23:59:59.999Z';
+  const after0 = '+010000-01-01T00:00:00.000Z';
+  const after1 = '+010000-01-01T00:00:00.001Z';
+  const after2 = '+010000-01-01T00:00:00.002Z';
+  const after3 = '+010000-01-01T00:00:00.003Z';
+
+  await assert.doesNotReject(
+    buildRoiOpportunityReportV1(request({
+      evaluatedAt: after2,
+      runEvidenceIds: ['record-1'],
+      minimumEvidenceRuns: 1,
+    }), {
+      resolveTrustedRunEvidence: resolver([trustedRun({
+        startedAt: before,
+        finishedAt: after0,
+        recordedAt: after1,
+        validThrough: after3,
+      })]),
+    }),
+  );
+
+  await assert.doesNotReject(
+    buildRoiOpportunityReportV1(request({
+      evaluatedAt: after2,
+      runEvidenceIds: ['record-1'],
+      minimumEvidenceRuns: 1,
+    }), {
+      resolveTrustedRunEvidence: resolver([trustedRun({
+        startedAt: '9999-12-31T23:59:59.997Z',
+        finishedAt: '9999-12-31T23:59:59.998Z',
+        recordedAt: before,
+        validThrough: after3,
+      })]),
+    }),
+  );
+
+  const invalidCases = [
+    {
+      overrides: {
+        startedAt: after0,
+        finishedAt: before,
+        recordedAt: after1,
+        validThrough: after3,
+      },
+      evaluatedAt: after2,
+      error: /finishedAt predates startedAt/,
+    },
+    {
+      overrides: {
+        startedAt: before,
+        finishedAt: after0,
+        recordedAt: '9999-12-31T23:59:59.998Z',
+        validThrough: after3,
+      },
+      evaluatedAt: after2,
+      error: /recordedAt predates finishedAt/,
+    },
+    {
+      overrides: {
+        startedAt: '9999-12-31T23:59:59.997Z',
+        finishedAt: '9999-12-31T23:59:59.998Z',
+        recordedAt: after0,
+        validThrough: after3,
+      },
+      evaluatedAt: before,
+      error: /future-recorded/,
+    },
+    {
+      overrides: {
+        startedAt: '9999-12-31T23:59:59.997Z',
+        finishedAt: '9999-12-31T23:59:59.998Z',
+        recordedAt: before,
+        validThrough: before,
+      },
+      evaluatedAt: after0,
+      error: /trusted evidence is stale/,
+    },
+    {
+      overrides: {
+        startedAt: '9999-12-31T23:59:59.997Z',
+        finishedAt: '9999-12-31T23:59:59.998Z',
+        recordedAt: after0,
+        validThrough: before,
+      },
+      evaluatedAt: after0,
+      error: /validThrough predates recordedAt/,
+    },
+  ];
+
+  for (const { overrides, evaluatedAt, error } of invalidCases) {
+    await assert.rejects(
+      buildRoiOpportunityReportV1(request({
+        evaluatedAt,
+        runEvidenceIds: ['record-1'],
+        minimumEvidenceRuns: 1,
+      }), {
+        resolveTrustedRunEvidence: resolver([trustedRun(overrides)]),
+      }),
+      error,
+    );
+  }
+});
+
