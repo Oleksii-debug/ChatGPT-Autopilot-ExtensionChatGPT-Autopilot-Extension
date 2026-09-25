@@ -63,7 +63,7 @@ export function formatAccessibleLocalDateTime(value) {
   return `${pad2(date.getDate())}.${pad2(date.getMonth() + 1)}.${date.getFullYear()} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
-export function normalizeAccessibleClockTime(raw, { optional = true } = {}) {
+export function normalizeAccessibleClockTime(raw, { optional = true, allowSeconds = false } = {}) {
   const value = String(raw || '').trim();
   if (!value) {
     if (optional) return '';
@@ -75,6 +75,7 @@ export function normalizeAccessibleClockTime(raw, { optional = true } = {}) {
   const minute = Number(match[2]);
   const second = Number(match[3] || 0);
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) throw new Error('Некоректний час.');
+  if (match[3] !== undefined && !allowSeconds) throw new Error('Використайте формат ГГ:ХХ, наприклад 09:15.');
   return match[3] === undefined
     ? `${pad2(hour)}:${pad2(minute)}`
     : `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`;
