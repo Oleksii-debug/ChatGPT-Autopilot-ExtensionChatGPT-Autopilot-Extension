@@ -449,7 +449,7 @@ test('nested reference collections reject non-array shapes with stable contract 
     status: 'OK',
     artifactRefs: 'artifact-1',
     observedAt: AT,
-  }), /artifactRefs must be a bounded array/);
+  }), /artifactRefs must be a bounded plain array/);
 
   assert.throws(() => normalizeSpecialistHandoffV1({
     schemaVersion: 1,
@@ -735,7 +735,7 @@ test('universal contract arrays consume descriptor snapshots without ordinary Pr
     schemaVersion: 1,
     observationId: 'observation-proxy-array',
     invocationId: 'invoke-proxy-array',
-    status: ObservationStatus.SUCCEEDED,
+    status: ObservationStatus.OK,
     summary: '',
     data: {},
     artifactRefs,
