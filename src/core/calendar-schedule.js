@@ -19,7 +19,42 @@ const WEEKDAY_ALIASES = Object.freeze({
   SU: 7, SUN: 7, SUNDAY: 7,
 });
 function parseWeekday(value) { if (Number.isInteger(value) && value >= 1 && value <= 7) return value; if (typeof value === 'string') { const normalized = WEEKDAY_ALIASES[value.trim().toUpperCase()]; if (normalized) return normalized; } throw new Error('Invalid calendar schedule weekday'); }
-function normalizeWeekdays(values) { if (!Array.isArray(values)) throw new Error('Calendar WEEKLY schedule weekdays required'); const weekdays = [...new Set(values.map(parseWeekday))].sort((a, b) => a - b); if (!weekdays.length || weekdays.length > 7) throw new Error('Calendar WEEKLY schedule requires 1-7 unique weekdays'); return weekdays; }
+function denseArrayValues(value, label, maxLength) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`Calendar schedule ${label} must be a plain dense array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > maxLength) {
+    throw new Error(`Calendar schedule ${label} must contain at most ${maxLength} items`);
+  }
+  const length = lengthDescriptor.value;
+  const ownKeys = Reflect.ownKeys(descriptors);
+  if (ownKeys.length !== length + 1) {
+    throw new Error(`Calendar schedule ${label} must be a plain dense array`);
+  }
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const key = String(index);
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`Calendar schedule ${label} must be a plain dense array`);
+    }
+    snapshot[index] = descriptor.value;
+  }
+  for (const key of ownKeys) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key) || Number(key) >= length) {
+      throw new Error(`Calendar schedule ${label} must be a plain dense array`);
+    }
+  }
+  return snapshot;
+}
+function normalizeWeekdays(values) { const dense = denseArrayValues(values, 'weekdays', 7); const weekdays = [...new Set(dense.map(parseWeekday))].sort((a, b) => a - b); if (!weekdays.length) throw new Error('Calendar WEEKLY schedule requires 1-7 unique weekdays'); return weekdays; }
 function normalizeMaxOccurrences(value) { if (value == null || value === '') return null; if (!Number.isSafeInteger(value) || value < 1 || value > MAX_RECURRENCE_OCCURRENCES) throw new Error(`Calendar recurrence maxOccurrences must be 1-${MAX_RECURRENCE_OCCURRENCES}`); return value; }
 function normalizeRecurrenceBounds(input, startDate) { const bounds = {}; if (input.endDate != null && input.endDate !== '') { const endDate = parseDate(input.endDate, 'endDate').key; if (endDate < startDate) throw new Error('Calendar recurrence endDate precedes startDate'); bounds.endDate = endDate; } const maxOccurrences = normalizeMaxOccurrences(input.maxOccurrences); if (maxOccurrences != null) bounds.maxOccurrences = maxOccurrences; return bounds; }
 function isoWeekday(date) { const day = new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay(); return day === 0 ? 7 : day; }
@@ -36,14 +71,15 @@ export function normalizeCalendarSchedule(input) {
   if (kind === CalendarScheduleKind.ONE_TIME) { const occurrence = normalizeExplicitOccurrence({ date: input.date, time: input.time }, timeZone); return { ...schedule, date: occurrence.date, time: occurrence.time }; }
   if (kind === CalendarScheduleKind.DAILY || kind === CalendarScheduleKind.WEEKLY) {
     const startDate = parseDate(input.startDate, 'startDate').key;
-    const times = [...new Set((input.times || []).map(value => parseTime(value).key))].sort();
-    if (!times.length || times.length > 48) throw new Error(`Calendar ${kind} schedule requires 1-48 unique times`);
+    const timeValues = denseArrayValues(input.times ?? [], 'times', 48);
+    const times = [...new Set(timeValues.map(value => parseTime(value).key))].sort();
+    if (!times.length) throw new Error(`Calendar ${kind} schedule requires 1-48 unique times`);
     const recurrence = { ...schedule, startDate };
     if (kind === CalendarScheduleKind.WEEKLY) recurrence.weekdays = normalizeWeekdays(input.weekdays);
     recurrence.times = times;
     return { ...recurrence, ...normalizeRecurrenceBounds(input, startDate) };
   }
-  const occurrences = (input.occurrences || []).map(item => normalizeExplicitOccurrence(item, timeZone)).sort((a, b) => a.scheduledAt - b.scheduledAt); if (!occurrences.length || occurrences.length > 10000) throw new Error('Calendar EXPLICIT schedule requires 1-10000 occurrences'); const seen = new Set(); for (const item of occurrences) { const key = `${item.date}T${item.time}`; if (seen.has(key)) throw new Error('Calendar EXPLICIT schedule contains duplicate occurrence'); seen.add(key); } return { ...schedule, occurrences: occurrences.map(({ date, time }) => ({ date, time })) };
+  const occurrenceValues = denseArrayValues(input.occurrences ?? [], 'occurrences', 10000); const occurrences = occurrenceValues.map(item => normalizeExplicitOccurrence(item, timeZone)).sort((a, b) => a.scheduledAt - b.scheduledAt); if (!occurrences.length) throw new Error('Calendar EXPLICIT schedule requires 1-10000 occurrences'); const seen = new Set(); for (const item of occurrences) { const key = `${item.date}T${item.time}`; if (seen.has(key)) throw new Error('Calendar EXPLICIT schedule contains duplicate occurrence'); seen.add(key); } return { ...schedule, occurrences: occurrences.map(({ date, time }) => ({ date, time })) };
 }
 
 function hash32(value, seed) { let hash = seed >>> 0; for (let i = 0; i < value.length; i += 1) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(16).padStart(8, '0'); }
