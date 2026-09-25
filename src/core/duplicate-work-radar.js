@@ -269,6 +269,7 @@ const POLICY_KEYS = new Set([
   'schemaVersion',
   'policyId',
   'highOverlapBasisPoints',
+  'minHighOverlapDimensions',
   'weights',
 ]);
 
@@ -283,6 +284,12 @@ export function normalizeDuplicateWorkRadarPolicyV1(input) {
       'highOverlapBasisPoints',
       1,
       10_000,
+    ),
+    minHighOverlapDimensions: integer(
+      raw.minHighOverlapDimensions,
+      'minHighOverlapDimensions',
+      1,
+      DIMENSIONS.length,
     ),
     weights: normalizeWeights(raw.weights),
   });
@@ -318,6 +325,7 @@ const DIMENSIONS = Object.freeze([
 function scorePair(a, b, policy) {
   let weighted = 0;
   let weightTotal = 0;
+  let matchedDimensionCount = 0;
   const basisPointsByDimension = {};
   const overlap = {};
   for (const [weightKey, field, outputField] of DIMENSIONS) {
@@ -329,10 +337,12 @@ function scorePair(a, b, policy) {
     if (basisPoints != null && weight > 0) {
       weighted += basisPoints * weight;
       weightTotal += weight;
+      if (shared.length > 0) matchedDimensionCount += 1;
     }
   }
   return {
     scoreBasisPoints: weightTotal ? Math.floor(weighted / weightTotal) : 0,
+    matchedDimensionCount,
     basisPointsByDimension,
     overlap,
   };
@@ -353,15 +363,18 @@ function isComplementaryReview(a, b) {
 }
 
 function classifyPair(a, b, policy, scored) {
-  const hasHardConflictKey = scored.overlap.conflictKeys.length > 0
+  const sharedConflictKey = scored.overlap.conflictKeys.length > 0;
+  const hasHardConflictKey = sharedConflictKey
     && a.mode === WorkIntentMode.MUTATION
     && b.mode === WorkIntentMode.MUTATION;
-  const high = scored.scoreBasisPoints >= policy.highOverlapBasisPoints;
+  const high = scored.scoreBasisPoints >= policy.highOverlapBasisPoints
+    && scored.matchedDimensionCount >= policy.minHighOverlapDimensions;
+  const strongOverlap = sharedConflictKey || high;
 
-  if (isIntentionalVariant(a, b) && (hasHardConflictKey || high)) {
+  if (isIntentionalVariant(a, b) && strongOverlap) {
     return WorkOverlapClassification.INTENTIONAL_VARIANT;
   }
-  if (isComplementaryReview(a, b) && (hasHardConflictKey || high)) {
+  if (isComplementaryReview(a, b) && strongOverlap) {
     return WorkOverlapClassification.COMPLEMENTARY_REVIEW;
   }
   if (hasHardConflictKey) return WorkOverlapClassification.HARD_CONFLICT;
@@ -392,6 +405,7 @@ function pairProjection(a, b, policy) {
     workerIdB: b.workerId,
     classification,
     scoreBasisPoints: scored.scoreBasisPoints,
+    matchedDimensionCount: scored.matchedDimensionCount,
     basisPointsByDimension: scored.basisPointsByDimension,
     overlap: scored.overlap,
     explicitParallelVariant: classification === WorkOverlapClassification.INTENTIONAL_VARIANT,
