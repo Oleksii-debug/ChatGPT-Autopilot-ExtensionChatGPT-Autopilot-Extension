@@ -121,13 +121,16 @@ function bool(value, label, fallback = false) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || value.length > max || Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!Array.isArray(value) || value.length > max) {
+    throw new Error(`${label} must be a bounded array`);
+  }
+  if (Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
   const out = [];
   for (const key of Reflect.ownKeys(value)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key)) {
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains a non-index field`);
     }
     const index = Number(key);
