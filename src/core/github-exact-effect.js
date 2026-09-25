@@ -22,6 +22,7 @@ const EFFECTFUL_TOOLS = new Set([
   GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
   GitHubToolId.ISSUE_CREATE,
   GitHubToolId.ISSUE_COMMENT_CREATE,
+  GitHubToolId.WORKFLOW_DISPATCH,
 ]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_EVIDENCE_AGE_MS = 5 * 60 * 1000;
