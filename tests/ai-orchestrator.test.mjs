@@ -368,3 +368,76 @@ test('non-retryable route rejection fails closed without calling another model',
   });
   assert.deepEqual(calls, ['route-a']);
 });
+
+
+test('provider-call lifecycle durably admits before gateway I/O and settles after exact success', async () => {
+  const events = [];
+  const gateway = {
+    async complete(req) {
+      events.push(['gateway', req.model]);
+      return { text:'done', usage:{ inputTokens:5, outputTokens:3, totalTokens:8 } };
+    },
+  };
+  const lifecycle = {
+    async beforeProviderCall({ context, route, maxOutputTokens, callNumber }) {
+      events.push(['before', context.jobId, route.model, maxOutputTokens, callNumber]);
+      return { reservationId:'reservation-1' };
+    },
+    async afterProviderCall({ context, reservation, route, ok, result }) {
+      events.push(['after', context.jobId, reservation.reservationId, route.model, ok, result.usage.totalTokens]);
+    },
+  };
+  const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 80_000 });
+  const result = await router.run(
+    settings({ primary:{ provider:'ollama', model:'qwen:8b' } }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'task',
+    {
+      maxOutputTokens:128,
+      providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-1', controlEpoch:2 },
+    },
+  );
+  assert.equal(result.text, 'done');
+  assert.deepEqual(events, [
+    ['before','job-1','qwen:8b',128,1],
+    ['gateway','qwen:8b'],
+    ['after','job-1','reservation-1','qwen:8b',true,8],
+  ]);
+});
+
+test('provider-call lifecycle conservatively settles an admitted failed gateway attempt before failover logic continues', async () => {
+  const events = [];
+  const gateway = {
+    async complete(req) {
+      events.push(['gateway', req.model]);
+      throw Object.assign(new Error('provider failed'), { code:'AI_POLICY_DENIED', status:403 });
+    },
+  };
+  const lifecycle = {
+    async beforeProviderCall({ route }) {
+      events.push(['before', route.model]);
+      return { reservationId:'reservation-failed' };
+    },
+    async afterProviderCall({ reservation, route, ok, error }) {
+      events.push(['after', reservation.reservationId, route.model, ok, error.message]);
+    },
+  };
+  const router = new AiOrchestrator({ gatewayClient:gateway, providerCallLifecycle:lifecycle, now:() => 81_000 });
+  await assert.rejects(
+    () => router.run(
+      settings({ primary:{ provider:'ollama', model:'qwen:8b' } }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-2', controlEpoch:0 },
+      },
+    ),
+    /provider failed/,
+  );
+  assert.deepEqual(events, [
+    ['before','qwen:8b'],
+    ['gateway','qwen:8b'],
+    ['after','reservation-failed','qwen:8b',false,'provider failed'],
+  ]);
+});
