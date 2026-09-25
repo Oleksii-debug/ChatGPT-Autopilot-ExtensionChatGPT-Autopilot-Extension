@@ -804,3 +804,62 @@ test('normalized state cannot be forged into authority-bearing flags or healthy 
     /requires all qualification gates/,
   );
 });
+
+
+test('publish exact-effect verifier must be independent from publisher', () => {
+  const qualified = qualify();
+  const effect = committedEffect({
+    effectId: 'publish-effect-1',
+    artifactRef: candidate,
+    startedAt: at(6),
+    observedAt: at(7),
+    verifiedAt: at(8),
+    committedAt: at(9),
+  });
+  const forged = structuredClone(effect);
+  forged.verification.verifierId = 'publisher-1';
+  const binding = effectBinding({
+    effectId: 'publish-effect-1',
+    kind: DeploymentEffectKind.PUBLISH,
+    artifactRef: candidate,
+    state: forged,
+  });
+  assert.throws(
+    () => reduceDeploymentLifecycleV1(qualified, event(qualified, {
+      eventId: 'self-verified-publish',
+      type: DeploymentEventType.RECORD_PUBLISH_EFFECT,
+      evidenceId: 'publish-effect-1',
+      at: at(10),
+    }), resolvers([], [binding])),
+    /independent/,
+  );
+});
+
+test('future-dated exact-effect verification cannot prove a present deployment effect', () => {
+  const qualified = qualify();
+  const effect = committedEffect({
+    effectId: 'publish-effect-1',
+    artifactRef: candidate,
+    startedAt: at(6),
+    observedAt: at(7),
+    verifiedAt: at(8),
+    committedAt: at(9),
+  });
+  const forged = structuredClone(effect);
+  forged.verification.verifiedAt = at(20);
+  const binding = effectBinding({
+    effectId: 'publish-effect-1',
+    kind: DeploymentEffectKind.PUBLISH,
+    artifactRef: candidate,
+    state: forged,
+  });
+  assert.throws(
+    () => reduceDeploymentLifecycleV1(qualified, event(qualified, {
+      eventId: 'future-effect-verification',
+      type: DeploymentEventType.RECORD_PUBLISH_EFFECT,
+      evidenceId: 'publish-effect-1',
+      at: at(10),
+    }), resolvers([], [binding])),
+    /cannot postdate durable effect state/,
+  );
+});
