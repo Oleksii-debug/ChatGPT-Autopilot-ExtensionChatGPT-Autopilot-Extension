@@ -225,8 +225,13 @@ export async function createShadowExecutionV1(input, { cryptoApi = globalThis.cr
     throw new Error('recordedAt cannot predate proposed invocation createdAt');
   }
 
-  const invocationFingerprint = await createSha256FingerprintV1(
-    JSON.stringify(['shadow-tool-invocation-v1', invocation]),
+  // The proposed invocation may contain private or credential-like argument
+  // material. Never persist either those bytes or an unsalted digest derived
+  // from them: a durable hash can become an offline oracle for low-entropy
+  // secrets. Bind only the non-secret canonical invocation identity here.
+  const proposedInvocation = publicInvocationIdentity(invocation);
+  const invocationIdentityFingerprint = await createSha256FingerprintV1(
+    JSON.stringify(['shadow-tool-invocation-identity-v1', proposedInvocation]),
     { cryptoApi },
   );
 
@@ -236,8 +241,11 @@ export async function createShadowExecutionV1(input, { cryptoApi = globalThis.cr
     shadowRunId: id(raw.shadowRunId, 'shadowRunId'),
     projectId: id(raw.projectId, 'projectId'),
     subjectRevisionId: id(raw.subjectRevisionId, 'subjectRevisionId'),
-    proposedInvocation: publicInvocationIdentity(invocation),
-    invocationFingerprint,
+    proposedInvocation,
+    invocationIdentityFingerprint,
+    argumentsRetained: false,
+    argumentDerivedFingerprintRetained: false,
+    requiresProposalArgumentsAtExecution: true,
     predictedEffect: normalizePredictedEffect(raw.predictedEffect),
     verificationPlan: normalizeVerificationPlan(raw.verificationPlan),
     recordedAt,
