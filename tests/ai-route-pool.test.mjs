@@ -153,6 +153,25 @@ test('economic route and policy authority is descriptor-safe before dispatch', (
   nullPolicy.maxInputPricePerMillionUsd = 0;
   assert.equal(normalizeAiRoutePolicy(nullPolicy).maxInputPricePerMillionUsd, 0);
 
+  let descriptorReads = 0;
+  const swappingTarget = { maxInputPricePerMillionUsd:0 };
+  const swappingPolicy = new Proxy(swappingTarget, {
+    getOwnPropertyDescriptor(target, key) {
+      descriptorReads += 1;
+      if (key === 'maxInputPricePerMillionUsd') {
+        return {
+          value: descriptorReads === 1 ? 0 : 999,
+          enumerable:true,
+          configurable:true,
+          writable:true,
+        };
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  assert.equal(normalizeAiRoutePolicy(swappingPolicy).maxInputPricePerMillionUsd, 0);
+  assert.equal(descriptorReads, 1, 'economic descriptor must be snapshotted exactly once');
+
   reads = 0;
   const accessorRoute = {
     routeId:'accessor-route',
