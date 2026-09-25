@@ -316,10 +316,18 @@ export function normalizeArtifactRegistryV1(input) {
   if (new Set(artifactIds).size !== artifactIds.length) {
     throw new Error('ArtifactRegistryV1 contains duplicate artifactId');
   }
+  const versionIds = artifacts.flatMap(entry => entry.versions.map(item => item.versionId));
+  if (new Set(versionIds).size !== versionIds.length) {
+    throw new Error('ArtifactRegistryV1 contains duplicate versionId across artifacts');
+  }
+  const revision = exactInteger(raw.revision, 'registry.revision', 0, Number.MAX_SAFE_INTEGER);
+  if (revision !== versionIds.length) {
+    throw new Error('ArtifactRegistryV1 revision must equal immutable version count');
+  }
   return deepFrozen({
     schemaVersion: exactVersion(raw.schemaVersion, 'ArtifactRegistryV1'),
     projectId,
-    revision: exactInteger(raw.revision, 'registry.revision', 0, Number.MAX_SAFE_INTEGER),
+    revision,
     artifacts,
   });
 }
@@ -343,6 +351,10 @@ export function putArtifactVersionV1(registryInput, versionInput) {
   if (version.projectId !== registry.projectId) throw new Error('Artifact version projectId mismatch');
 
   const existingEntry = registry.artifacts.find(item => item.artifactId === version.artifactRef.artifactId);
+  const versionOwner = registry.artifacts.find(entry => entry.versions.some(item => item.versionId === version.versionId));
+  if (versionOwner && versionOwner.artifactId !== version.artifactRef.artifactId) {
+    throw new Error(`Artifact versionId already belongs to another artifact: ${version.versionId}`);
+  }
   if (existingEntry) {
     const existingVersion = existingEntry.versions.find(item => item.versionId === version.versionId);
     if (existingVersion) {
