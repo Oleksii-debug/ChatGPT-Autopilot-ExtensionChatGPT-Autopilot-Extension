@@ -72,6 +72,8 @@ test('valid immutable PDF material produces a bounded authority-free passive pre
   assert.equal(result.passiveSafetyScreenScope, PDF_PASSIVE_SCREEN_SCOPE);
   assert.equal(result.activeContentDetected, false);
   assert.deepEqual(result.activeContentFindings, []);
+  assert.deepEqual(result.unsupportedSafetyFeatures, []);
+  assert.equal(result.passiveSafetyScreenComplete, true);
   assert.equal(result.safePassiveReviewReady, true);
   assert.equal(result.fullPdfParsePerformed, false);
   assert.equal(result.requiresQualifiedParserOrRenderer, true);
@@ -170,6 +172,25 @@ test('stream payload is not misclassified as structural active content', async (
   assert.equal(result.streamCount, 1);
   assert.equal(result.activeContentDetected, false);
   assert.equal(result.safePassiveReviewReady, true);
+});
+
+test('object streams and encrypted PDFs fail closed because lightweight screening cannot inspect hidden objects', async () => {
+  const objectStream = await run(pdf('<< /Type /ObjStm /N 1 /First 8 /Length 4 >>'));
+  assert.equal(objectStream.activeContentDetected, false);
+  assert.equal(objectStream.passiveSafetyScreenComplete, false);
+  assert.equal(objectStream.safePassiveReviewReady, false);
+  assert.deepEqual(
+    objectStream.unsupportedSafetyFeatures,
+    [{ name: '/ObjStm', reason: 'OBJECT_STREAM_REQUIRES_QUALIFIED_PARSER' }],
+  );
+
+  const encrypted = await run(pdf('<< /Type /Catalog /Encrypt 4 0 R >>'));
+  assert.equal(encrypted.passiveSafetyScreenComplete, false);
+  assert.equal(encrypted.safePassiveReviewReady, false);
+  assert.deepEqual(
+    encrypted.unsupportedSafetyFeatures,
+    [{ name: '/Encrypt', reason: 'ENCRYPTED_PDF_REQUIRES_QUALIFIED_PARSER' }],
+  );
 });
 
 test('literal strings, hex strings, and comments are data rather than structural action names', async () => {
@@ -291,7 +312,8 @@ test('unknown request fields and malformed structural tokens fail closed', async
 
 test('sensitive PDF remains disclosure-gated even when structural screen is clean', async () => {
   const result = await run(pdf(), { sensitive: true });
-  assert.equal(result.safePassiveReviewReady, true);
+  assert.equal(result.passiveSafetyScreenComplete, true);
+  assert.equal(result.safePassiveReviewReady, false);
   assert.equal(result.requiresCanonicalDisclosureAuthorization, true);
   assert.equal(result.disclosureAuthorized, false);
   assert.equal(result.distributionAuthorized, false);
