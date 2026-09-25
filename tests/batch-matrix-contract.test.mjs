@@ -11,6 +11,16 @@ import {
 } from '../src/core/batch-matrix-contract.js';
 
 const WORKLOAD_SHA = 'a'.repeat(64);
+const EVIDENCE_SHA = 'b'.repeat(64);
+
+function evidenceRef(artifactId = 'evidence-1', versionId = 'evidence-1@v1', digest = EVIDENCE_SHA) {
+  return {
+    projectId: 'project-1',
+    artifactId,
+    versionId,
+    sha256: digest,
+  };
+}
 
 function value(valueId, valueRef, sensitive = false) {
   return { valueId, valueRef, sensitive };
@@ -56,7 +66,7 @@ function terminal(item, status = BatchItemStatus.PASS, overrides = {}) {
     actorId: 'worker-1',
     verifierId: 'verifier-1',
     reasonCode: status === BatchItemStatus.PASS ? '' : 'ITEM_NOT_COMPLETE',
-    evidenceArtifactIds: ['evidence-1'],
+    evidenceRefs: [evidenceRef()],
     startedAt: '2026-09-25T06:31:00.000Z',
     completedAt: '2026-09-25T06:31:10.000Z',
     ...overrides,
@@ -76,7 +86,7 @@ test('normalizes axes deterministically and treats maxConcurrency as intent only
   assert.equal(Object.isFrozen(expansion.items), true);
 
   for (const item of expansion.items) {
-    assert.match(item.itemId, /^batch-1:item:[a-f0-9]{24}$/u);
+    assert.match(item.itemId, /^batch-item:[a-f0-9]{32}$/u);
     assert.match(item.itemSha256, /^[a-f0-9]{64}$/u);
     assert.equal(item.workloadSha256, WORKLOAD_SHA);
     assert.deepEqual(item.parameters.map(parameter => parameter.axisId), ['format', 'region']);
@@ -136,6 +146,10 @@ test('duplicate axes, value IDs and valueRef aliases fail closed', () => {
   const alias = spec();
   alias.axes[0].values[1].valueRef = alias.axes[0].values[0].valueRef;
   assert.throws(() => normalizeBatchMatrixSpecV1(alias), /duplicate valueRef alias/u);
+
+  const crossAxisAlias = spec();
+  crossAxisAlias.axes[1].values[0].valueRef = crossAxisAlias.axes[0].values[0].valueRef;
+  assert.throws(() => normalizeBatchMatrixSpecV1(crossAxisAlias), /duplicate valueRef alias/u);
 });
 
 test('matrix bounds axes, values, Cartesian product and concurrency intent', () => {
@@ -213,7 +227,7 @@ test('RUNNING item is reconciliation-required and never blind-resume candidate',
     actorId: 'worker-1',
     verifierId: '',
     reasonCode: '',
-    evidenceArtifactIds: [],
+    evidenceRefs: [],
     startedAt: '2026-09-25T06:31:00.000Z',
     completedAt: '',
   };
@@ -229,7 +243,7 @@ test('all independent PASS evidence produces COMPLETE and nothing else can', asy
     terminal(item, BatchItemStatus.PASS, {
       actorId: 'worker-' + index,
       verifierId: 'verifier-' + index,
-      evidenceArtifactIds: ['evidence-' + index],
+      evidenceRefs: [evidenceRef('evidence-' + index, 'evidence-' + index + '@v1')],
     }));
 
   const report = await assessBatchMatrixV1(spec(), results);
@@ -254,7 +268,7 @@ test('terminal FAIL or CANCELLED yields truthful PARTIAL rather than success', a
       actorId: 'worker-' + index,
       verifierId: 'verifier-' + index,
       reasonCode: statuses[index] === BatchItemStatus.PASS ? '' : 'NOT_COMPLETED',
-      evidenceArtifactIds: ['evidence-' + index],
+      evidenceRefs: [evidenceRef('evidence-' + index, 'evidence-' + index + '@v1')],
     }));
 
   const report = await assessBatchMatrixV1(spec(), results);
@@ -276,7 +290,7 @@ test('result must bind exact item identity and digest', async () => {
   );
 
   const unknown = terminal(expansion.items[0]);
-  unknown.itemId = 'batch-1:item:ffffffffffffffffffffffff';
+  unknown.itemId = 'batch-item:ffffffffffffffffffffffffffffffff';
   await assert.rejects(
     () => assessBatchMatrixV1(spec(), [unknown]),
     /unknown itemId/u,
@@ -288,6 +302,34 @@ test('result must bind exact item identity and digest', async () => {
       terminal(expansion.items[0]),
     ]),
     /duplicate itemId/u,
+  );
+});
+
+test('terminal evidence binds exact Project artifact version and SHA-256', async () => {
+  const expansion = await expandBatchMatrixV1(spec());
+  const item = expansion.items[0];
+
+  const duplicateVersion = terminal(item, BatchItemStatus.PASS, {
+    evidenceRefs: [evidenceRef(), evidenceRef()],
+  });
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [duplicateVersion]),
+    /duplicate artifact version identity/u,
+  );
+
+  const badDigest = terminal(item, BatchItemStatus.PASS, {
+    evidenceRefs: [evidenceRef('evidence-1', 'evidence-1@v1', 'B'.repeat(64))],
+  });
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [badDigest]),
+    /lowercase SHA-256/u,
+  );
+
+  const extra = terminal(item, BatchItemStatus.PASS);
+  extra.evidenceRefs[0].uri = 'file:///secret';
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [extra]),
+    /unknown field: uri/u,
   );
 });
 
@@ -304,7 +346,7 @@ test('terminal result requires independent verifier, evidence and causal times',
 
   await assert.rejects(
     () => assessBatchMatrixV1(spec(), [
-      terminal(item, BatchItemStatus.PASS, { evidenceArtifactIds: [] }),
+      terminal(item, BatchItemStatus.PASS, { evidenceRefs: [] }),
     ]),
     /requires actor, verifier, times and evidence/u,
   );
@@ -356,7 +398,7 @@ test('PENDING and RUNNING cannot smuggle terminal evidence', async () => {
     actorId: 'worker-1',
     verifierId: '',
     reasonCode: '',
-    evidenceArtifactIds: [],
+    evidenceRefs: [],
     startedAt: '',
     completedAt: '',
   };
@@ -370,7 +412,7 @@ test('PENDING and RUNNING cannot smuggle terminal evidence', async () => {
     status: BatchItemStatus.RUNNING,
     actorId: 'worker-1',
     verifierId: 'verifier-1',
-    evidenceArtifactIds: ['evidence-1'],
+    evidenceRefs: [evidenceRef()],
     startedAt: '2026-09-25T06:31:00.000Z',
   };
   await assert.rejects(
