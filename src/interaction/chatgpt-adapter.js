@@ -587,10 +587,14 @@
     const candidates = [...new Set([
       ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
       ...doc.querySelectorAll('[data-testid="user-message"]'),
+      // ChatGPT Work uses an explicit message bubble inside a keyed turn,
+      // without the older author-role attributes or article wrapper.
+      ...doc.querySelectorAll('[data-user-message-bubble="true"]'),
     ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         return role === 'user' || el.getAttribute?.('data-testid') === 'user-message'
+          || el.getAttribute?.('data-user-message-bubble') === 'true'
           || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
     // A turn article and its author-role child are ONE message, not two.
@@ -599,7 +603,8 @@
 
   function userMessageText(el) {
     // Read the message body without the turn heading, copy/edit buttons or footer.
-    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []);
+    if (el.getAttribute?.('data-user-message-bubble') === 'true') return textOf(el).trim();
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [data-user-message-bubble="true"]') || []);
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
     return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
@@ -609,16 +614,23 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'))
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key]'))
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'assistant' || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
+        // Work exposes separate keyed units for the user and assistant within
+        // one turn. The assistant unit has a role marker even when its heading
+        // is localized; an arbitrary non-user search unit is not a reply.
+        const workUnit = el.hasAttribute?.('data-chatgpt-search-unit-key')
+          && el.querySelector?.('[data-conversation-role="assistant"]')
+          && el.querySelector?.('[data-markdown-text-style="assistant-message"]');
+        return role === 'assistant' || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
+          || workUnit;
       });
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
   }
 
   function assistantMessageText(el) {
-    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"]') || []);
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"], [data-markdown-text-style="assistant-message"]') || []);
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
     return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
@@ -639,6 +651,9 @@
   function unlabeledPromptCount(doc, promptText) {
     const main = doc.querySelector?.('main, [role="main"]');
     if (!main || !promptText || typeof main.querySelectorAll !== 'function') return 0;
+    // Once this page exposes canonical user bubbles, the unlabeled fallback
+    // must not count an assistant quote or a sidebar copy of the same prompt.
+    if (main.querySelector?.('[data-user-message-bubble="true"]')) return 0;
     let count = 0;
     for (const node of main.querySelectorAll('p, div, span, pre, li, blockquote')) {
       if (!isVisible(node) || node.closest?.('form, [contenteditable="true"], nav, aside, [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
