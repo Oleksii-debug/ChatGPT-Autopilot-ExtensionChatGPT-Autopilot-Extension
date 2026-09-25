@@ -395,6 +395,10 @@ export function assessDeadlineSlaV1(input) {
   const projected = new Map();
   const blockers = [];
   const unknownEvidence = [];
+  if (currentSafeFanout === 0
+      && plan.nodes.some(node => node.state !== AgentPlanNodeState.VERIFIED)) {
+    blockers.push({ nodeId: '', reasonCode: 'NO_SAFE_FANOUT_CAPACITY' });
+  }
   let providerDegraded = false;
   let lowSampleEvidence = false;
 
@@ -475,18 +479,32 @@ export function assessDeadlineSlaV1(input) {
     return finish;
   }
 
-  const optimisticSeconds = Math.max(
+  const criticalOptimisticSeconds = Math.max(
     0,
     ...plan.nodes.map(node => finishFor(node.nodeId, 'optimisticSeconds')),
   );
-  const centralSeconds = Math.max(
+  const criticalCentralSeconds = Math.max(
     0,
     ...plan.nodes.map(node => finishFor(node.nodeId, 'centralSeconds')),
   );
-  const pessimisticSeconds = Math.max(
+  const criticalPessimisticSeconds = Math.max(
     0,
     ...plan.nodes.map(node => finishFor(node.nodeId, 'pessimisticSeconds')),
   );
+  const capacityDivisor = BigInt(Math.max(1, currentSafeFanout));
+  const capacityFloor = (field) => safeBigIntNumber(ceilDiv(
+    plan.nodes.reduce(
+      (sum, node) => sum + BigInt(projected.get(node.nodeId)[field]),
+      0n,
+    ),
+    capacityDivisor,
+  ), 'deadline fanout capacity floor');
+  const capacityOptimisticSeconds = capacityFloor('optimisticSeconds');
+  const capacityCentralSeconds = capacityFloor('centralSeconds');
+  const capacityPessimisticSeconds = capacityFloor('pessimisticSeconds');
+  const optimisticSeconds = Math.max(criticalOptimisticSeconds, capacityOptimisticSeconds);
+  const centralSeconds = Math.max(criticalCentralSeconds, capacityCentralSeconds);
+  const pessimisticSeconds = Math.max(criticalPessimisticSeconds, capacityPessimisticSeconds);
 
   const availableSeconds = Math.max(
     0,
@@ -592,6 +610,17 @@ export function assessDeadlineSlaV1(input) {
       optimisticAt: addSeconds(assessedAt, optimisticSeconds),
       centralAt: addSeconds(assessedAt, centralSeconds),
       pessimisticAt: addSeconds(assessedAt, pessimisticSeconds),
+    },
+    criticalPathBounds: {
+      optimisticSeconds: criticalOptimisticSeconds,
+      centralSeconds: criticalCentralSeconds,
+      pessimisticSeconds: criticalPessimisticSeconds,
+    },
+    fanoutCapacityFloor: {
+      fanout: currentSafeFanout,
+      optimisticSeconds: capacityOptimisticSeconds,
+      centralSeconds: capacityCentralSeconds,
+      pessimisticSeconds: capacityPessimisticSeconds,
     },
     nodeForecasts: nodeForecastOutput,
     blockers,
