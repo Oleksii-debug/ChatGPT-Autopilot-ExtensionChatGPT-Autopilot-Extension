@@ -85,6 +85,7 @@ test('valid immutable PDF material produces a bounded authority-free passive pre
   assert.equal(result.passiveSafetyScreenComplete, true);
   assert.equal(result.safePassiveReviewReady, true);
   assert.equal(result.fullPdfParsePerformed, false);
+  assert.equal(result.xrefTargetVerified, false);
   assert.equal(result.requiresQualifiedParserOrRenderer, true);
   assert.equal(result.extractionAuthorized, false);
   assert.equal(result.accessibilityVerified, false);
@@ -167,6 +168,28 @@ test('active structural action names block passive-ready state, including #xx na
     ['/AA', '/EmbeddedFile', '/JavaScript', '/Launch', '/OpenAction'],
   );
   assert.equal(result.executionAuthorized, false);
+});
+
+test('broader standard action names are structural blockers rather than passive-safe content', async () => {
+  const material = pdf('<< /S /GoToR /Next /Named /ResetForm true /Subtype /FileAttachment /Trans <<>> >>');
+  const result = await run(material);
+  assert.equal(result.activeContentDetected, true);
+  assert.equal(result.safePassiveReviewReady, false);
+  assert.deepEqual(
+    result.activeContentFindings.map(item => item.name),
+    ['/FileAttachment', '/GoToR', '/Named', '/ResetForm', '/Trans'],
+  );
+});
+
+test('AcroForm is parser-required because field/action semantics are outside the lightweight screen', async () => {
+  const result = await run(pdf('<< /Type /Catalog /AcroForm 2 0 R >>'));
+  assert.equal(result.activeContentDetected, false);
+  assert.equal(result.passiveSafetyScreenComplete, false);
+  assert.equal(result.safePassiveReviewReady, false);
+  assert.deepEqual(result.unsupportedSafetyFeatures, [{
+    name: '/AcroForm',
+    reason: 'ACROFORM_REQUIRES_QUALIFIED_PARSER',
+  }]);
 });
 
 test('stream payload is not misclassified as structural active content', async () => {
