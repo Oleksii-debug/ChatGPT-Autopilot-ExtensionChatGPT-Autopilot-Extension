@@ -521,6 +521,10 @@ export function normalizeRecipeRegistryV1(input) {
     if (Date.parse(recipe.createdAt) > Date.parse(updatedAt)) {
       throw new Error(`registry updatedAt predates recipe version: ${recipe.recipeId}@${recipe.version}`);
     }
+    if (recipe.qualification.status !== RecipeQualificationStatus.UNQUALIFIED
+        && Date.parse(recipe.qualification.evaluatedAt) > Date.parse(updatedAt)) {
+      throw new Error(`registry updatedAt predates recipe qualification: ${recipe.recipeId}@${recipe.version}`);
+    }
   }
   return frozen({
     schemaVersion: RECIPE_REGISTRY_VERSION,
