@@ -226,16 +226,27 @@ function artifactIdentity(artifact) {
 function sourceBinding(source) {
   return freeze({
     sourceId: source.sourceId,
+    projectId: source.projectId,
+    kind: source.kind,
+    uri: source.uri,
     revisionId: source.revisionId,
     contentSha256: source.contentSha256,
+    observedAt: source.observedAt,
+    authority: source.authority,
   });
 }
 
 function artifactBinding(artifact) {
   return freeze({
     artifactId: artifact.artifactId,
+    kind: artifact.kind,
+    uri: artifact.uri,
+    mediaType: artifact.mediaType || '',
     sha256: artifact.sha256,
     sizeBytes: artifact.sizeBytes,
+    createdAt: artifact.createdAt,
+    producerInvocationId: artifact.producerInvocationId || '',
+    sensitive: artifact.sensitive,
   });
 }
 
@@ -288,36 +299,58 @@ export function meetingEvidenceBindingFromBundleV1(bundle) {
     meetingId: normalized.meetingId,
     projectId: normalized.projectId,
     meetingRevisionId: normalized.meetingRevisionId,
+    observedAt: normalized.observedAt,
     sourceBindings: normalized.sourceRefs.map(sourceBinding),
     transcriptArtifactBinding: artifactBinding(normalized.transcriptArtifactRef),
     recordingArtifactBindings: normalized.recordingArtifactRefs.map(artifactBinding),
   });
 }
 
-const SOURCE_BINDING_KEYS = new Set(['sourceId','revisionId','contentSha256']);
+const SOURCE_BINDING_KEYS = new Set([
+  'sourceId','projectId','kind','uri','revisionId','contentSha256','observedAt','authority',
+]);
 function normalizeSourceBinding(input, label) {
   const raw = record(input, label);
   exact(raw, SOURCE_BINDING_KEYS, label);
+  if (typeof raw.authority !== 'string' || raw.authority !== raw.authority.trim() || raw.authority !== raw.authority.toUpperCase()) {
+    throw new Error(`${label}.authority must be canonical text`);
+  }
   return freeze({
     sourceId: identifier(raw.sourceId, `${label}.sourceId`),
+    projectId: identifier(raw.projectId, `${label}.projectId`),
+    kind: identifier(raw.kind, `${label}.kind`),
+    uri: text(raw.uri, `${label}.uri`, { max: 4096 }),
     revisionId: identifier(raw.revisionId, `${label}.revisionId`),
     contentSha256: digest(raw.contentSha256, `${label}.contentSha256`),
+    observedAt: timestamp(raw.observedAt, `${label}.observedAt`),
+    authority: raw.authority,
   });
 }
 
-const ARTIFACT_BINDING_KEYS = new Set(['artifactId','sha256','sizeBytes']);
+const ARTIFACT_BINDING_KEYS = new Set([
+  'artifactId','kind','uri','mediaType','sha256','sizeBytes','createdAt',
+  'producerInvocationId','sensitive',
+]);
 function normalizeArtifactBinding(input, label) {
   const raw = record(input, label);
   exact(raw, ARTIFACT_BINDING_KEYS, label);
   return freeze({
     artifactId: identifier(raw.artifactId, `${label}.artifactId`),
+    kind: identifier(raw.kind, `${label}.kind`),
+    uri: text(raw.uri, `${label}.uri`, { max: 4096 }),
+    mediaType: text(raw.mediaType, `${label}.mediaType`, { optional: true, max: 300 }),
     sha256: digest(raw.sha256, `${label}.sha256`),
     sizeBytes: integer(raw.sizeBytes, `${label}.sizeBytes`),
+    createdAt: timestamp(raw.createdAt, `${label}.createdAt`),
+    producerInvocationId: raw.producerInvocationId === ''
+      ? ''
+      : identifier(raw.producerInvocationId, `${label}.producerInvocationId`),
+    sensitive: bool(raw.sensitive, `${label}.sensitive`),
   });
 }
 
 const MEETING_BINDING_KEYS = new Set([
-  'meetingId','projectId','meetingRevisionId','sourceBindings',
+  'meetingId','projectId','meetingRevisionId','observedAt','sourceBindings',
   'transcriptArtifactBinding','recordingArtifactBindings',
 ]);
 
@@ -346,6 +379,7 @@ export function normalizeMeetingEvidenceBindingV1(input) {
     meetingId: identifier(raw.meetingId, 'meetingId'),
     projectId: identifier(raw.projectId, 'projectId'),
     meetingRevisionId: identifier(raw.meetingRevisionId, 'meetingRevisionId'),
+    observedAt: timestamp(raw.observedAt, 'observedAt'),
     sourceBindings,
     transcriptArtifactBinding,
     recordingArtifactBindings,
@@ -452,9 +486,26 @@ function bindingIdentity(binding) {
     binding.meetingId,
     binding.projectId,
     binding.meetingRevisionId,
-    binding.sourceBindings.map(item => [item.sourceId, item.revisionId, item.contentSha256]),
-    [binding.transcriptArtifactBinding.artifactId, binding.transcriptArtifactBinding.sha256, binding.transcriptArtifactBinding.sizeBytes],
-    binding.recordingArtifactBindings.map(item => [item.artifactId, item.sha256, item.sizeBytes]),
+    binding.observedAt,
+    binding.sourceBindings.map(item => [
+      item.sourceId, item.projectId, item.kind, item.uri, item.revisionId,
+      item.contentSha256, item.observedAt, item.authority,
+    ]),
+    [
+      binding.transcriptArtifactBinding.artifactId,
+      binding.transcriptArtifactBinding.kind,
+      binding.transcriptArtifactBinding.uri,
+      binding.transcriptArtifactBinding.mediaType,
+      binding.transcriptArtifactBinding.sha256,
+      binding.transcriptArtifactBinding.sizeBytes,
+      binding.transcriptArtifactBinding.createdAt,
+      binding.transcriptArtifactBinding.producerInvocationId,
+      binding.transcriptArtifactBinding.sensitive,
+    ],
+    binding.recordingArtifactBindings.map(item => [
+      item.artifactId, item.kind, item.uri, item.mediaType, item.sha256, item.sizeBytes,
+      item.createdAt, item.producerInvocationId, item.sensitive,
+    ]),
   ]);
 }
 

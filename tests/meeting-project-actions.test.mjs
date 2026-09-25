@@ -245,6 +245,20 @@ test('project actions bind exact meeting revision and never grant execution or i
     evidenceBundle: revised,
   }), /does not bind the exact/);
 
+  const reclassified = structuredClone(bundle);
+  reclassified.sourceRefs[0].authority = 'DERIVED';
+  assert.throws(() => assertMeetingProjectActionsMatchesEvidenceV1({
+    result: result(bundle),
+    evidenceBundle: reclassified,
+  }), /does not bind the exact/);
+
+  const sensitivityChanged = structuredClone(bundle);
+  sensitivityChanged.transcriptArtifactRef.sensitive = true;
+  assert.throws(() => assertMeetingProjectActionsMatchesEvidenceV1({
+    result: result(bundle),
+    evidenceBundle: sensitivityChanged,
+  }), /does not bind the exact/);
+
   assert.throws(() => normalizeMeetingProjectActionsV1({
     ...result(bundle),
     taskCreationAuthorized: true,
