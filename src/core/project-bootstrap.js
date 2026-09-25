@@ -583,6 +583,18 @@ export async function commitTrustedProjectBootstrapToWorkspaceV1(
   // it separately.
   const resolved = await resolveTrustedProjectBootstrapSnapshotV1(input, resolversInput);
 
+  // ProjectWorkspace timestamps are wall-clock epoch milliseconds. A durable
+  // admission must therefore be causally at or after the exact trusted
+  // snapshot and every source/artifact observation materialized by it.
+  const causalFloorMs = Math.max(
+    Date.parse(resolved.snapshot.createdAt),
+    ...resolved.snapshot.sourceRefs.map(source => Date.parse(source.observedAt)),
+    ...resolved.snapshot.artifactRefs.map(artifact => Date.parse(artifact.createdAt)),
+  );
+  if (commitAt < causalFloorMs) {
+    throw new Error('Project bootstrap workspace commit must not predate trusted snapshot or evidence');
+  }
+
   const workspace = await repository.update(draft => {
     addProjectSnapshot(draft, resolved.snapshot, { nowMs: commitAt });
     return draft;
