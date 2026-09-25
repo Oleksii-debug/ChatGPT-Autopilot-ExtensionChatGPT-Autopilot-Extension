@@ -159,6 +159,25 @@ test('meeting evidence is materialized, deterministic and source-aware', () => {
   assert.throws(() => normalizeMeetingEvidenceBundleV1(duplicateArtifact), /distinct artifactId/);
 });
 
+test('meeting evidence and generated proposals preserve temporal causality', () => {
+  const futureSource = source();
+  futureSource.observedAt = '2026-09-24T22:00:00.000Z';
+  assert.throws(() => normalizeMeetingEvidenceBundleV1(evidenceBundle({
+    sourceRefs: [futureSource],
+  })), /cannot predate source observation/);
+
+  const futureTranscript = transcript();
+  futureTranscript.createdAt = '2026-09-24T22:00:00.000Z';
+  assert.throws(() => normalizeMeetingEvidenceBundleV1(evidenceBundle({
+    transcriptRef: futureTranscript,
+  })), /cannot predate artifact creation/);
+
+  const bundle = evidenceBundle();
+  const beforeEvidence = result(bundle);
+  beforeEvidence.generatedAt = '2026-09-24T19:59:59.000Z';
+  assert.throws(() => normalizeMeetingProjectActionsV1(beforeEvidence), /cannot predate meeting evidence/);
+});
+
 test('strict boundary rejects accessors, hidden fields, symbols, exotic objects and sparse arrays without getter execution', () => {
   let reads = 0;
   const accessor = evidenceBundle();
@@ -308,6 +327,12 @@ test('meeting source freshness fails closed on revision/hash/URI/authority drift
   const missing = assessMeetingEvidenceFreshnessV1(bundle, []);
   assert.equal(missing.status, 'STALE');
   assert.deepEqual(missing.sources[0].reasons, ['CURRENT_SOURCE_MISSING']);
+
+  const regressed = source();
+  regressed.observedAt = '2026-09-24T19:00:00.000Z';
+  const regressedState = assessMeetingEvidenceFreshnessV1(bundle, [regressed]);
+  assert.equal(regressedState.status, 'STALE');
+  assert.deepEqual(regressedState.sources[0].reasons, ['OBSERVATION_REGRESSED']);
 });
 
 test('canonical primitive representation cannot gain authority through coercion/defaults', () => {

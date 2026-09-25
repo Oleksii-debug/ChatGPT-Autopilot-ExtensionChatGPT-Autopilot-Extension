@@ -281,6 +281,18 @@ export function normalizeMeetingEvidenceBundleV1(input) {
     throw new Error('transcriptArtifactRef and recordingArtifactRefs must have distinct artifactId values');
   }
 
+  const observedAt = timestamp(raw.observedAt, 'observedAt');
+  const observedMs = Date.parse(observedAt);
+  for (const source of sourceRefs) {
+    if (Date.parse(source.observedAt) > observedMs) {
+      throw new Error(`meeting evidence cannot predate source observation: ${source.sourceId}`);
+    }
+  }
+  for (const artifact of [transcriptArtifactRef, ...recordingArtifactRefs]) {
+    if (Date.parse(artifact.createdAt) > observedMs) {
+      throw new Error(`meeting evidence cannot predate artifact creation: ${artifact.artifactId}`);
+    }
+  }
   return freeze({
     schemaVersion: version(raw.schemaVersion, 'MeetingEvidenceBundleV1'),
     meetingId: identifier(raw.meetingId, 'meetingId'),
@@ -289,7 +301,7 @@ export function normalizeMeetingEvidenceBundleV1(input) {
     sourceRefs,
     transcriptArtifactRef,
     recordingArtifactRefs,
-    observedAt: timestamp(raw.observedAt, 'observedAt'),
+    observedAt,
   });
 }
 
@@ -466,13 +478,17 @@ export function normalizeMeetingProjectActionsV1(input) {
     }
   }
 
+  const generatedAt = timestamp(raw.generatedAt, 'generatedAt');
+  if (Date.parse(generatedAt) < Date.parse(meetingBinding.observedAt)) {
+    throw new Error('MeetingProjectActionsV1 generatedAt cannot predate meeting evidence');
+  }
   return freeze({
     schemaVersion: version(raw.schemaVersion, 'MeetingProjectActionsV1'),
     resultId: identifier(raw.resultId, 'resultId'),
     meetingBinding,
     decisions,
     actionItems,
-    generatedAt: timestamp(raw.generatedAt, 'generatedAt'),
+    generatedAt,
     advisoryOnly: true,
     taskCreationAuthorized: false,
     calendarMutationAuthorized: false,
@@ -572,6 +588,7 @@ export function assessMeetingEvidenceFreshnessV1(evidenceBundle, currentSourceRe
       if (actual.authority !== expected.authority) reasons.push('AUTHORITY_CHANGED');
       if (actual.revisionId !== expected.revisionId) reasons.push('REVISION_CHANGED');
       if (actual.contentSha256 !== expected.contentSha256) reasons.push('CONTENT_CHANGED');
+      if (Date.parse(actual.observedAt) < Date.parse(expected.observedAt)) reasons.push('OBSERVATION_REGRESSED');
     }
     return freeze({
       sourceId: expected.sourceId,
