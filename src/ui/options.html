@@ -95,6 +95,22 @@
 
       <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true" placeholder="Наприклад: перевір предмети зимового семестру, підбери розклад без конфліктів і виконай задачу відповідно до вибраної нижче політики автономності."></textarea>
+
+      <fieldset class="settings-group" id="agent-source-context-group">
+        <legend>Контекст із відкритої вкладки — необов’язково</legend>
+        <p class="field-help" id="agent-source-help">Виділення або текст сторінки передається Agent як недовірені дані, окремо від вашої команди. Текст сторінки не може надати дозвіл, змінити політику чи стати вашою інструкцією.</p>
+        <label for="agent-source-tab">Вкладка-джерело</label>
+        <select id="agent-source-tab" aria-describedby="agent-source-help agent-source-status"></select>
+        <div class="agent-actions" aria-label="Дії з контекстом вкладки">
+          <button id="agent-source-refresh-button" type="button">Оновити список вкладок</button>
+          <button id="agent-source-permission-button" type="button" disabled>Дозволити читання цього сайту</button>
+          <button id="agent-source-selection-button" type="button" disabled>Захопити виділення</button>
+          <button id="agent-source-page-button" type="button" disabled>Захопити текст сторінки</button>
+          <button id="agent-source-clear-button" type="button" disabled>Очистити контекст</button>
+        </div>
+        <p id="agent-source-status" role="status">Контекст не прикріплено.</p>
+      </fieldset>
+
       <div class="agent-actions" aria-label="Основні дії агента">
         <button id="agent-run-prompt-button" type="button">Запустити агента</button>
         <button id="agent-pause-button" type="button" disabled>Пауза</button>
