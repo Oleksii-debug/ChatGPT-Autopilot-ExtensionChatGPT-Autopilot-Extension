@@ -200,3 +200,30 @@ test('failed route health persists for restart without counting a completed requ
   assert.equal(loaded.runtime.routeStates.a.backoffUntil, 62_000);
   assert.equal(loaded.runtime.lastFailoverChain[0].routeId, 'a');
 });
+
+
+test('route profile names and prompts persist through the canonical router settings boundary', async () => {
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  const settings = {
+    enabled: false,
+    mode: 'primary',
+    primary: { provider: 'ollama', model: '' },
+    strong: { provider: 'openai', model: '' },
+    routes: [{
+      routeId: 'implementer',
+      provider: 'ollama',
+      model: 'qwen',
+      displayName: 'Implementer',
+      systemPrompt: 'Preserve project policy.',
+      workerPrompt: 'Implement the assigned slice.',
+      roles: ['coder'],
+      priority: 10,
+    }],
+  };
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings });
+  const loaded = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(loaded.settings.routes[0].displayName, 'Implementer');
+  assert.equal(loaded.settings.routes[0].systemPrompt, 'Preserve project policy.');
+  assert.equal(loaded.settings.routes[0].workerPrompt, 'Implement the assigned slice.');
+});

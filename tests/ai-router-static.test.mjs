@@ -65,3 +65,20 @@ test('route-pool owner controls are native, keyboard accessible and persist ever
   assert.match(optionsJs, /routeStates/);
   assert.doesNotMatch(html, /textarea[^>]+route-pool/i);
 });
+
+
+test('route model profiles expose bounded native controls and round-trip form wiring', () => {
+  for (const field of ['displayName', 'systemPrompt', 'workerPrompt']) {
+    assert.match(html, new RegExp(`data-label-for="${field}"`));
+    assert.match(html, new RegExp(`data-route-field="${field}"`));
+  }
+  assert.match(html, /data-route-field="displayName"[^>]*maxlength="160"/);
+  assert.match(html, /data-route-field="systemPrompt"[^>]*maxlength="8000"/);
+  assert.match(html, /data-route-field="workerPrompt"[^>]*maxlength="8000"/);
+  assert.match(optionsJs, /displayName:text\('displayName'\)/);
+  assert.match(optionsJs, /systemPrompt:text\('systemPrompt'\)/);
+  assert.match(optionsJs, /workerPrompt:text\('workerPrompt'\)/);
+  assert.match(optionsJs, /displayName:route\.displayName \|\| ''/);
+  assert.match(optionsJs, /systemPrompt:route\.systemPrompt \|\| ''/);
+  assert.match(optionsJs, /workerPrompt:route\.workerPrompt \|\| ''/);
+});
