@@ -58,7 +58,7 @@ function nativeClient(overrides = {}) {
   };
 }
 
-test('filesystem provider advertises only executable read/search tools and enforces invocation-bound owner policy', async () => {
+test('filesystem provider advertises only executable read/search tools while retaining hidden write recovery contract', async () => {
   const calls = [];
   const client = nativeClient({
     searchFiles: async payload => { calls.push(payload); return { items: ['docs/a.txt'], truncated: false }; },
@@ -82,14 +82,83 @@ test('filesystem provider advertises only executable read/search tools and enfor
   assert.deepEqual(calls, [{ rootId: 'workspace', query: 'a' }]);
 });
 
-test('unavailable filesystem write is not registered and cannot reach resolver or Native Companion', async () => {
-  let resolverCalls = 0;
-  let nativeCalls = 0;
+test('write invocation persists only ArtifactRef identity while resolver supplies transient content', async () => {
+  const calls = [];
+  const ref = artifactRef('x');
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({ writeExistingText: async payload => { calls.push(structuredClone(payload)); return { sha256: digest(payload.text), alreadyApplied: false }; } }),
+    resolveArtifactText: async resolvedRef => {
+      assert.equal(resolvedRef.artifactId, ref.artifactId);
+      return 'x';
+    },
+    grantedCapabilityIds: ['filesystem.writeExistingText'],
+  });
+  const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
+    rootId: 'workspace', relativePath: 'a.txt', contentArtifactRef: ref, expectedSha256: 'b'.repeat(64),
+  });
+  const result = await provider.invoke({ invocation: inv, policyDecision: allow() });
+  assert.equal(result.result.sha256, digest('x'));
+  assert.deepEqual(calls, [{ rootId: 'workspace', relativePath: 'a.txt', text: 'x', expectedSha256: 'b'.repeat(64) }]);
+  assert.equal(JSON.stringify(inv).includes('"text":"x"'), false);
+});
+
+test('effectful filesystem transport uncertainty is not retry-safe while known pre-effect rejection is retry-safe', async () => {
+  const transport = Object.assign(new Error('native port closed'), { code: 'NATIVE_TRANSPORT_ERROR' });
+  const common = {
+    nativeClient: nativeClient({ writeExistingText: async () => { throw transport; } }),
+    resolveArtifactText: async () => 'x',
+    grantedCapabilityIds: ['filesystem.writeExistingText'],
+  };
+  const uncertain = new FilesystemAgentProviderV1(common);
+  const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
+    rootId: 'workspace', relativePath: 'a.txt', contentArtifactRef: artifactRef('x'), expectedSha256: 'b'.repeat(64),
+  });
+  await assert.rejects(() => uncertain.invoke({ invocation: inv, policyDecision: allow() }), error => {
+    assert.equal(error.effectMayHaveOccurred, true);
+    assert.equal(error.safeToRetry, false);
+    return true;
+  });
+
+  const denied = Object.assign(new Error('root is read only'), { code: 'ROOT_NOT_WRITABLE' });
+  const preEffect = new FilesystemAgentProviderV1({
+    ...common,
+    nativeClient: nativeClient({ writeExistingText: async () => { throw denied; } }),
+  });
+  await assert.rejects(() => preEffect.invoke({ invocation: inv, policyDecision: allow() }), error => {
+    assert.equal(error.effectMayHaveOccurred, false);
+    assert.equal(error.safeToRetry, true);
+    assert.equal(error.code, 'ROOT_NOT_WRITABLE');
+    return true;
+  });
+});
+
+test('artifact resolver mismatch fails before Native Companion mutation', async () => {
+  let calls = 0;
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({ writeExistingText: async () => { calls += 1; return {}; } }),
+    resolveArtifactText: async () => 'tampered',
+    grantedCapabilityIds: ['filesystem.writeExistingText'],
+  });
+  const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
+    rootId: 'workspace', relativePath: 'a.txt', contentArtifactRef: artifactRef('x'), expectedSha256: 'b'.repeat(64),
+  });
+  await assert.rejects(() => provider.invoke({ invocation: inv, policyDecision: allow() }), error => {
+    assert.equal(error.code, 'ARTIFACT_CONTENT_INVALID');
+    assert.equal(error.effectMayHaveOccurred, false);
+    return true;
+  });
+  assert.equal(calls, 0);
+});
+
+
+test('unavailable atomic filesystem publication is classified as a pre-effect failure', async () => {
+  let calls = 0;
+  const unavailable = Object.assign(new Error('parent-bound publication unavailable'), { code: 'ATOMIC_WRITE_UNAVAILABLE' });
   const provider = new FilesystemAgentProviderV1({
     nativeClient: nativeClient({
-      writeExistingText: async () => { nativeCalls += 1; return {}; },
+      writeExistingText: async () => { calls += 1; throw unavailable; },
     }),
-    resolveArtifactText: async () => { resolverCalls += 1; return 'x'; },
+    resolveArtifactText: async () => 'x',
     grantedCapabilityIds: ['filesystem.writeExistingText'],
   });
   const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
@@ -98,11 +167,12 @@ test('unavailable filesystem write is not registered and cannot reach resolver o
     contentArtifactRef: artifactRef('x'),
     expectedSha256: 'b'.repeat(64),
   });
-  await assert.rejects(
-    () => provider.invoke({ invocation: inv, policyDecision: allow() }),
-    /Filesystem tool is not registered/,
-  );
-  assert.equal(resolverCalls, 0);
-  assert.equal(nativeCalls, 0);
-});
 
+  await assert.rejects(() => provider.invoke({ invocation: inv, policyDecision: allow() }), error => {
+    assert.equal(error.code, 'ATOMIC_WRITE_UNAVAILABLE');
+    assert.equal(error.effectMayHaveOccurred, false);
+    assert.equal(error.safeToRetry, true);
+    return true;
+  });
+  assert.equal(calls, 1);
+});

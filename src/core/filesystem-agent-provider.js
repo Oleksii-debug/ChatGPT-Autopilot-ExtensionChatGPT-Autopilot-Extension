@@ -27,6 +27,18 @@ const PRE_EFFECT_CODES = new Set([
   'ATOMIC_WRITE_UNAVAILABLE',
 ]);
 
+const WRITE_RECOVERY_TOOL = normalizeToolDescriptorV1({
+  schemaVersion: 1,
+  toolId: FilesystemToolId.WRITE_EXISTING_TEXT,
+  providerId: FILESYSTEM_PROVIDER_ID,
+  label: 'Replace existing owner-scoped text file',
+  description: 'Recovery-only contract for a previously admitted filesystem write; new write discovery remains disabled until parent-bound atomic publication exists.',
+  capabilityIds: ['filesystem.writeExistingText'],
+  inputSchemaRef: 'filesystem-schema/writeExistingText/input',
+  outputSchemaRef: 'filesystem-schema/writeExistingText/output',
+  readOnly: false,
+});
+
 const TOOLS = Object.freeze([
   normalizeToolDescriptorV1({
     schemaVersion: 1,
@@ -51,6 +63,7 @@ const TOOLS = Object.freeze([
     readOnly: true,
   }),
 ]);
+const KNOWN_TOOLS = Object.freeze([...TOOLS, WRITE_RECOVERY_TOOL]);
 
 function providerError(code, message) {
   const error = new Error(message);
@@ -106,7 +119,7 @@ export class FilesystemAgentProviderV1 {
   tools() { return TOOLS; }
 
   authorize({ invocation, policyDecision } = {}) {
-    const tool = TOOLS.find(item => item.toolId === invocation?.toolId);
+    const tool = KNOWN_TOOLS.find(item => item.toolId === invocation?.toolId);
     if (!tool) throw new Error('Filesystem tool is not registered');
     const authorized = assertToolInvocationAuthorizedV1({
       invocation,
@@ -120,7 +133,7 @@ export class FilesystemAgentProviderV1 {
 
   async invoke({ invocation, policyDecision } = {}) {
     const authorized = this.authorize({ invocation, policyDecision });
-    const tool = TOOLS.find(item => item.toolId === authorized.invocation.toolId);
+    const tool = KNOWN_TOOLS.find(item => item.toolId === authorized.invocation.toolId);
     try {
       let result;
       if (tool.toolId === FilesystemToolId.READ_TEXT) {
