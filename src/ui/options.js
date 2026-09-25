@@ -33,6 +33,9 @@ const ui = {
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
+  agentSourceTabs: [],
+  pendingAgentSourceContext: null,
+  pendingAgentSourceTitle: '',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1840,6 +1843,110 @@ function browserAgentNameFromGoal(goal) {
   return text ? text.slice(0, 90) : 'Нове завдання агента';
 }
 
+function selectedBrowserAgentSourceTab() {
+  const tabId = Number($('agent-source-tab').value);
+  return ui.agentSourceTabs.find(tab => tab.tabId === tabId) || null;
+}
+
+function syncBrowserAgentSourceControls() {
+  const selected = selectedBrowserAgentSourceTab();
+  const allowed = selected?.captureAllowed === true;
+  $('agent-source-permission-button').disabled = !selected || allowed;
+  $('agent-source-selection-button').disabled = !allowed;
+  $('agent-source-page-button').disabled = !allowed;
+  $('agent-source-clear-button').disabled = !ui.pendingAgentSourceContext;
+}
+
+function renderBrowserAgentSourceTabs({ selectedTabId = null } = {}) {
+  const select = $('agent-source-tab');
+  const previous = selectedTabId ?? Number(select.value || 0);
+  select.replaceChildren();
+  for (const tab of ui.agentSourceTabs) {
+    const option = document.createElement('option');
+    option.value = String(tab.tabId);
+    const title = tab.title || tab.url;
+    option.textContent = `${title} — ${tab.captureAllowed ? 'читання дозволено' : 'потрібен дозвіл'}`;
+    option.selected = tab.tabId === previous;
+    select.append(option);
+  }
+  if (!select.value && ui.agentSourceTabs[0]) select.value = String(ui.agentSourceTabs[0].tabId);
+  if (!ui.agentSourceTabs.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Немає доступних HTTP/HTTPS вкладок';
+    select.append(option);
+  }
+  syncBrowserAgentSourceControls();
+}
+
+async function loadBrowserAgentSourceTabs({ announceResult = false, selectedTabId = null } = {}) {
+  try {
+    const data = await core('LIST_BROWSER_AGENT_SOURCE_TABS');
+    ui.agentSourceTabs = Array.isArray(data?.tabs) ? data.tabs : [];
+    renderBrowserAgentSourceTabs({ selectedTabId });
+    if (announceResult) announce(`Оновлено вкладки для контексту Agent: ${ui.agentSourceTabs.length}.`);
+  } catch (error) {
+    ui.agentSourceTabs = [];
+    renderBrowserAgentSourceTabs();
+    $('agent-source-status').textContent = `Не вдалося отримати вкладки: ${error.message}`;
+  }
+}
+
+async function requestBrowserAgentSourcePermission() {
+  const selected = selectedBrowserAgentSourceTab();
+  if (!selected) {
+    $('agent-source-status').textContent = 'Оберіть вкладку.';
+    $('agent-source-tab').focus();
+    return;
+  }
+  try {
+    const origin = new URL(selected.url).origin;
+    const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
+    $('agent-source-status').textContent = granted
+      ? `Дозвіл на читання ${origin} надано.`
+      : `Chrome не надав дозвіл на читання ${origin}.`;
+    await loadBrowserAgentSourceTabs({ selectedTabId: selected.tabId });
+    if (granted) {
+      $('agent-source-selection-button').focus();
+      announce('Дозвіл на читання вибраної вкладки надано.');
+    }
+  } catch (error) {
+    $('agent-source-status').textContent = `Дозвіл не отримано: ${error.message}`;
+  }
+}
+
+async function captureBrowserAgentSource(kind) {
+  const selected = selectedBrowserAgentSourceTab();
+  if (!selected) {
+    $('agent-source-status').textContent = 'Оберіть вкладку.';
+    $('agent-source-tab').focus();
+    return;
+  }
+  try {
+    $('agent-source-status').textContent = kind === 'SELECTION'
+      ? 'Захоплюю виділений текст…'
+      : 'Захоплюю текст сторінки…';
+    const data = await core('CAPTURE_BROWSER_AGENT_SOURCE', { tabId: selected.tabId, kind });
+    if (!data?.source) throw new Error('Core не повернув контекст.');
+    ui.pendingAgentSourceContext = data.source;
+    ui.pendingAgentSourceTitle = data?.tab?.title || selected.title || selected.url;
+    syncBrowserAgentSourceControls();
+    const length = String(data.source.text || '').length;
+    $('agent-source-status').textContent = `Контекст готовий: ${kind === 'SELECTION' ? 'виділення' : 'сторінка'}, ${length} символів, ${ui.pendingAgentSourceTitle}.`;
+    announce('Контекст вкладки готовий і буде прикріплений до нового завдання Agent.');
+  } catch (error) {
+    $('agent-source-status').textContent = `Контекст не захоплено: ${error.message}`;
+  }
+}
+
+function clearBrowserAgentSource({ announceResult = true } = {}) {
+  ui.pendingAgentSourceContext = null;
+  ui.pendingAgentSourceTitle = '';
+  syncBrowserAgentSourceControls();
+  $('agent-source-status').textContent = 'Контекст не прикріплено.';
+  if (announceResult) announce('Контекст вкладки очищено.');
+}
+
 function browserAgentInteger(id, min, max, label) {
   const value = Number($(id).value);
   if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: введіть ціле число ${min}-${max}.`);
@@ -2090,14 +2197,23 @@ async function runBrowserAgentPrompt() {
   try {
     $('agent-run-prompt-button').disabled = true;
     $('agent-status').textContent = 'Створюю завдання й запускаю Agent…';
+    const attachedSource = ui.pendingAgentSourceContext ? structuredClone(ui.pendingAgentSourceContext) : null;
+    const attachedSourceTitle = ui.pendingAgentSourceTitle;
     const created = await core('CREATE_BROWSER_AGENT_JOB', {
       name: browserAgentNameFromGoal(goal),
       goal,
+      initialSourceContext: attachedSource,
       ...browserAgentPolicyFromForm(),
     });
     const id = created?.job?.id || created?.selectedId;
     if (!id) throw new Error('Core не повернув id завдання Agent.');
     ui.selectedBrowserAgentId = id;
+    if (attachedSource) {
+      ui.pendingAgentSourceContext = null;
+      ui.pendingAgentSourceTitle = '';
+      syncBrowserAgentSourceControls();
+      $('agent-source-status').textContent = `Контекст прикріплено до створеного завдання Agent${attachedSourceTitle ? ` — ${attachedSourceTitle}` : ''}.`;
+    }
     await core('START_BROWSER_AGENT_JOB', { id });
     await loadBrowserAgentJobs({ selectId: id });
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
@@ -3137,6 +3253,7 @@ async function createSession() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadBrowserAgentSourceTabs();
   await loadRemoteDispatchStatus();
     await openSession(data.session.id);
     $('session-name').focus();
@@ -3691,6 +3808,12 @@ $('import-orchestration-v2-profile-button').addEventListener('click', importOrch
 $('export-orchestration-v2-profile-button').addEventListener('click', exportOrchestrationProfile);
 $('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
 $('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
+$('agent-source-tab').addEventListener('change', syncBrowserAgentSourceControls);
+$('agent-source-refresh-button').addEventListener('click', () => { void loadBrowserAgentSourceTabs({ announceResult: true }); });
+$('agent-source-permission-button').addEventListener('click', () => { void requestBrowserAgentSourcePermission(); });
+$('agent-source-selection-button').addEventListener('click', () => { void captureBrowserAgentSource('SELECTION'); });
+$('agent-source-page-button').addEventListener('click', () => { void captureBrowserAgentSource('CURRENT_PAGE'); });
+$('agent-source-clear-button').addEventListener('click', () => clearBrowserAgentSource());
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
