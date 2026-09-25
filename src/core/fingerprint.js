@@ -4,6 +4,12 @@ function toHex(bytes) {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+export async function createSha256FingerprintV1(canonical, { cryptoApi = globalThis.crypto } = {}) {
+  if (typeof canonical !== 'string') throw new Error('Canonical fingerprint input must be a string');
+  if (!cryptoApi?.subtle?.digest) throw new Error('Web Crypto SHA-256 is unavailable');
+  return createSha256FingerprintV1(canonical, { cryptoApi });
+}
+
 export async function createPromptFingerprint({
   sessionId,
   taskId,
@@ -15,8 +21,6 @@ export async function createPromptFingerprint({
   if (!sessionId || !taskId) throw new Error('Session and task identity are required');
   if (typeof promptText !== 'string') throw new Error('Prompt text must be a string');
   if (!Number.isSafeInteger(generation) || generation < 1) throw new Error('Operation generation must be a positive integer');
-  if (!cryptoApi?.subtle?.digest) throw new Error('Web Crypto SHA-256 is unavailable');
-
   const canonical = JSON.stringify([
     'chatgpt-autopilot-prompt-v1',
     sessionId,
