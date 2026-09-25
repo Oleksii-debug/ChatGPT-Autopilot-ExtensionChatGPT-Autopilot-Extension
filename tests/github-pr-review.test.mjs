@@ -662,6 +662,93 @@ test('review verifier rejects uppercase expected-head aliases before any remote 
   assert.equal(remoteReads, 0);
 });
 
+test('review verifier accepts the canonical exact-effect envelope and binds its identity fields', async () => {
+  let remoteReads = 0;
+  const client = fullClient({
+    readPullRequest: async ({ repositoryFullName, pullRequestNumber }) => {
+      remoteReads += 1;
+      return {
+        repositoryFullName,
+        number: pullRequestNumber,
+        title: 'Review candidate',
+        body: '',
+        state: 'open',
+        merged: false,
+        headSha,
+        baseSha,
+        mergeCommitSha: '',
+        url: 'https://example.invalid/pr',
+      };
+    },
+    readPullRequestReview: async ({ repositoryFullName, pullRequestNumber, reviewId }) => {
+      remoteReads += 1;
+      return {
+        repositoryFullName,
+        pullRequestNumber,
+        reviewId,
+        body: reviewBody,
+        state: 'COMMENTED',
+        commitId: headSha,
+        url: 'https://example.invalid/review',
+      };
+    },
+  });
+  const verifier = new GitHubPullRequestReviewVerifierV1({
+    githubClient: client,
+    now: () => Date.parse(at),
+  });
+  const inv = invocation('github-pr-review-envelope-binding');
+  const request = {
+    invocation: inv,
+    effectId: inv.invocationId,
+    executionId: inv.invocationId + ':attempt:1',
+    attempt: 1,
+    policyDecisionId: inv.policyDecisionId,
+    observation: {
+      schemaVersion: 1,
+      observationId: inv.invocationId + ':observation',
+      invocationId: inv.invocationId,
+      status: 'OK',
+      summary: 'Provider result.',
+      data: {
+        repositoryFullName: repo,
+        pullRequestNumber: 7,
+        reviewId: 80,
+        expectedHeadSha: headSha,
+        event: 'COMMENT',
+        body: reviewBody,
+        state: 'COMMENTED',
+        commitId: headSha,
+        url: 'https://example.invalid/review',
+      },
+      artifactRefs: [],
+      observedAt: at,
+    },
+    requestedAt: at,
+  };
+
+  const verified = await verifier.verify(request);
+  assert.equal(verified.status, 'VERIFIED');
+  assert.equal(verified.effectId, inv.invocationId);
+  assert.equal(verified.executionId, request.executionId);
+  assert.equal(verified.attempt, 1);
+  assert.equal(verified.verificationAuthorityId, inv.policyDecisionId);
+  assert.equal(remoteReads, 2);
+
+  for (const [field, value, pattern] of [
+    ['effectId', 'forged-effect', /effectId does not match/i],
+    ['policyDecisionId', 'forged-policy', /policyDecisionId does not match/i],
+    ['attempt', 2, /attempt does not match/i],
+    ['requestedAt', '2026-09-25T17:00:00Z', /canonical ISO-8601 UTC/i],
+  ]) {
+    await assert.rejects(
+      () => verifier.verify({ ...request, [field]: value }),
+      pattern,
+    );
+  }
+  assert.equal(remoteReads, 2, 'forged executor envelope fields must fail before remote readback');
+});
+
 test('review verifier snapshots outer option and request envelopes before reads', async () => {
   let remoteReads = 0;
   const client = fullClient({
