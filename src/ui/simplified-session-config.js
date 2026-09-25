@@ -90,7 +90,7 @@ export function assertSimplifiedPortableProfile(profile) {
     if (!simplifiedDescriptor?.enumerable
         || !Object.hasOwn(simplifiedDescriptor, 'value')
         || simplifiedDescriptor.value !== true) {
-      throw new Error('Через «Спрощені сесії» можна імпортувати лише сесії з explicit simplifiedSession=true.');
+      throw new Error('Через «Спрощені сесії» можна імпортувати лише сесії з явним прапорцем simplifiedSession=true.');
     }
   }
   return profile;
