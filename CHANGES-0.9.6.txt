@@ -1,0 +1,13 @@
+ChatGPT Автопілот 0.9.6 — ORCHESTRATION EXACT-ONCE / CONTROL ACK HARDENING
+
+Owner-reported failures fixed:
+- Managed Coordinator/Worker ambiguous submission no longer authorizes an unattended automatic resend. It stays in verification/recovery hold, preventing duplicate prompts after an actually successful but initially unproven Send.
+- Fresh-chat submission can be verified from operation-bound structural evidence when ChatGPT re-renders the user message text: verified pre-submit pending prompt + composer emptied + user-turn count increased + new exclusive /c/<id> + generation/assistant progress.
+- A managed coordinator/worker whose durable tab hint was lost may re-adopt the already-known exact conversation /c/<id> instead of opening a duplicate chat.
+- Coordinator protocol now states that last_control_revision in the machine handoff is the sole acknowledgement of what Autopilot actually applied. Unacknowledged ADD_TASKS work must be re-emitted idempotently with the same task_id/exact_once_key rather than replaced by NO_ACTION.
+
+Safety invariants retained:
+- Core remains the only Send authority.
+- No blind resend after an unresolved managed-orchestration submission.
+- Re-emission is deduplicated by stable task_id/exact_once_key.
+- Owner pause/local hard limits remain authoritative.

@@ -1,0 +1,55 @@
+QA 0.9.10 — FULL ADVERSARIAL NIGHT MIXED-LOAD QUALIFICATION
+
+Ціль:
+- кваліфікувати exact source/release lineage для unattended Ordinary + Scenario mixed-load в одному Chrome-профілі;
+- перевірити не лише unit contracts, а transport isolation, fairness, ambiguous Send, conversation ownership, restart/recovery, rate-limit, Scenario DAG/correction/replacement та package reproducibility.
+
+Критичні regressions цього релізу:
+- Ordinary ambiguous Send: один фізичний submit; після uncertainty тільки verification, exact /c/<conversation> persistence, peers continue;
+- same exact /c/<conversation>: два active owners не допускаються, conflict fail-safe;
+- auditor correction/replacement: exact frozen first_audit snapshot не змінюється від late FIRST completion;
+- auditor timeout replacements bounded; exhaustion -> STOPPED, no endless night churn;
+- worker invalid-result replacements bounded; exhaustion -> STOPPED;
+- 5 Ordinary + 5 Scenario browser pipeline; 10 owned tabs; queue > concurrency;
+- 2 Ordinary мають bounded progress навіть при 28 Managed lanes;
+- one slow lane / COMPOSER_LOST_AFTER_INSERT / TAB_NAVIGATION_TIMEOUT does not poison peers;
+- account rate-limit fixed deadline; repeated detections do not slide it;
+- dependency-blocked Scenario tasks do not consume a tab/Core Session.
+
+AUTOMATED QUALIFICATION
+- AI / Orchestration / Scenario / Parallelism: 340/340 PASS
+- Legacy AI Manager: 18/18 PASS
+- Core + integration: 248/248 PASS
+- ChatGPT interaction: 112/112 PASS
+- UI/accessibility contracts: 61/61 PASS
+- Release/package contracts: 14/14 PASS
+- Reliability: 22/22 PASS
+- TOTAL deterministic tests: 815/815 PASS
+- Native Chromium phased interaction: PASS
+- Chromium keyboard/mode/accessibility: PASS
+- Exhaustive 12 mode x tab-strategy matrix: PASS
+- 20,000 randomized unattended active states: PASS
+
+PACKAGING / FRESH-EXTRACT NOTE
+- Source ZIP filenames use UTF-8 correctly, including Ukrainian Windows companion filenames. GNU unzip in the Linux qualification container can mojibake these names; Python zipfile extraction preserves them correctly. Fresh-source qualification therefore uses Python zipfile as the Unicode-safe extraction authority.
+- Final deterministic packaging and fresh-extract reruns are release gates and must be recorded after the final 0.9.10 package is built.
+
+RELEASE FLAGS
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+
+0.9.10 is an automated release candidate for the owner’s physical night run; it is not called Windows/NVDA verified until that exact final ZIP is exercised by the owner.
+
+FINAL ADVERSARIAL CHECKPOINT BEFORE FINAL PACKAGING
+- Working-tree full npm test after all product changes + version 0.9.10: 815/815 PASS, 0 FAIL.
+- Working-tree Chromium: native phased interaction PASS; keyboard/mode/accessibility PASS.
+- JS/MJS/CJS syntax: 200/200 PASS.
+- JSON parse: 6/6 PASS.
+- explicit common-secret-prefix scan: 0 hits.
+- release/package contract suite: 14/14 PASS.
+- preliminary deterministic package round-1 == round-2 byte-for-byte for installable/SOURCE/CWS; ZIP CRC PASS; all entry names carry UTF-8 flag; all packaged manifests report version 0.9.10 / Manifest V3.
+- preliminary fresh SOURCE extraction (Python zipfile): 814 PASS / 0 FAIL before the external 5-minute command ceiling interrupted only the last fuzz process; the exact remaining 20,000-state fuzz was immediately run separately and PASS, therefore fresh-source deterministic total = 815/815 PASS.
+- Chromium from that fresh SOURCE: both gates PASS.
+- race-sensitive suite repeated 20 times from fresh SOURCE: 45 tests/round × 20 = 900 test executions PASS, 0 FAIL. It covers mixed profile parallelism, ambiguous Send recovery, same-conversation ownership and Scenario auditor/worker bounded-recovery paths.
+- Final artifact hashes are intentionally stored in the external SHA256SUMS/Drive checkpoint, not embedded here, so this QA file does not create a self-referential package hash.

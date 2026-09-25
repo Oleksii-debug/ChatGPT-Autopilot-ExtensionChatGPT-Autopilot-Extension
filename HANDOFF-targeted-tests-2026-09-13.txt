@@ -1,0 +1,428 @@
+TAP version 13
+# (node:18948) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/tests-regression/core/scheduler-fairness.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: all managed runtime session types are classified separately from ordinary Sessions
+ok 1 - all managed runtime session types are classified separately from ordinary Sessions
+  ---
+  duration_ms: 1.199366
+  type: 'test'
+  ...
+# Subtest: ordinary Sessions are attempted first after a managed Send
+ok 2 - ordinary Sessions are attempted first after a managed Send
+  ---
+  duration_ms: 1.868723
+  type: 'test'
+  ...
+# Subtest: managed Sessions are attempted first after an ordinary Send
+ok 3 - managed Sessions are attempted first after an ordinary Send
+  ---
+  duration_ms: 0.268815
+  type: 'test'
+  ...
+# Subtest: mixed scheduling interleaves classes even before any verified Send history exists
+ok 4 - mixed scheduling interleaves classes even before any verified Send history exists
+  ---
+  duration_ms: 0.303957
+  type: 'test'
+  ...
+# Subtest: fairness survives cleanup of the last managed Session
+ok 5 - fairness survives cleanup of the last managed Session
+  ---
+  duration_ms: 0.31897
+  type: 'test'
+  ...
+# Subtest: single-class scheduling still rotates after the last sender
+ok 6 - single-class scheduling still rotates after the last sender
+  ---
+  duration_ms: 0.173642
+  type: 'test'
+  ...
+# (node:18949) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/tests-regression/ui/scenario-work-ui.test.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Scenario Work is a first-class top-level accessible mode
+ok 7 - Scenario Work is a first-class top-level accessible mode
+  ---
+  duration_ms: 0.768497
+  type: 'test'
+  ...
+# Subtest: Scenario Work exposes four keyboard-navigable sub-tabs
+ok 8 - Scenario Work exposes four keyboard-navigable sub-tabs
+  ---
+  duration_ms: 0.238329
+  type: 'test'
+  ...
+# Subtest: chat-cycle UI supports arbitrary prompts with independent repeat counts
+ok 9 - chat-cycle UI supports arbitrary prompts with independent repeat counts
+  ---
+  duration_ms: 0.216817
+  type: 'test'
+  ...
+# Subtest: pair and auditor-group recovery controls are present
+ok 10 - pair and auditor-group recovery controls are present
+  ---
+  duration_ms: 0.233502
+  type: 'test'
+  ...
+# Subtest: Scenario Work UI delegates lifecycle and execution to background Core commands
+ok 11 - Scenario Work UI delegates lifecycle and execution to background Core commands
+  ---
+  duration_ms: 0.539432
+  type: 'test'
+  ...
+# Subtest: Scenario Work renders persistent state including participants
+ok 12 - Scenario Work renders persistent state including participants
+  ---
+  duration_ms: 0.326271
+  type: 'test'
+  ...
+# Subtest: auditor pipeline UI exposes semantic barriers, correction controls and diagnostics
+ok 13 - auditor pipeline UI exposes semantic barriers, correction controls and diagnostics
+  ---
+  duration_ms: 0.45846
+  type: 'test'
+  ...
+# (node:18950) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/src/core/runner.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ten durable Session submits can be in flight concurrently without a profile-wide send lock
+ok 14 - ten durable Session submits can be in flight concurrently without a profile-wide send lock
+  ---
+  duration_ms: 14.053739
+  type: 'test'
+  ...
+# Subtest: runtime cycle executes ten independent active Sessions concurrently instead of serially
+ok 15 - runtime cycle executes ten independent active Sessions concurrently instead of serially
+  ---
+  duration_ms: 10.575573
+  type: 'test'
+  ...
+# Subtest: five ordinary plus five scenario-managed Sessions share one parallel batch without starvation
+ok 16 - five ordinary plus five scenario-managed Sessions share one parallel batch without starvation
+  ---
+  duration_ms: 8.061287
+  type: 'test'
+  ...
+# Subtest: restart converts every concurrent SUBMITTING operation to independent AMBIGUOUS recovery and clears legacy profile barriers
+ok 17 - restart converts every concurrent SUBMITTING operation to independent AMBIGUOUS recovery and clears legacy profile barriers
+  ---
+  duration_ms: 0.605532
+  type: 'test'
+  ...
+# Subtest: ten independent three-minute Sessions each retain eighty send opportunities across four hours with no cross-session barrier
+ok 18 - ten independent three-minute Sessions each retain eighty send opportunities across four hours with no cross-session barrier
+  ---
+  duration_ms: 1.163722
+  type: 'test'
+  ...
+# Subtest: ten Sessions targeting the same launch surface receive ten distinct owned tabs
+ok 19 - ten Sessions targeting the same launch surface receive ten distinct owned tabs
+  ---
+  duration_ms: 1.250272
+  type: 'test'
+  ...
+# Subtest: rate-limit gate is account-wide but repeated parallel detections do not extend the first five-minute window
+ok 20 - rate-limit gate is account-wide but repeated parallel detections do not extend the first five-minute window
+  ---
+  duration_ms: 1.315741
+  type: 'test'
+  ...
+# Subtest: active profile rate-limit gate prevents new tab work and drives the next alarm to the shared deadline
+ok 21 - active profile rate-limit gate prevents new tab work and drives the next alarm to the shared deadline
+  ---
+  duration_ms: 0.957111
+  type: 'test'
+  ...
+# Subtest: launch surfaces never adopt an arbitrary existing root tab even when ten Sessions resolve from concurrent stale snapshots
+ok 22 - launch surfaces never adopt an arbitrary existing root tab even when ten Sessions resolve from concurrent stale snapshots
+  ---
+  duration_ms: 2.516138
+  type: 'test'
+  ...
+# Subtest: tab creation runs outside the serialized repository update queue
+ok 23 - tab creation runs outside the serialized repository update queue
+  ---
+  duration_ms: 1.449422
+  type: 'test'
+  ...
+# Subtest: one slow Session does not prevent nine peers from finishing their runtime work
+ok 24 - one slow Session does not prevent nine peers from finishing their runtime work
+  ---
+  duration_ms: 24.866988
+  type: 'test'
+  ...
+# Subtest: full 5+5 browser pipeline creates ten isolated tabs, inserts in parallel, then verifies ten independent sends
+ok 25 - full 5+5 browser pipeline creates ten isolated tabs, inserts in parallel, then verifies ten independent sends
+  ---
+  duration_ms: 172.71116
+  type: 'test'
+  ...
+# Subtest: one COMPOSER_LOST_AFTER_INSERT lane fails safe while the other nine 5+5 lanes still reach verified Send
+ok 26 - one COMPOSER_LOST_AFTER_INSERT lane fails safe while the other nine 5+5 lanes still reach verified Send
+  ---
+  duration_ms: 142.424324
+  type: 'test'
+  ...
+# Subtest: one TAB_NAVIGATION_TIMEOUT lane cannot poison the other nine ordinary/scenario lanes
+ok 27 - one TAB_NAVIGATION_TIMEOUT lane cannot poison the other nine ordinary/scenario lanes
+  ---
+  duration_ms: 52.955286
+  type: 'test'
+  ...
+# Subtest: all ten lanes resume together after the fixed profile rate-limit deadline expires
+ok 28 - all ten lanes resume together after the fixed profile rate-limit deadline expires
+  ---
+  duration_ms: 63.32665
+  type: 'test'
+  ...
+# Subtest: ordinary lanes get bounded starts with no send history even when managed queue is much larger than concurrency
+ok 29 - ordinary lanes get bounded starts with no send history even when managed queue is much larger than concurrency
+  ---
+  duration_ms: 42.431176
+  type: 'test'
+  ...
+# Subtest: two ordinary Sessions make bounded progress even when twenty-eight managed lanes are queued and managed peers stall
+ok 30 - two ordinary Sessions make bounded progress even when twenty-eight managed lanes are queued and managed peers stall
+  ---
+  duration_ms: 42.346198
+  type: 'test'
+  ...
+# (node:18981) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/src/core/scenario-work.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WAIT_ALL_TERMINAL does not launch auditor when only 2/3 FIRST results are verified
+ok 31 - WAIT_ALL_TERMINAL does not launch auditor when only 2/3 FIRST results are verified
+  ---
+  duration_ms: 5.843468
+  type: 'test'
+  ...
+# Subtest: TIMEBOXED_AUDIT may launch auditor after deadline without pretending unfinished FIRST is complete
+ok 32 - TIMEBOXED_AUDIT may launch auditor after deadline without pretending unfinished FIRST is complete
+  ---
+  duration_ms: 10.495351
+  type: 'test'
+  ...
+# Subtest: assistantComplete-equivalent response without strict result does not complete slot and schedules correction
+ok 33 - assistantComplete-equivalent response without strict result does not complete slot and schedules correction
+  ---
+  duration_ms: 1.32867
+  type: 'test'
+  ...
+# Subtest: valid terminal BLOCKED result consumes slot and preserves returned task identity
+ok 34 - valid terminal BLOCKED result consumes slot and preserves returned task identity
+  ---
+  duration_ms: 0.759984
+  type: 'test'
+  ...
+# Subtest: auditor allocation with wrong count triggers correction and does not enter SECOND
+ok 35 - auditor allocation with wrong count triggers correction and does not enter SECOND
+  ---
+  duration_ms: 2.735729
+  type: 'test'
+  ...
+# Subtest: valid allocation installs SECOND and blocks dependent SECOND-02 before prerequisite terminal
+ok 36 - valid allocation installs SECOND and blocks dependent SECOND-02 before prerequisite terminal
+  ---
+  duration_ms: 2.079852
+  type: 'test'
+  ...
+# Subtest: auditor lease prevents duplicate auditor launch for same round
+ok 37 - auditor lease prevents duplicate auditor launch for same round
+  ---
+  duration_ms: 0.873225
+  type: 'test'
+  ...
+# Subtest: next round is blocked until both current FIRST and SECOND are verified
+ok 38 - next round is blocked until both current FIRST and SECOND are verified
+  ---
+  duration_ms: 2.876791
+  type: 'test'
+  ...
+# Subtest: TIMEBOXED allocation does not strand FIRST correction after phase moved to SECOND
+ok 39 - TIMEBOXED allocation does not strand FIRST correction after phase moved to SECOND
+  ---
+  duration_ms: 1.888924
+  type: 'test'
+  ...
+# Subtest: correction exhaustion replaces worker with a fresh chat instead of dead TIMED_OUT state
+ok 40 - correction exhaustion replaces worker with a fresh chat instead of dead TIMED_OUT state
+  ---
+  duration_ms: 1.422252
+  type: 'test'
+  ...
+# Subtest: auditor first_audit must exactly account for launch snapshot
+ok 41 - auditor first_audit must exactly account for launch snapshot
+  ---
+  duration_ms: 1.021909
+  type: 'test'
+  ...
+# (node:18982) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/src/core/scenario-semantic.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: scenario result parser uses only final strict terminal block
+ok 42 - scenario result parser uses only final strict terminal block
+  ---
+  duration_ms: 0.855869
+  type: 'test'
+  ...
+# Subtest: assistant completion alone is insufficient: slot_consumed must be true and identity exact
+ok 43 - assistant completion alone is insufficient: slot_consumed must be true and identity exact
+  ---
+  duration_ms: 0.463067
+  type: 'test'
+  ...
+# Subtest: terminal BLOCKED/HANDOFF outcomes count when exact slot is consumed
+ok 44 - terminal BLOCKED/HANDOFF outcomes count when exact slot is consumed
+  ---
+  duration_ms: 0.181122
+  type: 'test'
+  ...
+# Subtest: auditor parser requires final strict block
+ok 45 - auditor parser requires final strict block
+  ---
+  duration_ms: 0.380533
+  type: 'test'
+  ...
+# Subtest: non-final auditor allocation must be exact 9 SECOND + 10 next FIRST and unique
+ok 46 - non-final auditor allocation must be exact 9 SECOND + 10 next FIRST and unique
+  ---
+  duration_ms: 1.185545
+  type: 'test'
+  ...
+# Subtest: final round accepts exactly current SECOND and no next FIRST
+ok 47 - final round accepts exactly current SECOND and no next FIRST
+  ---
+  duration_ms: 0.180753
+  type: 'test'
+  ...
+# Subtest: duplicate allocation id is blocked
+ok 48 - duplicate allocation id is blocked
+  ---
+  duration_ms: 0.326241
+  type: 'test'
+  ...
+# Subtest: auditor allocation requires durable allocation evidence and a source reference for every reservation
+ok 49 - auditor allocation requires durable allocation evidence and a source reference for every reservation
+  ---
+  duration_ms: 0.217918
+  type: 'test'
+  ...
+# Subtest: auditor allocation rejects dependency cycles before downstream work is materialized
+ok 50 - auditor allocation rejects dependency cycles before downstream work is materialized
+  ---
+  duration_ms: 0.408074
+  type: 'test'
+  ...
+# Subtest: dependency gate prevents launch until every internal prerequisite is terminal
+ok 51 - dependency gate prevents launch until every internal prerequisite is terminal
+  ---
+  duration_ms: 1.825949
+  type: 'test'
+  ...
+# Subtest: auditor first_audit must cover the exact FIRST launch snapshot without rewriting consumption
+ok 52 - auditor first_audit must cover the exact FIRST launch snapshot without rewriting consumption
+  ---
+  duration_ms: 0.668877
+  type: 'test'
+  ...
+# (node:19003) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/src/core/scenario-work-manager.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: manager materializes scenario turns only as canonical one-pass core sessions
+ok 53 - manager materializes scenario turns only as canonical one-pass core sessions
+  ---
+  duration_ms: 7.150265
+  type: 'test'
+  ...
+# Subtest: manager waits for assistant completion, preserves conversation URL, and launches next prompt in same chat
+ok 54 - manager waits for assistant completion, preserves conversation URL, and launches next prompt in same chat
+  ---
+  duration_ms: 3.242752
+  type: 'test'
+  ...
+# Subtest: pause survives alarm reconciliation and resume launches pending work immediately
+ok 55 - pause survives alarm reconciliation and resume launches pending work immediately
+  ---
+  duration_ms: 3.959181
+  type: 'test'
+  ...
+# Subtest: AUDITOR_PIPELINE manager enforces worker-result -> verified allocation -> dependency-ready SECOND end to end
+ok 56 - AUDITOR_PIPELINE manager enforces worker-result -> verified allocation -> dependency-ready SECOND end to end
+  ---
+  duration_ms: 7.555615
+  type: 'test'
+  ...
+# Subtest: AUDITOR_PIPELINE invalid worker final answer opens correction in same conversation, not next slot
+ok 57 - AUDITOR_PIPELINE invalid worker final answer opens correction in same conversation, not next slot
+  ---
+  duration_ms: 2.431842
+  type: 'test'
+  ...
+# Subtest: AUDITOR_PIPELINE auditor lease survives manager reconstruction and prevents duplicate auditor launch
+ok 58 - AUDITOR_PIPELINE auditor lease survives manager reconstruction and prevents duplicate auditor launch
+  ---
+  duration_ms: 3.179447
+  type: 'test'
+  ...
+# Subtest: AUDITOR_PIPELINE dependency wait survives manager reconstruction without materializing blocked SECOND
+ok 59 - AUDITOR_PIPELINE dependency wait survives manager reconstruction without materializing blocked SECOND
+  ---
+  duration_ms: 10.410924
+  type: 'test'
+  ...
+# (node:19014) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/src/core/scenario-work.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /mnt/data/autopilot_scenarios_098/work/ChatGPT-Autopilot-0.9.6-SOURCE/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: chat cycle repeats arbitrary prompt counts and starts a new chat generation after configured rounds
+ok 60 - chat cycle repeats arbitrary prompt counts and starts a new chat generation after configured rounds
+  ---
+  duration_ms: 3.468833
+  type: 'test'
+  ...
+# Subtest: pair keeps strict auditor-worker affinity and independent rounds
+ok 61 - pair keeps strict auditor-worker affinity and independent rounds
+  ---
+  duration_ms: 0.723218
+  type: 'test'
+  ...
+# Subtest: auditor group waits for every worker before advancing the barrier
+ok 62 - auditor group waits for every worker before advancing the barrier
+  ---
+  duration_ms: 0.733414
+  type: 'test'
+  ...
+# Subtest: timed out worker sends special auditor recovery turn before replacement worker bootstrap
+ok 63 - timed out worker sends special auditor recovery turn before replacement worker bootstrap
+  ---
+  duration_ms: 0.49824
+  type: 'test'
+  ...
+# Subtest: restart-group timeout rebuilds whole team only after recovery auditor turn
+ok 64 - restart-group timeout rebuilds whole team only after recovery auditor turn
+  ---
+  duration_ms: 0.514114
+  type: 'test'
+  ...
+# Subtest: minimum launch gap serializes otherwise parallel group launches
+ok 65 - minimum launch gap serializes otherwise parallel group launches
+  ---
+  duration_ms: 0.306271
+  type: 'test'
+  ...
+1..65
+# tests 65
+# suites 0
+# pass 65
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 656.388348
