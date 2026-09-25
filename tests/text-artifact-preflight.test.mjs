@@ -132,6 +132,8 @@ test('NUL, C0/C1 controls, and bidi controls are rejected', async () => {
     ['nul', 'a\u0000b', /non-text control/u],
     ['bell', 'a\u0007b', /non-text control/u],
     ['c1', 'a\u0085b', /non-text control/u],
+    ['unicode-line-separator', 'a\u2028b', /Unicode line separator/u],
+    ['unicode-paragraph-separator', 'a\u2029b', /Unicode line separator/u],
     ['bidi-override', 'safe\u202eevil', /bidi override\/isolate/u],
     ['bidi-isolate', 'safe\u2066evil\u2069', /bidi override\/isolate/u],
   ];
