@@ -226,6 +226,48 @@ test('verifier rejects accessor/coercive boundaries before any GitHub readback',
   assert.equal(getterReads, 0); assert.equal(remoteReads, 0);
 });
 
+test('reconciliation snapshots invocation identities before access and remote read', async () => {
+  let getterReads = 0, remoteReads = 0;
+  const client = fullClient({
+    readIssue: async () => { remoteReads += 1; return {}; },
+    readIssueComment: async () => { remoteReads += 1; return {}; },
+  });
+  const verifier = new GitHubIssueWriteVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const hostile = {};
+  Object.defineProperty(hostile, 'invocationId', {
+    enumerable: true,
+    get() { getterReads += 1; return 'github-issue-hostile-reconcile'; },
+  });
+  Object.defineProperty(hostile, 'policyDecisionId', {
+    enumerable: true,
+    get() { getterReads += 1; return 'github-issue-hostile-reconcile:policy'; },
+  });
+
+  await assert.rejects(
+    () => verifier.reconcileVerify({
+      invocation: hostile,
+      effectId: 'github-issue-hostile-reconcile',
+      executionId: 'github-issue-hostile-reconcile:attempt:1',
+      attempt: 1,
+      policyDecisionId: 'github-issue-hostile-reconcile:policy',
+      expectedOutcome: 'VERIFIED',
+      priorObservation: {
+        schemaVersion: 1,
+        observationId: 'github-issue-hostile-reconcile:obs',
+        invocationId: 'github-issue-hostile-reconcile',
+        status: 'OK',
+        summary: '',
+        data: {},
+        artifactRefs: [],
+        observedAt: at,
+      },
+    }),
+    /enumerable data property/i,
+  );
+  assert.equal(getterReads, 0);
+  assert.equal(remoteReads, 0);
+});
+
 test('verifier rejects accessor-backed read dependency without executing getter', () => {
   let getterReads = 0;
   const client = fullClient();
