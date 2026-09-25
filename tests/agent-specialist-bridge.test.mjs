@@ -57,35 +57,42 @@ test('claim is durable and never silently retries an expired external lease', ()
   assert.equal(repeated.executionOwnerships[0].state, 'RECONCILE');
 });
 
-test('expired handoff becomes retriable only after canonical independent no-effect verification', () => {
+test('expired handoff remains fenced when verification has no canonical provenance', () => {
   const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
-  const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), [assignment], { executionOwnerships:[ownership()], availableSlots:1, leaseSeconds:30, at:T0 });
-  const expired = claimAgentPlanSpecialistHandoffsV1(claimed.plan, claimed.assignments, { executionOwnerships:claimed.executionOwnerships, availableSlots:1, at:T1 });
+  const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), [assignment], {
+    executionOwnerships:[ownership()],
+    availableSlots:1,
+    leaseSeconds:30,
+    at:T0,
+  });
+  const expired = claimAgentPlanSpecialistHandoffsV1(claimed.plan, claimed.assignments, {
+    executionOwnerships:claimed.executionOwnerships,
+    availableSlots:1,
+    at:T1,
+  });
   const agentId = claimed.assignments[0].agentId;
   const leaseId = claimed.assignments[0].leaseId;
-  const payload = {
+
+  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, {
     executionOwnerships: expired.executionOwnerships,
     agentId,
     leaseId,
     verification: safeRetryVerification(leaseId),
     at:'2026-09-23T12:01:01.000Z',
-  };
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:null }), /canonical verification/);
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification(leaseId, { verifierId:agentId }) }), /independent/);
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification(leaseId, { verifierId:'browser-agent:job-1' }) }), /independent/);
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification(leaseId, { verificationAuthorityId:'policy:other' }) }), /policy envelope/);
-  assert.throws(() => authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, { ...payload, verification:safeRetryVerification('lease-other') }), /preserved lease/);
-  const retriable = authorizeAgentPlanSpecialistSafeRetryV1(expired.plan, expired.assignments, payload);
-  assert.equal(retriable.assignments[0].state, 'READY');
-  assert.equal(retriable.assignments[0].leaseId, '');
-  assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
-  assert.equal(retriable.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId, 'effect identity must survive reconciliation');
-  assert.equal(retriable.safeRetryVerification.verificationId, 'verification-no-effect-specialist');
-  assert.equal(retriable.plan.nodes.find(node => node.nodeId === 'local').state, 'READY');
-  const reclaimed = claimAgentPlanSpecialistHandoffsV1(retriable.plan, retriable.assignments, { executionOwnerships:retriable.executionOwnerships, availableSlots:1, leaseSeconds:30, at:'2026-09-23T12:01:02.000Z' });
-  assert.deepEqual(reclaimed.claimed, [agentId]);
-  assert.notEqual(reclaimed.assignments[0].leaseId, leaseId);
-  assert.equal(reclaimed.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId);
+  }), /trusted verifier provenance/);
+
+  assert.equal(expired.assignments[0].state, 'LEASED');
+  assert.equal(expired.assignments[0].leaseId, leaseId);
+  assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(expired.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+
+  const repeated = claimAgentPlanSpecialistHandoffsV1(expired.plan, expired.assignments, {
+    executionOwnerships:expired.executionOwnerships,
+    availableSlots:1,
+    at:'2026-09-23T12:02:00.000Z',
+  });
+  assert.deepEqual(repeated.claimed, []);
+  assert.equal(repeated.executionOwnerships[0].state, 'RECONCILE');
 });
 
 test('completed specialist result cannot finish a plan without independent verification', () => {
