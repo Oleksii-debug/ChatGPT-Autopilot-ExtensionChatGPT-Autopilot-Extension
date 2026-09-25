@@ -123,11 +123,11 @@ test('reached and near decision deadlines dominate batching and deferral', () =>
 
   const out = buildOwnerAttentionPlanV1(request([near, reached]));
 
-  assert.equal(out.items[0].itemId, 'near');
+  assert.equal(out.items[0].itemId, 'reached');
   assert.equal(out.items[0].disposition, OwnerAttentionDisposition.ESCALATE_NOW);
-  assert.equal(out.items[0].reasonCode, 'DECISION_DEADLINE_NEAR');
-  assert.equal(out.items[1].itemId, 'reached');
-  assert.equal(out.items[1].reasonCode, 'DECISION_DEADLINE_REACHED');
+  assert.equal(out.items[0].reasonCode, 'DECISION_DEADLINE_REACHED');
+  assert.equal(out.items[1].itemId, 'near');
+  assert.equal(out.items[1].reasonCode, 'DECISION_DEADLINE_NEAR');
   assert.equal(out.batches.length, 0);
 });
 
