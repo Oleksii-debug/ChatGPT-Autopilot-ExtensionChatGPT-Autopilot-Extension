@@ -37,52 +37,99 @@ function enumerableDataValue(record, key) {
   }
   return { ok: true, value: descriptor.value };
 }
-function denseDataArray(value, seen = new Set()) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || seen.has(value)) return false;
-  seen.add(value);
-  const ownKeys = Reflect.ownKeys(value);
-  if (ownKeys.some(key => typeof key === 'symbol')) return false;
-  const names = ownKeys.filter(key => key !== 'length');
-  if (names.length !== value.length) return false;
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
+function snapshotDenseDataArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    return { ok: false, value: [] };
   }
-  return true;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (
+    !lengthDescriptor
+    || !Object.hasOwn(lengthDescriptor, 'value')
+    || !Number.isSafeInteger(lengthDescriptor.value)
+    || lengthDescriptor.value < 0
+  ) return { ok: false, value: [] };
+  const length = lengthDescriptor.value;
+  const ownKeys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (
+    ownKeys.length !== expected.size
+    || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))
+  ) return { ok: false, value: [] };
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      return { ok: false, value: [] };
+    }
+    out[index] = descriptor.value;
+  }
+  return { ok: true, value: out };
 }
-function persistedDataOnly(value, ancestors = new Set()) {
-  if (value === null) return true;
-  const type = typeof value;
-  if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') return true;
-  if (type !== 'object' || ancestors.has(value)) return false;
 
-  // Detect only actual recursion cycles. A repeated reference in a sibling
-  // branch is still ordinary data and structuredClone/Chrome storage may
-  // preserve that aliasing. Keeping every previously visited object forever
-  // incorrectly rejects such valid persisted state.
+function snapshotPersistedData(value, ancestors = new Set(), memo = new Map()) {
+  if (value === null) return { ok: true, value: null };
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') {
+    return { ok: true, value };
+  }
+  if (type !== 'object' || ancestors.has(value)) return { ok: false, value: undefined };
+  if (memo.has(value)) return { ok: true, value: memo.get(value) };
+
   ancestors.add(value);
   try {
     if (Array.isArray(value)) {
-      if (Object.getPrototypeOf(value) !== Array.prototype) return false;
-      const ownKeys = Reflect.ownKeys(value);
-      if (ownKeys.some(key => typeof key === 'symbol')) return false;
-      const names = ownKeys.filter(key => key !== 'length');
-      if (names.length !== value.length) return false;
-      for (let index = 0; index < value.length; index += 1) {
-        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
-        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
-        if (!persistedDataOnly(descriptor.value, ancestors)) return false;
+      if (Object.getPrototypeOf(value) !== Array.prototype) return { ok: false, value: undefined };
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const lengthDescriptor = descriptors.length;
+      if (
+        !lengthDescriptor
+        || !Object.hasOwn(lengthDescriptor, 'value')
+        || !Number.isSafeInteger(lengthDescriptor.value)
+        || lengthDescriptor.value < 0
+      ) return { ok: false, value: undefined };
+      const length = lengthDescriptor.value;
+      const ownKeys = Reflect.ownKeys(descriptors);
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      if (
+        ownKeys.length !== expected.size
+        || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))
+      ) return { ok: false, value: undefined };
+
+      const out = new Array(length);
+      memo.set(value, out);
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = descriptors[String(index)];
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+          return { ok: false, value: undefined };
+        }
+        const child = snapshotPersistedData(descriptor.value, ancestors, memo);
+        if (!child.ok) return { ok: false, value: undefined };
+        out[index] = child.value;
       }
-      return true;
+      return { ok: true, value: out };
     }
-    if (!plainRecord(value)) return false;
-    for (const key of Reflect.ownKeys(value)) {
-      if (typeof key === 'symbol') return false;
-      const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
-      if (!persistedDataOnly(descriptor.value, ancestors)) return false;
+
+    if (!plainRecord(value)) return { ok: false, value: undefined };
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const out = Object.create(null);
+    memo.set(value, out);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string') return { ok: false, value: undefined };
+      const descriptor = descriptors[key];
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        return { ok: false, value: undefined };
+      }
+      const child = snapshotPersistedData(descriptor.value, ancestors, memo);
+      if (!child.ok) return { ok: false, value: undefined };
+      Object.defineProperty(out, key, {
+        value: child.value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
     }
-    return true;
+    return { ok: true, value: out };
   } finally {
     ancestors.delete(value);
   }
@@ -120,15 +167,18 @@ function normalizeStore(raw, now = Date.now()) {
   const selectedId = enumerableDataValue(raw, 'selectedId');
   const order = enumerableDataValue(raw, 'order');
   const byId = enumerableDataValue(raw, 'byId');
+  const orderSnapshot = order.ok
+    ? snapshotDenseDataArray(order.value)
+    : { ok: false, value: [] };
   if (
     !schemaVersion.ok || schemaVersion.value !== STORAGE_SCHEMA_VERSION
     || !selectedId.ok || typeof selectedId.value !== 'string'
-    || !order.ok || !denseDataArray(order.value)
+    || !orderSnapshot.ok
     || !byId.ok || !plainRecord(byId.value)
   ) return freshStore();
 
   const out = freshStore();
-  for (const id of order.value) {
+  for (const id of orderSnapshot.value) {
     if (typeof id !== 'string' || Object.hasOwn(out.byId, id)) continue;
     const itemDescriptor = Object.getOwnPropertyDescriptor(byId.value, id);
     if (
@@ -136,10 +186,11 @@ function normalizeStore(raw, now = Date.now()) {
       || itemDescriptor.enumerable !== true
       || !Object.hasOwn(itemDescriptor, 'value')
       || !plainRecord(itemDescriptor.value)
-      || !persistedDataOnly(itemDescriptor.value)
     ) continue;
+    const itemSnapshot = snapshotPersistedData(itemDescriptor.value);
+    if (!itemSnapshot.ok) continue;
     try {
-      const item = itemDescriptor.value;
+      const item = itemSnapshot.value;
       const config = normalizeScenarioWorkConfig({ ...item.config, id });
       const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
         ? clone(item.runtime)
