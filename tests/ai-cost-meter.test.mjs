@@ -315,6 +315,82 @@ test('cost authority snapshots Proxy data descriptors once and never trusts a la
   assert.equal(normalized.costUsdMicros, 15);
 });
 
+test('meter request envelope is snapshotted before any authority-bearing field read', () => {
+  let reads = 0;
+  const request = {
+    route: route(),
+    invocationId: 'invoke-request-snapshot',
+    inputTokens: 10,
+    outputTokens: 0,
+    observedAt: AT,
+  };
+  const proxy = new Proxy(request, {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'inputTokens') return 999_999;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const record = meterAiRouteUsageV1(proxy);
+  assert.equal(reads, 0, 'meter request must consume descriptor snapshots, never Proxy get');
+  assert.equal(record.inputTokens, 10);
+  assert.equal(record.costUsdMicros, 15);
+
+  const accessor = { ...request };
+  Object.defineProperty(accessor, 'outputTokens', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 0;
+    },
+  });
+  assert.throws(() => meterAiRouteUsageV1(accessor), /enumerable own data properties/);
+  assert.equal(reads, 0, 'meter request getter must never execute');
+
+  assert.throws(
+    () => meterAiRouteUsageV1({ ...request, untrustedBudgetOverride: true }),
+    /unknown field/,
+  );
+});
+
+test('aggregate evidence array is descriptor-snapshotted once and never reread through Proxy get', () => {
+  const record = meterAiRouteUsageV1({
+    route: route(),
+    invocationId: 'invoke-array-snapshot',
+    inputTokens: 10,
+    outputTokens: 0,
+    observedAt: AT,
+  });
+  const conflicting = { ...record, inputTokens: 999_999, costUsdMicros: 1_499_999 };
+  let reads = 0;
+  let indexDescriptorReads = 0;
+  const proxy = new Proxy([record], {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === '0') return conflicting;
+      return Reflect.get(target, key, receiver);
+    },
+    getOwnPropertyDescriptor(target, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+      if (key !== '0') return descriptor;
+      indexDescriptorReads += 1;
+      return { ...descriptor, value: indexDescriptorReads === 1 ? record : conflicting };
+    },
+  });
+
+  const total = aggregateAiCostRecordsV1(proxy);
+  assert.equal(reads, 0, 'aggregate admission must never ordinary-read caller array');
+  assert.equal(indexDescriptorReads, 1, 'aggregate evidence index must be snapshotted exactly once');
+  assert.deepEqual(total, {
+    recordCount: 1,
+    modelCalls: 1,
+    modelInputTokens: 10,
+    modelOutputTokens: 0,
+    costUsdMicros: 15,
+  });
+});
+
 test('cost authority rejects accessors, hidden fields, symbols, and accessor-backed aggregate entries without executing getters', () => {
   const record = meterAiRouteUsageV1({
     route: route(),
