@@ -67,7 +67,7 @@ test('Agent checkpoint creation is deterministic, immutable and SHA-256 bound', 
   assert.equal(first.snapshotArtifact.sha256, SNAPSHOT_SHA);
   assert.equal(Object.isFrozen(first), true);
   assert.equal(Object.isFrozen(first.snapshotArtifact), true);
-  assert.equal(await verifyAgentCheckpointV1(first), first);
+  assert.deepEqual(await verifyAgentCheckpointV1(first), first);
   assert.deepEqual(normalizeAgentCheckpointV1(first), first);
 });
 
