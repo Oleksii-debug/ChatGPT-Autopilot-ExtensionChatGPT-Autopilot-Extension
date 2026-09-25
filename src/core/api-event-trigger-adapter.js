@@ -110,6 +110,12 @@ function timestamp(value, label) {
   return value;
 }
 
+function compareTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -225,7 +231,7 @@ export function normalizeApiResourceChangeV1(value) {
 
   const evidenceArtifactRef = artifactRef(raw.evidenceArtifactRef);
   const observedAt = timestamp(raw.observedAt, 'ApiResourceChangeV1 observedAt');
-  if (evidenceArtifactRef.createdAt > observedAt) {
+  if (compareTimestamp(evidenceArtifactRef.createdAt, observedAt) > 0) {
     throw new Error('ApiResourceChangeV1 evidence artifact cannot postdate observation');
   }
 
@@ -257,7 +263,7 @@ function assertTriggerBinding(trigger, binding) {
       throw new Error('API binding ' + key + ' does not match trusted trigger definition');
     }
   }
-  if (binding.createdAt < trigger.createdAt) {
+  if (compareTimestamp(binding.createdAt, trigger.createdAt) < 0) {
     throw new Error('API binding cannot predate its trusted trigger definition');
   }
 }
@@ -271,13 +277,13 @@ function assertChangeBinding(change, binding, request) {
   if (change.changeId !== request.changeId) {
     throw new Error('Resolved API change does not match requested changeId');
   }
-  if (change.observedAt < binding.createdAt) {
+  if (compareTimestamp(change.observedAt, binding.createdAt) < 0) {
     throw new Error('API change predates trusted binding');
   }
 }
 
 function assertFresh(binding, change, admittedAt) {
-  if (admittedAt < change.observedAt) {
+  if (compareTimestamp(admittedAt, change.observedAt) < 0) {
     throw new Error('API admission predates trusted change observation');
   }
   if (Date.parse(admittedAt) - Date.parse(change.observedAt) > binding.maxChangeAgeSeconds * 1000) {
