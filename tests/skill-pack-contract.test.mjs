@@ -171,6 +171,15 @@ test('strict ArtifactRef pre-boundary rejects coercive aliases before canonical 
   assert.throws(() => normalizeSkillPackManifestV1(nonCanonicalTime), /canonical timestamp/);
 });
 
+test('published pack cannot causally predate any materialized artifact', () => {
+  const future = manifest();
+  future.artifactRefs[1].createdAt = '2026-09-25T00:00:01.000Z';
+  assert.throws(
+    () => normalizeSkillPackManifestV1(future),
+    /cannot be published before artifact creation/,
+  );
+});
+
 test('entrypoint artifacts and requirement subsets are exact-bound to pack declarations', () => {
   const missingArtifact = manifest();
   missingArtifact.entrypoints[0].artifactId = 'not-in-pack';
