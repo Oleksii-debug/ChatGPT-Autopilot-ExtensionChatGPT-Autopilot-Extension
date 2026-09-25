@@ -601,6 +601,11 @@ test('resume assessment cannot use future exact-effect state or predate handback
   })), /causal timestamp ordering/);
 
   assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+    ...worldMaterial({
+      snapshotObservedAt: '2026-09-25T00:04:01.000Z',
+      currentObservedAt: '2026-09-25T00:04:10.000Z',
+      preconditionCreatedAt: '2026-09-25T00:04:02.000Z',
+    }),
     at: '2026-09-25T00:04:15.000Z',
   })), /exact-effect state cannot postdate resume assessment/);
 });
