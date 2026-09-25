@@ -172,10 +172,12 @@ export class SelectionSourceCaptureV1 {
       throw new Error('Site permission changed while source content was being captured');
     }
 
-    const capturedAt = new Date(this.now()).toISOString();
+    const capturedAtMs = this.now();
+    if (typeof capturedAtMs !== 'number' || !Number.isFinite(capturedAtMs)) throw new Error('capture clock is invalid');
+    const capturedAt = new Date(capturedAtMs).toISOString();
     const source = normalizeSelectionActionSourceV1({
       schemaVersion: SelectionActionContractVersion,
-      sourceId: `browser-source:${tabId}:${this.now()}`,
+      sourceId: `browser-source:${tabId}:${capturedAtMs}`,
       kind,
       capturedAt,
       text: captured.text,
