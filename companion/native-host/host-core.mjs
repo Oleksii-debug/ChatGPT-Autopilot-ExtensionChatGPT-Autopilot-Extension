@@ -183,6 +183,7 @@ export async function handleNativeCompanionRequest(input, {
   callerOrigin,
   fsApi = fs,
   fsReadBeforeOpen = null,
+  fsBinaryBeforeOpen = null,
   fsWriteBeforeOpen = null,
   now = () => Date.now(),
   credentialBroker = null,
@@ -229,7 +230,7 @@ export async function handleNativeCompanionRequest(input, {
       return response(request, await readScopedText(request.payload, normalizedConfig, fsApi, fsReadBeforeOpen));
     }
     if (request.type === RequestType.FILESYSTEM_READ_BINARY) {
-      return response(request, await readBinaryScopedV1(request.payload, normalizedConfig));
+      return response(request, await readBinaryScopedV1(request.payload, normalizedConfig, { beforeOpen: fsBinaryBeforeOpen }));
     }
     if (request.type === RequestType.FILESYSTEM_SEARCH) {
       return response(request, await searchScopedFilesystemV1(request.payload, normalizedConfig));
