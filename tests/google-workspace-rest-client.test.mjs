@@ -23,7 +23,7 @@ function credentialResolver(calls, secret = 'oauth-super-secret') {
   return {
     resolveCredential: async request => {
       calls.push(request);
-      return { credentialId: request.credentialId, secret };
+      return { credentialId: request.credentialId, targetOrigin: request.targetOrigin, secret };
     },
   };
 }
@@ -217,8 +217,39 @@ test('Gmail principal must be an exact explicit owner email and never ambiguous 
     () => client.searchGmail({ userId: 'me' }),
     error => error.code === 'GOOGLE_SCHEMA_INVALID',
   );
+  await assert.rejects(
+    () => client.searchGmail({ userId: 'OWNER@example.com' }),
+    error => error.code === 'GOOGLE_GMAIL_USER_NOT_ALLOWED',
+  );
   assert.equal(fetchCount, 0);
   assert.deepEqual(credentialCalls, []);
+});
+
+test('resolved credential identity and target origin are exact-bound before fetch', async () => {
+  const cases = [
+    { credentialId: undefined, targetOrigin: GOOGLE_DRIVE_API_ORIGIN, secret: 'wrongly-unbound-secret' },
+    { credentialId: 'google-gmail-main', targetOrigin: GOOGLE_DRIVE_API_ORIGIN, secret: 'wrong-id-secret' },
+    { credentialId: 'google-drive-main', targetOrigin: GMAIL_API_ORIGIN, secret: 'wrong-origin-secret' },
+  ];
+  for (const resolved of cases) {
+    let fetchCount = 0;
+    const nativeClient = {
+      resolveCredential: async request => ({
+        ...(resolved.credentialId === undefined ? {} : { credentialId: resolved.credentialId }),
+        targetOrigin: resolved.targetOrigin,
+        secret: resolved.secret,
+      }),
+    };
+    const client = new GoogleWorkspaceRestClientV1(baseConfig({
+      nativeClient,
+      fetchImpl: async () => { fetchCount += 1; return response(200, {}); },
+    }));
+    await assert.rejects(
+      () => client.request(GOOGLE_DRIVE_API_ORIGIN, '/drive/v3/files', new URLSearchParams(), 'google-drive-main', 1024),
+      error => error.code === 'GOOGLE_CREDENTIAL_SCOPE_MISMATCH',
+    );
+    assert.equal(fetchCount, 0);
+  }
 });
 
 test('transport binds each Google service origin to its configured credential before resolver or fetch', async () => {
