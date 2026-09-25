@@ -53,6 +53,23 @@ export function normalizeGatewayUrl(value) {
   return parsed.toString().replace(/\/$/, '');
 }
 
+function gatewayRequestUrl(base, path) {
+  if (typeof path !== 'string'
+      || !path.startsWith('/')
+      || path.startsWith('//')
+      || path.includes('\\')
+      || path.includes('#')
+      || /[\u0000-\u001f\u007f]/u.test(path)) {
+    throw new Error('AI Gateway request path must be an exact local API path');
+  }
+  const admitted = new URL(base);
+  const target = new URL(`${base}${path}`);
+  if (target.origin !== admitted.origin || target.username || target.password) {
+    throw new Error('AI Gateway request URL must remain on the admitted loopback origin');
+  }
+  return target.toString();
+}
+
 function optionalText(value, label) {
   if (value === undefined) return '';
   if (typeof value !== 'string') throw new Error(`${label} must be text when supplied`);
@@ -163,6 +180,7 @@ export class AiGatewayClient {
 
   async request(gatewayUrl, timeoutSeconds, path, init = {}) {
     const base = normalizeGatewayUrl(gatewayUrl);
+    const requestUrl = gatewayRequestUrl(base, path);
     const timeout = timeoutSeconds;
     if (typeof timeout !== 'number'
         || !Number.isInteger(timeout)
@@ -177,7 +195,7 @@ export class AiGatewayClient {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout * 1000);
     try {
-      const response = await this.fetchFn(`${base}${path}`, {
+      const response = await this.fetchFn(requestUrl, {
         ...init,
         cache: 'no-store',
         redirect: 'error',

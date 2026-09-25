@@ -28,6 +28,41 @@ test('gateway client health, model list and completion use local HTTP API', asyn
   assert.deepEqual(calls.map(x => [new URL(x[0]).pathname, x[1]]), [['/health','GET'],['/status','GET'],['/models','GET'],['/complete','POST']]);
 });
 
+test('gateway client rejects final-URL authority smuggling before fetch', async () => {
+  let fetchCalls = 0;
+  let coercions = 0;
+  const client = new AiGatewayClient({
+    fetchFn: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, '@example.com/steal'),
+    /exact local API path/,
+  );
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, '//example.com/steal'),
+    /exact local API path/,
+  );
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, '/\\example.com/steal'),
+    /exact local API path/,
+  );
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, {
+      toString() {
+        coercions += 1;
+        return '/health';
+      },
+    }),
+    /exact local API path/,
+  );
+  assert.equal(fetchCalls, 0);
+  assert.equal(coercions, 0);
+});
+
 test('gateway client blocks redirect egress even when caller requests follow', async () => {
   let observedUrl = '';
   let observedRedirect = '';
