@@ -57,6 +57,14 @@ function agentCategory(state) {
   return 'RUNNING';
 }
 
+function verifiedScenarioTurn(participant, session) {
+  // A verified Core effect can precede its assistant response. The latter is
+  // counted in totalCompletedTurns; count only the still-in-flight effect here.
+  return participant.state === 'WAITING'
+    && session?.operation?.phase === 'SENT_VERIFIED'
+    && num(session.successfulSendCount) > 0;
+}
+
 /** Pure read projection: no scheduler, counter mutation, or optimistic Send. */
 export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras = [], agentJobs = [], modelWorkers = [] } = {}) {
   const sessionsById = coreState.sessionsById || {};
@@ -68,6 +76,8 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
   const orchestration = [];
   const agents = [];
   const models = [];
+  let scenarioVerifiedSends = 0;
+  let verifiedSendHistoryComplete = true;
   const add = unit => { if (CATEGORIES.includes(unit.category)) units.push(unit); };
 
   for (const id of sessionOrder) {
@@ -88,22 +98,51 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
     const config = scenario.config || {};
     const steps = Array.isArray(config.steps) ? config.steps : [];
     const generationSize = steps.reduce((n, step) => n + Math.max(1, Number(step.repeat) || 1), 0);
-    const stepPosition = steps.slice(0, num(runtime.stepIndex)).reduce((n, step) => n + Math.max(1, Number(step.repeat) || 1), 0)
+    const turnsPerGeneration = generationSize * Math.max(1, Number(config.roundsPerGeneration) || 1);
+    const completedTurns = num(runtime.totalCompletedTurns);
+    const completedInGeneration = runtime.mode === 'CHAT_CYCLE'
+      ? Math.max(0, Math.min(turnsPerGeneration, completedTurns - (Math.max(1, num(runtime.generation)) - 1) * turnsPerGeneration))
+      : 0;
+    const pendingCleanup = new Set(runtime.cleanupPendingSessionIds || []);
+    const activeSessions = Object.values(sessionsById).filter(session =>
+      session?.scenarioWork?.managed === true
+      && session.scenarioWork.scenarioId === scenario.id
+      && !pendingCleanup.has(session.id));
+    const activeConfirmed = activeSessions.reduce((n, session) => n + num(session.successfulSendCount), 0);
+    const generationActiveConfirmed = activeSessions
+      .filter(session => num(session.scenarioWork.generation) === num(runtime.generation))
+      .reduce((n, session) => n + num(session.successfulSendCount), 0);
+    const historyKnown = runtime.verifiedSendHistoryComplete === true;
+    if (!historyKnown) verifiedSendHistoryComplete = false;
+    const stepPosition = num(runtime.round) * generationSize
+      + steps.slice(0, num(runtime.stepIndex)).reduce((n, step) => n + Math.max(1, Number(step.repeat) || 1), 0)
       + num(runtime.repeatIndex) + 1;
+    let inFlightVerified = 0;
     for (const participant of scenarioWorkParticipants(runtime)) {
       const session = sessionsById[participant.sessionId];
+      const verifiedPending = verifiedScenarioTurn(participant, session);
+      if (verifiedPending) inFlightVerified += 1;
       const row = {
         id: `${scenario.id}:${participant.key}`, scenario: scenario.name, role: participant.role,
         generation: num(participant.generation || runtime.generation),
-        message: runtime.mode === 'CHAT_CYCLE' ? Math.min(stepPosition, generationSize) : null,
-        messagesPerGeneration: runtime.mode === 'CHAT_CYCLE' ? generationSize : null,
-        verifiedSends: num(session?.successfulSendCount),
-        completedResponses: num(runtime.totalCompletedTurns),
+        message: runtime.mode === 'CHAT_CYCLE' ? Math.min(stepPosition, turnsPerGeneration) : null,
+        messagesPerGeneration: runtime.mode === 'CHAT_CYCLE' ? turnsPerGeneration : null,
+        verifiedSends: runtime.mode === 'CHAT_CYCLE'
+          ? (historyKnown
+            ? num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed
+            : Math.max(completedInGeneration + Number(verifiedPending),
+              num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed))
+          : num(session?.successfulSendCount),
+        completedResponses: runtime.mode === 'CHAT_CYCLE' ? completedInGeneration : completedTurns,
         category: scenarioCategory(runtime, participant, session),
       };
       scenarioSlots.push(row);
       add({ ...row, kind: 'SCENARIO' });
     }
+    const durableTotal = num(runtime.retiredVerifiedSends) + activeConfirmed;
+    scenarioVerifiedSends += historyKnown
+      ? durableTotal
+      : Math.max(completedTurns + inFlightVerified, durableTotal);
   }
 
   for (const orchestra of orchestras) {
@@ -149,11 +188,14 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
     add({ ...row, kind: 'MODEL' });
   }
   const counts = Object.fromEntries(CATEGORIES.map(key => [key, units.filter(unit => unit.category === key).length]));
-  const managedSends = Object.values(sessionsById).filter(managed).reduce((n, session) => n + num(session.successfulSendCount), 0);
+  const managedSends = Object.values(sessionsById)
+    .filter(session => managed(session) && !session?.scenarioWork?.managed)
+    .reduce((n, session) => n + num(session.successfulSendCount), 0);
   return {
     summary: {
       total: units.length, ...counts,
-      verifiedSends: [...sessions, ...simplifiedSessions].reduce((n, row) => n + row.verifiedSends, managedSends),
+      verifiedSends: [...sessions, ...simplifiedSessions].reduce((n, row) => n + row.verifiedSends, managedSends + scenarioVerifiedSends),
+      verifiedSendHistoryComplete,
       completedResponses: scenarios.reduce((n, scenario) => n + num(scenario.runtime?.totalCompletedTurns), 0),
     },
     sessions, simplifiedSessions, scenarioSlots, orchestration, agents, models,
