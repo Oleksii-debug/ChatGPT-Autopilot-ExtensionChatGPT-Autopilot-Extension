@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { projectGlobalStatus } from '../src/core/global-status.js';
 
 const cycle = (id, sends = 0, responses = 0) => ({
@@ -84,4 +85,39 @@ test('ambiguous Send and duplicate UI reads never increment verified counter', (
   scenario.coreSession.successfulSendCount = 1;
   assert.equal(projectGlobalStatus(source).summary.verifiedSends, 1);
   assert.equal(projectGlobalStatus(source).summary.verifiedSends, 1);
+});
+
+test('Browser Agent waiting states stay mutually exclusive and never project as READY', () => {
+  const states = [
+    'WAITING_PERMISSION',
+    'WAITING_APPROVAL',
+    'WAITING_CAPABILITY',
+    'WAITING_SCHEDULE',
+  ];
+  const agentJobs = states.map((state, index) => ({
+    id: `agent-${index + 1}`,
+    config: { name: state },
+    runtime: { runState: state },
+  }));
+
+  const view = projectGlobalStatus({ agentJobs });
+  assert.equal(view.summary.total, 4);
+  assert.equal(view.summary.READY, 0);
+  for (const state of states) {
+    assert.equal(view.summary[state], 1);
+  }
+  assert.deepEqual(view.agents.map(row => row.category), states);
+});
+
+test('Global Status UI exposes Ukrainian owner-action waiting labels', async () => {
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  for (const expected of [
+    'Потрібен дозвіл сайту',
+    'Очікує підтвердження дії',
+    'Потрібен дозвіл capability',
+    'Очікує розкладу',
+  ]) {
+    assert.match(source, new RegExp(expected));
+  }
+  assert.match(source, /globalStatusCategoryLabel\(row\.category\)/);
 });
