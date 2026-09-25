@@ -164,6 +164,13 @@ test('CREATED UPDATED and DELETED enforce exact version transition shapes', () =
   }));
   assert.equal(created.currentVersion, 'v1');
 
+  const quotedEtag = normalizeApiResourceChangeV1(change({
+    previousVersion: 'W/"etag-v1"',
+    currentVersion: '"etag-v2"',
+  }));
+  assert.equal(quotedEtag.previousVersion, 'W/"etag-v1"');
+  assert.equal(quotedEtag.currentVersion, '"etag-v2"');
+
   assert.throws(
     () => normalizeApiResourceChangeV1(change({
       changeKind: ApiResourceChangeKind.CREATED,
