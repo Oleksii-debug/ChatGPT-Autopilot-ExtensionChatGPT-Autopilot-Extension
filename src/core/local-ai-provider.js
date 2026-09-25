@@ -22,6 +22,37 @@ function nonEmptyString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function snapshotSettingsRecord(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Local AI settings must be a plain data object');
+  }
+  let prototype;
+  try { prototype = Object.getPrototypeOf(raw); } catch {
+    throw new Error('Local AI settings must be a plain data object');
+  }
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Local AI settings must be a plain data object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') {
+      throw new Error('Local AI settings cannot contain symbol fields');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Local AI settings fields must be enumerable own data properties');
+    }
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
+  }
+  return Object.freeze(snapshot);
+}
+
 export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_SETTINGS.providerType) {
   const raw = nonEmptyString(value) || (providerType === LocalAiProviderType.OPENAI_COMPATIBLE
     ? 'http://127.0.0.1:1234/v1'
@@ -37,17 +68,21 @@ export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_S
 }
 
 export function normalizeLocalAiSettings(raw = {}) {
-  const providerType = PROVIDER_TYPES.has(raw.providerType) ? raw.providerType : DEFAULT_LOCAL_AI_SETTINGS.providerType;
-  const timeoutSeconds = Number(raw.timeoutSeconds ?? DEFAULT_LOCAL_AI_SETTINGS.timeoutSeconds);
-  if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < MIN_TIMEOUT_SECONDS || timeoutSeconds > MAX_TIMEOUT_SECONDS) {
+  const source = snapshotSettingsRecord(raw);
+  const providerType = PROVIDER_TYPES.has(source.providerType) ? source.providerType : DEFAULT_LOCAL_AI_SETTINGS.providerType;
+  const timeoutSeconds = source.timeoutSeconds ?? DEFAULT_LOCAL_AI_SETTINGS.timeoutSeconds;
+  if (typeof timeoutSeconds !== 'number'
+      || !Number.isInteger(timeoutSeconds)
+      || timeoutSeconds < MIN_TIMEOUT_SECONDS
+      || timeoutSeconds > MAX_TIMEOUT_SECONDS) {
     throw new Error(`Local AI timeout must be a whole number from ${MIN_TIMEOUT_SECONDS} to ${MAX_TIMEOUT_SECONDS} seconds`);
   }
-  const model = nonEmptyString(raw.model);
+  const model = nonEmptyString(source.model);
   if (model.length > 300) throw new Error('Local AI model name is too long');
   return {
-    enabled: raw.enabled === true,
+    enabled: source.enabled === true,
     providerType,
-    baseUrl: normalizeLocalAiBaseUrl(raw.baseUrl, providerType),
+    baseUrl: normalizeLocalAiBaseUrl(source.baseUrl, providerType),
     model,
     timeoutSeconds,
   };
