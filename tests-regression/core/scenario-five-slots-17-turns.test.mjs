@@ -65,6 +65,9 @@ for (let turn = 1; turn <= 17; turn++) {
   const session = state.sessionsById[current.chat.sessionId];
   const task = session.tasksById[current.chat.taskId];
   assert.equal(task.promptOverride, turn === 1 ? 'START' : turn === 17 ? 'FINAL' : 'Продовжуй роботу.');
+  assert.equal((await manager.cycleOne(slot3)).kind, 'CYCLED');
+  assert.equal((await manager.get(slot3)).scenario.runtime.chat.state, 'WAITING');
+  assert.equal(state.sessionsById[current.chat.sessionId].successfulSendCount, turn - 1);
   task.lastVerifiedSendAt = ++now;
   task.lastConversationUrl = oldChatUrl;
   session.successfulSendCount = turn;
@@ -131,6 +134,9 @@ for (let slot = 1; slot <= 5; slot++) {
       const session = state.sessionsById[oldSessionId];
       const task = session.tasksById[before.chat.taskId];
       assert.equal(task.promptOverride, turn === 1 ? 'START' : turn === 17 ? 'FINAL' : 'Продовжуй роботу.');
+      assert.equal((await restarted.cycleOne(id)).kind, 'CYCLED');
+      assert.equal((await restarted.get(id)).scenario.runtime.chat.state, 'WAITING');
+      assert.equal(state.sessionsById[oldSessionId].successfulSendCount, turn - 1);
       task.lastVerifiedSendAt = ++now;
       task.lastConversationUrl = chatUrl;
       session.successfulSendCount = turn;
