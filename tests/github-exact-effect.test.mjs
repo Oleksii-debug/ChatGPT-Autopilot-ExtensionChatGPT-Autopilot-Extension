@@ -144,6 +144,78 @@ test('effectful GitHub mutation persists EXECUTING before provider dispatch and 
   assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
 });
 
+test('initial GitHub verification must be independently bound to the exact durable attempt before commit', async t => {
+  const cases = [
+    ['missing verifier identity', value => {
+      delete value.verifierId;
+      return value;
+    }, {}, /verification\.verifierId is invalid/],
+    ['executor self-verification', value => ({ ...value, verifierId: 'github-exact-effect-executor' }), {}, /must be independent/],
+    ['parent-controller self-verification', value => ({ ...value, verifierId: 'github-parent-controller' }), { parentActorId: 'github-parent-controller' }, /must be independent/],
+    ['provider self-verification', value => ({ ...value, verifierId: 'remote\/github' }), {}, /must be independent/],
+    ['wrong verification authority', value => ({ ...value, verificationAuthorityId: 'decision-other' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong effect identity', value => ({ ...value, effectId: 'github-effect-other' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong execution identity', value => ({ ...value, executionId: 'github-effect-other:attempt:1' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong attempt', value => ({ ...value, attempt: 2 }), {}, /does not match the current exact-effect attempt/],
+    ['wrong invocation binding', value => ({ ...value, invocationId: 'github-effect-other' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong observation binding', value => ({ ...value, observationId: 'github-effect-other:observation' }), {}, /does not match the current exact-effect attempt/],
+    ['verification predates observation', value => ({ ...value, verifiedAt: '2026-09-24T17:09:59.000Z' }), {}, /invalid chronology/],
+    ['verification is too far in the future', value => ({ ...value, verifiedAt: '2026-09-24T17:11:01.000Z' }), {}, /invalid chronology/],
+  ];
+
+  for (const [index, [label, mutate, executorOptions, expected]] of cases.entries()) {
+    await t.test(label, async () => {
+      const id = `verify-binding-${index}`;
+      const fx = storeFixture();
+      const p = providerFixture();
+      const executor = new GitHubExactEffectExecutorV1({
+        provider: p.provider,
+        store: fx.store,
+        now: () => Date.parse(at),
+        ...executorOptions,
+        verify: async ({ invocation: inv, observation }) => mutate(verified(inv, observation)),
+      });
+
+      await assert.rejects(
+        () => executor.invoke({ invocation: invocation(id), policyDecision: policy(id) }),
+        error => {
+          assert.match(error.message, expected);
+          assert.equal(error.effectState.phase, 'RECONCILE');
+          assert.equal(error.safeToRetry, false);
+          assert.equal(error.reconcileRequired, true);
+          return true;
+        },
+      );
+      assert.equal(fx.snapshot(id).phase, 'RECONCILE');
+      assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+      assert.equal(fx.writes.some(item => item.phase === 'COMMITTED'), false);
+    });
+  }
+});
+
+test('initial GitHub verification may take longer than clock skew when evidence is fresh at verifier completion', async () => {
+  const fx = storeFixture();
+  const p = providerFixture();
+  let clockMs = Date.parse(at);
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => clockMs,
+    verify: async ({ invocation: inv, observation }) => {
+      clockMs += 2 * 60 * 1000;
+      return {
+        ...verified(inv, observation),
+        verifiedAt: new Date(clockMs).toISOString(),
+      };
+    },
+  });
+
+  const id = 'slow-independent-verifier';
+  const result = await executor.invoke({ invocation: invocation(id), policyDecision: policy(id) });
+  assert.equal(result.effectState.phase, 'COMMITTED');
+  assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+});
+
 test('concurrent same-invocation contenders atomically admit exactly one GitHub mutation', async () => {
   const fx = storeFixture();
   const calls = [];
@@ -291,6 +363,115 @@ test('ambiguous GitHub transport outcome becomes durable RECONCILE and blind ret
 
   await assert.rejects(() => executor.invoke({ invocation: invocation(), policyDecision: policy() }), /requires reconciliation/);
   assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1, 'same mutation must not dispatch twice');
+});
+
+test('stale attempt-1 verification cannot satisfy attempt 2 after evidence-backed SAFE_RETRY', async () => {
+  const fx = storeFixture();
+  const calls = [];
+  const inv = invocation('github-cross-attempt-proof');
+  const decision = policy(inv.invocationId);
+  const provider = {
+    authorize({ invocation: input, policyDecision }) {
+      return { invocation: structuredClone(input), policyDecision: structuredClone(policyDecision) };
+    },
+    async invoke({ invocation: input }) {
+      calls.push(input.invocationId);
+      if (calls.length === 1) {
+        const error = new Error('attempt 1 transport outcome is ambiguous');
+        error.effectMayHaveOccurred = true;
+        error.safeToRetry = false;
+        throw error;
+      }
+      return {
+        providerId: 'remote/github',
+        invocationId: input.invocationId,
+        observedAt: at,
+        result: {
+          repository: input.arguments.repository,
+          path: input.arguments.path,
+          sha: '2'.repeat(40),
+        },
+      };
+    },
+  };
+  const executor = new GitHubExactEffectExecutorV1({
+    provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: async ({ invocation: currentInvocation, observation }) => {
+      // Deliberately replay an otherwise well-formed verification from attempt 1.
+      // The helper binds executionId/attempt to attempt 1, while attempt 2 is now durable.
+      return verified(currentInvocation, observation);
+    },
+    reconcileVerify: async ({ invocation: currentInvocation, effectId, executionId, attempt, policyDecisionId }) => {
+      const observation = {
+        schemaVersion: 1,
+        observationId: `${effectId}:safe-retry-observation`,
+        invocationId: effectId,
+        status: 'OK',
+        summary: '',
+        data: { committed: false },
+        artifactRefs: [],
+        observedAt: at,
+      };
+      return {
+        verifierId: 'independent-github-readback',
+        verificationAuthorityId: policyDecisionId,
+        effectId,
+        executionId,
+        attempt,
+        observation,
+        verification: {
+          ...verified(currentInvocation, observation, {
+            status: 'FAILED',
+            reasonCode: 'NO_COMMITTED_EFFECT',
+            verifierId: 'independent-github-readback',
+          }),
+          executionId,
+          attempt,
+        },
+      };
+    },
+  });
+
+  await assert.rejects(
+    () => executor.invoke({ invocation: inv, policyDecision: decision }),
+    error => {
+      assert.equal(error.effectState.phase, 'RECONCILE');
+      assert.equal(error.effectState.attempt, 1);
+      assert.equal(error.safeToRetry, false);
+      return true;
+    },
+  );
+  assert.equal(calls.length, 1);
+
+  const safeRetry = await executor.reconcile({
+    invocationId: inv.invocationId,
+    outcome: 'SAFE_RETRY',
+    reasonCode: 'NO_COMMITTED_EFFECT',
+    summary: 'Independent readback proves attempt 1 did not commit.',
+  });
+  assert.equal(safeRetry.phase, 'SAFE_RETRY');
+  assert.equal(safeRetry.attempt, 1);
+
+  const dispatchesBeforeAttempt2 = calls.length;
+  await assert.rejects(
+    () => executor.invoke({ invocation: structuredClone(inv), policyDecision: structuredClone(decision) }),
+    error => {
+      assert.match(error.message, /does not match the current exact-effect attempt/);
+      assert.equal(error.effectState.phase, 'RECONCILE');
+      assert.equal(error.effectState.attempt, 2);
+      assert.equal(error.safeToRetry, false);
+      assert.equal(error.reconcileRequired, true);
+      return true;
+    },
+  );
+
+  assert.equal(calls.length - dispatchesBeforeAttempt2, 1, 'attempt 2 must dispatch exactly once');
+  assert.equal(calls.length, 2, 'one physical dispatch per admitted attempt');
+  assert.equal(fx.snapshot(inv.invocationId).phase, 'RECONCILE');
+  assert.equal(fx.snapshot(inv.invocationId).attempt, 2);
+  assert.equal(fx.writes.some(item => item.phase === 'COMMITTED'), false);
 });
 
 test('restart recovery converts a durable EXECUTING mutation to RECONCILE before any provider replay', async () => {
