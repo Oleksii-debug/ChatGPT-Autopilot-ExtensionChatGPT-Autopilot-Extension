@@ -12,12 +12,12 @@ export const TERMINAL_AGENT_PAYLOAD_KIND = 'orchestration-terminal-event';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const TERMINAL_STATUSES = new Set(Object.values(OrchestrationTerminalStatus));
-const REQUEST_KEYS = new Set(['trigger', 'terminalIdentity', 'payloadArtifactRef', 'observedAt']);
+const REQUEST_KEYS = new Set(['trigger', 'terminalIdentity', 'observedAt']);
 const IDENTITY_KEYS = new Set(['graphId', 'controlEpoch', 'nodeId', 'generation', 'activationId']);
 const FACT_KEYS = new Set([
   'graphId', 'controlEpoch', 'nodeId', 'generation', 'activationId', 'status', 'terminalAt',
 ]);
-const DEPENDENCY_KEYS = new Set(['resolveTerminalActivation']);
+const DEPENDENCY_KEYS = new Set(['resolveTerminalActivation', 'materializeTerminalPayload']);
 
 function strictRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -156,6 +156,9 @@ function normalizeDependencies(value) {
   if (typeof raw.resolveTerminalActivation !== 'function') {
     throw new Error('Terminal agent trigger requires trusted resolveTerminalActivation');
   }
+  if (typeof raw.materializeTerminalPayload !== 'function') {
+    throw new Error('Terminal agent trigger requires trusted materializeTerminalPayload');
+  }
   return raw;
 }
 
@@ -194,7 +197,23 @@ export async function createTerminalAgentTriggerObservationV1(value, dependencie
   const descriptor = await createTerminalAgentPayloadDescriptorV1(fact);
   const materialFingerprint = await createSha256FingerprintV1(descriptor.materialUtf8);
   const digest = materialFingerprint.slice('sha256:'.length);
-  const payloadArtifactRef = request.payloadArtifactRef;
+  const payloadArtifactRef = await deps.materializeTerminalPayload(freezeDeep({
+    schemaVersion: TERMINAL_AGENT_TRIGGER_VERSION,
+    providerId: TERMINAL_AGENT_PROVIDER_ID,
+    kind: TERMINAL_AGENT_PAYLOAD_KIND,
+    mediaType: 'application/json',
+    sensitive: false,
+    graphId: fact.graphId,
+    controlEpoch: fact.controlEpoch,
+    nodeId: fact.nodeId,
+    generation: fact.generation,
+    activationId: fact.activationId,
+    status: fact.status,
+    terminalAt: fact.terminalAt,
+    materialUtf8: descriptor.materialUtf8,
+    sha256: descriptor.sha256,
+    sizeBytes: descriptor.sizeBytes,
+  }));
   const sourceEventId = `terminal-event:${digest}`;
   const observationId = `terminal-observation:${digest}`;
 
