@@ -5,6 +5,7 @@ import {
   ProjectWorkspaceRepository,
   addProjectSnapshot,
   createProjectWorkspace,
+  getProjectArtifactProvenance,
   projectCurrentState,
   putProjectArtifactProvenance,
   putProjectContextCapsule,
@@ -116,6 +117,41 @@ test('workspace stores reserved prototype-like durable ids as own entries withou
   assert.equal(Object.getPrototypeOf(project.provenanceByArtifactId), Object.prototype);
   assert.equal(validateProjectWorkspace(workspace), workspace);
   assert.equal(projectCurrentState(workspace, 'constructor', 'constructor', [specialSource]).status, 'FRESH');
+});
+
+test('workspace lookup identities reject leading and trailing whitespace aliases', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 4 });
+
+  assert.throws(
+    () => projectCurrentState(workspace, ' project-a', 'capsule-1', [source()]),
+    /Invalid projectId/,
+  );
+  assert.throws(
+    () => projectCurrentState(workspace, 'project-a ', 'capsule-1', [source()]),
+    /Invalid projectId/,
+  );
+  assert.throws(
+    () => projectCurrentState(workspace, 'project-a', ' capsule-1', [source()]),
+    /Invalid capsuleId/,
+  );
+  assert.throws(
+    () => projectCurrentState(workspace, 'project-a', 'capsule-1 ', [source()]),
+    /Invalid capsuleId/,
+  );
+  assert.throws(
+    () => getProjectArtifactProvenance(workspace, 'project-a', ' build'),
+    /Invalid artifactId/,
+  );
+  assert.throws(
+    () => getProjectArtifactProvenance(workspace, 'project-a', 'build '),
+    /Invalid artifactId/,
+  );
+
+  assert.equal(projectCurrentState(workspace, 'project-a', 'capsule-1', [source()]).status, 'FRESH');
+  assert.equal(getProjectArtifactProvenance(workspace, 'project-a', 'build').artifactRef.artifactId, 'build');
 });
 
 test('workspace lookup identities are string-only and persisted record prototypes fail closed', () => {
