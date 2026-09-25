@@ -135,12 +135,19 @@ test('preview manifest remains source-bound and never claims live freshness with
   const previewed = manifest.entries.find(entry => entry.itemId === 'item-a');
   const missing = manifest.entries.find(entry => entry.itemId === 'item-b');
   assert.equal(previewed.previewBindingStatus, 'SOURCE_BOUND');
+  assert.equal(previewed.sourceArtifactId, 'artifact-a');
   assert.equal(previewed.sourceSha256, SHA_A);
-  assert.equal(previewed.previewArtifactRef.artifactId, 'preview-a');
+  assert.equal(previewed.previewArtifactId, 'preview-a');
+  assert.equal(previewed.previewSha256, SHA_C);
+  assert.equal(previewed.requiresArtifactResolver, true);
   assert.equal(previewed.requiresFreshSourceObservation, true);
   assert.equal(previewed.liveSourceFreshnessVerified, false);
+  assert.equal(Object.hasOwn(previewed, 'sourceArtifactRef'), false);
+  assert.equal(Object.hasOwn(previewed, 'previewArtifactRef'), false);
+  assert.equal(Object.hasOwn(previewed, 'uri'), false);
   assert.equal(missing.previewBindingStatus, 'MISSING');
-  assert.equal(missing.previewArtifactRef, null);
+  assert.equal(missing.previewArtifactId, '');
+  assert.equal(missing.previewSha256, '');
 });
 
 test('freshness assessment distinguishes ready, preview-required, stale, and missing source states', () => {
