@@ -177,7 +177,7 @@ function exactOperation(value) {
   return value;
 }
 
-function normalizePayloadArtifact(input, requestedAt) {
+function normalizePayloadArtifact(input, notAfterAt, chronologyLabel = 'requestedAt') {
   if (input == null) return null;
   const raw = snapshotRecord(input, ARTIFACT_KEYS, 'payloadArtifactRef');
   requireKeys(raw, ARTIFACT_KEYS, 'payloadArtifactRef');
@@ -190,8 +190,8 @@ function normalizePayloadArtifact(input, requestedAt) {
       throw new Error('payloadArtifactRef contains a non-canonical representation');
     }
   }
-  if (Date.parse(artifact.createdAt) > Date.parse(requestedAt)) {
-    throw new Error('payloadArtifactRef cannot be created after requestedAt');
+  if (Date.parse(artifact.createdAt) > Date.parse(notAfterAt)) {
+    throw new Error('payloadArtifactRef cannot be created after ' + chronologyLabel);
   }
   return artifact;
 }
@@ -303,7 +303,7 @@ function normalizeReceipt(input, request) {
   }
   const resultArtifactRef = raw.resultArtifactRef == null
     ? null
-    : normalizePayloadArtifact(raw.resultArtifactRef, observedAt);
+    : normalizePayloadArtifact(raw.resultArtifactRef, observedAt, 'receipt.observedAt');
   return deepFreeze({
     schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
     requestId: request.requestId,
@@ -322,6 +322,7 @@ export function isAutopilotProgrammaticOperationReadOnly(operation) {
 }
 
 export async function executeAutopilotProgrammaticControlV1(input, dependencies = {}) {
+  const request = normalizeAutopilotProgrammaticRequestV1(input);
   const dependencyRecord = snapshotRecord(
     dependencies,
     DEPENDENCY_KEYS,
@@ -341,7 +342,6 @@ export async function executeAutopilotProgrammaticControlV1(input, dependencies 
     throw new Error('Canonical control-plane dispatcher is required');
   }
 
-  const request = normalizeAutopilotProgrammaticRequestV1(input);
   const rawScope = await resolveTrustedScope(request);
   const scopeProof = normalizeScopeProof(rawScope, request);
   if (!scopeProof.allowed) {
