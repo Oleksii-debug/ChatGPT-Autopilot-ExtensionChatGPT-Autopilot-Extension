@@ -705,3 +705,64 @@ test('universal-agent contract boundary rejects accessor-backed and hidden field
     /enumerable own data properties|unknown field: hiddenAuthority/,
   );
 });
+
+test('universal contract arrays consume descriptor snapshots without ordinary Proxy reads', () => {
+  let reads = 0;
+  const trackReads = target => new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+
+  const requestedCapabilityIds = trackReads(['filesystem.read']);
+  const invocation = normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-proxy-array',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds,
+    policyDecisionId: 'decision-proxy-array',
+    arguments: {},
+    createdAt: AT,
+  });
+  assert.deepEqual(invocation.requestedCapabilityIds, ['filesystem.read']);
+  assert.equal(reads, 0, 'capability array must not perform ordinary caller reads');
+
+  reads = 0;
+  const artifactRefs = trackReads([artifact({ artifactId: 'artifact-proxy-array' })]);
+  const observation = normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'observation-proxy-array',
+    invocationId: 'invoke-proxy-array',
+    status: ObservationStatus.SUCCEEDED,
+    summary: '',
+    data: {},
+    artifactRefs,
+    observedAt: AT,
+  });
+  assert.equal(observation.artifactRefs[0].artifactId, 'artifact-proxy-array');
+  assert.equal(reads, 0, 'artifact-ref array must not perform ordinary caller reads');
+
+  reads = 0;
+  const evidenceArtifactIds = trackReads(['evidence-proxy-array']);
+  const verification = normalizeVerificationV1({
+    schemaVersion: 1,
+    verificationId: 'verification-proxy-array',
+    invocationId: 'invoke-proxy-array',
+    observationId: 'observation-proxy-array',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    summary: '',
+    evidenceArtifactIds,
+    verifiedAt: AT,
+    verifierId: 'verifier-proxy-array',
+    verificationAuthorityId: 'authority-proxy-array',
+    effectId: 'effect-proxy-array',
+    executionId: 'execution-proxy-array',
+    attempt: 1,
+  });
+  assert.deepEqual(verification.evidenceArtifactIds, ['evidence-proxy-array']);
+  assert.equal(reads, 0, 'evidence array must not perform ordinary caller reads');
+});
+
