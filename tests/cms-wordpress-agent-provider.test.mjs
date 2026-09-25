@@ -69,19 +69,24 @@ function client(overrides = {}) {
     searchMedia: async args => ({ operation: 'searchMedia', args }),
     getMedia: async args => ({ operation: 'getMedia', args }),
     searchTaxonomy: async args => ({ operation: 'searchTaxonomy', args }),
+    createDraft: async args => ({ operation: 'createDraft', args }),
     ...overrides,
   };
 }
 
 const capabilities = Object.values(CmsWordPressCapabilityId);
 
-test('WordPress provider advertises only six read-only discovery tools and no mutation surface', () => {
+test('WordPress provider advertises six read tools plus one bounded draft-create mutation', () => {
   const provider = new CmsWordPressAgentProviderV1({
     materializeUntrustedContent, wordpressClient: client(), grantedCapabilityIds: capabilities });
   const tools = provider.tools();
-  assert.equal(tools.length, 6);
-  assert.ok(tools.every(tool => tool.providerId === CMS_WORDPRESS_PROVIDER_ID && tool.readOnly === true));
-  assert.ok(tools.every(tool => !/(create|update|edit|publish|upload|delete|trash|plugin|theme)/iu.test(tool.toolId)));
+  assert.equal(tools.length, 7);
+  assert.ok(tools.every(tool => tool.providerId === CMS_WORDPRESS_PROVIDER_ID));
+  assert.equal(tools.filter(tool => tool.readOnly === true).length, 6);
+  const mutation = tools.find(tool => tool.toolId === CmsWordPressToolId.CONTENT_DRAFT_CREATE);
+  assert.equal(mutation.readOnly, false);
+  assert.deepEqual(mutation.capabilityIds, [CmsWordPressCapabilityId.CONTENT_DRAFT_CREATE]);
+  assert.equal(tools.some(tool => /(update|edit|publish|upload|delete|trash|plugin|theme)/iu.test(tool.toolId)), false);
   assert.deepEqual(new Set(tools.flatMap(tool => tool.capabilityIds)), new Set(capabilities));
 });
 

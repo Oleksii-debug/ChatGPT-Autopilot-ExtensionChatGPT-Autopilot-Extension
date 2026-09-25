@@ -10,18 +10,25 @@ const STATUS = new Set(['publish', 'draft', 'pending', 'private', 'future']);
 const CONTENT_TYPES = new Set(['posts', 'pages']);
 const TAXONOMIES = new Set(['categories', 'tags']);
 
-function wpError(code, message, status = 0) {
-  const error = new Error(String(message || 'WordPress read failed').slice(0, 4000));
+function wpError(code, message, status = 0, {
+  effectMayHaveOccurred = false,
+  safeToRetry = true,
+} = {}) {
+  const error = new Error(String(message || 'WordPress request failed').slice(0, 4000));
   error.name = 'WordPressRestClientError';
   error.code = String(code || 'WORDPRESS_REQUEST_FAILED').slice(0, 120);
   error.status = Number.isInteger(status) ? status : 0;
-  error.effectMayHaveOccurred = false;
-  error.safeToRetry = true;
+  error.effectMayHaveOccurred = effectMayHaveOccurred === true;
+  error.safeToRetry = safeToRetry === true;
   return error;
 }
 
 function fail(code, message, status = 0) {
   throw wpError(code, message, status);
+}
+
+function failEffect(code, message, status = 0) {
+  throw wpError(code, message, status, { effectMayHaveOccurred: true, safeToRetry: false });
 }
 
 function record(value, allowed, label) {
@@ -84,6 +91,23 @@ function text(value, label, max = 4096, optional = false) {
     fail('WORDPRESS_SCHEMA_INVALID', label + ' is invalid');
   }
   return value;
+}
+
+function mutationText(value, label, max, { optional = false } = {}) {
+  if ((value == null || value === '') && optional) return '';
+  if (typeof value !== 'string' || (!optional && !value) || value.length > max
+      || /[\u0000\u000b\u000c\u001c-\u001f\u007f]/u.test(value)) {
+    fail('WORDPRESS_SCHEMA_INVALID', label + ' is invalid');
+  }
+  return value;
+}
+
+function draftSlug(value) {
+  const out = text(value, 'slug', 80);
+  if (!/^autopilot-[a-f0-9]{64}$/u.test(out)) {
+    fail('WORDPRESS_SCHEMA_INVALID', 'slug must be the deterministic invocation-bound draft slug');
+  }
+  return out;
 }
 
 function credentialId(value, label = 'credentialId') {
@@ -202,6 +226,15 @@ function rendered(value, label, max) {
   return raw;
 }
 
+function editableRaw(value, label, max) {
+  if (value == null) return '';
+  const object = plain(value, label);
+  const raw = own(object, 'raw');
+  if (raw == null) return '';
+  if (typeof raw !== 'string' || raw.length > max) fail('WORDPRESS_RESPONSE_INVALID', label + '.raw is invalid');
+  return raw;
+}
+
 function responseText(value, label, max, optional = false) {
   if ((value == null || value === '') && optional) return '';
   if (typeof value !== 'string' || (!optional && !value) || value.length > max) {
@@ -239,7 +272,12 @@ function contentItem(value, { full = false, expectedId = null } = {}) {
     titleHtml: rendered(own(raw, 'title'), 'WordPress content title', 100_000),
     excerptHtml: rendered(own(raw, 'excerpt'), 'WordPress content excerpt', 200_000),
   };
-  if (full) out.contentHtml = rendered(own(raw, 'content'), 'WordPress content body', MAX_BODY_TEXT);
+  if (full) {
+    out.contentHtml = rendered(own(raw, 'content'), 'WordPress content body', MAX_BODY_TEXT);
+    out.titleRaw = editableRaw(own(raw, 'title'), 'WordPress content title', 100_000);
+    out.excerptRaw = editableRaw(own(raw, 'excerpt'), 'WordPress content excerpt', 200_000);
+    out.contentRaw = editableRaw(own(raw, 'content'), 'WordPress content body', MAX_BODY_TEXT);
+  }
   return Object.freeze(out);
 }
 
@@ -384,6 +422,145 @@ export class WordPressRestClientV1 {
     try { payload = bodyText ? JSON.parse(bodyText) : {}; }
     catch { fail('WORDPRESS_RESPONSE_INVALID', 'WordPress returned invalid JSON'); }
     return payload;
+  }
+
+  async createDraftJson(siteOrigin, path, body) {
+    const site = this.assertSiteAllowed(siteOrigin);
+    if (!/^\/wp-json\/wp\/v2\/(?:posts|pages)$/u.test(path)) {
+      fail('WORDPRESS_SCHEMA_INVALID', 'WordPress draft-create path is invalid');
+    }
+    const mutation = record(body, new Set(['status', 'slug', 'title', 'content', 'excerpt']), 'WordPress draft-create body');
+    if (mutation.status !== 'draft') fail('WORDPRESS_SCHEMA_INVALID', 'WordPress draft create is restricted to draft status');
+    draftSlug(mutation.slug);
+    mutationText(mutation.title, 'title', 100_000);
+    if (mutation.content != null) mutationText(mutation.content, 'content', MAX_BODY_TEXT, { optional: true });
+    if (mutation.excerpt != null) mutationText(mutation.excerpt, 'excerpt', 200_000, { optional: true });
+    const serialized = JSON.stringify(mutation);
+    if (new TextEncoder().encode(serialized).byteLength > 1_000_000) {
+      fail('WORDPRESS_SCHEMA_INVALID', 'WordPress draft-create body exceeds the request size bound');
+    }
+
+    let resolved;
+    try {
+      resolved = await this.resolveCredential({ credentialId: site.credentialId, targetOrigin: site.origin });
+    } catch {
+      fail('WORDPRESS_CREDENTIAL_UNAVAILABLE', 'WordPress credential is unavailable');
+    }
+    const credential = record(resolved, new Set(['credentialId', 'kind', 'targetOrigin', 'username', 'secret']), 'Resolved WordPress credential');
+    if (credential.credentialId !== site.credentialId || credential.targetOrigin !== site.origin) {
+      fail('WORDPRESS_CREDENTIAL_SCOPE_MISMATCH', 'Resolved WordPress credential identity/origin does not match the admitted site');
+    }
+    if (credential.kind !== 'username-password') fail('WORDPRESS_CREDENTIAL_INVALID', 'WordPress requires a username-password application credential');
+    const username = text(credential.username, 'WordPress credential username', 320);
+    const secret = text(credential.secret, 'WordPress credential secret', 100_000);
+    const authorization = 'Basic ' + encodeBasic(username, secret);
+    const url = new URL(path, site.origin);
+    if (url.origin !== site.origin || url.pathname !== path || url.search || url.hash) {
+      fail('WORDPRESS_SCHEMA_INVALID', 'WordPress draft-create URL is not canonical');
+    }
+
+    const controller = new AbortController();
+    const timer = this.setTimeoutImpl(() => controller.abort(), this.requestTimeoutMs);
+    let response;
+    let bytes;
+    try {
+      try {
+        response = await this.fetchImpl(url.toString(), {
+          method: 'POST',
+          redirect: 'error',
+          signal: controller.signal,
+          headers: {
+            Authorization: authorization,
+            Accept: 'application/json',
+            'Content-Type': 'application/json; charset=utf-8',
+          },
+          body: serialized,
+        });
+      } catch {
+        failEffect(
+          controller.signal.aborted ? 'WORDPRESS_REQUEST_TIMEOUT' : 'WORDPRESS_TRANSPORT_ERROR',
+          controller.signal.aborted ? 'WordPress draft-create request timed out after dispatch' : 'WordPress draft-create transport failed after dispatch',
+        );
+      }
+      try {
+        bytes = await responseBytes(response, this.maxJsonBytes);
+      } catch {
+        failEffect(
+          controller.signal.aborted ? 'WORDPRESS_REQUEST_TIMEOUT' : 'WORDPRESS_RESPONSE_READ_FAILED',
+          controller.signal.aborted ? 'WordPress draft-create response timed out' : 'WordPress draft-create response body could not be read',
+        );
+      }
+    } finally {
+      this.clearTimeoutImpl(timer);
+      resolved = null;
+    }
+
+    const status = Number(response?.status) || 0;
+    if (status < 200 || status >= 300) {
+      failEffect('WORDPRESS_HTTP_' + (status || 'ERROR'), 'WordPress draft-create HTTP ' + status, status);
+    }
+    const responseBody = decodeUtf8(bytes, 'WordPress draft-create JSON response');
+    let payload;
+    try { payload = responseBody ? JSON.parse(responseBody) : {}; }
+    catch { failEffect('WORDPRESS_RESPONSE_INVALID', 'WordPress draft-create returned invalid JSON'); }
+    return payload;
+  }
+
+  async findContentBySlug(input = {}) {
+    const raw = record(input, new Set(['siteOrigin', 'contentType', 'slug']), 'WordPress exact-slug lookup request');
+    const site = this.assertSiteAllowed(raw.siteOrigin);
+    const contentType = text(raw.contentType, 'contentType', 16);
+    if (!CONTENT_TYPES.has(contentType)) fail('WORDPRESS_SCHEMA_INVALID', 'contentType must be posts or pages');
+    const slug = draftSlug(raw.slug);
+    const query = new URLSearchParams({
+      context: 'edit',
+      slug,
+      status: 'any',
+      per_page: '2',
+      _fields: 'id,date_gmt,modified_gmt,slug,status,type,link,title,excerpt,content',
+    });
+    const payload = await this.requestJson(site.origin, '/wp-json/wp/v2/' + contentType, query);
+    const items = denseArray(payload, 'WordPress exact-slug lookup response', 2)
+      .map(value => contentItem(value, { full: true }));
+    return Object.freeze({ siteOrigin: site.origin, contentType, slug, items: Object.freeze(items) });
+  }
+
+  async createDraft(input = {}) {
+    const raw = record(input, new Set(['siteOrigin', 'contentType', 'slug', 'title', 'content', 'excerpt']), 'WordPress draft-create request');
+    const site = this.assertSiteAllowed(raw.siteOrigin);
+    const contentType = text(raw.contentType, 'contentType', 16);
+    if (!CONTENT_TYPES.has(contentType)) fail('WORDPRESS_SCHEMA_INVALID', 'contentType must be posts or pages');
+    const slug = draftSlug(raw.slug);
+    const title = mutationText(raw.title, 'title', 100_000);
+    const content = raw.content == null ? '' : mutationText(raw.content, 'content', MAX_BODY_TEXT, { optional: true });
+    const excerpt = raw.excerpt == null ? '' : mutationText(raw.excerpt, 'excerpt', 200_000, { optional: true });
+
+    const existing = await this.findContentBySlug({ siteOrigin: site.origin, contentType, slug });
+    if (existing.items.length !== 0) {
+      fail('WORDPRESS_DRAFT_SLUG_CONFLICT', 'WordPress deterministic draft slug already exists');
+    }
+
+    const body = { status: 'draft', slug, title, content, excerpt };
+    let item;
+    try {
+      item = contentItem(
+        await this.createDraftJson(site.origin, '/wp-json/wp/v2/' + contentType, body),
+        { full: true },
+      );
+    } catch (error) {
+      if (error?.effectMayHaveOccurred === true) throw error;
+      failEffect('WORDPRESS_MUTATION_RESPONSE_INVALID', 'WordPress draft-create response failed canonical validation');
+    }
+    const expectedType = contentType === 'posts' ? 'post' : 'page';
+    if (item.type !== expectedType || item.status !== 'draft' || item.slug !== slug
+        || item.titleRaw !== title || item.contentRaw !== content || item.excerptRaw !== excerpt) {
+      failEffect('WORDPRESS_MUTATION_RESPONSE_MISMATCH', 'WordPress draft-create response did not match the requested draft');
+    }
+    return Object.freeze({
+      siteOrigin: site.origin,
+      contentType,
+      ...item,
+    });
   }
 
   async readSite(input = {}) {
