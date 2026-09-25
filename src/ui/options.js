@@ -94,7 +94,7 @@ function setUiMode(mode, { focus = false } = {}) {
 async function loadProfileSettings() {
   try {
     const data = await core('GET_PROFILE_SETTINGS');
-    const minutes = Number(data?.rateLimitCooldownMinutes || 5);
+    const minutes = Number(data?.rateLimitCooldownMinutes ?? 0);
     $('rate-limit-cooldown-minutes').value = String(minutes);
     $('rate-limit-setting-status').textContent = `Current fallback rate-limit pause: ${minutes} minute${minutes === 1 ? '' : 's'}.`;
   } catch (error) {
@@ -104,14 +104,16 @@ async function loadProfileSettings() {
 
 async function saveProfileSettings() {
   const minutes = Number($('rate-limit-cooldown-minutes').value);
-  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
-    $('rate-limit-setting-status').textContent = 'Enter a whole number from 1 to 120 minutes.';
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+    $('rate-limit-setting-status').textContent = 'Введіть ціле число від 0 до 120 хвилин.';
     $('rate-limit-cooldown-minutes').focus();
     return;
   }
   try {
     const data = await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
-    $('rate-limit-setting-status').textContent = `Saved fallback: if “Too many requests” remains after acknowledgement, this Chrome profile waits ${data.rateLimitCooldownMinutes} minute${data.rateLimitCooldownMinutes === 1 ? '' : 's'} and then retries automatically.`;
+    $('rate-limit-setting-status').textContent = data.rateLimitCooldownMinutes === 0
+      ? 'Збережено: додаткову спільну паузу після rate-limit вимкнено. Серверне обмеження та технічний retry залишаються чинними.'
+      : `Збережено резервну паузу: ${data.rateLimitCooldownMinutes} хв.`;
     announce('Rate-limit pause saved.');
   } catch (error) {
     $('rate-limit-setting-status').textContent = `Could not save fallback rate-limit pause: ${error.message}`;
