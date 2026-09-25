@@ -45,6 +45,9 @@ const RESULT_KEYS = new Set([
 ]);
 const SUBJECT_KEYS = new Set(['subjectId', 'subjectRevisionId']);
 const EXECUTION_KEYS = new Set(['runId', 'producerInvocationId', 'startedAt', 'completedAt']);
+const EVALUATION_REQUEST_KEYS = new Set([
+  'suite', 'run', 'expectedSubject', 'trustedExecution', 'trustedEvidenceArtifacts',
+]);
 
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -345,13 +348,15 @@ function assertionPasses(operator, observed, threshold) {
   return observed === threshold;
 }
 
-export function evaluateBenchmarkRunV1({
-  suite,
-  run,
-  expectedSubject,
-  trustedExecution,
-  trustedEvidenceArtifacts,
-} = {}) {
+export function evaluateBenchmarkRunV1(input = {}) {
+  const request = record(input, 'EvaluateBenchmarkRunV1 request');
+  exactKeys(request, EVALUATION_REQUEST_KEYS, 'EvaluateBenchmarkRunV1 request');
+  const suite = request.suite;
+  const run = request.run;
+  const expectedSubject = request.expectedSubject;
+  const trustedExecution = request.trustedExecution;
+  const trustedEvidenceArtifacts = request.trustedEvidenceArtifacts;
+
   const normalizedSuite = normalizeBenchmarkSuiteV1(suite);
   const subject = record(expectedSubject, 'ExpectedBenchmarkSubjectV1');
   exactKeys(subject, SUBJECT_KEYS, 'ExpectedBenchmarkSubjectV1');

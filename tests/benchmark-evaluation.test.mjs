@@ -561,6 +561,71 @@ test('rejects hidden allowed authority fields and trusted-artifact accessors', (
   assert.equal(reads, 0);
 });
 
+test('evaluation request boundary is data-only before reading trusted inputs', () => {
+  const baseRequest = {
+    suite: suite(),
+    run: run(),
+    expectedSubject,
+    trustedExecution,
+    trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+  };
+
+  let reads = 0;
+  const accessor = { ...baseRequest };
+  Object.defineProperty(accessor, 'trustedExecution', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return trustedExecution; },
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw(accessor),
+    /enumerable own data properties only/,
+  );
+  assert.equal(reads, 0, 'outer authority getter must never execute');
+
+  const hidden = { ...baseRequest };
+  Object.defineProperty(hidden, 'run', {
+    enumerable: false,
+    configurable: true,
+    value: run(),
+  });
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw(hidden),
+    /enumerable own data properties only/,
+  );
+
+  const symbol = { ...baseRequest, [Symbol('trusted-alias')]: trustedExecution };
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw(symbol),
+    /symbol fields/,
+  );
+
+  const exotic = Object.assign(
+    Object.create({ trustedExecution }),
+    {
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+    },
+  );
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw(exotic),
+    /plain object/,
+  );
+
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw({ ...baseRequest, callerPassed: true }),
+    /unknown field: callerPassed/,
+  );
+
+  const nullPrototype = Object.assign(Object.create(null), baseRequest);
+  assert.equal(
+    evaluateBenchmarkRunV1Raw(nullPrototype).status,
+    BenchmarkEvaluationStatus.PASS,
+  );
+});
+
 test('rejects non-canonical timestamps and completed-before-started runs', () => {
   assert.throws(
     () => evaluateBenchmarkRunV1({
