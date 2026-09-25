@@ -58,3 +58,19 @@ test('Session calendar presents dotted owner format while preserving canonical s
   assert.match(js, /formatAccessibleCalendarDate/);
   assert.match(js, /parseAccessibleOccurrenceLine/);
 });
+
+
+test('Session calendar exposes accessible interval recurrence with now or later start', () => {
+  for (const id of [
+    'calendar-interval-fields', 'calendar-interval-start-mode',
+    'calendar-interval-start-date', 'calendar-interval-start-time',
+    'calendar-interval-value', 'calendar-interval-unit',
+    'calendar-interval-max-occurrences',
+  ]) assert.match(html, new RegExp(`id=["']${id}["']`));
+  assert.match(html, /<option value="INTERVAL">/);
+  assert.match(html, /value="NOW">Зараз/);
+  assert.match(html, /value="LATER">У задану дату й час/);
+  assert.match(js, /intervalSecondsFromUi/);
+  assert.match(js, /calendarNowFields/);
+  assert.match(js, /kind === 'INTERVAL'/);
+});
