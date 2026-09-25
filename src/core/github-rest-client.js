@@ -1345,10 +1345,7 @@ export class GitHubRestClientV1 {
     const repository = exactRepositoryName(repositoryFullName);
     this.assertRepositoryAllowed(repository);
     const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
-    if (typeof expectedHeadSha !== 'string' || expectedHeadSha !== expectedHeadSha.trim()) {
-      throw githubError('GITHUB_INVALID_REQUEST', 'expectedHeadSha must use exact canonical text', { safeToRetry: true });
-    }
-    const expectedHead = sha(expectedHeadSha, 'expectedHeadSha');
+    const expectedHead = exactSha(expectedHeadSha, 'expectedHeadSha');
     if (typeof event !== 'string' || !PULL_REQUEST_REVIEW_EVENTS.has(event)) {
       throw githubError('GITHUB_INVALID_REQUEST', 'event must be APPROVE, REQUEST_CHANGES, or COMMENT', { safeToRetry: true });
     }
