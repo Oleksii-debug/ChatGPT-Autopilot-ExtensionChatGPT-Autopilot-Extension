@@ -700,5 +700,8 @@ test('universal-agent contract boundary rejects accessor-backed and hidden field
     configurable: true,
     value: 'filesystem.admin',
   });
-  assert.throws(() => normalizeCapabilityV1(hiddenAuthority), /unknown field: hiddenAuthority/);
+  assert.throws(
+    () => normalizeCapabilityV1(hiddenAuthority),
+    /enumerable own data properties|unknown field: hiddenAuthority/,
+  );
 });
