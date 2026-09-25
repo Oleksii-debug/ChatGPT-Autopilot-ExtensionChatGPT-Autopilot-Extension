@@ -138,7 +138,10 @@ test('projects the complete Outcome Contract planning envelope without granting 
   assert.equal(projected.verifierPlan.verificationAuthority, 'EXTERNAL_REQUIRED');
   assert.equal(projected.triggerRefs[0].schedulingAuthority, 'REFERENCE_ONLY');
   assert.equal(projected.advisoryOnly, true);
+  assert.equal(projected.sourceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(projected.planningAuthority, 'NONE');
   assert.equal(projected.planningAuthorized, false);
+  assert.equal(projected.requiresCanonicalContractResolution, true);
   assert.equal(projected.policyDecisionGranted, false);
   assert.equal(projected.executionAuthorized, false);
   assert.equal(projected.completionAuthorized, false);
@@ -152,7 +155,12 @@ test('binds an exact compatible AgentPlan and reports criterion coverage plus ag
   const contract = outcome();
   const result = assessAgentPlanOutcomeBindingV1(contract, plan(contract));
 
-  assert.equal(result.bindingStatus, 'STRUCTURALLY_BOUND');
+  assert.equal(result.bindingStatus, 'STRUCTURALLY_COMPATIBLE');
+  assert.equal(result.sourceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(result.bindingAuthority, 'NONE');
+  assert.equal(result.durableBindingAuthorized, false);
+  assert.equal(result.requiresCanonicalContractResolution, true);
+  assert.equal(result.requiresCanonicalPlanResolution, true);
   assert.deepEqual(result.criterionCoverage, [
     {
       criterionId: 'criterion-a',
