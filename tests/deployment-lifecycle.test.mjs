@@ -978,3 +978,83 @@ test('future-dated exact-effect verification cannot prove a present deployment e
     /cannot postdate durable effect state/,
   );
 });
+
+
+test('deployment chronology uses epoch ordering across 9999 to extended year +010000', () => {
+  const beforeCreate = '9999-12-31T23:59:59.900Z';
+  const beforeArtifact = '9999-12-31T23:59:59.800Z';
+  const afterBoundary = '+010000-01-01T00:00:00.000Z';
+
+  const crossBoundaryCreate = createDeploymentLifecycleV1({
+    deploymentId: 'deploy-boundary-create',
+    projectId: 'project-a',
+    targetId: 'production-a',
+    publisherId: 'publisher-1',
+    candidateArtifactRef: artifact(hash('c'), beforeArtifact),
+    rollbackArtifactRef: artifact(hash('d'), beforeArtifact),
+    publishEffectId: 'publish-effect-boundary-create',
+    rollbackEffectId: 'rollback-effect-boundary-create',
+    createdAt: afterBoundary,
+  });
+  assert.equal(crossBoundaryCreate.createdAt, afterBoundary);
+
+  const candidateBoundary = artifact(hash('e'), '9999-12-31T23:59:59.700Z');
+  const rollbackBoundary = artifact(hash('f'), '9999-12-31T23:59:59.700Z');
+  let state = createDeploymentLifecycleV1({
+    deploymentId: 'deploy-boundary-events',
+    projectId: 'project-a',
+    targetId: 'production-a',
+    publisherId: 'publisher-1',
+    candidateArtifactRef: candidateBoundary,
+    rollbackArtifactRef: rollbackBoundary,
+    publishEffectId: 'publish-effect-boundary-events',
+    rollbackEffectId: 'rollback-effect-boundary-events',
+    createdAt: beforeCreate,
+  });
+
+  const rows = [
+    verificationBinding({
+      verificationId: 'boundary-test',
+      checkKind: DeploymentCheckKind.TEST,
+      artifactRef: candidateBoundary,
+      verifiedAt: '9999-12-31T23:59:59.950Z',
+    }),
+    verificationBinding({
+      verificationId: 'boundary-a11y',
+      checkKind: DeploymentCheckKind.ACCESSIBILITY,
+      artifactRef: candidateBoundary,
+      verifiedAt: '+010000-01-01T00:00:00.001Z',
+    }),
+    verificationBinding({
+      verificationId: 'boundary-performance',
+      checkKind: DeploymentCheckKind.PERFORMANCE,
+      artifactRef: candidateBoundary,
+      verifiedAt: '+010000-01-01T00:00:00.002Z',
+    }),
+  ];
+  const resolution = resolvers(rows);
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    state = record(state, {
+      eventId: `boundary-qualification-${index}`,
+      type: DeploymentEventType.RECORD_QUALIFICATION_VERIFICATION,
+      evidenceId: row.verificationId,
+      at: row.verification.verifiedAt,
+    }, resolution);
+  }
+
+  assert.equal(state.phase, DeploymentPhase.QUALIFIED);
+  assert.equal(state.qualifiedAt, '+010000-01-01T00:00:00.002Z');
+  assert.equal(state.updatedAt, '+010000-01-01T00:00:00.002Z');
+
+  assert.throws(
+    () => reduceDeploymentLifecycleV1(state, event(state, {
+      eventId: 'boundary-regressed-event',
+      type: DeploymentEventType.RECORD_QUALIFICATION_VERIFICATION,
+      evidenceId: rows[0].verificationId,
+      at: '9999-12-31T23:59:59.999Z',
+    }), resolution),
+    /cannot predate durable state/u,
+  );
+});
