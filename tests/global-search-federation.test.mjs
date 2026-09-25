@@ -30,6 +30,7 @@ function batch(overrides = {}) {
   return {
     schemaVersion: 1,
     searchId: 'search-1',
+    query: 'source one',
     providerId: 'provider-project',
     domain: 'PROJECT',
     visibilityScopeId: 'scope-project',
@@ -163,6 +164,13 @@ test('different revisions never collapse into one result', () => {
   }));
   assert.equal(result.results.length, 2);
   assert.deepEqual(new Set(result.results.map(item => item.revisionId)), new Set(['rev-1', 'rev-2']));
+});
+
+test('provider batches are bound to the exact canonical query', () => {
+  assert.throws(() => fuseGlobalSearchV1(fusion({
+    providerResults: [batch({ query: 'different query' })],
+  })), /provider result query mismatch/);
+  assert.throws(() => normalizeGlobalSearchProviderResultV1(batch({ query: ' source one' })), /query is invalid/);
 });
 
 test('provider and observation chronology is causal', () => {
