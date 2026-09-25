@@ -37,6 +37,47 @@ function bindDataMethod(target, method, label) {
   throw new Error(`${label}.${method} is required`);
 }
 
+function exactParents(value, label) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new Error(`${label} must be a plain array`);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  const length = lengthDescriptor?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > 128) throw new Error(`${label} is invalid`);
+  const expectedKeys = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (Reflect.ownKeys(descriptors).some(key => typeof key !== 'string' || !expectedKeys.has(key))
+      || Reflect.ownKeys(descriptors).length !== expectedKeys.size) {
+    throw new Error(`${label} must be a dense canonical array`);
+  }
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+    out.push(requireDriveId(descriptor.value, `${label}[${index}]`));
+  }
+  return Object.freeze(out);
+}
+
+function snapshotDriveReadback(value) {
+  const raw = exactDataRecord(
+    value,
+    new Set(['id', 'name', 'mimeType', 'parents', 'modifiedTime', 'size', 'md5Checksum', 'sha256Checksum', 'trashed', 'version', 'webViewLink']),
+    'Drive readback file',
+  );
+  const fileId = requireDriveId(raw.id, 'Drive readback file id');
+  if (typeof raw.name !== 'string' || raw.name.length > 4096 || /[\u0000-\u001f\u007f]/u.test(raw.name)) {
+    throw new Error('Drive readback file name is invalid');
+  }
+  if (raw.trashed != null && typeof raw.trashed !== 'boolean') throw new Error('Drive readback trashed flag is invalid');
+  return Object.freeze({
+    id: fileId,
+    name: raw.name,
+    parents: exactParents(raw.parents ?? [], 'Drive readback parents'),
+    trashed: raw.trashed === true,
+  });
+}
+
 function requireVerifierId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !VERIFIER_ID.test(value)) throw new Error(`${label} is invalid`);
   return value;
@@ -104,8 +145,8 @@ export class DriveFileUpdateVerifierV1 {
 
   async #readback(invocation) {
     const expected = expectedUpdate(invocation);
-    const file = await this.getDriveFile({ fileId: expected.fileId });
-    if (!file || file.id !== expected.fileId) throw new Error('Drive update readback identity mismatch');
+    const file = snapshotDriveReadback(await this.getDriveFile({ fileId: expected.fileId }));
+    if (file.id !== expected.fileId) throw new Error('Drive update readback identity mismatch');
     return Object.freeze({ expected, file, matches: matchesExpected(file, expected) });
   }
 
