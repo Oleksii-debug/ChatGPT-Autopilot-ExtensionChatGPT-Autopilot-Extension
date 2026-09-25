@@ -325,10 +325,6 @@ export function prepareOpenHandsCodingSpecialistV1(input) {
   });
 }
 
-function byteLength(text) {
-  return new TextEncoder().encode(text).byteLength;
-}
-
 async function responseTextBounded(response, maxBytes) {
   const declared = response?.headers?.get?.('content-length');
   if (declared != null && declared !== '') {
@@ -522,7 +518,7 @@ export class OpenHandsCodingSpecialistClient {
       const ambiguous = effectDispatched && fetchStarted;
       throw new OpenHandsCodingSpecialistError(
         controller.signal.aborted
-          ? `OpenHands request timed out after ${prepared.config.requestTimeoutSeconds} seconds`
+          ? `OpenHands request timed out after ${timeoutMs} ms`
           : `Could not reach OpenHands Agent Server: ${error?.message || 'network error'}`,
         {
           code: controller.signal.aborted ? 'OPENHANDS_REQUEST_TIMEOUT' : 'OPENHANDS_TRANSPORT_FAILURE',
