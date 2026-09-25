@@ -46,6 +46,7 @@ function provenance(artifactRef, {
   revisionId = 'commit-a',
   contentSha256 = hash('c'),
   inputArtifactIds = [],
+  inputArtifactBindings = [],
   createdAt = at(2),
 } = {}) {
   return {
@@ -54,6 +55,7 @@ function provenance(artifactRef, {
     artifactRef,
     sourceBindings: [{ sourceId, revisionId, contentSha256 }],
     inputArtifactIds,
+    inputArtifactBindings,
     createdAt,
   };
 }
@@ -291,6 +293,235 @@ test('registered artifacts must be materialized with a SHA-256 digest', () => {
   );
 });
 
+test('derived artifact provenance binds one exact immutable version of a logical input', () => {
+  const inputV1Ref = artifact({
+    artifactId: 'input',
+    uri: 'project://artifact/input',
+    sha256: hash('a'),
+    createdAt: at(1),
+    producerInvocationId: 'input-v1-producer',
+  });
+  const inputV2Ref = artifact({
+    artifactId: 'input',
+    uri: 'project://artifact/input',
+    sha256: hash('b'),
+    createdAt: at(4),
+    producerInvocationId: 'input-v2-producer',
+  });
+  let registry = createArtifactRegistryV1('project-a');
+  registry = putArtifactVersionV1(registry, version({
+    versionId: 'input-v1',
+    artifactRef: inputV1Ref,
+    provenanceRef: provenance(inputV1Ref, { createdAt: at(2) }),
+    registeredAt: at(3),
+  }));
+  registry = putArtifactVersionV1(registry, version({
+    versionId: 'input-v2',
+    parentVersionId: 'input-v1',
+    artifactRef: inputV2Ref,
+    provenanceRef: provenance(inputV2Ref, { createdAt: at(5) }),
+    registeredAt: at(6),
+  }));
+
+  const derivedRef = artifact({
+    artifactId: 'derived',
+    uri: 'project://artifact/derived',
+    sha256: hash('d'),
+    createdAt: at(7),
+    producerInvocationId: 'derive-v1',
+  });
+  registry = putArtifactVersionV1(registry, version({
+    versionId: 'derived-v1',
+    artifactRef: derivedRef,
+    provenanceRef: provenance(derivedRef, {
+      inputArtifactIds: ['input'],
+      inputArtifactBindings: [{
+        artifactId: 'input',
+        versionId: 'input-v1',
+        sha256: inputV1Ref.sha256,
+      }],
+      createdAt: at(8),
+    }),
+    registeredAt: at(9),
+  }));
+
+  const derived = getArtifactVersionV1(registry, 'derived', 'derived-v1');
+  assert.deepEqual(derived.provenance.inputArtifactBindings, [{
+    artifactId: 'input',
+    versionId: 'input-v1',
+    sha256: inputV1Ref.sha256,
+  }]);
+  assert.notEqual(
+    derived.provenance.inputArtifactBindings[0].sha256,
+    inputV2Ref.sha256,
+    'same logical artifact v2 must not replace the exact v1 dependency',
+  );
+
+  const ambiguousRef = artifact({
+    artifactId: 'ambiguous-derived',
+    uri: 'project://artifact/ambiguous-derived',
+    sha256: hash('e'),
+    createdAt: at(7),
+    producerInvocationId: 'derive-ambiguous',
+  });
+  assert.throws(
+    () => putArtifactVersionV1(registry, version({
+      versionId: 'ambiguous-derived-v1',
+      artifactRef: ambiguousRef,
+      provenanceRef: provenance(ambiguousRef, {
+        inputArtifactIds: ['input'],
+        createdAt: at(8),
+      }),
+      registeredAt: at(9),
+    })),
+    /requires exact inputArtifactBindings/,
+  );
+});
+
+test('registry rejects unknown, mismatched, and future exact input dependencies', () => {
+  const inputRef = artifact({
+    artifactId: 'input',
+    uri: 'project://artifact/input',
+    sha256: hash('a'),
+    createdAt: at(1),
+    producerInvocationId: 'input-v1-producer',
+  });
+  let registry = putArtifactVersionV1(createArtifactRegistryV1('project-a'), version({
+    versionId: 'input-v1',
+    artifactRef: inputRef,
+    provenanceRef: provenance(inputRef, { createdAt: at(2) }),
+    registeredAt: at(3),
+  }));
+  const outputRef = artifact({
+    artifactId: 'output',
+    uri: 'project://artifact/output',
+    sha256: hash('d'),
+    createdAt: at(7),
+    producerInvocationId: 'derive-output',
+  });
+  const candidate = binding => version({
+    versionId: 'output-v1',
+    artifactRef: outputRef,
+    provenanceRef: provenance(outputRef, {
+      inputArtifactIds: [binding.artifactId],
+      inputArtifactBindings: [binding],
+      createdAt: at(8),
+    }),
+    registeredAt: at(9),
+  });
+
+  assert.throws(
+    () => putArtifactVersionV1(registry, candidate({
+      artifactId: 'missing',
+      versionId: 'missing-v1',
+      sha256: hash('a'),
+    })),
+    /input dependency not found/,
+  );
+  assert.throws(
+    () => putArtifactVersionV1(registry, candidate({
+      artifactId: 'input',
+      versionId: 'missing-v1',
+      sha256: hash('a'),
+    })),
+    /input version not found/,
+  );
+  assert.throws(
+    () => putArtifactVersionV1(registry, candidate({
+      artifactId: 'input',
+      versionId: 'input-v1',
+      sha256: hash('b'),
+    })),
+    /SHA-256 mismatch/,
+  );
+
+  const lateRegistrationRef = artifact({
+    artifactId: 'late-registration',
+    uri: 'project://artifact/late-registration',
+    sha256: hash('f'),
+    createdAt: at(1),
+    producerInvocationId: 'late-registration-producer',
+  });
+  registry = putArtifactVersionV1(registry, version({
+    versionId: 'late-registration-v1',
+    artifactRef: lateRegistrationRef,
+    provenanceRef: provenance(lateRegistrationRef, { createdAt: at(2) }),
+    registeredAt: at(9),
+  }));
+  assert.throws(
+    () => putArtifactVersionV1(registry, candidate({
+      artifactId: 'late-registration',
+      versionId: 'late-registration-v1',
+      sha256: lateRegistrationRef.sha256,
+    })),
+    /input registration is from the future/,
+  );
+
+  const futureMaterialRef = artifact({
+    artifactId: 'future-material',
+    uri: 'project://artifact/future-material',
+    sha256: hash('9'),
+    createdAt: at(9),
+    producerInvocationId: 'future-material-producer',
+  });
+  registry = putArtifactVersionV1(registry, version({
+    versionId: 'future-material-v1',
+    artifactRef: futureMaterialRef,
+    provenanceRef: provenance(futureMaterialRef, { createdAt: at(10) }),
+    registeredAt: at(11),
+  }));
+  assert.throws(
+    () => putArtifactVersionV1(registry, candidate({
+      artifactId: 'future-material',
+      versionId: 'future-material-v1',
+      sha256: futureMaterialRef.sha256,
+    })),
+    /input materialization is from the future/,
+  );
+});
+
+test('registry normalization revalidates exact input bindings instead of trusting stored snapshots', () => {
+  const inputRef = artifact({
+    artifactId: 'input',
+    uri: 'project://artifact/input',
+    sha256: hash('a'),
+    createdAt: at(1),
+    producerInvocationId: 'input-producer',
+  });
+  let registry = putArtifactVersionV1(createArtifactRegistryV1('project-a'), version({
+    versionId: 'input-v1',
+    artifactRef: inputRef,
+    provenanceRef: provenance(inputRef, { createdAt: at(2) }),
+    registeredAt: at(3),
+  }));
+  const outputRef = artifact({
+    artifactId: 'output',
+    uri: 'project://artifact/output',
+    sha256: hash('d'),
+    createdAt: at(7),
+    producerInvocationId: 'output-producer',
+  });
+  registry = putArtifactVersionV1(registry, version({
+    versionId: 'output-v1',
+    artifactRef: outputRef,
+    provenanceRef: provenance(outputRef, {
+      inputArtifactIds: ['input'],
+      inputArtifactBindings: [{
+        artifactId: 'input',
+        versionId: 'input-v1',
+        sha256: inputRef.sha256,
+      }],
+      createdAt: at(8),
+    }),
+    registeredAt: at(9),
+  }));
+
+  const forged = structuredClone(registry);
+  const output = forged.artifacts.find(entry => entry.artifactId === 'output');
+  output.versions[0].provenance.inputArtifactBindings[0].versionId = 'missing-v9';
+  assert.throws(() => normalizeArtifactRegistryV1(forged), /input version not found/);
+});
+
 test('descriptor snapshots prevent ordinary getter execution across nested version input', () => {
   let gets = 0;
   const noReads = value => new Proxy(value, {
@@ -312,6 +543,7 @@ test('descriptor snapshots prevent ordinary getter execution across nested versi
     artifactRef: ref,
     sourceBindings,
     inputArtifactIds: noReads([]),
+    inputArtifactBindings: noReads([]),
     createdAt: at(2),
   });
   const candidate = noReads({
