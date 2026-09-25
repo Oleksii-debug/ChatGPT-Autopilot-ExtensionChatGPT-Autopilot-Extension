@@ -86,10 +86,22 @@ const expectedSubject = {
 
 const trustedExecution = Object.freeze({
   runId: 'run-1',
+  suiteId: 'core-reliability',
+  suiteRevisionId: 'suite-rev-a1',
+  subjectId: 'autopilot',
+  subjectRevisionId: 'commit-abc123',
   producerInvocationId: 'benchmark-runner-1',
   startedAt: START,
   completedAt: END,
+  results: structuredClone(run().results),
 });
+
+function trustedExecutionForResults(runValue) {
+  return {
+    ...trustedExecution,
+    results: structuredClone(runValue.results),
+  };
+}
 
 const DEFAULT_TRUSTED_EVIDENCE_IDS = Object.freeze([
   'evidence-latency',
@@ -158,6 +170,7 @@ test('retains measured negative results instead of dropping or averaging them aw
     suite: suite(),
     run: failing,
     expectedSubject,
+    trustedExecution: trustedExecutionForResults(failing),
   });
 
   assert.equal(report.status, BenchmarkEvaluationStatus.FAIL);
@@ -191,6 +204,7 @@ test('preserves explicit execution errors as failed cases with evidence', () => 
     suite: suite(),
     run: crashed,
     expectedSubject,
+    trustedExecution: trustedExecutionForResults(crashed),
   });
 
   assert.equal(report.status, BenchmarkEvaluationStatus.FAIL);
@@ -692,6 +706,60 @@ test('binds trusted evidence causally to the exact benchmark execution', () => {
     expectedSubject,
   });
   assert.equal(exact.status, BenchmarkEvaluationStatus.PASS);
+});
+
+test('caller metrics cannot upgrade a failing trusted benchmark execution to PASS', () => {
+  const trustedRun = run({
+    results: [
+      result('quality', { accuracyMilli: 899, errorCount: 1 }),
+      result('latency', { latencyMs: 1001 }),
+    ],
+  });
+  const forgedPassingRun = run();
+
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw({
+      suite: suite(),
+      run: forgedPassingRun,
+      expectedSubject,
+      trustedExecution: trustedExecutionForResults(trustedRun),
+      trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+    }),
+    /results do not match trusted benchmark execution/,
+  );
+
+  const report = evaluateBenchmarkRunV1Raw({
+    suite: suite(),
+    run: trustedRun,
+    expectedSubject,
+    trustedExecution: trustedExecutionForResults(trustedRun),
+    trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+  });
+  assert.equal(report.status, BenchmarkEvaluationStatus.FAIL);
+  assert.equal(report.failedCaseCount, 2);
+});
+
+test('trusted execution is exact-bound to the evaluated suite and subject revision', () => {
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedExecution: { ...trustedExecution, subjectRevisionId: 'other-revision' },
+      trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+    }),
+    /TrustedBenchmarkExecutionV1 subject identity\/revision mismatch/,
+  );
+  assert.throws(
+    () => evaluateBenchmarkRunV1Raw({
+      suite: suite(),
+      run: run(),
+      expectedSubject,
+      trustedExecution: { ...trustedExecution, suiteRevisionId: 'other-suite-revision' },
+      trustedEvidenceArtifacts: trustedEvidenceArtifacts(),
+    }),
+    /TrustedBenchmarkExecutionV1 suite identity\/revision mismatch/,
+  );
 });
 
 test('caller run identity and interval must match separately trusted execution provenance', () => {
