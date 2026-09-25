@@ -255,6 +255,10 @@ function normalizeResult(input, index, context) {
     if (!evidenceById.has(artifactId)) {
       throw new Error(label + ' verification references unknown evidence artifact: ' + artifactId);
     }
+    const artifact = evidenceById.get(artifactId);
+    if (Date.parse(artifact.createdAt) > Date.parse(verification.verifiedAt)) {
+      throw new Error(label + ' verification references evidence created after verification: ' + artifactId);
+    }
   }
 
   const resultArtifactIds = uniqueIds(
