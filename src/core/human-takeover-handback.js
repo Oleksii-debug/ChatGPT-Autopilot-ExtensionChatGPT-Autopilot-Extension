@@ -11,7 +11,7 @@ export const HumanTakeoverPhase = Object.freeze({
   OWNER_IN_CONTROL: 'OWNER_IN_CONTROL',
   HANDBACK_PENDING: 'HANDBACK_PENDING',
   REOBSERVED: 'REOBSERVED',
-  RECONCILED: 'RECONCILED',
+  EVIDENCE_READY: 'EVIDENCE_READY',
   MANUAL_REVIEW: 'MANUAL_REVIEW',
 });
 
@@ -55,6 +55,8 @@ const TAKEOVER_KEYS = new Set([
   'advisoryOnly',
   'resumeAuthorized',
   'requiresCanonicalResumeGate',
+  'verificationProvenance',
+  'reconciliationAuthorized',
 ]);
 
 function strictRecord(value, label) {
@@ -390,7 +392,7 @@ function requirePhaseFields(state) {
     [HumanTakeoverPhase.OWNER_IN_CONTROL]: hasControl && !hasHandback && !hasObservation && !hasVerification,
     [HumanTakeoverPhase.HANDBACK_PENDING]: hasControl && hasHandback && !hasObservation && !hasVerification,
     [HumanTakeoverPhase.REOBSERVED]: hasControl && hasHandback && hasObservation && !hasVerification,
-    [HumanTakeoverPhase.RECONCILED]: hasControl && hasHandback && hasObservation && hasVerification
+    [HumanTakeoverPhase.EVIDENCE_READY]: hasControl && hasHandback && hasObservation && hasVerification
       && state.handbackVerification.status === VerificationStatus.VERIFIED
       && state.handbackVerification.evidenceArtifactIds.length > 0,
     [HumanTakeoverPhase.MANUAL_REVIEW]: hasControl && hasHandback && hasObservation && hasVerification
@@ -473,6 +475,8 @@ export function normalizeHumanTakeoverV1(input) {
     advisoryOnly: true,
     resumeAuthorized: false,
     requiresCanonicalResumeGate: true,
+    verificationProvenance: 'UNVERIFIED_INPUT',
+    reconciliationAuthorized: false,
   };
 
   if (Boolean(state.effectId) !== Boolean(state.executionId)) {
@@ -494,6 +498,14 @@ export function normalizeHumanTakeoverV1(input) {
   if (Object.hasOwn(raw, 'requiresCanonicalResumeGate')
       && ownValue(raw, 'requiresCanonicalResumeGate', 'HumanTakeoverV1') !== true) {
     throw new Error('HumanTakeoverV1 must require the canonical resume gate');
+  }
+  if (Object.hasOwn(raw, 'verificationProvenance')
+      && ownValue(raw, 'verificationProvenance', 'HumanTakeoverV1') !== 'UNVERIFIED_INPUT') {
+    throw new Error('HumanTakeoverV1 verification provenance must remain unverified');
+  }
+  if (Object.hasOwn(raw, 'reconciliationAuthorized')
+      && ownValue(raw, 'reconciliationAuthorized', 'HumanTakeoverV1') !== false) {
+    throw new Error('HumanTakeoverV1 cannot authorize reconciliation');
   }
 
   requirePhaseFields(state);
@@ -545,6 +557,8 @@ export function createHumanTakeoverV1({
     advisoryOnly: true,
     resumeAuthorized: false,
     requiresCanonicalResumeGate: true,
+    verificationProvenance: 'UNVERIFIED_INPUT',
+    reconciliationAuthorized: false,
   });
 }
 
@@ -652,7 +666,7 @@ export function recordHumanHandbackVerificationV1(raw, {
     && verified.evidenceArtifactIds.length > 0;
 
   return advance(current, HumanTakeoverPhase.REOBSERVED, {
-    phase: resumeCandidate ? HumanTakeoverPhase.RECONCILED : HumanTakeoverPhase.MANUAL_REVIEW,
+    phase: resumeCandidate ? HumanTakeoverPhase.EVIDENCE_READY : HumanTakeoverPhase.MANUAL_REVIEW,
     handbackVerification: verified,
     reconciledAt: verified.verifiedAt,
   });
@@ -660,7 +674,7 @@ export function recordHumanHandbackVerificationV1(raw, {
 
 export function buildHumanHandbackResumePacketV1(raw) {
   const current = normalizeHumanTakeoverV1(raw);
-  if (current.phase !== HumanTakeoverPhase.RECONCILED) {
+  if (current.phase !== HumanTakeoverPhase.EVIDENCE_READY) {
     throw new Error('Human handback is not a resume candidate');
   }
 
@@ -685,9 +699,11 @@ export function buildHumanHandbackResumePacketV1(raw) {
     resumeCandidate: true,
     resumeAuthorized: false,
     requiresCanonicalResumeGate: true,
+    verificationProvenance: 'UNVERIFIED_INPUT',
+    reconciliationAuthorized: false,
   });
 }
 
 export function humanTakeoverResumeCandidateV1(raw) {
-  return normalizeHumanTakeoverV1(raw).phase === HumanTakeoverPhase.RECONCILED;
+  return normalizeHumanTakeoverV1(raw).phase === HumanTakeoverPhase.EVIDENCE_READY;
 }
