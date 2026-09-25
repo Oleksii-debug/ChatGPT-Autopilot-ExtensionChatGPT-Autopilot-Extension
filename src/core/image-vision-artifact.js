@@ -256,7 +256,7 @@ async function sha256Hex(bytes, cryptoImpl) {
   return [...digest].map(value => value.toString(16).padStart(2, '0')).join('');
 }
 
-function ownDataField(value, key, label) {
+function ownDataField(value, key, label, { optional = false } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be a plain object`);
   }
@@ -265,16 +265,18 @@ function ownDataField(value, key, label) {
     throw new Error(`${label} must be a plain object`);
   }
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
-  if (!descriptor
-      || descriptor.enumerable !== true
-      || !Object.hasOwn(descriptor, 'value')) {
+  if (!descriptor) {
+    if (optional) return undefined;
+    throw new Error(`${label}.${key} must be an enumerable own data property`);
+  }
+  if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
     throw new Error(`${label}.${key} must be an enumerable own data property`);
   }
   return descriptor.value;
 }
 
 function routeText(routeResult) {
-  const direct = ownDataField(routeResult, 'result', 'vision router result');
+  const direct = ownDataField(routeResult, 'result', 'vision router result', { optional: true });
   const result = direct && typeof direct === 'object'
     ? direct
     : routeResult;
@@ -398,7 +400,7 @@ export async function analyzeImageArtifactV1(input, {
 
   const { systemPrompt, userPrompt } = buildPrompts(artifactRef, ownerPurpose);
   const routed = await routeVision({
-    userPrompt,
+    prompt: userPrompt,
     systemPrompt,
     imageDataUrl: raw.imageDataUrl,
     taskRole: 'vision',
