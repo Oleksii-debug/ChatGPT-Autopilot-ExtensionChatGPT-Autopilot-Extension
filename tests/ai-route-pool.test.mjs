@@ -224,6 +224,63 @@ test('economic route and policy authority is descriptor-safe before dispatch', (
   assert.throws(() => normalizeAiRoutePool([inheritedRoute]), /plain data object/u);
 });
 
+test('economic numeric fields reject object coercion before caller code can execute', () => {
+  let coercions = 0;
+  const hostileNumber = {
+    valueOf() {
+      coercions += 1;
+      return 0;
+    },
+    toString() {
+      coercions += 1;
+      return '0';
+    },
+  };
+
+  assert.throws(
+    () => normalizeAiRoutePool([{
+      routeId:'hostile-price',
+      provider:'openai',
+      model:'paid',
+      costClass:'paid',
+      inputPriceKnown:true,
+      outputPriceKnown:true,
+      inputPricePerMillionUsd:hostileNumber,
+      outputPricePerMillionUsd:1,
+    }]),
+    /input price is invalid/u,
+  );
+  assert.equal(coercions, 0, 'price normalization must reject objects before numeric coercion');
+
+  assert.throws(
+    () => normalizeAiRoutePool([{
+      routeId:'hostile-priority',
+      provider:'ollama',
+      model:'local',
+      priority:hostileNumber,
+    }]),
+    /priority is invalid/u,
+  );
+  assert.equal(coercions, 0, 'integer normalization must reject objects before numeric coercion');
+
+  assert.throws(
+    () => normalizeAiRoutePool([{
+      schemaVersion:hostileNumber,
+      routeId:'hostile-version',
+      provider:'ollama',
+      model:'local',
+    }]),
+    /schemaVersion is invalid/u,
+  );
+  assert.equal(coercions, 0, 'schemaVersion normalization must reject objects before numeric coercion');
+
+  assert.throws(
+    () => normalizeAiRoutePolicy({ maxInputPricePerMillionUsd:hostileNumber }),
+    /maximum input price is invalid/u,
+  );
+  assert.equal(coercions, 0, 'owner price-cap normalization must reject objects before numeric coercion');
+});
+
 test('economic route and policy arrays must be dense own data arrays', () => {
   let reads = 0;
   const accessorPool = [];
