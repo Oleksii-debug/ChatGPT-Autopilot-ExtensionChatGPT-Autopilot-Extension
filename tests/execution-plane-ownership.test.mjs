@@ -150,7 +150,7 @@ test('reconciliation request rejects coercive outcomes without executing them', 
     outcome,
     verification:reconciliationVerification(),
     at:'2026-09-23T13:31:00.000Z',
-  }), /outcome must be text/);
+  }), /reconciliation outcome must use exact canonical text/);
   assert.equal(coerced, 0);
 });
 
