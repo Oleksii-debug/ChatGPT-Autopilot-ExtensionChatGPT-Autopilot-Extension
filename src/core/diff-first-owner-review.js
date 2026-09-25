@@ -419,6 +419,7 @@ function buildPlainText(review) {
     for (const artifact of review.artifactRefs) {
       lines.push(
         `- ${artifact.artifactId}: ${artifact.kind}; sha256=${artifact.sha256}; sensitive=${artifact.sensitive ? 'yes' : 'no'}`,
+        `  URI: ${artifact.sensitive ? '[sensitive URI redacted from plain text]' : artifact.uri}`,
       );
     }
   }
