@@ -43,9 +43,32 @@ test('owner-scoped list is deterministic, streamed, bounded and hides link targe
       return { async read() { readCalls += 1; return real.read(); }, async close() { return real.close(); } };
     },
   });
-  assert.equal(readCalls, 1);
+  assert.equal(readCalls, 2);
   assert.equal(bounded.visitedEntries, 1);
   assert.equal(bounded.truncated, true);
+});
+
+test('filesystem list reports truncated only when bounded look-ahead proves another entry exists', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-list-exact-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const root = path.join(sandbox, 'root');
+  await fs.mkdir(root);
+  await fs.writeFile(path.join(root, 'only.txt'), 'one');
+  const scope = createFilesystemScopeV1({ scopeId: 'owner', roots: [root] });
+  let readCalls = 0;
+  const listed = await listFilesystemDirectoryV1(scope, root, {
+    maxEntries: 1,
+    openDirectory: async current => {
+      const real = await fs.opendir(current, { bufferSize: 1 });
+      return {
+        async read() { readCalls += 1; return real.read(); },
+        async close() { return real.close(); },
+      };
+    },
+  });
+  assert.equal(listed.visitedEntries, 1);
+  assert.equal(listed.truncated, false);
+  assert.equal(readCalls, 2);
 });
 
 test('filesystem stat computes bounded SHA-256 from the admitted regular-file handle', async t => {
@@ -59,6 +82,23 @@ test('filesystem stat computes bounded SHA-256 from the admitted regular-file ha
   const hashed = await statFilesystemPathV1(scope, target, { hash: true, maxHashBytes: 5 });
   assert.equal(hashed.sha256, digest('hello')); assert.match(hashed.sha256, /^[a-f0-9]{64}$/u);
   await assert.rejects(() => statFilesystemPathV1(scope, target, { hash: true, maxHashBytes: 4 }), /exceeds hash bound/u);
+});
+
+test('filesystem stat never pairs a digest with later same-inode metadata', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-stat-inplace-race-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const root = path.join(sandbox, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'data.txt');
+  await fs.writeFile(target, 'hello');
+  const scope = createFilesystemScopeV1({ scopeId: 'owner', roots: [root] });
+
+  await assert.rejects(() => statFilesystemPathV1(scope, target, {
+    hash: true,
+    afterHashRead: async () => {
+      await fs.writeFile(target, 'HELLO-WORLD');
+    },
+  }), /changed after hash read/u);
 });
 
 test('filesystem stat rejects target substitution before hash open', async t => {
