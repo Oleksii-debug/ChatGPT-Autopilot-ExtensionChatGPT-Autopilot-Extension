@@ -2265,6 +2265,8 @@ function blankSession() {
     sharedPrompt: '',
     defaultUniquePrompt: '',
     runMode: 'continuous',
+    calendarSchedule: null,
+    calendarRuntime: {},
     tasks: [blankTask()],
     configuredTaskCount: 1,
     minimumSendIntervalValue: 2,
@@ -2383,6 +2385,7 @@ function portableDraftConfig(session) {
     defaultUniquePrompt: session.defaultUniquePrompt,
     promptCadence: clone(session.promptCadence || null),
     drivePromptSources: clone(session.drivePromptSources || null),
+    calendarSchedule: clone(session.calendarSchedule || null),
     runMode: session.runMode,
     tasks: clone(session.tasks || []),
     configuredTaskCount: Number(session.configuredTaskCount || session.tasks?.length || 1),
@@ -2478,12 +2481,15 @@ async function refreshSelectedSessionStatus(sessionId) {
     ui.selected.actionAvailability = latest.actionAvailability;
     ui.selected.status = latest.status;
     ui.selected.log = latest.log;
+    ui.selected.calendar = latest.calendar;
+    ui.selected.calendarRuntime = latest.calendarRuntime;
 
     // Runtime Drive evidence is safe to refresh live, but never write it back
     // into the visible draft inputs. The user may currently be editing another
     // file/target locally; only the status line follows canonical runtime state.
     const latestDriveBinding = latest.drivePromptSources?.bindings?.[0] || null;
     renderDrivePromptRuntimeStatus(latestDriveBinding);
+    renderCalendarRuntimeStatus(ui.selected);
 
     const signature = JSON.stringify([
       latest.version,
@@ -2497,6 +2503,11 @@ async function refreshSelectedSessionStatus(sessionId) {
       latestDriveBinding?.lastCheckedAt || 0,
       latestDriveBinding?.nextCheckAt || 0,
       latestDriveBinding?.lastErrorCode || '',
+      latest.calendar?.admissionState || '',
+      latest.calendar?.nextOccurrence?.scheduledFor || 0,
+      latest.calendarRuntime?.lastOccurrence?.state || '',
+      latest.calendarRuntime?.lastOccurrence?.scheduledFor || 0,
+      latest.calendarRuntime?.lastOccurrence?.executedAt || 0,
     ]);
     if (signature !== lastRuntimeSignature) {
       lastRuntimeSignature = signature;
@@ -2578,6 +2589,136 @@ function renderDrivePromptRuntimeStatus(binding) {
     : 'Drive source вимкнено.';
 }
 
+function defaultCalendarTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+  catch { return 'UTC'; }
+}
+function calendarLines(id) {
+  return String($(id)?.value || '').split(/[\n,;]+/u).map(value => value.trim()).filter(Boolean);
+}
+function collectCalendarSchedule() {
+  const kind = $('calendar-mode').value;
+  if (kind === 'NONE') return null;
+  const schedule = {
+    kind,
+    timeZone: $('calendar-time-zone').value.trim(),
+    catchUp: $('calendar-catch-up').checked ? 'ON' : 'OFF',
+  };
+  if (kind === 'ONE_TIME') {
+    schedule.date = $('calendar-one-time-date').value.trim();
+    schedule.time = $('calendar-one-time-time').value.trim();
+    return schedule;
+  }
+  if (kind === 'DAILY' || kind === 'WEEKLY') {
+    schedule.startDate = $('calendar-start-date').value.trim();
+    schedule.times = calendarLines('calendar-times');
+    const endDate = $('calendar-end-date').value.trim();
+    const maxOccurrences = $('calendar-max-occurrences').value.trim();
+    if (endDate) schedule.endDate = endDate;
+    if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
+    if (kind === 'WEEKLY') {
+      schedule.weekdays = Array.from({ length: 7 }, (_, index) => index + 1)
+        .filter(day => $(`calendar-weekday-${day}`).checked);
+    }
+    return schedule;
+  }
+  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map(line => {
+    const match = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)$/u.exec(line);
+    return match ? { date: match[1], time: match[2] } : { date: line, time: '' };
+  });
+  return schedule;
+}
+function syncCalendarVisibility() {
+  const kind = $('calendar-mode')?.value || 'NONE';
+  $('calendar-common-fields').hidden = kind === 'NONE';
+  $('calendar-one-time-fields').hidden = kind !== 'ONE_TIME';
+  $('calendar-recurring-fields').hidden = kind !== 'DAILY' && kind !== 'WEEKLY';
+  $('calendar-weekdays').hidden = kind !== 'WEEKLY';
+  $('calendar-explicit-fields').hidden = kind !== 'EXPLICIT';
+}
+function formatCalendarInstant(value) {
+  const instant = Number(value || 0);
+  return Number.isFinite(instant) && instant > 0 ? new Date(instant).toLocaleString() : 'немає';
+}
+function renderCalendarRuntimeStatus(session = ui.selected) {
+  const status = $('calendar-runtime-status');
+  if (!status || !session?.calendarSchedule) {
+    if (status) status.textContent = 'Календарний розклад вимкнено.';
+    return;
+  }
+  const projection = session.calendar || {};
+  const nextAt = projection.nextOccurrence?.scheduledFor || 0;
+  const last = session.calendarRuntime?.lastOccurrence || projection.lastOccurrence || null;
+  status.textContent = `Стан: ${projection.admissionState || 'очікування'}. Наступний запуск: ${formatCalendarInstant(nextAt)}. Останній результат: ${last?.state || 'немає'}; заплановано ${formatCalendarInstant(last?.scheduledFor)}; виконано ${formatCalendarInstant(last?.executedAt)}.`;
+}
+function renderCalendarEditor() {
+  const schedule = ui.selected?.calendarSchedule || null;
+  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
+  $('calendar-mode').value = kind;
+  $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
+  $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
+  $('calendar-revision-confirm').checked = false;
+  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? (schedule.date || '') : '';
+  $('calendar-one-time-time').value = schedule?.kind === 'ONE_TIME' ? (schedule.time || '') : '';
+  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.startDate || '') : '';
+  $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
+  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.endDate || '') : '';
+  $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
+  const weekdays = new Set(schedule?.kind === 'WEEKLY' ? (schedule.weekdays || []) : []);
+  for (let day = 1; day <= 7; day += 1) $(`calendar-weekday-${day}`).checked = weekdays.has(day);
+  $('calendar-explicit-occurrences').value = schedule?.kind === 'EXPLICIT'
+    ? (schedule.occurrences || []).map(item => `${item.date} ${item.time}`).join('\n')
+    : '';
+  syncCalendarVisibility();
+  renderCalendarRuntimeStatus(ui.selected);
+}
+function validCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(String(value || ''));
+  if (!match) return false;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.getUTCFullYear() === Number(match[1])
+    && date.getUTCMonth() === Number(match[2]) - 1
+    && date.getUTCDate() === Number(match[3]);
+}
+function validCalendarTime(value) {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/u.exec(String(value || ''));
+  return Boolean(match && Number(match[1]) <= 23 && Number(match[2]) <= 59 && Number(match[3] || 0) <= 59);
+}
+function validateCalendarScheduleUi(session, errors) {
+  const schedule = session.calendarSchedule;
+  if (!schedule) return;
+  try { new Intl.DateTimeFormat('uk-UA', { timeZone: schedule.timeZone }).format(0); }
+  catch { errors.push(['calendar-time-zone', 'Вкажіть чинний IANA часовий пояс, наприклад Europe/Bratislava.']); }
+  if (schedule.kind === 'ONE_TIME') {
+    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Дата одноразового запуску має бути у форматі YYYY-MM-DD.']);
+    if (!validCalendarTime(schedule.time)) errors.push(['calendar-one-time-time', 'Час одноразового запуску має бути у форматі HH:MM або HH:MM:SS.']);
+    return;
+  }
+  if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
+    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Дата початку має бути у форматі YYYY-MM-DD.']);
+    if (!Array.isArray(schedule.times) || schedule.times.length < 1 || schedule.times.length > 48 || schedule.times.some(value => !validCalendarTime(value))) {
+      errors.push(['calendar-times', 'Додайте від 1 до 48 коректних часів, по одному в рядку, у форматі HH:MM.']);
+    }
+    if (schedule.kind === 'WEEKLY' && (!Array.isArray(schedule.weekdays) || schedule.weekdays.length < 1)) {
+      errors.push(['calendar-weekday-1', 'Для щотижневого розкладу виберіть щонайменше один день тижня.']);
+    }
+    if (schedule.endDate && !validCalendarDate(schedule.endDate)) errors.push(['calendar-end-date', 'Кінцева дата має бути у форматі YYYY-MM-DD.']);
+    if (schedule.endDate && validCalendarDate(schedule.endDate) && validCalendarDate(schedule.startDate) && schedule.endDate < schedule.startDate) {
+      errors.push(['calendar-end-date', 'Кінцева дата не може передувати даті початку.']);
+    }
+    if (schedule.maxOccurrences != null && (!Number.isSafeInteger(schedule.maxOccurrences) || schedule.maxOccurrences < 1 || schedule.maxOccurrences > 1000000)) {
+      errors.push(['calendar-max-occurrences', 'Кількість запусків має бути цілим числом від 1 до 1000000.']);
+    }
+    return;
+  }
+  if (schedule.kind === 'EXPLICIT') {
+    if (!Array.isArray(schedule.occurrences) || schedule.occurrences.length < 1 || schedule.occurrences.length > 10000
+      || schedule.occurrences.some(item => !validCalendarDate(item.date) || !validCalendarTime(item.time))) {
+      errors.push(['calendar-explicit-occurrences', 'Додайте від 1 до 10000 рядків у форматі YYYY-MM-DD HH:MM.']);
+    }
+  }
+}
+
 function renderEditor() {
   if (!ui.selected) return;
   $('empty-state').hidden = true; $('session-editor').hidden = false;
@@ -2606,6 +2747,7 @@ function renderEditor() {
   $('drive-prompt-interval').value = String(Math.max(1, Math.round(Number(driveBinding?.pollIntervalMs || 180000) / 60000)));
   $('drive-prompt-min-chars').value = String(driveBinding?.minChars ?? 1000);
   renderDrivePromptRuntimeStatus(driveBinding);
+  renderCalendarEditor();
   $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
   $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
   $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
@@ -2747,6 +2889,7 @@ function collectEditor() {
       lastErrorCode: preserveDriveRuntime ? (priorDrive.lastErrorCode || '') : '',
     }] : [],
   };
+  s.calendarSchedule = collectCalendarSchedule();
   s.runMode = document.querySelector('input[name="runMode"]:checked')?.value || 'continuous';
   s.configuredTaskCount = Number($('task-count').value);
   s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
@@ -2817,6 +2960,7 @@ function validate(session) {
       errors.push(['drive-prompt-target', 'Primary Drive prompt доступний лише для shared prompt mode. Для unique mode виберіть Prompt 2 або Prompt 3.']);
     }
   }
+  validateCalendarScheduleUi(session, errors);
   const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const intervalMax = intervalUnit === 'seconds' ? 86400 : 1440;
   if (!(session.minimumSendIntervalValue >= 1 && session.minimumSendIntervalValue <= intervalMax)) errors.push(['minimum-send-interval', `Minimum send interval must be between 1 and ${intervalMax} ${intervalUnit}.`]);
@@ -2844,7 +2988,7 @@ async function saveSession() {
   clearTimeout(draftSaveTimer);
   const session = collectEditor(); const errors = validate(session); if (errors.length) { persistCurrentDraft(); announce(`${errors.length} configuration error${errors.length === 1 ? '' : 's'}.`); return; }
   try {
-    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session });
+    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session, confirmCalendarRevisionChange: $('calendar-revision-confirm').checked });
     clearDraft(session.id);
     ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor(); await refreshRunTimeline({ announceResult: false });
   } catch (error) { persistCurrentDraft(); setAppStatus(error.message); announce(error.message); }
@@ -3456,6 +3600,7 @@ for (const id of [
   const eventName = field?.tagName === 'SELECT' || field?.type === 'checkbox' ? 'change' : 'input';
   field?.addEventListener(eventName, scheduleDraftPersistence);
 }
+$('calendar-mode').addEventListener('change', () => { syncCalendarVisibility(); renderCalendarRuntimeStatus(ui.selected); });
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);

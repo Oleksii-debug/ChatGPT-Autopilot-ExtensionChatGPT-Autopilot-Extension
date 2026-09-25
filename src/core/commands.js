@@ -1,5 +1,7 @@
 import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
+import { calendarScheduleRevision, normalizeCalendarSchedule } from './calendar-schedule.js';
+import { calendarAdmissionForSession } from './calendar-runtime.js';
 import { CoreCommand } from '../shared/protocol.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, MAX_PHYSICAL_TASKS, MAX_LOGICAL_TASKS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, isExclusiveConversationUrl, normalizeChatUrl } from './schema.js';
 import { configuredTaskCount as logicalTaskCount, isCompactLogicalSession, onePassCompletedCount } from './scheduler.js';
@@ -140,6 +142,8 @@ export function sessionFromUi(config, now = Date.now()) {
   session.version = Math.max(1, Number(config.version) || 1);
   session.promptCadence = normalizeSessionPromptCadence(config.promptCadence);
   session.drivePromptSources = normalizeSessionDrivePromptSources(config.drivePromptSources);
+  session.calendarSchedule = config.calendarSchedule == null ? null : normalizeCalendarSchedule(config.calendarSchedule);
+  session.calendarRuntime = {};
   session.defaultUniquePrompt = config.defaultUniquePrompt || '';
   session.retryPolicy = config.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
@@ -297,7 +301,50 @@ function sessionProgress(session) {
   };
 }
 
-export function sessionToUi(session, state) {
+function calendarStatusForUi(session, now = Date.now()) {
+  const lastOccurrence = session.calendarRuntime?.lastOccurrence
+    ? structuredClone(session.calendarRuntime.lastOccurrence)
+    : null;
+  if (!session.calendarSchedule) {
+    return { enabled: false, scheduleKind: '', admissionState: 'UNSCHEDULED', nextOccurrence: null, lastOccurrence, error: '' };
+  }
+  try {
+    const probe = structuredClone(session);
+    const admission = calendarAdmissionForSession(probe, now);
+    let nextAdmission = admission;
+    // A catch-up OFF probe records the skipped occurrence on the disposable
+    // clone. Probe once more so the UI can expose the next future occurrence
+    // while still reporting the skipped admission state.
+    if (admission.kind === 'MISSED_SKIPPED') {
+      nextAdmission = calendarAdmissionForSession(probe, now);
+    }
+    const next = nextAdmission?.occurrence;
+    return {
+      enabled: true,
+      scheduleKind: session.calendarSchedule.kind,
+      admissionState: admission.kind,
+      nextOccurrence: next ? {
+        id: next.id,
+        revision: next.revision,
+        scheduledFor: next.scheduledAt,
+        catchUp: next.catchUp === true,
+      } : null,
+      lastOccurrence,
+      error: '',
+    };
+  } catch (error) {
+    return {
+      enabled: true,
+      scheduleKind: session.calendarSchedule?.kind || '',
+      admissionState: 'INVALID',
+      nextOccurrence: null,
+      lastOccurrence,
+      error: String(error?.message || 'Invalid calendar schedule'),
+    };
+  }
+}
+
+export function sessionToUi(session, state, now = Date.now()) {
   const tasks = session.taskOrder.map(id => session.tasksById[id]);
   const currentTask = tasks[session.currentTaskIndex] || null;
   const log = state.logs[session.id] || [];
@@ -309,6 +356,7 @@ export function sessionToUi(session, state) {
     runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
     tabStrategy: session.tabStrategy === TabStrategy.ONE_WORKER_TAB_PER_SESSION ? 'worker' : session.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK ? 'open-close' : 'keep-open',
     tasks, configuredTaskCount: logicalTaskCount(session),
+    calendar: calendarStatusForUi(session, now),
     minimumSendIntervalMinutes: session.minimumSendIntervalMs / 60000,
     minimumSendIntervalSeconds: session.minimumSendIntervalMs / 1000,
     minimumSendIntervalUnit: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? 'minutes' : 'seconds',
@@ -722,11 +770,18 @@ export class CoreCommandDispatcher {
         if(ACTIVE_STATES.has(old.runState)||hasUnresolvedOperation(old)) throw new Error('Pause or stop the session and resolve uncertain work before editing');
         if(Number(payload.expectedVersion)!==Number(old.version||0)) throw new Error('This session changed in another view. Reload before saving');
         const replacement=sessionFromUi({...payload.config,id:old.id,version:(old.version||0)+1},this.now());
+        const oldCalendarRevision = old.calendarSchedule ? calendarScheduleRevision(old.calendarSchedule) : null;
+        const replacementCalendarRevision = replacement.calendarSchedule ? calendarScheduleRevision(replacement.calendarSchedule) : null;
+        if (oldCalendarRevision && replacementCalendarRevision && oldCalendarRevision !== replacementCalendarRevision
+          && payload.confirmCalendarRevisionChange !== true) {
+          throw new Error('Calendar schedule changed. Confirm the new calendar revision before saving.');
+        }
         replacement.runState=old.runState;
         const oldTaskId=old.taskOrder[old.currentTaskIndex];
         replacement.currentTaskIndex=Math.max(0,replacement.taskOrder.indexOf(oldTaskId));
         replacement.nextAllowedSendAt=old.nextAllowedSendAt;
         replacement.operation=old.operation;
+        replacement.calendarRuntime = replacement.calendarSchedule ? structuredClone(old.calendarRuntime || {}) : {};
         replacement.lastSuccessfulSendAt=old.lastSuccessfulSendAt;
         replacement.successfulSendCount=old.successfulSendCount||0;
         replacement.completedAt=old.completedAt||0;
