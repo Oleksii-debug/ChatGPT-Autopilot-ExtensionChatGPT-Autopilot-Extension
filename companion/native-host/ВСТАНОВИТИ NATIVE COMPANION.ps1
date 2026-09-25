@@ -30,7 +30,10 @@ $copyNames = @(
 )
 foreach ($name in $copyNames) {
   $src = Join-Path $source $name
-  if (Test-Path -LiteralPath $src) { Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force }
+  if (-not (Test-Path -LiteralPath $src -PathType Leaf)) {
+    throw "Пакет Native Companion неповний: відсутній обов'язковий файл: $name"
+  }
+  Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force
 }
 
 $nodeExe = $null
@@ -51,7 +54,16 @@ if (Test-Path -LiteralPath $portable) {
   }
 }
 if (-not $nodeExe) { throw 'Node.js 20+ не знайдено. Спочатку підготуйте portable Node через AI Gateway.' }
-Copy-Item -LiteralPath $nodeExe -Destination (Join-Path $runtime 'node.exe') -Force
+$installedNode = Join-Path $runtime 'node.exe'
+Copy-Item -LiteralPath $nodeExe -Destination $installedNode -Force
+
+foreach ($name in @($copyNames | Where-Object { $_ -like '*.mjs' })) {
+  $installedModule = Join-Path $target $name
+  & $installedNode --check $installedModule
+  if ($LASTEXITCODE -ne 0) {
+    throw "Перевірка синтаксису Native Companion не пройдена: $name"
+  }
+}
 
 $launcherSource = Join-Path $target 'NativeHostLauncher.cs'
 $launcherExe = Join-Path $target 'autopilot-native-host.exe'
