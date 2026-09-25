@@ -5,12 +5,32 @@ import { GitHubRestClientV1 } from '../src/core/github-rest-client.js';
 const repo = 'Oleksii-debug/example';
 const commitSha = 'b'.repeat(40);
 
-function jsonResponse(status, payload) {
-  return { status, text: async () => JSON.stringify(payload) };
-}
+const encoder = new TextEncoder();
 
 function rawResponse(status, text) {
-  return { status, text: async () => text };
+  const bytes = encoder.encode(text);
+  let read = false;
+  return {
+    status,
+    headers: { get: () => null },
+    body: {
+      getReader() {
+        return {
+          async read() {
+            if (read) return { done: true, value: undefined };
+            read = true;
+            return { done: false, value: bytes };
+          },
+          async cancel() {},
+          releaseLock() {},
+        };
+      },
+    },
+  };
+}
+
+function jsonResponse(status, payload) {
+  return rawResponse(status, JSON.stringify(payload));
 }
 
 function nativeCredential() {
