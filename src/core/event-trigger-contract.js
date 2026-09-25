@@ -235,10 +235,11 @@ async function fingerprints(trigger, observation, { cryptoApi = globalThis.crypt
     trigger.providerId,
     trigger.sourceBindingId,
     trigger.requiredCapabilityIds,
-    observation.observationId,
     observation.sourceEventId,
-    artifactMaterial(observation.payloadArtifactRef),
-    observation.observedAt,
+    observation.payloadArtifactRef.mediaType,
+    observation.payloadArtifactRef.sha256,
+    observation.payloadArtifactRef.sizeBytes,
+    observation.payloadArtifactRef.sensitive,
   ]);
   const [sourceIdentityFingerprint, materialFingerprint] = await Promise.all([
     createSha256FingerprintV1(sourceIdentityCanonical, { cryptoApi }),
@@ -305,7 +306,7 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
     sourceEventId: observation.sourceEventId,
     sourceIdentityFingerprint,
     materialFingerprint,
-    occurrenceId: `event:${materialFingerprint.slice('sha256:'.length)}`,
+    occurrenceId: `event:${sourceIdentityFingerprint.slice('sha256:'.length)}`,
     payloadArtifactId: observation.payloadArtifactRef.artifactId,
     payloadSha256: observation.payloadArtifactRef.sha256,
     observedAt: observation.observedAt,
