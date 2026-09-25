@@ -146,6 +146,7 @@ function sendInput(overrides = {}) {
     admission: admission(),
     delegation: delegation(),
     policyDecision: policy(),
+    exactEffectState: executingExactState(),
     messageText: 'Investigate the supplied artifact and return evidence.',
     timeoutMs: 5000,
     ...overrides,
@@ -192,6 +193,7 @@ test('sends one exact JSON-RPC message/send through admitted interface without c
   assert.equal(call.tenant, null);
   assert.equal(call.timeoutMs, 5000);
   assert.equal(call.effectId, 'effect-1');
+  assert.equal(call.executionId, 'effect-1:attempt:1');
   assert.deepEqual(call.securityRequirement, requirement());
   assert.equal(call.request.jsonrpc, '2.0');
   assert.equal(call.request.id, 'effect-1');
@@ -209,6 +211,7 @@ test('sends one exact JSON-RPC message/send through admitted interface without c
   assert.equal(result.providerId, 'a2a-remote-agent');
   assert.equal(result.remoteAgentId, 'agent.remote');
   assert.equal(result.effectId, 'effect-1');
+  assert.equal(result.executionId, 'effect-1:attempt:1');
   assert.equal(result.runtimeExpiryVerified, true);
   assert.equal(result.untrustedRemoteData, true);
   assert.equal(result.effectMayHaveOccurred, true);
@@ -221,6 +224,53 @@ test('sends one exact JSON-RPC message/send through admitted interface without c
   assert.equal(result.remoteResult.task.id, 'remote-task-1');
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.remoteResult), true);
+});
+
+test('SendMessage dispatch requires the exact current EXECUTING effect attempt before network I/O', async () => {
+  const invalidStates = [
+    preparedExactState(),
+    executingExactState({ invocationId: 'effect-other' }),
+    executingExactState({ providerId: 'other-provider' }),
+    executingExactState({ policyDecisionId: 'policy-other' }),
+    executingExactState({ requestedCapabilityIds: ['remote.other'] }),
+  ];
+
+  for (const exactEffectState of invalidStates) {
+    const { provider, calls } = harness();
+    await assert.rejects(
+      provider.sendMessage(sendInput({ exactEffectState })),
+      error => ['A2A_EXACT_EFFECT_STATE_INVALID', 'A2A_EXACT_EFFECT_BINDING_MISMATCH'].includes(error.code),
+    );
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('provider result cannot be relabeled from attempt 1 as an observation for attempt 2', async () => {
+  const attempt1 = executingExactState();
+  const { provider } = harness();
+  const providerResult = await provider.sendMessage(sendInput({ exactEffectState: attempt1 }));
+
+  const attempt2 = {
+    ...structuredClone(attempt1),
+    attempt: 2,
+    executionId: 'effect-1:attempt:2',
+    updatedAt: T4,
+  };
+
+  assert.throws(
+    () => provider.toObservation({
+      providerResult,
+      exactEffectState: attempt2,
+    }),
+    error => error.code === 'A2A_EXACT_EFFECT_BINDING_MISMATCH'
+      && /executionId/u.test(error.message),
+  );
+
+  const observation = provider.toObservation({
+    providerResult,
+    exactEffectState: attempt1,
+  });
+  assert.equal(observation.observationId, attempt1.executionId);
 });
 
 test('strict v1.0 SendMessageResponse accepts exactly one Task or Message payload', async () => {

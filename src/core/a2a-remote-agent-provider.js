@@ -29,6 +29,7 @@ const EXECUTE_KEYS = new Set([
   'admission',
   'delegation',
   'policyDecision',
+  'exactEffectState',
   'messageText',
   'timeoutMs',
 ]);
@@ -45,6 +46,7 @@ const PROVIDER_RESULT_KEYS = new Set([
   'localAgentId',
   'localTaskId',
   'effectId',
+  'executionId',
   'policyDecisionId',
   'interfaceUrl',
   'protocolBinding',
@@ -499,6 +501,29 @@ function assertPolicy(policy, delegation, runtimeNowMs) {
   }
 }
 
+function bindExecutingExactEffect(stateInput, delegation, policy) {
+  const state = normalizeExactEffectStateV1(stateInput);
+  if (state.phase !== ExactEffectPhase.EXECUTING || !state.executionId) {
+    fail(
+      'A2A_EXACT_EFFECT_STATE_INVALID',
+      'A2A SendMessage requires the current canonical EXECUTING exact-effect attempt',
+    );
+  }
+  if (state.effectId !== delegation.effectId
+      || state.invocation.providerId !== 'a2a-remote-agent'
+      || state.invocation.policyDecisionId !== policy.decisionId
+      || !sameStringSet(
+        state.invocation.requestedCapabilityIds,
+        delegation.requestedCapabilityIds,
+      )) {
+    fail(
+      'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      'A2A SendMessage exact-effect attempt does not match delegation/provider/policy/capabilities',
+    );
+  }
+  return state;
+}
+
 function jsonRpcRequest(delegation, messageText, tenant) {
   const message = {
     messageId: delegation.delegationId,
@@ -558,6 +583,12 @@ function a2aSendResultToObservationV1(input = {}) {
 
   if (typeof raw.effectId !== 'string' || raw.effectId !== state.effectId) {
     fail('A2A_EXACT_EFFECT_BINDING_MISMATCH', 'A2A provider result effectId does not match exact effect');
+  }
+  if (typeof raw.executionId !== 'string' || raw.executionId !== state.executionId) {
+    fail(
+      'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      'A2A provider result executionId does not match the current exact-effect attempt',
+    );
   }
   if (state.invocation.providerId !== raw.providerId) {
     fail(
@@ -644,6 +675,11 @@ export class A2ARemoteAgentProviderV1 {
     const delegation = normalizeA2ADelegationRequestV1(raw.delegation);
     const admission = normalizeA2ARemoteAdmissionRefV1(raw.admission);
     const policy = normalizePolicyDecisionV1(raw.policyDecision);
+    const exactEffectState = bindExecutingExactEffect(
+      raw.exactEffectState,
+      delegation,
+      policy,
+    );
     const messageText = exactString(raw.messageText, 'messageText', MAX_MESSAGE_BYTES);
     const timeoutMs = timeout(raw.timeoutMs);
     const runtimeNow = trustedNow(this.now);
@@ -694,6 +730,7 @@ export class A2ARemoteAgentProviderV1 {
         tenant: assessment.selectedInterface.tenant,
         timeoutMs,
         effectId: delegation.effectId,
+        executionId: exactEffectState.executionId,
         securityRequirement: delegation.declaredSecurityRequirement,
         request,
       }));
@@ -730,6 +767,7 @@ export class A2ARemoteAgentProviderV1 {
       localAgentId: delegation.localAgentId,
       localTaskId: delegation.localTaskId,
       effectId: delegation.effectId,
+      executionId: exactEffectState.executionId,
       policyDecisionId: policy.decisionId,
       interfaceUrl: assessment.selectedInterface.url,
       protocolBinding: assessment.selectedInterface.protocolBinding,
