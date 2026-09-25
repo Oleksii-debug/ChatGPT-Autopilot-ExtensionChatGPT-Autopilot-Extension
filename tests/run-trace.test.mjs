@@ -331,6 +331,7 @@ test('projection cannot be used as replay, execution, or evidence authority', ()
   const projection = buildRunTraceProjectionV1(request([event()]));
   assert.equal(projection.readOnly, true);
   assert.equal(projection.advisoryOnly, true);
+  assert.equal(projection.sourceTrust, 'UNVERIFIED_INPUT');
   assert.equal(projection.hiddenReasoningIncluded, false);
   assert.equal(projection.rawTranscriptIncluded, false);
   assert.equal(projection.replayAuthorized, false);
