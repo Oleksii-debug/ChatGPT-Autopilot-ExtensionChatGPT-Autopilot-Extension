@@ -75,6 +75,8 @@ function requested(overrides = {}) {
     nodeId: 'node-1',
     resourceId: 'resource-1',
     effectId: 'effect-1',
+    executionId: 'execution-1',
+    attempt: 1,
     agentId: 'agent-1',
     humanPrincipalId: 'owner-1',
     verificationAuthorityId: 'verify-authority-1',
@@ -183,6 +185,14 @@ test('verification must bind the exact fresh observation, invocation and authori
   assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
     verification: verification({ verificationAuthorityId: 'other-authority' }),
   }), /authority mismatch/);
+
+  assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
+    verification: verification({ executionId: 'other-execution' }),
+  }), /executionId mismatch/);
+
+  assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
+    verification: verification({ attempt: 2 }),
+  }), /attempt mismatch/);
 });
 
 test('agent or takeover principal cannot self-verify handback', () => {
@@ -289,6 +299,56 @@ test('top-level and nested accessors, hidden fields, symbols and sparse arrays f
   assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
     verification: sparseVerification,
   }), /dense data array/);
+});
+
+test('coercive ObservationV1 and VerificationV1 fields fail before inherited normalizers can coerce them', () => {
+  const pending = throughHandback();
+  assert.throws(() => recordHumanHandbackObservationV1(pending, {
+    observation: observation({ schemaVersion: '1' }),
+  }), /exact numeric 1/);
+  assert.throws(() => recordHumanHandbackObservationV1(pending, {
+    observation: observation({ observationId: 7 }),
+  }), /observationId must be text/);
+
+  const reobserved = recordHumanHandbackObservationV1(pending, { observation: observation() });
+  assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
+    verification: verification({ attempt: '1' }),
+  }), /attempt must be an exact integer/);
+  assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
+    verification: verification({ verifierId: 7 }),
+  }), /verifierId must be text/);
+});
+
+test('active and effect-free takeover identities remain structurally distinct', () => {
+  assert.throws(() => createHumanTakeoverV1({
+    takeoverId: 'takeover-x',
+    jobId: 'job-1',
+    planId: 'plan-1',
+    nodeId: 'node-1',
+    resourceId: 'resource-1',
+    effectId: 'effect-1',
+    agentId: 'agent-1',
+    humanPrincipalId: 'owner-1',
+    verificationAuthorityId: 'verify-authority-1',
+    reason: 'manual interaction',
+    at: T0,
+  }), /effectId and executionId/);
+
+  const noEffect = createHumanTakeoverV1({
+    takeoverId: 'takeover-no-effect',
+    jobId: 'job-1',
+    planId: 'plan-1',
+    nodeId: 'node-1',
+    resourceId: 'resource-1',
+    agentId: 'agent-1',
+    humanPrincipalId: 'owner-1',
+    verificationAuthorityId: 'verify-authority-1',
+    reason: 'manual inspection',
+    at: T0,
+  });
+  assert.equal(noEffect.effectId, '');
+  assert.equal(noEffect.executionId, '');
+  assert.equal(noEffect.attempt, 0);
 });
 
 test('null-prototype JSON-style takeover records remain supported', () => {
