@@ -534,7 +534,7 @@ export function buildSwarmRefillPlanV1(input) {
 
   proposals.sort((left, right) => (
     right.structuralDownstreamDepth - left.structuralDownstreamDepth
-    || asciiCompare(left.readySince, right.readySince)
+    || compareTimestamp(left.readySince, right.readySince)
     || asciiCompare(left.nodeId, right.nodeId)
   ));
   unassigned.sort((left, right) => asciiCompare(left.nodeId, right.nodeId));
