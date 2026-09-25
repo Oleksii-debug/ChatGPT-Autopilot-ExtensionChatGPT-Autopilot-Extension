@@ -71,7 +71,7 @@ The final canonical Session scheduler supports:
 - DAILY with one or many clock times;
 - WEEKLY with selected weekdays and one or many clock times;
 - EXPLICIT arbitrary date/time list;
-- INTERVAL recurrence with a configured start time (required product capability; must reuse the same occurrence authority when implemented);
+- INTERVAL recurrence with a configured start time (implemented in the canonical occurrence authority; start can be anchored «now» at save time or entered explicitly);
 - optional end date / maximum occurrences where applicable;
 - owner-selected timezone for calendar rules;
 - explicit **Catch up missed runs** policy.
@@ -131,6 +131,7 @@ Scheduling must be available where it semantically belongs:
 This branch adds:
 - shared text-first date/time parser for owner input;
 - Agent start/end and active-window fields converted away from required native date/time pickers;
+- Session INTERVAL occurrence mode with start-now/start-later, durable occurrence identity, catch-up and bounded maximum occurrence count;
 - Scenario Work one-time future start field;
 - durable `WAITING_SCHEDULE` Scenario state;
 - exact Scenario alarm wake at the scheduled start;
@@ -139,7 +140,7 @@ This branch adds:
 - backward compatibility for stored Scenario configs missing the new field;
 - focused regression tests.
 
-This slice does **not** claim the entire #151 roadmap complete. In particular, canonical interval occurrence scheduling and Orchestration scheduled start remain follow-on work unless already provided by another current-main lineage.
+This slice does **not** claim the entire #151 roadmap complete. Canonical interval occurrence scheduling is included here. Orchestration whole-algorithm scheduled start and any additional cloud execution-plane scheduling remain follow-on work unless already provided by another current-main lineage.
 
 ## 9. Non-removal rule
 
