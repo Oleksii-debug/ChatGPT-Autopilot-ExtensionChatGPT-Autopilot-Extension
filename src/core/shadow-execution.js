@@ -205,7 +205,8 @@ function publicInvocationIdentity(invocation) {
     invocationId: invocation.invocationId,
     toolId: invocation.toolId,
     providerId: invocation.providerId,
-    requestedCapabilityIds: [...invocation.requestedCapabilityIds],
+    requestedCapabilityIds: [...invocation.requestedCapabilityIds]
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     policyDecisionId: invocation.policyDecisionId,
     createdAt: invocation.createdAt,
     parentInvocationId: invocation.parentInvocationId,
