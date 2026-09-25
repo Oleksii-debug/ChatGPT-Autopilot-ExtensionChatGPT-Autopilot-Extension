@@ -64,6 +64,11 @@ function makeChrome({ permission = true } = {}) {
             viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 1600 },
           } }];
         }
+        if (name === 'readBrowserCredentialFrameOrigin') {
+          const tab = tabs.get(details.target.tabId);
+          const url = tab?.url || 'https://ais.example.edu/app';
+          return [{ frameId: details.target.frameIds?.[0] || 0, result: { url, origin: new URL(url).origin } }];
+        }
         if (name === 'executeBrowserPageAction') {
           actionCalls.push(structuredClone(details.args[1]));
           pageVersion += 1;
@@ -488,12 +493,15 @@ test('consequential approval is default policy and classifies multilingual final
 test('fill_credential parser accepts only a current broker ref and current password field', () => {
   const snapshot = {
     url: 'https://ais.example.edu/login',
-    frames: [{ frameId: 0, elements: [
+    frames: [{ frameId: 0, url: 'https://ais.example.edu/login', elements: [
       { ref: 'r1', tag: 'input', role: '', type: 'text', name: 'Username', sensitive: false },
       { ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true },
       { ref: 'r3', tag: 'input', role: '', type: 'text', name: 'Other', sensitive: false },
     ] }],
-    credentials: [{ ref: 'c1', credentialId: 'ais-main', brokerId: 'native-companion', kind: 'username-password', scope: ['https://ais.example.edu'], expiresAt: null }],
+    credentials: [{
+      ref: 'c1', credentialId: 'ais-main', brokerId: 'native-companion', kind: 'username-password',
+      scope: ['https://ais.example.edu'], expiresAt: null, targetOrigin: 'https://ais.example.edu', frameIds: [0],
+    }],
   };
   const action = parseBrowserAgentAction(JSON.stringify({
     type: 'fill_credential',
@@ -505,6 +513,7 @@ test('fill_credential parser accepts only a current broker ref and current passw
   }), snapshot);
   assert.equal(action.type, 'fill_credential');
   assert.equal(action.credentialId, 'ais-main');
+  assert.equal(action.credentialOrigin, 'https://ais.example.edu');
   assert.equal(action.usernameRef, 'r1');
   assert.equal(action.passwordRef, 'r2');
 
@@ -521,6 +530,69 @@ test('fill_credential parser accepts only a current broker ref and current passw
     passwordFrameId: 0,
     passwordRef: 'r3',
   }), snapshot), /password target must be a current password input/);
+
+  const crossOrigin = structuredClone(snapshot);
+  crossOrigin.frames[0].url = 'https://login.other.example/sign-in';
+  assert.throws(() => parseBrowserAgentAction(JSON.stringify({
+    type: 'fill_credential',
+    credentialRef: 'c1',
+    passwordFrameId: 0,
+    passwordRef: 'r2',
+  }), crossOrigin), /not bound to the current password frame origin/);
+});
+
+test('credential discovery is scoped to the exact password frame origin, not the top-level page', async () => {
+  const chrome = makeChrome();
+  const listedOrigins = [];
+  const nativeCompanionClient = {
+    async listCredentials({ targetOrigin }) {
+      listedOrigins.push(targetOrigin);
+      return {
+        credentialRefs: [{
+          schemaVersion: 1,
+          credentialId: 'login-main',
+          brokerId: 'native-companion',
+          kind: 'username-password',
+          scope: ['https://login.example.edu'],
+          expiresAt: null,
+        }],
+      };
+    },
+  };
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name !== 'snapshotBrowserPage') throw new Error(`unexpected script ${details.func?.name}`);
+    const snapshotId = details.args[0];
+    return [
+      { frameId: 0, result: {
+        snapshotId,
+        url: 'https://ais.example.edu/app',
+        title: 'Portal',
+        text: 'Embedded sign in',
+        elements: [],
+        viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+      } },
+      { frameId: 7, result: {
+        snapshotId,
+        url: 'https://login.example.edu/embed',
+        title: 'Login',
+        text: 'Sign in',
+        elements: [{ ref: 'r1', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true }],
+        viewport: { width: 640, height: 480, scrollY: 0, documentHeight: 600 },
+      } },
+    ];
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async () => ({ text: JSON.stringify({ type: 'done', summary: 'unused' }) }),
+  });
+  await manager.create({ id: 'job-1', goal: 'Inspect login', credentialDecision: 'ALLOW' });
+  const live = await manager.get('job-1');
+  const snapshot = await manager.collectSnapshot(1, live.job);
+  assert.deepEqual(listedOrigins, ['https://login.example.edu']);
+  assert.equal(snapshot.credentials.length, 1);
+  assert.equal(snapshot.credentials[0].targetOrigin, 'https://login.example.edu');
+  assert.deepEqual(snapshot.credentials[0].frameIds, [7]);
 });
 
 test('credential ALLOW runs autonomous login fill while keeping secret out of prompt and durable history', async () => {
@@ -783,6 +855,103 @@ test('credential resolve is discarded if page origin changes before secret inser
   const live = await manager.get('job-1');
   assert.match(live.job.runtime.lastError, /AGENT_CREDENTIAL_ORIGIN_STALE/);
   assert.equal(JSON.stringify(live.job.runtime.history).includes('must-not-be-inserted'), false);
+});
+
+test('credential resolve is discarded if the password frame origin changes while the top-level page stays stable', async () => {
+  const chrome = makeChrome();
+  let frameUrl = 'https://login.example.edu/embed';
+  let credentialExecutions = 0;
+  const nativeCalls = [];
+  const secretValue = 'cross-origin-secret-must-not-leak';
+  const nativeCompanionClient = {
+    async listCredentials({ targetOrigin }) {
+      nativeCalls.push(['list', targetOrigin]);
+      return { credentialRefs: [{
+        schemaVersion: 1,
+        credentialId: 'login-main',
+        brokerId: 'native-companion',
+        kind: 'username-password',
+        scope: ['https://login.example.edu'],
+        expiresAt: null,
+      }] };
+    },
+    async resolveCredential(input) {
+      nativeCalls.push(['resolve', structuredClone(input)]);
+      frameUrl = 'https://evil.example/phish';
+      return {
+        credentialId: input.credentialId,
+        kind: 'username-password',
+        targetOrigin: input.targetOrigin,
+        username: 'owner@example.edu',
+        secret: secretValue,
+      };
+    },
+  };
+  const original = chrome.scripting.executeScript;
+  chrome.scripting.executeScript = async details => {
+    if (details.func?.name === 'snapshotBrowserPage') {
+      const snapshotId = details.args[0];
+      return [
+        { frameId: 0, result: {
+          snapshotId,
+          url: 'https://ais.example.edu/app',
+          title: 'Portal',
+          text: 'Embedded sign in',
+          elements: [],
+          viewport: { width: 1280, height: 720, scrollY: 0, documentHeight: 900 },
+        } },
+        { frameId: 7, result: {
+          snapshotId,
+          url: frameUrl,
+          title: 'Login',
+          text: 'Sign in',
+          elements: [{ ref: 'r2', tag: 'input', role: '', type: 'password', name: 'Password', sensitive: true, editable: false }],
+          viewport: { width: 640, height: 480, scrollY: 0, documentHeight: 600 },
+        } },
+      ];
+    }
+    if (details.func?.name === 'readBrowserCredentialFrameOrigin') {
+      return [{ frameId: 7, result: { url: frameUrl, origin: new URL(frameUrl).origin } }];
+    }
+    if (details.func?.name === 'executeBrowserCredentialFill') {
+      credentialExecutions += 1;
+      return [{ frameId: 7, result: { ok: true, passwordFilled: true, url: frameUrl } }];
+    }
+    return original(details);
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    nativeCompanionClient,
+    routePrompt: async () => ({
+      text: JSON.stringify({
+        type: 'fill_credential',
+        credentialRef: 'c1',
+        passwordFrameId: 7,
+        passwordRef: 'r2',
+      }),
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+    }),
+    now: (() => { let n = 170_000; return () => ++n; })(),
+  });
+  await manager.create({
+    id: 'job-1',
+    goal: 'Use the embedded login',
+    credentialDecision: 'ALLOW',
+    approvalMode: 'ALLOW_ALL',
+    stepDelayMs: 0,
+  });
+  await manager.start('job-1', { runInitial: false });
+  const result = await manager.cycleOne('job-1');
+  assert.equal(result.kind, 'ACTION_RETRY');
+  assert.deepEqual(nativeCalls, [
+    ['list', 'https://login.example.edu'],
+    ['resolve', { credentialId: 'login-main', targetOrigin: 'https://login.example.edu' }],
+  ]);
+  assert.equal(chrome._tabs.get(1).url, 'https://ais.example.edu/app', 'top-level page must remain unchanged in this regression');
+  assert.equal(credentialExecutions, 0, 'changed password-frame origin must block secret insertion');
+  const live = await manager.get('job-1');
+  assert.match(live.job.runtime.lastError, /AGENT_CREDENTIAL_ORIGIN_STALE/);
+  assert.equal(JSON.stringify(live.job.runtime.history).includes(secretValue), false);
 });
 
 test('owner site policy overrides global autonomy and supports credentials independently', () => {
