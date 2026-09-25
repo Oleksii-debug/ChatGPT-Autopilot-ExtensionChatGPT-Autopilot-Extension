@@ -93,6 +93,8 @@ function input(overrides = {}) {
 
 function assessment(criterionId, overrides = {}) {
   return {
+    contractId: 'outcome-1',
+    contractRevision: 1,
     criterionId,
     status: 'VERIFIED',
     evidenceArtifactIds: [`evidence-${criterionId}`],
@@ -434,4 +436,87 @@ test('null-prototype contract records are accepted as JSON-style data', () => {
   assert.equal(result.contractId, 'outcome-1');
   assert.equal(result.ownerAccepted, false);
   assert.equal(result.executionAuthorized, false);
+});
+
+
+test('timestamps must already use canonical UTC representation', () => {
+  assert.throws(
+    () => createOutcomeContractV1(input({ createdAt: '2026-09-25T00:20:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  const contract = createOutcomeContractV1(input());
+  assert.throws(
+    () => projectOutcomeEvidenceV1({
+      contract,
+      assessments: [
+        assessment('criterion-a', { assessedAt: '2026-09-25T00:21:00Z' }),
+        assessment('criterion-b'),
+      ],
+    }),
+    /canonical ISO-8601 UTC representation/,
+  );
+});
+
+test('criterion assessments are bound to exact contract identity and revision', () => {
+  const revisionOne = createOutcomeContractV1(input());
+  const revisionTwo = normalizeOutcomeContractV1({
+    ...revisionOne,
+    revision: 2,
+  });
+
+  assert.throws(
+    () => projectOutcomeEvidenceV1({
+      contract: revisionOne,
+      assessments: [
+        assessment('criterion-a', { contractId: 'outcome-other' }),
+        assessment('criterion-b'),
+      ],
+    }),
+    /not bound to the exact contract revision/,
+  );
+
+  assert.throws(
+    () => projectOutcomeEvidenceV1({
+      contract: revisionTwo,
+      assessments: [
+        assessment('criterion-a'),
+        assessment('criterion-b'),
+      ],
+    }),
+    /not bound to the exact contract revision/,
+  );
+
+  const current = projectOutcomeEvidenceV1({
+    contract: revisionTwo,
+    assessments: [
+      assessment('criterion-a', { contractRevision: 2 }),
+      assessment('criterion-b', { contractRevision: 2 }),
+    ],
+  });
+  assert.equal(current.contractRevision, 2);
+  assert.equal(current.status, OutcomeEvidenceStatus.EVIDENCE_READY);
+});
+
+test('criterion assessment cannot predate the contract it claims to verify', () => {
+  const contract = createOutcomeContractV1(input());
+  assert.throws(
+    () => projectOutcomeEvidenceV1({
+      contract,
+      assessments: [
+        assessment('criterion-a', { assessedAt: '2026-09-25T00:19:59.999Z' }),
+        assessment('criterion-b'),
+      ],
+    }),
+    /predates contract creation/,
+  );
+
+  const atBoundary = projectOutcomeEvidenceV1({
+    contract,
+    assessments: [
+      assessment('criterion-a', { assessedAt: AT }),
+      assessment('criterion-b', { assessedAt: AT }),
+    ],
+  });
+  assert.equal(atBoundary.status, OutcomeEvidenceStatus.EVIDENCE_READY);
 });
