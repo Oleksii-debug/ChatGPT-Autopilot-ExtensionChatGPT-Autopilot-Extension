@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
 import path from 'node:path';
 import {
   MAX_SEARCH_ENTRIES,
@@ -85,15 +87,120 @@ function mapPathError(error) {
   return error;
 }
 
-async function writeAll(handle, bytes) {
+const ATOMIC_WRITE_CHUNK_BYTES = 64 * 1024;
+
+function canonicalPath(value) {
+  const resolved = path.resolve(value);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function sameFileIdentity(a, b) {
+  return Boolean(a && b && a.dev === b.dev && a.ino === b.ino);
+}
+
+async function closeQuietly(handle) {
+  if (!handle) return;
+  try {
+    await handle.close();
+  } catch (error) {
+    if (error?.code !== 'EBADF') throw error;
+  }
+}
+
+async function unlinkQuietly(filePath) {
+  if (!filePath) return;
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+}
+
+async function writeAll(handle, bytes, { afterChunk = null } = {}) {
   let offset = 0;
   while (offset < bytes.byteLength) {
-    const { bytesWritten } = await handle.write(bytes, offset, bytes.byteLength - offset, offset);
+    const length = Math.min(ATOMIC_WRITE_CHUNK_BYTES, bytes.byteLength - offset);
+    const { bytesWritten } = await handle.write(bytes, offset, length, offset);
     if (!Number.isInteger(bytesWritten) || bytesWritten <= 0) {
       throw nativeError('WRITE_VERIFICATION_FAILED', 'Filesystem write made no forward progress');
     }
     offset += bytesWritten;
+    if (afterChunk != null) await afterChunk({ writtenBytes: offset, totalBytes: bytes.byteLength });
   }
+}
+
+async function stageReplacementFile(target, desired, admitted, { afterTempWrite = null } = {}) {
+  const parent = path.dirname(target);
+  const tempPath = path.join(parent, `.chatgpt-autopilot-write-${crypto.randomBytes(16).toString('hex')}.tmp`);
+  const noFollow = Number.isInteger(fsConstants.O_NOFOLLOW) ? fsConstants.O_NOFOLLOW : 0;
+  const flags = fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL | noFollow;
+  let handle = null;
+  let complete = false;
+  try {
+    handle = await fs.open(tempPath, flags, 0o600);
+    if (Number.isInteger(admitted.stat.mode) && typeof handle.chmod === 'function') {
+      await handle.chmod(admitted.stat.mode & 0o777);
+    }
+    if (desired.byteLength) await writeAll(handle, desired, { afterChunk: afterTempWrite });
+    await handle.sync();
+    complete = true;
+  } finally {
+    await closeQuietly(handle);
+    if (!complete) await unlinkQuietly(tempPath);
+  }
+  return Object.freeze({
+    tempPath,
+    parent,
+    admittedPath: admitted.path,
+    admittedDev: admitted.stat.dev,
+    admittedIno: admitted.stat.ino,
+  });
+}
+
+async function requireTargetStillAdmitted(target, staged) {
+  const [real, stat] = await Promise.all([
+    fs.realpath(target),
+    fs.stat(target),
+  ]);
+  if (
+    canonicalPath(real) !== canonicalPath(staged.admittedPath)
+    || !stat.isFile()
+    || !sameFileIdentity(stat, { dev: staged.admittedDev, ino: staged.admittedIno })
+  ) {
+    throw nativeError('PATH_OUTSIDE_SCOPE', 'Requested filesystem path changed identity before publication');
+  }
+}
+
+async function syncParentDirectory(parent) {
+  let handle = null;
+  try {
+    handle = await fs.open(parent, fsConstants.O_RDONLY);
+    await handle.sync();
+  } catch (error) {
+    // Node cannot fsync directory handles on every Windows filesystem. The staged
+    // file itself is synced before the same-directory atomic rename, so an abrupt
+    // failure still exposes either the old complete file or the new complete file.
+    if (process.platform === 'win32' && ['EACCES', 'EINVAL', 'EPERM', 'EISDIR'].includes(error?.code)) return;
+    throw error;
+  } finally {
+    await closeQuietly(handle);
+  }
+}
+
+async function verifyPublishedFile(scope, target, desired) {
+  return withAuthorizedExistingFileV1(scope, target, { write: false }, async (handle, admitted) => {
+    if (!admitted.stat.isFile() || admitted.stat.size !== desired.byteLength) {
+      throw nativeError('WRITE_VERIFICATION_FAILED', 'Published file size did not match desired content');
+    }
+    const after = Buffer.alloc(desired.byteLength);
+    const read = desired.byteLength
+      ? await handle.read(after, 0, after.length, 0)
+      : { bytesRead: 0 };
+    if (read.bytesRead !== desired.byteLength) {
+      throw nativeError('WRITE_VERIFICATION_FAILED', 'Published file readback was incomplete');
+    }
+    return sha256(after);
+  });
 }
 
 export async function searchScopedFilesystemV1(payload, config) {
@@ -122,8 +229,18 @@ export async function searchScopedFilesystemV1(payload, config) {
  * present, the operation reports alreadyApplied=true, which makes ambiguity reconciliation
  * observable without blind replay.
  */
-export async function writeExistingTextScopedV1(payload, config, { beforeOpen = null } = {}) {
+export async function writeExistingTextScopedV1(payload, config, {
+  beforeOpen = null,
+  afterTempWrite = null,
+  beforePublish = null,
+} = {}) {
   exactKeys(payload, new Set(['rootId', 'relativePath', 'text', 'expectedSha256']), 'filesystem.writeExistingText payload');
+  if (afterTempWrite != null && typeof afterTempWrite !== 'function') {
+    throw nativeError('INVALID_REQUEST', 'afterTempWrite hook must be a function');
+  }
+  if (beforePublish != null && typeof beforePublish !== 'function') {
+    throw nativeError('INVALID_REQUEST', 'beforePublish hook must be a function');
+  }
   const root = configuredRoot(config, payload.rootId, { write: true });
   const rel = relativePath(payload.relativePath);
   if (typeof payload.text !== 'string') throw nativeError('INVALID_REQUEST', 'text must be text');
@@ -136,50 +253,71 @@ export async function writeExistingTextScopedV1(payload, config, { beforeOpen = 
   if (!SHA256.test(expectedSha256)) throw nativeError('INVALID_REQUEST', 'expectedSha256 must be a lowercase SHA-256 digest');
   const desiredSha256 = sha256(desired);
   const target = path.resolve(root.path, rel);
+  const scope = scopeFor(root, true);
+  let staged = null;
+  let published = false;
 
   try {
-    return await withAuthorizedExistingFileV1(scopeFor(root, true), target, { write: true, beforeOpen }, async (handle, admitted) => {
+    const prepared = await withAuthorizedExistingFileV1(scope, target, { write: true, beforeOpen }, async (handle, admitted) => {
       if (!admitted.stat.isFile()) throw nativeError('NOT_A_FILE', 'Requested path is not a regular file');
       if (admitted.stat.size > MAX_WRITE_TEXT_BYTES) throw nativeError('FILE_TOO_LARGE', 'Existing file exceeds mutation bound');
       const before = Buffer.alloc(admitted.stat.size);
       const { bytesRead } = await handle.read(before, 0, before.length, 0);
+      if (bytesRead !== admitted.stat.size) {
+        throw nativeError('PRECONDITION_FAILED', 'Existing file changed during optimistic-concurrency read');
+      }
       const beforeBytes = before.subarray(0, bytesRead);
       const beforeSha256 = sha256(beforeBytes);
       if (beforeSha256 === desiredSha256) {
-        return {
-          rootId: root.rootId,
-          relativePath: rel.replace(/\\/gu, '/'),
-          beforeSha256,
-          sha256: desiredSha256,
-          sizeBytes: desired.byteLength,
-          alreadyApplied: true,
-        };
+        return Object.freeze({ alreadyApplied: true, beforeSha256 });
       }
       if (beforeSha256 !== expectedSha256) {
         throw nativeError('PRECONDITION_FAILED', 'Existing file digest does not match expectedSha256');
       }
 
-      await handle.truncate(0);
-      if (desired.byteLength) await writeAll(handle, desired);
-      await handle.sync();
-      const postStat = await handle.stat();
-      if (!postStat.isFile() || postStat.size !== desired.byteLength) throw nativeError('WRITE_VERIFICATION_FAILED', 'Written file size did not match desired content');
-      const after = Buffer.alloc(desired.byteLength);
-      const afterRead = desired.byteLength ? await handle.read(after, 0, after.length, 0) : { bytesRead: 0 };
-      const afterSha256 = sha256(after.subarray(0, afterRead.bytesRead));
-      if (afterRead.bytesRead !== desired.byteLength || afterSha256 !== desiredSha256) {
-        throw nativeError('WRITE_VERIFICATION_FAILED', 'Written file digest did not match desired content');
-      }
+      staged = await stageReplacementFile(target, desired, admitted, { afterTempWrite });
+      return Object.freeze({ alreadyApplied: false, beforeSha256 });
+    });
+
+    if (prepared.alreadyApplied) {
       return {
         rootId: root.rootId,
         relativePath: rel.replace(/\\/gu, '/'),
-        beforeSha256,
-        sha256: afterSha256,
+        beforeSha256: prepared.beforeSha256,
+        sha256: desiredSha256,
         sizeBytes: desired.byteLength,
-        alreadyApplied: false,
+        alreadyApplied: true,
       };
-    });
+    }
+
+    // The admitted target handle is closed before publication so Windows can perform
+    // same-directory replacement. Revalidate the exact admitted file immediately before
+    // and after any test/integration hook. Atomic rename replaces the directory entry
+    // rather than truncating the admitted inode, so a crash before publication leaves
+    // the complete original file and a crash after publication exposes the complete
+    // fsynced replacement.
+    await requireTargetStillAdmitted(target, staged);
+    if (beforePublish != null) await beforePublish();
+    await requireTargetStillAdmitted(target, staged);
+    await fs.rename(staged.tempPath, target);
+    published = true;
+    await syncParentDirectory(staged.parent);
+
+    const afterSha256 = await verifyPublishedFile(scope, target, desired);
+    if (afterSha256 !== desiredSha256) {
+      throw nativeError('WRITE_VERIFICATION_FAILED', 'Published file digest did not match desired content');
+    }
+    return {
+      rootId: root.rootId,
+      relativePath: rel.replace(/\\/gu, '/'),
+      beforeSha256: prepared.beforeSha256,
+      sha256: afterSha256,
+      sizeBytes: desired.byteLength,
+      alreadyApplied: false,
+    };
   } catch (error) {
     throw mapPathError(error);
+  } finally {
+    if (staged && !published) await unlinkQuietly(staged.tempPath);
   }
 }
