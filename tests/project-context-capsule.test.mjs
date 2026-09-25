@@ -236,6 +236,72 @@ test('portable capsule requires exactly one raw summary or structured content so
   );
 });
 
+test('portable capsule createdAt requires exact canonical timestamp spelling', () => {
+  assert.throws(
+    () => build({ createdAt: '2026-09-24T20:00:00Z' }),
+    /exact canonical ISO-8601 UTC representation/,
+  );
+  assert.throws(
+    () => build({ createdAt: ' 2026-09-24T20:00:00.000Z' }),
+    /exact canonical ISO-8601 UTC representation/,
+  );
+  assert.equal(build({ createdAt: AT }).createdAt, AT);
+});
+
+test('capsule list boundaries reject accessors, sparse arrays and non-index data without reading entries', () => {
+  let idReads = 0;
+  const allowedSourceIds = [];
+  Object.defineProperty(allowedSourceIds, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      idReads += 1;
+      return 'source-main';
+    },
+  });
+  assert.throws(
+    () => normalizeContextCapsuleDisclosureV1(disclosure({ allowedSourceIds })),
+    /enumerable own data properties/,
+  );
+  assert.equal(idReads, 0);
+
+  let textReads = 0;
+  const constraints = [];
+  Object.defineProperty(constraints, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      textReads += 1;
+      return 'Do not read this getter.';
+    },
+  });
+  assert.throws(
+    () => normalizeContextCapsuleContentV1(structuredContent({ constraints })),
+    /enumerable own data properties/,
+  );
+  assert.equal(textReads, 0);
+
+  const sparse = [];
+  sparse.length = 1;
+  assert.throws(
+    () => normalizeContextCapsuleDisclosureV1(disclosure({ allowedSourceIds: sparse })),
+    /dense data-only array/,
+  );
+
+  const decorated = ['source-main'];
+  decorated.authority = 'ALLOW';
+  assert.throws(
+    () => normalizeContextCapsuleDisclosureV1(disclosure({ allowedSourceIds: decorated })),
+    /non-index array data/,
+  );
+
+  const subclass = new (class extends Array {})('source-main');
+  assert.throws(
+    () => normalizeContextCapsuleDisclosureV1(disclosure({ allowedSourceIds: subclass })),
+    /bounded plain array/,
+  );
+});
+
 test('portable capsule ordering is deterministic regardless of snapshot and disclosure order', () => {
   const sourceA = source('source-a', { contentSha256: 'c'.repeat(64) });
   const sourceZ = source('source-z', { contentSha256: 'd'.repeat(64) });
