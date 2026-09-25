@@ -121,6 +121,31 @@ test('dataset snapshots bind materialized sources/artifact and normalize determi
   assert.throws(() => normalizeDataDatasetSnapshotV1(noSourceHash), /contentSha256/);
 });
 
+test('dataset snapshots reject future source or artifact materialization evidence', () => {
+  const futureSource = dataset({
+    observedAt: T1,
+    sourceRefs: [source({ at: T2 })],
+  });
+  assert.throws(
+    () => normalizeDataDatasetSnapshotV1(futureSource),
+    /source observed after dataset snapshot/,
+  );
+
+  const futureArtifact = dataset({ observedAt: T1 });
+  futureArtifact.artifactRef.createdAt = T2;
+  assert.throws(
+    () => normalizeDataDatasetSnapshotV1(futureArtifact),
+    /artifactRef created after dataset snapshot/,
+  );
+
+  const laterDataset = dataset({
+    observedAt: T2,
+    sourceRefs: [source({ at: T1 })],
+  });
+  laterDataset.artifactRef.createdAt = T1;
+  assert.doesNotThrow(() => normalizeDataDatasetSnapshotV1(laterDataset));
+});
+
 test('analytics authority boundary rejects getters, hidden fields, symbols, exotic objects and sparse arrays without executing accessors', () => {
   let reads = 0;
   const accessor = dataset();
