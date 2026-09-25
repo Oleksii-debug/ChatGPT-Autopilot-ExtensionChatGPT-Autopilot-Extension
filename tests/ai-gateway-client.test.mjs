@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AiGatewayClient, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
+import { AiGatewayClient, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, MAX_RESPONSE_CHUNKS, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
 
 test('gateway URL is restricted to localhost', () => {
   assert.equal(normalizeGatewayUrl('http://127.0.0.1:17621/'), 'http://127.0.0.1:17621');
@@ -178,6 +178,23 @@ test('gateway client rejects and cancels chunked response overflow before JSON p
   );
   assert.equal(response.cancelled, true);
   assert.equal(response.reads, 2);
+  assert.equal(response.released, true);
+});
+
+test('gateway client rejects excessive tiny response chunks before unbounded accumulation', async () => {
+  const tinyChunks = Array.from(
+    { length: MAX_RESPONSE_CHUNKS + 1 },
+    () => new Uint8Array([0x20]),
+  );
+  const response = trackedStreamResponse('', { chunks: tinyChunks });
+  const client = new AiGatewayClient({ fetchFn: async () => response });
+
+  await assert.rejects(
+    () => client.health({ gatewayUrl: 'http://127.0.0.1:17621', timeoutSeconds: 30 }),
+    error => error?.code === 'AI_GATEWAY_INVALID_RESPONSE',
+  );
+  assert.equal(response.reads, MAX_RESPONSE_CHUNKS + 1);
+  assert.equal(response.cancelled, true);
   assert.equal(response.released, true);
 });
 
