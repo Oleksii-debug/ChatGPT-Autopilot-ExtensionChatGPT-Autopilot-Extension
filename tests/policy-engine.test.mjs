@@ -485,3 +485,27 @@ test('classification and decision timestamps preserve causal order', () => {
   assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
   assert.equal(result.policyDecision.reasonCode, 'POLICY_DECISION_PREDATES_CLASSIFICATION');
 });
+
+
+test('universal authority identities cannot be normalized from aliases', () => {
+  assert.throws(
+    () => evaluate({ invocation: invocation({ toolId: ' filesystem.read' }) }),
+    /ToolInvocationV1\.toolId is invalid/,
+  );
+  assert.throws(
+    () => evaluate({ invocation: invocation({ providerId: 'native-companion ' }) }),
+    /ToolInvocationV1\.providerId is invalid/,
+  );
+  assert.throws(
+    () => evaluate({ invocation: invocation({ requestedCapabilityIds: [' filesystem.read'] }) }),
+    /requestedCapabilityIds\[0\] is invalid/,
+  );
+  assert.throws(
+    () => evaluate({ toolDescriptor: tool({ capabilityIds: ['filesystem.read '] }) }),
+    /capabilityIds\[0\] is invalid/,
+  );
+  assert.throws(
+    () => evaluate({ capabilityDescriptors: [capability({ capabilityId: ' filesystem.read' })] }),
+    /capabilityId is invalid/,
+  );
+});
