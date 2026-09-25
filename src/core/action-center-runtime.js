@@ -1,4 +1,5 @@
 import {
+  MAX_ACTION_CENTER_ITEMS,
   ActionCenterItemStatus,
   ActionCenterOwnerActionKind,
   ActionCenterSeverity,
@@ -8,12 +9,21 @@ import {
 
 const UNRESOLVED_CORE_PHASES = new Set(['AMBIGUOUS', 'MANUAL_REVIEW']);
 const IDENTITY_DOMAIN = 'chatgpt-autopilot-action-center-runtime-v1';
+const MAX_DATE_MS = 8_640_000_000_000_000;
+const SEVERITY_RANK = Object.freeze({
+  [ActionCenterSeverity.BLOCKING]: 0,
+  [ActionCenterSeverity.HIGH]: 1,
+  [ActionCenterSeverity.NORMAL]: 2,
+  [ActionCenterSeverity.LOW]: 3,
+});
 
 function finiteTimestamp(value, fallback = 0) {
   const number = Number(value);
-  if (Number.isFinite(number) && number >= 0) return number;
+  if (Number.isFinite(number) && number >= 0 && number <= MAX_DATE_MS) return number;
   const fallbackNumber = Number(fallback);
-  return Number.isFinite(fallbackNumber) && fallbackNumber >= 0 ? fallbackNumber : 0;
+  return Number.isFinite(fallbackNumber) && fallbackNumber >= 0 && fallbackNumber <= MAX_DATE_MS
+    ? fallbackNumber
+    : 0;
 }
 
 function iso(value) {
@@ -22,12 +32,19 @@ function iso(value) {
 
 function displayName(value, fallback) {
   if (typeof value !== 'string') return fallback;
-  const clean = value.replace(/[\u0000-\u001f\u007f]+/gu, ' ').trim().replace(/\s+/gu, ' ');
+  const clean = value
+    .replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]+/gu, ' ')
+    .trim()
+    .replace(/\s+/gu, ' ');
   return clean ? clean.slice(0, 100) : fallback;
 }
 
 function canonicalRecords(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function compare(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 async function digestHex(value, cryptoApi) {
@@ -36,36 +53,11 @@ async function digestHex(value, cryptoApi) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function identity(kind, key, cryptoApi) {
-  return digestHex(`${IDENTITY_DOMAIN}|${kind}|${key}`, cryptoApi);
-}
-
 async function revision(kind, parts, cryptoApi) {
   return `sha256:${await digestHex(`${IDENTITY_DOMAIN}|revision|${kind}|${parts.join('|')}`, cryptoApi)}`;
 }
 
-function itemBase({ itemId, severity, ownerActionKind, title, materialityReason, sourceKind, sourceId, sourceRevisionId, sourceEffectId = '', createdAt, updatedAt }) {
-  return {
-    schemaVersion: 1,
-    itemId,
-    status: ActionCenterItemStatus.OPEN,
-    severity,
-    ownerActionKind,
-    title,
-    materialityReason,
-    sourceKind,
-    sourceId,
-    sourceRevisionId,
-    sourceEffectId,
-    evidenceArtifactIds: [],
-    createdAt: iso(createdAt),
-    updatedAt: iso(updatedAt),
-    closedAt: '',
-    supersededByItemId: '',
-  };
-}
-
-async function projectCoreAttention(coreState, items, cryptoApi) {
+function addCoreCandidates(coreState, candidates) {
   const sessionsById = canonicalRecords(coreState?.sessionsById);
   const order = Array.isArray(coreState?.sessionOrder) ? coreState.sessionOrder : Object.keys(sessionsById);
   const seen = new Set();
@@ -79,13 +71,12 @@ async function projectCoreAttention(coreState, items, cryptoApi) {
     const name = displayName(session.name, 'Core session');
 
     if (operation && UNRESOLVED_CORE_PHASES.has(phase)) {
-      const key = `${rawId}|${String(operation.operationId || '')}`;
-      const hex = await identity('core-effect', key, cryptoApi);
-      const sourceId = `sha256:${hex}`;
       const updatedAt = finiteTimestamp(operation.updatedAt, session.updatedAt);
-      const createdAt = finiteTimestamp(operation.createdAt, updatedAt);
-      items.push(itemBase({
-        itemId: `ac:core-effect:${hex}`,
+      candidates.push({
+        identityKind: 'core-effect',
+        identityKey: `${rawId}|${String(operation.operationId || '')}`,
+        revisionKind: 'core-effect',
+        revisionParts: [rawId, String(operation.operationId || ''), phase, String(updatedAt)],
         severity: ActionCenterSeverity.BLOCKING,
         ownerActionKind: phase === 'AMBIGUOUS'
           ? ActionCenterOwnerActionKind.RECONCILE
@@ -95,40 +86,34 @@ async function projectCoreAttention(coreState, items, cryptoApi) {
           ? 'A durable Core operation has an ambiguous external effect and must be reconciled before retry.'
           : 'A durable Core operation is in manual-review state and cannot continue automatically.',
         sourceKind: ActionCenterSourceKind.EFFECT,
-        sourceId,
-        sourceEffectId: sourceId,
-        sourceRevisionId: await revision('core-effect', [
-          rawId, String(operation.operationId || ''), phase, String(updatedAt),
-        ], cryptoApi),
-        createdAt,
+        sourceEffectId: true,
+        createdAt: finiteTimestamp(operation.createdAt, updatedAt),
         updatedAt,
-      }));
+      });
       continue;
     }
 
     if (session.runState === 'ERROR') {
-      const hex = await identity('core-session-error', rawId, cryptoApi);
       const updatedAt = finiteTimestamp(session.updatedAt, session.lastActionAt);
-      const createdAt = finiteTimestamp(session.createdAt, updatedAt);
-      items.push(itemBase({
-        itemId: `ac:core-error:${hex}`,
+      candidates.push({
+        identityKind: 'core-session-error',
+        identityKey: rawId,
+        revisionKind: 'core-session-error',
+        revisionParts: [rawId, String(updatedAt), String(session.lastError || '')],
         severity: ActionCenterSeverity.HIGH,
         ownerActionKind: ActionCenterOwnerActionKind.REVIEW,
         title: `${name}: execution error`,
         materialityReason: 'A durable Core session is in ERROR state and needs owner review before normal execution can resume.',
         sourceKind: ActionCenterSourceKind.JOB,
-        sourceId: `sha256:${hex}`,
-        sourceRevisionId: await revision('core-session-error', [
-          rawId, String(updatedAt), String(session.lastError || ''),
-        ], cryptoApi),
-        createdAt,
+        sourceEffectId: false,
+        createdAt: finiteTimestamp(session.createdAt, updatedAt),
         updatedAt,
-      }));
+      });
     }
   }
 }
 
-async function projectBrowserAgentAttention(agentJobs, items, cryptoApi) {
+function addBrowserAgentCandidates(agentJobs, candidates) {
   if (!Array.isArray(agentJobs)) return;
   for (const job of agentJobs) {
     if (!job || typeof job !== 'object' || typeof job.id !== 'string') continue;
@@ -141,42 +126,75 @@ async function projectBrowserAgentAttention(agentJobs, items, cryptoApi) {
       const snapshot = typeof runtime.pendingApproval.snapshotSignature === 'string'
         ? runtime.pendingApproval.snapshotSignature
         : '';
-      const hex = await identity('browser-agent-approval', `${job.id}|${snapshot}`, cryptoApi);
-      items.push(itemBase({
-        itemId: `ac:agent-approval:${hex}`,
+      candidates.push({
+        identityKind: 'browser-agent-approval',
+        identityKey: `${job.id}|${snapshot}`,
+        revisionKind: 'browser-agent-approval',
+        revisionParts: [job.id, snapshot, String(updatedAt)],
         severity: ActionCenterSeverity.BLOCKING,
         ownerActionKind: ActionCenterOwnerActionKind.APPROVE_OR_DENY,
         title: `${name}: approval required`,
         materialityReason: 'A durable Browser Agent job has a pending consequential action. Approve or reject it through the existing Browser Agent control.',
         sourceKind: ActionCenterSourceKind.APPROVAL,
-        sourceId: `sha256:${hex}`,
-        sourceRevisionId: await revision('browser-agent-approval', [
-          job.id, snapshot, String(updatedAt),
-        ], cryptoApi),
+        sourceEffectId: false,
         createdAt: updatedAt || createdAt,
         updatedAt,
-      }));
+      });
       continue;
     }
 
     if (runtime.runState === 'ERROR') {
-      const hex = await identity('browser-agent-error', job.id, cryptoApi);
-      items.push(itemBase({
-        itemId: `ac:agent-error:${hex}`,
+      candidates.push({
+        identityKind: 'browser-agent-error',
+        identityKey: job.id,
+        revisionKind: 'browser-agent-error',
+        revisionParts: [job.id, String(updatedAt), String(runtime.lastError || '')],
         severity: ActionCenterSeverity.HIGH,
         ownerActionKind: ActionCenterOwnerActionKind.REVIEW,
         title: `${name}: execution error`,
         materialityReason: 'A durable Browser Agent job is in ERROR state and needs owner review before normal execution can resume.',
         sourceKind: ActionCenterSourceKind.JOB,
-        sourceId: `sha256:${hex}`,
-        sourceRevisionId: await revision('browser-agent-error', [
-          job.id, String(updatedAt), String(runtime.lastError || ''),
-        ], cryptoApi),
+        sourceEffectId: false,
         createdAt,
         updatedAt,
-      }));
+      });
     }
   }
+}
+
+function selectCandidates(candidates) {
+  return [...candidates].sort((left, right) => (
+    (SEVERITY_RANK[left.severity] ?? 99) - (SEVERITY_RANK[right.severity] ?? 99)
+    || left.createdAt - right.createdAt
+    || compare(left.identityKind, right.identityKind)
+    || compare(left.identityKey, right.identityKey)
+  )).slice(0, MAX_ACTION_CENTER_ITEMS);
+}
+
+async function materializeCandidate(candidate, cryptoApi) {
+  const hex = await digestHex(
+    `${IDENTITY_DOMAIN}|${candidate.identityKind}|${candidate.identityKey}`,
+    cryptoApi,
+  );
+  const sourceId = `sha256:${hex}`;
+  return {
+    schemaVersion: 1,
+    itemId: `ac:${candidate.identityKind}:${hex}`,
+    status: ActionCenterItemStatus.OPEN,
+    severity: candidate.severity,
+    ownerActionKind: candidate.ownerActionKind,
+    title: candidate.title,
+    materialityReason: candidate.materialityReason,
+    sourceKind: candidate.sourceKind,
+    sourceId,
+    sourceRevisionId: await revision(candidate.revisionKind, candidate.revisionParts, cryptoApi),
+    sourceEffectId: candidate.sourceEffectId ? sourceId : '',
+    evidenceArtifactIds: [],
+    createdAt: iso(candidate.createdAt),
+    updatedAt: iso(candidate.updatedAt),
+    closedAt: '',
+    supersededByItemId: '',
+  };
 }
 
 export async function projectRuntimeActionCenter({
@@ -184,8 +202,18 @@ export async function projectRuntimeActionCenter({
   agentJobs = [],
   cryptoApi = globalThis.crypto,
 } = {}) {
-  const items = [];
-  await projectCoreAttention(coreState, items, cryptoApi);
-  await projectBrowserAgentAttention(agentJobs, items, cryptoApi);
-  return buildActionCenterProjectionV1(items);
+  const candidates = [];
+  addCoreCandidates(coreState, candidates);
+  addBrowserAgentCandidates(agentJobs, candidates);
+  const selected = selectCandidates(candidates);
+  const items = await Promise.all(selected.map(candidate => materializeCandidate(candidate, cryptoApi)));
+  const projection = buildActionCenterProjectionV1(items);
+  return Object.freeze({
+    ...projection,
+    runtimeSummary: Object.freeze({
+      candidateCount: candidates.length,
+      projectedCount: items.length,
+      truncated: candidates.length > items.length,
+    }),
+  });
 }
