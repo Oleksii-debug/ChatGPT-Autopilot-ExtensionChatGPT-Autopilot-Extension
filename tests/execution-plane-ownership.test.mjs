@@ -9,6 +9,7 @@ import {
   recoverExpiredExecutionOwnershipV1,
   resolveExecutionReconciliationV1,
   verifyOwnedExecutionV1,
+  verifyExecutionByAuthorityV1,
   normalizeExecutionOwnershipV1,
 } from '../src/core/execution-plane-ownership.js';
 
@@ -166,12 +167,55 @@ test('manual review is terminal to automation and carries ambiguity reason', () 
   assert.throws(() => claimExecutionOwnershipV1(manual, { plane:'REMOTE', ownerId:'r', leaseId:'r1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
 });
 
-test('only current lease can verify completion', () => {
+test('current effect owner cannot self-mint canonical VERIFIED', () => {
   const owned = localOwned();
-  assert.throws(() => verifyOwnedExecutionV1(owned, { leaseId:'wrong', at:T2 }), /current execution owner/);
-  const verified = verifyOwnedExecutionV1(owned, { leaseId:'lease-local', at:T2 });
-  assert.equal(verified.state, ExecutionOwnershipState.VERIFIED);
-  assert.equal(verified.ownerPlane, '');
+  assert.throws(
+    () => verifyOwnedExecutionV1(owned, { leaseId:'wrong', at:T2 }),
+    /current execution owner/,
+  );
+  assert.throws(
+    () => verifyOwnedExecutionV1(owned, { leaseId:'lease-local', at:T2 }),
+    /trusted verifier provenance/,
+  );
+  assert.equal(owned.state, ExecutionOwnershipState.OWNED);
+  assert.equal(owned.ownerId, 'local-worker');
+  assert.equal(owned.leaseId, 'lease-local');
+});
+
+test('caller-shaped verifier authority cannot mint canonical VERIFIED', () => {
+  const owned = localOwned();
+  assert.throws(
+    () => verifyExecutionByAuthorityV1(owned, {
+      leaseId:'lease-local',
+      verifierId:'independent-verifier',
+      verificationAuthorityId:'policy-1',
+      evidence:'Caller claims an independent observation verified the effect.',
+      at:T2,
+    }),
+    /trusted verifier provenance/,
+  );
+  assert.equal(owned.state, ExecutionOwnershipState.OWNED);
+  assert.equal(owned.ownerId, 'local-worker');
+  assert.equal(owned.leaseId, 'lease-local');
+
+  let reads = 0;
+  const request = new Proxy({
+    leaseId:'lease-local',
+    verifierId:'independent-verifier',
+    verificationAuthorityId:'policy-1',
+    evidence:'Caller-shaped evidence.',
+    at:T2,
+  }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  assert.throws(
+    () => verifyExecutionByAuthorityV1(owned, request),
+    /trusted verifier provenance/,
+  );
+  assert.equal(reads, 0, 'verification request must use descriptor snapshots, not caller get traps');
 });
 
 test('normalization fails closed on unknown fields and inconsistent durable ownership', () => {
