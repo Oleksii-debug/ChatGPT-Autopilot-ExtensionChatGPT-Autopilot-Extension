@@ -58,6 +58,10 @@ test('verifier accepts only exact workflow/ref run evidence and never fabricates
   const verified = await verifier.verify({ invocation: inv, executionId: inv.invocationId + ':attempt:1', observation }); assert.equal(verified.status, 'VERIFIED');
   const wrong = new GitHubWorkflowDispatchVerifierV1({ githubClient: { async readWorkflowRun() { return runReadback({ workflowId: workflowId + 1 }); } }, now: () => Date.parse(at) });
   const mismatch = await wrong.verify({ invocation: inv, executionId: inv.invocationId + ':attempt:1', observation }); assert.equal(mismatch.status, 'AMBIGUOUS');
+  const stale = new GitHubWorkflowDispatchVerifierV1({ githubClient: { async readWorkflowRun() { return runReadback({ createdAt: '2026-09-25T12:19:59.999Z', updatedAt: at }); } }, now: () => Date.parse(at) });
+  const staleResult = await stale.verify({ invocation: inv, executionId: inv.invocationId + ':attempt:1', observation }); assert.equal(staleResult.status, 'AMBIGUOUS');
+  const future = new GitHubWorkflowDispatchVerifierV1({ githubClient: { async readWorkflowRun() { return runReadback({ createdAt: '2026-09-25T12:20:00.001Z', updatedAt: '2026-09-25T12:20:00.001Z' }); } }, now: () => Date.parse(at) });
+  const futureResult = await future.verify({ invocation: inv, executionId: inv.invocationId + ':attempt:1', observation }); assert.equal(futureResult.status, 'AMBIGUOUS');
   await assert.rejects(() => verifier.reconcileVerify({ invocation: inv, effectId: inv.invocationId, executionId: inv.invocationId + ':attempt:1', attempt: 1, policyDecisionId: inv.policyDecisionId, expectedOutcome: 'SAFE_RETRY', priorObservation: null }), /cannot prove SAFE_RETRY/i);
 });
 
