@@ -50,33 +50,42 @@ function denseDataArray(value, seen = new Set()) {
   }
   return true;
 }
-function persistedDataOnly(value, seen = new Set()) {
+function persistedDataOnly(value, ancestors = new Set()) {
   if (value === null) return true;
   const type = typeof value;
   if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') return true;
-  if (type !== 'object' || seen.has(value)) return false;
-  seen.add(value);
-  if (Array.isArray(value)) {
-    if (Object.getPrototypeOf(value) !== Array.prototype) return false;
-    const ownKeys = Reflect.ownKeys(value);
-    if (ownKeys.some(key => typeof key === 'symbol')) return false;
-    const names = ownKeys.filter(key => key !== 'length');
-    if (names.length !== value.length) return false;
-    for (let index = 0; index < value.length; index += 1) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  if (type !== 'object' || ancestors.has(value)) return false;
+
+  // Detect only actual recursion cycles. A repeated reference in a sibling
+  // branch is still ordinary data and structuredClone/Chrome storage may
+  // preserve that aliasing. Keeping every previously visited object forever
+  // incorrectly rejects such valid persisted state.
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (Object.getPrototypeOf(value) !== Array.prototype) return false;
+      const ownKeys = Reflect.ownKeys(value);
+      if (ownKeys.some(key => typeof key === 'symbol')) return false;
+      const names = ownKeys.filter(key => key !== 'length');
+      if (names.length !== value.length) return false;
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
+        if (!persistedDataOnly(descriptor.value, ancestors)) return false;
+      }
+      return true;
+    }
+    if (!plainRecord(value)) return false;
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key === 'symbol') return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
       if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
-      if (!persistedDataOnly(descriptor.value, seen)) return false;
+      if (!persistedDataOnly(descriptor.value, ancestors)) return false;
     }
     return true;
+  } finally {
+    ancestors.delete(value);
   }
-  if (!plainRecord(value)) return false;
-  for (const key of Reflect.ownKeys(value)) {
-    if (typeof key === 'symbol') return false;
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) return false;
-    if (!persistedDataOnly(descriptor.value, seen)) return false;
-  }
-  return true;
 }
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
