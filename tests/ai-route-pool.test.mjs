@@ -611,6 +611,53 @@ test('durable route health state rejects numeric aliases instead of silently can
   );
 });
 
+test('route selection clock and outcome success flag reject coercive aliases', () => {
+  const [route] = normalizeAiRoutePool([
+    { routeId:'exact-boundary', provider:'ollama', model:'local', roles:['planner'], priority:1 },
+  ]);
+  const routeStates = {
+    'exact-boundary': {
+      backoffUntil:1001,
+      circuitOpenUntil:0,
+    },
+  };
+
+  for (const invalidNow of ['1000', 1000.5, -0, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(
+      () => selectAiRouteCandidates({
+        routes:[route],
+        policy:{},
+        routeStates,
+        role:'planner',
+        now:invalidNow,
+      }),
+      /AI route selection now is invalid/u,
+    );
+  }
+
+  for (const invalidOk of ['false', 0, 1, null, undefined]) {
+    assert.throws(
+      () => recordAiRouteOutcome({}, route, {}, {
+        ok:invalidOk,
+        at:1000,
+        latencyMs:0,
+      }),
+      /AI route outcome ok must be boolean/u,
+    );
+  }
+
+  assert.equal(
+    selectAiRouteCandidates({
+      routes:[route],
+      policy:{},
+      routeStates,
+      role:'planner',
+      now:1000,
+    }).candidates.length,
+    0,
+  );
+});
+
 test('route outcome emission preserves exact integer durable state and rejects overflow or coercive numeric aliases', () => {
   const [route] = normalizeAiRoutePool([
     { routeId:'exact-outcome', provider:'ollama', model:'local', roles:['planner'], priority:1 },
