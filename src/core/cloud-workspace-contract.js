@@ -17,6 +17,10 @@ export const CloudWorkspaceContinuityStatus = Object.freeze({
   BLOCKED: 'BLOCKED',
 });
 
+export const CloudWorkspaceObservationTrust = Object.freeze({
+  UNVERIFIED_INPUT: 'UNVERIFIED_INPUT',
+});
+
 const HEALTH = new Set(Object.values(CloudWorkspaceHealth));
 const OWNERSHIP_STATES = new Set(Object.values(ExecutionOwnershipState));
 const OWNERSHIP_PLANES = new Set(['LOCAL', 'CLOUD', 'REMOTE']);
@@ -192,13 +196,17 @@ const BINDING_KEYS = new Set([
   'environmentSha256', 'checkpointArtifactId', 'checkpointSha256',
   'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId',
   'executionOwnerId', 'executionLeaseId', 'executionOwnershipRevision',
-  'baselineObservedAt', 'boundAt', 'executionAuthorized', 'resumeAuthorized',
+  'baselineObservedAt', 'boundAt', 'observationTrust',
+  'executionAuthorized', 'resumeAuthorized',
 ]);
 
 export function normalizeCloudWorkspaceBindingV1(input) {
   const raw = dataRecord(input, BINDING_KEYS, 'CloudWorkspaceBindingV1');
   if (raw.schemaVersion !== CLOUD_WORKSPACE_VERSION) {
     throw new Error('Unsupported CloudWorkspaceBindingV1 schemaVersion');
+  }
+  if (raw.observationTrust !== CloudWorkspaceObservationTrust.UNVERIFIED_INPUT) {
+    throw new Error('Cloud workspace binding cannot self-assert trusted provider observation');
   }
   if (raw.executionAuthorized !== false || raw.resumeAuthorized !== false) {
     throw new Error('Cloud workspace binding cannot grant execution or resume authority');
@@ -233,6 +241,7 @@ export function normalizeCloudWorkspaceBindingV1(input) {
     ),
     baselineObservedAt,
     boundAt,
+    observationTrust: CloudWorkspaceObservationTrust.UNVERIFIED_INPUT,
     executionAuthorized: false,
     resumeAuthorized: false,
   });
@@ -279,8 +288,11 @@ function assessment(status, reasonCode, binding, ownership, at) {
     providerId: binding.providerId,
     executionOwnershipRevision: ownership.revision,
     workspaceReady: ready,
+    observationTrust: CloudWorkspaceObservationTrust.UNVERIFIED_INPUT,
+    providerObservationVerified: false,
     executionAuthorized: false,
     resumeAuthorized: false,
+    requiresCanonicalProviderObservation: true,
     requiresCanonicalRuntime: true,
     requiresFreshPolicy: true,
     requiresCanonicalReconciliation:
@@ -333,6 +345,7 @@ export function createCloudWorkspaceBindingV1(
     executionOwnershipRevision: observation.executionOwnershipRevision,
     baselineObservedAt: observation.observedAt,
     boundAt: assessedAt,
+    observationTrust: CloudWorkspaceObservationTrust.UNVERIFIED_INPUT,
     executionAuthorized: false,
     resumeAuthorized: false,
   });
