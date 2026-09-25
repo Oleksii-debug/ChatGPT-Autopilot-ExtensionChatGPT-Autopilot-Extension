@@ -124,6 +124,122 @@ test('explicit zero owner price caps reject positive paid dimensions while absen
   );
 });
 
+test('economic route and policy authority is descriptor-safe before dispatch', () => {
+  let reads = 0;
+  const accessorPolicy = {};
+  Object.defineProperty(accessorPolicy, 'maxInputPricePerMillionUsd', {
+    enumerable:true,
+    get() { reads += 1; return 0; },
+  });
+  assert.throws(() => normalizeAiRoutePolicy(accessorPolicy), /data property/u);
+  assert.equal(reads, 0, 'owner price-cap getter must never execute');
+
+  const hiddenPolicy = {};
+  Object.defineProperty(hiddenPolicy, 'maxOutputPricePerMillionUsd', {
+    value:0,
+    enumerable:false,
+  });
+  assert.throws(() => normalizeAiRoutePolicy(hiddenPolicy), /enumerable own data property/u);
+
+  const symbolPolicy = { freeOnly:true };
+  symbolPolicy[Symbol('hidden')] = true;
+  assert.throws(() => normalizeAiRoutePolicy(symbolPolicy), /symbol field/u);
+
+  const inheritedPolicy = Object.create({ maxInputPricePerMillionUsd:0 });
+  inheritedPolicy.freeOnly = true;
+  assert.throws(() => normalizeAiRoutePolicy(inheritedPolicy), /plain data object/u);
+
+  const nullPolicy = Object.create(null);
+  nullPolicy.maxInputPricePerMillionUsd = 0;
+  assert.equal(normalizeAiRoutePolicy(nullPolicy).maxInputPricePerMillionUsd, 0);
+
+  reads = 0;
+  const accessorRoute = {
+    routeId:'accessor-route',
+    provider:'openai',
+    model:'paid',
+    locality:'remote',
+    costClass:'paid',
+    outputPricePerMillionUsd:1,
+  };
+  Object.defineProperty(accessorRoute, 'inputPricePerMillionUsd', {
+    enumerable:true,
+    get() { reads += 1; return 1; },
+  });
+  assert.throws(() => normalizeAiRoutePool([accessorRoute]), /data property/u);
+  assert.equal(reads, 0, 'route price getter must never execute');
+
+  const hiddenKnown = {
+    routeId:'hidden-known',
+    provider:'openai',
+    model:'paid',
+    locality:'remote',
+    costClass:'paid',
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:1,
+  };
+  Object.defineProperty(hiddenKnown, 'outputPriceKnown', { value:false, enumerable:false });
+  assert.throws(() => normalizeAiRoutePool([hiddenKnown]), /enumerable own data property/u);
+
+  const symbolRoute = {
+    routeId:'symbol-route',
+    provider:'openai',
+    model:'paid',
+    locality:'remote',
+    costClass:'paid',
+    inputPricePerMillionUsd:0,
+    outputPricePerMillionUsd:0,
+  };
+  symbolRoute[Symbol('hidden')] = true;
+  assert.throws(() => normalizeAiRoutePool([symbolRoute]), /symbol field/u);
+
+  const inheritedRoute = Object.create({ inputPricePerMillionUsd:0 });
+  Object.assign(inheritedRoute, {
+    routeId:'inherited-route',
+    provider:'openai',
+    model:'paid',
+    locality:'remote',
+    costClass:'paid',
+    outputPricePerMillionUsd:0,
+  });
+  assert.throws(() => normalizeAiRoutePool([inheritedRoute]), /plain data object/u);
+});
+
+test('economic route and policy arrays must be dense own data arrays', () => {
+  let reads = 0;
+  const accessorPool = [];
+  accessorPool.length = 1;
+  Object.defineProperty(accessorPool, '0', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      reads += 1;
+      return { routeId:'a', provider:'ollama', model:'a' };
+    },
+  });
+  assert.throws(() => normalizeAiRoutePool(accessorPool), /dense data-only array/u);
+  assert.equal(reads, 0, 'route-array getter must never execute');
+
+  const sparsePool = new Array(1);
+  assert.throws(() => normalizeAiRoutePool(sparsePool), /dense data-only array/u);
+
+  const ordered = ['free-local'];
+  Object.defineProperty(ordered, '0', {
+    enumerable:true,
+    configurable:true,
+    get() {
+      reads += 1;
+      return 'free-local';
+    },
+  });
+  assert.throws(() => normalizeAiRoutePolicy({ orderedRouteIds:ordered }), /dense data-only array/u);
+  assert.equal(reads, 0, 'policy route-id getter must never execute');
+
+  const symbolIds = ['free-local'];
+  symbolIds[Symbol('hidden')] = 'paid-remote';
+  assert.throws(() => normalizeAiRoutePolicy({ allowRouteIds:symbolIds }), /dense data-only array/u);
+});
+
 test('route final tie-break uses locale-independent code-unit order', () => {
   const sameRank = normalizeAiRoutePool([
     { routeId:'alpha', provider:'ollama', model:'a', roles:['planner'], priority:1 },
