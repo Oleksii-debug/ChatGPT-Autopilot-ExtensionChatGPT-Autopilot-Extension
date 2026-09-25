@@ -68,6 +68,7 @@ function strictRecord(input, allowed, label) {
     throw new Error(`${label} must be a plain object`);
   }
   const descriptors = Object.getOwnPropertyDescriptors(input);
+  const snapshot = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
       throw new Error(`${label} contains unknown field: ${String(key)}`);
@@ -76,13 +77,9 @@ function strictRecord(input, allowed, label) {
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || !descriptor.enumerable) {
       throw new Error(`${label} must contain enumerable data properties only`);
     }
+    snapshot[key] = descriptor.value;
   }
-  for (const key of allowed) {
-    if (key in input && !Object.prototype.hasOwnProperty.call(input, key)) {
-      throw new Error(`${label} contains inherited field: ${key}`);
-    }
-  }
-  return input;
+  return snapshot;
 }
 
 function strictArray(input, label, { min = 0, max } = {}) {
@@ -514,6 +511,9 @@ export function derivePrincipalGovernanceCeilingV1({
       outboundDataClassIds: Object.freeze([]),
       ownedCredentialBindings: Object.freeze([]),
       policyDecision: 'NONE',
+      authorizationGranted: false,
+      credentialUseAuthorized: false,
+      requiresPolicyDecision: true,
     });
   }
 
@@ -555,6 +555,9 @@ export function derivePrincipalGovernanceCeilingV1({
     outboundDataClassIds: Object.freeze([...(effectiveDataClasses || new Set())].sort(asciiCompare)),
     ownedCredentialBindings: Object.freeze(activeCredentialBindingsForPrincipal(registry, principalId, atMillis)),
     policyDecision: 'NONE',
+    authorizationGranted: false,
+    credentialUseAuthorized: false,
+    requiresPolicyDecision: true,
   });
 }
 
@@ -681,5 +684,7 @@ export function inventoryIdentityGovernanceV1(registryInput) {
     grantIds: Object.freeze(registry.grants.map((item) => item.grantId)),
     credentialBindingIds: Object.freeze(registry.credentialOwnership.map((item) => item.bindingId)),
     updatedAt: registry.updatedAt,
+    authorizationGranted: false,
+    credentialUseAuthorized: false,
   });
 }
