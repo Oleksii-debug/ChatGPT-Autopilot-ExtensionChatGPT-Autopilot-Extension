@@ -16,6 +16,17 @@ const routes = () => normalizeAiRoutePool([
   { routeId:'compatible', provider:'openai-compatible', endpointId:'team-a', model:'worker', roles:['planner','coder'], capabilityIds:['code'], priority:10, locality:'remote', costClass:'paid', inputPricePerMillionUsd:2, outputPricePerMillionUsd:8 },
 ]);
 
+test('remote route with unclassified pricing remains unknown and cannot silently execute', () => {
+  const [remote, local] = normalizeAiRoutePool([
+    { routeId:'new-remote', provider:'openai-compatible', endpointId:'team-a', model:'worker' },
+    { routeId:'known-local', provider:'ollama', model:'local' },
+  ]);
+  assert.equal(remote.costClass, 'unknown');
+  assert.equal(local.costClass, 'free');
+  assert.deepEqual(selectAiRouteCandidates({ routes:[remote, local], role:'planner', now:1000 }).candidates.map(route => route.routeId), ['known-local']);
+  assert.equal(normalizeAiRoutePool([{ ...remote, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 }])[0].costClass, 'paid');
+});
+
 test('route pool applies owner allow/deny, cost, locality, capability and deterministic order', () => {
   const policy = normalizeAiRoutePolicy({ freeOnly:true, locality:'local', orderedRouteIds:['free-local','paid-remote'] });
   const selected = selectAiRouteCandidates({ routes:routes(), policy, role:'planner', now:1000 });
