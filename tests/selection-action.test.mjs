@@ -228,6 +228,22 @@ test('source and owner instruction bounds are enforced', () => {
   assert.throws(() => normalizeSelectionActionRequestV1(request({ ownerInstruction: 'x'.repeat(16_001) })), /ownerInstruction is invalid/);
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ uri: 'x'.repeat(4097) })), /uri is invalid/);
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ uri: ' https://example.test/' })), /uri is invalid/);
+  for (const uri of [
+    'https://example.test/a\nb',
+    'https://example.test/a\tb',
+    'https://example.test/a\u0000b',
+    'https://example.test/a\u007fb',
+  ]) {
+    assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ uri })), /uri is invalid/);
+  }
+
+  assert.equal(
+    normalizeSelectionActionSourceV1(selectionSource({
+      kind: 'CURRENT_PAGE',
+      uri: 'chrome://settings/accessibility',
+    })).uri,
+    'chrome://settings/accessibility',
+  );
 });
 
 test('request chronology cannot predate its captured source', () => {
