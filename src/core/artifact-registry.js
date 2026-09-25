@@ -144,6 +144,7 @@ function exactTimestamp(value, label) {
 function exactInteger(value, label, min, max) {
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
       || value < min
       || value > max) {
     throw new Error(`${label} must be an integer in range`);
