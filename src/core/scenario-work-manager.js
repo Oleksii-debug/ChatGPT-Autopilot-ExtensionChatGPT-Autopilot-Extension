@@ -193,6 +193,11 @@ function isSafeToRemoveSession(session) {
 function ensureManagerRuntimeFields(runtime) {
   const out = clone(runtime);
   out.ownerEpoch = Math.max(0, Number(out.ownerEpoch || 0));
+  // A legacy store cannot reconstruct verified sends from already retired
+  // timed-out chats. Keep that uncertainty visible to the read projection.
+  out.verifiedSendHistoryComplete = out.verifiedSendHistoryComplete === true;
+  out.retiredVerifiedSends = Math.max(0, Number(out.retiredVerifiedSends || 0));
+  out.generationRetiredVerifiedSends = Math.max(0, Number(out.generationRetiredVerifiedSends || 0));
   out.nextLaunchAt = Math.max(0, Number(out.nextLaunchAt || 0));
   if (!Number.isFinite(out.nextLaunchAt)) out.nextLaunchAt = 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
@@ -418,7 +423,9 @@ export class ScenarioWorkManager {
     await this.update(store => {
       if (store.byId[id]) throw new Error('Сценарій з таким ідентифікатором уже існує.');
       const normalizedConfig = normalizeScenarioWorkConfig({ ...config, id, name, mode });
-      store.byId[id] = { id, name: safeName(name), config: normalizedConfig, runtime: ensureManagerRuntimeFields(createScenarioWorkRuntime(normalizedConfig, now)), createdAt: now, updatedAt: now };
+      const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalizedConfig, now));
+      runtime.verifiedSendHistoryComplete = true;
+      store.byId[id] = { id, name: safeName(name), config: normalizedConfig, runtime, createdAt: now, updatedAt: now };
       store.order.push(id);
       store.selectedId = id;
       return store;
@@ -448,7 +455,10 @@ export class ScenarioWorkManager {
       const modeChanged = item.config.mode !== config.mode;
       item.name = safeName(config.name, item.name);
       item.config = config;
-      if (modeChanged) item.runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(config, now));
+      if (modeChanged) {
+        item.runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(config, now));
+        item.runtime.verifiedSendHistoryComplete = true;
+      }
       item.updatedAt = now;
       return store;
     });
@@ -462,7 +472,10 @@ export class ScenarioWorkManager {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
       let next = item.runtime;
-      if (next.runState === ScenarioWorkRunState.COMPLETED) next = ensureManagerRuntimeFields(createScenarioWorkRuntime(item.config, now));
+      if (next.runState === ScenarioWorkRunState.COMPLETED) {
+        next = ensureManagerRuntimeFields(createScenarioWorkRuntime(item.config, now));
+        next.verifiedSendHistoryComplete = true;
+      }
       next = startScenarioWork(item.config, next, now);
       next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
       item.runtime = ensureManagerRuntimeFields(next);
@@ -811,7 +824,13 @@ export class ScenarioWorkManager {
       const preserveChat = scenario.config.mode === ScenarioWorkMode.CHAT_CYCLE
         && next.runState === ScenarioWorkRunState.RUNNING
         && next.generation === completedGeneration;
-      if (!preserveChat) next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), completedSessionId])];
+      if (!preserveChat) {
+        const confirmed = Math.max(0, Number(session.successfulSendCount || 0));
+        next.retiredVerifiedSends += confirmed;
+        next.generationRetiredVerifiedSends = next.generation === completedGeneration
+          ? next.generationRetiredVerifiedSends + confirmed : 0;
+        next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), completedSessionId])];
+      }
       const checkpoint = await this.checkpointRuntime(scenario.id, next, expectedOwnerEpoch, now);
       if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
       runtime = checkpoint.runtime;
@@ -874,7 +893,13 @@ export class ScenarioWorkManager {
       const participant = scenarioWorkParticipants(runtime).find(item => item.key === action.participantKey);
       const staleSessionId = participant?.sessionId || '';
       let next = ensureManagerRuntimeFields(applyScenarioTimeout(scenario.config, runtime, action.participantKey, { now }));
-      if (staleSessionId) next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), staleSessionId])];
+      if (staleSessionId) {
+        const staleSession = (await this.coreRepository.load()).sessionsById?.[staleSessionId];
+        const confirmed = Math.max(0, Number(staleSession?.successfulSendCount || 0));
+        next.retiredVerifiedSends += confirmed;
+        next.generationRetiredVerifiedSends += confirmed;
+        next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), staleSessionId])];
+      }
       const checkpoint = await this.checkpointRuntime(id, next, expectedOwnerEpoch, now);
       if (!checkpoint.applied) {
         const live = await this.get(id);

@@ -360,12 +360,43 @@ test('five independent chats each keep one Core Session and tab for 17 completed
       } else {
         const state = await core.load();
         assert.equal(runtime.generation, 2);
+        assert.equal(runtime.retiredVerifiedSends, 17);
+        assert.equal(runtime.generationRetiredVerifiedSends, 0);
+        assert.equal(runtime.verifiedSendHistoryComplete, true);
         assert.equal(state.sessionsById[sid], undefined);
         assert.equal(state.sessionOrder.filter(candidate => state.sessionsById[candidate]?.scenarioWork?.scenarioId === id).length, 1);
       }
     }
   }
   assert.deepEqual(retired, [100, 101, 102, 103, 104]);
+});
+
+test('timed-out verified Send remains in durable totals after its Core Session is retired', async () => {
+  let now = 11_000;
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const build = () => new ScenarioWorkManager({ coreRepository: core, chromeApi: chrome, now: () => now,
+    createId: () => 'timeout-ledger', collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
+  let manager = build();
+  await manager.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: {
+    steps: [{ prompt: 'FIRST' }, { prompt: 'SECOND' }], responseTimeoutMinutes: 1,
+  } });
+  await manager.start('timeout-ledger');
+  const sid = core.state.sessionOrder[0];
+  await markOnlyManagedSessionSent(core, 'https://chatgpt.com/c/timeout-ledger', now + 1);
+  now += 61_000;
+  await manager.cycleOne('timeout-ledger');
+  let runtime = (await manager.get('timeout-ledger')).scenario.runtime;
+  assert.equal(runtime.totalCompletedTurns, 0);
+  assert.equal(runtime.retiredVerifiedSends, 1);
+  assert.equal(runtime.generationRetiredVerifiedSends, 1);
+  assert.equal(core.state.sessionsById[sid]?.successfulSendCount, 0,
+    'replacement chat starts a fresh Core Session after retiring the timed-out effect');
+  assert.equal(core.state.sessionsById[sid]?.createdAt, now);
+  manager = build();
+  await manager.cycleOne('timeout-ledger');
+  runtime = (await manager.get('timeout-ledger')).scenario.runtime;
+  assert.equal(runtime.retiredVerifiedSends, 1, 'restart cannot count the retired send twice');
 });
 
 test('replayed launch never resets verified send or unresolved operation', async () => {
