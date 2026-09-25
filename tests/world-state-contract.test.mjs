@@ -288,7 +288,7 @@ test('precondition is bound to exact snapshot identity/revision/scope and only r
     currentObservations: [current({ revisionId: 'commit-forged', contentSha256: HASH_B })],
     invocationId: 'invoke-1',
     at: ASSESSED,
-  }), /resource binding mismatch/);
+  }), /snapshot fingerprint mismatch/);
 
   assert.throws(() => assertWorldStatePreconditionFreshV1({
     precondition: precondition(),
