@@ -9,6 +9,7 @@ export const GoogleWorkspaceToolId = Object.freeze({
   DRIVE_FILE_UPDATE: 'remote/google-workspace/drive.file.update',
   GMAIL_SEARCH: 'remote/google-workspace/gmail.search',
   GMAIL_MESSAGE_GET: 'remote/google-workspace/gmail.message.get',
+  GMAIL_MESSAGE_MODIFY: 'remote/google-workspace/gmail.message.modify',
   GMAIL_THREAD_GET: 'remote/google-workspace/gmail.thread.get',
   GMAIL_ATTACHMENT_GET: 'remote/google-workspace/gmail.attachment.get',
   GMAIL_DRAFT_CREATE: 'remote/google-workspace/gmail.draft.create',
@@ -21,6 +22,7 @@ export const GoogleWorkspaceCapabilityId = Object.freeze({
   DRIVE_FILE_UPDATE: 'google.drive.file.update',
   GMAIL_SEARCH: 'google.gmail.search',
   GMAIL_MESSAGE_READ: 'google.gmail.message.read',
+  GMAIL_MESSAGE_MODIFY: 'google.gmail.message.modify',
   GMAIL_ATTACHMENT_READ: 'google.gmail.attachment.read',
   GMAIL_DRAFT_CREATE: 'google.gmail.draft.create',
   GMAIL_DRAFT_SEND: 'google.gmail.draft.send',
@@ -92,6 +94,17 @@ const TOOLS = Object.freeze([
     inputSchemaRef: 'google-workspace-schema/gmail.message.get/input',
     outputSchemaRef: 'google-workspace-schema/gmail.message.get/output',
     readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GoogleWorkspaceToolId.GMAIL_MESSAGE_MODIFY,
+    providerId: GOOGLE_WORKSPACE_PROVIDER_ID,
+    label: 'Modify owner-authorized Gmail message labels',
+    description: 'Adds and/or removes exact label IDs on one owner-authorized Gmail message through the canonical exact-effect path. Removing INBOX archives the message.',
+    capabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_MODIFY],
+    inputSchemaRef: 'google-workspace-schema/gmail.message.modify/input',
+    outputSchemaRef: 'google-workspace-schema/gmail.message.modify/output',
+    readOnly: false,
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
@@ -309,6 +322,7 @@ function methodFor(toolId) {
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_UPDATE) return 'updateDriveFile';
   if (toolId === GoogleWorkspaceToolId.GMAIL_SEARCH) return 'searchGmail';
   if (toolId === GoogleWorkspaceToolId.GMAIL_MESSAGE_GET) return 'getGmailMessage';
+  if (toolId === GoogleWorkspaceToolId.GMAIL_MESSAGE_MODIFY) return 'modifyGmailMessage';
   if (toolId === GoogleWorkspaceToolId.GMAIL_THREAD_GET) return 'getGmailThread';
   if (toolId === GoogleWorkspaceToolId.GMAIL_ATTACHMENT_GET) return 'getGmailAttachment';
   if (toolId === GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE) return 'createGmailDraft';

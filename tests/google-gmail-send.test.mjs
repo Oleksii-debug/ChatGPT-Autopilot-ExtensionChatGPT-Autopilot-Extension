@@ -57,7 +57,7 @@ test('successful draft send is committed only after independent SENT readback', 
   let sends=0,reads=0,now=baseMs;
   const workspaceClient={
     searchDrive:async()=>({}),getDriveFile:async()=>({}),readDriveText:async()=>({}),updateDriveFile:async()=>({}),searchGmail:async()=>({}),
-    getGmailMessage:async()=>({}),getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
+    getGmailMessage:async()=>({}),modifyGmailMessage:async()=>({}),getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
     sendGmailDraft:async()=>{sends+=1;return{userId,draftId:'draft_1',messageId:'sent_1',threadId:'thread_1',labelIds:['SENT']};},
     getGmailSentMessage:async({userId:seen,messageId})=>{reads+=1;assert.equal(seen,userId);assert.equal(messageId,'sent_1');return{id:'sent_1',threadId:'thread_1',labelIds:['SENT']};},
   };
@@ -78,7 +78,7 @@ test('transport-ambiguous draft send never blind-retries and cannot auto-verify 
   let sends=0,now=baseMs;
   const workspaceClient={
     searchDrive:async()=>({}),getDriveFile:async()=>({}),readDriveText:async()=>({}),updateDriveFile:async()=>({}),searchGmail:async()=>({}),
-    getGmailMessage:async()=>({}),getGmailSentMessage:async()=>{throw new Error('must not read arbitrary candidates');},getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
+    getGmailMessage:async()=>({}),modifyGmailMessage:async()=>({}),getGmailSentMessage:async()=>{throw new Error('must not read arbitrary candidates');},getGmailThread:async()=>({}),getGmailAttachment:async()=>({}),createGmailDraft:async()=>({}),
     sendGmailDraft:async()=>{sends+=1;const e=new Error('lost response');e.effectMayHaveOccurred=true;e.safeToRetry=false;throw e;},
   };
   const provider=new GoogleWorkspaceAgentProviderV1({workspaceClient,grantedCapabilityIds:[GoogleWorkspaceCapabilityId.GMAIL_DRAFT_SEND],now:()=>{now+=100;return now;}});
