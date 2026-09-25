@@ -183,8 +183,23 @@ function exactStringArray(value, label) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     fail('A2A_PROVIDER_RESULT_INVALID', `${label} must be a plain dense array`);
   }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0) {
+    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must have an exact data length`);
+  }
+  const length = lengthDescriptor.value;
+  const expectedKeys = new Set(['length']);
+  for (let index = 0; index < length; index += 1) expectedKeys.add(String(index));
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !expectedKeys.has(key)) {
+      fail('A2A_PROVIDER_RESULT_INVALID', `${label} must not contain extra array properties`);
+    }
+  }
   const out = [];
-  for (let index = 0; index < value.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
     if (!descriptor
         || descriptor.enumerable !== true
@@ -195,10 +210,6 @@ function exactStringArray(value, label) {
       fail('A2A_PROVIDER_RESULT_INVALID', `${label} must contain exact string identifiers`);
     }
     out.push(descriptor.value);
-  }
-  const ownKeys = Reflect.ownKeys(value).filter(key => key !== 'length');
-  if (ownKeys.length !== value.length) {
-    fail('A2A_PROVIDER_RESULT_INVALID', `${label} must not contain extra array properties`);
   }
   return out;
 }
