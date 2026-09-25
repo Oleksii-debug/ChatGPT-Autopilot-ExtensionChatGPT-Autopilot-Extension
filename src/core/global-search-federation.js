@@ -203,7 +203,7 @@ export function normalizeGlobalSearchProviderResultV1(input) {
     }
     if (hitIds.has(hit.hitId)) throw new Error(`duplicate hitId: ${hit.hitId}`);
     if (ranks.has(hit.rank)) throw new Error(`duplicate provider rank: ${hit.rank}`);
-    const sourceIdentity = JSON.stringify([hit.sourceId, hit.revisionId, hit.uri, hit.contentSha256]);
+    const sourceIdentity = JSON.stringify([hit.sourceId, hit.revisionId, hit.uri]);
     if (sourceIdentities.has(sourceIdentity)) throw new Error(`duplicate provider source identity: ${hit.sourceId}`);
     hitIds.add(hit.hitId);
     ranks.add(hit.rank);
@@ -234,7 +234,7 @@ export function normalizeGlobalSearchProviderResultV1(input) {
 }
 
 function sourceKey(batch, hit) {
-  return JSON.stringify([batch.domain, hit.sourceId, hit.revisionId, hit.uri, hit.contentSha256]);
+  return JSON.stringify([batch.domain, hit.sourceId, hit.revisionId, hit.uri]);
 }
 
 function providerBatchKey(batch) {
@@ -287,6 +287,11 @@ export function fuseGlobalSearchV1(input) {
           providerRefs: [],
         };
         fused.set(key, item);
+      } else {
+        if (item.contentSha256 && hit.contentSha256 && item.contentSha256 !== hit.contentSha256) {
+          throw new Error(`conflicting content digest for source revision: ${hit.sourceId}`);
+        }
+        if (!item.contentSha256 && hit.contentSha256) item.contentSha256 = hit.contentSha256;
       }
       item.fusionScore += rrfContribution(hit.rank);
       item.providerCount += 1;
@@ -297,6 +302,7 @@ export function fuseGlobalSearchV1(input) {
       item.providerRefs.push({
         providerId: batch.providerId,
         hitId: hit.hitId,
+        contentSha256: hit.contentSha256,
         rank: hit.rank,
         visibilityScopeId: batch.visibilityScopeId,
         observedAt: hit.observedAt,
