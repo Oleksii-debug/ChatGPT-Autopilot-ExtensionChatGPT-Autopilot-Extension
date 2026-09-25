@@ -109,7 +109,10 @@ test('compiles a registry-compatible value-free CANDIDATE without granting autho
 
   assert.deepEqual(
     compiled.recipeDefinition.sourceBindings
-      .filter(item => !item.sourceId.startsWith('recipe-parameters:'))
+      .filter(item =>
+        !item.sourceId.startsWith('recipe-parameters:')
+        && !item.sourceId.startsWith('recipe-trace:')
+      )
       .map(item => item.sourceId),
     ['source-a', 'source-b'],
   );
@@ -123,6 +126,19 @@ test('compiles a registry-compatible value-free CANDIDATE without granting autho
       item.sourceId === compiled.parameterSchemaBinding.sourceId
       && item.revisionId === compiled.parameterSchemaBinding.revisionId
       && item.contentSha256 === compiled.parameterSchemaBinding.contentSha256
+    ),
+    true,
+  );
+  assert.match(compiled.traceBinding.sourceId, /^recipe-trace:[a-f0-9]{32}$/u);
+  assert.equal(
+    compiled.traceBinding.revisionId,
+    'sha256:' + compiled.traceBinding.contentSha256,
+  );
+  assert.equal(
+    compiled.recipeDefinition.sourceBindings.some(item =>
+      item.sourceId === compiled.traceBinding.sourceId
+      && item.revisionId === compiled.traceBinding.revisionId
+      && item.contentSha256 === compiled.traceBinding.contentSha256
     ),
     true,
   );
@@ -381,6 +397,36 @@ test('strict boundary rejects hidden/symbol/exotic records and sparse/side array
   await assert.rejects(() => compileRecipeCandidateV1(side), /non-index array data/u);
 });
 
+test('structural trace/evidence SHA-256 is part of Recipe subject provenance', async () => {
+  const base = await compileRecipeCandidateV1(input());
+
+  const changedInput = input();
+  changedInput.trace.steps[0].verificationEvidenceSha256 = SHA_D;
+  const changed = await compileRecipeCandidateV1(changedInput);
+
+  assert.notEqual(
+    base.traceBinding.contentSha256,
+    changed.traceBinding.contentSha256,
+  );
+  assert.notDeepEqual(
+    base.recipeDefinition.sourceBindings,
+    changed.recipeDefinition.sourceBindings,
+  );
+  assert.equal(base.traceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(base.registryAdmissionAuthorized, false);
+
+  const collisionInput = input();
+  collisionInput.sourceBindings.push({
+    sourceId: base.traceBinding.sourceId,
+    revisionId: 'external-revision',
+    contentSha256: SHA_D,
+  });
+  await assert.rejects(
+    () => compileRecipeCandidateV1(collisionInput),
+    /collides with compiler provenance identity/u,
+  );
+});
+
 test('parameter schema SHA-256 is part of the Recipe subject source bindings', async () => {
   const base = await compileRecipeCandidateV1(input());
 
@@ -405,7 +451,7 @@ test('parameter schema SHA-256 is part of the Recipe subject source bindings', a
   });
   await assert.rejects(
     () => compileRecipeCandidateV1(collisionInput),
-    /collides with compiler parameter schema identity/u,
+    /collides with compiler provenance identity/u,
   );
 });
 
