@@ -23,7 +23,6 @@ const REQUEST_KEYS = new Set([
 const ROW_KEYS = new Set([
   'criterionId',
   'verification',
-  'evidenceKinds',
 ]);
 
 function record(value, label) {
@@ -113,15 +112,6 @@ function compareCodeUnit(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function uniqueIdList(value, label, { min = 0, max = MAX_ITEMS } = {}) {
-  const items = denseArray(value, label, { min, max });
-  const out = items.map((item, index) => exactId(item, label + '[' + index + ']'));
-  if (new Set(out).size !== out.length) {
-    throw new Error(label + ' contains duplicate ids');
-  }
-  return Object.freeze(out.sort(compareCodeUnit));
-}
-
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -160,7 +150,6 @@ function normalizeRow(input, index) {
   return Object.freeze({
     criterionId: exactId(raw.criterionId, label + ' criterionId'),
     verification: normalizeVerificationV1(raw.verification),
-    evidenceKinds: uniqueIdList(raw.evidenceKinds, label + ' evidenceKinds', { min: 0, max: 32 }),
   });
 }
 
@@ -190,6 +179,7 @@ function criterionResult({
     throw new Error('Criterion ' + row.criterionId + ' verification is future-dated');
   }
 
+  const evidenceKinds = new Set();
   for (const artifactId of verification.evidenceArtifactIds) {
     const artifact = artifactsById.get(artifactId);
     if (!artifact) {
@@ -201,12 +191,12 @@ function criterionResult({
     if (artifact.createdAt > verification.verifiedAt || artifact.createdAt > evaluatedAt) {
       throw new Error('Criterion ' + row.criterionId + ' evidence is future-dated relative to verification: ' + artifactId);
     }
+    evidenceKinds.add(artifact.kind);
     referencedArtifactIds.add(artifactId);
   }
 
-  const suppliedKinds = new Set(row.evidenceKinds);
   const missingKinds = criterion.requiredEvidenceKinds
-    .filter(kind => !suppliedKinds.has(kind))
+    .filter(kind => !evidenceKinds.has(kind))
     .sort(compareCodeUnit);
   const missingArtifactCount = Math.max(
     0,
@@ -235,7 +225,7 @@ function criterionResult({
     accepted,
     reasonCode,
     evidenceArtifactIds: [...verification.evidenceArtifactIds].sort(compareCodeUnit),
-    evidenceKinds: [...row.evidenceKinds],
+    evidenceKinds: [...evidenceKinds].sort(compareCodeUnit),
     missingEvidenceKinds: missingKinds,
     missingEvidenceArtifactCount: missingArtifactCount,
     verifiedAt: verification.verifiedAt,
