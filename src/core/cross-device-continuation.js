@@ -16,6 +16,7 @@ export const CrossDeviceContinuationStatus = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const PLANES = new Set(['LOCAL', 'CLOUD', 'REMOTE']);
 const STATES = new Set(Object.values(ExecutionOwnershipState));
 const REQUEST_KEYS = new Set([
@@ -24,13 +25,18 @@ const REQUEST_KEYS = new Set([
   'requestedAt','expiresAt',
 ]);
 const OPTION_KEYS = new Set([
-  'resolveExecutionOwnership','resolveAgentCheckpoint','resolveAgentHead','resolveTargetWorldState','assessmentAt','cryptoApi',
+  'resolveExecutionOwnership','resolveHandoffCheckpointBinding','resolveAgentCheckpoint','resolveAgentHead',
+  'resolveTargetWorldState','assessmentAt','cryptoApi',
 ]);
 const OWNERSHIP_KEYS = new Set([
   'schemaVersion','taskId','planId','nodeId','effectId','policyEnvelopeId','state','ownerPlane','ownerId','leaseId',
   'leaseUntil','handoffToPlane','handoffId','ambiguityReason','updatedAt','revision',
 ]);
 const WORLD_KEYS = new Set(['snapshot','currentObservations']);
+const HANDOFF_CHECKPOINT_KEYS = new Set([
+  'schemaVersion','taskId','planId','nodeId','effectId','handoffId','executionOwnershipRevision',
+  'checkpointId','checkpointDigest','boundAt',
+]);
 
 function record(value, label, keys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' must be a plain data object');
@@ -82,6 +88,10 @@ function timestamp(value, label, optional = false) {
   if (!Number.isFinite(ms) || new Date(ms).toISOString() !== value) throw new Error(label + ' must use exact canonical timestamp representation');
   return value;
 }
+function digest(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) throw new Error(label + ' must use exact lowercase sha256 representation');
+  return value;
+}
 function exactEnum(value, allowed, label, optional = false) {
   if (optional && (value == null || value === '')) return '';
   if (typeof value !== 'string' || value !== value.trim() || !allowed.has(value)) throw new Error(label + ' must use exact canonical enum representation');
@@ -123,6 +133,7 @@ function normalizeOptions(input) {
   const raw = record(input, 'Cross-device continuation options', OPTION_KEYS);
   return Object.freeze({
     resolveExecutionOwnership: method(raw, 'resolveExecutionOwnership'),
+    resolveHandoffCheckpointBinding: method(raw, 'resolveHandoffCheckpointBinding'),
     resolveAgentCheckpoint: method(raw, 'resolveAgentCheckpoint'),
     resolveAgentHead: method(raw, 'resolveAgentHead'),
     resolveTargetWorldState: method(raw, 'resolveTargetWorldState'),
@@ -141,6 +152,26 @@ function normalizeExactOwnership(input) {
   timestamp(raw.updatedAt, 'ExecutionOwnershipV1.updatedAt');
   if (!Number.isSafeInteger(raw.revision) || raw.revision < 1) throw new Error('ExecutionOwnershipV1.revision must be a positive safe integer');
   return normalizeExecutionOwnershipV1(raw);
+}
+
+function normalizeHandoffCheckpointBinding(input) {
+  const raw = record(input, 'CrossDeviceHandoffCheckpointBindingV1', HANDOFF_CHECKPOINT_KEYS);
+  if (raw.schemaVersion !== 1) throw new Error('CrossDeviceHandoffCheckpointBindingV1 schemaVersion must be numeric 1');
+  if (!Number.isSafeInteger(raw.executionOwnershipRevision) || raw.executionOwnershipRevision < 1) {
+    throw new Error('CrossDeviceHandoffCheckpointBindingV1.executionOwnershipRevision must be a positive safe integer');
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    taskId: id(raw.taskId, 'CrossDeviceHandoffCheckpointBindingV1.taskId'),
+    planId: id(raw.planId, 'CrossDeviceHandoffCheckpointBindingV1.planId'),
+    nodeId: id(raw.nodeId, 'CrossDeviceHandoffCheckpointBindingV1.nodeId'),
+    effectId: id(raw.effectId, 'CrossDeviceHandoffCheckpointBindingV1.effectId'),
+    handoffId: id(raw.handoffId, 'CrossDeviceHandoffCheckpointBindingV1.handoffId'),
+    executionOwnershipRevision: raw.executionOwnershipRevision,
+    checkpointId: id(raw.checkpointId, 'CrossDeviceHandoffCheckpointBindingV1.checkpointId'),
+    checkpointDigest: digest(raw.checkpointDigest, 'CrossDeviceHandoffCheckpointBindingV1.checkpointDigest'),
+    boundAt: timestamp(raw.boundAt, 'CrossDeviceHandoffCheckpointBindingV1.boundAt'),
+  });
 }
 
 function outcome(status, reasonCode, request, ownership, checkpoint, head, extra = {}) {
@@ -214,6 +245,25 @@ export async function assessCrossDeviceContinuationV1(input, options) {
     throw new Error('Cross-device continuation checkpoint identity is stale or mismatched');
   }
   if (Date.parse(checkpoint.createdAt) > requestedMs) throw new Error('Cross-device continuation checkpoint cannot postdate request');
+
+  const handoffCheckpoint = normalizeHandoffCheckpointBinding(await trusted.resolveHandoffCheckpointBinding(Object.freeze({
+    taskId: request.taskId, planId: request.planId, nodeId: request.nodeId, effectId: request.effectId,
+    handoffId: ownership.handoffId, executionOwnershipRevision: ownership.revision,
+  })));
+  if (handoffCheckpoint.taskId !== request.taskId || handoffCheckpoint.planId !== request.planId
+      || handoffCheckpoint.nodeId !== request.nodeId || handoffCheckpoint.effectId !== request.effectId
+      || handoffCheckpoint.handoffId !== ownership.handoffId
+      || handoffCheckpoint.executionOwnershipRevision !== ownership.revision) {
+    throw new Error('Cross-device handoff checkpoint binding does not match canonical execution ownership');
+  }
+  const boundAtMs = Date.parse(handoffCheckpoint.boundAt);
+  if (boundAtMs < Date.parse(ownership.updatedAt) || boundAtMs < Date.parse(checkpoint.createdAt) || boundAtMs > requestedMs) {
+    throw new Error('Cross-device handoff checkpoint binding chronology is invalid');
+  }
+  if (handoffCheckpoint.checkpointId !== checkpoint.checkpointId
+      || handoffCheckpoint.checkpointDigest !== checkpoint.checkpointDigest) {
+    return outcome(CrossDeviceContinuationStatus.BLOCKED, 'HANDOFF_CHECKPOINT_BINDING_MISMATCH', request, ownership, checkpoint, null);
+  }
 
   const head = normalizeAgentCheckpointHeadV1(await trusted.resolveAgentHead(Object.freeze({
     agentId: request.agentId, jobId: request.jobId, planId: request.planId,
