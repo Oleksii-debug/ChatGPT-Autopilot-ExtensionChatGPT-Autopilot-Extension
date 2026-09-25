@@ -5,6 +5,7 @@ import {
   SHARED_PROJECT_COLLABORATION_SCHEMA_VERSION,
   SharedProjectCollaborationKind,
   assessSharedProjectAccessV1,
+  assessSharedProjectAccessBatchV1,
   assessSharedProjectCollaborationEventV1,
   normalizeSharedProjectBindingV1,
   normalizeSharedProjectCollaborationEventV1,
@@ -302,6 +303,93 @@ test('access resolves exact trusted binding, Project snapshot and governance reg
       organizationId: 'org-1',
     }],
   ]);
+});
+
+test('batch access resolves one trusted context for all principals', async () => {
+  const resolver = trusted();
+  const result = await assessSharedProjectAccessBatchV1({
+    bindingId: 'shared-project-1',
+    at: T3,
+    requests: [
+      {
+        principalId: 'agent-worker',
+        requestedCapabilityIds: ['project.read'],
+        requestedProviderIds: ['drive'],
+        requestedOutboundDataClassIds: ['internal'],
+      },
+      {
+        principalId: 'user-guest',
+        requestedCapabilityIds: [],
+        requestedProviderIds: [],
+        requestedOutboundDataClassIds: [],
+      },
+    ],
+  }, resolver);
+
+  assert.equal(result.projectId, 'project-a');
+  assert.equal(result.projectRevisionId, 'project-r1');
+  assert.equal(result.governanceRegistryRevision, 7);
+  assert.equal(result.assessments.length, 2);
+  assert.equal(result.assessments[0].principalId, 'agent-worker');
+  assert.equal(result.assessments[0].collaborationEligible, true);
+  assert.equal(result.assessments[1].principalId, 'user-guest');
+  assert.equal(result.assessments[1].reasonCode, 'NO_PROJECT_GRANT');
+  assert.equal(result.authorizationGranted, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.mutationAuthorized, false);
+  assert.equal(result.credentialUseAuthorized, false);
+  assert.deepEqual(resolver.calls, [
+    ['binding', 'shared-project-1'],
+    ['snapshot', { projectId: 'project-a', projectRevisionId: 'project-r1' }],
+    ['registry', {
+      governanceRegistryId: 'identity-registry-1',
+      governanceRegistryRevision: 7,
+      organizationId: 'org-1',
+    }],
+  ]);
+});
+
+test('batch access rejects hostile collection boundaries before trusted resolution', async () => {
+  const resolver = trusted();
+  const sparse = new Array(2);
+  sparse[0] = {
+    principalId: 'agent-worker',
+    requestedCapabilityIds: [],
+    requestedProviderIds: [],
+    requestedOutboundDataClassIds: [],
+  };
+  await assert.rejects(
+    assessSharedProjectAccessBatchV1({
+      bindingId: 'shared-project-1',
+      at: T3,
+      requests: sparse,
+    }, resolver),
+    /must not be sparse/,
+  );
+  assert.deepEqual(resolver.calls, []);
+
+  let reads = 0;
+  const item = {};
+  Object.defineProperty(item, 'principalId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'agent-worker';
+    },
+  });
+  item.requestedCapabilityIds = [];
+  item.requestedProviderIds = [];
+  item.requestedOutboundDataClassIds = [];
+  await assert.rejects(
+    assessSharedProjectAccessBatchV1({
+      bindingId: 'shared-project-1',
+      at: T3,
+      requests: [item],
+    }, trusted()),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
 });
 
 test('requested authority outside inherited ceiling is visible but never admitted', async () => {
