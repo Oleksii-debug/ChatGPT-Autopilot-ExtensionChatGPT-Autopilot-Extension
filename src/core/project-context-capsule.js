@@ -89,11 +89,54 @@ function strictText(value, label, maxChars) {
   return text;
 }
 
-function boundedIdList(value, label, max) {
-  if (!Array.isArray(value) || value.length > max) {
-    throw new Error(`${label} must be a bounded array`);
+function boundedDataArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a bounded plain array`);
   }
-  const normalized = value.map((item, index) => strictId(item, `${label}[${index}]`));
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || Object.is(lengthDescriptor.value, -0)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
+  const out = new Array(length);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
+      throw new Error(`${label} contains non-index array data`);
+    }
+    const index = Number(key);
+    const descriptor = descriptors[key];
+    if (!Number.isSafeInteger(index)
+        || index < 0
+        || index >= length
+        || String(index) !== key
+        || !descriptor
+        || descriptor.enumerable !== true
+        || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} entries must be enumerable own data properties`);
+    }
+  }
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} must be a dense data-only array`);
+    }
+    out[index] = descriptor.value;
+  }
+  return out;
+}
+
+function boundedIdList(value, label, max) {
+  const normalized = boundedDataArray(value, label, max)
+    .map((item, index) => strictId(item, `${label}[${index}]`));
   if (new Set(normalized).size !== normalized.length) {
     throw new Error(`${label} contains duplicate ids`);
   }
@@ -101,10 +144,11 @@ function boundedIdList(value, label, max) {
 }
 
 function boundedTextList(value, label) {
-  if (!Array.isArray(value) || value.length > CONTEXT_CAPSULE_MAX_CONTENT_ITEMS) {
-    throw new Error(`${label} must be a bounded array`);
-  }
-  const normalized = value.map((item, index) => strictText(
+  const normalized = boundedDataArray(
+    value,
+    label,
+    CONTEXT_CAPSULE_MAX_CONTENT_ITEMS,
+  ).map((item, index) => strictText(
     item,
     `${label}[${index}]`,
     CONTEXT_CAPSULE_MAX_CONTENT_ITEM_CHARS,
@@ -123,10 +167,14 @@ function boundedInteger(value, label, min, max) {
 }
 
 function strictTimestamp(value, label) {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must use exact canonical ISO-8601 UTC representation`);
+  }
   const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  if (!Number.isFinite(ms) || new Date(ms).toISOString() !== value) {
+    throw new Error(`${label} must use exact canonical ISO-8601 UTC representation`);
+  }
+  return value;
 }
 
 function strictSummary(value, maxChars) {
