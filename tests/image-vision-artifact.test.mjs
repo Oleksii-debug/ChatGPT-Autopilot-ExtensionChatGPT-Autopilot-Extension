@@ -29,6 +29,41 @@ function pngBytes(width = 100, height = 50) {
   ]);
 }
 
+function gifBytes(width = 64, height = 32) {
+  return Uint8Array.from([
+    0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+    width & 0xff, (width >>> 8) & 0xff,
+    height & 0xff, (height >>> 8) & 0xff,
+  ]);
+}
+
+function jpegBytes(width = 80, height = 40) {
+  return Uint8Array.from([
+    0xff, 0xd8,
+    0xff, 0xc0,
+    0x00, 0x0b,
+    0x08,
+    (height >>> 8) & 0xff, height & 0xff,
+    (width >>> 8) & 0xff, width & 0xff,
+    0x01, 0x01, 0x11, 0x00,
+  ]);
+}
+
+function webpBytes(width = 96, height = 48) {
+  const w = width - 1;
+  const h = height - 1;
+  return Uint8Array.from([
+    0x52, 0x49, 0x46, 0x46,
+    0x16, 0x00, 0x00, 0x00,
+    0x57, 0x45, 0x42, 0x50,
+    0x56, 0x50, 0x38, 0x58,
+    0x0a, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    w & 0xff, (w >>> 8) & 0xff, (w >>> 16) & 0xff,
+    h & 0xff, (h >>> 8) & 0xff, (h >>> 16) & 0xff,
+  ]);
+}
+
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
 }
@@ -149,6 +184,52 @@ test('binds exact immutable image bytes before one canonical vision-router call'
   assert.ok(Object.isFrozen(result.model));
   assert.ok(Object.isFrozen(result.model.observations));
   assert.ok(Object.isFrozen(result.model.cropProposals[0]));
+});
+
+test('all declared raster formats have executable dimension-bound analysis coverage', async () => {
+  const cases = [
+    { mediaType: 'image/png', bytes: pngBytes(100, 50), widthPx: 100, heightPx: 50 },
+    { mediaType: 'image/jpeg', bytes: jpegBytes(80, 40), widthPx: 80, heightPx: 40 },
+    { mediaType: 'image/gif', bytes: gifBytes(64, 32), widthPx: 64, heightPx: 32 },
+    { mediaType: 'image/webp', bytes: webpBytes(96, 48), widthPx: 96, heightPx: 48 },
+  ];
+
+  for (const item of cases) {
+    const router = routerWith();
+    const ref = artifactRef(item.bytes, { mediaType: item.mediaType });
+    const result = await analyzeImageArtifactV1(request(item.bytes, {
+      artifactRef: ref,
+      imageDataUrl: dataUrl(item.bytes, item.mediaType),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    });
+    assert.equal(router.calls.length, 1, item.mediaType);
+    assert.deepEqual(result.technical, {
+      widthPx: item.widthPx,
+      heightPx: item.heightPx,
+      pixelCount: item.widthPx * item.heightPx,
+    });
+  }
+});
+
+test('PNG dimension admission rejects a forged IHDR length before model routing', async () => {
+  const bytes = pngBytes();
+  bytes[11] = 0x0c;
+  const router = routerWith();
+  const ref = artifactRef(bytes);
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes, {
+      artifactRef: ref,
+      imageDataUrl: dataUrl(bytes),
+    }), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /IHDR dimension header/u,
+  );
+  assert.equal(router.calls.length, 0);
 });
 
 test('analysis provenance retains the full canonical ArtifactRef identity for same-byte variants', async () => {
