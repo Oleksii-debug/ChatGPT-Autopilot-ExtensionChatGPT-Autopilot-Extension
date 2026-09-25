@@ -274,14 +274,14 @@ test('job-to-Project resolver composes exact persisted AgentPlan identity and fa
 
 test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
   const chrome = makeChrome();
-  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00Z') });
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00.000Z') });
   await manager.create({ id:'job-1', goal:'Complete a mixed-plane task' });
   await manager.update(store => {
     store.byId['job-1'].runtime.plan = {
-      schemaVersion:1, planId:'plan-1', jobId:'job-1', objective:'Complete safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      schemaVersion:1, planId:'plan-1', jobId:'job-1', objective:'Complete safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00.000Z', updatedAt:'2026-09-23T12:00:00.000Z', revision:1,
       nodes:[
-        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
-        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00.000Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00.000Z' },
       ],
     };
     return store;
@@ -316,15 +316,15 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
 
 test('Browser Agent keeps ambiguous specialist effect fenced across forged proof and restart', async () => {
   const chrome = makeChrome();
-  let clock = Date.parse('2026-09-23T12:00:00Z');
+  let clock = Date.parse('2026-09-23T12:00:00.000Z');
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
   await manager.create({ id:'job-retry', goal:'Recover an ambiguous specialist effect' });
   await manager.update(store => {
     store.byId['job-retry'].runtime.plan = {
-      schemaVersion:1, planId:'plan-retry', jobId:'job-retry', objective:'Recover safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      schemaVersion:1, planId:'plan-retry', jobId:'job-retry', objective:'Recover safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00.000Z', updatedAt:'2026-09-23T12:00:00.000Z', revision:1,
       nodes:[
-        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web:retry'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
-        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files:retry'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web:retry'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00.000Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files:retry'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00.000Z' },
       ],
     };
     return store;
@@ -378,7 +378,7 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
 
 test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
   const chrome = makeChrome();
-  const at = '2026-09-23T12:00:00Z';
+  const at = '2026-09-23T12:00:00.000Z';
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse(at) });
   for (const jobId of ['job-1', 'job-2']) {
     await manager.create({ id:jobId, goal:`Complete ${jobId}` });
@@ -2812,7 +2812,7 @@ test('Trusted Script consequential approval is invalidated if the approved brows
 
 test('Browser Agent specialist wrappers snapshot caller payloads before authority reads', async () => {
   const chrome = makeChrome();
-  const at = '2026-09-23T12:00:00Z';
+  const at = '2026-09-23T12:00:00.000Z';
   const manager = new BrowserAgentManager({
     chromeApi: chrome,
     routePrompt: async () => ({ text: '{}' }),
