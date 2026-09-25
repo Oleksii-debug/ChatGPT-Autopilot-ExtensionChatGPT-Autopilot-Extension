@@ -69,12 +69,15 @@ export function normalizeAccessibleClockTime(raw, { optional = true } = {}) {
     if (optional) return '';
     throw new Error('Вкажіть час.');
   }
-  const match = /^(\d{1,2}):(\d{2})$/u.exec(value);
+  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/u.exec(value);
   if (!match) throw new Error('Використайте формат ГГ:ХХ, наприклад 09:15.');
   const hour = Number(match[1]);
   const minute = Number(match[2]);
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) throw new Error('Некоректний час.');
-  return `${pad2(hour)}:${pad2(minute)}`;
+  const second = Number(match[3] || 0);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) throw new Error('Некоректний час.');
+  return match[3] === undefined
+    ? `${pad2(hour)}:${pad2(minute)}`
+    : `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`;
 }
 
 
