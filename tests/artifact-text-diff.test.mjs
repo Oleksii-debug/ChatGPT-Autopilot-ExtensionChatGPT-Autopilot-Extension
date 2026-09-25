@@ -189,8 +189,8 @@ test('material diff verifies immutable bytes and returns deterministic multi-blo
 });
 
 test('ill-formed UTF-16 aliases are rejected before UTF-8 identity while valid supplementary pairs remain exact', async () => {
-  const loneHighA = '\uD800';
-  const loneHighB = '\uD801';
+  const loneHighA = String.fromCharCode(0xD800);
+  const loneHighB = String.fromCharCode(0xD801);
   const encodedA = new TextEncoder().encode(loneHighA);
   const encodedB = new TextEncoder().encode(loneHighB);
   assert.deepEqual(encodedA, encodedB);
