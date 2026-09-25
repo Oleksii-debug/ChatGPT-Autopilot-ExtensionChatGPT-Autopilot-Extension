@@ -104,7 +104,7 @@ test('caller-supplied ownerInstruction is rejected until trusted instruction adm
   );
 });
 
-test('current-page quick action preserves exact page URI in the prompt envelope', () => {
+test('current-page quick action preserves exact URI and original capture time across delayed execution', () => {
   const plan = buildQuickCommandSessionPlanV1(request({
     source: {
       schemaVersion: 1,
@@ -114,8 +114,10 @@ test('current-page quick action preserves exact page URI in the prompt envelope'
       text: 'Visible page content.',
       uri: 'https://example.test/path?q=1',
     },
+    createdAt: '2026-09-25T16:15:00.000Z',
   }));
   assert.match(plan.sessionConfig.sharedPrompt, /https:\/\/example\.test\/path\?q=1/u);
+  assert.match(plan.sessionConfig.sharedPrompt, /2026-09-25T16:10:00\.000Z/u);
 });
 
 test('artifact-only source is rejected because the quick surface has no artifact resolver authority', () => {
