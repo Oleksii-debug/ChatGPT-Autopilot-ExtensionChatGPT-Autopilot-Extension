@@ -355,7 +355,7 @@ test('trusted ROI chronology uses epoch order across 9999 to extended year +0100
     buildRoiOpportunityReportV1(request({
       evaluatedAt: after2,
       runEvidenceIds: ['record-1'],
-      minimumEvidenceRuns: 1,
+      minimumEvidenceRuns: 2,
     }), {
       resolveTrustedRunEvidence: resolver([trustedRun({
         startedAt: before,
@@ -370,7 +370,7 @@ test('trusted ROI chronology uses epoch order across 9999 to extended year +0100
     buildRoiOpportunityReportV1(request({
       evaluatedAt: after2,
       runEvidenceIds: ['record-1'],
-      minimumEvidenceRuns: 1,
+      minimumEvidenceRuns: 2,
     }), {
       resolveTrustedRunEvidence: resolver([trustedRun({
         startedAt: '9999-12-31T23:59:59.997Z',
@@ -439,7 +439,7 @@ test('trusted ROI chronology uses epoch order across 9999 to extended year +0100
       buildRoiOpportunityReportV1(request({
         evaluatedAt,
         runEvidenceIds: ['record-1'],
-        minimumEvidenceRuns: 1,
+        minimumEvidenceRuns: 2,
       }), {
         resolveTrustedRunEvidence: resolver([trustedRun(overrides)]),
       }),
