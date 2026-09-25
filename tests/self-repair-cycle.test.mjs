@@ -112,7 +112,7 @@ function cycle({
     verifierPlanRevisionId: 'verify-plan-r1',
     baselineRevisionId,
     maxAttempts,
-    createdAt: '2026-09-25T05:00:00.000Z',
+    createdAt: '2026-09-25T05:00:10.000Z',
     updatedAt,
     attempts,
   };
@@ -123,7 +123,7 @@ test('starts from trusted failure evidence in READY_FOR_REPAIR without granting 
   assert.equal(result.state, SelfRepairCycleState.READY_FOR_REPAIR);
   assert.equal(result.activeAttemptNumber, 1);
   assert.equal(result.currentRevisionId, 'rev-1');
-  assert.equal(result.verifiedOutcome, false);
+  assert.equal(result.retestPassed, false);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.mutationAuthorized, false);
   assert.equal(result.verificationAuthorized, false);
@@ -131,6 +131,9 @@ test('starts from trusted failure evidence in READY_FOR_REPAIR without granting 
   assert.equal(result.requiresCanonicalExecutor, true);
   assert.equal(result.requiresCanonicalPolicy, true);
   assert.equal(result.requiresIndependentVerifier, true);
+  assert.equal(result.evidenceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(result.requiresCanonicalEvidenceResolution, true);
+  assert.equal(result.completionAuthorized, false);
 });
 
 test('applied repair must move revision and requires fresh retest before success', () => {
@@ -140,7 +143,7 @@ test('applied repair must move revision and requires fresh retest before success
   const result = assessSelfRepairCycleV1(value);
   assert.equal(result.state, SelfRepairCycleState.READY_FOR_RETEST);
   assert.equal(result.currentRevisionId, 'rev-2');
-  assert.equal(result.verifiedOutcome, false);
+  assert.equal(result.retestPassed, false);
 
   const unchanged = cycle({
     attempts: [attempt({
@@ -169,7 +172,7 @@ test('only independent fresh PASS retest can produce VERIFIED', () => {
   assert.equal(result.activeAttemptNumber, 0);
   assert.equal(result.currentRevisionId, 'rev-2');
   assert.equal(result.completedRetests, 1);
-  assert.equal(result.verifiedOutcome, true);
+  assert.equal(result.retestPassed, true);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.mutationAuthorized, false);
 });
@@ -230,7 +233,7 @@ test('FAIL retest can open exactly the next attempt only from the same evidence'
   assert.equal(result.state, SelfRepairCycleState.READY_FOR_REPAIR);
   assert.equal(result.activeAttemptNumber, 2);
   assert.equal(result.currentRevisionId, 'rev-2');
-  assert.equal(result.verifiedOutcome, false);
+  assert.equal(result.retestPassed, false);
 
   const second = attempt({
     number: 2,
@@ -308,7 +311,7 @@ test('ERROR requires manual review and failed final attempt is EXHAUSTED', () =>
     })],
   }));
   assert.equal(errored.state, SelfRepairCycleState.MANUAL_REVIEW);
-  assert.equal(errored.verifiedOutcome, false);
+  assert.equal(errored.retestPassed, false);
 
   const exhausted = assessSelfRepairCycleV1(cycle({
     maxAttempts: 1,
@@ -319,7 +322,7 @@ test('ERROR requires manual review and failed final attempt is EXHAUSTED', () =>
   }));
   assert.equal(exhausted.state, SelfRepairCycleState.EXHAUSTED);
   assert.equal(exhausted.attemptsRemaining, 0);
-  assert.equal(exhausted.verifiedOutcome, false);
+  assert.equal(exhausted.retestPassed, false);
 });
 
 test('attempt count is bounded and sequential', () => {
@@ -338,6 +341,14 @@ test('attempt count is bounded and sequential', () => {
 });
 
 test('cycle timestamps cannot backdate diagnosis, repair, retest or updatedAt', () => {
+  const cyclePredatesFailure = cycle({
+    attempts: [attempt({
+      failureValue: failure({ completedAt: '2026-09-25T05:00:11.000Z' }),
+      diagnosisValue: diagnosis({ createdAt: '2026-09-25T05:00:20.000Z' }),
+    })],
+  });
+  assert.throws(() => assessSelfRepairCycleV1(cyclePredatesFailure), /createdAt cannot predate initial failure evidence/u);
+
   const earlyDiagnosis = cycle({
     attempts: [attempt({
       diagnosisValue: diagnosis({ createdAt: '2026-09-25T05:00:09.000Z' }),
