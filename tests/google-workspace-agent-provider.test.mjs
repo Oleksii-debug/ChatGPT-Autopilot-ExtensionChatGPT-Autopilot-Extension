@@ -169,3 +169,25 @@ test('provider rejects coercive authority aliases before canonical contract norm
     /canonical text identity/i,
   );
 });
+
+
+test('workspace client method accessors are rejected without executing getters', () => {
+  let getterReads = 0;
+  const workspaceClient = client();
+  Object.defineProperty(workspaceClient, 'searchGmail', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterReads += 1;
+      return async () => ({});
+    },
+  });
+  assert.throws(
+    () => new GoogleWorkspaceAgentProviderV1({
+      workspaceClient,
+      grantedCapabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_SEARCH],
+    }),
+    /data method/i,
+  );
+  assert.equal(getterReads, 0);
+});
