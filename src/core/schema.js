@@ -219,6 +219,7 @@ function validateSession(session, id) {
   requireUniqueStringArray(session.onePassCompletedTaskIds, `session ${id} onePassCompletedTaskIds`);
   if (session.version !== undefined && (!Number.isInteger(session.version) || session.version < 0)) throw new Error(`Invalid session ${id} version`);
   if (session.pausedByMaster !== undefined) requireBoolean(session.pausedByMaster, `session ${id} pausedByMaster`);
+  if (session.simplifiedSession !== undefined) requireBoolean(session.simplifiedSession, `session ${id} simplifiedSession`);
   if (session.urlMode !== undefined && !['shared', 'unique'].includes(session.urlMode)) throw new Error(`Invalid session ${id} urlMode`);
   if (session.aiCoordinatorHandoff !== undefined) requireString(session.aiCoordinatorHandoff, `session ${id} aiCoordinatorHandoff`);
   if (session.aiCoordinatorHandoffCreatedAt !== undefined) requireNonNegativeNumber(session.aiCoordinatorHandoffCreatedAt, `session ${id} aiCoordinatorHandoffCreatedAt`);
