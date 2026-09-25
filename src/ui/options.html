@@ -953,6 +953,20 @@
         <button id="clear-log-button" type="button">Clear log</button>
       </section>
 
+      <section aria-labelledby="run-timeline-heading">
+        <h3 id="run-timeline-heading">Хронологія виконання та докази</h3>
+        <p id="run-timeline-help">Лише читання: структуровані стани Core і вже зредаговані ідентифікатори ChatGPT. Довільний текст журналів, помилок, промптів, ключі доступу, дані входу й приватні посилання тут не показуються.</p>
+        <label for="run-timeline-source-filter">Показувати джерела</label>
+        <select id="run-timeline-source-filter" aria-describedby="run-timeline-help">
+          <option value="ALL">Усі події</option>
+          <option value="LOG">Core log</option>
+          <option value="DIAGNOSTIC">Діагностика</option>
+        </select>
+        <button id="refresh-run-timeline-button" type="button" aria-describedby="run-timeline-help run-timeline-status">Оновити хронологію</button>
+        <p id="run-timeline-status" tabindex="0">Хронологію ще не завантажено.</p>
+        <ol id="run-timeline-list" aria-label="Хронологія виконання вибраного сеансу"></ol>
+      </section>
+
       <section aria-labelledby="diagnostics-heading">
         <h3 id="diagnostics-heading">Діагностика</h3>
         <button id="download-diagnostic-report-button" type="button" aria-describedby="diagnostic-report-status">Діагностичний звіт</button>
