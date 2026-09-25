@@ -1,8 +1,9 @@
 import { scenarioWorkParticipants } from './scenario-work.js';
 
 const CATEGORIES = Object.freeze([
-  'RUNNING', 'WAITING_RESPONSE', 'READY', 'PAUSED', 'RECOVERING',
-  'ERROR', 'AMBIGUOUS_EFFECT', 'COMPLETED', 'STOPPED',
+  'RUNNING', 'WAITING_RESPONSE', 'WAITING_PERMISSION', 'WAITING_APPROVAL',
+  'WAITING_CAPABILITY', 'WAITING_SCHEDULE', 'WAITING_OTHER', 'READY', 'PAUSED',
+  'RECOVERING', 'ERROR', 'AMBIGUOUS_EFFECT', 'COMPLETED', 'STOPPED',
 ]);
 const MANAGED_FIELDS = ['scenarioWork', 'orchestrationCoordinator', 'orchestrationWorker', 'remoteDispatch'];
 const num = value => Math.max(0, Number(value) || 0);
@@ -53,7 +54,11 @@ function agentCategory(state) {
   if (state === 'PAUSED') return 'PAUSED';
   if (state === 'ERROR') return 'ERROR';
   if (state === 'STOPPED') return 'STOPPED';
-  if (state?.startsWith('WAITING_')) return 'READY';
+  if (state === 'WAITING_PERMISSION') return 'WAITING_PERMISSION';
+  if (state === 'WAITING_APPROVAL') return 'WAITING_APPROVAL';
+  if (state === 'WAITING_CAPABILITY') return 'WAITING_CAPABILITY';
+  if (state === 'WAITING_SCHEDULE') return 'WAITING_SCHEDULE';
+  if (state?.startsWith('WAITING_')) return 'WAITING_OTHER';
   return 'RUNNING';
 }
 
