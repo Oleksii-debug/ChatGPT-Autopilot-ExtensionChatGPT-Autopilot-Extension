@@ -13,6 +13,7 @@ const MAX_TRUSTED_EVALUATIONS = 2_000;
 
 const REQUEST_KEYS = new Set([
   'bindingId',
+  'viewerPrincipalId',
   'recipeRegistry',
   'trustedEvaluations',
   'shares',
@@ -172,15 +173,21 @@ function activeShareAt(share, evaluatedAt) {
     && (!share.revokedAt || atMillis < Date.parse(share.revokedAt));
 }
 
-function accessRequest(bindingId, principalId, at) {
+function accessRequest(bindingId, principalId, at, capabilityId) {
   return {
     bindingId,
     principalId,
     at,
-    requestedCapabilityIds: [SHARED_PROJECT_RECIPE_SHARE_CAPABILITY],
+    requestedCapabilityIds: [capabilityId],
     requestedProviderIds: [],
     requestedOutboundDataClassIds: [],
   };
+}
+
+function assertCanonicalCatalogViewer(access) {
+  if (!access.collaborationEligible) {
+    throw new Error(`catalog viewer is outside canonical shared Project read ceiling: ${access.reasonCode}`);
+  }
 }
 
 function assertShareBindsAccess(share, access, label) {
@@ -205,7 +212,13 @@ function assertShareBindsAccess(share, access, label) {
 export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProjectResolver) {
   const request = strictRecord(input, REQUEST_KEYS, 'SharedProjectRecipeCatalogRequestV1');
   const bindingId = exactId(request.bindingId, 'bindingId');
+  const viewerPrincipalId = exactId(request.viewerPrincipalId, 'viewerPrincipalId');
   const evaluatedAt = timestamp(request.evaluatedAt, 'evaluatedAt');
+  const catalogAccess = await assessSharedProjectAccessV1(
+    accessRequest(bindingId, viewerPrincipalId, evaluatedAt, 'project.read'),
+    trustedProjectResolver,
+  );
+  assertCanonicalCatalogViewer(catalogAccess);
   const recipeRegistry = normalizeRecipeRegistryV1(request.recipeRegistry);
   if (Date.parse(recipeRegistry.updatedAt) > Date.parse(evaluatedAt)) {
     throw new Error('recipe registry is newer than catalog evaluation time');
@@ -219,38 +232,34 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProje
   const shares = strictArray(request.shares, 'shares', MAX_SHARES)
     .map((item, index) => normalizeShare(item, index, evaluatedAt));
   uniqueBy(shares, 'shareId', 'shares');
-  if (shares.length === 0) {
-    throw new Error('shares must contain at least one canonical Project Recipe share evidence record');
-  }
 
   const activeRecipeIdentities = new Set();
   const resolvedByRecipeId = new Map();
   const items = [];
-  let catalogProjectId = '';
-  let catalogProjectRevisionId = '';
-  let organizationId = '';
-  let governanceRegistryId = '';
-  let governanceRegistryRevision = 0;
+  const catalogProjectId = catalogAccess.projectId;
+  const catalogProjectRevisionId = catalogAccess.projectRevisionId;
+  const organizationId = catalogAccess.organizationId;
+  const governanceRegistryId = catalogAccess.governanceRegistryId;
+  const governanceRegistryRevision = catalogAccess.governanceRegistryRevision;
 
   for (const share of shares) {
     const initialAccess = await assessSharedProjectAccessV1(
-      accessRequest(bindingId, share.sharedByPrincipalId, share.sharedAt),
+      accessRequest(
+        bindingId,
+        share.sharedByPrincipalId,
+        share.sharedAt,
+        SHARED_PROJECT_RECIPE_SHARE_CAPABILITY,
+      ),
       trustedProjectResolver,
     );
     assertShareBindsAccess(share, initialAccess, `share ${share.shareId}`);
 
-    if (!catalogProjectId) {
-      catalogProjectId = initialAccess.projectId;
-      catalogProjectRevisionId = initialAccess.projectRevisionId;
-      organizationId = initialAccess.organizationId;
-      governanceRegistryId = initialAccess.governanceRegistryId;
-      governanceRegistryRevision = initialAccess.governanceRegistryRevision;
-    } else if (catalogProjectId !== initialAccess.projectId
+    if (catalogProjectId !== initialAccess.projectId
         || catalogProjectRevisionId !== initialAccess.projectRevisionId
         || organizationId !== initialAccess.organizationId
         || governanceRegistryId !== initialAccess.governanceRegistryId
         || governanceRegistryRevision !== initialAccess.governanceRegistryRevision) {
-      throw new Error('shares do not resolve to one canonical shared Project authority');
+      throw new Error('share does not resolve to canonical catalog Project authority');
     }
 
     if (!activeShareAt(share, evaluatedAt)) continue;
@@ -258,7 +267,12 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProje
     const currentAccess = share.sharedAt === evaluatedAt
       ? initialAccess
       : await assessSharedProjectAccessV1(
-        accessRequest(bindingId, share.sharedByPrincipalId, evaluatedAt),
+        accessRequest(
+          bindingId,
+          share.sharedByPrincipalId,
+          evaluatedAt,
+          SHARED_PROJECT_RECIPE_SHARE_CAPABILITY,
+        ),
         trustedProjectResolver,
       );
     assertShareBindsAccess(share, currentAccess, `active share ${share.shareId}`);
@@ -319,6 +333,7 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProje
   return freezeDeep({
     schemaVersion: SHARED_PROJECT_RECIPE_CATALOG_SCHEMA_VERSION,
     bindingId,
+    viewerPrincipalId,
     projectId: catalogProjectId,
     projectRevisionId: catalogProjectRevisionId,
     organizationId,
