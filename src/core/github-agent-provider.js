@@ -16,6 +16,7 @@ export const GitHubToolId = Object.freeze({
   FILE_PUT: 'remote/github/file.put',
   FILE_DELETE: 'remote/github/file.delete',
   PULL_REQUEST_CREATE: 'remote/github/pullRequest.create',
+  PULL_REQUEST_MERGE: 'remote/github/pullRequest.merge',
   PULL_REQUEST_COMMENT_CREATE: 'remote/github/pullRequest.comment.create',
   ISSUE_CREATE: 'remote/github/issue.create',
   ISSUE_COMMENT_CREATE: 'remote/github/issueComment.create',
@@ -34,6 +35,7 @@ export const GitHubCapabilityId = Object.freeze({
   FILE_WRITE: 'github.file.write',
   FILE_DELETE: 'github.file.delete',
   PULL_REQUEST_CREATE: 'github.pullRequest.create',
+  PULL_REQUEST_MERGE: 'github.pullRequest.merge',
   PULL_REQUEST_COMMENT_CREATE: 'github.pullRequest.comment.create',
   ISSUE_CREATE: 'github.issue.create',
   ISSUE_COMMENT_CREATE: 'github.issueComment.create',
@@ -185,6 +187,17 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_MERGE,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Merge GitHub pull request at exact head',
+    description: 'Merges one exact open pull request only when its current head SHA matches the owner-authorized expected head. Ambiguous outcomes require reconciliation.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_MERGE],
+    inputSchemaRef: 'github-schema/pullRequest.merge/input',
+    outputSchemaRef: 'github-schema/pullRequest.merge/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
     providerId: GITHUB_PROVIDER_ID,
     label: 'Create GitHub pull request timeline comment',
@@ -258,6 +271,7 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.FILE_PUT) return 'putFile';
   if (toolId === GitHubToolId.FILE_DELETE) return 'deleteFile';
   if (toolId === GitHubToolId.PULL_REQUEST_CREATE) return 'createPullRequest';
+  if (toolId === GitHubToolId.PULL_REQUEST_MERGE) return 'mergePullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) return 'createPullRequestComment';
   if (toolId === GitHubToolId.ISSUE_CREATE) return 'createIssue';
   if (toolId === GitHubToolId.ISSUE_COMMENT_CREATE) return 'createIssueComment';
@@ -266,11 +280,17 @@ function methodFor(toolId) {
 
 export class GitHubAgentProviderV1 {
   constructor({ githubClient, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
-    const methods = Object.values(GitHubToolId).map(methodFor);
+    if (!Array.isArray(grantedCapabilityIds)) throw new Error('grantedCapabilityIds must be an array');
+    const methods = Object.values(GitHubToolId)
+      .filter(toolId => toolId !== GitHubToolId.PULL_REQUEST_MERGE)
+      .map(methodFor);
     if (!githubClient || methods.some(method => typeof githubClient[method] !== 'function')) {
       throw new Error('GitHub REST client with the complete V1 operation set is required');
     }
-    if (!Array.isArray(grantedCapabilityIds)) throw new Error('grantedCapabilityIds must be an array');
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.PULL_REQUEST_MERGE)
+        && typeof githubClient.mergePullRequest !== 'function') {
+      throw new Error('GitHub REST client with pull-request merge support is required for the granted merge capability');
+    }
     this.githubClient = githubClient;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
     this.now = now;
