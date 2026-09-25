@@ -152,7 +152,8 @@ test('canonical non-sensitive lineage is only ready for owner policy and never s
   assert.equal(result.projectId, PROJECT);
   assert.equal(result.registryRevision, 2);
   assert.equal(result.lineageProvenance, 'CANONICAL_ARTIFACT_REGISTRY');
-  assert.equal(result.lineageCompletenessVerified, true);
+  assert.equal(result.lineageCompletenessVerified, false);
+  assert.equal(result.requiresCanonicalLineageResolution, true);
   assert.equal(result.exactInputVersionBindingVerified, false);
   assert.equal(result.inputVersionResolution, 'CONSERVATIVE_ALL_PLAUSIBLE_VERSIONS');
   assert.equal(result.requiresExactInputVersionBindingUpgrade, true);
@@ -175,6 +176,24 @@ test('canonical non-sensitive lineage is only ready for owner policy and never s
   assert.equal(result.egresses[0].policyDecisionRequired, true);
   assert.equal(result.egresses[0].independentSecretReviewRequired, false);
   assert.equal(result.egresses[0].executionAuthorized, false);
+});
+
+test('omitted canonical provenance edge can never yield a positive completeness claim', () => {
+  const result = assess(
+    request(),
+    defaultRegistry({ bInputs: [] }),
+  );
+
+  assert.equal(result.status, SecretDataFlowStatus.READY_FOR_POLICY);
+  assert.equal(result.lineageProvenance, 'CANONICAL_ARTIFACT_REGISTRY');
+  assert.equal(result.lineageCompletenessVerified, false);
+  assert.equal(result.requiresCanonicalLineageResolution, true);
+  assert.equal(result.exactInputVersionBindingVerified, false);
+  assert.equal(result.requiresExactInputVersionBindingUpgrade, true);
+  assert.equal(result.requiresIndependentSecretScan, true);
+  assert.equal(result.executionAuthorized, false);
+  assert.deepEqual(result.violations, []);
+  assert.equal(result.artifactStates[0].derived, false);
 });
 
 test('sensitive canonical input propagates into a correctly marked derived artifact', () => {
