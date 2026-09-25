@@ -2531,7 +2531,7 @@ function renderActionCenter(data) {
     ? ` Показано ${runtimeSummary.projectedCount || items.length} із ${runtimeSummary.candidateCount || items.length}; спочатку блокуючі та найстаріші питання.`
     : '';
   $('action-center-summary').textContent = items.length
-    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}.${truncation} Action Center лише показує стан; рішення виконуються у відповідному канонічному розділі.`
+    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}.${truncation} Центр уваги лише показує стан; рішення виконуються у відповідному канонічному розділі.`
     : 'Зараз немає питань, які потребують вашої дії.';
   const list = $('action-center-list');
   const signature = JSON.stringify(items.map(item => [
@@ -2552,7 +2552,7 @@ function renderActionCenter(data) {
 async function loadActionCenter() {
   if (document.visibilityState !== 'visible') return;
   try { renderActionCenter(await core('GET_ACTION_CENTER')); }
-  catch (error) { $('action-center-summary').textContent = `Не вдалося прочитати Action Center: ${error.message}`; }
+  catch (error) { $('action-center-summary').textContent = `Не вдалося прочитати центр уваги: ${error.message}`; }
 }
 
 async function loadSessions({ preserveFocus = true } = {}) {
