@@ -120,6 +120,12 @@ function canonicalTimestamp(value, label) {
   return value;
 }
 
+function compareCanonicalTimestamp(left, right) {
+  const leftMillis = Date.parse(left);
+  const rightMillis = Date.parse(right);
+  return leftMillis < rightMillis ? -1 : leftMillis > rightMillis ? 1 : 0;
+}
+
 function boolean(value, label) {
   if (typeof value !== 'boolean') throw new Error(label + ' must be boolean');
   return value;
@@ -160,7 +166,7 @@ function snapshotCurrentSources(value, assessedAt) {
       throw new Error('currentSourceRefs[' + index + '].observedAt is required');
     }
     const observedAt = canonicalTimestamp(raw.observedAt, 'currentSourceRefs[' + index + '].observedAt');
-    if (observedAt > assessedAt) {
+    if (compareCanonicalTimestamp(observedAt, assessedAt) > 0) {
       throw new Error('currentSourceRefs[' + index + '] is observed after assessedAt');
     }
     return raw;
@@ -254,10 +260,10 @@ export function buildDataMonitoringReportV1(input) {
   if (baseline.projectId !== current.projectId || baseline.datasetId !== current.datasetId) {
     throw new Error('monitoring requires the same projectId and datasetId');
   }
-  if (baseline.observedAt > current.observedAt) {
+  if (compareCanonicalTimestamp(baseline.observedAt, current.observedAt) > 0) {
     throw new Error('baseline dataset observation cannot be after current dataset observation');
   }
-  if (current.observedAt > assessedAt) {
+  if (compareCanonicalTimestamp(current.observedAt, assessedAt) > 0) {
     throw new Error('current dataset observation is after assessedAt');
   }
 
