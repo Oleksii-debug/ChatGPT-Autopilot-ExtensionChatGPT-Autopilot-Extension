@@ -566,6 +566,53 @@ export class GitHubRestClientV1 {
     });
   }
 
+
+  async readPullRequest({ repositoryFullName, pullRequestNumber } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/pulls/${number}`);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request response is invalid');
+    }
+    const returnedNumber = responsePositiveInteger(payload.number, 'pull request number');
+    if (returnedNumber !== number) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request identity mismatch');
+    if (!['open', 'closed'].includes(payload.state)) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request state is invalid');
+    return Object.freeze({
+      repositoryFullName: repository,
+      number,
+      title: responseText(payload.title, 'pull request title', 1000),
+      body: responseText(payload.body, 'pull request body', 100_000, { nullable: true }),
+      state: payload.state,
+      headSha: responseSha(payload?.head?.sha, 'pull request head sha'),
+      baseSha: responseSha(payload?.base?.sha, 'pull request base sha'),
+      url: responseText(payload.html_url, 'pull request URL', 4096),
+    });
+  }
+
+  async readPullRequestComment({ repositoryFullName, pullRequestNumber, commentId } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const id = positiveInteger(commentId, 'commentId');
+    await this.readPullRequest({ repositoryFullName: repository, pullRequestNumber: number });
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/issues/comments/${id}`);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request timeline comment response is invalid');
+    }
+    const returnedId = responsePositiveInteger(payload.id, 'pull request comment id');
+    if (returnedId !== id) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request comment identity mismatch');
+    const expectedIssueUrl = `${GITHUB_API_ORIGIN}/repos/${repositoryPath(repository)}/issues/${number}`;
+    if (typeof payload.issue_url !== 'string' || payload.issue_url.toLowerCase() !== expectedIssueUrl.toLowerCase()) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request comment parent identity mismatch');
+    }
+    return Object.freeze({
+      repositoryFullName: repository, pullRequestNumber: number, commentId: id,
+      body: responseText(payload.body, 'pull request comment body', 100_000),
+      url: responseText(payload.html_url, 'pull request comment URL', 4096),
+    });
+  }
+
   async readIssue({ repositoryFullName, issueNumber } = {}) {
     const repository = exactRepositoryName(repositoryFullName);
     this.assertRepositoryAllowed(repository);
@@ -689,6 +736,32 @@ export class GitHubRestClientV1 {
     const number = Number(payload.number);
     if (!Number.isInteger(number) || number < 1) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request response is invalid', { effectMayHaveOccurred: true });
     return Object.freeze({ repositoryFullName: repository, number, head: headRef, base: baseRef, url: clean(payload.html_url, 4096) });
+  }
+
+
+  async createPullRequestComment({ repositoryFullName, pullRequestNumber, body } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const commentBody = exactNonBlankText(body, 'body', 100_000);
+    await this.readPullRequest({ repositoryFullName: repository, pullRequestNumber: number });
+    const payload = await this.request('POST', `/repos/${repositoryPath(repository)}/issues/${number}/comments`, {
+      effectful: true,
+      expectedStatuses: [201],
+      body: { body: commentBody },
+    });
+    const commentId = responsePositiveInteger(payload?.id, 'pull request comment id', { effectMayHaveOccurred: true });
+    const returnedBody = responseText(payload?.body, 'pull request comment body', 100_000, { effectMayHaveOccurred: true });
+    const expectedIssueUrl = `${GITHUB_API_ORIGIN}/repos/${repositoryPath(repository)}/issues/${number}`;
+    if (returnedBody !== commentBody
+        || typeof payload?.issue_url !== 'string'
+        || payload.issue_url.toLowerCase() !== expectedIssueUrl.toLowerCase()) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub created pull request comment does not match the requested parent/body', { effectMayHaveOccurred: true });
+    }
+    return Object.freeze({
+      repositoryFullName: repository, pullRequestNumber: number, commentId, body: returnedBody,
+      url: responseText(payload?.html_url, 'pull request comment URL', 4096, { effectMayHaveOccurred: true }),
+    });
   }
 
   async createIssue({ repositoryFullName, title, body = '' } = {}) {

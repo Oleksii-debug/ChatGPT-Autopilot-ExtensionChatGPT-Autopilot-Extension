@@ -8,12 +8,15 @@ export const GitHubToolId = Object.freeze({
   TREE_READ: 'remote/github/tree.read',
   BRANCH_READ: 'remote/github/branch.read',
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
+  PULL_REQUEST_READ: 'remote/github/pullRequest.read',
+  PULL_REQUEST_COMMENT_READ: 'remote/github/pullRequest.comment.read',
   ISSUE_READ: 'remote/github/issue.read',
   ISSUE_COMMENT_READ: 'remote/github/issueComment.read',
   BRANCH_CREATE: 'remote/github/branch.create',
   FILE_PUT: 'remote/github/file.put',
   FILE_DELETE: 'remote/github/file.delete',
   PULL_REQUEST_CREATE: 'remote/github/pullRequest.create',
+  PULL_REQUEST_COMMENT_CREATE: 'remote/github/pullRequest.comment.create',
   ISSUE_CREATE: 'remote/github/issue.create',
   ISSUE_COMMENT_CREATE: 'remote/github/issueComment.create',
 });
@@ -24,12 +27,14 @@ export const GitHubCapabilityId = Object.freeze({
   TREE_READ: 'github.tree.read',
   BRANCH_READ: 'github.branch.read',
   PULL_REQUEST_READ: 'github.pullRequest.read',
+  PULL_REQUEST_COMMENT_READ: 'github.pullRequest.comment.read',
   ISSUE_READ: 'github.issue.read',
   ISSUE_COMMENT_READ: 'github.issueComment.read',
   BRANCH_CREATE: 'github.branch.create',
   FILE_WRITE: 'github.file.write',
   FILE_DELETE: 'github.file.delete',
   PULL_REQUEST_CREATE: 'github.pullRequest.create',
+  PULL_REQUEST_COMMENT_CREATE: 'github.pullRequest.comment.create',
   ISSUE_CREATE: 'github.issue.create',
   ISSUE_COMMENT_CREATE: 'github.issueComment.create',
 });
@@ -88,6 +93,28 @@ const TOOLS = Object.freeze([
     capabilityIds: [GitHubCapabilityId.PULL_REQUEST_READ],
     inputSchemaRef: 'github-schema/pullRequest.find/input',
     outputSchemaRef: 'github-schema/pullRequest.find/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_READ,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Read exact GitHub pull request',
+    description: 'Reads one exact pull request for bounded agent context and independent verification.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_READ],
+    inputSchemaRef: 'github-schema/pullRequest.read/input',
+    outputSchemaRef: 'github-schema/pullRequest.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_COMMENT_READ,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Read exact GitHub pull request timeline comment',
+    description: 'Reads one exact pull request timeline comment and binds it to its repository and parent pull request.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_COMMENT_READ],
+    inputSchemaRef: 'github-schema/pullRequest.comment.read/input',
+    outputSchemaRef: 'github-schema/pullRequest.comment.read/output',
     readOnly: true,
   }),
   normalizeToolDescriptorV1({
@@ -158,6 +185,17 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Create GitHub pull request timeline comment',
+    description: 'Adds one bounded ordinary timeline comment to an exact pull request. Diff-line review comments are not admitted.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE],
+    inputSchemaRef: 'github-schema/pullRequest.comment.create/input',
+    outputSchemaRef: 'github-schema/pullRequest.comment.create/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: GitHubToolId.ISSUE_CREATE,
     providerId: GITHUB_PROVIDER_ID,
     label: 'Create GitHub issue',
@@ -212,12 +250,15 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.TREE_READ) return 'readTree';
   if (toolId === GitHubToolId.BRANCH_READ) return 'readBranch';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
+  if (toolId === GitHubToolId.PULL_REQUEST_READ) return 'readPullRequest';
+  if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_READ) return 'readPullRequestComment';
   if (toolId === GitHubToolId.ISSUE_READ) return 'readIssue';
   if (toolId === GitHubToolId.ISSUE_COMMENT_READ) return 'readIssueComment';
   if (toolId === GitHubToolId.BRANCH_CREATE) return 'createBranch';
   if (toolId === GitHubToolId.FILE_PUT) return 'putFile';
   if (toolId === GitHubToolId.FILE_DELETE) return 'deleteFile';
   if (toolId === GitHubToolId.PULL_REQUEST_CREATE) return 'createPullRequest';
+  if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) return 'createPullRequestComment';
   if (toolId === GitHubToolId.ISSUE_CREATE) return 'createIssue';
   if (toolId === GitHubToolId.ISSUE_COMMENT_CREATE) return 'createIssueComment';
   return '';
