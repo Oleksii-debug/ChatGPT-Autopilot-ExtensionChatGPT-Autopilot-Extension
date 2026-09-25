@@ -48,7 +48,7 @@ const SNAPSHOT_KEYS = new Set([
   'observedAt',
 ]);
 const REDIRECT_KEYS = new Set(['kind', 'targetId']);
-const OPTIONS_KEYS = new Set(['cryptoApi', 'resolveCurrentSnapshot', 'assessmentAt']);
+const OPTIONS_KEYS = new Set(['resolveCurrentSnapshot', 'assessmentAt']);
 
 function snapshotRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -214,7 +214,6 @@ function normalizeOptions(options) {
     throw new Error('remote steering requires a trusted current-state resolver');
   }
   return Object.freeze({
-    cryptoApi: Object.hasOwn(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto,
     resolveCurrentSnapshot: raw.resolveCurrentSnapshot,
     assessmentAt: requireTimestamp(
       raw.assessmentAt,
@@ -308,7 +307,6 @@ export async function assessRemoteSteeringCommandV1(input, options = undefined) 
 
   const commandFingerprint = await createSha256FingerprintV1(
     canonicalFingerprintInput(command),
-    { cryptoApi: trusted.cryptoApi },
   );
 
   return Object.freeze({
