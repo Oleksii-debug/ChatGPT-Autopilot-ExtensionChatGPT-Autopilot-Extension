@@ -58,7 +58,7 @@ const INTENT_KEYS = new Set([
   'policyEnvelopeId', 'issuedAt', 'expiresAt',
   'jobId', 'planId', 'expectedJobRevision', 'expectedPlanRevision',
   'projectId', 'taskGoal',
-  'supervisionId', 'responseId', 'decision', 'choiceId',
+  'supervisionId', 'supervisionStepId', 'responseId', 'decision', 'choiceId',
   'clarificationText', 'reasonCode',
 ]);
 const STATUS_KEYS = new Set(['schemaVersion', 'projectionId', 'generatedAt', 'jobs', 'notifications']);
@@ -67,7 +67,7 @@ const JOB_KEYS = new Set([
   'policyEnvelopeId', 'state', 'label', 'attentionCount', 'observedAt',
 ]);
 const NOTIFICATION_KEYS = new Set([
-  'notificationId', 'jobId', 'kind', 'label', 'observedAt', 'supervisionId',
+  'notificationId', 'jobId', 'kind', 'label', 'observedAt', 'supervisionId', 'supervisionStepId',
 ]);
 
 function fail(message) {
@@ -297,7 +297,7 @@ function resolveAskIntent(source, common) {
     'schemaVersion', 'intentId', 'kind', 'inputMethod', 'sourcePrincipalId',
     'sourceDeviceId', 'sourceSessionId', 'policyEnvelopeId', 'issuedAt', 'expiresAt',
     'jobId', 'planId', 'expectedJobRevision', 'expectedPlanRevision',
-    'supervisionId', 'responseId', 'decision', 'choiceId', 'clarificationText', 'reasonCode',
+    'supervisionId', 'supervisionStepId', 'responseId', 'decision', 'choiceId', 'clarificationText', 'reasonCode',
   ]);
   assertOnlyFields(source, allowed, 'RESOLVE_ASK intent');
   const decision = enumValue(source.decision, ASK_DECISIONS, 'decision');
@@ -310,6 +310,7 @@ function resolveAskIntent(source, common) {
   const proposal = Object.freeze({
     schemaVersion: MOBILE_QUICK_CONTROL_VERSION,
     supervisionId: exactId(source.supervisionId, 'supervisionId'),
+    stepId: exactId(source.supervisionStepId, 'supervisionStepId'),
     responseId: exactId(source.responseId, 'responseId'),
     jobId: exactId(source.jobId, 'jobId'),
     planId: exactId(source.planId, 'planId'),
@@ -375,8 +376,9 @@ function normalizeNotification(input, index, generatedAt) {
   if (Date.parse(observedAt) > Date.parse(generatedAt)) fail(label + '.observedAt postdates generatedAt');
   const kind = enumValue(source.kind, NOTIFICATION_KINDS, label + '.kind');
   const supervisionId = exactId(source.supervisionId, label + '.supervisionId', true);
-  if (kind === MobileNotificationKind.ASK && !supervisionId) fail(label + ' ASK requires supervisionId');
-  if (kind !== MobileNotificationKind.ASK && supervisionId) fail(label + ' supervisionId is only valid for ASK');
+  const supervisionStepId = exactId(source.supervisionStepId, label + '.supervisionStepId', true);
+  if (kind === MobileNotificationKind.ASK && (!supervisionId || !supervisionStepId)) fail(label + ' ASK requires supervisionId and supervisionStepId');
+  if (kind !== MobileNotificationKind.ASK && (supervisionId || supervisionStepId)) fail(label + ' supervision binding is only valid for ASK');
   return Object.freeze({
     notificationId: exactId(source.notificationId, label + '.notificationId'),
     jobId: exactId(source.jobId, label + '.jobId'),
@@ -384,6 +386,7 @@ function normalizeNotification(input, index, generatedAt) {
     label: exactText(source.label, label + '.label', 1000),
     observedAt,
     supervisionId,
+    supervisionStepId,
   });
 }
 
@@ -442,6 +445,7 @@ export function projectMobileQuickControlStatusV1(input) {
     label: notification.label,
     observedAt: notification.observedAt,
     supervisionId: notification.supervisionId,
+    supervisionStepId: notification.supervisionStepId,
     semanticAction: notification.kind === MobileNotificationKind.ASK ? MobileQuickIntentKind.RESOLVE_ASK : 'OPEN_STATUS',
     keyboardReachable: true,
     nonVoiceEquivalent: true,

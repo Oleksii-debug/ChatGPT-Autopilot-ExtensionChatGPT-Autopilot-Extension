@@ -78,6 +78,7 @@ function statusInput() {
         label: 'Потрібне рішення',
         observedAt: T0,
         supervisionId: 'supervision-1',
+        supervisionStepId: 'step-1',
       },
       {
         notificationId: 'notification-a',
@@ -86,6 +87,7 @@ function statusInput() {
         label: 'Потрібна увага',
         observedAt: T0,
         supervisionId: '',
+        supervisionStepId: '',
       },
     ],
   };
@@ -148,6 +150,7 @@ test('ASK response is bounded proposal to canonical HumanSupervision/Approval au
     expectedJobRevision: 7,
     expectedPlanRevision: 4,
     supervisionId: 'supervision-1',
+    supervisionStepId: 'step-1',
     responseId: 'response-1',
     decision: MobileAskDecision.APPROVE,
     choiceId: '',
@@ -155,6 +158,7 @@ test('ASK response is bounded proposal to canonical HumanSupervision/Approval au
     reasonCode: 'owner-approved',
   });
   assert.equal(result.supervisionProposal.decision, MobileAskDecision.APPROVE);
+  assert.equal(result.supervisionProposal.stepId, 'step-1');
   assert.equal(result.supervisionProposal.requiresCanonicalHumanSupervisionResolution, true);
   assert.equal(result.supervisionProposal.requiresCanonicalApprovalResolution, true);
   assert.equal(result.permissionGranted, false);
@@ -165,7 +169,7 @@ test('ASK SELECT and FREE_TEXT payloads are exact and mutually exclusive', () =>
   const base = {
     ...common(MobileQuickIntentKind.RESOLVE_ASK),
     jobId: 'job-1', planId: 'plan-1', expectedJobRevision: 1, expectedPlanRevision: 1,
-    supervisionId: 'supervision-1', responseId: 'response-1', reasonCode: 'owner-response',
+    supervisionId: 'supervision-1', supervisionStepId: 'step-1', responseId: 'response-1', reasonCode: 'owner-response',
   };
   const selected = normalizeMobileQuickControlIntentV1({
     ...base, decision: MobileAskDecision.SELECT, choiceId: 'choice-a', clarificationText: '',
@@ -261,7 +265,11 @@ test('status duplicates, future observations and ASK binding are rejected', () =
 
   const ask = statusInput();
   ask.notifications[0].supervisionId = '';
-  assert.throws(() => projectMobileQuickControlStatusV1(ask), /ASK requires supervisionId/);
+  assert.throws(() => projectMobileQuickControlStatusV1(ask), /ASK requires supervisionId and supervisionStepId/);
+
+  const missingStep = statusInput();
+  missingStep.notifications[0].supervisionStepId = '';
+  assert.throws(() => projectMobileQuickControlStatusV1(missingStep), /ASK requires supervisionId and supervisionStepId/);
 });
 
 test('accessors and exotic records fail without executing getters', () => {
