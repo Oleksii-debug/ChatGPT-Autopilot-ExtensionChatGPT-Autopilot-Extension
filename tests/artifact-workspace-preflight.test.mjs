@@ -194,7 +194,7 @@ function controlArtifact(path, {
     kind: 'CONTROL',
     uri: `job://bundle/${path}`,
     mediaType,
-    sha256: hash(artifactId[0]),
+    sha256: hash('f'),
     sizeBytes: 12,
     createdAt,
     producerInvocationId: 'bundle-control',
