@@ -131,6 +131,7 @@ test('gateway client accepts the exact response byte ceiling through the streami
   assert.equal(result.ok, true);
   assert.equal(response.cancelled, false);
   assert.ok(response.reads >= 1);
+  assert.equal(response.released, true);
 });
 
 test('gateway client rejects declared response overflow before body consumption', async () => {
@@ -158,6 +159,7 @@ test('gateway client rejects and cancels chunked response overflow before JSON p
   );
   assert.equal(response.cancelled, true);
   assert.equal(response.reads, 2);
+  assert.equal(response.released, true);
 });
 
 test('gateway client enforces the response ceiling in UTF-8 bytes rather than JavaScript code units', async () => {
@@ -174,6 +176,7 @@ test('gateway client enforces the response ceiling in UTF-8 bytes rather than Ja
     error => error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE',
   );
   assert.equal(response.cancelled, true);
+  assert.equal(response.released, true);
 });
 
 
