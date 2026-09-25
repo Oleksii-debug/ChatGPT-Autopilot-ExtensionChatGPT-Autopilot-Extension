@@ -148,6 +148,7 @@ function id(value, label, { optional = false } = {}) {
 function integer(value, label, { min, max }) {
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
       || value < min
       || value > max) {
     throw new Error(label + ' is out of bounds');
@@ -526,7 +527,8 @@ async function buildTraceBinding(trace, cryptoApi) {
  * and evidence identities remain UNVERIFIED_INPUT until canonical authorities
  * resolve them independently.
  */
-export async function compileRecipeCandidateV1(input, { cryptoApi = globalThis.crypto } = {}) {
+export async function compileRecipeCandidateV1(input) {
+  const cryptoApi = globalThis.crypto;
   const raw = record(input, 'RecipeCompilerInputV1');
   exactKeys(raw, INPUT_KEYS, 'RecipeCompilerInputV1');
   if (raw.schemaVersion !== RECIPE_COMPILER_SCHEMA_VERSION) {
