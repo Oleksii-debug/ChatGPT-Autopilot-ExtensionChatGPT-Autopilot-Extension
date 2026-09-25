@@ -97,13 +97,14 @@ function verification({
 function artifact({
   artifactId,
   producerInvocationId,
+  kind = 'verification-evidence',
   sha256 = 'a'.repeat(64),
   createdAt: artifactCreatedAt = '2026-09-25T08:04:00.000Z',
 } = {}) {
   return {
     schemaVersion: 1,
     artifactId,
-    kind: 'verification-evidence',
+    kind,
     uri: 'artifact://evidence/' + artifactId,
     mediaType: 'application/json',
     sha256,
@@ -121,17 +122,15 @@ function happyInput() {
       {
         criterionId: 'criterion-tests',
         verification: verification({ criterionId: 'criterion-tests' }),
-        evidenceKinds: ['TEST'],
       },
       {
         criterionId: 'criterion-artifact',
         verification: verification({ criterionId: 'criterion-artifact' }),
-        evidenceKinds: ['ARTIFACT'],
       },
     ],
     evidenceArtifacts: [
-      artifact({ artifactId: 'evidence-tests', producerInvocationId: 'verify-tests' }),
-      artifact({ artifactId: 'evidence-artifact', producerInvocationId: 'verify-artifact' }),
+      artifact({ artifactId: 'evidence-tests', producerInvocationId: 'verify-tests', kind: 'TEST' }),
+      artifact({ artifactId: 'evidence-artifact', producerInvocationId: 'verify-artifact', kind: 'ARTIFACT' }),
     ],
     evaluatedAt,
   };
@@ -168,12 +167,10 @@ test('FAILED or AMBIGUOUS verification deterministically reopens instead of auth
           status,
           evidenceArtifactIds: [],
         }),
-        evidenceKinds: [],
       },
       {
         criterionId: 'criterion-tests',
         verification: verification({ criterionId: 'criterion-tests' }),
-        evidenceKinds: ['TEST'],
       },
     ];
     input.evidenceArtifacts = [
@@ -191,7 +188,11 @@ test('FAILED or AMBIGUOUS verification deterministically reopens instead of auth
 
 test('VERIFIED without required evidence kinds or artifact count reopens as incomplete evidence', () => {
   const kindInput = happyInput();
-  kindInput.criterionVerifications[0].evidenceKinds = ['OTHER'];
+  kindInput.evidenceArtifacts[0] = artifact({
+    artifactId: 'evidence-tests',
+    producerInvocationId: 'verify-tests',
+    kind: 'OTHER',
+  });
   const kindResult = adjudicateOutcomeVerificationV1(kindInput);
   assert.equal(kindResult.verdict, OutcomeVerificationVerdict.REOPEN);
   assert.deepEqual(kindResult.reopenCriterionIds, ['criterion-tests']);
@@ -329,7 +330,6 @@ test('hostile accessors, symbols, sparse arrays, and authority-forging request f
   let getterCalls = 0;
   const accessorRow = {
     verification: verification({ criterionId: 'criterion-tests' }),
-    evidenceKinds: ['TEST'],
   };
   Object.defineProperty(accessorRow, 'criterionId', {
     enumerable: true,
