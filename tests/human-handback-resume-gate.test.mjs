@@ -376,6 +376,51 @@ function exactEffectState(phase = ExactEffectPhase.COMMITTED, effectId = 'effect
   )).state;
 }
 
+function committedEffectBeforeHandbackVerification(effectId = 'effect-1') {
+  let state = createExactEffectStateV1(effectInvocation(effectId), { createdAt: PRE0 });
+  state = reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'stale-effect-begin',
+    PRE1,
+  )).state;
+  state = reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'stale-effect-ambiguous',
+    PRE2,
+    { reasonCode: 'OWNER_TAKEOVER', summary: 'Owner intervention requires reconciliation.' },
+  )).state;
+  const observationId = 'stale-effect-observed';
+  const observedAt = '2026-09-25T00:03:10.000Z';
+  const verifiedAt = '2026-09-25T00:03:20.000Z';
+  state = reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.RESOLVE_RECONCILIATION,
+    'stale-effect-reconciled',
+    '2026-09-25T00:03:30.000Z',
+    {
+      outcome: ReconciliationOutcome.VERIFIED,
+      reasonCode: 'POSTCONDITION_MATCH',
+      observation: {
+        ...effectObservation(effectId, observationId),
+        observedAt,
+      },
+      verification: {
+        ...effectVerification(effectId, observationId),
+        verifiedAt,
+      },
+    },
+  )).state;
+  return reduceExactEffectV1(state, effectEvent(
+    effectId,
+    ExactEffectEventType.COMMIT,
+    'stale-effect-commit',
+    '2026-09-25T00:03:40.000Z',
+    { commitId: 'stale-effect-commit-proof' },
+  )).state;
+}
+
 function secondAttemptCommittedEffect(effectId = 'effect-1') {
   let state = createExactEffectStateV1(effectInvocation(effectId), { createdAt: PRE0 });
   state = reduceExactEffectV1(state, effectEvent(
@@ -593,6 +638,19 @@ test('exact-effect identity, execution and attempt drift fail closed', () => {
     }),
     exactEffectState: attempt2,
   })), /attempt mismatch/);
+});
+
+test('matching committed exact-effect state from before handback verification cannot authorize resume', () => {
+  const staleCommitted = committedEffectBeforeHandbackVerification();
+  assert.equal(staleCommitted.phase, ExactEffectPhase.COMMITTED);
+  assert.equal(staleCommitted.effectId, 'effect-1');
+  assert.equal(staleCommitted.executionId, 'effect-1:attempt:1');
+  assert.equal(staleCommitted.attempt, 1);
+  assert.ok(Date.parse(staleCommitted.updatedAt) < Date.parse(T4));
+
+  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+    exactEffectState: staleCommitted,
+  })), /exact-effect resolution must not predate handback verification/);
 });
 
 test('resume assessment cannot use future exact-effect state or predate handback verification', () => {
