@@ -53,7 +53,7 @@ test('pending Browser Agent approval outranks an error and never exposes target 
   const job = agentJob('agent-one', {
     config: { name: 'Owner research agent' },
     runtime: {
-      runState: 'ERROR',
+      runState: 'WAITING_APPROVAL',
       updatedAt: T2,
       lastError: secret,
       pendingApproval: {
@@ -105,7 +105,12 @@ test('resolved or normal runtime states disappear instead of becoming stale inbo
       },
     },
     agentJobs: [agentJob('b', {
-      runtime: { runState: 'RUNNING', updatedAt: T1, lastError: '', pendingApproval: { snapshotSignature: 's1' } },
+      runtime: {
+        runState: 'WAITING_APPROVAL',
+        updatedAt: T1,
+        lastError: '',
+        pendingApproval: { snapshotSignature: 's1', action: { type: 'CLICK' } },
+      },
     })],
   });
   assert.equal(initial.summary.openCount, 2);
