@@ -58,6 +58,7 @@ const AUTHORITY_KEYS = new Set([
   'authorityId',
   'scopeId',
   'purpose',
+  'authorityEffect',
 ]);
 
 const BUDGET_KEYS = new Set([
@@ -65,6 +66,7 @@ const BUDGET_KEYS = new Set([
   'maxRuntimeSeconds',
   'maxCostUsdMicros',
   'maxConcurrency',
+  'enforcementAuthority',
 ]);
 
 const DELIVERABLE_KEYS = new Set([
@@ -81,11 +83,13 @@ const VERIFIER_PLAN_KEYS = new Set([
   'criterionIds',
   'requiredEvidenceArtifactCount',
   'independent',
+  'verificationAuthority',
 ]);
 
 const TRIGGER_KEYS = new Set([
   'triggerId',
   'kind',
+  'schedulingAuthority',
 ]);
 
 const ASSESSMENT_KEYS = new Set([
@@ -259,6 +263,10 @@ function normalizeSource(input) {
 function normalizeAuthority(input) {
   const raw = record(input, 'OutcomeAuthorityRequirementV1');
   exactKeys(raw, AUTHORITY_KEYS, 'OutcomeAuthorityRequirementV1');
+  const authorityEffect = own(raw, 'authorityEffect', 'OutcomeAuthorityRequirementV1', { optional: true });
+  if (authorityEffect != null && authorityEffect !== 'REQUIREMENT_ONLY') {
+    throw new Error('Outcome authority requirement cannot grant authority');
+  }
   return {
     authorityId: id(own(raw, 'authorityId', 'OutcomeAuthorityRequirementV1'), 'authorityId'),
     scopeId: id(own(raw, 'scopeId', 'OutcomeAuthorityRequirementV1'), 'scopeId'),
@@ -270,6 +278,10 @@ function normalizeAuthority(input) {
 function normalizeBudget(input) {
   const raw = record(input, 'OutcomeBudgetBoundariesV1');
   exactKeys(raw, BUDGET_KEYS, 'OutcomeBudgetBoundariesV1');
+  const enforcementAuthority = own(raw, 'enforcementAuthority', 'OutcomeBudgetBoundariesV1', { optional: true });
+  if (enforcementAuthority != null && enforcementAuthority !== 'NONE') {
+    throw new Error('Outcome budget boundaries cannot become enforcement authority');
+  }
   return {
     maxModelCalls: integer(own(raw, 'maxModelCalls', 'OutcomeBudgetBoundariesV1'), 'maxModelCalls', 0, MAX_MODEL_CALLS),
     maxRuntimeSeconds: integer(
@@ -313,6 +325,10 @@ function normalizeVerifierPlan(input) {
   if (actorId === verifierId) throw new Error('Outcome verifier must be independent from actor');
   const independent = own(raw, 'independent', 'OutcomeVerifierPlanV1');
   if (independent !== true) throw new Error('Outcome verifier plan must explicitly require independence');
+  const verificationAuthority = own(raw, 'verificationAuthority', 'OutcomeVerifierPlanV1', { optional: true });
+  if (verificationAuthority != null && verificationAuthority !== 'EXTERNAL_REQUIRED') {
+    throw new Error('Outcome verifier plan cannot mint verifier authority');
+  }
   return {
     planId: id(own(raw, 'planId', 'OutcomeVerifierPlanV1'), 'verifier planId'),
     actorId,
@@ -332,6 +348,10 @@ function normalizeVerifierPlan(input) {
 function normalizeTrigger(input) {
   const raw = record(input, 'OutcomeTriggerRefV1');
   exactKeys(raw, TRIGGER_KEYS, 'OutcomeTriggerRefV1');
+  const schedulingAuthority = own(raw, 'schedulingAuthority', 'OutcomeTriggerRefV1', { optional: true });
+  if (schedulingAuthority != null && schedulingAuthority !== 'REFERENCE_ONLY') {
+    throw new Error('Outcome trigger reference cannot grant scheduling authority');
+  }
   return {
     triggerId: id(own(raw, 'triggerId', 'OutcomeTriggerRefV1'), 'triggerId'),
     kind: id(own(raw, 'kind', 'OutcomeTriggerRefV1'), 'trigger kind'),
