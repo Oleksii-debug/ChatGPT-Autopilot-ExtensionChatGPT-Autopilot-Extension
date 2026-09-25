@@ -37,9 +37,10 @@ export function listSiteAdapters() {
 
 export function getSiteAdapter(adapterId) {
   const id = requireExactSiteAdapterId(adapterId);
-  const descriptor = DESCRIPTORS[id];
-  if (!descriptor) throw new Error(`Unsupported site adapter: ${id}`);
-  return cloneDescriptor(descriptor);
+  if (!Object.hasOwn(DESCRIPTORS, id)) {
+    throw new Error(`Unsupported site adapter: ${id}`);
+  }
+  return cloneDescriptor(DESCRIPTORS[id]);
 }
 
 export function siteAdapterAcceptsUrl(adapterId, value) {
