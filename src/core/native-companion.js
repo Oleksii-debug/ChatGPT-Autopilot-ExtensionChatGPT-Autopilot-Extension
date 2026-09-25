@@ -3,7 +3,7 @@ export const NATIVE_COMPANION_PROTOCOL_VERSION = 1;
 
 export const NativeCompanionRequestType = Object.freeze({
   HELLO: 'hello', HEALTH: 'health', CAPABILITIES: 'capabilities', FILESYSTEM_READ_TEXT: 'filesystem.readText',
-  FILESYSTEM_SEARCH: 'filesystem.search', FILESYSTEM_WRITE_EXISTING_TEXT: 'filesystem.writeExistingText',
+  FILESYSTEM_SEARCH: 'filesystem.search', FILESYSTEM_LIST: 'filesystem.list', FILESYSTEM_STAT: 'filesystem.stat', FILESYSTEM_WRITE_EXISTING_TEXT: 'filesystem.writeExistingText',
   CREDENTIALS_LIST: 'credentials.list', CREDENTIALS_RESOLVE: 'credentials.resolve', MCP_REQUEST: 'mcp.request', MCP_CLOSE: 'mcp.close',
   WINDOWS_EXEC_PINNED: 'windows.execPinned', WINDOWS_UIA_QUERY: 'windows.uia.query',
 });
@@ -24,6 +24,8 @@ export class NativeCompanionClient{
  hello(clientVersion=''){return this.send(NativeCompanionRequestType.HELLO,{clientVersion:clean(clientVersion,120)});} health(){return this.send(NativeCompanionRequestType.HEALTH);} capabilities(){return this.send(NativeCompanionRequestType.CAPABILITIES);}
  readText({rootId,relativePath,maxBytes=262144}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_READ_TEXT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',maxBytes});}
  searchFiles({rootId,query,maxResults=64,maxEntries=2048}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_SEARCH,{rootId:clean(rootId,128),query:typeof query==='string'?query:'',maxResults,maxEntries});}
+ listFiles({rootId,relativePath='.',maxEntries=256}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_LIST,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',maxEntries});}
+ statPath({rootId,relativePath,hash=false,maxHashBytes=16777216}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_STAT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',hash,maxHashBytes});}
  writeExistingText({rootId,relativePath,text,expectedSha256}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_WRITE_EXISTING_TEXT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',text:typeof text==='string'?text:'',expectedSha256:clean(expectedSha256,64).toLowerCase()});}
  listCredentials({targetOrigin}={}){return this.send(NativeCompanionRequestType.CREDENTIALS_LIST,{targetOrigin:clean(targetOrigin,2048)});} resolveCredential({credentialId,targetOrigin}={}){return this.send(NativeCompanionRequestType.CREDENTIALS_RESOLVE,{credentialId:clean(credentialId,128),targetOrigin:clean(targetOrigin,2048)});}
  mcpRequest(payload){return this.send(NativeCompanionRequestType.MCP_REQUEST,payload);} mcpClose(commandId){return this.send(NativeCompanionRequestType.MCP_CLOSE,{commandId});}

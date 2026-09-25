@@ -8,6 +8,8 @@ export const FILESYSTEM_PROVIDER_ID = 'native/filesystem';
 export const FilesystemToolId = Object.freeze({
   READ_TEXT: 'native/filesystem/readText',
   SEARCH: 'native/filesystem/search',
+  LIST: 'native/filesystem/list',
+  STAT: 'native/filesystem/stat',
   WRITE_EXISTING_TEXT: 'native/filesystem/writeExistingText',
 });
 
@@ -62,8 +64,65 @@ const TOOLS = Object.freeze([
     outputSchemaRef: 'filesystem-schema/search/output',
     readOnly: true,
   }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: FilesystemToolId.LIST,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'List owner-scoped filesystem directory',
+    description: 'Enumerates one owner-scoped directory through a bounded streamed Native Companion read.',
+    capabilityIds: ['filesystem.list'],
+    inputSchemaRef: 'filesystem-schema/list/input',
+    outputSchemaRef: 'filesystem-schema/list/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: FilesystemToolId.STAT,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'Inspect owner-scoped filesystem metadata',
+    description: 'Reads metadata and, when explicitly requested, a bounded SHA-256 from an admitted regular file.',
+    capabilityIds: ['filesystem.stat'],
+    inputSchemaRef: 'filesystem-schema/stat/input',
+    outputSchemaRef: 'filesystem-schema/stat/output',
+    readOnly: true,
+  }),
 ]);
 const KNOWN_TOOLS = Object.freeze([...TOOLS, WRITE_RECOVERY_TOOL]);
+const LEGACY_NATIVE_CAPABILITY_IDS = Object.freeze([
+  'filesystem.readText',
+  'filesystem.search',
+]);
+
+const NATIVE_METHOD_BY_TOOL_ID = Object.freeze({
+  [FilesystemToolId.READ_TEXT]: 'readText',
+  [FilesystemToolId.SEARCH]: 'searchFiles',
+  [FilesystemToolId.LIST]: 'listFiles',
+  [FilesystemToolId.STAT]: 'statPath',
+});
+
+function nativeCapabilityIdsFromSnapshot(snapshot) {
+  if (snapshot == null) return new Set(LEGACY_NATIVE_CAPABILITY_IDS);
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)
+      || !Array.isArray(snapshot.capabilities)) {
+    throw new Error('Native Companion capability snapshot is invalid');
+  }
+  const out = new Set();
+  for (const [index, capability] of snapshot.capabilities.entries()) {
+    if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
+      throw new Error(`Native Companion capabilities[${index}] is invalid`);
+    }
+    const capabilityId = capability.capabilityId;
+    if (typeof capabilityId !== 'string' || capabilityId !== capabilityId.trim() || !capabilityId) {
+      throw new Error(`Native Companion capabilities[${index}].capabilityId is invalid`);
+    }
+    if (out.has(capabilityId)) {
+      throw new Error(`Native Companion capability snapshot contains duplicate capabilityId: ${capabilityId}`);
+    }
+    out.add(capabilityId);
+  }
+  return out;
+}
+
 
 function providerError(code, message) {
   const error = new Error(message);
@@ -106,21 +165,37 @@ function wrapFailure(error, { readOnly, invocationId }) {
 }
 
 export class FilesystemAgentProviderV1 {
-  constructor({ nativeClient, resolveArtifactText = null, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
+  constructor({
+    nativeClient,
+    nativeCapabilities = null,
+    resolveArtifactText = null,
+    grantedCapabilityIds = [],
+    now = () => Date.now(),
+  } = {}) {
     if (!nativeClient?.readText || !nativeClient?.searchFiles) {
       throw new Error('Filesystem Native Companion read/search client is required');
     }
     this.nativeClient = nativeClient;
+    const nativeCapabilityIds = nativeCapabilityIdsFromSnapshot(nativeCapabilities);
+    this.availableTools = Object.freeze(TOOLS.filter(tool => {
+      const methodName = NATIVE_METHOD_BY_TOOL_ID[tool.toolId];
+      const capabilityId = tool.capabilityIds[0];
+      return nativeCapabilityIds.has(capabilityId)
+        && typeof nativeClient[methodName] === 'function';
+    }));
     this.resolveArtifactText = typeof resolveArtifactText === 'function' ? resolveArtifactText : null;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
     this.now = now;
   }
 
-  tools() { return TOOLS; }
+  tools() { return this.availableTools; }
 
   authorize({ invocation, policyDecision } = {}) {
     const tool = KNOWN_TOOLS.find(item => item.toolId === invocation?.toolId);
     if (!tool) throw new Error('Filesystem tool is not registered');
+    if (tool !== WRITE_RECOVERY_TOOL && !this.availableTools.some(item => item.toolId === tool.toolId)) {
+      throw providerError('TOOL_UNAVAILABLE', 'Filesystem tool is unavailable in the connected Native Companion');
+    }
     const authorized = assertToolInvocationAuthorizedV1({
       invocation,
       policyDecision,
@@ -140,6 +215,10 @@ export class FilesystemAgentProviderV1 {
         result = await this.nativeClient.readText(authorized.invocation.arguments);
       } else if (tool.toolId === FilesystemToolId.SEARCH) {
         result = await this.nativeClient.searchFiles(authorized.invocation.arguments);
+      } else if (tool.toolId === FilesystemToolId.LIST) {
+        result = await this.nativeClient.listFiles(authorized.invocation.arguments);
+      } else if (tool.toolId === FilesystemToolId.STAT) {
+        result = await this.nativeClient.statPath(authorized.invocation.arguments);
       } else {
         if (!this.resolveArtifactText) throw providerError('ARTIFACT_RESOLVER_UNAVAILABLE', 'Canonical ArtifactRef text resolver is required for filesystem write');
         const args = normalizeWriteArguments(authorized.invocation.arguments);
