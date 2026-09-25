@@ -6,6 +6,7 @@ import { constants as fsConstants } from 'node:fs';
 export const FILESYSTEM_PROVIDER_VERSION = 1;
 export const MAX_READ_BYTES = 1024 * 1024;
 export const MAX_SEARCH_RESULTS = 256;
+export const MAX_SEARCH_ENTRIES = 4096;
 
 function fail(message) { throw new Error(message); }
 function nonEmpty(value, label) {
@@ -126,6 +127,117 @@ export async function readFilesystemFileV1(scope, requestedPath, { maxBytes = MA
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
     return boundReadV1(buffer.subarray(0, bytesRead), { maxBytes });
   });
+}
+
+async function snapshotSearchDirectory(scope, admittedRoot, current, realRoots) {
+  const [real, stat] = await Promise.all([
+    fs.realpath(current).then(canonical),
+    fs.lstat(current),
+  ]);
+  requireContained(realRoots, real, false);
+  if (!isWithin(admittedRoot, real)) fail('Filesystem search escaped admitted root');
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('Filesystem search directory identity changed during enumeration');
+  return Object.freeze({ real, stat });
+}
+
+function requireSameSearchDirectory(before, after) {
+  if (before.real !== after.real || !sameFileIdentity(before.stat, after.stat)) {
+    fail('Filesystem search directory identity changed during enumeration');
+  }
+}
+
+async function closeDirectoryQuietly(directory) {
+  if (!directory) return;
+  try {
+    await directory.close();
+  } catch (error) {
+    if (error?.code !== 'ERR_DIR_CLOSED') throw error;
+  }
+}
+
+// Search is metadata-only and never grants execution authority. It refuses link/reparse
+// traversal and bounds both actual enumeration work and output so an owner-scoped root
+// cannot become an unbounded filesystem crawler. Directory and entry identities are
+// revalidated before any observed names are committed, so a pathname swap fails closed.
+// Only the bounded observed match set is sorted; when truncated, selection intentionally
+// reflects the bounded directory stream rather than materializing an entire directory.
+export async function searchFilesystemV1(scope, requestedRoot, query, {
+  maxResults = MAX_SEARCH_RESULTS,
+  maxEntries = MAX_SEARCH_ENTRIES,
+  beforeEnumerate = null,
+  openDirectory = null,
+} = {}) {
+  const needle = nonEmpty(query, 'filesystem search query').toLocaleLowerCase('en-US');
+  if (!Number.isInteger(maxEntries) || maxEntries < 1 || maxEntries > MAX_SEARCH_ENTRIES) fail('Invalid filesystem search entry bound');
+  if (!Number.isInteger(maxResults) || maxResults < 1 || maxResults > MAX_SEARCH_RESULTS) fail('Invalid filesystem search bound');
+  if (beforeEnumerate != null && typeof beforeEnumerate !== 'function') fail('Invalid filesystem beforeEnumerate hook');
+  if (openDirectory != null && typeof openDirectory !== 'function') fail('Invalid filesystem openDirectory hook');
+  const openDir = openDirectory ?? (current => fs.opendir(current, { bufferSize: 1 }));
+  const lexicalRoot = authorizeFilesystemPathV1(scope, requestedRoot);
+  const admittedRoot = await authorizeFilesystemPathAtIoV1(scope, lexicalRoot, { allowMissingLeaf: false });
+  const realRoots = await realRootsFor(scope, false);
+  const pending = [lexicalRoot];
+  const matches = [];
+  let visited = 0;
+  let workTruncated = false;
+
+  while (pending.length && visited < maxEntries) {
+    const current = pending.shift();
+    const admittedDirectory = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+    if (beforeEnumerate != null) await beforeEnumerate(current, admittedDirectory);
+
+    const beforeOpen = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+    requireSameSearchDirectory(admittedDirectory, beforeOpen);
+    let directory;
+    try {
+      directory = await openDir(current);
+      if (!directory || typeof directory.read !== 'function' || typeof directory.close !== 'function') {
+        fail('Filesystem directory enumerator is invalid');
+      }
+      const afterOpen = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+      requireSameSearchDirectory(beforeOpen, afterOpen);
+
+      while (visited < maxEntries) {
+        const entry = await directory.read();
+        if (entry == null) break;
+        visited += 1;
+        const candidate = path.join(current, entry.name);
+        const candidateStat = await fs.lstat(candidate).catch(error => {
+          if (error?.code === 'ENOENT') fail('Filesystem search entry identity changed during enumeration');
+          throw error;
+        });
+        if (candidateStat.isSymbolicLink()) continue;
+        const candidateReal = canonical(await fs.realpath(candidate));
+        requireContained(realRoots, candidateReal, false);
+        if (!isWithin(admittedRoot, candidateReal)) fail('Filesystem search escaped admitted root');
+        const postCandidateStat = await fs.lstat(candidate).catch(error => {
+          if (error?.code === 'ENOENT') fail('Filesystem search entry identity changed during enumeration');
+          throw error;
+        });
+        if (postCandidateStat.isSymbolicLink() || !sameFileIdentity(candidateStat, postCandidateStat)) {
+          fail('Filesystem search entry identity changed during enumeration');
+        }
+        const relativePath = path.relative(lexicalRoot, candidate).split(path.sep).join('/');
+        if (relativePath.toLocaleLowerCase('en-US').includes(needle)) matches.push(relativePath);
+        if (postCandidateStat.isDirectory()) pending.push(candidate);
+      }
+
+      const afterEnumeration = await snapshotSearchDirectory(scope, admittedRoot, current, realRoots);
+      requireSameSearchDirectory(afterOpen, afterEnumeration);
+      if (visited >= maxEntries) {
+        // Do not perform one extra directory.read() merely to determine EOF: the work
+        // budget is authoritative. Conservatively report truncation at the boundary.
+        workTruncated = true;
+      }
+    } finally {
+      await closeDirectoryQuietly(directory);
+    }
+  }
+
+  if (pending.length) workTruncated = true;
+  matches.sort((a, b) => a.localeCompare(b, 'en'));
+  const bounded = boundSearchResultsV1(matches, { maxResults });
+  return Object.freeze({ ...bounded, truncated: bounded.truncated || workTruncated, visitedEntries: visited });
 }
 
 export function boundReadV1(buffer, { maxBytes = MAX_READ_BYTES } = {}) {
