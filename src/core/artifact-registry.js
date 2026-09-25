@@ -377,6 +377,39 @@ function assertVersionInputDependencies(artifacts, version) {
   }
 }
 
+function assertAcyclicInputDependencies(artifacts) {
+  const versions = artifacts.flatMap(entry => entry.versions);
+  const indegree = new Map(versions.map(version => [version.versionId, 0]));
+  const dependents = new Map(versions.map(version => [version.versionId, []]));
+
+  for (const version of versions) {
+    for (const binding of version.provenance.inputArtifactBindings) {
+      indegree.set(version.versionId, indegree.get(version.versionId) + 1);
+      dependents.get(binding.versionId).push(version.versionId);
+    }
+  }
+
+  const ready = [];
+  for (const version of versions) {
+    if (indegree.get(version.versionId) === 0) ready.push(version.versionId);
+  }
+
+  let visited = 0;
+  for (let cursor = 0; cursor < ready.length; cursor += 1) {
+    const versionId = ready[cursor];
+    visited += 1;
+    for (const dependentId of dependents.get(versionId)) {
+      const next = indegree.get(dependentId) - 1;
+      indegree.set(dependentId, next);
+      if (next === 0) ready.push(dependentId);
+    }
+  }
+
+  if (visited !== versions.length) {
+    throw new Error('Artifact provenance input dependencies must be acyclic');
+  }
+}
+
 export function normalizeArtifactRegistryV1(input) {
   const raw = snapshotRecord(input, REGISTRY_KEYS, 'ArtifactRegistryV1');
   const projectId = exactId(raw.projectId, 'registry.projectId');
@@ -398,6 +431,7 @@ export function normalizeArtifactRegistryV1(input) {
   for (const entry of artifacts) {
     for (const version of entry.versions) assertVersionInputDependencies(artifacts, version);
   }
+  assertAcyclicInputDependencies(artifacts);
   return deepFrozen({
     schemaVersion: exactVersion(raw.schemaVersion, 'ArtifactRegistryV1'),
     projectId,

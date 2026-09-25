@@ -522,6 +522,73 @@ test('registry normalization revalidates exact input bindings instead of trustin
   assert.throws(() => normalizeArtifactRegistryV1(forged), /input version not found/);
 });
 
+test('registry normalization rejects forged cyclic exact-version provenance', () => {
+  const atSame = at(1);
+  const aRef = artifact({
+    artifactId: 'cycle-a',
+    uri: 'project://artifact/cycle-a',
+    sha256: hash('a'),
+    createdAt: atSame,
+    producerInvocationId: 'cycle-a-producer',
+  });
+  const bRef = artifact({
+    artifactId: 'cycle-b',
+    uri: 'project://artifact/cycle-b',
+    sha256: hash('b'),
+    createdAt: atSame,
+    producerInvocationId: 'cycle-b-producer',
+  });
+
+  const registry = {
+    schemaVersion: 1,
+    projectId: 'project-a',
+    revision: 2,
+    artifacts: [
+      {
+        artifactId: 'cycle-a',
+        currentVersionId: 'cycle-a-v1',
+        versions: [version({
+          versionId: 'cycle-a-v1',
+          artifactRef: aRef,
+          provenanceRef: provenance(aRef, {
+            inputArtifactIds: ['cycle-b'],
+            inputArtifactBindings: [{
+              artifactId: 'cycle-b',
+              versionId: 'cycle-b-v1',
+              sha256: bRef.sha256,
+            }],
+            createdAt: atSame,
+          }),
+          registeredAt: atSame,
+        })],
+      },
+      {
+        artifactId: 'cycle-b',
+        currentVersionId: 'cycle-b-v1',
+        versions: [version({
+          versionId: 'cycle-b-v1',
+          artifactRef: bRef,
+          provenanceRef: provenance(bRef, {
+            inputArtifactIds: ['cycle-a'],
+            inputArtifactBindings: [{
+              artifactId: 'cycle-a',
+              versionId: 'cycle-a-v1',
+              sha256: aRef.sha256,
+            }],
+            createdAt: atSame,
+          }),
+          registeredAt: atSame,
+        })],
+      },
+    ],
+  };
+
+  assert.throws(
+    () => normalizeArtifactRegistryV1(registry),
+    /input dependencies must be acyclic/,
+  );
+});
+
 test('descriptor snapshots prevent ordinary getter execution across nested version input', () => {
   let gets = 0;
   const noReads = value => new Proxy(value, {
