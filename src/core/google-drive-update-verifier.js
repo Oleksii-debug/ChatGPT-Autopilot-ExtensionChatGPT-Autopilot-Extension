@@ -4,6 +4,14 @@ import { GOOGLE_WORKSPACE_PROVIDER_ID, GoogleWorkspaceToolId } from './google-wo
 
 const DRIVE_ID = /^[A-Za-z0-9_-]{1,512}$/u;
 const VERIFIER_ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const INVOCATION_KEYS = new Set([
+  'schemaVersion', 'invocationId', 'toolId', 'providerId', 'requestedCapabilityIds',
+  'policyDecisionId', 'arguments', 'createdAt', 'parentInvocationId',
+]);
+const OBSERVATION_KEYS = new Set([
+  'schemaVersion', 'observationId', 'invocationId', 'status', 'summary', 'data',
+  'artifactRefs', 'observedAt',
+]);
 
 function exactDataRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
@@ -103,13 +111,17 @@ function attemptFromExecutionId(value) {
   return attempt;
 }
 
-function expectedUpdate(invocation) {
-  if (!invocation || invocation.toolId !== GoogleWorkspaceToolId.DRIVE_FILE_UPDATE
-      || invocation.providerId !== GOOGLE_WORKSPACE_PROVIDER_ID) {
+function snapshotInvocation(invocation) {
+  const raw = exactDataRecord(invocation, INVOCATION_KEYS, 'Drive update invocation');
+  if (raw.schemaVersion !== 1
+      || raw.toolId !== GoogleWorkspaceToolId.DRIVE_FILE_UPDATE
+      || raw.providerId !== GOOGLE_WORKSPACE_PROVIDER_ID) {
     throw new Error('Drive update verifier accepts only canonical Drive update invocations');
   }
+  const invocationId = requireVerifierId(raw.invocationId, 'invocationId');
+  const policyDecisionId = requireVerifierId(raw.policyDecisionId, 'policyDecisionId');
   const args = exactDataRecord(
-    invocation.arguments,
+    raw.arguments,
     new Set(['fileId', 'name', 'destinationParentId']),
     'Drive update verifier arguments',
   );
@@ -120,7 +132,21 @@ function expectedUpdate(invocation) {
   const name = hasName ? requireName(args.name) : null;
   const destinationParentId = hasDestination ? requireDriveId(args.destinationParentId, 'destinationParentId') : null;
   if (destinationParentId === fileId) throw new Error('Drive file cannot be moved into itself');
-  return Object.freeze({ fileId, hasName, name, hasDestination, destinationParentId });
+  return Object.freeze({
+    invocationId,
+    policyDecisionId,
+    expected: Object.freeze({ fileId, hasName, name, hasDestination, destinationParentId }),
+  });
+}
+
+function snapshotObservation(observation, invocationId) {
+  const raw = exactDataRecord(observation, OBSERVATION_KEYS, 'Drive update observation');
+  if (raw.schemaVersion !== 1) throw new Error('Drive update verifier requires canonical observation');
+  const observationId = requireVerifierId(raw.observationId, 'observationId');
+  if (requireVerifierId(raw.invocationId, 'observation.invocationId') !== invocationId) {
+    throw new Error('Drive update observation invocation identity mismatch');
+  }
+  return Object.freeze({ observationId });
 }
 
 function matchesExpected(file, expected) {
@@ -143,22 +169,22 @@ export class DriveFileUpdateVerifierV1 {
     this.now = now;
   }
 
-  async #readback(invocation) {
-    const expected = expectedUpdate(invocation);
+  async #readback(expected) {
     const file = snapshotDriveReadback(await this.getDriveFile({ fileId: expected.fileId }));
     if (file.id !== expected.fileId) throw new Error('Drive update readback identity mismatch');
     return Object.freeze({ expected, file, matches: matchesExpected(file, expected) });
   }
 
   async verify({ invocation, executionId, observation } = {}) {
-    if (!observation || typeof observation.observationId !== 'string') throw new Error('Drive update verifier requires canonical observation');
-    const readback = await this.#readback(invocation);
     const attempt = attemptFromExecutionId(executionId);
+    const safeInvocation = snapshotInvocation(invocation);
+    const safeObservation = snapshotObservation(observation, safeInvocation.invocationId);
+    const readback = await this.#readback(safeInvocation.expected);
     return {
       schemaVersion: 1,
-      verificationId: `${invocation.invocationId}:drive-update-verification:${attempt}`,
-      invocationId: invocation.invocationId,
-      observationId: observation.observationId,
+      verificationId: `${safeInvocation.invocationId}:drive-update-verification:${attempt}`,
+      invocationId: safeInvocation.invocationId,
+      observationId: safeObservation.observationId,
       status: readback.matches ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS,
       reasonCode: readback.matches ? 'DRIVE_FILE_UPDATE_MATCHED' : 'DRIVE_FILE_UPDATE_DIVERGED',
       summary: readback.matches
@@ -167,8 +193,8 @@ export class DriveFileUpdateVerifierV1 {
       evidenceArtifactIds: [],
       verifiedAt: new Date(this.now()).toISOString(),
       verifierId: this.verifierId,
-      verificationAuthorityId: invocation.policyDecisionId,
-      effectId: invocation.invocationId,
+      verificationAuthorityId: safeInvocation.policyDecisionId,
+      effectId: safeInvocation.invocationId,
       executionId,
       attempt,
     };
@@ -184,12 +210,13 @@ export class DriveFileUpdateVerifierV1 {
     if (expectedOutcome !== ReconciliationOutcome.VERIFIED) {
       throw new Error('Drive update reconciliation supports only independently verified committed state');
     }
-    const readback = await this.#readback(invocation);
+    const safeInvocation = snapshotInvocation(invocation);
+    const readback = await this.#readback(safeInvocation.expected);
     const observedAt = new Date(this.now()).toISOString();
     const observation = {
       schemaVersion: 1,
-      observationId: `${invocation.invocationId}:drive-update-readback:reconcile-${attempt}`,
-      invocationId: invocation.invocationId,
+      observationId: `${safeInvocation.invocationId}:drive-update-readback:reconcile-${attempt}`,
+      invocationId: safeInvocation.invocationId,
       status: 'OK',
       summary: 'Fresh Drive readback classified the requested update state.',
       data: {
@@ -203,8 +230,8 @@ export class DriveFileUpdateVerifierV1 {
     };
     const verification = {
       schemaVersion: 1,
-      verificationId: `${invocation.invocationId}:drive-update-verification:reconcile-${attempt}`,
-      invocationId: invocation.invocationId,
+      verificationId: `${safeInvocation.invocationId}:drive-update-verification:reconcile-${attempt}`,
+      invocationId: safeInvocation.invocationId,
       observationId: observation.observationId,
       status: readback.matches ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS,
       reasonCode: readback.matches ? 'DRIVE_FILE_UPDATE_COMMITTED_EFFECT_CONFIRMED' : 'DRIVE_FILE_UPDATE_STATE_DIVERGED',
