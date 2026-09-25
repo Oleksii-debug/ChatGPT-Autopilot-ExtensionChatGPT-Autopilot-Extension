@@ -19,11 +19,167 @@ import {
 export const SCENARIO_WORK_STORAGE_KEY = 'autopilotScenarioWorkV1';
 export const SCENARIO_WORK_ALARM = 'autopilot-scenario-work-wake';
 const STORAGE_SCHEMA_VERSION = 1;
+const MAX_PERSISTED_ARRAY_LENGTH = 10000;
+const MAX_PERSISTED_OBJECT_KEYS = 10000;
+const MAX_PERSISTED_GRAPH_NODES = 50000;
+const MAX_PERSISTED_DEPTH = 64;
 const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function safeName(value, fallback = 'Сценарна робота') { return text(value).slice(0, 120) || fallback; }
+function plainRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+function enumerableDataValue(record, key) {
+  if (!plainRecord(record)) return { ok: false, value: undefined };
+  const descriptor = Object.getOwnPropertyDescriptor(record, key);
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    return { ok: false, value: undefined };
+  }
+  return { ok: true, value: descriptor.value };
+}
+function snapshotDenseDataArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    return { ok: false, value: [] };
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (
+    !lengthDescriptor
+    || !Object.hasOwn(lengthDescriptor, 'value')
+    || !Number.isSafeInteger(lengthDescriptor.value)
+    || lengthDescriptor.value < 0
+    || lengthDescriptor.value > MAX_PERSISTED_ARRAY_LENGTH
+  ) return { ok: false, value: [] };
+  const length = lengthDescriptor.value;
+  const ownKeys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (
+    ownKeys.length !== expected.size
+    || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))
+  ) return { ok: false, value: [] };
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      return { ok: false, value: [] };
+    }
+    out[index] = descriptor.value;
+  }
+  return { ok: true, value: out };
+}
+
+function snapshotPersistedData(value, ancestors = new Set(), memo = new Map(), budget = { nodes: 0 }, depth = 0) {
+  if (value === null) return { ok: true, value: null };
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') {
+    return { ok: true, value };
+  }
+  if (type !== 'object' || ancestors.has(value) || depth > MAX_PERSISTED_DEPTH) {
+    return { ok: false, value: undefined };
+  }
+  if (memo.has(value)) return { ok: true, value: memo.get(value) };
+  budget.nodes += 1;
+  if (budget.nodes > MAX_PERSISTED_GRAPH_NODES) return { ok: false, value: undefined };
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (Object.getPrototypeOf(value) !== Array.prototype) return { ok: false, value: undefined };
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const lengthDescriptor = descriptors.length;
+      if (
+        !lengthDescriptor
+        || !Object.hasOwn(lengthDescriptor, 'value')
+        || !Number.isSafeInteger(lengthDescriptor.value)
+        || lengthDescriptor.value < 0
+        || lengthDescriptor.value > MAX_PERSISTED_ARRAY_LENGTH
+      ) return { ok: false, value: undefined };
+      const length = lengthDescriptor.value;
+      const ownKeys = Reflect.ownKeys(descriptors);
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      if (
+        ownKeys.length !== expected.size
+        || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))
+      ) return { ok: false, value: undefined };
+
+      const out = new Array(length);
+      memo.set(value, out);
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = descriptors[String(index)];
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+          return { ok: false, value: undefined };
+        }
+        const child = snapshotPersistedData(descriptor.value, ancestors, memo, budget, depth + 1);
+        if (!child.ok) return { ok: false, value: undefined };
+        out[index] = child.value;
+      }
+      return { ok: true, value: out };
+    }
+
+    if (!plainRecord(value)) return { ok: false, value: undefined };
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    if (keys.length > MAX_PERSISTED_OBJECT_KEYS) return { ok: false, value: undefined };
+    const out = Object.create(null);
+    memo.set(value, out);
+    for (const key of keys) {
+      if (typeof key !== 'string') return { ok: false, value: undefined };
+      const descriptor = descriptors[key];
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        return { ok: false, value: undefined };
+      }
+      const child = snapshotPersistedData(descriptor.value, ancestors, memo, budget, depth + 1);
+      if (!child.ok) return { ok: false, value: undefined };
+      Object.defineProperty(out, key, {
+        value: child.value,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+    return { ok: true, value: out };
+  } finally {
+    ancestors.delete(value);
+  }
+}
+function samePersistedData(actual, canonical, depth = 0) {
+  if (Object.is(actual, canonical)) return true;
+  if (depth > MAX_PERSISTED_DEPTH || typeof actual !== typeof canonical || actual === null || canonical === null) return false;
+  if (Array.isArray(actual) || Array.isArray(canonical)) {
+    if (!Array.isArray(actual) || !Array.isArray(canonical) || actual.length !== canonical.length) return false;
+    for (let index = 0; index < actual.length; index += 1) {
+      if (!samePersistedData(actual[index], canonical[index], depth + 1)) return false;
+    }
+    return true;
+  }
+  if (!plainRecord(actual) || !plainRecord(canonical)) return false;
+  const actualKeys = Object.keys(actual);
+  const canonicalKeys = Object.keys(canonical);
+  if (actualKeys.length !== canonicalKeys.length) return false;
+  for (const key of canonicalKeys) {
+    if (!Object.hasOwn(actual, key) || !samePersistedData(actual[key], canonical[key], depth + 1)) return false;
+  }
+  return true;
+}
+function compatiblePersistedConfig(persisted, canonical) {
+  if (samePersistedData(persisted, canonical)) return true;
+  const legacyCanonical = clone(canonical);
+  let migrated = false;
+  for (const [key, defaultValue] of [
+    ['schemaVersion', 1],
+    ['timeoutPolicy', 'REPLACE_MEMBER'],
+  ]) {
+    if (!Object.hasOwn(persisted, key) && Object.is(legacyCanonical[key], defaultValue)) {
+      delete legacyCanonical[key];
+      migrated = true;
+    }
+  }
+  return migrated && samePersistedData(persisted, legacyCanonical);
+}
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
@@ -52,29 +208,67 @@ function isTabAlreadyGoneError(error) {
   return /no tab with id|invalid tab id|tab not found/i.test(String(error?.message || error || ''));
 }
 function normalizeStore(raw, now = Date.now()) {
-  if (!raw || raw.schemaVersion !== STORAGE_SCHEMA_VERSION || !Array.isArray(raw.order) || typeof raw.byId !== 'object') return freshStore();
+  if (!plainRecord(raw)) return freshStore();
+  const schemaVersion = enumerableDataValue(raw, 'schemaVersion');
+  const selectedId = enumerableDataValue(raw, 'selectedId');
+  const order = enumerableDataValue(raw, 'order');
+  const byId = enumerableDataValue(raw, 'byId');
+  const orderSnapshot = order.ok
+    ? snapshotDenseDataArray(order.value)
+    : { ok: false, value: [] };
+  if (
+    !schemaVersion.ok || schemaVersion.value !== STORAGE_SCHEMA_VERSION
+    || !selectedId.ok || typeof selectedId.value !== 'string'
+    || !orderSnapshot.ok
+    || !byId.ok || !plainRecord(byId.value)
+  ) return freshStore();
+
   const out = freshStore();
-  for (const id of raw.order) {
-    if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
+  const recoveryBudget = { nodes: 0 };
+  for (const id of orderSnapshot.value) {
+    if (typeof id !== 'string' || Object.hasOwn(out.byId, id)) continue;
+    const itemDescriptor = Object.getOwnPropertyDescriptor(byId.value, id);
+    if (
+      !itemDescriptor
+      || itemDescriptor.enumerable !== true
+      || !Object.hasOwn(itemDescriptor, 'value')
+      || !plainRecord(itemDescriptor.value)
+    ) continue;
+    const itemSnapshot = snapshotPersistedData(itemDescriptor.value, new Set(), new Map(), recoveryBudget, 0);
+    if (!itemSnapshot.ok) continue;
     try {
-      const config = normalizeScenarioWorkConfig({ ...raw.byId[id].config, id });
-      const runtime = ensureManagerRuntimeFields(raw.byId[id].runtime && raw.byId[id].runtime.mode === config.mode
-        ? clone(raw.byId[id].runtime)
+      const item = itemSnapshot.value;
+      if (!plainRecord(item.config) || item.config.id !== id) continue;
+      const config = normalizeScenarioWorkConfig(item.config);
+      // Persistence recovery is not the interactive create/update boundary. A
+      // malformed stored config must never gain executable defaults/coercions
+      // after restart. Current-schema persisted bytes must already equal the
+      // canonical config that this version itself writes.
+      if (!compatiblePersistedConfig(item.config, config)) continue;
+      const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
+        ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
-      out.byId[id] = {
-        id,
-        name: safeName(raw.byId[id].name || config.name),
-        config,
-        runtime,
-        createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
-        updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
-      };
+      Object.defineProperty(out.byId, id, {
+        value: {
+          id,
+          name: safeName(item.name || config.name),
+          config,
+          runtime,
+          createdAt: Math.max(0, Number(item.createdAt || now)),
+          updatedAt: Math.max(0, Number(item.updatedAt || now)),
+        },
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
       out.order.push(id);
     } catch {
       // Corrupt individual scenarios are omitted rather than poisoning all others.
     }
   }
-  out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  out.selectedId = Object.hasOwn(out.byId, selectedId.value)
+    ? selectedId.value
+    : (out.order[0] || '');
   return out;
 }
 
