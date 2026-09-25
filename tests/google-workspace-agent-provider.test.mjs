@@ -150,6 +150,38 @@ test('accessor/sparse capability arrays fail closed before value reads', () => {
   assert.throws(() => new GoogleWorkspaceAgentProviderV1({ workspaceClient: client(), grantedCapabilityIds: sparse }), /dense canonical array/i);
 });
 
+test('authority arrays are descriptor-snapshotted without ordinary caller reads', async () => {
+  let reads = 0;
+  const proxiedGranted = new Proxy([GoogleWorkspaceCapabilityId.GMAIL_SEARCH], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const provider = new GoogleWorkspaceAgentProviderV1({
+    workspaceClient: client(),
+    grantedCapabilityIds: proxiedGranted,
+    now: () => Date.parse(at),
+  });
+  assert.equal(reads, 0, 'granted capability normalization must not read caller properties');
+
+  const proxiedRequested = new Proxy([GoogleWorkspaceCapabilityId.GMAIL_SEARCH], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const inv = invocation(
+    GoogleWorkspaceToolId.GMAIL_SEARCH,
+    GoogleWorkspaceCapabilityId.GMAIL_SEARCH,
+    { userId: 'me' },
+  );
+  inv.requestedCapabilityIds = proxiedRequested;
+  const result = await provider.invoke({ invocation: inv, policyDecision: decision() });
+  assert.equal(result.result.operation, 'searchGmail');
+  assert.equal(reads, 0, 'requested capability normalization must not read caller properties');
+});
+
 test('provider rejects coercive authority aliases before canonical contract normalizers', async () => {
   const provider = new GoogleWorkspaceAgentProviderV1({
     workspaceClient: client(),
