@@ -227,6 +227,12 @@ function exactTimestamp(value, label, { empty = false } = {}) {
   return value;
 }
 
+function compareTimestampEpoch(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function exactInteger(value, label, min, max) {
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
@@ -373,13 +379,13 @@ function normalizeEffectBinding(input) {
   if (state.verification.observationId !== state.observation.observationId) {
     throw new Error('Deployment exact-effect verification observation binding mismatch');
   }
-  if (state.observation.observedAt > state.verification.verifiedAt) {
+  if (compareTimestampEpoch(state.observation.observedAt, state.verification.verifiedAt) > 0) {
     throw new Error('Deployment exact-effect verification cannot predate observation');
   }
-  if (state.verification.verifiedAt > state.updatedAt) {
+  if (compareTimestampEpoch(state.verification.verifiedAt, state.updatedAt) > 0) {
     throw new Error('Deployment exact-effect verification cannot postdate durable effect state');
   }
-  if (state.observation.observedAt > state.updatedAt) {
+  if (compareTimestampEpoch(state.observation.observedAt, state.updatedAt) > 0) {
     throw new Error('Deployment exact-effect observation cannot postdate durable effect state');
   }
   return deepFreeze({
@@ -423,7 +429,10 @@ function normalizeHealthRecord(input, label = 'DeploymentHealthEvidenceV1') {
 }
 
 function maxTimestamp(values) {
-  return values.reduce((max, value) => (value > max ? value : max), '');
+  return values.reduce(
+    (max, value) => (!max || compareTimestampEpoch(value, max) > 0 ? value : max),
+    '',
+  );
 }
 
 function derivePhaseFlags(phase) {
@@ -511,7 +520,7 @@ function normalizeStateInternal(input) {
   for (const [key, expected] of Object.entries(expectedFlags)) {
     if (state[key] !== expected) throw new Error(`${key} is inconsistent with deployment phase`);
   }
-  if (state.updatedAt < state.createdAt) throw new Error('Deployment updatedAt cannot predate createdAt');
+  if (compareTimestampEpoch(state.updatedAt, state.createdAt) < 0) throw new Error('Deployment updatedAt cannot predate createdAt');
   const lastEventFields = [
     state.lastEventId,
     state.lastEventType,
@@ -535,15 +544,15 @@ function normalizeStateInternal(input) {
     if (evidence.verifierId === state.publisherId) {
       throw new Error('Deployment verifier must be independent from publisher');
     }
-    if (evidence.verifiedAt < candidateArtifactRef.createdAt
+    if (compareTimestampEpoch(evidence.verifiedAt, candidateArtifactRef.createdAt) < 0
         && evidence.checkKind !== DeploymentCheckKind.ROLLBACK_LIVE) {
       throw new Error('Deployment verification predates candidate materialization');
     }
     if (evidence.checkKind === DeploymentCheckKind.ROLLBACK_LIVE
-        && evidence.verifiedAt < rollbackArtifactRef.createdAt) {
+        && compareTimestampEpoch(evidence.verifiedAt, rollbackArtifactRef.createdAt) < 0) {
       throw new Error('Rollback verification predates rollback artifact materialization');
     }
-    if (evidence.verifiedAt > state.updatedAt) throw new Error('Deployment evidence cannot be from the future');
+    if (compareTimestampEpoch(evidence.verifiedAt, state.updatedAt) > 0) throw new Error('Deployment evidence cannot be from the future');
   }
 
   const qualificationKinds = new Set(qualificationEvidence.map(item => item.checkKind));
@@ -567,7 +576,7 @@ function normalizeStateInternal(input) {
   ]);
   if (publishPhases.has(phase)) {
     if (!state.publishedAt || !state.publishCommitId) throw new Error('Published deployment requires committed publish evidence');
-    if (state.publishedAt < state.qualifiedAt) throw new Error('Publish cannot predate qualification');
+    if (compareTimestampEpoch(state.publishedAt, state.qualifiedAt) < 0) throw new Error('Publish cannot predate qualification');
   } else if (state.publishedAt || state.publishCommitId) {
     throw new Error('Unpublished deployment cannot carry publish commit evidence');
   }
@@ -585,16 +594,16 @@ function normalizeStateInternal(input) {
   }
   if (healthEvidence.length && !state.publishedAt) throw new Error('Health evidence requires a published deployment');
   for (const evidence of healthEvidence) {
-    if (evidence.verifiedAt < state.publishedAt) throw new Error('Health verification cannot predate publish');
+    if (compareTimestampEpoch(evidence.verifiedAt, state.publishedAt) < 0) throw new Error('Health verification cannot predate publish');
   }
 
   if (state.lastHealthyAt) {
-    if (!state.publishedAt || state.lastHealthyAt < state.publishedAt || state.lastHealthyAt > state.updatedAt) {
+    if (!state.publishedAt || compareTimestampEpoch(state.lastHealthyAt, state.publishedAt) < 0 || compareTimestampEpoch(state.lastHealthyAt, state.updatedAt) > 0) {
       throw new Error('lastHealthyAt is causally invalid');
     }
   }
   if (state.degradedAt) {
-    if (!state.publishedAt || state.degradedAt < state.publishedAt || state.degradedAt > state.updatedAt) {
+    if (!state.publishedAt || compareTimestampEpoch(state.degradedAt, state.publishedAt) < 0 || compareTimestampEpoch(state.degradedAt, state.updatedAt) > 0) {
       throw new Error('degradedAt is causally invalid');
     }
   }
@@ -608,12 +617,12 @@ function normalizeStateInternal(input) {
     if (!state.rollbackPublishedAt || !state.rollbackCommitId) {
       throw new Error('Rollback phase requires committed rollback effect evidence');
     }
-    if (state.rollbackPublishedAt < state.publishedAt) throw new Error('Rollback cannot predate publish');
+    if (compareTimestampEpoch(state.rollbackPublishedAt, state.publishedAt) < 0) throw new Error('Rollback cannot predate publish');
   } else if (state.rollbackPublishedAt || state.rollbackCommitId || rollbackHealth || state.rolledBackAt) {
     throw new Error('Non-rollback phase cannot carry rollback evidence');
   }
   if (rollbackHealth) {
-    if (rollbackHealth.verifiedAt < state.rollbackPublishedAt) {
+    if (compareTimestampEpoch(rollbackHealth.verifiedAt, state.rollbackPublishedAt) < 0) {
       throw new Error('Rollback verification cannot predate rollback publish');
     }
     if (phase === DeploymentPhase.ROLLED_BACK && rollbackHealth.status !== VerificationStatus.VERIFIED) {
@@ -646,7 +655,7 @@ export function createDeploymentLifecycleV1(input) {
   const candidateArtifactRef = exactArtifactRef(raw.candidateArtifactRef, 'candidateArtifactRef');
   const rollbackArtifactRef = exactArtifactRef(raw.rollbackArtifactRef, 'rollbackArtifactRef');
   const createdAt = exactTimestamp(raw.createdAt, 'createdAt');
-  if (candidateArtifactRef.createdAt > createdAt || rollbackArtifactRef.createdAt > createdAt) {
+  if (compareTimestampEpoch(candidateArtifactRef.createdAt, createdAt) > 0 || compareTimestampEpoch(rollbackArtifactRef.createdAt, createdAt) > 0) {
     throw new Error('Deployment cannot predate release artifacts');
   }
   if (candidateArtifactRef.sha256 === rollbackArtifactRef.sha256) {
@@ -722,7 +731,7 @@ function resolveVerification(resolver, event, state, expectedKinds, artifact) {
   if (binding.verification.verifierId === state.publisherId) {
     throw new Error('Deployment verifier must be independent from publisher');
   }
-  if (binding.verification.verifiedAt > event.at) throw new Error('Verification evidence cannot postdate lifecycle event');
+  if (compareTimestampEpoch(binding.verification.verifiedAt, event.at) > 0) throw new Error('Verification evidence cannot postdate lifecycle event');
   return binding;
 }
 
@@ -742,7 +751,7 @@ function resolveEffect(resolver, event, state, expectedKind, artifact, expectedE
   if (binding.artifactId !== artifact.artifactId || binding.artifactSha256 !== artifact.sha256) {
     throw new Error('Resolved exact-effect artifact mismatch');
   }
-  if (binding.state.updatedAt > event.at) throw new Error('Exact-effect evidence cannot postdate lifecycle event');
+  if (compareTimestampEpoch(binding.state.updatedAt, event.at) > 0) throw new Error('Exact-effect evidence cannot postdate lifecycle event');
   return binding;
 }
 
@@ -799,7 +808,7 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
   if (event.previousRevision !== current.revision) {
     throw new Error('Deployment event previousRevision mismatch');
   }
-  if (event.at < current.updatedAt) throw new Error('Deployment lifecycle event cannot predate durable state');
+  if (compareTimestampEpoch(event.at, current.updatedAt) < 0) throw new Error('Deployment lifecycle event cannot predate durable state');
 
   if (event.type === DeploymentEventType.RECORD_QUALIFICATION_VERIFICATION) {
     if (current.phase !== DeploymentPhase.PREVIEW) {
@@ -815,7 +824,7 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
     if (binding.verification.status !== VerificationStatus.VERIFIED) {
       return rejected(current, 'QUALIFICATION_REQUIRES_VERIFIED_EVIDENCE');
     }
-    if (binding.verification.verifiedAt < current.candidateArtifactRef.createdAt) {
+    if (compareTimestampEpoch(binding.verification.verifiedAt, current.candidateArtifactRef.createdAt) < 0) {
       throw new Error('Qualification verification predates candidate materialization');
     }
     if (current.qualificationEvidence.some(item => item.checkKind === binding.checkKind)) {
@@ -847,7 +856,7 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
       current.publishEffectId,
     );
     const effectObservedAt = binding.state.observation.observedAt;
-    if (effectObservedAt < current.qualifiedAt) {
+    if (compareTimestampEpoch(effectObservedAt, current.qualifiedAt) < 0) {
       throw new Error('Publish exact-effect observation predates completed qualification');
     }
     return accepted(current, event, draft => {
@@ -871,11 +880,11 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
     if (binding.verification.status === VerificationStatus.NOT_APPLICABLE) {
       return rejected(current, 'PRODUCTION_HEALTH_CANNOT_BE_NOT_APPLICABLE');
     }
-    if (binding.verification.verifiedAt < current.publishedAt) {
+    if (compareTimestampEpoch(binding.verification.verifiedAt, current.publishedAt) < 0) {
       throw new Error('Production health verification predates publish');
     }
     const prior = current.healthEvidence.find(item => item.checkKind === binding.checkKind);
-    if (prior && binding.verification.verifiedAt <= prior.verifiedAt) {
+    if (prior && compareTimestampEpoch(binding.verification.verifiedAt, prior.verifiedAt) <= 0) {
       return rejected(current, 'HEALTH_EVIDENCE_NOT_NEWER');
     }
     return accepted(current, event, draft => {
@@ -923,7 +932,7 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
       current.rollbackEffectId,
     );
     const effectObservedAt = binding.state.observation.observedAt;
-    if (effectObservedAt < current.publishedAt) {
+    if (compareTimestampEpoch(effectObservedAt, current.publishedAt) < 0) {
       throw new Error('Rollback exact-effect observation predates current publish');
     }
     return accepted(current, event, draft => {
@@ -948,7 +957,7 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
     if (binding.verification.status === VerificationStatus.NOT_APPLICABLE) {
       return rejected(current, 'ROLLBACK_HEALTH_CANNOT_BE_NOT_APPLICABLE');
     }
-    if (binding.verification.verifiedAt < current.rollbackPublishedAt) {
+    if (compareTimestampEpoch(binding.verification.verifiedAt, current.rollbackPublishedAt) < 0) {
       throw new Error('Rollback live verification predates rollback publish');
     }
     return accepted(current, event, draft => {
