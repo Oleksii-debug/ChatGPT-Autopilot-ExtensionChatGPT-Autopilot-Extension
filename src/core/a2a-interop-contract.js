@@ -101,7 +101,12 @@ function protocolBinding(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 512) {
     throw new Error(label + ' is invalid');
   }
-  if (/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/u.test(value)) return value;
+  if (/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/u.test(value)) {
+    if (!new Set(['JSONRPC', 'GRPC', 'HTTP+JSON']).has(value)) {
+      throw new Error(label + ' is invalid');
+    }
+    return value;
+  }
   let parsed;
   try { parsed = new URL(value); } catch { throw new Error(label + ' is invalid'); }
   if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash) {
