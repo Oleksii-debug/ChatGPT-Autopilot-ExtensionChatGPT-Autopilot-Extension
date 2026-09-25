@@ -1,0 +1,9 @@
+ChatGPT Автопілот 0.9.5 — IMMEDIATE ORCHESTRA START / OWNER UX FIX
+
+- Added a visible «Запустити оркестр» action on the Orchestras panel.
+- Added «Зберегти й запустити зараз» on Settings.
+- First enable (disabled -> enabled) now starts the selected Coordinator cycle immediately instead of waiting for the watchdog alarm.
+- Resume after owner-local pause now starts recovery/reconciliation immediately instead of only scheduling an alarm.
+- Watchdog remains reconciliation/self-healing only; it is no longer the implicit first-start timer.
+- Imported profiles remain disabled and never auto-start.
+- Physical browser Send still respects the configured Coordinator pre-send delay (for the Accessible Chess profile: 8 seconds).
