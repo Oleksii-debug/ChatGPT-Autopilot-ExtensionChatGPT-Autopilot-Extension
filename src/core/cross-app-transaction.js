@@ -2,6 +2,7 @@ import {
   ExactEffectPhase,
   normalizeExactEffectStateV1,
 } from './universal-agent-exact-effect.js';
+import { VerificationStatus } from './universal-agent-contracts.js';
 
 export const CrossAppTransactionContractVersion = 1;
 
@@ -40,47 +41,50 @@ function record(value, allowed, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
-  for (const key of Reflect.ownKeys(value)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
       throw new Error(`${label} contains unknown field: ${String(key)}`);
     }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label}.${key} must be an enumerable data property`);
     }
+    snapshot[key] = descriptor.value;
   }
-  for (const key of allowed) {
-    if (key in value && !Object.prototype.hasOwnProperty.call(value, key)) {
-      throw new Error(`${label} contains inherited field: ${key}`);
-    }
-  }
-  return value;
+  return snapshot;
 }
 
 function denseArray(value, label, max = MAX_STEPS) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  for (const key of Reflect.ownKeys(value)) {
-    if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
-      throw new Error(`${label} contains an invalid array property`);
-    }
-    const index = Number(key);
-    if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
-      throw new Error(`${label} contains an invalid array index`);
-    }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
+  const keys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (keys.length !== expected.size
+      || keys.some(key => typeof key !== 'string' || !expected.has(key))) {
+    throw new Error(`${label} contains an invalid array property`);
+  }
+  const snapshot = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
-      throw new Error(`${label}[${index}] must be an enumerable data property`);
+      throw new Error(`${label} must not be sparse and must contain data items only`);
     }
+    snapshot.push(descriptor.value);
   }
-  for (let index = 0; index < value.length; index += 1) {
-    if (!Object.prototype.hasOwnProperty.call(value, index)) {
-      throw new Error(`${label} must not be sparse`);
-    }
-  }
-  return value;
+  return snapshot;
 }
 
 function version(value, label) {
@@ -118,7 +122,9 @@ function timestamp(value, label) {
   }
   const millis = Date.parse(value);
   if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
-  return new Date(millis).toISOString();
+  const canonical = new Date(millis).toISOString();
+  if (canonical !== value) throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  return canonical;
 }
 
 function idList(value, label, { max = MAX_STEPS } = {}) {
@@ -290,30 +296,80 @@ export async function createCrossAppTransactionFingerprintV1(transactionInput, c
   return sha256Json(['chatgpt-autopilot-cross-app-transaction-v1', transaction], cryptoApi);
 }
 
-function assertDeepDataOnly(value, label, depth = 0) {
+function snapshotDeepDataOnly(value, label, depth = 0) {
   if (depth > MAX_JSON_DEPTH) throw new Error(`${label} is too deeply nested`);
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
-    return;
+    return value;
   }
   if (Array.isArray(value)) {
-    denseArray(value, label, 4096);
-    for (let index = 0; index < value.length; index += 1) {
-      assertDeepDataOnly(value[index], `${label}[${index}]`, depth + 1);
-    }
-    return;
+    const items = denseArray(value, label, 4096);
+    return items.map((item, index) => snapshotDeepDataOnly(item, `${label}[${index}]`, depth + 1));
   }
   if (!value || typeof value !== 'object') throw new Error(`${label} must contain data properties only`);
   const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must contain plain objects only`);
-  for (const key of Reflect.ownKeys(value)) {
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must contain plain objects only`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > 4096) throw new Error(`${label} contains too many fields`);
+  const output = Object.create(null);
+  for (const key of keys) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol data`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label}.${key} must be an enumerable data property`);
     }
-    assertDeepDataOnly(descriptor.value, `${label}.${key}`, depth + 1);
+    output[key] = snapshotDeepDataOnly(descriptor.value, `${label}.${key}`, depth + 1);
+  }
+  return output;
+}
+
+function bindExactEffectStateResolver(resolver) {
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
+    throw new Error('Canonical durable exact-effect state resolver is required');
+  }
+  let owner = resolver;
+  let descriptor = null;
+  for (let depth = 0; owner && depth < 8; depth += 1) {
+    descriptor = Object.getOwnPropertyDescriptor(owner, 'loadExactEffectState');
+    if (descriptor) break;
+    owner = Object.getPrototypeOf(owner);
+  }
+  if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')
+      || typeof descriptor.value !== 'function') {
+    throw new Error('Canonical durable exact-effect resolver must expose loadExactEffectState as a data method');
+  }
+  return descriptor.value.bind(resolver);
+}
+
+function assertReducerReachableCommitEvidence(state, stepId) {
+  if (state.phase !== ExactEffectPhase.COMMITTED) return;
+  if (state.attempt < 1
+      || !state.executionId
+      || !state.commitId
+      || !state.observation
+      || !state.verification
+      || state.processedEventIds.length < 4) {
+    throw new Error(`committed exact-effect state for step ${stepId} lacks reducer-reachable commit evidence`);
+  }
+  const verification = state.verification;
+  if (![VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status)
+      || !verification.verifierId
+      || verification.verificationAuthorityId !== state.invocation.policyDecisionId
+      || verification.effectId !== state.effectId
+      || verification.executionId !== state.executionId
+      || verification.attempt !== state.attempt) {
+    throw new Error(`committed exact-effect state for step ${stepId} lacks exact verification provenance`);
+  }
+  const createdAt = Date.parse(state.createdAt);
+  const observedAt = Date.parse(state.observation.observedAt);
+  const verifiedAt = Date.parse(verification.verifiedAt);
+  const updatedAt = Date.parse(state.updatedAt);
+  if (observedAt < createdAt || verifiedAt < observedAt || updatedAt < verifiedAt) {
+    throw new Error(`committed exact-effect state for step ${stepId} has invalid commit chronology`);
   }
 }
 
@@ -353,30 +409,24 @@ function projectionStatus({ complete, attention, active, ready }) {
 
 export async function projectCrossAppTransactionV1(
   transactionInput,
-  exactEffectStateInputs = [],
+  exactEffectStateResolver,
   cryptoApi = globalThis.crypto,
 ) {
   const transaction = normalizeCrossAppTransactionV1(transactionInput);
-  const inputStates = denseArray(exactEffectStateInputs, 'exactEffectStates', MAX_STEPS);
-  const states = [];
-  for (let index = 0; index < inputStates.length; index += 1) {
-    const input = inputStates[index];
-    const label = `exactEffectStates[${index}]`;
-    assertDeepDataOnly(input, label);
-    const rawInvocationSha256 = await assertExactEffectEnvelope(input, label, cryptoApi);
-    const state = normalizeExactEffectStateV1(input);
-    states.push({ state, rawInvocationSha256 });
-  }
-
-  const byStep = new Map(transaction.steps.map(step => [step.stepId, step]));
-  const stepByInvocation = new Map(transaction.steps.map(step => [step.invocationId, step]));
+  const loadExactEffectState = bindExactEffectStateResolver(exactEffectStateResolver);
   const stateByStep = new Map();
   const commitIds = new Set();
 
-  for (const { state, rawInvocationSha256 } of states) {
-    const step = stepByInvocation.get(state.invocation.invocationId);
-    if (!step) throw new Error(`exact-effect state ${state.effectId} is not part of transaction`);
-    if (stateByStep.has(step.stepId)) throw new Error(`duplicate exact-effect state for step ${step.stepId}`);
+  for (const step of transaction.steps) {
+    const resolved = await loadExactEffectState(step.invocationId);
+    if (resolved == null) continue;
+    const label = `resolved exact-effect state for ${step.stepId}`;
+    const input = snapshotDeepDataOnly(resolved, label);
+    const rawInvocationSha256 = await assertExactEffectEnvelope(input, label, cryptoApi);
+    const state = normalizeExactEffectStateV1(input);
+    if (state.effectId !== step.invocationId || state.invocation.invocationId !== step.invocationId) {
+      throw new Error(`resolved exact-effect identity does not match step ${step.stepId}`);
+    }
     if (state.invocation.providerId !== step.providerId) {
       throw new Error(`exact-effect provider binding does not match step ${step.stepId}`);
     }
@@ -388,7 +438,7 @@ export async function projectCrossAppTransactionV1(
       throw new Error(`exact-effect state for step ${step.stepId} predates transaction`);
     }
     if (state.phase === ExactEffectPhase.COMMITTED) {
-      if (!state.commitId) throw new Error(`committed exact-effect state for step ${step.stepId} lacks commitId`);
+      assertReducerReachableCommitEvidence(state, step.stepId);
       if (commitIds.has(state.commitId)) throw new Error('exact-effect states contain duplicate commitId values');
       commitIds.add(state.commitId);
     }
