@@ -98,8 +98,8 @@ function input(overrides = {}) {
   };
 }
 
-test('compiles a registry-compatible value-free CANDIDATE without granting authority', () => {
-  const compiled = compileRecipeCandidateV1(input());
+test('compiles a registry-compatible value-free CANDIDATE without granting authority', async () => {
+  const compiled = await compileRecipeCandidateV1(input());
   assert.equal(compiled.schemaVersion, 1);
   assert.equal(compiled.proposalId, 'recipe-candidate:trace-1');
   assert.equal(compiled.recipeDefinition.lifecycle, 'CANDIDATE');
@@ -108,8 +108,23 @@ test('compiles a registry-compatible value-free CANDIDATE without granting autho
   assert.equal(compiled.recipeDefinition.createdAt, '2026-09-25T06:10:30.000Z');
 
   assert.deepEqual(
-    compiled.recipeDefinition.sourceBindings.map(item => item.sourceId),
+    compiled.recipeDefinition.sourceBindings
+      .filter(item => !item.sourceId.startsWith('recipe-parameters:'))
+      .map(item => item.sourceId),
     ['source-a', 'source-b'],
+  );
+  assert.match(compiled.parameterSchemaBinding.sourceId, /^recipe-parameters:[a-f0-9]{32}$/u);
+  assert.equal(
+    compiled.parameterSchemaBinding.revisionId,
+    'sha256:' + compiled.parameterSchemaBinding.contentSha256,
+  );
+  assert.equal(
+    compiled.recipeDefinition.sourceBindings.some(item =>
+      item.sourceId === compiled.parameterSchemaBinding.sourceId
+      && item.revisionId === compiled.parameterSchemaBinding.revisionId
+      && item.contentSha256 === compiled.parameterSchemaBinding.contentSha256
+    ),
+    true,
   );
   assert.deepEqual(
     compiled.parameters.map(item => item.parameterId),
@@ -157,51 +172,51 @@ test('compiles a registry-compatible value-free CANDIDATE without granting autho
   assert.doesNotMatch(serialized, /Bearer|token=|promptText|rawOutput|toolArguments/u);
 });
 
-test('compiler accepts only a declared VERIFIED trace and never upgrades its trust', () => {
+test('compiler accepts only a declared VERIFIED trace and never upgrades its trust', async () => {
   for (const outcome of ['FAILED', 'PARTIAL', '', true]) {
-    assert.throws(
+    await assert.rejects(
       () => compileRecipeCandidateV1(input({ trace: trace({ outcome }) })),
       /outcome must be VERIFIED/u,
     );
   }
-  const compiled = compileRecipeCandidateV1(input());
+  const compiled = await compileRecipeCandidateV1(input());
   assert.equal(compiled.trace.outcome, 'VERIFIED');
   assert.equal(compiled.traceTrust, 'UNVERIFIED_INPUT');
   assert.equal(compiled.promotionAuthorized, false);
 });
 
-test('raw prompt, arguments, outputs, credentials and parameter values are outside the accepted schema', () => {
+test('raw prompt, arguments, outputs, credentials and parameter values are outside the accepted schema', async () => {
   const withRawPrompt = input();
   withRawPrompt.trace.rawPrompt = 'SECRET prompt';
-  assert.throws(() => compileRecipeCandidateV1(withRawPrompt), /unknown field: rawPrompt/u);
+  await assert.rejects(() => compileRecipeCandidateV1(withRawPrompt), /unknown field: rawPrompt/u);
 
   const withArgs = input();
   withArgs.trace.steps[0].toolArguments = { token: 'SECRET' };
-  assert.throws(() => compileRecipeCandidateV1(withArgs), /unknown field: toolArguments/u);
+  await assert.rejects(() => compileRecipeCandidateV1(withArgs), /unknown field: toolArguments/u);
 
   const withOutput = input();
   withOutput.trace.steps[0].rawOutput = 'SECRET output';
-  assert.throws(() => compileRecipeCandidateV1(withOutput), /unknown field: rawOutput/u);
+  await assert.rejects(() => compileRecipeCandidateV1(withOutput), /unknown field: rawOutput/u);
 
   const withParameterValue = input();
   withParameterValue.parameters[0].value = 'ghp_SECRET';
-  assert.throws(() => compileRecipeCandidateV1(withParameterValue), /unknown field: value/u);
+  await assert.rejects(() => compileRecipeCandidateV1(withParameterValue), /unknown field: value/u);
 });
 
-test('credential parameters are value-free and must remain explicitly sensitive', () => {
+test('credential parameters are value-free and must remain explicitly sensitive', async () => {
   const unsafe = input();
   unsafe.parameters[0].sensitive = false;
-  assert.throws(() => compileRecipeCandidateV1(unsafe), /CREDENTIAL_REF must be sensitive/u);
+  await assert.rejects(() => compileRecipeCandidateV1(unsafe), /CREDENTIAL_REF must be sensitive/u);
 
   const unknownKind = input();
   unknownKind.parameters[0].kind = 'PASSWORD';
-  assert.throws(() => compileRecipeCandidateV1(unknownKind), /kind is invalid/u);
+  await assert.rejects(() => compileRecipeCandidateV1(unknownKind), /kind is invalid/u);
 });
 
-test('every declared parameter must be used and every step binding must resolve', () => {
+test('every declared parameter must be used and every step binding must resolve', async () => {
   const undeclared = input();
   undeclared.trace.steps[0].parameterIds.push('missing.parameter');
-  assert.throws(() => compileRecipeCandidateV1(undeclared), /undeclared parameterId/u);
+  await assert.rejects(() => compileRecipeCandidateV1(undeclared), /undeclared parameterId/u);
 
   const unused = input();
   unused.parameters.push({
@@ -210,105 +225,105 @@ test('every declared parameter must be used and every step binding must resolve'
     required: false,
     sensitive: false,
   });
-  assert.throws(() => compileRecipeCandidateV1(unused), /not bound to any trace step/u);
+  await assert.rejects(() => compileRecipeCandidateV1(unused), /not bound to any trace step/u);
 
   const duplicate = input();
   duplicate.parameters.push({ ...duplicate.parameters[1] });
-  assert.throws(() => compileRecipeCandidateV1(duplicate), /duplicate parameterId/u);
+  await assert.rejects(() => compileRecipeCandidateV1(duplicate), /duplicate parameterId/u);
 });
 
-test('trace step graph fails closed on dangling dependencies, cycles and duplicate IDs', () => {
+test('trace step graph fails closed on dangling dependencies, cycles and duplicate IDs', async () => {
   const dangling = input();
   dangling.trace.steps[1].dependsOn = ['missing.step'];
-  assert.throws(() => compileRecipeCandidateV1(dangling), /depends on unknown step/u);
+  await assert.rejects(() => compileRecipeCandidateV1(dangling), /depends on unknown step/u);
 
   const cycle = input();
   cycle.trace.steps[0].dependsOn = ['step.summarize'];
-  assert.throws(() => compileRecipeCandidateV1(cycle), /dependency cycle/u);
+  await assert.rejects(() => compileRecipeCandidateV1(cycle), /dependency cycle/u);
 
   const duplicate = input();
   duplicate.trace.steps[1].stepId = 'step.fetch';
-  assert.throws(() => compileRecipeCandidateV1(duplicate), /duplicate stepId/u);
+  await assert.rejects(() => compileRecipeCandidateV1(duplicate), /duplicate stepId/u);
 });
 
-test('step kind semantics reuse RecipeRegistry rules rather than minting tool authority', () => {
+test('step kind semantics reuse RecipeRegistry rules rather than minting tool authority', async () => {
   const deterministicWithTool = input();
   deterministicWithTool.trace.steps[1].providerId = 'github';
   deterministicWithTool.trace.steps[1].toolId = 'repo.fetch';
   deterministicWithTool.trace.steps[1].requiredCapabilityIds = ['repo.read'];
-  assert.throws(
+  await assert.rejects(
     () => compileRecipeCandidateV1(deterministicWithTool),
     /deterministic step cannot declare provider\/tool capabilities/u,
   );
 
   const toolWithoutCapability = input();
   toolWithoutCapability.trace.steps[0].requiredCapabilityIds = [];
-  assert.throws(
+  await assert.rejects(
     () => compileRecipeCandidateV1(toolWithoutCapability),
     /tool step requires provider, tool and capabilities/u,
   );
 });
 
-test('replay contracts and evidence artifact identity are mandatory for every recorded step', () => {
+test('replay contracts and evidence artifact identity are mandatory for every recorded step', async () => {
   const noVerifyContract = input();
   noVerifyContract.trace.steps[0].verificationContractRef = '';
-  assert.throws(() => compileRecipeCandidateV1(noVerifyContract), /verificationContractRef is invalid/u);
+  await assert.rejects(() => compileRecipeCandidateV1(noVerifyContract), /verificationContractRef is invalid/u);
 
   const noInputContract = input();
   noInputContract.trace.steps[0].inputContractRef = '';
-  assert.throws(() => compileRecipeCandidateV1(noInputContract), /inputContractRef is invalid/u);
+  await assert.rejects(() => compileRecipeCandidateV1(noInputContract), /inputContractRef is invalid/u);
 
   const noEvidenceArtifact = input();
   noEvidenceArtifact.trace.steps[0].verificationEvidenceArtifactId = '';
-  assert.throws(() => compileRecipeCandidateV1(noEvidenceArtifact), /verificationEvidenceArtifactId is invalid/u);
+  await assert.rejects(() => compileRecipeCandidateV1(noEvidenceArtifact), /verificationEvidenceArtifactId is invalid/u);
 });
 
-test('trace evidence timestamps and hashes are causally and canonically bound', () => {
+test('trace evidence timestamps and hashes are causally and canonically bound', async () => {
   const beforeRun = input();
   beforeRun.trace.steps[0].verifiedAt = '2026-09-25T06:09:59.000Z';
-  assert.throws(() => compileRecipeCandidateV1(beforeRun), /outside the trace interval/u);
+  await assert.rejects(() => compileRecipeCandidateV1(beforeRun), /outside the trace interval/u);
 
   const afterRun = input();
   afterRun.trace.steps[1].verifiedAt = '2026-09-25T06:10:31.000Z';
-  assert.throws(() => compileRecipeCandidateV1(afterRun), /outside the trace interval/u);
+  await assert.rejects(() => compileRecipeCandidateV1(afterRun), /outside the trace interval/u);
 
   const backwards = input({ trace: trace({
     startedAt: '2026-09-25T06:10:31.000Z',
     completedAt: '2026-09-25T06:10:30.000Z',
   }) });
-  assert.throws(() => compileRecipeCandidateV1(backwards), /cannot predate startedAt/u);
+  await assert.rejects(() => compileRecipeCandidateV1(backwards), /cannot predate startedAt/u);
 
   const uppercaseHash = input();
   uppercaseHash.trace.steps[0].verificationEvidenceSha256 = 'C'.repeat(64);
-  assert.throws(() => compileRecipeCandidateV1(uppercaseHash), /lowercase SHA-256/u);
+  await assert.rejects(() => compileRecipeCandidateV1(uppercaseHash), /lowercase SHA-256/u);
 });
 
-test('candidate version lineage is validated by the canonical RecipeRegistry contract', () => {
-  assert.throws(
+test('candidate version lineage is validated by the canonical RecipeRegistry contract', async () => {
+  await assert.rejects(
     () => compileRecipeCandidateV1(input({ version: 2, parentVersion: 0 })),
     /parentVersion/u,
   );
-  assert.throws(
+  await assert.rejects(
     () => compileRecipeCandidateV1(input({ version: 1, parentVersion: 1 })),
     /parentVersion/u,
   );
 });
 
-test('source bindings are exact, unique, deterministic revision identities', () => {
+test('source bindings are exact, unique, deterministic revision identities', async () => {
   const duplicate = input();
   duplicate.sourceBindings.push({
     sourceId: 'source-a',
     revisionId: 'other',
     contentSha256: SHA_D,
   });
-  assert.throws(() => compileRecipeCandidateV1(duplicate), /duplicate sourceId/u);
+  await assert.rejects(() => compileRecipeCandidateV1(duplicate), /duplicate sourceId/u);
 
   const badDigest = input();
   badDigest.sourceBindings[0].contentSha256 = 'B'.repeat(64);
-  assert.throws(() => compileRecipeCandidateV1(badDigest), /lowercase SHA-256/u);
+  await assert.rejects(() => compileRecipeCandidateV1(badDigest), /lowercase SHA-256/u);
 });
 
-test('strict boundary rejects accessors without executing getters', () => {
+test('strict boundary rejects accessors without executing getters', async () => {
   let reads = 0;
   const hostile = input();
   Object.defineProperty(hostile, 'recipeId', {
@@ -319,7 +334,7 @@ test('strict boundary rejects accessors without executing getters', () => {
       return 'recipe.pwned';
     },
   });
-  assert.throws(
+  await assert.rejects(
     () => compileRecipeCandidateV1(hostile),
     /enumerable own data properties/u,
   );
@@ -334,46 +349,74 @@ test('strict boundary rejects accessors without executing getters', () => {
       return 'repo.delete';
     },
   });
-  assert.throws(
+  await assert.rejects(
     () => compileRecipeCandidateV1(hostileStep),
     /enumerable own data properties/u,
   );
   assert.equal(reads, 0);
 });
 
-test('strict boundary rejects hidden/symbol/exotic records and sparse/side arrays', () => {
+test('strict boundary rejects hidden/symbol/exotic records and sparse/side arrays', async () => {
   const hidden = input();
   Object.defineProperty(hidden, 'authority', {
     enumerable: false,
     configurable: true,
     value: 'ALLOW',
   });
-  assert.throws(() => compileRecipeCandidateV1(hidden), /enumerable own data properties/u);
+  await assert.rejects(() => compileRecipeCandidateV1(hidden), /enumerable own data properties/u);
 
   const symbolic = input();
   symbolic[Symbol('authority')] = 'ALLOW';
-  assert.throws(() => compileRecipeCandidateV1(symbolic), /symbol fields/u);
+  await assert.rejects(() => compileRecipeCandidateV1(symbolic), /symbol fields/u);
 
   const exotic = Object.assign(Object.create({ permissionGranted: true }), input());
-  assert.throws(() => compileRecipeCandidateV1(exotic), /plain object/u);
+  await assert.rejects(() => compileRecipeCandidateV1(exotic), /plain object/u);
 
   const sparse = input();
   sparse.trace.steps = new Array(1);
-  assert.throws(() => compileRecipeCandidateV1(sparse), /must not be sparse/u);
+  await assert.rejects(() => compileRecipeCandidateV1(sparse), /must not be sparse/u);
 
   const side = input();
   side.parameters.extraAuthority = true;
-  assert.throws(() => compileRecipeCandidateV1(side), /non-index array data/u);
+  await assert.rejects(() => compileRecipeCandidateV1(side), /non-index array data/u);
 });
 
-test('canonical ordering is independent from caller ordering', () => {
-  const left = compileRecipeCandidateV1(input());
+test('parameter schema SHA-256 is part of the Recipe subject source bindings', async () => {
+  const base = await compileRecipeCandidateV1(input());
+
+  const changedInput = input();
+  changedInput.parameters[1].sensitive = true;
+  const changed = await compileRecipeCandidateV1(changedInput);
+
+  assert.notEqual(
+    base.parameterSchemaBinding.contentSha256,
+    changed.parameterSchemaBinding.contentSha256,
+  );
+  assert.notDeepEqual(
+    base.recipeDefinition.sourceBindings,
+    changed.recipeDefinition.sourceBindings,
+  );
+
+  const collisionInput = input();
+  collisionInput.sourceBindings.push({
+    sourceId: base.parameterSchemaBinding.sourceId,
+    revisionId: 'external-revision',
+    contentSha256: SHA_D,
+  });
+  await assert.rejects(
+    () => compileRecipeCandidateV1(collisionInput),
+    /collides with compiler parameter schema identity/u,
+  );
+});
+
+test('canonical ordering is independent from caller ordering', async () => {
+  const left = await compileRecipeCandidateV1(input());
 
   const rightInput = input();
   rightInput.sourceBindings.reverse();
   rightInput.parameters.reverse();
   rightInput.trace.steps[0].parameterIds.reverse();
-  const right = compileRecipeCandidateV1(rightInput);
+  const right = await compileRecipeCandidateV1(rightInput);
 
   assert.deepEqual(left.recipeDefinition.sourceBindings, right.recipeDefinition.sourceBindings);
   assert.deepEqual(left.parameters, right.parameters);
