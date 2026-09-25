@@ -208,6 +208,43 @@ test('dependencies are exact version/hash references and cannot self-reference',
   assert.throws(() => normalizeSkillPackManifestV1(duplicate), /duplicate skillPackId/);
 });
 
+test('skill pack and dependency identities use canonical SemVer 2.0 syntax', () => {
+  const buildMetadata = manifest({ version: '1.2.3+windows.x64.001' });
+  assert.equal(
+    normalizeSkillPackManifestV1(buildMetadata).version,
+    '1.2.3+windows.x64.001',
+  );
+
+  const prereleaseBuild = manifest({ version: '1.2.3-rc.01a+build.7' });
+  assert.equal(
+    normalizeSkillPackManifestV1(prereleaseBuild).version,
+    '1.2.3-rc.01a+build.7',
+  );
+
+  for (const invalidVersion of ['1.2.3-01', '1.2.3-alpha.01', '1.2.3-', '1.2.3+']) {
+    const invalid = manifest({ version: invalidVersion });
+    assert.throws(
+      () => normalizeSkillPackManifestV1(invalid),
+      /canonical semantic version/,
+      invalidVersion,
+    );
+  }
+
+  const dependencyBuild = manifest();
+  dependencyBuild.dependencies[0].version = '2.0.0-rc.1+sha.abc123';
+  assert.equal(
+    normalizeSkillPackManifestV1(dependencyBuild).dependencies[0].version,
+    '2.0.0-rc.1+sha.abc123',
+  );
+
+  const invalidDependency = manifest();
+  invalidDependency.dependencies[0].version = '2.0.0-00';
+  assert.throws(
+    () => normalizeSkillPackManifestV1(invalidDependency),
+    /canonical semantic version/,
+  );
+});
+
 test('eval and signature references bind exact source bytes but never assert trusted PASS/signature authority', () => {
   const emptyEvidence = manifest();
   emptyEvidence.evaluationRequirements[0].requiredEvidenceKinds = [];
