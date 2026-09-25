@@ -273,6 +273,39 @@ test('registry canonicalizes ordering and enforces contiguous immutable version 
   })), /updatedAt predates recipe version/);
 });
 
+test('registry revision cannot contain qualification evidence from its future boundary', async () => {
+  const future = await authorizedRecipe({
+    qualification: qualification('PASS', {
+      evaluatedAt: '2026-09-24T22:22:00.000Z',
+    }),
+  });
+  const futureTrustedEvaluation = trustedEvaluationFor(future);
+  assert.equal(futureTrustedEvaluation.report.completedAt, '2026-09-24T22:22:00.000Z');
+
+  assert.throws(
+    () => normalizeRecipeRegistryV1(registry([future], {
+      updatedAt: AT,
+    })),
+    /updatedAt predates recipe qualification/,
+  );
+
+  const boundary = await authorizedRecipe({
+    qualification: qualification('PASS', { evaluatedAt: AT }),
+  });
+  const boundaryRegistry = normalizeRecipeRegistryV1(registry([boundary], {
+    updatedAt: AT,
+  }));
+  assert.equal(boundaryRegistry.recipes[0].qualification.evaluatedAt, AT);
+  assert.equal(
+    (await resolvePromotedRecipeV1(
+      boundaryRegistry,
+      boundary.recipeId,
+      [trustedEvaluationFor(boundary)],
+    )).version,
+    1,
+  );
+});
+
 test('registry extension is append-only and preserves existing version bytes', () => {
   const v1 = recipe({ lifecycle: 'CANDIDATE', qualification: qualification('PASS') });
   const before = registry([v1]);
