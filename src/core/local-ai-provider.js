@@ -54,6 +54,12 @@ function snapshotSettingsRecord(raw) {
 }
 
 export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_SETTINGS.providerType) {
+  if (!PROVIDER_TYPES.has(providerType)) {
+    throw new Error('Local AI provider type must be ollama or openai-compatible');
+  }
+  if (value !== undefined && typeof value !== 'string') {
+    throw new Error('Local AI server URL must be text when supplied');
+  }
   const raw = nonEmptyString(value) || (providerType === LocalAiProviderType.OPENAI_COMPATIBLE
     ? 'http://127.0.0.1:1234/v1'
     : DEFAULT_LOCAL_AI_SETTINGS.baseUrl);
@@ -75,6 +81,15 @@ export function normalizeLocalAiSettings(raw = {}) {
   if (!PROVIDER_TYPES.has(providerType)) {
     throw new Error('Local AI provider type must be ollama or openai-compatible');
   }
+  if (source.enabled !== undefined && typeof source.enabled !== 'boolean') {
+    throw new Error('Local AI enabled must be boolean when supplied');
+  }
+  if (source.baseUrl !== undefined && typeof source.baseUrl !== 'string') {
+    throw new Error('Local AI server URL must be text when supplied');
+  }
+  if (source.model !== undefined && typeof source.model !== 'string') {
+    throw new Error('Local AI model must be text when supplied');
+  }
   const timeoutSeconds = source.timeoutSeconds ?? DEFAULT_LOCAL_AI_SETTINGS.timeoutSeconds;
   if (typeof timeoutSeconds !== 'number'
       || !Number.isInteger(timeoutSeconds)
@@ -91,6 +106,32 @@ export function normalizeLocalAiSettings(raw = {}) {
     model,
     timeoutSeconds,
   };
+}
+
+function snapshotCompletionOptions(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Local AI completion options must be a plain data object');
+  }
+  let prototype;
+  try { prototype = Object.getPrototypeOf(raw); } catch {
+    throw new Error('Local AI completion options must be a plain data object');
+  }
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Local AI completion options must be a plain data object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key !== 'systemPrompt') {
+      throw new Error(`Local AI completion options contain unknown field: ${String(key)}`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Local AI completion options fields must be enumerable own data properties');
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return Object.freeze(snapshot);
 }
 
 function endpointFor(settings, kind) {
@@ -280,15 +321,22 @@ export class LocalAiClient {
     };
   }
 
-  async complete(rawSettings, prompt, { systemPrompt = '' } = {}) {
+  async complete(rawSettings, prompt, rawOptions = {}) {
     const settings = normalizeLocalAiSettings(rawSettings);
     if (!settings.enabled) throw new Error('Local AI is disabled');
     if (!settings.model) throw new Error('Select a Local AI model first');
     const userPrompt = typeof prompt === 'string' ? prompt.trim() : '';
     if (!userPrompt) throw new Error('Local AI prompt is empty');
     if (userPrompt.length > MAX_PROMPT_LENGTH) throw new Error(`Local AI prompt exceeds ${MAX_PROMPT_LENGTH} characters`);
+    const options = snapshotCompletionOptions(rawOptions);
+    const systemPrompt = options.systemPrompt ?? '';
+    if (typeof systemPrompt !== 'string') throw new Error('Local AI system prompt must be text when supplied');
+    const normalizedSystemPrompt = systemPrompt.trim();
+    if (normalizedSystemPrompt.length > MAX_PROMPT_LENGTH) {
+      throw new Error(`Local AI system prompt exceeds ${MAX_PROMPT_LENGTH} characters`);
+    }
     const messages = [];
-    if (typeof systemPrompt === 'string' && systemPrompt.trim()) messages.push({ role: 'system', content: systemPrompt.trim() });
+    if (normalizedSystemPrompt) messages.push({ role: 'system', content: normalizedSystemPrompt });
     messages.push({ role: 'user', content: userPrompt });
 
     const payload = settings.providerType === LocalAiProviderType.OLLAMA
