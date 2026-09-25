@@ -138,16 +138,37 @@ test('Mistral credential cannot be retargeted to another endpoint identity or HT
 function streamingJsonResponse(text, { status = 200, chunks = null, includeContentLength = true } = {}) {
   const bytes = new TextEncoder().encode(text);
   const parts = chunks || [bytes];
+  let index = 0;
+  let reads = 0;
   let cancelled = false;
-  const body = new ReadableStream({
-    start(controller) {
-      for (const part of parts) controller.enqueue(part);
-      controller.close();
+  let released = false;
+  let readerTaken = false;
+
+  const reader = {
+    async read() {
+      if (index >= parts.length) return { done: true, value: undefined };
+      const value = parts[index];
+      index += 1;
+      reads += 1;
+      return { done: false, value };
     },
-    cancel() {
+    async cancel() {
       cancelled = true;
     },
-  });
+    releaseLock() {
+      released = true;
+    },
+  };
+  const body = {
+    getReader() {
+      if (readerTaken) throw new TypeError('ReadableStream is already locked');
+      readerTaken = true;
+      return reader;
+    },
+    async cancel() {
+      cancelled = true;
+    },
+  };
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -156,8 +177,14 @@ function streamingJsonResponse(text, { status = 200, chunks = null, includeConte
     async text() {
       throw new Error('streaming response must not use text()');
     },
+    get reads() {
+      return reads;
+    },
     get cancelled() {
       return cancelled;
+    },
+    get released() {
+      return released;
     },
   };
 }
@@ -182,7 +209,9 @@ test('Mistral response reader accepts the exact byte ceiling through the streami
   });
   assert.equal(Buffer.byteLength(payload, 'utf8'), MAX_UPSTREAM_RESPONSE_BYTES);
   assert.equal(models.length, 1);
+  assert.equal(response.reads, 1);
   assert.equal(response.cancelled, false);
+  assert.equal(response.released, true);
 });
 
 test('Mistral response reader rejects Content-Length above the byte ceiling and cancels before reading', async () => {
@@ -195,7 +224,9 @@ test('Mistral response reader rejects Content-Length above the byte ceiling and 
     compatibleEndpoints: endpoints,
     env: { MISTRAL_API_KEY: 'test-mistral-secret' },
   }), error => error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE');
+  assert.equal(response.reads, 0);
   assert.equal(response.cancelled, true);
+  assert.equal(response.released, false);
 });
 
 test('Mistral response reader detects multi-chunk overflow without trusting Content-Length', async () => {
@@ -213,7 +244,9 @@ test('Mistral response reader detects multi-chunk overflow without trusting Cont
     compatibleEndpoints: endpoints,
     env: { MISTRAL_API_KEY: 'test-mistral-secret' },
   }), error => error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE');
+  assert.equal(response.reads, 2);
   assert.equal(response.cancelled, true);
+  assert.equal(response.released, true);
 });
 
 test('bounded Mistral responses preserve upstream rate-limit classification', async () => {
