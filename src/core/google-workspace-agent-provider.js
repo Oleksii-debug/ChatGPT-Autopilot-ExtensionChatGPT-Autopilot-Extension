@@ -267,14 +267,15 @@ function methodFor(toolId) {
 }
 
 function wrapFailure(error, invocationId) {
-  const wrapped = new Error(typeof error?.message === 'string' ? error.message.slice(0, 4000) : 'Google Workspace read failed');
+  const rawCode = typeof error?.code === 'string' ? error.code : '';
+  const code = /^GOOGLE_[A-Z0-9_]{1,100}$/u.test(rawCode) ? rawCode : 'GOOGLE_WORKSPACE_PROVIDER_FAILED';
+  const wrapped = new Error('Google Workspace read failed');
   wrapped.name = 'GoogleWorkspaceAgentProviderError';
-  wrapped.code = typeof error?.code === 'string' && error.code ? error.code.slice(0, 120) : 'GOOGLE_WORKSPACE_PROVIDER_FAILED';
+  wrapped.code = code;
   wrapped.invocationId = invocationId;
   wrapped.effectMayHaveOccurred = false;
   wrapped.safeToRetry = true;
   if (Number.isInteger(error?.status)) wrapped.status = error.status;
-  wrapped.cause = error;
   return wrapped;
 }
 
