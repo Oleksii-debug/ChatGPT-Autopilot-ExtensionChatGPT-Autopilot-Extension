@@ -5,17 +5,19 @@ import {
   assessSecretDataFlowV1,
 } from '../src/core/secret-data-flow-guard.js';
 
+const PROJECT = 'project-1';
 const T0 = '2026-09-25T05:00:00.000Z';
 const T1 = '2026-09-25T05:01:00.000Z';
 const T2 = '2026-09-25T05:02:00.000Z';
 const T3 = '2026-09-25T05:03:00.000Z';
 const T4 = '2026-09-25T05:04:00.000Z';
 
-const SHA_A = 'a'.repeat(64);
-const SHA_B = 'b'.repeat(64);
-const SHA_C = 'c'.repeat(64);
+const SHA_A1 = 'a'.repeat(64);
+const SHA_A2 = 'd'.repeat(64);
+const SHA_B1 = 'b'.repeat(64);
+const SHA_C1 = 'c'.repeat(64);
 
-function artifact({
+function artifactRef({
   artifactId,
   sha256,
   sensitive = false,
@@ -36,34 +38,83 @@ function artifact({
   };
 }
 
-function artifactMap(overrides = {}) {
-  return new Map([
-    ['artifact-a', artifact({
-      artifactId: 'artifact-a',
-      sha256: SHA_A,
-      createdAt: T0,
-      sensitive: false,
-    })],
-    ['artifact-b', artifact({
-      artifactId: 'artifact-b',
-      sha256: SHA_B,
-      createdAt: T1,
-      producerInvocationId: 'invocation-transform-1',
-      sensitive: false,
-    })],
-    ['artifact-c', artifact({
-      artifactId: 'artifact-c',
-      sha256: SHA_C,
-      createdAt: T2,
-      producerInvocationId: 'invocation-transform-2',
-      sensitive: false,
-    })],
-    ...Object.entries(overrides),
-  ]);
+function version({
+  artifactId,
+  versionId,
+  parentVersionId = null,
+  sha256,
+  sensitive = false,
+  inputArtifactIds = [],
+  createdAt = T0,
+  provenanceAt = createdAt,
+  registeredAt = provenanceAt,
+} = {}) {
+  const ref = artifactRef({
+    artifactId,
+    sha256,
+    sensitive,
+    createdAt,
+    producerInvocationId: inputArtifactIds.length ? `invocation-${versionId}` : null,
+  });
+  return {
+    schemaVersion: 1,
+    projectId: PROJECT,
+    versionId,
+    parentVersionId,
+    artifactRef: ref,
+    provenance: {
+      schemaVersion: 1,
+      projectId: PROJECT,
+      artifactRef: { ...ref },
+      sourceBindings: [],
+      inputArtifactIds: [...inputArtifactIds],
+      createdAt: provenanceAt,
+    },
+    registeredAt,
+  };
 }
 
-function resolverFrom(map) {
-  return artifactId => map.get(artifactId) ?? null;
+function entry(artifactId, versions) {
+  return {
+    artifactId,
+    currentVersionId: versions[versions.length - 1].versionId,
+    versions,
+  };
+}
+
+function registry(entries) {
+  return {
+    schemaVersion: 1,
+    projectId: PROJECT,
+    revision: entries.reduce((count, item) => count + item.versions.length, 0),
+    artifacts: entries,
+  };
+}
+
+function defaultRegistry({
+  aSensitive = false,
+  bSensitive = false,
+  bInputs = ['artifact-a'],
+} = {}) {
+  const a1 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a1',
+    sha256: SHA_A1,
+    sensitive: aSensitive,
+    createdAt: T0,
+  });
+  const b1 = version({
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+    sensitive: bSensitive,
+    inputArtifactIds: bInputs,
+    createdAt: T1,
+  });
+  return registry([
+    entry('artifact-a', [a1]),
+    entry('artifact-b', [b1]),
+  ]);
 }
 
 function request(overrides = {}) {
@@ -72,15 +123,12 @@ function request(overrides = {}) {
     flowId: 'flow-1',
     agentId: 'agent-1',
     jobId: 'job-1',
-    artifactBindings: [
-      { artifactId: 'artifact-a', sha256: SHA_A },
-      { artifactId: 'artifact-b', sha256: SHA_B },
-    ],
-    transforms: [{
-      transformId: 'transform-1',
-      inputArtifactIds: ['artifact-a'],
-      outputArtifactId: 'artifact-b',
-      completedAt: T1,
+    projectId: PROJECT,
+    registryRevision: 2,
+    artifactBindings: [{
+      artifactId: 'artifact-b',
+      versionId: 'version-b1',
+      sha256: SHA_B1,
     }],
     egresses: [{
       egressId: 'egress-1',
@@ -93,387 +141,346 @@ function request(overrides = {}) {
   };
 }
 
-test('non-sensitive derivation is only ready for canonical policy and never self-authorizes', () => {
-  const result = assessSecretDataFlowV1(request(), {
-    resolveArtifactRef: resolverFrom(artifactMap()),
-  });
+function assess(value = request(), artifactRegistry = defaultRegistry()) {
+  return assessSecretDataFlowV1(value, { artifactRegistry });
+}
+
+test('canonical non-sensitive lineage is only ready for owner policy and never self-authorizes', () => {
+  const result = assess();
 
   assert.equal(result.status, SecretDataFlowStatus.READY_FOR_POLICY);
-  assert.equal(result.executionAuthorized, false);
-  assert.equal(result.credentialUseAuthorized, false);
-  assert.equal(result.declassificationAuthorized, false);
-  assert.equal(result.requiresCanonicalArtifactResolution, true);
-  assert.equal(result.requiresCanonicalLineageResolution, true);
+  assert.equal(result.projectId, PROJECT);
+  assert.equal(result.registryRevision, 2);
+  assert.equal(result.lineageProvenance, 'CANONICAL_ARTIFACT_REGISTRY');
+  assert.equal(result.lineageCompletenessVerified, true);
+  assert.equal(result.exactInputVersionBindingVerified, false);
+  assert.equal(result.inputVersionResolution, 'CONSERVATIVE_ALL_PLAUSIBLE_VERSIONS');
+  assert.equal(result.requiresExactInputVersionBindingUpgrade, true);
   assert.equal(result.requiresCanonicalPolicyDecision, true);
   assert.equal(result.requiresIndependentSecretScan, true);
-  assert.equal(result.lineageProvenance, 'UNVERIFIED_INPUT');
-  assert.equal(result.lineageCompletenessVerified, false);
+  assert.equal(result.declassificationAuthorized, false);
+  assert.equal(result.credentialUseAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
   assert.deepEqual(result.violations, []);
-  assert.deepEqual(
-    result.artifactStates.map(item => [item.artifactId, item.effectiveSensitive]),
-    [['artifact-a', false], ['artifact-b', false]],
-  );
+  assert.deepEqual(result.artifactStates, [{
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+    declaredSensitive: false,
+    inheritedSensitive: false,
+    effectiveSensitive: false,
+    derived: true,
+    registeredAt: T1,
+  }]);
   assert.equal(result.egresses[0].policyDecisionRequired, true);
   assert.equal(result.egresses[0].independentSecretReviewRequired, false);
   assert.equal(result.egresses[0].executionAuthorized, false);
 });
 
-test('sensitive lineage stays sensitive and sensitive egress requires independent review', () => {
-  const map = artifactMap({
-    'artifact-a': artifact({
-      artifactId: 'artifact-a',
-      sha256: SHA_A,
-      sensitive: true,
-      createdAt: T0,
-    }),
-    'artifact-b': artifact({
-      artifactId: 'artifact-b',
-      sha256: SHA_B,
-      sensitive: true,
-      createdAt: T1,
-      producerInvocationId: 'invocation-transform-1',
-    }),
-  });
-
-  const result = assessSecretDataFlowV1(request(), {
-    resolveArtifactRef: resolverFrom(map),
-  });
+test('sensitive canonical input propagates into a correctly marked derived artifact', () => {
+  const result = assess(
+    request(),
+    defaultRegistry({ aSensitive: true, bSensitive: true }),
+  );
 
   assert.equal(result.status, SecretDataFlowStatus.REVIEW_REQUIRED);
   assert.deepEqual(result.violations, []);
-  assert.equal(result.artifactStates.find(item => item.artifactId === 'artifact-b').effectiveSensitive, true);
+  assert.equal(result.artifactStates[0].inheritedSensitive, true);
+  assert.equal(result.artifactStates[0].effectiveSensitive, true);
   assert.equal(result.egresses[0].effectiveSensitive, true);
   assert.equal(result.egresses[0].independentSecretReviewRequired, true);
   assert.equal(result.executionAuthorized, false);
 });
 
-test('derived artifact cannot launder sensitive ancestry by declaring sensitive=false', () => {
-  const map = artifactMap({
-    'artifact-a': artifact({
-      artifactId: 'artifact-a',
-      sha256: SHA_A,
-      sensitive: true,
-      createdAt: T0,
+test('canonical provenance prevents caller omission from hiding sensitive ancestry', () => {
+  const result = assess(
+    request({
+      artifactBindings: [{
+        artifactId: 'artifact-b',
+        versionId: 'version-b1',
+        sha256: SHA_B1,
+      }],
     }),
-  });
-
-  const result = assessSecretDataFlowV1(request(), {
-    resolveArtifactRef: resolverFrom(map),
-  });
+    defaultRegistry({ aSensitive: true, bSensitive: false }),
+  );
 
   assert.equal(result.status, SecretDataFlowStatus.BLOCKED);
   assert.deepEqual(result.violations, [{
     code: 'SENSITIVE_DERIVATION_LAUNDERING',
     artifactId: 'artifact-b',
+    versionId: 'version-b1',
   }]);
-  assert.equal(result.artifactStates.find(item => item.artifactId === 'artifact-b').declaredSensitive, false);
-  assert.equal(result.artifactStates.find(item => item.artifactId === 'artifact-b').effectiveSensitive, true);
+  assert.equal(result.artifactStates[0].declaredSensitive, false);
+  assert.equal(result.artifactStates[0].inheritedSensitive, true);
+  assert.equal(result.artifactStates[0].effectiveSensitive, true);
 });
 
-test('sensitivity propagates transitively across multiple derivations', () => {
-  const map = artifactMap({
-    'artifact-a': artifact({
-      artifactId: 'artifact-a',
-      sha256: SHA_A,
-      sensitive: true,
-      createdAt: T0,
-    }),
-    'artifact-b': artifact({
-      artifactId: 'artifact-b',
-      sha256: SHA_B,
-      sensitive: true,
-      createdAt: T1,
-      producerInvocationId: 'invocation-transform-1',
-    }),
+test('sensitivity propagates transitively through canonical registry ancestry', () => {
+  const a1 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a1',
+    sha256: SHA_A1,
+    sensitive: true,
+    createdAt: T0,
   });
+  const b1 = version({
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+    sensitive: true,
+    inputArtifactIds: ['artifact-a'],
+    createdAt: T1,
+  });
+  const c1 = version({
+    artifactId: 'artifact-c',
+    versionId: 'version-c1',
+    sha256: SHA_C1,
+    sensitive: false,
+    inputArtifactIds: ['artifact-b'],
+    createdAt: T2,
+  });
+  const reg = registry([
+    entry('artifact-a', [a1]),
+    entry('artifact-b', [b1]),
+    entry('artifact-c', [c1]),
+  ]);
 
   const result = assessSecretDataFlowV1(request({
-    artifactBindings: [
-      { artifactId: 'artifact-a', sha256: SHA_A },
-      { artifactId: 'artifact-b', sha256: SHA_B },
-      { artifactId: 'artifact-c', sha256: SHA_C },
-    ],
-    transforms: [
-      {
-        transformId: 'transform-1',
-        inputArtifactIds: ['artifact-a'],
-        outputArtifactId: 'artifact-b',
-        completedAt: T1,
-      },
-      {
-        transformId: 'transform-2',
-        inputArtifactIds: ['artifact-b'],
-        outputArtifactId: 'artifact-c',
-        completedAt: T2,
-      },
-    ],
+    registryRevision: 3,
+    artifactBindings: [{
+      artifactId: 'artifact-c',
+      versionId: 'version-c1',
+      sha256: SHA_C1,
+    }],
     egresses: [],
-  }), {
-    resolveArtifactRef: resolverFrom(map),
-  });
+  }), { artifactRegistry: reg });
 
   assert.equal(result.status, SecretDataFlowStatus.BLOCKED);
   assert.deepEqual(result.violations, [{
     code: 'SENSITIVE_DERIVATION_LAUNDERING',
     artifactId: 'artifact-c',
+    versionId: 'version-c1',
   }]);
+  assert.equal(result.artifactStates[0].effectiveSensitive, true);
   assert.equal(result.requiresCanonicalPolicyDecision, false);
 });
 
-test('caller binding must match trusted resolver artifact identity and exact digest', () => {
-  const map = artifactMap();
-
-  assert.throws(
-    () => assessSecretDataFlowV1(request({
-      artifactBindings: [
-        { artifactId: 'artifact-a', sha256: 'd'.repeat(64) },
-        { artifactId: 'artifact-b', sha256: SHA_B },
-      ],
-    }), { resolveArtifactRef: resolverFrom(map) }),
-    /digest mismatch/,
-  );
-
-  const wrongIdentity = new Map(map);
-  wrongIdentity.set('artifact-a', artifact({
-    artifactId: 'artifact-other',
-    sha256: SHA_A,
+test('artifact family cannot clear prior sensitivity through a later version', () => {
+  const a1 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a1',
+    sha256: SHA_A1,
+    sensitive: true,
     createdAt: T0,
-  }));
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(wrongIdentity),
-    }),
-    /identity mismatch/,
-  );
+  });
+  const a2 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a2',
+    parentVersionId: 'version-a1',
+    sha256: SHA_A2,
+    sensitive: false,
+    createdAt: T1,
+  });
+  const reg = registry([entry('artifact-a', [a1, a2])]);
 
-  const missing = new Map(map);
-  missing.delete('artifact-a');
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(missing),
-    }),
-    /Canonical artifact is unavailable/,
-  );
+  const result = assessSecretDataFlowV1(request({
+    registryRevision: 2,
+    artifactBindings: [{
+      artifactId: 'artifact-a',
+      versionId: 'version-a2',
+      sha256: SHA_A2,
+    }],
+    egresses: [{
+      egressId: 'egress-a',
+      artifactId: 'artifact-a',
+      destinationOrigin: 'https://example.com',
+      requestedAt: T2,
+    }],
+  }), { artifactRegistry: reg });
+
+  assert.equal(result.status, SecretDataFlowStatus.BLOCKED);
+  assert.deepEqual(result.violations, [{
+    code: 'SENSITIVE_VERSION_DOWNGRADE',
+    artifactId: 'artifact-a',
+    versionId: 'version-a2',
+  }]);
+  assert.equal(result.artifactStates[0].declaredSensitive, false);
+  assert.equal(result.artifactStates[0].effectiveSensitive, true);
 });
 
-test('caller cannot supply ArtifactRef authority in artifact bindings', () => {
+test('binding is exact to canonical project, registry revision, version identity and digest', () => {
+  const reg = defaultRegistry();
+
+  assert.throws(
+    () => assessSecretDataFlowV1(request({ projectId: 'project-other' }), {
+      artifactRegistry: reg,
+    }),
+    /projectId does not match/,
+  );
+
+  assert.throws(
+    () => assessSecretDataFlowV1(request({ registryRevision: 1 }), {
+      artifactRegistry: reg,
+    }),
+    /registryRevision is stale or mismatched/,
+  );
+
   assert.throws(
     () => assessSecretDataFlowV1(request({
       artifactBindings: [{
-        artifactId: 'artifact-a',
-        sha256: SHA_A,
-        sensitive: false,
+        artifactId: 'artifact-b',
+        versionId: 'version-a1',
+        sha256: SHA_A1,
       }],
-      transforms: [],
-      egresses: [],
-    }), {
-      resolveArtifactRef: resolverFrom(artifactMap()),
-    }),
-    /unknown field: sensitive/,
-  );
-});
-
-test('resolver artifact representation is exact and accessors execute zero times', () => {
-  let reads = 0;
-  const hostile = artifact({
-    artifactId: 'artifact-a',
-    sha256: SHA_A,
-    createdAt: T0,
-  });
-  Object.defineProperty(hostile, 'sensitive', {
-    enumerable: true,
-    get() {
-      reads += 1;
-      return false;
-    },
-  });
-
-  const map = artifactMap({ 'artifact-a': hostile });
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(map),
-    }),
-    /enumerable own data property/,
-  );
-  assert.equal(reads, 0);
-
-  const upper = artifact({
-    artifactId: 'artifact-a',
-    sha256: SHA_A.toUpperCase(),
-    createdAt: T0,
-  });
-  const upperMap = artifactMap({ 'artifact-a': upper });
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(upperMap),
-    }),
-    /lowercase SHA-256/,
-  );
-
-  const aliasTime = artifact({
-    artifactId: 'artifact-a',
-    sha256: SHA_A,
-    createdAt: '2026-09-25T05:00:00Z',
-  });
-  const aliasMap = artifactMap({ 'artifact-a': aliasTime });
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(aliasMap),
-    }),
-    /canonical ISO-8601 UTC/,
-  );
-
-  const negativeZero = artifact({
-    artifactId: 'artifact-a',
-    sha256: SHA_A,
-    createdAt: T0,
-  });
-  negativeZero.sizeBytes = -0;
-  const zeroMap = artifactMap({ 'artifact-a': negativeZero });
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(zeroMap),
-    }),
-    /safe integer/,
-  );
-});
-
-test('artifact lineage rejects dangling references, duplicate producers and cycles', () => {
-  const map = artifactMap();
-
-  assert.throws(
-    () => assessSecretDataFlowV1(request({
-      transforms: [{
-        transformId: 'transform-dangling',
-        inputArtifactIds: ['artifact-missing'],
-        outputArtifactId: 'artifact-b',
-        completedAt: T1,
-      }],
-    }), { resolveArtifactRef: resolverFrom(map) }),
-    /unknown input artifact/,
+    }), { artifactRegistry: reg }),
+    /version identity mismatch/,
   );
 
   assert.throws(
     () => assessSecretDataFlowV1(request({
-      transforms: [
-        {
-          transformId: 'transform-1',
-          inputArtifactIds: ['artifact-a'],
-          outputArtifactId: 'artifact-b',
-          completedAt: T1,
-        },
-        {
-          transformId: 'transform-2',
-          inputArtifactIds: ['artifact-a'],
-          outputArtifactId: 'artifact-b',
-          completedAt: T2,
-        },
-      ],
-    }), { resolveArtifactRef: resolverFrom(map) }),
-    /duplicate outputArtifactId/,
+      artifactBindings: [{
+        artifactId: 'artifact-b',
+        versionId: 'version-b1',
+        sha256: 'f'.repeat(64),
+      }],
+    }), { artifactRegistry: reg }),
+    /version digest mismatch/,
   );
 
-  const cycleMap = new Map([
-    ['artifact-a', artifact({
-      artifactId: 'artifact-a',
-      sha256: SHA_A,
-      createdAt: T0,
-    })],
-    ['artifact-b', artifact({
-      artifactId: 'artifact-b',
-      sha256: SHA_B,
-      createdAt: T0,
-    })],
+  assert.throws(
+    () => assessSecretDataFlowV1(request({
+      artifactBindings: [{
+        artifactId: 'artifact-b',
+        versionId: 'version-missing',
+        sha256: SHA_B1,
+      }],
+    }), { artifactRegistry: reg }),
+    /version is unavailable/,
+  );
+});
+
+test('canonical lineage fails closed on unknown dependency and cyclic provenance', () => {
+  const unknown = defaultRegistry({ bInputs: ['artifact-missing'] });
+  assert.throws(
+    () => assess(request(), unknown),
+    /references unknown artifact/,
+  );
+
+  const a1 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a1',
+    sha256: SHA_A1,
+    inputArtifactIds: ['artifact-b'],
+    createdAt: T0,
+    provenanceAt: T1,
+    registeredAt: T1,
+  });
+  const b1 = version({
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+    inputArtifactIds: ['artifact-a'],
+    createdAt: T0,
+    provenanceAt: T1,
+    registeredAt: T1,
+  });
+  const cyclic = registry([
+    entry('artifact-a', [a1]),
+    entry('artifact-b', [b1]),
   ]);
+
   assert.throws(
     () => assessSecretDataFlowV1(request({
-      transforms: [
-        {
-          transformId: 'transform-a-to-b',
-          inputArtifactIds: ['artifact-a'],
-          outputArtifactId: 'artifact-b',
-          completedAt: T1,
-        },
-        {
-          transformId: 'transform-b-to-a',
-          inputArtifactIds: ['artifact-b'],
-          outputArtifactId: 'artifact-a',
-          completedAt: T1,
-        },
-      ],
+      artifactBindings: [{
+        artifactId: 'artifact-b',
+        versionId: 'version-b1',
+        sha256: SHA_B1,
+      }],
       egresses: [],
-    }), { resolveArtifactRef: resolverFrom(cycleMap) }),
-    /acyclic artifact graph/,
+      assessedAt: T2,
+    }), { artifactRegistry: cyclic }),
+    /provenance contains a cycle/,
   );
 });
 
-test('lineage and egress chronology fail closed', () => {
-  const futureOutput = artifactMap({
-    'artifact-b': artifact({
-      artifactId: 'artifact-b',
-      sha256: SHA_B,
-      createdAt: T4,
-      producerInvocationId: 'invocation-transform-1',
-    }),
+test('dependency must have a canonically admitted version before use', () => {
+  const a1 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a1',
+    sha256: SHA_A1,
+    createdAt: T1,
+    provenanceAt: T1,
+    registeredAt: T2,
   });
-  assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: resolverFrom(futureOutput),
-    }),
-    /postdates assessment/,
-  );
-
-  const outputBeforeInput = artifactMap({
-    'artifact-a': artifact({
-      artifactId: 'artifact-a',
-      sha256: SHA_A,
-      createdAt: T1,
-    }),
-    'artifact-b': artifact({
-      artifactId: 'artifact-b',
-      sha256: SHA_B,
-      createdAt: T0,
-      producerInvocationId: 'invocation-transform-1',
-    }),
+  const b1 = version({
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+    inputArtifactIds: ['artifact-a'],
+    createdAt: T1,
+    provenanceAt: T1,
+    registeredAt: T2,
   });
-  assert.throws(
-    () => assessSecretDataFlowV1(request({
-      transforms: [{
-        transformId: 'transform-1',
-        inputArtifactIds: ['artifact-a'],
-        outputArtifactId: 'artifact-b',
-        completedAt: T1,
-      }],
-    }), { resolveArtifactRef: resolverFrom(outputBeforeInput) }),
-    /output predates an input artifact/,
-  );
+  const reg = registry([
+    entry('artifact-a', [a1]),
+    entry('artifact-b', [b1]),
+  ]);
 
   assert.throws(
     () => assessSecretDataFlowV1(request({
-      transforms: [{
-        transformId: 'transform-1',
-        inputArtifactIds: ['artifact-a'],
-        outputArtifactId: 'artifact-b',
-        completedAt: T0,
+      artifactBindings: [{
+        artifactId: 'artifact-b',
+        versionId: 'version-b1',
+        sha256: SHA_B1,
       }],
-    }), { resolveArtifactRef: resolverFrom(artifactMap()) }),
-    /completes before output materialization/,
+      egresses: [],
+      assessedAt: T3,
+    }), { artifactRegistry: reg }),
+    /no admitted version before dependency use/,
+  );
+});
+
+test('egress must bind an admitted exact artifact and causal request time', () => {
+  const reg = defaultRegistry();
+
+  assert.throws(
+    () => assessSecretDataFlowV1(request({
+      egresses: [{
+        egressId: 'egress-unbound',
+        artifactId: 'artifact-a',
+        destinationOrigin: 'https://example.com',
+        requestedAt: T2,
+      }],
+    }), { artifactRegistry: reg }),
+    /references an unbound artifact/,
   );
 
   assert.throws(
     () => assessSecretDataFlowV1(request({
       egresses: [{
-        egressId: 'egress-1',
+        egressId: 'egress-early',
         artifactId: 'artifact-b',
         destinationOrigin: 'https://example.com',
         requestedAt: T0,
       }],
-    }), { resolveArtifactRef: resolverFrom(artifactMap()) }),
-    /predates artifact materialization/,
+    }), { artifactRegistry: reg }),
+    /predates canonical artifact admission/,
+  );
+
+  assert.throws(
+    () => assessSecretDataFlowV1(request({
+      egresses: [{
+        egressId: 'egress-future',
+        artifactId: 'artifact-b',
+        destinationOrigin: 'https://example.com',
+        requestedAt: T4,
+      }],
+    }), { artifactRegistry: reg }),
+    /postdates assessment/,
   );
 });
 
-test('authority envelopes reject getters, hidden fields, symbols and sparse arrays without ordinary getter reads', () => {
+test('request and trusted options reject accessors without ordinary getter execution', () => {
   let reads = 0;
   const hostileRequest = request();
   Object.defineProperty(hostileRequest, 'egresses', {
@@ -483,15 +490,31 @@ test('authority envelopes reject getters, hidden fields, symbols and sparse arra
       return [];
     },
   });
-
   assert.throws(
     () => assessSecretDataFlowV1(hostileRequest, {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+      artifactRegistry: defaultRegistry(),
     }),
     /enumerable own data property/,
   );
   assert.equal(reads, 0);
 
+  const hostileOptions = {};
+  Object.defineProperty(hostileOptions, 'artifactRegistry', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return defaultRegistry();
+    },
+  });
+  assert.throws(
+    () => assessSecretDataFlowV1(request(), hostileOptions),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('arrays are dense descriptor snapshots and authority smuggling fails closed', () => {
+  let reads = 0;
   const proxiedBindings = new Proxy(request().artifactBindings, {
     get(target, property, receiver) {
       reads += 1;
@@ -500,109 +523,121 @@ test('authority envelopes reject getters, hidden fields, symbols and sparse arra
   });
   const result = assessSecretDataFlowV1(request({
     artifactBindings: proxiedBindings,
-  }), {
-    resolveArtifactRef: resolverFrom(artifactMap()),
-  });
+  }), { artifactRegistry: defaultRegistry() });
   assert.equal(result.status, SecretDataFlowStatus.READY_FOR_POLICY);
   assert.equal(reads, 0);
 
-  const hiddenTransform = request().transforms[0];
-  Object.defineProperty(hiddenTransform, 'executionAuthorized', {
+  const sparse = [];
+  sparse.length = 2;
+  sparse[1] = {
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+  };
+  assert.throws(
+    () => assessSecretDataFlowV1(request({ artifactBindings: sparse }), {
+      artifactRegistry: defaultRegistry(),
+    }),
+    /must not be sparse/,
+  );
+
+  assert.throws(
+    () => assessSecretDataFlowV1(request({
+      artifactBindings: [{
+        artifactId: 'artifact-b',
+        versionId: 'version-b1',
+        sha256: SHA_B1,
+        sensitive: false,
+      }],
+    }), { artifactRegistry: defaultRegistry() }),
+    /unknown field: sensitive/,
+  );
+
+  const egress = request().egresses[0];
+  Object.defineProperty(egress, 'executionAuthorized', {
     enumerable: false,
     value: true,
   });
   assert.throws(
-    () => assessSecretDataFlowV1(request({
-      transforms: [hiddenTransform],
-    }), { resolveArtifactRef: resolverFrom(artifactMap()) }),
+    () => assessSecretDataFlowV1(request({ egresses: [egress] }), {
+      artifactRegistry: defaultRegistry(),
+    }),
     /unknown field: executionAuthorized/,
   );
 
-  const symbolEgress = request().egresses[0];
-  symbolEgress[Symbol('allow')] = true;
+  const symbolRequest = request();
+  symbolRequest[Symbol('allow')] = true;
   assert.throws(
-    () => assessSecretDataFlowV1(request({
-      egresses: [symbolEgress],
-    }), { resolveArtifactRef: resolverFrom(artifactMap()) }),
+    () => assessSecretDataFlowV1(symbolRequest, {
+      artifactRegistry: defaultRegistry(),
+    }),
     /unknown field: Symbol\(allow\)/,
   );
-
-  const sparse = [];
-  sparse.length = 2;
-  sparse[1] = { artifactId: 'artifact-a', sha256: SHA_A };
-  assert.throws(
-    () => assessSecretDataFlowV1(request({
-      artifactBindings: sparse,
-      transforms: [],
-      egresses: [],
-    }), { resolveArtifactRef: resolverFrom(artifactMap()) }),
-    /must not be sparse/,
-  );
 });
 
-test('null or omitted list aliases fail closed instead of meaning empty', () => {
+test('null, omitted and coercive representations fail closed', () => {
   assert.throws(
-    () => assessSecretDataFlowV1(request({ transforms: null }), {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+    () => assessSecretDataFlowV1(request({ artifactBindings: null }), {
+      artifactRegistry: defaultRegistry(),
     }),
     /bounded plain array/,
   );
-
   assert.throws(
     () => assessSecretDataFlowV1(request({ egresses: null }), {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+      artifactRegistry: defaultRegistry(),
     }),
     /bounded plain array/,
   );
 
-  const omittedTransforms = request();
-  delete omittedTransforms.transforms;
+  const omitted = request();
+  delete omitted.egresses;
   assert.throws(
-    () => assessSecretDataFlowV1(omittedTransforms, {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+    () => assessSecretDataFlowV1(omitted, {
+      artifactRegistry: defaultRegistry(),
     }),
     /bounded plain array/,
   );
 
-  const omittedEgresses = request();
-  delete omittedEgresses.egresses;
   assert.throws(
-    () => assessSecretDataFlowV1(omittedEgresses, {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+    () => assessSecretDataFlowV1(request({ registryRevision: -0 }), {
+      artifactRegistry: defaultRegistry(),
     }),
-    /bounded plain array/,
+    /safe integer/,
   );
-});
-
-test('exact IDs, timestamps, origins and synchronous resolver representation are required', () => {
   assert.throws(
-    () => assessSecretDataFlowV1(request({ flowId: ' flow-1' }), {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+    () => assessSecretDataFlowV1(request({ registryRevision: '2' }), {
+      artifactRegistry: defaultRegistry(),
     }),
-    /flowId is invalid/,
+    /safe integer/,
   );
-
   assert.throws(
     () => assessSecretDataFlowV1(request({ assessedAt: '2026-09-25T05:03:00Z' }), {
-      resolveArtifactRef: resolverFrom(artifactMap()),
+      artifactRegistry: defaultRegistry(),
     }),
     /canonical ISO-8601 UTC/,
   );
-
   assert.throws(
     () => assessSecretDataFlowV1(request({
       egresses: [{
         ...request().egresses[0],
         destinationOrigin: 'https://example.com/',
       }],
-    }), { resolveArtifactRef: resolverFrom(artifactMap()) }),
+    }), { artifactRegistry: defaultRegistry() }),
     /canonical HTTP\(S\) origin/,
+  );
+});
+
+test('missing canonical registry fails closed and no caller graph field is accepted', () => {
+  assert.throws(
+    () => assessSecretDataFlowV1(request(), {}),
+    /requires canonical artifactRegistry/,
   );
 
   assert.throws(
-    () => assessSecretDataFlowV1(request(), {
-      resolveArtifactRef: async artifactId => artifactMap().get(artifactId),
-    }),
-    /synchronous trusted artifact resolver/,
+    () => assessSecretDataFlowV1({
+      ...request(),
+      transforms: [],
+    }, { artifactRegistry: defaultRegistry() }),
+    /unknown field: transforms/,
   );
 });
