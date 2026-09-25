@@ -219,6 +219,22 @@ test('card digest or selected interface drift blocks delegation before policy ev
   assert(result.reasons.includes('INTERFACE_NOT_IN_CARD'));
 });
 
+test('stale admission sets outside the exact card fail closed even when the request itself is valid', () => {
+  const result = assessA2ADelegationV1({
+    card: card(),
+    admission: admission({
+      allowedSkillIds: ['research.deep', 'research.removed'],
+      allowedSecuritySchemeIds: ['oauth.main', 'mtls.removed'],
+    }),
+    delegation: delegation(),
+  });
+  assert.equal(result.status, 'BLOCKED');
+  assert.deepEqual(result.reasons, [
+    'ADMISSION_SECURITY_SET_NOT_IN_CARD',
+    'ADMISSION_SKILL_SET_NOT_IN_CARD',
+  ]);
+});
+
 test('unknown or non-admitted skills, capabilities and security schemes fail closed', () => {
   const result = assessA2ADelegationV1({
     card: card(),
