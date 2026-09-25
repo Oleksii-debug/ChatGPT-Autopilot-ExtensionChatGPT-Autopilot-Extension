@@ -127,23 +127,55 @@ test('Context capsule freshness requires exact current source revision and optio
   assert.throws(() => assertContextCapsuleFreshV1(value, []), /stale for sources: github-main/);
 });
 
-test('ArtifactProvenanceV1 preserves source-revision lineage and input artifact identity', () => {
+test('ArtifactProvenanceV1 preserves exact immutable input version bindings', () => {
+  const inputArtifactBindings = [
+    { artifactId: 'artifact-input-1', versionId: 'input-1-v3', sha256: 'c'.repeat(64) },
+    { artifactId: 'artifact-input-2', versionId: 'input-2-v7', sha256: 'd'.repeat(64) },
+  ];
   const value = normalizeArtifactProvenanceV1({
     schemaVersion: 1,
     projectId: 'autopilot',
     artifactRef: artifact(),
     sourceBindings: [sourceBindingFromRefV1(source())],
     inputArtifactIds: ['artifact-input-1', 'artifact-input-2'],
+    inputArtifactBindings,
     createdAt: AT,
   });
   assert.equal(value.artifactRef.artifactId, 'artifact-report');
   assert.deepEqual(value.inputArtifactIds, ['artifact-input-1', 'artifact-input-2']);
-  assert.equal(Object.isFrozen(value.artifactRef), true);
+  assert.deepEqual(value.inputArtifactBindings, inputArtifactBindings);
+  assert.equal(Object.isFrozen(value.inputArtifactBindings), true);
+  assert.equal(Object.isFrozen(value.inputArtifactBindings[0]), true);
 
   assert.throws(() => normalizeArtifactProvenanceV1({
     ...value,
     inputArtifactIds: ['artifact-input-1', 'artifact-input-1'],
   }), /duplicates/);
+
+  assert.throws(() => normalizeArtifactProvenanceV1({
+    ...value,
+    inputArtifactBindings: [
+      { artifactId: 'artifact-input-1', versionId: 'input-1-v3', sha256: 'c'.repeat(64) },
+    ],
+  }), /exactly bind inputArtifactIds/);
+
+  assert.throws(() => normalizeArtifactProvenanceV1({
+    ...value,
+    inputArtifactBindings: [
+      { artifactId: 'artifact-input-1', versionId: 'input-1-v3', sha256: 'C'.repeat(64) },
+      inputArtifactBindings[1],
+    ],
+  }), /sha256 is invalid/);
+
+  const legacyIncomplete = normalizeArtifactProvenanceV1({
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    artifactRef: artifact(),
+    sourceBindings: [],
+    inputArtifactIds: ['artifact-input-1'],
+    createdAt: AT,
+  });
+  assert.deepEqual(legacyIncomplete.inputArtifactBindings, []);
 });
 
 test('sourceBindingFromRefV1 strips source metadata and authority down to immutable revision truth', () => {
@@ -269,6 +301,18 @@ test('Project/Context optional list fields reject falsy type aliases instead of 
         artifactRef: artifact(),
         sourceBindings: [],
         inputArtifactIds: bad,
+        createdAt: AT,
+      }),
+      /bounded plain array/,
+    );
+    assert.throws(
+      () => normalizeArtifactProvenanceV1({
+        schemaVersion: 1,
+        projectId: 'autopilot',
+        artifactRef: artifact(),
+        sourceBindings: [],
+        inputArtifactIds: [],
+        inputArtifactBindings: bad,
         createdAt: AT,
       }),
       /bounded plain array/,
