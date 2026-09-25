@@ -163,6 +163,96 @@ test('analytics authority boundary rejects getters, hidden fields, symbols, exot
   assert.throws(() => normalizeDataDatasetSnapshotV1({ ...dataset(), policyDecision: 'ALLOW' }), /unknown field/);
 });
 
+test('public analytics requests and arrays consume descriptor snapshots without ordinary caller reads', () => {
+  const input = dataset();
+  const output = dataset({
+    datasetId: 'dataset-out',
+    revisionId: 'dataset-out-r1',
+    digest: sha('f'),
+    sourceRefs: [],
+    artifactId: 'artifact-dataset-out',
+    observedAt: T2,
+  });
+  const transform = lineage({ inputs: [input], output });
+  const projectSnapshot = {
+    schemaVersion: 1,
+    projectId: 'project-a',
+    revisionId: 'project-r1',
+    title: 'Project A',
+    sourceRefs: [source()],
+    artifactRefs: [],
+    createdAt: T1,
+  };
+  const after = dataset({
+    revisionId: 'dataset-r2',
+    digest: sha('c'),
+    artifactId: 'artifact-dataset-a-r2',
+    observedAt: T2,
+  });
+
+  function requestProxy(fields) {
+    const target = Object.assign(Object.create(null), fields);
+    let reads = 0;
+    return {
+      value: new Proxy(target, {
+        get() {
+          reads += 1;
+          return undefined;
+        },
+      }),
+      reads: () => reads,
+    };
+  }
+
+  const transformRequest = requestProxy({
+    lineage: transform,
+    inputSnapshots: [input],
+    outputSnapshot: output,
+  });
+  assert.doesNotThrow(() => assertDataTransformLineageMatchesSnapshotsV1(transformRequest.value));
+  assert.equal(transformRequest.reads(), 0);
+
+  const projectRequest = requestProxy({ dataset: input, projectSnapshot });
+  assert.doesNotThrow(() => assertDataDatasetSourcesMatchProjectSnapshotV1(projectRequest.value));
+  assert.equal(projectRequest.reads(), 0);
+
+  const deltaRequest = requestProxy({ baseline: input, current: after });
+  assert.equal(deriveDataDatasetDeltaV1(deltaRequest.value).status, 'CHANGED');
+  assert.equal(deltaRequest.reads(), 0);
+
+  const nullPrototype = Object.assign(Object.create(null), { baseline: input, current: structuredClone(input) });
+  assert.equal(deriveDataDatasetDeltaV1(nullPrototype).status, 'UNCHANGED');
+
+  const hidden = Object.assign(Object.create(null), { dataset: input, projectSnapshot });
+  Object.defineProperty(hidden, 'dataset', { value: input, enumerable: false });
+  assert.throws(() => assertDataDatasetSourcesMatchProjectSnapshotV1(hidden), /enumerable data property/);
+
+  const symbol = Object.assign(Object.create(null), { baseline: input, current: after });
+  symbol[Symbol('authority')] = 'ALLOW';
+  assert.throws(() => deriveDataDatasetDeltaV1(symbol), /symbol fields/);
+
+  const unknown = Object.assign(Object.create(null), { baseline: input, current: after, policyDecision: 'ALLOW' });
+  assert.throws(() => deriveDataDatasetDeltaV1(unknown), /unknown field/);
+
+  const exotic = Object.assign(Object.create({ inheritedAuthority: 'ALLOW' }), {
+    lineage: transform,
+    inputSnapshots: [input],
+    outputSnapshot: output,
+  });
+  assert.throws(() => assertDataTransformLineageMatchesSnapshotsV1(exotic), /plain data object/);
+
+  let arrayReads = 0;
+  const sourceRefs = new Proxy([source()], {
+    get(target, property, receiver) {
+      arrayReads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const normalized = normalizeDataDatasetSnapshotV1(dataset({ sourceRefs }));
+  assert.equal(normalized.sourceRefs[0].sourceId, 'source-a');
+  assert.equal(arrayReads, 0);
+});
+
 test('materialized provenance never aliases missing or noncanonical evidence to safe defaults', () => {
   const stringVersion = dataset();
   stringVersion.artifactRef.schemaVersion = '1';
