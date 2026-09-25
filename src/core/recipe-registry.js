@@ -69,17 +69,26 @@ function strictArray(input, label, { max, min = 0 } = {}) {
   if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) {
     throw new Error(`${label} must be a plain array`);
   }
-  if (!Number.isInteger(max) || input.length < min || input.length > max) {
-    throw new Error(`${label} must contain ${min}-${max} items`);
+  if (!Number.isInteger(max)) {
+    throw new Error(`${label} maximum bound is invalid`);
   }
   const descriptors = Object.getOwnPropertyDescriptors(input);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < min
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must contain ${min}-${max} items`);
+  }
+  const length = lengthDescriptor.value;
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
       throw new Error(`${label} contains non-index field`);
     }
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index < 0 || index >= input.length) {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length) {
       throw new Error(`${label} contains invalid index`);
     }
     const descriptor = descriptors[key];
@@ -87,17 +96,16 @@ function strictArray(input, label, { max, min = 0 } = {}) {
       throw new Error(`${label}[${index}] must be an enumerable data property`);
     }
   }
-  const out = [];
-  for (let index = 0; index < input.length; index += 1) {
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} must not be sparse`);
     }
-    out.push(descriptor.value);
+    out[index] = descriptor.value;
   }
   return out;
 }
-
 function id(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return '';
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
