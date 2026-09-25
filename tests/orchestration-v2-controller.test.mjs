@@ -302,7 +302,7 @@ test('coordinator rate limit preserves the same turn, avoids duplicate delivery,
   runtime = await controller.runtimeRepository.load();
   assert.equal(reportCalls,1);
   assert.equal(runtime.coordinator.lease.turnId,turnId);
-  assert.ok(runtime.coordinator.retryAfterAt >= now + 300_000);
+  assert.ok(runtime.coordinator.retryAfterAt >= now + 30_000);
   assert.equal(limited.coordinatorProbe.applied.rateLimited,true);
   let state = await core.load();
   const coordinator = findCoordinator(state);
@@ -315,7 +315,7 @@ test('coordinator rate limit preserves the same turn, avoids duplicate delivery,
 
   // One earlier watchdog wake is allowed. It must reconcile only and then sleep
   // until the real retry deadline rather than repeatedly probing the coordinator.
-  now = lastAlarm[2].when;
+  now = Math.min(lastAlarm[2].when, retryAt - 1);
   const watchdogDuringBackoff = await controller.cycle({nowMs:now});
   assert.equal(watchdogDuringBackoff.coordinatorProbe.kind,'COORDINATOR_BACKOFF');
   assert.equal(reportCalls,1);

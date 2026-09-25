@@ -14,6 +14,7 @@ import {
 import { appendLog } from './logger.js';
 import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
+import { normalizeCalendarSchedule } from './calendar-schedule.js';
 import { startSession } from './state-machine.js';
 
 export const PORTABLE_PROFILE_FORMAT = 'chatgpt-autopilot-profile';
@@ -141,6 +142,8 @@ function buildSession(raw, index, now, version = 1) {
     now,
   });
   session.version = Math.max(1, Number(version) || 1);
+  if (raw.simplifiedSession !== undefined && typeof raw.simplifiedSession !== 'boolean') throw new Error(`Session ${name} simplifiedSession must be boolean`);
+  session.simplifiedSession = raw.simplifiedSession === true;
   session.promptCadence = normalizeSessionPromptCadence(raw.promptCadence);
   const portableDrive = normalizeSessionDrivePromptSources(raw.drivePromptSources);
   session.drivePromptSources = {
@@ -159,6 +162,8 @@ function buildSession(raw, index, now, version = 1) {
       lastErrorCode: '',
     })),
   };
+  session.calendarSchedule = raw.calendarSchedule == null ? null : normalizeCalendarSchedule(raw.calendarSchedule);
+  session.calendarRuntime = {};
   session.defaultUniquePrompt = requireString(raw.defaultUniquePrompt ?? '', `Session ${name} defaultUniquePrompt`);
   session.retryPolicy = raw.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
@@ -318,6 +323,7 @@ function sessionToPortable(session) {
   return {
     id: session.id,
     name: session.name,
+    simplifiedSession: session.simplifiedSession === true,
     autoStart: false,
     promptMode: session.promptMode === PromptMode.UNIQUE ? 'unique' : 'shared',
     urlMode: session.urlMode === 'unique' ? 'unique' : 'shared',
@@ -337,6 +343,7 @@ function sessionToPortable(session) {
         })),
       };
     })(),
+    calendarSchedule: session.calendarSchedule ? normalizeCalendarSchedule(session.calendarSchedule) : null,
     runMode: session.runMode === RunMode.ONE_PASS ? 'one-pass' : 'continuous',
     configuredTaskCount: Number(session.configuredTaskCount || session.taskOrder.length),
     minimumSendIntervalValue: session.minimumSendIntervalMs >= 60000 && session.minimumSendIntervalMs % 60000 === 0 ? session.minimumSendIntervalMs / 60000 : session.minimumSendIntervalMs / 1000,
