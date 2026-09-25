@@ -28,8 +28,8 @@ export const DEFAULT_AI_ROUTE_POLICY = Object.freeze({
   denyRouteIds: Object.freeze([]),
   freeOnly: false,
   locality: 'any',
-  maxInputPricePerMillionUsd: 0,
-  maxOutputPricePerMillionUsd: 0,
+  maxInputPricePerMillionUsd: null,
+  maxOutputPricePerMillionUsd: null,
   retryBackoffSeconds: 60,
   circuitBreakerFailures: 2,
   circuitBreakerSeconds: 300,
@@ -49,6 +49,10 @@ function integer(value, label, min, max) { const out = Number(value); if (!Numbe
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
 function own(record, key) { return Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined; }
 function price(value, label) { const out = Number(value ?? 0); if (!Number.isFinite(out) || out < 0 || out > 1_000_000) throw new Error(`${label} is invalid`); return out; }
+function priceCap(value, label) {
+  if (value == null) return null;
+  return price(value, label);
+}
 function knownPriceDimension(item, priceKey, knownKey, label) {
   if (Object.hasOwn(item, knownKey)) {
     if (typeof item[knownKey] !== 'boolean') throw new Error(`${label} must be boolean`);
@@ -116,8 +120,8 @@ export function normalizeAiRoutePolicy(raw = {}) {
     denyRouteIds: ids(raw.denyRouteIds || [], 'AI route denyRouteIds'),
     freeOnly: raw.freeOnly === true,
     locality,
-    maxInputPricePerMillionUsd: price(raw.maxInputPricePerMillionUsd, 'AI route maximum input price'),
-    maxOutputPricePerMillionUsd: price(raw.maxOutputPricePerMillionUsd, 'AI route maximum output price'),
+    maxInputPricePerMillionUsd: priceCap(raw.maxInputPricePerMillionUsd, 'AI route maximum input price'),
+    maxOutputPricePerMillionUsd: priceCap(raw.maxOutputPricePerMillionUsd, 'AI route maximum output price'),
     retryBackoffSeconds: integer(raw.retryBackoffSeconds ?? DEFAULT_AI_ROUTE_POLICY.retryBackoffSeconds, 'AI route retryBackoffSeconds', 1, 86_400),
     circuitBreakerFailures: integer(raw.circuitBreakerFailures ?? DEFAULT_AI_ROUTE_POLICY.circuitBreakerFailures, 'AI route circuitBreakerFailures', 1, 100),
     circuitBreakerSeconds: integer(raw.circuitBreakerSeconds ?? DEFAULT_AI_ROUTE_POLICY.circuitBreakerSeconds, 'AI route circuitBreakerSeconds', 1, 86_400),
@@ -210,8 +214,10 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
     && (!normalizedPolicy.freeOnly || route.costClass === AiRouteCostClass.FREE)
     && (route.costClass === AiRouteCostClass.FREE || (route.inputPriceKnown && route.outputPriceKnown))
     && (normalizedPolicy.locality === 'any' || route.locality === normalizedPolicy.locality)
-    && (!normalizedPolicy.maxInputPricePerMillionUsd || route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd)
-    && (!normalizedPolicy.maxOutputPricePerMillionUsd || route.outputPricePerMillionUsd <= normalizedPolicy.maxOutputPricePerMillionUsd)
+    && (normalizedPolicy.maxInputPricePerMillionUsd === null
+      || route.inputPricePerMillionUsd <= normalizedPolicy.maxInputPricePerMillionUsd)
+    && (normalizedPolicy.maxOutputPricePerMillionUsd === null
+      || route.outputPricePerMillionUsd <= normalizedPolicy.maxOutputPricePerMillionUsd)
     && (!route.roles.length || route.roles.includes(normalizedRole))
     && capabilities.every(capabilityId => route.capabilityIds.includes(capabilityId))
     && (!requiresVision || route.supportsVision));
@@ -219,7 +225,11 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   candidates.sort((a, b) => {
     const orderedA = order.has(a.routeId) ? order.get(a.routeId) : Number.MAX_SAFE_INTEGER;
     const orderedB = order.has(b.routeId) ? order.get(b.routeId) : Number.MAX_SAFE_INTEGER;
-    return orderedA - orderedB || b.priority - a.priority || (own(states, a.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER) - (own(states, b.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER) || a.routeId.localeCompare(b.routeId);
+    return orderedA - orderedB
+      || b.priority - a.priority
+      || (own(states, a.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER)
+        - (own(states, b.routeId)?.lastLatencyMs || Number.MAX_SAFE_INTEGER)
+      || (a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0);
   });
   const available = candidates.filter(route => {
     const state = own(states, route.routeId);
