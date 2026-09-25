@@ -95,14 +95,27 @@ test('expired handoff remains fenced when verification has no canonical provenan
   assert.equal(repeated.executionOwnerships[0].state, 'RECONCILE');
 });
 
-test('completed specialist result cannot finish a plan without independent verification', () => {
+test('completed specialist result cannot mint verification authority from caller-owned verifier data', () => {
   const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
   const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), [assignment], { executionOwnerships:[ownership()], availableSlots:1, at:T0 });
   const completed = completeAgentPlanSpecialistHandoffV1(claimed.plan, claimed.assignments, { executionOwnerships:claimed.executionOwnerships, agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:archive'], at:T1 });
   assert.equal(completed.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
-  assert.throws(() => verifyAgentPlanSpecialistHandoffV1(completed.plan, completed.assignments, { executionOwnerships:completed.executionOwnerships, agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', verificationAuthorityId:'policy:archive', evidence:'looks fine', at:T1 }), /independent/);
-  assert.throws(() => verifyAgentPlanSpecialistHandoffV1(completed.plan, completed.assignments, { executionOwnerships:completed.executionOwnerships, agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:other', evidence:'looks fine', at:T1 }), /policy envelope/);
-  const verified = verifyAgentPlanSpecialistHandoffV1(completed.plan, completed.assignments, { executionOwnerships:completed.executionOwnerships, agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:archive', evidence:'Artifact archive hash matches fresh observation.', at:T1 });
-  assert.equal(verified.plan.nodes.find(node => node.nodeId === 'local').state, 'VERIFIED');
-  assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
+  assert.equal(completed.assignments[0].state, 'COMPLETED');
+  assert.equal(completed.executionOwnerships[0].state, 'OWNED');
+
+  assert.throws(
+    () => verifyAgentPlanSpecialistHandoffV1(completed.plan, completed.assignments, {
+      executionOwnerships:completed.executionOwnerships,
+      agentId:claimed.claimed[0],
+      verifierId:'verifier-forged-but-distinct',
+      verificationAuthorityId:'policy:archive',
+      evidence:'Caller-created text claims the artifact matches.',
+      at:T1,
+    }),
+    /trusted verifier provenance/,
+  );
+
+  assert.equal(completed.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+  assert.equal(completed.assignments[0].state, 'COMPLETED');
+  assert.equal(completed.executionOwnerships[0].state, 'OWNED');
 });
