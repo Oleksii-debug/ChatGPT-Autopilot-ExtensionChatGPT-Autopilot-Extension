@@ -125,6 +125,49 @@ function optionalText(value, label, max = MAX_BODY_TEXT) {
   return value;
 }
 
+function exactRepositoryName(value) {
+  const repository = repositoryName(value);
+  if (typeof value !== 'string' || value !== repository) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'repositoryFullName must be exact canonical text', { safeToRetry: true });
+  }
+  return repository;
+}
+
+function positiveInteger(value, label) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} must be a positive safe integer`, { safeToRetry: true });
+  }
+  return value;
+}
+
+function responsePositiveInteger(value, label, { effectMayHaveOccurred = false } = {}) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned invalid ${label}`, {
+      effectMayHaveOccurred,
+      safeToRetry: !effectMayHaveOccurred,
+    });
+  }
+  return value;
+}
+
+function exactNonBlankText(value, label, max = MAX_BODY_TEXT) {
+  if (typeof value !== 'string' || !value.trim() || value.length > max) {
+    throw githubError('GITHUB_INVALID_REQUEST', `${label} is invalid`, { safeToRetry: true });
+  }
+  return value;
+}
+
+function responseText(value, label, max = MAX_BODY_TEXT, { nullable = false, effectMayHaveOccurred = false } = {}) {
+  if (nullable && value == null) return '';
+  if (typeof value !== 'string' || value.length > max) {
+    throw githubError('GITHUB_RESPONSE_INVALID', `GitHub returned invalid ${label}`, {
+      effectMayHaveOccurred,
+      safeToRetry: !effectMayHaveOccurred,
+    });
+  }
+  return value;
+}
+
 function encodeBase64Utf8(value) {
   if (typeof value !== 'string') throw githubError('GITHUB_INVALID_REQUEST', 'contentUtf8 must be text', { safeToRetry: true });
   const bytes = new TextEncoder().encode(value);
@@ -523,6 +566,52 @@ export class GitHubRestClientV1 {
     });
   }
 
+  async readIssue({ repositoryFullName, issueNumber } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(issueNumber, 'issueNumber');
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/issues/${number}`);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || payload.pull_request) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue response is invalid');
+    }
+    const returnedNumber = responsePositiveInteger(payload.number, 'issue number');
+    if (returnedNumber !== number) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue identity mismatch');
+    if (!['open', 'closed'].includes(payload.state)) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue state is invalid');
+    return Object.freeze({
+      repositoryFullName: repository,
+      number,
+      title: responseText(payload.title, 'issue title', 1000),
+      body: responseText(payload.body, 'issue body', 100_000, { nullable: true }),
+      state: payload.state,
+      url: responseText(payload.html_url, 'issue URL', 4096),
+    });
+  }
+
+  async readIssueComment({ repositoryFullName, issueNumber, commentId } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(issueNumber, 'issueNumber');
+    const id = positiveInteger(commentId, 'commentId');
+    const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/issues/comments/${id}`);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue comment response is invalid');
+    }
+    const returnedId = responsePositiveInteger(payload.id, 'issue comment id');
+    if (returnedId !== id) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue comment identity mismatch');
+    const expectedIssueUrl = `${GITHUB_API_ORIGIN}/repos/${repositoryPath(repository)}/issues/${number}`;
+    if (typeof payload.issue_url !== 'string'
+        || payload.issue_url.toLowerCase() !== expectedIssueUrl.toLowerCase()) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue comment parent identity mismatch');
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      issueNumber: number,
+      commentId: id,
+      body: responseText(payload.body, 'issue comment body', 100_000),
+      url: responseText(payload.html_url, 'issue comment URL', 4096),
+    });
+  }
+
   async createBranch({ repositoryFullName, branch, fromSha } = {}) {
     const repository = this.assertRepositoryAllowed(repositoryFullName);
     const branchName = refName(branch, 'branch');
@@ -599,5 +688,61 @@ export class GitHubRestClientV1 {
     const number = Number(payload.number);
     if (!Number.isInteger(number) || number < 1) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request response is invalid', { effectMayHaveOccurred: true });
     return Object.freeze({ repositoryFullName: repository, number, head: headRef, base: baseRef, url: clean(payload.html_url, 4096) });
+  }
+
+  async createIssue({ repositoryFullName, title, body = '' } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const issueTitle = exactNonBlankText(title, 'title', 1000);
+    if (issueTitle !== issueTitle.trim()) {
+      throw githubError('GITHUB_INVALID_REQUEST', 'title must not contain surrounding whitespace', { safeToRetry: true });
+    }
+    const issueBody = optionalText(body, 'body', 100_000);
+    const payload = await this.request('POST', `/repos/${repositoryPath(repository)}/issues`, {
+      effectful: true,
+      expectedStatuses: [201],
+      body: { title: issueTitle, body: issueBody },
+    });
+    const number = responsePositiveInteger(payload?.number, 'issue number', { effectMayHaveOccurred: true });
+    const returnedTitle = responseText(payload?.title, 'issue title', 1000, { effectMayHaveOccurred: true });
+    const returnedBody = responseText(payload?.body, 'issue body', 100_000, { nullable: true, effectMayHaveOccurred: true });
+    if (returnedTitle !== issueTitle || returnedBody !== issueBody || payload?.pull_request || payload?.state !== 'open') {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub created issue does not match the requested issue', { effectMayHaveOccurred: true });
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      number,
+      title: returnedTitle,
+      body: returnedBody,
+      state: 'open',
+      url: responseText(payload?.html_url, 'issue URL', 4096, { effectMayHaveOccurred: true }),
+    });
+  }
+
+  async createIssueComment({ repositoryFullName, issueNumber, body } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(issueNumber, 'issueNumber');
+    const commentBody = exactNonBlankText(body, 'body', 100_000);
+    const payload = await this.request('POST', `/repos/${repositoryPath(repository)}/issues/${number}/comments`, {
+      effectful: true,
+      expectedStatuses: [201],
+      body: { body: commentBody },
+    });
+    const commentId = responsePositiveInteger(payload?.id, 'issue comment id', { effectMayHaveOccurred: true });
+    const returnedBody = responseText(payload?.body, 'issue comment body', 100_000, { effectMayHaveOccurred: true });
+    const expectedIssueUrl = `${GITHUB_API_ORIGIN}/repos/${repositoryPath(repository)}/issues/${number}`;
+    if (returnedBody !== commentBody
+        || typeof payload?.issue_url !== 'string'
+        || payload.issue_url.toLowerCase() !== expectedIssueUrl.toLowerCase()) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub created issue comment does not match the requested parent/body', { effectMayHaveOccurred: true });
+    }
+    return Object.freeze({
+      repositoryFullName: repository,
+      issueNumber: number,
+      commentId,
+      body: returnedBody,
+      url: responseText(payload?.html_url, 'issue comment URL', 4096, { effectMayHaveOccurred: true }),
+    });
   }
 }
