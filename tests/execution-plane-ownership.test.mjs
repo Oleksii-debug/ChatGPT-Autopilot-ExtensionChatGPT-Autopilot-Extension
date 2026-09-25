@@ -76,53 +76,54 @@ test('expiry always enters RECONCILE even when a caller asserts observedNoEffect
   assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
 });
 
-test('SAFE_RETRY requires fresh canonical no-effect verification bound to effect, lease and policy', () => {
+test('caller-shaped verification cannot release or complete reconciliation without trusted provenance', () => {
   const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
   const at = '2026-09-23T13:31:00Z';
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'other', outcome:'SAFE_RETRY', verification:reconciliationVerification(), at }), /preserved owner lease/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', evidence:'remote verifier proves no effect', at }), /VerificationV1/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification({ effectId:'effect-other' }), at }), /effectId/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification({ executionId:'lease-other' }), at }), /preserved lease/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification({ verificationAuthorityId:'policy-other' }), at }), /policy envelope/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification({ verifierId:'local-worker' }), at }), /independent/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification({ verifiedAt:'2026-09-23T13:29:59.000Z' }), at }), /fresh/);
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification({ reasonCode:'POSTCONDITION_MATCH' }), at }), /NO_EFFECT_OBSERVED/);
-  const retry = resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'SAFE_RETRY', verification:reconciliationVerification(), at });
-  assert.equal(retry.state, ExecutionOwnershipState.AVAILABLE);
-  const cloud = claimExecutionOwnershipV1(retry, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at });
-  assert.equal(cloud.ownerPlane, 'CLOUD');
-});
 
-test('ambiguous VERIFIED resolution also requires matching fresh canonical verification', () => {
-  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
-  const at = '2026-09-23T13:31:00Z';
-  assert.throws(() => resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'VERIFIED', at }), /VerificationV1/);
-  const verified = resolveExecutionReconciliationV1(reconcile, {
-    leaseId:'lease-local',
-    outcome:'VERIFIED',
-    verification:reconciliationVerification({ reasonCode:'POSTCONDITION_MATCH', verificationId:'verification-effect-1' }),
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'other',
+    outcome:'SAFE_RETRY',
+    verification:reconciliationVerification(),
     at,
-  });
-  assert.equal(verified.state, ExecutionOwnershipState.VERIFIED);
-  assert.equal(verified.ownerId, '');
-});
+  }), /preserved owner lease/);
 
-test('positive VERIFIED reconciliation rejects no-effect proof and coercive outcomes', () => {
-  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
-  const at = '2026-09-23T13:31:00Z';
+  assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
+    leaseId:'lease-local',
+    outcome:'SAFE_RETRY',
+    verification:reconciliationVerification(),
+    at,
+  }), /trusted verifier provenance/);
+
   assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
     leaseId:'lease-local',
     outcome:'VERIFIED',
-    verification:reconciliationVerification(),
+    verification:reconciliationVerification({
+      reasonCode:'POSTCONDITION_MATCH',
+      verificationId:'verification-effect-1',
+    }),
     at,
-  }), /POSTCONDITION_MATCH/);
+  }), /trusted verifier provenance/);
+
+  assert.equal(reconcile.state, ExecutionOwnershipState.RECONCILE);
+  assert.equal(reconcile.leaseId, 'lease-local');
+  assert.throws(() => claimExecutionOwnershipV1(reconcile, {
+    plane:'CLOUD',
+    ownerId:'cloud',
+    leaseId:'cloud-1',
+    leaseUntil:'2026-09-23T13:40:00Z',
+    at,
+  }), /not available/);
+});
+
+test('reconciliation request rejects coercive outcomes without executing them', () => {
+  const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
   let coerced = 0;
   const outcome = { toString() { coerced += 1; return 'SAFE_RETRY'; } };
   assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
     leaseId:'lease-local',
     outcome,
     verification:reconciliationVerification(),
-    at,
+    at:'2026-09-23T13:31:00Z',
   }), /outcome must be text/);
   assert.equal(coerced, 0);
 });
