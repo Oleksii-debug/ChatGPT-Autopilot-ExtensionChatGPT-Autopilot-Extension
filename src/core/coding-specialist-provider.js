@@ -379,13 +379,6 @@ async function responseJsonBounded(response, maxBytes) {
   return body;
 }
 
-function safeErrorDetail(body) {
-  const detail = body && typeof body === 'object' && !Array.isArray(body) ? body.detail : '';
-  if (typeof detail !== 'string') return '';
-  const text = detail.replace(/[\r\n\t]+/gu, ' ').trim();
-  return text.slice(0, 500);
-}
-
 function statusOf(info) {
   const status = typeof info?.execution_status === 'string' ? info.execution_status : '';
   if (!KNOWN_STATUS.has(status)) throw new Error('OpenHands conversation returned unknown execution_status');
@@ -500,9 +493,13 @@ export class OpenHandsCodingSpecialistClient {
       if (allowNotFound && response.status === 404) return null;
       const parsed = await responseJsonBounded(response, prepared.config.maxResponseBytes);
       if (!response.ok) {
-        const detail = safeErrorDetail(parsed);
+        // Server payload is untrusted data. Never promote body.detail (or any
+        // other response content) into a public exception/logging surface.
+        // The body is still fully consumed under the byte/UTF-8/JSON bounds
+        // above so malformed or oversized responses fail closed.
+        void parsed;
         throw new OpenHandsCodingSpecialistError(
-          `OpenHands Agent Server returned HTTP ${response.status}${detail ? `: ${detail}` : ''}`,
+          `OpenHands Agent Server returned HTTP ${response.status}`,
           {
             code: `OPENHANDS_HTTP_${response.status}`,
             conversationId: prepared.conversationId,
