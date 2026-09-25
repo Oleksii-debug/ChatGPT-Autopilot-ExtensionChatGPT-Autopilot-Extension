@@ -178,20 +178,12 @@ export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { 
   return freeze({ plan, assignments: assignments.map(normalizeSpecialistAssignmentV1), executionOwnerships: ownerships, verificationRequired: target.agentId });
 }
 
-/** A result is not a completed plan node until a distinct verifier supplies evidence. */
-export function verifyAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { executionOwnerships = [], agentId, verifierId, verificationAuthorityId, evidence, at = new Date().toISOString() } = {}) {
-  let plan = normalizeAgentPlanV1(rawPlan);
-  const assignments = validateAssignments(plan, rawAssignments);
-  const assignment = assignments.find(item => item.agentId === id(agentId, 'agentId'));
-  if (!assignment || assignment.state !== SpecialistAssignmentState.COMPLETED) throw new Error('Specialist handoff is not awaiting verification');
-  const verifier = id(verifierId, 'verifierId');
-  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) throw new Error('Verifier must be independent from specialist and parent');
-  const node = plan.nodes.find(item => specialistAssignmentIdForPlanNodeV1(plan.planId, item.nodeId) === assignment.agentId);
-  if (node.state !== AgentPlanNodeState.RUNNING) throw new Error('Specialist plan node is not running');
-  const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
-  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
-  const ownership = ownerships.find(item => item.effectId === effectId);
-  const verifiedOwnership = verifyExecutionByAuthorityV1(ownership, { leaseId:ownership.leaseId, verifierId:verifier, verificationAuthorityId, evidence, at });
-  plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.VERIFIED, evidence: text(evidence, 'verification evidence'), at });
-  return freeze({ plan, assignments, executionOwnerships: ownerships.map(item => item.effectId === effectId ? verifiedOwnership : item), verifiedAgentId: assignment.agentId });
+/**
+ * Caller-owned verifier IDs and free-text evidence are not verification
+ * authority. Keep normal specialist completion fenced exactly like ambiguous
+ * reconciliation until a canonical independently resolved verifier record can
+ * be supplied by the execution/evidence authority.
+ */
+export function verifyAgentPlanSpecialistHandoffV1() {
+  throw new Error('Specialist verification requires canonical trusted verifier provenance');
 }
