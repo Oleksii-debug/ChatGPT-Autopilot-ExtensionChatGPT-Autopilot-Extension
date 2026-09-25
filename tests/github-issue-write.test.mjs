@@ -140,6 +140,61 @@ test('issue-comment create is independently bound to exact parent, id and body',
   assert.equal(result.effectState.phase, 'COMMITTED'); assert.equal(comments, 1); assert.equal(reads, 1);
 });
 
+test('observed issue identity can reconcile to COMMITTED after fresh readback without replay', async () => {
+  let creates = 0;
+  let reads = 0;
+  const client = fullClient({
+    createIssue: async ({ repositoryFullName, title, body }) => {
+      creates += 1;
+      return { repositoryFullName, number: 7, title, body, state: 'open', url: 'https://example.invalid/issue' };
+    },
+    readIssue: async ({ repositoryFullName, issueNumber }) => {
+      reads += 1;
+      return {
+        repositoryFullName,
+        number: issueNumber,
+        title: 'Issue title',
+        body: reads === 1 ? 'temporarily divergent readback' : 'Issue body',
+        state: 'open',
+        url: 'https://example.invalid/issue',
+      };
+    },
+  });
+  const provider = new GitHubAgentProviderV1({
+    githubClient: client,
+    grantedCapabilityIds: [GitHubCapabilityId.ISSUE_CREATE],
+    now: () => Date.parse(at),
+  });
+  const verifier = new GitHubIssueWriteVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const fx = storeFixture();
+  const executor = new GitHubExactEffectExecutorV1({
+    provider,
+    store: fx.store,
+    now: () => Date.parse(at),
+    verify: input => verifier.verify(input),
+    reconcileVerify: input => verifier.reconcileVerify(input),
+  });
+  const inv = invocation('github-issue-reconcile', GitHubToolId.ISSUE_CREATE, GitHubCapabilityId.ISSUE_CREATE, {
+    repositoryFullName: repo, title: 'Issue title', body: 'Issue body',
+  });
+
+  await assert.rejects(
+    () => executor.invoke({ invocation: inv, policyDecision: policy(inv) }),
+    error => error.effectState?.phase === 'RECONCILE' && error.safeToRetry === false,
+  );
+  assert.equal(creates, 1);
+  assert.equal(reads, 1);
+
+  const reconciled = await executor.reconcile({
+    invocationId: inv.invocationId,
+    outcome: 'VERIFIED',
+    reasonCode: 'READBACK_CONFIRMED',
+  });
+  assert.equal(reconciled.phase, 'COMMITTED');
+  assert.equal(creates, 1, 'reconciliation must not replay the issue POST');
+  assert.equal(reads, 2, 'reconciliation performs one fresh readback');
+});
+
 test('ambiguous create dispatch enters durable RECONCILE and cannot blind replay', async () => {
   let creates = 0;
   const ambiguous = Object.assign(new Error('transport ended after send'), { code: 'GITHUB_TRANSPORT_ERROR', effectMayHaveOccurred: true, safeToRetry: false });
