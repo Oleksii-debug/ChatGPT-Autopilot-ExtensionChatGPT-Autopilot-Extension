@@ -1,4 +1,4 @@
-import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
+import { normalizeArtifactRegistryV1 } from './artifact-registry.js';
 
 export const SECRET_DATA_FLOW_GUARD_VERSION = 1;
 
@@ -12,47 +12,28 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const INDEX = /^(0|[1-9][0-9]*)$/u;
 
-const MAX_ARTIFACTS = 128;
-const MAX_TRANSFORMS = 256;
+const MAX_BINDINGS = 128;
 const MAX_EGRESSES = 128;
-const MAX_INPUTS = 128;
 
 const REQUEST_KEYS = new Set([
   'schemaVersion',
   'flowId',
   'agentId',
   'jobId',
+  'projectId',
+  'registryRevision',
   'artifactBindings',
-  'transforms',
   'egresses',
   'assessedAt',
 ]);
 
-const ARTIFACT_BINDING_KEYS = new Set(['artifactId', 'sha256']);
-const TRANSFORM_KEYS = new Set([
-  'transformId',
-  'inputArtifactIds',
-  'outputArtifactId',
-  'completedAt',
-]);
+const OPTIONS_KEYS = new Set(['artifactRegistry']);
+const BINDING_KEYS = new Set(['artifactId', 'versionId', 'sha256']);
 const EGRESS_KEYS = new Set([
   'egressId',
   'artifactId',
   'destinationOrigin',
   'requestedAt',
-]);
-
-const ARTIFACT_KEYS = new Set([
-  'schemaVersion',
-  'artifactId',
-  'kind',
-  'uri',
-  'mediaType',
-  'sha256',
-  'sizeBytes',
-  'createdAt',
-  'producerInvocationId',
-  'sensitive',
 ]);
 
 function strictRecord(value, label, allowedKeys) {
@@ -170,6 +151,13 @@ function exactSha256(value, label) {
   return value;
 }
 
+function exactInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < min || value > max) {
+    throw new Error(`${label} must be a safe integer`);
+  }
+  return value;
+}
+
 function exactTimestamp(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !value) {
     throw new Error(`${label} must be a canonical timestamp`);
@@ -185,46 +173,18 @@ function exactTimestamp(value, label) {
   return canonical;
 }
 
-function exactText(value, label, { optional = false, max = 4096 } = {}) {
-  if (optional && (value === '' || value == null)) {
-    if (value == null) {
-      throw new Error(`${label} must use canonical empty-string representation`);
-    }
-    return '';
-  }
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max) {
-    throw new Error(`${label} is invalid`);
-  }
-  return value;
-}
-
-function exactOptionalId(value, label) {
-  if (value === null) return null;
-  return exactId(value, label);
-}
-
-function exactBoolean(value, label) {
-  if (typeof value !== 'boolean') throw new Error(`${label} must be boolean`);
-  return value;
-}
-
-function exactInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
-  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < min || value > max) {
-    throw new Error(`${label} must be a safe integer`);
-  }
-  return value;
-}
-
 function canonicalOrigin(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !value) {
     throw new Error(`${label} must be a canonical HTTP(S) origin`);
   }
+
   let parsed;
   try {
     parsed = new URL(value);
   } catch {
     throw new Error(`${label} must be a canonical HTTP(S) origin`);
   }
+
   if (!['http:', 'https:'].includes(parsed.protocol)
       || parsed.username
       || parsed.password
@@ -237,8 +197,8 @@ function canonicalOrigin(value, label) {
   return parsed.origin;
 }
 
-function compareAscii(a, b) {
-  return a < b ? -1 : (a > b ? 1 : 0);
+function compareAscii(left, right) {
+  return left < right ? -1 : (left > right ? 1 : 0);
 }
 
 function freezeDeep(value) {
@@ -248,43 +208,12 @@ function freezeDeep(value) {
 }
 
 function normalizeBinding(value, index) {
-  const raw = strictRecord(
-    value,
-    `SecretDataFlowV1.artifactBindings[${index}]`,
-    ARTIFACT_BINDING_KEYS,
-  );
+  const label = `SecretDataFlowV1.artifactBindings[${index}]`;
+  const raw = strictRecord(value, label, BINDING_KEYS);
   return freezeDeep({
-    artifactId: exactId(
-      raw.artifactId,
-      `SecretDataFlowV1.artifactBindings[${index}].artifactId`,
-    ),
-    sha256: exactSha256(
-      raw.sha256,
-      `SecretDataFlowV1.artifactBindings[${index}].sha256`,
-    ),
-  });
-}
-
-function exactIdArray(value, label, { max = MAX_INPUTS, requireNonEmpty = false } = {}) {
-  const raw = strictArray(value, label, { max });
-  if (requireNonEmpty && raw.length === 0) throw new Error(`${label} must not be empty`);
-  const output = raw.map((item, index) => exactId(item, `${label}[${index}]`));
-  if (new Set(output).size !== output.length) throw new Error(`${label} contains duplicates`);
-  return output;
-}
-
-function normalizeTransform(value, index) {
-  const label = `SecretDataFlowV1.transforms[${index}]`;
-  const raw = strictRecord(value, label, TRANSFORM_KEYS);
-  return freezeDeep({
-    transformId: exactId(raw.transformId, `${label}.transformId`),
-    inputArtifactIds: exactIdArray(
-      raw.inputArtifactIds,
-      `${label}.inputArtifactIds`,
-      { requireNonEmpty: true },
-    ),
-    outputArtifactId: exactId(raw.outputArtifactId, `${label}.outputArtifactId`),
-    completedAt: exactTimestamp(raw.completedAt, `${label}.completedAt`),
+    artifactId: exactId(raw.artifactId, `${label}.artifactId`),
+    versionId: exactId(raw.versionId, `${label}.versionId`),
+    sha256: exactSha256(raw.sha256, `${label}.sha256`),
   });
 }
 
@@ -299,79 +228,6 @@ function normalizeEgress(value, index) {
   });
 }
 
-function normalizeResolvedArtifact(value, label) {
-  const raw = strictRecord(value, label, ARTIFACT_KEYS);
-  exactVersion(raw.schemaVersion, label);
-
-  const exact = {
-    schemaVersion: SECRET_DATA_FLOW_GUARD_VERSION,
-    artifactId: exactId(raw.artifactId, `${label}.artifactId`),
-    kind: exactId(raw.kind, `${label}.kind`),
-    uri: exactText(raw.uri, `${label}.uri`),
-    mediaType: exactText(raw.mediaType, `${label}.mediaType`, { optional: true, max: 300 }),
-    sha256: exactSha256(raw.sha256, `${label}.sha256`),
-    sizeBytes: exactInteger(raw.sizeBytes, `${label}.sizeBytes`),
-    createdAt: exactTimestamp(raw.createdAt, `${label}.createdAt`),
-    producerInvocationId: exactOptionalId(
-      raw.producerInvocationId,
-      `${label}.producerInvocationId`,
-    ),
-    sensitive: exactBoolean(raw.sensitive, `${label}.sensitive`),
-  };
-
-  const normalized = normalizeArtifactRefV1(exact);
-  if (normalized.sha256 !== exact.sha256
-      || normalized.createdAt !== exact.createdAt
-      || normalized.artifactId !== exact.artifactId
-      || normalized.kind !== exact.kind
-      || normalized.uri !== exact.uri
-      || normalized.mediaType !== exact.mediaType
-      || normalized.sizeBytes !== exact.sizeBytes
-      || normalized.producerInvocationId !== exact.producerInvocationId
-      || normalized.sensitive !== exact.sensitive) {
-    throw new Error(`${label} is not in exact canonical ArtifactRefV1 representation`);
-  }
-  return normalized;
-}
-
-function resolveArtifacts(bindings, resolveArtifactRef, assessedAt) {
-  if (typeof resolveArtifactRef !== 'function') {
-    throw new Error('Secret data-flow assessment requires trusted resolveArtifactRef');
-  }
-
-  const resolved = new Map();
-  for (const binding of bindings) {
-    let candidate;
-    try {
-      candidate = resolveArtifactRef(binding.artifactId);
-    } catch (error) {
-      throw new Error(`Artifact resolver failed for ${binding.artifactId}: ${error?.message || String(error)}`);
-    }
-    if (candidate && typeof candidate.then === 'function') {
-      throw new Error('Secret data-flow assessment requires a synchronous trusted artifact resolver');
-    }
-    if (candidate == null) {
-      throw new Error(`Canonical artifact is unavailable: ${binding.artifactId}`);
-    }
-
-    const artifact = normalizeResolvedArtifact(
-      candidate,
-      `Canonical ArtifactRefV1 ${binding.artifactId}`,
-    );
-    if (artifact.artifactId !== binding.artifactId) {
-      throw new Error(`Canonical artifact identity mismatch for ${binding.artifactId}`);
-    }
-    if (artifact.sha256 !== binding.sha256) {
-      throw new Error(`Canonical artifact digest mismatch for ${binding.artifactId}`);
-    }
-    if (artifact.createdAt > assessedAt) {
-      throw new Error(`Canonical artifact ${binding.artifactId} postdates assessment`);
-    }
-    resolved.set(binding.artifactId, artifact);
-  }
-  return resolved;
-}
-
 function normalizeRequest(value) {
   const raw = strictRecord(value, 'SecretDataFlowV1', REQUEST_KEYS);
   exactVersion(raw.schemaVersion, 'SecretDataFlowV1');
@@ -379,7 +235,7 @@ function normalizeRequest(value) {
   const artifactBindings = strictArray(
     raw.artifactBindings,
     'SecretDataFlowV1.artifactBindings',
-    { max: MAX_ARTIFACTS },
+    { max: MAX_BINDINGS },
   ).map(normalizeBinding);
   if (artifactBindings.length === 0) {
     throw new Error('SecretDataFlowV1.artifactBindings must not be empty');
@@ -390,19 +246,9 @@ function normalizeRequest(value) {
     throw new Error('SecretDataFlowV1.artifactBindings contains duplicate artifactId');
   }
 
-  const transforms = strictArray(
-    raw.transforms,
-    'SecretDataFlowV1.transforms',
-    { max: MAX_TRANSFORMS },
-  ).map(normalizeTransform);
-  const transformIds = transforms.map(item => item.transformId);
-  if (new Set(transformIds).size !== transformIds.length) {
-    throw new Error('SecretDataFlowV1.transforms contains duplicate transformId');
-  }
-
-  const outputIds = transforms.map(item => item.outputArtifactId);
-  if (new Set(outputIds).size !== outputIds.length) {
-    throw new Error('SecretDataFlowV1.transforms contains duplicate outputArtifactId');
+  const versionIds = artifactBindings.map(item => item.versionId);
+  if (new Set(versionIds).size !== versionIds.length) {
+    throw new Error('SecretDataFlowV1.artifactBindings contains duplicate versionId');
   }
 
   const egresses = strictArray(
@@ -420,93 +266,189 @@ function normalizeRequest(value) {
     flowId: exactId(raw.flowId, 'SecretDataFlowV1.flowId'),
     agentId: exactId(raw.agentId, 'SecretDataFlowV1.agentId'),
     jobId: exactId(raw.jobId, 'SecretDataFlowV1.jobId'),
+    projectId: exactId(raw.projectId, 'SecretDataFlowV1.projectId'),
+    registryRevision: exactInteger(raw.registryRevision, 'SecretDataFlowV1.registryRevision'),
     artifactBindings,
-    transforms,
     egresses,
     assessedAt: exactTimestamp(raw.assessedAt, 'SecretDataFlowV1.assessedAt'),
   });
 }
 
-function validateGraph(request, artifacts) {
-  const artifactIds = new Set(request.artifactBindings.map(item => item.artifactId));
-  const indegree = new Map([...artifactIds].map(id => [id, 0]));
-  const children = new Map([...artifactIds].map(id => [id, []]));
+function indexRegistry(registry) {
+  const entries = new Map();
+  const versions = new Map();
 
-  for (const transform of request.transforms) {
-    if (!artifactIds.has(transform.outputArtifactId)) {
-      throw new Error(`Transform ${transform.transformId} references unknown output artifact`);
-    }
-    if (transform.inputArtifactIds.includes(transform.outputArtifactId)) {
-      throw new Error(`Transform ${transform.transformId} cannot consume its own output`);
-    }
-
-    const output = artifacts.get(transform.outputArtifactId);
-    for (const inputId of transform.inputArtifactIds) {
-      if (!artifactIds.has(inputId)) {
-        throw new Error(`Transform ${transform.transformId} references unknown input artifact`);
-      }
-      const input = artifacts.get(inputId);
-      if (output.createdAt < input.createdAt) {
-        throw new Error(`Transform ${transform.transformId} output predates an input artifact`);
-      }
-      children.get(inputId).push(transform.outputArtifactId);
-      indegree.set(transform.outputArtifactId, indegree.get(transform.outputArtifactId) + 1);
-    }
-
-    if (transform.completedAt < output.createdAt) {
-      throw new Error(`Transform ${transform.transformId} completes before output materialization`);
-    }
-    if (transform.completedAt > request.assessedAt) {
-      throw new Error(`Transform ${transform.transformId} postdates assessment`);
+  for (const entry of registry.artifacts) {
+    entries.set(entry.artifactId, entry);
+    for (const version of entry.versions) {
+      versions.set(version.versionId, version);
     }
   }
 
-  for (const list of children.values()) list.sort(compareAscii);
-
-  const ready = [...artifactIds]
-    .filter(id => indegree.get(id) === 0)
-    .sort(compareAscii);
-  const order = [];
-
-  while (ready.length) {
-    const current = ready.shift();
-    order.push(current);
-    for (const child of children.get(current)) {
-      indegree.set(child, indegree.get(child) - 1);
-      if (indegree.get(child) === 0) {
-        ready.push(child);
-        ready.sort(compareAscii);
-      }
-    }
-  }
-
-  if (order.length !== artifactIds.size) {
-    throw new Error('SecretDataFlowV1 transforms must form an acyclic artifact graph');
-  }
-
-  return { children, order };
+  return { entries, versions };
 }
 
-function propagateSensitivity(order, children, artifacts) {
-  const effective = new Map();
-  for (const artifactId of order) {
-    const artifact = artifacts.get(artifactId);
-    const current = effective.get(artifactId) === true || artifact.sensitive === true;
-    effective.set(artifactId, current);
-    if (!current) continue;
-    for (const child of children.get(artifactId)) effective.set(child, true);
-  }
-  return effective;
+function versionTime(version) {
+  return Date.parse(version.registeredAt);
 }
 
-function validateEgresses(request, artifacts) {
+function provenanceTime(version) {
+  return Date.parse(version.provenance.createdAt);
+}
+
+function violation(code, artifactId, versionId) {
+  return freezeDeep({ code, artifactId, versionId });
+}
+
+function createLineageEvaluator(registryIndex, assessedAt) {
+  const assessedAtMs = Date.parse(assessedAt);
+  const lineageMemo = new Map();
+  const familyMemo = new Map();
+  const activeVersions = new Set();
+  const violations = new Map();
+
+  function addViolation(code, version) {
+    const key = `${code}:${version.artifactRef.artifactId}:${version.versionId}`;
+    if (!violations.has(key)) {
+      violations.set(
+        key,
+        violation(code, version.artifactRef.artifactId, version.versionId),
+      );
+    }
+  }
+
+  function candidateVersions(artifactId, cutoffMs) {
+    const entry = registryIndex.entries.get(artifactId);
+    if (!entry) {
+      throw new Error(`Canonical artifact lineage references unknown artifact: ${artifactId}`);
+    }
+
+    const candidates = entry.versions.filter(version => versionTime(version) <= cutoffMs);
+    if (candidates.length === 0) {
+      throw new Error(
+        `Canonical artifact lineage has no admitted version before dependency use: ${artifactId}`,
+      );
+    }
+    return candidates;
+  }
+
+  function familySensitivityAt(artifactId, cutoffMs) {
+    const key = `${artifactId}@${cutoffMs}`;
+    if (familyMemo.has(key)) return familyMemo.get(key);
+
+    const candidates = candidateVersions(artifactId, cutoffMs);
+    let priorTainted = false;
+    let effectiveSensitive = false;
+
+    for (const version of candidates) {
+      const lineage = evaluateVersionLineage(version);
+      if (priorTainted && version.artifactRef.sensitive !== true) {
+        addViolation('SENSITIVE_VERSION_DOWNGRADE', version);
+      }
+      if (lineage.effectiveSensitive) {
+        priorTainted = true;
+        effectiveSensitive = true;
+      }
+    }
+
+    familyMemo.set(key, effectiveSensitive);
+    return effectiveSensitive;
+  }
+
+  function evaluateVersionLineage(version) {
+    if (lineageMemo.has(version.versionId)) return lineageMemo.get(version.versionId);
+    if (activeVersions.has(version.versionId)) {
+      throw new Error(
+        `Canonical artifact provenance contains a cycle at version: ${version.versionId}`,
+      );
+    }
+    if (versionTime(version) > assessedAtMs) {
+      throw new Error(
+        `Canonical artifact version postdates assessment: ${version.versionId}`,
+      );
+    }
+
+    activeVersions.add(version.versionId);
+    let inheritedSensitive = false;
+
+    for (const inputArtifactId of version.provenance.inputArtifactIds) {
+      const inputSensitive = familySensitivityAt(
+        inputArtifactId,
+        provenanceTime(version),
+      );
+      inheritedSensitive = inheritedSensitive || inputSensitive;
+    }
+
+    const effectiveSensitive = version.artifactRef.sensitive === true || inheritedSensitive;
+    if (inheritedSensitive && version.artifactRef.sensitive !== true) {
+      addViolation('SENSITIVE_DERIVATION_LAUNDERING', version);
+    }
+
+    activeVersions.delete(version.versionId);
+    const result = freezeDeep({
+      effectiveSensitive,
+      inheritedSensitive,
+    });
+    lineageMemo.set(version.versionId, result);
+    return result;
+  }
+
+  function effectiveBindingSensitivity(version) {
+    return familySensitivityAt(
+      version.artifactRef.artifactId,
+      versionTime(version),
+    );
+  }
+
+  return {
+    evaluateVersionLineage,
+    effectiveBindingSensitivity,
+    violations: () => [...violations.values()].sort((left, right) =>
+      compareAscii(left.artifactId, right.artifactId)
+        || compareAscii(left.versionId, right.versionId)
+        || compareAscii(left.code, right.code)),
+  };
+}
+
+function resolveBindings(request, registry, registryIndex, evaluator) {
+  if (registry.projectId !== request.projectId) {
+    throw new Error('SecretDataFlowV1 projectId does not match canonical ArtifactRegistryV1');
+  }
+  if (registry.revision !== request.registryRevision) {
+    throw new Error('SecretDataFlowV1 registryRevision is stale or mismatched');
+  }
+
+  const resolved = new Map();
+  for (const binding of request.artifactBindings) {
+    const version = registryIndex.versions.get(binding.versionId);
+    if (!version) {
+      throw new Error(`Canonical artifact version is unavailable: ${binding.versionId}`);
+    }
+    if (version.projectId !== request.projectId
+        || version.artifactRef.artifactId !== binding.artifactId) {
+      throw new Error(`Canonical artifact version identity mismatch: ${binding.versionId}`);
+    }
+    if (version.artifactRef.sha256 !== binding.sha256) {
+      throw new Error(`Canonical artifact version digest mismatch: ${binding.versionId}`);
+    }
+    if (Date.parse(version.registeredAt) > Date.parse(request.assessedAt)) {
+      throw new Error(`Canonical artifact version postdates assessment: ${binding.versionId}`);
+    }
+
+    evaluator.evaluateVersionLineage(version);
+    resolved.set(binding.artifactId, version);
+  }
+  return resolved;
+}
+
+function validateEgresses(request, resolvedBindings) {
   for (const egress of request.egresses) {
-    const artifact = artifacts.get(egress.artifactId);
-    if (!artifact) {
-      throw new Error(`Egress ${egress.egressId} references unknown artifact`);
+    const version = resolvedBindings.get(egress.artifactId);
+    if (!version) {
+      throw new Error(`Egress ${egress.egressId} references an unbound artifact`);
     }
-    if (egress.requestedAt < artifact.createdAt) {
-      throw new Error(`Egress ${egress.egressId} predates artifact materialization`);
+    if (Date.parse(egress.requestedAt) < Date.parse(version.registeredAt)) {
+      throw new Error(`Egress ${egress.egressId} predates canonical artifact admission`);
     }
     if (egress.requestedAt > request.assessedAt) {
       throw new Error(`Egress ${egress.egressId} postdates assessment`);
@@ -514,76 +456,87 @@ function validateEgresses(request, artifacts) {
   }
 }
 
-function violation(code, artifactId) {
-  return freezeDeep({ code, artifactId });
-}
-
 /**
- * Pure artifact-level secret data-flow assessment.
+ * Pure, non-authorizing secret data-flow assessment over the canonical
+ * ArtifactRegistryV1 snapshot supplied by trusted integration code.
  *
- * The graph and egress plan are caller input, so this function never claims
- * lineage completeness, policy approval, declassification, credential use or
- * execution authority. Canonical ArtifactRefs are obtained only through the
- * trusted resolver supplied by integration code.
- *
- * Sensitivity is monotonic: once a canonical input artifact is sensitive,
- * every derived descendant is effectively sensitive. A descendant persisted
- * with sensitive=false is therefore a fail-closed laundering violation until a
- * separate canonical declassification authority exists.
+ * Artifact provenance, rather than caller-declared transform edges, determines
+ * ancestry. ArtifactProvenanceV1 currently binds input artifact identities but
+ * not exact input version IDs. To avoid under-tainting, every canonically
+ * admitted input version that could have existed before the dependent
+ * provenance timestamp is treated as plausible. Any sensitive/tainted plausible
+ * version taints the dependency. Once an artifact family is tainted, a later
+ * version cannot clear sensitivity without a separate declassification
+ * authority; this guard has no such authority.
  */
-export function assessSecretDataFlowV1(value, {
-  resolveArtifactRef,
-} = {}) {
+export function assessSecretDataFlowV1(value, optionsInput = {}) {
   const request = normalizeRequest(value);
-  const artifacts = resolveArtifacts(
-    request.artifactBindings,
-    resolveArtifactRef,
-    request.assessedAt,
+  const options = strictRecord(
+    optionsInput,
+    'Secret data-flow trusted options',
+    OPTIONS_KEYS,
   );
-
-  const { children, order } = validateGraph(request, artifacts);
-  validateEgresses(request, artifacts);
-  const effectiveSensitive = propagateSensitivity(order, children, artifacts);
-
-  const producedArtifacts = new Set(request.transforms.map(item => item.outputArtifactId));
-  const violations = [];
-  for (const artifactId of [...producedArtifacts].sort(compareAscii)) {
-    const artifact = artifacts.get(artifactId);
-    if (effectiveSensitive.get(artifactId) === true && artifact.sensitive !== true) {
-      violations.push(violation('SENSITIVE_DERIVATION_LAUNDERING', artifactId));
-    }
+  if (!options.artifactRegistry) {
+    throw new Error('Secret data-flow assessment requires canonical artifactRegistry');
   }
 
-  const artifactStates = order
-    .map(artifactId => {
-      const artifact = artifacts.get(artifactId);
+  const registry = normalizeArtifactRegistryV1(options.artifactRegistry);
+  const registryIndex = indexRegistry(registry);
+  const evaluator = createLineageEvaluator(
+    registryIndex,
+    request.assessedAt,
+  );
+  const resolvedBindings = resolveBindings(
+    request,
+    registry,
+    registryIndex,
+    evaluator,
+  );
+  validateEgresses(request, resolvedBindings);
+
+  const artifactStates = request.artifactBindings
+    .map(binding => {
+      const version = resolvedBindings.get(binding.artifactId);
+      const lineage = evaluator.evaluateVersionLineage(version);
+      const effectiveSensitive = evaluator.effectiveBindingSensitivity(version);
       return freezeDeep({
-        artifactId,
-        sha256: artifact.sha256,
-        declaredSensitive: artifact.sensitive,
-        effectiveSensitive: effectiveSensitive.get(artifactId) === true,
-        derived: producedArtifacts.has(artifactId),
+        artifactId: binding.artifactId,
+        versionId: binding.versionId,
+        sha256: binding.sha256,
+        declaredSensitive: version.artifactRef.sensitive,
+        inheritedSensitive: lineage.inheritedSensitive,
+        effectiveSensitive,
+        derived: version.provenance.inputArtifactIds.length > 0,
+        registeredAt: version.registeredAt,
       });
     })
-    .sort((a, b) => compareAscii(a.artifactId, b.artifactId));
+    .sort((left, right) =>
+      compareAscii(left.artifactId, right.artifactId)
+        || compareAscii(left.versionId, right.versionId));
+
+  const sensitivityByArtifact = new Map(
+    artifactStates.map(item => [item.artifactId, item.effectiveSensitive]),
+  );
 
   const egresses = request.egresses
     .map(egress => {
-      const sensitive = effectiveSensitive.get(egress.artifactId) === true;
+      const effectiveSensitive = sensitivityByArtifact.get(egress.artifactId) === true;
       return freezeDeep({
         egressId: egress.egressId,
         artifactId: egress.artifactId,
+        versionId: resolvedBindings.get(egress.artifactId).versionId,
         destinationOrigin: egress.destinationOrigin,
         requestedAt: egress.requestedAt,
-        effectiveSensitive: sensitive,
+        effectiveSensitive,
         policyDecisionRequired: true,
-        independentSecretReviewRequired: sensitive,
+        independentSecretReviewRequired: effectiveSensitive,
         executionAuthorized: false,
         credentialUseAuthorized: false,
       });
     })
-    .sort((a, b) => compareAscii(a.egressId, b.egressId));
+    .sort((left, right) => compareAscii(left.egressId, right.egressId));
 
+  const violations = evaluator.violations();
   const sensitiveEgress = egresses.some(item => item.effectiveSensitive);
   const status = violations.length
     ? SecretDataFlowStatus.BLOCKED
@@ -596,14 +549,17 @@ export function assessSecretDataFlowV1(value, {
     flowId: request.flowId,
     agentId: request.agentId,
     jobId: request.jobId,
+    projectId: request.projectId,
+    registryRevision: request.registryRevision,
     status,
     artifactStates,
     egresses,
     violations,
-    lineageProvenance: 'UNVERIFIED_INPUT',
-    lineageCompletenessVerified: false,
-    requiresCanonicalLineageResolution: true,
-    requiresCanonicalArtifactResolution: true,
+    lineageProvenance: 'CANONICAL_ARTIFACT_REGISTRY',
+    lineageCompletenessVerified: true,
+    exactInputVersionBindingVerified: false,
+    inputVersionResolution: 'CONSERVATIVE_ALL_PLAUSIBLE_VERSIONS',
+    requiresExactInputVersionBindingUpgrade: true,
     requiresCanonicalPolicyDecision: request.egresses.length > 0,
     requiresIndependentSecretScan: request.egresses.length > 0,
     declassificationAuthorized: false,
