@@ -272,7 +272,7 @@ async function readExactFileSnapshot(handle, admitted) {
   return bytes;
 }
 
-export async function readBinaryScopedV1(payload, config) {
+export async function readBinaryScopedV1(payload, config, { beforeOpen = null } = {}) {
   exactKeys(
     payload,
     new Set(['rootId', 'relativePath', 'offsetBytes', 'maxBytes', 'expectedSha256']),
@@ -298,7 +298,7 @@ export async function readBinaryScopedV1(payload, config) {
     return await withAuthorizedExistingFileV1(
       scopeFor(root),
       path.resolve(root.path, rel),
-      { write: false },
+      { write: false, beforeOpen },
       async (handle, admitted) => {
         if (!admitted.stat.isFile()) throw nativeError('NOT_A_FILE', 'Requested path is not a regular file');
         if (!Number.isSafeInteger(admitted.stat.size) || admitted.stat.size < 0 || admitted.stat.size > MAX_BINARY_FILE_BYTES) {
