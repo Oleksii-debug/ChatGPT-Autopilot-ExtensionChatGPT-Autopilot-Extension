@@ -86,9 +86,8 @@ function version(value, label) {
 function id(value, label, { optional = false } = {}) {
   if (optional && (value == null || value === '')) return null;
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
-  const out = value.trim();
-  if (!ID.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+  if (value !== value.trim() || !ID.test(value)) throw new Error(`${label} is invalid`);
+  return value;
 }
 
 function boundedText(value, label, max, { optional = false } = {}) {
@@ -107,7 +106,9 @@ function timestamp(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  const canonical = new Date(ms).toISOString();
+  if (value !== canonical) throw new Error(`${label} must be a canonical timestamp`);
+  return canonical;
 }
 
 function optionalDigest(value, label) {
@@ -136,7 +137,7 @@ function normalizeTargetV1(input = {}) {
 export function normalizeSelectionActionSourceV1(input) {
   const raw = snapshotRecord(input, SOURCE_KEYS, 'SelectionActionSourceV1');
   if (typeof raw.kind !== 'string') throw new Error('source kind must be text');
-  const kind = raw.kind.trim().toUpperCase();
+  const kind = raw.kind;
   if (!SOURCE_KINDS.has(kind)) throw new Error('source kind is invalid');
 
   const text = raw.text == null || raw.text === ''
@@ -194,15 +195,14 @@ function assertOperationTarget(operation, source, target) {
 
 export function selectionActionNeedsEffectAdmissionV1(operation) {
   if (typeof operation !== 'string') throw new Error('operation must be text');
-  const normalized = operation.trim().toUpperCase();
-  if (!OPERATIONS.has(normalized)) throw new Error('operation is invalid');
-  return EFFECTFUL_OPERATIONS.has(normalized);
+  if (!OPERATIONS.has(operation)) throw new Error('operation is invalid');
+  return EFFECTFUL_OPERATIONS.has(operation);
 }
 
 export function normalizeSelectionActionRequestV1(input) {
   const raw = snapshotRecord(input, REQUEST_KEYS, 'SelectionActionRequestV1');
   if (typeof raw.operation !== 'string') throw new Error('operation must be text');
-  const operation = raw.operation.trim().toUpperCase();
+  const operation = raw.operation;
   if (!OPERATIONS.has(operation)) throw new Error('operation is invalid');
 
   const source = normalizeSelectionActionSourceV1(raw.source);
