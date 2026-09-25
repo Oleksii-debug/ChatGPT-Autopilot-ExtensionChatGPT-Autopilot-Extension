@@ -37,7 +37,8 @@ test('accessible local date-time rejects invalid calendar values', () => {
 test('clock input is canonicalized without picker dependency', () => {
   assert.equal(normalizeAccessibleClockTime('9:15'), '09:15');
   assert.equal(normalizeAccessibleClockTime('23:59'), '23:59');
-  assert.equal(normalizeAccessibleClockTime('4:00:07'), '04:00:07');
+  assert.throws(() => normalizeAccessibleClockTime('4:00:07'), /формат/);
+  assert.equal(normalizeAccessibleClockTime('4:00:07', { allowSeconds: true }), '04:00:07');
   assert.equal(normalizeAccessibleClockTime(''), '');
   assert.throws(() => normalizeAccessibleClockTime('24:00'), /Некоректний/);
 });
