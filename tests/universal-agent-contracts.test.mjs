@@ -459,7 +459,7 @@ test('nested reference collections reject non-array shapes with stable contract 
     requestedCapabilityIds: ['workspace.read'],
     credentialRefs: { credentialId: 'cred-1' },
     createdAt: AT,
-  }), /credentialRefs must be a bounded array/);
+  }), /credentialRefs must be a bounded plain array/);
 });
 
 
