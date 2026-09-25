@@ -391,6 +391,93 @@ test('formal review commits only after independent immutable review readback', a
   assert.equal(fx.snapshot(inv.invocationId).verification.reasonCode, 'GITHUB_PULL_REQUEST_REVIEW_CONFIRMED');
 });
 
+test('formal review stays RECONCILE when parent PR head drifts after dispatch and is never replayed', async () => {
+  let creates = 0;
+  let parentReads = 0;
+  let reviewReads = 0;
+  const movedHeadSha = 'c'.repeat(40);
+  const client = fullClient({
+    readPullRequest: async ({ repositoryFullName, pullRequestNumber }) => {
+      parentReads += 1;
+      return {
+        repositoryFullName,
+        number: pullRequestNumber,
+        title: 'Review candidate',
+        body: '',
+        state: 'open',
+        merged: false,
+        headSha: parentReads === 1 ? headSha : movedHeadSha,
+        baseSha,
+        mergeCommitSha: '',
+        url: 'https://example.invalid/pr',
+      };
+    },
+    createPullRequestReview: async args => {
+      creates += 1;
+      return {
+        repositoryFullName: args.repositoryFullName,
+        pullRequestNumber: args.pullRequestNumber,
+        reviewId: 80,
+        expectedHeadSha: args.expectedHeadSha,
+        event: args.event,
+        body: args.body,
+        state: 'COMMENTED',
+        commitId: args.expectedHeadSha,
+        url: 'https://example.invalid/review',
+      };
+    },
+    readPullRequestReview: async ({ repositoryFullName, pullRequestNumber, reviewId }) => {
+      reviewReads += 1;
+      return {
+        repositoryFullName,
+        pullRequestNumber,
+        reviewId,
+        body: reviewBody,
+        state: 'COMMENTED',
+        commitId: headSha,
+        url: 'https://example.invalid/review',
+      };
+    },
+  });
+  const provider = new GitHubAgentProviderV1({
+    githubClient: client,
+    grantedCapabilityIds: [GitHubCapabilityId.PULL_REQUEST_REVIEW_CREATE],
+    now: () => Date.parse(at),
+  });
+  const verifier = new GitHubPullRequestReviewVerifierV1({ githubClient: client, now: () => Date.parse(at) });
+  const fx = storeFixture();
+  const executor = new GitHubExactEffectExecutorV1({
+    provider,
+    store: fx.store,
+    verify: input => verifier.verify(input),
+    reconcileVerify: input => verifier.reconcileVerify(input),
+    now: () => Date.parse(at),
+  });
+  const inv = invocation('github-pr-review-head-drift');
+
+  await assert.rejects(
+    () => executor.invoke({ invocation: inv, policyDecision: policy(inv) }),
+    error => error.effectState?.phase === 'RECONCILE' && error.safeToRetry === false,
+  );
+
+  assert.equal(creates, 1);
+  assert.equal(parentReads, 2, 'provider preflight and independent verifier must each read the parent PR');
+  assert.equal(reviewReads, 1);
+  assert.equal(
+    fx.snapshot(inv.invocationId).verification.reasonCode,
+    'GITHUB_PULL_REQUEST_REVIEW_PARENT_HEAD_STALE',
+  );
+
+  await assert.rejects(
+    () => executor.invoke({
+      invocation: structuredClone(inv),
+      policyDecision: structuredClone(policy(inv)),
+    }),
+    /requires reconciliation/i,
+  );
+  assert.equal(creates, 1, 'head drift must never cause blind formal-review replay');
+});
+
 test('temporarily divergent review readback reconciles without replay', async () => {
   let creates = 0;
   let reads = 0;
