@@ -144,6 +144,9 @@ runButton.addEventListener('click', async () => {
     if (sourceKind.value === SelectionActionSourceKind.CLIPBOARD) {
       const text = sourceText.value;
       if (!text.trim()) throw new Error('Вставте текст джерела через Ctrl+V.');
+      if (text.length > MAX_SOURCE_TEXT) {
+        throw new Error('Текст буфера перевищує 100000 символів. Скоротіть його перед запуском.');
+      }
       rawSource = {
         schemaVersion: SelectionActionContractVersion,
         sourceId: 'quick-source-' + crypto.randomUUID(),
