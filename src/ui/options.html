@@ -533,10 +533,14 @@
           <p class="field-help">Для 17 повідомлень у чаті встановіть одне коло: перший промпт ×1 → промпт продовження ×15 → фінальний ×1. Число повторів продовження можна змінити.</p>
           <div id="scenario-cycle-steps"></div>
           <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
-          <label for="scenario-cycle-parallel-count">Скільки незалежних чатів запустити</label>
+          <label for="scenario-cycle-parallel-count">Скільки чатів тримати одночасно в пулі</label>
           <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="5" aria-describedby="scenario-cycle-parallel-help">
-          <p id="scenario-cycle-parallel-help" class="field-help">Створює окремий цикл для кожного чату з поточними промптами. Кожен чекає своєї відповіді та після фінального промпта переходить у новий чат.</p>
-          <button id="scenario-cycle-start-parallel" type="button">Створити й запустити чати</button>
+          <label for="scenario-cycle-replacement-budget">Скільки додаткових чатів створити після початкових</label>
+          <input id="scenario-cycle-replacement-budget" type="number" min="0" max="100000" step="1" inputmode="numeric" value="0" aria-describedby="scenario-cycle-parallel-help">
+          <label for="scenario-cycle-initial-stagger">Пауза між початковими чатами, секунд</label>
+          <input id="scenario-cycle-initial-stagger" type="number" min="0" max="60" step="1" inputmode="numeric" value="3">
+          <p id="scenario-cycle-parallel-help" class="field-help">Наприклад, 7 одночасних чатів і 200 додаткових означає максимум 207 чатів загалом. Кожен слот надсилає наступний промпт після відповіді. Після завершення чату новий займає його слот, доки спільний ліміт замін не вичерпається; останні чати завершують свої промпти.</p>
+          <button id="scenario-cycle-start-parallel" type="button">Створити й запустити пул чатів</button>
         </fieldset>
       </div>
 
