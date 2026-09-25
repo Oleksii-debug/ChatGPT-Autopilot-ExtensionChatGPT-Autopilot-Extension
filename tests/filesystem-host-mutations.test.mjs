@@ -216,3 +216,106 @@ test('Native filesystem write digest is strict lowercase text and never coerced'
     assert.equal(await fs.readFile(target, 'utf8'), 'before');
   }
 });
+
+
+test('partial staging failure preserves original bytes and removes the staging file', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-host-partial-stage-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  await fs.writeFile(target, 'before', 'utf8');
+  const desired = 'x'.repeat(96 * 1024);
+  let hookCalls = 0;
+
+  await assert.rejects(
+    () => writeExistingTextScopedV1({
+      rootId: 'workspace',
+      relativePath: 'note.txt',
+      text: desired,
+      expectedSha256: digest('before'),
+    }, config(root, true), {
+      afterTempWrite: ({ writtenBytes, totalBytes }) => {
+        hookCalls += 1;
+        assert.ok(writtenBytes > 0);
+        assert.ok(writtenBytes < totalBytes);
+        throw new Error('simulated crash during staging');
+      },
+    }),
+    /simulated crash during staging/,
+  );
+
+  assert.equal(hookCalls, 1);
+  assert.equal(await fs.readFile(target, 'utf8'), 'before');
+  assert.deepEqual(await fs.readdir(root), ['note.txt']);
+});
+
+test('failure after fully synced staging but before publish preserves original bytes', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-host-before-publish-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  await fs.writeFile(target, 'before', 'utf8');
+
+  await assert.rejects(
+    () => writeExistingTextScopedV1({
+      rootId: 'workspace',
+      relativePath: 'note.txt',
+      text: 'after',
+      expectedSha256: digest('before'),
+    }, config(root, true), {
+      beforePublish: () => {
+        throw new Error('simulated crash before atomic publish');
+      },
+    }),
+    /simulated crash before atomic publish/,
+  );
+
+  assert.equal(await fs.readFile(target, 'utf8'), 'before');
+  assert.deepEqual(await fs.readdir(root), ['note.txt']);
+});
+
+test('atomic publish revalidates target identity after staging and never writes through an outside link', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-host-publish-swap-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  const outside = path.join(temp, 'outside.txt');
+  await fs.writeFile(target, 'before', 'utf8');
+  await fs.writeFile(outside, 'secret', 'utf8');
+  let swapped = false;
+
+  await assert.rejects(
+    () => writeExistingTextScopedV1({
+      rootId: 'workspace',
+      relativePath: 'note.txt',
+      text: 'after',
+      expectedSha256: digest('before'),
+    }, config(root, true), {
+      beforePublish: async () => {
+        try {
+          await fs.rm(target);
+          await fs.symlink(outside, target, 'file');
+          swapped = true;
+        } catch (error) {
+          if (process.platform === 'win32') return;
+          throw error;
+        }
+      },
+    }),
+    error => {
+      if (!swapped && process.platform === 'win32') return true;
+      return error.code === 'PATH_OUTSIDE_SCOPE';
+    },
+  );
+
+  if (!swapped && process.platform === 'win32') {
+    t.skip('symlink creation unavailable in this Windows test environment');
+    return;
+  }
+  assert.equal(await fs.readFile(outside, 'utf8'), 'secret');
+  const entries = await fs.readdir(root);
+  assert.equal(entries.some(name => name.startsWith('.chatgpt-autopilot-write-')), false);
+});
