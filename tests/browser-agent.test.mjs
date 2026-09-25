@@ -2916,6 +2916,234 @@ test('Browser Agent specialist wrappers snapshot caller payloads before authorit
 });
 
 
+test('Browser Agent input-token admission includes an existing durable reservation without throwing', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text:'{}' }),
+    now: () => 49_000,
+  });
+  await manager.create({
+    id:'job-input-reservation-headroom',
+    goal:'Respect reserved input-token headroom',
+    maxInputTokens:12,
+  });
+  await manager.update(store => {
+    const job = store.byId['job-input-reservation-headroom'];
+    job.runtime.inputTokens = 3;
+    job.runtime.totalTokens = 3;
+    job.runtime.modelBudgetReservation = {
+      reservationId:'job-input-reservation-headroom:model-budget:1',
+      controlEpoch:0,
+      modelCalls:1,
+      inputTokens:4,
+      outputTokens:2,
+      totalTokens:6,
+      estimatedCostUsd:0,
+      createdAt:48_000,
+      routeId:'primary',
+      provider:'ollama',
+      model:'qwen:8b',
+      callNumber:1,
+    };
+    return store;
+  });
+
+  const current = await manager.get('job-input-reservation-headroom');
+  assert.doesNotThrow(() => manager.budgetReason(current.job, { pendingInputTokens:5 }));
+  assert.equal(manager.budgetReason(current.job, { pendingInputTokens:5 }), '');
+  assert.equal(
+    manager.budgetReason(current.job, { pendingInputTokens:6 }),
+    'maximum input-token budget reached',
+  );
+});
+
+test('Browser Agent persists provider-call budget before I/O and restart cannot regain the reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 50_000 });
+  await manager.create({
+    id:'job-budget-restart',
+    goal:'Use a bounded model budget safely',
+    maxModelCalls:1,
+    maxOutputTokensPerCall:128,
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:2,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-restart'].runtime.runState = 'RUNNING';
+    return store;
+  });
+
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-budget-restart',
+    controlEpoch:0,
+    prompt:'bounded prompt',
+    systemPrompt:'bounded system',
+    maxOutputTokens:128,
+    route:{ routeId:'primary', provider:'ollama', model:'qwen:8b' },
+    callNumber:1,
+  });
+  const beforeRestart = await manager.get('job-budget-restart');
+  assert.equal(beforeRestart.job.runtime.modelCalls, 0);
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.reservationId, reservation.reservationId);
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.modelCalls, 1);
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.outputTokens, 128);
+
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({
+      jobId:'job-budget-restart',
+      controlEpoch:0,
+      prompt:'must not double reserve',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+    }),
+    error => {
+      assert.equal(error.code, 'AI_MODEL_BUDGET_RESERVATION_PENDING');
+      return true;
+    },
+  );
+
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 51_000 });
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-budget-restart'), true);
+  const recovered = await restarted.get('job-budget-restart');
+  assert.equal(recovered.job.runtime.modelBudgetReservation, null);
+  assert.equal(recovered.job.runtime.modelCalls, 1);
+  assert.ok(recovered.job.runtime.inputTokens > 0);
+  assert.equal(recovered.job.runtime.outputTokens, 128);
+  assert.equal(recovered.job.runtime.history.at(-1).type, 'model-budget-recovered-after-restart');
+
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId:'job-budget-restart',
+      controlEpoch:0,
+      prompt:'must remain exhausted after restart',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+    }),
+    error => {
+      assert.equal(error.code, 'AI_MODEL_BUDGET_EXHAUSTED');
+      assert.match(error.safeBudgetReason, /model-call budget/);
+      return true;
+    },
+  );
+});
+
+test('Browser Agent successful provider settlement uses exact usage once and clears its reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 60_000 });
+  await manager.create({
+    id:'job-budget-success',
+    goal:'Settle actual model usage',
+    maxModelCalls:3,
+    maxOutputTokensPerCall:256,
+    inputPricePerMillionUsd:2,
+    outputPricePerMillionUsd:4,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-success'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-budget-success',
+    controlEpoch:0,
+    prompt:'prompt',
+    systemPrompt:'system',
+    maxOutputTokens:256,
+  });
+  assert.deepEqual(
+    await manager.settleProviderModelBudget({
+      jobId:'job-budget-success',
+      reservationId:reservation.reservationId,
+      ok:true,
+      result:{ text:'done', usage:{ inputTokens:11, outputTokens:7, totalTokens:18 } },
+    }),
+    { settled:true },
+  );
+  const current = await manager.get('job-budget-success');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 1);
+  assert.equal(current.job.runtime.inputTokens, 11);
+  assert.equal(current.job.runtime.outputTokens, 7);
+  assert.equal(current.job.runtime.totalTokens, 18);
+  assert.equal(current.job.runtime.estimatedCostUsd, (11 / 1_000_000) * 2 + (7 / 1_000_000) * 4);
+  assert.equal(current.job.runtime.history.at(-1).type, 'model-budget-settled');
+  assert.deepEqual(
+    await manager.settleProviderModelBudget({
+      jobId:'job-budget-success',
+      reservationId:reservation.reservationId,
+      ok:true,
+      result:{ text:'duplicate', usage:{ inputTokens:999, outputTokens:999, totalTokens:1998 } },
+    }),
+    { settled:false },
+  );
+  assert.equal((await manager.get('job-budget-success')).job.runtime.modelCalls, 1);
+});
+
+test('Browser Agent conservatively consumes the bounded reservation after an admitted provider failure', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 70_000 });
+  await manager.create({
+    id:'job-budget-failure',
+    goal:'Fail closed on uncertain provider spend',
+    maxModelCalls:2,
+    maxOutputTokensPerCall:192,
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:3,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-failure'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-budget-failure',
+    controlEpoch:0,
+    prompt:'prompt with bounded input',
+    systemPrompt:'system',
+    maxOutputTokens:192,
+  });
+  await manager.settleProviderModelBudget({
+    jobId:'job-budget-failure',
+    reservationId:reservation.reservationId,
+    ok:false,
+  });
+  const current = await manager.get('job-budget-failure');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 1);
+  assert.equal(current.job.runtime.inputTokens, reservation.inputTokens);
+  assert.equal(current.job.runtime.outputTokens, 192);
+  assert.equal(current.job.runtime.totalTokens, reservation.totalTokens);
+  assert.equal(current.job.runtime.estimatedCostUsd, reservation.estimatedCostUsd);
+  assert.equal(current.job.runtime.history.at(-1).type, 'model-budget-conservative-settlement');
+});
+
+test('Browser Agent reservation fails closed when owner authority changes before dispatch', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-budget-owner', goal:'Respect owner cancellation', maxModelCalls:2, maxOutputTokensPerCall:128 });
+  await manager.update(store => {
+    store.byId['job-budget-owner'].runtime.runState = 'RUNNING';
+    store.byId['job-budget-owner'].runtime.controlEpoch = 4;
+    return store;
+  });
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({
+      jobId:'job-budget-owner',
+      controlEpoch:3,
+      prompt:'stale owner context',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+    }),
+    error => {
+      assert.equal(error.code, 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED');
+      return true;
+    },
+  );
+  const current = await manager.get('job-budget-owner');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 0);
+});
+
+
 test('owner approval fence rejects a replacement pending action that races with asynchronous tab verification', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({
