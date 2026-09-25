@@ -3040,6 +3040,34 @@ function defaultCalendarTimeZone() {
 function calendarLines(id) {
   return String($(id)?.value || '').split(/[\n,;]+/u).map(value => value.trim()).filter(Boolean);
 }
+function calendarNowFields(timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const value = type => parts.find(part => part.type === type)?.value || '';
+  return {
+    date: `${value('year')}-${value('month')}-${value('day')}`,
+    time: `${value('hour')}:${value('minute')}:${value('second')}`,
+  };
+}
+function intervalSecondsFromUi() {
+  const value = Number($('calendar-interval-value').value);
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error('Інтервал має бути додатним цілим числом.');
+  const multiplier = { seconds: 1, minutes: 60, hours: 3600, days: 86400 }[$('calendar-interval-unit').value] || 60;
+  const seconds = value * multiplier;
+  if (!Number.isSafeInteger(seconds) || seconds < 1 || seconds > 31_536_000) throw new Error('Інтервал має бути від 1 секунди до 365 днів.');
+  return seconds;
+}
+function intervalUiValue(secondsRaw) {
+  const seconds = Math.max(1, Number(secondsRaw || 60));
+  for (const [unit, factor] of [['days', 86400], ['hours', 3600], ['minutes', 60], ['seconds', 1]]) {
+    if (seconds % factor === 0) return { unit, value: seconds / factor };
+  }
+  return { unit: 'seconds', value: seconds };
+}
 function collectCalendarSchedule() {
   const kind = $('calendar-mode').value;
   if (kind === 'NONE') return null;
@@ -3066,6 +3094,21 @@ function collectCalendarSchedule() {
     }
     return schedule;
   }
+  if (kind === 'INTERVAL') {
+    const startMode = $('calendar-interval-start-mode').value === 'LATER' ? 'LATER' : 'NOW';
+    const start = startMode === 'NOW'
+      ? calendarNowFields(schedule.timeZone)
+      : {
+          date: normalizeAccessibleCalendarDate($('calendar-interval-start-date').value),
+          time: normalizeAccessibleClockTime($('calendar-interval-start-time').value, { optional: false }),
+        };
+    schedule.startDate = start.date;
+    schedule.startTime = start.time;
+    schedule.intervalSeconds = intervalSecondsFromUi();
+    const maxOccurrences = $('calendar-interval-max-occurrences').value.trim();
+    if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
+    return schedule;
+  }
   schedule.occurrences = calendarLines('calendar-explicit-occurrences').map((line, index) => {
     try {
       return parseAccessibleOccurrenceLine(line);
@@ -3081,6 +3124,8 @@ function syncCalendarVisibility() {
   $('calendar-one-time-fields').hidden = kind !== 'ONE_TIME';
   $('calendar-recurring-fields').hidden = kind !== 'DAILY' && kind !== 'WEEKLY';
   $('calendar-weekdays').hidden = kind !== 'WEEKLY';
+  $('calendar-interval-fields').hidden = kind !== 'INTERVAL';
+  $('calendar-interval-later-fields').hidden = kind !== 'INTERVAL' || $('calendar-interval-start-mode').value !== 'LATER';
   $('calendar-explicit-fields').hidden = kind !== 'EXPLICIT';
 }
 function formatCalendarInstant(value) {
@@ -3100,7 +3145,7 @@ function renderCalendarRuntimeStatus(session = ui.selected) {
 }
 function renderCalendarEditor() {
   const schedule = ui.selected?.calendarSchedule || null;
-  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
+  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'INTERVAL', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
   $('calendar-mode').value = kind;
   $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
   $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
@@ -3111,6 +3156,13 @@ function renderCalendarEditor() {
   $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
   $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? formatAccessibleCalendarDate(schedule.endDate || '') : '';
   $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
+  $('calendar-interval-start-mode').value = 'LATER';
+  $('calendar-interval-start-date').value = schedule?.kind === 'INTERVAL' ? formatAccessibleCalendarDate(schedule.startDate || '') : '';
+  $('calendar-interval-start-time').value = schedule?.kind === 'INTERVAL' ? (schedule.startTime || '') : '';
+  const intervalUi = intervalUiValue(schedule?.kind === 'INTERVAL' ? schedule.intervalSeconds : 60);
+  $('calendar-interval-value').value = String(intervalUi.value);
+  $('calendar-interval-unit').value = intervalUi.unit;
+  $('calendar-interval-max-occurrences').value = schedule?.kind === 'INTERVAL' && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
   const weekdays = new Set(schedule?.kind === 'WEEKLY' ? (schedule.weekdays || []) : []);
   for (let day = 1; day <= 7; day += 1) $(`calendar-weekday-${day}`).checked = weekdays.has(day);
   $('calendar-explicit-occurrences').value = schedule?.kind === 'EXPLICIT'
@@ -3155,6 +3207,17 @@ function validateCalendarScheduleUi(session, errors) {
     }
     if (schedule.maxOccurrences != null && (!Number.isSafeInteger(schedule.maxOccurrences) || schedule.maxOccurrences < 1 || schedule.maxOccurrences > 1000000)) {
       errors.push(['calendar-max-occurrences', 'Кількість запусків має бути цілим числом від 1 до 1000000.']);
+    }
+    return;
+  }
+  if (schedule.kind === 'INTERVAL') {
+    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-interval-start-date', 'Вкажіть коректну дату початку інтервального розкладу.']);
+    if (!validCalendarTime(schedule.startTime)) errors.push(['calendar-interval-start-time', 'Вкажіть коректний час початку інтервального розкладу.']);
+    if (!Number.isSafeInteger(schedule.intervalSeconds) || schedule.intervalSeconds < 1 || schedule.intervalSeconds > 31_536_000) {
+      errors.push(['calendar-interval-value', 'Інтервал має бути від 1 секунди до 365 днів.']);
+    }
+    if (schedule.maxOccurrences != null && (!Number.isSafeInteger(schedule.maxOccurrences) || schedule.maxOccurrences < 1 || schedule.maxOccurrences > 1000000)) {
+      errors.push(['calendar-interval-max-occurrences', 'Кількість запусків має бути цілим числом від 1 до 1000000.']);
     }
     return;
   }
