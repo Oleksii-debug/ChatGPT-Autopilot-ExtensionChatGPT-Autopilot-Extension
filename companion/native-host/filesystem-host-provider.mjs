@@ -284,7 +284,7 @@ export async function readBinaryScopedV1(payload, config, { beforeOpen = null } 
   const maxBytes = payload.maxBytes == null ? 256 * 1024 : payload.maxBytes;
   const expectedSha256 = payload.expectedSha256 == null ? '' : payload.expectedSha256;
 
-  if (!Number.isSafeInteger(offsetBytes) || offsetBytes < 0 || offsetBytes > MAX_BINARY_FILE_BYTES) {
+  if (!Number.isSafeInteger(offsetBytes) || Object.is(offsetBytes, -0) || offsetBytes < 0 || offsetBytes > MAX_BINARY_FILE_BYTES) {
     throw nativeError('INVALID_REQUEST', 'filesystem.readBinary offsetBytes must be a non-negative safe integer within bounds');
   }
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_BINARY_CHUNK_BYTES) {
