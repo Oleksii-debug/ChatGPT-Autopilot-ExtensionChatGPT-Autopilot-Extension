@@ -16,7 +16,10 @@ export const HumanTakeoverPhase = Object.freeze({
 });
 
 const PHASES = new Set(Object.values(HumanTakeoverPhase));
+const OBSERVATION_STATUSES = new Set(['OK', 'PARTIAL', 'ERROR', 'UNAVAILABLE']);
+const VERIFICATION_STATUSES = new Set(Object.values(VerificationStatus));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_REASON = 4_000;
 const MAX_JSON_DEPTH = 24;
 const MAX_JSON_NODES = 8_192;
@@ -212,6 +215,12 @@ function exactIntegerField(raw, key, label, { optional = false, min = 0, max = N
   }
 }
 
+function exactStatus(value, allowed, label) {
+  if (typeof value !== 'string' || !allowed.has(value)) {
+    throw new Error(`${label} must be a canonical status`);
+  }
+}
+
 function exactStringArray(value, label, max = MAX_ARRAY_ITEMS) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
     throw new Error(`${label} must be a bounded plain array`);
@@ -232,15 +241,24 @@ function exactStringArray(value, label, max = MAX_ARRAY_ITEMS) {
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} must be a dense data array`);
     }
-    if (typeof descriptor.value !== 'string') throw new Error(`${label}[${index}] must be text`);
+    exactId(descriptor.value, `${label}[${index}]`);
   }
 }
 
 function assertExactArtifactRefTypes(raw, label) {
   strictRecord(raw, label);
   exactSchemaVersion(raw, label);
-  for (const key of ['artifactId', 'kind', 'uri', 'createdAt']) exactStringField(raw, key, label);
-  for (const key of ['mediaType', 'sha256', 'producerInvocationId']) exactStringField(raw, key, label, { optional: true });
+  exactId(ownValue(raw, 'artifactId', label), `${label}.artifactId`);
+  exactId(ownValue(raw, 'kind', label), `${label}.kind`);
+  exactStringField(raw, 'uri', label);
+  exactStringField(raw, 'createdAt', label);
+  exactStringField(raw, 'mediaType', label, { optional: true });
+  const digest = ownValue(raw, 'sha256', label, { optional: true });
+  if (digest != null && digest !== '' && (typeof digest !== 'string' || !SHA256.test(digest))) {
+    throw new Error(`${label}.sha256 must be canonical lowercase SHA-256`);
+  }
+  const producer = ownValue(raw, 'producerInvocationId', label, { optional: true });
+  if (producer != null && producer !== '') exactId(producer, `${label}.producerInvocationId`);
   exactIntegerField(raw, 'sizeBytes', label, { optional: true, min: 0 });
   exactBooleanField(raw, 'sensitive', label, { optional: true });
 }
@@ -248,7 +266,10 @@ function assertExactArtifactRefTypes(raw, label) {
 function assertExactObservationTypes(raw, label) {
   strictRecord(raw, label);
   exactSchemaVersion(raw, label);
-  for (const key of ['observationId', 'invocationId', 'status', 'observedAt']) exactStringField(raw, key, label);
+  exactId(ownValue(raw, 'observationId', label), `${label}.observationId`);
+  exactId(ownValue(raw, 'invocationId', label), `${label}.invocationId`);
+  exactStatus(ownValue(raw, 'status', label), OBSERVATION_STATUSES, `${label}.status`);
+  exactStringField(raw, 'observedAt', label);
   exactStringField(raw, 'summary', label, { optional: true });
   const artifactRefs = ownValue(raw, 'artifactRefs', label, { optional: true });
   if (artifactRefs != null) {
@@ -268,13 +289,18 @@ function assertExactObservationTypes(raw, label) {
 function assertExactVerificationTypes(raw, label) {
   strictRecord(raw, label);
   exactSchemaVersion(raw, label);
-  for (const key of ['verificationId', 'invocationId', 'status', 'reasonCode', 'verifiedAt']) {
-    exactStringField(raw, key, label);
-  }
+  exactId(ownValue(raw, 'verificationId', label), `${label}.verificationId`);
+  exactId(ownValue(raw, 'invocationId', label), `${label}.invocationId`);
+  exactStatus(ownValue(raw, 'status', label), VERIFICATION_STATUSES, `${label}.status`);
+  exactId(ownValue(raw, 'reasonCode', label), `${label}.reasonCode`);
+  exactStringField(raw, 'verifiedAt', label);
+  exactStringField(raw, 'summary', label, { optional: true });
   for (const key of [
-    'observationId', 'summary', 'verifierId', 'verificationAuthorityId',
-    'effectId', 'executionId',
-  ]) exactStringField(raw, key, label, { optional: true });
+    'observationId', 'verifierId', 'verificationAuthorityId', 'effectId', 'executionId',
+  ]) {
+    const value = ownValue(raw, key, label, { optional: true });
+    if (value != null && value !== '') exactId(value, `${label}.${key}`);
+  }
   const evidenceArtifactIds = ownValue(raw, 'evidenceArtifactIds', label, { optional: true });
   if (evidenceArtifactIds != null) exactStringArray(evidenceArtifactIds, `${label}.evidenceArtifactIds`, 128);
   exactIntegerField(raw, 'attempt', label, { optional: true, min: 0, max: 64 });
