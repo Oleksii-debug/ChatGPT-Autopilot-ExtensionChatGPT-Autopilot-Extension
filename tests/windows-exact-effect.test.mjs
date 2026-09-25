@@ -72,6 +72,39 @@ test('SAFE_RETRY fails closed for self-authored, wrong-authority, mismatched, an
   }
 });
 
+test('primary verifier cannot relabel an exact effect execution binding',async()=>{
+  const variants=[
+    ['effectId','win-effect-other'],
+    ['executionId','win-effect-1:attempt:2'],
+    ['attempt',2],
+  ];
+  for(const [field,value] of variants){
+    const durable=store();let dispatches=0;
+    const provider={authorize,async invoke(){dispatches++;return {result:{exitCode:0}};}};
+    const now=clock();
+    const executor=new WindowsExactEffectExecutorV1({
+      provider,
+      store:durable,
+      now,
+      verify:async({observation})=>({
+        schemaVersion:1,
+        verificationId:`verify-wrong-${field}`,
+        invocationId:'win-effect-1',
+        observationId:observation.observationId,
+        status:'VERIFIED',
+        reasonCode:'POSTCONDITION_MATCH',
+        summary:'',
+        evidenceArtifactIds:[],
+        verifiedAt:new Date(now()).toISOString(),
+        [field]:value,
+      }),
+    });
+    await assert.rejects(()=>executor.invoke({invocation,policyDecision}),new RegExp(`verification ${field} binding is mismatched`, 'i'));
+    assert.equal(dispatches,1);
+    assert.equal((await durable.load('win-effect-1')).phase,'RECONCILE',`${field} mismatch must remain fail-closed`);
+  }
+});
+
 test('authorization rejection occurs before durable effect state or provider dispatch',async()=>{
   const durable=store();let dispatches=0;
   const provider={authorize(){const error=new Error('Policy decision does not authorize this invocation');error.code='POLICY_DENIED';throw error;},async invoke(){dispatches++;}};
