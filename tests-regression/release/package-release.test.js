@@ -129,6 +129,30 @@ test('release fails closed on NUL bytes in packaged text sources', async t => {
   );
 });
 
+
+test('release rejects common credential data filenames even when their contents look benign', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-credential-files-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const tokenPath = path.join(fixtureRoot, 'companion', 'token.json');
+  await fs.writeFile(tokenPath, '{"fixture":true}\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: companion\/token\.json/,
+  );
+  await fs.rm(tokenPath);
+
+  const credentialsPath = path.join(fixtureRoot, 'src', 'credentials.json');
+  await fs.writeFile(credentialsPath, '{"fixture":true}\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: src\/credentials\.json/,
+  );
+});
+
 test('release ZIP is byte-for-byte reproducible and has one canonical root folder', async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
