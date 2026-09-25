@@ -47,21 +47,26 @@ function client(overrides = {}) {
     getGmailThread: async args => ({ operation: 'getGmailThread', args }),
     getGmailAttachment: async args => ({ operation: 'getGmailAttachment', args }),
     createGmailDraft: async args => ({ operation: 'createGmailDraft', args }),
+    sendGmailDraft: async args => ({ operation: 'sendGmailDraft', args }),
     ...overrides,
   };
 }
 
 const allCapabilities = Object.values(GoogleWorkspaceCapabilityId);
 
-test('Google Workspace V1 advertises seven reads plus the canonical Drive-update and non-sending Gmail-draft mutations', () => {
+test('Google Workspace V1 advertises seven reads plus Drive-update, draft-create, and draft-send mutations', () => {
   const provider = new GoogleWorkspaceAgentProviderV1({ workspaceClient: client(), grantedCapabilityIds: allCapabilities });
   const tools = provider.tools();
-  assert.equal(tools.length, 9);
+  assert.equal(tools.length, 10);
   assert.equal(tools.filter(tool => tool.readOnly === true).length, 7);
   const effectful = tools.filter(tool => tool.readOnly === false);
-  assert.deepEqual(effectful.map(tool => tool.toolId), [GoogleWorkspaceToolId.DRIVE_FILE_UPDATE, GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE]);
+  assert.deepEqual(effectful.map(tool => tool.toolId), [
+    GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
+    GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+    GoogleWorkspaceToolId.GMAIL_DRAFT_SEND,
+  ]);
   assert.ok(tools.every(tool => tool.providerId === GOOGLE_WORKSPACE_PROVIDER_ID));
-  assert.ok(tools.every(tool => !/(send|trash|delete)/iu.test(tool.toolId)));
+  assert.ok(tools.every(tool => !/(trash|delete|reply|forward)/iu.test(tool.toolId)));
 });
 
 test('provider requires exact owner ALLOW and granted capability before client invocation', async () => {
@@ -101,6 +106,7 @@ test('each tool dispatches through the single workspace client without creating 
     [GoogleWorkspaceToolId.GMAIL_THREAD_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailThread', { userId: 'me', threadId: 'thread_1' }],
     [GoogleWorkspaceToolId.GMAIL_ATTACHMENT_GET, GoogleWorkspaceCapabilityId.GMAIL_ATTACHMENT_READ, 'getGmailAttachment', { userId: 'me', messageId: 'msg_1', attachmentId: 'att_1' }],
     [GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE, GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE, 'createGmailDraft', { userId: 'owner@example.com', rawMessageBase64Url: 'QUJD' }],
+    [GoogleWorkspaceToolId.GMAIL_DRAFT_SEND, GoogleWorkspaceCapabilityId.GMAIL_DRAFT_SEND, 'sendGmailDraft', { userId: 'owner@example.com', draftId: 'draft_1', rawMessageBase64Url: 'QUJD' }],
   ];
   for (let index = 0; index < cases.length; index += 1) {
     const [toolId, capabilityId, operation, args] = cases[index];
