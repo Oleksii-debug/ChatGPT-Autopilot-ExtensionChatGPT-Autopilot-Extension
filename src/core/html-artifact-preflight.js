@@ -20,6 +20,7 @@ const RISK_RULES = Object.freeze([
   ['SVG_OR_MATH_TAG', /<\s*(?:svg|math)\b/iu],
   ['BASE_TAG', /<\s*base\b/iu],
   ['FORM_TAG', /<\s*form\b/iu],
+  ['RESOURCE_LOADING_TAG', /<\s*(?:img|link|audio|video|source|track)\b/iu],
   ['META_REFRESH', /<\s*meta\b[^>]*\bhttp-equiv\s*=\s*(?:"\s*refresh\s*"|'\s*refresh\s*'|refresh\b)/iu],
   ['EVENT_HANDLER_ATTRIBUTE', /\bon[a-z][a-z0-9_-]*\s*=/iu],
   ['JAVASCRIPT_URL', /javascript\s*:/iu],
