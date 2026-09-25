@@ -74,12 +74,13 @@ const transport = new InteractionProviderRouter().register(AgentProviderId.CHATG
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
 const localAiClient = new LocalAiClient({ fetchFn: (...args) => fetch(...args) });
 const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...args) });
-const const aiOrchestrator = new AiOrchestrator({
+const browserAgentLifecycle = { current: null };
+const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
   providerCallLifecycle: {
     beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
-      if (context?.kind !== 'browser-agent' || !browserAgent) return null;
-      return browserAgent.reserveProviderModelBudget({
+      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
+      return browserAgentLifecycle.current.reserveProviderModelBudget({
         jobId: context.jobId,
         controlEpoch: context.controlEpoch,
         route,
@@ -90,8 +91,8 @@ const const aiOrchestrator = new AiOrchestrator({
       });
     },
     afterProviderCall: async ({ context, reservation, ok, result }) => {
-      if (context?.kind !== 'browser-agent' || !browserAgent || !reservation?.reservationId) return;
-      await browserAgent.settleProviderModelBudget({
+      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current || !reservation?.reservationId) return;
+      await browserAgentLifecycle.current.settleProviderModelBudget({
         jobId: context.jobId,
         reservationId: reservation.reservationId,
         ok,
@@ -202,10 +203,11 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
-browserAgent = new BrowserAgentManager({
+const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
 });
+browserAgentLifecycle.current = browserAgent;
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
