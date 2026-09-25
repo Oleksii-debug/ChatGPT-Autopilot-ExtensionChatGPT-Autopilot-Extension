@@ -6,7 +6,7 @@ import {
   normalizeSelectionActionRequestV1,
   normalizeSelectionActionSourceV1,
   selectionActionNeedsEffectAdmissionV1,
-} from './selection-action.js';
+} from '../src/core/selection-action.js';
 
 const SHA = 'a'.repeat(64);
 const NOW = '2026-09-24T23:56:00.000Z';
@@ -222,6 +222,7 @@ test('source and owner instruction bounds are enforced', () => {
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ text: 'x'.repeat(100_001) })), /source text is invalid/);
   assert.throws(() => normalizeSelectionActionRequestV1(request({ ownerInstruction: 'x'.repeat(16_001) })), /ownerInstruction is invalid/);
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ uri: 'x'.repeat(4097) })), /uri is invalid/);
+  assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ uri: ' https://example.test/' })), /uri is invalid/);
 });
 
 test('request chronology cannot predate its captured source', () => {
