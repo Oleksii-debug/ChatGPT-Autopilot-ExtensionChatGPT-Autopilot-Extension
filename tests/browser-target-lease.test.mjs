@@ -128,6 +128,19 @@ test('BrowserTargetLease request wrappers snapshot data before reading authority
     }),
     /unknown field: unexpected/,
   );
+
+  for (const invalidCurrent of [undefined, false, 0, '']) {
+    assert.throws(
+      () => acquireBrowserTargetLeaseV1({
+        current: invalidCurrent,
+        targetId: 'page:1',
+        ownerInvocationId: 'inv:2',
+        leaseId: 'lease:2',
+        now: '2026-09-21T02:16:01.000Z',
+      }),
+      /BrowserTargetLeaseV1 must be a plain object/,
+    );
+  }
 });
 
 test('BrowserTargetLease snapshots plain authority data without executing accessors', () => {
