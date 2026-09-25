@@ -248,6 +248,67 @@ test('RUNNING and terminal nodes are never dispatch proposals', () => {
   assert.ok(out.proposals.every(item => item.nodeId === 'n2' || item.nodeId === 'n4'));
 });
 
+test('forged READY with a pending dependency fails closed before dispatch planning', () => {
+  const plan = basePlan({
+    nodes: [
+      node('a', { state: 'PENDING', updatedAt: '2026-09-25T10:00:00.000Z' }),
+      node('b', {
+        state: 'READY',
+        dependsOn: ['a'],
+        updatedAt: '2026-09-25T10:10:00.000Z',
+      }),
+    ],
+    updatedAt: '2026-09-25T10:10:00.000Z',
+  });
+
+  assert.throws(
+    () => buildSwarmRefillPlanV1(request({
+      trigger: {
+        kind: SwarmRefillTriggerKind.WATCHDOG,
+        eventId: 'watchdog-forged-pending',
+        nodeId: '',
+        observedAt: NOW,
+      },
+      plan,
+      workers: [worker('w1')],
+    })),
+    /READY node has unverified dependency: b <- a/u,
+  );
+});
+
+test('forged READY with failed, cancelled or blocked dependency fails closed', () => {
+  for (const dependencyState of ['FAILED', 'CANCELLED', 'BLOCKED']) {
+    const plan = basePlan({
+      nodes: [
+        node('a', {
+          state: dependencyState,
+          updatedAt: '2026-09-25T10:00:00.000Z',
+        }),
+        node('b', {
+          state: 'READY',
+          dependsOn: ['a'],
+          updatedAt: '2026-09-25T10:10:00.000Z',
+        }),
+      ],
+      updatedAt: '2026-09-25T10:10:00.000Z',
+    });
+
+    assert.throws(
+      () => buildSwarmRefillPlanV1(request({
+        trigger: {
+          kind: SwarmRefillTriggerKind.WATCHDOG,
+          eventId: 'watchdog-forged-' + dependencyState.toLowerCase(),
+          nodeId: '',
+          observedAt: NOW,
+        },
+        plan,
+        workers: [worker('w1')],
+      })),
+      /READY node has terminal or blocked dependency: b <- a/u,
+    );
+  }
+});
+
 test('worker input ordering does not change deterministic dispatch selection', () => {
   const forward = buildSwarmRefillPlanV1(request());
   const reverse = buildSwarmRefillPlanV1(request({

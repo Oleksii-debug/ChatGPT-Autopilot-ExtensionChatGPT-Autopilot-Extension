@@ -260,6 +260,34 @@ function assertPlanTime(plan, evaluatedAt) {
   }
 }
 
+function assertStoredReadyStateIsDependencyCoherent(plan) {
+  const byId = new Map(plan.nodes.map(node => [node.nodeId, node]));
+  for (const node of plan.nodes) {
+    if (node.state !== AgentPlanNodeState.READY) continue;
+    const dependencies = node.dependsOn.map(dependencyId => byId.get(dependencyId));
+    const failedDependency = dependencies.find(dependency => (
+      dependency.state === AgentPlanNodeState.FAILED
+      || dependency.state === AgentPlanNodeState.CANCELLED
+      || dependency.state === AgentPlanNodeState.BLOCKED
+    ));
+    if (failedDependency) {
+      throw new Error(
+        'AgentPlan READY node has terminal or blocked dependency: '
+        + node.nodeId + ' <- ' + failedDependency.nodeId,
+      );
+    }
+    const unverifiedDependency = dependencies.find(
+      dependency => dependency.state !== AgentPlanNodeState.VERIFIED,
+    );
+    if (unverifiedDependency) {
+      throw new Error(
+        'AgentPlan READY node has unverified dependency: '
+        + node.nodeId + ' <- ' + unverifiedDependency.nodeId,
+      );
+    }
+  }
+}
+
 function buildDownstreamDepth(plan) {
   const dependents = new Map(plan.nodes.map(node => [node.nodeId, []]));
   for (const node of plan.nodes) {
@@ -371,6 +399,7 @@ export function buildSwarmRefillPlanV1(input) {
   );
   const plan = normalizeAgentPlanV1(raw.plan);
   assertPlanTime(plan, evaluatedAt);
+  assertStoredReadyStateIsDependencyCoherent(plan);
   const trigger = normalizeTrigger(raw.trigger, plan, evaluatedAt);
 
   const workers = strictArray(raw.workers, 'workers', { min: 1, max: MAX_WORKERS })
