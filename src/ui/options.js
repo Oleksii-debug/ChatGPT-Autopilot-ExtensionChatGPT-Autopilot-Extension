@@ -2306,14 +2306,31 @@ function sessionListSignature(sessions) {
   return JSON.stringify((sessions || []).map(session => [session.id, session.name, session.displayRunState || session.runState, session.enabledTaskCount, session.completedTaskCount, session.successfulSendCount]));
 }
 
+function globalStatusCategoryLabel(value) {
+  if (['WAITING_PERMISSION', 'WAITING_APPROVAL', 'WAITING_CAPABILITY', 'WAITING_SCHEDULE'].includes(value)) {
+    return browserAgentStateLabel(value);
+  }
+  return ({
+    RUNNING: 'працює',
+    WAITING_RESPONSE: 'очікує відповіді',
+    READY: 'готово',
+    PAUSED: 'призупинено',
+    RECOVERING: 'відновлюється',
+    ERROR: 'помилка',
+    AMBIGUOUS_EFFECT: 'неоднозначний ефект',
+    COMPLETED: 'завершено',
+    STOPPED: 'зупинено',
+  })[value] || value || 'невідомо';
+}
+
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених Send: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
+  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Потрібен дозвіл сайту: ${summary.WAITING_PERMISSION || 0}. Очікує підтвердження дії: ${summary.WAITING_APPROVAL || 0}. Потрібен дозвіл capability: ${summary.WAITING_CAPABILITY || 0}. Очікує розкладу: ${summary.WAITING_SCHEDULE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених Send: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
   const lists = [
-    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених Send ${row.verifiedSends}; стан ${row.category}`],
+    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених Send ${row.verifiedSends}; стан ${globalStatusCategoryLabel(row.category)}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
-    ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
-    ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
+    ['global-agents', data.agents, row => `${row.name}: ${globalStatusCategoryLabel(row.category)}`],
+    ['global-models', data.models, row => `${row.provider}/${row.model}: ${globalStatusCategoryLabel(row.category)}`],
   ];
   for (const [id, rows, describe] of lists) {
     const list = $(id);
