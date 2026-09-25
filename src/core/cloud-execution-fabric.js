@@ -432,6 +432,7 @@ function resultBase({
     checkpointSha256: request.checkpointSha256,
     workspaceProvisioningRequired: provisioningRequired,
     workspaceContinuityBindingRequired: recommendedPlane === AgentExecutionPlane.CLOUD,
+    workspaceContinuityVerified: false,
     checkpointVerificationRequired: request.requiresCheckpointResume,
     checkpointTransferRequired,
     artifactSyncRequired: recommendedPlane === AgentExecutionPlane.CLOUD || leavingCloud,
@@ -548,6 +549,14 @@ export function assessCloudExecutionFabricV1(input) {
   }
   if (ownership.state === ExecutionOwnershipState.VERIFIED) {
     return blocked(baseArgs, 'EXECUTION_ALREADY_VERIFIED');
+  }
+  if (ownership.state === ExecutionOwnershipState.OWNED
+      && Date.parse(request.assessedAt) > Date.parse(ownership.leaseUntil)) {
+    return blocked(
+      baseArgs,
+      'EXECUTION_LEASE_EXPIRED',
+      CloudFabricDisposition.RECONCILE_REQUIRED,
+    );
   }
 
   let existingBinding = null;
