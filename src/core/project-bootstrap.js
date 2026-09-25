@@ -4,6 +4,10 @@ import {
   normalizeProjectSourceRefV1,
 } from './project-context-artifact.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
+import {
+  ProjectWorkspaceRepository,
+  addProjectSnapshot,
+} from './project-workspace.js';
 
 export const PROJECT_BOOTSTRAP_SCHEMA_VERSION = 1;
 export const MAX_PROJECT_BOOTSTRAP_SOURCES = 128;
@@ -550,3 +554,61 @@ export async function resolveTrustedProjectBootstrapSnapshotV1(input, resolversI
     snapshot,
   });
 }
+
+function canonicalWorkspaceRepository(repository) {
+  if (!(repository instanceof ProjectWorkspaceRepository)) {
+    throw new Error('Project bootstrap workspace commit requires the canonical ProjectWorkspaceRepository');
+  }
+  return repository;
+}
+
+function workspaceCommitTime(value) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Project bootstrap workspace commit nowMs must be a non-negative safe integer');
+  }
+  return value;
+}
+
+export async function commitTrustedProjectBootstrapToWorkspaceV1(
+  input,
+  resolversInput,
+  repositoryInput,
+  { nowMs = Date.now() } = {},
+) {
+  const repository = canonicalWorkspaceRepository(repositoryInput);
+  const commitAt = workspaceCommitTime(nowMs);
+
+  // Trusted resolution and durable admission stay in one operation. Callers
+  // cannot manufacture a resolved snapshot and then ask the workspace to trust
+  // it separately.
+  const resolved = await resolveTrustedProjectBootstrapSnapshotV1(input, resolversInput);
+
+  // ProjectWorkspace timestamps are wall-clock epoch milliseconds. A durable
+  // admission must therefore be causally at or after the exact trusted
+  // snapshot and every source/artifact observation materialized by it.
+  const causalFloorMs = Math.max(
+    Date.parse(resolved.snapshot.createdAt),
+    ...resolved.snapshot.sourceRefs.map(source => Date.parse(source.observedAt)),
+    ...resolved.snapshot.artifactRefs.map(artifact => Date.parse(artifact.createdAt)),
+  );
+  if (commitAt < causalFloorMs) {
+    throw new Error('Project bootstrap workspace commit must not predate trusted snapshot or evidence');
+  }
+
+  const workspace = await repository.update(draft => {
+    addProjectSnapshot(draft, resolved.snapshot, { nowMs: commitAt });
+    return draft;
+  }, { nowMs: commitAt });
+
+  return freezeDeep({
+    schemaVersion: PROJECT_BOOTSTRAP_SCHEMA_VERSION,
+    bootstrapId: resolved.bootstrapId,
+    projectId: resolved.projectId,
+    projectRevisionId: resolved.projectRevisionId,
+    workspaceRevision: workspace.revision,
+    workspaceCommitApplied: true,
+    requiresCanonicalProjectWorkspaceCommit: false,
+    additionalMutationAuthorized: false,
+  });
+}
+
