@@ -1059,6 +1059,7 @@
       send.click();
     }
     const verifyDeadline = nowMs() + 15000;
+    let activatedForAcknowledgement = false;
     while (nowMs() < verifyDeadline) {
       await (deps.wait || wait)(100);
 
@@ -1079,6 +1080,21 @@
       const unlabeledVerified = exactTextPending && beforeUnlabeledMatches === 0
         && unlabeledPromptCount(doc, submittedText) === 1
         && !compactPromptText(editorText(findVisibleComposer(doc).element));
+      // Some account variants defer the conversation DOM in a hidden tab even
+      // after requestSubmit has created /c/<id> and cleared the composer. Wake
+      // it once to observe the already attempted effect; never submit again.
+      if (!textVerified && !unlabeledVerified && !representationVerified
+        && submitMethod === 'BACKGROUND_FORM_REQUEST_SUBMIT'
+        && !activatedForAcknowledgement
+        && nowMs() >= verifyDeadline - 13000
+        && typeof deps.activate === 'function') {
+        activatedForAcknowledgement = true;
+        if (await deps.activate({ observationOnly: true })) {
+          for (let attempt = 0; attempt < 10 && doc.visibilityState !== 'visible'; attempt += 1) {
+            await (deps.wait || wait)(100);
+          }
+        }
+      }
       // URL transition, composer clearing and generation state do not identify
       // the submitted prompt. Completion requires operation-local exact evidence.
       if (!textVerified && !unlabeledVerified && !representationVerified) continue;
