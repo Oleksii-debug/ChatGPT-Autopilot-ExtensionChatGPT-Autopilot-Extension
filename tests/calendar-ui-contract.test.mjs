@@ -48,3 +48,13 @@ test('Agent and Scenario scheduling are text-first and do not require inaccessib
   assert.match(js, /parseAccessibleLocalDateTime/);
   assert.match(js, /formatAccessibleLocalDateTime/);
 });
+
+
+test('Session calendar presents dotted owner format while preserving canonical schedule storage', () => {
+  assert.match(html, /placeholder="25\.09\.2026"/);
+  assert.match(html, /placeholder="25\.09\.2026 09:00/);
+  assert.match(html, /Рекомендований формат дати: ДД\.ММ\.РРРР/);
+  assert.match(js, /normalizeAccessibleCalendarDate/);
+  assert.match(js, /formatAccessibleCalendarDate/);
+  assert.match(js, /parseAccessibleOccurrenceLine/);
+});
