@@ -41,6 +41,31 @@ function reconciliationVerification(overrides = {}) {
   };
 }
 
+test('execution ownership timestamps require exact canonical ISO-8601 UTC spelling', () => {
+  assert.throws(
+    () => createExecutionOwnershipV1({
+      taskId:'task-alias',
+      planId:'plan-alias',
+      nodeId:'node-alias',
+      effectId:'effect-alias',
+      policyEnvelopeId:'policy-alias',
+      at:'2026-09-23T13:00:00Z',
+    }),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  const owned = localOwned();
+  assert.throws(
+    () => requestExecutionHandoffV1(owned, {
+      leaseId:'lease-local',
+      toPlane:'REMOTE',
+      handoffId:'handoff-alias',
+      at:'2026-09-23T15:11:00.000+02:00',
+    }),
+    /canonical ISO-8601 UTC representation/,
+  );
+});
+
 test('claim preserves durable causal identity and rejects a second execution owner', () => {
   const owned = localOwned();
   assert.equal(owned.state, ExecutionOwnershipState.OWNED);
@@ -51,7 +76,7 @@ test('claim preserves durable causal identity and rejects a second execution own
 });
 
 test('handoff transfers exactly one ownership lease without changing task/plan/effect identity', () => {
-  const pending = requestExecutionHandoffV1(localOwned(), { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-1', at:'2026-09-23T13:11:00Z' });
+  const pending = requestExecutionHandoffV1(localOwned(), { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-1', at:'2026-09-23T13:11:00.000Z' });
   assert.equal(pending.state, ExecutionOwnershipState.HANDOFF_PENDING);
   assert.equal(pending.ownerPlane, 'LOCAL');
   assert.throws(() => acceptExecutionHandoffV1(pending, { handoffId:'wrong', ownerId:'remote-worker', leaseId:'lease-remote', leaseUntil:T3, at:T2 }), /mismatch/);
@@ -67,19 +92,19 @@ test('expired ambiguous ownership enters RECONCILE and cannot be blindly reclaim
   const reconcile = recoverExpiredExecutionOwnershipV1(owned, { at:T3 });
   assert.equal(reconcile.state, ExecutionOwnershipState.RECONCILE);
   assert.equal(reconcile.leaseId, 'lease-local');
-  assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
+  assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00.000Z', at:T3 }), /not available/);
 });
 
 test('expiry always enters RECONCILE even when a caller asserts observedNoEffect', () => {
   const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3, observedNoEffect:true });
   assert.equal(reconcile.state, ExecutionOwnershipState.RECONCILE);
   assert.equal(reconcile.leaseId, 'lease-local');
-  assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
+  assert.throws(() => claimExecutionOwnershipV1(reconcile, { plane:'CLOUD', ownerId:'cloud', leaseId:'cloud-1', leaseUntil:'2026-09-23T13:40:00.000Z', at:T3 }), /not available/);
 });
 
 test('caller-shaped verification cannot release or complete reconciliation without trusted provenance', () => {
   const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3 });
-  const at = '2026-09-23T13:31:00Z';
+  const at = '2026-09-23T13:31:00.000Z';
 
   assert.throws(() => resolveExecutionReconciliationV1(reconcile, {
     leaseId:'other',
@@ -111,7 +136,7 @@ test('caller-shaped verification cannot release or complete reconciliation witho
     plane:'CLOUD',
     ownerId:'cloud',
     leaseId:'cloud-1',
-    leaseUntil:'2026-09-23T13:40:00Z',
+    leaseUntil:'2026-09-23T13:40:00.000Z',
     at,
   }), /not available/);
 });
@@ -124,7 +149,7 @@ test('reconciliation request rejects coercive outcomes without executing them', 
     leaseId:'lease-local',
     outcome,
     verification:reconciliationVerification(),
-    at:'2026-09-23T13:31:00Z',
+    at:'2026-09-23T13:31:00.000Z',
   }), /outcome must be text/);
   assert.equal(coerced, 0);
 });
@@ -161,10 +186,10 @@ test('execution ownership normalization is strict data-only without hidden or ac
 
 test('manual review is terminal to automation and carries ambiguity reason', () => {
   const reconcile = recoverExpiredExecutionOwnershipV1(localOwned(), { at:T3, reason:'write may have committed remotely' });
-  const manual = resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'MANUAL_REVIEW', at:'2026-09-23T13:31:00Z' });
+  const manual = resolveExecutionReconciliationV1(reconcile, { leaseId:'lease-local', outcome:'MANUAL_REVIEW', at:'2026-09-23T13:31:00.000Z' });
   assert.equal(manual.state, ExecutionOwnershipState.MANUAL_REVIEW);
   assert.match(manual.ambiguityReason, /may have committed/);
-  assert.throws(() => claimExecutionOwnershipV1(manual, { plane:'REMOTE', ownerId:'r', leaseId:'r1', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /not available/);
+  assert.throws(() => claimExecutionOwnershipV1(manual, { plane:'REMOTE', ownerId:'r', leaseId:'r1', leaseUntil:'2026-09-23T13:40:00.000Z', at:T3 }), /not available/);
 });
 
 test('current effect owner cannot self-mint canonical VERIFIED', () => {
@@ -229,7 +254,7 @@ test('normalization fails closed on unknown fields and inconsistent durable owne
 });
 
 test('lease duration is bounded and target plane must differ on handoff', () => {
-  assert.throws(() => claimExecutionOwnershipV1(base(), { plane:'LOCAL', ownerId:'x', leaseId:'l', leaseUntil:'2026-09-25T13:10:00Z', at:T1 }), /duration/);
+  assert.throws(() => claimExecutionOwnershipV1(base(), { plane:'LOCAL', ownerId:'x', leaseId:'l', leaseUntil:'2026-09-25T13:10:00.000Z', at:T1 }), /duration/);
   assert.throws(() => requestExecutionHandoffV1(localOwned(), { leaseId:'lease-local', toPlane:'LOCAL', handoffId:'h', at:T1 }), /distinct target/);
 });
 
@@ -238,6 +263,6 @@ test('expired lease fences handoff and completion until reconciliation resolves 
   assert.throws(() => requestExecutionHandoffV1(owned, { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-expired', at:T3 }), /expired.*reconciliation/);
   assert.throws(() => verifyOwnedExecutionV1(owned, { leaseId:'lease-local', at:T3 }), /expired.*reconciliation/);
 
-  const pending = requestExecutionHandoffV1(owned, { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-before-expiry', at:'2026-09-23T13:11:00Z' });
-  assert.throws(() => acceptExecutionHandoffV1(pending, { handoffId:'handoff-before-expiry', ownerId:'remote', leaseId:'lease-remote', leaseUntil:'2026-09-23T13:40:00Z', at:T3 }), /expired.*reconciliation/);
+  const pending = requestExecutionHandoffV1(owned, { leaseId:'lease-local', toPlane:'REMOTE', handoffId:'handoff-before-expiry', at:'2026-09-23T13:11:00.000Z' });
+  assert.throws(() => acceptExecutionHandoffV1(pending, { handoffId:'handoff-before-expiry', ownerId:'remote', leaseId:'lease-remote', leaseUntil:'2026-09-23T13:40:00.000Z', at:T3 }), /expired.*reconciliation/);
 });

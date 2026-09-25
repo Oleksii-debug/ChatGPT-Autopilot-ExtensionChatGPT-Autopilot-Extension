@@ -287,7 +287,7 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
     return store;
   });
   const prepared = await manager.prepareSpecialistHandoff('job-1', {
-    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00Z', priority:5,
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00.000Z', priority:5,
   });
   assert.equal(prepared.reused, false);
   assert.equal((await manager.listSpecialistHandoffs('job-1')).handoffs.length, 1);
@@ -330,7 +330,7 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
     return store;
   });
   await manager.prepareSpecialistHandoff('job-retry', {
-    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:retry', deadlineAt:'2026-09-23T13:00:00Z',
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:retry', deadlineAt:'2026-09-23T13:00:00.000Z',
   });
   const claimed = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
   const agentId = claimed.claimed[0];
@@ -392,20 +392,20 @@ test('product-wide specialist admission is durable across Browser Agent jobs and
       };
       return store;
     });
-    await manager.prepareSpecialistHandoff(jobId, { nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:`policy:${jobId}`, deadlineAt:'2026-09-23T13:00:00Z' });
+    await manager.prepareSpecialistHandoff(jobId, { nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:`policy:${jobId}`, deadlineAt:'2026-09-23T13:00:00.000Z' });
   }
   const first = await manager.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at });
   assert.deepEqual(first.claimed.map(item => item.jobId), ['job-1']);
   assert.equal((await manager.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
-  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30Z') });
-  const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30Z' });
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30.000Z') });
+  const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30.000Z' });
   assert.equal(afterRestart.claimed.length, 0, 'a restart must retain the product-wide lease fence');
   assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
 
   const afterExpiry = await restarted.claimSpecialistHandoffsAcrossJobs({
     maxConcurrentHandoffs:1,
     leaseSeconds:60,
-    at:'2026-09-23T12:02:00Z',
+    at:'2026-09-23T12:02:00.000Z',
   });
   assert.equal(afterExpiry.activeLeases, 0, 'expired lease labels are not the capacity authority');
   assert.equal(afterExpiry.capacityObligations, 1, 'unresolved canonical effect ownership still consumes one slot');
@@ -2870,7 +2870,7 @@ test('Browser Agent specialist wrappers snapshot caller payloads before authorit
     requestedCapabilityIds: ['filesystem.archive'],
     parentCapabilityIds: ['filesystem.archive'],
     policyEnvelopeId: 'policy:wrapper',
-    deadlineAt: '2026-09-23T13:00:00Z',
+    deadlineAt: '2026-09-23T13:00:00.000Z',
     at,
   }, {
     get(target, property, receiver) {
