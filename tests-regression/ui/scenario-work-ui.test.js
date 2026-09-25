@@ -8,8 +8,8 @@ const js = fs.readFileSync(new URL('../../src/ui/options.js', import.meta.url), 
 test('Scenario Work is a first-class top-level accessible mode', () => {
   assert.match(html, /id="mode-scenario-work"[^>]*role="tab"[^>]*>Сценарна робота<\/button>/);
   assert.match(html, /data-app-mode="scenario-work"/);
-  assert.match(js, /const UI_MODES = new Set\(\['sessions', 'orchestration', 'scenario-work', 'agent', 'ai'\]\)/);
-  assert.match(js, /const ordered = \['sessions', 'orchestration', 'scenario-work', 'agent', 'ai'\]/);
+  assert.match(js, /const UI_MODES = new Set\(\['sessions', 'simplified', 'orchestration', 'scenario-work', 'agent', 'ai'\]\)/);
+  assert.match(js, /const ordered = \['sessions', 'simplified', 'orchestration', 'scenario-work', 'agent', 'ai'\]/);
 });
 
 test('Scenario Work exposes four keyboard-navigable sub-tabs', () => {
