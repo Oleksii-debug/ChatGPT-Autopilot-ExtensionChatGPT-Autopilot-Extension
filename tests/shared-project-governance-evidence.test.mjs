@@ -141,14 +141,17 @@ function trustedResolver({
   projectSnapshot = project(),
   projectBinding = binding(),
   governanceRegistry = registry(),
+  callCounts = null,
 } = {}) {
   return {
     resolveSharedProjectBinding(bindingId) {
+      if (callCounts) callCounts.binding += 1;
       return projectBinding && bindingId === projectBinding.bindingId
         ? projectBinding
         : null;
     },
     resolveProjectSnapshot({ projectId, projectRevisionId }) {
+      if (callCounts) callCounts.project += 1;
       return projectSnapshot
         && projectId === projectSnapshot.projectId
         && projectRevisionId === projectSnapshot.revisionId
@@ -160,6 +163,7 @@ function trustedResolver({
       governanceRegistryRevision,
       organizationId,
     }) {
+      if (callCounts) callCounts.registry += 1;
       return governanceRegistry
         && governanceRegistryId === governanceRegistry.registryId
         && governanceRegistryRevision === governanceRegistry.revision
@@ -181,9 +185,10 @@ function request(overrides = {}) {
 }
 
 test('shared Project governance evidence is canonical, deterministic, scoped and non-authorizing', async () => {
+  const callCounts = { binding: 0, project: 0, registry: 0 };
   const out = await buildSharedProjectGovernanceEvidenceV1(
     request(),
-    trustedResolver(),
+    trustedResolver({ callCounts }),
   );
 
   assert.equal(out.schemaVersion, SHARED_PROJECT_GOVERNANCE_EVIDENCE_SCHEMA_VERSION);
@@ -228,6 +233,7 @@ test('shared Project governance evidence is canonical, deterministic, scoped and
   assert.equal(Object.isFrozen(out), true);
   assert.equal(Object.isFrozen(out.principals), true);
   assert.equal(Object.isFrozen(out.principals[0]), true);
+  assert.deepEqual(callCounts, { binding: 1, project: 1, registry: 1 });
 
   const serialized = JSON.stringify(out);
   assert.equal(serialized.includes('credential-private-identifier'), false);
