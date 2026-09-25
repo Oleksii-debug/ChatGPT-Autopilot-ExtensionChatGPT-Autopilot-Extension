@@ -21,6 +21,10 @@ const RECONCILE_PROOF_KEYS = new Set([
 ]);
 const DEFAULT_MAX_RECONCILIATION_EVIDENCE_AGE_MS = 5 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const EFFECTFUL_GMAIL_TOOL_IDS = new Set([
+  GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+  GoogleWorkspaceToolId.GMAIL_DRAFT_SEND,
+]);
 
 function requireId(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
@@ -93,7 +97,7 @@ function observationFor(invocationId, result, observedAt) {
     observationId: `${invocationId}:observation`,
     invocationId,
     status: 'OK',
-    summary: 'Gmail API returned a bounded draft-creation result.',
+    summary: 'Gmail API returned a bounded effect result awaiting independent readback verification.',
     data: structuredClone(result),
     artifactRefs: [],
     observedAt,
@@ -101,7 +105,7 @@ function observationFor(invocationId, result, observedAt) {
 }
 
 /**
- * Google Workspace Gmail-draft transport binding over the one canonical UniversalExactEffectV1
+ * Google Workspace Gmail mutation transport binding over the one canonical UniversalExactEffectV1
  * reducer and the caller-supplied canonical durable store. This module intentionally
  * owns no scheduler, persistence implementation, retry ledger, recovery engine, or
  * policy authority; it only binds the effectful google-workspace tool to those authorities.
@@ -325,8 +329,8 @@ export class GoogleWorkspaceExactEffectExecutorV1 {
   }
 
   async invoke({ invocation, policyDecision } = {}) {
-    if (invocation?.toolId !== GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE) {
-      throw new Error('GoogleWorkspaceExactEffectExecutorV1 accepts only effectful Gmail draft creation invocations');
+    if (!EFFECTFUL_GMAIL_TOOL_IDS.has(invocation?.toolId)) {
+      throw new Error('GoogleWorkspaceExactEffectExecutorV1 accepts only registered effectful Gmail draft invocations');
     }
 
     // Policy/capability admission is side-effect-free and happens before a fresh
