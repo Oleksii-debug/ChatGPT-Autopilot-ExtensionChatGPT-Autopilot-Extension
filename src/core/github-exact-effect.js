@@ -141,7 +141,7 @@ export class GitHubExactEffectExecutorV1 {
 
   #at() { return new Date(this.now()).toISOString(); }
 
-  #assertInitialVerificationBinding(state, verification, requestedAtMs) {
+  #assertInitialVerificationBinding(state, verification, requestedAtMs, completedAtMs) {
     const verifierId = requireId(verification.verifierId, 'verification.verifierId');
     if ([this.actorId, this.parentActorId, state.invocation.providerId].filter(Boolean).includes(verifierId)) {
       throw new Error('Initial GitHub verifier must be independent from the actor, parent controller, and GitHub provider');
@@ -159,11 +159,12 @@ export class GitHubExactEffectExecutorV1 {
 
     const observedAt = ms(state.observation.observedAt, 'observation.observedAt');
     const verifiedAt = ms(verification.verifiedAt, 'verification.verifiedAt');
-    const earliest = requestedAtMs - this.maxReconciliationEvidenceAgeMs;
-    if (observedAt < earliest
-      || verifiedAt < observedAt
+    const earliestObservation = requestedAtMs - MAX_EVIDENCE_AGE_MS;
+    if (observedAt < earliestObservation
       || observedAt > requestedAtMs + MAX_CLOCK_SKEW_MS
-      || verifiedAt > requestedAtMs + MAX_CLOCK_SKEW_MS) {
+      || verifiedAt < observedAt
+      || verifiedAt < requestedAtMs - MAX_CLOCK_SKEW_MS
+      || verifiedAt > completedAtMs + MAX_CLOCK_SKEW_MS) {
       throw new Error('Initial GitHub verification evidence is stale or has invalid chronology');
     }
     return verification;
@@ -332,7 +333,13 @@ export class GitHubExactEffectExecutorV1 {
         observation: structuredClone(state.observation),
         requestedAt: new Date(verificationRequestedAtMs).toISOString(),
       }));
-      this.#assertInitialVerificationBinding(state, verification, verificationRequestedAtMs);
+      const verificationCompletedAtMs = this.now();
+      this.#assertInitialVerificationBinding(
+        state,
+        verification,
+        verificationRequestedAtMs,
+        verificationCompletedAtMs,
+      );
       const verificationAdvance = await this.#advance(
         state,
         [ExactEffectPhase.OBSERVED],
