@@ -134,7 +134,7 @@ function positiveInteger(value, label) {
 }
 
 function nonNegativeInteger(value, label) {
-  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative integer`);
+  if (!Number.isSafeInteger(value) || Object.is(value, -0) || value < 0) throw new Error(`${label} must be a non-negative integer`);
   return value;
 }
 
