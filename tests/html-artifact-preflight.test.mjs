@@ -88,7 +88,7 @@ test('reports conservative executable and remote-loading risk evidence without e
     '<meta http-equiv="refresh" content="0;url=https://example.test/next">',
     '</head><body onload="boot()">',
     '<script>location.href="javascript:alert(1)"</script>',
-    '<iframe src="https://example.test/frame"></iframe>',
+    '<iframe src="https://example.test/frame"></iframe>',\n    '<img src="/relative-image.png" alt="x">',
     '<form action="//example.test/post"><input></form>',
     '<a href="data:text/html,x">x</a>',
     '</body></html>',
