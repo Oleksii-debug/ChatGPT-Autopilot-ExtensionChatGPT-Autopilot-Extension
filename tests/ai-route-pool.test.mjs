@@ -24,6 +24,8 @@ test('remote route with unclassified pricing remains unknown and cannot silently
   assert.equal(remote.costClass, 'unknown');
   assert.equal(local.costClass, 'free');
   assert.deepEqual(selectAiRouteCandidates({ routes:[remote, local], role:'planner', now:1000 }).candidates.map(route => route.routeId), ['known-local']);
+  const pricedButUnclassified = normalizeAiRoutePool([{ routeId:'unclassified', provider:'openai-compatible', endpointId:'team-a', model:'worker', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 }]);
+  assert.deepEqual(selectAiRouteCandidates({ routes:pricedButUnclassified, role:'planner', now:1000 }).candidates, []);
   assert.equal(normalizeAiRoutePool([{ ...remote, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 }])[0].costClass, 'paid');
 });
 

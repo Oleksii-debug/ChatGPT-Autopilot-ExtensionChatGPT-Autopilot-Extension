@@ -890,6 +890,7 @@ function aiRouterRoutesFromForm({ validate = true } = {}) {
       roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
       capabilityIds,
       priority:routeNumber(card, 'priority', 0, 1_000_000, `Маршрут ${routeId}, пріоритет`),
+      maxWorkers:routeNumber(card, 'maxWorkers', 0, 200, `Маршрут ${routeId}, максимум workers`),
       enabled:card.querySelector('[data-route-field="enabled"]').checked,
       locality:text('locality'),
       costClass:text('costClass'),
@@ -954,7 +955,14 @@ function renderAiModelPriceCatalog(routes = [], routeStates = {}) {
   }
 }
 
-function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
+function manualWorkerCountsFromCards() {
+  return Object.fromEntries([...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map(card => [
+    card.querySelector('[data-route-field="routeId"]').value.trim(),
+    Number(card.querySelector('[data-route-field="manualWorkers"]').value),
+  ]).filter(([id]) => id));
+}
+
+function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, workerPolicy = {}) {
   const list = $('ai-router-route-list');
   list.replaceChildren();
   for (const [index, route] of routes.entries()) {
@@ -969,6 +977,7 @@ function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
     const values = {
       routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
       capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
+      maxWorkers:route.maxWorkers ?? 0, manualWorkers:workerPolicy.manualRouteWorkers?.[route.routeId] ?? 0,
       locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'unknown'),
       inputPricePerMillionUsd:route.inputPricePerMillionUsd ?? 0, outputPricePerMillionUsd:route.outputPricePerMillionUsd ?? 0,
     };
@@ -990,7 +999,7 @@ function addAiRouterRoute() {
   renderAiRouterRoutes(current, {}, {
     pinnedRouteId:$('ai-router-pinned-route').value,
     allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
-  });
+  }, { manualRouteWorkers:manualWorkerCountsFromCards() });
   $('ai-router-route-list').lastElementChild?.querySelector('[data-route-field="routeId"]')?.focus();
 }
 
@@ -1098,6 +1107,17 @@ function aiRouterSettingsFromForm() {
       circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'Поріг circuit breaker'),
       circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Тривалість circuit breaker'),
     },
+    workerPolicy: {
+      allocationMode:$('ai-worker-count-manual').checked ? 'manual' : 'auto',
+      minWorkers:integer('ai-worker-min', 1, 200, 'Мінімум workers'),
+      maxParallelWorkers:integer('ai-worker-max-parallel', 1, 200, 'Максимум одночасних workers'),
+      manualRouteWorkers:Object.fromEntries([...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map(card => {
+        const routeId = card.querySelector('[data-route-field="routeId"]').value.trim();
+        const value = Number(card.querySelector('[data-route-field="manualWorkers"]').value);
+        if (!Number.isInteger(value) || value < 0 || value > 200) throw new Error(`Маршрут ${routeId}: workers вручну від 0 до 200.`);
+        return [routeId, value];
+      })),
+    },
   };
 }
 
@@ -1106,7 +1126,7 @@ function setAiRouterBusy(busy) {
     'save-ai-router-button', 'test-ai-gateway-button', 'reset-ai-router-runtime-button',
     'ai-router-primary-models-button', 'ai-router-strong-models-button',
     'run-ai-router-test-button', 'run-ai-router-strong-button',
-    'ai-router-add-route-button',
+    'ai-router-add-route-button', 'ai-router-add-mistral-button', 'ai-router-add-openrouter-button',
   ]) $(id).disabled = Boolean(busy);
   $('ai-router-route-list').querySelectorAll('button, input, select').forEach(control => { control.disabled = Boolean(busy); });
 }
@@ -1215,7 +1235,12 @@ async function loadAiRouterSettings() {
     $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
     $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
     $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
-    renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy);
+    const workerPolicy = settings.workerPolicy || {};
+    $('ai-worker-count-auto').checked = workerPolicy.allocationMode !== 'manual';
+    $('ai-worker-count-manual').checked = workerPolicy.allocationMode === 'manual';
+    $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
+    $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
+    renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -3737,6 +3762,7 @@ $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { f
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -3897,7 +3923,7 @@ function addNamedCompatibleRoute(endpointId, label) {
     renderAiRouterRoutes(routes, {}, {
       pinnedRouteId:$('ai-router-pinned-route').value,
       allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
-    });
+    }, { manualRouteWorkers:manualWorkerCountsFromCards() });
     $('ai-router-route-list').lastElementChild?.querySelector('[data-route-action="discover-models"]')?.focus();
     $('ai-router-status').textContent = `Маршрут ${label} додано до форми. Отримайте моделі, визначте вартість і збережіть налаштування.`;
   } catch (error) { $('ai-router-status').textContent = `Не вдалося додати ${label}: ${error.message}`; }
