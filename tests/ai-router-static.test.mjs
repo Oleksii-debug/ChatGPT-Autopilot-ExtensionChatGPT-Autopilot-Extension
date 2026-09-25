@@ -76,8 +76,8 @@ test('route model profiles expose bounded native controls and round-trip form wi
   assert.match(html, /data-route-field="systemPrompt"[^>]*maxlength="8000"/);
   assert.match(html, /data-route-field="workerPrompt"[^>]*maxlength="8000"/);
   assert.match(optionsJs, /displayName:text\('displayName'\)/);
-  assert.match(optionsJs, /systemPrompt:text\('systemPrompt'\)/);
-  assert.match(optionsJs, /workerPrompt:text\('workerPrompt'\)/);
+  assert.match(optionsJs, /systemPrompt:exactText\('systemPrompt'\)/);
+  assert.match(optionsJs, /workerPrompt:exactText\('workerPrompt'\)/);
   assert.match(optionsJs, /displayName:route\.displayName \|\| ''/);
   assert.match(optionsJs, /systemPrompt:route\.systemPrompt \|\| ''/);
   assert.match(optionsJs, /workerPrompt:route\.workerPrompt \|\| ''/);
