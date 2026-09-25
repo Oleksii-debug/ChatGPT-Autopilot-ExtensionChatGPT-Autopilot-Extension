@@ -509,3 +509,29 @@ test('universal authority identities cannot be normalized from aliases', async (
     /capabilityId is invalid/,
   );
 });
+
+
+test('policy invocation fingerprint is SHA-256 and does not disclose invocation arguments', async () => {
+  const fingerprint = await createPolicyInvocationFingerprintV1(invocation({
+    arguments: {
+      pathRef: 'workspace:private-file',
+      nested: { tokenLikeData: 'do-not-copy-into-fingerprint' },
+    },
+  }));
+  assert.match(fingerprint, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(fingerprint.includes('workspace:private-file'), false);
+  assert.equal(fingerprint.includes('do-not-copy-into-fingerprint'), false);
+});
+
+test('strict wrappers preserve canonical empty optional identity fields', async () => {
+  const currentInvocation = invocation({ parentInvocationId: '' });
+  const currentTool = tool({ inputSchemaRef: '', outputSchemaRef: '' });
+  const result = await evaluate({
+    invocation: currentInvocation,
+    toolDescriptor: currentTool,
+    classification: classification({
+      invocationFingerprint: await createPolicyInvocationFingerprintV1(currentInvocation),
+    }),
+  });
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.REQUIRE_APPROVAL);
+});
