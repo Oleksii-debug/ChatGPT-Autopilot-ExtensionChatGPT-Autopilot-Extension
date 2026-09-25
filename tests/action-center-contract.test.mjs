@@ -192,6 +192,23 @@ test('supersession graph rejects time travel and cycles', () => {
 
   assert.throws(
     () => buildActionCenterProjectionV1([
+      item('closed-before-successor', {
+        status: ActionCenterItemStatus.SUPERSEDED,
+        ownerActionKind: ActionCenterOwnerActionKind.NONE,
+        updatedAt: T1,
+        closedAt: T2,
+        supersededByItemId: 'future-successor',
+      }),
+      item('future-successor', {
+        createdAt: '2026-09-25T00:03:00.000Z',
+        updatedAt: '2026-09-25T00:03:00.000Z',
+      }),
+    ]),
+    /postdates superseded item closure/,
+  );
+
+  assert.throws(
+    () => buildActionCenterProjectionV1([
       item('a', {
         status: ActionCenterItemStatus.SUPERSEDED,
         ownerActionKind: ActionCenterOwnerActionKind.NONE,
