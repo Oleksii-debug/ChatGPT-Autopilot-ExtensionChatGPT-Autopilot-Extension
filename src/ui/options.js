@@ -875,6 +875,7 @@ function selectedValues(id) {
 function aiRouterRoutesFromForm({ validate = true } = {}) {
   return [...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map((card, index) => {
     const text = field => card.querySelector(`[data-route-field="${field}"]`).value.trim();
+    const exactText = field => card.querySelector(`[data-route-field="${field}"]`).value;
     const provider = text('provider');
     const routeId = text('routeId');
     const model = text('model');
@@ -886,6 +887,9 @@ function aiRouterRoutesFromForm({ validate = true } = {}) {
       routeId,
       provider,
       model,
+      displayName:text('displayName'),
+      systemPrompt:exactText('systemPrompt'),
+      workerPrompt:exactText('workerPrompt'),
       ...(provider === 'openai-compatible' && text('endpointId') ? { endpointId:text('endpointId') } : {}),
       roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
       capabilityIds,
@@ -937,7 +941,7 @@ function renderAiModelPriceCatalog(routes = [], routeStates = {}) {
   for (const route of routes) {
     const kind = ['free', 'paid'].includes(route.costClass) ? route.costClass : 'unknown';
     const health = routeStates[route.routeId] || {};
-    groups[kind].push(`${route.provider}, ${route.model || 'модель не вибрано'}; маршрут ${route.routeId}; ${route.enabled === false ? 'вимкнено' : 'увімкнено'}; помилок ${Number(health.failures || 0)}; обмеження до ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'немає'}`);
+    groups[kind].push(`${route.displayName ? `${route.displayName}; ` : ''}${route.provider}, ${route.model || 'модель не вибрано'}; маршрут ${route.routeId}; ${route.enabled === false ? 'вимкнено' : 'увімкнено'}; максимум workers ${Number(route.maxWorkers || 0) || 'загальна межа'}; помилок ${Number(health.failures || 0)}; обмеження до ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'немає'}`);
   }
   for (const kind of ['free', 'paid', 'unknown']) {
     const list = $(`ai-model-${kind}-list`);
@@ -976,6 +980,7 @@ function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, worker
     }
     const values = {
       routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
+      displayName:route.displayName || '', systemPrompt:route.systemPrompt || '', workerPrompt:route.workerPrompt || '',
       capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
       maxWorkers:route.maxWorkers ?? 0, manualWorkers:workerPolicy.manualRouteWorkers?.[route.routeId] ?? 0,
       locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'unknown'),
