@@ -284,6 +284,9 @@ export function buildActionCenterProjectionV1(rawItems) {
     if (Date.parse(successor.createdAt) < Date.parse(item.createdAt)) {
       throw new Error(`superseding attention item predates superseded item: ${item.itemId}`);
     }
+    if (Date.parse(successor.createdAt) > Date.parse(item.closedAt)) {
+      throw new Error(`superseding attention item postdates superseded item closure: ${item.itemId}`);
+    }
   }
 
   for (const item of items) {
