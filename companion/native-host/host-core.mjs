@@ -26,6 +26,7 @@ export const RequestType = Object.freeze({
   MCP_CLOSE: 'mcp.close',
   WINDOWS_EXEC_PINNED: 'windows.execPinned',
   WINDOWS_UIA_QUERY: 'windows.uia.query',
+  WINDOWS_UIA_INVOKE: 'windows.uia.invoke',
 });
 
 const REQUEST_TYPES = new Set(Object.values(RequestType));
@@ -264,6 +265,10 @@ export async function handleNativeCompanionRequest(input, {
     if (request.type === RequestType.WINDOWS_UIA_QUERY) {
       if (!windowsProvider) throw companionError('WINDOWS_PROVIDER_UNAVAILABLE', 'Windows provider is not configured');
       return response(request, await windowsProvider.queryUia(request.payload));
+    }
+    if (request.type === RequestType.WINDOWS_UIA_INVOKE) {
+      if (!windowsProvider) throw companionError('WINDOWS_PROVIDER_UNAVAILABLE', 'Windows provider is not configured');
+      return response(request, await windowsProvider.invokeUia(request.payload));
     }
     throw companionError('UNSUPPORTED_REQUEST', 'Unsupported Native Companion request');
   } catch (error) {
