@@ -12,19 +12,85 @@ import {
   normalizeExecutionOwnershipV1,
   claimExecutionOwnershipV1,
   recoverExpiredExecutionOwnershipV1,
-  resolveExecutionReconciliationV1,
   verifyExecutionByAuthorityV1,
 } from './execution-plane-ownership.js';
 
 const EXTERNAL_PLANES = new Set([AgentExecutionPlane.LOCAL, AgentExecutionPlane.CLOUD, AgentExecutionPlane.REMOTE]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const PREPARE_REQUEST_KEYS = new Set([
+  'nodeId', 'specialistId', 'requestedCapabilityIds', 'parentCapabilityIds',
+  'policyEnvelopeId', 'deadlineAt', 'priority', 'at',
+]);
+const CLAIM_REQUEST_KEYS = new Set([
+  'executionOwnerships', 'availableSlots', 'maxChildrenPerAgent', 'maxDepth', 'leaseSeconds', 'at',
+]);
+const COMPLETE_REQUEST_KEYS = new Set([
+  'executionOwnerships', 'agentId', 'leaseId', 'resultArtifactIds', 'at',
+]);
 
-function object(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`); return value; }
-function exact(value, allowed, label) { for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`); }
-function id(value, label) { const out = String(value ?? '').trim(); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
-function timestamp(value, label) { const ms = Date.parse(String(value ?? '')); if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`); return new Date(ms).toISOString(); }
-function integer(value, label, min, max) { const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
-function ids(value, label, max = 32) { if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`); const out = value.map((item, index) => id(item, `${label}[${index}]`)); if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`); return out; }
+function record(value, allowed, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) throw new Error(`${label} contains unknown field: ${String(key)}`);
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}.${key} must be an enumerable data property`);
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return snapshot;
+}
+function denseArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) throw new Error(`${label} must be a bounded plain array`);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
+  const keys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  if (keys.length !== expected.size || keys.some(key => typeof key !== 'string' || !expected.has(key))) {
+    throw new Error(`${label} contains invalid array data`);
+  }
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+    out[index] = descriptor.value;
+  }
+  return out;
+}
+function id(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) throw new Error(`${label} is invalid`);
+  return value;
+}
+function timestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(`${label} must be a timestamp`);
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
+  return new Date(ms).toISOString();
+}
+function integer(value, label, min, max) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`);
+  return value;
+}
+function ids(value, label, max = 32) {
+  const input = denseArray(value, label, max);
+  const out = input.map((item, index) => id(item, `${label}[${index}]`));
+  if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
+  return out;
+}
 function text(value, label, max = 8000) { const out = typeof value === 'string' ? value.trim() : ''; if (!out || out.length > max) throw new Error(`${label} is invalid`); return out; }
 function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) freeze(child); return Object.freeze(value); }
 
@@ -48,8 +114,8 @@ function externalNode(plan, nodeId) {
 }
 
 function validateAssignments(plan, rawAssignments = []) {
-  if (!Array.isArray(rawAssignments) || rawAssignments.length > 128) throw new Error('Specialist handoffs must be a bounded array');
-  const assignments = rawAssignments.map(normalizeSpecialistAssignmentV1);
+  const assignmentInputs = denseArray(rawAssignments, 'Specialist handoffs', 128);
+  const assignments = assignmentInputs.map(normalizeSpecialistAssignmentV1);
   if (new Set(assignments.map(item => item.agentId)).size !== assignments.length) throw new Error('Specialist handoffs contain duplicate agentId');
   for (const assignment of assignments) {
     if (assignment.jobId !== plan.jobId) throw new Error('Specialist handoff jobId does not match AgentPlan');
@@ -65,8 +131,9 @@ function nodeForAssignment(plan, assignment) {
 }
 
 function validateExecutionOwnerships(plan, assignments, rawOwnerships = []) {
-  if (!Array.isArray(rawOwnerships) || rawOwnerships.length !== assignments.length) throw new Error('Specialist execution ownership must exactly cover specialist handoffs');
-  const ownerships = rawOwnerships.map(normalizeExecutionOwnershipV1);
+  const ownershipInputs = denseArray(rawOwnerships, 'Specialist execution ownership', 128);
+  if (ownershipInputs.length !== assignments.length) throw new Error('Specialist execution ownership must exactly cover specialist handoffs');
+  const ownerships = ownershipInputs.map(normalizeExecutionOwnershipV1);
   if (new Set(ownerships.map(item => item.effectId)).size !== ownerships.length) throw new Error('Specialist execution ownership contains duplicate effect identity');
   for (const assignment of assignments) {
     const node = nodeForAssignment(plan, assignment);
@@ -81,12 +148,14 @@ function validateExecutionOwnerships(plan, assignments, rawOwnerships = []) {
 }
 
 /** Builds a child scope only when an explicit parent capability envelope contains it. */
-export function prepareAgentPlanSpecialistHandoffV1(rawPlan, { nodeId, specialistId, requestedCapabilityIds, parentCapabilityIds, deadlineAt, priority = 0, at = new Date().toISOString() } = {}) {
+export function prepareAgentPlanSpecialistHandoffV1(rawPlan, rawOptions = {}) {
+  const request = record(rawOptions, PREPARE_REQUEST_KEYS, 'Specialist handoff request');
+  const at = request.at === undefined ? new Date().toISOString() : timestamp(request.at, 'at');
   const plan = reconcileAgentPlanV1(rawPlan, { at });
-  const node = externalNode(plan, id(nodeId, 'nodeId'));
+  const node = externalNode(plan, id(request.nodeId, 'nodeId'));
   if (node.state !== AgentPlanNodeState.READY) throw new Error('AgentPlan node must be READY before specialist handoff');
-  const requested = ids(requestedCapabilityIds, 'requestedCapabilityIds');
-  const parent = new Set(ids(parentCapabilityIds, 'parentCapabilityIds'));
+  const requested = ids(request.requestedCapabilityIds, 'requestedCapabilityIds');
+  const parent = new Set(ids(request.parentCapabilityIds, 'parentCapabilityIds'));
   if (requested.some(capabilityId => !parent.has(capabilityId))) throw new Error('Specialist capability would exceed parent scope');
   const updatedAt = timestamp(at, 'at');
   return normalizeSpecialistAssignmentV1({
@@ -95,36 +164,45 @@ export function prepareAgentPlanSpecialistHandoffV1(rawPlan, { nodeId, specialis
     parentAgentId: id(`browser-agent:${plan.jobId}`, 'parentAgentId'),
     jobId: plan.jobId,
     purpose: node.objective,
-    specialistId: id(specialistId, 'specialistId'),
+    specialistId: id(request.specialistId, 'specialistId'),
     requestedCapabilityIds: requested,
     ownershipKey: node.conflictKeys[0] || `plan:${plan.planId}:${node.nodeId}`,
     depth: 2,
-    priority: integer(priority, 'priority', 0, 1_000_000),
+    priority: integer(request.priority === undefined ? 0 : request.priority, 'priority', 0, 1_000_000),
     state: SpecialistAssignmentState.READY,
     leaseId: '', leaseExpiresAt: '',
-    deadlineAt: timestamp(deadlineAt, 'deadlineAt'),
+    deadlineAt: timestamp(request.deadlineAt, 'deadlineAt'),
     resultArtifactIds: [],
     updatedAt,
   });
 }
 
 /** Creates the one canonical effect-ownership record paired with a specialist handoff. */
-export function prepareAgentPlanSpecialistExecutionOwnershipV1(rawPlan, { nodeId, policyEnvelopeId, at = new Date().toISOString() } = {}) {
+export function prepareAgentPlanSpecialistExecutionOwnershipV1(rawPlan, rawOptions = {}) {
+  const request = record(rawOptions, PREPARE_REQUEST_KEYS, 'Specialist execution ownership request');
+  const at = request.at === undefined ? new Date().toISOString() : timestamp(request.at, 'at');
   const plan = reconcileAgentPlanV1(rawPlan, { at });
-  const node = externalNode(plan, id(nodeId, 'nodeId'));
+  const node = externalNode(plan, id(request.nodeId, 'nodeId'));
   if (node.state !== AgentPlanNodeState.READY) throw new Error('AgentPlan node must be READY before specialist execution ownership is prepared');
   return createExecutionOwnershipV1({
     taskId: specialistTaskIdForPlanV1(plan.planId),
     planId: plan.planId,
     nodeId: node.nodeId,
     effectId: specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId),
-    policyEnvelopeId: id(policyEnvelopeId, 'policyEnvelopeId'),
+    policyEnvelopeId: id(request.policyEnvelopeId, 'policyEnvelopeId'),
     at,
   });
 }
 
 /** Claims only READY handoffs. Expired effect leases are returned for reconciliation, never silently reclaimed. */
-export function claimAgentPlanSpecialistHandoffsV1(rawPlan, rawAssignments, { executionOwnerships = [], availableSlots = 0, maxChildrenPerAgent = 4, maxDepth = 2, leaseSeconds = 900, at = new Date().toISOString() } = {}) {
+export function claimAgentPlanSpecialistHandoffsV1(rawPlan, rawAssignments, rawOptions = {}) {
+  const request = record(rawOptions, CLAIM_REQUEST_KEYS, 'Specialist claim request');
+  const at = request.at === undefined ? new Date().toISOString() : timestamp(request.at, 'at');
+  const executionOwnerships = request.executionOwnerships === undefined ? [] : request.executionOwnerships;
+  const availableSlots = integer(request.availableSlots === undefined ? 0 : request.availableSlots, 'availableSlots', 0, 256);
+  const maxChildrenPerAgent = integer(request.maxChildrenPerAgent === undefined ? 4 : request.maxChildrenPerAgent, 'maxChildrenPerAgent', 1, 256);
+  const maxDepth = integer(request.maxDepth === undefined ? 2 : request.maxDepth, 'maxDepth', 1, 8);
+  const leaseSeconds = integer(request.leaseSeconds === undefined ? 900 : request.leaseSeconds, 'leaseSeconds', 1, 86_400);
   let plan = reconcileAgentPlanV1(rawPlan, { at });
   const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
   let ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships).map(item => structuredClone(item));
@@ -156,84 +234,38 @@ export function claimAgentPlanSpecialistHandoffsV1(rawPlan, rawAssignments, { ex
  * verifier proves that the ambiguous attempt committed no effect.  This does
  * not dispatch the retry: normal bounded admission must claim it again.
  */
-export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments, {
-  executionOwnerships = [], agentId, leaseId, verifierId, verificationAuthorityId, evidence,
-  at = new Date().toISOString(),
-} = {}) {
-  let plan = normalizeAgentPlanV1(rawPlan);
-  const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
-  const assignment = assignments.find(item => item.agentId === id(agentId, 'agentId'));
-  const preservedLeaseId = id(leaseId, 'leaseId');
-  if (!assignment || assignment.state !== SpecialistAssignmentState.LEASED || assignment.leaseId !== preservedLeaseId) {
-    throw new Error('SAFE_RETRY requires the preserved specialist lease identity');
-  }
-  const verifier = id(verifierId, 'verifierId');
-  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) {
-    throw new Error('SAFE_RETRY verifier must be independent from specialist and parent');
-  }
-  const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
-  const node = nodeForAssignment(plan, assignment);
-  if (node.state !== AgentPlanNodeState.RUNNING) throw new Error('SAFE_RETRY requires the ambiguous AgentPlan node to remain RUNNING');
-  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
-  const ownership = ownerships.find(item => item.effectId === effectId);
-  if (ownership.state !== ExecutionOwnershipState.RECONCILE || ownership.leaseId !== preservedLeaseId) {
-    throw new Error('SAFE_RETRY requires matching canonical execution reconciliation');
-  }
-  const authority = id(verificationAuthorityId, 'verificationAuthorityId');
-  if (authority !== ownership.policyEnvelopeId) throw new Error('SAFE_RETRY authority must bind the execution policy envelope');
-  const noEffectEvidence = text(evidence, 'SAFE_RETRY no-effect evidence', 1000);
-  const availableOwnership = resolveExecutionReconciliationV1(ownership, {
-    leaseId: preservedLeaseId,
-    outcome: 'SAFE_RETRY',
-    evidence: noEffectEvidence,
-    at,
-  });
-  assignment.state = SpecialistAssignmentState.READY;
-  assignment.leaseId = '';
-  assignment.leaseExpiresAt = '';
-  assignment.resultArtifactIds = [];
-  assignment.updatedAt = timestamp(at, 'at');
-  plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.READY, at });
-  return freeze({
-    plan,
-    assignments: assignments.map(normalizeSpecialistAssignmentV1),
-    executionOwnerships: ownerships.map(item => item.effectId === effectId ? availableOwnership : item),
-    retriableAgentId: assignment.agentId,
-    safeRetryEvidence: { verifierId: verifier, verificationAuthorityId: authority, evidence: noEffectEvidence },
-  });
+export function authorizeAgentPlanSpecialistSafeRetryV1() {
+  // Caller-owned VerificationV1 data is not verifier authority. Keep ambiguous
+  // specialist effects fenced until a canonical independent verifier resolver
+  // exists and can supply provenance rather than a structurally valid shape.
+  throw new Error('SAFE_RETRY requires canonical trusted verifier provenance');
 }
-
-export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { executionOwnerships = [], agentId, leaseId, resultArtifactIds, at = new Date().toISOString() } = {}) {
+export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, rawOptions = {}) {
+  const request = record(rawOptions, COMPLETE_REQUEST_KEYS, 'Specialist completion request');
+  const at = request.at === undefined ? new Date().toISOString() : timestamp(request.at, 'at');
+  const executionOwnerships = request.executionOwnerships === undefined ? [] : request.executionOwnerships;
   const plan = normalizeAgentPlanV1(rawPlan);
   const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
-  const target = assignments.find(item => item.agentId === id(agentId, 'agentId'));
-  if (!target || target.state !== SpecialistAssignmentState.LEASED || target.leaseId !== id(leaseId, 'leaseId')) throw new Error('Only the current specialist lease may report completion');
-  if (target.leaseExpiresAt <= timestamp(at, 'at')) throw new Error('Expired specialist lease requires reconciliation');
+  const target = assignments.find(item => item.agentId === id(request.agentId, 'agentId'));
+  if (!target || target.state !== SpecialistAssignmentState.LEASED || target.leaseId !== id(request.leaseId, 'leaseId')) throw new Error('Only the current specialist lease may report completion');
+  if (target.leaseExpiresAt <= at) throw new Error('Expired specialist lease requires reconciliation');
   const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
   const node = nodeForAssignment(plan, target);
   const ownership = ownerships.find(item => item.effectId === specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId));
   if (ownership.state !== ExecutionOwnershipState.OWNED || ownership.leaseId !== target.leaseId) throw new Error('Specialist completion requires the matching canonical execution owner lease');
-  const artifacts = ids(resultArtifactIds, 'resultArtifactIds');
+  const artifacts = ids(request.resultArtifactIds, 'resultArtifactIds');
   if (!artifacts.length) throw new Error('Specialist completion requires result artifact evidence');
   target.state = SpecialistAssignmentState.COMPLETED;
-  target.leaseId = ''; target.leaseExpiresAt = ''; target.resultArtifactIds = artifacts; target.updatedAt = timestamp(at, 'at');
+  target.leaseId = ''; target.leaseExpiresAt = ''; target.resultArtifactIds = artifacts; target.updatedAt = at;
   return freeze({ plan, assignments: assignments.map(normalizeSpecialistAssignmentV1), executionOwnerships: ownerships, verificationRequired: target.agentId });
 }
 
-/** A result is not a completed plan node until a distinct verifier supplies evidence. */
-export function verifyAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { executionOwnerships = [], agentId, verifierId, verificationAuthorityId, evidence, at = new Date().toISOString() } = {}) {
-  let plan = normalizeAgentPlanV1(rawPlan);
-  const assignments = validateAssignments(plan, rawAssignments);
-  const assignment = assignments.find(item => item.agentId === id(agentId, 'agentId'));
-  if (!assignment || assignment.state !== SpecialistAssignmentState.COMPLETED) throw new Error('Specialist handoff is not awaiting verification');
-  const verifier = id(verifierId, 'verifierId');
-  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) throw new Error('Verifier must be independent from specialist and parent');
-  const node = plan.nodes.find(item => specialistAssignmentIdForPlanNodeV1(plan.planId, item.nodeId) === assignment.agentId);
-  if (node.state !== AgentPlanNodeState.RUNNING) throw new Error('Specialist plan node is not running');
-  const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
-  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
-  const ownership = ownerships.find(item => item.effectId === effectId);
-  const verifiedOwnership = verifyExecutionByAuthorityV1(ownership, { leaseId:ownership.leaseId, verifierId:verifier, verificationAuthorityId, evidence, at });
-  plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.VERIFIED, evidence: text(evidence, 'verification evidence'), at });
-  return freeze({ plan, assignments, executionOwnerships: ownerships.map(item => item.effectId === effectId ? verifiedOwnership : item), verifiedAgentId: assignment.agentId });
+/**
+ * Caller-owned verifier IDs and free-text evidence are not verification
+ * authority. Keep normal specialist completion fenced exactly like ambiguous
+ * reconciliation until a canonical independently resolved verifier record can
+ * be supplied by the execution/evidence authority.
+ */
+export function verifyAgentPlanSpecialistHandoffV1() {
+  throw new Error('Specialist verification requires canonical trusted verifier provenance');
 }

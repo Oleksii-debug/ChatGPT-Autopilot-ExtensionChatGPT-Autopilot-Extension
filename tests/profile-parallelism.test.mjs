@@ -302,6 +302,7 @@ class UpdateGuardRepository extends MemoryRepository {
 
 test('rate-limit gate is account-wide but repeated parallel detections do not extend the first five-minute window', async () => {
   const state = createEmptyState(1);
+  state.profile.rateLimitCooldownMs = 5 * 60 * 1000;
   addRunningSession(state, 1);
   addRunningSession(state, 2);
   const repo = new MemoryRepository(state);
@@ -323,6 +324,19 @@ test('rate-limit gate is account-wide but repeated parallel detections do not ex
   const events = after.diagnostics.map(item => item.event);
   assert.ok(events.includes('ГЛОБАЛЬНА_ПАУЗА_ЧЕРЕЗ_RATE_LIMIT'));
   assert.ok(events.includes('RATE_LIMIT_ВЖЕ_ВРАХОВАНО'));
+});
+
+test('zero reserve does not create a profile gate and bounds only technical retry', async () => {
+  const state = createEmptyState(1);
+  addRunningSession(state, 1);
+  const repo = new MemoryRepository(state);
+  const executor = new AutomaticSessionExecutor(repo, {}, { execute: async () => { throw new Error('transport must not run'); } }, { now: () => 1000 });
+  await executor.applyResult('s1', 't1', { status: InteractionResult.RATE_LIMITED });
+  const after = await repo.load();
+  assert.equal(after.profile.rateLimitCooldownMs, 0);
+  assert.equal(after.profile.rateLimitUntil, 0);
+  assert.equal(after.sessionsById.s1.tasksById.t1.retryAfterAt, 31_000);
+  assert.ok(after.diagnostics.some(item => item.event === 'RATE_LIMIT_БЕЗ_РЕЗЕРВНОЇ_ПАУЗИ'));
 });
 
 test('active profile rate-limit gate prevents new tab work and drives the next alarm to the shared deadline', async () => {

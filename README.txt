@@ -7,6 +7,7 @@ CHATGPT АВТОПІЛОТ 0.9.19 — DIAGNOSTIC-DERIVED ORDINARY SESSION LIVENE
 - Fresh launch / -> /c/<conversation> може бути verified за concrete conversation + empty composer + active generation ще до появи semantic user-message history; non-fresh recovery лишається fail-closed.
 - Permanent diagnostic-derived reliability gate проганяє одну Ordinary fresh-chat Session понад 230 verified sends із submit/receiver/navigation/composer/rate-limit/tab-close faults і перевіряє at-most-once Send + max one owned open-close tab.
 - 0.9.18 Trusted Script, Browser Agent, Scenario Work та Orchestration V2 збережені.
+- Вкладка «Спрощені сесії» використовує той самий Core: один ChatGPT URL та один промпт, або чотири комбінації спільних/різних URL і промптів. Підтримує один прохід або роботу по колу, керування запуском/паузою/продовженням/зупинкою, JSON імпорт/експорт і діагностику. Спільний URL+промпт дозволяє до 1 000 000 логічних циклів з одним фізичним task object. Ознака спрощеної сесії зберігається в Core й переносному JSON.
 - Exact automated qualification: 947/947 Node tests PASS, 27/27 reliability PASS, Chromium gates PASS; physical Windows/NVDA/real UKF AIS acceptance still not claimed.
 
 CHATGPT АВТОПІЛОТ 0.9.18 — TRUSTED SCRIPT APPROVAL / NETWORK-GUARDED DOM FALLBACK
