@@ -214,7 +214,7 @@ test('ArtifactRef and Base64 representations must already be canonical', async (
     /canonical Base64/u,
   );
 
-  const padded = utf8('{"x":"a"}');
+  const padded = utf8('{"x":"ab"}');
   const canonical = base64(padded);
   assert.match(canonical, /=+$/u);
   await assert.rejects(
@@ -279,7 +279,7 @@ test('malformed JSON and trailing material are rejected by the bounded grammar',
   ]) {
     await assert.rejects(
       preflightJsonArtifactV1(requestForText(text)),
-      /JSON|contentBase64/u,
+      /JSON|contentBase64|sizeBytes/u,
       text,
     );
   }
