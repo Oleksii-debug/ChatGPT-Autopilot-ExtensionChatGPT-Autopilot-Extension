@@ -534,10 +534,36 @@ export function assertMeetingProjectActionsMatchesEvidenceV1({ result, evidenceB
   return normalizedResult;
 }
 
+function strictProjectSnapshotForComposition(input) {
+  const raw = record(input, 'projectSnapshot');
+  requireOwn(raw, 'schemaVersion', 'projectSnapshot');
+  requireOwn(raw, 'projectId', 'projectSnapshot');
+  requireOwn(raw, 'revisionId', 'projectSnapshot');
+  requireOwn(raw, 'title', 'projectSnapshot');
+  requireOwn(raw, 'sourceRefs', 'projectSnapshot');
+  requireOwn(raw, 'artifactRefs', 'projectSnapshot');
+  requireOwn(raw, 'createdAt', 'projectSnapshot');
+  version(raw.schemaVersion, 'ProjectSnapshotV1');
+  identifier(raw.projectId, 'projectSnapshot.projectId');
+  identifier(raw.revisionId, 'projectSnapshot.revisionId');
+  text(raw.title, 'projectSnapshot.title', { max: 1000 });
+  timestamp(raw.createdAt, 'projectSnapshot.createdAt');
+  const sourceRefs = array(raw.sourceRefs, 'projectSnapshot.sourceRefs', MAX_SOURCES).map(
+    (item, index) => strictSource(item, `projectSnapshot.sourceRefs[${index}]`),
+  );
+  const artifactRefs = array(raw.artifactRefs, 'projectSnapshot.artifactRefs', MAX_EVIDENCE_IDS).map(
+    (item, index) => strictArtifact(item, `projectSnapshot.artifactRefs[${index}]`),
+  );
+  const safe = Object.create(null);
+  for (const key of Object.keys(raw)) safe[key] = raw[key];
+  safe.sourceRefs = sourceRefs;
+  safe.artifactRefs = artifactRefs;
+  return normalizeProjectSnapshotV1(safe);
+}
+
 export function assertMeetingEvidenceMatchesProjectSnapshotV1({ evidenceBundle, projectSnapshot } = {}) {
   const evidence = normalizeMeetingEvidenceBundleV1(evidenceBundle);
-  jsonData(projectSnapshot, 'projectSnapshot');
-  const project = normalizeProjectSnapshotV1(projectSnapshot);
+  const project = strictProjectSnapshotForComposition(projectSnapshot);
   if (project.projectId !== evidence.projectId) throw new Error('meeting evidence projectId does not match ProjectSnapshotV1');
 
   const projectSources = new Map(project.sourceRefs.map(source => [source.sourceId, source]));

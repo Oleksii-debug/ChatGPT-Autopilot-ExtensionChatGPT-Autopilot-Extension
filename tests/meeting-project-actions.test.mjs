@@ -221,6 +221,32 @@ test('meeting evidence must already be admitted by exact canonical ProjectSnapsh
   assert.equal(admitted.advisoryOnly, true);
   assert.equal(admitted.admissionAuthorized, false);
 
+  const coerciveVersion = structuredClone(project);
+  coerciveVersion.schemaVersion = '1';
+  assert.throws(() => assertMeetingEvidenceMatchesProjectSnapshotV1({
+    evidenceBundle: bundle,
+    projectSnapshot: coerciveVersion,
+  }), /schemaVersion/);
+
+  const coerciveArtifactId = structuredClone(project);
+  coerciveArtifactId.artifactRefs[0].artifactId = 7;
+  assert.throws(() => assertMeetingEvidenceMatchesProjectSnapshotV1({
+    evidenceBundle: bundle,
+    projectSnapshot: coerciveArtifactId,
+  }), /artifactId is invalid/);
+
+  let reads = 0;
+  const accessorArtifacts = structuredClone(project);
+  Object.defineProperty(accessorArtifacts.artifactRefs, '0', {
+    enumerable: true,
+    get() { reads += 1; return transcript(); },
+  });
+  assert.throws(() => assertMeetingEvidenceMatchesProjectSnapshotV1({
+    evidenceBundle: bundle,
+    projectSnapshot: accessorArtifacts,
+  }), /enumerable own data item/);
+  assert.equal(reads, 0);
+
   const staleSource = structuredClone(project);
   staleSource.sourceRefs[0].revisionId = 'source-r2';
   assert.throws(() => assertMeetingEvidenceMatchesProjectSnapshotV1({
