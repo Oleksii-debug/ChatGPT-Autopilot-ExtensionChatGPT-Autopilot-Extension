@@ -195,6 +195,10 @@ function canonicalTimestamp(value, label) {
   return canonical;
 }
 
+function timestampMillis(value, label) {
+  return Date.parse(canonicalTimestamp(value, label));
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -290,7 +294,8 @@ function normalizeVerifiedGitHubDelivery(value) {
     raw.verifiedAt,
     'VerifiedGitHubDeliveryV1 verifiedAt',
   );
-  if (verifiedAt < receivedAt) {
+  if (timestampMillis(verifiedAt, 'VerifiedGitHubDeliveryV1 verifiedAt')
+      < timestampMillis(receivedAt, 'VerifiedGitHubDeliveryV1 receivedAt')) {
     throw new Error('GitHub delivery verification cannot predate receipt');
   }
   return Object.freeze({
@@ -339,7 +344,8 @@ function assertTriggerMatchesBinding(trigger, binding) {
       throw new Error(`GitHub event binding ${key} does not match trusted trigger definition`);
     }
   }
-  if (binding.createdAt < trigger.createdAt) {
+  if (timestampMillis(binding.createdAt, 'GitHubEventBindingV1 createdAt')
+      < timestampMillis(trigger.createdAt, 'EventTriggerDefinitionV1 createdAt')) {
     throw new Error('GitHub event binding cannot predate its trusted trigger definition');
   }
 }
@@ -365,16 +371,27 @@ function assertDeliveryMatchesBinding(delivery, binding, request) {
   if (delivery.verificationStatus !== GitHubDeliveryVerificationStatus.VERIFIED) {
     throw new Error('GitHub delivery is not cryptographically verified');
   }
-  if (delivery.receivedAt < binding.createdAt) {
+  if (timestampMillis(delivery.receivedAt, 'VerifiedGitHubDeliveryV1 receivedAt')
+      < timestampMillis(binding.createdAt, 'GitHubEventBindingV1 createdAt')) {
     throw new Error('GitHub delivery predates trusted binding');
+  }
+  const payloadCreatedAt = timestampMillis(
+    delivery.payloadArtifactRef.createdAt,
+    'VerifiedGitHubDeliveryV1 payloadArtifactRef createdAt',
+  );
+  if (payloadCreatedAt > timestampMillis(delivery.receivedAt, 'VerifiedGitHubDeliveryV1 receivedAt')) {
+    throw new Error('GitHub delivery payload artifact cannot postdate receipt');
   }
 }
 
 function assertFreshDelivery(binding, delivery, admittedAt) {
-  if (admittedAt < delivery.verifiedAt) {
+  const admittedAtMillis = timestampMillis(admittedAt, 'GitHub admittedAt');
+  const verifiedAtMillis = timestampMillis(delivery.verifiedAt, 'VerifiedGitHubDeliveryV1 verifiedAt');
+  if (admittedAtMillis < verifiedAtMillis) {
     throw new Error('GitHub admission predates trusted verification');
   }
-  const ageMillis = Date.parse(admittedAt) - Date.parse(delivery.receivedAt);
+  const ageMillis = admittedAtMillis
+    - timestampMillis(delivery.receivedAt, 'VerifiedGitHubDeliveryV1 receivedAt');
   if (ageMillis > binding.maxDeliveryAgeSeconds * 1000) {
     throw new Error('GitHub delivery is stale for configured binding window');
   }
