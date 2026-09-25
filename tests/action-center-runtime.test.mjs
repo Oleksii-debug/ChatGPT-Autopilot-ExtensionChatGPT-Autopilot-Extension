@@ -188,3 +188,42 @@ test('runtime projection is deterministically bounded and reports truncation ins
   assert.equal(projection.runtimeSummary.truncated, true);
   assert.equal(projection.items.some(item => item.ownerActionKind === 'RECONCILE'), true, 'blocking attention must survive truncation');
 });
+
+
+test('stale or malformed Browser Agent pendingApproval does not manufacture an owner approval action', async () => {
+  const stale = agentJob('stale-approval', {
+    runtime: {
+      runState: 'PAUSED',
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: {
+        snapshotSignature: 'stale-snapshot',
+        action: { type: 'CLICK', ref: 'control-1' },
+      },
+    },
+  });
+  const missingAction = agentJob('missing-action', {
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: { snapshotSignature: 'missing-action' },
+    },
+  });
+  const valid = agentJob('valid-approval', {
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: {
+        snapshotSignature: 'valid-snapshot',
+        action: { type: 'CLICK', ref: 'control-2' },
+      },
+    },
+  });
+
+  const projection = await projectRuntimeActionCenter({ agentJobs: [stale, missingAction, valid] });
+  assert.equal(projection.summary.openCount, 1);
+  assert.equal(projection.items[0].ownerActionKind, 'APPROVE_OR_DENY');
+  assert.match(projection.items[0].title, /valid-approval/u);
+});
