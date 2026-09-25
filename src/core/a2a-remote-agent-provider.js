@@ -65,6 +65,7 @@ const PROVIDER_RESULT_KEYS = new Set([
   'requiresCanonicalExactEffectCommit',
 ]);
 const MAX_REMOTE_ID_BYTES = 1024;
+const ISSUED_PROVIDER_RESULTS = new WeakMap();
 
 function fail(code, message, {
   effectMayHaveOccurred = false,
@@ -496,7 +497,7 @@ function jsonRpcRequest(delegation, messageText, tenant) {
   });
 }
 
-export function a2aSendResultToObservationV1(input = {}) {
+function a2aSendResultToObservationV1(input = {}) {
   const request = dataRecord(input, OBSERVATION_INPUT_KEYS, 'A2A observation request');
   const state = normalizeExactEffectStateV1(request.exactEffectState);
   if (state.phase !== ExactEffectPhase.EXECUTING || !state.executionId) {
@@ -598,6 +599,19 @@ export class A2ARemoteAgentProviderV1 {
     }
     this.transport = transport;
     this.now = now;
+    ISSUED_PROVIDER_RESULTS.set(this, new WeakSet());
+  }
+
+  toObservation(input = {}) {
+    const request = dataRecord(input, OBSERVATION_INPUT_KEYS, 'A2A observation request');
+    const issuedResults = ISSUED_PROVIDER_RESULTS.get(this);
+    if (!issuedResults || !issuedResults.has(request.providerResult)) {
+      fail(
+        'A2A_PROVIDER_RESULT_UNTRUSTED',
+        'A2A observation requires the exact frozen result object issued by this provider instance',
+      );
+    }
+    return a2aSendResultToObservationV1(request);
   }
 
   async sendMessage(input = {}) {
@@ -683,7 +697,7 @@ export class A2ARemoteAgentProviderV1 {
         cause: error instanceof Error ? error : null,
       });
     }
-    return freeze({
+    const providerResult = freeze({
       schemaVersion: A2A_REMOTE_AGENT_PROVIDER_VERSION,
       providerId: 'a2a-remote-agent',
       remoteAgentId: assessment.remoteAgentId,
@@ -710,5 +724,7 @@ export class A2ARemoteAgentProviderV1 {
       requiresIndependentVerification: true,
       requiresCanonicalExactEffectCommit: true,
     });
+    ISSUED_PROVIDER_RESULTS.get(this).add(providerResult);
+    return providerResult;
   }
 }
