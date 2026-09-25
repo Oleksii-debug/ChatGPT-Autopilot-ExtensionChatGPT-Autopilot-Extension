@@ -333,3 +333,83 @@ test('checkpoint chronology uses epoch order across 9999 to extended year +01000
     /current observation predates checkpoint/u,
   );
 });
+
+test('checkpoint crypto options reject hostile caller representations before dependency reads', async () => {
+  function accessorOptions(counter) {
+    const options = {};
+    Object.defineProperty(options, 'cryptoApi', {
+      enumerable: true,
+      get() {
+        counter.reads += 1;
+        return globalThis.crypto;
+      },
+    });
+    return options;
+  }
+
+  const createCounter = { reads: 0 };
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput(), accessorOptions(createCounter)),
+    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+  );
+  assert.equal(createCounter.reads, 0);
+
+  const checkpoint = await createAgentCheckpointV1(checkpointInput());
+
+  const verifyCounter = { reads: 0 };
+  await assert.rejects(
+    () => verifyAgentCheckpointV1(checkpoint, accessorOptions(verifyCounter)),
+    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+  );
+  assert.equal(verifyCounter.reads, 0);
+
+  const assessCounter = { reads: 0 };
+  await assert.rejects(
+    () => assessAgentCheckpointRewindV1({
+      checkpoint,
+      current: head(),
+      snapshotUtf8: SNAPSHOT_UTF8,
+    }, accessorOptions(assessCounter)),
+    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+  );
+  assert.equal(assessCounter.reads, 0);
+});
+
+test('checkpoint crypto options are exact and preserve null-prototype compatibility', async () => {
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput(), { cryptoApi: globalThis.crypto, extra: true }),
+    /AgentCheckpoint crypto options contains unknown field: extra/u,
+  );
+
+  const symbolic = { cryptoApi: globalThis.crypto };
+  symbolic[Symbol('shadow')] = true;
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput(), symbolic),
+    /AgentCheckpoint crypto options contains unknown field/u,
+  );
+
+  const hidden = {};
+  Object.defineProperty(hidden, 'cryptoApi', { value: globalThis.crypto, enumerable: false });
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput(), hidden),
+    /AgentCheckpoint crypto options field cryptoApi must be an enumerable own data property/u,
+  );
+
+  const exotic = Object.assign(Object.create({ inherited: true }), { cryptoApi: globalThis.crypto });
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput(), exotic),
+    /AgentCheckpoint crypto options must be a plain object/u,
+  );
+
+  const nullPrototype = Object.create(null);
+  nullPrototype.cryptoApi = globalThis.crypto;
+  const checkpoint = await createAgentCheckpointV1(checkpointInput(), nullPrototype);
+  assert.deepEqual(await verifyAgentCheckpointV1(checkpoint, nullPrototype), checkpoint);
+  const result = await assessAgentCheckpointRewindV1({
+    checkpoint,
+    current: head(),
+    snapshotUtf8: SNAPSHOT_UTF8,
+  }, nullPrototype);
+  assert.equal(result.status, AgentCheckpointRewindStatus.READY_FOR_RECONCILIATION);
+});
+
