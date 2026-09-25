@@ -262,23 +262,30 @@ export class GitHubPullRequestReviewVerifierV1 {
       VERIFY_REQUEST_KEYS,
     );
     const invocation = request.invocation;
-    const effectId = request.effectId;
     const executionId = request.executionId;
-    const attempt = request.attempt;
-    const policyDecisionId = request.policyDecisionId;
     const observation = request.observation;
-    canonicalTimestamp(request.requestedAt, 'requestedAt');
-    const expected = expectedReview(invocation);
-    if (requireId(effectId, 'effectId') !== expected.invocationId) {
-      throw new Error('effectId does not match invocation identity');
-    }
-    if (requireId(policyDecisionId, 'policyDecisionId') !== expected.policyDecisionId) {
-      throw new Error('policyDecisionId does not match invocation policy identity');
-    }
     const exactAttempt = attemptFromExecutionId(executionId);
-    if (attempt !== exactAttempt) {
-      throw new Error('attempt does not match executionId');
+    const expected = expectedReview(invocation);
+
+    const envelopeKeys = ['effectId', 'attempt', 'policyDecisionId', 'requestedAt'];
+    const suppliedEnvelopeKeys = envelopeKeys.filter(key =>
+      Object.prototype.hasOwnProperty.call(request, key));
+    if (suppliedEnvelopeKeys.length !== 0 && suppliedEnvelopeKeys.length !== envelopeKeys.length) {
+      throw new Error('GitHub pull-request-review verify exact-effect envelope is incomplete');
     }
+    if (suppliedEnvelopeKeys.length === envelopeKeys.length) {
+      if (requireId(request.effectId, 'effectId') !== expected.invocationId) {
+        throw new Error('effectId does not match invocation identity');
+      }
+      if (requireId(request.policyDecisionId, 'policyDecisionId') !== expected.policyDecisionId) {
+        throw new Error('policyDecisionId does not match invocation policy identity');
+      }
+      if (request.attempt !== exactAttempt) {
+        throw new Error('attempt does not match executionId');
+      }
+      canonicalTimestamp(request.requestedAt, 'requestedAt');
+    }
+
     const observed = observedReview(expected, observation);
     const readback = await this.#readback(expected, observed.reviewId);
     return this.#verification(readback, executionId, exactAttempt, observed.observationId);
@@ -297,13 +304,23 @@ export class GitHubPullRequestReviewVerifierV1 {
     const policyDecisionId = request.policyDecisionId;
     const expectedOutcome = request.expectedOutcome;
     const priorObservation = request.priorObservation;
-    const ambiguityDeclaredAt = canonicalTimestamp(
-      request.ambiguityDeclaredAt,
+    const hasAmbiguityDeclaredAt = Object.prototype.hasOwnProperty.call(
+      request,
       'ambiguityDeclaredAt',
     );
-    const requestedAt = canonicalTimestamp(request.requestedAt, 'requestedAt');
-    if (Date.parse(requestedAt) < Date.parse(ambiguityDeclaredAt)) {
-      throw new Error('requestedAt cannot predate ambiguityDeclaredAt');
+    const hasRequestedAt = Object.prototype.hasOwnProperty.call(request, 'requestedAt');
+    if (hasAmbiguityDeclaredAt !== hasRequestedAt) {
+      throw new Error('GitHub pull-request-review reconciliation chronology envelope is incomplete');
+    }
+    if (hasAmbiguityDeclaredAt) {
+      const ambiguityDeclaredAt = canonicalTimestamp(
+        request.ambiguityDeclaredAt,
+        'ambiguityDeclaredAt',
+      );
+      const requestedAt = canonicalTimestamp(request.requestedAt, 'requestedAt');
+      if (Date.parse(requestedAt) < Date.parse(ambiguityDeclaredAt)) {
+        throw new Error('requestedAt cannot predate ambiguityDeclaredAt');
+      }
     }
     if (expectedOutcome === ReconciliationOutcome.SAFE_RETRY) {
       throw new Error('GitHub pull-request review cannot prove SAFE_RETRY after dispatch');
