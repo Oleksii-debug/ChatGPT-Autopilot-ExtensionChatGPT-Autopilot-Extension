@@ -44,6 +44,31 @@ test('normalization is bounded, exact, immutable, and fail closed by default', (
   assert.throws(() => normalizeResourceUsageV1({ modelCalls: '1' }), /invalid/);
 });
 
+test('budget, usage and request zeroes use one canonical numeric representation', () => {
+  const canonicalBudget = normalizeResourceBudgetV1({ maxCostUsdMicros:0 });
+  const canonicalUsage = normalizeResourceUsageV1({ costUsdMicros:0 });
+  assert.equal(canonicalBudget.maxCostUsdMicros, 0);
+  assert.equal(canonicalUsage.costUsdMicros, 0);
+  assert.equal(Object.is(canonicalBudget.maxCostUsdMicros, -0), false);
+  assert.equal(Object.is(canonicalUsage.costUsdMicros, -0), false);
+
+  assert.throws(
+    () => normalizeResourceBudgetV1({ maxCostUsdMicros:-0 }),
+    /ResourceBudgetV1 maxCostUsdMicros is invalid/,
+  );
+  assert.throws(
+    () => normalizeResourceUsageV1({ costUsdMicros:-0 }),
+    /ResourceUsageV1 costUsdMicros is invalid/,
+  );
+  assert.throws(
+    () => evaluateResourceBudgetV1({
+      budget:{ maxCostUsdMicros:1 },
+      request:{ costUsdMicros:-0 },
+    }),
+    /ResourceRequestV1 costUsdMicros is invalid/,
+  );
+});
+
 test('missing ceilings and usage ignore inherited prototype values', () => {
   const previousBudget = Object.getOwnPropertyDescriptor(Object.prototype, 'maxModelCalls');
   const previousUsage = Object.getOwnPropertyDescriptor(Object.prototype, 'modelCalls');
