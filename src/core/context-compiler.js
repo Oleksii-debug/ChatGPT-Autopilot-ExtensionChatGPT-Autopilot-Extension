@@ -308,7 +308,7 @@ const REQUEST_KEYS = new Set([
   'compiledAt',
 ]);
 
-export async function compileDeltaContextPlanV1(input, { cryptoApi = globalThis.crypto } = {}) {
+export async function compileDeltaContextPlanV1(input) {
   const raw = plain(input, 'ContextCompilerRequestV1');
   exactKeys(raw, REQUEST_KEYS, 'ContextCompilerRequestV1');
   if (raw.schemaVersion !== ContextCompilerContractVersion) {
@@ -339,7 +339,7 @@ export async function compileDeltaContextPlanV1(input, { cryptoApi = globalThis.
     if (Date.parse(fragment.createdAt) > compiledMs) {
       throw new Error(`fragment ${fragment.fragmentId} is from the future of compilation`);
     }
-    const actualSummarySha = await createSha256FingerprintV1(fragment.summary, { cryptoApi });
+    const actualSummarySha = await createSha256FingerprintV1(fragment.summary);
     if (actualSummarySha !== fragment.summarySha256) {
       throw new Error(`fragment ${fragment.fragmentId} summary hash mismatch`);
     }
@@ -376,7 +376,6 @@ export async function compileDeltaContextPlanV1(input, { cryptoApi = globalThis.
     if (freshness === ContextFragmentFreshness.FRESH) {
       const fragmentFingerprint = await createSha256FingerprintV1(
         canonicalFragmentFingerprintInput(fragment),
-        { cryptoApi },
       );
       resultById.set(fragmentId, deepFreeze({
         fragmentId,
