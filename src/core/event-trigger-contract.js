@@ -22,6 +22,7 @@ export const EventTriggerAdmissionStatus = Object.freeze({
 
 const KINDS = new Set(Object.values(EventTriggerKind));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_CAPABILITIES = 128;
 const ARTIFACT_KEYS = new Set([
   'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
@@ -142,10 +143,32 @@ function idList(value, label) {
 }
 
 function snapshotArtifact(value) {
-  const snapshot = strictRecord(value, 'EventTriggerObservationV1 payloadArtifactRef', ARTIFACT_KEYS);
+  const label = 'EventTriggerObservationV1 payloadArtifactRef';
+  const snapshot = strictRecord(value, label, ARTIFACT_KEYS);
+  if (snapshot.schemaVersion !== EVENT_TRIGGER_VERSION) throw new Error(`${label} schemaVersion must be numeric 1`);
+  exactId(snapshot.artifactId, `${label} artifactId`);
+  exactId(snapshot.kind, `${label} kind`);
+  if (typeof snapshot.uri !== 'string' || snapshot.uri !== snapshot.uri.trim() || !snapshot.uri || snapshot.uri.length > 4096) {
+    throw new Error(`${label} uri must be canonical bounded text`);
+  }
+  if (snapshot.mediaType != null && snapshot.mediaType !== '') {
+    if (typeof snapshot.mediaType !== 'string' || snapshot.mediaType !== snapshot.mediaType.trim() || snapshot.mediaType.length > 300) {
+      throw new Error(`${label} mediaType must be canonical bounded text`);
+    }
+  }
+  if (typeof snapshot.sha256 !== 'string' || snapshot.sha256 !== snapshot.sha256.trim() || !SHA256.test(snapshot.sha256)) {
+    throw new Error(`${label} sha256 must be canonical lowercase SHA-256`);
+  }
+  if (!Number.isSafeInteger(snapshot.sizeBytes) || snapshot.sizeBytes < 1) {
+    throw new Error(`${label} requires non-empty material with integer sizeBytes`);
+  }
+  canonicalTimestamp(snapshot.createdAt, `${label} createdAt`);
+  if (snapshot.producerInvocationId != null && snapshot.producerInvocationId !== '') {
+    exactId(snapshot.producerInvocationId, `${label} producerInvocationId`);
+  }
+  if (typeof snapshot.sensitive !== 'boolean') throw new Error(`${label} sensitive must be explicit boolean`);
   const artifact = normalizeArtifactRefV1(snapshot);
-  if (!artifact.sha256) throw new Error('EventTriggerObservationV1 payloadArtifactRef requires sha256');
-  if (artifact.sizeBytes < 1) throw new Error('EventTriggerObservationV1 payloadArtifactRef requires non-empty material');
+  if (!artifact.sha256) throw new Error(`${label} requires sha256`);
   return artifact;
 }
 
