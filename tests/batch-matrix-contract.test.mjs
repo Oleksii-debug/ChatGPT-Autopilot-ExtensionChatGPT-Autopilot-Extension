@@ -212,8 +212,12 @@ test('missing results are implicit PENDING and only PENDING items are resume can
   assert.equal(report.reconciliationAuthorized, false);
   assert.equal(report.executionAuthorized, false);
   assert.equal(report.schedulingAuthorized, false);
-  assert.equal(report.allPassed, false);
-  assert.equal(report.partialFailure, false);
+  assert.equal(report.reportedAllPassed, false);
+  assert.equal(report.reportedPartialFailure, false);
+  assert.equal(report.resultEvidenceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(report.completionAuthorized, false);
+  assert.equal(report.requiresCanonicalEvidenceResolution, true);
+  assert.equal(report.requiresIndependentVerifierAuthority, true);
 });
 
 test('RUNNING item is reconciliation-required and never blind-resume candidate', async () => {
@@ -248,8 +252,10 @@ test('all independent PASS evidence produces COMPLETE and nothing else can', asy
 
   const report = await assessBatchMatrixV1(spec(), results);
   assert.equal(report.state, BatchMatrixState.COMPLETE);
-  assert.equal(report.allPassed, true);
-  assert.equal(report.partialFailure, false);
+  assert.equal(report.reportedAllPassed, true);
+  assert.equal(report.reportedPartialFailure, false);
+  assert.equal(report.resultEvidenceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(report.completionAuthorized, false);
   assert.equal(report.counts.pass, 4);
   assert.deepEqual(report.resumeCandidateItemIds, []);
   assert.deepEqual(report.reconciliationRequiredItemIds, []);
@@ -273,8 +279,8 @@ test('terminal FAIL or CANCELLED yields truthful PARTIAL rather than success', a
 
   const report = await assessBatchMatrixV1(spec(), results);
   assert.equal(report.state, BatchMatrixState.PARTIAL);
-  assert.equal(report.allPassed, false);
-  assert.equal(report.partialFailure, true);
+  assert.equal(report.reportedAllPassed, false);
+  assert.equal(report.reportedPartialFailure, true);
   assert.equal(report.counts.pass, 2);
   assert.equal(report.counts.fail, 1);
   assert.equal(report.counts.cancelled, 1);
