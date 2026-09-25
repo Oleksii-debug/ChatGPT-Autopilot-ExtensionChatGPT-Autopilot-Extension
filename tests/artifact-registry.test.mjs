@@ -259,6 +259,25 @@ test('registry rejects coercive identity, digest and timestamp aliases', () => {
     ),
     /canonical ISO-8601/,
   );
+
+  const negativeZeroSize = artifact({ sizeBytes: -0 });
+  assert.throws(
+    () => putArtifactVersionV1(
+      createArtifactRegistryV1('project-a'),
+      version({ artifactRef: negativeZeroSize, provenanceRef: provenance(negativeZeroSize) }),
+    ),
+    /integer in range/,
+  );
+
+  assert.throws(
+    () => normalizeArtifactRegistryV1({
+      schemaVersion: 1,
+      projectId: 'project-a',
+      revision: -0,
+      artifacts: [],
+    }),
+    /integer in range/,
+  );
 });
 
 test('registered artifacts must be materialized with a SHA-256 digest', () => {
