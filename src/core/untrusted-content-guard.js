@@ -18,6 +18,7 @@ export const UntrustedContentGuardStatus = Object.freeze({
 
 const SOURCE_KINDS = new Set(Object.values(UntrustedContentSourceKind));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_LIST = 128;
 
 const ARTIFACT_KEYS = new Set([
@@ -60,6 +61,9 @@ const PROPOSAL_KEYS = new Set([
   'agentId',
   'jobId',
   'sourceId',
+  'sourceArtifactId',
+  'sourceSha256',
+  'sourceObservedAt',
   'requestedCapabilityIds',
   'requestedToolIds',
   'requestedProviderIds',
@@ -148,6 +152,13 @@ function exactVersion(value, label) {
 function exactId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function exactSha256(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) {
+    throw new Error(`${label} must be a lowercase SHA-256 digest`);
   }
   return value;
 }
@@ -260,6 +271,9 @@ export function normalizeUntrustedInfluenceProposalV1(value) {
     agentId: exactId(raw.agentId, 'UntrustedInfluenceProposalV1 agentId'),
     jobId: exactId(raw.jobId, 'UntrustedInfluenceProposalV1 jobId'),
     sourceId: exactId(raw.sourceId, 'UntrustedInfluenceProposalV1 sourceId'),
+    sourceArtifactId: exactId(raw.sourceArtifactId, 'UntrustedInfluenceProposalV1 sourceArtifactId'),
+    sourceSha256: exactSha256(raw.sourceSha256, 'UntrustedInfluenceProposalV1 sourceSha256'),
+    sourceObservedAt: timestamp(raw.sourceObservedAt, 'UntrustedInfluenceProposalV1 sourceObservedAt'),
     requestedCapabilityIds: exactIdList(raw.requestedCapabilityIds, 'UntrustedInfluenceProposalV1 requestedCapabilityIds'),
     requestedToolIds: exactIdList(raw.requestedToolIds, 'UntrustedInfluenceProposalV1 requestedToolIds'),
     requestedProviderIds: exactIdList(raw.requestedProviderIds, 'UntrustedInfluenceProposalV1 requestedProviderIds'),
@@ -297,6 +311,11 @@ export function assessUntrustedContentInfluenceV1(value) {
   }
   if (proposal.sourceId !== source.sourceId) {
     throw new Error('Untrusted influence proposal sourceId does not match source');
+  }
+  if (proposal.sourceArtifactId !== source.artifactRef.artifactId
+      || proposal.sourceSha256 !== source.artifactRef.sha256
+      || proposal.sourceObservedAt !== source.observedAt) {
+    throw new Error('Untrusted influence proposal does not match exact source material observation');
   }
   if (source.observedAt > proposal.createdAt) {
     throw new Error('Untrusted influence proposal predates source observation');
@@ -344,6 +363,7 @@ export function assessUntrustedContentInfluenceV1(value) {
     sourceOrigin: source.sourceOrigin,
     sourceArtifactId: source.artifactRef.artifactId,
     sourceSha256: source.artifactRef.sha256,
+    sourceObservedAt: source.observedAt,
     contentTrust: 'UNTRUSTED_DATA',
     instructionAuthority: 'NONE',
     authorityAmplificationAllowed: false,
