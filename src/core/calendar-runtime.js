@@ -7,7 +7,8 @@ import {
   occurrenceId,
 } from './calendar-schedule.js';
 
-const RECURRENCE_PROBE_LOOKBACK_MS = 9 * 24 * 60 * 60 * 1000;
+const DAILY_RECURRENCE_PROBE_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
+const WEEKLY_RECURRENCE_PROBE_LOOKBACK_MS = 9 * 24 * 60 * 60 * 1000;
 
 export const CalendarOccurrenceState = Object.freeze({
   WAITING: 'WAITING',
@@ -58,14 +59,18 @@ function catchUpProbeRuntime(runtime, schedule, probeSchedule, now) {
   }
   // Unbounded recurring catch-up ON normally starts at startDate. For an
   // OFF-policy missed/not-missed probe we only need to know whether a recent
-  // occurrence precedes now. Nine local days cover every selected WEEKLY
-  // weekday while spanning DST transitions, bounding work independent of age.
+  // occurrence precedes now. Three elapsed days cover DAILY across a skipped
+  // DST wall time; nine elapsed days cover every selected WEEKLY weekday.
+  // Both keep probe work bounded independently of schedule age.
   if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
+    const lookbackMs = schedule.kind === 'DAILY'
+      ? DAILY_RECURRENCE_PROBE_LOOKBACK_MS
+      : WEEKLY_RECURRENCE_PROBE_LOOKBACK_MS;
     return {
       ...runtime,
       reconciledThroughByRevision: {
         ...(runtime.reconciledThroughByRevision || {}),
-        [probeRevision]: now - RECURRENCE_PROBE_LOOKBACK_MS,
+        [probeRevision]: now - lookbackMs,
       },
     };
   }
