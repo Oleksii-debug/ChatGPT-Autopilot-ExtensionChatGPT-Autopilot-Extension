@@ -138,7 +138,7 @@ async function stageReplacementFile(target, desired, admitted, { afterTempWrite 
   let complete = false;
   try {
     handle = await fs.open(tempPath, flags, 0o600);
-    if (Number.isInteger(admitted.stat.mode) && typeof handle.chmod === 'function') {
+    if (process.platform !== 'win32' && Number.isInteger(admitted.stat.mode) && typeof handle.chmod === 'function') {
       await handle.chmod(admitted.stat.mode & 0o777);
     }
     if (desired.byteLength) await writeAll(handle, desired, { afterChunk: afterTempWrite });
@@ -157,18 +157,32 @@ async function stageReplacementFile(target, desired, admitted, { afterTempWrite 
   });
 }
 
-async function requireTargetStillAdmitted(target, staged) {
-  const [real, stat] = await Promise.all([
-    fs.realpath(target),
-    fs.stat(target),
-  ]);
-  if (
-    canonicalPath(real) !== canonicalPath(staged.admittedPath)
-    || !stat.isFile()
-    || !sameFileIdentity(stat, { dev: staged.admittedDev, ino: staged.admittedIno })
-  ) {
-    throw nativeError('PATH_OUTSIDE_SCOPE', 'Requested filesystem path changed identity before publication');
-  }
+async function inspectTargetBeforePublication(scope, target, staged) {
+  return withAuthorizedExistingFileV1(scope, target, { write: true }, async (handle, admitted) => {
+    if (
+      canonicalPath(admitted.path) !== canonicalPath(staged.admittedPath)
+      || !admitted.stat.isFile()
+      || !sameFileIdentity(admitted.stat, { dev: staged.admittedDev, ino: staged.admittedIno })
+    ) {
+      throw nativeError('PATH_OUTSIDE_SCOPE', 'Requested filesystem path changed identity before publication');
+    }
+    if (admitted.stat.size > MAX_WRITE_TEXT_BYTES) {
+      throw nativeError('FILE_TOO_LARGE', 'Existing file exceeds mutation bound before publication');
+    }
+    const bytes = Buffer.alloc(admitted.stat.size);
+    const read = admitted.stat.size
+      ? await handle.read(bytes, 0, bytes.length, 0)
+      : { bytesRead: 0 };
+    const afterReadStat = await handle.stat();
+    if (
+      read.bytesRead !== admitted.stat.size
+      || !sameFileIdentity(afterReadStat, admitted.stat)
+      || afterReadStat.size !== admitted.stat.size
+    ) {
+      throw nativeError('PRECONDITION_FAILED', 'Existing file changed during publication precondition read');
+    }
+    return Object.freeze({ sha256: sha256(bytes), sizeBytes: bytes.byteLength });
+  });
 }
 
 async function syncParentDirectory(parent) {
@@ -221,7 +235,7 @@ export async function searchScopedFilesystemV1(payload, config) {
 }
 
 /**
- * V1 mutation primitive intentionally overwrites an existing regular UTF-8 file only.
+ * V1 mutation primitive crash-safely replaces an existing regular UTF-8 file only.
  * Creation remains fail-closed because Node has no portable openat-style parent handle
  * primitive that can bind a missing leaf to the admitted directory identity.
  *
@@ -296,9 +310,25 @@ export async function writeExistingTextScopedV1(payload, config, {
     // rather than truncating the admitted inode, so a crash before publication leaves
     // the complete original file and a crash after publication exposes the complete
     // fsynced replacement.
-    await requireTargetStillAdmitted(target, staged);
+    let liveTarget = await inspectTargetBeforePublication(scope, target, staged);
+    if (liveTarget.sha256 !== expectedSha256 && liveTarget.sha256 !== desiredSha256) {
+      throw nativeError('PRECONDITION_FAILED', 'Existing file changed while replacement was staged');
+    }
     if (beforePublish != null) await beforePublish();
-    await requireTargetStillAdmitted(target, staged);
+    liveTarget = await inspectTargetBeforePublication(scope, target, staged);
+    if (liveTarget.sha256 === desiredSha256) {
+      return {
+        rootId: root.rootId,
+        relativePath: rel.replace(/\\/gu, '/'),
+        beforeSha256: prepared.beforeSha256,
+        sha256: desiredSha256,
+        sizeBytes: desired.byteLength,
+        alreadyApplied: true,
+      };
+    }
+    if (liveTarget.sha256 !== expectedSha256) {
+      throw nativeError('PRECONDITION_FAILED', 'Existing file changed while replacement was staged');
+    }
     await fs.rename(staged.tempPath, target);
     published = true;
     await syncParentDirectory(staged.parent);
