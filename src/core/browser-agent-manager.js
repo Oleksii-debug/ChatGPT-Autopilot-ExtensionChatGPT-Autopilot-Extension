@@ -78,6 +78,9 @@ function isHttpUrl(value) {
 }
 
 function clone(value) { return structuredClone(value); }
+const BROWSER_APPROVAL_FENCE_KEYS = new Set([
+  'controlEpoch', 'updatedAt', 'snapshotId', 'snapshotSignature', 'requestedAt',
+]);
 function snapshotOwnDataRequest(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
   const prototype = Object.getPrototypeOf(value);
@@ -93,6 +96,57 @@ function snapshotOwnDataRequest(value, label) {
     snapshot[key] = descriptor.value;
   }
   return snapshot;
+}
+function nonNegativeSafeInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
+  return value;
+}
+function boundedExactString(value, label, max) {
+  if (typeof value !== 'string' || value.length > max) throw new Error(`${label} must be a bounded string`);
+  return value;
+}
+function normalizeBrowserApprovalFence(value) {
+  if (value == null) return null;
+  const raw = snapshotOwnDataRequest(value, 'Browser Agent expected approval');
+  const keys = Object.keys(raw);
+  if (keys.length !== BROWSER_APPROVAL_FENCE_KEYS.size || keys.some(key => !BROWSER_APPROVAL_FENCE_KEYS.has(key))) {
+    throw new Error('Browser Agent expected approval contains unexpected or missing fields');
+  }
+  return Object.freeze({
+    controlEpoch: nonNegativeSafeInteger(raw.controlEpoch, 'Browser Agent expected approval controlEpoch'),
+    updatedAt: nonNegativeSafeInteger(raw.updatedAt, 'Browser Agent expected approval updatedAt'),
+    snapshotId: boundedExactString(raw.snapshotId, 'Browser Agent expected approval snapshotId', 160),
+    snapshotSignature: boundedExactString(raw.snapshotSignature, 'Browser Agent expected approval snapshotSignature', 256),
+    requestedAt: nonNegativeSafeInteger(raw.requestedAt, 'Browser Agent expected approval requestedAt'),
+  });
+}
+function browserApprovalFenceFromJob(job) {
+  const runtime = job?.runtime;
+  const pending = runtime?.pendingApproval;
+  if (!runtime || !pending || typeof pending !== 'object') return null;
+  return Object.freeze({
+    controlEpoch: nonNegativeSafeInteger(runtime.controlEpoch, 'Browser Agent approval controlEpoch'),
+    updatedAt: nonNegativeSafeInteger(runtime.updatedAt, 'Browser Agent approval updatedAt'),
+    snapshotId: boundedExactString(pending.snapshotId || '', 'Browser Agent approval snapshotId', 160),
+    snapshotSignature: boundedExactString(pending.snapshotSignature || '', 'Browser Agent approval snapshotSignature', 256),
+    requestedAt: nonNegativeSafeInteger(pending.requestedAt || 0, 'Browser Agent approval requestedAt'),
+  });
+}
+function browserApprovalFenceMatches(job, fence) {
+  if (!fence || job?.runtime?.runState !== BrowserAgentRunState.WAITING_APPROVAL || !job.runtime.pendingApproval?.action) return false;
+  let live;
+  try { live = browserApprovalFenceFromJob(job); } catch { return false; }
+  return Boolean(live)
+    && live.controlEpoch === fence.controlEpoch
+    && live.updatedAt === fence.updatedAt
+    && live.snapshotId === fence.snapshotId
+    && live.snapshotSignature === fence.snapshotSignature
+    && live.requestedAt === fence.requestedAt;
+}
+function staleBrowserApprovalError() {
+  const error = new Error('Browser Agent pending approval changed; refresh before deciding');
+  error.code = 'BROWSER_AGENT_APPROVAL_STALE';
+  return error;
 }
 function specialistRequestTimestamp(value, fallback, label = 'Specialist request at') {
   const candidate = value === undefined ? fallback : value;
@@ -1776,31 +1830,46 @@ export class BrowserAgentManager {
     return stored ? { kind: 'WAITING_APPROVAL' } : { kind: 'CANCELLED_BY_OWNER' };
   }
 
-  async approvePendingAction(id, { runInitial = true } = {}) {
+  async approvePendingAction(id, { runInitial = true, expectedApproval = null } = {}) {
+    const requiredFence = normalizeBrowserApprovalFence(expectedApproval);
     const before = await this.get(id);
     if (!before.job) throw new Error('Browser Agent job not found');
     if (before.job.runtime.runState !== BrowserAgentRunState.WAITING_APPROVAL || !before.job.runtime.pendingApproval?.action) {
       throw new Error('Browser Agent has no pending action to approve');
     }
+    const observedFence = browserApprovalFenceFromJob(before.job);
+    if (requiredFence && !browserApprovalFenceMatches(before.job, requiredFence)) throw staleBrowserApprovalError();
+    const executionFence = requiredFence || observedFence;
     const pending = clone(before.job.runtime.pendingApproval);
     const now = this.now();
-    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
-    const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
-    if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
+    const pauseStaleApproval = async (message, action = null) => {
+      let matched = false;
       await this.update(store => {
         const job = store.byId[id];
-        if (!job) return store;
+        if (!job || !browserApprovalFenceMatches(job, executionFence)) return store;
+        matched = true;
         job.runtime.controlEpoch += 1;
         job.runtime.runState = BrowserAgentRunState.PAUSED;
         job.runtime.pendingApproval = null;
-        job.runtime.lastError = 'Approved action could not run because its browser tab is no longer available.';
+        job.runtime.lastError = message;
         job.runtime.nextWakeAt = 0;
         job.runtime.updatedAt = now;
-        appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
+        appendHistory(job.runtime, {
+          at: now,
+          type: 'approval-stale',
+          message: job.runtime.lastError,
+          ...(action ? { action: clone(action) } : {}),
+        });
         return store;
       });
+      if (!matched) throw staleBrowserApprovalError();
       await this.reconcileAlarm();
       return this.get(id);
+    };
+    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
+    if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
+      return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
     }
     if (pending.action?.ref && pending.targetFingerprint) {
       let proof = null;
@@ -1813,20 +1882,7 @@ export class BrowserAgentManager {
         proof = verified?.[0]?.result || null;
       } catch { proof = null; }
       if (!proof?.ok) {
-        await this.update(store => {
-          const job = store.byId[id];
-          if (!job) return store;
-          job.runtime.controlEpoch += 1;
-          job.runtime.runState = BrowserAgentRunState.PAUSED;
-          job.runtime.pendingApproval = null;
-          job.runtime.lastError = 'Approved action became stale because the target control changed; nothing was executed.';
-          job.runtime.nextWakeAt = 0;
-          job.runtime.updatedAt = now;
-          appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
-          return store;
-        });
-        await this.reconcileAlarm();
-        return this.get(id);
+        return pauseStaleApproval('Approved action became stale because the target control changed; nothing was executed.', pending.action);
       }
     } else if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(pending.action?.type) && pending.targetFingerprint) {
       let proof = null;
@@ -1839,20 +1895,7 @@ export class BrowserAgentManager {
         proof = verified?.[0]?.result || null;
       } catch { proof = null; }
       if (!proof?.ok) {
-        await this.update(store => {
-          const job = store.byId[id];
-          if (!job) return store;
-          job.runtime.controlEpoch += 1;
-          job.runtime.runState = BrowserAgentRunState.PAUSED;
-          job.runtime.pendingApproval = null;
-          job.runtime.lastError = 'Approved visual action became stale because the target under that coordinate changed; nothing was executed.';
-          job.runtime.nextWakeAt = 0;
-          job.runtime.updatedAt = now;
-          appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
-          return store;
-        });
-        await this.reconcileAlarm();
-        return this.get(id);
+        return pauseStaleApproval('Approved visual action became stale because the target under that coordinate changed; nothing was executed.', pending.action);
       }
     } else if (pending.action?.type === BrowserAgentActionType.DRAG_AT && pending.dragStartFingerprint && pending.dragEndFingerprint) {
       let startProof = null;
@@ -1875,26 +1918,17 @@ export class BrowserAgentManager {
         endProof = null;
       }
       if (!startProof?.ok || !endProof?.ok) {
-        await this.update(store => {
-          const job = store.byId[id];
-          if (!job) return store;
-          job.runtime.controlEpoch += 1;
-          job.runtime.runState = BrowserAgentRunState.PAUSED;
-          job.runtime.pendingApproval = null;
-          job.runtime.lastError = 'Approved drag became stale because its source or destination changed; nothing was executed.';
-          job.runtime.nextWakeAt = 0;
-          job.runtime.updatedAt = now;
-          appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
-          return store;
-        });
-        await this.reconcileAlarm();
-        return this.get(id);
+        return pauseStaleApproval('Approved drag became stale because its source or destination changed; nothing was executed.', pending.action);
       }
     }
     let epoch = 0;
+    let approvalChanged = false;
     await this.update(store => {
       const job = store.byId[id];
-      if (!job || job.runtime.runState !== BrowserAgentRunState.WAITING_APPROVAL) return store;
+      if (!job || !browserApprovalFenceMatches(job, executionFence)) {
+        approvalChanged = true;
+        return store;
+      }
       job.runtime.controlEpoch += 1;
       epoch = job.runtime.controlEpoch;
       job.runtime.runState = BrowserAgentRunState.RUNNING;
@@ -1904,6 +1938,7 @@ export class BrowserAgentManager {
       appendHistory(job.runtime, { at: now, type: 'approval-approved', message: `Owner approved: ${pending.targetName || pending.action.type}`, action: clone(pending.action) });
       return store;
     });
+    if (approvalChanged) throw staleBrowserApprovalError();
     const live = await this.get(id);
     if (!live.job || !epoch) return this.get(id);
     try {
@@ -1955,12 +1990,18 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async rejectPendingAction(id) {
+  async rejectPendingAction(id, { expectedApproval = null } = {}) {
+    const requiredFence = normalizeBrowserApprovalFence(expectedApproval);
     const now = this.now();
+    let approvalChanged = false;
     await this.update(store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState !== BrowserAgentRunState.WAITING_APPROVAL || !job.runtime.pendingApproval) throw new Error('Browser Agent has no pending action to reject');
+      if (requiredFence && !browserApprovalFenceMatches(job, requiredFence)) {
+        approvalChanged = true;
+        return store;
+      }
       const target = job.runtime.pendingApproval.targetName || job.runtime.pendingApproval.action?.type || 'action';
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.PAUSED;
@@ -1971,6 +2012,7 @@ export class BrowserAgentManager {
       appendHistory(job.runtime, { at: now, type: 'approval-rejected', message: job.runtime.lastError });
       return store;
     });
+    if (approvalChanged) throw staleBrowserApprovalError();
     await this.reconcileAlarm();
     return this.get(id);
   }

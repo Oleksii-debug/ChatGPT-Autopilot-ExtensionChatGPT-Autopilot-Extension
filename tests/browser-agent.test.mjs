@@ -3142,3 +3142,88 @@ test('Browser Agent reservation fails closed when owner authority changes before
   assert.equal(current.job.runtime.modelBudgetReservation, null);
   assert.equal(current.job.runtime.modelCalls, 0);
 });
+
+
+test('owner approval fence rejects a replacement pending action that races with asynchronous tab verification', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: (() => { let n = 200_000; return () => ++n; })(),
+  });
+  await manager.create({ id: 'approval-race-job', goal: 'Never execute a stale approval' });
+  await manager.update(store => {
+    const job = store.byId['approval-race-job'];
+    job.runtime.runState = 'WAITING_APPROVAL';
+    job.runtime.controlEpoch = 10;
+    job.runtime.updatedAt = 200_010;
+    job.runtime.pendingApproval = {
+      action: { type: 'click', frameId: 0, ref: 'r1' },
+      snapshotId: 'snapshot-old',
+      snapshotSignature: 'signature-old',
+      url: 'https://ais.example.edu/app',
+      tabId: 1,
+      targetName: 'Old action',
+      targetFingerprint: null,
+      dragStartFingerprint: null,
+      dragEndFingerprint: null,
+      reason: 'Old approval',
+      requestedAt: 200_009,
+    };
+    return store;
+  });
+  const before = await manager.get('approval-race-job');
+  const oldFence = {
+    controlEpoch: before.job.runtime.controlEpoch,
+    updatedAt: before.job.runtime.updatedAt,
+    snapshotId: before.job.runtime.pendingApproval.snapshotId,
+    snapshotSignature: before.job.runtime.pendingApproval.snapshotSignature,
+    requestedAt: before.job.runtime.pendingApproval.requestedAt,
+  };
+
+  const originalGet = chrome.tabs.get.bind(chrome.tabs);
+  let swapped = false;
+  chrome.tabs.get = async id => {
+    if (!swapped) {
+      swapped = true;
+      await manager.update(store => {
+        const job = store.byId['approval-race-job'];
+        job.runtime.controlEpoch = 11;
+        job.runtime.updatedAt = 200_012;
+        job.runtime.pendingApproval = {
+          ...job.runtime.pendingApproval,
+          action: { type: 'click', frameId: 0, ref: 'r2' },
+          snapshotId: 'snapshot-new',
+          snapshotSignature: 'signature-new',
+          targetName: 'New action',
+          reason: 'New approval',
+          requestedAt: 200_011,
+        };
+        return store;
+      });
+    }
+    return originalGet(id);
+  };
+
+  await assert.rejects(
+    () => manager.approvePendingAction('approval-race-job', {
+      runInitial: false,
+      expectedApproval: oldFence,
+    }),
+    error => error?.code === 'BROWSER_AGENT_APPROVAL_STALE',
+  );
+  chrome.tabs.get = originalGet;
+  let live = await manager.get('approval-race-job');
+  assert.equal(chrome._actionCalls.length, 0, 'raced stale approval must execute nothing');
+  assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
+  assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new');
+  assert.equal(live.job.runtime.pendingApproval.action.ref, 'r2');
+
+  await assert.rejects(
+    () => manager.rejectPendingAction('approval-race-job', { expectedApproval: oldFence }),
+    error => error?.code === 'BROWSER_AGENT_APPROVAL_STALE',
+  );
+  live = await manager.get('approval-race-job');
+  assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
+  assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new', 'stale reject must not clear the replacement approval');
+});

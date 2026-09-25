@@ -113,6 +113,32 @@ function addCoreCandidates(coreState, candidates) {
   }
 }
 
+function browserApprovalOwnerReference(job, runtime, pending) {
+  if (!job || typeof job.id !== 'string' || !runtime || !pending || typeof pending !== 'object') return null;
+  const controlEpoch = runtime.controlEpoch;
+  const updatedAt = runtime.updatedAt;
+  const requestedAt = pending.requestedAt;
+  const snapshotId = pending.snapshotId;
+  const snapshotSignature = pending.snapshotSignature;
+  if (!Number.isSafeInteger(controlEpoch) || controlEpoch < 0
+      || !Number.isSafeInteger(updatedAt) || updatedAt < 0
+      || !Number.isSafeInteger(requestedAt) || requestedAt < 0
+      || typeof snapshotId !== 'string' || snapshotId.length > 160
+      || typeof snapshotSignature !== 'string' || snapshotSignature.length > 256) {
+    return null;
+  }
+  return Object.freeze({
+    jobId: job.id,
+    expectedApproval: Object.freeze({
+      controlEpoch,
+      updatedAt,
+      snapshotId,
+      snapshotSignature,
+      requestedAt,
+    }),
+  });
+}
+
 function addBrowserAgentCandidates(agentJobs, candidates) {
   if (!Array.isArray(agentJobs)) return;
   for (const job of agentJobs) {
@@ -130,11 +156,20 @@ function addBrowserAgentCandidates(agentJobs, candidates) {
       const snapshot = typeof runtime.pendingApproval.snapshotSignature === 'string'
         ? runtime.pendingApproval.snapshotSignature
         : '';
+      const ownerReference = browserApprovalOwnerReference(job, runtime, runtime.pendingApproval);
       candidates.push({
         identityKind: 'browser-agent-approval',
         identityKey: `${job.id}|${snapshot}`,
         revisionKind: 'browser-agent-approval',
-        revisionParts: [job.id, snapshot, String(updatedAt)],
+        revisionParts: [
+          job.id,
+          snapshot,
+          ownerReference?.expectedApproval.snapshotId || '',
+          String(ownerReference?.expectedApproval.requestedAt ?? ''),
+          String(ownerReference?.expectedApproval.controlEpoch ?? ''),
+          String(updatedAt),
+        ],
+        ownerReference,
         severity: ActionCenterSeverity.BLOCKING,
         ownerActionKind: ActionCenterOwnerActionKind.APPROVE_OR_DENY,
         title: `${name}: approval required`,
@@ -201,14 +236,26 @@ async function materializeCandidate(candidate, cryptoApi) {
   };
 }
 
+function runtimeCandidates(coreState, agentJobs) {
+  const candidates = [];
+  addCoreCandidates(coreState, candidates);
+  addBrowserAgentCandidates(agentJobs, candidates);
+  return candidates;
+}
+
+function exactLookupId(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 300) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
 export async function projectRuntimeActionCenter({
   coreState = {},
   agentJobs = [],
   cryptoApi = globalThis.crypto,
 } = {}) {
-  const candidates = [];
-  addCoreCandidates(coreState, candidates);
-  addBrowserAgentCandidates(agentJobs, candidates);
+  const candidates = runtimeCandidates(coreState, agentJobs);
   const selected = selectCandidates(candidates);
   const items = await Promise.all(selected.map(candidate => materializeCandidate(candidate, cryptoApi)));
   const projection = buildActionCenterProjectionV1(items);
@@ -219,5 +266,38 @@ export async function projectRuntimeActionCenter({
       projectedCount: items.length,
       truncated: candidates.length > items.length,
     }),
+  });
+}
+
+export async function resolveRuntimeActionCenterBrowserApproval({
+  coreState = {},
+  agentJobs = [],
+  itemId,
+  sourceRevisionId,
+  decision,
+  cryptoApi = globalThis.crypto,
+} = {}) {
+  const exactItemId = exactLookupId(itemId, 'Action Center itemId');
+  const exactRevisionId = exactLookupId(sourceRevisionId, 'Action Center sourceRevisionId');
+  if (decision !== 'APPROVE' && decision !== 'REJECT') throw new Error('Action Center approval decision is invalid');
+
+  const selected = selectCandidates(runtimeCandidates(coreState, agentJobs));
+  const items = await Promise.all(selected.map(candidate => materializeCandidate(candidate, cryptoApi)));
+  const index = items.findIndex(item => item.itemId === exactItemId);
+  if (index < 0) throw new Error('Action Center item is no longer current');
+  const item = items[index];
+  const candidate = selected[index];
+  if (item.sourceRevisionId !== exactRevisionId) throw new Error('Action Center item revision is stale');
+  if (item.status !== ActionCenterItemStatus.OPEN
+      || item.sourceKind !== ActionCenterSourceKind.APPROVAL
+      || item.ownerActionKind !== ActionCenterOwnerActionKind.APPROVE_OR_DENY
+      || candidate.identityKind !== 'browser-agent-approval'
+      || !candidate.ownerReference) {
+    throw new Error('Action Center item is not an actionable Browser Agent approval');
+  }
+  return Object.freeze({
+    decision,
+    jobId: candidate.ownerReference.jobId,
+    expectedApproval: candidate.ownerReference.expectedApproval,
   });
 }
