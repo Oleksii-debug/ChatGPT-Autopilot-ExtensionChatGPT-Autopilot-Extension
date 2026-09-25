@@ -59,6 +59,7 @@ function validCanvas() {
     createdAt: '2026-09-25T05:00:00.000Z',
     kind: 'preview',
     mediaType: 'image/png',
+    sensitive: true,
   });
 
   return {
@@ -215,6 +216,15 @@ test('preview must bind the exact source SHA and obey source -> preview -> obser
   const observationAfterCanvas = validCanvas();
   observationAfterCanvas.items[0].preview.observedAt = '2026-09-25T05:03:00.000Z';
   assert.throws(() => normalizeArtifactDesignCanvasV1(observationAfterCanvas), /postdates updatedAt/);
+});
+
+test('sensitive source cannot bind a non-sensitive preview without declassification authority', () => {
+  const canvas = validCanvas();
+  canvas.items[0].preview.previewArtifactRef.sensitive = false;
+  assert.throws(
+    () => normalizeArtifactDesignCanvasV1(canvas),
+    /cannot downgrade sensitive source material/,
+  );
 });
 
 test('source and preview artifacts require exact canonical IDs, lowercase SHA, and canonical timestamps', () => {

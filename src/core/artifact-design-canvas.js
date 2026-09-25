@@ -200,6 +200,9 @@ function normalizePreviewBindingV1(input, sourceArtifactRef, label) {
   if (previewArtifactRef.artifactId === sourceArtifactRef.artifactId) {
     fail(`${label}.previewArtifactRef must be distinct from the source artifact`);
   }
+  if (sourceArtifactRef.sensitive === true && previewArtifactRef.sensitive !== true) {
+    fail(`${label}.previewArtifactRef cannot downgrade sensitive source material`);
+  }
   const observedAt = exactTimestamp(raw.observedAt, `${label}.observedAt`);
   if (Date.parse(previewArtifactRef.createdAt) < Date.parse(sourceArtifactRef.createdAt)) {
     fail(`${label} preview artifact predates its source artifact`);
