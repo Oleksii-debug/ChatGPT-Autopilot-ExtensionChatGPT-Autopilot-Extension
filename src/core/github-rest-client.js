@@ -10,6 +10,7 @@ const MAX_BODY_TEXT = 256_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
 const MAX_RESPONSE_CHUNKS = 8192;
 const SAFE_HTTP_FAILURES = new Set([400, 401, 403, 404, 405, 409, 412, 415, 422, 429]);
+const PULL_REQUEST_MERGE_METHODS = new Set(['merge', 'squash', 'rebase']);
 
 function clean(value, max = MAX_PATH) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -584,8 +585,12 @@ export class GitHubRestClientV1 {
       title: responseText(payload.title, 'pull request title', 1000),
       body: responseText(payload.body, 'pull request body', 100_000, { nullable: true }),
       state: payload.state,
+      merged: payload.merged === true,
       headSha: responseSha(payload?.head?.sha, 'pull request head sha'),
       baseSha: responseSha(payload?.base?.sha, 'pull request base sha'),
+      mergeCommitSha: payload.merge_commit_sha
+        ? responseSha(payload.merge_commit_sha, 'pull request merge commit sha')
+        : '',
       url: responseText(payload.html_url, 'pull request URL', 4096),
     });
   }
@@ -736,6 +741,58 @@ export class GitHubRestClientV1 {
     const number = Number(payload.number);
     if (!Number.isInteger(number) || number < 1) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub pull request response is invalid', { effectMayHaveOccurred: true });
     return Object.freeze({ repositoryFullName: repository, number, head: headRef, base: baseRef, url: clean(payload.html_url, 4096) });
+  }
+
+
+  async mergePullRequest({
+    repositoryFullName,
+    pullRequestNumber,
+    expectedHeadSha,
+    mergeMethod,
+  } = {}) {
+    const repository = exactRepositoryName(repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const number = positiveInteger(pullRequestNumber, 'pullRequestNumber');
+    const expectedHead = sha(expectedHeadSha, 'expectedHeadSha');
+    if (typeof mergeMethod !== 'string' || !PULL_REQUEST_MERGE_METHODS.has(mergeMethod)) {
+      throw githubError('GITHUB_INVALID_REQUEST', 'mergeMethod must be merge, squash, or rebase', { safeToRetry: true });
+    }
+
+    const before = await this.readPullRequest({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+    });
+    if (before.state !== 'open' || before.merged) {
+      throw githubError('GITHUB_PULL_REQUEST_NOT_OPEN', 'Pull request is not open for merge', { safeToRetry: true });
+    }
+    if (before.headSha !== expectedHead) {
+      throw githubError('GITHUB_PULL_REQUEST_HEAD_MISMATCH', 'Pull request head changed from expectedHeadSha', { safeToRetry: true });
+    }
+
+    const payload = await this.request(
+      'PUT',
+      `/repos/${repositoryPath(repository)}/pulls/${number}/merge`,
+      {
+        effectful: true,
+        expectedStatuses: [200],
+        body: { sha: expectedHead, merge_method: mergeMethod },
+      },
+    );
+    if (payload?.merged !== true) {
+      throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub merge response did not confirm a merged pull request', {
+        effectMayHaveOccurred: true,
+        safeToRetry: false,
+      });
+    }
+    const mergeCommitSha = responseSha(payload?.sha, 'merge commit sha', { effectMayHaveOccurred: true });
+    return Object.freeze({
+      repositoryFullName: repository,
+      pullRequestNumber: number,
+      expectedHeadSha: expectedHead,
+      mergeMethod,
+      merged: true,
+      mergeCommitSha,
+    });
   }
 
 
