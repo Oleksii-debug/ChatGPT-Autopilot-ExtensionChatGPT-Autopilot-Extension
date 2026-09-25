@@ -78,6 +78,15 @@ function isHttpUrl(value) {
 }
 
 function clone(value) { return structuredClone(value); }
+function ownDataField(value, key, label) {
+  if (!value || typeof value !== 'object') return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (!descriptor) return undefined;
+  if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(`${label} must be an enumerable own data property`);
+  }
+  return descriptor.value;
+}
 function snapshotOwnDataRequest(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
   const prototype = Object.getPrototypeOf(value);
@@ -642,6 +651,7 @@ export class BrowserAgentManager {
   async create(raw = {}) {
     const id = clean(raw.id, 128) || this.createId();
     const now = this.now();
+    const initialSourceContext = ownDataField(raw, 'initialSourceContext', 'Browser Agent initialSourceContext') ?? null;
     const config = normalizeBrowserAgentConfig({
       id,
       projectId: raw.projectId ?? '',
@@ -649,6 +659,7 @@ export class BrowserAgentManager {
       startUrl: raw.startUrl || '',
       startFromActiveTab: raw.startFromActiveTab !== false,
       goal: raw.goal || '',
+      initialSourceContext,
       acceptanceCriteria: raw.acceptanceCriteria || [],
       maxSteps: raw.maxSteps ?? 500,
       stepDelayMs: raw.stepDelayMs ?? 0,
@@ -705,6 +716,10 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+      if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'initialSourceContext')) {
+        ownDataField(rawConfig, 'initialSourceContext', 'Browser Agent initialSourceContext');
+        throw new Error('Browser Agent initialSourceContext is immutable; create a new job for another captured source');
+      }
 
       let nextProjectId = job.config.projectId || '';
       if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
