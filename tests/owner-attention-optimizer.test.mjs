@@ -279,6 +279,83 @@ test('near-deadline window and numeric boundaries reject aliases and negative ze
   );
 });
 
+
+test('extended-year deadlines use epoch order for batches and owner-attention priority', () => {
+  const evaluatedAt = '9999-01-01T00:00:00.000Z';
+  const itemTime = {
+    createdAt: '9998-12-30T00:00:00.000Z',
+    updatedAt: '9998-12-31T00:00:00.000Z',
+  };
+  const earlierDeadline = '9999-12-31T23:59:59.999Z';
+  const laterDeadline = '+010000-01-01T00:00:00.000Z';
+
+  const batched = buildOwnerAttentionPlanV1(request([
+    candidate({
+      attentionItem: attentionItem({
+        ...itemTime,
+        itemId: 'batch-later',
+        sourceId: 'job-batch-later',
+        sourceRevisionId: 'rev-batch-later',
+      }),
+      batchKey: 'extended-year-batch',
+      decisionDeadlineAt: laterDeadline,
+    }),
+    candidate({
+      attentionItem: attentionItem({
+        ...itemTime,
+        itemId: 'batch-earlier',
+        sourceId: 'job-batch-earlier',
+        sourceRevisionId: 'rev-batch-earlier',
+      }),
+      batchKey: 'extended-year-batch',
+      decisionDeadlineAt: earlierDeadline,
+    }),
+  ], {
+    evaluatedAt,
+    nearDeadlineWindowMs: 0,
+  }));
+
+  assert.equal(batched.batches.length, 1);
+  assert.equal(batched.batches[0].earliestDeadlineAt, earlierDeadline);
+
+  const ordered = buildOwnerAttentionPlanV1(request([
+    candidate({
+      attentionItem: attentionItem({
+        ...itemTime,
+        itemId: 'sort-later-a',
+        sourceId: 'job-sort-later',
+        sourceRevisionId: 'rev-sort-later',
+      }),
+      decisionDeadlineAt: laterDeadline,
+    }),
+    candidate({
+      attentionItem: attentionItem({
+        ...itemTime,
+        itemId: 'sort-no-deadline-a',
+        sourceId: 'job-sort-none',
+        sourceRevisionId: 'rev-sort-none',
+      }),
+    }),
+    candidate({
+      attentionItem: attentionItem({
+        ...itemTime,
+        itemId: 'sort-earlier-z',
+        sourceId: 'job-sort-earlier',
+        sourceRevisionId: 'rev-sort-earlier',
+      }),
+      decisionDeadlineAt: earlierDeadline,
+    }),
+  ], {
+    evaluatedAt,
+    nearDeadlineWindowMs: 0,
+  }));
+
+  assert.deepEqual(
+    ordered.items.map(item => item.itemId),
+    ['sort-earlier-z', 'sort-later-a', 'sort-no-deadline-a'],
+  );
+});
+
 test('output is deeply frozen, bounded and grants no notification, decision, evidence or task authority', () => {
   const out = buildOwnerAttentionPlanV1(request([
     candidate({ canContinueAround: true }),

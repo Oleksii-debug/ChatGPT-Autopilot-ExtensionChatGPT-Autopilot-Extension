@@ -347,11 +347,23 @@ function evidenceUnion(candidates) {
   )].sort(asciiCompare);
 }
 
+function compareCanonicalTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
+function compareOptionalDeadline(left, right) {
+  if (!left) return right ? 1 : 0;
+  if (!right) return -1;
+  return compareCanonicalTimestamp(left, right);
+}
+
 function earliestDeadline(candidates) {
   const deadlines = candidates
     .map(candidate => candidate.decisionDeadlineAt)
     .filter(Boolean)
-    .sort(asciiCompare);
+    .sort(compareCanonicalTimestamp);
   return deadlines[0] || '';
 }
 
@@ -472,7 +484,7 @@ export function buildOwnerAttentionPlanV1(input) {
   )).sort((left, right) => (
     DISPOSITION_RANK[left.disposition] - DISPOSITION_RANK[right.disposition]
     || SEVERITY_RANK[left.severity] - SEVERITY_RANK[right.severity]
-    || asciiCompare(left.decisionDeadlineAt || '9999', right.decisionDeadlineAt || '9999')
+    || compareOptionalDeadline(left.decisionDeadlineAt, right.decisionDeadlineAt)
     || asciiCompare(left.itemId, right.itemId)
   ));
 
