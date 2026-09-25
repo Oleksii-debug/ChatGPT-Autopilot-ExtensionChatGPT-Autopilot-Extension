@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $source = $PSScriptRoot
 $installRoot = Join-Path $env:LOCALAPPDATA 'ChatGPT-Autopilot\Native-Companion'
 $versionsRoot = Join-Path $installRoot 'versions'
-$regKey = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts\org.chatgpt_autopilot.companion'
+$registryPath = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts\org.chatgpt_autopilot.companion'
 $hostName = 'org.chatgpt_autopilot.companion'
 
 $copyNames = @(
@@ -64,7 +64,7 @@ foreach ($name in @($copyNames | Where-Object { $_ -like '*.mjs' })) {
 }
 
 $origin = "chrome-extension://$ExtensionId/"
-$hadRegistration = Test-Path -LiteralPath $regKey
+$hadRegistration = Test-Path -LiteralPath $registryPath
 $currentManifestPath = $null
 $existingConfigDir = $null
 $existingConfig = $null
@@ -73,7 +73,7 @@ $configPath = $null
 # Resolve the currently registered version only as a state source. Never write into it.
 if ($hadRegistration) {
   try {
-    $currentManifestPath = [string](Get-Item -LiteralPath $regKey).GetValue('')
+    $currentManifestPath = [string](Get-Item -LiteralPath $registryPath).GetValue('')
   } catch {
     throw "Не вдалося прочитати чинну реєстрацію Native Companion: $($_.Exception.Message)"
   }
@@ -221,6 +221,7 @@ try {
   }
 
   # Atomic authority point: until this succeeds, any prior registered version remains untouched and active.
+  $regKey = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts\org.chatgpt_autopilot.companion'
   New-Item -Path $regKey -Force | Out-Null
   Set-Item -Path $regKey -Value $manifestPath
   $published = $true
@@ -228,8 +229,8 @@ try {
   if (-not $published -and (Test-Path -LiteralPath $target)) {
     Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction SilentlyContinue
   }
-  if (-not $hadRegistration -and -not $published -and (Test-Path -LiteralPath $regKey)) {
-    Remove-Item -LiteralPath $regKey -Recurse -Force -ErrorAction SilentlyContinue
+  if (-not $hadRegistration -and -not $published -and (Test-Path -LiteralPath $registryPath)) {
+    Remove-Item -LiteralPath $registryPath -Recurse -Force -ErrorAction SilentlyContinue
   }
   throw
 } finally {
