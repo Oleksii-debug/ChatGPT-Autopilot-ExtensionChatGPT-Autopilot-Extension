@@ -289,7 +289,7 @@ function normalizeScopeProof(input, request, assessedAt) {
   });
 }
 
-function normalizeReceipt(input, request, dispatchAt) {
+function normalizeReceipt(input, request, dispatchAt, completedAt) {
   const raw = snapshotRecord(input, RECEIPT_KEYS, 'AutopilotProgrammaticDispatchReceiptV1');
   requireKeys(raw, RECEIPT_KEYS, 'AutopilotProgrammaticDispatchReceiptV1');
   if (raw.schemaVersion !== AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION) {
@@ -304,8 +304,12 @@ function normalizeReceipt(input, request, dispatchAt) {
     throw new Error('receipt.status is invalid');
   }
   const observedAt = canonicalTimestamp(raw.observedAt, 'receipt.observedAt');
-  if (Date.parse(observedAt) < Date.parse(dispatchAt)) {
+  const observedMs = Date.parse(observedAt);
+  if (observedMs < Date.parse(dispatchAt)) {
     throw new Error('receipt.observedAt cannot predate dispatchAt');
+  }
+  if (observedMs > Date.parse(completedAt)) {
+    throw new Error('receipt.observedAt cannot be after trusted completedAt');
   }
   const resultArtifactRef = raw.resultArtifactRef == null
     ? null
@@ -387,7 +391,11 @@ export async function executeAutopilotProgrammaticControlV1(input, dependencies 
     adapterGrantsAuthority: false,
   });
   const rawReceipt = await dispatchCanonicalControl(dispatchEnvelope);
-  const receipt = normalizeReceipt(rawReceipt, request, dispatchAt);
+  const completedAt = trustedNowTimestamp(now, 'completion');
+  if (Date.parse(completedAt) < Date.parse(dispatchAt)) {
+    throw new Error('Trusted programmatic control clock regressed after dispatch');
+  }
+  const receipt = normalizeReceipt(rawReceipt, request, dispatchAt, completedAt);
 
   return deepFreeze({
     schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
@@ -396,6 +404,7 @@ export async function executeAutopilotProgrammaticControlV1(input, dependencies 
     receipt,
     assessedAt,
     dispatchAt,
+    completedAt,
     readOnly,
     downstreamAuthorityRequired: !readOnly,
     adapterGrantsAuthority: false,

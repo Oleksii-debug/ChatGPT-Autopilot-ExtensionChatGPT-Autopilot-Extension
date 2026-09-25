@@ -93,7 +93,7 @@ test('read-only SDK request is exact-scoped and dispatched through the canonical
   let scopes = 0;
   let dispatches = 0;
   const output = await executeAutopilotProgrammaticControlV1(request(), {
-    now: fixedNow,
+    now: nowSequence(assessedAt, assessedAt, observedAt),
     async resolveTrustedScope(normalizedRequest) {
       scopes += 1;
       assert.equal(Object.isFrozen(normalizedRequest), true);
@@ -120,6 +120,7 @@ test('read-only SDK request is exact-scoped and dispatched through the canonical
   assert.equal(output.schedulerAuthority, false);
   assert.equal(output.exactEffectAuthority, false);
   assert.equal(output.receipt.requestId, output.request.requestId);
+  assert.equal(output.completedAt, observedAt);
   assert.equal(Object.isFrozen(output), true);
   assert.equal(Object.isFrozen(output.scopeProof), true);
   assert.equal(Object.isFrozen(output.receipt), true);
@@ -140,7 +141,7 @@ test('mutating SDK operation carries a versioned payload artifact but does not m
   );
 
   const output = await executeAutopilotProgrammaticControlV1(raw, {
-    now: fixedNow,
+    now: nowSequence(assessedAt, assessedAt, observedAt),
     resolveTrustedScope(normalizedRequest) {
       assert.equal(normalizedRequest.request.payloadArtifactRef.sha256, shaA);
       return scopeFor(normalizedRequest);
@@ -206,7 +207,7 @@ test('scope proof must bind exact principal, project, request, operation, target
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(raw, {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope(normalizedRequest) {
         return scopeFor(normalizedRequest, { principalId: 'other-owner' });
       },
@@ -221,7 +222,7 @@ test('scope proof must bind exact principal, project, request, operation, target
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(raw, {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope(normalizedRequest) {
         return scopeFor(normalizedRequest, { allowed: false });
       },
@@ -244,7 +245,7 @@ test('scope chronology is causal and unexpired at assessment', async () => {
   ]) {
     await assert.rejects(
       () => executeAutopilotProgrammaticControlV1(request(), {
-        now: fixedNow,
+        now: nowSequence(assessedAt, assessedAt, observedAt),
         resolveTrustedScope(normalizedRequest) {
           return scopeFor(normalizedRequest, override);
         },
@@ -262,7 +263,7 @@ test('scope chronology is causal and unexpired at assessment', async () => {
 test('dispatch receipt is exact-bound and its result artifact is causal to receipt observation', async () => {
   let attempt = 0;
   const dependencies = {
-    now: fixedNow,
+    now: nowSequence(assessedAt, assessedAt, observedAt),
     resolveTrustedScope(normalizedRequest) {
       return scopeFor(normalizedRequest);
     },
@@ -296,6 +297,19 @@ test('dispatch receipt is exact-bound and its result artifact is causal to recei
     () => executeAutopilotProgrammaticControlV1(request(), dependencies),
     /cannot be created after receipt\.observedAt/u,
   );
+
+  await assert.rejects(
+    () => executeAutopilotProgrammaticControlV1(request(), {
+      now: nowSequence(assessedAt, assessedAt, observedAt),
+      resolveTrustedScope(lookup) {
+        return scopeFor(lookup);
+      },
+      dispatchCanonicalControl(envelope) {
+        return receiptFor(envelope, { observedAt: '2026-09-25T18:00:12.000Z' });
+      },
+    }),
+    /cannot be after trusted completedAt/u,
+  );
 });
 
 test('outer request and dependency records reject accessors without executing getters', async () => {
@@ -314,7 +328,7 @@ test('outer request and dependency records reject accessors without executing ge
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(hostileRequest, {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -367,7 +381,7 @@ test('payload, scope proof and receipt descriptor boundaries reject getters with
       targetId: 'outcome-1',
       payloadArtifactRef: hostilePayload,
     }), {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope() {
         return {};
       },
@@ -383,7 +397,7 @@ test('payload, scope proof and receipt descriptor boundaries reject getters with
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope(normalizedRequest) {
         const proof = scopeFor(normalizedRequest);
         Object.defineProperty(proof, 'allowed', {
@@ -407,7 +421,7 @@ test('payload, scope proof and receipt descriptor boundaries reject getters with
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope(normalizedRequest) {
         return scopeFor(normalizedRequest);
       },
@@ -439,7 +453,7 @@ test('payload artifact identities reject normalization aliases before scope reso
       targetId: 'outcome-1',
       payloadArtifactRef: uppercase,
     }), {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -463,7 +477,7 @@ test('payload artifact identities reject normalization aliases before scope reso
       targetId: 'outcome-1',
       payloadArtifactRef: futurePayload,
     }), {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -482,7 +496,7 @@ test('null-prototype request, dependencies, scope proof and receipt remain suppo
     requestId: 'request-null-prototype',
   }));
   const dependencies = Object.create(null);
-  dependencies.now = fixedNow;
+  dependencies.now = nowSequence(assessedAt, assessedAt, observedAt);
   dependencies.resolveTrustedScope = normalizedRequest => Object.assign(
     Object.create(null),
     scopeFor(normalizedRequest),
@@ -505,7 +519,7 @@ test('trusted clock, not caller timestamps, controls scope freshness through dis
     () => executeAutopilotProgrammaticControlV1(request({
       requestedAt: '2026-09-25T18:00:11.000Z',
     }), {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -536,11 +550,24 @@ test('trusted clock, not caller timestamps, controls scope freshness through dis
   );
   assert.equal(dispatches, 0);
 
+  await assert.rejects(
+    () => executeAutopilotProgrammaticControlV1(request(), {
+      now: nowSequence(assessedAt, observedAt, assessedAt),
+      resolveTrustedScope(lookup) {
+        return scopeFor(lookup);
+      },
+      dispatchCanonicalControl(envelope) {
+        return receiptFor(envelope);
+      },
+    }),
+    /clock regressed after dispatch/u,
+  );
+
   const callerTime = request();
   callerTime.assessedAt = assessedAt;
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(callerTime, {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope() {
         return {};
       },
@@ -562,7 +589,7 @@ test('scope proof binds payload artifact identity as well as bytes', async () =>
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(raw, {
-      now: fixedNow,
+      now: nowSequence(assessedAt, assessedAt, observedAt),
       resolveTrustedScope(lookup) {
         return scopeFor(lookup, { payloadArtifactId: 'payload-alias-id' });
       },
@@ -592,7 +619,7 @@ test('unknown, symbol, hidden and exotic dependency/request authority fields fai
   );
 
   const hiddenDependencies = {
-    now: fixedNow,
+    now: nowSequence(assessedAt, assessedAt, observedAt),
     resolveTrustedScope() {},
     dispatchCanonicalControl() {},
   };
