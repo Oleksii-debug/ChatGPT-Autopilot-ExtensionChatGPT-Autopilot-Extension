@@ -188,7 +188,7 @@ test('Drive resource outside admitted roots is rejected before content download'
 });
 
 test('Gmail principal must be an exact explicit owner email and never ambiguous me', async () => {
-  for (const invalid of ['me', ' owner@example.com', 'owner@example.com ', 'owner\\u0000@example.com', 'owner@example.com\\u007f']) {
+  for (const invalid of ['me', ' owner@example.com', 'owner@example.com ', `owner${String.fromCharCode(0)}@example.com`, `owner@example.com${String.fromCharCode(127)}`]) {
     assert.throws(
       () => new GoogleWorkspaceRestClientV1(baseConfig({ allowedGmailUsers: [invalid] })),
       /exact owner-configured email address/i,
