@@ -186,6 +186,34 @@ test('Drive search revalidates descendant scope after list observation before re
   );
 });
 
+test('Drive file metadata revalidates descendant scope after observation before returning data', async () => {
+  let targetReads = 0;
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === `/drive/v3/files/${fileId}`) {
+        targetReads += 1;
+        return response(200, driveFile(fileId, {
+          parents: [targetReads === 1 ? folderId : 'foreign_root'],
+          mimeType: 'text/plain',
+        }));
+      }
+      if (parsed.pathname === `/drive/v3/files/${folderId}`) {
+        return response(200, driveFile(folderId, { parents: [rootId] }));
+      }
+      if (parsed.pathname === `/drive/v3/files/${rootId}`) return response(200, driveFile(rootId));
+      if (parsed.pathname === '/drive/v3/files/foreign_root') return response(200, driveFile('foreign_root'));
+      return response(404, { error: { message: 'missing' } });
+    },
+  }));
+
+  await assert.rejects(
+    () => client.getDriveFile({ fileId }),
+    error => ['GOOGLE_DRIVE_RESOURCE_NOT_ALLOWED', 'GOOGLE_DRIVE_SCOPE_CHANGED'].includes(error.code),
+  );
+  assert.equal(targetReads, 2);
+});
+
 test('Drive resource outside admitted roots is rejected before content download', async () => {
   let mediaReads = 0;
   const client = new GoogleWorkspaceRestClientV1(baseConfig({
