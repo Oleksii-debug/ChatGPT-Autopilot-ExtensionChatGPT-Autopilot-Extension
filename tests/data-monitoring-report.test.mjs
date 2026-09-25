@@ -392,3 +392,87 @@ test('same revision with changed material remains rejected by canonical dataset 
     /dataset revision identity conflict/u,
   );
 });
+
+test('monitoring chronology uses epoch order across 9999 to extended year +010000', () => {
+  const before = '9999-12-31T23:59:59.999Z';
+  const after0 = '+010000-01-01T00:00:00.000Z';
+  const after1 = '+010000-01-01T00:00:00.001Z';
+  const after2 = '+010000-01-01T00:00:00.002Z';
+
+  const baseline = snapshot({
+    revisionId: 'dataset-boundary-before',
+    digest: sha('a'),
+    artifactId: 'artifact-boundary-before',
+    at: before,
+    sourceRef: source({ revisionId: 'source-boundary', digest: sha('b'), at: before }),
+  });
+  const current = snapshot({
+    revisionId: 'dataset-boundary-after',
+    digest: sha('c'),
+    artifactId: 'artifact-boundary-after',
+    at: after0,
+    sourceRef: source({ revisionId: 'source-boundary', digest: sha('b'), at: after0 }),
+  });
+
+  assert.doesNotThrow(() => buildDataMonitoringReportV1(request({
+    baseline,
+    current,
+    currentSourceRefs: [source({ revisionId: 'source-boundary', digest: sha('b'), at: after1 })],
+    assessedAt: after2,
+  })));
+
+  assert.throws(
+    () => buildDataMonitoringReportV1(request({
+      baseline: snapshot({
+        revisionId: 'dataset-later',
+        digest: sha('d'),
+        artifactId: 'artifact-later',
+        at: after0,
+        sourceRef: source({ at: after0 }),
+      }),
+      current: snapshot({
+        revisionId: 'dataset-earlier',
+        digest: sha('e'),
+        artifactId: 'artifact-earlier',
+        at: before,
+        sourceRef: source({ at: before }),
+      }),
+      currentSourceRefs: [source({ at: before })],
+      assessedAt: after2,
+    })),
+    /baseline dataset observation cannot be after current/u,
+  );
+
+  assert.throws(
+    () => buildDataMonitoringReportV1(request({
+      baseline: snapshot({ at: '9999-12-31T23:59:59.998Z' }),
+      current: snapshot({
+        revisionId: 'dataset-future',
+        digest: sha('c'),
+        artifactId: 'artifact-future',
+        at: after0,
+        sourceRef: source({ at: after0 }),
+      }),
+      currentSourceRefs: [source({ at: after0 })],
+      assessedAt: before,
+    })),
+    /current dataset observation is after assessedAt/u,
+  );
+
+  assert.throws(
+    () => buildDataMonitoringReportV1(request({
+      baseline: snapshot({ at: '9999-12-31T23:59:59.997Z' }),
+      current: snapshot({
+        revisionId: 'dataset-before-source',
+        digest: sha('c'),
+        artifactId: 'artifact-before-source',
+        at: before,
+        sourceRef: source({ at: before }),
+      }),
+      currentSourceRefs: [source({ at: after0 })],
+      assessedAt: before,
+    })),
+    /observed after assessedAt/u,
+  );
+});
+

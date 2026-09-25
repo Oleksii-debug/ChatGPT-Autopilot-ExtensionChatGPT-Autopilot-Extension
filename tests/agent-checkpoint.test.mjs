@@ -264,3 +264,72 @@ test('current checkpoint head is strict and bounded', () => {
     /bounded plain array/,
   );
 });
+
+test('checkpoint timestamp boundaries require exact canonical UTC representation', async () => {
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput({
+      createdAt: '2026-09-25T02:40:00Z',
+    })),
+    /canonical ISO-8601 UTC representation/u,
+  );
+
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput({
+      snapshotArtifact: {
+        ...checkpointInput().snapshotArtifact,
+        createdAt: '2026-09-25T02:40:00Z',
+      },
+    })),
+    /canonical ISO-8601 UTC representation/u,
+  );
+
+  assert.throws(
+    () => normalizeAgentCheckpointHeadV1(head({
+      observedAt: '2026-09-25T02:45:00Z',
+    })),
+    /canonical ISO-8601 UTC representation/u,
+  );
+});
+
+test('checkpoint chronology uses epoch order across 9999 to extended year +010000', async () => {
+  const beforeBoundary = '9999-12-31T23:59:59.999Z';
+  const afterBoundary = '+010000-01-01T00:00:00.000Z';
+  const afterBoundaryLater = '+010000-01-01T00:00:00.001Z';
+
+  const valid = await createAgentCheckpointV1(checkpointInput({
+    createdAt: afterBoundary,
+    snapshotArtifact: {
+      ...checkpointInput().snapshotArtifact,
+      createdAt: beforeBoundary,
+    },
+  }));
+  assert.equal(valid.createdAt, afterBoundary);
+  assert.equal(valid.snapshotArtifact.createdAt, beforeBoundary);
+
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput({
+      createdAt: beforeBoundary,
+      snapshotArtifact: {
+        ...checkpointInput().snapshotArtifact,
+        createdAt: afterBoundary,
+      },
+    })),
+    /snapshot artifact cannot be created after checkpoint/u,
+  );
+
+  const accepted = await assessAgentCheckpointRewindV1({
+    checkpoint: valid,
+    current: head({ observedAt: afterBoundaryLater }),
+    snapshotUtf8: SNAPSHOT_UTF8,
+  });
+  assert.equal(accepted.status, AgentCheckpointRewindStatus.READY_FOR_RECONCILIATION);
+
+  await assert.rejects(
+    () => assessAgentCheckpointRewindV1({
+      checkpoint: valid,
+      current: head({ observedAt: beforeBoundary }),
+      snapshotUtf8: SNAPSHOT_UTF8,
+    }),
+    /current observation predates checkpoint/u,
+  );
+});

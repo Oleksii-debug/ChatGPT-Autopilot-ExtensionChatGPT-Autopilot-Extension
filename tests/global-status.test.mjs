@@ -37,8 +37,102 @@ test('one scenario shows message four, four confirmed sends and three finished r
   assert.equal(first.scenarioSlots[0].message, 4);
   assert.equal(first.scenarioSlots[0].messagesPerGeneration, 17);
   assert.equal(first.scenarioSlots[0].verifiedSends, 4);
+  assert.equal(first.scenarioSlots[0].completedResponses, 3);
   assert.equal(first.summary.completedResponses, 3);
   assert.equal(first.scenarioSlots[0].category, 'WAITING_RESPONSE');
+});
+
+test('scenario send totals survive READY, Core cleanup, and the next chat generation', () => {
+  const scenario = cycle('autosport', 17, 16);
+  const source = { coreState: { sessionOrder: [scenario.coreSession.id],
+    sessionsById: { [scenario.coreSession.id]: scenario.coreSession } }, scenarios: [scenario] };
+  scenario.runtime.chat.state = 'READY';
+  scenario.runtime.chat.sessionId = '';
+  scenario.runtime.totalCompletedTurns = 17;
+  scenario.runtime.stepIndex = 0;
+  scenario.runtime.repeatIndex = 0;
+  let view = projectGlobalStatus(source);
+  assert.equal(view.scenarioSlots[0].verifiedSends, 17);
+  assert.equal(view.scenarioSlots[0].completedResponses, 17);
+  assert.equal(view.summary.verifiedSends, 17, 'retained Core proof is not counted twice');
+  delete source.coreState.sessionsById[scenario.coreSession.id];
+  view = projectGlobalStatus(structuredClone(source));
+  assert.equal(view.summary.verifiedSends, 17, 'cleaning the old Core Session cannot erase confirmed history');
+
+  scenario.runtime.generation = 2;
+  scenario.runtime.chat.generation = 2;
+  scenario.runtime.chat.state = 'NEW';
+  view = projectGlobalStatus(source);
+  assert.equal(view.scenarioSlots[0].verifiedSends, 0, 'the next generation starts at zero');
+  assert.equal(view.scenarioSlots[0].completedResponses, 0);
+  assert.equal(view.summary.verifiedSends, 17, 'historical confirmed sends remain in the global total');
+});
+
+test('multi-round chat progress uses the full generation length', () => {
+  const scenario = cycle('rounds', 0, 19);
+  scenario.config.roundsPerGeneration = 2;
+  scenario.runtime.round = 1;
+  scenario.runtime.stepIndex = 1;
+  scenario.runtime.repeatIndex = 1;
+  scenario.runtime.chat.state = 'READY';
+  scenario.runtime.chat.sessionId = '';
+  const view = projectGlobalStatus({ scenarios: [scenario] });
+  assert.equal(view.scenarioSlots[0].message, 20);
+  assert.equal(view.scenarioSlots[0].messagesPerGeneration, 34);
+  assert.equal(view.scenarioSlots[0].verifiedSends, 19);
+  assert.equal(view.scenarioSlots[0].completedResponses, 19);
+});
+
+test('five 17-turn scenarios retain all confirmed sends without counting an ambiguous new effect', () => {
+  const scenarios = Array.from({ length: 5 }, (_, index) => cycle(`slot-${index}`, 0, 17));
+  for (const scenario of scenarios) {
+    scenario.runtime.generation = 2;
+    scenario.runtime.chat.generation = 2;
+    scenario.runtime.chat.sessionId = '';
+    scenario.runtime.chat.state = 'NEW';
+  }
+  const view = projectGlobalStatus({ scenarios, coreState: { sessionOrder: [], sessionsById: {} } });
+  assert.equal(view.summary.verifiedSends, 85);
+  assert.equal(view.summary.completedResponses, 85);
+  assert.equal(view.scenarioSlots.every(row => row.verifiedSends === 0), true);
+  const ambiguous = scenarios[0];
+  ambiguous.runtime.chat.state = 'WAITING';
+  ambiguous.runtime.chat.sessionId = 'ambiguous:core';
+  const coreState = { sessionOrder: ['ambiguous:core'], sessionsById: {
+    'ambiguous:core': { scenarioWork: { managed: true }, successfulSendCount: 1, operation: { phase: 'AMBIGUOUS' } },
+  } };
+  assert.equal(projectGlobalStatus({ scenarios, coreState }).summary.verifiedSends, 85);
+  assert.equal(view.summary.verifiedSendHistoryComplete, false,
+    'legacy runtime without a retired-send ledger reports a lower bound');
+});
+
+test('durable send ledger counts timed-out effects and never counts pending cleanup twice', () => {
+  const scenario = cycle('timeout', 0, 0);
+  scenario.runtime.verifiedSendHistoryComplete = true;
+  scenario.runtime.retiredVerifiedSends = 1;
+  scenario.runtime.generationRetiredVerifiedSends = 1;
+  scenario.runtime.cleanupPendingSessionIds = ['old:core'];
+  scenario.runtime.chat.state = 'NEW';
+  scenario.runtime.chat.sessionId = '';
+  const old = { id: 'old:core', successfulSendCount: 1,
+    scenarioWork: { managed: true, scenarioId: 'timeout', generation: 1 } };
+  const coreState = { sessionOrder: ['old:core'], sessionsById: { 'old:core': old } };
+  let view = projectGlobalStatus({ scenarios: [scenario], coreState });
+  assert.equal(view.summary.verifiedSends, 1);
+  assert.equal(view.scenarioSlots[0].verifiedSends, 1);
+  assert.equal(view.summary.completedResponses, 0);
+  assert.equal(view.summary.verifiedSendHistoryComplete, true);
+
+  delete coreState.sessionsById['old:core'];
+  const replacement = { id: 'replacement:core', successfulSendCount: 1,
+    operation: { phase: 'SENT_VERIFIED' }, scenarioWork: { managed: true, scenarioId: 'timeout', generation: 1 } };
+  coreState.sessionOrder = ['replacement:core'];
+  coreState.sessionsById['replacement:core'] = replacement;
+  scenario.runtime.chat.state = 'WAITING';
+  scenario.runtime.chat.sessionId = 'replacement:core';
+  view = projectGlobalStatus(structuredClone({ scenarios: [scenario], coreState }));
+  assert.equal(view.summary.verifiedSends, 2);
+  assert.equal(view.scenarioSlots[0].verifiedSends, 2);
 });
 
 test('31 orchestration roles remain mutually exclusive and display round seven', () => {
