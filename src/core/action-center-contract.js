@@ -274,10 +274,27 @@ export function buildActionCenterProjectionV1(rawItems) {
     throw new Error('Action Center items contain duplicate itemId');
   }
 
-  const knownIds = new Set(items.map((item) => item.itemId));
+  const itemById = new Map(items.map((item) => [item.itemId, item]));
   for (const item of items) {
-    if (item.status === ActionCenterItemStatus.SUPERSEDED && !knownIds.has(item.supersededByItemId)) {
+    if (item.status !== ActionCenterItemStatus.SUPERSEDED) continue;
+    const successor = itemById.get(item.supersededByItemId);
+    if (!successor) {
       throw new Error(`SUPERSEDED attention item references unknown superseding item: ${item.supersededByItemId}`);
+    }
+    if (Date.parse(successor.createdAt) < Date.parse(item.createdAt)) {
+      throw new Error(`superseding attention item predates superseded item: ${item.itemId}`);
+    }
+  }
+
+  for (const item of items) {
+    if (item.status !== ActionCenterItemStatus.SUPERSEDED) continue;
+    const seen = new Set([item.itemId]);
+    let cursor = item;
+    while (cursor.status === ActionCenterItemStatus.SUPERSEDED) {
+      const nextId = cursor.supersededByItemId;
+      if (seen.has(nextId)) throw new Error('Action Center supersession graph contains a cycle');
+      seen.add(nextId);
+      cursor = itemById.get(nextId);
     }
   }
 
