@@ -91,10 +91,12 @@ function sha256(value, label) {
 }
 
 function timestamp(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(`${label} must be a timestamp`);
+  if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(`${label} must be a canonical ISO timestamp`);
   const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  if (!Number.isFinite(ms) || new Date(ms).toISOString() !== value) {
+    throw new Error(`${label} must be a canonical ISO timestamp`);
+  }
+  return value;
 }
 
 function asciiCompare(a, b) { return a < b ? -1 : a > b ? 1 : 0; }

@@ -91,7 +91,7 @@ test('candidate identity is exact, immutable and bound to one isolation/base rev
 
   assert.throws(() => normalizeVariantCandidateV1(candidate('variant-a', 'producer-a', { schemaVersion: '1' })), /schemaVersion/);
   assert.throws(() => normalizeVariantCandidateV1(candidate(' variant-a', 'producer-a')), /candidateId/);
-  assert.throws(() => normalizeVariantCandidateV1(candidate('variant-a', 'producer-a', { submittedAt: '2026-09-24T22:46:00Z' })), /predate createdAt/);
+  assert.throws(() => normalizeVariantCandidateV1(candidate('variant-a', 'producer-a', { submittedAt: '2026-09-24T22:46:00.000Z' })), /predate createdAt/);
 });
 
 test('strict boundary rejects accessors, symbols, hidden fields, exotic records and sparse arrays', () => {
@@ -151,6 +151,22 @@ test('evaluation references exact lab/candidate/criterion, has evidence and inde
   ] })), /candidateSha256 mismatch/);
 });
 
+test('variant provenance timestamps require one exact canonical representation', () => {
+  assert.throws(
+    () => normalizeVariantCandidateV1(candidate('variant-a', 'producer-a', {
+      submittedAt: '2026-09-24T22:48:00Z',
+    })),
+    /canonical ISO timestamp/,
+  );
+
+  assert.throws(
+    () => normalizeVariantEvaluationV1(evaluation('variant-a', 'security', 'PASS', {
+      evaluatedAt: '2026-09-25T00:49:00.000+02:00',
+    })),
+    /canonical ISO timestamp/,
+  );
+});
+
 test('evaluation timestamps are causal and lab updatedAt covers candidate/evaluation evidence', () => {
   assert.throws(() => normalizeVariantLabV1(lab({ evaluations: [
     evaluation('variant-a', 'security', 'PASS', { evaluatedAt: CREATED }),
@@ -158,7 +174,7 @@ test('evaluation timestamps are causal and lab updatedAt covers candidate/evalua
 
   assert.throws(() => normalizeVariantLabV1(lab({
     evaluations: [evaluation('variant-a', 'security')],
-    updatedAt: '2026-09-24T22:48:30Z',
+    updatedAt: '2026-09-24T22:48:30.000Z',
   })), /updatedAt predates evaluation/);
 });
 
