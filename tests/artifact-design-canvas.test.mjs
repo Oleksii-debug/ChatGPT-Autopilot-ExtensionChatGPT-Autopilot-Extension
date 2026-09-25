@@ -292,11 +292,9 @@ test('dense Canvas arrays are snapshotted without ordinary Proxy reads', () => {
   assert.equal(normalized.items.length, 2);
   assert.equal(reads, 0);
 
+  const currentRefs = normalized.items.map(item => structuredClone(item.artifactRef));
   reads = 0;
-  const current = wrap([
-    structuredClone(canvas.items[0].artifactRef),
-    structuredClone(canvas.items[1].artifactRef),
-  ]);
+  const current = wrap(currentRefs);
   assessArtifactDesignCanvasPreviewFreshnessV1(canvas, current);
   assert.equal(reads, 0);
 });
