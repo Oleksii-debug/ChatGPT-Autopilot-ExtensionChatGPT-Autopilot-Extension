@@ -540,6 +540,40 @@ test('authority envelopes reject getters, hidden fields, symbols and sparse arra
   );
 });
 
+test('null or omitted list aliases fail closed instead of meaning empty', () => {
+  assert.throws(
+    () => assessSecretDataFlowV1(request({ transforms: null }), {
+      resolveArtifactRef: resolverFrom(artifactMap()),
+    }),
+    /bounded plain array/,
+  );
+
+  assert.throws(
+    () => assessSecretDataFlowV1(request({ egresses: null }), {
+      resolveArtifactRef: resolverFrom(artifactMap()),
+    }),
+    /bounded plain array/,
+  );
+
+  const omittedTransforms = request();
+  delete omittedTransforms.transforms;
+  assert.throws(
+    () => assessSecretDataFlowV1(omittedTransforms, {
+      resolveArtifactRef: resolverFrom(artifactMap()),
+    }),
+    /bounded plain array/,
+  );
+
+  const omittedEgresses = request();
+  delete omittedEgresses.egresses;
+  assert.throws(
+    () => assessSecretDataFlowV1(omittedEgresses, {
+      resolveArtifactRef: resolverFrom(artifactMap()),
+    }),
+    /bounded plain array/,
+  );
+});
+
 test('exact IDs, timestamps, origins and synchronous resolver representation are required', () => {
   assert.throws(
     () => assessSecretDataFlowV1(request({ flowId: ' flow-1' }), {
