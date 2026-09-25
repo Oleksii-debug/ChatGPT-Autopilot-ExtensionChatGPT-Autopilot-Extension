@@ -6,6 +6,7 @@ const T0 = '2026-09-25T08:00:00.000Z';
 const T1 = '2026-09-25T08:01:00.000Z';
 const T2 = '2026-09-25T08:02:00.000Z';
 const T3 = '2026-09-25T08:03:00.000Z';
+const T4 = '2026-09-25T08:04:00.000Z';
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
 const C = 'c'.repeat(64);
@@ -390,4 +391,52 @@ test('signature verification cannot predate the materialized signature artifact'
     createSkillPackAdmissionV1({ manifest: m, entrypointId: 'run-report', admittedAt: T3 }, runtime.options),
     /artifact\/admission time boundary/u,
   );
+});
+
+
+test('materialized ArtifactRef representation aliases fail closed before canonical normalization', async () => {
+  const m = manifest();
+  const runtime = deps(m, {
+    resolveArtifact: async query => {
+      const expected = structuredClone(m.artifactRefs.find(item => item.artifactId === query.artifactId));
+      if (query.artifactId === 'source') expected.sha256 = expected.sha256.toUpperCase();
+      return expected;
+    },
+  });
+  await assert.rejects(
+    createSkillPackAdmissionV1({ manifest: m, entrypointId: 'run-report', admittedAt: T3 }, runtime.options),
+    /trusted materialized ArtifactRef/u,
+  );
+});
+
+test('admission identity binds verification evidence and admission time', async () => {
+  const m = manifest();
+  const first = await createSkillPackAdmissionV1(
+    { manifest: m, entrypointId: 'run-report', admittedAt: T3 },
+    deps(m).options,
+  );
+  const later = await createSkillPackAdmissionV1(
+    { manifest: m, entrypointId: 'run-report', admittedAt: T4 },
+    deps(m).options,
+  );
+  assert.notEqual(later.admissionId, first.admissionId);
+
+  const evidenceRuntime = deps(m, {
+    resolveEvaluation: async query => ({
+      evaluationRequirementId: query.evaluationRequirementId,
+      evaluationId: 'evaluation.analytics.pass',
+      suiteId: query.suiteId,
+      suiteRevisionId: query.suiteRevisionId,
+      subjectSha256: query.subjectSha256,
+      status: 'PASS',
+      completedAt: T3,
+      evidenceKinds: ['golden-output', 'benchmark-log'],
+      verificationAuthorityId: 'benchmark-authority',
+    }),
+  });
+  const changedEvidence = await createSkillPackAdmissionV1(
+    { manifest: m, entrypointId: 'run-report', admittedAt: T4 },
+    evidenceRuntime.options,
+  );
+  assert.notEqual(changedEvidence.admissionId, later.admissionId);
 });
