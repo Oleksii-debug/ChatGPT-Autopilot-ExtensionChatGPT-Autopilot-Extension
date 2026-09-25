@@ -157,6 +157,16 @@ test('referential integrity, one owner and ancestry cycles fail closed', () => {
   assert.throws(() => normalizeAgentGovernanceSnapshotV1(crossOrg), /Role organization mismatch/);
 });
 
+test('Agent principals cannot bypass parent narrowing through a SERVICE parent', () => {
+  const input = snapshot();
+  input.principals.push(principal('service.runner', 'SERVICE'));
+  input.principals.find(item => item.principalId === 'agent.parent').parentPrincipalId = 'service.runner';
+  assert.throws(
+    () => normalizeAgentGovernanceSnapshotV1(input),
+    /AGENT parent must be OWNER, HUMAN, or AGENT/,
+  );
+});
+
 test('child Agent authority is narrowed by Agent ancestry before owner-policy intersection', () => {
   const access = projectAgentGovernanceAccessV1(snapshot(), projection());
   assert.deepEqual(access.ancestry, ['agent.child', 'agent.parent', 'owner']);
