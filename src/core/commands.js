@@ -457,7 +457,7 @@ export class CoreCommandDispatcher {
       });
     }
   }
-  async execute(command, payload = {}) {
+  async execute(command, payload = {}, internal = {}) {
     if (command === CoreCommand.RESOLVE_UNCERTAIN) {
       const state = await this.repo.update(draft => {
         const session = requireSession(draft, payload.sessionId);
@@ -608,6 +608,7 @@ export class CoreCommandDispatcher {
           taskRole: payload.taskRole || 'planner',
           strongTaskRole: payload.strongTaskRole || 'verifier',
           capabilityIds: Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
+          providerCallBudgetContext: internal?.providerCallBudgetContext || null,
         });
       } catch (error) {
         if (!isolatedRuntime && error?.routerRuntime) {

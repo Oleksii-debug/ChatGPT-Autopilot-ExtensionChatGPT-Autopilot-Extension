@@ -12,7 +12,7 @@ import {
 } from '../src/core/policy-engine.js';
 import { PolicyDecisionKind } from '../src/core/universal-agent-contracts.js';
 
-const AT = '2026-09-24T21:55:00Z';
+const AT = '2026-09-24T21:55:00.000Z';
 
 function capability(overrides = {}) {
   return {
@@ -104,6 +104,29 @@ test('explicit owner ALLOW remains ALLOW even for R4/S3 without a hidden mandato
   assert.equal(result.effectiveEffectRisk, EffectRiskClass.R4);
   assert.equal(result.dataSensitivity, DataSensitivityClass.S3);
   assert.equal(result.matchedRuleId, '');
+});
+
+test('policy authority timestamps require exact canonical UTC spelling', async () => {
+  assert.throws(
+    () => normalizePolicyClassificationV1(classification({
+      classifiedAt: '2026-09-24T21:55:00Z',
+    })),
+    /classifiedAt must be an exact canonical UTC timestamp/,
+  );
+
+  await assert.rejects(
+    () => evaluate({
+      invocation: invocation({ createdAt: '2026-09-24T21:55:00Z' }),
+    }),
+    /ToolInvocationV1.createdAt must be an exact canonical UTC timestamp/,
+  );
+
+  await assert.rejects(
+    () => evaluate({
+      decidedAt: '2026-09-24T23:55:00.000+02:00',
+    }),
+    /decidedAt must be an exact canonical UTC timestamp/,
+  );
 });
 
 test('owner ASK maps to the canonical REQUIRE_APPROVAL contract', async () => {
@@ -476,7 +499,7 @@ test('invocation fingerprint is canonical across JSON object key order', async (
 });
 
 test('classification and decision timestamps preserve causal order', async () => {
-  const laterInvocation = invocation({ createdAt: '2026-09-24T21:55:01Z' });
+  const laterInvocation = invocation({ createdAt: '2026-09-24T21:55:01.000Z' });
   const staleClassification = classification({
     classifiedAt: AT,
     invocationFingerprint: await createPolicyInvocationFingerprintV1(laterInvocation),
@@ -484,17 +507,17 @@ test('classification and decision timestamps preserve causal order', async () =>
   let result = await evaluate({
     invocation: laterInvocation,
     classification: staleClassification,
-    decidedAt: '2026-09-24T21:55:02Z',
+    decidedAt: '2026-09-24T21:55:02.000Z',
   });
   assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
   assert.equal(result.policyDecision.reasonCode, 'CLASSIFICATION_PREDATES_INVOCATION');
 
   const laterClassification = classification({
-    classifiedAt: '2026-09-24T21:55:02Z',
+    classifiedAt: '2026-09-24T21:55:02.000Z',
   });
   result = await evaluate({
     classification: laterClassification,
-    decidedAt: '2026-09-24T21:55:01Z',
+    decidedAt: '2026-09-24T21:55:01.000Z',
   });
   assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
   assert.equal(result.policyDecision.reasonCode, 'POLICY_DECISION_PREDATES_CLASSIFICATION');

@@ -194,15 +194,24 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
 }
 
 export class AiOrchestrator {
-  constructor({ gatewayClient, now = () => Date.now() } = {}) {
+  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
+    if (providerCallLifecycle != null && (
+      typeof providerCallLifecycle !== 'object'
+      || typeof providerCallLifecycle.beforeProviderCall !== 'function'
+      || typeof providerCallLifecycle.afterProviderCall !== 'function'
+    )) {
+      throw new Error('AI provider-call lifecycle must expose beforeProviderCall and afterProviderCall');
+    }
     this.gateway = gatewayClient;
     this.now = now;
+    this.providerCallLifecycle = providerCallLifecycle;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
     systemPrompt = '', forceStrong = false, maxOutputTokens = 0, maxModelCallsForRequest = 0, imageDataUrl = '',
     taskRole = AiRouteRole.PLANNER, strongTaskRole = AiRouteRole.VERIFIER, capabilityIds = [],
+    providerCallBudgetContext = null,
   } = {}) {
     const settings = normalizeAiRouterSettings(rawSettings);
     const runtime = normalizeAiRouterRuntime(rawRuntime);
@@ -235,22 +244,68 @@ export class AiOrchestrator {
         error.modelCallsUsed = callsUsed;
         throw attachFailureRuntime(error);
       }
+      const lifecycle = providerCallBudgetContext ? this.providerCallLifecycle : null;
+      const routeIdentity = Object.freeze({
+        routeId: clean(route?.routeId),
+        provider: clean(route?.provider),
+        model: clean(route?.model),
+        endpointId: clean(route?.endpointId),
+      });
+      let reservation = null;
+      if (lifecycle) {
+        reservation = await lifecycle.beforeProviderCall({
+          context: providerCallBudgetContext,
+          route: routeIdentity,
+          prompt: callPrompt,
+          systemPrompt: callSystem,
+          maxOutputTokens: bounded,
+          callNumber: callsUsed + 1,
+        });
+      }
       callsUsed += 1;
+      let value;
       try {
-        return await this.gateway.complete({
+        value = await this.gateway.complete({
           gatewayUrl: settings.gatewayUrl,
           timeoutSeconds: settings.timeoutSeconds,
           provider: route.provider,
           model: route.model,
           ...(route.endpointId ? { endpointId: route.endpointId } : {}),
           prompt: callPrompt,
-        systemPrompt: callSystem,
-        ...(bounded ? { maxOutputTokens: bounded } : {}),
+          systemPrompt: callSystem,
+          ...(bounded ? { maxOutputTokens: bounded } : {}),
           ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}),
         });
       } catch (error) {
+        if (lifecycle) {
+          try {
+            await lifecycle.afterProviderCall({
+              context: providerCallBudgetContext,
+              reservation,
+              route: routeIdentity,
+              ok: false,
+              error,
+            });
+          } catch (settlementError) {
+            throw attachFailureRuntime(settlementError);
+          }
+        }
         throw attachFailureRuntime(error);
       }
+      if (lifecycle) {
+        try {
+          await lifecycle.afterProviderCall({
+            context: providerCallBudgetContext,
+            reservation,
+            route: routeIdentity,
+            ok: true,
+            result: value,
+          });
+        } catch (settlementError) {
+          throw attachFailureRuntime(settlementError);
+        }
+      }
+      return value;
     };
     const call = async (slot, callPrompt, callSystem, callOutputLimit = 0, requestedRole = taskRole) => {
       const bounded = Math.max(0, Math.floor(Number(callOutputLimit) || 0));

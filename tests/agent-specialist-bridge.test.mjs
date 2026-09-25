@@ -44,6 +44,17 @@ test('external AgentPlan node becomes a bounded child handoff only inside explic
   assert.throws(() => prepareAgentPlanSpecialistHandoffV1(plan(), scope({ requestedCapabilityIds:['filesystem.delete'] })), /exceed parent scope/);
 });
 
+test('specialist bridge rejects non-canonical durable timestamp aliases', () => {
+  assert.throws(
+    () => prepareAgentPlanSpecialistHandoffV1(plan(), scope({ at:'2026-09-23T12:00:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+  assert.throws(
+    () => prepareAgentPlanSpecialistHandoffV1(plan(), scope({ deadlineAt:'2026-09-23T15:00:00.000+02:00' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+});
+
 test('claim is durable and never silently retries an expired external lease', () => {
   const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
   const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), [assignment], { executionOwnerships:[ownership()], availableSlots:1, leaseSeconds:30, at:T0 });

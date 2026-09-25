@@ -35,8 +35,10 @@ function id(value, label) { if (typeof value !== 'string' || value !== value.tri
 function ts(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(`${label} must be a timestamp`);
   const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  if (!Number.isFinite(ms) || new Date(ms).toISOString() !== value) {
+    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  }
+  return value;
 }
 function plane(value) { if (typeof value !== 'string') throw new Error('execution plane is invalid'); const out = value.trim().toUpperCase(); if (!PLANES.has(out)) throw new Error('execution plane is invalid'); return out; }
 function optionalId(value, label) { return value == null || value === '' ? '' : id(value, label); }

@@ -1,5 +1,7 @@
 import { projectGlobalStatus } from '../core/global-status.js';
 import { projectRuntimeActionCenter, resolveRuntimeActionCenterBrowserApproval } from '../core/action-center-runtime.js';
+import { ProjectWorkspaceRepository } from '../core/project-workspace.js';
+import { ProjectWorkspaceRuntimeReader } from '../core/project-workspace-runtime.js';
 import { StorageRepository } from '../core/storage.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
 import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
@@ -62,19 +64,47 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_SCENARIO_WORK',
   'GET_GLOBAL_STATUS',
   'GET_ACTION_CENTER',
+  'GET_PROJECT_WORKSPACE_SUMMARY',
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
+const projectWorkspaceRuntime = new ProjectWorkspaceRuntimeReader(new ProjectWorkspaceRepository(chrome));
 const chatgptProvider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
 const chatgptTransport = new ChromeInteractionTransport(chrome, { siteAdapterId: chatgptProvider.siteAdapterId });
 const transport = new InteractionProviderRouter().register(AgentProviderId.CHATGPT_BROWSER, chatgptTransport);
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
 const localAiClient = new LocalAiClient({ fetchFn: (...args) => fetch(...args) });
 const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...args) });
-const aiOrchestrator = new AiOrchestrator({ gatewayClient: aiGatewayClient });
+const browserAgentLifecycle = { current: null };
+const aiOrchestrator = new AiOrchestrator({
+  gatewayClient: aiGatewayClient,
+  providerCallLifecycle: {
+    beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
+      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
+      return browserAgentLifecycle.current.reserveProviderModelBudget({
+        jobId: context.jobId,
+        controlEpoch: context.controlEpoch,
+        route,
+        prompt,
+        systemPrompt,
+        maxOutputTokens,
+        callNumber,
+      });
+    },
+    afterProviderCall: async ({ context, reservation, ok, result }) => {
+      if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current || !reservation?.reservationId) return;
+      await browserAgentLifecycle.current.settleProviderModelBudget({
+        jobId: context.jobId,
+        reservationId: reservation.reservationId,
+        ok,
+        result,
+      });
+    },
+  },
+});
 const remoteDispatch = new RemoteDispatchController({ coreRepository: repo, chromeApi: chrome, fetchFn: (...args) => fetch(...args) });
 
 const orchestrationV2 = new OrchestrationV2Manager({
@@ -179,8 +209,9 @@ const aiManager = new AiAutonomyManager({
 });
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
-  routePrompt: payload => dispatchSerializedAiRoute(payload),
+  routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
 });
+browserAgentLifecycle.current = browserAgent;
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
@@ -451,8 +482,12 @@ export async function reconcileRuntime() {
 }
 
 let aiRouteQueue = Promise.resolve();
-function dispatchSerializedAiRoute(payload) {
-  const run = aiRouteQueue.then(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', payload || {}));
+function dispatchSerializedAiRoute(payload, providerCallBudgetContext = null) {
+  const run = aiRouteQueue.then(() => dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    payload || {},
+    { providerCallBudgetContext },
+  ));
   aiRouteQueue = run.catch(() => undefined);
   return run;
 }
@@ -474,6 +509,8 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'GET_ACTION_CENTER') {
     const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
     result = await projectRuntimeActionCenter({ coreState, agentJobs: agentState.jobs });
+  } else if (message.command === 'GET_PROJECT_WORKSPACE_SUMMARY') {
+    result = await projectWorkspaceRuntime.readSummary();
   } else if (message.command === 'DECIDE_ACTION_CENTER_BROWSER_APPROVAL') {
     const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
     const resolution = await resolveRuntimeActionCenterBrowserApproval({
