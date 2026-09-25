@@ -291,3 +291,50 @@ test('exact Drive file allowlist never widens into descendant-folder search auth
   await assert.rejects(() => client.searchDrive({ parentId: exactFolder }), error => error.code === 'GOOGLE_DRIVE_RESOURCE_NOT_ALLOWED');
   assert.equal(listCalls, 0);
 });
+
+
+test('credential resolver accessor is rejected without getter execution', () => {
+  let getterReads = 0;
+  const nativeClient = {};
+  Object.defineProperty(nativeClient, 'resolveCredential', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return async () => ({ secret: 'must-not-run' });
+    },
+  });
+  assert.throws(
+    () => new GoogleWorkspaceRestClientV1(baseConfig({ nativeClient })),
+    /data method/i,
+  );
+  assert.equal(getterReads, 0);
+});
+
+test('credential and transport failures redact provider-controlled secret text', async () => {
+  const credentialSecret = 'credential-secret-must-not-leak';
+  const badCredential = new GoogleWorkspaceRestClientV1(baseConfig({
+    nativeClient: {
+      resolveCredential: async () => {
+        throw new Error(credentialSecret);
+      },
+    },
+  }));
+  await assert.rejects(
+    () => badCredential.searchGmail({ userId: 'me' }),
+    error => error.code === 'GOOGLE_CREDENTIAL_UNAVAILABLE'
+      && !String(error.message).includes(credentialSecret),
+  );
+
+  const transportSecret = 'transport-secret-must-not-leak';
+  const badTransport = new GoogleWorkspaceRestClientV1(baseConfig({
+    nativeClient: credentialResolver([], transportSecret),
+    fetchImpl: async () => {
+      throw new Error(`Bearer ${transportSecret} failed`);
+    },
+  }));
+  await assert.rejects(
+    () => badTransport.searchGmail({ userId: 'me' }),
+    error => error.code === 'GOOGLE_TRANSPORT_ERROR'
+      && !String(error.message).includes(transportSecret),
+  );
+});
