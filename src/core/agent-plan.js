@@ -31,15 +31,23 @@ function object(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain data object`);
-  for (const key of Reflect.ownKeys(value)) {
+  const snapshot = Object.create(null);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} cannot contain symbol fields`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} fields must be own data properties`);
     }
     if (!descriptor.enumerable) throw new Error(`${label} cannot contain non-enumerable fields`);
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 function exact(raw, allowed, label) {
   for (const key of Reflect.ownKeys(raw)) {
@@ -110,20 +118,18 @@ function uniqueText(value, label, max = 32) {
 function frozen(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) frozen(child); return Object.freeze(value); }
 
 function normalizeBudget(raw = {}) {
-  object(raw, 'AgentPlan budget');
-  exact(raw, new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']), 'AgentPlan budget');
+  const source = object(raw, 'AgentPlan budget');
+  exact(source, new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']), 'AgentPlan budget');
   return {
-    maxModelCalls: strictInteger(raw.maxModelCalls === undefined ? 0 : raw.maxModelCalls, 'AgentPlan budget maxModelCalls', { max: 1_000_000 }),
-    maxRuntimeSeconds: strictInteger(raw.maxRuntimeSeconds === undefined ? 0 : raw.maxRuntimeSeconds, 'AgentPlan budget maxRuntimeSeconds', { max: 31_536_000 }),
-    maxCostUsdMicros: strictInteger(raw.maxCostUsdMicros === undefined ? 0 : raw.maxCostUsdMicros, 'AgentPlan budget maxCostUsdMicros'),
+    maxModelCalls: strictInteger(source.maxModelCalls === undefined ? 0 : source.maxModelCalls, 'AgentPlan budget maxModelCalls', { max: 1_000_000 }),
+    maxRuntimeSeconds: strictInteger(source.maxRuntimeSeconds === undefined ? 0 : source.maxRuntimeSeconds, 'AgentPlan budget maxRuntimeSeconds', { max: 31_536_000 }),
+    maxCostUsdMicros: strictInteger(source.maxCostUsdMicros === undefined ? 0 : source.maxCostUsdMicros, 'AgentPlan budget maxCostUsdMicros'),
   };
 }
 
 function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
-  object(rawEnvelope, 'AgentPlan extension resourceEnvelope');
-  const prototype = Object.getPrototypeOf(rawEnvelope);
-  if (prototype !== Object.prototype && prototype !== null) throw new Error('AgentPlan extension resourceEnvelope must be a plain data object');
-  const envelope = normalizeBudget(rawEnvelope);
+  const source = object(rawEnvelope, 'AgentPlan extension resourceEnvelope');
+  const envelope = normalizeBudget(source);
   const fields = ['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros'];
   for (const field of fields) {
     const total = nodes.reduce((sum, node) => sum + BigInt(node.budget[field]), 0n);
@@ -133,23 +139,23 @@ function assertAggregateBudgetWithinEnvelope(nodes, rawEnvelope) {
 }
 
 function normalizeNode(raw) {
-  object(raw, 'AgentPlan node');
-  exact(raw, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
-  const state = raw.state === undefined ? AgentPlanNodeState.PENDING : raw.state;
+  const source = object(raw, 'AgentPlan node');
+  exact(source, new Set(['nodeId', 'title', 'objective', 'dependsOn', 'conflictKeys', 'ownerId', 'executionPlane', 'acceptanceCriteria', 'budget', 'state', 'evidence', 'updatedAt']), 'AgentPlan node');
+  const state = source.state === undefined ? AgentPlanNodeState.PENDING : source.state;
   if (typeof state !== 'string' || !NODE_STATES.has(state)) throw new Error('AgentPlan node state is invalid');
   return {
-    nodeId: id(raw.nodeId, 'AgentPlan nodeId'),
-    title: text(raw.title, 'AgentPlan node title', { max: 240 }),
-    objective: text(raw.objective, 'AgentPlan node objective', { max: 4000 }),
-    dependsOn: uniqueIds(raw.dependsOn === undefined ? [] : raw.dependsOn, 'AgentPlan node dependsOn'),
-    conflictKeys: uniqueIds(raw.conflictKeys === undefined ? [] : raw.conflictKeys, 'AgentPlan node conflictKeys'),
-    ownerId: raw.ownerId == null || raw.ownerId === '' ? '' : id(raw.ownerId, 'AgentPlan node ownerId'),
-    executionPlane: typeof raw.executionPlane === 'string' && PLANES.has(raw.executionPlane) ? raw.executionPlane : (() => { throw new Error('AgentPlan node executionPlane is invalid'); })(),
-    acceptanceCriteria: uniqueText(raw.acceptanceCriteria === undefined ? [] : raw.acceptanceCriteria, 'AgentPlan node acceptanceCriteria'),
-    budget: normalizeBudget(raw.budget === undefined ? {} : raw.budget),
+    nodeId: id(source.nodeId, 'AgentPlan nodeId'),
+    title: text(source.title, 'AgentPlan node title', { max: 240 }),
+    objective: text(source.objective, 'AgentPlan node objective', { max: 4000 }),
+    dependsOn: uniqueIds(source.dependsOn === undefined ? [] : source.dependsOn, 'AgentPlan node dependsOn'),
+    conflictKeys: uniqueIds(source.conflictKeys === undefined ? [] : source.conflictKeys, 'AgentPlan node conflictKeys'),
+    ownerId: source.ownerId == null || source.ownerId === '' ? '' : id(source.ownerId, 'AgentPlan node ownerId'),
+    executionPlane: typeof source.executionPlane === 'string' && PLANES.has(source.executionPlane) ? source.executionPlane : (() => { throw new Error('AgentPlan node executionPlane is invalid'); })(),
+    acceptanceCriteria: uniqueText(source.acceptanceCriteria === undefined ? [] : source.acceptanceCriteria, 'AgentPlan node acceptanceCriteria'),
+    budget: normalizeBudget(source.budget === undefined ? {} : source.budget),
     state,
-    evidence: raw.evidence == null || raw.evidence === '' ? '' : text(raw.evidence, 'AgentPlan node evidence', { max: 8000 }),
-    updatedAt: timestamp(raw.updatedAt, 'AgentPlan node updatedAt'),
+    evidence: source.evidence == null || source.evidence === '' ? '' : text(source.evidence, 'AgentPlan node evidence', { max: 8000 }),
+    updatedAt: timestamp(source.updatedAt, 'AgentPlan node updatedAt'),
   };
 }
 
@@ -168,31 +174,31 @@ function assertAcyclic(nodes) {
 }
 
 export function normalizeAgentPlanV1(raw) {
-  object(raw, 'AgentPlanV1');
-  exact(raw, new Set(['schemaVersion', 'planId', 'jobId', 'objective', 'successCriteria', 'nodes', 'createdAt', 'updatedAt', 'revision']), 'AgentPlanV1');
-  if (raw.schemaVersion !== AGENT_PLAN_VERSION) throw new Error('Unsupported AgentPlanV1 schemaVersion');
-  const nodes = dataArray(raw.nodes, 'AgentPlan nodes', { min: 1, max: 128 }).map(normalizeNode);
+  const source = object(raw, 'AgentPlanV1');
+  exact(source, new Set(['schemaVersion', 'planId', 'jobId', 'objective', 'successCriteria', 'nodes', 'createdAt', 'updatedAt', 'revision']), 'AgentPlanV1');
+  if (source.schemaVersion !== AGENT_PLAN_VERSION) throw new Error('Unsupported AgentPlanV1 schemaVersion');
+  const nodes = dataArray(source.nodes, 'AgentPlan nodes', { min: 1, max: 128 }).map(normalizeNode);
   if (new Set(nodes.map(node => node.nodeId)).size !== nodes.length) throw new Error('AgentPlan contains duplicate nodeId');
   assertAcyclic(nodes);
-  const revision = strictInteger(raw.revision, 'AgentPlan revision', { min: 1 });
+  const revision = strictInteger(source.revision, 'AgentPlan revision', { min: 1 });
   return frozen({
     schemaVersion: AGENT_PLAN_VERSION,
-    planId: id(raw.planId, 'AgentPlan planId'),
-    jobId: id(raw.jobId, 'AgentPlan jobId'),
-    objective: text(raw.objective, 'AgentPlan objective', { max: 8000 }),
-    successCriteria: uniqueText(raw.successCriteria === undefined ? [] : raw.successCriteria, 'AgentPlan successCriteria'),
+    planId: id(source.planId, 'AgentPlan planId'),
+    jobId: id(source.jobId, 'AgentPlan jobId'),
+    objective: text(source.objective, 'AgentPlan objective', { max: 8000 }),
+    successCriteria: uniqueText(source.successCriteria === undefined ? [] : source.successCriteria, 'AgentPlan successCriteria'),
     nodes,
-    createdAt: timestamp(raw.createdAt, 'AgentPlan createdAt'),
-    updatedAt: timestamp(raw.updatedAt, 'AgentPlan updatedAt'),
+    createdAt: timestamp(source.createdAt, 'AgentPlan createdAt'),
+    updatedAt: timestamp(source.updatedAt, 'AgentPlan updatedAt'),
     revision,
   });
 }
 
 /** Derives ready/blocked state from durable node terminals and conflict keys. */
 export function reconcileAgentPlanV1(raw, options = {}) {
-  object(options, 'AgentPlan reconcile options');
-  exact(options, new Set(['at']), 'AgentPlan reconcile options');
-  const at = options.at === undefined ? new Date().toISOString() : options.at;
+  const source = object(options, 'AgentPlan reconcile options');
+  exact(source, new Set(['at']), 'AgentPlan reconcile options');
+  const at = source.at === undefined ? new Date().toISOString() : source.at;
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const byId = new Map(plan.nodes.map(node => [node.nodeId, node]));
   const runningKeys = new Set(plan.nodes.filter(node => node.state === AgentPlanNodeState.RUNNING).flatMap(node => node.conflictKeys));
@@ -219,12 +225,12 @@ export function reconcileAgentPlanV1(raw, options = {}) {
  * must remain inside that same durable owner/job envelope on every extension.
  */
 export function extendAgentPlanV1(raw, options = {}) {
-  object(options, 'AgentPlan extension options');
-  exact(options, new Set(['expectedRevision', 'nodes', 'resourceEnvelope', 'at']), 'AgentPlan extension options');
-  const expectedRevision = options.expectedRevision;
-  const nodes = options.nodes;
-  const resourceEnvelope = options.resourceEnvelope;
-  const at = options.at === undefined ? new Date().toISOString() : options.at;
+  const source = object(options, 'AgentPlan extension options');
+  exact(source, new Set(['expectedRevision', 'nodes', 'resourceEnvelope', 'at']), 'AgentPlan extension options');
+  const expectedRevision = source.expectedRevision;
+  const nodes = source.nodes;
+  const resourceEnvelope = source.resourceEnvelope;
+  const at = source.at === undefined ? new Date().toISOString() : source.at;
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const expected = expectedRevision;
   if (typeof expected !== 'number' || !Number.isSafeInteger(expected) || expected < 1) {
@@ -237,24 +243,24 @@ export function extendAgentPlanV1(raw, options = {}) {
   const existingIds = new Set(plan.nodes.map(node => node.nodeId));
   const addedIds = new Set();
   const additions = extensionNodes.map((rawNode, index) => {
-    object(rawNode, `AgentPlan extension node[${index}]`);
-    if (Object.hasOwn(rawNode, 'state') && rawNode.state !== AgentPlanNodeState.PENDING) {
+    const sourceNode = object(rawNode, `AgentPlan extension node[${index}]`);
+    if (Object.hasOwn(sourceNode, 'state') && sourceNode.state !== AgentPlanNodeState.PENDING) {
       throw new Error('AgentPlan extension node state must be PENDING');
     }
-    if (Object.hasOwn(rawNode, 'evidence') && rawNode.evidence !== undefined && rawNode.evidence !== '') {
-      if (typeof rawNode.evidence !== 'string' || rawNode.evidence.trim() !== '') {
+    if (Object.hasOwn(sourceNode, 'evidence') && sourceNode.evidence !== undefined && sourceNode.evidence !== '') {
+      if (typeof sourceNode.evidence !== 'string' || sourceNode.evidence.trim() !== '') {
         throw new Error('AgentPlan extension node cannot inject evidence');
       }
     }
     // Validate nested budget authority before cloning: structuredClone() can
     // erase an exotic prototype and silently turn malformed budget input into
     // an apparently safe plain object.
-    const normalizedBudget = normalizeBudget(rawNode.budget === undefined ? {} : rawNode.budget);
+    const normalizedBudget = normalizeBudget(sourceNode.budget === undefined ? {} : sourceNode.budget);
     // rawNode itself is descriptor-checked by object(); preserve the original
     // nested array objects until normalizeNode() validates their canonical
     // dense data descriptors. Cloning here would materialize accessors first.
     const candidate = normalizeNode({
-      ...rawNode,
+      ...sourceNode,
       budget: normalizedBudget,
       state: AgentPlanNodeState.PENDING,
       evidence: '',
@@ -278,10 +284,10 @@ export function extendAgentPlanV1(raw, options = {}) {
  * only a suffix of new PENDING nodes may be introduced.
  */
 export function evolveAgentPlanV1(raw, rawCandidate, options = {}) {
-  object(options, 'AgentPlan evolution options');
-  exact(options, new Set(['resourceEnvelope', 'at']), 'AgentPlan evolution options');
-  const resourceEnvelope = options.resourceEnvelope;
-  const at = options.at === undefined ? new Date().toISOString() : options.at;
+  const source = object(options, 'AgentPlan evolution options');
+  exact(source, new Set(['resourceEnvelope', 'at']), 'AgentPlan evolution options');
+  const resourceEnvelope = source.resourceEnvelope;
+  const at = source.at === undefined ? new Date().toISOString() : source.at;
   const current = normalizeAgentPlanV1(raw);
   const candidate = normalizeAgentPlanV1(rawCandidate);
   if (candidate.revision !== current.revision) throw new Error('AgentPlan revision conflict');
@@ -302,12 +308,12 @@ export function evolveAgentPlanV1(raw, rawCandidate, options = {}) {
 }
 
 export function transitionAgentPlanNodeV1(raw, options = {}) {
-  object(options, 'AgentPlan transition options');
-  exact(options, new Set(['nodeId', 'state', 'evidence', 'at']), 'AgentPlan transition options');
-  const nodeId = options.nodeId;
-  const state = options.state;
-  const evidence = options.evidence === undefined ? '' : options.evidence;
-  const at = options.at === undefined ? new Date().toISOString() : options.at;
+  const source = object(options, 'AgentPlan transition options');
+  exact(source, new Set(['nodeId', 'state', 'evidence', 'at']), 'AgentPlan transition options');
+  const nodeId = source.nodeId;
+  const state = source.state;
+  const evidence = source.evidence === undefined ? '' : source.evidence;
+  const at = source.at === undefined ? new Date().toISOString() : source.at;
   const plan = structuredClone(normalizeAgentPlanV1(raw));
   const node = plan.nodes.find(item => item.nodeId === nodeId);
   if (!node) throw new Error('AgentPlan node not found');
