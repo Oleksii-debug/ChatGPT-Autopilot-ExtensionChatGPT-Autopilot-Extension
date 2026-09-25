@@ -142,12 +142,17 @@ test('captured content cannot smuggle instruction or permission authority', () =
 test('contract rejects coercive IDs, versions, operations, timestamps and digests', () => {
   assert.throws(() => normalizeSelectionActionRequestV1(request({ schemaVersion: '1' })), /schemaVersion/);
   assert.throws(() => normalizeSelectionActionRequestV1(request({ requestId: 7 })), /must be text/);
+  assert.throws(() => normalizeSelectionActionRequestV1(request({ requestId: ' micro-1' })), /requestId is invalid/);
   assert.throws(() => normalizeSelectionActionRequestV1(request({ operation: true })), /operation must be text/);
+  assert.throws(() => normalizeSelectionActionRequestV1(request({ operation: 'summarize' })), /operation is invalid/);
+  assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ kind: 'selection' })), /source kind is invalid/);
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ capturedAt: 7 })), /must be a timestamp/);
+  assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({ capturedAt: '2026-09-24T23:56:00Z' })), /canonical timestamp/);
   assert.throws(() => normalizeSelectionActionSourceV1(selectionSource({
     text: '', artifactId: 'artifact-1', contentSha256: SHA.toUpperCase(),
   })), /lowercase SHA-256/);
   assert.throws(() => selectionActionNeedsEffectAdmissionV1(true), /operation must be text/);
+  assert.throws(() => selectionActionNeedsEffectAdmissionV1(' save_to_project '), /operation is invalid/);
 });
 
 test('request, source and target accessors are rejected without getter execution', () => {
@@ -231,8 +236,8 @@ test('request chronology cannot predate its captured source', () => {
 
 test('normalization is deterministic and does not mutate caller inputs', () => {
   const input = request({
-    source: selectionSource({ kind: 'clipboard', capturedAt: '2026-09-24T23:56:00Z' }),
-    operation: 'rewrite',
+    source: selectionSource({ kind: 'CLIPBOARD' }),
+    operation: 'REWRITE',
   });
   const before = structuredClone(input);
   const one = normalizeSelectionActionRequestV1(input);
