@@ -1,6 +1,5 @@
 import {
   SourceAuthorityKind,
-  normalizeProjectSnapshotV1,
   normalizeProjectSourceRefV1,
 } from './project-context-artifact.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
@@ -346,18 +345,43 @@ function deriveBlockers(normalized) {
   return blockers;
 }
 
+function sourceCandidate(source) {
+  return {
+    sourceId: source.sourceId,
+    kind: source.kind,
+    uri: source.uri,
+    revisionId: source.revisionId,
+    contentSha256: source.contentSha256,
+    observedAt: source.observedAt,
+    metadata: source.metadata,
+  };
+}
+
+function artifactCandidate(artifact) {
+  return {
+    artifactId: artifact.artifactId,
+    kind: artifact.kind,
+    uri: artifact.uri,
+    mediaType: artifact.mediaType,
+    sha256: artifact.sha256,
+    sizeBytes: artifact.sizeBytes,
+    createdAt: artifact.createdAt,
+    producerInvocationId: artifact.producerInvocationId,
+    sensitive: artifact.sensitive,
+  };
+}
+
 export function buildProjectBootstrapV1(input) {
   const normalized = normalizeInput(input);
-  const snapshot = normalizeProjectSnapshotV1({
-    schemaVersion: 1,
+  const blockers = deriveBlockers(normalized);
+  const candidate = {
     projectId: normalized.projectId,
     revisionId: normalized.revisionId,
     title: normalized.title,
-    sourceRefs: normalized.sourceRefs,
-    artifactRefs: normalized.artifactRefs,
     createdAt: normalized.createdAt,
-  });
-  const blockers = deriveBlockers(normalized);
+    sourceCandidates: normalized.sourceRefs.map(sourceCandidate),
+    artifactCandidates: normalized.artifactRefs.map(artifactCandidate),
+  };
   return freezeDeep({
     schemaVersion: PROJECT_BOOTSTRAP_SCHEMA_VERSION,
     bootstrapId: normalized.bootstrapId,
@@ -371,7 +395,7 @@ export function buildProjectBootstrapV1(input) {
     requiredSourceIds: [...normalized.requiredSourceIds],
     requiredArtifactIds: [...normalized.requiredArtifactIds],
     blockers,
-    snapshot,
+    candidate,
   });
 }
 
