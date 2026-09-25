@@ -36,3 +36,15 @@ test('calendar mode visibility is semantic and explicit list remains direct text
   assert.match(html, /Щоб додати час, додайте новий рядок/);
   assert.match(html, /value="WEEKLY"/);
 });
+
+
+test('Agent and Scenario scheduling are text-first and do not require inaccessible native date/time pickers', () => {
+  assert.match(html, /id="agent-schedule-start" type="text"[^>]*placeholder="25\.09\.2026 04:00"/);
+  assert.match(html, /id="agent-schedule-end" type="text"/);
+  assert.match(html, /id="agent-active-window-start" type="text"[^>]*placeholder="09:00"/);
+  assert.match(html, /id="scenario-work-start-at" type="text"[^>]*placeholder="25\.09\.2026 04:00"/);
+  assert.doesNotMatch(html, /id="agent-schedule-start" type="datetime-local"/);
+  assert.doesNotMatch(html, /id="agent-active-window-start" type="time"/);
+  assert.match(js, /parseAccessibleLocalDateTime/);
+  assert.match(js, /formatAccessibleLocalDateTime/);
+});

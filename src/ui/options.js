@@ -3,6 +3,7 @@ import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
+import { parseAccessibleLocalDateTime, formatAccessibleLocalDateTime, normalizeAccessibleClockTime } from './accessible-date-time.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -1531,12 +1532,13 @@ function syncScenarioWorkButtons() {
   const has = Boolean(item);
   const running = state === 'RUNNING';
   const paused = state === 'PAUSED';
-  $('save-scenario-work-button').disabled = !has || running || paused;
-  $('start-scenario-work-button').disabled = !has || running || paused;
-  $('pause-scenario-work-button').disabled = !has || !running;
+  const waitingSchedule = state === 'WAITING_SCHEDULE';
+  $('save-scenario-work-button').disabled = !has || running || paused || waitingSchedule;
+  $('start-scenario-work-button').disabled = !has || running || paused || waitingSchedule;
+  $('pause-scenario-work-button').disabled = !has || (!running && !waitingSchedule);
   $('resume-scenario-work-button').disabled = !has || !paused;
-  $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running;
+  $('stop-scenario-work-button').disabled = !has || (!running && !paused && !waitingSchedule);
+  $('delete-scenario-work-button').disabled = !has || running || waitingSchedule;
   $('scenario-work-run-now').disabled = !has || !running;
   $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
 }
@@ -1545,6 +1547,7 @@ function clearScenarioWorkState() {
   ui.selectedScenarioWorkId = '';
   ui.selectedScenarioWork = null;
   $('scenario-work-name').value = '';
+  $('scenario-work-start-at').value = '';
   $('scenario-work-mode-label').textContent = 'Формат не вибрано.';
   $('scenario-work-state').replaceChildren();
   $('scenario-work-summary').textContent = 'Сценарій не вибрано.';
@@ -1582,6 +1585,9 @@ function renderScenarioWorkState(item) {
   }
   const runtime = item.runtime || {};
   addScenarioStateLine('Стан', runtime.runState || 'STOPPED');
+  if (runtime.runState === 'WAITING_SCHEDULE' && Number(runtime.scheduledStartAt || 0) > 0) {
+    addScenarioStateLine('Запланований старт', formatAccessibleLocalDateTime(runtime.scheduledStartAt));
+  }
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
   addScenarioStateLine('Покоління', runtime.generation ?? 1);
   addScenarioStateLine('Фаза', runtime.phase || '—');
@@ -1724,6 +1730,7 @@ function scenarioWorkConfigFromForm() {
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
     timeoutPolicy: $('scenario-work-timeout-policy').value,
+    startNotBeforeAt: parseAccessibleLocalDateTime($('scenario-work-start-at').value, { optional: true }),
   };
   if (mode === 'CHAT_CYCLE') {
     return {
@@ -1771,6 +1778,7 @@ function fillScenarioWorkForm(item) {
   ui.selectedScenarioWork = clone(item);
   const config = item.config || {};
   $('scenario-work-name').value = item.name || config.name || '';
+  $('scenario-work-start-at').value = formatAccessibleLocalDateTime(config.startNotBeforeAt || 0);
   $('scenario-work-mode-label').textContent = `Формат: ${SCENARIO_WORK_MODE_LABELS[config.mode] || config.mode || 'невідомий'}.`;
   $('scenario-work-rounds').value = String(config.roundsPerGeneration ?? 10);
   $('scenario-work-generations').value = String(config.maxGenerations ?? 0);
@@ -1986,20 +1994,15 @@ function browserAgentNumber(id, min, max, label) {
 }
 
 function browserAgentDateTimeLocalToEpoch(id) {
-  const raw = $(id).value.trim();
-  if (!raw) return 0;
-  const value = new Date(raw).getTime();
-  if (!Number.isFinite(value)) throw new Error('Некоректна дата або час у полі розкладу Agent.');
-  return value;
+  try {
+    return parseAccessibleLocalDateTime($(id).value, { optional: true });
+  } catch (error) {
+    throw new Error(`Поле розкладу Agent: ${error.message}`);
+  }
 }
 
 function browserAgentEpochToDateTimeLocal(value) {
-  const time = Number(value || 0);
-  if (!time) return '';
-  const date = new Date(time);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = number => String(number).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return formatAccessibleLocalDateTime(value);
 }
 
 function browserAgentSiteRulesFromText(raw) {
@@ -2051,8 +2054,14 @@ function browserAgentPolicyFromForm() {
   const scheduleStartAt = browserAgentDateTimeLocalToEpoch('agent-schedule-start');
   const scheduleEndAt = browserAgentDateTimeLocalToEpoch('agent-schedule-end');
   if (scheduleStartAt && scheduleEndAt && scheduleEndAt <= scheduleStartAt) throw new Error('Кінець розкладу Agent має бути пізніше початку.');
-  const activeWindowStart = $('agent-active-window-start').value.trim();
-  const activeWindowEnd = $('agent-active-window-end').value.trim();
+  let activeWindowStart = '';
+  let activeWindowEnd = '';
+  try {
+    activeWindowStart = normalizeAccessibleClockTime($('agent-active-window-start').value, { optional: true });
+    activeWindowEnd = normalizeAccessibleClockTime($('agent-active-window-end').value, { optional: true });
+  } catch (error) {
+    throw new Error(`Щоденне активне вікно Agent: ${error.message}`);
+  }
   if (Boolean(activeWindowStart) !== Boolean(activeWindowEnd)) throw new Error('Для щоденного активного вікна вкажіть і початок, і кінець.');
   return {
     startUrl: $('agent-start-url').value.trim(),

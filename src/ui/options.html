@@ -212,14 +212,15 @@
           </select>
           <label for="agent-interval-seconds">Інтервал між завершеними циклами, секунд</label>
           <input id="agent-interval-seconds" type="number" min="1" max="604800" step="1" inputmode="numeric" value="60">
+          <p id="agent-schedule-text-help" class="field-help">Вводьте дату й час звичайним текстом. Рекомендований формат: ДД.ММ.РРРР ГГ:ХХ, наприклад 25.09.2026 04:00. Також приймається 2026-09-25 04:00. Для щоденного вікна використовуйте лише ГГ:ХХ.</p>
           <label for="agent-schedule-start">Почати не раніше, необов’язково</label>
-          <input id="agent-schedule-start" type="datetime-local">
+          <input id="agent-schedule-start" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026 04:00" aria-describedby="agent-schedule-text-help">
           <label for="agent-schedule-end">Завершити не пізніше, необов’язково</label>
-          <input id="agent-schedule-end" type="datetime-local">
+          <input id="agent-schedule-end" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026 23:00" aria-describedby="agent-schedule-text-help">
           <label for="agent-active-window-start">Щоденне активне вікно — початок, необов’язково</label>
-          <input id="agent-active-window-start" type="time">
+          <input id="agent-active-window-start" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="09:00" aria-describedby="agent-schedule-text-help">
           <label for="agent-active-window-end">Щоденне активне вікно — кінець, необов’язково</label>
-          <input id="agent-active-window-end" type="time">
+          <input id="agent-active-window-end" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="21:00" aria-describedby="agent-schedule-text-help">
         </fieldset>
         <fieldset class="settings-group">
           <legend>Модель цього Agent</legend>
@@ -491,6 +492,9 @@
 
       <fieldset class="settings-group" id="scenario-work-common-settings">
         <legend>Загальні параметри</legend>
+        <label for="scenario-work-start-at">Запустити сценарій не раніше, необов’язково</label>
+        <input id="scenario-work-start-at" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026 04:00" aria-describedby="scenario-work-start-help">
+        <p id="scenario-work-start-help" class="field-help">Порожньо — запуск одразу. Формат: ДД.ММ.РРРР ГГ:ХХ. Це час старту всього алгоритму; внутрішні промпти після старту йдуть за правилами сценарію.</p>
         <label for="scenario-work-rounds">Кіл у одному поколінні чатів</label>
         <input id="scenario-work-rounds" type="number" min="1" max="10000" step="1" inputmode="numeric" value="10">
         <label for="scenario-work-generations">Кількість поколінь чатів</label>

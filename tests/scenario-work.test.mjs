@@ -8,6 +8,9 @@ import {
   createScenarioWorkRuntime,
   normalizeScenarioWorkConfig,
   startScenarioWork,
+  activateScheduledScenarioWork,
+  pauseScenarioWork,
+  resumeScenarioWork,
   planScenarioWorkActions,
   applyScenarioLaunch,
   applyScenarioCompletion,
@@ -287,4 +290,30 @@ test('auditor timeout during worker recovery preserves recovery after replacemen
   planned = planScenarioWorkActions(config, runtime, 104);
   assert.equal(planned.actions.length, 1);
   assert.equal(planned.actions[0].stage, 'TIMEOUT_AUDITOR');
+});
+
+
+test('scenario delayed start waits durably and resumes into RUNNING only when due', () => {
+  const config = normalizeScenarioWorkConfig({
+    id: 'scheduled',
+    mode: ScenarioWorkMode.CHAT_CYCLE,
+    startNotBeforeAt: 10_000,
+    steps: [{ prompt: 'ONE' }],
+  });
+  let runtime = startScenarioWork(config, createScenarioWorkRuntime(config, 1_000), 1_000);
+  assert.equal(runtime.runState, ScenarioWorkRunState.WAITING_SCHEDULE);
+  assert.equal(runtime.scheduledStartAt, 10_000);
+  assert.deepEqual(planScenarioWorkActions(config, runtime, 5_000).actions, []);
+
+  runtime = pauseScenarioWork(runtime, 5_001);
+  assert.equal(runtime.runState, ScenarioWorkRunState.PAUSED);
+  runtime = resumeScenarioWork(runtime, 5_002);
+  assert.equal(runtime.runState, ScenarioWorkRunState.WAITING_SCHEDULE);
+
+  runtime = activateScheduledScenarioWork(runtime, 9_999);
+  assert.equal(runtime.runState, ScenarioWorkRunState.WAITING_SCHEDULE);
+  runtime = activateScheduledScenarioWork(runtime, 10_000);
+  assert.equal(runtime.runState, ScenarioWorkRunState.RUNNING);
+  assert.equal(runtime.scheduledStartAt, 0);
+  assert.equal(planScenarioWorkActions(config, runtime, 10_000).actions.length, 1);
 });
