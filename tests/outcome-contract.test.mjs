@@ -121,6 +121,9 @@ test('normalizes the complete North-Star Outcome Contract surface deterministica
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.completionCriteria), true);
   assert.equal(Object.isFrozen(result.verifierPlan), true);
+
+  const roundTrip = normalizeOutcomeContractV1(result);
+  assert.deepEqual(roundTrip, result);
 });
 
 test('criteria, verifier coverage and required deliverables are cross-reference complete', () => {
@@ -184,7 +187,7 @@ test('budget/time/concurrency boundaries are exact non-enforcing contract data',
   })), /exact integer/);
 });
 
-test('contract representation cannot authenticate owner acceptance or mint execution authority', () => {
+test('contract representation and nested declarations cannot mint authority', () => {
   const normalized = createOutcomeContractV1(input());
 
   assert.throws(() => normalizeOutcomeContractV1({
@@ -201,6 +204,38 @@ test('contract representation cannot authenticate owner acceptance or mint execu
     ...normalized,
     policyDecision: 'ALLOW',
   }), /unknown field/);
+
+  assert.throws(() => normalizeOutcomeContractV1({
+    ...normalized,
+    allowedAuthority: [{
+      ...normalized.allowedAuthority[0],
+      authorityEffect: 'GRANT',
+    }],
+  }), /cannot grant authority/);
+
+  assert.throws(() => normalizeOutcomeContractV1({
+    ...normalized,
+    budgetBoundaries: {
+      ...normalized.budgetBoundaries,
+      enforcementAuthority: 'SELF',
+    },
+  }), /cannot become enforcement authority/);
+
+  assert.throws(() => normalizeOutcomeContractV1({
+    ...normalized,
+    verifierPlan: {
+      ...normalized.verifierPlan,
+      verificationAuthority: 'SELF',
+    },
+  }), /cannot mint verifier authority/);
+
+  assert.throws(() => normalizeOutcomeContractV1({
+    ...normalized,
+    triggerRefs: [{
+      ...normalized.triggerRefs[0],
+      schedulingAuthority: 'EXECUTE',
+    }],
+  }), /cannot grant scheduling authority/);
 });
 
 test('all structurally verified criteria yield only unverified EVIDENCE_READY, never completion authority', () => {
