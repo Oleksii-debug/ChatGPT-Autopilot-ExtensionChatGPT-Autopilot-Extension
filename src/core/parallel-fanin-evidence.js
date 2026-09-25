@@ -64,6 +64,27 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
+function sameNormalizedValue(left, right) {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (!sameNormalizedValue(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) return false;
+    const key = leftKeys[index];
+    if (!sameNormalizedValue(left[key], right[key])) return false;
+  }
+  return true;
+}
+
 function record(input, allowed, label) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error(label + ' must be a plain object');
@@ -215,6 +236,8 @@ function normalizeResult(input, index, context) {
     nodeById,
     evidenceById,
     evaluatedAt,
+    plan,
+    resolveTrustedVerification,
   } = context;
   const label = 'results[' + index + ']';
   const raw = record(input, RESULT_KEYS, label);
@@ -239,10 +262,30 @@ function normalizeResult(input, index, context) {
   const verificationDescriptors = Object.getOwnPropertyDescriptors(raw.verification);
   const rawVerifiedAt = verificationDescriptors.verifiedAt?.value;
   timestamp(rawVerifiedAt, label + '.verification.verifiedAt');
-  const verification = normalizeVerificationV1(raw.verification);
-  if (verification.verifiedAt !== rawVerifiedAt) {
+  const reportedVerification = normalizeVerificationV1(raw.verification);
+  if (reportedVerification.verifiedAt !== rawVerifiedAt) {
     throw new Error(label + '.verification.verifiedAt representation is non-canonical');
   }
+
+  const trustedLookup = deepFreeze({
+    schemaVersion: PARALLEL_FANIN_SCHEMA_VERSION,
+    planId: plan.planId,
+    planRevision: plan.revision,
+    nodeId,
+    verificationId: reportedVerification.verificationId,
+  });
+  const rawTrustedVerification = resolveTrustedVerification(trustedLookup);
+  if (rawTrustedVerification == null) {
+    throw new Error(label + ' canonical verification is not bound to participant node');
+  }
+  if (typeof rawTrustedVerification?.then === 'function') {
+    throw new Error('resolveTrustedVerification must synchronously return a trusted VerificationV1 snapshot');
+  }
+  const verification = normalizeVerificationV1(rawTrustedVerification);
+  if (!sameNormalizedValue(reportedVerification, verification)) {
+    throw new Error(label + ' reported verification does not exactly match canonical trusted verification');
+  }
+
   if (Date.parse(verification.verifiedAt) < Date.parse(node.updatedAt)) {
     throw new Error(label + ' verification predates terminal node state');
   }
@@ -371,7 +414,13 @@ function deriveStatus({
   return ParallelFanInStatus.EVIDENCE_COMPLETE;
 }
 
-export function buildParallelFanInEvidenceV1(input) {
+export function buildParallelFanInEvidenceV1(input, {
+  resolveTrustedVerification,
+} = {}) {
+  if (typeof resolveTrustedVerification !== 'function') {
+    throw new Error('Canonical trusted verification resolver is required');
+  }
+
   const raw = record(input, REQUEST_KEYS, 'ParallelFanInRequestV1');
   for (const key of REQUEST_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(raw, key)) {
@@ -421,13 +470,32 @@ export function buildParallelFanInEvidenceV1(input) {
       nodeById,
       evidenceById,
       evaluatedAt,
+      plan,
+      resolveTrustedVerification,
     }));
   const resultNodes = new Set();
+  const verificationIds = new Set();
+  const invocationIds = new Set();
+  const observationIds = new Set();
   for (const result of results) {
     if (resultNodes.has(result.nodeId)) {
       throw new Error('results contains duplicate nodeId: ' + result.nodeId);
     }
     resultNodes.add(result.nodeId);
+
+    const identities = [
+      [verificationIds, result.verification.verificationId, 'verificationId'],
+      [invocationIds, result.verification.invocationId, 'invocationId'],
+    ];
+    if (result.verification.observationId) {
+      identities.push([observationIds, result.verification.observationId, 'observationId']);
+    }
+    for (const [seen, value, label] of identities) {
+      if (seen.has(value)) {
+        throw new Error('results reuses ' + label + ' across participant nodes: ' + value);
+      }
+      seen.add(value);
+    }
   }
   results.sort((left, right) => asciiCompare(left.nodeId, right.nodeId));
 

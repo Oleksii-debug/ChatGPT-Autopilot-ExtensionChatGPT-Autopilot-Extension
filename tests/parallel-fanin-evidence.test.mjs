@@ -126,8 +126,24 @@ function request(overrides = {}) {
   };
 }
 
+function trustedDependencies(input) {
+  const byLookup = new Map(input.results.map(item => [
+    item.nodeId + '\u0000' + item.verification.verificationId,
+    structuredClone(item.verification),
+  ]));
+  return {
+    resolveTrustedVerification(lookup) {
+      return byLookup.get(lookup.nodeId + '\u0000' + lookup.verificationId) ?? null;
+    },
+  };
+}
+
+function buildWithTrustedVerification(input, dependencies = trustedDependencies(input)) {
+  return buildParallelFanInEvidenceV1(input, dependencies);
+}
+
 test('complete parallel fan-in reports evidence-complete without granting synthesis authority', () => {
-  const out = buildParallelFanInEvidenceV1(request());
+  const out = buildWithTrustedVerification(request());
 
   assert.equal(out.status, ParallelFanInStatus.EVIDENCE_COMPLETE);
   assert.equal(out.summary.participantCount, 2);
@@ -143,7 +159,7 @@ test('same subject and predicate with distinct declared value digests produces a
   const input = request();
   input.results[1] = result('b', 'evidence-b', SHA_B);
 
-  const out = buildParallelFanInEvidenceV1(input);
+  const out = buildWithTrustedVerification(input);
 
   assert.equal(out.status, ParallelFanInStatus.CONTRADICTION_REPORTED);
   assert.equal(out.contradictions.length, 1);
@@ -164,7 +180,7 @@ test('non-terminal participant holds fan-in in WAITING and cannot submit result 
       updatedAt: '2026-09-25T10:00:00.000Z',
     }),
   ]);
-  const out = buildParallelFanInEvidenceV1(request({
+  const out = buildWithTrustedVerification(request({
     plan: p,
     results: [result('a', 'evidence-a', SHA_C)],
   }));
@@ -173,13 +189,13 @@ test('non-terminal participant holds fan-in in WAITING and cannot submit result 
   assert.deepEqual(out.nonTerminalParticipantIds, ['b']);
 
   assert.throws(
-    () => buildParallelFanInEvidenceV1(request({ plan: p })),
+    () => buildWithTrustedVerification(request({ plan: p })),
     /cannot report a non-terminal participant/u,
   );
 });
 
 test('terminal participant without a result is evidence-incomplete rather than silently synthesized', () => {
-  const out = buildParallelFanInEvidenceV1(request({
+  const out = buildWithTrustedVerification(request({
     results: [result('a', 'evidence-a', SHA_C)],
   }));
 
@@ -197,7 +213,7 @@ test('reported FAILED or AMBIGUOUS verification keeps fan-in negative', () => {
         reasonCode: 'CHECK_' + status,
       }),
     });
-    const out = buildParallelFanInEvidenceV1(input);
+    const out = buildWithTrustedVerification(input);
     assert.equal(out.status, ParallelFanInStatus.REPORTED_NEGATIVE);
     assert.equal(out.summary.reportedNegativeCount, 1);
   }
@@ -212,7 +228,7 @@ test('FAILED or CANCELLED participant state remains negative even with caller-re
         evidence: state === 'FAILED' ? 'failure evidence' : 'cancel evidence',
       }),
     ]);
-    const out = buildParallelFanInEvidenceV1(request({ plan: p }));
+    const out = buildWithTrustedVerification(request({ plan: p }));
 
     assert.equal(out.status, ParallelFanInStatus.REPORTED_NEGATIVE);
     assert.equal(out.summary.reportedNegativeCount, 1);
@@ -228,7 +244,7 @@ test('result artifacts must be covered by the exact result verification evidence
   });
 
   assert.throws(
-    () => buildParallelFanInEvidenceV1(input),
+    () => buildWithTrustedVerification(input),
     /result artifact must be included in result verification evidence/u,
   );
 });
@@ -237,7 +253,7 @@ test('verification and claim evidence must resolve to materialized exact artifac
   const missingVerification = request();
   missingVerification.results[0] = result('a', 'unknown-artifact', SHA_C);
   assert.throws(
-    () => buildParallelFanInEvidenceV1(missingVerification),
+    () => buildWithTrustedVerification(missingVerification),
     /verification references unknown evidence artifact/u,
   );
 
@@ -248,14 +264,14 @@ test('verification and claim evidence must resolve to materialized exact artifac
     ],
   });
   assert.throws(
-    () => buildParallelFanInEvidenceV1(outsideVerification),
+    () => buildWithTrustedVerification(outsideVerification),
     /must be included in result verification evidence/u,
   );
 
   const uppercase = request();
   uppercase.evidenceArtifacts[0] = artifact('evidence-a', SHA_A.toUpperCase());
   assert.throws(
-    () => buildParallelFanInEvidenceV1(uppercase),
+    () => buildWithTrustedVerification(uppercase),
     /exact lowercase sha256 digest/u,
   );
 });
@@ -268,7 +284,7 @@ test('self-verification is surfaced as negative evidence and never becomes synth
     }),
   });
 
-  const out = buildParallelFanInEvidenceV1(input);
+  const out = buildWithTrustedVerification(input);
 
   assert.equal(out.status, ParallelFanInStatus.REPORTED_NEGATIVE);
   assert.equal(out.results[0].selfVerificationReported, true);
@@ -287,7 +303,7 @@ test('verification cannot depend on evidence created after verifiedAt', () => {
   });
 
   assert.throws(
-    () => buildParallelFanInEvidenceV1(input),
+    () => buildWithTrustedVerification(input),
     /evidence created after verification: evidence-a/u,
   );
 });
@@ -300,7 +316,7 @@ test('verification chronology must follow the terminal node and precede fan-in e
     }),
   });
   assert.throws(
-    () => buildParallelFanInEvidenceV1(early),
+    () => buildWithTrustedVerification(early),
     /predates terminal node state/u,
   );
 
@@ -311,7 +327,7 @@ test('verification chronology must follow the terminal node and precede fan-in e
     }),
   });
   assert.throws(
-    () => buildParallelFanInEvidenceV1(future),
+    () => buildWithTrustedVerification(future),
     /after evaluatedAt/u,
   );
 
@@ -322,18 +338,18 @@ test('verification chronology must follow the terminal node and precede fan-in e
     }),
   });
   assert.throws(
-    () => buildParallelFanInEvidenceV1(alias),
+    () => buildWithTrustedVerification(alias),
     /canonical ISO timestamp/u,
   );
 });
 
 test('result ordering is deterministic and independent of participant/result/artifact input order', () => {
-  const forward = buildParallelFanInEvidenceV1(request());
+  const forward = buildWithTrustedVerification(request());
   const input = request();
   input.participantNodeIds.reverse();
   input.results.reverse();
   input.evidenceArtifacts.reverse();
-  const reverse = buildParallelFanInEvidenceV1(input);
+  const reverse = buildWithTrustedVerification(input);
 
   assert.deepEqual(forward.participantNodeIds, reverse.participantNodeIds);
   assert.deepEqual(forward.results, reverse.results);
@@ -341,9 +357,50 @@ test('result ordering is deterministic and independent of participant/result/art
   assert.deepEqual(forward.contradictions, reverse.contradictions);
 });
 
+test('verification identities cannot be reused across participant results even if a resolver is malicious', () => {
+  const input = request();
+  const copied = structuredClone(input.results[0].verification);
+  input.results[1] = result('b', 'evidence-a', SHA_C, {
+    verification: copied,
+    resultArtifactIds: ['evidence-a'],
+    claims: [
+      claim('claim-b', 'subject-1', 'predicate-1', SHA_C, ['evidence-a']),
+    ],
+  });
+
+  assert.throws(
+    () => buildWithTrustedVerification(input, {
+      resolveTrustedVerification() {
+        return copied;
+      },
+    }),
+    /reuses verificationId across participant nodes/u,
+  );
+});
+
+test('verification genuinely bound to node A cannot be wrapped as node B', () => {
+  const input = request();
+  const canonical = trustedDependencies(input);
+  const verificationForA = structuredClone(input.results[0].verification);
+  input.results = [
+    result('b', 'evidence-a', SHA_C, {
+      verification: verificationForA,
+      resultArtifactIds: ['evidence-a'],
+      claims: [
+        claim('claim-b', 'subject-1', 'predicate-1', SHA_C, ['evidence-a']),
+      ],
+    }),
+  ];
+
+  assert.throws(
+    () => buildWithTrustedVerification(input, canonical),
+    /canonical verification is not bound to participant node/u,
+  );
+});
+
 test('duplicate participants, results and claims fail closed', () => {
   assert.throws(
-    () => buildParallelFanInEvidenceV1(request({
+    () => buildWithTrustedVerification(request({
       participantNodeIds: ['a', 'a'],
     })),
     /participantNodeIds contains duplicates/u,
@@ -355,7 +412,7 @@ test('duplicate participants, results and claims fail closed', () => {
     result('a', 'evidence-a', SHA_C),
   ];
   assert.throws(
-    () => buildParallelFanInEvidenceV1(duplicateResult),
+    () => buildWithTrustedVerification(duplicateResult),
     /duplicate nodeId/u,
   );
 
@@ -364,7 +421,7 @@ test('duplicate participants, results and claims fail closed', () => {
   r.claims.push({ ...r.claims[0] });
   duplicateClaim.results[0] = r;
   assert.throws(
-    () => buildParallelFanInEvidenceV1(duplicateClaim),
+    () => buildWithTrustedVerification(duplicateClaim),
     /duplicate claimId/u,
   );
 });
@@ -382,7 +439,7 @@ test('descriptor/symbol/sparse boundaries fail closed without executing getters'
   const input = request();
   input.results[0] = bad;
   assert.throws(
-    () => buildParallelFanInEvidenceV1(input),
+    () => buildWithTrustedVerification(input),
     /enumerable own data properties/u,
   );
   assert.equal(getterCalls, 0);
@@ -390,7 +447,7 @@ test('descriptor/symbol/sparse boundaries fail closed without executing getters'
   const symbolic = request();
   symbolic[Symbol('authority')] = true;
   assert.throws(
-    () => buildParallelFanInEvidenceV1(symbolic),
+    () => buildWithTrustedVerification(symbolic),
     /unknown field/u,
   );
 
@@ -398,13 +455,13 @@ test('descriptor/symbol/sparse boundaries fail closed without executing getters'
   sparse[0] = 'a';
   const sparseInput = request({ participantNodeIds: sparse });
   assert.throws(
-    () => buildParallelFanInEvidenceV1(sparseInput),
+    () => buildWithTrustedVerification(sparseInput),
     /enumerable own data property/u,
   );
 });
 
 test('output is deeply frozen and explicitly grants no truth, verification, merge, task or execution authority', () => {
-  const out = buildParallelFanInEvidenceV1(request());
+  const out = buildWithTrustedVerification(request());
 
   assert.equal(out.sourceTrust, 'UNVERIFIED_INPUT');
   assert.equal(out.readOnly, true);
