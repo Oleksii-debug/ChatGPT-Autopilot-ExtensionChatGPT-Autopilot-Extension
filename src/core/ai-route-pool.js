@@ -79,15 +79,27 @@ function dataRecord(value, allowed, label) {
   return Object.freeze(out);
 }
 function denseDataArray(value, label, max) {
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  const ownKeys = Reflect.ownKeys(value);
-  const expected = new Set(['length', ...Array.from({ length:value.length }, (_, index) => String(index))]);
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a bounded array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded array`);
+  }
+  const length = lengthDescriptor.value;
+  const ownKeys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
   if (ownKeys.length !== expected.size || ownKeys.some(key => typeof key !== 'string' || !expected.has(key))) {
     throw new Error(`${label} must be a dense data-only array`);
   }
   const out = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label} must be a dense data-only array`);
     }
