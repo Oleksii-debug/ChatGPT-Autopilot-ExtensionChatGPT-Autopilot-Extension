@@ -171,6 +171,89 @@ test('Drive verifier rejects accessor-backed readback data without executing get
   assert.equal(getterReads, 0);
 });
 
+test('Drive verifier rejects accessor-backed top-level invocation without executing getters or remote reads', async () => {
+  let getterReads = 0;
+  let driveReads = 0;
+  const hostileInvocation = invocation();
+  Object.defineProperty(hostileInvocation, 'toolId', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return GoogleWorkspaceToolId.DRIVE_FILE_UPDATE;
+    },
+  });
+  const verifier = new DriveFileUpdateVerifierV1({
+    workspaceClient: {
+      getDriveFile: async () => {
+        driveReads += 1;
+        return { id: 'file_1', name: 'new.txt', parents: ['folder_2'], trashed: false };
+      },
+    },
+  });
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: hostileInvocation,
+      executionId: 'drive-update-effect-1:attempt:1',
+      observation: observation(),
+    }),
+    /enumerable data property/i,
+  );
+  assert.equal(getterReads, 0);
+  assert.equal(driveReads, 0);
+});
+
+test('Drive verifier rejects accessor-backed observation without executing getters or remote reads', async () => {
+  let getterReads = 0;
+  let driveReads = 0;
+  const hostileObservation = observation();
+  Object.defineProperty(hostileObservation, 'observationId', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return 'drive-update-effect-1:observation:1';
+    },
+  });
+  const verifier = new DriveFileUpdateVerifierV1({
+    workspaceClient: {
+      getDriveFile: async () => {
+        driveReads += 1;
+        return { id: 'file_1', name: 'new.txt', parents: ['folder_2'], trashed: false };
+      },
+    },
+  });
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: invocation(),
+      executionId: 'drive-update-effect-1:attempt:1',
+      observation: hostileObservation,
+    }),
+    /enumerable data property/i,
+  );
+  assert.equal(getterReads, 0);
+  assert.equal(driveReads, 0);
+});
+
+test('Drive verifier rejects invalid execution identity before any remote read', async () => {
+  let driveReads = 0;
+  const verifier = new DriveFileUpdateVerifierV1({
+    workspaceClient: {
+      getDriveFile: async () => {
+        driveReads += 1;
+        return { id: 'file_1', name: 'new.txt', parents: ['folder_2'], trashed: false };
+      },
+    },
+  });
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: invocation(),
+      executionId: { toString: () => 'drive-update-effect-1:attempt:1' },
+      observation: observation(),
+    }),
+    /executionId is invalid/i,
+  );
+  assert.equal(driveReads, 0);
+});
+
 test('Drive verifier preserves exact Unicode/spaces in requested name', async () => {
   const exactName = '  Звіт — готово  ';
   const verifier = new DriveFileUpdateVerifierV1({
