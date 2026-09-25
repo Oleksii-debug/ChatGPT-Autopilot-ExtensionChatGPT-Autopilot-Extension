@@ -169,13 +169,23 @@ function snapshotJson(value, label, depth = 0, nodes = { count: 0 }) {
   if (typeof value !== 'object') fail(`${label} contains an unsupported value`);
   if (++nodes.count > 10_000) fail(`${label} is too complex`);
   if (Array.isArray(value)) {
-    if (Object.getPrototypeOf(value) !== Array.prototype || value.length > 1024) fail(`${label} must be a bounded plain array`);
-    const keys = Reflect.ownKeys(value);
-    const expected = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
+    if (Object.getPrototypeOf(value) !== Array.prototype) fail(`${label} must be a bounded plain array`);
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const lengthDescriptor = descriptors.length;
+    if (!lengthDescriptor
+        || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+        || !Number.isSafeInteger(lengthDescriptor.value)
+        || lengthDescriptor.value < 0
+        || lengthDescriptor.value > 1024) {
+      fail(`${label} must be a bounded plain array`);
+    }
+    const length = lengthDescriptor.value;
+    const keys = Reflect.ownKeys(descriptors);
+    const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
     if (keys.length !== expected.size || keys.some(key => typeof key !== 'string' || !expected.has(key))) fail(`${label} must be a dense canonical array`);
     const out = [];
-    for (let index = 0; index < value.length; index += 1) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = descriptors[String(index)];
       if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) fail(`${label}[${index}] must be an enumerable data property`);
       out.push(snapshotJson(descriptor.value, `${label}[${index}]`, depth + 1, nodes));
     }
@@ -204,13 +214,23 @@ function canonicalInputs(input) {
 }
 
 function strictCapabilities(value) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 128) fail('grantedCapabilityIds must be a bounded plain array');
-  const keys = Reflect.ownKeys(value);
-  const expected = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) fail('grantedCapabilityIds must be a bounded plain array');
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > 128) {
+    fail('grantedCapabilityIds must be a bounded plain array');
+  }
+  const length = lengthDescriptor.value;
+  const keys = Reflect.ownKeys(descriptors);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
   if (keys.length !== expected.size || keys.some(key => typeof key !== 'string' || !expected.has(key))) fail('grantedCapabilityIds must be a dense canonical array');
   const out = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value') || typeof descriptor.value !== 'string') {
       fail(`grantedCapabilityIds[${index}] must be an enumerable text data property`);
     }
