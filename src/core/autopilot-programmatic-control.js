@@ -76,6 +76,7 @@ const RECEIPT_KEYS = new Set([
   'dispatchId',
   'status',
   'resultArtifactRef',
+  'observedAt',
 ]);
 const ARTIFACT_KEYS = new Set([
   'schemaVersion',
@@ -296,9 +297,13 @@ function normalizeReceipt(input, request) {
   if (typeof raw.status !== 'string' || !DISPATCH_STATUSES.has(raw.status)) {
     throw new Error('receipt.status is invalid');
   }
+  const observedAt = canonicalTimestamp(raw.observedAt, 'receipt.observedAt');
+  if (Date.parse(observedAt) < Date.parse(request.assessedAt)) {
+    throw new Error('receipt.observedAt cannot predate assessedAt');
+  }
   const resultArtifactRef = raw.resultArtifactRef == null
     ? null
-    : normalizePayloadArtifact(raw.resultArtifactRef, request.assessedAt);
+    : normalizePayloadArtifact(raw.resultArtifactRef, observedAt);
   return deepFreeze({
     schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
     requestId: request.requestId,
@@ -307,6 +312,7 @@ function normalizeReceipt(input, request) {
     dispatchId: exactId(raw.dispatchId, 'receipt.dispatchId'),
     status: raw.status,
     resultArtifactRef,
+    observedAt,
   });
 }
 
