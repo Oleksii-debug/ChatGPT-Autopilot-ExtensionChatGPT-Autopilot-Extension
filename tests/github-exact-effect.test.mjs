@@ -193,6 +193,29 @@ test('initial GitHub verification must be independently bound to the exact durab
   }
 });
 
+test('initial GitHub verification may take longer than clock skew when evidence is fresh at verifier completion', async () => {
+  const fx = storeFixture();
+  const p = providerFixture();
+  let clockMs = Date.parse(at);
+  const executor = new GitHubExactEffectExecutorV1({
+    provider: p.provider,
+    store: fx.store,
+    now: () => clockMs,
+    verify: async ({ invocation: inv, observation }) => {
+      clockMs += 2 * 60 * 1000;
+      return {
+        ...verified(inv, observation),
+        verifiedAt: new Date(clockMs).toISOString(),
+      };
+    },
+  });
+
+  const id = 'slow-independent-verifier';
+  const result = await executor.invoke({ invocation: invocation(id), policyDecision: policy(id) });
+  assert.equal(result.effectState.phase, 'COMMITTED');
+  assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+});
+
 test('concurrent same-invocation contenders atomically admit exactly one GitHub mutation', async () => {
   const fx = storeFixture();
   const calls = [];
