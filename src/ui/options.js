@@ -2,7 +2,7 @@ import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
-import { buildSimplifiedSessionConfig } from './simplified-session-config.js';
+import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -2423,7 +2423,7 @@ async function importSimplifiedProfile(start) {
   const file = $('simplified-import-file').files?.[0];
   if (!file) { $('simplified-command-result').textContent = 'Оберіть JSON-файл.'; return; }
   try {
-    const profile = parsePortableJson(await file.text());
+    const profile = assertSimplifiedPortableProfile(parsePortableJson(await file.text()));
     await core('PREVIEW_PORTABLE_PROFILE', { profile });
     const data = await core('IMPORT_PORTABLE_PROFILE', { profile, confirmAutoStart: start });
     const importedIds = data.summary?.importedSessionIds || [];
