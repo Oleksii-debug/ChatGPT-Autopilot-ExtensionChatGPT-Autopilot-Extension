@@ -59,10 +59,16 @@ function exact(value, allowed, label) {
   }
 }
 function dataRecord(value, allowed, label) {
-  exact(value, allowed, label);
+  object(value, label);
+  const keys = Reflect.ownKeys(value);
   const out = Object.create(null);
-  for (const key of Reflect.ownKeys(value)) {
+  for (const key of keys) {
+    if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`${label} field must be an enumerable own data property: ${key}`);
+    }
     Object.defineProperty(out, key, {
       value:descriptor.value,
       enumerable:true,
