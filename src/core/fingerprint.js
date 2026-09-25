@@ -7,7 +7,8 @@ function toHex(bytes) {
 export async function createSha256FingerprintV1(canonical, { cryptoApi = globalThis.crypto } = {}) {
   if (typeof canonical !== 'string') throw new Error('Canonical fingerprint input must be a string');
   if (!cryptoApi?.subtle?.digest) throw new Error('Web Crypto SHA-256 is unavailable');
-  return createSha256FingerprintV1(canonical, { cryptoApi });
+  const digest = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  return `sha256:${toHex(new Uint8Array(digest))}`;
 }
 
 export async function createPromptFingerprint({
@@ -29,8 +30,7 @@ export async function createPromptFingerprint({
     generation,
     promptText,
   ]);
-  const digest = await cryptoApi.subtle.digest('SHA-256', new TextEncoder().encode(canonical));
-  return `sha256:${toHex(new Uint8Array(digest))}`;
+  return createSha256FingerprintV1(canonical, { cryptoApi });
 }
 
 export function createOperationId({ sessionId, taskId, generation, promptFingerprint }) {
