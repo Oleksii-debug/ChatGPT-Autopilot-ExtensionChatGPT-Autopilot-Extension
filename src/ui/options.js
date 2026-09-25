@@ -2472,6 +2472,50 @@ async function loadGlobalStatus() {
   catch (error) { $('global-runtime-summary').textContent = `Не вдалося прочитати стан Autopilot: ${error.message}`; }
 }
 
+const ACTION_CENTER_ACTION_LABELS = Object.freeze({
+  APPROVE_OR_DENY: 'схвалити або відхилити',
+  RECONCILE: 'узгодити неоднозначний ефект',
+  REVIEW: 'переглянути',
+  CLARIFY: 'уточнити',
+  TAKE_OVER: 'взяти під контроль',
+  REAUTHENTICATE: 'повторно авторизувати',
+});
+
+const ACTION_CENTER_SEVERITY_LABELS = Object.freeze({
+  BLOCKING: 'блокує роботу',
+  HIGH: 'високий пріоритет',
+  NORMAL: 'звичайний пріоритет',
+  LOW: 'низький пріоритет',
+});
+
+function renderActionCenter(data) {
+  const items = Array.isArray(data?.items) ? data.items.filter(item => item?.status === 'OPEN') : [];
+  const summary = data?.summary || {};
+  $('action-center-summary').textContent = items.length
+    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}. Action Center лише показує стан; рішення виконуються у відповідному канонічному розділі.`
+    : 'Зараз немає питань, які потребують вашої дії.';
+  const list = $('action-center-list');
+  const signature = JSON.stringify(items.map(item => [
+    item.itemId, item.sourceRevisionId, item.severity, item.ownerActionKind, item.title, item.materialityReason,
+  ]));
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  list.replaceChildren();
+  for (const item of items) {
+    const li = document.createElement('li');
+    const severity = ACTION_CENTER_SEVERITY_LABELS[item.severity] || item.severity;
+    const action = ACTION_CENTER_ACTION_LABELS[item.ownerActionKind] || item.ownerActionKind;
+    li.textContent = `${severity}. ${item.title}. Потрібно: ${action}. ${item.materialityReason}`;
+    list.append(li);
+  }
+}
+
+async function loadActionCenter() {
+  if (document.visibilityState !== 'visible') return;
+  try { renderActionCenter(await core('GET_ACTION_CENTER')); }
+  catch (error) { $('action-center-summary').textContent = `Не вдалося прочитати Action Center: ${error.message}`; }
+}
+
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
   const activeId = preserveFocus ? active?.id || null : null;
@@ -3877,6 +3921,7 @@ async function initialLoad() {
   if (firstSimplified) await selectSimplifiedSession(firstSimplified.id);
   else showSimplifiedSession(null);
   await loadGlobalStatus();
+  await loadActionCenter();
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
@@ -3890,7 +3935,12 @@ window.setInterval(() => {
   if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
 }, 2000);
 
-window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') void loadGlobalStatus(); }, 5000);
+window.setInterval(() => {
+  if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') {
+    void loadGlobalStatus();
+    void loadActionCenter();
+  }
+}, 5000);
 window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };
