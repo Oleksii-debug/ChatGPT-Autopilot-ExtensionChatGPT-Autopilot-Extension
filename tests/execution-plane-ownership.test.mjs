@@ -366,3 +366,19 @@ test('ownership revision is a safe exact integer and transition overflow fails c
     /revision exceeds exact durable-state range/,
   );
 });
+
+
+test('optional durable ownership fields reject falsy non-string aliases instead of treating them as absent', () => {
+  const available = structuredClone(base());
+  const fields = ['ownerPlane', 'handoffToPlane', 'ambiguityReason'];
+
+  for (const field of fields) {
+    for (const alias of [0, false]) {
+      assert.throws(
+        () => normalizeExecutionOwnershipV1({ ...available, [field]: alias }),
+        /execution plane is invalid|ambiguityReason is invalid/,
+        `${field}=${String(alias)}`,
+      );
+    }
+  }
+});

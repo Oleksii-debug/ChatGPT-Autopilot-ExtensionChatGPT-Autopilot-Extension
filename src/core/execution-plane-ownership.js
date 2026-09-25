@@ -43,7 +43,9 @@ function ts(value, label) {
 function plane(value) { if (typeof value !== 'string' || value !== value.trim() || !PLANES.has(value)) throw new Error('execution plane is invalid'); return value; }
 function optionalId(value, label) { return value == null || value === '' ? '' : id(value, label); }
 function optionalTs(value, label) { return value == null || value === '' ? '' : ts(value, label); }
+function optionalPlane(value) { return value == null || value === '' ? '' : plane(value); }
 function boundedText(value, label, max = 1000) { if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max) throw new Error(`${label} is invalid`); return value; }
+function optionalBoundedText(value, label, max = 1000) { return value == null || value === '' ? '' : boundedText(value, label, max); }
 function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) freeze(child); return Object.freeze(value); }
 
 export function createExecutionOwnershipV1({ taskId, planId, nodeId, effectId, policyEnvelopeId, at = new Date().toISOString() } = {}) {
@@ -63,13 +65,13 @@ export function normalizeExecutionOwnershipV1(raw) {
   if (raw.schemaVersion !== EXECUTION_OWNERSHIP_VERSION) throw new Error('Unsupported ExecutionOwnershipV1 schemaVersion');
   if (typeof raw.state !== 'string' || raw.state !== raw.state.trim() || !STATES.has(raw.state)) throw new Error('ExecutionOwnershipV1 state is invalid');
   const state = raw.state;
-  const ownerPlane = raw.ownerPlane ? plane(raw.ownerPlane) : '';
+  const ownerPlane = optionalPlane(raw.ownerPlane);
   const ownerId = optionalId(raw.ownerId, 'ownerId');
   const leaseId = optionalId(raw.leaseId, 'leaseId');
   const leaseUntil = optionalTs(raw.leaseUntil, 'leaseUntil');
-  const handoffToPlane = raw.handoffToPlane ? plane(raw.handoffToPlane) : '';
+  const handoffToPlane = optionalPlane(raw.handoffToPlane);
   const handoffId = optionalId(raw.handoffId, 'handoffId');
-  const ambiguityReason = raw.ambiguityReason ? boundedText(raw.ambiguityReason, 'ambiguityReason') : '';
+  const ambiguityReason = optionalBoundedText(raw.ambiguityReason, 'ambiguityReason');
   const owned = state === ExecutionOwnershipState.OWNED || state === ExecutionOwnershipState.HANDOFF_PENDING || state === ExecutionOwnershipState.RECONCILE;
   if (owned && (!ownerPlane || !ownerId || !leaseId || !leaseUntil)) throw new Error('owned execution state requires complete owner lease identity');
   if (!owned && (ownerPlane || ownerId || leaseId || leaseUntil)) throw new Error('unowned execution state cannot retain owner lease identity');
