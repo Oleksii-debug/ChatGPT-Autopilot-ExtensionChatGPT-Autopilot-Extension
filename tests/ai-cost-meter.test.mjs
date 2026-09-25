@@ -278,7 +278,7 @@ test('signed zero is rejected at financial evidence boundaries while canonical p
     inputTokens: 0,
     outputTokens: 0,
     observedAt: AT,
-  }), /input price is invalid|invalid/);
+  }), /canonical number for cost metering|input price is invalid/);
 });
 
 test('persisted zero-cost evidence must carry an explicit costUsdMicros field', () => {
