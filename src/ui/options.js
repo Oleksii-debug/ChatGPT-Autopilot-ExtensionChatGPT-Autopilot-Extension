@@ -3100,7 +3100,7 @@ function collectCalendarSchedule() {
       ? calendarNowFields(schedule.timeZone)
       : {
           date: normalizeAccessibleCalendarDate($('calendar-interval-start-date').value),
-          time: normalizeAccessibleClockTime($('calendar-interval-start-time').value, { optional: false }),
+          time: normalizeAccessibleClockTime($('calendar-interval-start-time').value, { optional: false, allowSeconds: true }),
         };
     schedule.startDate = start.date;
     schedule.startTime = start.time;
