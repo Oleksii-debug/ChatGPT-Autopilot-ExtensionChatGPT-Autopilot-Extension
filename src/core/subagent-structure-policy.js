@@ -41,15 +41,23 @@ const ADMISSION_REQUEST_KEYS = new Set([
 const MAX_DEPTH = 64;
 const MAX_CHILDREN_PER_AGENT = 1000;
 
-function plainObject(value, label) {
+function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
-  return value;
-}
 
-function exactKeys(value, allowed, label) {
-  for (const key of Object.keys(value)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+    const descriptor = descriptors[key];
+    if (!descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label}.${key} must be an enumerable own data property`);
+    }
+    snapshot[key] = descriptor.value;
+  }
+  return Object.freeze(snapshot);
 }
 
 function own(value, key, fallback) {
@@ -91,8 +99,7 @@ function initiator(value) {
 }
 
 export function normalizeSubagentStructurePolicyV1(input = {}) {
-  const raw = plainObject(input, 'SubagentStructurePolicyV1');
-  exactKeys(raw, POLICY_KEYS, 'SubagentStructurePolicyV1');
+  const raw = strictRecord(input, POLICY_KEYS, 'SubagentStructurePolicyV1');
   const schemaVersion = own(raw, 'schemaVersion', SUBAGENT_STRUCTURE_POLICY_VERSION);
   if (schemaVersion !== SUBAGENT_STRUCTURE_POLICY_VERSION) throw new Error('Unsupported SubagentStructurePolicyV1 schemaVersion');
   return frozen({
@@ -135,9 +142,8 @@ export function deriveSubagentStructureFactsFromGraphV1({ graph, parentNodeId } 
 }
 
 function normalizedCapacityRequest(input, { includeRequestedChildren }) {
-  const raw = plainObject(input || {}, 'SubagentStructureAdmissionRequestV1');
-  exactKeys(
-    raw,
+  const raw = strictRecord(
+    input ?? {},
     includeRequestedChildren ? ADMISSION_REQUEST_KEYS : CAPACITY_REQUEST_KEYS,
     'SubagentStructureAdmissionRequestV1',
   );
