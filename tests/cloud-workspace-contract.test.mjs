@@ -336,3 +336,24 @@ test('binding itself requires a fresh ready observation within the live lease', 
     { at: '2026-09-25T06:06:00.000Z' },
   ), /fresh observation/);
 }
+
+
+test('assessment option timestamp is data-only and cannot execute an accessor', () => {
+  const { binding, ownership } = bindingAndOwnership();
+  let reads = 0;
+  const options = {};
+  Object.defineProperty(options, 'at', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return '2026-09-25T06:11:00.000Z';
+    },
+  });
+  assert.throws(() => assessCloudWorkspaceContinuityV1(
+    binding,
+    observation({ observedAt: '2026-09-25T06:10:00.000Z', expiresAt: '2026-09-25T06:40:00.000Z' }),
+    ownership,
+    options,
+  ), /own data properties/);
+  assert.equal(reads, 0);
+});
