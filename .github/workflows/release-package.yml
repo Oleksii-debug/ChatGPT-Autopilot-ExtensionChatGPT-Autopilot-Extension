@@ -1,0 +1,79 @@
+name: Release package candidate
+
+on:
+  push:
+    branches: ["main", "source/0.9.19-canonical-convergence"]
+    paths:
+      - "manifest.json"
+      - "src/**"
+      - "companion/**"
+      - "tests/**"
+      - "scripts/package-release.mjs"
+      - "tests-regression/release/**"
+      - "tests-regression/reliability/**"
+      - "package.json"
+      - "README.md"
+      - "README.txt"
+      - "CHANGES-*.txt"
+      - ".github/workflows/release-package.yml"
+  pull_request:
+    paths:
+      - "manifest.json"
+      - "src/**"
+      - "companion/**"
+      - "tests/**"
+      - "scripts/package-release.mjs"
+      - "tests-regression/release/**"
+      - "tests-regression/reliability/**"
+      - "package.json"
+      - "README.md"
+      - "README.txt"
+      - "CHANGES-*.txt"
+      - ".github/workflows/release-package.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Collapse only superseded heads of the same pull request/workflow.
+  # Push/main and manual runs use a unique run_id so exact-main evidence is preserved.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run deterministic Node qualification
+        run: npm test
+      - name: Build release candidate twice and verify deterministic bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          npm run package:release
+          candidate="dist/ChatGPT-Autopilot-0.9.19.zip"
+          test -f "$candidate"
+          first_sha="$(sha256sum "$candidate" | awk '{print $1}')"
+          cp "$candidate" /tmp/ChatGPT-Autopilot-first.zip
+          rm -rf dist
+          npm run package:release
+          test -f "$candidate"
+          second_sha="$(sha256sum "$candidate" | awk '{print $1}')"
+          test "$first_sha" = "$second_sha"
+          cmp -s /tmp/ChatGPT-Autopilot-first.zip "$candidate"
+          unzip -t "$candidate"
+          echo "release candidate deterministic SHA-256: $second_sha"
+      - name: Upload release candidate ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatGPT-Autopilot-0.9.19-candidate
+          path: dist/ChatGPT-Autopilot-0.9.19.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
