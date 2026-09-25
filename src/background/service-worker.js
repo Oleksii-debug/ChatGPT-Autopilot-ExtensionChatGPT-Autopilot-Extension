@@ -17,6 +17,7 @@ import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
+import { SelectionSourceCaptureV1 } from '../core/selection-source-capture.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
@@ -62,6 +63,8 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
+  'LIST_BROWSER_AGENT_SOURCE_TABS',
+  'CAPTURE_BROWSER_AGENT_SOURCE',
 ]);
 const repo = new StorageRepository(chrome);
 const chatgptProvider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
@@ -177,6 +180,7 @@ const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: payload => dispatchSerializedAiRoute(payload),
 });
+const selectionSourceCapture = new SelectionSourceCaptureV1({ chromeApi: chrome });
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
@@ -549,6 +553,10 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.get(message.payload?.id || '');
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
+  } else if (message.command === 'LIST_BROWSER_AGENT_SOURCE_TABS') {
+    result = await selectionSourceCapture.listTabs();
+  } else if (message.command === 'CAPTURE_BROWSER_AGENT_SOURCE') {
+    result = await selectionSourceCapture.capture(message.payload || {});
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.create(message.payload || {});
   } else if (message.command === 'SELECT_BROWSER_AGENT_JOB') {
