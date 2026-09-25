@@ -342,6 +342,17 @@ test('projection cannot be used as replay, execution, or evidence authority', ()
   assert.ok(Object.isFrozen(projection.summary));
 });
 
+test('budget trace rejects negative-zero money aliases', () => {
+  assert.throws(
+    () => normalizeRunTraceEventV1(event({
+      kind: RunTraceEventKind.BUDGET,
+      budgetCostUsdMicros: -0,
+      status: 'OBSERVED',
+    })),
+    /canonical integer/u,
+  );
+});
+
 test('projection request itself rejects authority and transcript smuggling fields', () => {
   for (const [field, value] of [
     ['replayAuthorized', true],
