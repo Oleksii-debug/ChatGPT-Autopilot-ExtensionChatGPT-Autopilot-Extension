@@ -1,3 +1,16 @@
+CHATGPT АВТОПІЛОТ 0.10.0 — RELEASE CANDIDATE / SCENARIO WORK RECOVERY + PORTABLE CONFIG
+
+СТАТУС 0.10.0 CANDIDATE
+- Це нова унікальна candidate-лінія після frozen 0.9.19; старий ZIP не перейменовується і не видається за новий реліз.
+- Реальний user diagnostic із 7 Scenario Work чатами підтвердив: перший Send фізично відбувся, але Work UI acknowledgement лишав operation у SUBMISSION_UNCERTAIN/AMBIGUOUS, тому підтверджений лічильник не рухався і другий промпт не стартував.
+- PR #418 додає Work-specific semantic acknowledgement і shared persistent chat-pool recovery. CHAT_CYCLE тепер має однозначний контракт: одна послідовність промптів = один фізичний чат; новий чат створюється лише через pool replacement budget.
+- Конфігурація 1 стартовий + 10 продовжень + 1 фінальний тепер означає 12 повідомлень у кожному фізичному чаті, а не 60 через старе rounds-per-generation множення.
+- Стан Scenario Work показує фізичний чат, поточне/загальне повідомлення, промпт і повтор; raw AMBIGUOUS_EFFECT не показується користувачу як внутрішній enum.
+- PR #420 додає JSON шаблон / імпорт / експорт Scenario Work; template прямо кодує 1 + 10 + 1 = 12 повідомлень.
+- Release/version tooling більше не має незалежних вручну зашитих номерів для installable/source ZIP та GitHub Actions artifact names: package.json є єдиним version authority, manifest.json перевіряється packager-ом на точну відповідність.
+- DEVELOPMENT_HISTORY.md і Drive 09_ІСТОРІЯ_ЗМІН / 01_CURRENT_STATUS зберігають exact SHA, root cause, verification state та rollback provenance для наступних чатів/Work/Codex.
+- 0.10.0 не є FINAL/OWNER-VERIFIED до exact-head CI, deterministic package qualification та реального installed-extension acceptance. HUMAN_TESTED=false; NVDA_VERIFIED=false; OWNER_WINDOWS_CHROME_VERIFIED=false.
+
 CHATGPT АВТОПІЛОТ 0.9.19 — DIAGNOSTIC-DERIVED ORDINARY SESSION LIVENESS / POST-SEND EVIDENCE PRESERVATION
 
 ЗАХИЩЕНІ ПОСТАЧАЛЬНИКИ МОДЕЛЕЙ
