@@ -138,7 +138,11 @@ function exactTimestamp(value, label, { optional = false } = {}) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  const canonical = new Date(ms).toISOString();
+  if (canonical !== value) {
+    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  }
+  return value;
 }
 
 function exactInteger(value, label, min = 1, max = Number.MAX_SAFE_INTEGER) {
@@ -275,7 +279,7 @@ function assertExactArtifactRefTypes(raw, label) {
   exactId(ownValue(raw, 'artifactId', label), `${label}.artifactId`);
   exactId(ownValue(raw, 'kind', label), `${label}.kind`);
   exactStringField(raw, 'uri', label);
-  exactStringField(raw, 'createdAt', label);
+  exactTimestamp(ownValue(raw, 'createdAt', label), `${label}.createdAt`);
   exactStringField(raw, 'mediaType', label, { optional: true });
   const digest = ownValue(raw, 'sha256', label, { optional: true });
   if (digest != null && digest !== '' && (typeof digest !== 'string' || !SHA256.test(digest))) {
@@ -293,7 +297,7 @@ function assertExactObservationTypes(raw, label) {
   exactId(ownValue(raw, 'observationId', label), `${label}.observationId`);
   exactId(ownValue(raw, 'invocationId', label), `${label}.invocationId`);
   exactStatus(ownValue(raw, 'status', label), OBSERVATION_STATUSES, `${label}.status`);
-  exactStringField(raw, 'observedAt', label);
+  exactTimestamp(ownValue(raw, 'observedAt', label), `${label}.observedAt`);
   exactStringField(raw, 'summary', label, { optional: true });
   const artifactRefs = ownValue(raw, 'artifactRefs', label, { optional: true });
   if (artifactRefs != null) {
@@ -317,7 +321,7 @@ function assertExactVerificationTypes(raw, label) {
   exactId(ownValue(raw, 'invocationId', label), `${label}.invocationId`);
   exactStatus(ownValue(raw, 'status', label), VERIFICATION_STATUSES, `${label}.status`);
   exactId(ownValue(raw, 'reasonCode', label), `${label}.reasonCode`);
-  exactStringField(raw, 'verifiedAt', label);
+  exactTimestamp(ownValue(raw, 'verifiedAt', label), `${label}.verifiedAt`);
   exactStringField(raw, 'summary', label, { optional: true });
   for (const key of [
     'observationId', 'verifierId', 'verificationAuthorityId', 'effectId', 'executionId',
