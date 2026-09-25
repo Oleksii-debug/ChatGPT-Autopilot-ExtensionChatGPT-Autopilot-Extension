@@ -24,8 +24,8 @@ const ASSET_KEYS = new Set([
 const VARIABLE_KEYS = new Set(['name', 'required', 'maxChars', 'defaultValue', 'sensitive']);
 const SOURCE_KEYS = new Set(['sourceId', 'revisionId', 'contentSha256']);
 const CADENCE_KEYS = new Set(['mode', 'referenceId']);
-const TRIGGER_KEYS = new Set(['mode', 'referenceId']);
-const RENDER_KEYS = new Set(['values', 'currentSourceBindings', 'trigger']);
+const TRIGGER_ASSERTION_KEYS = new Set(['mode', 'referenceId']);
+const RENDER_KEYS = new Set(['values', 'sourceBindingAssertions', 'triggerAssertion']);
 const SENSITIVE_REF_KEYS = new Set(['schemaVersion', 'brokerId', 'credentialId']);
 const PLACEHOLDER = /\{\{\s*([A-Za-z][A-Za-z0-9_]{0,63})\s*\}\}/gu;
 
@@ -293,31 +293,31 @@ function bindingKey(binding) {
   return `${binding.sourceId}\u0000${binding.revisionId}\u0000${binding.contentSha256}`;
 }
 
-function assertSourceFreshness(asset, currentBindingsRaw) {
-  const currentInputs = dataArray(currentBindingsRaw, 'currentSourceBindings', { max: MAX_SOURCES });
-  const current = currentInputs.map(normalizeSourceBinding).sort(compareSourceBinding);
-  if (current.length !== asset.sourceBindings.length) {
-    throw new Error('Prompt asset source binding set is stale or incomplete');
+function assertSourceBindingComparison(asset, assertionsRaw) {
+  const assertionInputs = dataArray(assertionsRaw, 'sourceBindingAssertions', { max: MAX_SOURCES });
+  const assertions = assertionInputs.map(normalizeSourceBinding).sort(compareSourceBinding);
+  if (assertions.length !== asset.sourceBindings.length) {
+    throw new Error('Prompt asset source comparison set does not match declared bindings');
   }
   for (let index = 0; index < asset.sourceBindings.length; index += 1) {
-    if (bindingKey(asset.sourceBindings[index]) !== bindingKey(current[index])) {
-      throw new Error(`Prompt asset source binding is stale: ${asset.sourceBindings[index].sourceId}`);
+    if (bindingKey(asset.sourceBindings[index]) !== bindingKey(assertions[index])) {
+      throw new Error(`Prompt asset source binding comparison mismatch: ${asset.sourceBindings[index].sourceId}`);
     }
   }
 }
 
-function assertCadenceTrigger(asset, triggerRaw) {
+function assertCadenceComparison(asset, triggerAssertionRaw) {
   if (asset.cadence.mode === PromptAssetCadenceMode.MANUAL) {
-    if (triggerRaw != null) throw new Error('MANUAL prompt asset cannot accept a scheduler/event trigger');
+    if (triggerAssertionRaw != null) throw new Error('MANUAL prompt asset cannot accept a scheduler/event trigger assertion');
     return;
   }
-  const raw = plain(triggerRaw, 'trigger');
-  exactKeys(raw, TRIGGER_KEYS, 'trigger');
+  const raw = plain(triggerAssertionRaw, 'triggerAssertion');
+  exactKeys(raw, TRIGGER_ASSERTION_KEYS, 'triggerAssertion');
   if (typeof raw.mode !== 'string' || raw.mode !== asset.cadence.mode) {
-    throw new Error('trigger mode does not match prompt asset cadence');
+    throw new Error('trigger assertion mode does not match prompt asset cadence');
   }
-  if (id(raw.referenceId, 'trigger.referenceId') !== asset.cadence.referenceId) {
-    throw new Error('trigger referenceId does not match prompt asset cadence');
+  if (id(raw.referenceId, 'triggerAssertion.referenceId') !== asset.cadence.referenceId) {
+    throw new Error('trigger assertion referenceId does not match prompt asset cadence');
   }
 }
 
@@ -375,11 +375,13 @@ export function renderPromptAssetV1(assetInput, options = {}) {
   const rawOptions = plain(options, 'render options');
   exactKeys(rawOptions, RENDER_KEYS, 'render options');
   const values = Object.hasOwn(rawOptions, 'values') ? rawOptions.values : null;
-  const currentSourceBindings = Object.hasOwn(rawOptions, 'currentSourceBindings') ? rawOptions.currentSourceBindings : [];
-  const trigger = Object.hasOwn(rawOptions, 'trigger') ? rawOptions.trigger : null;
+  const sourceBindingAssertions = Object.hasOwn(rawOptions, 'sourceBindingAssertions') ? rawOptions.sourceBindingAssertions : [];
+  const triggerAssertion = Object.hasOwn(rawOptions, 'triggerAssertion') ? rawOptions.triggerAssertion : null;
   const asset = normalizePromptAssetV1(assetInput);
-  assertSourceFreshness(asset, currentSourceBindings);
-  assertCadenceTrigger(asset, trigger);
+  // These inputs are caller assertions used only for deterministic comparison.
+  // They are not source-freshness, scheduler/event, policy, or execution authority.
+  assertSourceBindingComparison(asset, sourceBindingAssertions);
+  assertCadenceComparison(asset, triggerAssertion);
   const normalizedValues = normalizeValues(asset, values);
   const definitions = new Map(asset.variables.map(item => [item.name, item]));
   const sensitiveBindingsByName = new Map();
@@ -407,6 +409,19 @@ export function renderPromptAssetV1(assetInput, options = {}) {
     rendered,
     sourceBindings: asset.sourceBindings.map(item => ({ ...item })),
     cadence: { ...asset.cadence },
+    sourceComparison: {
+      authority: 'UNVERIFIED_INPUT',
+      matchesDeclaredBindings: true,
+      freshnessVerified: false,
+      requiresTrustedSourceAdmission: asset.sourceBindings.length > 0,
+    },
+    cadenceComparison: {
+      authority: 'UNVERIFIED_INPUT',
+      matchesDeclaredCadence: true,
+      triggerVerified: false,
+      requiresTrustedTriggerAdmission: asset.cadence.mode !== PromptAssetCadenceMode.MANUAL,
+    },
+    executionAuthorized: false,
     sensitiveVariableNames: asset.variables.filter(item => item.sensitive).map(item => item.name),
     sensitiveBindings,
   });

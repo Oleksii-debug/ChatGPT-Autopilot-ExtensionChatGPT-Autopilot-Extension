@@ -81,59 +81,72 @@ test('template variables must be explicitly declared and every declaration is us
   );
 });
 
-test('render binds exact fresh sources, declared variables and immutable identity', () => {
+test('render compares exact source assertions without granting freshness authority', () => {
   const normalized = normalizePromptAssetV1(asset());
   const result = renderPromptAssetV1(normalized, {
     values: { target: 'PR #216' },
-    currentSourceBindings: [source()],
+    sourceBindingAssertions: [source()],
   });
   assert.equal(result.rendered, 'Review PR #216 against North Star.\nReturn evidence only.');
   assert.equal(result.assetId, 'prompt:release-review');
   assert.equal(result.version, 1);
   assert.deepEqual(result.sourceBindings, [source()]);
+  assert.deepEqual(result.sourceComparison, {
+    authority: 'UNVERIFIED_INPUT',
+    matchesDeclaredBindings: true,
+    freshnessVerified: false,
+    requiresTrustedSourceAdmission: true,
+  });
+  assert.deepEqual(result.cadenceComparison, {
+    authority: 'UNVERIFIED_INPUT',
+    matchesDeclaredCadence: true,
+    triggerVerified: false,
+    requiresTrustedTriggerAdmission: false,
+  });
+  assert.equal(result.executionAuthorized, false);
   assert.equal(Object.isFrozen(result), true);
 
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       values: { target: 'PR #216', unexpected: 'authority' },
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
     }),
     /unknown variable: unexpected/,
   );
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       values: {},
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
     }),
     /required variable is missing: target/,
   );
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       values: { target: 'x'.repeat(201) },
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
     }),
     /exceeds maxChars/,
   );
 });
 
-test('render fails closed on stale, missing, duplicate or type-aliased source revision evidence', () => {
+test('render comparison fails closed on mismatched, missing, duplicate or type-aliased source assertions', () => {
   const normalized = normalizePromptAssetV1(asset());
   const base = { values: { target: 'PR #216' } };
   assert.throws(
-    () => renderPromptAssetV1(normalized, { ...base, currentSourceBindings: [] }),
-    /stale or incomplete/,
+    () => renderPromptAssetV1(normalized, { ...base, sourceBindingAssertions: [] }),
+    /does not match declared bindings/,
   );
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       ...base,
-      currentSourceBindings: [source('spec', 'rev-2', SHA_A)],
+      sourceBindingAssertions: [source('spec', 'rev-2', SHA_A)],
     }),
-    /source binding is stale: spec/,
+    /source binding comparison mismatch: spec/,
   );
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       ...base,
-      currentSourceBindings: [{ sourceId: 7, revisionId: 'rev-1', contentSha256: SHA_A }],
+      sourceBindingAssertions: [{ sourceId: 7, revisionId: 'rev-1', contentSha256: SHA_A }],
     }),
     /identity fields must be strings/,
   );
@@ -143,36 +156,36 @@ test('render fails closed on stale, missing, duplicate or type-aliased source re
   );
 });
 
-test('cadence is a reference-only execution gate and never invents scheduler authority', () => {
+test('cadence matching is comparison-only and never invents scheduler authority', () => {
   const scheduled = normalizePromptAssetV1(asset({
     cadence: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
   }));
   assert.throws(
     () => renderPromptAssetV1(scheduled, {
       values: { target: 'main' },
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
     }),
     /trigger.*plain object/,
   );
   assert.throws(
     () => renderPromptAssetV1(scheduled, {
       values: { target: 'main' },
-      currentSourceBindings: [source()],
-      trigger: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'schedule:nightly' },
+      sourceBindingAssertions: [source()],
+      triggerAssertion: { mode: PromptAssetCadenceMode.EVENT, referenceId: 'schedule:nightly' },
     }),
     /trigger mode/,
   );
   assert.throws(
     () => renderPromptAssetV1(scheduled, {
       values: { target: 'main' },
-      currentSourceBindings: [source()],
-      trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:other' },
+      sourceBindingAssertions: [source()],
+      triggerAssertion: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:other' },
     }),
     /referenceId/,
   );
   const result = renderPromptAssetV1(scheduled, {
     values: { target: 'main' },
-    currentSourceBindings: [source()],
+    sourceBindingAssertions: [source()],
     trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
   });
   assert.equal(result.cadence.referenceId, 'schedule:nightly');
@@ -182,6 +195,47 @@ test('cadence is a reference-only execution gate and never invents scheduler aut
       cadence: { mode: PromptAssetCadenceMode.MANUAL, referenceId: 'schedule:hidden' },
     })),
     /MANUAL cadence cannot/,
+  );
+});
+
+test('matching caller source and cadence assertions remain unverified and cannot authorize execution', () => {
+  const scheduled = normalizePromptAssetV1(asset({
+    cadence: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+  }));
+  const result = renderPromptAssetV1(scheduled, {
+    values: { target: 'main' },
+    sourceBindingAssertions: [source()],
+    triggerAssertion: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+  });
+  assert.deepEqual(result.sourceComparison, {
+    authority: 'UNVERIFIED_INPUT',
+    matchesDeclaredBindings: true,
+    freshnessVerified: false,
+    requiresTrustedSourceAdmission: true,
+  });
+  assert.deepEqual(result.cadenceComparison, {
+    authority: 'UNVERIFIED_INPUT',
+    matchesDeclaredCadence: true,
+    triggerVerified: false,
+    requiresTrustedTriggerAdmission: true,
+  });
+  assert.equal(result.executionAuthorized, false);
+
+  assert.throws(
+    () => renderPromptAssetV1(scheduled, {
+      values: { target: 'main' },
+      currentSourceBindings: [source()],
+      triggerAssertion: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+    }),
+    /unknown field: currentSourceBindings/,
+  );
+  assert.throws(
+    () => renderPromptAssetV1(scheduled, {
+      values: { target: 'main' },
+      sourceBindingAssertions: [source()],
+      trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+    }),
+    /unknown field: trigger/,
   );
 });
 
@@ -197,7 +251,7 @@ test('sensitive values remain opaque and generic render output never contains se
   assert.throws(
     () => renderPromptAssetV1(secretAsset, {
       values: { secret: rawSecret, target: 'release' },
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
     }),
     /opaque credential reference/,
   );
@@ -209,7 +263,7 @@ test('sensitive values remain opaque and generic render output never contains se
   };
   const rendered = renderPromptAssetV1(secretAsset, {
     values: { secret: credentialRef, target: 'release' },
-    currentSourceBindings: [source()],
+    sourceBindingAssertions: [source()],
   });
   assert.equal(rendered.rendered, 'Authenticate with {{SENSITIVE_REF:secret}} then review release.');
   assert.equal(rendered.rendered.includes(rawSecret), false);
@@ -227,7 +281,7 @@ test('sensitive values remain opaque and generic render output never contains se
     },
   });
   assert.throws(
-    () => renderPromptAssetV1(secretAsset, { values, currentSourceBindings: [source()] }),
+    () => renderPromptAssetV1(secretAsset, { values, sourceBindingAssertions: [source()] }),
     /enumerable own data property/,
   );
   assert.equal(reads, 0, 'generic renderer must not execute secret-bearing accessors');
@@ -296,7 +350,7 @@ test('render options cannot inherit values, source evidence or cadence authority
   const normalized = normalizePromptAssetV1(asset());
   const inheritedOptions = Object.assign(Object.create({
     values: { target: 'inherited' },
-    currentSourceBindings: [source()],
+    sourceBindingAssertions: [source()],
   }), {});
   assert.throws(
     () => renderPromptAssetV1(normalized, inheritedOptions),
@@ -305,7 +359,7 @@ test('render options cannot inherit values, source evidence or cadence authority
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       values: { target: 'main' },
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
       extraAuthority: true,
     }),
     /unknown field: extraAuthority/,
@@ -318,7 +372,7 @@ test('plain value maps cannot smuggle inherited variable values', () => {
   assert.throws(
     () => renderPromptAssetV1(normalized, {
       values: inherited,
-      currentSourceBindings: [source()],
+      sourceBindingAssertions: [source()],
     }),
     /values must be a plain object/,
   );
