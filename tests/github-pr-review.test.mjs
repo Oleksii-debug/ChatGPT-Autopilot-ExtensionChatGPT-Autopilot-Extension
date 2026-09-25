@@ -749,6 +749,65 @@ test('review verifier accepts the canonical exact-effect envelope and binds its 
   assert.equal(remoteReads, 2, 'forged executor envelope fields must fail before remote readback');
 });
 
+test('review verifier exact-binds executionId to the invocation effect before any readback', async () => {
+  let remoteReads = 0;
+  const client = fullClient({
+    readPullRequest: async () => {
+      remoteReads += 1;
+      return {};
+    },
+    readPullRequestReview: async () => {
+      remoteReads += 1;
+      return {};
+    },
+  });
+  const verifier = new GitHubPullRequestReviewVerifierV1({
+    githubClient: client,
+    now: () => Date.parse(at),
+  });
+  const inv = invocation('github-pr-review-execution-binding');
+  const foreignExecutionId = 'github-pr-review-other-effect:attempt:1';
+
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: inv,
+      executionId: foreignExecutionId,
+      observation: {},
+    }),
+    /executionId does not match invocation identity/i,
+  );
+
+  await assert.rejects(
+    () => verifier.verify({
+      invocation: inv,
+      effectId: inv.invocationId,
+      executionId: foreignExecutionId,
+      attempt: 1,
+      policyDecisionId: inv.policyDecisionId,
+      observation: {},
+      requestedAt: at,
+    }),
+    /executionId does not match invocation identity/i,
+  );
+
+  await assert.rejects(
+    () => verifier.reconcileVerify({
+      invocation: inv,
+      effectId: inv.invocationId,
+      executionId: foreignExecutionId,
+      attempt: 1,
+      policyDecisionId: inv.policyDecisionId,
+      expectedOutcome: 'VERIFIED',
+      priorObservation: {},
+      ambiguityDeclaredAt: at,
+      requestedAt: at,
+    }),
+    /executionId does not match effect identity/i,
+  );
+
+  assert.equal(remoteReads, 0, 'cross-effect execution identity must fail before GitHub readback');
+});
+
 test('review verifier snapshots outer option and request envelopes before reads', async () => {
   let remoteReads = 0;
   const client = fullClient({

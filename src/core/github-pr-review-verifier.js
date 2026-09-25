@@ -266,6 +266,9 @@ export class GitHubPullRequestReviewVerifierV1 {
     const observation = request.observation;
     const exactAttempt = attemptFromExecutionId(executionId);
     const expected = expectedReview(invocation);
+    if (executionId !== `${expected.invocationId}:attempt:${exactAttempt}`) {
+      throw new Error('executionId does not match invocation identity');
+    }
 
     const envelopeKeys = ['effectId', 'attempt', 'policyDecisionId', 'requestedAt'];
     const suppliedEnvelopeKeys = envelopeKeys.filter(key =>
@@ -333,6 +336,9 @@ export class GitHubPullRequestReviewVerifierV1 {
     if (requireId(effectId, 'effectId') !== expected.invocationId) throw new Error('effectId is invalid');
     if (requireId(policyDecisionId, 'policyDecisionId') !== expected.policyDecisionId) throw new Error('policyDecisionId is invalid');
     const exactAttempt = attemptFromExecutionId(executionId);
+    if (executionId !== `${expected.invocationId}:attempt:${exactAttempt}`) {
+      throw new Error('executionId does not match effect identity');
+    }
     if (attempt !== exactAttempt) throw new Error('attempt does not match executionId');
     if (!priorObservation) {
       throw new Error('GitHub pull-request review requires the immutable provider review identity for automatic reconciliation; otherwise manual review is required');
