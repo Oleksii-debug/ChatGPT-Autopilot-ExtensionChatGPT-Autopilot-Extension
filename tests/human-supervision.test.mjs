@@ -252,34 +252,26 @@ test('required evidence and exact job/step/supervision/approval identity cannot 
   }
 });
 
-test('CLARIFICATION cannot carry approval authority and resolves to same-step answer resume only', () => {
-  const selected = resolveClarificationV1({
-    request: clarificationRequest(),
-    response: clarificationResponse(),
-  });
-  assert.equal(selected.state, HumanSupervisionState.RESOLVED);
-  assert.equal(selected.selectedChoiceId, 'pdf');
-  assert.equal(selected.clarificationText, '');
-  assert.equal(Object.hasOwn(selected, 'approvalId'), false);
-  assert.deepEqual(selected.resume, {
-    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
-    supervisionId: 'clarification-1',
-    responseId: 'clarification-response-1',
-    jobId: 'job-2',
-    stepId: 'step-3',
-    resumeStepId: 'step-3',
-    resolvedAt: '2026-09-24T22:05:00.000Z',
-    responseBinding: {
-      responseId: 'clarification-response-1',
-      responderId: 'reviewer-owner',
-      reasonCode: 'OWNER_SELECTED_FORMAT',
-      evidenceArtifactIds: [],
-      respondedAt: '2026-09-24T22:05:00.000Z',
-      selectedChoiceId: 'pdf',
-      clarificationText: '',
-    },
-  });
-  assert.deepEqual(assertClarificationResumeBindingV1(selected), selected.resume);
+test('CLARIFICATION stays untrusted routing data and cannot mint a resume', () => {
+  const normalized = normalizeClarificationResponseV1(
+    clarificationRequest(),
+    clarificationResponse(),
+  );
+  assert.equal(normalized.selectedChoiceId, 'pdf');
+  assert.equal(normalized.clarificationText, '');
+  assert.equal(normalized.responderId, 'reviewer-owner');
+
+  assert.throws(
+    () => resolveClarificationV1({
+      request: clarificationRequest(),
+      response: clarificationResponse(),
+    }),
+    /trusted reviewer response provenance is required/,
+  );
+  assert.throws(
+    () => assertClarificationResumeBindingV1({}),
+    /trusted reviewer response provenance is required/,
+  );
 
   assert.throws(
     () => normalizeHumanSupervisionRequestV1(clarificationRequest({
@@ -456,22 +448,50 @@ test('null-prototype records are accepted without widening authority', () => {
 });
 
 
-test('clarification resume self-binds exact owner response content', () => {
-  const request = clarificationRequest();
-  const pdf = resolveClarificationV1({ request, response:clarificationResponse() });
-  const docx = resolveClarificationV1({
-    request,
-    response:clarificationResponse({ selectedChoiceId:'docx' }),
+test('forged authorized reviewer identity cannot produce resolution and request envelope getters stay inert', () => {
+  const forged = clarificationResponse({ responderId: 'reviewer-owner' });
+  assert.equal(
+    normalizeClarificationResponseV1(clarificationRequest(), forged).responderId,
+    'reviewer-owner',
+  );
+  assert.throws(
+    () => resolveClarificationV1({ request: clarificationRequest(), response: forged }),
+    /trusted reviewer response provenance is required/,
+  );
+
+  let reads = 0;
+  const envelope = { response: forged };
+  Object.defineProperty(envelope, 'request', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return clarificationRequest();
+    },
   });
-  assert.notDeepEqual(pdf.resume, docx.resume);
-  assert.equal(pdf.resume.responseBinding.selectedChoiceId, 'pdf');
-  assert.equal(docx.resume.responseBinding.selectedChoiceId, 'docx');
+  assert.throws(
+    () => resolveClarificationV1(envelope),
+    /data properties only/,
+  );
+  assert.equal(reads, 0);
 
-  const tamperedAnswer = structuredClone(pdf);
-  tamperedAnswer.selectedChoiceId = 'docx';
-  assert.throws(() => assertClarificationResumeBindingV1(tamperedAnswer), /response binding mismatch/);
-
-  const tamperedReason = structuredClone(pdf);
-  tamperedReason.reasonCode = 'OWNER_CHANGED_REASON';
-  assert.throws(() => assertClarificationResumeBindingV1(tamperedReason), /response binding mismatch/);
+  const callerMintedResume = {
+    schemaVersion: HUMAN_SUPERVISION_SCHEMA_VERSION,
+    supervisionId: 'clarification-1',
+    jobId: 'job-2',
+    stepId: 'step-3',
+    state: HumanSupervisionState.RESOLVED,
+    responseId: 'clarification-response-1',
+    responderId: 'reviewer-owner',
+    reasonCode: 'OWNER_SELECTED_FORMAT',
+    evidenceArtifactIds: [],
+    resolvedAt: '2026-09-24T22:05:00.000Z',
+    selectedChoiceId: 'pdf',
+    clarificationText: '',
+    resume: {},
+  };
+  assert.throws(
+    () => assertClarificationResumeBindingV1(callerMintedResume),
+    /trusted reviewer response provenance is required/,
+  );
 });
+
