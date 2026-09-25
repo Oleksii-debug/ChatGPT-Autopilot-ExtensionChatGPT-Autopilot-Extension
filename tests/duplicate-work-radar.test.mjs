@@ -218,7 +218,37 @@ test('input and set ordering do not change pair identity, scoring or metrics', (
   const forward = analyzeDuplicateWorkV1({ schemaVersion:1, policy:policy(), workItems:[a, b] });
   const reverse = analyzeDuplicateWorkV1({ schemaVersion:1, policy:policy(), workItems:[b, a] });
   assert.deepEqual(reverse, forward);
-  assert.equal(forward.pairs[0].pairId, 'pair:a:b');
+  assert.equal(forward.pairs[0].pairId, 'pair:1:a:1:b');
+});
+
+test('pair identity is injective for legal colon-bearing work IDs and stable under input reordering', () => {
+  const items = [
+    work('a', 'worker.a', { conflictKeys:['shared'] }),
+    work('b:c', 'worker.bc', { conflictKeys:['shared'] }),
+    work('a:b', 'worker.ab', { conflictKeys:['shared'] }),
+    work('c', 'worker.c', { conflictKeys:['shared'] }),
+  ];
+  const forward = analyzeDuplicateWorkV1({
+    schemaVersion:1,
+    policy:policy(),
+    workItems:items,
+  });
+  const reverse = analyzeDuplicateWorkV1({
+    schemaVersion:1,
+    policy:policy(),
+    workItems:[...items].reverse(),
+  });
+
+  assert.deepEqual(reverse, forward);
+  assert.equal(new Set(forward.pairs.map(pair => pair.pairId)).size, forward.pairs.length);
+
+  const first = forward.pairs.find(pair => pair.workIdA === 'a' && pair.workIdB === 'b:c');
+  const second = forward.pairs.find(pair => pair.workIdA === 'a:b' && pair.workIdB === 'c');
+  assert.ok(first);
+  assert.ok(second);
+  assert.equal(first.pairId, 'pair:1:a:3:b:c');
+  assert.equal(second.pairId, 'pair:3:a:b:1:c');
+  assert.notEqual(first.pairId, second.pairId);
 });
 
 test('overlap metrics count only conflicting mutation workers, not complementary review or variants', () => {

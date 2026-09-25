@@ -398,7 +398,7 @@ function pairProjection(a, b, policy) {
   const classification = classifyPair(a, b, policy, scored);
   if (!classification) return null;
   return deepFreeze({
-    pairId: `pair:${a.workId}:${b.workId}`,
+    pairId: `pair:${a.workId.length}:${a.workId}:${b.workId.length}:${b.workId}`,
     workIdA: a.workId,
     workIdB: b.workId,
     workerIdA: a.workerId,
