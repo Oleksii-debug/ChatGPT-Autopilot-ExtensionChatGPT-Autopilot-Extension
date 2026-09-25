@@ -415,3 +415,57 @@ test('credential and transport failures redact provider-controlled secret text',
       && !String(error.message).includes(transportSecret),
   );
 });
+
+
+test('request deadline stays armed through streamed response body consumption', async () => {
+  let deadline = null;
+  let signal = null;
+  let clearCalls = 0;
+  let bodyReads = 0;
+  let releaseCalls = 0;
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    requestTimeoutMs: 1000,
+    setTimeoutImpl(callback) {
+      deadline = callback;
+      return 77;
+    },
+    clearTimeoutImpl(timer) {
+      assert.equal(timer, 77);
+      clearCalls += 1;
+    },
+    fetchImpl: async (_url, options) => {
+      signal = options.signal;
+      return {
+        status: 200,
+        body: {
+          getReader() {
+            return {
+              async read() {
+                bodyReads += 1;
+                assert.equal(typeof deadline, 'function', 'deadline must remain armed while body is consumed');
+                deadline();
+                assert.equal(signal.aborted, true);
+                const error = new Error('aborted during body read');
+                error.name = 'AbortError';
+                throw error;
+              },
+              releaseLock() {
+                releaseCalls += 1;
+              },
+            };
+          },
+        },
+      };
+    },
+  }));
+
+  await assert.rejects(
+    () => client.searchGmail({ userId }),
+    error => error.code === 'GOOGLE_REQUEST_TIMEOUT'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+  assert.equal(bodyReads, 1);
+  assert.equal(releaseCalls, 1);
+  assert.equal(clearCalls, 1);
+});
