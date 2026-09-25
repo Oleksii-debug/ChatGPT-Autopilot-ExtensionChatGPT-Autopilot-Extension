@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { createFilesystemScopeV1, withAuthorizedExistingFileV1 } from './filesystem-provider.mjs';
-import { searchScopedFilesystemV1, writeExistingTextScopedV1 } from './filesystem-host-provider.mjs';
+import { listScopedFilesystemV1, searchScopedFilesystemV1, statScopedFilesystemV1, writeExistingTextScopedV1 } from './filesystem-host-provider.mjs';
 import { normalizeWindowsProviderConfig } from './windows-provider.mjs';
 
 export const HOST_NAME = 'org.chatgpt_autopilot.companion';
@@ -17,6 +17,8 @@ export const RequestType = Object.freeze({
   CAPABILITIES: 'capabilities',
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
   FILESYSTEM_SEARCH: 'filesystem.search',
+  FILESYSTEM_LIST: 'filesystem.list',
+  FILESYSTEM_STAT: 'filesystem.stat',
   FILESYSTEM_WRITE_EXISTING_TEXT: 'filesystem.writeExistingText',
   CREDENTIALS_LIST: 'credentials.list',
   CREDENTIALS_RESOLVE: 'credentials.resolve',
@@ -208,6 +210,8 @@ export async function handleNativeCompanionRequest(input, {
           { capabilityId: 'native.health', readOnly: true },
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
           { capabilityId: 'filesystem.search', readOnly: true, scoped: true },
+          { capabilityId: 'filesystem.list', readOnly: true, scoped: true },
+          { capabilityId: 'filesystem.stat', readOnly: true, scoped: true, boundedHash: true },
           { capabilityId: 'credentials.list', readOnly: true, scoped: true },
           { capabilityId: 'credentials.resolve', readOnly: false, scoped: true, sensitive: true },
           { capabilityId: 'mcp.localStdio', readOnly: false, scoped: true },
@@ -224,6 +228,12 @@ export async function handleNativeCompanionRequest(input, {
     }
     if (request.type === RequestType.FILESYSTEM_SEARCH) {
       return response(request, await searchScopedFilesystemV1(request.payload, normalizedConfig));
+    }
+    if (request.type === RequestType.FILESYSTEM_LIST) {
+      return response(request, await listScopedFilesystemV1(request.payload, normalizedConfig));
+    }
+    if (request.type === RequestType.FILESYSTEM_STAT) {
+      return response(request, await statScopedFilesystemV1(request.payload, normalizedConfig));
     }
     if (request.type === RequestType.FILESYSTEM_WRITE_EXISTING_TEXT) {
       return response(request, await writeExistingTextScopedV1(request.payload, normalizedConfig, { beforeOpen: fsWriteBeforeOpen }));
