@@ -15,14 +15,33 @@ const STATES = new Set(Object.values(ExecutionOwnershipState));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_LEASE_MS = 24 * 60 * 60 * 1000;
 
-function obj(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`); return value; }
+function obj(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
+  const output = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol fields`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`${label}.${key} must be an enumerable data property`);
+    }
+    output[key] = descriptor.value;
+  }
+  return output;
+}
 function exact(raw, allowed, label) { for (const key of Object.keys(raw)) if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`); }
-function id(value, label) { const out = String(value ?? '').trim(); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
-function ts(value, label) { const ms = Date.parse(String(value ?? '')); if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`); return new Date(ms).toISOString(); }
-function plane(value) { const out = String(value ?? '').toUpperCase(); if (!PLANES.has(out)) throw new Error('execution plane is invalid'); return out; }
+function id(value, label) { if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) throw new Error(`${label} is invalid`); return value; }
+function ts(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(`${label} must be a timestamp`);
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
+  return new Date(ms).toISOString();
+}
+function plane(value) { if (typeof value !== 'string') throw new Error('execution plane is invalid'); const out = value.trim().toUpperCase(); if (!PLANES.has(out)) throw new Error('execution plane is invalid'); return out; }
 function optionalId(value, label) { return value == null || value === '' ? '' : id(value, label); }
 function optionalTs(value, label) { return value == null || value === '' ? '' : ts(value, label); }
-function boundedText(value, label, max = 1000) { const out = String(value ?? '').trim(); if (!out || out.length > max) throw new Error(`${label} is invalid`); return out; }
+function boundedText(value, label, max = 1000) { if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max) throw new Error(`${label} is invalid`); return value; }
 function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) freeze(child); return Object.freeze(value); }
 
 export function createExecutionOwnershipV1({ taskId, planId, nodeId, effectId, policyEnvelopeId, at = new Date().toISOString() } = {}) {
@@ -37,10 +56,11 @@ export function createExecutionOwnershipV1({ taskId, planId, nodeId, effectId, p
 }
 
 export function normalizeExecutionOwnershipV1(raw) {
-  obj(raw, 'ExecutionOwnershipV1');
+  raw = obj(raw, 'ExecutionOwnershipV1');
   exact(raw, new Set(['schemaVersion','taskId','planId','nodeId','effectId','policyEnvelopeId','state','ownerPlane','ownerId','leaseId','leaseUntil','handoffToPlane','handoffId','ambiguityReason','updatedAt','revision']), 'ExecutionOwnershipV1');
-  if (Number(raw.schemaVersion) !== EXECUTION_OWNERSHIP_VERSION) throw new Error('Unsupported ExecutionOwnershipV1 schemaVersion');
-  const state = String(raw.state ?? '').toUpperCase();
+  if (raw.schemaVersion !== EXECUTION_OWNERSHIP_VERSION) throw new Error('Unsupported ExecutionOwnershipV1 schemaVersion');
+  if (typeof raw.state !== 'string') throw new Error('ExecutionOwnershipV1 state is invalid');
+  const state = raw.state.trim().toUpperCase();
   if (!STATES.has(state)) throw new Error('ExecutionOwnershipV1 state is invalid');
   const ownerPlane = raw.ownerPlane ? plane(raw.ownerPlane) : '';
   const ownerId = optionalId(raw.ownerId, 'ownerId');
@@ -55,8 +75,8 @@ export function normalizeExecutionOwnershipV1(raw) {
   if (state === ExecutionOwnershipState.HANDOFF_PENDING && (!handoffToPlane || !handoffId || handoffToPlane === ownerPlane)) throw new Error('handoff requires a distinct target plane and handoff identity');
   if (state !== ExecutionOwnershipState.HANDOFF_PENDING && (handoffToPlane || handoffId)) throw new Error('handoff metadata is only valid while HANDOFF_PENDING');
   if ((state === ExecutionOwnershipState.RECONCILE || state === ExecutionOwnershipState.MANUAL_REVIEW) !== Boolean(ambiguityReason)) throw new Error('ambiguity reason must exist exactly for reconciliation/manual review');
-  const revision = Number(raw.revision);
-  if (!Number.isInteger(revision) || revision < 1) throw new Error('ExecutionOwnershipV1 revision is invalid');
+  const revision = raw.revision;
+  if (typeof revision !== 'number' || !Number.isInteger(revision) || revision < 1) throw new Error('ExecutionOwnershipV1 revision is invalid');
   return freeze({ schemaVersion: EXECUTION_OWNERSHIP_VERSION, taskId: id(raw.taskId,'taskId'), planId: id(raw.planId,'planId'), nodeId: id(raw.nodeId,'nodeId'), effectId: id(raw.effectId,'effectId'), policyEnvelopeId: id(raw.policyEnvelopeId,'policyEnvelopeId'), state, ownerPlane, ownerId, leaseId, leaseUntil, handoffToPlane, handoffId, ambiguityReason, updatedAt: ts(raw.updatedAt,'updatedAt'), revision });
 }
 
@@ -98,24 +118,44 @@ export function acceptExecutionHandoffV1(raw, { handoffId, ownerId, leaseId, lea
   return next(current, { state: ExecutionOwnershipState.OWNED, ownerPlane: current.handoffToPlane, ownerId: id(ownerId,'ownerId'), leaseId: id(leaseId,'leaseId'), leaseUntil: ts(leaseUntil,'leaseUntil'), handoffToPlane: '', handoffId: '' }, at);
 }
 
-export function recoverExpiredExecutionOwnershipV1(raw, { at = new Date().toISOString(), observedNoEffect = false, reason = 'owner lease expired before verified completion' } = {}) {
+export function recoverExpiredExecutionOwnershipV1(raw, { at = new Date().toISOString(), reason = 'owner lease expired before verified completion' } = {}) {
   const current = normalizeExecutionOwnershipV1(raw);
   if (![ExecutionOwnershipState.OWNED, ExecutionOwnershipState.HANDOFF_PENDING].includes(current.state)) throw new Error('execution ownership is not recoverable');
   if (Date.parse(ts(at,'at')) <= Date.parse(current.leaseUntil)) throw new Error('execution ownership lease has not expired');
-  if (observedNoEffect) return next(current, { state: ExecutionOwnershipState.AVAILABLE, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', handoffToPlane: '', handoffId: '' }, at);
+  // Expiry alone can never prove that an external effect did not happen.
+  // Every ambiguous expired attempt first enters RECONCILE and preserves the
+  // original lease identity until a fresh canonical VerificationV1 resolves it.
   return next(current, { state: ExecutionOwnershipState.RECONCILE, handoffToPlane: '', handoffId: '', ambiguityReason: boundedText(reason,'reason') }, at);
 }
 
-export function resolveExecutionReconciliationV1(raw, { leaseId, outcome, evidence = '', at = new Date().toISOString() } = {}) {
+export function resolveExecutionReconciliationV1(raw, options = {}) {
+  const request = obj(options, 'Execution reconciliation request');
+  exact(request, new Set(['leaseId', 'outcome', 'verification', 'at']), 'Execution reconciliation request');
   const current = normalizeExecutionOwnershipV1(raw);
-  if (current.state !== ExecutionOwnershipState.RECONCILE || current.leaseId !== id(leaseId,'leaseId')) throw new Error('reconciliation requires the preserved owner lease identity');
-  const normalized = String(outcome ?? '').toUpperCase();
-  if (normalized === 'VERIFIED') return next(current, { state: ExecutionOwnershipState.VERIFIED, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', ambiguityReason: '' }, at);
-  if (normalized === 'SAFE_RETRY') {
-    if (!boundedText(evidence,'evidence')) throw new Error('SAFE_RETRY requires observed no-effect evidence');
-    return next(current, { state: ExecutionOwnershipState.AVAILABLE, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', ambiguityReason: '' }, at);
+  const leaseId = request.leaseId;
+  const outcome = request.outcome;
+  const at = request.at === undefined ? new Date().toISOString() : request.at;
+  if (current.state !== ExecutionOwnershipState.RECONCILE || current.leaseId !== id(leaseId,'leaseId')) {
+    throw new Error('reconciliation requires the preserved owner lease identity');
   }
-  if (normalized === 'MANUAL_REVIEW') return next(current, { state: ExecutionOwnershipState.MANUAL_REVIEW, ownerPlane: '', ownerId: '', leaseId: '', leaseUntil: '', ambiguityReason: current.ambiguityReason }, at);
+  if (typeof outcome !== 'string') throw new Error('reconciliation outcome must be text');
+  const normalized = outcome.trim().toUpperCase();
+  if (normalized === 'MANUAL_REVIEW') {
+    return next(current, {
+      state: ExecutionOwnershipState.MANUAL_REVIEW,
+      ownerPlane: '',
+      ownerId: '',
+      leaseId: '',
+      leaseUntil: '',
+      ambiguityReason: current.ambiguityReason,
+    }, at);
+  }
+  if (normalized === 'VERIFIED' || normalized === 'SAFE_RETRY') {
+    // VerificationV1 normalization proves shape, not provenance. Until an
+    // independently resolved canonical verifier record is available, caller-
+    // supplied verification data cannot release or complete an ambiguous effect.
+    throw new Error('trusted verifier provenance is required before automated reconciliation');
+  }
   throw new Error('reconciliation outcome must be VERIFIED, SAFE_RETRY, or MANUAL_REVIEW');
 }
 

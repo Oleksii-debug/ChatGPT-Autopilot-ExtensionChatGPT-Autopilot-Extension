@@ -12,7 +12,6 @@ import {
   normalizeExecutionOwnershipV1,
   claimExecutionOwnershipV1,
   recoverExpiredExecutionOwnershipV1,
-  resolveExecutionReconciliationV1,
   verifyExecutionByAuthorityV1,
 } from './execution-plane-ownership.js';
 
@@ -156,53 +155,12 @@ export function claimAgentPlanSpecialistHandoffsV1(rawPlan, rawAssignments, { ex
  * verifier proves that the ambiguous attempt committed no effect.  This does
  * not dispatch the retry: normal bounded admission must claim it again.
  */
-export function authorizeAgentPlanSpecialistSafeRetryV1(rawPlan, rawAssignments, {
-  executionOwnerships = [], agentId, leaseId, verifierId, verificationAuthorityId, evidence,
-  at = new Date().toISOString(),
-} = {}) {
-  let plan = normalizeAgentPlanV1(rawPlan);
-  const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
-  const assignment = assignments.find(item => item.agentId === id(agentId, 'agentId'));
-  const preservedLeaseId = id(leaseId, 'leaseId');
-  if (!assignment || assignment.state !== SpecialistAssignmentState.LEASED || assignment.leaseId !== preservedLeaseId) {
-    throw new Error('SAFE_RETRY requires the preserved specialist lease identity');
-  }
-  const verifier = id(verifierId, 'verifierId');
-  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) {
-    throw new Error('SAFE_RETRY verifier must be independent from specialist and parent');
-  }
-  const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
-  const node = nodeForAssignment(plan, assignment);
-  if (node.state !== AgentPlanNodeState.RUNNING) throw new Error('SAFE_RETRY requires the ambiguous AgentPlan node to remain RUNNING');
-  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
-  const ownership = ownerships.find(item => item.effectId === effectId);
-  if (ownership.state !== ExecutionOwnershipState.RECONCILE || ownership.leaseId !== preservedLeaseId) {
-    throw new Error('SAFE_RETRY requires matching canonical execution reconciliation');
-  }
-  const authority = id(verificationAuthorityId, 'verificationAuthorityId');
-  if (authority !== ownership.policyEnvelopeId) throw new Error('SAFE_RETRY authority must bind the execution policy envelope');
-  const noEffectEvidence = text(evidence, 'SAFE_RETRY no-effect evidence', 1000);
-  const availableOwnership = resolveExecutionReconciliationV1(ownership, {
-    leaseId: preservedLeaseId,
-    outcome: 'SAFE_RETRY',
-    evidence: noEffectEvidence,
-    at,
-  });
-  assignment.state = SpecialistAssignmentState.READY;
-  assignment.leaseId = '';
-  assignment.leaseExpiresAt = '';
-  assignment.resultArtifactIds = [];
-  assignment.updatedAt = timestamp(at, 'at');
-  plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.READY, at });
-  return freeze({
-    plan,
-    assignments: assignments.map(normalizeSpecialistAssignmentV1),
-    executionOwnerships: ownerships.map(item => item.effectId === effectId ? availableOwnership : item),
-    retriableAgentId: assignment.agentId,
-    safeRetryEvidence: { verifierId: verifier, verificationAuthorityId: authority, evidence: noEffectEvidence },
-  });
+export function authorizeAgentPlanSpecialistSafeRetryV1() {
+  // Caller-owned VerificationV1 data is not verifier authority. Keep ambiguous
+  // specialist effects fenced until a canonical independent verifier resolver
+  // exists and can supply provenance rather than a structurally valid shape.
+  throw new Error('SAFE_RETRY requires canonical trusted verifier provenance');
 }
-
 export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { executionOwnerships = [], agentId, leaseId, resultArtifactIds, at = new Date().toISOString() } = {}) {
   const plan = normalizeAgentPlanV1(rawPlan);
   const assignments = validateAssignments(plan, rawAssignments).map(item => structuredClone(item));
@@ -220,20 +178,12 @@ export function completeAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { 
   return freeze({ plan, assignments: assignments.map(normalizeSpecialistAssignmentV1), executionOwnerships: ownerships, verificationRequired: target.agentId });
 }
 
-/** A result is not a completed plan node until a distinct verifier supplies evidence. */
-export function verifyAgentPlanSpecialistHandoffV1(rawPlan, rawAssignments, { executionOwnerships = [], agentId, verifierId, verificationAuthorityId, evidence, at = new Date().toISOString() } = {}) {
-  let plan = normalizeAgentPlanV1(rawPlan);
-  const assignments = validateAssignments(plan, rawAssignments);
-  const assignment = assignments.find(item => item.agentId === id(agentId, 'agentId'));
-  if (!assignment || assignment.state !== SpecialistAssignmentState.COMPLETED) throw new Error('Specialist handoff is not awaiting verification');
-  const verifier = id(verifierId, 'verifierId');
-  if ([assignment.agentId, assignment.parentAgentId].includes(verifier)) throw new Error('Verifier must be independent from specialist and parent');
-  const node = plan.nodes.find(item => specialistAssignmentIdForPlanNodeV1(plan.planId, item.nodeId) === assignment.agentId);
-  if (node.state !== AgentPlanNodeState.RUNNING) throw new Error('Specialist plan node is not running');
-  const ownerships = validateExecutionOwnerships(plan, assignments, executionOwnerships);
-  const effectId = specialistEffectIdForPlanNodeV1(plan.planId, node.nodeId);
-  const ownership = ownerships.find(item => item.effectId === effectId);
-  const verifiedOwnership = verifyExecutionByAuthorityV1(ownership, { leaseId:ownership.leaseId, verifierId:verifier, verificationAuthorityId, evidence, at });
-  plan = transitionAgentPlanNodeV1(plan, { nodeId: node.nodeId, state: AgentPlanNodeState.VERIFIED, evidence: text(evidence, 'verification evidence'), at });
-  return freeze({ plan, assignments, executionOwnerships: ownerships.map(item => item.effectId === effectId ? verifiedOwnership : item), verifiedAgentId: assignment.agentId });
+/**
+ * Caller-owned verifier IDs and free-text evidence are not verification
+ * authority. Keep normal specialist completion fenced exactly like ambiguous
+ * reconciliation until a canonical independently resolved verifier record can
+ * be supplied by the execution/evidence authority.
+ */
+export function verifyAgentPlanSpecialistHandoffV1() {
+  throw new Error('Specialist verification requires canonical trusted verifier provenance');
 }
