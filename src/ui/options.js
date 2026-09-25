@@ -920,6 +920,40 @@ function renderAiRouterRouteSelects(policy = {}) {
   }
 }
 
+function selectAiModelPriceTab(kind, focus = false) {
+  for (const value of ['free', 'paid']) {
+    const selected = kind === value;
+    const tab = $(`ai-model-${value}-tab`);
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    $(`ai-model-${value}-panel`).hidden = !selected;
+    if (selected && focus) tab.focus();
+  }
+}
+
+function renderAiModelPriceCatalog(routes = [], routeStates = {}) {
+  const groups = { free: [], paid: [], unknown: [] };
+  for (const route of routes) {
+    const kind = ['free', 'paid'].includes(route.costClass) ? route.costClass : 'unknown';
+    const health = routeStates[route.routeId] || {};
+    groups[kind].push(`${route.provider}, ${route.model || 'модель не вибрано'}; маршрут ${route.routeId}; ${route.enabled === false ? 'вимкнено' : 'увімкнено'}; помилок ${Number(health.failures || 0)}; обмеження до ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'немає'}`);
+  }
+  for (const kind of ['free', 'paid', 'unknown']) {
+    const list = $(`ai-model-${kind}-list`);
+    list.replaceChildren();
+    for (const description of groups[kind]) {
+      const item = document.createElement('li');
+      item.textContent = description;
+      list.append(item);
+    }
+    if (!groups[kind].length) {
+      const item = document.createElement('li');
+      item.textContent = 'Збережених моделей немає.';
+      list.append(item);
+    }
+  }
+}
+
 function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
   const list = $('ai-router-route-list');
   list.replaceChildren();
@@ -935,7 +969,7 @@ function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
     const values = {
       routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
       capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
-      locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'paid'),
+      locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'unknown'),
       inputPricePerMillionUsd:route.inputPricePerMillionUsd ?? 0, outputPricePerMillionUsd:route.outputPricePerMillionUsd ?? 0,
     };
     for (const [field, value] of Object.entries(values)) card.querySelector(`[data-route-field="${field}"]`).value = String(value);
@@ -1146,6 +1180,7 @@ async function loadAiRouterSettings() {
     $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
     $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
     renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy);
+    renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
       ? 'AI-координатор увімкнено. Перевірте Gateway і моделі.'
@@ -3763,13 +3798,20 @@ $('ai-router-add-route-button').addEventListener('click', () => {
   catch (error) { $('ai-router-status').textContent = `Не вдалося додати маршрут: ${error.message}`; }
 });
 $('ai-router-route-list').addEventListener('click', handleAiRouterRouteAction);
+$('ai-model-free-tab').addEventListener('click', () => selectAiModelPriceTab('free', true));
+$('ai-model-paid-tab').addEventListener('click', () => selectAiModelPriceTab('paid', true));
+$('ai-model-price-tabs').addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  selectAiModelPriceTab(event.key === 'Home' ? 'free' : event.key === 'End' ? 'paid' : $('ai-model-free-tab').getAttribute('aria-selected') === 'true' ? 'paid' : 'free', true);
+});
 $('ai-router-route-list').addEventListener('change', event => {
   if (event.target.matches('[data-route-field="routeId"]')) renderAiRouterRouteSelects();
   if (event.target.matches('[data-route-field="provider"]')) {
     const card = event.target.closest('[data-ai-route]');
     const local = event.target.value === 'ollama';
     card.querySelector('[data-route-field="locality"]').value = local ? 'local' : 'remote';
-    card.querySelector('[data-route-field="costClass"]').value = local ? 'free' : 'paid';
+    card.querySelector('[data-route-field="costClass"]').value = local ? 'free' : 'unknown';
   }
 });
 $('run-ai-router-test-button').addEventListener('click', () => runAiRouterPrompt(false));
