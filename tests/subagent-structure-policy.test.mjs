@@ -245,6 +245,59 @@ test('policy and admission authority records reject accessors and hidden known f
   assert.throws(() => normalizeSubagentStructurePolicyV1(symbolic), /symbol field/);
 });
 
+test('derived structure facts reject request accessors and identity aliases without reads', () => {
+  let reads = 0;
+  const request = {
+    graph: ROOT_ONLY,
+    parentNodeId: 'root',
+  };
+  Object.defineProperty(request, 'parentNodeId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'root';
+    },
+  });
+  assert.throws(
+    () => deriveSubagentStructureFactsFromGraphV1(request),
+    /parentNodeId.*enumerable own data property/,
+  );
+  assert.equal(reads, 0, 'facts request getter must never execute');
+
+  assert.throws(
+    () => deriveSubagentStructureFactsFromGraphV1({
+      graph: ROOT_ONLY,
+      parentNodeId: ' root ',
+    }),
+    /parentNodeId is invalid/,
+  );
+
+  assert.throws(
+    () => evaluateSubagentStructureAdmissionV1({
+      policy,
+      initiator: SubagentSpawnInitiator.AGENT,
+      graph: ROOT_ONLY,
+      parentNodeId: 'root ',
+      requestedChildren: 1,
+    }),
+    /parentNodeId is invalid/,
+  );
+
+  const nullProto = Object.assign(Object.create(null), {
+    graph: ROOT_ONLY,
+    parentNodeId: 'root',
+  });
+  assert.deepEqual(
+    deriveSubagentStructureFactsFromGraphV1(nullProto),
+    {
+      parentNodeId: 'root',
+      parentDepth: 0,
+      currentDirectChildren: 0,
+    },
+  );
+});
+
 test('unknown fields, coercion, exotic objects and invalid identities fail closed', () => {
   assert.throws(() => normalizeSubagentStructurePolicyV1({ ...policy, maxDepth: '4' }), /invalid/);
   assert.throws(() => normalizeSubagentStructurePolicyV1({ ...policy, surprise: true }), /unknown field/);
