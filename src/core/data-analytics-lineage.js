@@ -423,6 +423,7 @@ function sourceIdentity(source) {
     source.uri,
     source.revisionId,
     source.contentSha256,
+    source.observedAt,
     source.authority,
   ]);
 }
@@ -535,6 +536,7 @@ function sourceDeltaView(source) {
     authority: source.authority,
     revisionId: source.revisionId,
     contentSha256: source.contentSha256,
+    observedAt: source.observedAt,
   });
 }
 
