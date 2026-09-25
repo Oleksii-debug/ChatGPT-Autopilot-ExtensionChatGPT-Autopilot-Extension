@@ -107,7 +107,7 @@ function boundedDataArray(value, label, max) {
   const out = new Array(length);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key)) {
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains non-index array data`);
     }
     const index = Number(key);
