@@ -476,6 +476,30 @@ test('null-prototype JSON-style takeover records remain supported', () => {
   assert.equal(normalized.resumeAuthorized, false);
 });
 
+
+
+test('takeover evidence timestamp aliases fail closed before inherited canonicalizers can rewrite them', () => {
+  assert.throws(() => requested({ at: '2026-09-25T00:00:00Z' }), /canonical ISO-8601 UTC/);
+
+  const pending = throughHandback();
+  assert.throws(() => recordHumanHandbackObservationV1(pending, {
+    observation: observation({ observedAt: '2026-09-25T00:03:00Z' }),
+  }), /canonical ISO-8601 UTC/);
+
+  const artifactAlias = observation();
+  artifactAlias.artifactRefs[0].createdAt = '2026-09-25T00:03:00Z';
+  assert.throws(() => recordHumanHandbackObservationV1(pending, {
+    observation: artifactAlias,
+  }), /canonical ISO-8601 UTC/);
+
+  const reobserved = recordHumanHandbackObservationV1(pending, {
+    observation: observation(),
+  });
+  assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
+    verification: verification({ verifiedAt: '2026-09-25T00:04:00Z' }),
+  }), /canonical ISO-8601 UTC/);
+});
+
 test('causal timestamps reject verification that predates fresh observation', () => {
   const reobserved = recordHumanHandbackObservationV1(throughHandback(), {
     observation: observation(),
