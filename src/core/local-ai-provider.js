@@ -78,7 +78,7 @@ function declaredResponseBytes(response) {
   const raw = response?.headers?.get?.('content-length');
   if (raw == null || raw === '') return null;
   const value = String(raw).trim();
-  if (!/^\\d+$/.test(value)) return null;
+  if (!/^\d+$/.test(value)) return null;
   const bytes = Number(value);
   return Number.isSafeInteger(bytes) ? bytes : null;
 }
