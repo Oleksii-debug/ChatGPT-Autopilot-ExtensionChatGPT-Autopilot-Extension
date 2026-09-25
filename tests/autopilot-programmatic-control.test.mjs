@@ -43,12 +43,12 @@ function request(overrides = {}) {
     targetId: 'job-1',
     payloadArtifactRef: null,
     requestedAt,
-    assessedAt,
     ...overrides,
   };
 }
 
-function scopeFor(normalizedRequest, overrides = {}) {
+function scopeFor(requestOrLookup, overrides = {}) {
+  const normalizedRequest = requestOrLookup.request ?? requestOrLookup;
   return {
     schemaVersion: 1,
     scopeRevisionId: 'scope-revision-1',
@@ -57,12 +57,22 @@ function scopeFor(normalizedRequest, overrides = {}) {
     projectId: normalizedRequest.projectId,
     operation: normalizedRequest.operation,
     targetId: normalizedRequest.targetId,
+    payloadArtifactId: normalizedRequest.payloadArtifactRef?.artifactId ?? null,
     payloadSha256: normalizedRequest.payloadArtifactRef?.sha256 ?? null,
     allowed: true,
     verifiedAt,
     validThrough,
     ...overrides,
   };
+}
+
+function fixedNow() {
+  return Date.parse(assessedAt);
+}
+
+function nowSequence(...timestamps) {
+  let index = 0;
+  return () => Date.parse(timestamps[Math.min(index++, timestamps.length - 1)]);
 }
 
 function receiptFor(envelope, overrides = {}) {
@@ -83,6 +93,7 @@ test('read-only SDK request is exact-scoped and dispatched through the canonical
   let scopes = 0;
   let dispatches = 0;
   const output = await executeAutopilotProgrammaticControlV1(request(), {
+    now: fixedNow,
     async resolveTrustedScope(normalizedRequest) {
       scopes += 1;
       assert.equal(Object.isFrozen(normalizedRequest), true);
@@ -129,8 +140,9 @@ test('mutating SDK operation carries a versioned payload artifact but does not m
   );
 
   const output = await executeAutopilotProgrammaticControlV1(raw, {
+    now: fixedNow,
     resolveTrustedScope(normalizedRequest) {
-      assert.equal(normalizedRequest.payloadArtifactRef.sha256, shaA);
+      assert.equal(normalizedRequest.request.payloadArtifactRef.sha256, shaA);
       return scopeFor(normalizedRequest);
     },
     dispatchCanonicalControl(envelope) {
@@ -194,6 +206,7 @@ test('scope proof must bind exact principal, project, request, operation, target
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(raw, {
+      now: fixedNow,
       resolveTrustedScope(normalizedRequest) {
         return scopeFor(normalizedRequest, { principalId: 'other-owner' });
       },
@@ -208,6 +221,7 @@ test('scope proof must bind exact principal, project, request, operation, target
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(raw, {
+      now: fixedNow,
       resolveTrustedScope(normalizedRequest) {
         return scopeFor(normalizedRequest, { allowed: false });
       },
@@ -230,6 +244,7 @@ test('scope chronology is causal and unexpired at assessment', async () => {
   ]) {
     await assert.rejects(
       () => executeAutopilotProgrammaticControlV1(request(), {
+        now: fixedNow,
         resolveTrustedScope(normalizedRequest) {
           return scopeFor(normalizedRequest, override);
         },
@@ -247,6 +262,7 @@ test('scope chronology is causal and unexpired at assessment', async () => {
 test('dispatch receipt is exact-bound and its result artifact is causal to receipt observation', async () => {
   let attempt = 0;
   const dependencies = {
+    now: fixedNow,
     resolveTrustedScope(normalizedRequest) {
       return scopeFor(normalizedRequest);
     },
@@ -274,7 +290,7 @@ test('dispatch receipt is exact-bound and its result artifact is causal to recei
   );
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), dependencies),
-    /cannot predate assessedAt/u,
+    /cannot predate dispatchAt/u,
   );
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), dependencies),
@@ -298,6 +314,7 @@ test('outer request and dependency records reject accessors without executing ge
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(hostileRequest, {
+      now: fixedNow,
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -350,6 +367,7 @@ test('payload, scope proof and receipt descriptor boundaries reject getters with
       targetId: 'outcome-1',
       payloadArtifactRef: hostilePayload,
     }), {
+      now: fixedNow,
       resolveTrustedScope() {
         return {};
       },
@@ -365,6 +383,7 @@ test('payload, scope proof and receipt descriptor boundaries reject getters with
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), {
+      now: fixedNow,
       resolveTrustedScope(normalizedRequest) {
         const proof = scopeFor(normalizedRequest);
         Object.defineProperty(proof, 'allowed', {
@@ -388,6 +407,7 @@ test('payload, scope proof and receipt descriptor boundaries reject getters with
 
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), {
+      now: fixedNow,
       resolveTrustedScope(normalizedRequest) {
         return scopeFor(normalizedRequest);
       },
@@ -419,6 +439,7 @@ test('payload artifact identities reject normalization aliases before scope reso
       targetId: 'outcome-1',
       payloadArtifactRef: uppercase,
     }), {
+      now: fixedNow,
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -442,6 +463,7 @@ test('payload artifact identities reject normalization aliases before scope reso
       targetId: 'outcome-1',
       payloadArtifactRef: futurePayload,
     }), {
+      now: fixedNow,
       resolveTrustedScope() {
         scopes += 1;
         return {};
@@ -460,6 +482,7 @@ test('null-prototype request, dependencies, scope proof and receipt remain suppo
     requestId: 'request-null-prototype',
   }));
   const dependencies = Object.create(null);
+  dependencies.now = fixedNow;
   dependencies.resolveTrustedScope = normalizedRequest => Object.assign(
     Object.create(null),
     scopeFor(normalizedRequest),
@@ -472,6 +495,85 @@ test('null-prototype request, dependencies, scope proof and receipt remain suppo
   const output = await executeAutopilotProgrammaticControlV1(rawRequest, dependencies);
   assert.equal(output.receipt.status, AutopilotProgrammaticDispatchStatus.COMPLETED);
   assert.equal(output.request.requestId, 'request-null-prototype');
+});
+
+test('trusted clock, not caller timestamps, controls scope freshness through dispatch', async () => {
+  let scopes = 0;
+  let dispatches = 0;
+
+  await assert.rejects(
+    () => executeAutopilotProgrammaticControlV1(request({
+      requestedAt: '2026-09-25T18:00:11.000Z',
+    }), {
+      now: fixedNow,
+      resolveTrustedScope() {
+        scopes += 1;
+        return {};
+      },
+      dispatchCanonicalControl() {
+        dispatches += 1;
+        return {};
+      },
+    }),
+    /after trusted assessedAt/u,
+  );
+  assert.equal(scopes, 0);
+  assert.equal(dispatches, 0);
+
+  await assert.rejects(
+    () => executeAutopilotProgrammaticControlV1(request(), {
+      now: nowSequence(assessedAt, '2026-09-25T18:05:00.001Z'),
+      resolveTrustedScope(lookup) {
+        scopes += 1;
+        return scopeFor(lookup);
+      },
+      dispatchCanonicalControl() {
+        dispatches += 1;
+        return {};
+      },
+    }),
+    /scope expired before dispatch/u,
+  );
+  assert.equal(dispatches, 0);
+
+  const callerTime = request();
+  callerTime.assessedAt = assessedAt;
+  await assert.rejects(
+    () => executeAutopilotProgrammaticControlV1(callerTime, {
+      now: fixedNow,
+      resolveTrustedScope() {
+        return {};
+      },
+      dispatchCanonicalControl() {
+        return {};
+      },
+    }),
+    /unknown field: assessedAt/u,
+  );
+});
+
+test('scope proof binds payload artifact identity as well as bytes', async () => {
+  let dispatches = 0;
+  const raw = request({
+    operation: AutopilotProgrammaticOperation.OUTCOME_SUBMIT,
+    targetId: 'outcome-identity',
+    payloadArtifactRef: artifact('payload-exact-id'),
+  });
+
+  await assert.rejects(
+    () => executeAutopilotProgrammaticControlV1(raw, {
+      now: fixedNow,
+      resolveTrustedScope(lookup) {
+        return scopeFor(lookup, { payloadArtifactId: 'payload-alias-id' });
+      },
+      dispatchCanonicalControl() {
+        dispatches += 1;
+        return {};
+      },
+    }),
+    /scope proof does not match/u,
+  );
+  assert.equal(dispatches, 0);
 });
 
 test('unknown, symbol, hidden and exotic dependency/request authority fields fail closed', async () => {
@@ -490,6 +592,7 @@ test('unknown, symbol, hidden and exotic dependency/request authority fields fai
   );
 
   const hiddenDependencies = {
+    now: fixedNow,
     resolveTrustedScope() {},
     dispatchCanonicalControl() {},
   };
