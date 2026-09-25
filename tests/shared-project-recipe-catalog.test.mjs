@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   buildSharedProjectRecipeCatalogV1,
   SHARED_PROJECT_RECIPE_CATALOG_SCHEMA_VERSION,
+  SHARED_PROJECT_RECIPE_SHARE_CAPABILITY,
 } from '../src/core/shared-project-recipe-catalog.js';
 import {
   computeRecipeSubjectSha256V1,
@@ -34,12 +35,12 @@ function project() {
   };
 }
 
-function registryForIdentity(overrides = {}) {
+function identityRegistry({ agentCapability = true, revokeAgentAt = '' } = {}) {
   return {
     schemaVersion: 1,
     registryId: 'identity-registry-1',
     organizationId: 'org-1',
-    revision: 3,
+    revision: 4,
     principals: [
       {
         principalId: 'owner',
@@ -57,16 +58,25 @@ function registryForIdentity(overrides = {}) {
         kind: GovernancePrincipalKind.AGENT,
         displayName: 'Agent A',
         parentPrincipalId: 'owner',
-        status: GovernancePrincipalStatus.ACTIVE,
+        status: revokeAgentAt ? GovernancePrincipalStatus.REVOKED : GovernancePrincipalStatus.ACTIVE,
         createdAt: T1,
-        revokedAt: '',
+        revokedAt: revokeAgentAt,
       },
     ],
     roles: [
       {
-        roleId: 'project-member',
-        title: 'Project member',
-        capabilityCeilingIds: ['project.read'],
+        roleId: 'role-owner',
+        title: 'Project owner ceiling',
+        capabilityCeilingIds: ['project.read', SHARED_PROJECT_RECIPE_SHARE_CAPABILITY],
+        providerCeilingIds: ['recipe-registry'],
+        outboundDataClassIds: ['internal'],
+      },
+      {
+        roleId: 'role-agent',
+        title: 'Project agent ceiling',
+        capabilityCeilingIds: agentCapability
+          ? ['project.read', SHARED_PROJECT_RECIPE_SHARE_CAPABILITY]
+          : ['project.read'],
         providerCeilingIds: ['recipe-registry'],
         outboundDataClassIds: ['internal'],
       },
@@ -75,7 +85,7 @@ function registryForIdentity(overrides = {}) {
       {
         grantId: 'grant-owner',
         principalId: 'owner',
-        roleId: 'project-member',
+        roleId: 'role-owner',
         resourceKeys: ['project:project-a'],
         grantedByPrincipalId: 'owner',
         createdAt: T1,
@@ -85,45 +95,52 @@ function registryForIdentity(overrides = {}) {
       {
         grantId: 'grant-agent',
         principalId: 'agent-a',
-        roleId: 'project-member',
+        roleId: 'role-agent',
         resourceKeys: ['project:project-a'],
         grantedByPrincipalId: 'owner',
         createdAt: T2,
         expiresAt: '',
-        revokedAt: '',
+        revokedAt: revokeAgentAt,
       },
     ],
     credentialOwnership: [],
     updatedAt: T4,
-    ...overrides,
   };
 }
 
-function governanceRequest(overrides = {}) {
+function binding() {
   return {
-    projectSnapshot: project(),
-    identityRegistry: registryForIdentity(),
-    memberships: [
-      {
-        membershipId: 'm-owner',
-        projectId: 'project-a',
-        principalId: 'owner',
-        invitedByPrincipalId: 'owner',
-        joinedAt: T1,
-        leftAt: '',
-      },
-      {
-        membershipId: 'm-agent',
-        projectId: 'project-a',
-        principalId: 'agent-a',
-        invitedByPrincipalId: 'owner',
-        joinedAt: T2,
-        leftAt: '',
-      },
-    ],
-    auditEvents: [],
-    evaluatedAt: T4,
-    ...overrides,
+    schemaVersion: 1,
+    bindingId: 'shared-project-a',
+    projectId: 'project-a',
+    projectRevisionId: 'project-r1',
+    organizationId: 'org-1',
+    governanceRegistryId: 'identity-registry-1',
+    governanceRegistryRevision: 4,
+    ownerPrincipalId: 'owner',
+    resourceKey: 'project:project-a',
+    createdAt: T2,
+  };
+}
+
+function trustedResolver({ registry = identityRegistry(), projectSnapshot = project(), projectBinding = binding() } = {}) {
+  return {
+    resolveSharedProjectBinding(requestedBindingId) {
+      return requestedBindingId === projectBinding.bindingId ? projectBinding : null;
+    },
+    resolveProjectSnapshot({ projectId, projectRevisionId }) {
+      return projectId === projectSnapshot.projectId
+        && projectRevisionId === projectSnapshot.revisionId
+        ? projectSnapshot
+        : null;
+    },
+    resolveIdentityGovernanceRegistry({ governanceRegistryId, governanceRegistryRevision, organizationId }) {
+      return governanceRegistryId === registry.registryId
+        && governanceRegistryRevision === registry.revision
+        && organizationId === registry.organizationId
+        ? registry
+        : null;
+    },
   };
 }
 
@@ -172,8 +189,8 @@ function recipeBase(recipeId = 'recipe-a', version = 1) {
   };
 }
 
-async function qualifiedRecipe(recipeId = 'recipe-a', version = 1) {
-  const draft = recipeBase(recipeId, version);
+async function qualifiedRecipe(recipeId = 'recipe-a', version = 1, overrides = {}) {
+  const draft = { ...recipeBase(recipeId, version), ...overrides };
   const subjectSha256 = await computeRecipeSubjectSha256V1(draft);
   return {
     ...draft,
@@ -184,7 +201,7 @@ async function qualifiedRecipe(recipeId = 'recipe-a', version = 1) {
   };
 }
 
-function trustedEvaluation(recipe) {
+function trustedEvaluation(recipe, evidenceArtifactId = 'evidence-a') {
   return {
     verifierId: recipe.qualification.verifierId,
     report: {
@@ -194,7 +211,7 @@ function trustedEvaluation(recipe) {
       suiteRevisionId: recipe.qualification.benchmarkSuiteRevision,
       subjectId: recipe.recipeId,
       subjectRevisionId: recipe.qualification.subjectSha256,
-      startedAt: T2,
+      startedAt: recipe.createdAt,
       completedAt: recipe.qualification.evaluatedAt,
       status: 'PASS',
       caseCount: 1,
@@ -202,9 +219,9 @@ function trustedEvaluation(recipe) {
       failedCaseCount: 0,
       results: [
         {
-          caseId: 'case-a',
+          caseId: `case-${recipe.recipeId}-${recipe.version}`,
           passed: true,
-          evidenceArtifactIds: ['evidence-a'],
+          evidenceArtifactIds: [evidenceArtifactId],
         },
       ],
     },
@@ -215,9 +232,10 @@ function share(overrides = {}) {
   return {
     shareId: 'share-a',
     projectId: 'project-a',
+    projectRevisionId: 'project-r1',
     recipeId: 'recipe-a',
     version: 1,
-    sharedByPrincipalId: 'owner',
+    sharedByPrincipalId: 'agent-a',
     sharedAt: T3,
     revokedAt: '',
     ...overrides,
@@ -227,7 +245,7 @@ function share(overrides = {}) {
 async function request(overrides = {}) {
   const recipe = await qualifiedRecipe();
   return {
-    projectGovernanceRequest: governanceRequest(),
+    bindingId: 'shared-project-a',
     recipeRegistry: {
       schemaVersion: 1,
       registryId: 'recipe-registry-1',
@@ -237,47 +255,87 @@ async function request(overrides = {}) {
     },
     trustedEvaluations: [trustedEvaluation(recipe)],
     shares: [share()],
+    evaluatedAt: T4,
     ...overrides,
   };
 }
 
-test('shared Project catalog exposes only trusted promoted recipes and grants no authority', async () => {
-  const out = await buildSharedProjectRecipeCatalogV1(await request());
+test('shared Recipe catalog composes canonical Project access and grants no authority', async () => {
+  const out = await buildSharedProjectRecipeCatalogV1(
+    await request(),
+    trustedResolver(),
+  );
 
   assert.equal(out.schemaVersion, SHARED_PROJECT_RECIPE_CATALOG_SCHEMA_VERSION);
+  assert.equal(out.bindingId, 'shared-project-a');
   assert.equal(out.projectId, 'project-a');
   assert.equal(out.projectRevisionId, 'project-r1');
+  assert.equal(out.organizationId, 'org-1');
+  assert.equal(out.governanceRegistryId, 'identity-registry-1');
   assert.equal(out.recipeRegistryId, 'recipe-registry-1');
-  assert.equal(out.recipeRegistryRevision, 5);
   assert.equal(out.items.length, 1);
   assert.equal(out.items[0].recipeId, 'recipe-a');
   assert.equal(out.items[0].version, 1);
+  assert.equal(out.items[0].requiredShareCapabilityId, SHARED_PROJECT_RECIPE_SHARE_CAPABILITY);
   assert.equal(out.items[0].lifecycle, 'PROMOTED');
   assert.equal(out.items[0].qualificationStatus, 'PASS');
   assert.equal(out.items[0].admissionAuthorized, false);
   assert.equal(out.items[0].executionAuthorized, false);
+  assert.equal(out.items[0].mutationAuthorized, false);
   assert.equal(out.admissionAuthorized, false);
   assert.equal(out.executionAuthorized, false);
-  assert.equal(out.requiresPolicyDecision, true);
+  assert.equal(out.mutationAuthorized, false);
+  assert.equal(out.requiresCanonicalPolicyDecision, true);
   assert.equal(out.policyDecision, 'NONE');
   assert.equal(Object.isFrozen(out), true);
   assert.equal(Object.isFrozen(out.items), true);
 });
 
-test('share must bind the exact current trusted promoted recipe version', async () => {
+test('share creation fails closed when canonical Project ceiling lacks project.recipe.share', async () => {
+  await assert.rejects(
+    buildSharedProjectRecipeCatalogV1(
+      await request(),
+      trustedResolver({ registry: identityRegistry({ agentCapability: false }) }),
+    ),
+    /outside canonical Project recipe-share ceiling: CAPABILITY_OUTSIDE_CEILING/,
+  );
+});
+
+test('active share fails closed when sharer is revoked after sharing', async () => {
+  await assert.rejects(
+    buildSharedProjectRecipeCatalogV1(
+      await request(),
+      trustedResolver({ registry: identityRegistry({ revokeAgentAt: T4 }) }),
+    ),
+    /active share .* outside canonical Project recipe-share ceiling: PRINCIPAL_INACTIVE/,
+  );
+});
+
+test('revoked share remains canonical historical evidence but is absent from active catalog', async () => {
+  const out = await buildSharedProjectRecipeCatalogV1(
+    await request({
+      shares: [share({ revokedAt: T4 })],
+    }),
+    trustedResolver({ registry: identityRegistry({ revokeAgentAt: T4 }) }),
+  );
+
+  assert.equal(out.projectId, 'project-a');
+  assert.equal(out.projectRevisionId, 'project-r1');
+  assert.deepEqual(out.items, []);
+  assert.equal(out.executionAuthorized, false);
+});
+
+test('share must bind the exact current trusted promoted Recipe version', async () => {
   const recipe1 = await qualifiedRecipe('recipe-a', 1);
   const recipe2Base = recipeBase('recipe-a', 2);
   recipe2Base.createdAt = T3;
-  recipe2Base.qualification.evaluatedAt = T4;
-  recipe2Base.qualification.evidenceArtifactIds = ['evidence-b'];
-  const subjectSha256 = await computeRecipeSubjectSha256V1(recipe2Base);
-  const recipe2 = {
-    ...recipe2Base,
-    qualification: { ...recipe2Base.qualification, subjectSha256 },
+  recipe2Base.qualification = {
+    ...recipe2Base.qualification,
+    evidenceArtifactIds: ['evidence-b'],
+    evaluatedAt: T4,
   };
-  const trusted2 = trustedEvaluation(recipe2);
-  trusted2.report.startedAt = T3;
-  trusted2.report.results[0].evidenceArtifactIds = ['evidence-b'];
+  const recipe2 = await qualifiedRecipe('recipe-a', 2, recipe2Base);
+  const trusted2 = trustedEvaluation(recipe2, 'evidence-b');
 
   const input = await request({
     recipeRegistry: {
@@ -292,85 +350,76 @@ test('share must bind the exact current trusted promoted recipe version', async 
   });
 
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(input),
+    buildSharedProjectRecipeCatalogV1(input, trustedResolver()),
     /does not bind current trusted PROMOTED version/,
   );
 });
 
-test('untrusted qualification evidence cannot make a shared recipe discoverable', async () => {
-  const input = await request({ trustedEvaluations: [] });
+test('untrusted Recipe qualification cannot make a shared Recipe discoverable', async () => {
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(input),
+    buildSharedProjectRecipeCatalogV1(
+      await request({ trustedEvaluations: [] }),
+      trustedResolver(),
+    ),
     /no trusted active PROMOTED version/,
   );
 });
 
-test('revoked share disappears at the exact revocation boundary', async () => {
-  const input = await request({
-    shares: [share({ revokedAt: T4 })],
-  });
-  const out = await buildSharedProjectRecipeCatalogV1(input);
-  assert.deepEqual(out.items, []);
-});
-
-test('active share fails closed when sharer is no longer an active Project participant', async () => {
-  const input = await request({
-    projectGovernanceRequest: governanceRequest({
-      memberships: [
-        {
-          membershipId: 'm-owner',
-          projectId: 'project-a',
-          principalId: 'owner',
-          invitedByPrincipalId: 'owner',
-          joinedAt: T1,
-          leftAt: T4,
-        },
-      ],
-    }),
-  });
+test('share must bind exact Project id and revision from canonical collaboration authority', async () => {
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(input),
-    /no active Project participant sharer/,
+    buildSharedProjectRecipeCatalogV1(
+      await request({ shares: [share({ projectId: 'project-b' })] }),
+      trustedResolver(),
+    ),
+    /does not match canonical shared Project binding/,
+  );
+
+  await assert.rejects(
+    buildSharedProjectRecipeCatalogV1(
+      await request({ shares: [share({ projectRevisionId: 'project-r2' })] }),
+      trustedResolver(),
+    ),
+    /does not match canonical shared Project binding/,
   );
 });
 
-test('catalog rejects wrong Project binding, future share, duplicate active identity, and newer recipe truth', async () => {
+test('future sharing, duplicate active Recipe identity, and future Recipe registry fail closed', async () => {
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(await request({
-      shares: [share({ projectId: 'project-b' })],
-    })),
-    /does not match shared Project governance/,
+    buildSharedProjectRecipeCatalogV1(
+      await request({ shares: [share({ sharedAt: '2026-09-25T10:00:00.001Z' })] }),
+      trustedResolver(),
+    ),
+    /later than catalog evaluation time/,
   );
 
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(await request({
-      shares: [share({ sharedAt: '2026-09-25T10:00:00.001Z' })],
-    })),
-    /later than Project evaluation time/,
-  );
-
-  await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(await request({
-      shares: [
-        share({ shareId: 'share-a' }),
-        share({ shareId: 'share-b' }),
-      ],
-    })),
+    buildSharedProjectRecipeCatalogV1(
+      await request({
+        shares: [
+          share({ shareId: 'share-a' }),
+          share({ shareId: 'share-b' }),
+        ],
+      }),
+      trustedResolver(),
+    ),
     /multiple active shares expose the same recipe identity/,
   );
 
   const recipe = await qualifiedRecipe();
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(await request({
-      recipeRegistry: {
-        schemaVersion: 1,
-        registryId: 'recipe-registry-1',
-        revision: 6,
-        recipes: [recipe],
-        updatedAt: '2026-09-25T10:00:00.001Z',
-      },
-    })),
-    /recipe registry is newer than Project governance evaluation time/,
+    buildSharedProjectRecipeCatalogV1(
+      await request({
+        recipeRegistry: {
+          schemaVersion: 1,
+          registryId: 'recipe-registry-1',
+          revision: 6,
+          recipes: [recipe],
+          updatedAt: '2026-09-25T10:00:00.001Z',
+        },
+      }),
+      trustedResolver(),
+    ),
+    /recipe registry is newer than catalog evaluation time/,
   );
 });
 
@@ -387,35 +436,44 @@ test('strict request/share boundaries reject getters, aliases, sparse arrays and
     },
   });
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1(getter),
+    buildSharedProjectRecipeCatalogV1(getter, trustedResolver()),
     /enumerable data properties only/,
   );
   assert.equal(reads, 0);
 
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1({ ...base, executionAuthorized: true }),
+    buildSharedProjectRecipeCatalogV1(
+      { ...base, executionAuthorized: true },
+      trustedResolver(),
+    ),
     /unknown field/,
   );
 
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1({
-      ...base,
-      shares: [share({ recipeId: ' recipe-a' })],
-    }),
+    buildSharedProjectRecipeCatalogV1(
+      { ...base, shares: [share({ recipeId: ' recipe-a' })] },
+      trustedResolver(),
+    ),
     /exact canonical identity representation/,
   );
 
   const sparse = new Array(2);
   sparse[0] = share();
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1({ ...base, shares: sparse }),
+    buildSharedProjectRecipeCatalogV1(
+      { ...base, shares: sparse },
+      trustedResolver(),
+    ),
     /dense data-only array/,
   );
 
   const hidden = [...base.shares];
   Object.defineProperty(hidden, 'authority', { value: 'ALLOW', enumerable: false });
   await assert.rejects(
-    buildSharedProjectRecipeCatalogV1({ ...base, shares: hidden }),
+    buildSharedProjectRecipeCatalogV1(
+      { ...base, shares: hidden },
+      trustedResolver(),
+    ),
     /non-index data/,
   );
 });
