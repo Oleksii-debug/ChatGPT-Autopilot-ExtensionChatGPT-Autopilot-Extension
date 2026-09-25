@@ -491,11 +491,13 @@
 
       <fieldset class="settings-group" id="scenario-work-common-settings">
         <legend>Загальні параметри</legend>
-        <label for="scenario-work-rounds">Кіл у одному поколінні чатів</label>
-        <input id="scenario-work-rounds" type="number" min="1" max="10000" step="1" inputmode="numeric" value="10">
-        <label for="scenario-work-generations">Кількість поколінь чатів</label>
-        <input id="scenario-work-generations" type="number" min="0" max="10000" step="1" inputmode="numeric" value="0" aria-describedby="scenario-work-generations-help">
-        <p id="scenario-work-generations-help" class="field-help">0 — без обмеження. Після кожного покоління старі фізичні чати більше не використовуються.</p>
+        <div id="scenario-work-round-generation-settings">
+          <label for="scenario-work-rounds">Кіл командної роботи в одному поколінні</label>
+          <input id="scenario-work-rounds" type="number" min="1" max="10000" step="1" inputmode="numeric" value="10">
+          <label for="scenario-work-generations">Кількість поколінь командної роботи</label>
+          <input id="scenario-work-generations" type="number" min="0" max="10000" step="1" inputmode="numeric" value="0" aria-describedby="scenario-work-generations-help">
+          <p id="scenario-work-generations-help" class="field-help">0 — без обмеження. Ці поля стосуються командних форматів. У режимі «Цикли в чаті» один фізичний чат завжди виконує задану послідовність промптів рівно один раз.</p>
+        </div>
         <label for="scenario-work-timeout">Скільки чекати завершення відповіді, хв</label>
         <input id="scenario-work-timeout" type="number" min="1" max="1440" step="1" inputmode="numeric" value="40">
         <label for="scenario-work-poll">Перевірка завершення відповіді, с</label>
@@ -530,8 +532,9 @@
           <input id="scenario-cycle-url" type="url" autocomplete="off" spellcheck="false" value="https://chatgpt.com/">
           <label><input id="scenario-cycle-restart-round-timeout" type="checkbox" checked>Після зависання нового чату повторити поточне коло з першого промпта</label>
           <h3>Послідовність промптів</h3>
-          <p class="field-help">Для 17 повідомлень у чаті встановіть одне коло: перший промпт ×1 → промпт продовження ×15 → фінальний ×1. Число повторів продовження можна змінити.</p>
-          <div id="scenario-cycle-steps"></div>
+          <p class="field-help">Один фізичний чат виконує цю послідовність рівно один раз. Наприклад, перший промпт ×1 → «Продовжуй» ×10 → фінальний ×1 означає рівно 12 повідомлень у кожному чаті. Нові фізичні чати створює пул нижче.</p>
+          <p id="scenario-cycle-message-count" class="field-help" role="status">Повідомлень у кожному чаті: 1.</p>
+          <div id="scenario-cycle-steps" aria-describedby="scenario-cycle-message-count"></div>
           <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
           <label for="scenario-cycle-parallel-count">Скільки чатів тримати одночасно в пулі</label>
           <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="5" aria-describedby="scenario-cycle-parallel-help">
