@@ -15,6 +15,17 @@ class MemoryRepo {
   }
 }
 
+test('model discovery forwards exact compatible endpoint identity to Gateway', async () => {
+  let request;
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiGatewayClient: { async listModels(input) { request = input; return { models:['mistral-model'] }; } },
+  });
+  const result = await dispatcher.execute('LIST_AI_ROUTER_MODELS', { provider:'openai-compatible', endpointId:'mistral' });
+  assert.equal(request.provider, 'openai-compatible');
+  assert.equal(request.endpointId, 'mistral');
+  assert.deepEqual(result.result.models, ['mistral-model']);
+});
+
 test('AI router settings persist and old states without router fields stay valid', async () => {
   const old = createEmptyState(1000);
   delete old.profile.aiRouter;
