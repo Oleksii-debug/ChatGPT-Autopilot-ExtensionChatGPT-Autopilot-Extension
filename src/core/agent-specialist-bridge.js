@@ -78,8 +78,10 @@ function id(value, label) {
 function timestamp(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !value) throw new Error(`${label} must be a timestamp`);
   const ms = Date.parse(value);
-  if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  if (!Number.isFinite(ms) || new Date(ms).toISOString() !== value) {
+    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  }
+  return value;
 }
 function integer(value, label, min, max) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`);

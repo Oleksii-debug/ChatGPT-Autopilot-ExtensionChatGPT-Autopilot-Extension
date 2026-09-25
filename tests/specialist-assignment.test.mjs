@@ -12,6 +12,25 @@ test('Specialist assignments bind child identity, explicit capability scope, dep
   assert.throws(() => normalizeSpecialistAssignmentV1(assignment({ unrestrictedCapabilities: true })), /unknown field/);
 });
 
+test('Specialist assignment timestamps require exact canonical spelling without caller coercion', () => {
+  assert.throws(
+    () => normalizeSpecialistAssignmentV1(assignment({ deadlineAt: '2026-09-23T13:00:00Z' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+  assert.throws(
+    () => normalizeSpecialistAssignmentV1(assignment({ updatedAt: '2026-09-23T14:00:00.000+02:00' })),
+    /canonical ISO-8601 UTC representation/,
+  );
+
+  let coercions = 0;
+  const coerciveNow = { toString() { coercions += 1; return AT; } };
+  assert.throws(
+    () => claimEligibleSpecialistAssignmentsV1([assignment()], { now: coerciveNow, availableSlots: 1 }),
+    /now must be a timestamp/,
+  );
+  assert.equal(coercions, 0, 'timestamp validation must not coerce caller-owned objects');
+});
+
 test('Specialist claiming is completion-driven, capacity-bounded and recovers only expired leases', () => {
   const result = claimEligibleSpecialistAssignmentsV1([
     assignment({ agentId: 'low', priority: 1 }),
