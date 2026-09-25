@@ -201,8 +201,9 @@ export class GitHubIssueWriteVerifierV1 {
     if (expectedOutcome !== ReconciliationOutcome.VERIFIED || !priorObservation) {
       throw new Error('GitHub issue/comment create requires an observed immutable created identity for automatic reconciliation; otherwise manual review is required');
     }
-    if (requireId(effectId, 'effectId') !== requireId(invocation?.invocationId, 'invocationId')) throw new Error('effectId is invalid');
-    if (requireId(policyDecisionId, 'policyDecisionId') !== requireId(invocation?.policyDecisionId, 'invocation.policyDecisionId')) {
+    const safeInvocation = expectedMutation(invocation);
+    if (requireId(effectId, 'effectId') !== safeInvocation.invocationId) throw new Error('effectId is invalid');
+    if (requireId(policyDecisionId, 'policyDecisionId') !== safeInvocation.policyDecisionId) {
       throw new Error('policyDecisionId is invalid');
     }
     const exactAttempt = attemptFromExecutionId(executionId);
