@@ -45,18 +45,22 @@ function client(overrides = {}) {
     getGmailMessage: async args => ({ operation: 'getGmailMessage', args }),
     getGmailThread: async args => ({ operation: 'getGmailThread', args }),
     getGmailAttachment: async args => ({ operation: 'getGmailAttachment', args }),
+    createGmailDraft: async args => ({ operation: 'createGmailDraft', args }),
     ...overrides,
   };
 }
 
 const allCapabilities = Object.values(GoogleWorkspaceCapabilityId);
 
-test('all Google Workspace V1 tools are read-only and expose no send/delete/mutation surface', () => {
+test('Google Workspace V1 advertises seven reads plus exactly one non-sending Gmail draft mutation', () => {
   const provider = new GoogleWorkspaceAgentProviderV1({ workspaceClient: client(), grantedCapabilityIds: allCapabilities });
   const tools = provider.tools();
-  assert.equal(tools.length, 7);
-  assert.ok(tools.every(tool => tool.providerId === GOOGLE_WORKSPACE_PROVIDER_ID && tool.readOnly === true));
-  assert.ok(tools.every(tool => !/(send|trash|delete|write|update|create)/iu.test(tool.toolId)));
+  assert.equal(tools.length, 8);
+  assert.equal(tools.filter(tool => tool.readOnly === true).length, 7);
+  const effectful = tools.filter(tool => tool.readOnly === false);
+  assert.deepEqual(effectful.map(tool => tool.toolId), [GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE]);
+  assert.ok(tools.every(tool => tool.providerId === GOOGLE_WORKSPACE_PROVIDER_ID));
+  assert.ok(tools.every(tool => !/(send|trash|delete|update)/iu.test(tool.toolId)));
 });
 
 test('provider requires exact owner ALLOW and granted capability before client invocation', async () => {
@@ -94,6 +98,7 @@ test('each tool dispatches through the single workspace client without creating 
     [GoogleWorkspaceToolId.GMAIL_MESSAGE_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailMessage', { userId: 'me', messageId: 'msg_1' }],
     [GoogleWorkspaceToolId.GMAIL_THREAD_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailThread', { userId: 'me', threadId: 'thread_1' }],
     [GoogleWorkspaceToolId.GMAIL_ATTACHMENT_GET, GoogleWorkspaceCapabilityId.GMAIL_ATTACHMENT_READ, 'getGmailAttachment', { userId: 'me', messageId: 'msg_1', attachmentId: 'att_1' }],
+    [GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE, GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE, 'createGmailDraft', { userId: 'owner@example.com', rawMessageBase64Url: 'QUJD' }],
   ];
   for (let index = 0; index < cases.length; index += 1) {
     const [toolId, capabilityId, operation, args] = cases[index];
@@ -281,4 +286,47 @@ test('workspace client method accessors are rejected without executing getters',
     /data method/i,
   );
   assert.equal(getterReads, 0);
+});
+
+
+test('effectful Gmail draft failures preserve no-effect preflight vs uncertain post-dispatch semantics without leaking causes', async () => {
+  const providerNoEffect = new GoogleWorkspaceAgentProviderV1({
+    workspaceClient: client({
+      createGmailDraft: async () => {
+        const error = new Error('raw secret');
+        error.code = 'GOOGLE_SCHEMA_INVALID';
+        error.effectMayHaveOccurred = false;
+        error.safeToRetry = true;
+        throw error;
+      },
+    }),
+    grantedCapabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE],
+  });
+  const inv = invocation(
+    GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+    GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE,
+    { userId: 'owner@example.com', rawMessageBase64Url: 'QUJD' },
+    'google-draft-effect',
+  );
+  await assert.rejects(
+    () => providerNoEffect.invoke({ invocation: inv, policyDecision: decision(inv.invocationId) }),
+    error => error.effectMayHaveOccurred === false && error.safeToRetry === true && !String(error.message).includes('raw secret'),
+  );
+
+  const providerAmbiguous = new GoogleWorkspaceAgentProviderV1({
+    workspaceClient: client({
+      createGmailDraft: async () => {
+        const error = new Error('Bearer secret disappeared');
+        error.code = 'GOOGLE_MUTATION_TRANSPORT_UNCERTAIN';
+        error.effectMayHaveOccurred = true;
+        error.safeToRetry = false;
+        throw error;
+      },
+    }),
+    grantedCapabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE],
+  });
+  await assert.rejects(
+    () => providerAmbiguous.invoke({ invocation: inv, policyDecision: decision(inv.invocationId) }),
+    error => error.effectMayHaveOccurred === true && error.safeToRetry === false && !String(error.message).includes('Bearer secret'),
+  );
 });

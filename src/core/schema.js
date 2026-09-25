@@ -3,6 +3,7 @@ import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRoute
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
+import { normalizeCalendarSchedule } from './calendar-schedule.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -189,6 +190,8 @@ function validateSession(session, id) {
   requireString(session.sharedPrompt, `session ${id} sharedPrompt`);
   if (session.promptCadence !== undefined) normalizeSessionPromptCadence(session.promptCadence);
   if (session.drivePromptSources !== undefined) normalizeSessionDrivePromptSources(session.drivePromptSources);
+  if (session.calendarSchedule !== undefined && session.calendarSchedule !== null) normalizeCalendarSchedule(session.calendarSchedule);
+  if (session.calendarRuntime !== undefined) requireRecord(session.calendarRuntime, `session ${id} calendarRuntime`);
   requireEnum(session.runMode, RUN_MODES, `session ${id} runMode`);
   requireUniqueStringArray(session.taskOrder, `session ${id} taskOrder`, { min: 1, max: MAX_PHYSICAL_TASKS });
   const configuredTaskCount = session.configuredTaskCount === undefined ? session.taskOrder.length : session.configuredTaskCount;
@@ -216,6 +219,7 @@ function validateSession(session, id) {
   requireUniqueStringArray(session.onePassCompletedTaskIds, `session ${id} onePassCompletedTaskIds`);
   if (session.version !== undefined && (!Number.isInteger(session.version) || session.version < 0)) throw new Error(`Invalid session ${id} version`);
   if (session.pausedByMaster !== undefined) requireBoolean(session.pausedByMaster, `session ${id} pausedByMaster`);
+  if (session.simplifiedSession !== undefined) requireBoolean(session.simplifiedSession, `session ${id} simplifiedSession`);
   if (session.urlMode !== undefined && !['shared', 'unique'].includes(session.urlMode)) throw new Error(`Invalid session ${id} urlMode`);
   if (session.aiCoordinatorHandoff !== undefined) requireString(session.aiCoordinatorHandoff, `session ${id} aiCoordinatorHandoff`);
   if (session.aiCoordinatorHandoffCreatedAt !== undefined) requireNonNegativeNumber(session.aiCoordinatorHandoffCreatedAt, `session ${id} aiCoordinatorHandoffCreatedAt`);

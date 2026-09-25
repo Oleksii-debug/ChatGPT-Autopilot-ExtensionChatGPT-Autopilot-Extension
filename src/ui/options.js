@@ -2,6 +2,7 @@ import { focusAfterLifecycleSuccess } from './focus-policy.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
+import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -13,6 +14,8 @@ const DRAFT_KEY_PREFIX = 'chatgpt-autopilot-draft:';
 const LAST_SESSION_KEY = 'chatgpt-autopilot-last-session';
 const ui = {
   sessions: [],
+  simplifiedSelectedId: '',
+  simplifiedSelected: null,
   sessionListSignature: '',
   selectedSessionId: null,
   selected: null,
@@ -37,7 +40,7 @@ const announce = (text) => { $('live-announcer').textContent = ''; requestAnimat
 const formatTime = (value) => value ? new Date(value).toLocaleString() : 'Not available';
 const runtimeAvailable = () => Boolean(globalThis.chrome?.runtime?.sendMessage);
 const UI_MODE_KEY = 'chatgpt-autopilot-ui-mode';
-const UI_MODES = new Set(['sessions', 'orchestration', 'scenario-work', 'agent', 'ai']);
+const UI_MODES = new Set(['sessions', 'simplified', 'orchestration', 'scenario-work', 'agent', 'ai']);
 const ORCHESTRATION_PANEL_KEY = 'chatgpt-autopilot-orchestration-panel';
 const ORCHESTRATION_PANELS = ['orchestras', 'settings', 'state'];
 const SCENARIO_WORK_PANEL_KEY = 'chatgpt-autopilot-scenario-work-panel';
@@ -2265,6 +2268,8 @@ function blankSession() {
     sharedPrompt: '',
     defaultUniquePrompt: '',
     runMode: 'continuous',
+    calendarSchedule: null,
+    calendarRuntime: {},
     tasks: [blankTask()],
     configuredTaskCount: 1,
     minimumSendIntervalValue: 2,
@@ -2304,8 +2309,138 @@ function storageRemove(key) {
 }
 
 function sessionListSignature(sessions) {
-  return JSON.stringify((sessions || []).map(session => [session.id, session.name, session.displayRunState || session.runState, session.enabledTaskCount, session.completedTaskCount, session.successfulSendCount]));
+  return JSON.stringify((sessions || []).map(session => [session.id, session.name, session.displayRunState || session.runState, session.enabledTaskCount, session.completedTaskCount, session.successfulSendCount, session.simplifiedSession]));
 }
+
+function simplifiedFields() {
+  const field = id => $(id).value;
+  return {
+    name: field('simplified-name'), mode: field('simplified-config-mode'),
+    url: field('simplified-url'), urls: field('simplified-urls'),
+    prompt: field('simplified-prompt'), prompts: field('simplified-prompts'),
+    runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
+    interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
+    delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
+    retryPolicy: field('simplified-retry-policy'), tabs: field('simplified-tabs'),
+  };
+}
+
+function updateSimplifiedMode() {
+  const mode = $('simplified-config-mode').value;
+  $('simplified-url-group').hidden = mode.startsWith('unique-');
+  $('simplified-prompt-group').hidden = mode.endsWith('-unique');
+  $('simplified-urls-group').hidden = !mode.startsWith('unique-');
+  $('simplified-prompts-group').hidden = !mode.endsWith('-unique');
+  $('simplified-cycles').disabled = mode !== 'shared-shared';
+}
+
+function showSimplifiedSession(session) {
+  ui.simplifiedSelected = session ? clone(session) : null;
+  ui.simplifiedSelectedId = session?.id || '';
+  const tasks = session?.tasks || [];
+  $('simplified-name').value = session?.name || 'Новий сеанс';
+  $('simplified-config-mode').value = `${session?.urlMode || 'shared'}-${session?.promptMode || 'shared'}`;
+  $('simplified-url').value = tasks[0]?.url || 'https://chatgpt.com/';
+  $('simplified-urls').value = tasks.map(task => task.url).join('\n');
+  $('simplified-prompt').value = session?.sharedPrompt || '';
+  $('simplified-prompts').value = tasks.map(task => task.promptOverride).join('\n---\n');
+  $('simplified-run-mode').value = session?.runMode || 'continuous';
+  $('simplified-cycles').value = String(session?.configuredTaskCount || 1);
+  $('simplified-interval-unit').value = session?.minimumSendIntervalUnit || 'minutes';
+  $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
+  $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
+  $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
+  $('simplified-retry').value = String(session?.retryBackoffSeconds || 30);
+  $('simplified-retry-policy').value = session?.retryPolicy || 'safe';
+  $('simplified-tabs').value = session?.tabStrategy || 'keep-open';
+  updateSimplifiedMode();
+  $('simplified-list').value = session?.id || '';
+  $('simplified-state').textContent = session
+    ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
+    : 'Новий сеанс ще не збережено.';
+}
+
+function renderSimplifiedList() {
+  const rows = ui.sessions.filter(item => item.simplifiedSession);
+  const signature = JSON.stringify(rows.map(row => [row.id, row.name, row.displayRunState, row.successfulSendCount]));
+  const list = $('simplified-list');
+  if (list.dataset.signature !== signature) {
+    list.dataset.signature = signature;
+    list.replaceChildren();
+    for (const row of rows) {
+      const option = document.createElement('option');
+      option.value = row.id;
+      option.textContent = `${row.name}: ${row.displayRunState || row.runState}; Send ${row.successfulSendCount || 0}`;
+      list.append(option);
+    }
+  }
+  if (ui.simplifiedSelectedId) list.value = ui.simplifiedSelectedId;
+  $('simplified-overview').textContent = `Сеансів: ${rows.length}. Працює: ${rows.filter(row => row.runState === 'RUNNING').length}. Завершено: ${rows.filter(row => row.isCompleted).length}. Призупинено: ${rows.filter(row => row.runState === 'PAUSED').length}. Помилок: ${rows.filter(row => row.runState === 'ERROR').length}. Підтверджених Send: ${rows.reduce((n, row) => n + Number(row.successfulSendCount || 0), 0)}.`;
+}
+
+async function selectSimplifiedSession(id) {
+  if (!id) { showSimplifiedSession(null); return; }
+  try {
+    const data = await core('GET_SESSION', { sessionId: id });
+    showSimplifiedSession(data.session);
+  } catch (error) { $('simplified-command-result').textContent = `Не вдалося прочитати сеанс: ${error.message}`; }
+}
+
+async function refreshSimplifiedSessionStatus() {
+  await loadSessions();
+  if (!ui.simplifiedSelectedId) return;
+  try {
+    const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
+    const session = data.session;
+    $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`;
+  } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
+}
+
+async function saveSimplifiedSession() {
+  try {
+    const config = buildSimplifiedSessionConfig(simplifiedFields(), ui.simplifiedSelected);
+    const data = ui.simplifiedSelected
+      ? await core('UPDATE_SESSION', { sessionId: config.id, expectedVersion: ui.simplifiedSelected.version, config })
+      : await core('CREATE_SESSION', { config });
+    ui.simplifiedSelectedId = data.session.id;
+    await loadSessions();
+    showSimplifiedSession(data.session);
+    $('simplified-command-result').textContent = 'Сеанс збережено.';
+  } catch (error) { $('simplified-command-result').textContent = `Не вдалося зберегти: ${error.message}`; }
+}
+
+async function simplifiedAction(command) {
+  if (!ui.simplifiedSelectedId) {
+    $('simplified-command-result').textContent = 'Спочатку збережіть сеанс.';
+    return;
+  }
+  try {
+    const data = await core(command, { sessionId: ui.simplifiedSelectedId });
+    await loadSessions();
+    showSimplifiedSession(data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session);
+    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${ui.simplifiedSelected.runState}.`;
+  } catch (error) { $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`; }
+}
+
+async function importSimplifiedProfile(start) {
+  const file = $('simplified-import-file').files?.[0];
+  if (!file) { $('simplified-command-result').textContent = 'Оберіть JSON-файл.'; return; }
+  try {
+    const profile = assertSimplifiedPortableProfile(parsePortableJson(await file.text()));
+    await core('PREVIEW_PORTABLE_PROFILE', { profile });
+    const data = await core('IMPORT_PORTABLE_PROFILE', { profile, confirmAutoStart: start });
+    const importedIds = data.summary?.importedSessionIds || [];
+    const alreadyStarted = new Set(data.summary?.startedSessionIds || []);
+    if (start) for (const sessionId of importedIds) {
+      if (!alreadyStarted.has(sessionId)) { await core('START_SESSION', { sessionId }); alreadyStarted.add(sessionId); }
+    }
+    await loadSessions();
+    const id = importedIds[0];
+    if (id) await selectSimplifiedSession(id);
+    $('simplified-command-result').textContent = `Імпортовано: ${importedIds.length}; запущено: ${alreadyStarted.size}.`;
+  } catch (error) { $('simplified-command-result').textContent = `Імпорт не вдався: ${error.message}`; }
+}
+
 
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
@@ -2315,6 +2450,7 @@ async function loadSessions({ preserveFocus = true } = {}) {
     const nextSessions = (Array.isArray(data?.sessions) ? data.sessions : []).filter(session => !session.managedKind);
     const nextSignature = sessionListSignature(nextSessions);
     ui.sessions = nextSessions;
+    renderSimplifiedList();
     renderRemoteFallbackSessionOptions();
     if (nextSignature !== ui.sessionListSignature) {
       ui.sessionListSignature = nextSignature;
@@ -2332,7 +2468,8 @@ async function loadSessions({ preserveFocus = true } = {}) {
 function renderSessionList() {
   const list = $('session-list');
   list.replaceChildren();
-  for (const session of ui.sessions) {
+  const ordinarySessions = ui.sessions.filter(session => !session.simplifiedSession);
+  for (const session of ordinarySessions) {
     const li = document.createElement('li');
     const open = document.createElement('button');
     open.type = 'button'; open.id = `session-select-${session.id}`;
@@ -2353,12 +2490,12 @@ function renderSessionList() {
     li.append(open, state, count, rename, duplicate, del);
     list.append(li);
   }
-  const total = ui.sessions.length;
-  const running = ui.sessions.filter(s => ['RUNNING','RECOVERING'].includes(s.runState)).length;
-  const completed = ui.sessions.filter(s => s.isCompleted).length;
-  const paused = ui.sessions.filter(s => s.runState === 'PAUSED').length;
-  const errors = ui.sessions.filter(s => s.runState === 'ERROR').length;
-  const sent = ui.sessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
+  const total = ordinarySessions.length;
+  const running = ordinarySessions.filter(s => ['RUNNING','RECOVERING'].includes(s.runState)).length;
+  const completed = ordinarySessions.filter(s => s.isCompleted).length;
+  const paused = ordinarySessions.filter(s => s.runState === 'PAUSED').length;
+  const errors = ordinarySessions.filter(s => s.runState === 'ERROR').length;
+  const sent = ordinarySessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
   if ($('session-overview')) $('session-overview').textContent = `Sessions: ${total}. Running: ${running}. Completed: ${completed}. Paused: ${paused}. Errors: ${errors}. Successfully sent total: ${sent}.`;
   syncCurrentSessionMarker();
 }
@@ -2377,12 +2514,14 @@ function portableDraftConfig(session) {
     id: session.id,
     version: session.version,
     name: session.name,
+    simplifiedSession: session.simplifiedSession === true,
     promptMode: session.promptMode,
     urlMode: session.urlMode,
     sharedPrompt: session.sharedPrompt,
     defaultUniquePrompt: session.defaultUniquePrompt,
     promptCadence: clone(session.promptCadence || null),
     drivePromptSources: clone(session.drivePromptSources || null),
+    calendarSchedule: clone(session.calendarSchedule || null),
     runMode: session.runMode,
     tasks: clone(session.tasks || []),
     configuredTaskCount: Number(session.configuredTaskCount || session.tasks?.length || 1),
@@ -2478,12 +2617,15 @@ async function refreshSelectedSessionStatus(sessionId) {
     ui.selected.actionAvailability = latest.actionAvailability;
     ui.selected.status = latest.status;
     ui.selected.log = latest.log;
+    ui.selected.calendar = latest.calendar;
+    ui.selected.calendarRuntime = latest.calendarRuntime;
 
     // Runtime Drive evidence is safe to refresh live, but never write it back
     // into the visible draft inputs. The user may currently be editing another
     // file/target locally; only the status line follows canonical runtime state.
     const latestDriveBinding = latest.drivePromptSources?.bindings?.[0] || null;
     renderDrivePromptRuntimeStatus(latestDriveBinding);
+    renderCalendarRuntimeStatus(ui.selected);
 
     const signature = JSON.stringify([
       latest.version,
@@ -2497,6 +2639,11 @@ async function refreshSelectedSessionStatus(sessionId) {
       latestDriveBinding?.lastCheckedAt || 0,
       latestDriveBinding?.nextCheckAt || 0,
       latestDriveBinding?.lastErrorCode || '',
+      latest.calendar?.admissionState || '',
+      latest.calendar?.nextOccurrence?.scheduledFor || 0,
+      latest.calendarRuntime?.lastOccurrence?.state || '',
+      latest.calendarRuntime?.lastOccurrence?.scheduledFor || 0,
+      latest.calendarRuntime?.lastOccurrence?.executedAt || 0,
     ]);
     if (signature !== lastRuntimeSignature) {
       lastRuntimeSignature = signature;
@@ -2578,6 +2725,136 @@ function renderDrivePromptRuntimeStatus(binding) {
     : 'Drive source вимкнено.';
 }
 
+function defaultCalendarTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+  catch { return 'UTC'; }
+}
+function calendarLines(id) {
+  return String($(id)?.value || '').split(/[\n,;]+/u).map(value => value.trim()).filter(Boolean);
+}
+function collectCalendarSchedule() {
+  const kind = $('calendar-mode').value;
+  if (kind === 'NONE') return null;
+  const schedule = {
+    kind,
+    timeZone: $('calendar-time-zone').value.trim(),
+    catchUp: $('calendar-catch-up').checked ? 'ON' : 'OFF',
+  };
+  if (kind === 'ONE_TIME') {
+    schedule.date = $('calendar-one-time-date').value.trim();
+    schedule.time = $('calendar-one-time-time').value.trim();
+    return schedule;
+  }
+  if (kind === 'DAILY' || kind === 'WEEKLY') {
+    schedule.startDate = $('calendar-start-date').value.trim();
+    schedule.times = calendarLines('calendar-times');
+    const endDate = $('calendar-end-date').value.trim();
+    const maxOccurrences = $('calendar-max-occurrences').value.trim();
+    if (endDate) schedule.endDate = endDate;
+    if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
+    if (kind === 'WEEKLY') {
+      schedule.weekdays = Array.from({ length: 7 }, (_, index) => index + 1)
+        .filter(day => $(`calendar-weekday-${day}`).checked);
+    }
+    return schedule;
+  }
+  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map(line => {
+    const match = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)$/u.exec(line);
+    return match ? { date: match[1], time: match[2] } : { date: line, time: '' };
+  });
+  return schedule;
+}
+function syncCalendarVisibility() {
+  const kind = $('calendar-mode')?.value || 'NONE';
+  $('calendar-common-fields').hidden = kind === 'NONE';
+  $('calendar-one-time-fields').hidden = kind !== 'ONE_TIME';
+  $('calendar-recurring-fields').hidden = kind !== 'DAILY' && kind !== 'WEEKLY';
+  $('calendar-weekdays').hidden = kind !== 'WEEKLY';
+  $('calendar-explicit-fields').hidden = kind !== 'EXPLICIT';
+}
+function formatCalendarInstant(value) {
+  const instant = Number(value || 0);
+  return Number.isFinite(instant) && instant > 0 ? new Date(instant).toLocaleString() : 'немає';
+}
+function renderCalendarRuntimeStatus(session = ui.selected) {
+  const status = $('calendar-runtime-status');
+  if (!status || !session?.calendarSchedule) {
+    if (status) status.textContent = 'Календарний розклад вимкнено.';
+    return;
+  }
+  const projection = session.calendar || {};
+  const nextAt = projection.nextOccurrence?.scheduledFor || 0;
+  const last = session.calendarRuntime?.lastOccurrence || projection.lastOccurrence || null;
+  status.textContent = `Стан: ${projection.admissionState || 'очікування'}. Наступний запуск: ${formatCalendarInstant(nextAt)}. Останній результат: ${last?.state || 'немає'}; заплановано ${formatCalendarInstant(last?.scheduledFor)}; виконано ${formatCalendarInstant(last?.executedAt)}.`;
+}
+function renderCalendarEditor() {
+  const schedule = ui.selected?.calendarSchedule || null;
+  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
+  $('calendar-mode').value = kind;
+  $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
+  $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
+  $('calendar-revision-confirm').checked = false;
+  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? (schedule.date || '') : '';
+  $('calendar-one-time-time').value = schedule?.kind === 'ONE_TIME' ? (schedule.time || '') : '';
+  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.startDate || '') : '';
+  $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
+  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.endDate || '') : '';
+  $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
+  const weekdays = new Set(schedule?.kind === 'WEEKLY' ? (schedule.weekdays || []) : []);
+  for (let day = 1; day <= 7; day += 1) $(`calendar-weekday-${day}`).checked = weekdays.has(day);
+  $('calendar-explicit-occurrences').value = schedule?.kind === 'EXPLICIT'
+    ? (schedule.occurrences || []).map(item => `${item.date} ${item.time}`).join('\n')
+    : '';
+  syncCalendarVisibility();
+  renderCalendarRuntimeStatus(ui.selected);
+}
+function validCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(String(value || ''));
+  if (!match) return false;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.getUTCFullYear() === Number(match[1])
+    && date.getUTCMonth() === Number(match[2]) - 1
+    && date.getUTCDate() === Number(match[3]);
+}
+function validCalendarTime(value) {
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/u.exec(String(value || ''));
+  return Boolean(match && Number(match[1]) <= 23 && Number(match[2]) <= 59 && Number(match[3] || 0) <= 59);
+}
+function validateCalendarScheduleUi(session, errors) {
+  const schedule = session.calendarSchedule;
+  if (!schedule) return;
+  try { new Intl.DateTimeFormat('uk-UA', { timeZone: schedule.timeZone }).format(0); }
+  catch { errors.push(['calendar-time-zone', 'Вкажіть чинний IANA часовий пояс, наприклад Europe/Bratislava.']); }
+  if (schedule.kind === 'ONE_TIME') {
+    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Дата одноразового запуску має бути у форматі YYYY-MM-DD.']);
+    if (!validCalendarTime(schedule.time)) errors.push(['calendar-one-time-time', 'Час одноразового запуску має бути у форматі HH:MM або HH:MM:SS.']);
+    return;
+  }
+  if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
+    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Дата початку має бути у форматі YYYY-MM-DD.']);
+    if (!Array.isArray(schedule.times) || schedule.times.length < 1 || schedule.times.length > 48 || schedule.times.some(value => !validCalendarTime(value))) {
+      errors.push(['calendar-times', 'Додайте від 1 до 48 коректних часів, по одному в рядку, у форматі HH:MM.']);
+    }
+    if (schedule.kind === 'WEEKLY' && (!Array.isArray(schedule.weekdays) || schedule.weekdays.length < 1)) {
+      errors.push(['calendar-weekday-1', 'Для щотижневого розкладу виберіть щонайменше один день тижня.']);
+    }
+    if (schedule.endDate && !validCalendarDate(schedule.endDate)) errors.push(['calendar-end-date', 'Кінцева дата має бути у форматі YYYY-MM-DD.']);
+    if (schedule.endDate && validCalendarDate(schedule.endDate) && validCalendarDate(schedule.startDate) && schedule.endDate < schedule.startDate) {
+      errors.push(['calendar-end-date', 'Кінцева дата не може передувати даті початку.']);
+    }
+    if (schedule.maxOccurrences != null && (!Number.isSafeInteger(schedule.maxOccurrences) || schedule.maxOccurrences < 1 || schedule.maxOccurrences > 1000000)) {
+      errors.push(['calendar-max-occurrences', 'Кількість запусків має бути цілим числом від 1 до 1000000.']);
+    }
+    return;
+  }
+  if (schedule.kind === 'EXPLICIT') {
+    if (!Array.isArray(schedule.occurrences) || schedule.occurrences.length < 1 || schedule.occurrences.length > 10000
+      || schedule.occurrences.some(item => !validCalendarDate(item.date) || !validCalendarTime(item.time))) {
+      errors.push(['calendar-explicit-occurrences', 'Додайте від 1 до 10000 рядків у форматі YYYY-MM-DD HH:MM.']);
+    }
+  }
+}
+
 function renderEditor() {
   if (!ui.selected) return;
   $('empty-state').hidden = true; $('session-editor').hidden = false;
@@ -2606,6 +2883,7 @@ function renderEditor() {
   $('drive-prompt-interval').value = String(Math.max(1, Math.round(Number(driveBinding?.pollIntervalMs || 180000) / 60000)));
   $('drive-prompt-min-chars').value = String(driveBinding?.minChars ?? 1000);
   renderDrivePromptRuntimeStatus(driveBinding);
+  renderCalendarEditor();
   $('task-count').value = String(Math.max(1, Number(ui.selected.configuredTaskCount || ui.selected.tasks?.length || 1)));
   $('run-mode-one-pass').checked = ui.selected.runMode === 'one-pass';
   $('run-mode-continuous').checked = ui.selected.runMode !== 'one-pass';
@@ -2747,6 +3025,7 @@ function collectEditor() {
       lastErrorCode: preserveDriveRuntime ? (priorDrive.lastErrorCode || '') : '',
     }] : [],
   };
+  s.calendarSchedule = collectCalendarSchedule();
   s.runMode = document.querySelector('input[name="runMode"]:checked')?.value || 'continuous';
   s.configuredTaskCount = Number($('task-count').value);
   s.minimumSendIntervalValue = Number($('minimum-send-interval').value);
@@ -2817,6 +3096,7 @@ function validate(session) {
       errors.push(['drive-prompt-target', 'Primary Drive prompt доступний лише для shared prompt mode. Для unique mode виберіть Prompt 2 або Prompt 3.']);
     }
   }
+  validateCalendarScheduleUi(session, errors);
   const intervalUnit = session.minimumSendIntervalUnit === 'seconds' ? 'seconds' : 'minutes';
   const intervalMax = intervalUnit === 'seconds' ? 86400 : 1440;
   if (!(session.minimumSendIntervalValue >= 1 && session.minimumSendIntervalValue <= intervalMax)) errors.push(['minimum-send-interval', `Minimum send interval must be between 1 and ${intervalMax} ${intervalUnit}.`]);
@@ -2844,7 +3124,7 @@ async function saveSession() {
   clearTimeout(draftSaveTimer);
   const session = collectEditor(); const errors = validate(session); if (errors.length) { persistCurrentDraft(); announce(`${errors.length} configuration error${errors.length === 1 ? '' : 's'}.`); return; }
   try {
-    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session });
+    const data = await core('UPDATE_SESSION', { sessionId: session.id, expectedVersion: session.version, config: session, confirmCalendarRevisionChange: $('calendar-revision-confirm').checked });
     clearDraft(session.id);
     ui.selected = clone(data.session); announce('Session saved.'); await loadSessions(); renderEditor(); await refreshRunTimeline({ announceResult: false });
   } catch (error) { persistCurrentDraft(); setAppStatus(error.message); announce(error.message); }
@@ -2885,6 +3165,7 @@ function closeDeleteDialog({ restoreFocus = true } = {}) {
   if (restoreFocus && target?.isConnected) target.focus();
 }
 function deleteFocusTargetId(sessionId) {
+  if (storageGet(UI_MODE_KEY) === 'simplified') return 'simplified-new';
   const index = ui.sessions.findIndex((session) => session.id === sessionId);
   const next = index >= 0 ? ui.sessions[index + 1] || ui.sessions[index - 1] : null;
   return next ? `session-select-${next.id}` : 'create-session-button';
@@ -2897,6 +3178,7 @@ async function confirmDelete() {
     clearDraft(id);
     closeDeleteDialog({ restoreFocus: false });
     if (ui.selectedSessionId === id) { ui.selectedSessionId = null; ui.selected = null; storageRemove(LAST_SESSION_KEY); $('session-editor').hidden = true; $('empty-state').hidden = false; }
+    if (ui.simplifiedSelectedId === id) showSimplifiedSession(null);
     await loadSessions({ preserveFocus: false });
   await loadRemoteDispatchStatus();
     ($(focusTargetId) || $('create-session-button')).focus();
@@ -3302,13 +3584,14 @@ async function flushStatusRefresh() {
 }
 
 $('mode-sessions').addEventListener('click', () => setUiMode('sessions', { focus: true }));
+$('mode-simplified').addEventListener('click', () => setUiMode('simplified', { focus: true }));
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  const ordered = ['sessions', 'orchestration', 'scenario-work', 'agent', 'ai'];
+  const ordered = ['sessions', 'simplified', 'orchestration', 'scenario-work', 'agent', 'ai'];
   const current = ordered.findIndex(value => $(`mode-${value}`)?.getAttribute('aria-selected') === 'true');
   let index = current < 0 ? 0 : current;
   if (event.key === 'Home') index = 0;
@@ -3317,6 +3600,42 @@ $('mode-tabs').addEventListener('keydown', (event) => {
   event.preventDefault();
   setUiMode(ordered[index], { focus: true });
 });
+
+$('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
+$('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });
+$('simplified-list').addEventListener('change', () => { void selectSimplifiedSession($('simplified-list').value); });
+$('simplified-save').addEventListener('click', () => { void saveSimplifiedSession(); });
+for (const [id, command] of [
+  ['simplified-start', 'START_SESSION'], ['simplified-pause', 'PAUSE_SESSION'],
+  ['simplified-resume', 'RESUME_SESSION'], ['simplified-stop', 'STOP_SESSION'],
+]) $(id).addEventListener('click', () => { void simplifiedAction(command); });
+$('simplified-duplicate').addEventListener('click', async () => {
+  if (!ui.simplifiedSelectedId) return;
+  try {
+    const data = await core('DUPLICATE_SESSION', { sessionId: ui.simplifiedSelectedId });
+    await loadSessions(); showSimplifiedSession(data.session);
+    $('simplified-command-result').textContent = 'Сеанс дубльовано.';
+  } catch (error) { $('simplified-command-result').textContent = error.message; }
+});
+$('simplified-delete').addEventListener('click', event => {
+  if (ui.simplifiedSelectedId) openDeleteDialog(ui.simplifiedSelectedId, event.currentTarget);
+});
+$('simplified-import').addEventListener('click', () => { void importSimplifiedProfile(false); });
+$('simplified-import-start').addEventListener('click', () => { void importSimplifiedProfile(true); });
+$('simplified-export').addEventListener('click', async () => {
+  try {
+    if (!ui.simplifiedSelectedId) throw new Error('Оберіть збережений сеанс.');
+    const data = await core('EXPORT_PORTABLE_PROFILE', { sessionIds: [ui.simplifiedSelectedId], profileName: ui.simplifiedSelected?.name || 'Спрощений сеанс' });
+    downloadJson(data.profile, `${safeFileName(data.profile.profileName)}.json`);
+    $('simplified-command-result').textContent = 'JSON експортовано.';
+  } catch (error) { $('simplified-command-result').textContent = error.message; }
+});
+$('simplified-template').addEventListener('click', () => {
+  const config = buildSimplifiedSessionConfig({ name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/', prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1', interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2', retry: '30', retryPolicy: 'safe', tabs: 'keep-open' });
+  downloadJson({ format: 'chatgpt-autopilot-profile', version: 1, profileName: 'Спрощений сеанс', autoStart: false, sessions: [{ ...config, autoStart: false }] }, 'Спрощений-сеанс-шаблон.json');
+  $('simplified-command-result').textContent = 'Шаблон JSON експортовано.';
+});
+$('simplified-diagnostics').addEventListener('click', () => { void downloadDiagnosticReport(); });
 
 for (const panel of SCENARIO_WORK_PANELS) $('scenario-work-tab-' + panel).addEventListener('click', () => setScenarioWorkPanel(panel, { focus: true }));
 $('scenario-work-tabs').addEventListener('keydown', (event) => {
@@ -3456,6 +3775,7 @@ for (const id of [
   const eventName = field?.tagName === 'SELECT' || field?.type === 'checkbox' ? 'change' : 'input';
   field?.addEventListener(eventName, scheduleDraftPersistence);
 }
+$('calendar-mode').addEventListener('change', () => { syncCalendarVisibility(); renderCalendarRuntimeStatus(ui.selected); });
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
@@ -3523,6 +3843,9 @@ async function initialLoad() {
   await loadAiRouterSettings();
   await loadAiManagerSettings();
   await loadSessions({ preserveFocus: false });
+  const firstSimplified = ui.sessions.find(session => session.simplifiedSession);
+  if (firstSimplified) await selectSimplifiedSession(firstSimplified.id);
+  else showSimplifiedSession(null);
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
@@ -3535,5 +3858,7 @@ window.setInterval(() => { void recordDashboardDiagnosticSnapshot(); }, DIAGNOST
 window.setInterval(() => {
   if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
 }, 2000);
+
+window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };

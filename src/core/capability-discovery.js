@@ -67,11 +67,18 @@ function exact(raw, allowed, label) {
   }
 }
 
-function id(value, label) {
-  if (typeof value !== 'string') throw new Error(`${label} must be text`);
-  const out = value.trim();
-  if (!ID.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+function exactId(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
+    throw new Error(`${label} must use exact canonical identity representation`);
+  }
+  return value;
+}
+
+function exactEnum(value, allowed, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !allowed.has(value)) {
+    throw new Error(`${label} must use exact canonical enum representation`);
+  }
+  return value;
 }
 
 function bool(value, label) {
@@ -150,24 +157,19 @@ export function normalizeProviderReadinessV1(input) {
   const raw = plain(input, 'ProviderReadinessV1');
   exact(raw, PROVIDER_STATE_KEYS, 'ProviderReadinessV1');
   if (raw.schemaVersion !== 1) throw new Error('ProviderReadinessV1 schemaVersion is invalid');
-  const health = id(raw.health, 'health').toUpperCase();
-  if (!HEALTH.has(health)) throw new Error('health is invalid');
+  const health = exactEnum(raw.health, HEALTH, 'health');
   return frozen({
     schemaVersion: 1,
-    providerId: id(raw.providerId, 'providerId'),
-    toolId: raw.toolId == null || raw.toolId === '' ? '' : id(raw.toolId, 'toolId'),
+    providerId: exactId(raw.providerId, 'providerId'),
+    toolId: raw.toolId == null || raw.toolId === '' ? '' : exactId(raw.toolId, 'toolId'),
     health,
     installationRequired: bool(raw.installationRequired, 'installationRequired'),
     installed: bool(raw.installed, 'installed'),
     authenticationRequired: bool(raw.authenticationRequired, 'authenticationRequired'),
     authenticated: bool(raw.authenticated, 'authenticated'),
-    pathKind: (() => {
-      const value = id(raw.pathKind, 'pathKind').toUpperCase();
-      if (!PATH_KINDS.has(value)) throw new Error('pathKind is invalid');
-      return value;
-    })(),
+    pathKind: exactEnum(raw.pathKind, PATH_KINDS, 'pathKind'),
     latencyMs: optionalInteger(raw.latencyMs, 'latencyMs', MAX_LATENCY_MS),
-    reasonCode: raw.reasonCode == null || raw.reasonCode === '' ? '' : id(raw.reasonCode, 'reasonCode'),
+    reasonCode: raw.reasonCode == null || raw.reasonCode === '' ? '' : exactId(raw.reasonCode, 'reasonCode'),
   });
 }
 
@@ -181,12 +183,30 @@ function readinessFor(state) {
   return CapabilityPathReadiness.READY;
 }
 
+function normalizeCapabilityIdentityExact(input) {
+  const raw = plain(input, 'CapabilityV1');
+  exactId(raw.capabilityId, 'capabilityId');
+  if (raw.riskClass != null && raw.riskClass !== '') exactId(raw.riskClass, 'riskClass');
+  return normalizeCapabilityV1(raw);
+}
+
+function normalizeToolIdentityExact(input) {
+  const raw = plain(input, 'ToolDescriptorV1');
+  exactId(raw.toolId, 'toolId');
+  exactId(raw.providerId, 'providerId');
+  const capabilityIds = boundedArray(raw.capabilityIds, 'capabilityIds', MAX_CAPABILITIES);
+  capabilityIds.forEach((capabilityId, index) => exactId(capabilityId, `capabilityIds[${index}]`));
+  if (raw.inputSchemaRef != null && raw.inputSchemaRef !== '') exactId(raw.inputSchemaRef, 'inputSchemaRef');
+  if (raw.outputSchemaRef != null && raw.outputSchemaRef !== '') exactId(raw.outputSchemaRef, 'outputSchemaRef');
+  return normalizeToolDescriptorV1(raw);
+}
+
 function normalizeInventory({ capabilities, tools, providerStates }) {
-  const normalizedCapabilities = boundedArray(capabilities, 'capabilities', MAX_CAPABILITIES).map(normalizeCapabilityV1);
+  const normalizedCapabilities = boundedArray(capabilities, 'capabilities', MAX_CAPABILITIES).map(normalizeCapabilityIdentityExact);
   const capabilityIds = new Set(normalizedCapabilities.map(item => item.capabilityId));
   if (capabilityIds.size !== normalizedCapabilities.length) throw new Error('capabilities contain duplicate capabilityId');
 
-  const normalizedTools = boundedArray(tools, 'tools', MAX_TOOLS).map(normalizeToolDescriptorV1);
+  const normalizedTools = boundedArray(tools, 'tools', MAX_TOOLS).map(normalizeToolIdentityExact);
   const toolIds = new Set(normalizedTools.map(item => item.toolId));
   if (toolIds.size !== normalizedTools.length) throw new Error('tools contain duplicate toolId');
   for (const tool of normalizedTools) {
@@ -218,7 +238,7 @@ function normalizeInventory({ capabilities, tools, providerStates }) {
 
 function requestedIds(value) {
   const raw = boundedArray(value, 'requestedCapabilityIds', MAX_REQUESTED_CAPABILITIES);
-  const out = raw.map((item, index) => id(item, `requestedCapabilityIds[${index}]`));
+  const out = raw.map((item, index) => exactId(item, `requestedCapabilityIds[${index}]`));
   if (new Set(out).size !== out.length) throw new Error('requestedCapabilityIds contains duplicates');
   return out.sort();
 }
