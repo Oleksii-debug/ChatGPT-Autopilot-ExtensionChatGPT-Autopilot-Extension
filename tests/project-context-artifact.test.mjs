@@ -407,3 +407,57 @@ test('nested ArtifactRef is descriptor-snapshotted before canonical normalizatio
   );
   assert.equal(reads, 0);
 });
+
+
+test('nested ArtifactRef and source URI require exact canonical representation', () => {
+  const aliases = [
+    artifact({ artifactId: ' artifact-report' }),
+    artifact({ kind: 'report ' }),
+    artifact({ uri: ' artifact://autopilot/report.json' }),
+    artifact({ sha256: 'B'.repeat(64) }),
+    artifact({ createdAt: '2026-09-20T18:36:00Z' }),
+    artifact({ producerInvocationId: 'invoke-1 ' }),
+    artifact({ sizeBytes: -0 }),
+  ];
+  for (const ref of aliases) {
+    assert.throws(
+      () => normalizeContextCapsuleV1(capsule({ artifactRefs: [ref] })),
+      /invalid|canonical ISO-8601 UTC representation/u,
+    );
+  }
+
+  assert.throws(
+    () => normalizeProjectSourceRefV1(source({
+      uri: ' github://Oleksii-debug/autopilot/main',
+    })),
+    /uri is invalid/u,
+  );
+
+  const exact = normalizeContextCapsuleV1(capsule());
+  assert.equal(exact.artifactRefs[0].artifactId, 'artifact-report');
+  assert.equal(exact.artifactRefs[0].sha256, 'b'.repeat(64));
+  assert.equal(exact.artifactRefs[0].createdAt, AT);
+});
+
+test('Project/Context array admission performs zero ordinary length/index getter reads', () => {
+  let reads = 0;
+  const refs = new Proxy([source()], {
+    get(target, key, receiver) {
+      reads += 1;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+
+  const normalized = normalizeProjectSnapshotV1({
+    schemaVersion: 1,
+    projectId: 'autopilot',
+    revisionId: 'project-rev-1',
+    title: 'ChatGPT Autopilot Extension',
+    sourceRefs: refs,
+    artifactRefs: [],
+    createdAt: AT,
+  });
+
+  assert.equal(reads, 0);
+  assert.equal(normalized.sourceRefs[0].sourceId, 'github-main');
+});
