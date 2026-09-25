@@ -117,7 +117,12 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
     }
     const absolutePath = path.join(root, relativePath);
     const data = await fs.readFile(absolutePath);
-    if (data.includes(0)) continue;
+    if (data.includes(0)) {
+      if (NORMALIZED_TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) {
+        throw new Error(`NUL byte found in packaged text source: ${relativePath}`);
+      }
+      continue;
+    }
     const text = data.toString('utf8');
     for (const { name, pattern } of FORBIDDEN_TEXT_PATTERNS) {
       if (pattern.test(text)) throw new Error(`Potential ${name} found in packaged source: ${relativePath}`);
