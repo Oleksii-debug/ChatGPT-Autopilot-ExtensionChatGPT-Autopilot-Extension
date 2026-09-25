@@ -63,6 +63,12 @@ function asciiCompare(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function compareTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -428,7 +434,7 @@ export function buildSwarmRefillPlanV1(input) {
     .filter(node => node.state === AgentPlanNodeState.READY)
     .sort((left, right) => (
       downstreamDepth.get(right.nodeId) - downstreamDepth.get(left.nodeId)
-      || asciiCompare(left.updatedAt, right.updatedAt)
+      || compareTimestamp(left.updatedAt, right.updatedAt)
       || asciiCompare(left.nodeId, right.nodeId)
     ));
 
@@ -528,7 +534,7 @@ export function buildSwarmRefillPlanV1(input) {
 
   proposals.sort((left, right) => (
     right.structuralDownstreamDepth - left.structuralDownstreamDepth
-    || asciiCompare(left.readySince, right.readySince)
+    || compareTimestamp(left.readySince, right.readySince)
     || asciiCompare(left.nodeId, right.nodeId)
   ));
   unassigned.sort((left, right) => asciiCompare(left.nodeId, right.nodeId));
