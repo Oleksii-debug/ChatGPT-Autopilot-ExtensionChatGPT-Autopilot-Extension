@@ -250,6 +250,36 @@ test('internal variant is proposal-only even when no external effect progressed 
   assert.equal(result.variantProposal.requiresFreshReconciliation, true);
 });
 
+test('effect that began before checkpoint and remains executing blocks variant proposal eligibility', () => {
+  const beforeCheckpoint = '2026-09-25T02:38:00.000Z';
+  let effect = createExactEffectStateV1(
+    invocation({ createdAt: beforeCheckpoint }),
+    { createdAt: beforeCheckpoint },
+  );
+  effect = reduceExactEffectV1(effect, {
+    schemaVersion: 1,
+    eventId: 'event-begin-before-checkpoint',
+    type: ExactEffectEventType.BEGIN_EXECUTION,
+    effectId: 'effect-1',
+    at: '2026-09-25T02:39:00.000Z',
+    executionId: '',
+  }).state;
+
+  const result = buildWorkflowDebuggerV1(request({ effects: [effect] }));
+  assert.equal(result.effects[0].phase, ExactEffectPhase.EXECUTING);
+  assert.equal(result.effects[0].updatedAt, '2026-09-25T02:39:00.000Z');
+  assert.equal(Date.parse(result.effects[0].updatedAt) < Date.parse(CHECKPOINT_AT), true);
+  assert.equal(result.variantProposal.proposalEligible, false);
+  assert.equal(
+    result.variantProposal.reasonCode,
+    'EXTERNAL_EFFECT_STATE_REQUIRES_RECONCILIATION',
+  );
+  assert.deepEqual(result.variantProposal.blockingEffectIds, ['effect-1']);
+  assert.equal(result.variantProposal.externalEffectReplayAuthorized, false);
+  assert.equal(result.variantProposal.checkpointRestoreAuthorized, false);
+  assert.equal(result.variantProposal.requiresFreshReconciliation, true);
+});
+
 test('post-checkpoint ambiguous external effect blocks internal variant proposal eligibility', () => {
   const effect = reconciliationEffect();
   const result = buildWorkflowDebuggerV1(request({
@@ -258,7 +288,10 @@ test('post-checkpoint ambiguous external effect blocks internal variant proposal
   assert.equal(result.effects[0].phase, ExactEffectPhase.RECONCILE);
   assert.equal(result.effects[0].ambiguityReasonCode, 'TRANSPORT_AMBIGUOUS');
   assert.equal(result.variantProposal.proposalEligible, false);
-  assert.equal(result.variantProposal.reasonCode, 'EXTERNAL_EFFECT_STATE_AFTER_CHECKPOINT');
+  assert.equal(
+    result.variantProposal.reasonCode,
+    'EXTERNAL_EFFECT_STATE_REQUIRES_RECONCILIATION',
+  );
   assert.deepEqual(result.variantProposal.blockingEffectIds, ['effect-1']);
   assert.equal(result.variantProposal.externalEffectReplayAuthorized, false);
 });

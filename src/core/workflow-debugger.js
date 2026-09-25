@@ -312,7 +312,7 @@ function buildBreakpointHits(breakpoints, plan, effects) {
   return hits.map(hit => deepFreeze(hit));
 }
 
-const POST_CHECKPOINT_EFFECT_PHASES = new Set([
+const BLOCKING_VARIANT_EFFECT_PHASES = new Set([
   ExactEffectPhase.EXECUTING,
   ExactEffectPhase.OBSERVED,
   ExactEffectPhase.RECONCILE,
@@ -336,12 +336,16 @@ function buildVariantProposal(variant, checkpoint, plan, effects, generatedAt) {
   const target = plan.nodes.find(node => node.nodeId === variant.targetNodeId);
   if (!target) throw new Error('variantRequest targetNodeId does not exist in AgentPlan');
 
-  const postCheckpointEffectIds = effects
-    .filter(effect => POST_CHECKPOINT_EFFECT_PHASES.has(effect.phase)
-      && Date.parse(effect.updatedAt) >= Date.parse(checkpoint.createdAt))
+  // A checkpoint does not carry per-effect inclusion/reconciliation evidence.
+  // Therefore any effect that has progressed beyond PREPARED must fail closed for
+  // rewind/variant eligibility, even when its last transition predates the
+  // checkpoint. Timestamp ordering alone cannot prove that an in-flight or
+  // consequential effect is safely represented by the checkpoint ledger.
+  const blockingEffectIds = effects
+    .filter(effect => BLOCKING_VARIANT_EFFECT_PHASES.has(effect.phase))
     .map(effect => effect.effectId)
     .sort(codeUnitCompare);
-  const proposalEligible = postCheckpointEffectIds.length === 0;
+  const proposalEligible = blockingEffectIds.length === 0;
   return deepFreeze({
     variantId: variant.variantId,
     checkpointId: checkpoint.checkpointId,
@@ -351,8 +355,8 @@ function buildVariantProposal(variant, checkpoint, plan, effects, generatedAt) {
     proposalEligible,
     reasonCode: proposalEligible
       ? 'INTERNAL_VARIANT_REQUIRES_FRESH_GATES'
-      : 'EXTERNAL_EFFECT_STATE_AFTER_CHECKPOINT',
-    blockingEffectIds: postCheckpointEffectIds,
+      : 'EXTERNAL_EFFECT_STATE_REQUIRES_RECONCILIATION',
+    blockingEffectIds,
     internalPlanningReplayRequested: true,
     internalPlanningReplayAuthorized: false,
     externalEffectReplayAuthorized: false,
