@@ -530,9 +530,13 @@
           <input id="scenario-cycle-url" type="url" autocomplete="off" spellcheck="false" value="https://chatgpt.com/">
           <label><input id="scenario-cycle-restart-round-timeout" type="checkbox" checked>Після зависання нового чату повторити поточне коло з першого промпта</label>
           <h3>Послідовність промптів</h3>
-          <p class="field-help">Кожен крок має власну кількість повторів. Наприклад: головний ×1 → «продовжуй» ×20 → фінальний ×1.</p>
+          <p class="field-help">Для 17 повідомлень у чаті встановіть одне коло: перший промпт ×1 → промпт продовження ×15 → фінальний ×1. Число повторів продовження можна змінити.</p>
           <div id="scenario-cycle-steps"></div>
           <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
+          <label for="scenario-cycle-parallel-count">Скільки незалежних чатів запустити</label>
+          <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="5" aria-describedby="scenario-cycle-parallel-help">
+          <p id="scenario-cycle-parallel-help" class="field-help">Створює окремий цикл для кожного чату з поточними промптами. Кожен чекає своєї відповіді та після фінального промпта переходить у новий чат.</p>
+          <button id="scenario-cycle-start-parallel" type="button">Створити й запустити чати</button>
         </fieldset>
       </div>
 

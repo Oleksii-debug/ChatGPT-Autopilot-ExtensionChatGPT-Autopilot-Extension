@@ -309,6 +309,35 @@ test('forged READY with failed, cancelled or blocked dependency fails closed', (
   }
 });
 
+test('READY chronology uses epoch order across canonical extended-year ISO timestamps', () => {
+  const plan = basePlan({
+    nodes: [
+      node('older', { updatedAt: '9999-12-31T23:59:59.999Z' }),
+      node('newer', { updatedAt: '+010000-01-01T00:00:00.000Z' }),
+    ],
+    createdAt: '9999-12-31T23:59:59.000Z',
+    updatedAt: '+010000-01-01T00:00:00.000Z',
+  });
+  const evaluatedAt = '+010000-01-01T00:00:00.500Z';
+  const out = buildSwarmRefillPlanV1(request({
+    evaluatedAt,
+    trigger: {
+      kind: SwarmRefillTriggerKind.WATCHDOG,
+      eventId: 'watchdog-extended-year-order',
+      nodeId: '',
+      observedAt: evaluatedAt,
+    },
+    plan,
+    workers: [worker('w1', {
+      maxConcurrent: 2,
+      observedAt: '+010000-01-01T00:00:00.000Z',
+      validUntil: '+010000-01-01T00:10:00.000Z',
+    })],
+  }));
+
+  assert.deepEqual(out.proposals.map(item => item.nodeId), ['older', 'newer']);
+});
+
 test('worker input ordering does not change deterministic dispatch selection', () => {
   const forward = buildSwarmRefillPlanV1(request());
   const reverse = buildSwarmRefillPlanV1(request({
