@@ -1927,7 +1927,10 @@ async function importScenarioWorkProfile() {
     await loadScenarioWork({ preservePanel: false });
     if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
     setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
-    status.textContent = `Імпортовано новий зупинений сценарій: ${config.name}.`;
+    const messageSummary = config.mode === 'CHAT_CYCLE'
+      ? ` У кожному фізичному чаті: ${config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень.`
+      : '';
+    status.textContent = `Імпортовано новий зупинений сценарій: ${config.name}.${messageSummary}`;
     $('scenario-work-list').focus();
   } catch (error) {
     status.textContent = `Не вдалося імпортувати: ${error.message}`;
