@@ -315,6 +315,108 @@ test('top-level and nested accessors, hidden fields, symbols and sparse arrays f
   }), /dense data array/);
 });
 
+test('all public takeover request envelopes reject accessors before field reads', () => {
+  let reads = 0;
+  const accessorField = (base, key, value) => {
+    const out = { ...base };
+    Object.defineProperty(out, key, {
+      enumerable: true,
+      get() {
+        reads += 1;
+        return value;
+      },
+    });
+    return out;
+  };
+
+  const createBase = {
+    takeoverId: 'takeover-request-boundary',
+    jobId: 'job-1',
+    planId: 'plan-1',
+    nodeId: 'node-1',
+    resourceId: 'resource-1',
+    effectId: 'effect-1',
+    executionId: 'execution-1',
+    attempt: 1,
+    agentId: 'agent-1',
+    humanPrincipalId: 'owner-1',
+    verificationAuthorityId: 'verify-authority-1',
+    reason: 'manual interaction',
+    at: T0,
+  };
+  assert.throws(
+    () => createHumanTakeoverV1(accessorField(createBase, 'reason', 'unsafe')),
+    /enumerable data property/,
+  );
+  assert.equal(reads, 0);
+
+  const initial = requested();
+  assert.throws(() => recordHumanTakeoverStartedV1(initial, accessorField({
+    at: T1,
+  }, 'quiescenceEvidenceId', 'pause-evidence-1')), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const controlled = recordHumanTakeoverStartedV1(initial, {
+    quiescenceEvidenceId: 'pause-evidence-1',
+    at: T1,
+  });
+  assert.throws(() => requestHumanHandbackV1(controlled, accessorField({
+    at: T2,
+  }, 'reobservationInvocationId', 'observe-after')), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const pending = requestHumanHandbackV1(controlled, {
+    reobservationInvocationId: 'observe-after',
+    at: T2,
+  });
+  assert.throws(() => recordHumanHandbackObservationV1(
+    pending,
+    accessorField({}, 'observation', observation()),
+  ), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const reobserved = recordHumanHandbackObservationV1(pending, {
+    observation: observation(),
+  });
+  assert.throws(() => recordHumanHandbackVerificationV1(
+    reobserved,
+    accessorField({}, 'verification', verification()),
+  ), /enumerable data property/);
+  assert.equal(reads, 0);
+});
+
+test('takeover request envelopes reject hidden, symbol and inherited authority while accepting null-prototype data', () => {
+  const initial = requested();
+
+  const hidden = {
+    quiescenceEvidenceId: 'pause-evidence-1',
+    at: T1,
+  };
+  Object.defineProperty(hidden, 'execute', { enumerable: false, value: true });
+  assert.throws(() => recordHumanTakeoverStartedV1(initial, hidden), /unknown field|enumerable data property/);
+
+  const symbolic = {
+    quiescenceEvidenceId: 'pause-evidence-1',
+    at: T1,
+    [Symbol('authority')]: 'ALLOW',
+  };
+  assert.throws(() => recordHumanTakeoverStartedV1(initial, symbolic), /unknown field/);
+
+  const inherited = Object.create({ execute: true });
+  inherited.quiescenceEvidenceId = 'pause-evidence-1';
+  inherited.at = T1;
+  assert.throws(() => recordHumanTakeoverStartedV1(initial, inherited), /plain object/);
+
+  const nullProto = Object.assign(Object.create(null), {
+    quiescenceEvidenceId: 'pause-evidence-1',
+    at: T1,
+  });
+  assert.equal(
+    recordHumanTakeoverStartedV1(initial, nullProto).phase,
+    HumanTakeoverPhase.OWNER_IN_CONTROL,
+  );
+});
+
 test('coercive ObservationV1 and VerificationV1 fields fail before inherited normalizers can coerce them', () => {
   const pending = throughHandback();
   assert.throws(() => recordHumanHandbackObservationV1(pending, {
