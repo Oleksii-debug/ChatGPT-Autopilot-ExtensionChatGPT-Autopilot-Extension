@@ -260,7 +260,7 @@ test('application text-like media types are admitted but JSON remains routed to 
 });
 
 test('Base64 must be exact canonical bytes without whitespace or padding aliases', async () => {
-  const text = 'abc';
+  const text = 'ab';
   const request = requestFor(text, {
     artifactRef: artifactFor(text, { mediaType: 'text/plain' }),
   });
