@@ -213,7 +213,7 @@ function resolverFor(records, calls = []) {
   return async lookup => {
     calls.push(structuredClone(lookup));
     const item = records.get(lookup.verificationId);
-    return item == null ? null : structuredClone(item);
+    return item == null ? null : item;
   };
 }
 
