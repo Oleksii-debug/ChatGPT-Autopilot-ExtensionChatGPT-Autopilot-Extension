@@ -293,6 +293,30 @@ async function resolveTrustedContext(bindingIdInput, trustedResolver) {
   return freezeDeep({ binding, snapshot, registry });
 }
 
+
+export async function resolveSharedProjectCanonicalContextV1(bindingIdInput, trustedResolver) {
+  const { binding } = await resolveTrustedContext(bindingIdInput, trustedResolver);
+  return freezeDeep({
+    schemaVersion: SHARED_PROJECT_COLLABORATION_SCHEMA_VERSION,
+    bindingId: binding.bindingId,
+    projectId: binding.projectId,
+    projectRevisionId: binding.projectRevisionId,
+    organizationId: binding.organizationId,
+    governanceRegistryId: binding.governanceRegistryId,
+    governanceRegistryRevision: binding.governanceRegistryRevision,
+    ownerPrincipalId: binding.ownerPrincipalId,
+    resourceKey: binding.resourceKey,
+    createdAt: binding.createdAt,
+    canonicalSourcesResolved: true,
+    advisoryOnly: true,
+    authorizationGranted: false,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    credentialUseAuthorized: false,
+    requiresCanonicalPolicyDecision: true,
+  });
+}
+
 function normalizeAccessRequest(input) {
   const raw = strictRecord(input, ACCESS_KEYS, 'SharedProjectAccessRequestV1');
   return {
