@@ -329,7 +329,7 @@ export function planScenarioWorkActions(configRaw, runtimeRaw, now = Date.now())
     if (!canLaunch(runtime, config, now)) return { runtime, actions };
     if (runtime.chat.state === ScenarioParticipantState.NEW || runtime.chat.state === ScenarioParticipantState.READY) {
       const step = config.steps[runtime.stepIndex];
-      actions.push(launchAction(runtime.chat, step.prompt, `STEP:${runtime.stepIndex}:${runtime.repeatIndex}`, config.launchUrl, now, config));
+      actions.push(launchAction(runtime.chat, step.prompt, `STEP:${runtime.round}:${runtime.stepIndex}:${runtime.repeatIndex}`, config.launchUrl, now, config));
     }
     return { runtime, actions };
   }

@@ -354,12 +354,13 @@
           return await adapter.execute(request, {
             insert: () => nativeInput('insert'),
             submit: point => nativeInput('submit', point),
-            activate: async () => {
+            activate: async ({ observationOnly = false } = {}) => {
               const response = await runtime.sendMessage({
                 channel:'autopilot-send-tab-activation',
                 action:'activate',
                 requestId:request.requestId,
                 taskId:request.taskId,
+                observationOnly,
               });
               if (!response?.ok) return false;
               previousSendTabId = Number(response.data?.previousTabId || 0);

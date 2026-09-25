@@ -151,7 +151,11 @@ export async function activateOwnedSendTab(chromeApi, repository, message, sende
   const state = await repository.load();
   const { operation } = authorizedOperation(state, { ...message, kind:'submit' }, sender, chromeApi);
   const tab = await chromeApi.tabs.get(sender.tab.id);
-  if (!sameChatConversationUrl(normalizeChatUrl(tab.url), operation.targetUrl)) fail('NATIVE_INPUT_URL_MISMATCH');
+  const observedUrl = normalizeChatUrl(tab.url);
+  if (!sameChatConversationUrl(observedUrl, operation.targetUrl)
+    && !(message.observationOnly === true && expectedPostSendConversationUrl(observedUrl, operation.targetUrl))) {
+    fail('NATIVE_INPUT_URL_MISMATCH');
+  }
 
   const alreadyPrevious = Number(operation.previousSendTabId || 0);
   const alreadyWindow = Number(operation.previousSendWindowId || 0);

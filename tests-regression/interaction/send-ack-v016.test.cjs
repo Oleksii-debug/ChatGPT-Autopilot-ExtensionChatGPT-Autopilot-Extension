@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../src/interaction/chatgpt-adapter.js'), 'utf8');
 const prompt = 'Особистий промпт\nДругий рядок';
-function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=false, startUrl='https://chatgpt.com/c/test', expectedUrl=startUrl, redirectAfterSend='', deliveredTextOverride='', suppressMessage=false, messageShape='author-role'}={}) {
+function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=false, startUrl='https://chatgpt.com/c/test', expectedUrl=startUrl, redirectAfterSend='', deliveredTextOverride='', suppressMessage=false, messageShape='author-role', ackOnlyWhenVisible=false}={}) {
   let clock=1000, clicks=0, submits=0, nativeSubmits=0, sentAt=null, acknowledged=false, model='', sentText='';
   const messages=[];
   class Clock extends Date { static now() { return clock; } }
@@ -49,7 +49,7 @@ function fixture({ackAt=0, formSubmit=false, nested=false, noOp=false, stale=fal
     }
     composer.value='';
   }
-  async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt)acknowledge();}
+  async function wait(ms){clock+=ms;if(sentAt!==null && clock-sentAt>=ackAt && (!ackOnlyWhenVisible || document.visibilityState==='visible'))acknowledge();}
   function run(mode='SUBMIT_EXISTING', overrides={}, deps={}){return sandbox.ChatGPTInteractionAdapter.execute({mode,requestId:'op1',taskId:'t1',expectedUrl,promptText:prompt,...overrides},{document,wait,...deps});}
   function reloadAdapter(){ vm.runInContext(source,sandbox); }
   return {run,wait,acknowledge,reloadAdapter,composer,messages,document,sandbox,clicks:()=>clicks,submits:()=>submits,nativeSubmits:()=>nativeSubmits,model:()=>model};
@@ -138,6 +138,35 @@ test('unlabeled main user turn verifies the changed account UI with one Send',as
   assert.equal(r.status,'SENT_VERIFIED');
   assert.equal(r.safeDiagnosticCode,'SEND_VERIFIED_MAIN_PROMPT_APPEND');
   assert.equal(f.clicks(),1);
+});
+test('hidden form submission wakes a deferred changed UI once and observes its exact turn',async()=>{
+  const f=fixture({messageShape:'unlabeled',formSubmit:true,ackOnlyWhenVisible:true,
+    startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/deferred-render'});
+  let activations=0;
+  const r=await f.run('SUBMIT_EXISTING',{}, {activate:async()=>{
+    activations++;
+    f.document.visibilityState='visible';
+    return true;
+  }});
+  assert.equal(r.status,'SENT_VERIFIED');
+  assert.equal(r.submissionEvidence,'OPERATION_LOCAL_MAIN_PROMPT_APPEND');
+  assert.equal(f.submits(),1);
+  assert.equal(f.clicks(),0);
+  assert.equal(activations,1);
+});
+test('waking a hidden tab without an exact rendered turn leaves the Send uncertain',async()=>{
+  const f=fixture({messageShape:'unlabeled',formSubmit:true,suppressMessage:true,
+    startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/no-turn'});
+  let activations=0;
+  const r=await f.run('SUBMIT_EXISTING',{}, {activate:async()=>{
+    activations++;
+    f.document.visibilityState='visible';
+    return true;
+  }});
+  assert.equal(r.status,'SUBMISSION_UNCERTAIN');
+  assert.equal(f.submits(),1);
+  assert.equal(f.clicks(),0);
+  assert.equal(activations,1);
 });
 test('unlabeled main user turn recovers after navigation without resending',async()=>{
   const f=fixture({messageShape:'unlabeled',ackAt:25000,startUrl:'https://chatgpt.com/',redirectAfterSend:'https://chatgpt.com/c/new-account'});

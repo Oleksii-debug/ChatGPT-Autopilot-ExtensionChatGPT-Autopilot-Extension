@@ -132,6 +132,12 @@ function canonicalTimestamp(value, label) {
   return canonical;
 }
 
+function compareTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -273,7 +279,7 @@ export function normalizeVerifiedWebhookDeliveryV1(value) {
 
   const receivedAt = canonicalTimestamp(raw.receivedAt, 'VerifiedWebhookDeliveryV1 receivedAt');
   const verifiedAt = canonicalTimestamp(raw.verifiedAt, 'VerifiedWebhookDeliveryV1 verifiedAt');
-  if (verifiedAt < receivedAt) {
+  if (compareTimestamp(verifiedAt, receivedAt) < 0) {
     throw new Error('Webhook verification cannot predate receipt');
   }
 
@@ -321,7 +327,7 @@ function assertTriggerMatchesBinding(trigger, binding) {
       throw new Error(`Webhook binding ${key} does not match trusted trigger definition`);
     }
   }
-  if (binding.createdAt < trigger.createdAt) {
+  if (compareTimestamp(binding.createdAt, trigger.createdAt) < 0) {
     throw new Error('Webhook binding cannot predate its trusted trigger definition');
   }
 }
@@ -338,13 +344,13 @@ function assertDeliveryMatchesBinding(delivery, binding, request) {
   if (delivery.verificationStatus !== WebhookVerificationStatus.VERIFIED) {
     throw new Error('Webhook delivery is not cryptographically verified');
   }
-  if (delivery.receivedAt < binding.createdAt) {
+  if (compareTimestamp(delivery.receivedAt, binding.createdAt) < 0) {
     throw new Error('Webhook delivery predates trusted binding');
   }
 }
 
 function assertFreshDelivery(binding, delivery, admittedAt) {
-  if (admittedAt < delivery.verifiedAt) {
+  if (compareTimestamp(admittedAt, delivery.verifiedAt) < 0) {
     throw new Error('Webhook admission predates trusted verification');
   }
   const ageMillis = Date.parse(admittedAt) - Date.parse(delivery.receivedAt);
