@@ -139,10 +139,20 @@ function nonNegativeInteger(value, label) {
 }
 
 function timestamp(value, label) {
-  if (typeof value !== 'string' || !value) throw new Error(`${label} must be a timestamp`);
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must be a canonical timestamp`);
+  }
   const millis = Date.parse(value);
-  if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
-  return new Date(millis).toISOString();
+  if (!Number.isFinite(millis)) throw new Error(`${label} must be a canonical timestamp`);
+  const canonical = new Date(millis).toISOString();
+  if (canonical !== value) {
+    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  }
+  return canonical;
+}
+
+function timestampMillis(value, label) {
+  return Date.parse(timestamp(value, label));
 }
 
 function digest(value, label) {
@@ -159,6 +169,7 @@ function idList(value, label, { max }) {
 
 function snapshotArtifact(value) {
   const safe = strictRecord(value, 'AgentCheckpointV1 snapshotArtifact', ARTIFACT_KEYS);
+  timestamp(safe.createdAt, 'AgentCheckpointV1 snapshotArtifact createdAt');
   const normalized = normalizeArtifactRefV1(safe);
   if (normalized.kind !== 'agent-state-checkpoint') {
     throw new Error('AgentCheckpointV1 snapshotArtifact kind must be agent-state-checkpoint');
@@ -184,7 +195,8 @@ function normalizeCheckpointMaterial(raw, allowedKeys) {
   }
   const createdAt = timestamp(input.createdAt, 'AgentCheckpointV1 createdAt');
   const artifact = snapshotArtifact(input.snapshotArtifact);
-  if (artifact.createdAt > createdAt) {
+  if (timestampMillis(artifact.createdAt, 'AgentCheckpointV1 snapshotArtifact createdAt')
+      > timestampMillis(createdAt, 'AgentCheckpointV1 createdAt')) {
     throw new Error('AgentCheckpointV1 snapshot artifact cannot be created after checkpoint');
   }
   return {
@@ -329,7 +341,8 @@ export async function assessAgentCheckpointRewindV1(raw, options = {}) {
       || current.exactEffectLedgerRevision < checkpoint.exactEffectLedgerRevision) {
     throw new Error('AgentCheckpoint rewind current state regressed behind checkpoint');
   }
-  if (current.observedAt < checkpoint.createdAt) {
+  if (timestampMillis(current.observedAt, 'AgentCheckpointHeadV1 observedAt')
+      < timestampMillis(checkpoint.createdAt, 'AgentCheckpointV1 createdAt')) {
     throw new Error('AgentCheckpoint rewind current observation predates checkpoint');
   }
   if (current.unresolvedEffectIds.length) {
