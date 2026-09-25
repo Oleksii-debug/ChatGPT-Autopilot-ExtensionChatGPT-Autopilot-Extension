@@ -173,14 +173,6 @@ function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
-function normalizeIds(value, label, { min = 0, max = 128 } = {}) {
-  const items = denseArray(value, label, { min, max })
-    .map((item, index) => id(item, label + '[' + index + ']'));
-  if (new Set(items).size !== items.length) throw new Error(label + ' contains duplicates');
-  items.sort(compareText);
-  return items;
-}
-
 function normalizeValue(input, axisLabel, index) {
   const label = axisLabel + '.values[' + index + ']';
   const raw = record(input, label);
@@ -528,8 +520,12 @@ export async function assessBatchMatrixV1(
     results: Object.freeze(results),
     resumeCandidateItemIds: Object.freeze(resumeCandidateItemIds),
     reconciliationRequiredItemIds: Object.freeze(reconciliationRequiredItemIds),
-    allPassed: state === BatchMatrixState.COMPLETE,
-    partialFailure: state === BatchMatrixState.PARTIAL,
+    reportedAllPassed: state === BatchMatrixState.COMPLETE,
+    reportedPartialFailure: state === BatchMatrixState.PARTIAL,
+    resultEvidenceTrust: 'UNVERIFIED_INPUT',
+    completionAuthorized: false,
+    requiresCanonicalEvidenceResolution: true,
+    requiresIndependentVerifierAuthority: true,
     schedulingAuthorized: false,
     executionAuthorized: false,
     resumeAuthorized: false,
