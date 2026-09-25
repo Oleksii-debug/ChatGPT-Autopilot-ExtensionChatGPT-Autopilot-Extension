@@ -21,6 +21,42 @@ test('ChatGPT site adapter is explicit and returned defensively', () => {
   assert.equal(listSiteAdapters().length, 1);
 });
 
+test('site adapter identities are exact text and never trimmed or coerced', () => {
+  for (const alias of [
+    ` ${SiteAdapterId.CHATGPT_WEB}`,
+    `${SiteAdapterId.CHATGPT_WEB} `,
+    '',
+  ]) {
+    assert.throws(
+      () => getSiteAdapter(alias),
+      /exact canonical text representation/,
+    );
+  }
+
+  let coercions = 0;
+  const coercive = {
+    toString() {
+      coercions += 1;
+      return SiteAdapterId.CHATGPT_WEB;
+    },
+  };
+  assert.throws(
+    () => getSiteAdapter(coercive),
+    /exact canonical text representation/,
+  );
+  assert.equal(coercions, 0);
+
+  assert.throws(
+    () => siteAdapterAcceptsUrl(` ${SiteAdapterId.CHATGPT_WEB}`, 'https://chatgpt.com/'),
+    /exact canonical text representation/,
+  );
+  assert.throws(
+    () => requireSiteAdapterUrl(coercive, 'https://chatgpt.com/'),
+    /exact canonical text representation/,
+  );
+  assert.equal(coercions, 0);
+});
+
 test('site adapter URL contract fails closed outside declared HTTPS hosts', () => {
   assert.equal(siteAdapterAcceptsUrl(SiteAdapterId.CHATGPT_WEB, 'https://chatgpt.com/c/abc'), true);
   assert.equal(siteAdapterAcceptsUrl(SiteAdapterId.CHATGPT_WEB, 'https://www.chatgpt.com/'), false);
