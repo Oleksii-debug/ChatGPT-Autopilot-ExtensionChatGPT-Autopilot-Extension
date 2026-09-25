@@ -520,3 +520,18 @@ test('sensitive artifact drift evidence is aggregated without artifact identity 
   assert.equal(serialized.includes('artifact://secret'), false);
   assert.equal(serialized.includes('secret-drift-producer'), false);
 });
+
+
+test('current-state visibility envelope rejects type-coerced source identities', () => {
+  const input = stateInput();
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: [1],
+  }), /string ids/);
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: [true],
+  }), /string ids/);
+});
