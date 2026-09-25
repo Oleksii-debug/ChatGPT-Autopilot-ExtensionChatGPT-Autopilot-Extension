@@ -161,15 +161,14 @@ test('rate-limit surface blocks SUBMIT_EXISTING before any Send effect', async (
   assert.equal(fx.clicks(), 0);
 });
 
-test('fresh-launch uncertain recovery can prove the exact newly-created conversation after document reload', async () => {
+test('fresh-launch history after document reload cannot prove an operation without its baseline', async () => {
   const { adapter } = loadAdapter();
   const fx = fixture({ userMessages: ['exact recovery prompt'] });
   const result = await adapter.execute(request('VERIFY_AFTER_UNCERTAIN_SUBMIT', {
     recoveryLaunchUrl: 'https://chatgpt.com/'
   }), { document: fx.document });
-  assert.equal(result.status, adapter.STATUS.SENT_VERIFIED);
-  assert.equal(result.safeDiagnosticCode, 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED');
-  assert.equal(result.submissionEvidence, 'FRESH_LAUNCH_DURABLE_SINGLE_USER_TURN');
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(result.safeDiagnosticCode, 'RECOVERY_STALE_MATCH_UNPROVEN');
   assert.equal(fx.clicks(), 0);
 });
 
@@ -186,15 +185,14 @@ test('fresh-launch durable recovery refuses ambiguous multi-turn history even wh
 
 
 
-test('fresh-launch recovery treats active generation as durable Send proof even before user history renders', async () => {
+test('fresh-launch active generation without the user turn cannot prove this operation', async () => {
   const { adapter } = loadAdapter();
   const fx = fixture({ buttons: [stopButton()] });
   const result = await adapter.execute(request('VERIFY_AFTER_UNCERTAIN_SUBMIT', {
     recoveryLaunchUrl: 'https://chatgpt.com/'
   }), { document: fx.document });
-  assert.equal(result.status, adapter.STATUS.SENT_VERIFIED);
-  assert.equal(result.safeDiagnosticCode, 'RECOVERY_FRESH_GENERATION_STARTED');
-  assert.equal(result.submissionEvidence, 'FRESH_LAUNCH_DURABLE_GENERATION_STARTED');
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(result.safeDiagnosticCode, 'RECOVERY_UNCERTAIN');
   assert.equal(fx.clicks(), 0);
 });
 
@@ -207,13 +205,13 @@ test('non-fresh recovery never treats an unrelated active generation as proof of
   assert.equal(fx.clicks(), 0);
 });
 
-test('fresh-launch recovery verifies accepted Send while ChatGPT is actively generating', async () => {
+test('fresh-launch historical match and generation cannot replace lost operation baseline', async () => {
   const { adapter } = loadAdapter();
   const fx = fixture({ userMessages: ['exact recovery prompt'], buttons: [stopButton()] });
   const result = await adapter.execute(request('VERIFY_AFTER_UNCERTAIN_SUBMIT', {
     recoveryLaunchUrl: 'https://chatgpt.com/'
   }), { document: fx.document });
-  assert.equal(result.status, adapter.STATUS.SENT_VERIFIED);
-  assert.equal(result.safeDiagnosticCode, 'RECOVERY_FRESH_LAUNCH_DURABLE_VERIFIED');
+  assert.equal(result.status, adapter.STATUS.SUBMISSION_UNCERTAIN);
+  assert.equal(result.safeDiagnosticCode, 'RECOVERY_STALE_MATCH_UNPROVEN');
   assert.equal(fx.clicks(), 0);
 });

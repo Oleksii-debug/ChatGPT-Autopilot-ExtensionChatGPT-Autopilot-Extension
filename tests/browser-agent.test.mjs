@@ -1474,8 +1474,8 @@ test('three-route model failover preserves Browser Agent job identity and execut
     enabled:true,
     mode:'primary',
     routes:[
-      { routeId:'a', provider:'openai-compatible', endpointId:'team-a', model:'route-a', roles:['planner'], priority:30 },
-      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20 },
+      { routeId:'a', provider:'openai-compatible', endpointId:'team-a', model:'route-a', roles:['planner'], priority:30, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
       { routeId:'c', provider:'ollama', model:'route-c', roles:['planner'], priority:10 },
     ],
     routePolicy:{ autoSwitch:true, retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
