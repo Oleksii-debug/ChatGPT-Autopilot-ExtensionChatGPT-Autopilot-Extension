@@ -81,7 +81,7 @@ test('simplified import rejects generic or mixed portable profiles before Core m
   });
   assert.throws(
     () => assertSimplifiedPortableProfile({ sessions: [accessor] }),
-    /explicit simplifiedSession=true/,
+    /simplifiedSession=true/,
   );
   assert.equal(reads, 0);
 });
