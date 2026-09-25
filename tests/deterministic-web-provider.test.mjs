@@ -47,6 +47,11 @@ test('normalizes bounded deterministic web actions and rejects unsafe URL protoc
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'navigate', url: 'https://user:secret@example.test/' }), /credentials/);
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'click', selector: '' }), /selector/);
   assert.throws(() => normalizeDeterministicWebActionV1({ kind: 'click', selector: '#ok', surprise: true }), /unknown field/);
+  assert.throws(() => normalizeDeterministicWebActionV1({ kind: { toString: () => 'CLICK' }, selector: '#ok' }), /kind must be text/);
+  assert.throws(() => normalizeDeterministicWebActionV1(Object.assign(Object.create({ kind: 'CLICK' }), { selector: '#ok' })), /plain object/);
+  const symbolic = { kind: 'CLICK', selector: '#ok' };
+  symbolic[Symbol('authority')] = true;
+  assert.throws(() => normalizeDeterministicWebActionV1(symbolic), /unknown field/);
 });
 
 test('invalid actions and verification requirements cannot acquire a lease or execute', async () => {
@@ -70,6 +75,11 @@ test('executes only authorized invocation and independently verifies URL postcon
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-7', action: { kind: 'NAVIGATE', url: 'https://example.test/done' }, postcondition: { url: 'https://example.test/done' } });
   assert.equal(result.status, 'VERIFIED');
   assert.equal(result.verification.reasonCode, 'URL_MATCH');
+  assert.equal(result.verification.verifierId, 'deterministic-web-postcondition-verifier');
+  assert.equal(result.verification.verificationAuthorityId, 'decision-inv-1');
+  assert.equal(result.verification.effectId, 'inv-1');
+  assert.equal(result.verification.executionId, 'inv-1:attempt:1');
+  assert.equal(result.verification.attempt, 1);
   assert.deepEqual(calls.map(([name]) => name), ['execute', 'observe']);
   assert.equal(leaseState.value, null, 'target lease is released after verification');
 });
@@ -134,11 +144,15 @@ test('an expired lease does not erase unresolved target ownership after a restar
   assert.equal(executed, false);
 });
 
-test('independent verifier fails when expected selector is absent', async () => {
-  const p = provider({ execute: async () => {}, observe: async () => ({ data: { visibleSelectors: ['#other'] }, artifactRefs: [] }) });
+test('failed postcondition is AMBIGUOUS and retains its target until reconciliation', async () => {
+  const leaseState = { value: null };
+  const p = provider({ execute: async () => {}, observe: async () => ({ data: { visibleSelectors: ['#other'] }, artifactRefs: [] }) }, leaseState);
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } });
-  assert.equal(result.status, 'FAILED');
+  assert.equal(result.status, 'AMBIGUOUS');
+  assert.equal(result.reconcileRequired, true);
   assert.equal(result.verification.reasonCode, 'SELECTOR_NOT_VISIBLE');
+  assert.equal(result.effectState.phase, 'RECONCILE');
+  assert.equal(leaseState.value.ownerInvocationId, 'inv-1');
 });
 
 test('a restarted provider does not replay a durable EXECUTING effect; manual reconciliation frees its target', async () => {
@@ -163,8 +177,9 @@ test('a restarted provider does not replay a durable EXECUTING effect; manual re
   finishDispatch();
   assert.equal((await pending).status, 'AMBIGUOUS');
   await assert.rejects(() => restarted.reconcile({ invocationId: 'inv-1', outcome: 'MANUAL_REVIEW' }), /independent web reconciliation verifier/);
-  const withQuiescenceProof = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+  const withQuiescenceProof = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
+    targetId,
     observation: { schemaVersion: 1, observationId: 'quiescent-observation', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { quiescent: true }, artifactRefs: [], observedAt: at },
     verification: { schemaVersion: 1, verificationId: 'quiescent-verification', invocationId: invocation.invocationId, observationId: 'quiescent-observation', status: 'AMBIGUOUS', reasonCode: 'EFFECT_UNRESOLVED', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
   }) });
@@ -207,20 +222,161 @@ test('safe retry needs fresh independently bound no-effect evidence', async () =
   const initial = provider(transport, leaseState, store);
   const request = { ...fixtures(), targetId: 'tab-1', action: { kind: 'CLICK', selector: '#go' }, postcondition: { selector: '#done' } };
   assert.equal((await initial.invoke(request)).status, 'AMBIGUOUS');
+
+  const beforeAliasAttempt = store.snapshot();
+  const beforeAliasLease = structuredClone(leaseState.value);
+  let aliasVerifierCalls = 0;
+  const aliasGuard = createDeterministicWebProviderV1({
+    transport,
+    store,
+    now: () => at,
+    reconcileVerify: async () => {
+      aliasVerifierCalls += 1;
+      throw new Error('reconciliation verifier must not run for a noncanonical invocation identity');
+    },
+  });
+  for (const invocationId of [' inv-1', 'inv-1 ']) {
+    await assert.rejects(
+      () => aliasGuard.reconcile({ invocationId, outcome: 'SAFE_RETRY' }),
+      /reconciliation invocationId is invalid/,
+    );
+  }
+  assert.equal(aliasVerifierCalls, 0);
+  assert.deepEqual(store.snapshot(), beforeAliasAttempt);
+  assert.deepEqual(leaseState.value, beforeAliasLease);
+
   await assert.rejects(() => initial.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /independent web reconciliation verifier/);
-  const bad = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+  const bad = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
+    targetId,
     observation: { schemaVersion: 1, observationId: 'reconcile-obs', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { committed: true }, artifactRefs: [], observedAt: at },
     verification: { schemaVersion: 1, verificationId: 'reconcile-check', invocationId: invocation.invocationId, observationId: 'reconcile-obs', status: 'FAILED', reasonCode: 'NO_COMMITTED_EFFECT', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
   }) });
   await assert.rejects(() => bad.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' }), /proof of no committed effect/);
   assert.equal(store.snapshot().effectsById['inv-1'].state.phase, 'RECONCILE');
-  const safe = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId }) => ({
+  const safe = createDeterministicWebProviderV1({ transport, store, now: () => at, reconcileVerify: async ({ invocation, executionId, targetId }) => ({
     verifierId: 'independent-verifier',
+    targetId,
     observation: { schemaVersion: 1, observationId: 'reconcile-obs', invocationId: invocation.invocationId, status: 'OK', summary: '', data: { committed: false }, artifactRefs: [], observedAt: at },
     verification: { schemaVersion: 1, verificationId: 'reconcile-check', invocationId: invocation.invocationId, observationId: 'reconcile-obs', status: 'FAILED', reasonCode: 'NO_COMMITTED_EFFECT', summary: '', evidenceArtifactIds: [], verifiedAt: at, verifierId: 'independent-verifier', verificationAuthorityId: invocation.policyDecisionId, effectId: invocation.invocationId, executionId, attempt: 1 },
   }) });
   assert.equal((await safe.reconcile({ invocationId: 'inv-1', outcome: 'SAFE_RETRY' })).phase, 'SAFE_RETRY');
   assert.equal((await safe.invoke(request)).status, 'VERIFIED');
   assert.equal(dispatches, 2);
+});
+
+
+test('provider rejects malformed canonical durable maps before browser dispatch', async t => {
+  const malformedRoots = [
+    { effectsById: null, leasesByTargetId: {} },
+    { effectsById: {}, leasesByTargetId: null },
+    { effectsById: [], leasesByTargetId: {} },
+    { effectsById: {}, leasesByTargetId: [] },
+  ];
+
+  for (const [index, root] of malformedRoots.entries()) {
+    await t.test(`malformed durable maps ${index + 1}`, async () => {
+      let effects = 0;
+      const store = {
+        async update(mutator) {
+          const draft = structuredClone(root);
+          return mutator(draft);
+        },
+      };
+      const p = createDeterministicWebProviderV1({
+        transport: {
+          execute: async () => { effects += 1; },
+          observe: async () => ({ data: { visibleSelectors: ['#done'] }, artifactRefs: [] }),
+        },
+        store,
+        now: () => at,
+        leaseId: () => 'must-not-be-used',
+      });
+      await assert.rejects(() => p.invoke({
+        ...fixtures(`malformed-store-${index + 1}`),
+        targetId: 'tab-1',
+        action: { kind: 'CLICK', selector: '#go' },
+        postcondition: { selector: '#done' },
+      }), /effectsById|leasesByTargetId/);
+      assert.equal(effects, 0);
+    });
+  }
+});
+
+test('prototype-named invocation ids are treated only as own durable entries', async () => {
+  const leaseState = { value: null };
+  const store = durableStore(leaseState);
+  let effects = 0;
+  const p = createDeterministicWebProviderV1({
+    transport: {
+      execute: async () => { effects += 1; },
+      observe: async () => ({ data: { visibleSelectors: ['#done'] }, artifactRefs: [] }),
+    },
+    store,
+    now: () => at,
+    leaseId: () => 'constructor-lease',
+  });
+  const result = await p.invoke({
+    ...fixtures('constructor'),
+    targetId: 'tab-1',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: { selector: '#done' },
+  });
+  assert.equal(result.status, 'VERIFIED');
+  assert.equal(effects, 1);
+  assert.equal(store.snapshot().effectsById.constructor.state.phase, 'COMMITTED');
+});
+
+
+test('malformed reconciliation request authority is rejected before durable state access', async t => {
+  let storeUpdates = 0;
+  const store = {
+    async update() {
+      storeUpdates += 1;
+      throw new Error('store must not be reached');
+    },
+  };
+  const p = createDeterministicWebProviderV1({
+    transport: { execute: async () => {}, observe: async () => ({ data: {} }) },
+    store,
+    now: () => at,
+  });
+
+  const inherited = Object.create({ invocationId: 'inv-1', outcome: 'VERIFIED' });
+  const symbolic = { invocationId: 'inv-1', outcome: 'VERIFIED' };
+  symbolic[Symbol('authority')] = true;
+  const cases = [
+    [{ invocationId: 7, outcome: 'VERIFIED' }, /invocationId must be text/],
+    [{ invocationId: 'inv-1', outcome: { toString: () => 'VERIFIED' } }, /outcome must be text/],
+    [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: true }, /reasonCode must be text/],
+    [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: ' WEB_RECONCILED' }, /reasonCode is invalid/],
+    [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: 'WEB_RECONCILED ' }, /reasonCode is invalid/],
+    [inherited, /plain object/],
+    [symbolic, /unknown field/],
+  ];
+
+  for (const [request, expected] of cases) {
+    await t.test(expected.source, async () => {
+      await assert.rejects(() => p.reconcile(request), expected);
+      assert.equal(storeUpdates, 0);
+    });
+  }
+});
+
+test('exotic postcondition authority is rejected before target lease or browser effect', async () => {
+  let effects = 0;
+  const leaseState = { value: null };
+  const p = provider({
+    execute: async () => { effects += 1; },
+    observe: async () => ({ data: {} }),
+  }, leaseState);
+  const inherited = Object.create({ selector: '#done' });
+  await assert.rejects(() => p.invoke({
+    ...fixtures('exotic-postcondition'),
+    targetId: 'tab-1',
+    action: { kind: 'CLICK', selector: '#go' },
+    postcondition: inherited,
+  }), /plain object/);
+  assert.equal(effects, 0);
+  assert.equal(leaseState.value, null);
 });
