@@ -20,6 +20,12 @@ export function normalizeGatewayUrl(value) {
   return parsed.toString().replace(/\/$/, '');
 }
 
+function invalidRequestBodyError() {
+  const error = new Error('AI Gateway request body must be JSON text');
+  error.code = 'AI_GATEWAY_INVALID_REQUEST_BODY';
+  return error;
+}
+
 function requestTooLargeError() {
   const error = new Error('AI Gateway request is too large');
   error.code = 'AI_GATEWAY_REQUEST_TOO_LARGE';
@@ -117,6 +123,7 @@ export class AiGatewayClient {
     if (!Number.isInteger(timeout) || timeout < MIN_TIMEOUT_SECONDS || timeout > MAX_TIMEOUT_SECONDS) {
       throw new Error(`AI Gateway timeout must be ${MIN_TIMEOUT_SECONDS}-${MAX_TIMEOUT_SECONDS} seconds`);
     }
+    if (init.body != null && typeof init.body !== 'string') throw invalidRequestBodyError();
     if (typeof init.body === 'string' && new TextEncoder().encode(init.body).byteLength > MAX_REQUEST_BYTES) {
       throw requestTooLargeError();
     }
