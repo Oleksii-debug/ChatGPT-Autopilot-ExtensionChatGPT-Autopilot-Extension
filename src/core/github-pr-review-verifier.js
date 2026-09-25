@@ -14,7 +14,15 @@ const REVIEW_STATE_BY_EVENT = Object.freeze({
 const MAX_BODY = 100_000;
 
 const VERIFIER_OPTION_KEYS = new Set(['githubClient', 'verifierId', 'now']);
-const VERIFY_REQUEST_KEYS = new Set(['invocation', 'executionId', 'observation']);
+const VERIFY_REQUEST_KEYS = new Set([
+  'invocation',
+  'effectId',
+  'executionId',
+  'attempt',
+  'policyDecisionId',
+  'observation',
+  'requestedAt',
+]);
 const RECONCILE_REQUEST_KEYS = new Set([
   'invocation',
   'effectId',
@@ -23,10 +31,23 @@ const RECONCILE_REQUEST_KEYS = new Set([
   'policyDecisionId',
   'expectedOutcome',
   'priorObservation',
+  'ambiguityDeclaredAt',
+  'requestedAt',
 ]);
 
 function requireId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) throw new Error(label + ' is invalid');
+  return value;
+}
+
+function canonicalTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error(label + ' must be a canonical ISO-8601 UTC timestamp');
+  }
+  const millis = Date.parse(value);
+  if (!Number.isFinite(millis) || new Date(millis).toISOString() !== value) {
+    throw new Error(label + ' must be a canonical ISO-8601 UTC timestamp');
+  }
   return value;
 }
 
@@ -241,13 +262,26 @@ export class GitHubPullRequestReviewVerifierV1 {
       VERIFY_REQUEST_KEYS,
     );
     const invocation = request.invocation;
+    const effectId = request.effectId;
     const executionId = request.executionId;
+    const attempt = request.attempt;
+    const policyDecisionId = request.policyDecisionId;
     const observation = request.observation;
-    const attempt = attemptFromExecutionId(executionId);
+    canonicalTimestamp(request.requestedAt, 'requestedAt');
     const expected = expectedReview(invocation);
+    if (requireId(effectId, 'effectId') !== expected.invocationId) {
+      throw new Error('effectId does not match invocation identity');
+    }
+    if (requireId(policyDecisionId, 'policyDecisionId') !== expected.policyDecisionId) {
+      throw new Error('policyDecisionId does not match invocation policy identity');
+    }
+    const exactAttempt = attemptFromExecutionId(executionId);
+    if (attempt !== exactAttempt) {
+      throw new Error('attempt does not match executionId');
+    }
     const observed = observedReview(expected, observation);
     const readback = await this.#readback(expected, observed.reviewId);
-    return this.#verification(readback, executionId, attempt, observed.observationId);
+    return this.#verification(readback, executionId, exactAttempt, observed.observationId);
   }
 
   async reconcileVerify(input = {}) {
@@ -263,6 +297,14 @@ export class GitHubPullRequestReviewVerifierV1 {
     const policyDecisionId = request.policyDecisionId;
     const expectedOutcome = request.expectedOutcome;
     const priorObservation = request.priorObservation;
+    const ambiguityDeclaredAt = canonicalTimestamp(
+      request.ambiguityDeclaredAt,
+      'ambiguityDeclaredAt',
+    );
+    const requestedAt = canonicalTimestamp(request.requestedAt, 'requestedAt');
+    if (Date.parse(requestedAt) < Date.parse(ambiguityDeclaredAt)) {
+      throw new Error('requestedAt cannot predate ambiguityDeclaredAt');
+    }
     if (expectedOutcome === ReconciliationOutcome.SAFE_RETRY) {
       throw new Error('GitHub pull-request review cannot prove SAFE_RETRY after dispatch');
     }
