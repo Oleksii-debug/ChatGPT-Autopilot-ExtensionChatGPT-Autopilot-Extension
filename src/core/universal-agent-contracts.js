@@ -81,7 +81,7 @@ function version(value, label) {
 function id(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return null;
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
-  if (value !== value.trim()) throw new Error(`${label} is invalid: must be an exact canonical ID`);
+  if (value !== value.trim()) throw new Error(`${label} is invalid: must be an exact canonical identity`);
   if (!ID.test(value)) throw new Error(`${label} is invalid`);
   return value;
 }
