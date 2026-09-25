@@ -41,28 +41,37 @@ function exactObject(value, allowed, label, code = 'WINDOWS_INVALID_REQUEST') {
 }
 
 function denseDataArray(value, label, maxLength, code = 'WINDOWS_INVALID_REQUEST') {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > maxLength) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     fail(code, label + ' must be a bounded dense array');
   }
-  const ownKeys = Reflect.ownKeys(value);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > maxLength) {
+    fail(code, label + ' must be a bounded dense array');
+  }
+  const length = lengthDescriptor.value;
+  const ownKeys = Reflect.ownKeys(descriptors);
   if (ownKeys.some(key => typeof key === 'symbol')) {
     fail(code, label + ' must contain only canonical data indices');
   }
   const names = ownKeys.filter(key => key !== 'length');
-  if (names.length !== value.length) {
+  if (names.length !== length) {
     fail(code, label + ' must be a bounded dense array');
   }
-  const out = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       fail(code, label + ' must contain only enumerable data items');
     }
-    out.push(descriptor.value);
+    out[index] = descriptor.value;
   }
   return out;
 }
-
 function id(value, label) {
   const out = clean(value, 128);
   if (!ID.test(out)) fail('WINDOWS_INVALID_REQUEST', label + ' is invalid');
