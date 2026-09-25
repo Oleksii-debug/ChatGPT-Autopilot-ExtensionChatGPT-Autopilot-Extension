@@ -472,14 +472,16 @@ function sameInterface(admission, iface) {
     && admission.tenant === iface.tenant;
 }
 
-export function assessA2ADelegationV1({
-  card: cardInput,
-  admission: admissionInput,
-  delegation: delegationInput,
-} = {}) {
-  const card = normalizeA2ARemoteAgentCardRefV1(cardInput);
-  const admission = normalizeA2ARemoteAdmissionRefV1(admissionInput);
-  const delegation = normalizeA2ADelegationRequestV1(delegationInput);
+const DELEGATION_ASSESSMENT_KEYS = new Set([
+  'card', 'admission', 'delegation', 'assessmentAt',
+]);
+
+export function assessA2ADelegationV1(requestInput = {}) {
+  const request = record(requestInput, 'A2ADelegationAssessmentV1', DELEGATION_ASSESSMENT_KEYS);
+  const assessmentAt = timestamp(request.assessmentAt, 'assessmentAt');
+  const card = normalizeA2ARemoteAgentCardRefV1(request.card);
+  const admission = normalizeA2ARemoteAdmissionRefV1(request.admission);
+  const delegation = normalizeA2ADelegationRequestV1(request.delegation);
   const reasons = [];
 
   if (admission.remoteAgentId !== card.remoteAgentId) reasons.push('ADMISSION_AGENT_MISMATCH');
@@ -523,10 +525,13 @@ export function assessA2ADelegationV1({
   }
 
   const createdMs = Date.parse(delegation.createdAt);
+  const assessmentMs = Date.parse(assessmentAt);
   if (createdMs < Date.parse(card.discoveredAt)) reasons.push('DELEGATION_PREDATES_DISCOVERY');
   if (createdMs < Date.parse(admission.decidedAt)) reasons.push('DELEGATION_PREDATES_ADMISSION');
-  if (admission.expiresAt && createdMs >= Date.parse(admission.expiresAt)) {
-    reasons.push('ADMISSION_EXPIRED');
+  if (assessmentMs < createdMs) reasons.push('ASSESSMENT_PREDATES_DELEGATION');
+  if (admission.expiresAt) {
+    const expiresMs = Date.parse(admission.expiresAt);
+    if (createdMs >= expiresMs || assessmentMs >= expiresMs) reasons.push('ADMISSION_EXPIRED');
   }
 
   reasons.sort(ascii);
@@ -541,7 +546,12 @@ export function assessA2ADelegationV1({
     effectId: delegation.effectId,
     requestedSkillId: delegation.requestedSkillId,
     selectedInterface,
-    status: reasons.length ? 'BLOCKED' : 'READY_FOR_POLICY',
+    assessmentAt,
+    assessmentTimeAuthority: 'UNVERIFIED_INPUT',
+    admissionExpiryRecheckRequired: Boolean(admission.expiresAt),
+    status: reasons.length
+      ? 'BLOCKED'
+      : (admission.expiresAt ? 'EXPIRY_UNVERIFIED' : 'READY_FOR_POLICY'),
     reasons,
     policyDecisionId: delegation.policyDecisionId,
     taskEnvelopeArtifactId: delegation.taskEnvelopeArtifactId,
