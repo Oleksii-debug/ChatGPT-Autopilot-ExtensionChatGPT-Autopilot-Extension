@@ -315,9 +315,10 @@
     let score = 0;
 
     if (/(^|[-_])send-button($|[-_])/.test(testId)) score += 100;
-    if (/^(send|send message|send prompt)$/.test(aria)) score += 50;
-    if (/^(send|send message|send prompt)$/.test(title)) score += 30;
-    if (/^(send|send message|send prompt)$/.test(text)) score += 20;
+    const exactSend = /^(?:send|send message|send prompt|надіслати|надіслати повідомлення|відправити|відправити повідомлення|отправить|отправить сообщение)$/u;
+    if (exactSend.test(aria)) score += 50;
+    if (exactSend.test(title)) score += 30;
+    if (exactSend.test(text)) score += 20;
     return score;
   }
 
@@ -1159,6 +1160,8 @@
       `pendingMatch=${composer && promptTextMatches(editorText(composer), request.promptText) ? 'yes' : 'no'}`,
       `messagesBefore=${before?.length ?? 'unknown'}`,
       `messagesAfter=${userMessageHistorySnapshot(doc).length}`,
+      `surface=${doc.documentElement?.getAttribute?.('data-codex-window-type') === 'browser' ? 'chatgpt-work' : 'chatgpt-web'}`,
+      `mainExactMatches=${unlabeledPromptCount(doc, request.promptText)}`,
       `block=${blocking?.code || 'none'}`,
       `visibility=${doc.visibilityState || 'unknown'}`
     ].join('; ');
