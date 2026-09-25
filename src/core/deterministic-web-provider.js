@@ -46,7 +46,7 @@ export function normalizeDeterministicWebActionV1(input) {
   return Object.freeze({ kind, selector, value: text(input.value, 'value', 16_000) });
 }
 
-function verifyPostcondition({ invocationId, effectId, executionId, attempt, observation, expected, now }) {
+function verifyPostcondition({ invocationId, observation, expected, now }) {
   const observed = observation.data || {};
   let ok = false;
   let reasonCode = 'POSTCONDITION_FAILED';
@@ -70,9 +70,6 @@ function verifyPostcondition({ invocationId, effectId, executionId, attempt, obs
     summary: ok ? 'Independent browser postcondition verified.' : 'Independent browser postcondition failed.',
     evidenceArtifactIds: observation.artifactRefs.map(ref => ref.artifactId),
     verifiedAt: now,
-    effectId,
-    executionId,
-    attempt,
   });
 }
 
@@ -169,7 +166,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           const entry = draft.effectsById[invocationId];
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_OBSERVATION, 'observe', { observation });
         });
-        const verification = verifyPostcondition({ invocationId, effectId: admitted.effectState.effectId, executionId: admitted.effectState.executionId, attempt: admitted.effectState.attempt, observation, expected, now: now() });
+        const verification = verifyPostcondition({ invocationId, observation, expected, now: now() });
         const effectState = await atomic(draft => {
           const entry = draft.effectsById[invocationId];
           let state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_VERIFICATION, 'verify', { verification });
