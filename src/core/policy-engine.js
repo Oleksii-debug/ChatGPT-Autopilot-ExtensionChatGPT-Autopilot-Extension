@@ -88,7 +88,9 @@ function timestamp(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) throw new Error(`${label} must be a timestamp`);
-  return new Date(parsed).toISOString();
+  const canonical = new Date(parsed).toISOString();
+  if (value !== canonical) throw new Error(`${label} must be an exact canonical UTC timestamp`);
+  return value;
 }
 
 function decision(value, label = 'decision') {
@@ -306,6 +308,7 @@ function strictInvocation(input) {
     toolId: id(raw.toolId, 'ToolInvocationV1.toolId'),
     providerId: id(raw.providerId, 'ToolInvocationV1.providerId'),
     policyDecisionId: id(raw.policyDecisionId, 'ToolInvocationV1.policyDecisionId'),
+    createdAt: timestamp(raw.createdAt, 'ToolInvocationV1.createdAt'),
     parentInvocationId: raw.parentInvocationId == null || raw.parentInvocationId === ''
       ? null
       : id(raw.parentInvocationId, 'ToolInvocationV1.parentInvocationId'),
