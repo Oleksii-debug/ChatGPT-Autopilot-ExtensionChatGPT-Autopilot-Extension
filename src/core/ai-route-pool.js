@@ -243,13 +243,26 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   return Object.freeze({ allocationMode, minWorkers, maxParallelWorkers, manualRouteWorkers: Object.freeze(manualRouteWorkers) });
 }
 
-function stateNumber(value, label) {
-  if (value == null) return 0;
-  if (typeof value !== 'number' && typeof value !== 'string') {
+function stateInteger(value, label) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
     throw new Error(`${label} is invalid`);
   }
-  const out = Number(value);
-  if (!Number.isFinite(out) || out < 0) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+function stateIntegerField(state, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(state, key)) return 0;
+  return stateInteger(own(state, key), label);
+}
+
+function checkedStateAdd(value, increment, label) {
+  const out = value + increment;
+  if (!Number.isSafeInteger(out) || Object.is(out, -0) || out < 0) {
+    throw new Error(`${label} exceeds the exact durable-state range`);
+  }
   return out;
 }
 
@@ -267,7 +280,6 @@ const AI_ROUTE_STATE_FIELDS = new Set([
 ]);
 
 export function normalizeAiRouteStates(raw = {}, routes = []) {
-  if (raw == null) raw = {};
   object(raw, 'AI route states');
   const stateDescriptors = Object.getOwnPropertyDescriptors(raw);
   const allowed = new Set(routes.map(route => route.routeId));
@@ -282,16 +294,16 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
     const value = descriptor.value;
     const state = dataRecord(value, AI_ROUTE_STATE_FIELDS, `AI route state ${routeId}`);
     Object.defineProperty(out, routeId, { value:{
-      consecutiveFailures: Math.floor(stateNumber(own(state, 'consecutiveFailures'), `AI route state ${routeId}.consecutiveFailures`)),
-      successes: Math.floor(stateNumber(own(state, 'successes'), `AI route state ${routeId}.successes`)),
-      failures: Math.floor(stateNumber(own(state, 'failures'), `AI route state ${routeId}.failures`)),
-      backoffUntil: stateNumber(own(state, 'backoffUntil'), `AI route state ${routeId}.backoffUntil`),
-      circuitOpenUntil: stateNumber(own(state, 'circuitOpenUntil'), `AI route state ${routeId}.circuitOpenUntil`),
+      consecutiveFailures: stateIntegerField(state, 'consecutiveFailures', `AI route state ${routeId}.consecutiveFailures`),
+      successes: stateIntegerField(state, 'successes', `AI route state ${routeId}.successes`),
+      failures: stateIntegerField(state, 'failures', `AI route state ${routeId}.failures`),
+      backoffUntil: stateIntegerField(state, 'backoffUntil', `AI route state ${routeId}.backoffUntil`),
+      circuitOpenUntil: stateIntegerField(state, 'circuitOpenUntil', `AI route state ${routeId}.circuitOpenUntil`),
       lastErrorCode: clean(own(state, 'lastErrorCode'), 120),
       lastErrorCategory: clean(own(state, 'lastErrorCategory'), 80),
-      lastErrorAt: stateNumber(own(state, 'lastErrorAt'), `AI route state ${routeId}.lastErrorAt`),
-      lastSuccessAt: stateNumber(own(state, 'lastSuccessAt'), `AI route state ${routeId}.lastSuccessAt`),
-      lastLatencyMs: stateNumber(own(state, 'lastLatencyMs'), `AI route state ${routeId}.lastLatencyMs`),
+      lastErrorAt: stateIntegerField(state, 'lastErrorAt', `AI route state ${routeId}.lastErrorAt`),
+      lastSuccessAt: stateIntegerField(state, 'lastSuccessAt', `AI route state ${routeId}.lastSuccessAt`),
+      lastLatencyMs: stateIntegerField(state, 'lastLatencyMs', `AI route state ${routeId}.lastLatencyMs`),
     }, enumerable:true, writable:true, configurable:true });
   }
   return out;
@@ -321,6 +333,7 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   if (!ROLES.has(normalizedRole)) throw new Error('AI route requested role is invalid');
   const capabilities = ids(capabilityIds || [], 'AI route requested capabilityIds', 64);
   const states = normalizeAiRouteStates(routeStates, pool);
+  const selectionNow = stateInteger(now, 'AI route selection now');
   const allow = new Set(normalizedPolicy.allowRouteIds);
   const deny = new Set(normalizedPolicy.denyRouteIds);
   const order = new Map(normalizedPolicy.orderedRouteIds.map((routeId, index) => [routeId, index]));
@@ -350,13 +363,13 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   });
   const available = candidates.filter(route => {
     const state = own(states, route.routeId);
-    return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= now;
+    return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= selectionNow;
   });
   const retryAt = candidates.length && !available.length
     ? Math.min(...candidates.map(route => {
       const state = own(states, route.routeId);
       return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
-    }).filter(value => value > now))
+    }).filter(value => value > selectionNow))
     : 0;
   return Object.freeze({ candidates: Object.freeze((normalizedPolicy.autoSwitch ? available : available.slice(0, 1))), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
 }
@@ -410,24 +423,42 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
 }
 
 export function recordAiRouteOutcome(routeStates, route, policy, { ok, classification = null, at = Date.now(), latencyMs = 0 } = {}) {
+  if (typeof ok !== 'boolean') throw new Error('AI route outcome ok must be boolean');
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const states = normalizeAiRouteStates(routeStates, [route]);
   const current = own(states, route.routeId) || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
+  const recordedAt = stateInteger(at, 'AI route outcome at');
+  const recordedLatencyMs = stateInteger(latencyMs, 'AI route outcome latencyMs');
   if (ok) {
-    return { ...current, consecutiveFailures:0, successes:current.successes + 1, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastSuccessAt:at, lastLatencyMs:Math.max(0, Number(latencyMs) || 0) };
+    return {
+      ...current,
+      consecutiveFailures:0,
+      successes:checkedStateAdd(current.successes, 1, 'AI route state successes'),
+      backoffUntil:0,
+      circuitOpenUntil:0,
+      lastErrorCode:'',
+      lastErrorCategory:'',
+      lastSuccessAt:recordedAt,
+      lastLatencyMs:recordedLatencyMs,
+    };
   }
-  const failures = current.consecutiveFailures + 1;
+  const failures = checkedStateAdd(current.consecutiveFailures, 1, 'AI route state consecutiveFailures');
+  const totalFailures = checkedStateAdd(current.failures, 1, 'AI route state failures');
   const retryable = classification?.retryable === true;
   return {
     ...current,
     consecutiveFailures: failures,
-    failures: current.failures + 1,
-    backoffUntil: retryable ? at + normalizedPolicy.retryBackoffSeconds * 1000 : current.backoffUntil,
-    circuitOpenUntil: retryable && failures >= normalizedPolicy.circuitBreakerFailures ? at + normalizedPolicy.circuitBreakerSeconds * 1000 : current.circuitOpenUntil,
+    failures: totalFailures,
+    backoffUntil: retryable
+      ? checkedStateAdd(recordedAt, normalizedPolicy.retryBackoffSeconds * 1000, 'AI route state backoffUntil')
+      : current.backoffUntil,
+    circuitOpenUntil: retryable && failures >= normalizedPolicy.circuitBreakerFailures
+      ? checkedStateAdd(recordedAt, normalizedPolicy.circuitBreakerSeconds * 1000, 'AI route state circuitOpenUntil')
+      : current.circuitOpenUntil,
     lastErrorCode: clean(classification?.code || 'AI_ROUTE_FAILURE', 120),
     lastErrorCategory: clean(classification?.category || 'unknown', 80),
-    lastErrorAt: at,
-    lastLatencyMs: Math.max(0, Number(latencyMs) || 0),
+    lastErrorAt: recordedAt,
+    lastLatencyMs: recordedLatencyMs,
   };
 }
 
