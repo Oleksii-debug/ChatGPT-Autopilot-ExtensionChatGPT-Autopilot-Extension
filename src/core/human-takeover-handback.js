@@ -131,10 +131,10 @@ function assertAtOrAfter(later, earlier, label) {
   }
 }
 
-function cloneDataOnly(value, label, state = { depth: 0, nodes: 0 }) {
-  state.nodes += 1;
-  if (state.nodes > MAX_JSON_NODES) throw new Error(`${label} exceeds data node bound`);
-  if (state.depth > MAX_JSON_DEPTH) throw new Error(`${label} exceeds data depth bound`);
+function cloneDataOnly(value, label, budget = { nodes: 0 }, depth = 0) {
+  budget.nodes += 1;
+  if (budget.nodes > MAX_JSON_NODES) throw new Error(`${label} exceeds data node bound`);
+  if (depth > MAX_JSON_DEPTH) throw new Error(`${label} exceeds data depth bound`);
 
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
@@ -168,32 +168,128 @@ function cloneDataOnly(value, label, state = { depth: 0, nodes: 0 }) {
         throw new Error(`${label} must be a dense data array`);
       }
     }
-    const childState = { ...state, depth: state.depth + 1 };
-    return value.map((item, index) => cloneDataOnly(item, `${label}[${index}]`, childState));
+    return value.map((item, index) => cloneDataOnly(item, `${label}[${index}]`, budget, depth + 1));
   }
 
   const raw = strictRecord(value, label);
   const keys = Reflect.ownKeys(raw);
   if (keys.length > MAX_RECORD_FIELDS) throw new Error(`${label} has too many fields`);
   const out = Object.create(null);
-  const childState = { ...state, depth: state.depth + 1 };
   for (const key of keys) {
     if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
     const descriptor = Object.getOwnPropertyDescriptor(raw, key);
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} field ${key} must be an enumerable data property`);
     }
-    out[key] = cloneDataOnly(descriptor.value, `${label}.${key}`, childState);
+    out[key] = cloneDataOnly(descriptor.value, `${label}.${key}`, budget, depth + 1);
   }
   return out;
 }
 
+function exactSchemaVersion(raw, label) {
+  if (ownValue(raw, 'schemaVersion', label) !== 1) {
+    throw new Error(`${label} schemaVersion must be exact numeric 1`);
+  }
+}
+
+function exactStringField(raw, key, label, { optional = false } = {}) {
+  const value = ownValue(raw, key, label, { optional });
+  if (value == null && optional) return;
+  if (typeof value !== 'string') throw new Error(`${label}.${key} must be text`);
+}
+
+function exactBooleanField(raw, key, label, { optional = false } = {}) {
+  const value = ownValue(raw, key, label, { optional });
+  if (value == null && optional) return;
+  if (typeof value !== 'boolean') throw new Error(`${label}.${key} must be boolean`);
+}
+
+function exactIntegerField(raw, key, label, { optional = false, min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
+  const value = ownValue(raw, key, label, { optional });
+  if (value == null && optional) return;
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new Error(`${label}.${key} must be an exact integer`);
+  }
+}
+
+function exactStringArray(value, label, max = MAX_ARRAY_ITEMS) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const keys = Reflect.ownKeys(value);
+  for (const key of keys) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
+      throw new Error(`${label} contains non-index array property`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} field ${key} must be an enumerable data property`);
+    }
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} must be a dense data array`);
+    }
+    if (typeof descriptor.value !== 'string') throw new Error(`${label}[${index}] must be text`);
+  }
+}
+
+function assertExactArtifactRefTypes(raw, label) {
+  strictRecord(raw, label);
+  exactSchemaVersion(raw, label);
+  for (const key of ['artifactId', 'kind', 'uri', 'createdAt']) exactStringField(raw, key, label);
+  for (const key of ['mediaType', 'sha256', 'producerInvocationId']) exactStringField(raw, key, label, { optional: true });
+  exactIntegerField(raw, 'sizeBytes', label, { optional: true, min: 0 });
+  exactBooleanField(raw, 'sensitive', label, { optional: true });
+}
+
+function assertExactObservationTypes(raw, label) {
+  strictRecord(raw, label);
+  exactSchemaVersion(raw, label);
+  for (const key of ['observationId', 'invocationId', 'status', 'observedAt']) exactStringField(raw, key, label);
+  exactStringField(raw, 'summary', label, { optional: true });
+  const artifactRefs = ownValue(raw, 'artifactRefs', label, { optional: true });
+  if (artifactRefs != null) {
+    if (!Array.isArray(artifactRefs) || Object.getPrototypeOf(artifactRefs) !== Array.prototype) {
+      throw new Error(`${label}.artifactRefs must be a plain array`);
+    }
+    for (let index = 0; index < artifactRefs.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(artifactRefs, String(index));
+      if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(`${label}.artifactRefs must be a dense data array`);
+      }
+      assertExactArtifactRefTypes(descriptor.value, `${label}.artifactRefs[${index}]`);
+    }
+  }
+}
+
+function assertExactVerificationTypes(raw, label) {
+  strictRecord(raw, label);
+  exactSchemaVersion(raw, label);
+  for (const key of ['verificationId', 'invocationId', 'status', 'reasonCode', 'verifiedAt']) {
+    exactStringField(raw, key, label);
+  }
+  for (const key of [
+    'observationId', 'summary', 'verifierId', 'verificationAuthorityId',
+    'effectId', 'executionId',
+  ]) exactStringField(raw, key, label, { optional: true });
+  const evidenceArtifactIds = ownValue(raw, 'evidenceArtifactIds', label, { optional: true });
+  if (evidenceArtifactIds != null) exactStringArray(evidenceArtifactIds, `${label}.evidenceArtifactIds`, 128);
+  exactIntegerField(raw, 'attempt', label, { optional: true, min: 0, max: 64 });
+}
+
 function canonicalObservation(value, label) {
-  return normalizeObservationV1(cloneDataOnly(value, label));
+  const cloned = cloneDataOnly(value, label);
+  assertExactObservationTypes(cloned, label);
+  return normalizeObservationV1(cloned);
 }
 
 function canonicalVerification(value, label) {
-  return normalizeVerificationV1(cloneDataOnly(value, label));
+  const cloned = cloneDataOnly(value, label);
+  assertExactVerificationTypes(cloned, label);
+  return normalizeVerificationV1(cloned);
 }
 
 function freezeDeep(value) {
