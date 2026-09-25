@@ -113,7 +113,7 @@ export async function listFilesystemDirectoryV1(scope, requestedDirectory, {
 
       const admitted = await authorizeFilesystemPathAtIoV1(scope, candidate, { allowMissingLeaf: false });
       const real = canonical(await fs.realpath(candidate));
-      if (real !== canonical(admitted)) fail('Filesystem list entry escaped owner scope');
+      if (real !== canonical(admitted)) fail('Filesystem list entry escapes owner scope');
       const afterEntry = await fs.lstat(candidate).catch(error => {
         if (error?.code === 'ENOENT') fail('Filesystem list entry identity changed during enumeration');
         throw error;

@@ -225,3 +225,27 @@ test('read-only filesystem list/stat dispatch through canonical policy authoriza
     /not authorized/u,
   );
 });
+
+test('filesystem provider keeps legacy read/search client compatible and hides unavailable list/stat tools', async () => {
+  const client = nativeClient();
+  delete client.listFiles;
+  delete client.statPath;
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: client,
+    grantedCapabilityIds: ['filesystem.readText', 'filesystem.search', 'filesystem.list', 'filesystem.stat'],
+  });
+  assert.deepEqual(provider.tools().map(tool => tool.toolId), [
+    FilesystemToolId.READ_TEXT,
+    FilesystemToolId.SEARCH,
+  ]);
+  const listInvocation = invocation(
+    FilesystemToolId.LIST,
+    'filesystem.list',
+    { rootId: 'workspace', relativePath: '.', maxEntries: 10 },
+    'fs-list-unavailable',
+  );
+  await assert.rejects(
+    () => provider.invoke({ invocation: listInvocation, policyDecision: allow('fs-list-unavailable') }),
+    error => error.code === 'TOOL_UNAVAILABLE',
+  );
+});

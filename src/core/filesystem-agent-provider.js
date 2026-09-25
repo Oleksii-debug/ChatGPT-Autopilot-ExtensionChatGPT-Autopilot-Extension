@@ -131,20 +131,28 @@ function wrapFailure(error, { readOnly, invocationId }) {
 
 export class FilesystemAgentProviderV1 {
   constructor({ nativeClient, resolveArtifactText = null, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
-    if (!nativeClient?.readText || !nativeClient?.searchFiles || !nativeClient?.listFiles || !nativeClient?.statPath) {
-      throw new Error('Filesystem Native Companion read/search/list/stat client is required');
+    if (!nativeClient?.readText || !nativeClient?.searchFiles) {
+      throw new Error('Filesystem Native Companion read/search client is required');
     }
     this.nativeClient = nativeClient;
+    this.availableTools = Object.freeze(TOOLS.filter(tool => {
+      if (tool.toolId === FilesystemToolId.LIST) return typeof nativeClient.listFiles === 'function';
+      if (tool.toolId === FilesystemToolId.STAT) return typeof nativeClient.statPath === 'function';
+      return true;
+    }));
     this.resolveArtifactText = typeof resolveArtifactText === 'function' ? resolveArtifactText : null;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
     this.now = now;
   }
 
-  tools() { return TOOLS; }
+  tools() { return this.availableTools; }
 
   authorize({ invocation, policyDecision } = {}) {
     const tool = KNOWN_TOOLS.find(item => item.toolId === invocation?.toolId);
     if (!tool) throw new Error('Filesystem tool is not registered');
+    if (tool !== WRITE_RECOVERY_TOOL && !this.availableTools.some(item => item.toolId === tool.toolId)) {
+      throw providerError('TOOL_UNAVAILABLE', 'Filesystem tool is unavailable in the connected Native Companion');
+    }
     const authorized = assertToolInvocationAuthorizedV1({
       invocation,
       policyDecision,

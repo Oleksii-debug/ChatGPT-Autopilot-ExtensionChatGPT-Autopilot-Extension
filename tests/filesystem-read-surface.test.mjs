@@ -69,16 +69,19 @@ test('filesystem stat rejects target substitution before hash open', async t => 
   const target = path.join(root, 'data.txt'), parked = path.join(root, 'parked.txt'), secret = path.join(outside, 'secret.txt');
   await fs.writeFile(target, 'inside'); await fs.writeFile(secret, 'outside-secret');
   const scope = createFilesystemScopeV1({ scopeId: 'owner', roots: [root] });
+  const probe = path.join(root, 'probe-link');
   try {
-    await assert.rejects(() => statFilesystemPathV1(scope, target, {
-      hash: true,
-      beforeHashOpen: async () => { await fs.rename(target, parked); await fs.symlink(secret, target, 'file'); },
-    }), /symbolic link|escapes owner scope|identity changed|ELOOP/iu);
-    assert.equal(await fs.readFile(secret, 'utf8'), 'outside-secret');
+    await fs.symlink(secret, probe, 'file');
+    await fs.unlink(probe);
   } catch (error) {
-    if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes(error?.code)) { t.diagnostic(`symlink unavailable: ${error.code}`); return; }
-    throw error;
+    t.diagnostic(`file symlink unavailable: ${error.code || error.message}`);
+    return;
   }
+  await assert.rejects(() => statFilesystemPathV1(scope, target, {
+    hash: true,
+    beforeHashOpen: async () => { await fs.rename(target, parked); await fs.symlink(secret, target, 'file'); },
+  }), /symbolic link|escapes owner scope|identity changed|ELOOP/iu);
+  assert.equal(await fs.readFile(secret, 'utf8'), 'outside-secret');
 });
 
 test('Native Companion list/stat keep absolute roots private and advertise read-only capabilities', async t => {
