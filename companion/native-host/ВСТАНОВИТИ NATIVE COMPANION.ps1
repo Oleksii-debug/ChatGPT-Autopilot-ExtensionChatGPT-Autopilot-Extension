@@ -63,20 +63,7 @@ foreach ($name in @($copyNames | Where-Object { $_ -like '*.mjs' })) {
   }
 }
 
-New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDir -Force | Out-Null
-foreach ($name in $copyNames) {
-  $src = Join-Path $source $name
-  Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force
-}
-
-$installedNode = Join-Path $runtime 'node.exe'
-Copy-Item -LiteralPath $nodeExe -Destination $installedNode -Force
-
-$launcherSource = Join-Path $target 'NativeHostLauncher.cs'
-$launcherExe = Join-Path $target 'autopilot-native-host.exe'
-if (Test-Path -LiteralPath $launcherExe) { Remove-Item -LiteralPath $launcherExe -Force }
-Add-Type -Path $launcherSource -OutputAssembly $launcherExe -OutputType ConsoleApplication
-
+# Validate the existing local configuration before any active installation bytes are changed.
 $origin = "chrome-extension://$ExtensionId/"
 $configPath = Join-Path $configDir 'native-companion.json'
 $roots = @()
@@ -88,6 +75,38 @@ if (Test-Path -LiteralPath $configPath) {
     throw "Існуючий Native Companion config пошкоджений: $($_.Exception.Message)"
   }
 }
+
+# Compile the launcher in a disposable staging directory before touching the registered target.
+$stagingDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ChatGPT-Autopilot-Native-Companion-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+$stagedLauncher = Join-Path $stagingDir 'autopilot-native-host.exe'
+try {
+  Add-Type -Path (Join-Path $source 'NativeHostLauncher.cs') -OutputAssembly $stagedLauncher -OutputType ConsoleApplication
+} catch {
+  if (Test-Path -LiteralPath $stagingDir) {
+    Remove-Item -LiteralPath $stagingDir -Recurse -Force
+  }
+  throw "Не вдалося підготувати Native Companion launcher: $($_.Exception.Message)"
+}
+
+New-Item -ItemType Directory -Path $target, $runtime, $configDir, $credentialsDir -Force | Out-Null
+foreach ($name in $copyNames) {
+  $src = Join-Path $source $name
+  Copy-Item -LiteralPath $src -Destination (Join-Path $target $name) -Force
+}
+
+$installedNode = Join-Path $runtime 'node.exe'
+Copy-Item -LiteralPath $nodeExe -Destination $installedNode -Force
+
+$launcherExe = Join-Path $target 'autopilot-native-host.exe'
+try {
+  Copy-Item -LiteralPath $stagedLauncher -Destination $launcherExe -Force
+} finally {
+  if (Test-Path -LiteralPath $stagingDir) {
+    Remove-Item -LiteralPath $stagingDir -Recurse -Force
+  }
+}
+
 @{
   schemaVersion = 1
   allowedOrigin = $origin
