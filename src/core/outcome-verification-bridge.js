@@ -148,6 +148,12 @@ function canonicalTimestamp(value, label) {
   return value;
 }
 
+function compareTimestamp(left, right) {
+  const leftMs = Date.parse(left);
+  const rightMs = Date.parse(right);
+  return leftMs < rightMs ? -1 : leftMs > rightMs ? 1 : 0;
+}
+
 function compareCodeUnit(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -287,10 +293,10 @@ function normalizeTrustedVerificationRecord(input) {
 
   const recordedAt = canonicalTimestamp(raw.recordedAt, 'trusted record recordedAt');
   const validThrough = canonicalTimestamp(raw.validThrough, 'trusted record validThrough');
-  if (recordedAt < verification.verifiedAt) {
+  if (compareTimestamp(recordedAt, verification.verifiedAt) < 0) {
     throw new Error('Trusted verification record predates its verification');
   }
-  if (validThrough < recordedAt) {
+  if (compareTimestamp(validThrough, recordedAt) < 0) {
     throw new Error('Trusted verification record validity interval is invalid');
   }
 
@@ -355,17 +361,17 @@ function criterionResult({
     || verification.verificationAuthorityId !== trustedRecord.verificationAuthorityId) {
     throw new Error('Trusted verification authority binding is missing or mismatched');
   }
-  if (verification.verifiedAt < contract.createdAt) {
+  if (compareTimestamp(verification.verifiedAt, contract.createdAt) < 0) {
     throw new Error('Trusted verification predates the exact outcome contract');
   }
-  if (verification.verifiedAt > evaluatedAt) {
+  if (compareTimestamp(verification.verifiedAt, evaluatedAt) > 0) {
     throw new Error('Trusted verification is future-dated');
   }
-  if (trustedRecord.recordedAt < contract.createdAt
-    || trustedRecord.recordedAt > evaluatedAt) {
+  if (compareTimestamp(trustedRecord.recordedAt, contract.createdAt) < 0
+    || compareTimestamp(trustedRecord.recordedAt, evaluatedAt) > 0) {
     throw new Error('Trusted verification record chronology is invalid');
   }
-  if (evaluatedAt > trustedRecord.validThrough) {
+  if (compareTimestamp(evaluatedAt, trustedRecord.validThrough) > 0) {
     throw new Error('Trusted verification record is stale');
   }
 
@@ -380,13 +386,13 @@ function criterionResult({
         'Trusted verification references missing evidence artifact: ' + artifactId,
       );
     }
-    if (artifact.createdAt < contract.createdAt) {
+    if (compareTimestamp(artifact.createdAt, contract.createdAt) < 0) {
       throw new Error(
         'Trusted verification evidence predates the exact outcome contract: ' + artifactId,
       );
     }
-    if (artifact.createdAt > verification.verifiedAt
-      || artifact.createdAt > evaluatedAt) {
+    if (compareTimestamp(artifact.createdAt, verification.verifiedAt) > 0
+      || compareTimestamp(artifact.createdAt, evaluatedAt) > 0) {
       throw new Error(
         'Trusted verification evidence is future-dated relative to verification: ' + artifactId,
       );
@@ -468,7 +474,7 @@ export async function adjudicateOutcomeVerificationV1(
   assertCanonicalOutcomeContractMatches(contract, requestedContract);
 
   const evaluatedAt = canonicalTimestamp(request.evaluatedAt, 'evaluatedAt');
-  if (evaluatedAt < contract.createdAt) {
+  if (compareTimestamp(evaluatedAt, contract.createdAt) < 0) {
     throw new Error('evaluatedAt predates the exact outcome contract');
   }
 

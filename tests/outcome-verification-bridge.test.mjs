@@ -13,7 +13,7 @@ const recordedAt = '2026-09-25T08:06:00.000Z';
 const evaluatedAt = '2026-09-25T08:10:00.000Z';
 const validThrough = '2026-09-25T09:00:00.000Z';
 
-function contract({ requiredEvidenceArtifactCount = 1 } = {}) {
+function contract({ requiredEvidenceArtifactCount = 1, contractCreatedAt = createdAt } = {}) {
   return createOutcomeContractV1({
     contractId: 'outcome-1',
     projectId: 'project-1',
@@ -67,7 +67,7 @@ function contract({ requiredEvidenceArtifactCount = 1 } = {}) {
       verificationAuthority: 'EXTERNAL_REQUIRED',
     },
     triggerRefs: [],
-    createdAt,
+    createdAt: contractCreatedAt,
   });
 }
 
@@ -515,6 +515,148 @@ test('trusted record freshness and chronology fail closed', async () => {
     const fixture = happyFixture();
     mutate(fixture.records.get('verification-tests'));
     await assert.rejects(() => adjudicate(fixture), expected, name);
+  }
+});
+
+test('outcome verification chronology uses epoch order across 9999 to extended year +010000', async () => {
+  const beforeContract = '9999-12-31T23:59:59.998Z';
+  const beforeBoundary = '9999-12-31T23:59:59.999Z';
+  const afterBoundary = '+010000-01-01T00:00:00.000Z';
+  const afterOne = '+010000-01-01T00:00:00.001Z';
+  const afterTwo = '+010000-01-01T00:00:00.002Z';
+  const afterThree = '+010000-01-01T00:00:00.003Z';
+
+  function chronologyFixture({
+    contractAt = beforeContract,
+    artifactAt = beforeBoundary,
+    verificationAt = afterBoundary,
+    recordAt = afterOne,
+    evaluationAt = afterTwo,
+    expiresAt = afterThree,
+  } = {}) {
+    const fixture = happyFixture({ contractCreatedAt: contractAt });
+    fixture.input.evaluatedAt = evaluationAt;
+    for (const record of fixture.records.values()) {
+      record.verification.verifiedAt = verificationAt;
+      record.recordedAt = recordAt;
+      record.validThrough = expiresAt;
+      for (const evidenceArtifact of record.evidenceArtifacts) {
+        evidenceArtifact.createdAt = artifactAt;
+      }
+    }
+    return fixture;
+  }
+
+  const accepted = await adjudicate(chronologyFixture());
+  assert.equal(accepted.verdict, OutcomeVerificationVerdict.VERIFIED);
+
+  for (const [name, options, expected] of [
+    [
+      'record before verification',
+      {
+        verificationAt: afterBoundary,
+        recordAt: beforeBoundary,
+        evaluationAt: afterTwo,
+        expiresAt: afterThree,
+      },
+      /record predates its verification/u,
+    ],
+    [
+      'validity ends before record',
+      {
+        verificationAt: beforeBoundary,
+        recordAt: afterBoundary,
+        evaluationAt: afterOne,
+        expiresAt: beforeBoundary,
+      },
+      /validity interval is invalid/u,
+    ],
+    [
+      'verification before contract',
+      {
+        contractAt: afterBoundary,
+        artifactAt: beforeBoundary,
+        verificationAt: beforeBoundary,
+        recordAt: afterOne,
+        evaluationAt: afterTwo,
+        expiresAt: afterThree,
+      },
+      /verification predates the exact outcome contract/u,
+    ],
+    [
+      'verification after evaluation',
+      {
+        contractAt: beforeContract,
+        artifactAt: beforeBoundary,
+        verificationAt: afterBoundary,
+        recordAt: afterBoundary,
+        evaluationAt: beforeBoundary,
+        expiresAt: afterOne,
+      },
+      /verification is future-dated/u,
+    ],
+    [
+      'record after evaluation',
+      {
+        contractAt: beforeContract,
+        artifactAt: beforeBoundary,
+        verificationAt: beforeBoundary,
+        recordAt: afterBoundary,
+        evaluationAt: beforeBoundary,
+        expiresAt: afterOne,
+      },
+      /record chronology is invalid/u,
+    ],
+    [
+      'evaluation after validity',
+      {
+        contractAt: beforeContract,
+        artifactAt: beforeBoundary,
+        verificationAt: beforeBoundary,
+        recordAt: beforeBoundary,
+        evaluationAt: afterBoundary,
+        expiresAt: beforeBoundary,
+      },
+      /record is stale/u,
+    ],
+    [
+      'evidence before contract',
+      {
+        contractAt: afterBoundary,
+        artifactAt: beforeBoundary,
+        verificationAt: afterOne,
+        recordAt: afterTwo,
+        evaluationAt: afterTwo,
+        expiresAt: afterThree,
+      },
+      /evidence predates the exact outcome contract/u,
+    ],
+    [
+      'evidence after verification',
+      {
+        contractAt: beforeContract,
+        artifactAt: afterBoundary,
+        verificationAt: beforeBoundary,
+        recordAt: afterOne,
+        evaluationAt: afterTwo,
+        expiresAt: afterThree,
+      },
+      /evidence is future-dated relative to verification/u,
+    ],
+    [
+      'evaluation before contract',
+      {
+        contractAt: afterBoundary,
+        artifactAt: afterBoundary,
+        verificationAt: afterOne,
+        recordAt: afterOne,
+        evaluationAt: beforeBoundary,
+        expiresAt: afterThree,
+      },
+      /evaluatedAt predates the exact outcome contract/u,
+    ],
+  ]) {
+    await assert.rejects(() => adjudicate(chronologyFixture(options)), expected, name);
   }
 });
 
