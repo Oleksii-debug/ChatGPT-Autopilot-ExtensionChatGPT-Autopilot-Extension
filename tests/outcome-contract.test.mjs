@@ -364,6 +364,48 @@ test('strict descriptor boundary rejects getters, hidden fields, symbols and spa
   assert.equal(getterReads, 0);
 });
 
+test('evidence projection request boundary executes zero getters and rejects hidden, symbol, inherited and unknown fields', () => {
+  const contract = createOutcomeContractV1(input());
+  let reads = 0;
+
+  const accessor = {};
+  Object.defineProperty(accessor, 'contract', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return contract;
+    },
+  });
+  accessor.assessments = [assessment('criterion-a'), assessment('criterion-b')];
+  assert.throws(() => projectOutcomeEvidenceV1(accessor), /enumerable data property/);
+  assert.equal(reads, 0);
+
+  const hidden = {
+    contract,
+    assessments: [assessment('criterion-a'), assessment('criterion-b')],
+  };
+  Object.defineProperty(hidden, 'shadowAuthority', { enumerable: false, value: 'ALLOW' });
+  assert.throws(() => projectOutcomeEvidenceV1(hidden), /unknown field|enumerable data property/);
+
+  const symbolic = {
+    contract,
+    assessments: [assessment('criterion-a'), assessment('criterion-b')],
+    [Symbol('authority')]: 'ALLOW',
+  };
+  assert.throws(() => projectOutcomeEvidenceV1(symbolic), /unknown field/);
+
+  const inherited = Object.create({ executionAuthorized: true });
+  inherited.contract = contract;
+  inherited.assessments = [assessment('criterion-a'), assessment('criterion-b')];
+  assert.throws(() => projectOutcomeEvidenceV1(inherited), /plain object/);
+
+  const nullProto = Object.assign(Object.create(null), {
+    contract,
+    assessments: [assessment('criterion-a'), assessment('criterion-b')],
+  });
+  assert.equal(projectOutcomeEvidenceV1(nullProto).status, OutcomeEvidenceStatus.EVIDENCE_READY);
+});
+
 test('coercive versions, ids, booleans and status aliases fail closed', () => {
   const contract = createOutcomeContractV1(input());
 
