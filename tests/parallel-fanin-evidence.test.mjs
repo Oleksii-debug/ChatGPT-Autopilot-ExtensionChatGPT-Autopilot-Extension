@@ -427,6 +427,8 @@ test('duplicate participants, results and claims fail closed', () => {
 });
 
 test('descriptor/symbol/sparse boundaries fail closed without executing getters', () => {
+  const baseInput = request();
+  const trusted = trustedDependencies(baseInput);
   let getterCalls = 0;
   const bad = result('a', 'evidence-a', SHA_C);
   Object.defineProperty(bad, 'nodeId', {
@@ -436,10 +438,10 @@ test('descriptor/symbol/sparse boundaries fail closed without executing getters'
       return 'a';
     },
   });
-  const input = request();
+  const input = baseInput;
   input.results[0] = bad;
   assert.throws(
-    () => buildWithTrustedVerification(input),
+    () => buildWithTrustedVerification(input, trusted),
     /enumerable own data properties/u,
   );
   assert.equal(getterCalls, 0);
