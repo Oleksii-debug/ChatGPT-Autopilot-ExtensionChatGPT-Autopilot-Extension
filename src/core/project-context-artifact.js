@@ -54,9 +54,8 @@ function version(value, label) {
 
 function id(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
-  const out = value.trim();
-  if (!ID.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+  if (value !== value.trim() || !ID.test(value)) throw new Error(`${label} is invalid`);
+  return value;
 }
 
 function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
@@ -68,18 +67,19 @@ function text(value, label, { optional = false, max = MAX_TEXT } = {}) {
 }
 
 function timestamp(value, label) {
-  if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
+  if (typeof value !== 'string' || !value) throw new Error(`${label} must be a timestamp`);
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  const canonical = new Date(ms).toISOString();
+  if (value !== canonical) throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  return value;
 }
 
 function digest(value, label, { optional = true } = {}) {
   if ((value == null || value === '') && optional) return '';
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
-  const out = value.trim().toLowerCase();
-  if (!SHA256.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+  if (!SHA256.test(value)) throw new Error(`${label} is invalid`);
+  return value;
 }
 
 function dataArray(value, label, max) {
@@ -196,7 +196,7 @@ export function normalizeProjectSourceRefV1(input) {
   const raw = plain(input, 'ProjectSourceRefV1');
   exactKeys(raw, SOURCE_KEYS, 'ProjectSourceRefV1');
   if (typeof raw.authority !== 'string') throw new Error('authority must be text');
-  const authority = raw.authority.trim().toUpperCase();
+  const authority = raw.authority;
   if (!AUTHORITY.has(authority)) throw new Error('authority is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ProjectSourceRefV1'),
