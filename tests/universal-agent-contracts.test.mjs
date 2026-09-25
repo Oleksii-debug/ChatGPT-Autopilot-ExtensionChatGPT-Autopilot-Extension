@@ -235,6 +235,72 @@ test('ToolDescriptorV1 requires unique bounded capabilities and ToolInvocationV1
   }), /policyDecisionId/);
 });
 
+test('universal authority and evidence identifiers reject leading or trailing whitespace aliases', () => {
+  const baseInvocation = {
+    schemaVersion: 1,
+    invocationId: 'invoke-1',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  };
+
+  for (const [field, value] of [
+    ['invocationId', ' invoke-1'],
+    ['toolId', 'fs.read '],
+    ['providerId', ' native-companion'],
+    ['policyDecisionId', 'decision-1 '],
+  ]) {
+    assert.throws(
+      () => normalizeToolInvocationV1({ ...baseInvocation, [field]: value }),
+      /invalid/u,
+      `${field} must not be normalized from a whitespace alias`,
+    );
+  }
+
+  assert.throws(
+    () => normalizeToolInvocationV1({
+      ...baseInvocation,
+      requestedCapabilityIds: [' filesystem.read'],
+    }),
+    /invalid/u,
+  );
+
+  assert.throws(
+    () => normalizeArtifactRefV1(artifact({ artifactId: ' artifact-1' })),
+    /artifactId is invalid/u,
+  );
+  assert.throws(
+    () => normalizeArtifactRefV1(artifact({ producerInvocationId: 'invoke-1 ' })),
+    /producerInvocationId is invalid/u,
+  );
+
+  assert.throws(
+    () => normalizePolicyDecisionV1({
+      schemaVersion: 1,
+      decisionId: ' decision-1',
+      invocationId: 'invoke-1',
+      decision: PolicyDecisionKind.DENY,
+      reasonCode: 'OWNER_DENY',
+      decidedAt: AT,
+    }),
+    /decisionId is invalid/u,
+  );
+
+  assert.throws(
+    () => normalizeCredentialRefV1(credential({ credentialId: 'cred-1 ' })),
+    /credentialId is invalid/u,
+  );
+
+  const canonical = normalizeToolInvocationV1(baseInvocation);
+  assert.equal(canonical.invocationId, 'invoke-1');
+  assert.equal(canonical.toolId, 'fs.read');
+  assert.equal(canonical.providerId, 'native-companion');
+  assert.equal(canonical.policyDecisionId, 'decision-1');
+});
+
 test('PolicyDecisionV1 approval authority is explicit and cannot appear on allow/deny decisions', () => {
   const approval = normalizePolicyDecisionV1({
     schemaVersion: 1,
