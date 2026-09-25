@@ -250,8 +250,11 @@ export function extendAgentPlanV1(raw, options = {}) {
     // erase an exotic prototype and silently turn malformed budget input into
     // an apparently safe plain object.
     const normalizedBudget = normalizeBudget(rawNode.budget === undefined ? {} : rawNode.budget);
+    // rawNode itself is descriptor-checked by object(); preserve the original
+    // nested array objects until normalizeNode() validates their canonical
+    // dense data descriptors. Cloning here would materialize accessors first.
     const candidate = normalizeNode({
-      ...structuredClone(rawNode),
+      ...rawNode,
       budget: normalizedBudget,
       state: AgentPlanNodeState.PENDING,
       evidence: '',
