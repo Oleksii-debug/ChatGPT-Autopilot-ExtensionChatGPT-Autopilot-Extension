@@ -64,6 +64,78 @@ test('paid routes with any unknown price dimension are rejected before automatic
   );
 });
 
+test('explicit zero owner price caps reject positive paid dimensions while absent caps remain unbounded', () => {
+  const priceVariants = normalizeAiRoutePool([
+    {
+      routeId:'positive-input', provider:'openai', model:'input-paid', roles:['planner'],
+      locality:'remote', costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:0,
+    },
+    {
+      routeId:'positive-output', provider:'openai', model:'output-paid', roles:['planner'],
+      locality:'remote', costClass:'paid', inputPricePerMillionUsd:0, outputPricePerMillionUsd:1,
+    },
+    {
+      routeId:'zero-both', provider:'openai', model:'zero-paid', roles:['planner'],
+      locality:'remote', costClass:'paid', inputPricePerMillionUsd:0, outputPricePerMillionUsd:0,
+    },
+  ]);
+
+  assert.deepEqual(
+    selectAiRouteCandidates({
+      routes:priceVariants,
+      policy:{},
+      role:'planner',
+      now:1000,
+    }).candidates.map(route => route.routeId),
+    ['positive-input', 'positive-output', 'zero-both'],
+    'absent caps must remain unbounded',
+  );
+
+  assert.deepEqual(
+    selectAiRouteCandidates({
+      routes:priceVariants,
+      policy:{ maxInputPricePerMillionUsd:0 },
+      role:'planner',
+      now:1000,
+    }).candidates.map(route => route.routeId),
+    ['positive-output', 'zero-both'],
+    'explicit zero input cap must reject positive input price before dispatch',
+  );
+
+  assert.deepEqual(
+    selectAiRouteCandidates({
+      routes:priceVariants,
+      policy:{ maxOutputPricePerMillionUsd:0 },
+      role:'planner',
+      now:1000,
+    }).candidates.map(route => route.routeId),
+    ['positive-input', 'zero-both'],
+    'explicit zero output cap must reject positive output price before dispatch',
+  );
+
+  assert.deepEqual(
+    selectAiRouteCandidates({
+      routes:priceVariants,
+      policy:{ maxInputPricePerMillionUsd:0, maxOutputPricePerMillionUsd:0 },
+      role:'planner',
+      now:1000,
+    }).candidates.map(route => route.routeId),
+    ['zero-both'],
+  );
+});
+
+test('route final tie-break uses locale-independent code-unit order', () => {
+  const sameRank = normalizeAiRoutePool([
+    { routeId:'alpha', provider:'ollama', model:'a', roles:['planner'], priority:1 },
+    { routeId:'Zulu', provider:'ollama', model:'z', roles:['planner'], priority:1 },
+  ]);
+  assert.deepEqual(
+    selectAiRouteCandidates({ routes:sameRank, policy:{}, role:'planner', now:1000 })
+      .candidates.map(route => route.routeId),
+    ['Zulu', 'alpha'],
+  );
+});
+
 test('route failures create bounded backoff and open a circuit at the configured threshold', () => {
   const [route] = normalizeAiRoutePool([{ routeId:'a', provider:'ollama', model:'a', roles:[], priority:1 }]);
   const policy = normalizeAiRoutePolicy({ retryBackoffSeconds:30, circuitBreakerFailures:2, circuitBreakerSeconds:300 });
