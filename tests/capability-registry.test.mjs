@@ -30,6 +30,31 @@ test('unknown or under-capable providers fail closed', () => {
   assert.throws(() => requireAgentProviderCapabilities(AgentProviderId.CHATGPT_BROWSER, ['not-yet-supported']), /lacks capabilities/);
 });
 
+test('provider identities are exact text and never trimmed or coerced', () => {
+  for (const alias of [
+    ` ${AgentProviderId.CHATGPT_BROWSER}`,
+    `${AgentProviderId.CHATGPT_BROWSER} `,
+    '',
+  ]) {
+    assert.throws(
+      () => getAgentProvider(alias),
+      /exact canonical text representation/,
+    );
+  }
+
+  let coercions = 0;
+  const coercive = {
+    toString() {
+      coercions += 1;
+      return AgentProviderId.CHATGPT_BROWSER;
+    },
+  };
+  assert.throws(
+    () => getAgentProvider(coercive),
+    /exact canonical text representation/,
+  );
+  assert.equal(coercions, 0);
+});
 
 test('provider launch URL is bound to its declared site adapter', () => {
   assert.equal(resolveAgentProviderLaunchUrl(AgentProviderId.CHATGPT_BROWSER, ''), 'https://chatgpt.com/');
