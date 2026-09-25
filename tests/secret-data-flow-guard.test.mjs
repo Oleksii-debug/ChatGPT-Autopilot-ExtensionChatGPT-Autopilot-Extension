@@ -38,6 +38,19 @@ function artifactRef({
   };
 }
 
+function defaultInputBinding(artifactId) {
+  const known = {
+    'artifact-a': { versionId: 'version-a1', sha256: SHA_A1 },
+    'artifact-b': { versionId: 'version-b1', sha256: SHA_B1 },
+    'artifact-c': { versionId: 'version-c1', sha256: SHA_C1 },
+  };
+  const binding = known[artifactId] ?? {
+    versionId: `version-${artifactId.replace(/^artifact-/u, '') || 'missing'}1`,
+    sha256: 'e'.repeat(64),
+  };
+  return { artifactId, versionId: binding.versionId, sha256: binding.sha256 };
+}
+
 function version({
   artifactId,
   versionId,
@@ -45,10 +58,13 @@ function version({
   sha256,
   sensitive = false,
   inputArtifactIds = [],
+  inputArtifactBindings = null,
   createdAt = T0,
   provenanceAt = createdAt,
   registeredAt = provenanceAt,
 } = {}) {
+  const exactInputArtifactBindings = inputArtifactBindings
+    ?? inputArtifactIds.map(defaultInputBinding);
   const ref = artifactRef({
     artifactId,
     sha256,
@@ -68,6 +84,7 @@ function version({
       artifactRef: { ...ref },
       sourceBindings: [],
       inputArtifactIds: [...inputArtifactIds],
+      inputArtifactBindings: exactInputArtifactBindings.map(binding => ({ ...binding })),
       createdAt: provenanceAt,
     },
     registeredAt,
@@ -154,9 +171,9 @@ test('canonical non-sensitive lineage is only ready for owner policy and never s
   assert.equal(result.lineageProvenance, 'CANONICAL_ARTIFACT_REGISTRY');
   assert.equal(result.lineageCompletenessVerified, false);
   assert.equal(result.requiresCanonicalLineageResolution, true);
-  assert.equal(result.exactInputVersionBindingVerified, false);
-  assert.equal(result.inputVersionResolution, 'CONSERVATIVE_ALL_PLAUSIBLE_VERSIONS');
-  assert.equal(result.requiresExactInputVersionBindingUpgrade, true);
+  assert.equal(result.exactInputVersionBindingVerified, true);
+  assert.equal(result.inputVersionResolution, 'EXACT_CANONICAL_BINDINGS');
+  assert.equal(result.requiresExactInputVersionBindingUpgrade, false);
   assert.equal(result.requiresCanonicalPolicyDecision, true);
   assert.equal(result.requiresIndependentSecretScan, true);
   assert.equal(result.declassificationAuthorized, false);
@@ -188,8 +205,8 @@ test('omitted canonical provenance edge can never yield a positive completeness 
   assert.equal(result.lineageProvenance, 'CANONICAL_ARTIFACT_REGISTRY');
   assert.equal(result.lineageCompletenessVerified, false);
   assert.equal(result.requiresCanonicalLineageResolution, true);
-  assert.equal(result.exactInputVersionBindingVerified, false);
-  assert.equal(result.requiresExactInputVersionBindingUpgrade, true);
+  assert.equal(result.exactInputVersionBindingVerified, true);
+  assert.equal(result.requiresExactInputVersionBindingUpgrade, false);
   assert.equal(result.requiresIndependentSecretScan, true);
   assert.equal(result.executionAuthorized, false);
   assert.deepEqual(result.violations, []);
@@ -209,6 +226,56 @@ test('sensitive canonical input propagates into a correctly marked derived artif
   assert.equal(result.egresses[0].effectiveSensitive, true);
   assert.equal(result.egresses[0].independentSecretReviewRequired, true);
   assert.equal(result.executionAuthorized, false);
+});
+
+test('exact provenance follows the bound input version instead of later plausible versions', () => {
+  const a1 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a1',
+    sha256: SHA_A1,
+    sensitive: false,
+    createdAt: T0,
+  });
+  const a2 = version({
+    artifactId: 'artifact-a',
+    versionId: 'version-a2',
+    parentVersionId: 'version-a1',
+    sha256: SHA_A2,
+    sensitive: true,
+    createdAt: T1,
+  });
+  const b1 = version({
+    artifactId: 'artifact-b',
+    versionId: 'version-b1',
+    sha256: SHA_B1,
+    sensitive: false,
+    inputArtifactIds: ['artifact-a'],
+    inputArtifactBindings: [{
+      artifactId: 'artifact-a',
+      versionId: 'version-a1',
+      sha256: SHA_A1,
+    }],
+    createdAt: T2,
+  });
+  const reg = registry([
+    entry('artifact-a', [a1, a2]),
+    entry('artifact-b', [b1]),
+  ]);
+
+  const result = assessSecretDataFlowV1(request({
+    registryRevision: 3,
+    egresses: [],
+    assessedAt: T4,
+  }), { artifactRegistry: reg });
+
+  assert.equal(result.status, SecretDataFlowStatus.READY_FOR_POLICY);
+  assert.equal(result.exactInputVersionBindingVerified, true);
+  assert.equal(result.inputVersionResolution, 'EXACT_CANONICAL_BINDINGS');
+  assert.equal(result.requiresExactInputVersionBindingUpgrade, false);
+  assert.equal(result.lineageCompletenessVerified, false);
+  assert.equal(result.artifactStates[0].inheritedSensitive, false);
+  assert.equal(result.artifactStates[0].effectiveSensitive, false);
+  assert.deepEqual(result.violations, []);
 });
 
 test('canonical provenance prevents caller omission from hiding sensitive ancestry', () => {
@@ -382,7 +449,7 @@ test('canonical lineage fails closed on unknown dependency and cyclic provenance
   const unknown = defaultRegistry({ bInputs: ['artifact-missing'] });
   assert.throws(
     () => assess(request(), unknown),
-    /references unknown artifact/,
+    /Artifact input dependency not found/,
   );
 
   const a1 = version({
@@ -390,7 +457,7 @@ test('canonical lineage fails closed on unknown dependency and cyclic provenance
     versionId: 'version-a1',
     sha256: SHA_A1,
     inputArtifactIds: ['artifact-b'],
-    createdAt: T0,
+    createdAt: T1,
     provenanceAt: T1,
     registeredAt: T1,
   });
@@ -399,7 +466,7 @@ test('canonical lineage fails closed on unknown dependency and cyclic provenance
     versionId: 'version-b1',
     sha256: SHA_B1,
     inputArtifactIds: ['artifact-a'],
-    createdAt: T0,
+    createdAt: T1,
     provenanceAt: T1,
     registeredAt: T1,
   });
@@ -418,11 +485,11 @@ test('canonical lineage fails closed on unknown dependency and cyclic provenance
       egresses: [],
       assessedAt: T2,
     }), { artifactRegistry: cyclic }),
-    /provenance contains a cycle/,
+    /input dependencies must be acyclic/,
   );
 });
 
-test('dependency must have a canonically admitted version before use', () => {
+test('canonical registry rejects dependency admitted after derived materialization', () => {
   const a1 = version({
     artifactId: 'artifact-a',
     versionId: 'version-a1',
@@ -455,7 +522,7 @@ test('dependency must have a canonically admitted version before use', () => {
       egresses: [],
       assessedAt: T3,
     }), { artifactRegistry: reg }),
-    /no admitted version before dependency use/,
+    /Artifact input registration is from the future/,
   );
 });
 
