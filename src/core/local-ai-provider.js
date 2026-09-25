@@ -69,7 +69,12 @@ export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_S
 
 export function normalizeLocalAiSettings(raw = {}) {
   const source = snapshotSettingsRecord(raw);
-  const providerType = PROVIDER_TYPES.has(source.providerType) ? source.providerType : DEFAULT_LOCAL_AI_SETTINGS.providerType;
+  const providerType = source.providerType === undefined
+    ? DEFAULT_LOCAL_AI_SETTINGS.providerType
+    : source.providerType;
+  if (!PROVIDER_TYPES.has(providerType)) {
+    throw new Error('Local AI provider type must be ollama or openai-compatible');
+  }
   const timeoutSeconds = source.timeoutSeconds ?? DEFAULT_LOCAL_AI_SETTINGS.timeoutSeconds;
   if (typeof timeoutSeconds !== 'number'
       || !Number.isInteger(timeoutSeconds)
