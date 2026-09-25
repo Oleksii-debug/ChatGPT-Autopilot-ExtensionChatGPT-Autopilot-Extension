@@ -1,7 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { webcrypto } from 'node:crypto';
-
 import {
   MAX_REMOTE_STEERING_TTL_MS,
   RemoteSteeringAction,
@@ -52,7 +50,6 @@ function currentSnapshot(overrides = {}) {
 
 async function assess(input, snapshot = currentSnapshot(), onResolve = null, assessmentAt = ASSESSMENT_AT) {
   return assessRemoteSteeringCommandV1(input, {
-    cryptoApi: webcrypto,
     assessmentAt,
     async resolveCurrentSnapshot(request) {
       if (onResolve) onResolve(request);
@@ -96,7 +93,7 @@ test('admits exact current PAUSE proposal only for canonical authorization', asy
 
 test('requires a trusted canonical current-state resolver and ignores no caller snapshot', async () => {
   await assert.rejects(
-    () => assessRemoteSteeringCommandV1(validInput(), { cryptoApi: webcrypto }),
+    () => assessRemoteSteeringCommandV1(validInput(), { assessmentAt: ASSESSMENT_AT }),
     /trusted current-state resolver/u,
   );
 
@@ -121,7 +118,6 @@ test('requires a trusted canonical current-state resolver and ignores no caller 
 
   await assert.rejects(
     () => assessRemoteSteeringCommandV1(validInput(), {
-      cryptoApi: webcrypto,
       resolveCurrentSnapshot: async () => currentSnapshot(),
     }),
     /assessmentAt must be a canonical ISO timestamp/u,
@@ -401,9 +397,41 @@ test('rejects unknown and hidden redirect fields with exact target identity', as
   await assert.rejects(() => assess(hidden), /unknown field: policyDecision/u);
 });
 
+test('remote command fingerprint cannot use caller-supplied digest authority', async () => {
+  let digestCalls = 0;
+  const fakeCrypto = {
+    subtle: {
+      async digest() {
+        digestCalls += 1;
+        return new Uint8Array(32).buffer;
+      },
+    },
+  };
+
+  await assert.rejects(
+    () => assessRemoteSteeringCommandV1(validInput(), {
+      cryptoApi: fakeCrypto,
+      assessmentAt: ASSESSMENT_AT,
+      resolveCurrentSnapshot: async () => currentSnapshot(),
+    }),
+    /unknown field: cryptoApi/u,
+  );
+  assert.equal(digestCalls, 0);
+
+  const symbolOptions = {
+    assessmentAt: ASSESSMENT_AT,
+    resolveCurrentSnapshot: async () => currentSnapshot(),
+  };
+  symbolOptions[Symbol('cryptoAuthority')] = fakeCrypto;
+  await assert.rejects(
+    () => assessRemoteSteeringCommandV1(validInput(), symbolOptions),
+    /symbol fields/u,
+  );
+  assert.equal(digestCalls, 0);
+});
+
 test('does not trust hidden or unknown dependency-injection option fields', async () => {
   const options = {
-    cryptoApi: webcrypto,
     assessmentAt: ASSESSMENT_AT,
     resolveCurrentSnapshot: async () => currentSnapshot(),
     authority: 'ALLOW',
