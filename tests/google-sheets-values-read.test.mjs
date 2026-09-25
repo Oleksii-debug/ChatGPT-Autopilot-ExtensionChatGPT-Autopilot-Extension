@@ -138,7 +138,7 @@ test('Sheets read rejects absent credential, foreign type, aliases, and accessor
   let fetchCalls = 0;
   let getterReads = 0;
   const noCredential = new GoogleWorkspaceRestClientV1(config({
-    overrides: { sheetsCredentialId: '' },
+    overrides: { sheetsCredentialId: null },
     fetchImpl: async () => { fetchCalls += 1; return response(500, {}); },
   }));
   await assert.rejects(
