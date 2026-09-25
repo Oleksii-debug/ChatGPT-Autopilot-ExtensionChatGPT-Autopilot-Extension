@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { makeScenarioWorkProfile, parseScenarioWorkProfile } from '../../src/ui/scenario-work-profile.js';
+import { ScenarioWorkManager } from '../../src/core/scenario-work-manager.js';
 
 for (const [mode, extra] of [
   ['CHAT_CYCLE', { launchUrl: 'https://chatgpt.com/', steps: [{ prompt: 'Перший', repeat: 1 }, { prompt: 'Далі', repeat: 29 }] }],
@@ -43,4 +44,29 @@ test('scenario import remains reachable from every scenario sub-tab', async () =
   assert.match(html, /<label for="scenario-work-profile-file">JSON-файл сценарію<\/label>/);
   assert.match(js, /'scenario-work-import-button'\)\.addEventListener\('click', importScenarioWorkProfile\)/);
   assert.match(js, /core\('CREATE_SCENARIO_WORK', \{ name: config\.name, mode: config\.mode, config \}\)/);
+});
+
+test('imported config creates a fresh stopped Core scenario with no inherited counters', async () => {
+  const storage = {};
+  const chromeApi = { storage: { local: {
+    async get(key) { return { [key]: structuredClone(storage[key]) }; },
+    async set(value) { Object.assign(storage, structuredClone(value)); },
+  } }, alarms: { async create() {}, async clear() {} } };
+  const state = { sessionsById: {}, sessionOrder: [], tabHintsByTaskId: {}, logs: {} };
+  const coreRepository = {
+    async load() { return structuredClone(state); },
+    async update(mutator) { await mutator(state); return structuredClone(state); },
+  };
+  const manager = new ScenarioWorkManager({ coreRepository, chromeApi, createId: () => 'new-id',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }) });
+  const profile = makeScenarioWorkProfile({ id: 'old-id', mode: 'CHAT_CYCLE', name: 'Імпорт',
+    roundsPerGeneration: 1, steps: [{ prompt: 'Спроба', repeat: 10 }] });
+  profile.runtime = { runState: 'RUNNING', totalCompletedTurns: 200 };
+  const config = parseScenarioWorkProfile(JSON.stringify(profile));
+  const { scenario } = await manager.create({ name: config.name, mode: config.mode, config });
+  assert.equal(scenario.id, 'new-id');
+  assert.equal(scenario.runtime.runState, 'STOPPED');
+  assert.equal(scenario.runtime.totalCompletedTurns, 0);
+  assert.equal(scenario.config.steps[0].repeat, 10);
+  assert.equal(Object.keys(state.sessionsById).length, 0);
 });
