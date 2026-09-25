@@ -390,8 +390,57 @@ export function arbitrateTruthFactV1(input) {
   const selectedRankStates = fresh.filter(
     state => rankByAuthority.get(state.authorityClass) === bestFreshRank,
   );
-  const hashes = new Set(selectedRankStates.map(state => state.contentSha256));
-  if (hashes.size > 1) {
+  const selectedRankStaleAvailable = orderedStates.filter(
+    state => rankByAuthority.get(state.authorityClass) === bestFreshRank
+      && state.available
+      && !isFresh(state, rule, asOfMs),
+  );
+  if (selectedRankStaleAvailable.length) {
+    const refreshable = selectedRankStaleAvailable.filter(state => state.refreshable);
+    if (refreshable.length) {
+      return deepFreeze({
+        schemaVersion: TruthArbitrationContractVersion,
+        factId,
+        factClass,
+        ruleId: rule.ruleId,
+        asOf,
+        status: TruthResolutionStatus.REFRESH_REQUIRED,
+        canonical: null,
+        refreshRequests: refreshable
+          .map(state => refreshProjection(state, 'EQUAL_AUTHORITY_STALE_OR_MISSING'))
+          .sort((a, b) => asciiCompare(a.sourceId, b.sourceId)),
+        conflicts: [],
+        overriddenDisagreements: [],
+        unavailableHigherAuthoritySourceIds: [],
+        attention: null,
+      });
+    }
+    return deepFreeze({
+      schemaVersion: TruthArbitrationContractVersion,
+      factId,
+      factClass,
+      ruleId: rule.ruleId,
+      asOf,
+      status: TruthResolutionStatus.UNAVAILABLE,
+      canonical: null,
+      refreshRequests: [],
+      conflicts: [],
+      overriddenDisagreements: [],
+      unavailableHigherAuthoritySourceIds: [],
+      attention: attentionProjection(
+        factId,
+        factClass,
+        'TRUTH_UNAVAILABLE',
+        'EQUAL_AUTHORITY_REFRESH_UNAVAILABLE',
+        selectedRankStaleAvailable.map(state => state.sourceId),
+      ),
+    });
+  }
+
+  const claims = new Set(
+    selectedRankStates.map(state => `${state.revisionId}\u0000${state.contentSha256}`),
+  );
+  if (claims.size > 1) {
     const conflicts = selectedRankStates
       .map(state => evidenceProjection(state, bestFreshRank))
       .sort((a, b) => asciiCompare(a.sourceId, b.sourceId));
@@ -430,7 +479,8 @@ export function arbitrateTruthFactV1(input) {
   const overriddenDisagreements = fresh
     .filter(state =>
       rankByAuthority.get(state.authorityClass) > bestFreshRank
-      && state.contentSha256 !== selected.contentSha256)
+      && (state.revisionId !== selected.revisionId
+        || state.contentSha256 !== selected.contentSha256))
     .map(state => deepFreeze({
       ...evidenceProjection(state, rankByAuthority.get(state.authorityClass)),
       overriddenByAuthority: true,
