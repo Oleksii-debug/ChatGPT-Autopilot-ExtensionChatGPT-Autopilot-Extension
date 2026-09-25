@@ -16,6 +16,7 @@ export const GitHubToolId = Object.freeze({
   FILE_PUT: 'remote/github/file.put',
   FILE_DELETE: 'remote/github/file.delete',
   PULL_REQUEST_CREATE: 'remote/github/pullRequest.create',
+  PULL_REQUEST_COMMENT_CREATE: 'remote/github/pullRequest.comment.create',
   ISSUE_CREATE: 'remote/github/issue.create',
   ISSUE_COMMENT_CREATE: 'remote/github/issueComment.create',
 });
