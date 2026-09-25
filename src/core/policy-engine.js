@@ -183,6 +183,7 @@ const CLASSIFICATION_KEYS = new Set([
   'schemaVersion',
   'classificationId',
   'invocationId',
+  'invocationFingerprint',
   'classifierId',
   'effectRisk',
   'dataSensitivity',
@@ -196,6 +197,14 @@ export function normalizePolicyClassificationV1(input) {
     schemaVersion: exactVersion(raw.schemaVersion, 'PolicyClassificationV1'),
     classificationId: id(raw.classificationId, 'classificationId'),
     invocationId: id(raw.invocationId, 'classification invocationId'),
+    invocationFingerprint: (() => {
+      if (typeof raw.invocationFingerprint !== 'string'
+          || !raw.invocationFingerprint
+          || raw.invocationFingerprint.length > 300_000) {
+        throw new Error('invocationFingerprint is invalid');
+      }
+      return raw.invocationFingerprint;
+    })(),
     classifierId: id(raw.classifierId, 'classifierId'),
     effectRisk: risk(raw.effectRisk),
     dataSensitivity: sensitivity(raw.dataSensitivity),
@@ -290,6 +299,33 @@ function strictInvocation(input) {
     requestedCapabilityIds,
     arguments: dataOnlyJson(raw.arguments, 'ToolInvocationV1.arguments'),
   });
+}
+
+function canonicalFingerprintValue(value) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Object.is(value, -0) ? 0 : value;
+  if (Array.isArray(value)) return value.map(canonicalFingerprintValue);
+  const out = Object.create(null);
+  for (const key of Object.keys(value).sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0)))) {
+    out[key] = canonicalFingerprintValue(value[key]);
+  }
+  return out;
+}
+
+export function createPolicyInvocationFingerprintV1(invocationInput) {
+  const invocation = strictInvocation(invocationInput);
+  return JSON.stringify([
+    'chatgpt-autopilot-policy-invocation-v1',
+    invocation.schemaVersion,
+    invocation.invocationId,
+    invocation.toolId,
+    invocation.providerId,
+    [...invocation.requestedCapabilityIds].sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0))),
+    invocation.policyDecisionId,
+    canonicalFingerprintValue(invocation.arguments),
+    invocation.createdAt,
+    invocation.parentInvocationId,
+  ]);
 }
 
 function strictToolDescriptor(input) {
@@ -430,6 +466,16 @@ export function evaluateOwnerPolicyV1({
 
   if (normalizedClassification.invocationId !== normalizedInvocation.invocationId) {
     return denyResult(baseContext, 'CLASSIFICATION_INVOCATION_MISMATCH', 'Policy classification is not bound to this invocation.');
+  }
+  const invocationFingerprint = createPolicyInvocationFingerprintV1(normalizedInvocation);
+  if (normalizedClassification.invocationFingerprint !== invocationFingerprint) {
+    return denyResult(baseContext, 'CLASSIFICATION_INVOCATION_FINGERPRINT_MISMATCH', 'Policy classification does not match the exact invocation bytes.');
+  }
+  if (Date.parse(normalizedClassification.classifiedAt) < Date.parse(normalizedInvocation.createdAt)) {
+    return denyResult(baseContext, 'CLASSIFICATION_PREDATES_INVOCATION', 'Policy classification predates the invocation.');
+  }
+  if (Date.parse(normalizedDecidedAt) < Date.parse(normalizedClassification.classifiedAt)) {
+    return denyResult(baseContext, 'POLICY_DECISION_PREDATES_CLASSIFICATION', 'Policy decision predates the classification.');
   }
   if (!normalizedProfile.trustedClassifierIds.includes(normalizedClassification.classifierId)) {
     return denyResult(baseContext, 'CLASSIFIER_NOT_TRUSTED', 'Policy classification authority is not trusted by the owner profile.');
