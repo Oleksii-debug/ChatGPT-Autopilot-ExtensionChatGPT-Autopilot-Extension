@@ -106,6 +106,18 @@ test('private proposal arguments neither persist nor influence a durable fingerp
   assert.notEqual(first.invocationIdentityFingerprint, differentIdentity.invocationIdentityFingerprint);
 });
 
+test('capability-set permutations produce one stable public identity fingerprint', async () => {
+  const first = await createShadowExecutionV1(shadow({
+    invocation: invocation({ requestedCapabilityIds: ['repo.write', 'repo.read'] }),
+  }));
+  const second = await createShadowExecutionV1(shadow({
+    invocation: invocation({ requestedCapabilityIds: ['repo.read', 'repo.write'] }),
+  }));
+  assert.deepEqual(first.proposedInvocation.requestedCapabilityIds, ['repo.read', 'repo.write']);
+  assert.deepEqual(second.proposedInvocation.requestedCapabilityIds, ['repo.read', 'repo.write']);
+  assert.equal(first.invocationIdentityFingerprint, second.invocationIdentityFingerprint);
+});
+
 test('shadow identities and timestamps require exact representation and causal time', async () => {
   await assert.rejects(
     createShadowExecutionV1(shadow({ shadowRunId: ' shadow-run-1' })),
