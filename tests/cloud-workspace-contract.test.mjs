@@ -344,8 +344,7 @@ test('binding itself requires a fresh ready observation within the live lease', 
     ownership,
     { at: '2026-09-25T06:06:00.000Z' },
   ), /fresh observation/);
-}
-
+});
 
 test('assessment option timestamp is data-only and cannot execute an accessor', () => {
   const { binding, ownership } = bindingAndOwnership();
