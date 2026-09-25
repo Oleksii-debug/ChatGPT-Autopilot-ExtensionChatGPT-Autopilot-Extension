@@ -88,7 +88,8 @@ test('reports conservative executable and remote-loading risk evidence without e
     '<meta http-equiv="refresh" content="0;url=https://example.test/next">',
     '</head><body onload="boot()">',
     '<script>location.href="javascript:alert(1)"</script>',
-    '<iframe src="https://example.test/frame"></iframe>',\n    '<img src="/relative-image.png" alt="x">',
+    '<iframe src="https://example.test/frame"></iframe>',
+    '<img src="/relative-image.png" alt="x">',
     '<form action="//example.test/post"><input></form>',
     '<a href="data:text/html,x">x</a>',
     '</body></html>',
@@ -105,6 +106,7 @@ test('reports conservative executable and remote-loading risk evidence without e
     'JAVASCRIPT_URL',
     'META_REFRESH',
     'REMOTE_RESOURCE_URL',
+    'RESOURCE_LOADING_TAG',
     'SCRIPT_TAG',
     'STYLE_SURFACE',
   ]) {
@@ -115,6 +117,21 @@ test('reports conservative executable and remote-loading risk evidence without e
   assert.equal(out.executionAuthorized, false);
   assert.equal(out.browserNavigationAuthorized, false);
 });
+
+test('flags relative resource-loading elements independently of absolute URL spelling', async () => {
+  for (const markup of [
+    '<img src="/images/a.png" alt="a">',
+    '<link rel="stylesheet" href="./site.css">',
+    '<video controls><source src="../movie.mp4" type="video/mp4"></video>',
+  ]) {
+    const out = await preflightHtmlArtifactV1(request('<html><head></head><body>' + markup + '</body></html>'));
+    assert.equal(out.lexical.riskIndicators.includes('RESOURCE_LOADING_TAG'), true, markup);
+    assert.equal(out.safeForAutomaticRender, false);
+    assert.equal(out.activeContentScanComplete, false);
+    assert.equal(out.requiresQualifiedHtmlParser, true);
+  }
+});
+
 
 test('sensitive HTML returns structural facts only and preserves disclosure fence', async () => {
   const bytes = utf8('<html><body>private</body></html>');
