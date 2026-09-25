@@ -246,7 +246,7 @@ test('foreign verifier, missing verification authority, and self-verifier plans 
   );
 });
 
-test('evidence must be exact hashed artifacts from the verification invocation and exact time interval', () => {
+test('evidence must be exact hashed ArtifactRefs explicitly referenced by verification and time-bounded', () => {
   const missing = happyInput();
   missing.evidenceArtifacts = [
     artifact({ artifactId: 'evidence-artifact', producerInvocationId: 'verify-artifact' }),
@@ -264,12 +264,13 @@ test('evidence must be exact hashed artifacts from the verification invocation a
   });
   assert.throws(() => adjudicateOutcomeVerificationV1(unhashed), /must have sha256/);
 
-  const foreignProducer = happyInput();
-  foreignProducer.evidenceArtifacts[0] = artifact({
+  const actorProduced = happyInput();
+  actorProduced.evidenceArtifacts[0] = artifact({
     artifactId: 'evidence-tests',
-    producerInvocationId: 'other-invocation',
+    producerInvocationId: 'actor-tool-invocation',
   });
-  assert.throws(() => adjudicateOutcomeVerificationV1(foreignProducer), /producer does not match/);
+  const actorProducedResult = adjudicateOutcomeVerificationV1(actorProduced);
+  assert.equal(actorProducedResult.verdict, OutcomeVerificationVerdict.VERIFIED);
 
   const stale = happyInput();
   stale.evidenceArtifacts[0] = artifact({
