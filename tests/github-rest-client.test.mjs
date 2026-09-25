@@ -6,8 +6,53 @@ const repo = 'Oleksii-debug/example';
 const blobSha = 'a'.repeat(40);
 const commitSha = 'b'.repeat(40);
 
-function jsonResponse(status, payload) {
-  return { status, text: async () => JSON.stringify(payload) };
+const encoder = new TextEncoder();
+
+function rawStreamResponse(status, text, { declaredLength = null, chunks = null } = {}) {
+  const bytes = encoder.encode(text);
+  const streamChunks = chunks || [bytes];
+  const state = { reads: 0, cancelled: false, released: false, bodyCancelled: false };
+  let index = 0;
+  const body = {
+    async cancel() {
+      state.bodyCancelled = true;
+    },
+    getReader() {
+      return {
+        async read() {
+          state.reads += 1;
+          if (index >= streamChunks.length) return { done: true, value: undefined };
+          const value = streamChunks[index];
+          index += 1;
+          return { done: false, value };
+        },
+        async cancel() {
+          state.cancelled = true;
+        },
+        releaseLock() {
+          state.released = true;
+        },
+      };
+    },
+  };
+  return {
+    response: {
+      status,
+      headers: {
+        get(name) {
+          return String(name).toLowerCase() === 'content-length' && declaredLength != null
+            ? String(declaredLength)
+            : null;
+        },
+      },
+      body,
+    },
+    state,
+  };
+}
+
+function jsonResponse(status, payload, options = {}) {
+  return rawStreamResponse(status, JSON.stringify(payload), options).response;
 }
 
 function nativeCredential(calls, secret = 'token-secret-value') {
@@ -295,5 +340,155 @@ test('read-only transport failure is retry-safe and branch/file inputs fail clos
   await assert.rejects(
     () => client.createBranch({ repositoryFullName: repo, branch: '../bad', fromSha: commitSha }),
     error => error.code === 'GITHUB_INVALID_REQUEST',
+  );
+});
+
+
+test('GitHub response transport admits the exact 4,000,000-byte boundary and parses it deterministically', async () => {
+  const prefix = '{"pad":"';
+  const suffix = '"}';
+  const targetBytes = 4_000_000;
+  const overhead = encoder.encode(prefix + suffix).byteLength;
+  const remaining = targetBytes - overhead;
+  const wideCount = Math.floor(remaining / 3);
+  const tail = 'a'.repeat(remaining - (wideCount * 3));
+  const text = prefix + '界'.repeat(wideCount) + tail + suffix;
+  assert.equal(encoder.encode(text).byteLength, targetBytes);
+  assert.ok(text.length <= 1_500_000);
+
+  const tracked = rawStreamResponse(200, text);
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => tracked.response,
+  });
+  const payload = await client.request('GET', '/repos/Oleksii-debug/example');
+  assert.equal(typeof payload.pad, 'string');
+  assert.equal(tracked.state.cancelled, false);
+  assert.equal(tracked.state.released, true);
+});
+
+test('declared GitHub response overflow rejects before reader acquisition and preserves mutation ambiguity', async () => {
+  const tracked = rawStreamResponse(201, '{"ok":true}', { declaredLength: 4_000_001 });
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => tracked.response,
+  });
+
+  await assert.rejects(
+    () => client.createBranch({ repositoryFullName: repo, branch: 'work/oversize', fromSha: commitSha }),
+    error => error.code === 'GITHUB_RESPONSE_TOO_LARGE'
+      && error.status === 201
+      && error.effectMayHaveOccurred === true
+      && error.safeToRetry === false,
+  );
+  assert.equal(tracked.state.reads, 0);
+  assert.equal(tracked.state.bodyCancelled, true);
+});
+
+test('chunked GitHub response overflow cancels the reader before unbounded materialization', async () => {
+  const tracked = rawStreamResponse(200, '', {
+    chunks: [new Uint8Array(2_000_000), new Uint8Array(2_000_001)],
+  });
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => tracked.response,
+  });
+
+  await assert.rejects(
+    () => client.readRepository({ repositoryFullName: repo }),
+    error => error.code === 'GITHUB_RESPONSE_TOO_LARGE'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+  assert.equal(tracked.state.reads, 2);
+  assert.equal(tracked.state.cancelled, true);
+  assert.equal(tracked.state.released, true);
+});
+
+test('GitHub response chunk-count amplification is bounded independently of byte count', async () => {
+  const chunks = Array.from({ length: 8193 }, () => new Uint8Array([0x20]));
+  const tracked = rawStreamResponse(200, '', { chunks });
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => tracked.response,
+  });
+
+  await assert.rejects(
+    () => client.readRepository({ repositoryFullName: repo }),
+    error => error.code === 'GITHUB_RESPONSE_TOO_LARGE' && error.safeToRetry === true,
+  );
+  assert.equal(tracked.state.cancelled, true);
+  assert.equal(tracked.state.released, true);
+});
+
+test('request timeout remains armed through GitHub response body consumption', async () => {
+  let timeoutCallback = null;
+  let cleared = false;
+  const response = {
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader() {
+        return {
+          async read() {
+            timeoutCallback();
+            const error = new Error('body read aborted');
+            error.name = 'AbortError';
+            throw error;
+          },
+          async cancel() {},
+          releaseLock() {},
+        };
+      },
+    },
+  };
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => response,
+    requestTimeoutMs: 1000,
+    setTimeoutImpl(callback) {
+      timeoutCallback = callback;
+      return 7;
+    },
+    clearTimeoutImpl(id) {
+      assert.equal(id, 7);
+      cleared = true;
+    },
+  });
+
+  await assert.rejects(
+    () => client.readRepository({ repositoryFullName: repo }),
+    error => error.code === 'GITHUB_REQUEST_TIMEOUT'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+  assert.equal(cleared, true);
+});
+
+test('deterministic GitHub rejection keeps retry-safe classification even when its body exceeds the byte bound', async () => {
+  const tracked = rawStreamResponse(422, '{"message":"too large"}', { declaredLength: 4_000_001 });
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeCredential([]),
+    credentialId: 'github-main',
+    allowedRepositories: [repo],
+    fetchImpl: async () => tracked.response,
+  });
+
+  await assert.rejects(
+    () => client.createBranch({ repositoryFullName: repo, branch: 'work/rejected', fromSha: commitSha }),
+    error => error.code === 'GITHUB_RESPONSE_TOO_LARGE'
+      && error.status === 422
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
   );
 });
