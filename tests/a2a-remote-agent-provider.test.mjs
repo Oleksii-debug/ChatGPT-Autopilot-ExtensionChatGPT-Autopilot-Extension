@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import {
   A2A_JSONRPC_METHOD_SEND_MESSAGE,
   A2ARemoteAgentProviderV1,
-  a2aSendResultToObservationV1,
 } from '../src/core/a2a-remote-agent-provider.js';
 import {
   ExactEffectEventType,
@@ -273,7 +272,7 @@ test('converts an exact Task response into canonical ObservationV1 for the curre
   const providerResult = await provider.sendMessage(sendInput());
   const exactEffectState = executingExactState();
 
-  const observation = a2aSendResultToObservationV1({
+  const observation = provider.toObservation({
     providerResult,
     exactEffectState,
   });
@@ -324,7 +323,7 @@ test('converts a Message response into minimal identity-only ObservationV1', asy
   });
   const { provider } = harness({ response });
   const providerResult = await provider.sendMessage(sendInput());
-  const observation = a2aSendResultToObservationV1({
+  const observation = provider.toObservation({
     providerResult,
     exactEffectState: executingExactState(),
   });
@@ -335,48 +334,57 @@ test('converts a Message response into minimal identity-only ObservationV1', asy
   assert.equal(JSON.stringify(observation).includes('sensitive remote content'), false);
 });
 
-test('ObservationV1 conversion rejects forged, mismatched, or non-executing state', async () => {
+test('ObservationV1 conversion rejects cloned/cross-provider results and exact-effect mismatches', async () => {
   const { provider } = harness();
   const providerResult = await provider.sendMessage(sendInput());
   const executing = executingExactState();
 
   const forgedCases = [
+    { ...providerResult },
     { ...providerResult, effectId: 'effect-other' },
-    { ...providerResult, providerId: 'other-provider' },
-    { ...providerResult, policyDecisionId: 'policy-other' },
-    { ...providerResult, requestedCapabilityIds: ['remote.other'] },
     { ...providerResult, executionAuthorized: true },
-    { ...providerResult, observedAt: '2026-09-25T00:40:00Z' },
   ];
   for (const forged of forgedCases) {
     assert.throws(
-      () => a2aSendResultToObservationV1({
+      () => provider.toObservation({
         providerResult: forged,
         exactEffectState: executing,
       }),
-      error => [
-        'A2A_PROVIDER_RESULT_INVALID',
-        'A2A_EXACT_EFFECT_BINDING_MISMATCH',
-      ].includes(error.code),
+      error => error.code === 'A2A_PROVIDER_RESULT_UNTRUSTED',
     );
   }
 
+  const { provider: otherProvider } = harness();
   assert.throws(
-    () => a2aSendResultToObservationV1({
+    () => otherProvider.toObservation({
+      providerResult,
+      exactEffectState: executing,
+    }),
+    error => error.code === 'A2A_PROVIDER_RESULT_UNTRUSTED',
+  );
+
+  assert.throws(
+    () => provider.toObservation({
       providerResult,
       exactEffectState: preparedExactState(),
     }),
     error => error.code === 'A2A_EXACT_EFFECT_STATE_INVALID',
   );
 
-  const mismatchedProviderState = executingExactState({ providerId: 'other-provider' });
-  assert.throws(
-    () => a2aSendResultToObservationV1({
-      providerResult,
-      exactEffectState: mismatchedProviderState,
-    }),
-    error => error.code === 'A2A_EXACT_EFFECT_BINDING_MISMATCH',
-  );
+  for (const exactEffectState of [
+    executingExactState({ invocationId: 'effect-other' }),
+    executingExactState({ providerId: 'other-provider' }),
+    executingExactState({ policyDecisionId: 'policy-other' }),
+    executingExactState({ requestedCapabilityIds: ['remote.other'] }),
+  ]) {
+    assert.throws(
+      () => provider.toObservation({
+        providerResult,
+        exactEffectState,
+      }),
+      error => error.code === 'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+    );
+  }
 });
 
 test('DENY and REQUIRE_APPROVAL never reach transport', async () => {
