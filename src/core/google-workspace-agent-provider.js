@@ -6,6 +6,7 @@ export const GoogleWorkspaceToolId = Object.freeze({
   DRIVE_SEARCH: 'remote/google-workspace/drive.search',
   DRIVE_FILE_GET: 'remote/google-workspace/drive.file.get',
   DRIVE_FILE_READ_TEXT: 'remote/google-workspace/drive.file.readText',
+  DRIVE_FILE_UPDATE: 'remote/google-workspace/drive.file.update',
   GMAIL_SEARCH: 'remote/google-workspace/gmail.search',
   GMAIL_MESSAGE_GET: 'remote/google-workspace/gmail.message.get',
   GMAIL_THREAD_GET: 'remote/google-workspace/gmail.thread.get',
@@ -16,6 +17,7 @@ export const GoogleWorkspaceToolId = Object.freeze({
 export const GoogleWorkspaceCapabilityId = Object.freeze({
   DRIVE_SEARCH: 'google.drive.search',
   DRIVE_FILE_READ: 'google.drive.file.read',
+  DRIVE_FILE_UPDATE: 'google.drive.file.update',
   GMAIL_SEARCH: 'google.gmail.search',
   GMAIL_MESSAGE_READ: 'google.gmail.message.read',
   GMAIL_ATTACHMENT_READ: 'google.gmail.attachment.read',
@@ -55,6 +57,17 @@ const TOOLS = Object.freeze([
     inputSchemaRef: 'google-workspace-schema/drive.file.readText/input',
     outputSchemaRef: 'google-workspace-schema/drive.file.readText/output',
     readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
+    providerId: GOOGLE_WORKSPACE_PROVIDER_ID,
+    label: 'Update owner-authorized Google Drive file',
+    description: 'Renames and/or moves one existing owner-authorized Drive file through the canonical exact-effect path.',
+    capabilityIds: [GoogleWorkspaceCapabilityId.DRIVE_FILE_UPDATE],
+    inputSchemaRef: 'google-workspace-schema/drive.file.update/input',
+    outputSchemaRef: 'google-workspace-schema/drive.file.update/output',
+    readOnly: false,
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
@@ -280,6 +293,7 @@ function methodFor(toolId) {
   if (toolId === GoogleWorkspaceToolId.DRIVE_SEARCH) return 'searchDrive';
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_GET) return 'getDriveFile';
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_READ_TEXT) return 'readDriveText';
+  if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_UPDATE) return 'updateDriveFile';
   if (toolId === GoogleWorkspaceToolId.GMAIL_SEARCH) return 'searchGmail';
   if (toolId === GoogleWorkspaceToolId.GMAIL_MESSAGE_GET) return 'getGmailMessage';
   if (toolId === GoogleWorkspaceToolId.GMAIL_THREAD_GET) return 'getGmailThread';
