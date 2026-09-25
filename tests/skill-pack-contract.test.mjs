@@ -208,23 +208,28 @@ test('dependencies are exact version/hash references and cannot self-reference',
   assert.throws(() => normalizeSkillPackManifestV1(duplicate), /duplicate skillPackId/);
 });
 
-test('skill pack and dependency identities use canonical SemVer 2.0 syntax', () => {
-  const buildMetadata = manifest({ version: '1.2.3+windows.x64.001' });
-  assert.equal(
-    normalizeSkillPackManifestV1(buildMetadata).version,
+test('skill pack and dependency identities use bounded canonical SemVer 2.0 syntax', () => {
+  for (const validVersion of [
     '1.2.3+windows.x64.001',
-  );
-
-  const prereleaseBuild = manifest({ version: '1.2.3-rc.01a+build.7' });
-  assert.equal(
-    normalizeSkillPackManifestV1(prereleaseBuild).version,
+    '1.2.3-alpha.1+build.5',
     '1.2.3-rc.01a+build.7',
-  );
+  ]) {
+    const input = manifest({ version: validVersion });
+    assert.equal(normalizeSkillPackManifestV1(input).version, validVersion);
+  }
 
-  for (const invalidVersion of ['1.2.3-01', '1.2.3-alpha.01', '1.2.3-', '1.2.3+']) {
-    const invalid = manifest({ version: invalidVersion });
+  for (const invalidVersion of [
+    '1.2.3-01',
+    '1.2.3-alpha.01',
+    '1.2.3-',
+    '1.2.3+',
+    '1.2.3+build..5',
+    '01.2.3',
+    '1.2.3+' + 'a'.repeat(300),
+  ]) {
+    const input = manifest({ version: invalidVersion });
     assert.throws(
-      () => normalizeSkillPackManifestV1(invalid),
+      () => normalizeSkillPackManifestV1(input),
       /canonical semantic version/,
       invalidVersion,
     );
@@ -305,38 +310,4 @@ test('valid null-prototype manifest is supported and unknown authority fields fa
   const unknown = manifest();
   unknown.permissionGranted = true;
   assert.throws(() => normalizeSkillPackManifestV1(unknown), /unknown field: permissionGranted/);
-});
-
-
-test('accepts canonical SemVer prerelease and build metadata', () => {
-  const input = manifest({ version: '1.2.3-alpha.1+build.5' });
-  input.dependencies[0].version = '2.0.0+vendor.7';
-  const normalized = normalizeSkillPackManifestV1(input);
-  assert.equal(normalized.version, '1.2.3-alpha.1+build.5');
-  assert.equal(normalized.dependencies[0].version, '2.0.0+vendor.7');
-});
-
-test('rejects non-canonical numeric prerelease identifiers and malformed build metadata', () => {
-  for (const invalid of [
-    '1.2.3-01',
-    '1.2.3-alpha.01',
-    '1.2.3+',
-    '1.2.3+build..5',
-    '01.2.3',
-  ]) {
-    const input = manifest({ version: invalid });
-    assert.throws(
-      () => normalizeSkillPackManifestV1(input),
-      /canonical semantic version/,
-      invalid,
-    );
-  }
-});
-
-test('semantic versions are bounded before grammar admission', () => {
-  const input = manifest({ version: '1.2.3+' + 'a'.repeat(300) });
-  assert.throws(
-    () => normalizeSkillPackManifestV1(input),
-    /canonical semantic version/,
-  );
 });
