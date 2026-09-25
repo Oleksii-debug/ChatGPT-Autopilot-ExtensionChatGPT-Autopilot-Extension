@@ -15,7 +15,10 @@ function requireResourceId(value, label) {
   return value;
 }
 function attemptFromExecutionId(value) {
-  const match = /:attempt:(\d+)$/u.exec(String(value || ''));
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error('executionId does not contain a valid attempt');
+  }
+  const match = /:attempt:(\d+)$/u.exec(value);
   const attempt = match ? Number(match[1]) : 0;
   if (!Number.isInteger(attempt) || attempt < 1 || attempt > 64) throw new Error('executionId does not contain a valid attempt');
   return attempt;
@@ -27,26 +30,67 @@ function canonicalRaw(value) {
   if (Math.floor((value.length * 3) / 4) > 10_000_000) throw new Error('rawMessageBase64Url exceeds the verifier bound');
   return value;
 }
+function snapshotDataRecord(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new Error(`${label} must be a plain object`);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains an invalid field`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label}.${key} must be an enumerable data property`);
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
+}
+function bindDataMethod(target, method, label) {
+  if (!target || (typeof target !== 'object' && typeof target !== 'function')) {
+    throw new Error(`${label} is required`);
+  }
+  let current = target;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, method);
+    if (descriptor) {
+      if (!Object.prototype.hasOwnProperty.call(descriptor, 'value') || typeof descriptor.value !== 'function') {
+        throw new Error(`${label}.${method} must be a data method`);
+      }
+      return descriptor.value.bind(target);
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  throw new Error(`${label}.${method} is required`);
+}
+
 function requireInvocation(invocation) {
-  if (!invocation || invocation.toolId !== GoogleWorkspaceToolId.GMAIL_DRAFT_SEND
-      || invocation.providerId !== GOOGLE_WORKSPACE_PROVIDER_ID) {
+  const admitted = snapshotDataRecord(invocation, 'Gmail draft-send invocation');
+  if (admitted.toolId !== GoogleWorkspaceToolId.GMAIL_DRAFT_SEND
+      || admitted.providerId !== GOOGLE_WORKSPACE_PROVIDER_ID) {
     throw new Error('Gmail draft-send verifier accepts only canonical draft-send invocations');
   }
-  const userId = invocation.arguments?.userId;
+  const args = snapshotDataRecord(admitted.arguments, 'Gmail draft-send invocation arguments');
+  const userId = args.userId;
   if (typeof userId !== 'string' || !userId || userId !== userId.trim()) throw new Error('Gmail draft-send verifier requires exact userId');
-  const draftId = requireResourceId(invocation.arguments?.draftId, 'draftId');
-  canonicalRaw(invocation.arguments?.rawMessageBase64Url);
-  return { userId, draftId };
+  const draftId = requireResourceId(args.draftId, 'draftId');
+  canonicalRaw(args.rawMessageBase64Url);
+  return {
+    userId,
+    draftId,
+    invocationId: requireId(admitted.invocationId, 'invocationId'),
+    policyDecisionId: requireId(admitted.policyDecisionId, 'policyDecisionId'),
+  };
 }
 function observedIdentity(invocation, observation) {
   const expected = requireInvocation(invocation);
-  const data = observation?.data;
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Gmail draft-send observation data is invalid');
+  const observed = snapshotDataRecord(observation, 'Gmail draft-send observation');
+  const data = snapshotDataRecord(observed.data, 'Gmail draft-send observation data');
   if (data.userId !== expected.userId || data.draftId !== expected.draftId) {
     throw new Error('Gmail draft-send observation does not match the admitted owner/draft identity');
   }
   return {
     ...expected,
+    observationId: observed.observationId,
     messageId: requireResourceId(data.messageId, 'observed messageId'),
     threadId: requireResourceId(data.threadId, 'observed threadId'),
   };
@@ -54,10 +98,11 @@ function observedIdentity(invocation, observation) {
 
 export class GmailDraftSendVerifierV1 {
   constructor({ workspaceClient, verifierId = 'gmail-draft-send-readback-verifier', now = () => Date.now() } = {}) {
-    if (!workspaceClient || typeof workspaceClient.getGmailSentMessage !== 'function') {
-      throw new Error('Google Workspace sent-message readback client is required');
-    }
-    this.workspaceClient = workspaceClient;
+    this.getGmailSentMessage = bindDataMethod(
+      workspaceClient,
+      'getGmailSentMessage',
+      'Google Workspace sent-message readback client',
+    );
     this.verifierId = requireId(verifierId, 'verifierId');
     if (this.verifierId === GOOGLE_WORKSPACE_PROVIDER_ID) throw new Error('Gmail send verifier identity must differ from effect provider identity');
     if (typeof now !== 'function') throw new Error('now must be a function');
@@ -66,7 +111,7 @@ export class GmailDraftSendVerifierV1 {
 
   async #readback(invocation, observation) {
     const identity = observedIdentity(invocation, observation);
-    const message = await this.workspaceClient.getGmailSentMessage({
+    const message = await this.getGmailSentMessage({
       userId: identity.userId,
       messageId: identity.messageId,
     });
@@ -78,13 +123,13 @@ export class GmailDraftSendVerifierV1 {
   }
 
   async verify({ invocation, executionId, observation } = {}) {
-    const readback = await this.#readback(invocation, observation);
     const attempt = attemptFromExecutionId(executionId);
+    const readback = await this.#readback(invocation, observation);
     return {
       schemaVersion: 1,
-      verificationId: `${invocation.invocationId}:gmail-draft-send-verification:${attempt}`,
-      invocationId: invocation.invocationId,
-      observationId: observation.observationId,
+      verificationId: `${readback.invocationId}:gmail-draft-send-verification:${attempt}`,
+      invocationId: readback.invocationId,
+      observationId: readback.observationId,
       status: readback.sent ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS,
       reasonCode: readback.sent ? 'GMAIL_SENT_MESSAGE_CONFIRMED' : 'GMAIL_SENT_LABEL_NOT_CONFIRMED',
       summary: readback.sent
@@ -93,8 +138,8 @@ export class GmailDraftSendVerifierV1 {
       evidenceArtifactIds: [],
       verifiedAt: new Date(this.now()).toISOString(),
       verifierId: this.verifierId,
-      verificationAuthorityId: invocation.policyDecisionId,
-      effectId: invocation.invocationId,
+      verificationAuthorityId: readback.policyDecisionId,
+      effectId: readback.invocationId,
       executionId,
       attempt,
     };
@@ -114,8 +159,8 @@ export class GmailDraftSendVerifierV1 {
     const observedAt = new Date(this.now()).toISOString();
     const observation = {
       schemaVersion: 1,
-      observationId: `${invocation.invocationId}:gmail-draft-send-readback:reconcile-${attempt}`,
-      invocationId: invocation.invocationId,
+      observationId: `${readback.invocationId}:gmail-draft-send-readback:reconcile-${attempt}`,
+      invocationId: readback.invocationId,
       status: 'OK',
       summary: 'Fresh Gmail readback classified the provider-returned sent-message identity.',
       data: {
@@ -130,8 +175,8 @@ export class GmailDraftSendVerifierV1 {
     };
     const verification = {
       schemaVersion: 1,
-      verificationId: `${invocation.invocationId}:gmail-draft-send-verification:reconcile-${attempt}`,
-      invocationId: invocation.invocationId,
+      verificationId: `${readback.invocationId}:gmail-draft-send-verification:reconcile-${attempt}`,
+      invocationId: readback.invocationId,
       observationId: observation.observationId,
       status: readback.sent ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS,
       reasonCode: readback.sent ? 'GMAIL_SENT_EFFECT_CONFIRMED' : 'GMAIL_SENT_EFFECT_NOT_CONFIRMED',

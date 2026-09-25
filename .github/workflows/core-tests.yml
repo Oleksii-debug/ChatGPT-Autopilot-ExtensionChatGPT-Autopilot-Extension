@@ -7,6 +7,7 @@ on:
       - "src/core/**"
       - "src/shared/**"
       - "src/background/**"
+      - "tests/**"
       - "tests-regression/core/**"
       - "tests-regression/integration/**"
       - "package.json"
@@ -16,6 +17,7 @@ on:
       - "src/core/**"
       - "src/shared/**"
       - "src/background/**"
+      - "tests/**"
       - "tests-regression/core/**"
       - "tests-regression/integration/**"
       - "package.json"
@@ -39,3 +41,4 @@ jobs:
         with:
           node-version: "22"
       - run: npm run test:core
+      - run: npm run test:web-det

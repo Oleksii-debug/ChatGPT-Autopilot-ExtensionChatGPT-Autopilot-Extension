@@ -96,6 +96,71 @@ test('transport-ambiguous draft send never blind-retries and cannot auto-verify 
   assert.equal(sends,1);
 });
 
+test('send verifier rejects coercive execution identity before readback without invoking caller hooks', async()=>{
+  let coercions=0,reads=0;
+  const hostile={toString(){coercions+=1;return 'gmail-send-hostile-exec:attempt:1';}};
+  const inv=invocation('gmail-send-hostile-exec');
+  const verifier=new GmailDraftSendVerifierV1({workspaceClient:{getGmailSentMessage:async()=>{reads+=1;return{id:'sent_1',threadId:'thread_1',labelIds:['SENT']};}}});
+  await assert.rejects(
+    ()=>verifier.verify({
+      invocation:inv,
+      executionId:hostile,
+      observation:{observationId:'obs-hostile-exec',data:{userId,draftId:'draft_1',messageId:'sent_1',threadId:'thread_1'}},
+    }),
+    /executionId does not contain a valid attempt/i,
+  );
+  assert.equal(coercions,0);
+  assert.equal(reads,0);
+});
+
+test('send verifier rejects accessor-backed readback dependency without executing getter',()=>{
+  let getterReads=0;
+  const workspaceClient={};
+  Object.defineProperty(workspaceClient,'getGmailSentMessage',{
+    enumerable:true,
+    configurable:true,
+    get(){getterReads+=1;return async()=>({id:'sent_1',threadId:'thread_1',labelIds:['SENT']});},
+  });
+  assert.throws(
+    ()=>new GmailDraftSendVerifierV1({workspaceClient}),
+    /data method/i,
+  );
+  assert.equal(getterReads,0);
+});
+
+test('send verifier snapshots invocation arguments and observation data without executing accessors', async()=>{
+  let getterReads=0,reads=0;
+  const inv=invocation('gmail-send-accessor-boundary');
+  const hostileArgs={};
+  Object.defineProperty(hostileArgs,'userId',{enumerable:true,get(){getterReads+=1;return userId;}});
+  inv.arguments=hostileArgs;
+  const verifier=new GmailDraftSendVerifierV1({workspaceClient:{getGmailSentMessage:async()=>{reads+=1;return{id:'sent_1',threadId:'thread_1',labelIds:['SENT']};}}});
+  await assert.rejects(
+    ()=>verifier.verify({
+      invocation:inv,
+      executionId:`${inv.invocationId}:attempt:1`,
+      observation:{observationId:'obs-accessor-args',data:{userId,draftId:'draft_1',messageId:'sent_1',threadId:'thread_1'}},
+    }),
+    /enumerable data property/i,
+  );
+  assert.equal(getterReads,0);
+  assert.equal(reads,0);
+
+  const canonical=invocation('gmail-send-accessor-observation');
+  const hostileData={};
+  Object.defineProperty(hostileData,'userId',{enumerable:true,get(){getterReads+=1;return userId;}});
+  await assert.rejects(
+    ()=>verifier.verify({
+      invocation:canonical,
+      executionId:`${canonical.invocationId}:attempt:1`,
+      observation:{observationId:'obs-accessor-data',data:hostileData},
+    }),
+    /enumerable data property/i,
+  );
+  assert.equal(getterReads,0);
+  assert.equal(reads,0);
+});
+
 test('send verifier rejects coercive owner identity without invoking caller conversion hooks', async()=>{
   let coercions=0;
   const hostile={toString(){coercions+=1;return userId;}};
