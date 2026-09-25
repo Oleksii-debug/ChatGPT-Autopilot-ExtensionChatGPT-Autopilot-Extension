@@ -380,9 +380,27 @@ export class A2ARemoteAgentProviderV1 {
       transportFailure(error);
     }
 
-    const response = responseEnvelope(rawResponse);
-    const remoteResult = parseJsonRpcResponse(response, delegation.effectId);
-    const observedAt = trustedNow(this.now).iso;
+    let remoteResult;
+    try {
+      const response = responseEnvelope(rawResponse);
+      remoteResult = parseJsonRpcResponse(response, delegation.effectId);
+    } catch (error) {
+      if (error?.effectMayHaveOccurred === true) throw error;
+      fail('A2A_RESPONSE_INVALID', String(error?.message || error || 'A2A response validation failed').slice(0, 4000), {
+        effectMayHaveOccurred: true,
+        cause: error instanceof Error ? error : null,
+      });
+    }
+
+    let observedAt;
+    try {
+      observedAt = trustedNow(this.now).iso;
+    } catch (error) {
+      fail('A2A_EFFECT_AMBIGUOUS', 'A2A response was received but observation time could not be established', {
+        effectMayHaveOccurred: true,
+        cause: error instanceof Error ? error : null,
+      });
+    }
     return freeze({
       schemaVersion: A2A_REMOTE_AGENT_PROVIDER_VERSION,
       providerId: 'a2a-remote-agent',
