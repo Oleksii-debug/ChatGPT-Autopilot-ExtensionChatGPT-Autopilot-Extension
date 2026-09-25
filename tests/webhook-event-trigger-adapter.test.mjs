@@ -287,6 +287,36 @@ test('secret/signature material is not part of accepted binding or delivery sche
   );
 });
 
+test('payload artifact accessors fail closed without executing getters or scheduler', async () => {
+  let getterReads = 0;
+  let schedulerCalls = 0;
+  const hostileArtifact = artifact();
+  Object.defineProperty(hostileArtifact, 'sha256', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterReads += 1;
+      return SHA_A;
+    },
+  });
+
+  await assert.rejects(
+    admitVerifiedWebhookDeliveryV1(
+      request(),
+      deps({
+        trustedDelivery: delivery({ payloadArtifactRef: hostileArtifact }),
+        admitCanonicalOccurrence: async () => {
+          schedulerCalls += 1;
+          throw new Error('must not run');
+        },
+      }),
+    ),
+    /payloadArtifactRef field sha256 must be an enumerable own data property/,
+  );
+  assert.equal(getterReads, 0);
+  assert.equal(schedulerCalls, 0);
+});
+
 test('accessor-backed dependency fails without invoking getter or scheduler', async () => {
   let getterReads = 0;
   let schedulerCalls = 0;
