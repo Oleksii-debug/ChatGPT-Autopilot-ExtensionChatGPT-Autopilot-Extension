@@ -19,6 +19,9 @@ const WORKFLOW_RUN_STATUSES = new Set([
 const WORKFLOW_JOB_FILTERS = new Set(['latest', 'all']);
 const MAX_ACTIONS_PAGE = 10_000;
 const MAX_WORKFLOW_STEPS_PER_JOB = 256;
+const MAX_WORKFLOW_DISPATCH_INPUTS = 25;
+const MAX_WORKFLOW_DISPATCH_INPUT_JSON_BYTES = 65_535;
+const WORKFLOW_INPUT_KEY = /^[A-Za-z0-9_-]{1,128}$/u;
 
 function clean(value, max = MAX_PATH) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -175,6 +178,55 @@ function boundedIntegerInput(value, label, { defaultValue, min = 1, max } = {}) 
   return value;
 }
 
+function exactRef(value, label) {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw githubError('GITHUB_INVALID_REQUEST', label + ' must use exact canonical text', { safeToRetry: true });
+  }
+  return refName(value, label);
+}
+
+function workflowDispatchInputs(value) {
+  if (value == null) return Object.freeze(Object.create(null));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'inputs must be a bounded plain data object', { safeToRetry: true });
+  }
+  const prototype = Object.getPrototypeOf(value);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'inputs must be a bounded plain data object', { safeToRetry: true });
+  }
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > MAX_WORKFLOW_DISPATCH_INPUTS) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'inputs exceeds the maximum of 25 workflow inputs', { safeToRetry: true });
+  }
+  const out = Object.create(null);
+  for (const key of keys) {
+    if (typeof key !== 'string' || !WORKFLOW_INPUT_KEY.test(key)) {
+      throw githubError('GITHUB_INVALID_REQUEST', 'inputs contains an invalid workflow input key', { safeToRetry: true });
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw githubError('GITHUB_INVALID_REQUEST', 'inputs.' + String(key) + ' must be an enumerable data property', { safeToRetry: true });
+    }
+    const item = descriptor.value;
+    if (typeof item === 'string') {
+      if (item.length > MAX_WORKFLOW_DISPATCH_INPUT_JSON_BYTES) throw githubError('GITHUB_INVALID_REQUEST', 'inputs.' + key + ' is too large', { safeToRetry: true });
+      out[key] = item;
+    } else if (typeof item === 'boolean') {
+      out[key] = item;
+    } else if (typeof item === 'number' && Number.isFinite(item) && !Object.is(item, -0)) {
+      out[key] = item;
+    } else {
+      throw githubError('GITHUB_INVALID_REQUEST', 'inputs.' + key + ' must be a canonical string, boolean, or finite number', { safeToRetry: true });
+    }
+  }
+  const ordered = Object.create(null);
+  for (const key of Object.keys(out).sort()) ordered[key] = out[key];
+  if (new TextEncoder().encode(JSON.stringify(ordered)).byteLength > MAX_WORKFLOW_DISPATCH_INPUT_JSON_BYTES) {
+    throw githubError('GITHUB_INVALID_REQUEST', 'inputs serialized payload is too large', { safeToRetry: true });
+  }
+  return Object.freeze(ordered);
+}
 function optionalExactRef(value, label) {
   if (value == null || value === '') return '';
   if (typeof value !== 'string' || value !== value.trim()) {
@@ -764,6 +816,53 @@ export class GitHubRestClientV1 {
     });
   }
 
+  async readWorkflowRun(input = {}) {
+    const args = strictInputRecord(input, new Set(['repositoryFullName', 'runId']), 'workflowRun.read input');
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const runId = positiveInteger(args.runId, 'runId');
+    const payload = await this.request('GET', '/repos/' + repositoryPath(repository) + '/actions/runs/' + runId);
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub returned invalid workflow run response', { safeToRetry: true });
+    const returnedRunId = responsePositiveInteger(payload.id, 'workflow run id');
+    if (returnedRunId !== runId) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub workflow run identity mismatch', { safeToRetry: true });
+    return Object.freeze({
+      repositoryFullName: repository,
+      id: returnedRunId,
+      workflowId: responsePositiveInteger(payload.workflow_id, 'workflow id'),
+      runNumber: responsePositiveInteger(payload.run_number, 'workflow run number'),
+      runAttempt: responsePositiveInteger(payload.run_attempt ?? 1, 'workflow run attempt'),
+      event: responseText(payload.event, 'workflow run event', 120),
+      status: responseText(payload.status, 'workflow run status', 80),
+      conclusion: responseText(payload.conclusion, 'workflow run conclusion', 80, { nullable: true }),
+      headBranch: responseText(payload.head_branch, 'workflow run head branch', 240, { nullable: true }),
+      headSha: responseSha(payload.head_sha, 'workflow run head sha'),
+      createdAt: responseText(payload.created_at, 'workflow run createdAt', 120),
+      updatedAt: responseText(payload.updated_at, 'workflow run updatedAt', 120),
+      url: responseText(payload.html_url, 'workflow run URL', 4096),
+    });
+  }
+
+  async dispatchWorkflow(input = {}) {
+    const args = strictInputRecord(input, new Set(['repositoryFullName', 'workflowId', 'ref', 'inputs']), 'workflow.dispatch input');
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const workflowId = positiveInteger(args.workflowId, 'workflowId');
+    const ref = exactRef(args.ref, 'ref');
+    const inputs = workflowDispatchInputs(args.inputs);
+    const payload = await this.request(
+      'POST',
+      '/repos/' + repositoryPath(repository) + '/actions/workflows/' + workflowId + '/dispatches',
+      { body: { ref, inputs: { ...inputs }, return_run_details: true }, effectful: true, expectedStatuses: [200] },
+    );
+    const runId = responsePositiveInteger(payload.workflow_run_id, 'workflow run id', { effectMayHaveOccurred: true });
+    const expectedRunUrl = GITHUB_API_ORIGIN + '/repos/' + repositoryPath(repository) + '/actions/runs/' + runId;
+    const runUrl = responseText(payload.run_url, 'workflow run API URL', 4096);
+    if (runUrl !== expectedRunUrl) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub workflow dispatch run URL identity mismatch', { effectMayHaveOccurred: true, safeToRetry: false });
+    const expectedHtmlUrl = 'https://github.com/' + repository + '/actions/runs/' + runId;
+    const htmlUrl = responseText(payload.html_url, 'workflow run HTML URL', 4096);
+    if (htmlUrl !== expectedHtmlUrl) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub workflow dispatch HTML URL identity mismatch', { effectMayHaveOccurred: true, safeToRetry: false });
+    return Object.freeze({ repositoryFullName: repository, workflowId, ref, inputs, runId, runUrl, htmlUrl });
+  }
   async listWorkflowRunJobs(input = {}) {
     const args = strictInputRecord(
       input,
