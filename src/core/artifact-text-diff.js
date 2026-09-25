@@ -110,7 +110,7 @@ function assertWellFormedUtf16(text, label) {
   }
 }
 
-async function verifyTextMaterial(text, version, label, { cryptoApi = globalThis.crypto } = {}) {
+async function verifyTextMaterial(text, version, label) {
   if (typeof text !== 'string') throw new Error(`${label} must be UTF-8 text`);
   assertWellFormedUtf16(text, label);
   const bytes = new TextEncoder().encode(text);
@@ -120,7 +120,7 @@ async function verifyTextMaterial(text, version, label, { cryptoApi = globalThis
   if (bytes.byteLength !== version.artifactRef.sizeBytes) {
     throw new Error(`${label} byte length does not match immutable ArtifactRef`);
   }
-  const digest = await createSha256FingerprintV1(text, { cryptoApi });
+  const digest = await createSha256FingerprintV1(text);
   const sha256 = digest.slice('sha256:'.length);
   if (sha256 !== version.artifactRef.sha256) {
     throw new Error(`${label} SHA-256 does not match immutable ArtifactRef`);
@@ -293,7 +293,7 @@ function deepFreeze(value) {
  * The result is an advisory/read-only review projection. It grants no artifact
  * mutation, approval, distribution, verification, policy, or execution authority.
  */
-export async function buildArtifactTextDiffV1(raw, options = {}) {
+export async function buildArtifactTextDiffV1(raw) {
   const input = strictRecord(raw, 'ArtifactTextDiffV1 request', REQUEST_KEYS);
   exactVersion(input.schemaVersion);
 
@@ -314,8 +314,8 @@ export async function buildArtifactTextDiffV1(raw, options = {}) {
   assertDiffableVersion(toVersion, 'To');
 
   const [fromMaterial, toMaterial] = await Promise.all([
-    verifyTextMaterial(input.fromText, fromVersion, 'fromText', options),
-    verifyTextMaterial(input.toText, toVersion, 'toText', options),
+    verifyTextMaterial(input.fromText, fromVersion, 'fromText'),
+    verifyTextMaterial(input.toText, toVersion, 'toText'),
   ]);
 
   const fromLines = splitExactLines(fromMaterial.text, 'fromText');
