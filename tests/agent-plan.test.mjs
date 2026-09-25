@@ -7,6 +7,67 @@ const ZERO_ENVELOPE = { maxModelCalls: 0, maxRuntimeSeconds: 0, maxCostUsdMicros
 function plan(nodes) { return { schemaVersion: 1, planId: 'plan-1', jobId: 'job-1', objective: 'Book a verified course', successCriteria: ['Course is selected'], createdAt: AT, updatedAt: AT, revision: 1, nodes }; }
 function node(nodeId, dependsOn = [], conflictKeys = [], budget = {}) { return { nodeId, title: nodeId, objective: `Do ${nodeId}`, dependsOn, conflictKeys, ownerId: 'agent-1', executionPlane: 'BROWSER', acceptanceCriteria: ['Observed complete'], budget, state: 'PENDING', evidence: '', updatedAt: AT }; }
 
+test('AgentPlan record boundaries consume one descriptor snapshot and never Proxy get authority', () => {
+  let reads = 0;
+  const planProxy = new Proxy(plan([node('discover')]), {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'revision') return 999;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const normalized = normalizeAgentPlanV1(planProxy);
+  assert.equal(reads, 0, 'top-level plan Proxy get must never execute');
+  assert.equal(normalized.revision, 1);
+
+  reads = 0;
+  const proxiedNode = new Proxy(node('discover'), {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'executionPlane') return 'REMOTE';
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const normalizedNodePlan = normalizeAgentPlanV1(plan([proxiedNode]));
+  assert.equal(reads, 0, 'node Proxy get must never execute');
+  assert.equal(normalizedNodePlan.nodes[0].executionPlane, 'BROWSER');
+
+  reads = 0;
+  const budgetProxy = new Proxy({ maxModelCalls: 1, maxRuntimeSeconds: 2, maxCostUsdMicros: 3 }, {
+    get(target, key, receiver) {
+      reads += 1;
+      if (key === 'maxCostUsdMicros') return Number.MAX_SAFE_INTEGER;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const normalizedBudgetPlan = normalizeAgentPlanV1(plan([node('discover', [], [], budgetProxy)]));
+  assert.equal(reads, 0, 'budget Proxy get must never execute');
+  assert.equal(normalizedBudgetPlan.nodes[0].budget.maxCostUsdMicros, 3);
+
+  const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
+  reads = 0;
+  const envelopeProxy = new Proxy({ ...ZERO_ENVELOPE }, {
+    get(target, key, receiver) {
+      reads += 1;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const optionsProxy = new Proxy({
+    expectedRevision: current.revision,
+    nodes: [node('later')],
+    resourceEnvelope: envelopeProxy,
+    at: AT,
+  }, {
+    get(target, key, receiver) {
+      reads += 1;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const extended = extendAgentPlanV1(current, optionsProxy);
+  assert.equal(reads, 0, 'extension options/resource envelope Proxy get must never execute');
+  assert.equal(extended.nodes.some(item => item.nodeId === 'later'), true);
+});
+
 test('AgentPlan public option envelopes reject accessors before authority reads', () => {
   const current = reconcileAgentPlanV1(plan([node('discover')]), { at: AT });
   let reads = 0;
