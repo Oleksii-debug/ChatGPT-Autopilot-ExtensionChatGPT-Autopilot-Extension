@@ -592,6 +592,7 @@ export class GitHubRestClientV1 {
     this.assertRepositoryAllowed(repository);
     const number = positiveInteger(issueNumber, 'issueNumber');
     const id = positiveInteger(commentId, 'commentId');
+    await this.readIssue({ repositoryFullName: repository, issueNumber: number });
     const payload = await this.request('GET', `/repos/${repositoryPath(repository)}/issues/comments/${id}`);
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub issue comment response is invalid');
@@ -724,6 +725,7 @@ export class GitHubRestClientV1 {
     this.assertRepositoryAllowed(repository);
     const number = positiveInteger(issueNumber, 'issueNumber');
     const commentBody = exactNonBlankText(body, 'body', 100_000);
+    await this.readIssue({ repositoryFullName: repository, issueNumber: number });
     const payload = await this.request('POST', `/repos/${repositoryPath(repository)}/issues/${number}/comments`, {
       effectful: true,
       expectedStatuses: [201],

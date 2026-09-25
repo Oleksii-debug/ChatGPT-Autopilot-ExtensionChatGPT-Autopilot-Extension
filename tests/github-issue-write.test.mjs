@@ -18,7 +18,9 @@ test('REST issue/comment operations use fixed endpoints, exact identities and bo
   const queue = [
     response(201, { number: 7, title: 'Issue title', body: 'Issue body', state: 'open', html_url: 'https://github.com/owner/repo/issues/7' }),
     response(200, { number: 7, title: 'Issue title', body: 'Issue body', state: 'open', html_url: 'https://github.com/owner/repo/issues/7' }),
+    response(200, { number: 7, title: 'Issue title', body: 'Issue body', state: 'open', html_url: 'https://github.com/owner/repo/issues/7' }),
     response(201, { id: 99, body: 'Exact comment', issue_url: `${GITHUB_API_ORIGIN}/repos/owner/repo/issues/7`, html_url: 'https://github.com/owner/repo/issues/7#issuecomment-99' }),
+    response(200, { number: 7, title: 'Issue title', body: 'Issue body', state: 'open', html_url: 'https://github.com/owner/repo/issues/7' }),
     response(200, { id: 99, body: 'Exact comment', issue_url: `${GITHUB_API_ORIGIN}/repos/owner/repo/issues/7`, html_url: 'https://github.com/owner/repo/issues/7#issuecomment-99' }),
   ];
   const client = new GitHubRestClientV1({
@@ -31,11 +33,38 @@ test('REST issue/comment operations use fixed endpoints, exact identities and bo
   assert.equal((await client.createIssueComment({ repositoryFullName: repo, issueNumber: 7, body: 'Exact comment' })).commentId, 99);
   assert.equal((await client.readIssueComment({ repositoryFullName: repo, issueNumber: 7, commentId: 99 })).body, 'Exact comment');
   assert.deepEqual(calls.map(call => [call.init.method, new URL(call.url).pathname]), [
-    ['POST', '/repos/owner/repo/issues'], ['GET', '/repos/owner/repo/issues/7'],
-    ['POST', '/repos/owner/repo/issues/7/comments'], ['GET', '/repos/owner/repo/issues/comments/99'],
+    ['POST', '/repos/owner/repo/issues'],
+    ['GET', '/repos/owner/repo/issues/7'],
+    ['GET', '/repos/owner/repo/issues/7'],
+    ['POST', '/repos/owner/repo/issues/7/comments'],
+    ['GET', '/repos/owner/repo/issues/7'],
+    ['GET', '/repos/owner/repo/issues/comments/99'],
   ]);
   assert.deepEqual(JSON.parse(calls[0].init.body), { title: 'Issue title', body: 'Issue body' });
-  assert.deepEqual(JSON.parse(calls[2].init.body), { body: 'Exact comment' });
+  assert.deepEqual(JSON.parse(calls[3].init.body), { body: 'Exact comment' });
+});
+
+test('issue-comment mutation rejects a pull-request parent before POST', async () => {
+  const calls = [];
+  const client = new GitHubRestClientV1({
+    nativeClient: nativeClient(), credentialId: 'github-main', allowedRepositories: [repo],
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return response(200, {
+        number: 7,
+        title: 'PR title',
+        body: 'PR body',
+        state: 'open',
+        pull_request: { url: 'https://api.github.com/repos/owner/repo/pulls/7' },
+        html_url: 'https://github.com/owner/repo/pull/7',
+      });
+    },
+  });
+  await assert.rejects(
+    () => client.createIssueComment({ repositoryFullName: repo, issueNumber: 7, body: 'must not post to PR' }),
+    error => error.code === 'GITHUB_RESPONSE_INVALID' && error.effectMayHaveOccurred === false,
+  );
+  assert.deepEqual(calls.map(call => call.init.method), ['GET']);
 });
 
 test('REST issue/comment mutation rejects aliases before network and marks transport ambiguity non-retryable', async () => {
