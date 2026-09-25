@@ -2584,6 +2584,25 @@ const ACTION_CENTER_SEVERITY_LABELS = Object.freeze({
   LOW: 'низький пріоритет',
 });
 
+async function decideActionCenterBrowserApproval(item, decision, container) {
+  const summary = $('action-center-summary');
+  const controls = [...container.querySelectorAll('button')];
+  controls.forEach(button => { button.disabled = true; });
+  try {
+    await core('DECIDE_ACTION_CENTER_BROWSER_APPROVAL', {
+      itemId: item.itemId,
+      sourceRevisionId: item.sourceRevisionId,
+      decision,
+    });
+    await loadActionCenter();
+    summary.focus();
+  } catch (error) {
+    summary.textContent = `Не вдалося застосувати рішення: ${error.message}`;
+    controls.forEach(button => { button.disabled = false; });
+    summary.focus();
+  }
+}
+
 function renderActionCenter(data) {
   const items = Array.isArray(data?.items) ? data.items.filter(item => item?.status === 'OPEN') : [];
   const summary = data?.summary || {};
@@ -2592,7 +2611,7 @@ function renderActionCenter(data) {
     ? ` Показано ${runtimeSummary.projectedCount || items.length} із ${runtimeSummary.candidateCount || items.length}; спочатку блокуючі та найстаріші питання.`
     : '';
   $('action-center-summary').textContent = items.length
-    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}.${truncation} Центр уваги лише показує стан; рішення виконуються у відповідному канонічному розділі.`
+    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}.${truncation} Очікувані дії Browser Agent можна схвалити або відхилити тут; інші питання вирішуються у відповідному канонічному розділі.`
     : 'Зараз немає питань, які потребують вашої дії.';
   const list = $('action-center-list');
   const signature = JSON.stringify(items.map(item => [
@@ -2605,7 +2624,22 @@ function renderActionCenter(data) {
     const li = document.createElement('li');
     const severity = ACTION_CENTER_SEVERITY_LABELS[item.severity] || item.severity;
     const action = ACTION_CENTER_ACTION_LABELS[item.ownerActionKind] || item.ownerActionKind;
-    li.textContent = `${severity}. ${item.title}. Потрібно: ${action}. ${item.materialityReason}`;
+    const description = document.createElement('span');
+    description.textContent = `${severity}. ${item.title}. Потрібно: ${action}. ${item.materialityReason}`;
+    li.append(description);
+    if (item.ownerActionKind === 'APPROVE_OR_DENY' && item.sourceKind === 'APPROVAL') {
+      const approve = document.createElement('button');
+      approve.type = 'button';
+      approve.textContent = 'Схвалити';
+      approve.setAttribute('aria-label', `Схвалити: ${item.title}`);
+      approve.addEventListener('click', () => { void decideActionCenterBrowserApproval(item, 'APPROVE', li); });
+      const reject = document.createElement('button');
+      reject.type = 'button';
+      reject.textContent = 'Відхилити';
+      reject.setAttribute('aria-label', `Відхилити: ${item.title}`);
+      reject.addEventListener('click', () => { void decideActionCenterBrowserApproval(item, 'REJECT', li); });
+      li.append(' ', approve, ' ', reject);
+    }
     list.append(li);
   }
 }

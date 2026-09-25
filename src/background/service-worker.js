@@ -1,5 +1,5 @@
 import { projectGlobalStatus } from '../core/global-status.js';
-import { projectRuntimeActionCenter } from '../core/action-center-runtime.js';
+import { projectRuntimeActionCenter, resolveRuntimeActionCenterBrowserApproval } from '../core/action-center-runtime.js';
 import { StorageRepository } from '../core/storage.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
 import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
@@ -474,6 +474,22 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'GET_ACTION_CENTER') {
     const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
     result = await projectRuntimeActionCenter({ coreState, agentJobs: agentState.jobs });
+  } else if (message.command === 'DECIDE_ACTION_CENTER_BROWSER_APPROVAL') {
+    const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
+    const resolution = await resolveRuntimeActionCenterBrowserApproval({
+      coreState,
+      agentJobs: agentState.jobs,
+      itemId: message.payload?.itemId,
+      sourceRevisionId: message.payload?.sourceRevisionId,
+      decision: message.payload?.decision,
+    });
+    if (resolution.decision === 'APPROVE') {
+      await browserAgent.approvePendingAction(resolution.jobId, { expectedApproval: resolution.expectedApproval });
+      result = { kind: 'APPROVED' };
+    } else {
+      await browserAgent.rejectPendingAction(resolution.jobId, { expectedApproval: resolution.expectedApproval });
+      result = { kind: 'REJECTED' };
+    }
   } else if (message.command === 'LIST_ORCHESTRATION_V2_ORCHESTRAS') {
     result = await orchestrationV2.list();
   } else if (message.command === 'CREATE_ORCHESTRATION_V2_ORCHESTRA') {

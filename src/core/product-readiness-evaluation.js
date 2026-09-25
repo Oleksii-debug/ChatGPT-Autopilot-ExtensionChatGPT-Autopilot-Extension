@@ -226,12 +226,12 @@ function normalizeBenchmarkCheck(input, expectedSubject, asOf) {
   const ageMs = asOfMs - completedMs;
   let gateStatus;
   let reasonCode;
-  if (ageMs > maxAgeMs) {
-    gateStatus = ProductReadinessGateStatus.UNKNOWN;
-    reasonCode = 'BENCHMARK_STALE';
-  } else if (evaluation.status === BenchmarkEvaluationStatus.FAIL) {
+  if (evaluation.status === BenchmarkEvaluationStatus.FAIL) {
     gateStatus = ProductReadinessGateStatus.BLOCKED;
     reasonCode = 'BENCHMARK_FAILED';
+  } else if (ageMs > maxAgeMs) {
+    gateStatus = ProductReadinessGateStatus.UNKNOWN;
+    reasonCode = 'BENCHMARK_STALE';
   } else {
     gateStatus = ProductReadinessGateStatus.READY;
     reasonCode = 'BENCHMARK_PASSED';

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectRuntimeActionCenter } from '../src/core/action-center-runtime.js';
+import { projectRuntimeActionCenter, resolveRuntimeActionCenterBrowserApproval } from '../src/core/action-center-runtime.js';
 
 const T0 = Date.parse('2026-09-25T08:00:00.000Z');
 const T1 = Date.parse('2026-09-25T08:01:00.000Z');
@@ -231,4 +231,125 @@ test('stale or malformed Browser Agent pendingApproval does not manufacture an o
   assert.equal(projection.summary.openCount, 1);
   assert.equal(projection.items[0].ownerActionKind, 'APPROVE_OR_DENY');
   assert.match(projection.items[0].title, /valid-approval/u);
+});
+
+
+test('Action Center resolves only the exact current Browser Agent approval revision to a private owner fence', async () => {
+  const job = agentJob('private-job-id', {
+    config: { name: 'Owner research agent' },
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      controlEpoch: 7,
+      updatedAt: T2,
+      lastError: 'private diagnostic',
+      pendingApproval: {
+        snapshotId: 'snapshot-7',
+        snapshotSignature: 'signature-7',
+        requestedAt: T1,
+        targetName: 'Private target',
+        url: 'https://example.invalid/private',
+        action: { type: 'click', ref: 'control-7' },
+      },
+    },
+  });
+  const projection = await projectRuntimeActionCenter({ agentJobs: [job] });
+  assert.equal(projection.items.length, 1);
+  const item = projection.items[0];
+  const publicJson = JSON.stringify(projection);
+  assert.equal(publicJson.includes('private-job-id'), false);
+  assert.equal(publicJson.includes('example.invalid'), false);
+  assert.equal(publicJson.includes('Private target'), false);
+
+  const resolved = await resolveRuntimeActionCenterBrowserApproval({
+    agentJobs: [job],
+    itemId: item.itemId,
+    sourceRevisionId: item.sourceRevisionId,
+    decision: 'APPROVE',
+  });
+  assert.equal(resolved.jobId, 'private-job-id');
+  assert.equal(resolved.decision, 'APPROVE');
+  assert.deepEqual(resolved.expectedApproval, {
+    controlEpoch: 7,
+    updatedAt: T2,
+    snapshotId: 'snapshot-7',
+    snapshotSignature: 'signature-7',
+    requestedAt: T1,
+  });
+  assert.equal(Object.isFrozen(resolved.expectedApproval), true);
+});
+
+test('Action Center rejects a stale approval revision when canonical pending ownership changes', async () => {
+  const job = agentJob('approval-race', {
+    config: { name: 'Approval race' },
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      controlEpoch: 3,
+      updatedAt: T1,
+      lastError: '',
+      pendingApproval: {
+        snapshotId: 'snapshot-old',
+        snapshotSignature: 'same-page-signature',
+        requestedAt: T0,
+        action: { type: 'click', ref: 'old-control' },
+      },
+    },
+  });
+  const first = await projectRuntimeActionCenter({ agentJobs: [job] });
+  const stale = first.items[0];
+
+  job.runtime.controlEpoch = 4;
+  job.runtime.updatedAt = T2;
+  job.runtime.pendingApproval = {
+    snapshotId: 'snapshot-new',
+    snapshotSignature: 'same-page-signature',
+    requestedAt: T1,
+    action: { type: 'click', ref: 'new-control' },
+  };
+  const second = await projectRuntimeActionCenter({ agentJobs: [job] });
+  assert.equal(second.items[0].itemId, stale.itemId, 'same page identity remains one attention item');
+  assert.notEqual(second.items[0].sourceRevisionId, stale.sourceRevisionId, 'approval ownership change must move revision');
+
+  await assert.rejects(
+    () => resolveRuntimeActionCenterBrowserApproval({
+      agentJobs: [job],
+      itemId: stale.itemId,
+      sourceRevisionId: stale.sourceRevisionId,
+      decision: 'APPROVE',
+    }),
+    /revision is stale/i,
+  );
+});
+
+test('Action Center owner bridge refuses non-approval items and invalid decisions', async () => {
+  const projection = await projectRuntimeActionCenter({
+    coreState: {
+      sessionOrder: ['core-error'],
+      sessionsById: {
+        'core-error': coreSession('core-error', { runState: 'ERROR', lastError: 'diagnostic' }),
+      },
+    },
+  });
+  const item = projection.items[0];
+  await assert.rejects(
+    () => resolveRuntimeActionCenterBrowserApproval({
+      coreState: {
+        sessionOrder: ['core-error'],
+        sessionsById: {
+          'core-error': coreSession('core-error', { runState: 'ERROR', lastError: 'diagnostic' }),
+        },
+      },
+      itemId: item.itemId,
+      sourceRevisionId: item.sourceRevisionId,
+      decision: 'APPROVE',
+    }),
+    /not an actionable Browser Agent approval/i,
+  );
+  await assert.rejects(
+    () => resolveRuntimeActionCenterBrowserApproval({
+      itemId: item.itemId,
+      sourceRevisionId: item.sourceRevisionId,
+      decision: 'ALLOW_ALL',
+    }),
+    /decision is invalid/i,
+  );
 });
