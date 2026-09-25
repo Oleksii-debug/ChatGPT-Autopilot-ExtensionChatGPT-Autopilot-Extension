@@ -3,7 +3,14 @@ import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
-import { parseAccessibleLocalDateTime, formatAccessibleLocalDateTime, normalizeAccessibleClockTime } from './accessible-date-time.js';
+import {
+  parseAccessibleLocalDateTime,
+  formatAccessibleLocalDateTime,
+  normalizeAccessibleClockTime,
+  normalizeAccessibleCalendarDate,
+  formatAccessibleCalendarDate,
+  parseAccessibleOccurrenceLine,
+} from './accessible-date-time.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -3042,16 +3049,16 @@ function collectCalendarSchedule() {
     catchUp: $('calendar-catch-up').checked ? 'ON' : 'OFF',
   };
   if (kind === 'ONE_TIME') {
-    schedule.date = $('calendar-one-time-date').value.trim();
-    schedule.time = $('calendar-one-time-time').value.trim();
+    schedule.date = normalizeAccessibleCalendarDate($('calendar-one-time-date').value);
+    schedule.time = normalizeAccessibleClockTime($('calendar-one-time-time').value, { optional: false });
     return schedule;
   }
   if (kind === 'DAILY' || kind === 'WEEKLY') {
-    schedule.startDate = $('calendar-start-date').value.trim();
-    schedule.times = calendarLines('calendar-times');
+    schedule.startDate = normalizeAccessibleCalendarDate($('calendar-start-date').value);
+    schedule.times = calendarLines('calendar-times').map(value => normalizeAccessibleClockTime(value, { optional: false }));
     const endDate = $('calendar-end-date').value.trim();
     const maxOccurrences = $('calendar-max-occurrences').value.trim();
-    if (endDate) schedule.endDate = endDate;
+    if (endDate) schedule.endDate = normalizeAccessibleCalendarDate(endDate);
     if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
     if (kind === 'WEEKLY') {
       schedule.weekdays = Array.from({ length: 7 }, (_, index) => index + 1)
@@ -3059,9 +3066,12 @@ function collectCalendarSchedule() {
     }
     return schedule;
   }
-  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map(line => {
-    const match = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)$/u.exec(line);
-    return match ? { date: match[1], time: match[2] } : { date: line, time: '' };
+  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map((line, index) => {
+    try {
+      return parseAccessibleOccurrenceLine(line);
+    } catch (error) {
+      throw new Error(`Запуск ${index + 1}: ${error.message}`);
+    }
   });
   return schedule;
 }
@@ -3095,16 +3105,16 @@ function renderCalendarEditor() {
   $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
   $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
   $('calendar-revision-confirm').checked = false;
-  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? (schedule.date || '') : '';
+  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? formatAccessibleCalendarDate(schedule.date || '') : '';
   $('calendar-one-time-time').value = schedule?.kind === 'ONE_TIME' ? (schedule.time || '') : '';
-  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.startDate || '') : '';
+  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? formatAccessibleCalendarDate(schedule.startDate || '') : '';
   $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
-  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.endDate || '') : '';
+  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? formatAccessibleCalendarDate(schedule.endDate || '') : '';
   $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
   const weekdays = new Set(schedule?.kind === 'WEEKLY' ? (schedule.weekdays || []) : []);
   for (let day = 1; day <= 7; day += 1) $(`calendar-weekday-${day}`).checked = weekdays.has(day);
   $('calendar-explicit-occurrences').value = schedule?.kind === 'EXPLICIT'
-    ? (schedule.occurrences || []).map(item => `${item.date} ${item.time}`).join('\n')
+    ? (schedule.occurrences || []).map(item => `${formatAccessibleCalendarDate(item.date)} ${item.time}`).join('\n')
     : '';
   syncCalendarVisibility();
   renderCalendarRuntimeStatus(ui.selected);
@@ -3127,12 +3137,12 @@ function validateCalendarScheduleUi(session, errors) {
   try { new Intl.DateTimeFormat('uk-UA', { timeZone: schedule.timeZone }).format(0); }
   catch { errors.push(['calendar-time-zone', 'Вкажіть чинний IANA часовий пояс, наприклад Europe/Bratislava.']); }
   if (schedule.kind === 'ONE_TIME') {
-    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Дата одноразового запуску має бути у форматі YYYY-MM-DD.']);
+    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Вкажіть коректну дату одноразового запуску.']);
     if (!validCalendarTime(schedule.time)) errors.push(['calendar-one-time-time', 'Час одноразового запуску має бути у форматі HH:MM або HH:MM:SS.']);
     return;
   }
   if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
-    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Дата початку має бути у форматі YYYY-MM-DD.']);
+    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Вкажіть коректну дату початку.']);
     if (!Array.isArray(schedule.times) || schedule.times.length < 1 || schedule.times.length > 48 || schedule.times.some(value => !validCalendarTime(value))) {
       errors.push(['calendar-times', 'Додайте від 1 до 48 коректних часів, по одному в рядку, у форматі HH:MM.']);
     }
@@ -3151,7 +3161,7 @@ function validateCalendarScheduleUi(session, errors) {
   if (schedule.kind === 'EXPLICIT') {
     if (!Array.isArray(schedule.occurrences) || schedule.occurrences.length < 1 || schedule.occurrences.length > 10000
       || schedule.occurrences.some(item => !validCalendarDate(item.date) || !validCalendarTime(item.time))) {
-      errors.push(['calendar-explicit-occurrences', 'Додайте від 1 до 10000 рядків у форматі YYYY-MM-DD HH:MM.']);
+      errors.push(['calendar-explicit-occurrences', 'Додайте від 1 до 10000 запусків у форматі ДД.ММ.РРРР ГГ:ХХ.']);
     }
   }
 }
