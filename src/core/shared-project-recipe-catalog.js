@@ -229,12 +229,28 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProje
   let governanceRegistryId = '';
   let governanceRegistryRevision = 0;
 
-  for (const share of shares.filter((item) => activeShareAt(item, evaluatedAt))) {
+  for (const share of shares) {
     const initialAccess = await assessSharedProjectAccessV1(
       accessRequest(bindingId, share.sharedByPrincipalId, share.sharedAt),
       trustedProjectResolver,
     );
     assertShareBindsAccess(share, initialAccess, `share ${share.shareId}`);
+
+    if (!catalogProjectId) {
+      catalogProjectId = initialAccess.projectId;
+      catalogProjectRevisionId = initialAccess.projectRevisionId;
+      organizationId = initialAccess.organizationId;
+      governanceRegistryId = initialAccess.governanceRegistryId;
+      governanceRegistryRevision = initialAccess.governanceRegistryRevision;
+    } else if (catalogProjectId !== initialAccess.projectId
+        || catalogProjectRevisionId !== initialAccess.projectRevisionId
+        || organizationId !== initialAccess.organizationId
+        || governanceRegistryId !== initialAccess.governanceRegistryId
+        || governanceRegistryRevision !== initialAccess.governanceRegistryRevision) {
+      throw new Error('shares do not resolve to one canonical shared Project authority');
+    }
+
+    if (!activeShareAt(share, evaluatedAt)) continue;
 
     const currentAccess = share.sharedAt === evaluatedAt
       ? initialAccess
@@ -243,20 +259,6 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProje
         trustedProjectResolver,
       );
     assertShareBindsAccess(share, currentAccess, `active share ${share.shareId}`);
-
-    if (!catalogProjectId) {
-      catalogProjectId = currentAccess.projectId;
-      catalogProjectRevisionId = currentAccess.projectRevisionId;
-      organizationId = currentAccess.organizationId;
-      governanceRegistryId = currentAccess.governanceRegistryId;
-      governanceRegistryRevision = currentAccess.governanceRegistryRevision;
-    } else if (catalogProjectId !== currentAccess.projectId
-        || catalogProjectRevisionId !== currentAccess.projectRevisionId
-        || organizationId !== currentAccess.organizationId
-        || governanceRegistryId !== currentAccess.governanceRegistryId
-        || governanceRegistryRevision !== currentAccess.governanceRegistryRevision) {
-      throw new Error('active shares do not resolve to one canonical shared Project authority');
-    }
 
     const identity = `${share.recipeId}@${share.version}`;
     if (activeRecipeIdentities.has(identity)) {
