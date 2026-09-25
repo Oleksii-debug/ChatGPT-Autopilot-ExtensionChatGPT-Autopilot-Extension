@@ -617,7 +617,7 @@ test('coordinator rate limit preserves lease and blocks project launches until r
   const applied = applyCoordinatorCompletionProbe(runtime, { status:'RATE_LIMITED', retryAfterAt:NOW + 120_000 }, NOW + 1);
   assert.equal(applied.rateLimited, true);
   assert.equal(runtime.coordinator.lease.turnId, turnId);
-  assert.ok(runtime.coordinator.retryAfterAt >= NOW + 300_001, 'minimum backoff is five minutes');
+  assert.ok(runtime.coordinator.retryAfterAt >= NOW + 30_001, 'technical probe delay is bounded to thirty seconds');
   assert.equal(projectBackpressureUntil(runtime, NOW + 2), runtime.coordinator.retryAfterAt);
 
   releaseExpiredWorkerBackpressure(runtime, runtime.coordinator.retryAfterAt + 1);

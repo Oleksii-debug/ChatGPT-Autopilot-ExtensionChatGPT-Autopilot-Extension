@@ -136,6 +136,45 @@ test('submit exception becomes ambiguous recovery without cooldown and without a
   assert.equal(state.logs.s1.at(-1).message, 'Submission uncertain; unattended recovery active [SUBMIT_EFFECT_EXCEPTION]');
 });
 
+test('tab activation denied before any input permits bounded retry without recording Send', async () => {
+  const repo = new FakeRepository(fixture());
+  const clock = { value:0 };
+  const coordinator = new DurableSubmissionCoordinator(repo, { now:() => clock.value, cryptoApi:webcrypto });
+  const identity = await prepareForSubmit(coordinator, clock);
+  clock.value = 1040;
+  const result = await coordinator.submitWithDurableCheckpoint({
+    sessionId:'s1', operationId:identity.operationId,
+    submit:async () => ({ status:InteractionResult.TEMPORARY_ERROR,
+      submissionEvidence:'PROVEN_NO_EFFECT', safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT' }),
+  });
+  const after = await repo.load();
+  assert.equal(result.status, InteractionResult.TEMPORARY_ERROR);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.FAILED_SAFE);
+  assert.equal(after.sessionsById.s1.operation.submitStartedAt, 0);
+  assert.equal(after.sessionsById.s1.successfulSendCount, 0);
+  assert.equal(after.sessionsById.s1.tasksById.t1.status, 'RETRY_WAIT');
+});
+
+test('pre-effect claim cannot downgrade a persisted native click to a safe retry', async () => {
+  const repo = new FakeRepository(fixture());
+  const clock = { value:0 };
+  const coordinator = new DurableSubmissionCoordinator(repo, { now:() => clock.value, cryptoApi:webcrypto });
+  const identity = await prepareForSubmit(coordinator, clock);
+  clock.value = 1040;
+  const result = await coordinator.submitWithDurableCheckpoint({
+    sessionId:'s1', operationId:identity.operationId,
+    submit:async () => {
+      await repo.update(state => { state.sessionsById.s1.operation.nativeSubmitDispatched = true; return state; });
+      return { status:InteractionResult.TEMPORARY_ERROR,
+        submissionEvidence:'PROVEN_NO_EFFECT', safeDiagnosticCode:'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT' };
+    },
+  });
+  const after = await repo.load();
+  assert.equal(result.status, InteractionResult.SUBMISSION_UNCERTAIN);
+  assert.equal(after.sessionsById.s1.operation.phase, OperationPhase.AMBIGUOUS);
+  assert.equal(after.sessionsById.s1.successfulSendCount, 0);
+});
+
 test('pre-send deadline prevents premature submit before any side effect', async () => {
   const repo = new FakeRepository(fixture());
   const clock = { value: 0 };

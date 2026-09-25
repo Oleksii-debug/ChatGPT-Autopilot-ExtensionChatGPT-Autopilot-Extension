@@ -15,8 +15,8 @@ export const RunState = Object.freeze({ STOPPED:'STOPPED', RUNNING:'RUNNING', PA
 export const PromptMode = Object.freeze({ SHARED:'SHARED', UNIQUE:'UNIQUE' });
 export const RunMode = Object.freeze({ ONE_PASS:'ONE_PASS', CONTINUOUS:'CONTINUOUS' });
 export const TabStrategy = Object.freeze({ KEEP_TASK_TABS_OPEN:'KEEP_TASK_TABS_OPEN', ONE_WORKER_TAB_PER_SESSION:'ONE_WORKER_TAB_PER_SESSION', OPEN_CLOSE_PER_TASK:'OPEN_CLOSE_PER_TASK' });
-export const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 5 * 60 * 1000;
-export const MIN_RATE_LIMIT_COOLDOWN_MS = 1 * 60 * 1000;
+export const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 0;
+export const MIN_RATE_LIMIT_COOLDOWN_MS = 0;
 export const MAX_RATE_LIMIT_COOLDOWN_MS = 120 * 60 * 1000;
 export const OperationPhase = Object.freeze({ NONE:'NONE', CHECKING:'CHECKING', READY:'READY', INSERTING:'INSERTING', INSERTED:'INSERTED', PRE_SEND_WAIT:'PRE_SEND_WAIT', SUBMITTING:'SUBMITTING', SENT_VERIFIED:'SENT_VERIFIED', AMBIGUOUS:'AMBIGUOUS', FAILED_SAFE:'FAILED_SAFE', MANUAL_REVIEW:'MANUAL_REVIEW' });
 
@@ -60,7 +60,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -169,6 +169,12 @@ function validateOperation(operation, session) {
     requireString(operation.launchUrl, `session ${session.id} operation launchUrl`);
     if (operation.launchUrl && normalizeChatUrl(operation.launchUrl) !== operation.launchUrl) {
       throw new Error(`Invalid session ${session.id} operation launchUrl`);
+    }
+  }
+  for (const field of ['previousSendTabId', 'previousSendWindowId']) {
+    if (operation[field] !== undefined
+        && (!Number.isInteger(operation[field]) || operation[field] < 0)) {
+      throw new Error(`Invalid session ${session.id} operation ${field}`);
     }
   }
 }
