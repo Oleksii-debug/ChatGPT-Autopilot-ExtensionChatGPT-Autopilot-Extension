@@ -468,15 +468,18 @@ test('DENY and REQUIRE_APPROVAL never reach transport', async () => {
 });
 
 test('policy identity must bind exactly to delegation decision and effect identity', async () => {
-  for (const policyDecision of [
-    policy({ decisionId: 'policy-other' }),
-    policy({ invocationId: 'effect-other' }),
-    policy({ decidedAt: T1 }),
-    policy({ decidedAt: '2026-09-25T02:00:00.000Z' }),
+  for (const { policyDecision, exactEffectState = executingExactState() } of [
+    {
+      policyDecision: policy({ decisionId: 'policy-other' }),
+      exactEffectState: executingExactState({ policyDecisionId: 'policy-other' }),
+    },
+    { policyDecision: policy({ invocationId: 'effect-other' }) },
+    { policyDecision: policy({ decidedAt: T1 }) },
+    { policyDecision: policy({ decidedAt: '2026-09-25T02:00:00.000Z' }) },
   ]) {
     const { provider, calls } = harness();
     await assert.rejects(
-      provider.sendMessage(sendInput({ policyDecision })),
+      provider.sendMessage(sendInput({ policyDecision, exactEffectState })),
       error => error.code === 'A2A_POLICY_MISMATCH',
     );
     assert.equal(calls.length, 0);
@@ -496,7 +499,10 @@ test('card/admission drift and capability drift fail closed before transport', a
   const cases = [
     { card: card({ cardSha256: sha('b') }) },
     { admission: admission({ allowedCapabilityIds: [] }) },
-    { delegation: delegation({ requestedCapabilityIds: ['remote.write'] }) },
+    {
+      delegation: delegation({ requestedCapabilityIds: ['remote.write'] }),
+      exactEffectState: executingExactState({ requestedCapabilityIds: ['remote.write'] }),
+    },
   ];
   for (const patch of cases) {
     const { provider, calls } = harness();
