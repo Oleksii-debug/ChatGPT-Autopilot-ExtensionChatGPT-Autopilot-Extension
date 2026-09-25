@@ -96,7 +96,8 @@ const STATE_KEYS = new Set([
   'qualifiedAt', 'publishedAt', 'lastHealthyAt', 'degradedAt',
   'rollbackPublishedAt', 'rolledBackAt',
   'publishCommitId', 'rollbackCommitId', 'regressionCount',
-  'revision', 'lastEventId', 'createdAt', 'updatedAt',
+  'revision', 'lastEventId', 'lastEventType', 'lastEventEvidenceId', 'lastEventAt',
+  'createdAt', 'updatedAt',
   'rollbackRecommended', 'rollbackAuthorized', 'publishAuthorized',
   'executionAuthorized', 'advisoryOnly',
 ]);
@@ -360,16 +361,25 @@ function normalizeEffectBinding(input) {
   if (state.phase !== ExactEffectPhase.COMMITTED || !state.commitId) {
     throw new Error('Deployment effect must be canonically COMMITTED');
   }
+  if (!state.observation?.observedAt) {
+    throw new Error('Deployment effect requires canonical exact-effect observation evidence');
+  }
   if (!state.verification || state.verification.status !== VerificationStatus.VERIFIED) {
     throw new Error('Deployment effect requires VERIFIED canonical exact-effect evidence');
   }
   if (!state.verification.verifierId || !state.verification.verificationAuthorityId) {
     throw new Error('Deployment effect requires verifier and verification-authority identity');
   }
+  if (state.verification.observationId !== state.observation.observationId) {
+    throw new Error('Deployment exact-effect verification observation binding mismatch');
+  }
+  if (state.observation.observedAt > state.verification.verifiedAt) {
+    throw new Error('Deployment exact-effect verification cannot predate observation');
+  }
   if (state.verification.verifiedAt > state.updatedAt) {
     throw new Error('Deployment exact-effect verification cannot postdate durable effect state');
   }
-  if (state.observation?.observedAt && state.observation.observedAt > state.updatedAt) {
+  if (state.observation.observedAt > state.updatedAt) {
     throw new Error('Deployment exact-effect observation cannot postdate durable effect state');
   }
   return deepFreeze({
@@ -485,6 +495,9 @@ function normalizeStateInternal(input) {
     regressionCount: exactInteger(raw.regressionCount, 'regressionCount', 0, Number.MAX_SAFE_INTEGER),
     revision: exactInteger(raw.revision, 'revision', 0, Number.MAX_SAFE_INTEGER),
     lastEventId: exactId(raw.lastEventId, 'lastEventId', { empty: true }),
+    lastEventType: exactId(raw.lastEventType, 'lastEventType', { empty: true }),
+    lastEventEvidenceId: exactId(raw.lastEventEvidenceId, 'lastEventEvidenceId', { empty: true }),
+    lastEventAt: exactTimestamp(raw.lastEventAt, 'lastEventAt', { empty: true }),
     createdAt: exactTimestamp(raw.createdAt, 'createdAt'),
     updatedAt: exactTimestamp(raw.updatedAt, 'updatedAt'),
     rollbackRecommended: exactBoolean(raw.rollbackRecommended, 'rollbackRecommended'),
@@ -499,8 +512,23 @@ function normalizeStateInternal(input) {
     if (state[key] !== expected) throw new Error(`${key} is inconsistent with deployment phase`);
   }
   if (state.updatedAt < state.createdAt) throw new Error('Deployment updatedAt cannot predate createdAt');
-  if ((state.revision === 0) !== (state.lastEventId === '')) {
-    throw new Error('Deployment revision and lastEventId are inconsistent');
+  const lastEventFields = [
+    state.lastEventId,
+    state.lastEventType,
+    state.lastEventEvidenceId,
+    state.lastEventAt,
+  ];
+  if (state.revision === 0) {
+    if (lastEventFields.some(Boolean)) {
+      throw new Error('Deployment revision and last-event identity are inconsistent');
+    }
+  } else {
+    if (lastEventFields.some(value => !value)) {
+      throw new Error('Deployment revision and last-event identity are inconsistent');
+    }
+    if (!EVENT_TYPES.has(state.lastEventType) || state.lastEventAt !== state.updatedAt) {
+      throw new Error('Deployment last-event identity is inconsistent with durable state');
+    }
   }
 
   for (const evidence of [...qualificationEvidence, ...healthEvidence, ...(rollbackHealth ? [rollbackHealth] : [])]) {
@@ -649,6 +677,9 @@ export function createDeploymentLifecycleV1(input) {
     regressionCount: 0,
     revision: 0,
     lastEventId: '',
+    lastEventType: '',
+    lastEventEvidenceId: '',
+    lastEventAt: '',
     createdAt,
     updatedAt: createdAt,
     ...derivePhaseFlags(DeploymentPhase.PREVIEW),
@@ -720,6 +751,9 @@ function accepted(current, event, mutate) {
   mutate(draft);
   draft.revision = current.revision + 1;
   draft.lastEventId = event.eventId;
+  draft.lastEventType = event.type;
+  draft.lastEventEvidenceId = event.evidenceId;
+  draft.lastEventAt = event.at;
   draft.updatedAt = event.at;
   Object.assign(draft, derivePhaseFlags(draft.phase));
   return deepFreeze({
@@ -747,7 +781,14 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
   const event = normalizeEvent(eventInput);
   if (event.deploymentId !== current.deploymentId) throw new Error('Deployment event deploymentId mismatch');
 
-  if (event.eventId === current.lastEventId && event.previousRevision === current.revision - 1) {
+  if (event.eventId === current.lastEventId) {
+    const exactReplay = event.previousRevision === current.revision - 1
+      && event.type === current.lastEventType
+      && event.evidenceId === current.lastEventEvidenceId
+      && event.at === current.lastEventAt;
+    if (!exactReplay) {
+      throw new Error('Deployment event idempotency conflict for lastEventId');
+    }
     return deepFreeze({
       state: current,
       accepted: true,
@@ -805,12 +846,13 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
       current.candidateArtifactRef,
       current.publishEffectId,
     );
-    if (binding.state.updatedAt < current.qualifiedAt) {
-      throw new Error('Publish exact effect predates completed qualification');
+    const effectObservedAt = binding.state.observation.observedAt;
+    if (effectObservedAt < current.qualifiedAt) {
+      throw new Error('Publish exact-effect observation predates completed qualification');
     }
     return accepted(current, event, draft => {
       draft.phase = DeploymentPhase.PUBLISHED_UNVERIFIED;
-      draft.publishedAt = binding.state.updatedAt;
+      draft.publishedAt = effectObservedAt;
       draft.publishCommitId = binding.state.commitId;
     });
   }
@@ -880,12 +922,13 @@ export function reduceDeploymentLifecycleV1(stateInput, eventInput, {
       current.rollbackArtifactRef,
       current.rollbackEffectId,
     );
-    if (binding.state.updatedAt < current.publishedAt) {
-      throw new Error('Rollback exact effect predates current publish');
+    const effectObservedAt = binding.state.observation.observedAt;
+    if (effectObservedAt < current.publishedAt) {
+      throw new Error('Rollback exact-effect observation predates current publish');
     }
     return accepted(current, event, draft => {
       draft.phase = DeploymentPhase.ROLLBACK_PUBLISHED_UNVERIFIED;
-      draft.rollbackPublishedAt = binding.state.updatedAt;
+      draft.rollbackPublishedAt = effectObservedAt;
       draft.rollbackCommitId = binding.state.commitId;
       draft.rollbackHealth = null;
     });
