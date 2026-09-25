@@ -83,22 +83,31 @@ function digest(value, label, { optional = true } = {}) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value)
-      || Object.getPrototypeOf(value) !== Array.prototype
-      || value.length > max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const out = [];
-  for (const key of Reflect.ownKeys(value)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || Object.is(lengthDescriptor.value, -0)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
+  const out = new Array(length);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains a non-index field`);
     }
     const index = Number(key);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!Number.isSafeInteger(index)
         || index < 0
-        || index >= value.length
+        || index >= length
         || String(index) !== key
         || !descriptor
         || descriptor.enumerable !== true
@@ -106,14 +115,14 @@ function dataArray(value, label, max) {
       throw new Error(`${label} entries must be enumerable own data properties`);
     }
   }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor
         || descriptor.enumerable !== true
         || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} must be a dense data-only array`);
     }
-    out.push(descriptor.value);
+    out[index] = descriptor.value;
   }
   return out;
 }
@@ -173,8 +182,55 @@ function boundedArray(value, label, normalizeItem, { max = MAX_LIST, optional = 
   });
 }
 
+const NESTED_ARTIFACT_KEYS = new Set([
+  'schemaVersion', 'artifactId', 'kind', 'uri', 'mediaType', 'sha256',
+  'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
+]);
+
+function exactText(value, label, { optional = false, max = MAX_TEXT } = {}) {
+  if ((value == null || value === '') && optional) return '';
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > max) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function optionalId(value, label) {
+  if (value == null || value === '') return '';
+  return id(value, label);
+}
+
+function exactNonNegativeInteger(value, label) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
 function normalizeNestedArtifactRefV1(input) {
-  return normalizeArtifactRefV1(plain(input, 'ArtifactRefV1'));
+  const raw = plain(input, 'ArtifactRefV1');
+  exactKeys(raw, NESTED_ARTIFACT_KEYS, 'ArtifactRefV1');
+
+  version(raw.schemaVersion, 'ArtifactRefV1');
+  id(raw.artifactId, 'artifactId');
+  id(raw.kind, 'kind');
+  exactText(raw.uri, 'uri', { max: 4096 });
+  exactText(raw.mediaType, 'mediaType', { optional: true, max: 300 });
+  digest(raw.sha256, 'sha256', { optional: true });
+  if (raw.sizeBytes != null) exactNonNegativeInteger(raw.sizeBytes, 'sizeBytes');
+  timestamp(raw.createdAt, 'createdAt');
+  optionalId(raw.producerInvocationId, 'producerInvocationId');
+  if (raw.sensitive != null && typeof raw.sensitive !== 'boolean') {
+    throw new Error('sensitive must be boolean');
+  }
+
+  return normalizeArtifactRefV1(raw);
 }
 
 function uniqueBy(items, key, label) {
@@ -203,7 +259,7 @@ export function normalizeProjectSourceRefV1(input) {
     sourceId: id(raw.sourceId, 'sourceId'),
     projectId: id(raw.projectId, 'projectId'),
     kind: id(raw.kind, 'kind'),
-    uri: text(raw.uri, 'uri', { max: 4096 }),
+    uri: exactText(raw.uri, 'uri', { max: 4096 }),
     revisionId: id(raw.revisionId, 'revisionId'),
     contentSha256: digest(raw.contentSha256, 'contentSha256'),
     observedAt: timestamp(raw.observedAt, 'observedAt'),
