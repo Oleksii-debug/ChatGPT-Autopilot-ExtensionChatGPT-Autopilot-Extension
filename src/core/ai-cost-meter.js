@@ -29,14 +29,21 @@ function plainObject(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain object`);
   }
+  const snapshot = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') throw new Error(`${label} contains a symbol field`);
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} fields must be enumerable own data properties`);
     }
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 
 function exactKeys(value, allowed, label) {
