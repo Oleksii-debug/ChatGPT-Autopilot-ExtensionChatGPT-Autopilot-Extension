@@ -135,6 +135,14 @@ function codeUnitCompare(a, b) {
   return 0;
 }
 
+function canonicalTimestampCompare(a, b) {
+  const aMs = Date.parse(a);
+  const bMs = Date.parse(b);
+  if (aMs < bMs) return -1;
+  if (aMs > bMs) return 1;
+  return 0;
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -296,8 +304,12 @@ export function fuseGlobalSearchV1(input) {
       item.fusionScore += rrfContribution(hit.rank);
       item.providerCount += 1;
       item.bestRank = Math.min(item.bestRank, hit.rank);
-      if (hit.observedAt > item.latestObservedAt) item.latestObservedAt = hit.observedAt;
-      if (batch.completedAt > item.latestSearchCompletedAt) item.latestSearchCompletedAt = batch.completedAt;
+      if (canonicalTimestampCompare(hit.observedAt, item.latestObservedAt) > 0) {
+        item.latestObservedAt = hit.observedAt;
+      }
+      if (canonicalTimestampCompare(batch.completedAt, item.latestSearchCompletedAt) > 0) {
+        item.latestSearchCompletedAt = batch.completedAt;
+      }
       if (codeUnitCompare(hit.title, item.title) < 0) item.title = hit.title;
       item.providerRefs.push({
         providerId: batch.providerId,
@@ -329,7 +341,7 @@ export function fuseGlobalSearchV1(input) {
   results.sort((a, b) => b.fusionScore - a.fusionScore
     || b.providerCount - a.providerCount
     || a.bestRank - b.bestRank
-    || codeUnitCompare(b.latestObservedAt, a.latestObservedAt)
+    || canonicalTimestampCompare(b.latestObservedAt, a.latestObservedAt)
     || codeUnitCompare(a.domain, b.domain)
     || codeUnitCompare(a.sourceId, b.sourceId)
     || codeUnitCompare(a.revisionId, b.revisionId)
