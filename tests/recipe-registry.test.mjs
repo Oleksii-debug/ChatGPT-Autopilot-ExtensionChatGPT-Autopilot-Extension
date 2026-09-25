@@ -558,3 +558,36 @@ test('replay eligibility never upgrades non-promoted or failed candidates', asyn
     qualification: qualification('FAIL'),
   })), /requires PASS/);
 });
+
+test('recipe array boundaries consume descriptor snapshots without ordinary Proxy reads', async () => {
+  let reads = 0;
+  const trackReads = target => new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+
+  const structural = recipe({
+    sourceBindings: trackReads([binding()]),
+    steps: trackReads(recipe().steps),
+  });
+  const normalized = normalizeRecipeDefinitionV1(structural);
+  assert.equal(normalized.steps.length, 2);
+  assert.equal(normalized.sourceBindings.length, 1);
+  assert.equal(reads, 0, 'recipe structural arrays must not perform ordinary caller reads');
+
+  reads = 0;
+  const promoted = await authorizedRecipe();
+  const trusted = trustedEvaluationFor(promoted);
+  trusted.report.results = trackReads(trusted.report.results);
+  const trustedInputs = trackReads([trusted]);
+  const resolved = await resolvePromotedRecipeV1(
+    registry([promoted]),
+    promoted.recipeId,
+    trustedInputs,
+  );
+  assert.equal(resolved.version, 1);
+  assert.equal(reads, 0, 'trusted evaluation arrays must not perform ordinary caller reads');
+});
+
