@@ -4,11 +4,17 @@ import {
   ProjectBootstrapBlockerCode,
   ProjectBootstrapStatus,
   buildProjectBootstrapV1,
+  commitTrustedProjectBootstrapToWorkspaceV1,
   resolveTrustedProjectBootstrapSnapshotV1,
 } from '../src/core/project-bootstrap.js';
+import {
+  PROJECT_WORKSPACE_STORAGE_KEY,
+  ProjectWorkspaceRepository,
+} from '../src/core/project-workspace.js';
 import { normalizeArtifactRefV1 } from '../src/core/universal-agent-contracts.js';
 
 const AT = '2026-09-25T00:00:00.000Z';
+const AT_MS = Date.parse(AT);
 const SHA_A = 'a'.repeat(64);
 const SHA_B = 'b'.repeat(64);
 const SHA_C = 'c'.repeat(64);
@@ -448,3 +454,180 @@ test('trusted snapshot resolution requires exact material identity for every opt
   );
   assert.equal(calls, 0);
 });
+
+function fakeWorkspaceChrome(initial = {}) {
+  const data = structuredClone(initial);
+  return {
+    data,
+    storage: {
+      local: {
+        async get(key) {
+          return { [key]: data[key] };
+        },
+        async set(value) {
+          Object.assign(data, structuredClone(value));
+        },
+      },
+    },
+  };
+}
+
+test('trusted bootstrap commits exactly once through canonical ProjectWorkspaceRepository and survives recreation', async () => {
+  const raw = input();
+  const sources = new Map(raw.sourceRefs.map(item => [item.sourceId, item]));
+  const artifacts = new Map(raw.artifactRefs.map(item => [item.artifactId, item]));
+  const chrome = fakeWorkspaceChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  const result = await commitTrustedProjectBootstrapToWorkspaceV1(
+    raw,
+    {
+      async resolveSourceRef(query) {
+        return sources.get(query.sourceId);
+      },
+      async resolveArtifactRef(query) {
+        return artifacts.get(query.artifactId);
+      },
+    },
+    repository,
+    { nowMs: AT_MS },
+  );
+
+  assert.deepEqual(result, {
+    schemaVersion: 1,
+    bootstrapId: 'bootstrap-1',
+    projectId: 'project-1',
+    projectRevisionId: 'project-rev-1',
+    workspaceRevision: 1,
+    workspaceCommitApplied: true,
+    requiresCanonicalProjectWorkspaceCommit: false,
+    additionalMutationAuthorized: false,
+  });
+  assert.equal(Object.isFrozen(result), true);
+
+  const restored = await new ProjectWorkspaceRepository(chrome).load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.projectsById['project-1'].snapshot.revisionId, 'project-rev-1');
+  assert.deepEqual(
+    restored.projectsById['project-1'].snapshot.sourceRefs.map(item => item.sourceId),
+    ['drive', 'repo'],
+  );
+  assert.ok(chrome.data[PROJECT_WORKSPACE_STORAGE_KEY]);
+});
+
+test('workspace bootstrap is create-only: duplicate Project admission fails without durable revision advance', async () => {
+  const raw = input();
+  const sources = new Map(raw.sourceRefs.map(item => [item.sourceId, item]));
+  const artifacts = new Map(raw.artifactRefs.map(item => [item.artifactId, item]));
+  const chrome = fakeWorkspaceChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  const resolvers = {
+    async resolveSourceRef(query) {
+      return sources.get(query.sourceId);
+    },
+    async resolveArtifactRef(query) {
+      return artifacts.get(query.artifactId);
+    },
+  };
+
+  await commitTrustedProjectBootstrapToWorkspaceV1(raw, resolvers, repository, { nowMs: AT_MS });
+  await assert.rejects(
+    () => commitTrustedProjectBootstrapToWorkspaceV1(raw, resolvers, repository, { nowMs: AT_MS + 1 }),
+    /Project already exists/,
+  );
+
+  const restored = await new ProjectWorkspaceRepository(chrome).load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.updatedAt, AT_MS);
+});
+
+test('workspace bootstrap rejects commit time before trusted snapshot and evidence without durable mutation', async () => {
+  const raw = input();
+  const sources = new Map(raw.sourceRefs.map(item => [item.sourceId, item]));
+  const artifacts = new Map(raw.artifactRefs.map(item => [item.artifactId, item]));
+  const chrome = fakeWorkspaceChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+
+  await assert.rejects(
+    () => commitTrustedProjectBootstrapToWorkspaceV1(
+      raw,
+      {
+        async resolveSourceRef(query) {
+          return sources.get(query.sourceId);
+        },
+        async resolveArtifactRef(query) {
+          return artifacts.get(query.artifactId);
+        },
+      },
+      repository,
+      { nowMs: AT_MS - 1 },
+    ),
+    /must not predate trusted snapshot or evidence/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 0);
+  assert.deepEqual(restored.projectsById, {});
+  assert.equal(chrome.data[PROJECT_WORKSPACE_STORAGE_KEY], undefined);
+});
+
+test('workspace bootstrap rejects non-canonical repository and invalid commit clocks before trusted resolution', async () => {
+  let resolverCalls = 0;
+  const resolvers = {
+    async resolveSourceRef() {
+      resolverCalls += 1;
+      throw new Error('must not run');
+    },
+    async resolveArtifactRef() {
+      resolverCalls += 1;
+      throw new Error('must not run');
+    },
+  };
+
+  await assert.rejects(
+    () => commitTrustedProjectBootstrapToWorkspaceV1(input(), resolvers, { update() {} }, { nowMs: 1 }),
+    /canonical ProjectWorkspaceRepository/,
+  );
+
+  const repository = new ProjectWorkspaceRepository(fakeWorkspaceChrome());
+  await assert.rejects(
+    () => commitTrustedProjectBootstrapToWorkspaceV1(input(), resolvers, repository, { nowMs: 1.5 }),
+    /non-negative safe integer/,
+  );
+  assert.equal(resolverCalls, 0);
+});
+
+test('workspace bootstrap does not save or claim success when trusted resolution fails', async () => {
+  const raw = input();
+  const chrome = fakeWorkspaceChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  let artifactCalls = 0;
+
+  await assert.rejects(
+    () => commitTrustedProjectBootstrapToWorkspaceV1(
+      raw,
+      {
+        async resolveSourceRef(query) {
+          const item = raw.sourceRefs.find(candidate => candidate.sourceId === query.sourceId);
+          return query.sourceId === 'repo'
+            ? { ...item, contentSha256: SHA_C }
+            : item;
+        },
+        async resolveArtifactRef() {
+          artifactCalls += 1;
+          return raw.artifactRefs[0];
+        },
+      },
+      repository,
+      { nowMs: AT_MS },
+    ),
+    /does not exactly match bootstrap source: repo/,
+  );
+
+  assert.equal(artifactCalls, 0);
+  const restored = await repository.load();
+  assert.equal(restored.revision, 0);
+  assert.deepEqual(restored.projectsById, {});
+  assert.equal(chrome.data[PROJECT_WORKSPACE_STORAGE_KEY], undefined);
+});
+
