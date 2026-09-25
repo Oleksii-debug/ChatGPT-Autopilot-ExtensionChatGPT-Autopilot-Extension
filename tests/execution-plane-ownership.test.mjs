@@ -368,6 +368,62 @@ test('ownership revision is a safe exact integer and transition overflow fails c
 });
 
 
+test('durable ownership revision transitions cannot move updatedAt backwards', () => {
+  assert.throws(
+    () => claimExecutionOwnershipV1(base(), {
+      plane:'LOCAL',
+      ownerId:'stale-worker',
+      leaseId:'stale-lease',
+      leaseUntil:'2026-09-23T13:05:00.000Z',
+      at:'2026-09-23T12:59:00.000Z',
+    }),
+    /transition cannot predate current durable state/,
+  );
+
+  const owned = localOwned();
+  assert.throws(
+    () => requestExecutionHandoffV1(owned, {
+      leaseId:'lease-local',
+      toPlane:'REMOTE',
+      handoffId:'stale-handoff',
+      at:T0,
+    }),
+    /transition cannot predate current durable state/,
+  );
+
+  const reconcile = recoverExpiredExecutionOwnershipV1(owned, { at:T3 });
+  assert.throws(
+    () => resolveExecutionReconciliationV1(reconcile, {
+      leaseId:'lease-local',
+      outcome:'MANUAL_REVIEW',
+      at:T2,
+    }),
+    /transition cannot predate current durable state/,
+  );
+});
+
+test('same-timestamp durable ownership transitions remain valid and advance exact revision', () => {
+  const available = base();
+  const owned = claimExecutionOwnershipV1(available, {
+    plane:'LOCAL',
+    ownerId:'same-time-worker',
+    leaseId:'same-time-lease',
+    leaseUntil:T1,
+    at:T0,
+  });
+  assert.equal(owned.updatedAt, T0);
+  assert.equal(owned.revision, available.revision + 1);
+
+  const pending = requestExecutionHandoffV1(owned, {
+    leaseId:'same-time-lease',
+    toPlane:'REMOTE',
+    handoffId:'same-time-handoff',
+    at:T0,
+  });
+  assert.equal(pending.updatedAt, T0);
+  assert.equal(pending.revision, owned.revision + 1);
+});
+
 test('optional durable ownership fields reject falsy non-string aliases instead of treating them as absent', () => {
   const available = structuredClone(base());
   const fields = ['ownerPlane', 'handoffToPlane', 'ambiguityReason'];
