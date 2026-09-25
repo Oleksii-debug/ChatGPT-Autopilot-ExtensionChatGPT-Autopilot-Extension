@@ -90,8 +90,29 @@ function assertDiffableVersion(version, label) {
   }
 }
 
+function assertWellFormedUtf16(text, label) {
+  for (let index = 0; index < text.length; index += 1) {
+    const codeUnit = text.charCodeAt(index);
+    if (codeUnit >= 0xD800 && codeUnit <= 0xDBFF) {
+      if (index + 1 >= text.length) {
+        throw new Error(`${label} must be well-formed UTF-16 before UTF-8 encoding`);
+      }
+      const nextCodeUnit = text.charCodeAt(index + 1);
+      if (nextCodeUnit < 0xDC00 || nextCodeUnit > 0xDFFF) {
+        throw new Error(`${label} must be well-formed UTF-16 before UTF-8 encoding`);
+      }
+      index += 1;
+      continue;
+    }
+    if (codeUnit >= 0xDC00 && codeUnit <= 0xDFFF) {
+      throw new Error(`${label} must be well-formed UTF-16 before UTF-8 encoding`);
+    }
+  }
+}
+
 async function verifyTextMaterial(text, version, label, { cryptoApi = globalThis.crypto } = {}) {
   if (typeof text !== 'string') throw new Error(`${label} must be UTF-8 text`);
+  assertWellFormedUtf16(text, label);
   const bytes = new TextEncoder().encode(text);
   if (bytes.byteLength > MAX_ARTIFACT_TEXT_DIFF_BYTES) {
     throw new Error(`${label} exceeds ${MAX_ARTIFACT_TEXT_DIFF_BYTES} UTF-8 bytes`);
