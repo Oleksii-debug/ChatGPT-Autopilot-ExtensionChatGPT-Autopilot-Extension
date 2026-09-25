@@ -17,6 +17,7 @@ export const FileChangeKind = Object.freeze({
 
 const CHANGE_KINDS = new Set(Object.values(FileChangeKind));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_CHANGE_KINDS = CHANGE_KINDS.size;
 const MAX_OBSERVATION_AGE_SECONDS = 7 * 24 * 60 * 60;
 
@@ -213,6 +214,13 @@ function snapshotEvidenceArtifactRef(value) {
     'TrustedFileChangeV1 evidenceArtifactRef',
     ARTIFACT_KEYS,
   );
+  if (raw.schemaVersion !== FILE_EVENT_TRIGGER_ADAPTER_VERSION) {
+    throw new Error('TrustedFileChangeV1 evidenceArtifactRef schemaVersion must be numeric 1');
+  }
+  const artifactId = exactId(
+    raw.artifactId,
+    'TrustedFileChangeV1 evidenceArtifactRef artifactId',
+  );
   if (raw.kind !== 'file-change-event') {
     throw new Error('TrustedFileChangeV1 evidenceArtifactRef kind must be file-change-event');
   }
@@ -228,7 +236,39 @@ function snapshotEvidenceArtifactRef(value) {
       || raw.uri.length > 4096) {
     throw new Error('TrustedFileChangeV1 evidenceArtifactRef uri must be an opaque artifact URI');
   }
-  return Object.freeze({ ...raw });
+  if (typeof raw.sha256 !== 'string'
+      || raw.sha256 !== raw.sha256.trim()
+      || !SHA256.test(raw.sha256)) {
+    throw new Error('TrustedFileChangeV1 evidenceArtifactRef sha256 must be canonical lowercase SHA-256');
+  }
+  if (!Number.isSafeInteger(raw.sizeBytes)
+      || Object.is(raw.sizeBytes, -0)
+      || raw.sizeBytes < 1) {
+    throw new Error('TrustedFileChangeV1 evidenceArtifactRef requires non-empty integer sizeBytes');
+  }
+  const createdAt = canonicalTimestamp(
+    raw.createdAt,
+    'TrustedFileChangeV1 evidenceArtifactRef createdAt',
+  );
+  let producerInvocationId = null;
+  if (raw.producerInvocationId != null && raw.producerInvocationId !== '') {
+    producerInvocationId = exactId(
+      raw.producerInvocationId,
+      'TrustedFileChangeV1 evidenceArtifactRef producerInvocationId',
+    );
+  }
+  return Object.freeze({
+    schemaVersion: FILE_EVENT_TRIGGER_ADAPTER_VERSION,
+    artifactId,
+    kind: raw.kind,
+    uri: raw.uri,
+    mediaType: raw.mediaType,
+    sha256: raw.sha256,
+    sizeBytes: raw.sizeBytes,
+    createdAt,
+    producerInvocationId,
+    sensitive: false,
+  });
 }
 
 function normalizeRequest(value) {
