@@ -254,6 +254,13 @@ test('meeting evidence must already be admitted by exact canonical ProjectSnapsh
     projectSnapshot: staleSource,
   }), /source is not admitted/);
 
+  const olderSourceObservation = structuredClone(project);
+  olderSourceObservation.sourceRefs[0].observedAt = '2026-09-24T19:59:59.000Z';
+  assert.throws(() => assertMeetingEvidenceMatchesProjectSnapshotV1({
+    evidenceBundle: bundle,
+    projectSnapshot: olderSourceObservation,
+  }), /source is not admitted/);
+
   const swappedTranscript = structuredClone(project);
   swappedTranscript.artifactRefs[0].sha256 = sha('f');
   assert.throws(() => assertMeetingEvidenceMatchesProjectSnapshotV1({
