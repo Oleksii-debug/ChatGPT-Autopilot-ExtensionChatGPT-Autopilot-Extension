@@ -31,32 +31,46 @@ function validInput(overrides = {}) {
       issuedAt: ISSUED_AT,
       expiresAt: EXPIRES_AT,
     },
-    currentSnapshot: {
-      schemaVersion: 1,
-      jobId: 'job-1',
-      planId: 'plan-1',
-      jobRevision: 7,
-      planRevision: 11,
-      policyEnvelopeId: 'policy-1',
-      observedAt: OBSERVED_AT,
-    },
     assessmentAt: ASSESSMENT_AT,
   };
 
   if (overrides.command) Object.assign(input.command, overrides.command);
-  if (overrides.currentSnapshot) Object.assign(input.currentSnapshot, overrides.currentSnapshot);
   if (Object.hasOwn(overrides, 'assessmentAt')) input.assessmentAt = overrides.assessmentAt;
   return input;
 }
 
-async function assess(input) {
-  return assessRemoteSteeringCommandV1(input, { cryptoApi: webcrypto });
+function currentSnapshot(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    jobId: 'job-1',
+    planId: 'plan-1',
+    jobRevision: 7,
+    planRevision: 11,
+    policyEnvelopeId: 'policy-1',
+    observedAt: OBSERVED_AT,
+    ...overrides,
+  };
 }
 
-test('admits an exact current PAUSE proposal without granting runtime authority', async () => {
-  const result = await assess(validInput());
+async function assess(input, snapshot = currentSnapshot(), onResolve = null) {
+  return assessRemoteSteeringCommandV1(input, {
+    cryptoApi: webcrypto,
+    async resolveCurrentSnapshot(request) {
+      if (onResolve) onResolve(request);
+      return snapshot;
+    },
+  });
+}
 
-  assert.equal(result.status, 'READY_FOR_CANONICAL_RUNTIME_EVALUATION');
+test('admits exact current PAUSE proposal only for canonical authorization', async () => {
+  let resolverRequest = null;
+  const result = await assess(validInput(), currentSnapshot(), (request) => {
+    resolverRequest = request;
+  });
+
+  assert.deepEqual(resolverRequest, { jobId: 'job-1', planId: 'plan-1' });
+  assert.equal(Object.isFrozen(resolverRequest), true);
+  assert.equal(result.status, 'READY_FOR_CANONICAL_AUTHORIZATION');
   assert.match(result.commandFingerprint, /^sha256:[a-f0-9]{64}$/u);
   assert.equal(result.action, RemoteSteeringAction.PAUSE);
   assert.equal(result.jobId, 'job-1');
@@ -64,16 +78,40 @@ test('admits an exact current PAUSE proposal without granting runtime authority'
   assert.equal(result.jobRevision, 7);
   assert.equal(result.planRevision, 11);
   assert.equal(result.policyEnvelopeId, 'policy-1');
+  assert.equal(result.trustedCurrentStateBound, true);
+  assert.equal(result.sourceIdentityAuthority, 'UNVERIFIED_REFERENCE');
+  assert.equal(result.sourceAuthenticated, false);
   assert.equal(result.advisoryOnly, true);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.mutationAuthorized, false);
   assert.equal(result.credentialUseAuthorized, false);
   assert.equal(result.policyDecisionGranted, false);
+  assert.equal(result.requiresCanonicalPrincipalAuthentication, true);
   assert.equal(result.requiresCanonicalRuntime, true);
+  assert.equal(result.requiresCanonicalCommandDeduplication, true);
   assert.equal(result.requiresFreshPolicy, true);
   assert.equal(result.requiresFreshStateRecheck, true);
   assert.equal(result.redirectTarget, null);
   assert.equal(Object.isFrozen(result), true);
+});
+
+test('requires a trusted canonical current-state resolver and ignores no caller snapshot', async () => {
+  await assert.rejects(
+    () => assessRemoteSteeringCommandV1(validInput(), { cryptoApi: webcrypto }),
+    /trusted current-state resolver/u,
+  );
+
+  await assert.rejects(
+    () => assessRemoteSteeringCommandV1(validInput()),
+    /trusted current-state resolver/u,
+  );
+
+  const forged = validInput();
+  forged.currentSnapshot = currentSnapshot({ jobRevision: 999 });
+  await assert.rejects(
+    () => assess(forged),
+    /unknown field: currentSnapshot/u,
+  );
 });
 
 test('fingerprint is deterministic and changes with command semantics', async () => {
@@ -97,17 +135,17 @@ test('fingerprint is deterministic and changes with command semantics', async ()
   assert.notEqual(first.commandFingerprint, differentSource.commandFingerprint);
 });
 
-test('rejects stale or mismatched durable job, plan, revision and policy bindings', async () => {
+test('rejects stale or mismatched canonical job, plan, revision and policy bindings', async () => {
   const cases = [
-    [{ command: { jobId: 'job-2' } }, /job identity/u],
-    [{ command: { planId: 'plan-2' } }, /plan identity/u],
-    [{ command: { expectedJobRevision: 6 } }, /job revision is stale/u],
-    [{ command: { expectedPlanRevision: 10 } }, /plan revision is stale/u],
-    [{ command: { policyEnvelopeId: 'policy-2' } }, /policy envelope/u],
+    [validInput(), currentSnapshot({ jobId: 'job-2' }), /job identity/u],
+    [validInput(), currentSnapshot({ planId: 'plan-2' }), /plan identity/u],
+    [validInput({ command: { expectedJobRevision: 6 } }), currentSnapshot(), /job revision is stale/u],
+    [validInput({ command: { expectedPlanRevision: 10 } }), currentSnapshot(), /plan revision is stale/u],
+    [validInput({ command: { policyEnvelopeId: 'policy-2' } }), currentSnapshot(), /policy envelope/u],
   ];
 
-  for (const [override, expected] of cases) {
-    await assert.rejects(() => assess(validInput(override)), expected);
+  for (const [input, snapshot, expected] of cases) {
+    await assert.rejects(() => assess(input, snapshot), expected);
   }
 });
 
@@ -125,8 +163,8 @@ test('fails closed on expiry, future chronology, oversized TTL and non-canonical
   );
 
   await assert.rejects(
-    () => assess(validInput({
-      currentSnapshot: { observedAt: '2026-09-25T03:33:00.000Z' },
+    () => assess(validInput(), currentSnapshot({
+      observedAt: '2026-09-25T03:33:00.000Z',
     })),
     /observed after assessment/u,
   );
@@ -207,13 +245,12 @@ test('REDIRECT carries only a bounded advisory target reference', async () => {
   await assert.rejects(() => assess(secretSmuggle), /unknown field: credentialRef/u);
 });
 
-test('accepts null-prototype request records but rejects exotic prototypes and symbols', async () => {
+test('accepts null-prototype command/request records but rejects exotic prototypes and symbols', async () => {
   const base = validInput();
   const nullProto = Object.assign(Object.create(null), base);
   nullProto.command = Object.assign(Object.create(null), base.command);
-  nullProto.currentSnapshot = Object.assign(Object.create(null), base.currentSnapshot);
 
-  const result = await assess(nullProto);
+  const result = await assess(nullProto, Object.assign(Object.create(null), currentSnapshot()));
   assert.equal(result.commandId, 'steer-1');
 
   const exotic = Object.assign(Object.create({ inheritedAuthority: true }), validInput());
@@ -261,6 +298,23 @@ test('rejects accessor-backed and non-enumerable request authority without execu
   await assert.rejects(() => assess(hidden), /unknown field: credentialRef/u);
 });
 
+test('uses descriptor snapshots rather than ordinary Proxy reads', async () => {
+  let ordinaryReads = 0;
+  const target = validInput().command;
+  const proxy = new Proxy(target, {
+    get(object, property, receiver) {
+      ordinaryReads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+  const input = validInput();
+  input.command = proxy;
+
+  const result = await assess(input);
+  assert.equal(result.commandId, 'steer-1');
+  assert.equal(ordinaryReads, 0);
+});
+
 test('rejects unknown authority-bearing fields rather than silently ignoring them', async () => {
   const forbiddenFields = [
     ['credentialRef', 'cred-1'],
@@ -287,13 +341,22 @@ test('uses exact types and canonical identity spelling without coercion aliases'
     [{ command: { expectedJobRevision: '7' } }, /positive safe integer/u],
     [{ command: { expectedPlanRevision: 11.5 } }, /positive safe integer/u],
     [{ command: { action: 'pause' } }, /action is invalid/u],
-    [{ currentSnapshot: { jobRevision: '7' } }, /positive safe integer/u],
-    [{ currentSnapshot: { policyEnvelopeId: { toString: () => 'policy-1' } } }, /policyEnvelopeId is invalid/u],
   ];
 
   for (const [override, expected] of cases) {
     await assert.rejects(() => assess(validInput(override)), expected);
   }
+
+  await assert.rejects(
+    () => assess(validInput(), currentSnapshot({ jobRevision: '7' })),
+    /positive safe integer/u,
+  );
+  await assert.rejects(
+    () => assess(validInput(), currentSnapshot({
+      policyEnvelopeId: { toString: () => 'policy-1' },
+    })),
+    /policyEnvelopeId is invalid/u,
+  );
 });
 
 test('rejects unknown and hidden redirect fields with exact target identity', async () => {
@@ -324,16 +387,29 @@ test('rejects unknown and hidden redirect fields with exact target identity', as
   await assert.rejects(() => assess(hidden), /unknown field: policyDecision/u);
 });
 
-test('does not trust injected crypto options with hidden or unknown option fields', async () => {
-  const options = { cryptoApi: webcrypto, authority: 'ALLOW' };
+test('does not trust hidden or unknown dependency-injection option fields', async () => {
+  const options = {
+    cryptoApi: webcrypto,
+    resolveCurrentSnapshot: async () => currentSnapshot(),
+    authority: 'ALLOW',
+  };
   await assert.rejects(
     () => assessRemoteSteeringCommandV1(validInput(), options),
     /unknown field: authority/u,
   );
 
-  const noCrypto = {};
+  let getterReads = 0;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, 'resolveCurrentSnapshot', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return async () => currentSnapshot();
+    },
+  });
   await assert.rejects(
-    () => assessRemoteSteeringCommandV1(validInput(), noCrypto),
-    /must contain cryptoApi/u,
+    () => assessRemoteSteeringCommandV1(validInput(), accessorOptions),
+    /data properties only/u,
   );
+  assert.equal(getterReads, 0);
 });
