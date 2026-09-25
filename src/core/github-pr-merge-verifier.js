@@ -127,17 +127,24 @@ export class GitHubPullRequestMergeVerifierV1 {
     this.now = now;
   }
 
-  async #readback(expected) {
+  async #readback(expected, observedMergeCommitSha) {
+    const mergeCommitSha = exactSha(observedMergeCommitSha, 'observed mergeCommitSha');
     const pull = snapshotRecord(await this.readPullRequest({
       repositoryFullName: expected.repositoryFullName,
       pullRequestNumber: expected.pullRequestNumber,
     }), 'GitHub pull request merge readback');
+    const readbackMergeCommitSha = typeof pull.mergeCommitSha === 'string'
+      && pull.mergeCommitSha === pull.mergeCommitSha.trim()
+      && SHA.test(pull.mergeCommitSha)
+      ? pull.mergeCommitSha.toLowerCase()
+      : '';
     const matches = pull.repositoryFullName === expected.repositoryFullName
       && pull.number === expected.pullRequestNumber
       && pull.state === 'closed'
       && pull.merged === true
-      && exactSha(pull.headSha, 'readback headSha') === expected.expectedHeadSha;
-    return Object.freeze({ expected, matches, readback: pull });
+      && exactSha(pull.headSha, 'readback headSha') === expected.expectedHeadSha
+      && readbackMergeCommitSha === mergeCommitSha;
+    return Object.freeze({ expected, mergeCommitSha, matches, readback: pull });
   }
 
   #verification(readback, executionId, attempt, observationId, suffix = '') {
@@ -166,7 +173,7 @@ export class GitHubPullRequestMergeVerifierV1 {
     const attempt = attemptFromExecutionId(executionId);
     const expected = expectedMerge(invocation);
     const observed = observedMerge(expected, observation);
-    const readback = await this.#readback(expected);
+    const readback = await this.#readback(expected, observed.mergeCommitSha);
     return this.#verification(readback, executionId, attempt, observed.observationId);
   }
 
@@ -194,9 +201,9 @@ export class GitHubPullRequestMergeVerifierV1 {
     if (!priorObservation) {
       throw new Error('GitHub pull-request merge requires the immutable provider merge identity for automatic reconciliation; otherwise manual review is required');
     }
-    observedMerge(expected, priorObservation);
+    const observed = observedMerge(expected, priorObservation);
 
-    const readback = await this.#readback(expected);
+    const readback = await this.#readback(expected, observed.mergeCommitSha);
     const observedAt = new Date(this.now()).toISOString();
     const observation = {
       schemaVersion: 1,
