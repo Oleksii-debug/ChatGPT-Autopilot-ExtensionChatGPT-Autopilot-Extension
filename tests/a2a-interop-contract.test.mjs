@@ -148,14 +148,15 @@ test('A2A transport endpoints follow binding-specific secure production forms', 
   });
   const normalizedGrpc = normalizeA2ARemoteAgentCardRefV1(grpcCard);
   assert.equal(normalizedGrpc.supportedInterfaces[0].url, 'grpc.example.com:443');
-  assert.doesNotThrow(() => assessA2ADelegationV1({
+  const grpcAssessment = assessA2ADelegationV1({
     card: grpcCard,
     admission: admission({
       interfaceUrl: 'grpc.example.com:443',
       protocolBinding: 'GRPC',
     }),
     delegation: delegation(),
-  }));
+  });
+  assert.equal(grpcAssessment.status, 'READY_FOR_POLICY');
   assert.throws(
     () => normalizeA2ARemoteAgentCardRefV1(card({
       supportedInterfaces: [iface({ url: 'grpc.example.com', protocolBinding: 'GRPC' })],
@@ -191,6 +192,18 @@ test('descriptor boundaries reject getters, hidden fields, symbols and sparse ar
   const symbol = card();
   symbol[Symbol('token')] = 'secret';
   assert.throws(() => normalizeA2ARemoteAgentCardRefV1(symbol), /symbol fields/);
+
+  let arrayReads = 0;
+  const proxiedArray = card();
+  proxiedArray.skillIds = new Proxy(['research.deep', 'research.quick'], {
+    get(target, property, receiver) {
+      arrayReads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const normalizedProxyArray = normalizeA2ARemoteAgentCardRefV1(proxiedArray);
+  assert.equal(arrayReads, 0);
+  assert.deepEqual(normalizedProxyArray.skillIds, ['research.deep', 'research.quick']);
 
   const sparse = card();
   sparse.skillIds = new Array(1);
