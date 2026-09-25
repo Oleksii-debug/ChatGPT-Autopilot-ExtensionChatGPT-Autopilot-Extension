@@ -211,7 +211,7 @@ function strictArtifact(input, label) {
 function sourceIdentity(source) {
   return JSON.stringify([
     source.sourceId, source.projectId, source.kind, source.uri, source.revisionId,
-    source.contentSha256, source.authority,
+    source.contentSha256, source.observedAt, source.authority,
   ]);
 }
 
