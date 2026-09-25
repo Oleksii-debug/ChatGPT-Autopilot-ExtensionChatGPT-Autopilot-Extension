@@ -309,6 +309,46 @@ test('post-dispatch response boundary failures are always ambiguous and non-retr
   }
 });
 
+test('malformed transport response envelope remains post-dispatch ambiguous', async () => {
+  const response = {
+    ...okResponse(),
+    unexpected: true,
+  };
+  const { provider, calls } = harness({ response });
+  await assert.rejects(
+    provider.sendMessage(sendInput()),
+    error => error.code === 'A2A_RESPONSE_INVALID'
+      && error.effectMayHaveOccurred === true
+      && error.safeToRetry === false,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test('trusted clock failure after a remote response is ambiguous rather than retry-safe', async () => {
+  let clockReads = 0;
+  let calls = 0;
+  const provider = new A2ARemoteAgentProviderV1({
+    transport: {
+      async sendJsonRpc() {
+        calls += 1;
+        return okResponse();
+      },
+    },
+    now: () => {
+      clockReads += 1;
+      return clockReads === 1 ? Date.parse(T4) : NaN;
+    },
+  });
+  await assert.rejects(
+    provider.sendMessage(sendInput()),
+    error => error.code === 'A2A_EFFECT_AMBIGUOUS'
+      && error.effectMayHaveOccurred === true
+      && error.safeToRetry === false,
+  );
+  assert.equal(calls, 1);
+  assert.equal(clockReads, 2);
+});
+
 test('JSON-RPC error is retained only as untrusted error evidence and never marked safe retry', async () => {
   const response = {
     status: 200,
