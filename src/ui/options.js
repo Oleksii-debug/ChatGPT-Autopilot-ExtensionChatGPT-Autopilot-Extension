@@ -3156,9 +3156,9 @@ function renderCalendarEditor() {
   $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
   $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? formatAccessibleCalendarDate(schedule.endDate || '') : '';
   $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
-  $('calendar-interval-start-mode').value = 'LATER';
+  $('calendar-interval-start-mode').value = schedule?.kind === 'INTERVAL' ? 'LATER' : 'NOW';
   $('calendar-interval-start-date').value = schedule?.kind === 'INTERVAL' ? formatAccessibleCalendarDate(schedule.startDate || '') : '';
-  $('calendar-interval-start-time').value = schedule?.kind === 'INTERVAL' ? (schedule.startTime || '') : '';
+  $('calendar-interval-start-time').value = schedule?.kind === 'INTERVAL' ? String(schedule.startTime || '').replace(/:00$/u, '') : '';
   const intervalUi = intervalUiValue(schedule?.kind === 'INTERVAL' ? schedule.intervalSeconds : 60);
   $('calendar-interval-value').value = String(intervalUi.value);
   $('calendar-interval-unit').value = intervalUi.unit;
@@ -4187,6 +4187,7 @@ for (const id of [
   field?.addEventListener(eventName, scheduleDraftPersistence);
 }
 $('calendar-mode').addEventListener('change', () => { syncCalendarVisibility(); renderCalendarRuntimeStatus(ui.selected); });
+$('calendar-interval-start-mode').addEventListener('change', syncCalendarVisibility);
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);
