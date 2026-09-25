@@ -266,4 +266,92 @@ test('exact timestamp representation is required at board, plan, node and review
   assert.throws(() => buildProjectSwarmWorkboardV1(planAlias), /canonical ISO-8601/);
 
   const nodeAlias = validInput();
-  nodeAlias.planSnapshots[0].plan.nodes[0]
+  nodeAlias.planSnapshots[0].plan.nodes[0].updatedAt = '2026-09-25T05:30:00Z';
+  assert.throws(() => buildProjectSwarmWorkboardV1(nodeAlias), /canonical ISO-8601/);
+
+  const reviewAlias = validInput();
+  reviewAlias.reviews[0].updatedAt = '2026-09-25T06:30:00Z';
+  assert.throws(() => buildProjectSwarmWorkboardV1(reviewAlias), /canonical ISO-8601/);
+});
+
+test('READY/RUNNING state cannot contradict unresolved same-plan dependencies', () => {
+  for (const state of ['READY', 'RUNNING']) {
+    const input = validInput();
+    input.planSnapshots[1].plan.nodes[0].state = 'RUNNING';
+    input.planSnapshots[1].plan.nodes[0].evidence = '';
+    input.planSnapshots[1].plan.nodes[1].state = state;
+    input.reviews = [];
+    assert.throws(() => buildProjectSwarmWorkboardV1(input), /with unmet dependencies/);
+  }
+});
+
+test('top-level and review accessors fail without executing getters', () => {
+  let reads = 0;
+  const input = validInput();
+  Object.defineProperty(input, 'projectId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return PROJECT_ID;
+    },
+  });
+  assert.throws(() => buildProjectSwarmWorkboardV1(input), /enumerable own data properties/);
+  assert.equal(reads, 0);
+
+  const reviewInput = validInput();
+  Object.defineProperty(reviewInput.reviews[0], 'state', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return WorkboardReviewState.APPROVED;
+    },
+  });
+  assert.throws(() => buildProjectSwarmWorkboardV1(reviewInput), /enumerable own data properties/);
+  assert.equal(reads, 0);
+});
+
+test('workboard arrays are descriptor-snapshotted without ordinary Proxy reads', () => {
+  let reads = 0;
+  const wrap = value => new Proxy(value, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const input = validInput();
+  input.planSnapshots = wrap(input.planSnapshots);
+  input.reviews = wrap(input.reviews);
+  input.planSnapshots[0].plan.nodes = wrap(input.planSnapshots[0].plan.nodes);
+  const board = buildProjectSwarmWorkboardV1(input);
+  assert.equal(board.taskCount, 4);
+  assert.equal(reads, 0);
+});
+
+test('hidden, symbol, unknown and exotic request/review fields fail closed', () => {
+  const hidden = validInput();
+  Object.defineProperty(hidden, 'projectId', { value: PROJECT_ID, enumerable: false, configurable: true });
+  assert.throws(() => buildProjectSwarmWorkboardV1(hidden), /enumerable own data properties/);
+
+  const unknown = validInput();
+  unknown.executionAuthorized = true;
+  assert.throws(() => buildProjectSwarmWorkboardV1(unknown), /unknown field/);
+
+  const symbol = validInput();
+  symbol.reviews[0][Symbol('authority')] = 'ALLOW';
+  assert.throws(() => buildProjectSwarmWorkboardV1(symbol), /unknown field/);
+
+  const exotic = validInput();
+  exotic.reviews[0] = Object.assign(Object.create({ state: WorkboardReviewState.APPROVED }), exotic.reviews[0]);
+  assert.throws(() => buildProjectSwarmWorkboardV1(exotic), /plain data object/);
+});
+
+test('null-prototype request and review records remain valid data-only inputs', () => {
+  const input = validInput();
+  input.reviews[0] = Object.assign(Object.create(null), input.reviews[0]);
+  const request = Object.assign(Object.create(null), input);
+  const board = buildProjectSwarmWorkboardV1(request);
+  assert.equal(board.taskCount, 4);
+  assert.equal(entry(board, 'plan-a', 'a-source').lane, WorkboardLane.DONE);
+});
