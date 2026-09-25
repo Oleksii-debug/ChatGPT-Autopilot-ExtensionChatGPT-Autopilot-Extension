@@ -89,3 +89,9 @@ test('Scenario Work UI exposes template, import and export controls together', a
   assert.match(html, /id="scenario-work-export-button"[^>]*>Експортувати вибраний сценарій</u);
   assert.match(js, /'scenario-work-template-button'\)\.addEventListener\('click', downloadScenarioWorkTemplate\)/u);
 });
+
+test('Scenario Work import status reports the physical-chat message count for CHAT_CYCLE', async () => {
+  const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
+  assert.match(js, /У кожному фізичному чаті:/u);
+  assert.match(js, /config\.steps\.reduce\(\(sum, step\) => sum \+ step\.repeat, 0\)/u);
+});
