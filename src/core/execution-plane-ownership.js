@@ -93,7 +93,11 @@ function nextRevision(revision) {
 
 function next(raw, patch, at) {
   const current = normalizeExecutionOwnershipV1(raw);
-  return normalizeExecutionOwnershipV1({ ...current, ...patch, updatedAt: ts(at,'at'), revision: nextRevision(current.revision) });
+  const transitionAt = ts(at,'at');
+  if (Date.parse(transitionAt) < Date.parse(current.updatedAt)) {
+    throw new Error('execution ownership transition cannot predate current durable state');
+  }
+  return normalizeExecutionOwnershipV1({ ...current, ...patch, updatedAt: transitionAt, revision: nextRevision(current.revision) });
 }
 
 function assertLeaseDuration(at, leaseUntil) {
