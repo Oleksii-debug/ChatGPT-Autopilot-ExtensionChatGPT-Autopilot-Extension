@@ -1,24 +1,27 @@
-import { buildSharedProjectGovernanceV1 } from './shared-project-governance.js';
+import { assessSharedProjectAccessV1 } from './shared-project-collaboration.js';
 import {
   normalizeRecipeRegistryV1,
   resolvePromotedRecipeV1,
 } from './recipe-registry.js';
 
 export const SHARED_PROJECT_RECIPE_CATALOG_SCHEMA_VERSION = 1;
+export const SHARED_PROJECT_RECIPE_SHARE_CAPABILITY = 'project.recipe.share';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_SHARES = 2_000;
 const MAX_TRUSTED_EVALUATIONS = 2_000;
 
 const REQUEST_KEYS = new Set([
-  'projectGovernanceRequest',
+  'bindingId',
   'recipeRegistry',
   'trustedEvaluations',
   'shares',
+  'evaluatedAt',
 ]);
 const SHARE_KEYS = new Set([
   'shareId',
   'projectId',
+  'projectRevisionId',
   'recipeId',
   'version',
   'sharedByPrincipalId',
@@ -132,24 +135,21 @@ function timestamp(value, label, { optional = false } = {}) {
   return value;
 }
 
-function normalizeShare(input, index, projectId, evaluatedAt) {
+function normalizeShare(input, index, evaluatedAt) {
   const label = `shares[${index}]`;
   const raw = strictRecord(input, SHARE_KEYS, label);
-  const boundProjectId = exactId(raw.projectId, `${label}.projectId`);
-  if (boundProjectId !== projectId) {
-    throw new Error(`${label}.projectId does not match shared Project governance`);
-  }
   const sharedAt = timestamp(raw.sharedAt, `${label}.sharedAt`);
   const revokedAt = timestamp(raw.revokedAt, `${label}.revokedAt`, { optional: true });
   if (revokedAt && Date.parse(revokedAt) <= Date.parse(sharedAt)) {
     throw new Error(`${label}.revokedAt must be after sharedAt`);
   }
   if (Date.parse(sharedAt) > Date.parse(evaluatedAt)) {
-    throw new Error(`${label}.sharedAt cannot be later than Project evaluation time`);
+    throw new Error(`${label}.sharedAt cannot be later than catalog evaluation time`);
   }
   return freezeDeep({
     shareId: exactId(raw.shareId, `${label}.shareId`),
-    projectId: boundProjectId,
+    projectId: exactId(raw.projectId, `${label}.projectId`),
+    projectRevisionId: exactId(raw.projectRevisionId, `${label}.projectRevisionId`),
     recipeId: exactId(raw.recipeId, `${label}.recipeId`),
     version: positiveInteger(raw.version, `${label}.version`),
     sharedByPrincipalId: exactId(raw.sharedByPrincipalId, `${label}.sharedByPrincipalId`),
@@ -172,48 +172,90 @@ function activeShareAt(share, evaluatedAt) {
     && (!share.revokedAt || atMillis < Date.parse(share.revokedAt));
 }
 
+function accessRequest(bindingId, principalId, at) {
+  return {
+    bindingId,
+    principalId,
+    at,
+    requestedCapabilityIds: [SHARED_PROJECT_RECIPE_SHARE_CAPABILITY],
+    requestedProviderIds: [],
+    requestedOutboundDataClassIds: [],
+  };
+}
+
+function assertShareBindsAccess(share, access, label) {
+  if (access.projectId !== share.projectId
+      || access.projectRevisionId !== share.projectRevisionId) {
+    throw new Error(`${label} does not match canonical shared Project binding`);
+  }
+  if (!access.collaborationEligible) {
+    throw new Error(`${label} sharer is outside canonical Project recipe-share ceiling: ${access.reasonCode}`);
+  }
+}
+
 /**
- * Builds a read-only Project recipe catalog from the canonical RecipeRegistryV1
- * and shared Project governance projection.
+ * Builds a read-only recipe catalog for a canonical shared Project binding.
  *
- * Sharing is evidence/discovery only. It does not authorize recipe admission,
- * replay, provider use, execution, or any underlying tool effect.
+ * The Project collaboration contract owns identity/revision/governance scope.
+ * This module only verifies that the sharer fits the canonical
+ * project.recipe.share ceiling and that the RecipeRegistry exposes an exact,
+ * trusted active PROMOTED version. Sharing never authorizes admission, replay,
+ * provider use, execution, mutation, or any underlying effect.
  */
-export async function buildSharedProjectRecipeCatalogV1(input = {}) {
+export async function buildSharedProjectRecipeCatalogV1(input = {}, trustedProjectResolver) {
   const request = strictRecord(input, REQUEST_KEYS, 'SharedProjectRecipeCatalogRequestV1');
-  const projectGovernance = buildSharedProjectGovernanceV1(request.projectGovernanceRequest);
+  const bindingId = exactId(request.bindingId, 'bindingId');
+  const evaluatedAt = timestamp(request.evaluatedAt, 'evaluatedAt');
   const recipeRegistry = normalizeRecipeRegistryV1(request.recipeRegistry);
+  if (Date.parse(recipeRegistry.updatedAt) > Date.parse(evaluatedAt)) {
+    throw new Error('recipe registry is newer than catalog evaluation time');
+  }
+
   const trustedEvaluations = strictArray(
     request.trustedEvaluations,
     'trustedEvaluations',
     MAX_TRUSTED_EVALUATIONS,
   );
   const shares = strictArray(request.shares, 'shares', MAX_SHARES)
-    .map((item, index) => normalizeShare(
-      item,
-      index,
-      projectGovernance.projectId,
-      projectGovernance.evaluatedAt,
-    ));
+    .map((item, index) => normalizeShare(item, index, evaluatedAt));
   uniqueBy(shares, 'shareId', 'shares');
-
-  if (Date.parse(recipeRegistry.updatedAt) > Date.parse(projectGovernance.evaluatedAt)) {
-    throw new Error('recipe registry is newer than Project governance evaluation time');
-  }
-
-  const participantById = new Map(
-    projectGovernance.participants.map((participant) => [participant.principalId, participant]),
-  );
-  const activeShares = shares.filter((share) => activeShareAt(share, projectGovernance.evaluatedAt));
 
   const activeRecipeIdentities = new Set();
   const resolvedByRecipeId = new Map();
   const items = [];
+  let catalogProjectId = '';
+  let catalogProjectRevisionId = '';
+  let organizationId = '';
+  let governanceRegistryId = '';
+  let governanceRegistryRevision = 0;
 
-  for (const share of activeShares) {
-    const participant = participantById.get(share.sharedByPrincipalId);
-    if (!participant || !participant.identityActive) {
-      throw new Error(`active share has no active Project participant sharer: ${share.shareId}`);
+  for (const share of shares.filter((item) => activeShareAt(item, evaluatedAt))) {
+    const initialAccess = await assessSharedProjectAccessV1(
+      accessRequest(bindingId, share.sharedByPrincipalId, share.sharedAt),
+      trustedProjectResolver,
+    );
+    assertShareBindsAccess(share, initialAccess, `share ${share.shareId}`);
+
+    const currentAccess = share.sharedAt === evaluatedAt
+      ? initialAccess
+      : await assessSharedProjectAccessV1(
+        accessRequest(bindingId, share.sharedByPrincipalId, evaluatedAt),
+        trustedProjectResolver,
+      );
+    assertShareBindsAccess(share, currentAccess, `active share ${share.shareId}`);
+
+    if (!catalogProjectId) {
+      catalogProjectId = currentAccess.projectId;
+      catalogProjectRevisionId = currentAccess.projectRevisionId;
+      organizationId = currentAccess.organizationId;
+      governanceRegistryId = currentAccess.governanceRegistryId;
+      governanceRegistryRevision = currentAccess.governanceRegistryRevision;
+    } else if (catalogProjectId !== currentAccess.projectId
+        || catalogProjectRevisionId !== currentAccess.projectRevisionId
+        || organizationId !== currentAccess.organizationId
+        || governanceRegistryId !== currentAccess.governanceRegistryId
+        || governanceRegistryRevision !== currentAccess.governanceRegistryRevision) {
+      throw new Error('active shares do not resolve to one canonical shared Project authority');
     }
 
     const identity = `${share.recipeId}@${share.version}`;
@@ -243,6 +285,8 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}) {
 
     items.push(freezeDeep({
       shareId: share.shareId,
+      projectId: share.projectId,
+      projectRevisionId: share.projectRevisionId,
       recipeId: recipe.recipeId,
       version: recipe.version,
       title: recipe.title,
@@ -255,9 +299,11 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}) {
       lifecycle: recipe.lifecycle,
       qualificationStatus: recipe.qualification.status,
       evaluationId: recipe.qualification.evaluationId,
-      requiresPolicyDecision: true,
+      requiredShareCapabilityId: SHARED_PROJECT_RECIPE_SHARE_CAPABILITY,
+      requiresCanonicalPolicyDecision: true,
       admissionAuthorized: false,
       executionAuthorized: false,
+      mutationAuthorized: false,
     }));
   }
 
@@ -267,18 +313,21 @@ export async function buildSharedProjectRecipeCatalogV1(input = {}) {
 
   return freezeDeep({
     schemaVersion: SHARED_PROJECT_RECIPE_CATALOG_SCHEMA_VERSION,
-    projectId: projectGovernance.projectId,
-    projectRevisionId: projectGovernance.projectRevisionId,
-    organizationId: projectGovernance.organizationId,
-    identityRegistryId: projectGovernance.identityRegistryId,
-    identityRegistryRevision: projectGovernance.identityRegistryRevision,
+    bindingId,
+    projectId: catalogProjectId,
+    projectRevisionId: catalogProjectRevisionId,
+    organizationId,
+    governanceRegistryId,
+    governanceRegistryRevision,
     recipeRegistryId: recipeRegistry.registryId,
     recipeRegistryRevision: recipeRegistry.revision,
-    evaluatedAt: projectGovernance.evaluatedAt,
+    evaluatedAt,
     items,
-    requiresPolicyDecision: true,
+    requiredShareCapabilityId: SHARED_PROJECT_RECIPE_SHARE_CAPABILITY,
+    requiresCanonicalPolicyDecision: true,
     policyDecision: 'NONE',
     admissionAuthorized: false,
     executionAuthorized: false,
+    mutationAuthorized: false,
   });
 }
