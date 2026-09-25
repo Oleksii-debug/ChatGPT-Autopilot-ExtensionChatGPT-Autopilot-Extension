@@ -263,8 +263,9 @@ export async function writeExistingTextScopedV1(payload, config, {
   if (typeof payload.expectedSha256 !== 'string') {
     throw nativeError('INVALID_REQUEST', 'expectedSha256 must be a lowercase SHA-256 digest');
   }
-  const expectedSha256 = payload.expectedSha256.trim();
+  const expectedSha256 = payload.expectedSha256;
   if (!SHA256.test(expectedSha256)) throw nativeError('INVALID_REQUEST', 'expectedSha256 must be a lowercase SHA-256 digest');
+  throw nativeError('ATOMIC_WRITE_UNAVAILABLE', 'Filesystem write is fail-closed until publication can be bound to the admitted parent directory identity');
   const desiredSha256 = sha256(desired);
   const target = path.resolve(root.path, rel);
   const scope = scopeFor(root, true);
