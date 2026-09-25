@@ -495,6 +495,26 @@ async function buildParameterSchemaBinding(parameters, parameterBindings, crypto
   });
 }
 
+async function buildTraceBinding(trace, cryptoApi) {
+  const canonical = JSON.stringify([
+    'chatgpt-autopilot-recipe-structural-trace-v1',
+    trace,
+  ]);
+  const tagged = await createSha256FingerprintV1(canonical, { cryptoApi });
+  if (typeof tagged !== 'string' || !tagged.startsWith('sha256:')) {
+    throw new Error('Recipe compiler trace fingerprint is invalid');
+  }
+  const digest = sha256(
+    tagged.slice('sha256:'.length),
+    'Recipe compiler trace SHA-256',
+  );
+  return freezeDeep({
+    sourceId: 'recipe-trace:' + digest.slice(0, 32),
+    revisionId: 'sha256:' + digest,
+    contentSha256: digest,
+  });
+}
+
 /**
  * Compiles a value-free, non-authorizing Recipe candidate from a structural
  * record of a successful run. Raw prompts, tool arguments, outputs, tokens,
@@ -523,17 +543,21 @@ export async function compileRecipeCandidateV1(input, { cryptoApi = globalThis.c
   const parameters = normalizeParameters(raw.parameters);
   const trace = normalizeTrace(raw.trace, parameters);
   const parameterBindings = buildParameterBindings(trace.steps);
-  const parameterSchemaBinding = await buildParameterSchemaBinding(
-    parameters,
-    parameterBindings,
-    cryptoApi,
-  );
-  if (sourceBindings.some((binding) => binding.sourceId === parameterSchemaBinding.sourceId)) {
-    throw new Error('sourceBindings collides with compiler parameter schema identity');
+  const [parameterSchemaBinding, traceBinding] = await Promise.all([
+    buildParameterSchemaBinding(parameters, parameterBindings, cryptoApi),
+    buildTraceBinding(trace, cryptoApi),
+  ]);
+  const compilerBindingIds = new Set([
+    parameterSchemaBinding.sourceId,
+    traceBinding.sourceId,
+  ]);
+  if (sourceBindings.some((binding) => compilerBindingIds.has(binding.sourceId))) {
+    throw new Error('sourceBindings collides with compiler provenance identity');
   }
   const boundSourceBindings = normalizeSourceBindings([
     ...sourceBindings,
     parameterSchemaBinding,
+    traceBinding,
   ]);
   const recipeDefinition = buildCandidateRecipe({
     recipeId,
@@ -550,6 +574,7 @@ export async function compileRecipeCandidateV1(input, { cryptoApi = globalThis.c
     parameters,
     parameterBindings,
     parameterSchemaBinding,
+    traceBinding,
     verificationEvidence: buildVerificationEvidence(trace.steps),
     trace: {
       traceId: trace.traceId,
