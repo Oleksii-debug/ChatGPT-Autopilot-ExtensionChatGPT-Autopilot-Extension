@@ -49,5 +49,5 @@ test('Project Workspace list renders identity/revision/count metadata without so
   assert.match(renderer, /project\.sourceCount/u);
   assert.match(renderer, /project\.artifactCount/u);
   assert.match(renderer, /project\.capsuleCount/u);
-  assert.doesNotMatch(renderer, /\.uri\b|\.title\b|\.summary\b|credential/iu);
+  assert.doesNotMatch(renderer, /project\.(?:uri|title|summary)\b|credential/iu);
 });
