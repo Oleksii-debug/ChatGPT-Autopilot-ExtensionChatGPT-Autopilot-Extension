@@ -8,12 +8,30 @@ const OPERATION_PHASES = new Set(Object.values(OperationPhase));
 const SAFE_DIAGNOSTIC_LOCATION = /^(?:chatgpt\.com\/розмова: (?:немає ідентифікатора|…[A-Za-z0-9_-]{1,6})|не-ChatGPT-адреса|некоректна адреса ChatGPT)$/u;
 const LOG_LEVELS = new Set(['INFO', 'WARN', 'WARNING', 'ERROR']);
 const MAX_DATE_MILLIS = 8_640_000_000_000_000;
+const TIMELINE_OPTION_KEYS = new Set(['sessionId', 'limit']);
 
 function plainObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
   return value;
+}
+
+function timelineOptions(value) {
+  if (value === undefined) return Object.create(null);
+  const raw = plainObject(value, 'Run timeline options');
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !TIMELINE_OPTION_KEYS.has(key)) {
+      throw new Error(`Run timeline options contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`Run timeline options field ${key} must be an enumerable own data property`);
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
 }
 
 function requiredSessionId(value) {
@@ -88,10 +106,11 @@ function currentSessionSummary(session) {
  * Read-only projection of already-canonical Core evidence.
  * This function never mutates state, creates effects, or stores a second log.
  */
-export function buildRunTimelineV1(state, { sessionId, limit } = {}) {
+export function buildRunTimelineV1(state, options = undefined) {
+  const rawOptions = timelineOptions(options);
   const root = plainObject(state, 'Run timeline state');
-  const id = requiredSessionId(sessionId);
-  const maxEntries = boundedLimit(limit);
+  const id = requiredSessionId(rawOptions.sessionId);
+  const maxEntries = boundedLimit(rawOptions.limit);
   const sessionsById = root.sessionsById;
   if (!sessionsById || typeof sessionsById !== 'object' || Array.isArray(sessionsById)
       || !Object.hasOwn(sessionsById, id)) {
