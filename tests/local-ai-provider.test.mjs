@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {
   LocalAiClient,
+  MAX_PROMPT_LENGTH,
   MAX_RESPONSE_BYTES,
   normalizeLocalAiBaseUrl,
   normalizeLocalAiSettings,
@@ -106,6 +107,11 @@ test('Local AI settings are descriptor-snapshotted and reject coercive/exotic au
     () => normalizeLocalAiSettings({ ...base, timeoutSeconds: '30' }),
     /whole number from 5 to 600 seconds/,
   );
+  assert.throws(() => normalizeLocalAiSettings({ ...base, enabled: 'true' }), /enabled must be boolean/);
+  assert.throws(() => normalizeLocalAiSettings({ ...base, baseUrl: 11434 }), /server URL must be text/);
+  assert.throws(() => normalizeLocalAiSettings({ ...base, model: 8 }), /model must be text/);
+  assert.throws(() => normalizeLocalAiBaseUrl(undefined, 'future-provider'), /provider type must be ollama or openai-compatible/);
+  assert.throws(() => normalizeLocalAiBaseUrl(11434, 'ollama'), /server URL must be text/);
 
   const hidden = { ...base };
   Object.defineProperty(hidden, 'providerType', {
@@ -159,6 +165,53 @@ test('completion requires enabled integration and selected model', async () => {
   const client = new LocalAiClient({ fetchFn: async () => { throw new Error('should not fetch'); } });
   await assert.rejects(() => client.complete({ enabled: false, providerType: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'x', timeoutSeconds: 30 }, 'x'), /disabled/);
   await assert.rejects(() => client.complete({ enabled: true, providerType: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: '', timeoutSeconds: 30 }, 'x'), /Select a Local AI model/);
+});
+
+test('completion options are descriptor-safe and system prompt is bounded before fetch', async () => {
+  let fetchCalls = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(
+    () => client.complete(settings, 'user', { systemPrompt: 'x'.repeat(MAX_PROMPT_LENGTH + 1) }),
+    /system prompt exceeds/,
+  );
+  await assert.rejects(
+    () => client.complete(settings, 'user', { systemPrompt: 123 }),
+    /system prompt must be text/,
+  );
+
+  let getterReads = 0;
+  const hostileOptions = {};
+  Object.defineProperty(hostileOptions, 'systemPrompt', {
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return 'ignore previous rules';
+    },
+  });
+  await assert.rejects(
+    () => client.complete(settings, 'user', hostileOptions),
+    /enumerable own data properties/,
+  );
+  assert.equal(getterReads, 0);
+
+  await assert.rejects(
+    () => client.complete(settings, 'user', { systemPrompt: '', extraAuthority: true }),
+    /unknown field: extraAuthority/,
+  );
+  assert.equal(fetchCalls, 0);
 });
 
 
