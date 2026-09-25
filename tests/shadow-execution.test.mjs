@@ -76,7 +76,10 @@ test('ShadowExecutionV1 is immutable, non-authorizing, and stores no invocation 
   assert.equal(value.requiresFreshWorldState, true);
   assert.equal(value.requiresCanonicalPolicyAtExecution, true);
   assert.equal(value.requiresIndependentVerificationAtExecution, true);
-  assert.match(value.invocationFingerprint, /^sha256:[a-f0-9]{64}$/u);
+  assert.match(value.invocationIdentityFingerprint, /^sha256:[a-f0-9]{64}$/u);
+  assert.equal(value.argumentsRetained, false);
+  assert.equal(value.argumentDerivedFingerprintRetained, false);
+  assert.equal(value.requiresProposalArgumentsAtExecution, true);
   assert.equal(Object.hasOwn(value.proposedInvocation, 'arguments'), false);
   assert.equal(JSON.stringify(value).includes(secret), false);
   assert.equal(Object.isFrozen(value), true);
@@ -84,16 +87,23 @@ test('ShadowExecutionV1 is immutable, non-authorizing, and stores no invocation 
   assert.equal(Object.isFrozen(value.verificationPlan), true);
 });
 
-test('complete proposed invocation arguments affect the fingerprint without being retained', async () => {
+test('private proposal arguments neither persist nor influence a durable fingerprint', async () => {
   const first = await createShadowExecutionV1(shadow({
     invocation: invocation({ arguments: { target: 'A', secret: 'one' } }),
   }));
   const second = await createShadowExecutionV1(shadow({
     invocation: invocation({ arguments: { target: 'A', secret: 'two' } }),
   }));
-  assert.notEqual(first.invocationFingerprint, second.invocationFingerprint);
+  assert.equal(first.invocationIdentityFingerprint, second.invocationIdentityFingerprint);
+  assert.equal(first.argumentDerivedFingerprintRetained, false);
+  assert.equal(second.argumentDerivedFingerprintRetained, false);
   assert.equal(JSON.stringify(first).includes('one'), false);
   assert.equal(JSON.stringify(second).includes('two'), false);
+
+  const differentIdentity = await createShadowExecutionV1(shadow({
+    invocation: invocation({ invocationId: 'invoke-shadow-2', arguments: { secret: 'one' } }),
+  }));
+  assert.notEqual(first.invocationIdentityFingerprint, differentIdentity.invocationIdentityFingerprint);
 });
 
 test('shadow identities and timestamps require exact representation and causal time', async () => {
