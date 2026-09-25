@@ -59,27 +59,41 @@ function own(value, key, fallback) {
 }
 
 function dataArray(value, label, maximum) {
-  if (!Array.isArray(value) || value.length > maximum) {
+  if (!Array.isArray(value)) {
     throw new Error(`${label} must be an array of at most ${maximum} items`);
   }
-  for (const key of Reflect.ownKeys(value)) {
+  let prototype;
+  try { prototype = Object.getPrototypeOf(value); } catch {
+    throw new Error(`${label} must be a plain array`);
+  }
+  if (prototype !== Array.prototype) throw new Error(`${label} must be a plain array`);
+
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor || !Object.hasOwn(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0 || lengthDescriptor.value > maximum) {
+    throw new Error(`${label} must be an array of at most ${maximum} items`);
+  }
+  const length = lengthDescriptor.value;
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
-    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key) || Number(key) >= value.length) {
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\\d*)$/u.test(key) || Number(key) >= length) {
       throw new Error(`${label} contains an invalid array field`);
     }
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
-      throw new Error(`${label} entries must be enumerable own data properties`);
-    }
   }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(`${label} must be dense data-only evidence`);
     }
+    snapshot[index] = descriptor.value;
   }
-  return value;
+  return Object.freeze(snapshot);
 }
+
 
 function id(value, label, { optional = false } = {}) {
   if (optional && (value == null || value === '')) return '';
@@ -249,10 +263,26 @@ export function normalizeAiCostRecordV1(input) {
   return frozen(normalized);
 }
 
-export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTokens, observedAt } = {}) {
-  const normalizedRoute = normalizeRouteForMetering(route);
-  const normalizedInputTokens = requiredInteger(inputTokens, 'AI usage inputTokens');
-  const normalizedOutputTokens = requiredInteger(outputTokens, 'AI usage outputTokens');
+const METER_REQUEST_KEYS = new Set([
+  'route',
+  'invocationId',
+  'inputTokens',
+  'outputTokens',
+  'observedAt',
+]);
+
+export function meterAiRouteUsageV1(requestInput = {}) {
+  const request = plainObject(requestInput, 'AiCostMeterRequestV1');
+  exactKeys(request, METER_REQUEST_KEYS, 'AiCostMeterRequestV1');
+  const normalizedRoute = normalizeRouteForMetering(own(request, 'route', undefined));
+  const normalizedInputTokens = requiredInteger(
+    own(request, 'inputTokens', undefined),
+    'AI usage inputTokens',
+  );
+  const normalizedOutputTokens = requiredInteger(
+    own(request, 'outputTokens', undefined),
+    'AI usage outputTokens',
+  );
   assertPricing(
     normalizedRoute.costClass,
     normalizedRoute.inputPricePerMillionUsd,
@@ -275,7 +305,7 @@ export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTo
 
   return normalizeAiCostRecordV1({
     schemaVersion: AI_COST_RECORD_VERSION,
-    invocationId,
+    invocationId: own(request, 'invocationId', undefined),
     routeId: normalizedRoute.routeId,
     provider: normalizedRoute.provider,
     model: normalizedRoute.model,
@@ -287,9 +317,10 @@ export function meterAiRouteUsageV1({ route, invocationId, inputTokens, outputTo
     inputPricePerMillionUsd: normalizedRoute.inputPricePerMillionUsd,
     outputPricePerMillionUsd: normalizedRoute.outputPricePerMillionUsd,
     costUsdMicros,
-    observedAt,
+    observedAt: own(request, 'observedAt', undefined),
   });
 }
+
 
 export function resourceUsageFromAiCostRecordV1(input) {
   const record = normalizeAiCostRecordV1(input);
