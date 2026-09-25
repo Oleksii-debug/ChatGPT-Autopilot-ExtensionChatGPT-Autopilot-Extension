@@ -114,6 +114,42 @@ test('WEEKLY preserves fail-closed DST handling for nonexistent local wall time'
   );
 });
 
+test('recurrence normalization rejects sparse and decorated authority arrays before scheduling', () => {
+  const sparseWeekdays = new Array(1);
+  assert.throws(() => normalizeCalendarSchedule({
+    kind: 'WEEKLY',
+    startDate: '2026-09-21',
+    weekdays: sparseWeekdays,
+    times: ['09:00'],
+    timeZone: 'UTC',
+  }), /plain dense array/);
+
+  const sparseTimes = new Array(1);
+  assert.throws(() => normalizeCalendarSchedule({
+    kind: 'DAILY',
+    startDate: '2026-09-21',
+    times: sparseTimes,
+    timeZone: 'UTC',
+  }), /plain dense array/);
+
+  const sparseOccurrences = new Array(1);
+  assert.throws(() => normalizeCalendarSchedule({
+    kind: 'EXPLICIT',
+    occurrences: sparseOccurrences,
+    timeZone: 'UTC',
+  }), /plain dense array/);
+
+  const decoratedWeekdays = ['MO'];
+  decoratedWeekdays.policy = 'ALLOW';
+  assert.throws(() => normalizeCalendarSchedule({
+    kind: 'WEEKLY',
+    startDate: '2026-09-21',
+    weekdays: decoratedWeekdays,
+    times: ['09:00'],
+    timeZone: 'UTC',
+  }), /plain dense array/);
+});
+
 test('recurrence bounds reject invalid ranges and counts', () => {
   assert.throws(() => normalizeCalendarSchedule({
     kind: 'DAILY', startDate: '2026-09-21', times: ['09:00'], timeZone: 'UTC',
