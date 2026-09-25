@@ -16,7 +16,7 @@ export const CrossDeviceContinuationStatus = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
-const SHA256 = /^[a-f0-9]{64}$/u;
+const CHECKPOINT_DIGEST = /^sha256:[a-f0-9]{64}$/u;
 const PLANES = new Set(['LOCAL', 'CLOUD', 'REMOTE']);
 const STATES = new Set(Object.values(ExecutionOwnershipState));
 const REQUEST_KEYS = new Set([
@@ -89,7 +89,7 @@ function timestamp(value, label, optional = false) {
   return value;
 }
 function digest(value, label) {
-  if (typeof value !== 'string' || !SHA256.test(value)) throw new Error(label + ' must use exact lowercase sha256 representation');
+  if (typeof value !== 'string' || !CHECKPOINT_DIGEST.test(value)) throw new Error(label + ' must use exact lowercase sha256 fingerprint representation');
   return value;
 }
 function exactEnum(value, allowed, label, optional = false) {

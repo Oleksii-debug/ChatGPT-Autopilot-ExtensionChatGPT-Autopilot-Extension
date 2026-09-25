@@ -375,6 +375,80 @@ test('exact authority representations fail closed before resolver execution', as
   assert.equal(resolverCalls, 0);
 });
 
+test('handoff checkpoint binding requires canonical checkpoint digest and exact ownership revision', async () => {
+  const cp = await checkpoint();
+  const ownership = pendingOwnership();
+
+  for (const checkpointDigest of [
+    cp.checkpointDigest.slice('sha256:'.length),
+    cp.checkpointDigest.toUpperCase(),
+  ]) {
+    await assert.rejects(
+      () => assessCrossDeviceContinuationV1(
+        request(),
+        await options({
+          resolveExecutionOwnership: async () => ownership,
+          resolveAgentCheckpoint: async () => cp,
+          resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(cp, ownership, { checkpointDigest }),
+        }),
+      ),
+      /exact lowercase sha256 fingerprint representation/i,
+    );
+  }
+
+  await assert.rejects(
+    () => assessCrossDeviceContinuationV1(
+      request(),
+      await options({
+        resolveExecutionOwnership: async () => ownership,
+        resolveAgentCheckpoint: async () => cp,
+        resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(cp, ownership, {
+          executionOwnershipRevision: ownership.revision - 1,
+        }),
+      }),
+    ),
+    /does not match canonical execution ownership/i,
+  );
+});
+
+test('handoff checkpoint binding time is causally bounded by ownership, checkpoint and request', async () => {
+  const cp = await checkpoint();
+  const ownership = pendingOwnership();
+  for (const boundAt of [
+    '2026-09-25T13:07:59.999Z',
+    '2026-09-25T13:08:59.999Z',
+    '2026-09-25T13:10:00.001Z',
+  ]) {
+    await assert.rejects(
+      () => assessCrossDeviceContinuationV1(
+        request(),
+        await options({
+          resolveExecutionOwnership: async () => ownership,
+          resolveAgentCheckpoint: async () => cp,
+          resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(cp, ownership, { boundAt }),
+        }),
+      ),
+      /binding chronology is invalid/i,
+    );
+  }
+});
+
+test('handoff checkpoint binding accepts exact causal boundary times', async () => {
+  const cp = await checkpoint();
+  const ownership = pendingOwnership();
+  for (const boundAt of [ownership.updatedAt, REQUESTED_AT]) {
+    const result = await assessCrossDeviceContinuationV1(
+      request(),
+      await options({
+        resolveExecutionOwnership: async () => ownership,
+        resolveAgentCheckpoint: async () => cp,
+        resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(cp, ownership, { boundAt }),
+      }),
+    );
+    assert.equal(result.status, CrossDeviceContinuationStatus.READY_FOR_CANONICAL_ACCEPT);
+  }
+});
+
 test('continuation TTL is bounded', async () => {
   const tooLong = new Date(Date.parse(REQUESTED_AT) + MAX_CROSS_DEVICE_CONTINUATION_TTL_MS + 1).toISOString();
   await assert.rejects(
