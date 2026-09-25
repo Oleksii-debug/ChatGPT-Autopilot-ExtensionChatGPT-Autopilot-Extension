@@ -12,6 +12,7 @@ import {
 
 const WORKLOAD_SHA = 'a'.repeat(64);
 const EVIDENCE_SHA = 'b'.repeat(64);
+const ASSESSED_AT = '2026-09-25T06:32:00.000Z';
 
 function evidenceRef(artifactId = 'evidence-1', versionId = 'evidence-1@v1', digest = EVIDENCE_SHA) {
   return {
@@ -73,6 +74,10 @@ function terminal(item, status = BatchItemStatus.PASS, overrides = {}) {
   };
 }
 
+function assessBatch(specInput, results = []) {
+  return assessBatchMatrixV1(specInput, results, { assessedAt: ASSESSED_AT });
+}
+
 test('normalizes axes deterministically and treats maxConcurrency as intent only', async () => {
   const expansion = await expandBatchMatrixV1(spec());
   assert.equal(expansion.spec.itemCount, 4);
@@ -88,6 +93,7 @@ test('normalizes axes deterministically and treats maxConcurrency as intent only
   for (const item of expansion.items) {
     assert.match(item.itemId, /^batch-item:[a-f0-9]{32}$/u);
     assert.match(item.itemSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(item.producerId, 'owner-agent');
     assert.equal(item.workloadSha256, WORKLOAD_SHA);
     assert.deepEqual(item.parameters.map(parameter => parameter.axisId), ['format', 'region']);
   }
@@ -122,6 +128,14 @@ test('item SHA-256 binds workload revision and exact opaque parameter refs', asy
   assert.notDeepEqual(
     base.items.map(item => item.itemSha256),
     changedWorkload.items.map(item => item.itemSha256),
+  );
+
+  const changedProducer = await expandBatchMatrixV1(spec({
+    producerId: 'owner-agent-2',
+  }));
+  assert.notDeepEqual(
+    base.items.map(item => item.itemSha256),
+    changedProducer.items.map(item => item.itemSha256),
   );
 });
 
@@ -193,12 +207,14 @@ test('matrix bounds axes, values, Cartesian product and concurrency intent', () 
 
 test('missing results are implicit PENDING and only PENDING items are resume candidates', async () => {
   const expansion = await expandBatchMatrixV1(spec());
-  const report = await assessBatchMatrixV1(spec(), [
+  const report = await assessBatch(spec(), [
     terminal(expansion.items[0], BatchItemStatus.PASS),
   ]);
 
   assert.equal(report.state, BatchMatrixState.IN_PROGRESS);
   assert.equal(report.totalItems, 4);
+  assert.equal(report.producerId, 'owner-agent');
+  assert.equal(report.assessedAt, ASSESSED_AT);
   assert.deepEqual(report.counts, {
     pending: 3,
     running: 0,
@@ -235,7 +251,7 @@ test('RUNNING item is reconciliation-required and never blind-resume candidate',
     startedAt: '2026-09-25T06:31:00.000Z',
     completedAt: '',
   };
-  const report = await assessBatchMatrixV1(spec(), [running]);
+  const report = await assessBatch(spec(), [running]);
   assert.deepEqual(report.reconciliationRequiredItemIds, [expansion.items[0].itemId]);
   assert.equal(report.resumeCandidateItemIds.includes(expansion.items[0].itemId), false);
   assert.equal(report.state, BatchMatrixState.IN_PROGRESS);
@@ -250,7 +266,7 @@ test('all independent PASS evidence produces COMPLETE and nothing else can', asy
       evidenceRefs: [evidenceRef('evidence-' + index, 'evidence-' + index + '@v1')],
     }));
 
-  const report = await assessBatchMatrixV1(spec(), results);
+  const report = await assessBatch(spec(), results);
   assert.equal(report.state, BatchMatrixState.COMPLETE);
   assert.equal(report.reportedAllPassed, true);
   assert.equal(report.reportedPartialFailure, false);
@@ -277,7 +293,7 @@ test('terminal FAIL or CANCELLED yields truthful PARTIAL rather than success', a
       evidenceRefs: [evidenceRef('evidence-' + index, 'evidence-' + index + '@v1')],
     }));
 
-  const report = await assessBatchMatrixV1(spec(), results);
+  const report = await assessBatch(spec(), results);
   assert.equal(report.state, BatchMatrixState.PARTIAL);
   assert.equal(report.reportedAllPassed, false);
   assert.equal(report.reportedPartialFailure, true);
@@ -291,19 +307,19 @@ test('result must bind exact item identity and digest', async () => {
   const forgedHash = terminal(expansion.items[0]);
   forgedHash.itemSha256 = 'f'.repeat(64);
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [forgedHash]),
+    () => assessBatch(spec(), [forgedHash]),
     /itemSha256 mismatch/u,
   );
 
   const unknown = terminal(expansion.items[0]);
   unknown.itemId = 'batch-item:ffffffffffffffffffffffffffffffff';
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [unknown]),
+    () => assessBatch(spec(), [unknown]),
     /unknown itemId/u,
   );
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(expansion.items[0]),
       terminal(expansion.items[0]),
     ]),
@@ -319,7 +335,7 @@ test('terminal evidence binds exact Project artifact version and SHA-256', async
     evidenceRefs: [evidenceRef(), evidenceRef()],
   });
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [duplicateVersion]),
+    () => assessBatch(spec(), [duplicateVersion]),
     /duplicate artifact version identity/u,
   );
 
@@ -327,14 +343,14 @@ test('terminal evidence binds exact Project artifact version and SHA-256', async
     evidenceRefs: [evidenceRef('evidence-1', 'evidence-1@v1', 'B'.repeat(64))],
   });
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [badDigest]),
+    () => assessBatch(spec(), [badDigest]),
     /lowercase SHA-256/u,
   );
 
   const extra = terminal(item, BatchItemStatus.PASS);
   extra.evidenceRefs[0].uri = 'file:///secret';
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [extra]),
+    () => assessBatch(spec(), [extra]),
     /unknown field: uri/u,
   );
 });
@@ -344,35 +360,35 @@ test('terminal result requires independent verifier, evidence and causal times',
   const item = expansion.items[0];
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(item, BatchItemStatus.PASS, { verifierId: 'worker-1' }),
     ]),
     /independent from actor/u,
   );
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(item, BatchItemStatus.PASS, { evidenceRefs: [] }),
     ]),
     /requires actor, verifier, times and evidence/u,
   );
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(item, BatchItemStatus.FAIL, { reasonCode: '' }),
     ]),
     /requires reasonCode/u,
   );
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(item, BatchItemStatus.PASS, { reasonCode: 'FAKE_REASON' }),
     ]),
     /must not carry failure reasonCode/u,
   );
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(item, BatchItemStatus.PASS, {
         startedAt: '2026-09-25T06:29:59.000Z',
       }),
@@ -381,13 +397,56 @@ test('terminal result requires independent verifier, evidence and causal times',
   );
 
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [
+    () => assessBatch(spec(), [
       terminal(item, BatchItemStatus.PASS, {
         startedAt: '2026-09-25T06:31:10.000Z',
         completedAt: '2026-09-25T06:31:09.000Z',
       }),
     ]),
     /completedAt predates startedAt/u,
+  );
+});
+
+test('assessment time is explicit and future-dated execution evidence fails closed', async () => {
+  const expansion = await expandBatchMatrixV1(spec());
+  const item = expansion.items[0];
+
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [], {}),
+    /assessedAt/u,
+  );
+
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [], {
+      assessedAt: '2026-09-25T06:29:59.000Z',
+    }),
+    /assessedAt predates batch creation/u,
+  );
+
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [
+      terminal(item, BatchItemStatus.PASS, {
+        completedAt: '2026-09-25T06:32:00.001Z',
+      }),
+    ], { assessedAt: ASSESSED_AT }),
+    /completedAt exceeds assessedAt/u,
+  );
+
+  await assert.rejects(
+    () => assessBatchMatrixV1(spec(), [{
+      schemaVersion: 1,
+      batchId: item.batchId,
+      itemId: item.itemId,
+      itemSha256: item.itemSha256,
+      status: BatchItemStatus.RUNNING,
+      actorId: 'worker-1',
+      verifierId: '',
+      reasonCode: '',
+      evidenceRefs: [],
+      startedAt: '2026-09-25T06:32:00.001Z',
+      completedAt: '',
+    }], { assessedAt: ASSESSED_AT }),
+    /startedAt exceeds assessedAt/u,
   );
 });
 
@@ -409,7 +468,7 @@ test('PENDING and RUNNING cannot smuggle terminal evidence', async () => {
     completedAt: '',
   };
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [pending]),
+    () => assessBatch(spec(), [pending]),
     /PENDING cannot carry execution or terminal evidence/u,
   );
 
@@ -422,7 +481,7 @@ test('PENDING and RUNNING cannot smuggle terminal evidence', async () => {
     startedAt: '2026-09-25T06:31:00.000Z',
   };
   await assert.rejects(
-    () => assessBatchMatrixV1(spec(), [running]),
+    () => assessBatch(spec(), [running]),
     /RUNNING cannot carry terminal evidence/u,
   );
 });
