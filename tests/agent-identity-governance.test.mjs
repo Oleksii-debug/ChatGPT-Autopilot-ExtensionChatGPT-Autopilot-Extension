@@ -232,6 +232,15 @@ test('credential ownership remains opaque, explicit and independently owner-gate
     projection({ assessedAt: T2 }),
   );
   assert.deepEqual(revoked.declaredCredentialRefIds, []);
+
+  const disabledOwnerSnapshot = snapshot();
+  disabledOwnerSnapshot.principals.push(principal('human.credential-owner', 'HUMAN', null, { disabledAt: T1 }));
+  disabledOwnerSnapshot.credentialOwnerships[0].ownerPrincipalId = 'human.credential-owner';
+  const disabledOwner = projectAgentGovernanceAccessV1(
+    disabledOwnerSnapshot,
+    projection({ assessedAt: T2 }),
+  );
+  assert.deepEqual(disabledOwner.declaredCredentialRefIds, []);
 });
 
 test('canonical normalized snapshots remain safely composable and cannot self-upgrade authority', () => {
