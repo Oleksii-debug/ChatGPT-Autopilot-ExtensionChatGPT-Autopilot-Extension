@@ -706,3 +706,26 @@ test('route outcome emission preserves exact integer durable state and rejects o
     /backoffUntil exceeds the exact durable-state range/u,
   );
 });
+
+
+test('route profile prompts preserve exact owner text and reject representation aliases', () => {
+  const systemPrompt = '  preserve leading space\nline two\n';
+  const workerPrompt = '\nImplement exactly.  ';
+  const [route] = normalizeAiRoutePool([{
+    routeId:'profile-exact',
+    provider:'ollama',
+    model:'qwen',
+    systemPrompt,
+    workerPrompt,
+  }]);
+  assert.equal(route.systemPrompt, systemPrompt);
+  assert.equal(route.workerPrompt, workerPrompt);
+  assert.throws(
+    () => normalizeAiRoutePool([{ routeId:'bad-system', provider:'ollama', model:'qwen', systemPrompt:42 }]),
+    /systemPrompt must be text/u,
+  );
+  assert.throws(
+    () => normalizeAiRoutePool([{ routeId:'bad-worker', provider:'ollama', model:'qwen', workerPrompt:{ toString: () => 'forged' } }]),
+    /workerPrompt must be text/u,
+  );
+});
