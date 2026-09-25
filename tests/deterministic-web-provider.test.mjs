@@ -75,6 +75,11 @@ test('executes only authorized invocation and independently verifies URL postcon
   const result = await p.invoke({ ...fixtures(), targetId: 'tab-7', action: { kind: 'NAVIGATE', url: 'https://example.test/done' }, postcondition: { url: 'https://example.test/done' } });
   assert.equal(result.status, 'VERIFIED');
   assert.equal(result.verification.reasonCode, 'URL_MATCH');
+  assert.equal(result.verification.verifierId, 'deterministic-web-postcondition-verifier');
+  assert.equal(result.verification.verificationAuthorityId, 'decision-inv-1');
+  assert.equal(result.verification.effectId, 'inv-1');
+  assert.equal(result.verification.executionId, 'inv-1:attempt:1');
+  assert.equal(result.verification.attempt, 1);
   assert.deepEqual(calls.map(([name]) => name), ['execute', 'observe']);
   assert.equal(leaseState.value, null, 'target lease is released after verification');
 });
