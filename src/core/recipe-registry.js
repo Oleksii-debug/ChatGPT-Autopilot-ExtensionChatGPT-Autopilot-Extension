@@ -1,3 +1,5 @@
+import { createSha256FingerprintV1 } from './fingerprint.js';
+
 /**
  * RecipeRegistryV1 is a deterministic, data-only procedural recipe contract.
  * It deliberately does not execute recipes, grant capabilities, schedule work,
@@ -122,11 +124,13 @@ function integer(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) 
 function timestamp(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return '';
   if (typeof value !== 'string' || value !== value.trim() || !value) {
-    throw new Error(`${label} must be a timestamp`);
+    throw new Error(`${label} must be a canonical timestamp`);
   }
   const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) throw new Error(`${label} must be a timestamp`);
-  return new Date(parsed).toISOString();
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {
+    throw new Error(`${label} must be a canonical timestamp`);
+  }
+  return value;
 }
 
 function sha256(value, label) {
@@ -281,6 +285,139 @@ function normalizeQualification(input, producerId) {
   });
 }
 
+const TRUSTED_EVALUATION_KEYS = new Set(['verifierId', 'report']);
+const TRUSTED_REPORT_KEYS = new Set([
+  'schemaVersion', 'runId', 'suiteId', 'suiteRevisionId', 'subjectId',
+  'subjectRevisionId', 'startedAt', 'completedAt', 'status',
+  'caseCount', 'passedCaseCount', 'failedCaseCount', 'results',
+]);
+const TRUSTED_RESULT_KEYS = new Set([
+  'caseId', 'outcome', 'passed', 'reasonCode', 'metrics',
+  'evidenceArtifactIds', 'assertionResults',
+]);
+
+function normalizeTrustedBenchmarkEvaluationV1(input) {
+  const envelope = strictRecord(input, TRUSTED_EVALUATION_KEYS, 'TrustedRecipeEvaluationV1');
+  const verifierId = id(envelope.verifierId, 'TrustedRecipeEvaluationV1.verifierId');
+  const report = strictRecord(envelope.report, TRUSTED_REPORT_KEYS, 'TrustedRecipeEvaluationV1.report');
+  if (report.schemaVersion !== 1) throw new Error('TrustedRecipeEvaluationV1.report schemaVersion is invalid');
+
+  const runId = id(report.runId, 'TrustedRecipeEvaluationV1.report.runId');
+  const suiteId = id(report.suiteId, 'TrustedRecipeEvaluationV1.report.suiteId');
+  const suiteRevisionId = id(report.suiteRevisionId, 'TrustedRecipeEvaluationV1.report.suiteRevisionId');
+  const subjectId = id(report.subjectId, 'TrustedRecipeEvaluationV1.report.subjectId');
+  const subjectRevisionId = id(report.subjectRevisionId, 'TrustedRecipeEvaluationV1.report.subjectRevisionId');
+  const startedAt = timestamp(report.startedAt, 'TrustedRecipeEvaluationV1.report.startedAt');
+  const completedAt = timestamp(report.completedAt, 'TrustedRecipeEvaluationV1.report.completedAt');
+  if (Date.parse(completedAt) < Date.parse(startedAt)) {
+    throw new Error('TrustedRecipeEvaluationV1.report completedAt precedes startedAt');
+  }
+  if (report.status !== RecipeQualificationStatus.PASS && report.status !== RecipeQualificationStatus.FAIL) {
+    throw new Error('TrustedRecipeEvaluationV1.report status is invalid');
+  }
+
+  const caseCount = integer(report.caseCount, 'TrustedRecipeEvaluationV1.report.caseCount', { min: 1, max: 100000 });
+  const passedCaseCount = integer(
+    report.passedCaseCount,
+    'TrustedRecipeEvaluationV1.report.passedCaseCount',
+    { min: 0, max: caseCount },
+  );
+  const failedCaseCount = integer(
+    report.failedCaseCount,
+    'TrustedRecipeEvaluationV1.report.failedCaseCount',
+    { min: 0, max: caseCount },
+  );
+  if (passedCaseCount + failedCaseCount !== caseCount) {
+    throw new Error('TrustedRecipeEvaluationV1.report case counts are inconsistent');
+  }
+
+  const rawResults = strictArray(
+    report.results,
+    'TrustedRecipeEvaluationV1.report.results',
+    { min: caseCount, max: caseCount },
+  );
+  const caseIds = new Set();
+  const evidence = new Set();
+  for (let index = 0; index < rawResults.length; index += 1) {
+    const result = strictRecord(
+      rawResults[index],
+      TRUSTED_RESULT_KEYS,
+      `TrustedRecipeEvaluationV1.report.results[${index}]`,
+    );
+    const caseId = id(result.caseId, `TrustedRecipeEvaluationV1.report.results[${index}].caseId`);
+    if (caseIds.has(caseId)) throw new Error('TrustedRecipeEvaluationV1.report contains duplicate caseId');
+    caseIds.add(caseId);
+    if (typeof result.passed !== 'boolean') {
+      throw new Error(`TrustedRecipeEvaluationV1.report.results[${index}].passed must be boolean`);
+    }
+    const ids = normalizeIdList(
+      result.evidenceArtifactIds,
+      `TrustedRecipeEvaluationV1.report.results[${index}].evidenceArtifactIds`,
+      { max: MAX_IDS, min: 1 },
+    );
+    for (const evidenceArtifactId of ids) evidence.add(evidenceArtifactId);
+  }
+
+  return frozen({
+    verifierId,
+    report: {
+      schemaVersion: 1,
+      runId,
+      suiteId,
+      suiteRevisionId,
+      subjectId,
+      subjectRevisionId,
+      startedAt,
+      completedAt,
+      status: report.status,
+      caseCount,
+      passedCaseCount,
+      failedCaseCount,
+      evidenceArtifactIds: [...evidence].sort(asciiCompare),
+    },
+  });
+}
+
+function normalizeTrustedBenchmarkEvaluationsV1(input = []) {
+  const raw = strictArray(input, 'trustedEvaluations', { max: MAX_IDS });
+  const values = raw.map(normalizeTrustedBenchmarkEvaluationV1);
+  const byRunId = new Map();
+  for (const value of values) {
+    if (byRunId.has(value.report.runId)) {
+      throw new Error('trustedEvaluations contains duplicate runId: ' + value.report.runId);
+    }
+    byRunId.set(value.report.runId, value);
+  }
+  return byRunId;
+}
+
+function recipeSubjectCanonicalV1(recipe) {
+  return JSON.stringify([
+    'chatgpt-autopilot-recipe-subject-v1',
+    recipe.schemaVersion,
+    recipe.recipeId,
+    recipe.version,
+    recipe.parentVersion,
+    recipe.title,
+    recipe.description,
+    recipe.producerId,
+    recipe.sourceBindings,
+    recipe.steps,
+    recipe.createdAt,
+  ]);
+}
+
+async function computeNormalizedRecipeSubjectSha256V1(recipe, cryptoApi) {
+  const tagged = await createSha256FingerprintV1(
+    recipeSubjectCanonicalV1(recipe),
+    { cryptoApi },
+  );
+  if (typeof tagged !== 'string' || !tagged.startsWith('sha256:')) {
+    throw new Error('Recipe subject fingerprint helper returned invalid output');
+  }
+  return sha256(tagged.slice('sha256:'.length), 'recipe subjectSha256');
+}
+
 const RECIPE_KEYS = new Set([
   'schemaVersion', 'recipeId', 'version', 'parentVersion', 'title', 'description',
   'producerId', 'lifecycle', 'sourceBindings', 'steps', 'qualification', 'createdAt',
@@ -414,14 +551,88 @@ export function getCurrentRecipeVersionV1(registryInput, recipeIdInput) {
   return versions.length ? versions[versions.length - 1] : null;
 }
 
-export function resolvePromotedRecipeV1(registryInput, recipeIdInput) {
+export async function computeRecipeSubjectSha256V1(
+  recipeInput,
+  { cryptoApi = globalThis.crypto } = {},
+) {
+  const recipe = normalizeRecipeDefinitionV1(recipeInput);
+  return computeNormalizedRecipeSubjectSha256V1(recipe, cryptoApi);
+}
+
+export async function assertRecipePromotionAuthorizedV1(
+  recipeInput,
+  trustedEvaluationInput,
+  { cryptoApi = globalThis.crypto } = {},
+) {
+  const recipe = normalizeRecipeDefinitionV1(recipeInput);
+  if (recipe.lifecycle !== RecipeLifecycleState.PROMOTED) throw new Error('recipe is not PROMOTED');
+  if (recipe.qualification.status !== RecipeQualificationStatus.PASS) {
+    throw new Error('recipe qualification is not PASS');
+  }
+
+  const trusted = normalizeTrustedBenchmarkEvaluationV1(trustedEvaluationInput);
+  const report = trusted.report;
+  const qualification = recipe.qualification;
+
+  if (trusted.verifierId === recipe.producerId) {
+    throw new Error('trusted evaluation verifier must be independent from recipe producer');
+  }
+  if (trusted.verifierId !== qualification.verifierId) {
+    throw new Error('trusted evaluation verifier does not match recipe qualification');
+  }
+  if (report.status !== RecipeQualificationStatus.PASS) {
+    throw new Error('trusted evaluation did not PASS');
+  }
+  if (report.runId !== qualification.evaluationId) {
+    throw new Error('trusted evaluation runId does not match recipe qualification evaluationId');
+  }
+  if (report.suiteId !== qualification.benchmarkSuiteId
+      || report.suiteRevisionId !== qualification.benchmarkSuiteRevision) {
+    throw new Error('trusted evaluation suite identity does not match recipe qualification');
+  }
+  if (report.subjectId !== recipe.recipeId) {
+    throw new Error('trusted evaluation subjectId does not match recipe');
+  }
+  if (Date.parse(report.startedAt) < Date.parse(recipe.createdAt)) {
+    throw new Error('trusted evaluation predates recipe creation');
+  }
+  if (report.completedAt !== qualification.evaluatedAt) {
+    throw new Error('trusted evaluation completion does not match recipe qualification evaluatedAt');
+  }
+
+  const subjectSha256 = await computeNormalizedRecipeSubjectSha256V1(recipe, cryptoApi);
+  if (qualification.subjectSha256 !== subjectSha256) {
+    throw new Error('recipe qualification subjectSha256 does not match immutable recipe content');
+  }
+  if (report.subjectRevisionId !== subjectSha256) {
+    throw new Error('trusted evaluation subjectRevisionId does not match immutable recipe content');
+  }
+
+  if (JSON.stringify(report.evidenceArtifactIds) !== JSON.stringify(qualification.evidenceArtifactIds)) {
+    throw new Error('trusted evaluation evidence does not match recipe qualification');
+  }
+  return recipe;
+}
+
+export async function resolvePromotedRecipeV1(
+  registryInput,
+  recipeIdInput,
+  trustedEvaluationsInput = [],
+  { cryptoApi = globalThis.crypto } = {},
+) {
   const registry = normalizeRecipeRegistryV1(registryInput);
   const recipeId = id(recipeIdInput, 'recipeId');
+  const trustedByRunId = normalizeTrustedBenchmarkEvaluationsV1(trustedEvaluationsInput);
   const versions = registry.recipes.filter(recipe => recipe.recipeId === recipeId);
   if (!versions.length) return null;
-  if (versions[versions.length - 1].lifecycle === RecipeLifecycleState.RETIRED) return null;
+
   for (let index = versions.length - 1; index >= 0; index -= 1) {
-    if (versions[index].lifecycle === RecipeLifecycleState.PROMOTED) return versions[index];
+    const recipe = versions[index];
+    if (recipe.lifecycle === RecipeLifecycleState.RETIRED) return null;
+    if (recipe.lifecycle !== RecipeLifecycleState.PROMOTED) continue;
+    const trusted = trustedByRunId.get(recipe.qualification.evaluationId);
+    if (!trusted) return null;
+    return assertRecipePromotionAuthorizedV1(recipe, trusted, { cryptoApi });
   }
   return null;
 }
@@ -454,10 +665,17 @@ export function assessRecipeSourceFreshnessV1(recipeInput, currentSourceBindings
   });
 }
 
-export function assertRecipeReplayEligibleV1(recipeInput, currentSourceBindingsInput) {
-  const recipe = normalizeRecipeDefinitionV1(recipeInput);
-  if (recipe.lifecycle !== RecipeLifecycleState.PROMOTED) throw new Error('recipe is not PROMOTED');
-  if (recipe.qualification.status !== RecipeQualificationStatus.PASS) throw new Error('recipe qualification is not PASS');
+export async function assertRecipeReplayEligibleV1(
+  recipeInput,
+  currentSourceBindingsInput,
+  trustedEvaluationInput,
+  { cryptoApi = globalThis.crypto } = {},
+) {
+  const recipe = await assertRecipePromotionAuthorizedV1(
+    recipeInput,
+    trustedEvaluationInput,
+    { cryptoApi },
+  );
   const freshness = assessRecipeSourceFreshnessV1(recipe, currentSourceBindingsInput);
   if (freshness.status !== RecipeFreshnessStatus.FRESH) {
     const evidence = freshness.drift.map(item => `${item.sourceId}:${item.reason}`).join(', ');
@@ -466,10 +684,29 @@ export function assertRecipeReplayEligibleV1(recipeInput, currentSourceBindingsI
   return recipe;
 }
 
-export function resolveReplayEligibleRecipeV1(registryInput, recipeIdInput, currentSourceBindingsInput) {
-  const recipe = resolvePromotedRecipeV1(registryInput, recipeIdInput);
-  if (!recipe) throw new Error('recipe has no active PROMOTED version');
-  return assertRecipeReplayEligibleV1(recipe, currentSourceBindingsInput);
+export async function resolveReplayEligibleRecipeV1(
+  registryInput,
+  recipeIdInput,
+  currentSourceBindingsInput,
+  trustedEvaluationsInput = [],
+  { cryptoApi = globalThis.crypto } = {},
+) {
+  const trustedByRunId = normalizeTrustedBenchmarkEvaluationsV1(trustedEvaluationsInput);
+  const recipe = await resolvePromotedRecipeV1(
+    registryInput,
+    recipeIdInput,
+    trustedEvaluationsInput,
+    { cryptoApi },
+  );
+  if (!recipe) throw new Error('recipe has no active trusted PROMOTED version');
+  const trusted = trustedByRunId.get(recipe.qualification.evaluationId);
+  if (!trusted) throw new Error('recipe trusted evaluation is unavailable');
+  return assertRecipeReplayEligibleV1(
+    recipe,
+    currentSourceBindingsInput,
+    trusted,
+    { cryptoApi },
+  );
 }
 
 export function recipeRequiredCapabilityIdsV1(recipeInput) {
