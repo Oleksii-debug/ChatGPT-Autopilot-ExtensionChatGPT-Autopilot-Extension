@@ -65,6 +65,71 @@ test('BrowserTargetLease rejects representation aliases and coercion at the auth
   );
 });
 
+test('BrowserTargetLease request wrappers snapshot data before reading authority fields', () => {
+  let acquireReads = 0;
+  const acquireRequest = {
+    targetId: 'page:1',
+    ownerInvocationId: 'inv:1',
+    leaseId: 'lease:1',
+    now: NOW,
+  };
+  Object.defineProperty(acquireRequest, 'ownerInvocationId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      acquireReads += 1;
+      return 'inv:1';
+    },
+  });
+  assert.throws(
+    () => acquireBrowserTargetLeaseV1(acquireRequest),
+    /enumerable data property/,
+  );
+  assert.equal(acquireReads, 0);
+
+  const lease = acquireBrowserTargetLeaseV1({
+    targetId: 'page:1',
+    ownerInvocationId: 'inv:1',
+    leaseId: 'lease:1',
+    now: NOW,
+  }).lease;
+
+  let releaseReads = 0;
+  const releaseRequest = { ownerInvocationId: 'inv:1', leaseId: 'lease:1' };
+  Object.defineProperty(releaseRequest, 'leaseId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      releaseReads += 1;
+      return 'lease:1';
+    },
+  });
+  assert.throws(
+    () => releaseBrowserTargetLeaseV1(lease, releaseRequest),
+    /enumerable data property/,
+  );
+  assert.equal(releaseReads, 0);
+
+  assert.throws(
+    () => acquireBrowserTargetLeaseV1({
+      targetId: 'page:1',
+      ownerInvocationId: 'inv:1',
+      leaseId: 'lease:1',
+      now: NOW,
+      unexpected: true,
+    }),
+    /unknown field: unexpected/,
+  );
+  assert.throws(
+    () => releaseBrowserTargetLeaseV1(lease, {
+      ownerInvocationId: 'inv:1',
+      leaseId: 'lease:1',
+      unexpected: true,
+    }),
+    /unknown field: unexpected/,
+  );
+});
+
 test('BrowserTargetLease snapshots plain authority data without executing accessors', () => {
   let reads = 0;
   const accessor = { ...VALID };
