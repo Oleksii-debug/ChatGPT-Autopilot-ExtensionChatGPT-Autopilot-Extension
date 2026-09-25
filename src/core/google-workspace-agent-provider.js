@@ -12,6 +12,7 @@ export const GoogleWorkspaceToolId = Object.freeze({
   GMAIL_THREAD_GET: 'remote/google-workspace/gmail.thread.get',
   GMAIL_ATTACHMENT_GET: 'remote/google-workspace/gmail.attachment.get',
   GMAIL_DRAFT_CREATE: 'remote/google-workspace/gmail.draft.create',
+  GMAIL_DRAFT_SEND: 'remote/google-workspace/gmail.draft.send',
 });
 
 export const GoogleWorkspaceCapabilityId = Object.freeze({
@@ -22,6 +23,7 @@ export const GoogleWorkspaceCapabilityId = Object.freeze({
   GMAIL_MESSAGE_READ: 'google.gmail.message.read',
   GMAIL_ATTACHMENT_READ: 'google.gmail.attachment.read',
   GMAIL_DRAFT_CREATE: 'google.gmail.draft.create',
+  GMAIL_DRAFT_SEND: 'google.gmail.draft.send',
 });
 
 const TOOLS = Object.freeze([
@@ -122,6 +124,17 @@ const TOOLS = Object.freeze([
     capabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE],
     inputSchemaRef: 'google-workspace-schema/gmail.draft.create/input',
     outputSchemaRef: 'google-workspace-schema/gmail.draft.create/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GoogleWorkspaceToolId.GMAIL_DRAFT_SEND,
+    providerId: GOOGLE_WORKSPACE_PROVIDER_ID,
+    label: 'Send owner-authorized Gmail draft',
+    description: 'Sends one exact owner-authorized Gmail draft through the canonical exact-effect path. The invocation binds the exact RFC822 bytes used by drafts.send.',
+    capabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_DRAFT_SEND],
+    inputSchemaRef: 'google-workspace-schema/gmail.draft.send/input',
+    outputSchemaRef: 'google-workspace-schema/gmail.draft.send/output',
     readOnly: false,
   }),
 ]);
@@ -299,6 +312,7 @@ function methodFor(toolId) {
   if (toolId === GoogleWorkspaceToolId.GMAIL_THREAD_GET) return 'getGmailThread';
   if (toolId === GoogleWorkspaceToolId.GMAIL_ATTACHMENT_GET) return 'getGmailAttachment';
   if (toolId === GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE) return 'createGmailDraft';
+  if (toolId === GoogleWorkspaceToolId.GMAIL_DRAFT_SEND) return 'sendGmailDraft';
   return '';
 }
 
