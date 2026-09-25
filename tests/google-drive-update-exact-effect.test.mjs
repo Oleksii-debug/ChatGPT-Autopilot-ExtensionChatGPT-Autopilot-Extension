@@ -97,6 +97,7 @@ function workspace({ onUpdate } = {}) {
     },
     searchGmail: async () => ({ messages: [] }),
     getGmailMessage: async () => ({}),
+    modifyGmailMessage: async () => ({}),
     getGmailThread: async () => ({}),
     getGmailAttachment: async () => ({}),
     createGmailDraft: async () => ({}),

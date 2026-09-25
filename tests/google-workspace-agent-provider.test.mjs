@@ -44,6 +44,7 @@ function client(overrides = {}) {
     updateDriveFile: async args => ({ operation: 'updateDriveFile', args }),
     searchGmail: async args => ({ operation: 'searchGmail', args }),
     getGmailMessage: async args => ({ operation: 'getGmailMessage', args }),
+    modifyGmailMessage: async args => ({ operation: 'modifyGmailMessage', args }),
     getGmailThread: async args => ({ operation: 'getGmailThread', args }),
     getGmailAttachment: async args => ({ operation: 'getGmailAttachment', args }),
     createGmailDraft: async args => ({ operation: 'createGmailDraft', args }),
@@ -54,14 +55,15 @@ function client(overrides = {}) {
 
 const allCapabilities = Object.values(GoogleWorkspaceCapabilityId);
 
-test('Google Workspace V1 advertises seven reads plus Drive-update, draft-create, and draft-send mutations', () => {
+test('Google Workspace V1 advertises seven reads plus Drive-update, Gmail-label, draft-create, and draft-send mutations', () => {
   const provider = new GoogleWorkspaceAgentProviderV1({ workspaceClient: client(), grantedCapabilityIds: allCapabilities });
   const tools = provider.tools();
-  assert.equal(tools.length, 10);
+  assert.equal(tools.length, 11);
   assert.equal(tools.filter(tool => tool.readOnly === true).length, 7);
   const effectful = tools.filter(tool => tool.readOnly === false);
   assert.deepEqual(effectful.map(tool => tool.toolId), [
     GoogleWorkspaceToolId.DRIVE_FILE_UPDATE,
+    GoogleWorkspaceToolId.GMAIL_MESSAGE_MODIFY,
     GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
     GoogleWorkspaceToolId.GMAIL_DRAFT_SEND,
   ]);
@@ -103,6 +105,7 @@ test('each tool dispatches through the single workspace client without creating 
     [GoogleWorkspaceToolId.DRIVE_FILE_UPDATE, GoogleWorkspaceCapabilityId.DRIVE_FILE_UPDATE, 'updateDriveFile', { fileId: 'file_1', name: 'renamed.txt' }],
     [GoogleWorkspaceToolId.GMAIL_SEARCH, GoogleWorkspaceCapabilityId.GMAIL_SEARCH, 'searchGmail', { userId: 'me' }],
     [GoogleWorkspaceToolId.GMAIL_MESSAGE_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailMessage', { userId: 'me', messageId: 'msg_1' }],
+    [GoogleWorkspaceToolId.GMAIL_MESSAGE_MODIFY, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_MODIFY, 'modifyGmailMessage', { userId: 'owner@example.com', messageId: 'msg_1', removeLabelIds: ['INBOX'] }],
     [GoogleWorkspaceToolId.GMAIL_THREAD_GET, GoogleWorkspaceCapabilityId.GMAIL_MESSAGE_READ, 'getGmailThread', { userId: 'me', threadId: 'thread_1' }],
     [GoogleWorkspaceToolId.GMAIL_ATTACHMENT_GET, GoogleWorkspaceCapabilityId.GMAIL_ATTACHMENT_READ, 'getGmailAttachment', { userId: 'me', messageId: 'msg_1', attachmentId: 'att_1' }],
     [GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE, GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE, 'createGmailDraft', { userId: 'owner@example.com', rawMessageBase64Url: 'QUJD' }],
