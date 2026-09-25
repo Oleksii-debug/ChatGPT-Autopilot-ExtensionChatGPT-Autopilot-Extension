@@ -224,6 +224,21 @@ test('credential ownership remains opaque, explicit and independently owner-gate
   assert.deepEqual(revoked.declaredCredentialRefIds, []);
 });
 
+test('canonical normalized snapshots remain safely composable and cannot self-upgrade authority', () => {
+  const normalized = normalizeAgentGovernanceSnapshotV1(snapshot());
+  assert.doesNotThrow(() => normalizeAgentGovernanceSnapshotV1(normalized));
+  const access = projectAgentGovernanceAccessV1(normalized, projection());
+  assert.deepEqual(access.effectiveCapabilityIds, ['repo.read']);
+
+  const forgedSnapshot = structuredClone(normalized);
+  forgedSnapshot.authorizationGranted = true;
+  assert.throws(() => normalizeAgentGovernanceSnapshotV1(forgedSnapshot), /cannot grant authorization/);
+
+  const forgedCredential = structuredClone(normalized.credentialOwnerships[0]);
+  forgedCredential.credentialUseAuthorized = true;
+  assert.throws(() => normalizeCredentialOwnershipRefV1(forgedCredential), /cannot authorize credential use/);
+});
+
 test('strict type and authority-field aliases fail closed while null-prototype records remain valid', () => {
   const badVersion = snapshot();
   badVersion.schemaVersion = '1';
