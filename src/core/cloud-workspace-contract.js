@@ -110,6 +110,11 @@ function frozen(value) {
   return Object.freeze(value);
 }
 
+function optionAt(input, label) {
+  const raw = dataRecord(input == null ? {} : input, new Set(['at']), label);
+  return exactTimestamp(raw.at === undefined ? new Date().toISOString() : raw.at, 'at');
+}
+
 const OWNERSHIP_KEYS = new Set([
   'schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId',
   'state', 'ownerPlane', 'ownerId', 'leaseId', 'leaseUntil',
@@ -287,11 +292,11 @@ function assessment(status, reasonCode, binding, ownership, at) {
 export function createCloudWorkspaceBindingV1(
   observationInput,
   executionOwnershipInput,
-  { at = new Date().toISOString() } = {},
+  options = {},
 ) {
   const observation = normalizeCloudWorkspaceObservationV1(observationInput);
   const ownership = normalizeExactExecutionOwnershipV1(executionOwnershipInput);
-  const assessedAt = exactTimestamp(at, 'at');
+  const assessedAt = optionAt(options, 'Cloud workspace binding options');
 
   if (ownership.state !== ExecutionOwnershipState.OWNED || ownership.ownerPlane !== 'CLOUD') {
     throw new Error('cloud workspace binding requires a currently OWNED CLOUD execution lease');
@@ -337,12 +342,12 @@ export function assessCloudWorkspaceContinuityV1(
   bindingInput,
   currentObservationInput,
   executionOwnershipInput,
-  { at = new Date().toISOString() } = {},
+  options = {},
 ) {
   const binding = normalizeCloudWorkspaceBindingV1(bindingInput);
   const observation = normalizeCloudWorkspaceObservationV1(currentObservationInput);
   const ownership = normalizeExactExecutionOwnershipV1(executionOwnershipInput);
-  const assessedAt = exactTimestamp(at, 'at');
+  const assessedAt = optionAt(options, 'Cloud workspace continuity options');
 
   if (ownership.state === ExecutionOwnershipState.RECONCILE
       || ownership.state === ExecutionOwnershipState.MANUAL_REVIEW) {
