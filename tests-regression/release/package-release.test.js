@@ -106,6 +106,29 @@ test('release rejects top-level file and directory symlinks before source traver
   );
 });
 
+
+test('release fails closed on NUL bytes in packaged text sources', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-nul-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  await fs.writeFile(
+    path.join(fixtureRoot, 'README.txt'),
+    Buffer.concat([
+      Buffer.from(`ChatGPT Autopilot ${RELEASE_VERSION}\n`, 'utf8'),
+      Buffer.from([0]),
+      Buffer.from('sk-example-secret-material-abcdefghijklmnopqrstuvwxyz', 'utf8'),
+    ]),
+  );
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /NUL byte found in packaged text source: README\.txt/,
+  );
+});
+
 test('release ZIP is byte-for-byte reproducible and has one canonical root folder', async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
