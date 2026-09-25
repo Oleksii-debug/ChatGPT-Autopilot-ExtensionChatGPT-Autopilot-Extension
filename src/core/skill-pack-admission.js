@@ -144,7 +144,14 @@ function sourceArtifact(manifest) {
 }
 
 function exactArtifactMatch(expected, observedInput, label) {
-  const observed = normalizeArtifactRefV1(observedInput);
+  const expectedKeys = new Set(Object.keys(expected));
+  const raw = strictRecord(observedInput, label, expectedKeys);
+  for (const key of expectedKeys) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key) || !Object.is(raw[key], expected[key])) {
+      throw new Error(`${label} does not match the trusted materialized ArtifactRef`);
+    }
+  }
+  const observed = normalizeArtifactRefV1(raw);
   if (!same(expected, observed)) {
     throw new Error(`${label} does not match the trusted materialized ArtifactRef`);
   }
@@ -365,11 +372,11 @@ export async function createSkillPackAdmissionV1(input = {}, options = {}) {
     trustedManifest.skillPackId,
     trustedManifest.version,
     trustedManifestFingerprint,
-    source.sha256,
     entrypoint.entrypointId,
-    dependencyProofs.map(item => item.admissionId),
-    evaluationProofs.map(item => item.evaluationId),
-    signatureProofs.map(item => item.signatureId),
+    dependencyProofs,
+    evaluationProofs,
+    signatureProofs,
+    admittedAt,
   ]));
 
   return frozen({
