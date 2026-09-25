@@ -50,17 +50,6 @@ const TOOLS = Object.freeze([
     outputSchemaRef: 'filesystem-schema/search/output',
     readOnly: true,
   }),
-  normalizeToolDescriptorV1({
-    schemaVersion: 1,
-    toolId: FilesystemToolId.WRITE_EXISTING_TEXT,
-    providerId: FILESYSTEM_PROVIDER_ID,
-    label: 'Replace existing owner-scoped text file',
-    description: 'Replaces an existing UTF-8 file from a hash-bound ArtifactRef under an explicitly writable owner root.',
-    capabilityIds: ['filesystem.writeExistingText'],
-    inputSchemaRef: 'filesystem-schema/writeExistingText/input',
-    outputSchemaRef: 'filesystem-schema/writeExistingText/output',
-    readOnly: false,
-  }),
 ]);
 
 function providerError(code, message) {
@@ -105,8 +94,8 @@ function wrapFailure(error, { readOnly, invocationId }) {
 
 export class FilesystemAgentProviderV1 {
   constructor({ nativeClient, resolveArtifactText = null, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
-    if (!nativeClient?.readText || !nativeClient?.searchFiles || !nativeClient?.writeExistingText) {
-      throw new Error('Filesystem Native Companion client is required');
+    if (!nativeClient?.readText || !nativeClient?.searchFiles) {
+      throw new Error('Filesystem Native Companion read/search client is required');
     }
     this.nativeClient = nativeClient;
     this.resolveArtifactText = typeof resolveArtifactText === 'function' ? resolveArtifactText : null;
