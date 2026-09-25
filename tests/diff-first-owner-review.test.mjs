@@ -284,6 +284,29 @@ test('verification evidence cannot come from the future relative to the review p
   );
 });
 
+test('artifact and verification evidence chronology cannot point into the future', () => {
+  assert.throws(
+    () => buildDiffFirstOwnerReviewV1(input({
+      artifactRefs: [artifact('artifact-diff', {
+        createdAt: '2026-09-25T00:10:00.001Z',
+      })],
+    })),
+    /artifact artifact-diff createdAt is after review generatedAt/,
+  );
+
+  assert.throws(
+    () => buildDiffFirstOwnerReviewV1(input({
+      artifactRefs: [artifact('artifact-diff', {
+        createdAt: '2026-09-25T00:05:00.001Z',
+      })],
+      verificationRefs: [verification('verify-before-evidence', {
+        verifiedAt: '2026-09-25T00:05:00.000Z',
+      })],
+    })),
+    /references evidence created after verifiedAt: artifact-diff/,
+  );
+});
+
 test('failed or ambiguous verification exceptions require owner attention deterministically', () => {
   const failed = buildDiffFirstOwnerReviewV1(input({
     risks: [],
