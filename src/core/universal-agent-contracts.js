@@ -30,24 +30,58 @@ const MAX_DATA_JSON = 256_000;
 const MAX_LIST = 128;
 
 function plain(value, label) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
-  return value;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  // Authority/evidence contracts are untrusted input. Snapshot descriptor
+  // values without evaluating accessors so validation and normalization read
+  // the exact same immutable input view.
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
 }
 
 function exactKeys(value, allowed, label) {
-  for (const key of Object.keys(value)) {
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in value && !Object.prototype.hasOwnProperty.call(value, key)) {
+      throw new Error(`${label} contains inherited field: ${key}`);
+    }
   }
 }
 
 function version(value, label) {
-  if (Number(value) !== UniversalAgentContractVersion) throw new Error(`Unsupported ${label} schemaVersion`);
+  if (typeof value !== 'number'
+      || !Number.isInteger(value)
+      || value !== UniversalAgentContractVersion) {
+    throw new Error(`Unsupported ${label} schemaVersion`);
+  }
   return UniversalAgentContractVersion;
 }
 
 function id(value, label, { optional = false } = {}) {
   if ((value == null || value === '') && optional) return null;
-  const out = String(value ?? '').trim();
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
   if (!ID.test(out)) throw new Error(`${label} is invalid`);
   return out;
 }
@@ -69,10 +103,15 @@ function timestamp(value, label, { optional = false } = {}) {
 }
 
 function integer(value, label, min, max, { optional = false, fallback = 0 } = {}) {
-  if ((value == null || value === '') && optional) return fallback;
-  const n = Number(value);
-  if (!Number.isInteger(n) || !Number.isFinite(n) || n < min || n > max) throw new Error(`${label} is invalid`);
-  return n;
+  if (value == null && optional) return fallback;
+  if (typeof value !== 'number'
+      || !Number.isInteger(value)
+      || !Number.isFinite(value)
+      || value < min
+      || value > max) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
 }
 
 function bool(value, label, fallback = false) {
@@ -81,24 +120,99 @@ function bool(value, label, fallback = false) {
   return value;
 }
 
+function dataArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded array`);
+  }
+  const length = lengthDescriptor.value;
+  const out = new Array(length);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
+      throw new Error(`${label} contains a non-index field`);
+    }
+    const index = Number(key);
+    const descriptor = descriptors[key];
+    if (!Number.isSafeInteger(index)
+        || index < 0
+        || index >= length
+        || String(index) !== key
+        || !descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} entries must be enumerable own data properties`);
+    }
+  }
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} must be a dense data-only array`);
+    }
+    out[index] = descriptor.value;
+  }
+  return out;
+}
 function idList(value, label, { optional = true, max = MAX_LIST } = {}) {
   if (value == null && optional) return [];
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  const out = value.map((item, index) => id(item, `${label}[${index}]`));
+  const items = dataArray(value, label, max);
+  const out = items.map((item, index) => id(item, `${label}[${index}]`));
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
 }
 
 function stringList(value, label, { optional = true, max = MAX_LIST, itemMax = 500 } = {}) {
   if (value == null && optional) return [];
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  return value.map((item, index) => text(item, `${label}[${index}]`, { max: itemMax }));
+  const items = dataArray(value, label, max);
+  return items.map((item, index) => text(item, `${label}[${index}]`, { max: itemMax }));
+}
+
+function cloneJsonData(value, label, stack = new WeakSet(), depth = 0) {
+  if (depth > 64) throw new Error(`${label} exceeds maximum nesting depth`);
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`${label} contains a non-finite number`);
+    return value;
+  }
+  if (!value || typeof value !== 'object') {
+    throw new Error(`${label} must contain JSON-compatible data only`);
+  }
+  if (stack.has(value)) throw new Error(`${label} must not contain cycles`);
+  stack.add(value);
+  try {
+    if (Array.isArray(value)) {
+      const items = dataArray(value, label, MAX_DATA_JSON);
+      return items.map((item, index) => cloneJsonData(item, `${label}[${index}]`, stack, depth + 1));
+    }
+    const raw = plain(value, label);
+    const out = {};
+    for (const key of Object.keys(raw)) {
+      Object.defineProperty(out, key, {
+        value: cloneJsonData(raw[key], `${label}.${key}`, stack, depth + 1),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+    return out;
+  } finally {
+    stack.delete(value);
+  }
 }
 
 function jsonData(value, label, { optional = true } = {}) {
   if (value == null && optional) return {};
-  plain(value, label);
-  const cloned = structuredClone(value);
+  const cloned = cloneJsonData(value, label);
   const serialized = JSON.stringify(cloned);
   if (serialized.length > MAX_DATA_JSON) throw new Error(`${label} is too large`);
   return cloned;
@@ -112,8 +226,8 @@ function frozen(value) {
 
 function normalizedObjectList(value, label, normalizeItem, { max = MAX_LIST } = {}) {
   if (value == null) return [];
-  if (!Array.isArray(value) || value.length > max) throw new Error(`${label} must be a bounded array`);
-  return value.map((item, index) => {
+  const items = dataArray(value, label, max);
+  return items.map((item, index) => {
     try { return normalizeItem(item); }
     catch (error) { throw new Error(`${label}[${index}]: ${error.message}`); }
   });
@@ -127,7 +241,7 @@ export function normalizeCapabilityV1(input) {
     schemaVersion: version(raw.schemaVersion, 'CapabilityV1'),
     capabilityId: id(raw.capabilityId, 'capabilityId'),
     description: text(raw.description, 'description', { optional: true, max: 2000 }),
-    riskClass: id(raw.riskClass || 'R0', 'riskClass'),
+    riskClass: id(raw.riskClass == null ? 'R0' : raw.riskClass, 'riskClass'),
     attributes: jsonData(raw.attributes, 'attributes'),
   });
 }
@@ -159,7 +273,8 @@ const POLICY_KEYS = new Set([
 export function normalizePolicyDecisionV1(input) {
   const raw = plain(input, 'PolicyDecisionV1');
   exactKeys(raw, POLICY_KEYS, 'PolicyDecisionV1');
-  const decision = String(raw.decision || '').trim().toUpperCase();
+  if (typeof raw.decision !== 'string') throw new Error('decision must be text');
+  const decision = raw.decision.trim().toUpperCase();
   if (!POLICY_KINDS.has(decision)) throw new Error('decision is invalid');
   const approvalId = id(raw.approvalId, 'approvalId', { optional: true });
   if (decision === PolicyDecisionKind.REQUIRE_APPROVAL && !approvalId) {
@@ -207,7 +322,10 @@ const ARTIFACT_KEYS = new Set([
 export function normalizeArtifactRefV1(input) {
   const raw = plain(input, 'ArtifactRefV1');
   exactKeys(raw, ARTIFACT_KEYS, 'ArtifactRefV1');
-  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : String(raw.sha256).trim().toLowerCase();
+  if (raw.sha256 != null && raw.sha256 !== '' && typeof raw.sha256 !== 'string') {
+    throw new Error('sha256 must be text');
+  }
+  const digest = raw.sha256 == null || raw.sha256 === '' ? '' : raw.sha256.trim().toLowerCase();
   if (digest && !SHA256.test(digest)) throw new Error('sha256 is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'ArtifactRefV1'),
@@ -230,7 +348,8 @@ const OBSERVATION_KEYS = new Set([
 export function normalizeObservationV1(input) {
   const raw = plain(input, 'ObservationV1');
   exactKeys(raw, OBSERVATION_KEYS, 'ObservationV1');
-  const status = String(raw.status || '').trim().toUpperCase();
+  if (typeof raw.status !== 'string') throw new Error('status must be text');
+  const status = raw.status.trim().toUpperCase();
   if (!OBSERVATION_STATUSES.has(status)) throw new Error('status is invalid');
   const artifactRefs = normalizedObjectList(raw.artifactRefs, 'artifactRefs', normalizeArtifactRefV1);
   return frozen({
@@ -253,7 +372,8 @@ const VERIFICATION_KEYS = new Set([
 export function normalizeVerificationV1(input) {
   const raw = plain(input, 'VerificationV1');
   exactKeys(raw, VERIFICATION_KEYS, 'VerificationV1');
-  const status = String(raw.status || '').trim().toUpperCase();
+  if (typeof raw.status !== 'string') throw new Error('status must be text');
+  const status = raw.status.trim().toUpperCase();
   if (!VERIFICATION_STATUSES.has(status)) throw new Error('status is invalid');
   return frozen({
     schemaVersion: version(raw.schemaVersion, 'VerificationV1'),
