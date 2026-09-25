@@ -108,17 +108,21 @@ function reconciled() {
 
 test('takeover -> fresh observation -> independent verification yields only an advisory resume candidate', () => {
   const state = reconciled();
-  assert.equal(state.phase, HumanTakeoverPhase.RECONCILED);
+  assert.equal(state.phase, HumanTakeoverPhase.EVIDENCE_READY);
   assert.equal(humanTakeoverResumeCandidateV1(state), true);
   assert.equal(state.advisoryOnly, true);
   assert.equal(state.resumeAuthorized, false);
   assert.equal(state.requiresCanonicalResumeGate, true);
+  assert.equal(state.verificationProvenance, 'UNVERIFIED_INPUT');
+  assert.equal(state.reconciliationAuthorized, false);
   assert.equal(state.revision, 5);
 
   const packet = buildHumanHandbackResumePacketV1(state);
   assert.equal(packet.resumeCandidate, true);
   assert.equal(packet.resumeAuthorized, false);
   assert.equal(packet.requiresCanonicalResumeGate, true);
+  assert.equal(packet.verificationProvenance, 'UNVERIFIED_INPUT');
+  assert.equal(packet.reconciliationAuthorized, false);
   assert.equal(packet.postTakeoverObservation.observationId, 'obs-after');
   assert.equal(packet.handbackVerification.verificationId, 'verify-after');
   assert.equal(Object.isFrozen(packet), true);
@@ -247,6 +251,16 @@ test('takeover representation cannot smuggle resume or execution authority', () 
 
   assert.throws(() => normalizeHumanTakeoverV1({
     ...state,
+    reconciliationAuthorized: true,
+  }), /cannot authorize reconciliation/);
+
+  assert.throws(() => normalizeHumanTakeoverV1({
+    ...state,
+    verificationProvenance: 'TRUSTED',
+  }), /provenance must remain unverified/);
+
+  assert.throws(() => normalizeHumanTakeoverV1({
+    ...state,
     execute: true,
   }), /unknown field: execute/);
 });
@@ -308,7 +322,7 @@ test('coercive ObservationV1 and VerificationV1 fields fail before inherited nor
   }), /exact numeric 1/);
   assert.throws(() => recordHumanHandbackObservationV1(pending, {
     observation: observation({ observationId: 7 }),
-  }), /observationId must be text/);
+  }), /observationId must be an exact id/);
 
   const reobserved = recordHumanHandbackObservationV1(pending, { observation: observation() });
   assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
@@ -316,7 +330,7 @@ test('coercive ObservationV1 and VerificationV1 fields fail before inherited nor
   }), /attempt must be an exact integer/);
   assert.throws(() => recordHumanHandbackVerificationV1(reobserved, {
     verification: verification({ verifierId: 7 }),
-  }), /verifierId must be text/);
+  }), /verifierId must be an exact id/);
 });
 
 test('active and effect-free takeover identities remain structurally distinct', () => {
