@@ -1,5 +1,6 @@
 import { normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
+import { normalizeCalendarSchedule } from './calendar-schedule.js';
 import { CoreCommand } from '../shared/protocol.js';
 import { DEFAULT_RATE_LIMIT_COOLDOWN_MS, MIN_RATE_LIMIT_COOLDOWN_MS, MAX_RATE_LIMIT_COOLDOWN_MS, MAX_PHYSICAL_TASKS, MAX_LOGICAL_TASKS, OperationPhase, PromptMode, RunMode, RunState, TabStrategy, createSession, createTask, isExclusiveConversationUrl, normalizeChatUrl } from './schema.js';
 import { configuredTaskCount as logicalTaskCount, isCompactLogicalSession, onePassCompletedCount } from './scheduler.js';
@@ -140,6 +141,8 @@ export function sessionFromUi(config, now = Date.now()) {
   session.version = Math.max(1, Number(config.version) || 1);
   session.promptCadence = normalizeSessionPromptCadence(config.promptCadence);
   session.drivePromptSources = normalizeSessionDrivePromptSources(config.drivePromptSources);
+  session.calendarSchedule = config.calendarSchedule == null ? null : normalizeCalendarSchedule(config.calendarSchedule);
+  session.calendarRuntime = {};
   session.defaultUniquePrompt = config.defaultUniquePrompt || '';
   session.retryPolicy = config.retryPolicy === 'manual' ? 'manual' : 'safe';
   session.busyChatBehavior = 'skip-next';
@@ -725,6 +728,7 @@ export class CoreCommandDispatcher {
         replacement.currentTaskIndex=Math.max(0,replacement.taskOrder.indexOf(oldTaskId));
         replacement.nextAllowedSendAt=old.nextAllowedSendAt;
         replacement.operation=old.operation;
+        replacement.calendarRuntime = replacement.calendarSchedule ? structuredClone(old.calendarRuntime || {}) : {};
         replacement.lastSuccessfulSendAt=old.lastSuccessfulSendAt;
         replacement.successfulSendCount=old.successfulSendCount||0;
         replacement.completedAt=old.completedAt||0;
