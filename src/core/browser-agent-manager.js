@@ -50,11 +50,18 @@ import {
   verifyAgentPlanSpecialistHandoffV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
+import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
 
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const SPECIALIST_CAPACITY_STATES = new Set([
+  ExecutionOwnershipState.OWNED,
+  ExecutionOwnershipState.HANDOFF_PENDING,
+  ExecutionOwnershipState.RECONCILE,
+  ExecutionOwnershipState.MANUAL_REVIEW,
+]);
 const PLAN_BOUND_ACTIONS = new Set([
   BrowserAgentActionType.CLICK, BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.DRAG_AT, BrowserAgentActionType.TYPE_AT,
   BrowserAgentActionType.TRUSTED_SCRIPT, BrowserAgentActionType.FILL, BrowserAgentActionType.FILL_CREDENTIAL, BrowserAgentActionType.SELECT,
@@ -478,7 +485,18 @@ export class BrowserAgentManager {
     await this.update(store => {
       const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
         .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
-      let remaining = Math.max(0, limit - liveLeases.length);
+      const specialistOwnerships = store.order
+        .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
+        .map(normalizeExecutionOwnershipV1);
+      const effectIds = new Set();
+      for (const ownership of specialistOwnerships) {
+        if (effectIds.has(ownership.effectId)) {
+          throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
+        }
+        effectIds.add(ownership.effectId);
+      }
+      const capacityOwnerships = specialistOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state));
+      let remaining = Math.max(0, limit - capacityOwnerships.length);
       const claimed = [];
       const reconciliationRequired = [];
       for (const jobId of store.order) {
@@ -504,7 +522,14 @@ export class BrowserAgentManager {
           appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
         }
       }
-      result = { maxConcurrentHandoffs: limit, activeLeases: liveLeases.length, remainingSlots: remaining, claimed, reconciliationRequired };
+      result = {
+        maxConcurrentHandoffs: limit,
+        activeLeases: liveLeases.length,
+        capacityObligations: capacityOwnerships.length,
+        remainingSlots: remaining,
+        claimed,
+        reconciliationRequired,
+      };
       return store;
     });
     return result;
