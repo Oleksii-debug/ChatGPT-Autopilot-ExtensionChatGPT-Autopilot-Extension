@@ -8,7 +8,7 @@ export const AiRouteRole = Object.freeze({
   VISION: 'vision',
 });
 export const AiRouteLocality = Object.freeze({ LOCAL: 'local', REMOTE: 'remote' });
-export const AiRouteCostClass = Object.freeze({ FREE: 'free', PAID: 'paid' });
+export const AiRouteCostClass = Object.freeze({ FREE: 'free', PAID: 'paid', UNKNOWN: 'unknown' });
 export const AiWorkerAllocationMode = Object.freeze({ AUTO: 'auto', MANUAL: 'manual' });
 
 const PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
@@ -150,7 +150,7 @@ export function normalizeAiRoutePool(raw = []) {
     if (roles.some(role => !ROLES.has(role))) throw new Error('AI route role is invalid');
     const locality = clean(own(item, 'locality') || (provider === 'ollama' ? AiRouteLocality.LOCAL : AiRouteLocality.REMOTE), 20);
     if (!LOCALITIES.has(locality)) throw new Error('AI route locality is invalid');
-    const costClass = clean(own(item, 'costClass') || (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.PAID), 20);
+    const costClass = clean(own(item, 'costClass') || (provider === 'ollama' ? AiRouteCostClass.FREE : AiRouteCostClass.UNKNOWN), 20);
     if (!COST_CLASSES.has(costClass)) throw new Error('AI route costClass is invalid');
     const inputPriceKnown = knownPriceDimension(item, 'inputPricePerMillionUsd', 'inputPriceKnown', `AI route ${index + 1} inputPriceKnown`);
     const outputPriceKnown = knownPriceDimension(item, 'outputPricePerMillionUsd', 'outputPriceKnown', `AI route ${index + 1} outputPriceKnown`);
