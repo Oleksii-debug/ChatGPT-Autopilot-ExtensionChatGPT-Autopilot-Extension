@@ -43,6 +43,136 @@ function canonicalRecords(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+const PROJECT_RUNTIME_INPUT_KEYS = new Set(['coreState', 'agentJobs', 'cryptoApi']);
+const RESOLVE_RUNTIME_INPUT_KEYS = new Set([
+  'coreState',
+  'agentJobs',
+  'itemId',
+  'sourceRevisionId',
+  'decision',
+  'cryptoApi',
+]);
+const INVALID_DATA_FIELD = Symbol('invalid-data-field');
+
+function plainRecordDescriptors(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const prototype = Object.getPrototypeOf(input);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  return Object.getOwnPropertyDescriptors(input);
+}
+
+function dataField(descriptors, key, required = false) {
+  const descriptor = descriptors?.[key];
+  if (!descriptor) return required ? INVALID_DATA_FIELD : undefined;
+  if (descriptor.enumerable !== true
+      || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return INVALID_DATA_FIELD;
+  }
+  return descriptor.value;
+}
+
+function snapshotDenseArrayValues(input) {
+  if (!Array.isArray(input)) return Object.freeze([]);
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0) return Object.freeze([]);
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return Object.freeze([]);
+    }
+    out.push(descriptor.value);
+  }
+  return Object.freeze(out);
+}
+
+function optionalPresentationName(jobDescriptors) {
+  const config = dataField(jobDescriptors, 'config');
+  if (config === INVALID_DATA_FIELD || config == null) return undefined;
+  const configDescriptors = plainRecordDescriptors(config);
+  if (!configDescriptors) return undefined;
+  const name = dataField(configDescriptors, 'name');
+  return name === INVALID_DATA_FIELD ? undefined : name;
+}
+
+function optionalDataValue(descriptors, key, fallback) {
+  const value = dataField(descriptors, key);
+  return value === INVALID_DATA_FIELD ? fallback : value;
+}
+
+function snapshotBrowserAgentJob(input) {
+  const jobDescriptors = plainRecordDescriptors(input);
+  if (!jobDescriptors) return null;
+
+  const id = dataField(jobDescriptors, 'id', true);
+  const runtimeInput = dataField(jobDescriptors, 'runtime', true);
+  if (id === INVALID_DATA_FIELD || typeof id !== 'string'
+      || runtimeInput === INVALID_DATA_FIELD) {
+    return null;
+  }
+
+  const runtimeDescriptors = plainRecordDescriptors(runtimeInput);
+  if (!runtimeDescriptors) return null;
+  const runState = dataField(runtimeDescriptors, 'runState', true);
+  if (runState === INVALID_DATA_FIELD || typeof runState !== 'string') return null;
+
+  const createdAt = optionalDataValue(jobDescriptors, 'createdAt', undefined);
+  const jobUpdatedAt = optionalDataValue(jobDescriptors, 'updatedAt', undefined);
+  const name = optionalPresentationName(jobDescriptors);
+
+  let controlEpoch;
+  let runtimeUpdatedAt = optionalDataValue(runtimeDescriptors, 'updatedAt', undefined);
+  let lastError = optionalDataValue(runtimeDescriptors, 'lastError', '');
+  let pendingApproval = null;
+
+  if (runState === 'WAITING_APPROVAL') {
+    controlEpoch = dataField(runtimeDescriptors, 'controlEpoch', true);
+    runtimeUpdatedAt = dataField(runtimeDescriptors, 'updatedAt', true);
+    const pendingInput = dataField(runtimeDescriptors, 'pendingApproval', true);
+    if (controlEpoch === INVALID_DATA_FIELD
+        || runtimeUpdatedAt === INVALID_DATA_FIELD
+        || pendingInput === INVALID_DATA_FIELD) {
+      return null;
+    }
+
+    const pendingDescriptors = plainRecordDescriptors(pendingInput);
+    if (!pendingDescriptors) return null;
+    const snapshotId = dataField(pendingDescriptors, 'snapshotId');
+    const snapshotSignature = dataField(pendingDescriptors, 'snapshotSignature');
+    const requestedAt = dataField(pendingDescriptors, 'requestedAt');
+    const action = dataField(pendingDescriptors, 'action', true);
+    if (snapshotId === INVALID_DATA_FIELD
+        || snapshotSignature === INVALID_DATA_FIELD
+        || requestedAt === INVALID_DATA_FIELD
+        || action === INVALID_DATA_FIELD) {
+      return null;
+    }
+    pendingApproval = Object.freeze({
+      snapshotId,
+      snapshotSignature,
+      requestedAt,
+      hasAction: action != null && typeof action === 'object' && !Array.isArray(action),
+    });
+  }
+
+  return Object.freeze({
+    id,
+    config: Object.freeze({ name }),
+    createdAt,
+    updatedAt: jobUpdatedAt,
+    runtime: Object.freeze({
+      runState,
+      controlEpoch,
+      updatedAt: runtimeUpdatedAt,
+      lastError,
+      pendingApproval,
+    }),
+  });
+}
+
 function compare(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -120,11 +250,13 @@ function browserApprovalOwnerReference(job, runtime, pending) {
   const requestedAt = pending.requestedAt;
   const snapshotId = pending.snapshotId;
   const snapshotSignature = pending.snapshotSignature;
-  if (!Number.isSafeInteger(controlEpoch) || controlEpoch < 0
-      || !Number.isSafeInteger(updatedAt) || updatedAt < 0
-      || !Number.isSafeInteger(requestedAt) || requestedAt < 0
-      || typeof snapshotId !== 'string' || snapshotId.length > 160
-      || typeof snapshotSignature !== 'string' || snapshotSignature.length > 256) {
+  if (!Number.isSafeInteger(controlEpoch) || Object.is(controlEpoch, -0) || controlEpoch < 0
+      || !Number.isSafeInteger(updatedAt) || Object.is(updatedAt, -0) || updatedAt < 0
+      || !Number.isSafeInteger(requestedAt) || Object.is(requestedAt, -0) || requestedAt < 0
+      || typeof snapshotId !== 'string' || snapshotId.length < 1 || snapshotId.length > 160
+      || typeof snapshotSignature !== 'string'
+      || snapshotSignature.length < 1
+      || snapshotSignature.length > 256) {
     return null;
   }
   return Object.freeze({
@@ -140,23 +272,21 @@ function browserApprovalOwnerReference(job, runtime, pending) {
 }
 
 function addBrowserAgentCandidates(agentJobs, candidates) {
-  if (!Array.isArray(agentJobs)) return;
-  for (const job of agentJobs) {
-    if (!job || typeof job !== 'object' || typeof job.id !== 'string') continue;
-    const runtime = job.runtime && typeof job.runtime === 'object' ? job.runtime : {};
-    const name = displayName(job.config?.name, 'Browser Agent');
+  for (const rawJob of snapshotDenseArrayValues(agentJobs)) {
+    const job = snapshotBrowserAgentJob(rawJob);
+    if (!job) continue;
+    const runtime = job.runtime;
+    const pending = runtime.pendingApproval;
+    const name = displayName(job.config.name, 'Browser Agent');
     const updatedAt = finiteTimestamp(runtime.updatedAt, job.updatedAt);
     const createdAt = finiteTimestamp(job.createdAt, updatedAt);
 
-    if (runtime.runState === 'WAITING_APPROVAL'
-        && runtime.pendingApproval
-        && typeof runtime.pendingApproval === 'object'
-        && runtime.pendingApproval.action
-        && typeof runtime.pendingApproval.action === 'object') {
-      const snapshot = typeof runtime.pendingApproval.snapshotSignature === 'string'
-        ? runtime.pendingApproval.snapshotSignature
+    if (runtime.runState === 'WAITING_APPROVAL' && pending?.hasAction === true) {
+      const snapshot = typeof pending.snapshotSignature === 'string'
+        ? pending.snapshotSignature
         : '';
-      const ownerReference = browserApprovalOwnerReference(job, runtime, runtime.pendingApproval);
+      const ownerReference = browserApprovalOwnerReference(job, runtime, pending);
+      if (!ownerReference) continue;
       candidates.push({
         identityKind: 'browser-agent-approval',
         identityKey: `${job.id}|${snapshot}`,
@@ -164,9 +294,9 @@ function addBrowserAgentCandidates(agentJobs, candidates) {
         revisionParts: [
           job.id,
           snapshot,
-          ownerReference?.expectedApproval.snapshotId || '',
-          String(ownerReference?.expectedApproval.requestedAt ?? ''),
-          String(ownerReference?.expectedApproval.controlEpoch ?? ''),
+          ownerReference.expectedApproval.snapshotId,
+          String(ownerReference.expectedApproval.requestedAt),
+          String(ownerReference.expectedApproval.controlEpoch),
           String(updatedAt),
         ],
         ownerReference,
@@ -250,11 +380,11 @@ function exactLookupId(value, label) {
   return value;
 }
 
-export async function projectRuntimeActionCenter({
-  coreState = {},
-  agentJobs = [],
-  cryptoApi = globalThis.crypto,
-} = {}) {
+export async function projectRuntimeActionCenter(input = {}) {
+  const raw = snapshotExactOptions(input, PROJECT_RUNTIME_INPUT_KEYS, 'Action Center projection input');
+  const coreState = Object.prototype.hasOwnProperty.call(raw, 'coreState') ? raw.coreState : {};
+  const agentJobs = Object.prototype.hasOwnProperty.call(raw, 'agentJobs') ? raw.agentJobs : [];
+  const cryptoApi = Object.prototype.hasOwnProperty.call(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto;
   const candidates = runtimeCandidates(coreState, agentJobs);
   const selected = selectCandidates(candidates);
   const items = await Promise.all(selected.map(candidate => materializeCandidate(candidate, cryptoApi)));
@@ -269,14 +399,14 @@ export async function projectRuntimeActionCenter({
   });
 }
 
-export async function resolveRuntimeActionCenterBrowserApproval({
-  coreState = {},
-  agentJobs = [],
-  itemId,
-  sourceRevisionId,
-  decision,
-  cryptoApi = globalThis.crypto,
-} = {}) {
+export async function resolveRuntimeActionCenterBrowserApproval(input = {}) {
+  const raw = snapshotExactOptions(input, RESOLVE_RUNTIME_INPUT_KEYS, 'Action Center approval input');
+  const coreState = Object.prototype.hasOwnProperty.call(raw, 'coreState') ? raw.coreState : {};
+  const agentJobs = Object.prototype.hasOwnProperty.call(raw, 'agentJobs') ? raw.agentJobs : [];
+  const itemId = raw.itemId;
+  const sourceRevisionId = raw.sourceRevisionId;
+  const decision = raw.decision;
+  const cryptoApi = Object.prototype.hasOwnProperty.call(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto;
   const exactItemId = exactLookupId(itemId, 'Action Center itemId');
   const exactRevisionId = exactLookupId(sourceRevisionId, 'Action Center sourceRevisionId');
   if (decision !== 'APPROVE' && decision !== 'REJECT') throw new Error('Action Center approval decision is invalid');
