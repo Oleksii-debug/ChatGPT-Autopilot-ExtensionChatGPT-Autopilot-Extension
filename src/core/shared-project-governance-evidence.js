@@ -1,4 +1,4 @@
-import { assessSharedProjectAccessV1 } from './shared-project-collaboration.js';
+import { assessSharedProjectAccessBatchV1 } from './shared-project-collaboration.js';
 
 export const SHARED_PROJECT_GOVERNANCE_EVIDENCE_SCHEMA_VERSION = 1;
 export const SHARED_PROJECT_GOVERNANCE_EXPORT_CAPABILITY = 'project.governance.export';
@@ -121,28 +121,13 @@ function principalIdList(input) {
   return Object.freeze(values);
 }
 
-function accessRequest(bindingId, principalId, at, capabilityIds = []) {
+function accessBatchItem(principalId, capabilityIds = []) {
   return {
-    bindingId,
     principalId,
-    at,
     requestedCapabilityIds: capabilityIds,
     requestedProviderIds: [],
     requestedOutboundDataClassIds: [],
   };
-}
-
-function assertSameCanonicalProject(reference, candidate, label) {
-  if (candidate.bindingId !== reference.bindingId
-      || candidate.projectId !== reference.projectId
-      || candidate.projectRevisionId !== reference.projectRevisionId
-      || candidate.organizationId !== reference.organizationId
-      || candidate.governanceRegistryId !== reference.governanceRegistryId
-      || candidate.governanceRegistryRevision !== reference.governanceRegistryRevision
-      || candidate.resourceKey !== reference.resourceKey
-      || candidate.evaluatedAt !== reference.evaluatedAt) {
-    throw new Error(`${label} does not resolve to the canonical shared Project governance context`);
-  }
 }
 
 function principalEvidence(access) {
@@ -189,40 +174,38 @@ export async function buildSharedProjectGovernanceEvidenceV1(
   const principalIds = principalIdList(request.principalIds);
   const evaluatedAt = timestamp(request.evaluatedAt, 'evaluatedAt');
 
-  const viewerAccess = await assessSharedProjectAccessV1(
-    accessRequest(
+  const batch = await assessSharedProjectAccessBatchV1(
+    {
       bindingId,
-      viewerPrincipalId,
-      evaluatedAt,
-      [SHARED_PROJECT_GOVERNANCE_EXPORT_CAPABILITY],
-    ),
+      at: evaluatedAt,
+      requests: [
+        accessBatchItem(
+          viewerPrincipalId,
+          [SHARED_PROJECT_GOVERNANCE_EXPORT_CAPABILITY],
+        ),
+        ...principalIds.map(principalId => accessBatchItem(principalId)),
+      ],
+    },
     trustedProjectResolver,
   );
+  const [viewerAccess, ...principalAccesses] = batch.assessments;
   if (!viewerAccess.collaborationEligible) {
     throw new Error(
       `governance evidence viewer is outside canonical export ceiling: ${viewerAccess.reasonCode}`,
     );
   }
 
-  const principals = [];
-  for (const principalId of principalIds) {
-    const access = await assessSharedProjectAccessV1(
-      accessRequest(bindingId, principalId, evaluatedAt),
-      trustedProjectResolver,
-    );
-    assertSameCanonicalProject(viewerAccess, access, `principal ${principalId}`);
-    principals.push(principalEvidence(access));
-  }
+  const principals = principalAccesses.map(principalEvidence);
 
   return freezeDeep({
     schemaVersion: SHARED_PROJECT_GOVERNANCE_EVIDENCE_SCHEMA_VERSION,
-    bindingId: viewerAccess.bindingId,
-    projectId: viewerAccess.projectId,
-    projectRevisionId: viewerAccess.projectRevisionId,
-    organizationId: viewerAccess.organizationId,
-    governanceRegistryId: viewerAccess.governanceRegistryId,
-    governanceRegistryRevision: viewerAccess.governanceRegistryRevision,
-    resourceKey: viewerAccess.resourceKey,
+    bindingId: batch.bindingId,
+    projectId: batch.projectId,
+    projectRevisionId: batch.projectRevisionId,
+    organizationId: batch.organizationId,
+    governanceRegistryId: batch.governanceRegistryId,
+    governanceRegistryRevision: batch.governanceRegistryRevision,
+    resourceKey: batch.resourceKey,
     evaluatedAt,
     viewerPrincipalId,
     viewerRequiredCapabilityId: SHARED_PROJECT_GOVERNANCE_EXPORT_CAPABILITY,
