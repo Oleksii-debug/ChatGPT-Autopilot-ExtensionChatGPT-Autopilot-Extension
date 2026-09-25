@@ -317,42 +317,56 @@ function createLineageEvaluator(registryIndex, assessedAt) {
     }
   }
 
-  function candidateVersions(artifactId, cutoffMs) {
+  function exactDependencyVersion(binding) {
+    const dependency = registryIndex.versions.get(binding.versionId);
+    if (!dependency) {
+      throw new Error(
+        `Canonical artifact input version is unavailable: ${binding.artifactId}/${binding.versionId}`,
+      );
+    }
+    if (dependency.artifactRef.artifactId !== binding.artifactId) {
+      throw new Error(
+        `Canonical artifact input identity mismatch: ${binding.artifactId}/${binding.versionId}`,
+      );
+    }
+    if (dependency.artifactRef.sha256 !== binding.sha256) {
+      throw new Error(
+        `Canonical artifact input digest mismatch: ${binding.artifactId}/${binding.versionId}`,
+      );
+    }
+    return dependency;
+  }
+
+  function familySensitivityThroughVersion(version) {
+    if (familyMemo.has(version.versionId)) return familyMemo.get(version.versionId);
+
+    const artifactId = version.artifactRef.artifactId;
     const entry = registryIndex.entries.get(artifactId);
     if (!entry) {
       throw new Error(`Canonical artifact lineage references unknown artifact: ${artifactId}`);
     }
 
-    const candidates = entry.versions.filter(version => versionTime(version) <= cutoffMs);
-    if (candidates.length === 0) {
+    let priorTainted = false;
+    let found = false;
+    for (const candidate of entry.versions) {
+      const lineage = evaluateVersionLineage(candidate);
+      if (priorTainted && candidate.artifactRef.sensitive !== true) {
+        addViolation('SENSITIVE_VERSION_DOWNGRADE', candidate);
+      }
+      if (lineage.effectiveSensitive) priorTainted = true;
+      if (candidate.versionId === version.versionId) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
       throw new Error(
-        `Canonical artifact lineage has no admitted version before dependency use: ${artifactId}`,
+        `Canonical artifact family does not contain version: ${artifactId}/${version.versionId}`,
       );
     }
-    return candidates;
-  }
-
-  function familySensitivityAt(artifactId, cutoffMs) {
-    const key = `${artifactId}@${cutoffMs}`;
-    if (familyMemo.has(key)) return familyMemo.get(key);
-
-    const candidates = candidateVersions(artifactId, cutoffMs);
-    let priorTainted = false;
-    let effectiveSensitive = false;
-
-    for (const version of candidates) {
-      const lineage = evaluateVersionLineage(version);
-      if (priorTainted && version.artifactRef.sensitive !== true) {
-        addViolation('SENSITIVE_VERSION_DOWNGRADE', version);
-      }
-      if (lineage.effectiveSensitive) {
-        priorTainted = true;
-        effectiveSensitive = true;
-      }
-    }
-
-    familyMemo.set(key, effectiveSensitive);
-    return effectiveSensitive;
+    familyMemo.set(version.versionId, priorTainted);
+    return priorTainted;
   }
 
   function evaluateVersionLineage(version) {
@@ -369,35 +383,33 @@ function createLineageEvaluator(registryIndex, assessedAt) {
     }
 
     activeVersions.add(version.versionId);
-    let inheritedSensitive = false;
+    try {
+      let inheritedSensitive = false;
 
-    for (const inputArtifactId of version.provenance.inputArtifactIds) {
-      const inputSensitive = familySensitivityAt(
-        inputArtifactId,
-        provenanceTime(version),
-      );
-      inheritedSensitive = inheritedSensitive || inputSensitive;
+      for (const binding of version.provenance.inputArtifactBindings) {
+        const dependency = exactDependencyVersion(binding);
+        const inputSensitive = familySensitivityThroughVersion(dependency);
+        inheritedSensitive = inheritedSensitive || inputSensitive;
+      }
+
+      const effectiveSensitive = version.artifactRef.sensitive === true || inheritedSensitive;
+      if (inheritedSensitive && version.artifactRef.sensitive !== true) {
+        addViolation('SENSITIVE_DERIVATION_LAUNDERING', version);
+      }
+
+      const result = freezeDeep({
+        effectiveSensitive,
+        inheritedSensitive,
+      });
+      lineageMemo.set(version.versionId, result);
+      return result;
+    } finally {
+      activeVersions.delete(version.versionId);
     }
-
-    const effectiveSensitive = version.artifactRef.sensitive === true || inheritedSensitive;
-    if (inheritedSensitive && version.artifactRef.sensitive !== true) {
-      addViolation('SENSITIVE_DERIVATION_LAUNDERING', version);
-    }
-
-    activeVersions.delete(version.versionId);
-    const result = freezeDeep({
-      effectiveSensitive,
-      inheritedSensitive,
-    });
-    lineageMemo.set(version.versionId, result);
-    return result;
   }
 
   function effectiveBindingSensitivity(version) {
-    return familySensitivityAt(
-      version.artifactRef.artifactId,
-      versionTime(version),
-    );
+    return familySensitivityThroughVersion(version);
   }
 
   return {
@@ -461,13 +473,13 @@ function validateEgresses(request, resolvedBindings) {
  * ArtifactRegistryV1 snapshot supplied by trusted integration code.
  *
  * Artifact provenance, rather than caller-declared transform edges, determines
- * ancestry. ArtifactProvenanceV1 currently binds input artifact identities but
- * not exact input version IDs. To avoid under-tainting, every canonically
- * admitted input version that could have existed before the dependent
- * provenance timestamp is treated as plausible. Any sensitive/tainted plausible
- * version taints the dependency. Once an artifact family is tainted, a later
- * version cannot clear sensitivity without a separate declassification
- * authority; this guard has no such authority.
+ * ancestry. Canonical ArtifactRegistryV1 admission requires each declared input
+ * artifact identity to be bound to one exact immutable {artifactId, versionId,
+ * sha256} dependency. This guard follows only those exact version edges. The
+ * registry still cannot prove that a producer declared every real-world input,
+ * so lineage completeness remains explicitly unverified. Once an artifact
+ * family is tainted, a later version cannot clear sensitivity without a separate
+ * declassification authority; this guard has no such authority.
  */
 export function assessSecretDataFlowV1(value, optionsInput = {}) {
   const request = normalizeRequest(value);
@@ -558,9 +570,9 @@ export function assessSecretDataFlowV1(value, optionsInput = {}) {
     lineageProvenance: 'CANONICAL_ARTIFACT_REGISTRY',
     lineageCompletenessVerified: false,
     requiresCanonicalLineageResolution: true,
-    exactInputVersionBindingVerified: false,
-    inputVersionResolution: 'CONSERVATIVE_ALL_PLAUSIBLE_VERSIONS',
-    requiresExactInputVersionBindingUpgrade: true,
+    exactInputVersionBindingVerified: true,
+    inputVersionResolution: 'EXACT_CANONICAL_BINDINGS',
+    requiresExactInputVersionBindingUpgrade: false,
     requiresCanonicalPolicyDecision: request.egresses.length > 0,
     requiresIndependentSecretScan: request.egresses.length > 0,
     declassificationAuthorized: false,
