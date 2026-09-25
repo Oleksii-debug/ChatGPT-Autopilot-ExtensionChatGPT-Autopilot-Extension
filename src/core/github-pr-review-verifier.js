@@ -145,6 +145,7 @@ function observedReview(expected, observation) {
 
 export class GitHubPullRequestReviewVerifierV1 {
   constructor({ githubClient, verifierId = 'github-pr-review-readback-verifier', now = () => Date.now() } = {}) {
+    this.readPullRequest = bindDataMethod(githubClient, 'readPullRequest', 'GitHub pull-request parent readback client');
     this.readPullRequestReview = bindDataMethod(githubClient, 'readPullRequestReview', 'GitHub review readback client');
     this.verifierId = requireId(verifierId, 'verifierId');
     if (this.verifierId === GITHUB_PROVIDER_ID) throw new Error('GitHub review verifier identity must differ from provider identity');
@@ -159,27 +160,52 @@ export class GitHubPullRequestReviewVerifierV1 {
       pullRequestNumber: expected.pullRequestNumber,
       reviewId: id,
     }), 'GitHub pull request review readback');
-    const matches = review.repositoryFullName === expected.repositoryFullName
+    const parent = snapshotRecord(await this.readPullRequest({
+      repositoryFullName: expected.repositoryFullName,
+      pullRequestNumber: expected.pullRequestNumber,
+    }), 'GitHub pull request parent readback');
+
+    const reviewMatches = review.repositoryFullName === expected.repositoryFullName
       && review.pullRequestNumber === expected.pullRequestNumber
       && review.reviewId === id
       && review.body === expected.body
       && review.state === expected.expectedState
       && exactSha(review.commitId, 'readback commitId') === expected.expectedHeadSha;
-    return Object.freeze({ expected, reviewId: id, matches, readback: review });
+    const parentMatches = parent.repositoryFullName === expected.repositoryFullName
+      && parent.number === expected.pullRequestNumber
+      && parent.state === 'open'
+      && parent.merged === false
+      && exactSha(parent.headSha, 'parent readback headSha') === expected.expectedHeadSha;
+    return Object.freeze({
+      expected,
+      reviewId: id,
+      matches: reviewMatches && parentMatches,
+      reviewMatches,
+      parentMatches,
+      readback: review,
+      parentReadback: parent,
+    });
   }
 
   #verification(readback, executionId, attempt, observationId, suffix = '') {
     const verified = readback.matches;
+    const staleParent = readback.reviewMatches && !readback.parentMatches;
     return {
       schemaVersion: 1,
       verificationId: readback.expected.invocationId + ':github-pr-review-verification' + suffix + ':' + attempt,
       invocationId: readback.expected.invocationId,
       observationId,
       status: verified ? VerificationStatus.VERIFIED : VerificationStatus.AMBIGUOUS,
-      reasonCode: verified ? 'GITHUB_PULL_REQUEST_REVIEW_CONFIRMED' : 'GITHUB_PULL_REQUEST_REVIEW_NOT_CONFIRMED',
+      reasonCode: verified
+        ? 'GITHUB_PULL_REQUEST_REVIEW_CONFIRMED'
+        : staleParent
+          ? 'GITHUB_PULL_REQUEST_REVIEW_PARENT_HEAD_STALE'
+          : 'GITHUB_PULL_REQUEST_REVIEW_NOT_CONFIRMED',
       summary: verified
-        ? 'Fresh independent GitHub readback confirmed the exact formal review on the expected pull request head.'
-        : 'Fresh independent GitHub readback did not confirm the exact formal review on the expected pull request head.',
+        ? 'Fresh independent GitHub readback confirmed the exact formal review and the parent pull request remains on the expected open head.'
+        : staleParent
+          ? 'The exact formal review exists, but the parent pull request no longer remains on the expected open head.'
+          : 'Fresh independent GitHub readback did not confirm the exact formal review on the expected pull request head.',
       evidenceArtifactIds: [],
       verifiedAt: new Date(this.now()).toISOString(),
       verifierId: this.verifierId,
@@ -233,6 +259,8 @@ export class GitHubPullRequestReviewVerifierV1 {
       summary: 'Fresh GitHub review readback classified whether the exact formal review is committed.',
       data: {
         committed: readback.matches,
+        reviewMatches: readback.reviewMatches,
+        parentHeadMatches: readback.parentMatches,
         repositoryFullName: expected.repositoryFullName,
         pullRequestNumber: expected.pullRequestNumber,
         reviewId: observed.reviewId,
