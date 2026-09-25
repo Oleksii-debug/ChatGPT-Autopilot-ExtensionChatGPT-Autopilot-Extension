@@ -37,7 +37,19 @@ test('same provider event identity with changed material exposes a stable dedup 
  const second=await createEventTriggerAdmissionV1(request({observation:observation({observationId:'observation-2',payloadArtifactRef:{...observation().payloadArtifactRef,artifactId:'artifact-event-42b',sha256:'b'.repeat(64)}})}));
  assert.equal(first.sourceIdentityFingerprint,second.sourceIdentityFingerprint);
  assert.notEqual(first.materialFingerprint,second.materialFingerprint);
- assert.notEqual(first.occurrenceId,second.occurrenceId);
+ assert.equal(first.occurrenceId,second.occurrenceId);
+});
+
+test('duplicate observation of identical upstream event and payload preserves occurrence/material identity', async()=>{
+ const first=await createEventTriggerAdmissionV1(request());
+ const second=await createEventTriggerAdmissionV1(request({observation:observation({
+  observationId:'observation-duplicate',
+  observedAt:T2,
+  payloadArtifactRef:{...observation().payloadArtifactRef,artifactId:'artifact-duplicate',uri:'artifact://events/42-copy',createdAt:T2},
+ })}));
+ assert.equal(first.sourceIdentityFingerprint,second.sourceIdentityFingerprint);
+ assert.equal(first.materialFingerprint,second.materialFingerprint);
+ assert.equal(first.occurrenceId,second.occurrenceId);
 });
 
 test('disabled trigger never becomes executable work', async()=>{
