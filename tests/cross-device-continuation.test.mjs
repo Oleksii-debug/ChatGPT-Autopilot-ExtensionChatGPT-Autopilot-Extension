@@ -74,6 +74,22 @@ async function checkpoint(overrides = {}) {
   });
 }
 
+function handoffCheckpointBinding(cp, ownership = pendingOwnership(), overrides = {}) {
+  return {
+    schemaVersion: 1,
+    taskId: ownership.taskId,
+    planId: ownership.planId,
+    nodeId: ownership.nodeId,
+    effectId: ownership.effectId,
+    handoffId: ownership.handoffId,
+    executionOwnershipRevision: ownership.revision,
+    checkpointId: cp.checkpointId,
+    checkpointDigest: cp.checkpointDigest,
+    boundAt: '2026-09-25T13:09:30.000Z',
+    ...overrides,
+  };
+}
+
 function head(overrides = {}) {
   return {
     schemaVersion: 1,
@@ -148,8 +164,10 @@ function request(overrides = {}) {
 
 async function options(overrides = {}) {
   const cp = await checkpoint();
+  const ownership = pendingOwnership();
   return {
-    resolveExecutionOwnership: async () => pendingOwnership(),
+    resolveExecutionOwnership: async () => ownership,
+    resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(cp, ownership),
     resolveAgentCheckpoint: async () => cp,
     resolveAgentHead: async () => head(),
     resolveTargetWorldState: async () => worldState(),
@@ -186,6 +204,49 @@ test('fresh target device + exact pending handoff + current checkpoint yields ad
   assert.equal(result.requiresCheckpointSnapshotVerification, true);
   assert.equal(result.requiresExactEffectReconciliation, false);
   assert.equal(Object.isFrozen(result), true);
+});
+
+test('caller cannot substitute a different valid checkpoint with identical revision counters', async () => {
+  const ownership = pendingOwnership();
+  const bound = await checkpoint();
+  const substituted = await checkpoint({
+    checkpointId: 'checkpoint-2',
+    snapshotArtifact: {
+      schemaVersion: 1,
+      artifactId: 'artifact-checkpoint-2',
+      kind: 'agent-state-checkpoint',
+      uri: 'artifact://checkpoint-2',
+      mediaType: 'application/json',
+      sha256: SHA_B,
+      sizeBytes: 128,
+      createdAt: CHECKPOINT_AT,
+      producerInvocationId: 'invocation-checkpoint-2',
+      sensitive: true,
+    },
+    evidenceArtifactIds: ['evidence-checkpoint-2'],
+  });
+  let downstreamReads = 0;
+  const result = await assessCrossDeviceContinuationV1(
+    request({ checkpointId: 'checkpoint-2' }),
+    await options({
+      resolveExecutionOwnership: async () => ownership,
+      resolveAgentCheckpoint: async () => substituted,
+      resolveHandoffCheckpointBinding: async () => handoffCheckpointBinding(bound, ownership),
+      resolveAgentHead: async () => {
+        downstreamReads += 1;
+        return head();
+      },
+      resolveTargetWorldState: async () => {
+        downstreamReads += 1;
+        return worldState();
+      },
+    }),
+  );
+  assert.equal(result.status, CrossDeviceContinuationStatus.BLOCKED);
+  assert.equal(result.reasonCode, 'HANDOFF_CHECKPOINT_BINDING_MISMATCH');
+  assert.equal(result.acceptAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(downstreamReads, 0);
 });
 
 test('unresolved external effects require reconciliation and never authorize resume', async () => {
