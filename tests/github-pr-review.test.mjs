@@ -662,6 +662,93 @@ test('review verifier rejects uppercase expected-head aliases before any remote 
   assert.equal(remoteReads, 0);
 });
 
+test('review verifier snapshots outer option and request envelopes before reads', async () => {
+  let remoteReads = 0;
+  const client = fullClient({
+    readPullRequest: async () => {
+      remoteReads += 1;
+      return {};
+    },
+    readPullRequestReview: async () => {
+      remoteReads += 1;
+      return {};
+    },
+  });
+
+  let optionGetterReads = 0;
+  const hostileOptions = { githubClient: client };
+  Object.defineProperty(hostileOptions, 'now', {
+    enumerable: true,
+    get() {
+      optionGetterReads += 1;
+      return () => Date.parse(at);
+    },
+  });
+  assert.throws(
+    () => new GitHubPullRequestReviewVerifierV1(hostileOptions),
+    /enumerable data property/i,
+  );
+  assert.equal(optionGetterReads, 0);
+
+  const nullPrototypeOptions = Object.create(null);
+  nullPrototypeOptions.githubClient = client;
+  nullPrototypeOptions.now = () => Date.parse(at);
+  const verifier = new GitHubPullRequestReviewVerifierV1(nullPrototypeOptions);
+
+  let verifyGetterReads = 0;
+  const hostileVerifyRequest = {
+    executionId: 'github-pr-review-outer-hostile:attempt:1',
+    observation: {},
+  };
+  Object.defineProperty(hostileVerifyRequest, 'invocation', {
+    enumerable: true,
+    get() {
+      verifyGetterReads += 1;
+      return invocation('github-pr-review-outer-hostile');
+    },
+  });
+  await assert.rejects(
+    () => verifier.verify(hostileVerifyRequest),
+    /enumerable data property/i,
+  );
+  assert.equal(verifyGetterReads, 0);
+  assert.equal(remoteReads, 0);
+
+  let reconcileGetterReads = 0;
+  const hostileReconcileRequest = {
+    effectId: 'github-pr-review-outer-hostile',
+    executionId: 'github-pr-review-outer-hostile:attempt:1',
+    attempt: 1,
+    policyDecisionId: 'policy-github-pr-review-outer-hostile',
+    expectedOutcome: 'VERIFIED',
+    priorObservation: {},
+  };
+  Object.defineProperty(hostileReconcileRequest, 'invocation', {
+    enumerable: true,
+    get() {
+      reconcileGetterReads += 1;
+      return invocation('github-pr-review-outer-hostile');
+    },
+  });
+  await assert.rejects(
+    () => verifier.reconcileVerify(hostileReconcileRequest),
+    /enumerable data property/i,
+  );
+  assert.equal(reconcileGetterReads, 0);
+  assert.equal(remoteReads, 0);
+
+  const unknownVerifyRequest = Object.create(null);
+  unknownVerifyRequest.invocation = invocation('github-pr-review-outer-unknown');
+  unknownVerifyRequest.executionId = 'github-pr-review-outer-unknown:attempt:1';
+  unknownVerifyRequest.observation = {};
+  unknownVerifyRequest.unexpectedAuthority = true;
+  await assert.rejects(
+    () => verifier.verify(unknownVerifyRequest),
+    /contains unknown field/i,
+  );
+  assert.equal(remoteReads, 0);
+});
+
 test('review verifier rejects accessor-backed arguments before any remote readback', async () => {
   let getterReads = 0;
   let remoteReads = 0;

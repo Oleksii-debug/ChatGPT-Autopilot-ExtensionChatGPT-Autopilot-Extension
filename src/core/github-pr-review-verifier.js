@@ -13,6 +13,18 @@ const REVIEW_STATE_BY_EVENT = Object.freeze({
 });
 const MAX_BODY = 100_000;
 
+const VERIFIER_OPTION_KEYS = new Set(['githubClient', 'verifierId', 'now']);
+const VERIFY_REQUEST_KEYS = new Set(['invocation', 'executionId', 'observation']);
+const RECONCILE_REQUEST_KEYS = new Set([
+  'invocation',
+  'effectId',
+  'executionId',
+  'attempt',
+  'policyDecisionId',
+  'expectedOutcome',
+  'priorObservation',
+]);
+
 function requireId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) throw new Error(label + ' is invalid');
   return value;
@@ -144,7 +156,13 @@ function observedReview(expected, observation) {
 }
 
 export class GitHubPullRequestReviewVerifierV1 {
-  constructor({ githubClient, verifierId = 'github-pr-review-readback-verifier', now = () => Date.now() } = {}) {
+  constructor(input = {}) {
+    const options = snapshotRecord(input, 'GitHub pull-request-review verifier options', VERIFIER_OPTION_KEYS);
+    const githubClient = options.githubClient;
+    const verifierId = options.verifierId === undefined
+      ? 'github-pr-review-readback-verifier'
+      : options.verifierId;
+    const now = options.now === undefined ? (() => Date.now()) : options.now;
     this.readPullRequest = bindDataMethod(githubClient, 'readPullRequest', 'GitHub pull-request parent readback client');
     this.readPullRequestReview = bindDataMethod(githubClient, 'readPullRequestReview', 'GitHub review readback client');
     this.verifierId = requireId(verifierId, 'verifierId');
@@ -216,7 +234,15 @@ export class GitHubPullRequestReviewVerifierV1 {
     };
   }
 
-  async verify({ invocation, executionId, observation } = {}) {
+  async verify(input = {}) {
+    const request = snapshotRecord(
+      input,
+      'GitHub pull-request-review verify request',
+      VERIFY_REQUEST_KEYS,
+    );
+    const invocation = request.invocation;
+    const executionId = request.executionId;
+    const observation = request.observation;
     const attempt = attemptFromExecutionId(executionId);
     const expected = expectedReview(invocation);
     const observed = observedReview(expected, observation);
@@ -224,15 +250,19 @@ export class GitHubPullRequestReviewVerifierV1 {
     return this.#verification(readback, executionId, attempt, observed.observationId);
   }
 
-  async reconcileVerify({
-    invocation,
-    effectId,
-    executionId,
-    attempt,
-    policyDecisionId,
-    expectedOutcome,
-    priorObservation,
-  } = {}) {
+  async reconcileVerify(input = {}) {
+    const request = snapshotRecord(
+      input,
+      'GitHub pull-request-review reconciliation request',
+      RECONCILE_REQUEST_KEYS,
+    );
+    const invocation = request.invocation;
+    const effectId = request.effectId;
+    const executionId = request.executionId;
+    const attempt = request.attempt;
+    const policyDecisionId = request.policyDecisionId;
+    const expectedOutcome = request.expectedOutcome;
+    const priorObservation = request.priorObservation;
     if (expectedOutcome === ReconciliationOutcome.SAFE_RETRY) {
       throw new Error('GitHub pull-request review cannot prove SAFE_RETRY after dispatch');
     }
