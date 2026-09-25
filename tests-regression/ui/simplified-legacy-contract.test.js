@@ -87,6 +87,9 @@ test('UI removes tutorial prose globally while keeping runtime and safety status
   assert.doesNotMatch(html, /0 означає «без окремого ліміту»/u);
   assert.doesNotMatch(html, /Стандартна адреса локального Gateway/u);
   assert.doesNotMatch(html, /Один рядок — один напрям/u);
+  assert.doesNotMatch(html, /\splaceholder="/u);
+  const described = [...html.matchAll(/aria-describedby="([^"]+)"/gu)].flatMap(match => match[1].split(/\s+/u));
+  assert.deepEqual([...new Set(described)].sort(), ['delete-dialog-description', 'uncertain-help']);
   assert.match(html, /id="uncertain-help"/u, 'duplicate-send safety warning must remain');
   assert.match(html, /id="delete-dialog-description"/u, 'destructive delete description must remain');
 });
