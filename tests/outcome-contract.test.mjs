@@ -520,3 +520,46 @@ test('criterion assessment cannot predate the contract it claims to verify', () 
   });
   assert.equal(atBoundary.status, OutcomeEvidenceStatus.EVIDENCE_READY);
 });
+
+
+test('valid Proxy-backed contract records and arrays execute zero ordinary getter reads', () => {
+  let reads = 0;
+  const proxiedCriteria = new Proxy(input().completionCriteria, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const proxiedInput = new Proxy(input({ completionCriteria: proxiedCriteria }), {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const contract = createOutcomeContractV1(proxiedInput);
+  assert.equal(contract.contractId, 'outcome-1');
+  assert.equal(reads, 0);
+
+  const proxiedAssessments = new Proxy([
+    assessment('criterion-a'),
+    assessment('criterion-b'),
+  ], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const projectionRequest = new Proxy({
+    contract,
+    assessments: proxiedAssessments,
+  }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  assert.equal(projectOutcomeEvidenceV1(projectionRequest).status, OutcomeEvidenceStatus.EVIDENCE_READY);
+  assert.equal(reads, 0);
+});
