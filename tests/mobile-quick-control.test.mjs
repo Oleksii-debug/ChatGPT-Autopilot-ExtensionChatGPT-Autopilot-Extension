@@ -9,7 +9,7 @@ import {
   MobileQuickIntentKind,
   normalizeMobileQuickControlIntentV1,
   projectMobileQuickControlStatusV1,
-} from './mobile-quick-control.js';
+} from '../src/core/mobile-quick-control.js';
 
 const T0 = '2026-09-25T06:00:00.000Z';
 const T1 = '2026-09-25T06:05:00.000Z';
