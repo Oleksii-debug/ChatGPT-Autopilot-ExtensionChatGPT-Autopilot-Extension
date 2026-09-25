@@ -52,9 +52,8 @@ const REQUEST_KEYS = new Set([
   'targetId',
   'payloadArtifactRef',
   'requestedAt',
-  'assessedAt',
 ]);
-const DEPENDENCY_KEYS = new Set(['resolveTrustedScope', 'dispatchCanonicalControl']);
+const DEPENDENCY_KEYS = new Set(['resolveTrustedScope', 'dispatchCanonicalControl', 'now']);
 const SCOPE_KEYS = new Set([
   'schemaVersion',
   'scopeRevisionId',
@@ -63,6 +62,7 @@ const SCOPE_KEYS = new Set([
   'projectId',
   'operation',
   'targetId',
+  'payloadArtifactId',
   'payloadSha256',
   'allowed',
   'verifiedAt',
@@ -177,6 +177,14 @@ function exactOperation(value) {
   return value;
 }
 
+function trustedNowTimestamp(now, label) {
+  const value = now();
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+    throw new Error(label + ' trusted clock must return epoch milliseconds');
+  }
+  return new Date(value).toISOString();
+}
+
 function normalizePayloadArtifact(input, notAfterAt, chronologyLabel = 'requestedAt') {
   if (input == null) return null;
   const raw = snapshotRecord(input, ARTIFACT_KEYS, 'payloadArtifactRef');
@@ -219,10 +227,6 @@ export function normalizeAutopilotProgrammaticRequestV1(input) {
     throw new Error('AutopilotProgrammaticRequestV1 schemaVersion must be numeric 1');
   }
   const requestedAt = canonicalTimestamp(raw.requestedAt, 'requestedAt');
-  const assessedAt = canonicalTimestamp(raw.assessedAt, 'assessedAt');
-  if (Date.parse(requestedAt) > Date.parse(assessedAt)) {
-    throw new Error('requestedAt cannot be after assessedAt');
-  }
   const normalized = {
     schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
     requestId: exactId(raw.requestId, 'requestId'),
@@ -232,24 +236,25 @@ export function normalizeAutopilotProgrammaticRequestV1(input) {
     targetId: optionalId(raw.targetId, 'targetId'),
     payloadArtifactRef: normalizePayloadArtifact(raw.payloadArtifactRef, requestedAt),
     requestedAt,
-    assessedAt,
   };
   assertOperationShape(normalized);
   return deepFreeze(normalized);
 }
 
-function normalizeScopeProof(input, request) {
+function normalizeScopeProof(input, request, assessedAt) {
   const raw = snapshotRecord(input, SCOPE_KEYS, 'AutopilotProgrammaticScopeProofV1');
   requireKeys(raw, SCOPE_KEYS, 'AutopilotProgrammaticScopeProofV1');
   if (raw.schemaVersion !== AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION) {
     throw new Error('AutopilotProgrammaticScopeProofV1 schemaVersion must be numeric 1');
   }
+  const expectedPayloadArtifactId = request.payloadArtifactRef?.artifactId ?? null;
   const expectedPayloadSha = request.payloadArtifactRef?.sha256 ?? null;
   if (exactId(raw.requestId, 'scope.requestId') !== request.requestId
       || exactId(raw.principalId, 'scope.principalId') !== request.principalId
       || exactId(raw.projectId, 'scope.projectId') !== request.projectId
       || exactOperation(raw.operation) !== request.operation
       || optionalId(raw.targetId, 'scope.targetId') !== request.targetId
+      || optionalId(raw.payloadArtifactId, 'scope.payloadArtifactId') !== expectedPayloadArtifactId
       || raw.payloadSha256 !== expectedPayloadSha) {
     throw new Error('Programmatic scope proof does not match the exact request identity');
   }
@@ -261,7 +266,7 @@ function normalizeScopeProof(input, request) {
   const verifiedAt = canonicalTimestamp(raw.verifiedAt, 'scope.verifiedAt');
   const validThrough = canonicalTimestamp(raw.validThrough, 'scope.validThrough');
   const requestedMs = Date.parse(request.requestedAt);
-  const assessedMs = Date.parse(request.assessedAt);
+  const assessedMs = Date.parse(assessedAt);
   if (Date.parse(verifiedAt) < requestedMs || Date.parse(verifiedAt) > assessedMs) {
     throw new Error('scope.verifiedAt must be within the request assessment interval');
   }
@@ -276,6 +281,7 @@ function normalizeScopeProof(input, request) {
     projectId: request.projectId,
     operation: request.operation,
     targetId: request.targetId,
+    payloadArtifactId: expectedPayloadArtifactId,
     payloadSha256: expectedPayloadSha,
     allowed: raw.allowed,
     verifiedAt,
@@ -283,7 +289,7 @@ function normalizeScopeProof(input, request) {
   });
 }
 
-function normalizeReceipt(input, request) {
+function normalizeReceipt(input, request, dispatchAt) {
   const raw = snapshotRecord(input, RECEIPT_KEYS, 'AutopilotProgrammaticDispatchReceiptV1');
   requireKeys(raw, RECEIPT_KEYS, 'AutopilotProgrammaticDispatchReceiptV1');
   if (raw.schemaVersion !== AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION) {
@@ -298,8 +304,8 @@ function normalizeReceipt(input, request) {
     throw new Error('receipt.status is invalid');
   }
   const observedAt = canonicalTimestamp(raw.observedAt, 'receipt.observedAt');
-  if (Date.parse(observedAt) < Date.parse(request.assessedAt)) {
-    throw new Error('receipt.observedAt cannot predate assessedAt');
+  if (Date.parse(observedAt) < Date.parse(dispatchAt)) {
+    throw new Error('receipt.observedAt cannot predate dispatchAt');
   }
   const resultArtifactRef = raw.resultArtifactRef == null
     ? null
@@ -335,17 +341,38 @@ export async function executeAutopilotProgrammaticControlV1(input, dependencies 
   );
   const resolveTrustedScope = dependencyRecord.resolveTrustedScope;
   const dispatchCanonicalControl = dependencyRecord.dispatchCanonicalControl;
+  const now = dependencyRecord.now;
   if (typeof resolveTrustedScope !== 'function') {
     throw new Error('Canonical programmatic scope resolver is required');
   }
   if (typeof dispatchCanonicalControl !== 'function') {
     throw new Error('Canonical control-plane dispatcher is required');
   }
+  if (typeof now !== 'function') {
+    throw new Error('Trusted programmatic control clock is required');
+  }
 
-  const rawScope = await resolveTrustedScope(request);
-  const scopeProof = normalizeScopeProof(rawScope, request);
+  const assessedAt = trustedNowTimestamp(now, 'assessment');
+  if (Date.parse(request.requestedAt) > Date.parse(assessedAt)) {
+    throw new Error('requestedAt cannot be after trusted assessedAt');
+  }
+  const scopeLookup = deepFreeze({
+    schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
+    request,
+    assessedAt,
+  });
+  const rawScope = await resolveTrustedScope(scopeLookup);
+  const scopeProof = normalizeScopeProof(rawScope, request, assessedAt);
   if (!scopeProof.allowed) {
     throw new Error('Programmatic control scope denied');
+  }
+
+  const dispatchAt = trustedNowTimestamp(now, 'dispatch');
+  if (Date.parse(dispatchAt) < Date.parse(assessedAt)) {
+    throw new Error('Trusted programmatic control clock regressed before dispatch');
+  }
+  if (Date.parse(dispatchAt) > Date.parse(scopeProof.validThrough)) {
+    throw new Error('Programmatic control scope expired before dispatch');
   }
 
   const readOnly = isAutopilotProgrammaticOperationReadOnly(request.operation);
@@ -353,18 +380,22 @@ export async function executeAutopilotProgrammaticControlV1(input, dependencies 
     schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
     request,
     scopeProof,
+    assessedAt,
+    dispatchAt,
     readOnly,
     downstreamAuthorityRequired: !readOnly,
     adapterGrantsAuthority: false,
   });
   const rawReceipt = await dispatchCanonicalControl(dispatchEnvelope);
-  const receipt = normalizeReceipt(rawReceipt, request);
+  const receipt = normalizeReceipt(rawReceipt, request, dispatchAt);
 
   return deepFreeze({
     schemaVersion: AUTOPILOT_PROGRAMMATIC_CONTROL_VERSION,
     request,
     scopeProof,
     receipt,
+    assessedAt,
+    dispatchAt,
     readOnly,
     downstreamAuthorityRequired: !readOnly,
     adapterGrantsAuthority: false,
