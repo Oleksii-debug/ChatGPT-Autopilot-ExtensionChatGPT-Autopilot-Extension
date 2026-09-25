@@ -28,12 +28,13 @@ function candidate(overrides = {}) {
   };
 }
 function search(query, candidates, options = {}) {
+  const { current, ...requestOptions } = options;
   return searchProjectContextV1({
     query,
     candidates,
-    currentSourceRefs: options.currentSourceRefs || [source(options.current || {})],
-    allowedSourceIds: options.allowedSourceIds || ['src-1'],
-    ...options,
+    currentSourceRefs: requestOptions.currentSourceRefs || [source(current || {})],
+    allowedSourceIds: requestOptions.allowedSourceIds || ['src-1'],
+    ...requestOptions,
   });
 }
 
@@ -62,9 +63,158 @@ test('source authority/uri/kind substitution is fail-closed even with same sourc
 });
 
 test('permission scope is explicit and denies unlisted source and disallowed authority', () => {
-  assert.throws(() => searchProjectContextV1({ query: 'runtime', candidates: [candidate()], currentSourceRefs: [source()] }), /allowedSourceIds must be an explicit/);
+  assert.throws(() => searchProjectContextV1({ query: 'runtime', candidates: [candidate()], currentSourceRefs: [source()] }), /allowedSourceIds must be a bounded plain array/);
   assert.equal(search('runtime', [candidate()], { allowedSourceIds: ['other'] }).resultCount, 0);
   assert.equal(search('runtime', [candidate()], { allowedAuthorities: ['DERIVED'] }).resultCount, 0);
+});
+
+test('permission identities and authorities are exact and never string-coerced', () => {
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates: [candidate()],
+      currentSourceRefs: [source()],
+      allowedSourceIds: [1],
+    }),
+    /exact canonical ids/,
+  );
+
+  let coercions = 0;
+  const hostileId = {
+    toString() {
+      coercions += 1;
+      return 'src-1';
+    },
+  };
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates: [candidate()],
+      currentSourceRefs: [source()],
+      allowedSourceIds: [hostileId],
+    }),
+    /exact canonical ids/,
+  );
+  assert.equal(coercions, 0);
+
+  assert.throws(
+    () => search('runtime', [candidate()], { allowedAuthorities: ['canonical'] }),
+    /exact SourceAuthorityKind/,
+  );
+  assert.throws(
+    () => search('runtime', [candidate()], { allowedAuthorities: ['CANONICAL', 'CANONICAL'] }),
+    /must not contain duplicates/,
+  );
+});
+
+test('top-level search request is snapshotted before any caller getter can run', () => {
+  let reads = 0;
+  const request = {
+    candidates: [candidate()],
+    currentSourceRefs: [source()],
+    allowedSourceIds: ['src-1'],
+  };
+  Object.defineProperty(request, 'query', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'runtime';
+    },
+  });
+  assert.throws(
+    () => searchProjectContextV1(request),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates: [candidate()],
+      currentSourceRefs: [source()],
+      allowedSourceIds: ['src-1'],
+      hiddenAuthority: 'CANONICAL',
+    }),
+    /unknown field/,
+  );
+});
+
+test('search list and candidate boundaries reject accessors before reading caller values', () => {
+  let reads = 0;
+  const allowedSourceIds = [];
+  Object.defineProperty(allowedSourceIds, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'src-1';
+    },
+  });
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates: [candidate()],
+      currentSourceRefs: [source()],
+      allowedSourceIds,
+    }),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const candidates = [];
+  Object.defineProperty(candidates, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return candidate();
+    },
+  });
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates,
+      currentSourceRefs: [source()],
+      allowedSourceIds: ['src-1'],
+    }),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const wrapped = candidate();
+  Object.defineProperty(wrapped, 'snapshot', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return candidate().snapshot;
+    },
+  });
+  assert.throws(
+    () => search('runtime', [wrapped]),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const decorated = ['src-1'];
+  decorated.authority = 'CANONICAL';
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates: [candidate()],
+      currentSourceRefs: [source()],
+      allowedSourceIds: decorated,
+    }),
+    /non-index array data/,
+  );
+});
+
+test('equal-score result tie-break uses locale-independent code-unit order', () => {
+  const upper = candidate({ capsuleId: 'Z-cap' });
+  const lower = candidate({ capsuleId: 'a-cap' });
+  const out = search('runtime', [lower, upper]);
+  assert.deepEqual(out.results.map(item => item.capsuleId), ['Z-cap', 'a-cap']);
 });
 
 test('candidate cannot inject its own freshness authority', () => {
@@ -151,8 +301,8 @@ test('authority ranking remains deterministic', () => {
 test('bounded query/candidates/current-state/result limit fail closed', () => {
   assert.throws(() => searchProjectContextV1({ query: '', candidates: [], currentSourceRefs: [], allowedSourceIds: [] }), /query is invalid/);
   assert.throws(() => searchProjectContextV1({ query: 'x'.repeat(513), candidates: [], currentSourceRefs: [], allowedSourceIds: [] }), /query is invalid/);
-  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: Array(129).fill(candidate()), currentSourceRefs: [], allowedSourceIds: [] }), /bounded array/);
-  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: [], currentSourceRefs: Array(513).fill(source()), allowedSourceIds: [] }), /trusted-current-state/);
+  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: Array(129).fill(candidate()), currentSourceRefs: [], allowedSourceIds: [] }), /bounded plain array/);
+  assert.throws(() => searchProjectContextV1({ query: 'x', candidates: [], currentSourceRefs: Array(513).fill(source()), allowedSourceIds: [] }), /currentSourceRefs must be a bounded plain array/);
   assert.throws(() => searchProjectContextV1({ query: 'x', candidates: [], currentSourceRefs: [], allowedSourceIds: [], limit: 33 }), /limit is invalid/);
 });
 

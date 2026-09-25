@@ -1517,7 +1517,7 @@ function setScenarioWorkBusy(busy) {
     'new-scenario-cycle-button', 'new-scenario-pairs-button', 'new-scenario-group-button', 'new-scenario-pipeline-button',
     'save-scenario-work-button', 'start-scenario-work-button', 'pause-scenario-work-button',
     'resume-scenario-work-button', 'stop-scenario-work-button', 'delete-scenario-work-button',
-    'scenario-work-run-now',
+    'scenario-work-run-now', 'scenario-cycle-start-parallel',
   ]) {
     const element = $(id);
     if (element) element.disabled = busy;
@@ -1538,6 +1538,7 @@ function syncScenarioWorkButtons() {
   $('stop-scenario-work-button').disabled = !has || (!running && !paused);
   $('delete-scenario-work-button').disabled = !has || running;
   $('scenario-work-run-now').disabled = !has || !running;
+  $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
 }
 
 function clearScenarioWorkState() {
@@ -1870,6 +1871,42 @@ async function createScenarioWork(mode) {
     announce(`Створено сценарій: ${label}.`);
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося створити сценарій: ${error.message}`;
+  } finally { setScenarioWorkBusy(false); }
+}
+
+async function startParallelScenarioChats() {
+  if (ui.selectedScenarioWork?.config?.mode !== 'CHAT_CYCLE') return;
+  let created = 0;
+  let started = 0;
+  let firstId = '';
+  try {
+    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість незалежних чатів');
+    const config = scenarioWorkConfigFromForm();
+    const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
+    setScenarioWorkBusy(true);
+    for (let index = 1; index <= count; index += 1) {
+      const result = await core('CREATE_SCENARIO_WORK', {
+        name: `${baseName} — чат ${index}`, mode: 'CHAT_CYCLE', config,
+      });
+      const id = result?.scenario?.id;
+      if (!id) throw new Error('Створений цикл не повернув ідентифікатор.');
+      created++;
+      firstId ||= id;
+      await core('START_SCENARIO_WORK', { id });
+      started++;
+    }
+    await loadScenarioWork();
+    if (firstId) {
+      $('scenario-work-list').value = firstId;
+      await openScenarioWork(firstId);
+    }
+    setScenarioWorkPanel('state');
+    announce(`Запущено ${started} незалежних чатів. Кожен чекає своєї відповіді.`);
+  } catch (error) {
+    await loadScenarioWork();
+    const message = `Створено ${created}, запущено ${started} чатів. Помилка: ${error.message}`;
+    $('scenario-work-summary').textContent = message;
+    announce(message);
   } finally { setScenarioWorkBusy(false); }
 }
 
@@ -2540,10 +2577,10 @@ async function importSimplifiedProfile(start) {
 
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених Send: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
+  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених надсилань${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
   const lists = [
     ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${row.category}; підтверджених Send ${row.verifiedSends}; циклів ${row.completedCycles}`],
-    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених Send ${row.verifiedSends}; стан ${row.category}`],
+    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених надсилань ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${row.category}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
     ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
     ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
@@ -3906,6 +3943,7 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
 });
 $('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
+$('scenario-cycle-start-parallel').addEventListener('click', startParallelScenarioChats);
 $('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
 $('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
 $('new-scenario-pipeline-button').addEventListener('click', () => createScenarioWork('AUDITOR_PIPELINE'));
