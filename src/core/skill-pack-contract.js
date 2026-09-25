@@ -368,6 +368,14 @@ export function normalizeSkillPackManifestV1(input) {
     }
   }
 
+  const publishedAt = timestamp(raw.publishedAt, 'publishedAt');
+  const publishedMs = Date.parse(publishedAt);
+  for (const artifact of artifacts) {
+    if (Date.parse(artifact.createdAt) > publishedMs) {
+      throw new Error(`skill pack cannot be published before artifact creation: ${artifact.artifactId}`);
+    }
+  }
+
   return freeze({
     schemaVersion: SKILL_PACK_SCHEMA_VERSION,
     skillPackId,
@@ -382,7 +390,7 @@ export function normalizeSkillPackManifestV1(input) {
     requiredPermissionIds,
     evaluationRequirements,
     signatureRefs,
-    publishedAt: timestamp(raw.publishedAt, 'publishedAt'),
+    publishedAt,
     admissionAuthorized: false,
     executionAuthorized: false,
     trustAuthority: 'UNVERIFIED_REFERENCES',
