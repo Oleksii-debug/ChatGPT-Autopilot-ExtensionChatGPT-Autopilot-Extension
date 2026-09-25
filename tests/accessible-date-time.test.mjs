@@ -4,6 +4,9 @@ import {
   parseAccessibleLocalDateTime,
   formatAccessibleLocalDateTime,
   normalizeAccessibleClockTime,
+  normalizeAccessibleCalendarDate,
+  formatAccessibleCalendarDate,
+  parseAccessibleOccurrenceLine,
 } from '../src/ui/accessible-date-time.js';
 
 test('accessible local date-time accepts owner-friendly dotted format', () => {
@@ -36,4 +39,18 @@ test('clock input is canonicalized without picker dependency', () => {
   assert.equal(normalizeAccessibleClockTime('23:59'), '23:59');
   assert.equal(normalizeAccessibleClockTime(''), '');
   assert.throws(() => normalizeAccessibleClockTime('24:00'), /Некоректний/);
+});
+
+
+test('Session calendar dates accept dotted owner format and normalize to canonical ISO', () => {
+  assert.equal(normalizeAccessibleCalendarDate('25.09.2026'), '2026-09-25');
+  assert.equal(normalizeAccessibleCalendarDate('2026-09-25'), '2026-09-25');
+  assert.equal(formatAccessibleCalendarDate('2026-09-25'), '25.09.2026');
+  assert.throws(() => normalizeAccessibleCalendarDate('31.02.2026'), /Некоректна/);
+});
+
+test('explicit occurrence lines accept dotted and legacy ISO forms', () => {
+  assert.deepEqual(parseAccessibleOccurrenceLine('25.09.2026 09:15'), { date: '2026-09-25', time: '09:15' });
+  assert.deepEqual(parseAccessibleOccurrenceLine('2026-09-25 9:15'), { date: '2026-09-25', time: '09:15' });
+  assert.deepEqual(parseAccessibleOccurrenceLine('25.09.2026 09:15:30'), { date: '2026-09-25', time: '09:15:30' });
 });
