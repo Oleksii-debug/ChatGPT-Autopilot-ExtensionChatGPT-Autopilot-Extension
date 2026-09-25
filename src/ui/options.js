@@ -2526,8 +2526,12 @@ const ACTION_CENTER_SEVERITY_LABELS = Object.freeze({
 function renderActionCenter(data) {
   const items = Array.isArray(data?.items) ? data.items.filter(item => item?.status === 'OPEN') : [];
   const summary = data?.summary || {};
+  const runtimeSummary = data?.runtimeSummary || {};
+  const truncation = runtimeSummary.truncated
+    ? ` Показано ${runtimeSummary.projectedCount || items.length} із ${runtimeSummary.candidateCount || items.length}; спочатку блокуючі та найстаріші питання.`
+    : '';
   $('action-center-summary').textContent = items.length
-    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}. Action Center лише показує стан; рішення виконуються у відповідному канонічному розділі.`
+    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}.${truncation} Action Center лише показує стан; рішення виконуються у відповідному канонічному розділі.`
     : 'Зараз немає питань, які потребують вашої дії.';
   const list = $('action-center-list');
   const signature = JSON.stringify(items.map(item => [
