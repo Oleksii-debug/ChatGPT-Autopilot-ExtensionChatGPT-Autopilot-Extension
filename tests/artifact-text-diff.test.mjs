@@ -248,6 +248,30 @@ test('byte material must match immutable size and SHA-256 before any diff is emi
   );
 });
 
+test('caller-supplied digest implementation cannot forge immutable material identity', async () => {
+  const fromText = 'alpha';
+  const toText = 'omega';
+  const registry = await registryFor(fromText, toText);
+  let fakeDigestCalls = 0;
+  const fakeCrypto = {
+    subtle: {
+      async digest() {
+        fakeDigestCalls += 1;
+        return new Uint8Array(32).buffer;
+      },
+    },
+  };
+
+  await assert.rejects(
+    buildArtifactTextDiffV1(
+      request(registry, 'bravo', toText),
+      { cryptoApi: fakeCrypto },
+    ),
+    /SHA-256 does not match immutable ArtifactRef/u,
+  );
+  assert.equal(fakeDigestCalls, 0);
+});
+
 test('sensitive and non-text artifacts fail closed instead of exposing material', async () => {
   const fromText = 'private';
   const toText = 'still private';
