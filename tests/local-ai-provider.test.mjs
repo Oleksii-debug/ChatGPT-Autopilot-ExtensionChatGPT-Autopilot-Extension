@@ -5,6 +5,7 @@ import {
   LocalAiClient,
   MAX_PROMPT_LENGTH,
   MAX_RESPONSE_BYTES,
+  MAX_RESPONSE_CHUNKS,
   normalizeLocalAiBaseUrl,
   normalizeLocalAiSettings,
 } from '../src/core/local-ai-provider.js';
@@ -399,6 +400,49 @@ test('counts streamed response bytes and cancels immediately after the size ceil
 
   await assert.rejects(() => client.complete(settings, 'test'), /response is too large/);
   assert.equal(readCalls, 2);
+  assert.equal(cancelCalls, 1);
+  assert.equal(releaseCalls, 1);
+});
+
+test('rejects excessive tiny Local AI response chunks with bounded cleanup', async () => {
+  let readCalls = 0;
+  let cancelCalls = 0;
+  let releaseCalls = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      body: {
+        getReader() {
+          return {
+            async read() {
+              readCalls += 1;
+              if (readCalls <= MAX_RESPONSE_CHUNKS + 1) {
+                return { done: false, value: new Uint8Array(0) };
+              }
+              return { done: true, value: undefined };
+            },
+            async cancel() { cancelCalls += 1; },
+            releaseLock() { releaseCalls += 1; },
+          };
+        },
+      },
+    }),
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(
+    () => client.complete(settings, 'test'),
+    /too many chunks/,
+  );
+  assert.equal(readCalls, MAX_RESPONSE_CHUNKS + 1);
   assert.equal(cancelCalls, 1);
   assert.equal(releaseCalls, 1);
 });

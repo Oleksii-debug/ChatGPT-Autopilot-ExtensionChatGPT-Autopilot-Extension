@@ -13,6 +13,7 @@ export const DEFAULT_LOCAL_AI_SETTINGS = Object.freeze({
 
 const MAX_PROMPT_LENGTH = 200_000;
 const MAX_RESPONSE_BYTES = 2_000_000;
+const MAX_RESPONSE_CHUNKS = 8192;
 const MIN_TIMEOUT_SECONDS = 5;
 const MAX_TIMEOUT_SECONDS = 600;
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
@@ -196,11 +197,21 @@ async function readResponseTextBounded(response) {
     const reader = readable.getReader();
     const decoder = new TextDecoder();
     let totalBytes = 0;
+    let chunkCount = 0;
     let text = '';
     try {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        chunkCount += 1;
+        if (chunkCount > MAX_RESPONSE_CHUNKS) {
+          try {
+            await reader.cancel();
+          } catch {
+            // Best-effort cleanup; fail closed regardless of cancel outcome.
+          }
+          throw new Error('Local AI response contains too many chunks');
+        }
         if (!(value instanceof Uint8Array)) {
           try {
             await reader.cancel();
@@ -380,4 +391,4 @@ export class LocalAiClient {
   }
 }
 
-export { MAX_PROMPT_LENGTH, MAX_RESPONSE_BYTES, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS };
+export { MAX_PROMPT_LENGTH, MAX_RESPONSE_BYTES, MAX_RESPONSE_CHUNKS, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS };
