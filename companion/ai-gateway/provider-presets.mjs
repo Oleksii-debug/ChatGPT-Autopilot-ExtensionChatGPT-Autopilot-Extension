@@ -8,10 +8,20 @@ export const MISTRAL_ENDPOINT_PRESET = Object.freeze({
   apiKeyEnv: 'MISTRAL_API_KEY',
 });
 
+export const OPENROUTER_ENDPOINT_PRESET = Object.freeze({
+  endpointId: 'openrouter',
+  baseUrl: 'https://openrouter.ai/api/v1',
+  apiKeyEnv: 'OPENROUTER_API_KEY',
+});
+
 export const PINNED_COMPATIBLE_CREDENTIAL_BINDINGS = Object.freeze({
   MISTRAL_API_KEY: Object.freeze({
     endpointId: MISTRAL_ENDPOINT_PRESET.endpointId,
     origin: 'https://api.mistral.ai',
+  }),
+  OPENROUTER_API_KEY: Object.freeze({
+    endpointId: OPENROUTER_ENDPOINT_PRESET.endpointId,
+    origin: 'https://openrouter.ai',
   }),
 });
 
@@ -223,6 +233,12 @@ function main(argv) {
     process.stdout.write(`${JSON.stringify(endpoint)}\n`);
     return;
   }
+  if (argv[0] === '--apply-openrouter' && argv[1] && argv.length === 2) {
+    const settings = writeCompatibleEndpointPreset(argv[1], OPENROUTER_ENDPOINT_PRESET);
+    const endpoint = settings.compatibleEndpoints.find(item => item.endpointId === OPENROUTER_ENDPOINT_PRESET.endpointId);
+    process.stdout.write(`${JSON.stringify(endpoint)}\n`);
+    return;
+  }
   if (argv[0] === '--apply-default' && argv[1] && argv[2] && argv.length === 3) {
     const settings = writeDefaultCompatibleEndpoint(argv[1], argv[2]);
     const endpoint = settings.compatibleEndpoints.find(item => item.endpointId === 'default');
@@ -234,7 +250,7 @@ function main(argv) {
     return;
   }
   throw new Error(
-    'Usage: node provider-presets.mjs --apply-mistral <gateway-settings.json> | --apply-default <gateway-settings.json> <base-url> | --credential-plan <gateway-settings.json> <provider-keys-dir>',
+    'Usage: node provider-presets.mjs --apply-mistral <gateway-settings.json> | --apply-openrouter <gateway-settings.json> | --apply-default <gateway-settings.json> <base-url> | --credential-plan <gateway-settings.json> <provider-keys-dir>',
   );
 }
 
