@@ -5,6 +5,7 @@ import {
   DataSensitivityClass,
   EffectRiskClass,
   OwnerPolicyDecision,
+  createPolicyInvocationFingerprintV1,
   evaluateOwnerPolicyV1,
   normalizeOwnerPolicyProfileV1,
   normalizePolicyClassificationV1,
@@ -59,6 +60,7 @@ function classification(overrides = {}) {
     schemaVersion: 1,
     classificationId: 'classification-1',
     invocationId: 'invoke-1',
+    invocationFingerprint: createPolicyInvocationFingerprintV1(invocation()),
     classifierId: 'core-classifier',
     effectRisk: EffectRiskClass.R1,
     dataSensitivity: DataSensitivityClass.S0,
@@ -412,4 +414,74 @@ test('identity strings are exact and capability attributes remain optional but d
   });
   assert.throws(() => evaluate({ capabilityDescriptors: [guardedCapability] }), /enumerable data property/);
   assert.equal(reads, 0);
+});
+
+
+test('classification is bound to exact invocation content, not invocationId alone', () => {
+  const classifiedInvocation = invocation();
+  const trustedClassification = classification({
+    invocationFingerprint: createPolicyInvocationFingerprintV1(classifiedInvocation),
+  });
+
+  const swappedArguments = invocation({
+    arguments: { pathRef: 'workspace:file-2' },
+  });
+  const result = evaluate({
+    classification: trustedClassification,
+    invocation: swappedArguments,
+  });
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
+  assert.equal(result.policyDecision.reasonCode, 'CLASSIFICATION_INVOCATION_FINGERPRINT_MISMATCH');
+});
+
+test('invocation fingerprint is canonical across JSON object key order', () => {
+  const first = invocation({
+    arguments: {
+      target: 'workspace:file-1',
+      options: { mode: 'safe', retry: false },
+    },
+  });
+  const second = invocation({
+    arguments: {
+      options: { retry: false, mode: 'safe' },
+      target: 'workspace:file-1',
+    },
+  });
+  assert.equal(
+    createPolicyInvocationFingerprintV1(first),
+    createPolicyInvocationFingerprintV1(second),
+  );
+
+  const result = evaluate({
+    invocation: second,
+    classification: classification({
+      invocationFingerprint: createPolicyInvocationFingerprintV1(first),
+    }),
+  });
+  assert.notEqual(result.policyDecision.reasonCode, 'CLASSIFICATION_INVOCATION_FINGERPRINT_MISMATCH');
+});
+
+test('classification and decision timestamps preserve causal order', () => {
+  const laterInvocation = invocation({ createdAt: '2026-09-24T21:55:01Z' });
+  const staleClassification = classification({
+    classifiedAt: AT,
+    invocationFingerprint: createPolicyInvocationFingerprintV1(laterInvocation),
+  });
+  let result = evaluate({
+    invocation: laterInvocation,
+    classification: staleClassification,
+    decidedAt: '2026-09-24T21:55:02Z',
+  });
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
+  assert.equal(result.policyDecision.reasonCode, 'CLASSIFICATION_PREDATES_INVOCATION');
+
+  const laterClassification = classification({
+    classifiedAt: '2026-09-24T21:55:02Z',
+  });
+  result = evaluate({
+    classification: laterClassification,
+    decidedAt: '2026-09-24T21:55:01Z',
+  });
+  assert.equal(result.policyDecision.decision, PolicyDecisionKind.DENY);
+  assert.equal(result.policyDecision.reasonCode, 'POLICY_DECISION_PREDATES_CLASSIFICATION');
 });
