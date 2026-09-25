@@ -408,3 +408,35 @@ test('version history is explicitly bounded', () => {
     /version limit exceeded/,
   );
 });
+
+
+test('registry revision must exactly equal immutable version count', () => {
+  const registry = putArtifactVersionV1(createArtifactRegistryV1('project-a'), version());
+  const forged = { ...registry, revision: 99 };
+  assert.throws(
+    () => normalizeArtifactRegistryV1(forged),
+    /revision must equal immutable version count/,
+  );
+});
+
+test('versionId is a project-wide durable identity across logical artifacts', () => {
+  const firstRef = artifact({ artifactId: 'first', uri: 'project://artifact/first' });
+  let registry = putArtifactVersionV1(createArtifactRegistryV1('project-a'), version({
+    versionId: 'shared-version',
+    artifactRef: firstRef,
+    provenanceRef: provenance(firstRef),
+  }));
+  const secondRef = artifact({
+    artifactId: 'second',
+    uri: 'project://artifact/second',
+    sha256: hash('b'),
+  });
+  assert.throws(
+    () => putArtifactVersionV1(registry, version({
+      versionId: 'shared-version',
+      artifactRef: secondRef,
+      provenanceRef: provenance(secondRef),
+    })),
+    /already belongs to another artifact/,
+  );
+});
