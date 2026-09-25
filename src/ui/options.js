@@ -1086,9 +1086,9 @@ function renderAiRouterRuntime(runtime = {}) {
 }
 
 const OPENAI_MODEL_PRESETS = Object.freeze([
-  Object.freeze({ id: 'gpt-6-astra', label: 'GPT-6 Astra — найсильніша для найскладніших end-to-end задач' }),
-  Object.freeze({ id: 'gpt-6-sol', label: 'GPT-6 Sol — для складного coding та agentic workflows' }),
-  Object.freeze({ id: 'gpt-6-luna', label: 'GPT-6 Luna — ефективна для сфокусованих масових задач' }),
+  Object.freeze({ id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — найсильніша для складного reasoning і coding' }),
+  Object.freeze({ id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — баланс якості, швидкості та вартості' }),
+  Object.freeze({ id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — швидка та економна для масових задач' }),
 ]);
 
 function uniqueModelIds(models = []) {
@@ -1245,7 +1245,7 @@ async function loadAiRouterModels(slot) {
     const models = data.result?.models || [];
     fillModelSelect(modelId, provider, models, selectedBefore);
     if (!$(modelId).value && models.length === 1) $(modelId).value = models[0];
-    const recommended = provider === 'openai' ? ' Рекомендовані GPT-6 також доступні у верхній групі списку.' : '';
+    const recommended = provider === 'openai' ? ' Рекомендовані GPT-5.6 також доступні у верхній групі списку.' : '';
     $('ai-router-status').textContent = `Знайдено моделей ${provider}: ${models.length}.${recommended}`;
   } catch (error) {
     fillModelSelect(modelId, provider, [], selectedBefore);

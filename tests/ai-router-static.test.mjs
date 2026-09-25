@@ -45,10 +45,9 @@ test('AI router UI describes OpenAI-compatible as local or remote HTTPS rather t
 test('OpenAI API UI exposes real model selection and keeps the secret out of extension storage', () => {
   assert.match(html, /<select id="ai-router-primary-model"/);
   assert.match(html, /<select id="ai-router-strong-model"/);
-  assert.match(optionsJs, /gpt-6-astra/);
-  assert.match(optionsJs, /gpt-6-sol/);
-  assert.match(optionsJs, /gpt-6-luna/);
-  assert.doesNotMatch(optionsJs, /gpt-5\.6-(?:sol|terra|luna)/);
+  assert.match(optionsJs, /gpt-5\.6-sol/);
+  assert.match(optionsJs, /gpt-5\.6-terra/);
+  assert.match(optionsJs, /gpt-5\.6-luna/);
   assert.match(html, /Windows DPAPI/);
   assert.match(html, /НАЛАШТУВАТИ OPENAI API КЛЮЧ\.ps1/);
   assert.doesNotMatch(html, /type="password"[^>]*openai/i);
