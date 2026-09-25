@@ -55,6 +55,111 @@ function credential(overrides = {}) {
   };
 }
 
+test('nested contract data and list boundaries reject accessors without executing them', () => {
+  let reads = 0;
+
+  const capabilities = ['filesystem.read'];
+  Object.defineProperty(capabilities, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'filesystem.read';
+    },
+  });
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-array-accessor',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: capabilities,
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  }), /data properties/);
+  assert.equal(reads, 0, 'array entry getter must never execute');
+
+  const nested = {};
+  Object.defineProperty(nested, 'pathRef', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'workspace:README.md';
+    },
+  });
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-nested-accessor',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: { request: nested },
+    createdAt: AT,
+  }), /enumerable own data properties/);
+  assert.equal(reads, 0, 'nested JSON getter must never execute');
+
+  const hiddenKnown = {
+    schemaVersion: 1,
+    decisionId: 'decision-hidden',
+    invocationId: 'invoke-1',
+    decision: PolicyDecisionKind.DENY,
+    reasonCode: 'OWNER_DENY',
+    decidedAt: AT,
+  };
+  Object.defineProperty(hiddenKnown, 'decision', {
+    enumerable: false,
+    configurable: true,
+    value: PolicyDecisionKind.ALLOW,
+  });
+  assert.throws(() => normalizePolicyDecisionV1(hiddenKnown), /enumerable own data properties/);
+
+  const sparse = [];
+  sparse.length = 1;
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-sparse-capabilities',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: sparse,
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  }), /dense data-only array/);
+
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-nonfinite-json',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: { score: Number.NaN },
+    createdAt: AT,
+  }), /non-finite number/);
+
+  const protoNamedArguments = {};
+  Object.defineProperty(protoNamedArguments, '__proto__', {
+    enumerable: true,
+    configurable: true,
+    value: { marker: 'data-not-prototype' },
+  });
+  const normalizedProtoNamed = normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-proto-named-json',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: protoNamedArguments,
+    createdAt: AT,
+  });
+  assert.equal(Object.getPrototypeOf(normalizedProtoNamed.arguments), Object.prototype);
+  assert.equal(Object.hasOwn(normalizedProtoNamed.arguments, '__proto__'), true);
+  assert.deepEqual(normalizedProtoNamed.arguments.__proto__, { marker: 'data-not-prototype' });
+});
+
 test('CapabilityV1 and ToolDescriptorV1 adapt existing registry truth without creating a second registry', () => {
   const provider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
   const tool = toolDescriptorV1FromAgentProvider(provider, {
@@ -344,7 +449,7 @@ test('nested reference collections reject non-array shapes with stable contract 
     status: 'OK',
     artifactRefs: 'artifact-1',
     observedAt: AT,
-  }), /artifactRefs must be a bounded array/);
+  }), /artifactRefs must be a bounded plain array/);
 
   assert.throws(() => normalizeSpecialistHandoffV1({
     schemaVersion: 1,
@@ -354,7 +459,7 @@ test('nested reference collections reject non-array shapes with stable contract 
     requestedCapabilityIds: ['workspace.read'],
     credentialRefs: { credentialId: 'cred-1' },
     createdAt: AT,
-  }), /credentialRefs must be a bounded array/);
+  }), /credentialRefs must be a bounded plain array/);
 });
 
 
@@ -442,3 +547,222 @@ test('Specialist handoff cannot amplify parent capability grant', () => {
     /exceeds granted capabilities: workspace.write/,
   );
 });
+
+test('untrusted universal-agent contracts fail closed on type-coerced authority and evidence fields', () => {
+  for (const schemaVersion of ['1', true]) {
+    assert.throws(() => normalizeCapabilityV1({
+      schemaVersion,
+      capabilityId: 'filesystem.read',
+      description: 'Read',
+      riskClass: 'R1',
+      attributes: {},
+    }), /schemaVersion/);
+  }
+
+  assert.throws(() => normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 1,
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.read'],
+    policyDecisionId: 'decision-1',
+    arguments: {},
+    createdAt: AT,
+  }), /invocationId must be text/);
+
+  assert.throws(() => normalizePolicyDecisionV1({
+    schemaVersion: 1,
+    decisionId: 'decision-1',
+    invocationId: 'invoke-1',
+    decision: true,
+    reasonCode: 'POLICY_OK',
+    decidedAt: AT,
+  }), /decision must be text/);
+
+  assert.throws(() => normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'obs-1',
+    invocationId: 'invoke-1',
+    status: true,
+    observedAt: AT,
+  }), /status must be text/);
+
+  assert.throws(() => normalizeArtifactRefV1(artifact({ sha256: 123 })), /sha256 must be text/);
+  assert.throws(() => normalizeArtifactRefV1(artifact({ sizeBytes: '123' })), /sizeBytes is invalid/);
+  assert.throws(() => normalizeArtifactRefV1(artifact({ sizeBytes: '' })), /sizeBytes is invalid/);
+
+  assert.throws(() => normalizeVerificationV1({
+    schemaVersion: 1,
+    verificationId: 'verify-1',
+    invocationId: 'invoke-1',
+    observationId: 'obs-1',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    verifiedAt: AT,
+    attempt: '1',
+  }), /attempt is invalid/);
+});
+
+test('universal-agent contract objects reject exotic prototypes and symbol authority while allowing null-prototype data records', () => {
+  const exotic = Object.create({
+    schemaVersion: 1,
+    capabilityId: 'filesystem.admin',
+    riskClass: 'R0',
+  });
+  exotic.description = 'Inherited authority must not be trusted.';
+  exotic.attributes = {};
+  assert.throws(() => normalizeCapabilityV1(exotic), /plain object/);
+
+  const symbolAuthority = {
+    schemaVersion: 1,
+    capabilityId: 'filesystem.read',
+    description: 'Read',
+    riskClass: 'R1',
+    attributes: {},
+  };
+  symbolAuthority[Symbol('admin')] = true;
+  assert.throws(() => normalizeCapabilityV1(symbolAuthority), /unknown field/);
+
+  const nullPrototype = Object.assign(Object.create(null), {
+    schemaVersion: 1,
+    capabilityId: 'filesystem.read',
+    description: 'Read',
+    riskClass: 'R1',
+    attributes: {},
+  });
+  const normalized = normalizeCapabilityV1(nullPrototype);
+  assert.equal(normalized.capabilityId, 'filesystem.read');
+  assert.equal(normalized.riskClass, 'R1');
+});
+
+
+
+test('universal-agent contract boundary rejects accessor-backed and hidden fields without executing getters', () => {
+  let decisionReads = 0;
+  const policy = {
+    schemaVersion: 1,
+    decisionId: 'decision-accessor',
+    invocationId: 'invoke-accessor',
+    reasonCode: 'POLICY_OK',
+    decidedAt: AT,
+  };
+  Object.defineProperty(policy, 'decision', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      decisionReads += 1;
+      return decisionReads === 1 ? 'DENY' : 'ALLOW';
+    },
+  });
+  assert.throws(() => normalizePolicyDecisionV1(policy), /own data properties/);
+  assert.equal(decisionReads, 0, 'decision getter must never execute at the authority boundary');
+
+  let statusReads = 0;
+  const observation = {
+    schemaVersion: 1,
+    observationId: 'obs-accessor',
+    invocationId: 'invoke-accessor',
+    observedAt: AT,
+  };
+  Object.defineProperty(observation, 'status', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      statusReads += 1;
+      return 'OK';
+    },
+  });
+  assert.throws(() => normalizeObservationV1(observation), /own data properties/);
+  assert.equal(statusReads, 0, 'status getter must never execute at the evidence boundary');
+
+  let digestReads = 0;
+  const artifactWithAccessor = artifact();
+  Object.defineProperty(artifactWithAccessor, 'sha256', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      digestReads += 1;
+      return '0'.repeat(64);
+    },
+  });
+  assert.throws(() => normalizeArtifactRefV1(artifactWithAccessor), /own data properties/);
+  assert.equal(digestReads, 0, 'evidence digest getter must never execute');
+
+  const hiddenAuthority = {
+    schemaVersion: 1,
+    capabilityId: 'filesystem.read',
+    description: 'Read',
+    riskClass: 'R1',
+    attributes: {},
+  };
+  Object.defineProperty(hiddenAuthority, 'hiddenAuthority', {
+    enumerable: false,
+    configurable: true,
+    value: 'filesystem.admin',
+  });
+  assert.throws(
+    () => normalizeCapabilityV1(hiddenAuthority),
+    /enumerable own data properties|unknown field: hiddenAuthority/,
+  );
+});
+
+test('universal contract arrays consume descriptor snapshots without ordinary Proxy reads', () => {
+  let reads = 0;
+  const trackReads = target => new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+
+  const requestedCapabilityIds = trackReads(['filesystem.read']);
+  const invocation = normalizeToolInvocationV1({
+    schemaVersion: 1,
+    invocationId: 'invoke-proxy-array',
+    toolId: 'fs.read',
+    providerId: 'native-companion',
+    requestedCapabilityIds,
+    policyDecisionId: 'decision-proxy-array',
+    arguments: {},
+    createdAt: AT,
+  });
+  assert.deepEqual(invocation.requestedCapabilityIds, ['filesystem.read']);
+  assert.equal(reads, 0, 'capability array must not perform ordinary caller reads');
+
+  reads = 0;
+  const artifactRefs = trackReads([artifact({ artifactId: 'artifact-proxy-array' })]);
+  const observation = normalizeObservationV1({
+    schemaVersion: 1,
+    observationId: 'observation-proxy-array',
+    invocationId: 'invoke-proxy-array',
+    status: ObservationStatus.OK,
+    summary: '',
+    data: {},
+    artifactRefs,
+    observedAt: AT,
+  });
+  assert.equal(observation.artifactRefs[0].artifactId, 'artifact-proxy-array');
+  assert.equal(reads, 0, 'artifact-ref array must not perform ordinary caller reads');
+
+  reads = 0;
+  const evidenceArtifactIds = trackReads(['evidence-proxy-array']);
+  const verification = normalizeVerificationV1({
+    schemaVersion: 1,
+    verificationId: 'verification-proxy-array',
+    invocationId: 'invoke-proxy-array',
+    observationId: 'observation-proxy-array',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'POSTCONDITION_MATCH',
+    summary: '',
+    evidenceArtifactIds,
+    verifiedAt: AT,
+    verifierId: 'verifier-proxy-array',
+    verificationAuthorityId: 'authority-proxy-array',
+    effectId: 'effect-proxy-array',
+    executionId: 'execution-proxy-array',
+    attempt: 1,
+  });
+  assert.deepEqual(verification.evidenceArtifactIds, ['evidence-proxy-array']);
+  assert.equal(reads, 0, 'evidence array must not perform ordinary caller reads');
+});
+
