@@ -100,7 +100,9 @@ function boundedText(value, label, max, { optional = false } = {}) {
 function optionalUri(value) {
   if (value == null || value === '') return '';
   const uri = boundedText(value, 'uri', MAX_URI);
-  if (uri !== uri.trim()) throw new Error('uri is invalid');
+  if (uri !== uri.trim() || /[\u0000-\u001F\u007F]/u.test(uri)) {
+    throw new Error('uri is invalid');
+  }
   return uri;
 }
 
