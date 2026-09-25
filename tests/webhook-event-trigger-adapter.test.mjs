@@ -432,6 +432,101 @@ test('duplicate upstream event keeps occurrence identity while changed material 
   assert.equal(changed.canonicalWorkPresent, false);
 });
 
+test('extended-year webhook chronology is ordered by epoch at every trust boundary', async () => {
+  const beforeBoundary = '9999-12-31T23:59:59.999Z';
+  const afterBoundary = '+010000-01-01T00:00:00.000Z';
+  const afterBoundaryLater = '+010000-01-01T00:00:00.001Z';
+  const afterBoundaryLatest = '+010000-01-01T00:00:00.002Z';
+
+  const validDelivery = normalizeVerifiedWebhookDeliveryV1(delivery({
+    receivedAt: beforeBoundary,
+    verifiedAt: afterBoundary,
+    payloadArtifactRef: artifact({ createdAt: beforeBoundary }),
+  }));
+  assert.equal(validDelivery.verifiedAt, afterBoundary);
+
+  assert.throws(
+    () => normalizeVerifiedWebhookDeliveryV1(delivery({
+      receivedAt: afterBoundary,
+      verifiedAt: beforeBoundary,
+      payloadArtifactRef: artifact({ createdAt: beforeBoundary }),
+    })),
+    /verification cannot predate receipt/u,
+  );
+
+  let schedulerCalls = 0;
+  const stop = async () => {
+    schedulerCalls += 1;
+    throw new Error('must not run');
+  };
+
+  await assert.rejects(
+    admitVerifiedWebhookDeliveryV1(
+      request({ admittedAt: afterBoundaryLatest }),
+      deps({
+        trustedTrigger: trigger({ createdAt: afterBoundary }),
+        trustedBinding: binding({ createdAt: beforeBoundary }),
+        trustedDelivery: delivery({
+          receivedAt: afterBoundaryLater,
+          verifiedAt: afterBoundaryLater,
+          payloadArtifactRef: artifact({ createdAt: afterBoundaryLater }),
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /binding cannot predate its trusted trigger definition/u,
+  );
+
+  await assert.rejects(
+    admitVerifiedWebhookDeliveryV1(
+      request({ admittedAt: afterBoundaryLatest }),
+      deps({
+        trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+        trustedBinding: binding({ createdAt: afterBoundary }),
+        trustedDelivery: delivery({
+          receivedAt: beforeBoundary,
+          verifiedAt: afterBoundaryLater,
+          payloadArtifactRef: artifact({ createdAt: beforeBoundary }),
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /delivery predates trusted binding/u,
+  );
+
+  await assert.rejects(
+    admitVerifiedWebhookDeliveryV1(
+      request({ admittedAt: beforeBoundary }),
+      deps({
+        trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+        trustedBinding: binding({ createdAt: beforeBoundary }),
+        trustedDelivery: delivery({
+          receivedAt: afterBoundary,
+          verifiedAt: afterBoundaryLater,
+          payloadArtifactRef: artifact({ createdAt: afterBoundary }),
+        }),
+        admitCanonicalOccurrence: stop,
+      }),
+    ),
+    /admission predates trusted verification/u,
+  );
+  assert.equal(schedulerCalls, 0);
+
+  const accepted = await admitVerifiedWebhookDeliveryV1(
+    request({ admittedAt: afterBoundaryLatest }),
+    deps({
+      trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
+      trustedBinding: binding({ createdAt: beforeBoundary }),
+      trustedDelivery: delivery({
+        receivedAt: afterBoundary,
+        verifiedAt: afterBoundaryLater,
+        payloadArtifactRef: artifact({ createdAt: afterBoundary }),
+      }),
+    }),
+  );
+  assert.equal(accepted.status, EventTriggerRuntimeStatus.ACCEPTED);
+});
+
 test('noncanonical timestamps and verification-profile substitution fail closed', async () => {
   let calls = 0;
   await assert.rejects(
