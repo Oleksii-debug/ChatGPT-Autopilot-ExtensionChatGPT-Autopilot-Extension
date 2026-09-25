@@ -157,6 +157,7 @@ function addBrowserAgentCandidates(agentJobs, candidates) {
         ? runtime.pendingApproval.snapshotSignature
         : '';
       const ownerReference = browserApprovalOwnerReference(job, runtime, runtime.pendingApproval);
+      if (!ownerReference) continue;
       candidates.push({
         identityKind: 'browser-agent-approval',
         identityKey: `${job.id}|${snapshot}`,
