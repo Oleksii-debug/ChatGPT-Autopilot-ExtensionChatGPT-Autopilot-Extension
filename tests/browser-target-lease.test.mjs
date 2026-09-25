@@ -174,22 +174,25 @@ test('BrowserTargetLease serializes conflicting invocation ownership', () => {
   assert.equal(first.status, 'ACQUIRED');
   const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:1', ownerInvocationId: 'inv:2', leaseId: 'lease:2', now: '2026-09-21T02:16:01.000Z' });
   assert.equal(conflict.status, 'CONFLICT');
-  assert.equal(conflict.lease.ownerInvocationId, 'inv:1');
+  assert.equal(conflict.lease, null);
 });
 
 test('BrowserTargetLease preserves a live target when another target is requested', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW });
   const conflict = acquireBrowserTargetLeaseV1({ current: first.lease, targetId: 'page:2', ownerInvocationId: 'inv:1', leaseId: 'lease:2', now: '2026-09-21T02:16:01.000Z' });
   assert.equal(conflict.status, 'CONFLICT');
-  assert.deepEqual(conflict.lease, first.lease);
-  assert.equal(conflict.lease.targetId, 'page:1');
-  assert.equal(conflict.lease.leaseId, 'lease:1');
+  assert.equal(conflict.lease, null);
+  assert.equal(first.lease.targetId, 'page:1');
+  assert.equal(first.lease.leaseId, 'lease:1');
 });
 
 test('BrowserTargetLease survives restart as data and only expires deterministically', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW, ttlMs: 2_000 });
   const restored = JSON.parse(JSON.stringify(first.lease));
-  const held = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'ignored', now: '2026-09-21T02:16:01.000Z' });
+  const wrongToken = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:wrong', now: '2026-09-21T02:16:01.000Z' });
+  assert.equal(wrongToken.status, 'CONFLICT');
+  assert.equal(wrongToken.lease, null);
+  const held = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: '2026-09-21T02:16:01.000Z' });
   assert.equal(held.status, 'HELD');
   assert.equal(held.lease.leaseId, 'lease:1');
   const reacquired = acquireBrowserTargetLeaseV1({ current: restored, targetId: 'page:1', ownerInvocationId: 'inv:2', leaseId: 'lease:2', now: '2026-09-21T02:16:02.000Z' });
@@ -197,8 +200,13 @@ test('BrowserTargetLease survives restart as data and only expires deterministic
   assert.equal(reacquired.lease.ownerInvocationId, 'inv:2');
 });
 
-test('BrowserTargetLease release is owner-and-token scoped', () => {
+test('BrowserTargetLease release is owner-and-token scoped without credential disclosure', () => {
   const first = acquireBrowserTargetLeaseV1({ targetId: 'page:1', ownerInvocationId: 'inv:1', leaseId: 'lease:1', now: NOW });
-  assert.equal(releaseBrowserTargetLeaseV1(first.lease, { ownerInvocationId: 'inv:2', leaseId: 'lease:1' }).status, 'NOT_OWNER');
+  const wrongOwner = releaseBrowserTargetLeaseV1(first.lease, { ownerInvocationId: 'inv:2', leaseId: 'lease:1' });
+  assert.equal(wrongOwner.status, 'NOT_OWNER');
+  assert.equal(wrongOwner.lease, null);
+  const wrongToken = releaseBrowserTargetLeaseV1(first.lease, { ownerInvocationId: 'inv:1', leaseId: 'lease:2' });
+  assert.equal(wrongToken.status, 'NOT_OWNER');
+  assert.equal(wrongToken.lease, null);
   assert.equal(releaseBrowserTargetLeaseV1(first.lease, { ownerInvocationId: 'inv:1', leaseId: 'lease:1' }).status, 'RELEASED');
 });
