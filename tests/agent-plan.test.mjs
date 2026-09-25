@@ -109,6 +109,36 @@ test('AgentPlan array boundaries reject getters and non-canonical collections be
   }), /AgentPlan node dependsOn\[0\].*enumerable own data property/);
   assert.equal(reads, 0);
 
+  const conflictNode = node('later', [], ['shared-key']);
+  const originalConflict = conflictNode.conflictKeys[0];
+  Object.defineProperty(conflictNode.conflictKeys, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalConflict; },
+  });
+  assert.throws(() => extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: [conflictNode],
+    resourceEnvelope: ZERO_ENVELOPE,
+    at: AT,
+  }), /AgentPlan node conflictKeys\[0\].*enumerable own data property/);
+  assert.equal(reads, 0);
+
+  const criteriaNode = node('later');
+  const originalAcceptance = criteriaNode.acceptanceCriteria[0];
+  Object.defineProperty(criteriaNode.acceptanceCriteria, '0', {
+    enumerable: true,
+    configurable: true,
+    get() { reads += 1; return originalAcceptance; },
+  });
+  assert.throws(() => extendAgentPlanV1(current, {
+    expectedRevision: current.revision,
+    nodes: [criteriaNode],
+    resourceEnvelope: ZERO_ENVELOPE,
+    at: AT,
+  }), /AgentPlan node acceptanceCriteria\[0\].*enumerable own data property/);
+  assert.equal(reads, 0);
+
   const candidate = structuredClone(current);
   candidate.nodes.push(node('later'));
   const originalCriterion = candidate.successCriteria[0];
