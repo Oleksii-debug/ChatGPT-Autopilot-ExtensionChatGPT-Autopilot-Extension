@@ -119,3 +119,81 @@ test('completed specialist result cannot mint verification authority from caller
   assert.equal(completed.assignments[0].state, 'COMPLETED');
   assert.equal(completed.executionOwnerships[0].state, 'OWNED');
 });
+
+
+test('specialist bridge snapshots caller-owned request and array authority without coercion or getters', () => {
+  let optionReads = 0;
+  const proxyScope = new Proxy(scope(), {
+    get(target, property, receiver) {
+      optionReads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const prepared = prepareAgentPlanSpecialistHandoffV1(plan(), proxyScope);
+  assert.equal(prepared.state, 'READY');
+  assert.equal(optionReads, 0, 'request Proxy get trap must not execute');
+
+  let arrayReads = 0;
+  const capabilityProxy = new Proxy(['filesystem.archive'], {
+    get(target, property, receiver) {
+      arrayReads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const withProxyArray = prepareAgentPlanSpecialistHandoffV1(
+    plan(),
+    scope({ requestedCapabilityIds: capabilityProxy }),
+  );
+  assert.deepEqual(withProxyArray.requestedCapabilityIds, ['filesystem.archive']);
+  assert.equal(arrayReads, 0, 'authority array Proxy get trap must not execute');
+
+  let getterCalls = 0;
+  const accessorScope = scope();
+  Object.defineProperty(accessorScope, 'nodeId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 'local';
+    },
+  });
+  assert.throws(
+    () => prepareAgentPlanSpecialistHandoffV1(plan(), accessorScope),
+    /nodeId must be an enumerable data property/,
+  );
+  assert.equal(getterCalls, 0, 'request accessor must never execute');
+
+  let coercions = 0;
+  const coerciveId = {
+    toString() {
+      coercions += 1;
+      return 'native-companion';
+    },
+  };
+  assert.throws(
+    () => prepareAgentPlanSpecialistHandoffV1(plan(), scope({ specialistId: coerciveId })),
+    /specialistId is invalid/,
+  );
+  assert.equal(coercions, 0, 'identity coercion must never execute');
+
+  assert.throws(
+    () => prepareAgentPlanSpecialistHandoffV1(plan(), scope({ authorizationGranted: true })),
+    /unknown field: authorizationGranted/,
+  );
+
+  const assignment = prepareAgentPlanSpecialistHandoffV1(plan(), scope());
+  let assignmentReads = 0;
+  const assignmentArray = new Proxy([assignment], {
+    get(target, property, receiver) {
+      assignmentReads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const claimed = claimAgentPlanSpecialistHandoffsV1(plan(), assignmentArray, {
+    executionOwnerships: [ownership()],
+    availableSlots: 1,
+    at: T0,
+  });
+  assert.equal(claimed.claimed.length, 1);
+  assert.equal(assignmentReads, 0, 'handoff array Proxy get trap must not execute');
+});
