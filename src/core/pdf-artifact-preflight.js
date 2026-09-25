@@ -417,8 +417,13 @@ function scanPassiveStructuralNames(bytes) {
       if (parsed.name === 'Length' && dictionaries.length) {
         const length = parseDirectLengthValue(bytes, parsed.next);
         const current = dictionaries[dictionaries.length - 1];
-        current.lengthKind = length.kind;
-        current.directLength = length.value;
+        if (current.lengthKind !== 'MISSING') {
+          current.lengthKind = 'AMBIGUOUS';
+          current.directLength = null;
+        } else {
+          current.lengthKind = length.kind;
+          current.directLength = length.value;
+        }
       }
       cursor = parsed.next;
       continue;
@@ -440,7 +445,9 @@ function scanPassiveStructuralNames(bytes) {
         stopForUnsupportedStreamLength(
           dictionary?.lengthKind === 'INDIRECT'
             ? 'INDIRECT_STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER'
-            : 'STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER',
+            : dictionary?.lengthKind === 'AMBIGUOUS'
+              ? 'AMBIGUOUS_STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER'
+              : 'STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER',
         );
         break;
       }
