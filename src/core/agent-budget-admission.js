@@ -44,7 +44,11 @@ function own(raw, key) {
 
 function integer(value, label, max, fallback = 0) {
   const number = value == null ? fallback : value;
-  if (typeof number !== 'number' || !Number.isSafeInteger(number) || number < 0 || number > max) {
+  if (typeof number !== 'number'
+      || !Number.isSafeInteger(number)
+      || Object.is(number, -0)
+      || number < 0
+      || number > max) {
     throw new Error(`${label} is invalid`);
   }
   return number;
