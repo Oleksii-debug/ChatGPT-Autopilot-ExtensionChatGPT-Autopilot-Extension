@@ -93,6 +93,8 @@ const TRIGGER_KEYS = new Set([
 ]);
 
 const ASSESSMENT_KEYS = new Set([
+  'contractId',
+  'contractRevision',
   'criterionId',
   'status',
   'evidenceArtifactIds',
@@ -163,7 +165,9 @@ function timestamp(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a timestamp`);
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  const canonical = new Date(ms).toISOString();
+  if (value !== canonical) throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  return canonical;
 }
 
 function integer(value, label, min, max) {
@@ -513,6 +517,13 @@ function normalizeAssessment(input) {
     throw new Error('Outcome criterion assessment status is invalid');
   }
   return {
+    contractId: id(own(raw, 'contractId', 'OutcomeCriterionAssessmentV1'), 'assessment contractId'),
+    contractRevision: integer(
+      own(raw, 'contractRevision', 'OutcomeCriterionAssessmentV1'),
+      'assessment contractRevision',
+      1,
+      Number.MAX_SAFE_INTEGER,
+    ),
     criterionId: id(own(raw, 'criterionId', 'OutcomeCriterionAssessmentV1'), 'criterionId'),
     status,
     evidenceArtifactIds: idList(
@@ -552,6 +563,12 @@ export function projectOutcomeEvidenceV1(input = {}) {
 
   const criteriaById = new Map(normalized.completionCriteria.map(item => [item.criterionId, item]));
   for (const row of rows) {
+    if (row.contractId !== normalized.contractId || row.contractRevision !== normalized.revision) {
+      throw new Error(`Assessment ${row.criterionId} is not bound to the exact contract revision`);
+    }
+    if (row.assessedAt < normalized.createdAt) {
+      throw new Error(`Assessment ${row.criterionId} predates contract creation`);
+    }
     if (row.assessedBy !== normalized.verifierPlan.verifierId) {
       throw new Error(`Assessment ${row.criterionId} is not attributed to the declared verifier`);
     }
