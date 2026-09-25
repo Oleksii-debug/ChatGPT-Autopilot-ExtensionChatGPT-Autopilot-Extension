@@ -75,11 +75,27 @@ async function payload(overrides = {}, terminalFact = fact()) {
   };
 }
 
-function dependencies(terminalFact = fact()) {
+function dependencies(terminalFact = fact(), { artifactPatch = {}, onMaterialize = null } = {}) {
   return {
     resolveTerminalActivation: async query => {
       assert.deepEqual(query, identity());
       return structuredClone(terminalFact);
+    },
+    materializeTerminalPayload: async material => {
+      const descriptor = await createTerminalAgentPayloadDescriptorV1(terminalFact);
+      assert.deepEqual(material, {
+        schemaVersion: 1,
+        providerId: TERMINAL_AGENT_PROVIDER_ID,
+        kind: TERMINAL_AGENT_PAYLOAD_KIND,
+        mediaType: 'application/json',
+        sensitive: false,
+        ...terminalFact,
+        materialUtf8: descriptor.materialUtf8,
+        sha256: descriptor.sha256,
+        sizeBytes: descriptor.sizeBytes,
+      });
+      if (onMaterialize) onMaterialize(material);
+      return payload(artifactPatch, terminalFact);
     },
   };
 }
@@ -90,13 +106,11 @@ test('projects one trusted orchestration terminal fact into deterministic TERMIN
   const first = await createTerminalAgentTriggerObservationV1({
     trigger: t,
     terminalIdentity: identity(),
-    payloadArtifactRef: p,
     observedAt: T3,
   }, dependencies());
   const second = await createTerminalAgentTriggerObservationV1({
     trigger: structuredClone(t),
     terminalIdentity: identity(),
-    payloadArtifactRef: structuredClone(p),
     observedAt: T3,
   }, dependencies());
 
@@ -114,7 +128,6 @@ test('generated observation composes with the canonical EventTrigger admission w
   const observation = await createTerminalAgentTriggerObservationV1({
     trigger: t,
     terminalIdentity: identity(),
-    payloadArtifactRef: await payload(),
     observedAt: T3,
   }, dependencies());
 
@@ -169,7 +182,6 @@ test('trusted terminal fact must match every requested causal identity field', a
       async () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
-        payloadArtifactRef: await payload({}, terminalFact),
         observedAt: T3,
       }, dependencies(terminalFact)),
       /does not match requested terminal identity/u,
@@ -188,33 +200,48 @@ test('terminal status and timestamps are exact canonical trusted fact data', asy
       async () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
-        payloadArtifactRef: await payload(),
         observedAt: T3,
       }, dependencies(terminalFact)),
     );
   }
 });
 
-test('payload artifact is byte-identity bound to canonical terminal fact material', async () => {
+test('trusted materializer result is byte-identity bound to canonical terminal fact material', async () => {
   const t = await trigger();
   await assert.rejects(
     async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
-      payloadArtifactRef: await payload({ sha256: 'f'.repeat(64) }),
       observedAt: T3,
-    }, dependencies()),
+    }, dependencies(fact(), { artifactPatch: { sha256: 'f'.repeat(64) } })),
     /does not match canonical terminal fact bytes/u,
   );
   await assert.rejects(
     async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
-      payloadArtifactRef: await payload({ sizeBytes: 1 }),
       observedAt: T3,
-    }, dependencies()),
+    }, dependencies(fact(), { artifactPatch: { sizeBytes: 1 } })),
     /does not match canonical terminal fact bytes/u,
   );
+});
+
+test('caller cannot supply payload ArtifactRef as trust proof even when metadata matches', async () => {
+  const t = await trigger();
+  const forgedArtifact = await payload();
+  let materializeCalls = 0;
+  await assert.rejects(
+    () => createTerminalAgentTriggerObservationV1({
+      trigger: t,
+      terminalIdentity: identity(),
+      payloadArtifactRef: forgedArtifact,
+      observedAt: T3,
+    }, dependencies(fact(), {
+      onMaterialize: () => { materializeCalls += 1; },
+    })),
+    /unknown field: payloadArtifactRef/u,
+  );
+  assert.equal(materializeCalls, 0);
 });
 
 test('payload representation and chronology fail closed', async () => {
@@ -226,12 +253,11 @@ test('payload representation and chronology fail closed', async () => {
     { createdAt: T0 },
   ]) {
     await assert.rejects(
-      async () => createTerminalAgentTriggerObservationV1({
+      () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
-        payloadArtifactRef: await payload(artifactPatch),
         observedAt: T3,
-      }, dependencies()),
+      }, dependencies(fact(), { artifactPatch })),
     );
   }
 
@@ -239,7 +265,6 @@ test('payload representation and chronology fail closed', async () => {
     async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
-      payloadArtifactRef: await payload(),
       observedAt: T0,
     }, dependencies()),
     /predates trusted terminal fact/u,
@@ -257,7 +282,6 @@ test('trigger kind, provider and graph/node binding must be canonical', async ()
       async () => createTerminalAgentTriggerObservationV1({
         trigger: badTrigger,
         terminalIdentity: identity(),
-        payloadArtifactRef: await payload(),
         observedAt: T3,
       }, dependencies()),
     );
@@ -266,7 +290,6 @@ test('trigger kind, provider and graph/node binding must be canonical', async ()
   const observation = await createTerminalAgentTriggerObservationV1({
     trigger: good,
     terminalIdentity: identity(),
-    payloadArtifactRef: await payload(),
     observedAt: T3,
   }, dependencies());
   assert.equal(observation.triggerId, good.triggerId);
@@ -278,7 +301,6 @@ test('hostile request/dependency accessors are rejected without getter execution
   const request = {
     trigger: t,
     terminalIdentity: identity(),
-    payloadArtifactRef: await payload(),
     observedAt: T3,
   };
   Object.defineProperty(request, 'terminalIdentity', {
@@ -306,7 +328,6 @@ test('hostile request/dependency accessors are rejected without getter execution
     async () => createTerminalAgentTriggerObservationV1({
       trigger: t,
       terminalIdentity: identity(),
-      payloadArtifactRef: await payload(),
       observedAt: T3,
     }, hostileDeps),
     /enumerable own data property/u,
@@ -322,13 +343,11 @@ test('changing trusted terminal status changes exact source event and payload id
   const completed = await createTerminalAgentTriggerObservationV1({
     trigger: t,
     terminalIdentity: identity(),
-    payloadArtifactRef: await payload({}, completedFact),
     observedAt: T3,
   }, dependencies(completedFact));
   const failed = await createTerminalAgentTriggerObservationV1({
     trigger: t,
     terminalIdentity: identity(),
-    payloadArtifactRef: await payload({}, failedFact),
     observedAt: T3,
   }, dependencies(failedFact));
 
