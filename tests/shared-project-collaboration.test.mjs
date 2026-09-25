@@ -263,6 +263,7 @@ test('access resolves exact trusted binding, Project snapshot and governance reg
   assert.equal(result.collaborationEligible, true);
   assert.equal(result.reasonCode, 'ELIGIBLE_FOR_CANONICAL_POLICY');
   assert.equal(result.canonicalSourcesResolved, true);
+  assert.equal(result.projectOwnerCurrentlyBound, true);
   assert.deepEqual(result.effectiveGrantIds, ['grant-agent', 'grant-owner']);
   assert.deepEqual(result.capabilityCeilingIds, ['project.comment', 'project.read']);
   assert.deepEqual(result.providerCeilingIds, ['drive']);
@@ -316,6 +317,26 @@ test('revoked principals fail closed at assessment instant', async () => {
   assert.equal(result.active, false);
   assert.equal(result.collaborationEligible, false);
   assert.equal(result.reasonCode, 'PRINCIPAL_INACTIVE');
+});
+
+test('current owner revocation invalidates collaboration even for an independently granted user', async () => {
+  const revokedOwnerRegistry = registry();
+  revokedOwnerRegistry.principals = revokedOwnerRegistry.principals.map(item => (
+    item.principalId === 'user-owner'
+      ? { ...item, status: GovernancePrincipalStatus.REVOKED, revokedAt: T25 }
+      : item
+  ));
+  const result = await assessSharedProjectAccessV1(access('user-collab', {
+    requestedCapabilityIds: ['project.read'],
+    requestedProviderIds: ['github'],
+    requestedOutboundDataClassIds: ['public'],
+  }), trusted({ registryValue: revokedOwnerRegistry }));
+  assert.equal(result.active, true);
+  assert.equal(result.projectOwnerCurrentlyBound, false);
+  assert.equal(result.collaborationEligible, false);
+  assert.equal(result.reasonCode, 'PROJECT_OWNER_INACTIVE_OR_UNBOUND');
+  assert.equal(result.authorizationGranted, false);
+  assert.equal(result.credentialUseAuthorized, false);
 });
 
 test('trusted source identity, project revision and governance revision drift fail closed', async () => {
