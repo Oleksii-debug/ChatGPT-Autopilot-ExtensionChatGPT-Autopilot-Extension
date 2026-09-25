@@ -297,7 +297,7 @@ function strictInvocation(input) {
     toolId: id(raw.toolId, 'ToolInvocationV1.toolId'),
     providerId: id(raw.providerId, 'ToolInvocationV1.providerId'),
     policyDecisionId: id(raw.policyDecisionId, 'ToolInvocationV1.policyDecisionId'),
-    parentInvocationId: raw.parentInvocationId == null
+    parentInvocationId: raw.parentInvocationId == null || raw.parentInvocationId === ''
       ? null
       : id(raw.parentInvocationId, 'ToolInvocationV1.parentInvocationId'),
     requestedCapabilityIds,
@@ -349,10 +349,10 @@ function strictToolDescriptor(input) {
     ...raw,
     toolId: id(raw.toolId, 'ToolDescriptorV1.toolId'),
     providerId: id(raw.providerId, 'ToolDescriptorV1.providerId'),
-    inputSchemaRef: raw.inputSchemaRef == null
+    inputSchemaRef: raw.inputSchemaRef == null || raw.inputSchemaRef === ''
       ? null
       : id(raw.inputSchemaRef, 'ToolDescriptorV1.inputSchemaRef'),
-    outputSchemaRef: raw.outputSchemaRef == null
+    outputSchemaRef: raw.outputSchemaRef == null || raw.outputSchemaRef === ''
       ? null
       : id(raw.outputSchemaRef, 'ToolDescriptorV1.outputSchemaRef'),
     capabilityIds,
