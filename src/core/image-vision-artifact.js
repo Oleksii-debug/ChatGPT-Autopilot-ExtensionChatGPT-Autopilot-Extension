@@ -418,12 +418,7 @@ export async function analyzeImageArtifactV1(input, {
   return deepFreeze({
     schemaVersion: IMAGE_VISION_ARTIFACT_SCHEMA_VERSION,
     analysisId,
-    sourceArtifact: {
-      artifactId: artifactRef.artifactId,
-      sha256: artifactRef.sha256,
-      mediaType: artifactRef.mediaType,
-      sizeBytes: artifactRef.sizeBytes,
-    },
+    sourceArtifact: artifactRef,
     ownerPurpose,
     model,
     sourceTrust: 'MODEL_OBSERVATION',
