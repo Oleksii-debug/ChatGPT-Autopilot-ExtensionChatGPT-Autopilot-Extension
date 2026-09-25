@@ -856,6 +856,67 @@
           <p id="drive-prompt-status" role="status">Drive source вимкнено.</p>
         </fieldset>
 
+        <fieldset id="calendar-schedule-settings">
+          <legend>Календарний розклад</legend>
+          <p id="calendar-help">Усі дати й час можна вводити без миші. Формат дати: YYYY-MM-DD. Формат часу: HH:MM. Для кількох часів або явних запусків використовуйте по одному запису в рядку.</p>
+
+          <label for="calendar-mode">Режим календаря</label>
+          <select id="calendar-mode" aria-describedby="calendar-help">
+            <option value="NONE">Зараз / без календаря</option>
+            <option value="ONE_TIME">Одноразово у точну дату й час</option>
+            <option value="DAILY">Щоденний повторюваний розклад</option>
+            <option value="WEEKLY">Щотижневий розклад за вибраними днями</option>
+            <option value="EXPLICIT">Явний список дат і часу</option>
+          </select>
+
+          <div id="calendar-common-fields" hidden>
+            <label for="calendar-time-zone">Часовий пояс IANA</label>
+            <input id="calendar-time-zone" type="text" autocomplete="off" spellcheck="false" placeholder="Europe/Bratislava" aria-describedby="calendar-help">
+            <label><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски</label>
+            <label><input id="calendar-revision-confirm" type="checkbox" aria-describedby="calendar-revision-help"> Підтверджую зміну вже існуючого календарного розкладу</label>
+            <p id="calendar-revision-help">Зміна дати, часу, часового поясу, recurrence або catch-up створює нову revision occurrence identity. Для вже збереженого календаря Core не прийме таку зміну без цього явного підтвердження.</p>
+          </div>
+
+          <div id="calendar-one-time-fields" hidden>
+            <label for="calendar-one-time-date">Дата запуску</label>
+            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <label for="calendar-one-time-time">Час запуску</label>
+            <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off" placeholder="21:00" aria-describedby="calendar-help">
+          </div>
+
+          <div id="calendar-recurring-fields" hidden>
+            <label for="calendar-start-date">Дата початку повторення</label>
+            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+
+            <label for="calendar-times">Часи запуску, по одному в рядку</label>
+            <textarea id="calendar-times" rows="4" spellcheck="false" aria-describedby="calendar-times-help"></textarea>
+            <p id="calendar-times-help">Щоб додати час, додайте новий рядок. Щоб видалити час, видаліть відповідний рядок.</p>
+
+            <fieldset id="calendar-weekdays" hidden>
+              <legend>Дні тижня</legend>
+              <label><input id="calendar-weekday-1" type="checkbox"> Понеділок</label>
+              <label><input id="calendar-weekday-2" type="checkbox"> Вівторок</label>
+              <label><input id="calendar-weekday-3" type="checkbox"> Середа</label>
+              <label><input id="calendar-weekday-4" type="checkbox"> Четвер</label>
+              <label><input id="calendar-weekday-5" type="checkbox"> П’ятниця</label>
+              <label><input id="calendar-weekday-6" type="checkbox"> Субота</label>
+              <label><input id="calendar-weekday-7" type="checkbox"> Неділя</label>
+            </fieldset>
+
+            <label for="calendar-end-date">Необов’язкова кінцева дата</label>
+            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-12-31" aria-describedby="calendar-help">
+            <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
+            <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
+          </div>
+
+          <div id="calendar-explicit-fields" hidden>
+            <label for="calendar-explicit-occurrences">Явні дати й час, по одному запуску в рядку</label>
+            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="2026-09-25 09:00&#10;2026-09-25 14:00&#10;2026-09-25 21:00" aria-describedby="calendar-help"></textarea>
+          </div>
+
+          <p id="calendar-runtime-status" role="status" tabindex="0">Календарний розклад вимкнено.</p>
+        </fieldset>
+
         <fieldset id="run-mode">
           <legend>Run mode</legend>
           <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
