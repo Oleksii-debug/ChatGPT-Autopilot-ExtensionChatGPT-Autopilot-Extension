@@ -136,6 +136,10 @@ function canonicalTimestamp(value, label) {
   return canonical;
 }
 
+function timestampMillis(value, label) {
+  return Date.parse(canonicalTimestamp(value, label));
+}
+
 function idList(value, label) {
   const raw = strictArray(value ?? [], label);
   const out = raw.map((item, index) => exactId(item, `${label}[${index}]`));
@@ -243,7 +247,8 @@ export function normalizeEventTriggerObservationV1(value) {
   exactVersion(raw.schemaVersion, 'EventTriggerObservationV1');
   const payloadArtifactRef = snapshotArtifact(raw.payloadArtifactRef);
   const observedAt = canonicalTimestamp(raw.observedAt, 'EventTriggerObservationV1 observedAt');
-  if (payloadArtifactRef.createdAt > observedAt) {
+  if (timestampMillis(payloadArtifactRef.createdAt, 'EventTriggerObservationV1 payloadArtifactRef createdAt')
+      > timestampMillis(observedAt, 'EventTriggerObservationV1 observedAt')) {
     throw new Error('EventTriggerObservationV1 payload artifact cannot postdate observation');
   }
   return freezeDeep({
@@ -309,10 +314,12 @@ export async function createEventTriggerAdmissionV1(value, options = {}) {
       throw new Error(`Event trigger observation ${key} does not match trigger definition`);
     }
   }
-  if (observation.observedAt < trigger.createdAt) {
+  if (timestampMillis(observation.observedAt, 'EventTriggerObservationV1 observedAt')
+      < timestampMillis(trigger.createdAt, 'EventTriggerDefinitionV1 createdAt')) {
     throw new Error('Event trigger observation predates trigger definition');
   }
-  if (admittedAt < observation.observedAt) {
+  if (timestampMillis(admittedAt, 'Event trigger admittedAt')
+      < timestampMillis(observation.observedAt, 'EventTriggerObservationV1 observedAt')) {
     throw new Error('Event trigger admission predates observation');
   }
 
