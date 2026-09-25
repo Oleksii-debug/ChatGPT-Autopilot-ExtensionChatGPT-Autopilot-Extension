@@ -283,6 +283,7 @@ async function itemDigest(spec, parameters, cryptoApi) {
   const canonical = JSON.stringify([
     'chatgpt-autopilot-batch-item-v1',
     spec.batchId,
+    spec.producerId,
     spec.workloadId,
     spec.workloadRevisionId,
     spec.workloadSha256,
@@ -314,6 +315,7 @@ export async function expandBatchMatrixV1(
       batchId: spec.batchId,
       itemId,
       itemSha256: digest,
+      producerId: spec.producerId,
       workloadId: spec.workloadId,
       workloadRevisionId: spec.workloadRevisionId,
       workloadSha256: spec.workloadSha256,
@@ -359,7 +361,7 @@ function normalizeEvidenceRefs(input, label) {
   return refs;
 }
 
-function normalizeResult(input, index, spec, itemById) {
+function normalizeResult(input, index, spec, itemById, assessedAt) {
   const label = 'results[' + index + ']';
   const raw = record(input, label);
   exactKeys(raw, RESULT_KEYS, label);
@@ -397,6 +399,13 @@ function normalizeResult(input, index, spec, itemById) {
   }
   if (startedAt && completedAt && Date.parse(completedAt) < Date.parse(startedAt)) {
     throw new Error(label + ' completedAt predates startedAt');
+  }
+  const assessedMs = Date.parse(assessedAt);
+  if (startedAt && Date.parse(startedAt) > assessedMs) {
+    throw new Error(label + ' startedAt exceeds assessedAt');
+  }
+  if (completedAt && Date.parse(completedAt) > assessedMs) {
+    throw new Error(label + ' completedAt exceeds assessedAt');
   }
 
   if (status === BatchItemStatus.PENDING) {
@@ -457,10 +466,14 @@ function implicitPending(spec, item) {
 export async function assessBatchMatrixV1(
   specInput,
   resultsInput = [],
-  { cryptoApi = globalThis.crypto } = {},
+  { cryptoApi = globalThis.crypto, assessedAt } = {},
 ) {
+  const assessedAtCanonical = timestamp(assessedAt, 'assessedAt');
   const expansion = await expandBatchMatrixV1(specInput, { cryptoApi });
   const spec = expansion.spec;
+  if (Date.parse(assessedAtCanonical) < Date.parse(spec.createdAt)) {
+    throw new Error('assessedAt predates batch creation');
+  }
   const itemById = new Map(expansion.items.map((item) => [item.itemId, item]));
   const rawResults = denseArray(resultsInput, 'results', {
     max: MAX_BATCH_ITEMS,
@@ -468,7 +481,13 @@ export async function assessBatchMatrixV1(
   const resultById = new Map();
 
   for (let index = 0; index < rawResults.length; index += 1) {
-    const result = normalizeResult(rawResults[index], index, spec, itemById);
+    const result = normalizeResult(
+      rawResults[index],
+      index,
+      spec,
+      itemById,
+      assessedAtCanonical,
+    );
     if (resultById.has(result.itemId)) throw new Error('results contains duplicate itemId');
     resultById.set(result.itemId, result);
   }
@@ -511,9 +530,11 @@ export async function assessBatchMatrixV1(
   return freezeDeep({
     schemaVersion: BATCH_MATRIX_SCHEMA_VERSION,
     batchId: spec.batchId,
+    producerId: spec.producerId,
     workloadId: spec.workloadId,
     workloadRevisionId: spec.workloadRevisionId,
     workloadSha256: spec.workloadSha256,
+    assessedAt: assessedAtCanonical,
     state,
     totalItems: results.length,
     counts: freezeDeep(counts),
