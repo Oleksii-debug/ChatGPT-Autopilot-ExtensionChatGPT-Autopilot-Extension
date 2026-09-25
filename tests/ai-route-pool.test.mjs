@@ -4,6 +4,7 @@ import {
   classifyAiRouteError,
   normalizeAiRoutePolicy,
   normalizeAiRoutePool,
+  normalizeAiRouteStates,
   normalizeAiWorkerPolicy,
   recordAiRouteOutcome,
   selectAiRouteCandidates,
@@ -413,6 +414,84 @@ test('route final tie-break uses locale-independent code-unit order', () => {
     selectAiRouteCandidates({ routes:sameRank, policy:{}, role:'planner', now:1000 })
       .candidates.map(route => route.routeId),
     ['Zulu', 'alpha'],
+  );
+});
+
+test('durable route state is descriptor-snapshotted and malformed authority fails closed', () => {
+  const route = normalizeAiRoutePool([{ routeId:'a', provider:'ollama', model:'a', roles:[], priority:1 }]);
+  let reads = 0;
+  let coercions = 0;
+  const nested = new Proxy({
+    consecutiveFailures:1,
+    failures:1,
+    successes:0,
+    backoffUntil:160_000,
+    circuitOpenUntil:0,
+    lastErrorCode:'HTTP_429',
+    lastErrorCategory:'quota-or-rate',
+    lastErrorAt:100_000,
+    lastSuccessAt:0,
+    lastLatencyMs:10,
+  }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const outer = new Proxy({ a:nested }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalized = normalizeAiRouteStates(outer, route);
+  assert.equal(normalized.a.backoffUntil, 160_000);
+  assert.equal(reads, 0, 'durable route state must not perform ordinary caller property reads');
+
+  const hostileNumber = {
+    valueOf() {
+      coercions += 1;
+      return 0;
+    },
+    toString() {
+      coercions += 1;
+      return '0';
+    },
+  };
+  assert.throws(
+    () => normalizeAiRouteStates({ a:{ backoffUntil:hostileNumber } }, route),
+    /backoffUntil is invalid/u,
+  );
+  assert.equal(coercions, 0, 'durable route state must reject objects before numeric coercion');
+
+  const accessor = {};
+  Object.defineProperty(accessor, 'backoffUntil', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 0;
+    },
+  });
+  assert.throws(
+    () => normalizeAiRouteStates({ a:accessor }, route),
+    /enumerable own data property/u,
+  );
+  assert.equal(reads, 0, 'durable route state getters must never execute');
+
+  const hiddenOuter = {};
+  Object.defineProperty(hiddenOuter, 'a', {
+    value:{ backoffUntil:160_000 },
+    enumerable:false,
+  });
+  assert.throws(
+    () => normalizeAiRouteStates(hiddenOuter, route),
+    /enumerable own data property/u,
+  );
+
+  assert.throws(
+    () => normalizeAiRouteStates({ a:{ backoffUntil:'not-a-number' } }, route),
+    /backoffUntil is invalid/u,
   );
 });
 
