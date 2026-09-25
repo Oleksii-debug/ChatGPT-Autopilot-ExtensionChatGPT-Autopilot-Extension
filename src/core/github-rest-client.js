@@ -16,6 +16,9 @@ const WORKFLOW_RUN_STATUSES = new Set([
   'stale', 'success', 'timed_out', 'in_progress', 'queued', 'requested',
   'waiting', 'pending',
 ]);
+const WORKFLOW_RUN_CANCELABLE_STATUSES = new Set([
+  'in_progress', 'queued', 'requested', 'waiting', 'pending',
+]);
 const WORKFLOW_JOB_FILTERS = new Set(['latest', 'all']);
 const MAX_ACTIONS_PAGE = 10_000;
 const MAX_WORKFLOW_STEPS_PER_JOB = 256;
@@ -183,6 +186,20 @@ function exactRef(value, label) {
     throw githubError('GITHUB_INVALID_REQUEST', label + ' must use exact canonical text', { safeToRetry: true });
   }
   return refName(value, label);
+}
+
+function exactSha(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || value !== value.toLowerCase()) {
+    throw githubError('GITHUB_INVALID_REQUEST', label + ' must use exact canonical lowercase SHA text', { safeToRetry: true });
+  }
+  return sha(value, label);
+}
+
+function workflowRunPrecondition(message) {
+  return githubError('GITHUB_WORKFLOW_RUN_PRECONDITION_FAILED', message, {
+    effectMayHaveOccurred: false,
+    safeToRetry: true,
+  });
 }
 
 function workflowDispatchInputs(value) {
@@ -863,6 +880,88 @@ export class GitHubRestClientV1 {
     if (htmlUrl !== expectedHtmlUrl) throw githubError('GITHUB_RESPONSE_INVALID', 'GitHub workflow dispatch HTML URL identity mismatch', { effectMayHaveOccurred: true, safeToRetry: false });
     return Object.freeze({ repositoryFullName: repository, workflowId, ref, inputs, runId, runUrl, htmlUrl });
   }
+  async rerunWorkflowRun(input = {}) {
+    const args = strictInputRecord(
+      input,
+      new Set(['repositoryFullName', 'runId', 'expectedWorkflowId', 'expectedRunAttempt', 'expectedHeadSha']),
+      'workflowRun.rerun input',
+    );
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const runId = positiveInteger(args.runId, 'runId');
+    const expectedWorkflowId = positiveInteger(args.expectedWorkflowId, 'expectedWorkflowId');
+    const expectedRunAttempt = positiveInteger(args.expectedRunAttempt, 'expectedRunAttempt');
+    const expectedHeadSha = exactSha(args.expectedHeadSha, 'expectedHeadSha');
+    const before = await this.readWorkflowRun({ repositoryFullName: repository, runId });
+    if (before.workflowId !== expectedWorkflowId
+        || before.runAttempt !== expectedRunAttempt
+        || before.headSha !== expectedHeadSha) {
+      throw workflowRunPrecondition('GitHub workflow run changed since the owner-authorized expected identity');
+    }
+    if (before.status !== 'completed') {
+      throw workflowRunPrecondition('GitHub workflow run must be completed before rerun');
+    }
+    await this.request(
+      'POST',
+      '/repos/' + repositoryPath(repository) + '/actions/runs/' + runId + '/rerun',
+      { effectful: true, expectedStatuses: [201] },
+    );
+    return Object.freeze({
+      operation: 'RERUN',
+      repositoryFullName: repository,
+      runId,
+      workflowId: before.workflowId,
+      runNumber: before.runNumber,
+      headSha: before.headSha,
+      event: before.event,
+      previousRunAttempt: before.runAttempt,
+      previousStatus: before.status,
+      previousConclusion: before.conclusion,
+      previousUpdatedAt: before.updatedAt,
+    });
+  }
+
+  async cancelWorkflowRun(input = {}) {
+    const args = strictInputRecord(
+      input,
+      new Set(['repositoryFullName', 'runId', 'expectedWorkflowId', 'expectedRunAttempt', 'expectedHeadSha']),
+      'workflowRun.cancel input',
+    );
+    const repository = exactRepositoryName(args.repositoryFullName);
+    this.assertRepositoryAllowed(repository);
+    const runId = positiveInteger(args.runId, 'runId');
+    const expectedWorkflowId = positiveInteger(args.expectedWorkflowId, 'expectedWorkflowId');
+    const expectedRunAttempt = positiveInteger(args.expectedRunAttempt, 'expectedRunAttempt');
+    const expectedHeadSha = exactSha(args.expectedHeadSha, 'expectedHeadSha');
+    const before = await this.readWorkflowRun({ repositoryFullName: repository, runId });
+    if (before.workflowId !== expectedWorkflowId
+        || before.runAttempt !== expectedRunAttempt
+        || before.headSha !== expectedHeadSha) {
+      throw workflowRunPrecondition('GitHub workflow run changed since the owner-authorized expected identity');
+    }
+    if (!WORKFLOW_RUN_CANCELABLE_STATUSES.has(before.status) || before.conclusion !== '') {
+      throw workflowRunPrecondition('GitHub workflow run is not in a canonical cancellable state');
+    }
+    await this.request(
+      'POST',
+      '/repos/' + repositoryPath(repository) + '/actions/runs/' + runId + '/cancel',
+      { effectful: true, expectedStatuses: [202] },
+    );
+    return Object.freeze({
+      operation: 'CANCEL',
+      repositoryFullName: repository,
+      runId,
+      workflowId: before.workflowId,
+      runNumber: before.runNumber,
+      headSha: before.headSha,
+      event: before.event,
+      previousRunAttempt: before.runAttempt,
+      previousStatus: before.status,
+      previousConclusion: before.conclusion,
+      previousUpdatedAt: before.updatedAt,
+    });
+  }
+
   async listWorkflowRunJobs(input = {}) {
     const args = strictInputRecord(
       input,

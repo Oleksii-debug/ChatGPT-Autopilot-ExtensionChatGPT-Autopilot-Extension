@@ -6,11 +6,11 @@ import {
   EventTriggerSchedulerReceiptStatus,
 } from '../src/core/event-trigger-runtime.js';
 import {
-  DriveChangeKind,
-  admitDriveChangeV1,
-  normalizeDriveChangeV1,
-  normalizeDriveWatchBindingV1,
-} from '../src/core/drive-event-trigger-adapter.js';
+  ApiResourceChangeKind,
+  admitApiResourceChangeV1,
+  normalizeApiMonitorBindingV1,
+  normalizeApiResourceChangeV1,
+} from '../src/core/api-event-trigger-adapter.js';
 
 const T0 = '2026-09-25T10:00:00.000Z';
 const T1 = '2026-09-25T10:01:00.000Z';
@@ -20,14 +20,14 @@ const SHA_A = 'a'.repeat(64);
 function trigger(overrides = {}) {
   return {
     schemaVersion: 1,
-    triggerId: 'drive-trigger-1',
-    triggerRevision: 2,
+    triggerId: 'api-trigger-1',
+    triggerRevision: 3,
     agentId: 'agent-1',
     jobId: 'job-1',
-    kind: 'DRIVE',
-    providerId: 'google-workspace',
-    sourceBindingId: 'drive-source-1',
-    requiredCapabilityIds: ['google.drive.changes.read'],
+    kind: 'API',
+    providerId: 'api-monitor-provider',
+    sourceBindingId: 'api-source-1',
+    requiredCapabilityIds: ['api.monitor.read'],
     enabled: true,
     createdAt: T0,
     ...overrides,
@@ -37,15 +37,14 @@ function trigger(overrides = {}) {
 function binding(overrides = {}) {
   return {
     schemaVersion: 1,
-    bindingId: 'drive-binding-1',
-    bindingRevision: 4,
-    triggerId: 'drive-trigger-1',
-    triggerRevision: 2,
-    providerId: 'google-workspace',
-    sourceBindingId: 'drive-source-1',
-    watchId: 'watch-1',
+    bindingId: 'api-binding-1',
+    bindingRevision: 5,
+    triggerId: 'api-trigger-1',
+    triggerRevision: 3,
+    providerId: 'api-monitor-provider',
+    sourceBindingId: 'api-source-1',
+    monitorId: 'monitor-1',
     resourceId: 'resource-1',
-    driveScopeId: 'scope-1',
     maxChangeAgeSeconds: 300,
     createdAt: T0,
     ...overrides,
@@ -55,15 +54,15 @@ function binding(overrides = {}) {
 function artifact(overrides = {}) {
   return {
     schemaVersion: 1,
-    artifactId: 'drive-change-evidence-1',
-    kind: 'drive-change-evidence',
-    uri: 'artifact://drive/change-1',
+    artifactId: 'api-change-evidence-1',
+    kind: 'api-change-evidence',
+    uri: 'artifact://api/change-1',
     mediaType: 'application/json',
     sha256: SHA_A,
-    sizeBytes: 128,
+    sizeBytes: 96,
     createdAt: T1,
     producerInvocationId: null,
-    sensitive: true,
+    sensitive: false,
     ...overrides,
   };
 }
@@ -71,14 +70,14 @@ function artifact(overrides = {}) {
 function change(overrides = {}) {
   return {
     schemaVersion: 1,
-    bindingId: 'drive-binding-1',
-    bindingRevision: 4,
-    watchId: 'watch-1',
+    bindingId: 'api-binding-1',
+    bindingRevision: 5,
+    monitorId: 'monitor-1',
     resourceId: 'resource-1',
-    driveScopeId: 'scope-1',
-    changeToken: 'page-token-123:ordinal-7',
-    changeKind: DriveChangeKind.FILE_CHANGED,
-    fileId: 'file-1',
+    changeId: 'change-42',
+    changeKind: ApiResourceChangeKind.UPDATED,
+    previousVersion: 'etag-v1',
+    currentVersion: 'etag-v2',
     evidenceArtifactRef: artifact(),
     observedAt: T1,
     ...overrides,
@@ -87,9 +86,9 @@ function change(overrides = {}) {
 
 function request(overrides = {}) {
   return {
-    bindingId: 'drive-binding-1',
-    bindingRevision: 4,
-    changeToken: 'page-token-123:ordinal-7',
+    bindingId: 'api-binding-1',
+    bindingRevision: 5,
+    changeId: 'change-42',
     admittedAt: T2,
     ...overrides,
   };
@@ -104,23 +103,23 @@ function deps({
     status: EventTriggerSchedulerReceiptStatus.ACCEPTED,
     occurrenceId: schedulerRequest.occurrenceId,
     materialFingerprint: schedulerRequest.materialFingerprint,
-    canonicalTaskId: 'task-drive-1',
-    schedulerRevision: 5,
+    canonicalTaskId: 'task-api-1',
+    schedulerRevision: 7,
     reason: '',
   }),
 } = {}) {
   return {
     resolveTriggerDefinition: async () => trustedTrigger,
-    resolveDriveWatchBinding: async () => trustedBinding,
-    resolveDriveChange: async () => trustedChange,
+    resolveApiMonitorBinding: async () => trustedBinding,
+    resolveApiResourceChange: async () => trustedChange,
     admitCanonicalOccurrence,
   };
 }
 
-test('trusted Drive change is bound to exact watch identity and canonical scheduler', async () => {
+test('trusted API change reaches canonical scheduler with exact resource identity', async () => {
   let calls = 0;
   let seen;
-  const out = await admitDriveChangeV1(request(), deps({
+  const out = await admitApiResourceChangeV1(request(), deps({
     admitCanonicalOccurrence: async (schedulerRequest) => {
       calls += 1;
       seen = schedulerRequest;
@@ -129,37 +128,82 @@ test('trusted Drive change is bound to exact watch identity and canonical schedu
         status: EventTriggerSchedulerReceiptStatus.ACCEPTED,
         occurrenceId: schedulerRequest.occurrenceId,
         materialFingerprint: schedulerRequest.materialFingerprint,
-        canonicalTaskId: 'task-drive-1',
-        schedulerRevision: 5,
+        canonicalTaskId: 'task-api-1',
+        schedulerRevision: 7,
         reason: '',
       };
     },
   }));
 
   assert.equal(calls, 1);
-  assert.equal(seen.kind, 'DRIVE');
-  assert.equal(seen.triggerId, 'drive-trigger-1');
-  assert.equal(seen.providerId, 'google-workspace');
-  assert.equal(seen.sourceBindingId, 'drive-source-1');
-  assert.match(seen.sourceEventId, /^drive:[a-f0-9]{64}$/u);
-  assert.equal(seen.payloadArtifactId, 'drive-change-evidence-1');
+  assert.equal(seen.kind, 'API');
+  assert.equal(seen.triggerId, 'api-trigger-1');
+  assert.equal(seen.providerId, 'api-monitor-provider');
+  assert.equal(seen.sourceBindingId, 'api-source-1');
+  assert.match(seen.sourceEventId, /^api:[a-f0-9]{64}$/u);
+  assert.equal(seen.payloadArtifactId, 'api-change-evidence-1');
 
   assert.equal(out.status, EventTriggerRuntimeStatus.ACCEPTED);
-  assert.equal(out.driveBindingId, 'drive-binding-1');
-  assert.equal(out.driveWatchId, 'watch-1');
-  assert.equal(out.driveResourceId, 'resource-1');
-  assert.equal(out.driveScopeId, 'scope-1');
-  assert.equal(out.driveChangeKind, DriveChangeKind.FILE_CHANGED);
-  assert.equal(out.driveFileId, 'file-1');
-  assert.equal(out.driveChangeFresh, true);
-  assert.equal(out.watchAuthority, false);
-  assert.equal(out.changeFeedCursorAuthority, false);
+  assert.equal(out.apiMonitorId, 'monitor-1');
+  assert.equal(out.apiResourceId, 'resource-1');
+  assert.equal(out.apiChangeId, 'change-42');
+  assert.equal(out.apiChangeKind, ApiResourceChangeKind.UPDATED);
+  assert.equal(out.apiPreviousVersion, 'etag-v1');
+  assert.equal(out.apiCurrentVersion, 'etag-v2');
   assert.equal(out.providerNetworkAuthority, false);
+  assert.equal(out.pollingAuthority, false);
   assert.equal(out.executionAuthorized, false);
   assert.equal(Object.isFrozen(out), true);
 });
 
-test('Drive trigger/binding/change identities must match exact trusted revisions', async () => {
+test('CREATED UPDATED and DELETED enforce exact version transition shapes', () => {
+  const created = normalizeApiResourceChangeV1(change({
+    changeKind: ApiResourceChangeKind.CREATED,
+    previousVersion: '',
+    currentVersion: 'v1',
+  }));
+  assert.equal(created.currentVersion, 'v1');
+
+  const quotedEtag = normalizeApiResourceChangeV1(change({
+    previousVersion: 'W/"etag-v1"',
+    currentVersion: '"etag-v2"',
+  }));
+  assert.equal(quotedEtag.previousVersion, 'W/"etag-v1"');
+  assert.equal(quotedEtag.currentVersion, '"etag-v2"');
+
+  assert.throws(
+    () => normalizeApiResourceChangeV1(change({
+      changeKind: ApiResourceChangeKind.CREATED,
+      previousVersion: 'old',
+      currentVersion: 'v1',
+    })),
+    /CREATED requires empty previousVersion/u,
+  );
+  assert.throws(
+    () => normalizeApiResourceChangeV1(change({
+      previousVersion: 'same',
+      currentVersion: 'same',
+    })),
+    /UPDATED requires distinct non-empty versions/u,
+  );
+
+  const deleted = normalizeApiResourceChangeV1(change({
+    changeKind: ApiResourceChangeKind.DELETED,
+    previousVersion: 'v2',
+    currentVersion: '',
+  }));
+  assert.equal(deleted.currentVersion, '');
+  assert.throws(
+    () => normalizeApiResourceChangeV1(change({
+      changeKind: ApiResourceChangeKind.DELETED,
+      previousVersion: '',
+      currentVersion: '',
+    })),
+    /DELETED requires non-empty previousVersion/u,
+  );
+});
+
+test('trigger binding and resolved change substitutions fail before scheduler', async () => {
   let calls = 0;
   const stop = async () => {
     calls += 1;
@@ -167,31 +211,30 @@ test('Drive trigger/binding/change identities must match exact trusted revisions
   };
 
   await assert.rejects(
-    admitDriveChangeV1(request(), deps({
-      trustedTrigger: trigger({ kind: 'MAIL' }),
+    admitApiResourceChangeV1(request(), deps({
+      trustedTrigger: trigger({ kind: 'SITE' }),
       admitCanonicalOccurrence: stop,
     })),
-    /must resolve a DRIVE trigger/u,
+    /must resolve an API trigger/u,
   );
   await assert.rejects(
-    admitDriveChangeV1(request(), deps({
-      trustedBinding: binding({ resourceId: 'resource-2' }),
-      trustedChange: change(),
+    admitApiResourceChangeV1(request(), deps({
+      trustedChange: change({ resourceId: 'resource-2' }),
       admitCanonicalOccurrence: stop,
     })),
     /resourceId does not match trusted binding/u,
   );
   await assert.rejects(
-    admitDriveChangeV1(request(), deps({
-      trustedChange: change({ changeToken: 'other-token' }),
+    admitApiResourceChangeV1(request(), deps({
+      trustedChange: change({ changeId: 'change-43' }),
       admitCanonicalOccurrence: stop,
     })),
-    /does not match requested changeToken/u,
+    /does not match requested changeId/u,
   );
   assert.equal(calls, 0);
 });
 
-test('stale or future Drive change fails closed before scheduler admission', async () => {
+test('stale or future API changes fail closed before scheduler admission', async () => {
   let calls = 0;
   const stop = async () => {
     calls += 1;
@@ -199,15 +242,14 @@ test('stale or future Drive change fails closed before scheduler admission', asy
   };
 
   await assert.rejects(
-    admitDriveChangeV1(
+    admitApiResourceChangeV1(
       request({ admittedAt: '2026-09-25T10:10:00.000Z' }),
       deps({ admitCanonicalOccurrence: stop }),
     ),
     /stale for configured binding window/u,
   );
-
   await assert.rejects(
-    admitDriveChangeV1(
+    admitApiResourceChangeV1(
       request({ admittedAt: '2026-09-25T10:00:30.000Z' }),
       deps({ admitCanonicalOccurrence: stop }),
     ),
@@ -216,79 +258,44 @@ test('stale or future Drive change fails closed before scheduler admission', asy
   assert.equal(calls, 0);
 });
 
-test('file-level and drive-level change kinds enforce file identity shape', () => {
+test('API evidence is immutable ArtifactRef metadata and direct endpoint/auth material is rejected', () => {
   assert.throws(
-    () => normalizeDriveChangeV1(change({ fileId: '' })),
-    /file change requires fileId/u,
-  );
-  assert.throws(
-    () => normalizeDriveChangeV1(change({
-      changeKind: DriveChangeKind.DRIVE_CHANGED,
-      fileId: 'file-1',
+    () => normalizeApiResourceChangeV1(change({
+      evidenceArtifactRef: artifact({ kind: 'raw-api-response' }),
     })),
-    /drive-level change must not carry fileId/u,
-  );
-
-  const driveLevel = normalizeDriveChangeV1(change({
-    changeKind: DriveChangeKind.DRIVE_CHANGED,
-    fileId: '',
-  }));
-  assert.equal(driveLevel.fileId, '');
-});
-
-test('change evidence must be opaque, immutable, sensitive JSON artifact material', () => {
-  assert.throws(
-    () => normalizeDriveChangeV1(change({
-      evidenceArtifactRef: artifact({ kind: 'raw-file' }),
-    })),
-    /kind must be drive-change-evidence/u,
+    /kind must be api-change-evidence/u,
   );
   assert.throws(
-    () => normalizeDriveChangeV1(change({
-      evidenceArtifactRef: artifact({ sensitive: false }),
-    })),
-    /sensitive must be true/u,
-  );
-  assert.throws(
-    () => normalizeDriveChangeV1(change({
-      evidenceArtifactRef: artifact({ uri: 'https://drive.google.com/file/secret' }),
+    () => normalizeApiResourceChangeV1(change({
+      evidenceArtifactRef: artifact({ uri: 'https://api.example.test/private' }),
     })),
     /opaque artifact:\/\/ URI/u,
   );
   assert.throws(
-    () => normalizeDriveChangeV1(change({
+    () => normalizeApiResourceChangeV1(change({
       evidenceArtifactRef: artifact({ sha256: SHA_A.toUpperCase() }),
     })),
     /canonical lowercase SHA-256/u,
   );
-});
 
-test('raw OAuth, webhook token, path and notification header fields are rejected', () => {
-  for (const extra of [
-    ['accessToken', 'secret'],
-    ['channelToken', 'secret'],
-    ['xGoogMessageNumber', '7'],
-    ['rawPath', 'C:\\secret\\file.txt'],
+  for (const [key, value] of [
+    ['url', 'https://api.example.test/private'],
+    ['authorization', 'Bearer secret'],
+    ['headers', {}],
+    ['responseBody', 'secret'],
   ]) {
     assert.throws(
-      () => normalizeDriveChangeV1({
-        ...change(),
-        [extra[0]]: extra[1],
-      }),
+      () => normalizeApiResourceChangeV1({ ...change(), [key]: value }),
       /unknown field/u,
     );
   }
-
   assert.throws(
-    () => normalizeDriveWatchBindingV1({
-      ...binding(),
-      credentialRef: 'credential-1',
-    }),
+    () => normalizeApiMonitorBindingV1({ ...binding(), credentialRef: 'credential-1' }),
     /unknown field/u,
   );
 });
 
-test('descriptor-backed change evidence fails without invoking getter or scheduler', async () => {
+test('descriptor-backed evidence and dependency accessors fail without execution', async () => {
   let getterReads = 0;
   let schedulerCalls = 0;
   const hostile = artifact();
@@ -302,32 +309,20 @@ test('descriptor-backed change evidence fails without invoking getter or schedul
   });
 
   await assert.rejects(
-    admitDriveChangeV1(
-      request(),
-      deps({
-        trustedChange: change({ evidenceArtifactRef: hostile }),
-        admitCanonicalOccurrence: async () => {
-          schedulerCalls += 1;
-          throw new Error('must not run');
-        },
-      }),
-    ),
+    admitApiResourceChangeV1(request(), deps({
+      trustedChange: change({ evidenceArtifactRef: hostile }),
+      admitCanonicalOccurrence: async () => {
+        schedulerCalls += 1;
+        throw new Error('must not run');
+      },
+    })),
     /field sha256 must be an enumerable own data property/u,
   );
   assert.equal(getterReads, 0);
   assert.equal(schedulerCalls, 0);
-});
 
-test('accessor-backed dependency fails without invoking getter or scheduler', async () => {
-  let getterReads = 0;
-  let schedulerCalls = 0;
-  const bad = deps({
-    admitCanonicalOccurrence: async () => {
-      schedulerCalls += 1;
-      throw new Error('must not run');
-    },
-  });
-  Object.defineProperty(bad, 'resolveDriveChange', {
+  const bad = deps();
+  Object.defineProperty(bad, 'resolveApiResourceChange', {
     enumerable: true,
     configurable: true,
     get() {
@@ -337,14 +332,13 @@ test('accessor-backed dependency fails without invoking getter or scheduler', as
   });
 
   await assert.rejects(
-    admitDriveChangeV1(request(), bad),
-    /resolveDriveChange must be an enumerable own data property/u,
+    admitApiResourceChangeV1(request(), bad),
+    /resolveApiResourceChange must be an enumerable own data property/u,
   );
   assert.equal(getterReads, 0);
-  assert.equal(schedulerCalls, 0);
 });
 
-test('same trusted change token keeps occurrence identity while changed evidence conflicts canonically', async () => {
+test('same trusted changeId keeps occurrence identity while changed material conflicts canonically', async () => {
   const seen = new Map();
   const canonical = async (schedulerRequest) => {
     const prior = seen.get(schedulerRequest.occurrenceId);
@@ -365,8 +359,8 @@ test('same trusted change token keeps occurrence identity while changed evidence
         status: EventTriggerSchedulerReceiptStatus.DUPLICATE,
         occurrenceId: schedulerRequest.occurrenceId,
         materialFingerprint: schedulerRequest.materialFingerprint,
-        canonicalTaskId: 'task-drive-existing',
-        schedulerRevision: 6,
+        canonicalTaskId: 'task-api-existing',
+        schedulerRevision: 8,
         reason: 'Already admitted',
       };
     }
@@ -376,22 +370,19 @@ test('same trusted change token keeps occurrence identity while changed evidence
       status: EventTriggerSchedulerReceiptStatus.ACCEPTED,
       occurrenceId: schedulerRequest.occurrenceId,
       materialFingerprint: schedulerRequest.materialFingerprint,
-      canonicalTaskId: 'task-drive-1',
-      schedulerRevision: 5,
+      canonicalTaskId: 'task-api-1',
+      schedulerRevision: 7,
       reason: '',
     };
   };
 
-  const first = await admitDriveChangeV1(request(), deps({
-    admitCanonicalOccurrence: canonical,
-  }));
-  const duplicate = await admitDriveChangeV1(request(), deps({
-    admitCanonicalOccurrence: canonical,
-  }));
-  const changed = await admitDriveChangeV1(request(), deps({
+  const first = await admitApiResourceChangeV1(request(), deps({ admitCanonicalOccurrence: canonical }));
+  const duplicate = await admitApiResourceChangeV1(request(), deps({ admitCanonicalOccurrence: canonical }));
+  const changed = await admitApiResourceChangeV1(request(), deps({
     trustedChange: change({
+      currentVersion: 'etag-v3',
       evidenceArtifactRef: artifact({
-        artifactId: 'drive-change-evidence-2',
+        artifactId: 'api-change-evidence-2',
         sha256: 'b'.repeat(64),
       }),
     }),
@@ -405,19 +396,19 @@ test('same trusted change token keeps occurrence identity while changed evidence
   assert.equal(first.occurrenceId, changed.occurrenceId);
 });
 
-test('extended-year Drive chronology is ordered by epoch at every admission boundary', async () => {
+test('extended-year API chronology is ordered by epoch at every admission boundary', async () => {
   const beforeBoundary = '9999-12-31T23:59:59.999Z';
   const afterBoundary = '+010000-01-01T00:00:00.000Z';
   const afterBoundaryLater = '+010000-01-01T00:00:00.001Z';
 
-  const valid = normalizeDriveChangeV1(change({
+  const valid = normalizeApiResourceChangeV1(change({
     evidenceArtifactRef: artifact({ createdAt: beforeBoundary }),
     observedAt: afterBoundary,
   }));
   assert.equal(valid.observedAt, afterBoundary);
 
   assert.throws(
-    () => normalizeDriveChangeV1(change({
+    () => normalizeApiResourceChangeV1(change({
       evidenceArtifactRef: artifact({ createdAt: afterBoundary }),
       observedAt: beforeBoundary,
     })),
@@ -431,7 +422,7 @@ test('extended-year Drive chronology is ordered by epoch at every admission boun
   };
 
   await assert.rejects(
-    admitDriveChangeV1(
+    admitApiResourceChangeV1(
       request({ admittedAt: afterBoundaryLater }),
       deps({
         trustedTrigger: trigger({ createdAt: afterBoundary }),
@@ -447,7 +438,7 @@ test('extended-year Drive chronology is ordered by epoch at every admission boun
   );
 
   await assert.rejects(
-    admitDriveChangeV1(
+    admitApiResourceChangeV1(
       request({ admittedAt: afterBoundaryLater }),
       deps({
         trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
@@ -459,11 +450,11 @@ test('extended-year Drive chronology is ordered by epoch at every admission boun
         admitCanonicalOccurrence: stop,
       }),
     ),
-    /Drive change predates trusted binding/u,
+    /API change predates trusted binding/u,
   );
 
   await assert.rejects(
-    admitDriveChangeV1(
+    admitApiResourceChangeV1(
       request({ admittedAt: beforeBoundary }),
       deps({
         trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
@@ -475,10 +466,11 @@ test('extended-year Drive chronology is ordered by epoch at every admission boun
         admitCanonicalOccurrence: stop,
       }),
     ),
-    /Drive admission predates trusted change observation/u,
+    /API admission predates trusted change observation/u,
   );
+  assert.equal(schedulerCalls, 0);
 
-  const accepted = await admitDriveChangeV1(
+  const accepted = await admitApiResourceChangeV1(
     request({ admittedAt: afterBoundaryLater }),
     deps({
       trustedTrigger: trigger({ createdAt: '9999-12-31T23:59:59.998Z' }),
@@ -490,22 +482,19 @@ test('extended-year Drive chronology is ordered by epoch at every admission boun
     }),
   );
   assert.equal(accepted.status, EventTriggerRuntimeStatus.ACCEPTED);
-  assert.equal(schedulerCalls, 0);
 });
 
-test('noncanonical timestamp and opaque-token aliases fail closed', async () => {
+test('noncanonical timestamps and representation aliases fail closed', async () => {
   await assert.rejects(
-    admitDriveChangeV1(
-      request({ admittedAt: '2026-09-25T10:02:00Z' }),
-      deps(),
-    ),
+    admitApiResourceChangeV1(request({ admittedAt: '2026-09-25T10:02:00Z' }), deps()),
     /canonical ISO-8601 UTC representation/u,
   );
   await assert.rejects(
-    admitDriveChangeV1(
-      request({ changeToken: ' page-token-123:ordinal-7 ' }),
-      deps(),
-    ),
-    /bounded opaque ASCII/u,
+    admitApiResourceChangeV1(request({ changeId: ' change-42 ' }), deps()),
+    /bounded canonical opaque text/u,
+  );
+  assert.throws(
+    () => normalizeApiResourceChangeV1(change({ previousVersion: ' etag-v1 ' })),
+    /bounded canonical opaque text/u,
   );
 });

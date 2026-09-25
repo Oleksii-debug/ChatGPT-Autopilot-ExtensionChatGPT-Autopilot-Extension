@@ -1,4 +1,4 @@
-import { createSession, createTask, PromptMode, RunMode, RunState, TabStrategy, OperationPhase } from './schema.js';
+import { createSession, createTask, PromptMode, RunMode, RunState, TabStrategy, OperationPhase, isExclusiveConversationUrl } from './schema.js';
 import {
   ScenarioWorkMode,
   ScenarioWorkRunState,
@@ -193,6 +193,11 @@ function isSafeToRemoveSession(session) {
 function ensureManagerRuntimeFields(runtime) {
   const out = clone(runtime);
   out.ownerEpoch = Math.max(0, Number(out.ownerEpoch || 0));
+  // A legacy store cannot reconstruct verified sends from already retired
+  // timed-out chats. Keep that uncertainty visible to the read projection.
+  out.verifiedSendHistoryComplete = out.verifiedSendHistoryComplete === true;
+  out.retiredVerifiedSends = Math.max(0, Number(out.retiredVerifiedSends || 0));
+  out.generationRetiredVerifiedSends = Math.max(0, Number(out.generationRetiredVerifiedSends || 0));
   out.nextLaunchAt = Math.max(0, Number(out.nextLaunchAt || 0));
   if (!Number.isFinite(out.nextLaunchAt)) out.nextLaunchAt = 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
@@ -418,7 +423,9 @@ export class ScenarioWorkManager {
     await this.update(store => {
       if (store.byId[id]) throw new Error('Сценарій з таким ідентифікатором уже існує.');
       const normalizedConfig = normalizeScenarioWorkConfig({ ...config, id, name, mode });
-      store.byId[id] = { id, name: safeName(name), config: normalizedConfig, runtime: ensureManagerRuntimeFields(createScenarioWorkRuntime(normalizedConfig, now)), createdAt: now, updatedAt: now };
+      const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalizedConfig, now));
+      runtime.verifiedSendHistoryComplete = true;
+      store.byId[id] = { id, name: safeName(name), config: normalizedConfig, runtime, createdAt: now, updatedAt: now };
       store.order.push(id);
       store.selectedId = id;
       return store;
@@ -448,7 +455,10 @@ export class ScenarioWorkManager {
       const modeChanged = item.config.mode !== config.mode;
       item.name = safeName(config.name, item.name);
       item.config = config;
-      if (modeChanged) item.runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(config, now));
+      if (modeChanged) {
+        item.runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(config, now));
+        item.runtime.verifiedSendHistoryComplete = true;
+      }
       item.updatedAt = now;
       return store;
     });
@@ -462,7 +472,10 @@ export class ScenarioWorkManager {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
       let next = item.runtime;
-      if (next.runState === ScenarioWorkRunState.COMPLETED) next = ensureManagerRuntimeFields(createScenarioWorkRuntime(item.config, now));
+      if (next.runState === ScenarioWorkRunState.COMPLETED) {
+        next = ensureManagerRuntimeFields(createScenarioWorkRuntime(item.config, now));
+        next.verifiedSendHistoryComplete = true;
+      }
       next = startScenarioWork(item.config, next, now);
       next.ownerEpoch = Math.max(0, Number(item.runtime.ownerEpoch || 0)) + 1;
       item.runtime = ensureManagerRuntimeFields(next);
@@ -683,7 +696,11 @@ export class ScenarioWorkManager {
 
   async materializeLaunch(scenario, action, now) {
     const ordinal = scenario.runtime.totalLaunches + 1;
-    const sessionId = managedSessionId(scenario.id, action.participantKey, ordinal);
+    // A CHAT_CYCLE generation owns one durable Core Session and one Task/tab
+    // identity. Other scenario modes retain their existing per-turn lifecycle.
+    const persistentChat = scenario.config.mode === ScenarioWorkMode.CHAT_CYCLE;
+    const sessionId = managedSessionId(scenario.id, action.participantKey,
+      persistentChat ? `generation-${action.generation}` : ordinal);
     const taskId = managedTaskId(sessionId);
     const task = createTask({ id: taskId, url: action.url, promptOverride: action.prompt, enabled: true, label: `${scenario.name}: ${action.participantKey}` });
     const session = createSession({
@@ -712,18 +729,59 @@ export class ScenarioWorkManager {
       const existing = state.sessionsById[sessionId];
       if (existing) {
         const existingTask = existing.tasksById?.[taskId];
-        const sameIdentity = existing?.scenarioWork?.managed === true
+        const sameGeneration = existing?.scenarioWork?.managed === true
           && existing.scenarioWork.scenarioId === scenario.id
           && existing.scenarioWork.participantKey === action.participantKey
-          && Number(existing.scenarioWork.generation) === Number(action.generation)
-          && existing.scenarioWork.stage === action.stage
+          && Number(existing.scenarioWork.generation) === Number(action.generation);
+        const sameTurn = sameGeneration && existing.scenarioWork.stage === action.stage
           && existingTask?.normalizedUrl === task.normalizedUrl
           && existingTask?.promptOverride === task.promptOverride;
-        if (!sameIdentity) throw new Error(`SCENARIO_MANAGED_SESSION_IDENTITY_COLLISION:${sessionId}`);
+        if (!sameTurn && !(persistentChat && sameGeneration && existingTask
+            && scenario.runtime.chat?.state === ScenarioParticipantState.READY
+            && isExclusiveConversationUrl(action.url)
+            && existingTask.lastConversationUrl === task.normalizedUrl
+            && existingTask.lastVerifiedSendAt > 0
+            && existing.successfulSendCount > 0
+            && existing.onePassCompletedCount === 1
+            && isSafeToRemoveSession(existing))) {
+          throw new Error(`SCENARIO_MANAGED_SESSION_IDENTITY_COLLISION:${sessionId}`);
+        }
+        if (!sameTurn) {
+          // The previous assistant turn was checkpointed before this mutation.
+          // Clear its send evidence so a restart cannot observe the old answer
+          // as the completion of the newly armed prompt. Retain cumulative
+          // successfulSendCount and the exact Task/tab identity.
+          existingTask.url = task.normalizedUrl;
+          existingTask.normalizedUrl = task.normalizedUrl;
+          existingTask.promptOverride = task.promptOverride;
+          existingTask.status = 'IDLE';
+          existingTask.lastVerifiedSendAt = 0;
+          existingTask.lastVerifiedFingerprint = '';
+          existingTask.lastAssistantBaselineCount = 0;
+          existingTask.lastAssistantBaselineKnown = false;
+          existingTask.lastAssistantReport = '';
+          existingTask.lastAssistantReportAt = 0;
+          existingTask.retryAfterAt = 0;
+          existing.onePassCompletedTaskIds = [];
+          existing.onePassCompletedCount = 0;
+          existing.completedAt = 0;
+          existing.operation = null;
+          existing.scenarioWork.stage = action.stage;
+          const hint = state.tabHintsByTaskId?.[taskId];
+          if (hint?.sessionId === sessionId && hint.ownedByExtension === true) {
+            hint.normalizedUrl = task.normalizedUrl;
+          }
+        }
         // Deterministic replay after service-worker crash: same identity is the
         // same launch, not a new Send. Re-enable only while owner still RUNNING.
         existing.enabled = true;
-        if ([RunState.PAUSED, RunState.STOPPED].includes(existing.runState)) existing.runState = RunState.RUNNING;
+        if (sameTurn && existing.successfulSendCount > 0 && existingTask.lastVerifiedSendAt > 0
+            && existing.onePassCompletedCount === 1) {
+          // A replayed launch already produced a verified effect. The manager
+          // must observe its response, never re-arm or send it a second time.
+          return state;
+        }
+        if ([RunState.PAUSED, RunState.STOPPED, RunState.COMPLETED].includes(existing.runState)) existing.runState = RunState.RUNNING;
         return state;
       }
       state.sessionsById[sessionId] = session;
@@ -756,16 +814,27 @@ export class ScenarioWorkManager {
       }
       if (report?.status !== 'READY' || report.assistantComplete !== true) continue;
       const completedSessionId = participant.sessionId;
+      const completedGeneration = participant.generation;
       let next = applyScenarioCompletion(scenario.config, runtime, participant.key, {
         chatUrl: task.lastConversationUrl,
         assistantText: report.assistantText || report.text || '',
         now,
       });
       next = ensureManagerRuntimeFields(next);
-      next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), completedSessionId])];
+      const preserveChat = scenario.config.mode === ScenarioWorkMode.CHAT_CYCLE
+        && next.runState === ScenarioWorkRunState.RUNNING
+        && next.generation === completedGeneration;
+      if (!preserveChat) {
+        const confirmed = Math.max(0, Number(session.successfulSendCount || 0));
+        next.retiredVerifiedSends += confirmed;
+        next.generationRetiredVerifiedSends = next.generation === completedGeneration
+          ? next.generationRetiredVerifiedSends + confirmed : 0;
+        next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), completedSessionId])];
+      }
       const checkpoint = await this.checkpointRuntime(scenario.id, next, expectedOwnerEpoch, now);
       if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
       runtime = checkpoint.runtime;
+      if (preserveChat) continue;
       const cleanup = await this.cleanupManagedSession(completedSessionId);
       if (cleanup.removed) {
         await this.clearCleanupObligation(scenario.id, completedSessionId);
@@ -824,7 +893,13 @@ export class ScenarioWorkManager {
       const participant = scenarioWorkParticipants(runtime).find(item => item.key === action.participantKey);
       const staleSessionId = participant?.sessionId || '';
       let next = ensureManagerRuntimeFields(applyScenarioTimeout(scenario.config, runtime, action.participantKey, { now }));
-      if (staleSessionId) next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), staleSessionId])];
+      if (staleSessionId) {
+        const staleSession = (await this.coreRepository.load()).sessionsById?.[staleSessionId];
+        const confirmed = Math.max(0, Number(staleSession?.successfulSendCount || 0));
+        next.retiredVerifiedSends += confirmed;
+        next.generationRetiredVerifiedSends += confirmed;
+        next.cleanupPendingSessionIds = [...new Set([...(next.cleanupPendingSessionIds || []), staleSessionId])];
+      }
       const checkpoint = await this.checkpointRuntime(id, next, expectedOwnerEpoch, now);
       if (!checkpoint.applied) {
         const live = await this.get(id);
