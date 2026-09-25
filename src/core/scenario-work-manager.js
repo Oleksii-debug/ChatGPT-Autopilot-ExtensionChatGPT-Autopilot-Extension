@@ -19,6 +19,10 @@ import {
 export const SCENARIO_WORK_STORAGE_KEY = 'autopilotScenarioWorkV1';
 export const SCENARIO_WORK_ALARM = 'autopilot-scenario-work-wake';
 const STORAGE_SCHEMA_VERSION = 1;
+const MAX_PERSISTED_ARRAY_LENGTH = 10000;
+const MAX_PERSISTED_OBJECT_KEYS = 10000;
+const MAX_PERSISTED_GRAPH_NODES = 50000;
+const MAX_PERSISTED_DEPTH = 64;
 const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 
 function clone(value) { return structuredClone(value); }
@@ -48,6 +52,7 @@ function snapshotDenseDataArray(value) {
     || !Object.hasOwn(lengthDescriptor, 'value')
     || !Number.isSafeInteger(lengthDescriptor.value)
     || lengthDescriptor.value < 0
+    || lengthDescriptor.value > MAX_PERSISTED_ARRAY_LENGTH
   ) return { ok: false, value: [] };
   const length = lengthDescriptor.value;
   const ownKeys = Reflect.ownKeys(descriptors);
@@ -67,14 +72,18 @@ function snapshotDenseDataArray(value) {
   return { ok: true, value: out };
 }
 
-function snapshotPersistedData(value, ancestors = new Set(), memo = new Map()) {
+function snapshotPersistedData(value, ancestors = new Set(), memo = new Map(), budget = { nodes: 0 }, depth = 0) {
   if (value === null) return { ok: true, value: null };
   const type = typeof value;
   if (type === 'string' || type === 'number' || type === 'boolean' || type === 'undefined') {
     return { ok: true, value };
   }
-  if (type !== 'object' || ancestors.has(value)) return { ok: false, value: undefined };
+  if (type !== 'object' || ancestors.has(value) || depth > MAX_PERSISTED_DEPTH) {
+    return { ok: false, value: undefined };
+  }
   if (memo.has(value)) return { ok: true, value: memo.get(value) };
+  budget.nodes += 1;
+  if (budget.nodes > MAX_PERSISTED_GRAPH_NODES) return { ok: false, value: undefined };
 
   ancestors.add(value);
   try {
@@ -87,6 +96,7 @@ function snapshotPersistedData(value, ancestors = new Set(), memo = new Map()) {
         || !Object.hasOwn(lengthDescriptor, 'value')
         || !Number.isSafeInteger(lengthDescriptor.value)
         || lengthDescriptor.value < 0
+        || lengthDescriptor.value > MAX_PERSISTED_ARRAY_LENGTH
       ) return { ok: false, value: undefined };
       const length = lengthDescriptor.value;
       const ownKeys = Reflect.ownKeys(descriptors);
@@ -103,7 +113,7 @@ function snapshotPersistedData(value, ancestors = new Set(), memo = new Map()) {
         if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
           return { ok: false, value: undefined };
         }
-        const child = snapshotPersistedData(descriptor.value, ancestors, memo);
+        const child = snapshotPersistedData(descriptor.value, ancestors, memo, budget, depth + 1);
         if (!child.ok) return { ok: false, value: undefined };
         out[index] = child.value;
       }
@@ -112,15 +122,17 @@ function snapshotPersistedData(value, ancestors = new Set(), memo = new Map()) {
 
     if (!plainRecord(value)) return { ok: false, value: undefined };
     const descriptors = Object.getOwnPropertyDescriptors(value);
+    const keys = Reflect.ownKeys(descriptors);
+    if (keys.length > MAX_PERSISTED_OBJECT_KEYS) return { ok: false, value: undefined };
     const out = Object.create(null);
     memo.set(value, out);
-    for (const key of Reflect.ownKeys(descriptors)) {
+    for (const key of keys) {
       if (typeof key !== 'string') return { ok: false, value: undefined };
       const descriptor = descriptors[key];
       if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
         return { ok: false, value: undefined };
       }
-      const child = snapshotPersistedData(descriptor.value, ancestors, memo);
+      const child = snapshotPersistedData(descriptor.value, ancestors, memo, budget, depth + 1);
       if (!child.ok) return { ok: false, value: undefined };
       Object.defineProperty(out, key, {
         value: child.value,
@@ -178,6 +190,7 @@ function normalizeStore(raw, now = Date.now()) {
   ) return freshStore();
 
   const out = freshStore();
+  const recoveryBudget = { nodes: 0 };
   for (const id of orderSnapshot.value) {
     if (typeof id !== 'string' || Object.hasOwn(out.byId, id)) continue;
     const itemDescriptor = Object.getOwnPropertyDescriptor(byId.value, id);
@@ -187,7 +200,7 @@ function normalizeStore(raw, now = Date.now()) {
       || !Object.hasOwn(itemDescriptor, 'value')
       || !plainRecord(itemDescriptor.value)
     ) continue;
-    const itemSnapshot = snapshotPersistedData(itemDescriptor.value);
+    const itemSnapshot = snapshotPersistedData(itemDescriptor.value, new Set(), new Map(), recoveryBudget, 0);
     if (!itemSnapshot.ok) continue;
     try {
       const item = itemSnapshot.value;

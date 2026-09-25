@@ -559,3 +559,41 @@ test('manager consumes persisted descriptor snapshots without Proxy get re-entry
   assert.equal(listed.scenarios[0].name, 'Valid');
 });
 
+
+
+test('manager bounds persisted collection length and recursive depth bombs', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  stored.order = new Array(10001);
+  stored.order[0] = 'valid';
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
+
+  let listed = await manager.list();
+  assert.equal(listed.selectedId, '');
+  assert.deepEqual(listed.scenarios, []);
+
+  stored.order = ['valid'];
+  const root = {};
+  let cursor = root;
+  for (let index = 0; index < 70; index += 1) {
+    cursor.next = {};
+    cursor = cursor.next;
+  }
+  stored.byId.valid.runtime.persistedDepthBomb = root;
+
+  listed = await manager.list();
+  assert.equal(listed.selectedId, '');
+  assert.deepEqual(listed.scenarios, []);
+});
