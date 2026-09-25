@@ -1,3 +1,4 @@
+import { createSha256FingerprintV1 } from './fingerprint.js';
 import {
   RecipeLifecycleState,
   RecipeQualificationStatus,
@@ -473,6 +474,27 @@ function buildVerificationEvidence(steps) {
   );
 }
 
+async function buildParameterSchemaBinding(parameters, parameterBindings, cryptoApi) {
+  const canonical = JSON.stringify([
+    'chatgpt-autopilot-recipe-parameter-schema-v1',
+    parameters,
+    parameterBindings,
+  ]);
+  const tagged = await createSha256FingerprintV1(canonical, { cryptoApi });
+  if (typeof tagged !== 'string' || !tagged.startsWith('sha256:')) {
+    throw new Error('Recipe compiler parameter schema fingerprint is invalid');
+  }
+  const digest = sha256(
+    tagged.slice('sha256:'.length),
+    'Recipe compiler parameter schema SHA-256',
+  );
+  return freezeDeep({
+    sourceId: 'recipe-parameters:' + digest.slice(0, 32),
+    revisionId: 'sha256:' + digest,
+    contentSha256: digest,
+  });
+}
+
 /**
  * Compiles a value-free, non-authorizing Recipe candidate from a structural
  * record of a successful run. Raw prompts, tool arguments, outputs, tokens,
@@ -484,7 +506,7 @@ function buildVerificationEvidence(steps) {
  * and evidence identities remain UNVERIFIED_INPUT until canonical authorities
  * resolve them independently.
  */
-export function compileRecipeCandidateV1(input) {
+export async function compileRecipeCandidateV1(input, { cryptoApi = globalThis.crypto } = {}) {
   const raw = record(input, 'RecipeCompilerInputV1');
   exactKeys(raw, INPUT_KEYS, 'RecipeCompilerInputV1');
   if (raw.schemaVersion !== RECIPE_COMPILER_SCHEMA_VERSION) {
@@ -500,11 +522,24 @@ export function compileRecipeCandidateV1(input) {
   const sourceBindings = normalizeSourceBindings(raw.sourceBindings);
   const parameters = normalizeParameters(raw.parameters);
   const trace = normalizeTrace(raw.trace, parameters);
+  const parameterBindings = buildParameterBindings(trace.steps);
+  const parameterSchemaBinding = await buildParameterSchemaBinding(
+    parameters,
+    parameterBindings,
+    cryptoApi,
+  );
+  if (sourceBindings.some((binding) => binding.sourceId === parameterSchemaBinding.sourceId)) {
+    throw new Error('sourceBindings collides with compiler parameter schema identity');
+  }
+  const boundSourceBindings = normalizeSourceBindings([
+    ...sourceBindings,
+    parameterSchemaBinding,
+  ]);
   const recipeDefinition = buildCandidateRecipe({
     recipeId,
     version,
     parentVersion,
-    sourceBindings,
+    sourceBindings: boundSourceBindings,
     trace,
   });
 
@@ -513,7 +548,8 @@ export function compileRecipeCandidateV1(input) {
     proposalId: 'recipe-candidate:' + trace.traceId,
     recipeDefinition,
     parameters,
-    parameterBindings: buildParameterBindings(trace.steps),
+    parameterBindings,
+    parameterSchemaBinding,
     verificationEvidence: buildVerificationEvidence(trace.steps),
     trace: {
       traceId: trace.traceId,
