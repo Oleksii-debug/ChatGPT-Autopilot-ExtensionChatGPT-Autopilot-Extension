@@ -13,7 +13,7 @@ const ENTRYPOINT_KINDS = new Set(Object.values(SkillEntrypointKind));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SEMVER_IDENTIFIER = '(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)';
-const SEMVER = new RegExp(
+const SEMVER = /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u;
   `^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)` +
   `(?:-${SEMVER_IDENTIFIER}(?:\\.${SEMVER_IDENTIFIER})*)?` +
   '(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?
@@ -24,6 +24,7 @@ const MAX_REQUIREMENTS = 128;
 const MAX_EVALUATIONS = 64;
 const MAX_SIGNATURES = 32;
 const MAX_TEXT = 16_000;
+const MAX_VERSION_LENGTH = 256;
 
 function record(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -91,7 +92,10 @@ function identifier(value, label) {
 }
 
 function version(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !SEMVER.test(value)) {
+  if (typeof value !== 'string'
+      || value.length > MAX_VERSION_LENGTH
+      || value !== value.trim()
+      || !SEMVER.test(value)) {
     throw new Error(`${label} must be a canonical semantic version`);
   }
   return value;
