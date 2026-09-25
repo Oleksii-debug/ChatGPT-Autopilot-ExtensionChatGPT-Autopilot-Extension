@@ -17,10 +17,9 @@ function observation(overrides={}){return {schemaVersion:1,observationId:'observ
 
 function request(overrides={}){return {trigger:trigger(),observation:observation(),admittedAt:T2,...overrides};}
 
-function admit(value=request(), { trustedTrigger=trigger(), cryptoApi } = {}) {
+function admit(value=request(), { trustedTrigger=trigger() } = {}) {
  return createEventTriggerAdmissionV1(value, {
   resolveTriggerDefinition: async()=>trustedTrigger,
-  ...(cryptoApi ? { cryptoApi } : {}),
  });
 }
 
@@ -130,6 +129,49 @@ test('admission requires an exact trusted trigger revision and rejects same-revi
  assert.equal(a.trustedTriggerDefinitionBound,true);
  assert.match(a.triggerDefinitionFingerprint,/^sha256:[a-f0-9]{64}$/u);
  assert.equal(a.triggerDefinitionFingerprint,b.triggerDefinitionFingerprint);
+});
+
+test('event occurrence fingerprints cannot use caller-supplied digest authority', async()=>{
+ let digestCalls=0;
+ const fakeCrypto={
+  subtle:{
+   async digest(){
+    digestCalls+=1;
+    return new Uint8Array(32).buffer;
+   },
+  },
+ };
+ await assert.rejects(
+  ()=>createEventTriggerAdmissionV1(request(),{
+   resolveTriggerDefinition:async()=>trigger(),
+   cryptoApi:fakeCrypto,
+  }),
+  /unknown field: cryptoApi/,
+ );
+ assert.equal(digestCalls,0);
+
+ let resolverReads=0;
+ const accessorDependencies={};
+ Object.defineProperty(accessorDependencies,'resolveTriggerDefinition',{
+  enumerable:true,
+  get(){
+   resolverReads+=1;
+   return async()=>trigger();
+  },
+ });
+ await assert.rejects(
+  ()=>createEventTriggerAdmissionV1(request(),accessorDependencies),
+  /enumerable own data property/,
+ );
+ assert.equal(resolverReads,0);
+
+ const symbolDependencies={resolveTriggerDefinition:async()=>trigger()};
+ symbolDependencies[Symbol('cryptoAuthority')]=fakeCrypto;
+ await assert.rejects(
+  ()=>createEventTriggerAdmissionV1(request(),symbolDependencies),
+  /unknown field: Symbol\(cryptoAuthority\)/,
+ );
+ assert.equal(digestCalls,0);
 });
 
 test('hidden/accessor/symbol authority aliases are rejected without invoking accessors', async()=>{
