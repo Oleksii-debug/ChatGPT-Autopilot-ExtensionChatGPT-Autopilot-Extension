@@ -73,12 +73,20 @@ export function normalizeBrowserTargetLeaseV1(input) {
   });
 }
 
-export function acquireBrowserTargetLeaseV1({ current = null, targetId, ownerInvocationId, leaseId, now, ttlMs = 30_000 } = {}) {
-  const nowIso = iso(now, 'now');
+export function acquireBrowserTargetLeaseV1(input = {}) {
+  const raw = plainRecord(input, 'BrowserTargetLeaseAcquireRequestV1');
+  exactKeys(
+    raw,
+    new Set(['current', 'targetId', 'ownerInvocationId', 'leaseId', 'now', 'ttlMs']),
+    'BrowserTargetLeaseAcquireRequestV1',
+  );
+  const current = Object.prototype.hasOwnProperty.call(raw, 'current') ? raw.current : null;
+  const ttlMs = Object.prototype.hasOwnProperty.call(raw, 'ttlMs') ? raw.ttlMs : 30_000;
+  const nowIso = iso(raw.now, 'now');
   if (!Number.isInteger(ttlMs) || ttlMs < 1_000 || ttlMs > 300_000) throw new Error('ttlMs is invalid');
-  const requestedTargetId = requiredId(targetId, 'targetId');
-  const requestedOwnerInvocationId = requiredId(ownerInvocationId, 'ownerInvocationId');
-  const requestedLeaseId = requiredId(leaseId, 'leaseId');
+  const requestedTargetId = requiredId(raw.targetId, 'targetId');
+  const requestedOwnerInvocationId = requiredId(raw.ownerInvocationId, 'ownerInvocationId');
+  const requestedLeaseId = requiredId(raw.leaseId, 'leaseId');
   const existing = current ? normalizeBrowserTargetLeaseV1(current) : null;
   if (existing && Date.parse(existing.expiresAt) > Date.parse(nowIso)) {
     if (existing.targetId !== requestedTargetId) {
@@ -100,10 +108,16 @@ export function acquireBrowserTargetLeaseV1({ current = null, targetId, ownerInv
   return Object.freeze({ status: existing ? 'REACQUIRED' : 'ACQUIRED', lease });
 }
 
-export function releaseBrowserTargetLeaseV1(current, { ownerInvocationId, leaseId } = {}) {
+export function releaseBrowserTargetLeaseV1(current, input = {}) {
+  const raw = plainRecord(input, 'BrowserTargetLeaseReleaseRequestV1');
+  exactKeys(
+    raw,
+    new Set(['ownerInvocationId', 'leaseId']),
+    'BrowserTargetLeaseReleaseRequestV1',
+  );
   const lease = normalizeBrowserTargetLeaseV1(current);
-  const requestedOwnerInvocationId = requiredId(ownerInvocationId, 'ownerInvocationId');
-  const requestedLeaseId = requiredId(leaseId, 'leaseId');
+  const requestedOwnerInvocationId = requiredId(raw.ownerInvocationId, 'ownerInvocationId');
+  const requestedLeaseId = requiredId(raw.leaseId, 'leaseId');
   if (lease.ownerInvocationId !== requestedOwnerInvocationId || lease.leaseId !== requestedLeaseId) {
     return Object.freeze({ status: 'NOT_OWNER', lease });
   }
