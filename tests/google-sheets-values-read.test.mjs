@@ -85,7 +85,7 @@ test('Sheets values read uses owner-scoped Drive proof, fixed Sheets origin, and
   assert.equal(result.requestedRange, 'Sheet1!A1:B2');
   assert.equal(result.majorDimension, 'ROWS');
   assert.equal(result.valueRenderOption, 'FORMATTED_VALUE');
-  assert.equal(result.dateTimeRenderOption, 'SERIAL_NUMBER');
+  assert.equal(result.dateTimeRenderOption, null);
   assert.equal(result.cellCount, 4);
   assert.deepEqual(result.values, [['Item', 'Cost'], ['Wheel', 20.5]]);
   assert.equal(fetchCalls.length, 3, 'Drive preflight + Sheets read + Drive revalidation');
@@ -93,7 +93,7 @@ test('Sheets values read uses owner-scoped Drive proof, fixed Sheets origin, and
   assert.equal(sheetsUrl.origin, GOOGLE_SHEETS_API_ORIGIN);
   assert.equal(sheetsUrl.searchParams.get('majorDimension'), 'ROWS');
   assert.equal(sheetsUrl.searchParams.get('valueRenderOption'), 'FORMATTED_VALUE');
-  assert.equal(sheetsUrl.searchParams.get('dateTimeRenderOption'), 'SERIAL_NUMBER');
+  assert.equal(sheetsUrl.searchParams.has('dateTimeRenderOption'), false);
   assert.equal(fetchCalls[1].options.method, 'GET');
   assert.equal(JSON.stringify(result).includes('test-oauth-secret'), false);
   assert.deepEqual(resolverCalls, [
@@ -131,7 +131,29 @@ test('Sheets values read preserves exact A1 request and admitted render options'
   assert.equal(sheetsUrl.searchParams.get('valueRenderOption'), 'FORMULA');
   assert.equal(sheetsUrl.searchParams.get('dateTimeRenderOption'), 'FORMATTED_STRING');
   assert.equal(result.majorDimension, 'COLUMNS');
+  assert.equal(result.dateTimeRenderOption, 'FORMATTED_STRING');
   assert.equal(result.cellCount, 6);
+});
+
+test('Sheets values read rejects ineffective dateTimeRenderOption with FORMATTED_VALUE before I/O', async () => {
+  let fetchCalls = 0;
+  const client = new GoogleWorkspaceRestClientV1(config({
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return response(500, { error: { message: 'unexpected' } });
+    },
+  }));
+
+  await assert.rejects(
+    () => client.readSheetsValues({
+      spreadsheetId,
+      range: 'Sheet1!A1:B2',
+      valueRenderOption: 'FORMATTED_VALUE',
+      dateTimeRenderOption: 'SERIAL_NUMBER',
+    }),
+    /dateTimeRenderOption is ignored when valueRenderOption is FORMATTED_VALUE/u,
+  );
+  assert.equal(fetchCalls, 0);
 });
 
 test('Sheets read rejects absent credential, foreign type, aliases, and accessors before Sheets I/O', async () => {
