@@ -53,6 +53,9 @@ function verification(overrides = {}) {
     summary: 'Expected postcondition observed.',
     evidenceArtifactIds: [],
     verifiedAt: '2026-09-19T12:00:04Z',
+    effectId: 'invoke-1',
+    executionId: 'invoke-1:attempt:1',
+    attempt: 1,
     ...overrides,
   };
 }
@@ -426,6 +429,109 @@ test('late evidence from an older execution attempt cannot satisfy a SAFE_RETRY 
   assert.equal(current.state.observation.observationId, 'obs-attempt-2');
 });
 
+test('rejected events do not mutate durable state and may later apply with the same event identity', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const premature = event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'premature-observation',
+    '2026-09-19T12:00:02Z',
+    { observation: observation({ observedAt: '2026-09-19T12:00:02Z' }) },
+  );
+  const before = JSON.parse(JSON.stringify(state));
+  let result = reduceExactEffectV1(state, premature);
+  assert.equal(result.accepted, false);
+  assert.deepEqual(result.state, before);
+  assert.deepEqual(result.state.processedEventIds, []);
+  assert.equal(result.state.updatedAt, new Date(AT).toISOString());
+
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'start-before-premature',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  result = reduceExactEffectV1(state, premature);
+  assert.equal(result.accepted, true);
+  assert.equal(result.state.phase, ExactEffectPhase.OBSERVED);
+  assert.ok(result.state.processedEventIds.includes('premature-observation'));
+});
+
+test('new events cannot regress durable time while old accepted duplicates remain idempotent', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const start = event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'chronology-start',
+    '2026-09-19T12:00:01Z',
+  );
+  state = reduceExactEffectV1(state, start).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'chronology-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation({ observedAt: '2026-09-19T12:00:03Z' }) },
+  )).state;
+
+  const replay = reduceExactEffectV1(state, start);
+  assert.equal(replay.accepted, true);
+  assert.equal(replay.deduplicated, true);
+  assert.equal(replay.state.updatedAt, '2026-09-19T12:00:03.000Z');
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.DECLARE_AMBIGUITY,
+      'stale-new-event',
+      '2026-09-19T12:00:02Z',
+      { reasonCode: 'STALE_EVENT' },
+    )),
+    /cannot predate current durable state/,
+  );
+  assert.equal(state.updatedAt, '2026-09-19T12:00:03.000Z');
+  assert.equal(state.processedEventIds.includes('stale-new-event'), false);
+});
+
+test('verification used by exact effect requires exact effect execution and attempt bindings', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'binding-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'binding-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+
+  const cases = [
+    [{ effectId: '' }, /effectId does not match exact effect/],
+    [{ effectId: 'invoke-other' }, /effectId does not match exact effect/],
+    [{ executionId: '' }, /executionId does not match current exact-effect attempt/],
+    [{ executionId: 'invoke-1:attempt:2' }, /executionId does not match current exact-effect attempt/],
+    [{ attempt: 0 }, /attempt does not match current exact-effect attempt/],
+    [{ attempt: 2 }, /attempt does not match current exact-effect attempt/],
+  ];
+  for (const [overrides, pattern] of cases) {
+    assert.throws(
+      () => reduceExactEffectV1(state, event(
+        ExactEffectEventType.RECORD_VERIFICATION,
+        `binding-bad-${Object.keys(overrides)[0]}-${String(Object.values(overrides)[0])}`,
+        '2026-09-19T12:00:04Z',
+        { verification: verification(overrides) },
+      )),
+      pattern,
+    );
+  }
+
+  const valid = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'binding-valid',
+    '2026-09-19T12:00:04Z',
+    { verification: verification() },
+  ));
+  assert.equal(valid.state.phase, ExactEffectPhase.VERIFIED);
+  assert.equal(valid.action, 'COMMIT');
+});
+
 test('effect event replay is idempotent across durable restart', () => {
   let state = createExactEffectStateV1(invocation(), { createdAt: AT });
   const start = event(
@@ -500,5 +606,264 @@ test('commit is impossible without verified evidence', () => {
   ));
   assert.equal(result.accepted, false);
   assert.equal(result.reason, 'COMMIT_REQUIRES_VERIFIED_EFFECT');
+  assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
+});
+
+
+test('exact-effect envelope rejects coercive durable state aliases', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, schemaVersion: '1' }),
+    /schemaVersion/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, effectId: 1 }),
+    /effectId is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, phase: ' prepared ' }),
+    /phase is invalid/,
+  );
+
+  const executing = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'strict-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...executing, attempt: '1' }),
+    /attempt is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...executing, executionId: 1 }),
+    /executionId is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, commitId: true }),
+    /commitId is invalid/,
+  );
+});
+
+test('state, nested metadata and create options reject accessors before getter execution', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  let reads = 0;
+
+  const hostileState = { ...state };
+  Object.defineProperty(hostileState, 'phase', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'PREPARED';
+    },
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1(hostileState),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const hostileAmbiguity = { ...state.ambiguity };
+  Object.defineProperty(hostileAmbiguity, 'reasonCode', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'FORGED';
+    },
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, ambiguity: hostileAmbiguity }),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const options = {};
+  Object.defineProperty(options, 'createdAt', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return AT;
+    },
+  });
+  assert.throws(
+    () => createExactEffectStateV1(invocation(), options),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('state envelope rejects hidden, symbol and inherited authority aliases', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+
+  const hidden = { ...state };
+  Object.defineProperty(hidden, 'authorityGranted', {
+    value: true,
+    enumerable: false,
+    configurable: true,
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1(hidden),
+    /unknown field: authorityGranted/,
+  );
+
+  const symbolic = { ...state };
+  symbolic[Symbol('authority')] = true;
+  assert.throws(
+    () => normalizeExactEffectStateV1(symbolic),
+    /symbol fields/,
+  );
+
+  const inherited = Object.assign(Object.create({ phase: 'COMMITTED' }), state);
+  assert.throws(
+    () => normalizeExactEffectStateV1(inherited),
+    /plain data object/,
+  );
+});
+
+test('processed event IDs require a plain dense data array', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'dense-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+
+  const custom = [...state.processedEventIds];
+  custom.authority = true;
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, processedEventIds: custom }),
+    /non-index fields/,
+  );
+
+  const sparse = new Array(1);
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, processedEventIds: sparse }),
+    /enumerable own data item/,
+  );
+
+  let reads = 0;
+  const accessor = [...state.processedEventIds];
+  Object.defineProperty(accessor, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'dense-start';
+    },
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, processedEventIds: accessor }),
+    /enumerable own data item/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('event envelope rejects coercion and accessors before transition logic', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const good = event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'strict-event',
+    '2026-09-19T12:00:01Z',
+  );
+
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, schemaVersion: '1' }),
+    /schemaVersion/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, eventId: 1 }),
+    /eventId is invalid/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, type: ' begin_execution ' }),
+    /event type is invalid/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, effectId: true }),
+    /event\.effectId is invalid/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, executionId: 1 }),
+    /event\.executionId is invalid/,
+  );
+
+  let reads = 0;
+  const accessor = { ...good };
+  Object.defineProperty(accessor, 'type', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ExactEffectEventType.BEGIN_EXECUTION;
+    },
+  });
+  assert.throws(
+    () => reduceExactEffectV1(state, accessor),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('nested reconciliation outcome uses exact enum representation and strict data fields', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'reconcile-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'reconcile-ambiguous',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'reconcile-alias',
+      '2026-09-19T12:00:03Z',
+      {
+        outcome: 'safe_retry',
+        reasonCode: 'NO_EFFECT_PROVEN',
+        observation: observation({
+          observationId: 'reconcile-alias-observation',
+          status: 'ERROR',
+          summary: 'Effect absent.',
+        }),
+        verification: verification({
+          verificationId: 'reconcile-alias-verification',
+          observationId: 'reconcile-alias-observation',
+          status: 'FAILED',
+          reasonCode: 'POSTCONDITION_ABSENT',
+        }),
+      },
+    )),
+    /Reconciliation outcome is invalid/,
+  );
+
+  const persisted = { ...state.reconciliation };
+  persisted[Symbol('authority')] = true;
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, reconciliation: persisted }),
+    /symbol fields/,
+  );
+});
+
+test('null-prototype durable state and event records remain supported', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const nullState = Object.assign(Object.create(null), JSON.parse(JSON.stringify(state)));
+  const normalized = normalizeExactEffectStateV1(nullState);
+  assert.equal(normalized.phase, ExactEffectPhase.PREPARED);
+
+  const rawEvent = Object.assign(Object.create(null), event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'null-proto-event',
+    '2026-09-19T12:00:01Z',
+  ));
+  const result = reduceExactEffectV1(normalized, rawEvent);
   assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
 });

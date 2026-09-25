@@ -21,6 +21,7 @@
 </header>
 <div id="mode-tabs" class="mode-tabs" role="tablist" aria-label="Режим">
   <button id="mode-sessions" type="button" role="tab" aria-selected="true">Сеанси</button>
+  <button id="mode-simplified" type="button" role="tab" aria-selected="false">Спрощені сесії</button>
   <button id="mode-orchestration" type="button" role="tab" aria-selected="false">Оркестрація</button>
   <button id="mode-scenario-work" type="button" role="tab" aria-selected="false">Сценарна робота</button>
   <button id="mode-agent" type="button" role="tab" aria-selected="false">Агент</button>
@@ -34,10 +35,56 @@
     <ul id="session-list"></ul>
   </nav>
   <main id="main" tabindex="-1">
+    <section data-app-mode="simplified" aria-labelledby="simplified-heading" hidden>
+      <h2 id="simplified-heading">Спрощені сесії</h2>
+      <p>Один чат і один промпт можна повторювати без обмеження часу. Цей режим використовує той самий Core і збережений стан, що й звичайні сеанси.</p>
+      <button id="simplified-new" type="button">Новий сеанс</button>
+      <label for="simplified-list">Збережені спрощені сеанси</label>
+      <select id="simplified-list" size="5"></select>
+      <p id="simplified-overview" tabindex="0"></p>
+      <div class="settings-group">
+        <label for="simplified-name">Назва</label><input id="simplified-name" type="text" maxlength="120" autocomplete="off">
+        <label for="simplified-config-mode">Посилання та промпти</label>
+        <select id="simplified-config-mode">
+          <option value="shared-shared">Одне посилання + один промпт</option>
+          <option value="shared-unique">Одне посилання + різні промпти</option>
+          <option value="unique-shared">Різні посилання + один промпт</option>
+          <option value="unique-unique">Різні посилання + різні промпти</option>
+        </select>
+        <div id="simplified-url-group"><label for="simplified-url">Посилання ChatGPT</label><input id="simplified-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://chatgpt.com/"></div>
+        <div id="simplified-prompt-group"><label for="simplified-prompt">Промпт</label><textarea id="simplified-prompt" rows="8"></textarea></div>
+        <div id="simplified-urls-group" hidden><label for="simplified-urls">Різні посилання: одне на рядок</label><textarea id="simplified-urls" rows="5" spellcheck="false"></textarea></div>
+        <div id="simplified-prompts-group" hidden><label for="simplified-prompts">Різні промпти: розділіть окремим рядком ---</label><textarea id="simplified-prompts" rows="7"></textarea></div>
+        <label for="simplified-run-mode">Робота</label><select id="simplified-run-mode"><option value="continuous">Постійно по колу</option><option value="one-pass">Один прохід</option></select>
+        <label for="simplified-cycles">Кількість логічних циклів за один прохід, до 1 000 000</label><input id="simplified-cycles" type="number" min="1" max="1000000" step="1" value="1" inputmode="numeric" aria-describedby="simplified-cycle-help">
+        <p id="simplified-cycle-help">У режимі «Постійно по колу» ліміту немає. Для різних URL або промптів кількість позицій визначається списком.</p>
+        <label for="simplified-interval">Інтервал</label><input id="simplified-interval" type="number" min="1" max="86400" step="1" value="2" inputmode="numeric">
+        <label for="simplified-interval-unit">Одиниця інтервалу</label><select id="simplified-interval-unit"><option value="minutes">Хвилини</option><option value="seconds">Секунди</option></select>
+        <label for="simplified-delay">Пауза перед Send, секунд</label><input id="simplified-delay" type="number" min="1" max="30" step="1" value="20" inputmode="numeric">
+        <label for="simplified-busy">Повторна перевірка зайнятого чату, секунд</label><input id="simplified-busy" type="number" min="1" max="30" step="1" value="2" inputmode="numeric">
+        <label for="simplified-retry">Затримка технічного повтору, секунд</label><input id="simplified-retry" type="number" min="5" max="3600" step="1" value="30" inputmode="numeric">
+        <label for="simplified-retry-policy">Помилка</label><select id="simplified-retry-policy"><option value="safe">Автоматичне безпечне відновлення</option><option value="manual">Ручна перевірка</option></select>
+        <label for="simplified-tabs">Вкладки</label><select id="simplified-tabs"><option value="keep-open">Зберігати вкладки</option><option value="worker">Одна робоча вкладка</option><option value="open-close">Відкривати й закривати</option></select>
+      </div>
+      <div class="button-row" aria-label="Керування спрощеним сеансом">
+        <button id="simplified-save" type="button">Зберегти</button><button id="simplified-start" type="button">Старт</button>
+        <button id="simplified-pause" type="button">Пауза</button><button id="simplified-resume" type="button">Продовжити</button>
+        <button id="simplified-stop" type="button">Стоп</button><button id="simplified-duplicate" type="button">Дублювати</button>
+        <button id="simplified-delete" type="button">Видалити</button>
+      </div>
+      <p id="simplified-state" tabindex="0">Сеанс не вибрано.</p>
+      <p id="simplified-command-result" role="status"></p>
+      <h3>JSON</h3>
+      <button id="simplified-template" type="button">Шаблон</button>
+      <label for="simplified-import-file">Імпорт JSON</label><input id="simplified-import-file" type="file" accept="application/json,.json">
+      <button id="simplified-import" type="button">Імпорт</button><button id="simplified-import-start" type="button">Імпорт + старт</button>
+      <button id="simplified-export" type="button">Експорт</button>
+      <button id="simplified-diagnostics" type="button">Експорт діагностики</button>
+    </section>
     <section aria-labelledby="rate-limit-settings-heading" data-app-mode="sessions">
       <h2 id="rate-limit-settings-heading">Rate-limit recovery</h2>
       <label for="rate-limit-cooldown-minutes">Rate-limit пауза, хв</label>
-      <input id="rate-limit-cooldown-minutes" type="number" min="1" max="120" step="1" inputmode="numeric">
+      <input id="rate-limit-cooldown-minutes" type="number" min="0" max="120" step="1" inputmode="numeric">
       <button id="save-rate-limit-cooldown-button" type="button">Зберегти</button>
       <p id="rate-limit-setting-status" role="status">Завантаження…</p>
     </section>
@@ -856,6 +903,67 @@
           <p id="drive-prompt-status" role="status">Drive source вимкнено.</p>
         </fieldset>
 
+        <fieldset id="calendar-schedule-settings">
+          <legend>Календарний розклад</legend>
+          <p id="calendar-help">Усі дати й час можна вводити без миші. Формат дати: YYYY-MM-DD. Формат часу: HH:MM. Для кількох часів або явних запусків використовуйте по одному запису в рядку.</p>
+
+          <label for="calendar-mode">Режим календаря</label>
+          <select id="calendar-mode" aria-describedby="calendar-help">
+            <option value="NONE">Зараз / без календаря</option>
+            <option value="ONE_TIME">Одноразово у точну дату й час</option>
+            <option value="DAILY">Щоденний повторюваний розклад</option>
+            <option value="WEEKLY">Щотижневий розклад за вибраними днями</option>
+            <option value="EXPLICIT">Явний список дат і часу</option>
+          </select>
+
+          <div id="calendar-common-fields" hidden>
+            <label for="calendar-time-zone">Часовий пояс IANA</label>
+            <input id="calendar-time-zone" type="text" autocomplete="off" spellcheck="false" placeholder="Europe/Bratislava" aria-describedby="calendar-help">
+            <label><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски</label>
+            <label><input id="calendar-revision-confirm" type="checkbox" aria-describedby="calendar-revision-help"> Підтверджую зміну вже існуючого календарного розкладу</label>
+            <p id="calendar-revision-help">Зміна дати, часу, часового поясу, recurrence або catch-up створює нову revision occurrence identity. Для вже збереженого календаря Core не прийме таку зміну без цього явного підтвердження.</p>
+          </div>
+
+          <div id="calendar-one-time-fields" hidden>
+            <label for="calendar-one-time-date">Дата запуску</label>
+            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <label for="calendar-one-time-time">Час запуску</label>
+            <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off" placeholder="21:00" aria-describedby="calendar-help">
+          </div>
+
+          <div id="calendar-recurring-fields" hidden>
+            <label for="calendar-start-date">Дата початку повторення</label>
+            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+
+            <label for="calendar-times">Часи запуску, по одному в рядку</label>
+            <textarea id="calendar-times" rows="4" spellcheck="false" aria-describedby="calendar-times-help"></textarea>
+            <p id="calendar-times-help">Щоб додати час, додайте новий рядок. Щоб видалити час, видаліть відповідний рядок.</p>
+
+            <fieldset id="calendar-weekdays" hidden>
+              <legend>Дні тижня</legend>
+              <label><input id="calendar-weekday-1" type="checkbox"> Понеділок</label>
+              <label><input id="calendar-weekday-2" type="checkbox"> Вівторок</label>
+              <label><input id="calendar-weekday-3" type="checkbox"> Середа</label>
+              <label><input id="calendar-weekday-4" type="checkbox"> Четвер</label>
+              <label><input id="calendar-weekday-5" type="checkbox"> П’ятниця</label>
+              <label><input id="calendar-weekday-6" type="checkbox"> Субота</label>
+              <label><input id="calendar-weekday-7" type="checkbox"> Неділя</label>
+            </fieldset>
+
+            <label for="calendar-end-date">Необов’язкова кінцева дата</label>
+            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-12-31" aria-describedby="calendar-help">
+            <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
+            <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
+          </div>
+
+          <div id="calendar-explicit-fields" hidden>
+            <label for="calendar-explicit-occurrences">Явні дати й час, по одному запуску в рядку</label>
+            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="2026-09-25 09:00&#10;2026-09-25 14:00&#10;2026-09-25 21:00" aria-describedby="calendar-help"></textarea>
+          </div>
+
+          <p id="calendar-runtime-status" role="status" tabindex="0">Календарний розклад вимкнено.</p>
+        </fieldset>
+
         <fieldset id="run-mode">
           <legend>Run mode</legend>
           <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
@@ -951,6 +1059,20 @@
         <p id="session-log-count">0 Core log entries shown.</p>
         <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
         <button id="clear-log-button" type="button">Clear log</button>
+      </section>
+
+      <section aria-labelledby="run-timeline-heading">
+        <h3 id="run-timeline-heading">Хронологія виконання та докази</h3>
+        <p id="run-timeline-help">Лише читання: структуровані стани Core і вже зредаговані ідентифікатори ChatGPT. Довільний текст журналів, помилок, промптів, ключі доступу, дані входу й приватні посилання тут не показуються.</p>
+        <label for="run-timeline-source-filter">Показувати джерела</label>
+        <select id="run-timeline-source-filter" aria-describedby="run-timeline-help">
+          <option value="ALL">Усі події</option>
+          <option value="LOG">Core log</option>
+          <option value="DIAGNOSTIC">Діагностика</option>
+        </select>
+        <button id="refresh-run-timeline-button" type="button" aria-describedby="run-timeline-help run-timeline-status">Оновити хронологію</button>
+        <p id="run-timeline-status" tabindex="0">Хронологію ще не завантажено.</p>
+        <ol id="run-timeline-list" aria-label="Хронологія виконання вибраного сеансу"></ol>
       </section>
 
       <section aria-labelledby="diagnostics-heading">

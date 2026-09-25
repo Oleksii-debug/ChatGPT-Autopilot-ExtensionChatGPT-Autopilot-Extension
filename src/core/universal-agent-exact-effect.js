@@ -45,9 +45,14 @@ function clone(value) {
 }
 
 function id(value, label) {
-  const out = String(value ?? '').trim();
-  if (!ID.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+  if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function optionalId(value, label) {
+  return value == null || value === '' ? '' : id(value, label);
 }
 
 function timestamp(value, label) {
@@ -65,11 +70,51 @@ function optionalText(value, label, max = 8000) {
   return out;
 }
 
-function exactKeys(raw, allowed, label) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${label} must be an object`);
-  for (const key of Object.keys(raw)) {
-    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+function dataRecord(value, allowed, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain data object`);
   }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain data object`);
+  }
+  const output = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') throw new Error(`${label} contains symbol fields`);
+    if (!allowed.has(key)) throw new Error(`${label} contains unknown field: ${key}`);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`${label}.${key} must be an enumerable own data property`);
+    }
+    output[key] = descriptor.value;
+  }
+  return output;
+}
+
+function dataArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a plain dense array`);
+  }
+  if (value.length > max) throw new Error(`${label} is invalid`);
+  const output = [];
+  for (const key of Reflect.ownKeys(value)) {
+    if (key === 'length') continue;
+    if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
+      throw new Error(`${label} contains non-index fields`);
+    }
+    const index = Number(key);
+    if (!Number.isSafeInteger(index) || index >= value.length) {
+      throw new Error(`${label} contains invalid indices`);
+    }
+  }
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`${label}[${index}] must be an enumerable own data item`);
+    }
+    output.push(descriptor.value);
+  }
+  return output;
 }
 
 function freeze(value) {
@@ -103,26 +148,26 @@ function assertVerificationBinding(verification, state) {
   if (!state.observation || verification.observationId !== state.observation.observationId) {
     throw new Error('Verification observationId does not match current effect observation');
   }
-  if (verification.effectId && verification.effectId !== state.effectId) {
+  if (verification.effectId !== state.effectId) {
     throw new Error('Verification effectId does not match exact effect');
   }
-  if (verification.executionId && verification.executionId !== state.executionId) {
+  if (verification.executionId !== state.executionId) {
     throw new Error('Verification executionId does not match current exact-effect attempt');
   }
-  if (verification.attempt && verification.attempt !== state.attempt) {
+  if (verification.attempt !== state.attempt) {
     throw new Error('Verification attempt does not match current exact-effect attempt');
   }
 }
 
-function normalizedState(raw) {
-  exactKeys(raw, new Set([
+function normalizedState(input) {
+  const raw = dataRecord(input, new Set([
     'schemaVersion', 'effectId', 'invocation', 'phase', 'attempt',
     'executionId', 'observation', 'verification', 'ambiguity',
     'reconciliation', 'commitId', 'createdAt', 'updatedAt',
     'processedEventIds',
   ]), 'ExactEffectStateV1');
 
-  if (Number(raw.schemaVersion) !== UniversalExactEffectVersion) {
+  if (raw.schemaVersion !== UniversalExactEffectVersion) {
     throw new Error('Unsupported ExactEffectStateV1 schemaVersion');
   }
   const invocation = normalizeToolInvocationV1(raw.invocation);
@@ -130,14 +175,16 @@ function normalizedState(raw) {
   if (effectId !== invocation.invocationId) {
     throw new Error('effectId must equal invocationId');
   }
-  const phase = String(raw.phase || '').trim().toUpperCase();
-  if (!PHASES.has(phase)) throw new Error('Exact effect phase is invalid');
-  const attempt = Number(raw.attempt);
-  if (!Number.isInteger(attempt) || attempt < 0 || attempt > MAX_ATTEMPTS) {
+  if (typeof raw.phase !== 'string' || !PHASES.has(raw.phase)) {
+    throw new Error('Exact effect phase is invalid');
+  }
+  const phase = raw.phase;
+  const attempt = raw.attempt;
+  if (typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 0 || attempt > MAX_ATTEMPTS) {
     throw new Error('Exact effect attempt is invalid');
   }
   const expectedExecutionId = attempt > 0 ? executionId(effectId, attempt) : '';
-  if (String(raw.executionId || '') !== expectedExecutionId) {
+  if (optionalId(raw.executionId, 'executionId') !== expectedExecutionId) {
     throw new Error('Exact effect executionId is inconsistent');
   }
   const observation = raw.observation == null ? null : normalizeObservationV1(raw.observation);
@@ -153,31 +200,47 @@ function normalizedState(raw) {
       attempt,
     });
   }
-  const processedEventIds = Array.isArray(raw.processedEventIds)
-    ? raw.processedEventIds.map((value, index) => id(value, `processedEventIds[${index}]`))
-    : (() => { throw new Error('processedEventIds must be an array'); })();
-  if (processedEventIds.length > MAX_PROCESSED_EVENTS || new Set(processedEventIds).size !== processedEventIds.length) {
+  const processedEventIds = dataArray(raw.processedEventIds, 'processedEventIds', MAX_PROCESSED_EVENTS)
+    .map((value, index) => id(value, `processedEventIds[${index}]`));
+  if (new Set(processedEventIds).size !== processedEventIds.length) {
     throw new Error('processedEventIds is invalid');
   }
 
-  const ambiguity = raw.ambiguity && typeof raw.ambiguity === 'object'
-    ? {
-      reasonCode: raw.ambiguity.reasonCode ? id(raw.ambiguity.reasonCode, 'ambiguity.reasonCode') : '',
-      summary: optionalText(raw.ambiguity.summary, 'ambiguity.summary'),
-      declaredAt: raw.ambiguity.declaredAt ? timestamp(raw.ambiguity.declaredAt, 'ambiguity.declaredAt') : '',
-    }
-    : freshAmbiguity();
+  let ambiguity = freshAmbiguity();
+  if (raw.ambiguity != null) {
+    const value = dataRecord(
+      raw.ambiguity,
+      new Set(['reasonCode', 'summary', 'declaredAt']),
+      'ambiguity',
+    );
+    ambiguity = {
+      reasonCode: optionalId(value.reasonCode, 'ambiguity.reasonCode'),
+      summary: optionalText(value.summary, 'ambiguity.summary'),
+      declaredAt: value.declaredAt == null || value.declaredAt === ''
+        ? ''
+        : timestamp(value.declaredAt, 'ambiguity.declaredAt'),
+    };
+  }
 
-  const reconciliation = raw.reconciliation && typeof raw.reconciliation === 'object'
-    ? {
-      outcome: raw.reconciliation.outcome ? String(raw.reconciliation.outcome).trim().toUpperCase() : '',
-      reasonCode: raw.reconciliation.reasonCode ? id(raw.reconciliation.reasonCode, 'reconciliation.reasonCode') : '',
-      summary: optionalText(raw.reconciliation.summary, 'reconciliation.summary'),
-      resolvedAt: raw.reconciliation.resolvedAt ? timestamp(raw.reconciliation.resolvedAt, 'reconciliation.resolvedAt') : '',
+  let reconciliation = freshReconciliation();
+  if (raw.reconciliation != null) {
+    const value = dataRecord(
+      raw.reconciliation,
+      new Set(['outcome', 'reasonCode', 'summary', 'resolvedAt']),
+      'reconciliation',
+    );
+    const outcome = value.outcome == null || value.outcome === '' ? '' : value.outcome;
+    if (outcome && (typeof outcome !== 'string' || !RECONCILE_OUTCOMES.has(outcome))) {
+      throw new Error('reconciliation.outcome is invalid');
     }
-    : freshReconciliation();
-  if (reconciliation.outcome && !RECONCILE_OUTCOMES.has(reconciliation.outcome)) {
-    throw new Error('reconciliation.outcome is invalid');
+    reconciliation = {
+      outcome,
+      reasonCode: optionalId(value.reasonCode, 'reconciliation.reasonCode'),
+      summary: optionalText(value.summary, 'reconciliation.summary'),
+      resolvedAt: value.resolvedAt == null || value.resolvedAt === ''
+        ? ''
+        : timestamp(value.resolvedAt, 'reconciliation.resolvedAt'),
+    };
   }
 
   return freeze({
@@ -191,16 +254,17 @@ function normalizedState(raw) {
     verification,
     ambiguity,
     reconciliation,
-    commitId: raw.commitId ? id(raw.commitId, 'commitId') : '',
+    commitId: optionalId(raw.commitId, 'commitId'),
     createdAt: timestamp(raw.createdAt, 'createdAt'),
     updatedAt: timestamp(raw.updatedAt, 'updatedAt'),
     processedEventIds,
   });
 }
 
-export function createExactEffectStateV1(invocation, { createdAt } = {}) {
+export function createExactEffectStateV1(invocation, options = {}) {
+  const request = dataRecord(options, new Set(['createdAt']), 'ExactEffect create options');
   const normalizedInvocation = normalizeToolInvocationV1(invocation);
-  const at = timestamp(createdAt || normalizedInvocation.createdAt, 'createdAt');
+  const at = timestamp(request.createdAt || normalizedInvocation.createdAt, 'createdAt');
   return normalizedState({
     schemaVersion: UniversalExactEffectVersion,
     effectId: normalizedInvocation.invocationId,
@@ -223,17 +287,19 @@ export function normalizeExactEffectStateV1(raw) {
   return normalizedState(raw);
 }
 
-function normalizeEvent(raw) {
-  exactKeys(raw, new Set([
+function normalizeEvent(input) {
+  const raw = dataRecord(input, new Set([
     'schemaVersion', 'eventId', 'type', 'effectId', 'at',
     'observation', 'verification', 'reasonCode', 'summary',
     'outcome', 'commitId', 'executionId',
   ]), 'ExactEffectEventV1');
-  if (Number(raw.schemaVersion) !== UniversalExactEffectVersion) {
+  if (raw.schemaVersion !== UniversalExactEffectVersion) {
     throw new Error('Unsupported ExactEffectEventV1 schemaVersion');
   }
-  const type = String(raw.type || '').trim().toUpperCase();
-  if (!EVENTS.has(type)) throw new Error('Exact effect event type is invalid');
+  if (typeof raw.type !== 'string' || !EVENTS.has(raw.type)) {
+    throw new Error('Exact effect event type is invalid');
+  }
+  const type = raw.type;
   return {
     schemaVersion: UniversalExactEffectVersion,
     eventId: id(raw.eventId, 'eventId'),
@@ -246,7 +312,7 @@ function normalizeEvent(raw) {
     summary: raw.summary,
     outcome: raw.outcome,
     commitId: raw.commitId,
-    executionId: raw.executionId == null || raw.executionId === '' ? '' : id(raw.executionId, 'event.executionId'),
+    executionId: optionalId(raw.executionId, 'event.executionId'),
   };
 }
 
@@ -273,6 +339,11 @@ function withEvent(state, event) {
   state.updatedAt = event.at;
 }
 
+function acceptEvent(state, event, outcome = {}) {
+  withEvent(state, event);
+  return result(state, outcome);
+}
+
 export function reduceExactEffectV1(stateRaw, eventRaw) {
   const current = normalizedState(stateRaw);
   const event = normalizeEvent(eventRaw);
@@ -284,13 +355,15 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       reason: 'DUPLICATE_EVENT',
     });
   }
+  if (Date.parse(event.at) < Date.parse(current.updatedAt)) {
+    throw new Error('New exact-effect event cannot predate current durable state');
+  }
 
   const state = clone(current);
-  withEvent(state, event);
 
   if (event.type === ExactEffectEventType.BEGIN_EXECUTION) {
     if (![ExactEffectPhase.PREPARED, ExactEffectPhase.SAFE_RETRY].includes(current.phase)) {
-      return result(state, {
+      return result(current, {
         accepted: false,
         reason: current.phase === ExactEffectPhase.COMMITTED
           ? 'EFFECT_ALREADY_COMMITTED'
@@ -306,7 +379,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
         summary: 'Exact effect retry budget exhausted.',
         resolvedAt: event.at,
       };
-      return result(state, { reason: 'MAX_ATTEMPTS_EXCEEDED', action: 'MANUAL_REVIEW' });
+      return acceptEvent(state, event, { reason: 'MAX_ATTEMPTS_EXCEEDED', action: 'MANUAL_REVIEW' });
     }
     state.attempt = current.attempt + 1;
     state.executionId = executionId(current.effectId, state.attempt);
@@ -315,24 +388,24 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     state.verification = null;
     state.ambiguity = freshAmbiguity();
     state.reconciliation = freshReconciliation();
-    return result(state, { reason: current.phase === ExactEffectPhase.SAFE_RETRY ? 'SAFE_RETRY_EXECUTION_STARTED' : 'EXECUTION_STARTED', action: 'EXECUTE' });
+    return acceptEvent(state, event, { reason: current.phase === ExactEffectPhase.SAFE_RETRY ? 'SAFE_RETRY_EXECUTION_STARTED' : 'EXECUTION_STARTED', action: 'EXECUTE' });
   }
 
   if (event.type === ExactEffectEventType.RECORD_OBSERVATION) {
     if (current.phase !== ExactEffectPhase.EXECUTING) {
-      return result(state, { accepted: false, reason: 'OBSERVATION_NOT_EXPECTED' });
+      return result(current, { accepted: false, reason: 'OBSERVATION_NOT_EXPECTED' });
     }
     assertCurrentExecutionEvent(event, current);
     const observation = normalizeObservationV1(event.observation);
     assertObservationBinding(observation, current);
     state.observation = observation;
     state.phase = ExactEffectPhase.OBSERVED;
-    return result(state, { reason: 'OBSERVATION_RECORDED', action: 'VERIFY' });
+    return acceptEvent(state, event, { reason: 'OBSERVATION_RECORDED', action: 'VERIFY' });
   }
 
   if (event.type === ExactEffectEventType.DECLARE_AMBIGUITY) {
     if (![ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(current.phase)) {
-      return result(state, { accepted: false, reason: 'AMBIGUITY_NOT_EXPECTED' });
+      return result(current, { accepted: false, reason: 'AMBIGUITY_NOT_EXPECTED' });
     }
     assertCurrentExecutionEvent(event, current);
     state.phase = ExactEffectPhase.RECONCILE;
@@ -341,12 +414,12 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       summary: optionalText(event.summary, 'summary'),
       declaredAt: event.at,
     };
-    return result(state, { reason: 'AMBIGUITY_REQUIRES_RECONCILIATION', action: 'RECONCILE' });
+    return acceptEvent(state, event, { reason: 'AMBIGUITY_REQUIRES_RECONCILIATION', action: 'RECONCILE' });
   }
 
   if (event.type === ExactEffectEventType.RECORD_VERIFICATION) {
     if (current.phase !== ExactEffectPhase.OBSERVED) {
-      return result(state, { accepted: false, reason: 'VERIFICATION_NOT_EXPECTED' });
+      return result(current, { accepted: false, reason: 'VERIFICATION_NOT_EXPECTED' });
     }
     assertCurrentExecutionEvent(event, current);
     const verification = normalizeVerificationV1(event.verification);
@@ -354,7 +427,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     state.verification = verification;
     if ([VerificationStatus.VERIFIED, VerificationStatus.NOT_APPLICABLE].includes(verification.status)) {
       state.phase = ExactEffectPhase.VERIFIED;
-      return result(state, { reason: 'EFFECT_VERIFIED', action: 'COMMIT' });
+      return acceptEvent(state, event, { reason: 'EFFECT_VERIFIED', action: 'COMMIT' });
     }
     if (verification.status === VerificationStatus.AMBIGUOUS) {
       state.phase = ExactEffectPhase.RECONCILE;
@@ -363,7 +436,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
         summary: verification.summary,
         declaredAt: verification.verifiedAt,
       };
-      return result(state, { reason: 'VERIFICATION_AMBIGUOUS', action: 'RECONCILE' });
+      return acceptEvent(state, event, { reason: 'VERIFICATION_AMBIGUOUS', action: 'RECONCILE' });
     }
     state.phase = ExactEffectPhase.MANUAL_REVIEW;
     state.reconciliation = {
@@ -372,16 +445,18 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       summary: verification.summary,
       resolvedAt: verification.verifiedAt,
     };
-    return result(state, { reason: 'VERIFICATION_FAILED', action: 'MANUAL_REVIEW' });
+    return acceptEvent(state, event, { reason: 'VERIFICATION_FAILED', action: 'MANUAL_REVIEW' });
   }
 
   if (event.type === ExactEffectEventType.RESOLVE_RECONCILIATION) {
     if (current.phase !== ExactEffectPhase.RECONCILE) {
-      return result(state, { accepted: false, reason: 'RECONCILIATION_NOT_EXPECTED' });
+      return result(current, { accepted: false, reason: 'RECONCILIATION_NOT_EXPECTED' });
     }
     assertCurrentExecutionEvent(event, current);
-    const outcome = String(event.outcome || '').trim().toUpperCase();
-    if (!RECONCILE_OUTCOMES.has(outcome)) throw new Error('Reconciliation outcome is invalid');
+    if (typeof event.outcome !== 'string' || !RECONCILE_OUTCOMES.has(event.outcome)) {
+      throw new Error('Reconciliation outcome is invalid');
+    }
+    const outcome = event.outcome;
     const reasonCode = id(event.reasonCode, 'reasonCode');
     const summary = optionalText(event.summary, 'summary');
 
@@ -402,7 +477,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       state.verification = verification;
       state.phase = ExactEffectPhase.VERIFIED;
       state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
-      return result(state, { reason: 'RECONCILIATION_VERIFIED', action: 'COMMIT' });
+      return acceptEvent(state, event, { reason: 'RECONCILIATION_VERIFIED', action: 'COMMIT' });
     }
 
     if (outcome === ReconciliationOutcome.SAFE_RETRY) {
@@ -417,7 +492,7 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
       state.verification = verification;
       state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
       state.phase = ExactEffectPhase.SAFE_RETRY;
-      return result(state, { reason: 'RECONCILIATION_SAFE_RETRY', action: 'SAFE_RETRY' });
+      return acceptEvent(state, event, { reason: 'RECONCILIATION_SAFE_RETRY', action: 'SAFE_RETRY' });
     }
 
     if (event.verification != null) {
@@ -428,19 +503,19 @@ export function reduceExactEffectV1(stateRaw, eventRaw) {
     }
     state.reconciliation = { outcome, reasonCode, summary, resolvedAt: event.at };
     state.phase = ExactEffectPhase.MANUAL_REVIEW;
-    return result(state, { reason: 'RECONCILIATION_MANUAL_REVIEW', action: 'MANUAL_REVIEW' });
+    return acceptEvent(state, event, { reason: 'RECONCILIATION_MANUAL_REVIEW', action: 'MANUAL_REVIEW' });
   }
 
   if (event.type === ExactEffectEventType.COMMIT) {
     if (current.phase !== ExactEffectPhase.VERIFIED) {
-      return result(state, {
+      return result(current, {
         accepted: false,
         reason: current.phase === ExactEffectPhase.COMMITTED ? 'EFFECT_ALREADY_COMMITTED' : 'COMMIT_REQUIRES_VERIFIED_EFFECT',
       });
     }
     state.commitId = id(event.commitId, 'commitId');
     state.phase = ExactEffectPhase.COMMITTED;
-    return result(state, { reason: 'EFFECT_COMMITTED', action: 'NONE' });
+    return acceptEvent(state, event, { reason: 'EFFECT_COMMITTED', action: 'NONE' });
   }
 
   throw new Error('Unhandled exact effect event');

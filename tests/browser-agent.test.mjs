@@ -137,6 +137,141 @@ test('prompt-first config allows empty URL and keeps policy as optional ceilings
   assert.equal(value.allowCrossOriginNavigation, true);
 });
 
+test('Browser Agent project identity uses the canonical Project id grammar', () => {
+  assert.equal(config({ projectId: 'project-1' }).projectId, 'project-1');
+  assert.equal(config().projectId, '');
+  assert.throws(() => config({ projectId: ' project-1 ' }), /projectId is invalid/);
+  assert.throws(() => config({ projectId: 'project id' }), /projectId is invalid/);
+  assert.throws(() => config({ projectId: 1 }), /projectId is invalid/);
+});
+
+test('Browser Agent persists immutable job-to-Project identity across restart', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-project', projectId:'project-1', goal:'Produce project evidence' });
+
+  const binding = await manager.resolveJobProjectBinding('job-project');
+  assert.deepEqual(binding, { schemaVersion:1, jobId:'job-project', projectId:'project-1', planId:'' });
+  assert.equal(Object.isFrozen(binding), true);
+
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  assert.deepEqual(await restarted.resolveJobProjectBinding('job-project'), binding);
+  await assert.rejects(
+    () => restarted.updateConfig('job-project', { projectId:'project-2' }),
+    /projectId is immutable/,
+  );
+  await assert.rejects(
+    () => restarted.updateConfig('job-project', { projectId:'' }),
+    /projectId is immutable/,
+  );
+});
+
+test('legacy Browser Agent may bind a Project exactly once before execution history exists', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-legacy', goal:'Bind before execution' });
+  await assert.rejects(() => manager.resolveJobProjectBinding('job-legacy'), /not bound to a Project/);
+
+  await manager.updateConfig('job-legacy', { projectId:'project-legacy' });
+  assert.deepEqual(await manager.resolveJobProjectBinding('job-legacy'), {
+    schemaVersion:1,
+    jobId:'job-legacy',
+    projectId:'project-legacy',
+    planId:'',
+  });
+
+  await assert.rejects(
+    () => manager.updateConfig('job-legacy', { projectId:'project-other' }),
+    /projectId is immutable/,
+  );
+});
+
+test('Browser Agent refuses retroactive Project binding after execution evidence exists', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-history', goal:'Already executed' });
+  await manager.update(store => {
+    store.byId['job-history'].runtime.history.push({ at:1, type:'effect', message:'existing evidence' });
+    return store;
+  });
+  await assert.rejects(
+    () => manager.updateConfig('job-history', { projectId:'project-late' }),
+    /must be bound before the job produces execution history/,
+  );
+  await assert.rejects(() => manager.resolveJobProjectBinding('job-history'), /not bound to a Project/);
+});
+
+test('Browser Agent Project update rejects accessor-backed identity without executing it', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-accessor', goal:'No getter execution' });
+  let reads = 0;
+  const update = {};
+  Object.defineProperty(update, 'projectId', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'project-accessor';
+    },
+  });
+  await assert.rejects(
+    () => manager.updateConfig('job-accessor', update),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('job-to-Project resolver composes exact persisted AgentPlan identity and fails closed on mismatch', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-plan-project', projectId:'project-plan', goal:'Plan within project' });
+  await manager.update(store => {
+    store.byId['job-plan-project'].runtime.plan = {
+      schemaVersion:1,
+      planId:'plan-project',
+      jobId:'job-plan-project',
+      objective:'Produce verified project result',
+      successCriteria:['Verified'],
+      createdAt:'2026-09-25T03:00:00.000Z',
+      updatedAt:'2026-09-25T03:00:00.000Z',
+      revision:1,
+      nodes:[{
+        nodeId:'work',
+        title:'Work',
+        objective:'Produce result',
+        dependsOn:[],
+        conflictKeys:[],
+        ownerId:'parent',
+        executionPlane:'BROWSER',
+        acceptanceCriteria:[],
+        budget:{},
+        state:'PENDING',
+        evidence:'',
+        updatedAt:'2026-09-25T03:00:00.000Z',
+      }],
+    };
+    return store;
+  });
+  assert.deepEqual(await manager.resolveJobProjectBinding('job-plan-project'), {
+    schemaVersion:1,
+    jobId:'job-plan-project',
+    projectId:'project-plan',
+    planId:'plan-project',
+  });
+
+  await manager.update(store => {
+    store.byId['job-plan-project'].runtime.plan = {
+      ...store.byId['job-plan-project'].runtime.plan,
+      jobId: 'other-job',
+    };
+    return store;
+  });
+  await assert.rejects(
+    () => manager.resolveJobProjectBinding('job-plan-project'),
+    /AgentPlan jobId does not match the durable job/,
+  );
+});
+
 test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00Z') });
@@ -163,13 +298,23 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   assert.equal(claimed.claimed.length, 1);
   const completed = await manager.completeSpecialistHandoff('job-1', { agentId:claimed.claimed[0], leaseId:claimed.assignments[0].leaseId, resultArtifactIds:['artifact:1'] });
   assert.equal(completed.verificationRequired, claimed.claimed[0]);
-  await assert.rejects(() => manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'browser-agent:job-1', verificationAuthorityId:'policy:archive', evidence:'self verified' }), /independent/);
-  const verified = await manager.verifySpecialistHandoff('job-1', { agentId:claimed.claimed[0], verifierId:'verifier-1', verificationAuthorityId:'policy:archive', evidence:'Fresh artifact hash and current-state observation match.' });
-  assert.equal(verified.plan.nodes.find(node => node.nodeId === 'archive').state, 'VERIFIED');
-  assert.equal(verified.executionOwnerships[0].state, 'VERIFIED');
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job-1', {
+      agentId:claimed.claimed[0],
+      verifierId:'verifier-forged-but-distinct',
+      verificationAuthorityId:'policy:archive',
+      evidence:'Caller-created text claims fresh artifact evidence.',
+    }),
+    /trusted verifier provenance/,
+  );
+  const after = await manager.listSpecialistHandoffs('job-1');
+  const durable = await manager.get('job-1');
+  assert.equal(durable.job.runtime.plan.nodes.find(node => node.nodeId === 'archive').state, 'RUNNING');
+  assert.equal(after.handoffs[0].state, 'COMPLETED');
+  assert.equal(after.executionOwnerships[0].state, 'OWNED');
 });
 
-test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handoff only through normal capacity', async () => {
+test('Browser Agent keeps ambiguous specialist effect fenced across forged proof and restart', async () => {
   const chrome = makeChrome();
   let clock = Date.parse('2026-09-23T12:00:00Z');
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
@@ -194,21 +339,41 @@ test('Browser Agent persists SAFE_RETRY evidence and re-admits an expired handof
   const expired = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1 });
   assert.deepEqual(expired.claimed, []);
   assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
-  const reconciliation = { agentId, leaseId, verifierId:'provider-observer', verificationAuthorityId:'policy:retry', evidence:'A fresh provider query proves no archive exists.' };
-  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', { ...reconciliation, evidence:'' }), /evidence/);
-  const retriable = await manager.authorizeSpecialistSafeRetry('job-retry', reconciliation);
-  assert.equal(retriable.assignments[0].state, 'READY');
-  assert.equal(retriable.executionOwnerships[0].state, 'AVAILABLE');
+
+  const verification = {
+    schemaVersion:1,
+    verificationId:'verification-no-effect-job-retry',
+    invocationId:'invoke-safe-retry-job-retry',
+    observationId:'observation-no-effect-job-retry',
+    status:'VERIFIED',
+    reasonCode:'NO_EFFECT_OBSERVED',
+    summary:'Caller-shaped no-effect assertion.',
+    evidenceArtifactIds:['artifact:no-effect-job-retry'],
+    verifiedAt:'2026-09-23T12:01:01.000Z',
+    verifierId:'provider-observer',
+    verificationAuthorityId:'policy:retry',
+    effectId:claimed.executionOwnerships[0].effectId,
+    executionId:leaseId,
+    attempt:1,
+  };
+  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', {
+    agentId,
+    leaseId,
+    verification,
+  }), /trusted verifier provenance/);
+
   const durable = await manager.get('job-retry');
-  assert.equal(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
-  assert.equal(durable.job.runtime.history.at(-1).evidence, reconciliation.evidence);
+  assert.equal(durable.job.runtime.specialistHandoffs[0].state, 'LEASED');
+  assert.equal(durable.job.runtime.specialistHandoffs[0].leaseId, leaseId);
+  assert.equal(durable.job.runtime.specialistExecutionOwnerships[0].state, 'RECONCILE');
+  assert.notEqual(durable.job.runtime.history.at(-1).type, 'specialist-handoff-safe-retry-authorized');
+
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock + 2_000 });
   const beforeAdmission = await restarted.listSpecialistHandoffs('job-retry');
-  assert.equal(beforeAdmission.handoffs[0].state, 'READY', 'restart must preserve explicit SAFE_RETRY authorization');
+  assert.equal(beforeAdmission.handoffs[0].state, 'LEASED');
   const reclaimed = await restarted.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
-  assert.deepEqual(reclaimed.claimed, [agentId]);
-  assert.notEqual(reclaimed.assignments[0].leaseId, leaseId);
-  assert.equal(reclaimed.executionOwnerships[0].effectId, claimed.executionOwnerships[0].effectId);
+  assert.deepEqual(reclaimed.claimed, []);
+  assert.equal(reclaimed.executionOwnerships[0].state, 'RECONCILE');
 });
 
 test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
@@ -235,6 +400,19 @@ test('product-wide specialist admission is durable across Browser Agent jobs and
   const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30Z') });
   const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30Z' });
   assert.equal(afterRestart.claimed.length, 0, 'a restart must retain the product-wide lease fence');
+  assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
+
+  const afterExpiry = await restarted.claimSpecialistHandoffsAcrossJobs({
+    maxConcurrentHandoffs:1,
+    leaseSeconds:60,
+    at:'2026-09-23T12:02:00Z',
+  });
+  assert.equal(afterExpiry.activeLeases, 0, 'expired lease labels are not the capacity authority');
+  assert.equal(afterExpiry.capacityObligations, 1, 'unresolved canonical effect ownership still consumes one slot');
+  assert.equal(afterExpiry.remainingSlots, 0);
+  assert.equal(afterExpiry.claimed.length, 0, 'RECONCILE must block admitting another effectful specialist job');
+  assert.deepEqual(afterExpiry.reconciliationRequired.map(item => item.jobId), ['job-1']);
+  assert.equal((await restarted.listSpecialistHandoffs('job-1')).executionOwnerships[0].state, 'RECONCILE');
   assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
 });
 
@@ -1296,8 +1474,8 @@ test('three-route model failover preserves Browser Agent job identity and execut
     enabled:true,
     mode:'primary',
     routes:[
-      { routeId:'a', provider:'openai-compatible', endpointId:'team-a', model:'route-a', roles:['planner'], priority:30 },
-      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20 },
+      { routeId:'a', provider:'openai-compatible', endpointId:'team-a', model:'route-a', roles:['planner'], priority:30, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+      { routeId:'b', provider:'openai', model:'route-b', roles:['planner'], priority:20, inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
       { routeId:'c', provider:'ollama', model:'route-c', roles:['planner'], priority:10 },
     ],
     routePolicy:{ autoSwitch:true, retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
@@ -2629,4 +2807,110 @@ test('Trusted Script consequential approval is invalidated if the approved brows
   assert.equal(after.job.runtime.runState, 'PAUSED');
   assert.equal(evaluateCalls, 0);
   assert.match(after.job.runtime.lastError, /no longer available|stale|changed/i);
+});
+
+
+test('Browser Agent specialist wrappers snapshot caller payloads before authority reads', async () => {
+  const chrome = makeChrome();
+  const at = '2026-09-23T12:00:00Z';
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(at),
+  });
+  await manager.create({ id: 'job-wrapper-boundary', goal: 'Exercise specialist request boundary' });
+  await manager.update(store => {
+    store.byId['job-wrapper-boundary'].runtime.plan = {
+      schemaVersion: 1,
+      planId: 'plan-wrapper-boundary',
+      jobId: 'job-wrapper-boundary',
+      objective: 'Complete safely',
+      successCriteria: ['Verified'],
+      createdAt: at,
+      updatedAt: at,
+      revision: 1,
+      nodes: [
+        {
+          nodeId: 'inspect',
+          title: 'Inspect',
+          objective: 'Inspect page',
+          dependsOn: [],
+          conflictKeys: ['web:wrapper'],
+          ownerId: 'parent',
+          executionPlane: 'BROWSER',
+          acceptanceCriteria: [],
+          budget: {},
+          state: 'VERIFIED',
+          evidence: 'Observed',
+          updatedAt: at,
+        },
+        {
+          nodeId: 'archive',
+          title: 'Archive',
+          objective: 'Create archive',
+          dependsOn: ['inspect'],
+          conflictKeys: ['files:wrapper'],
+          ownerId: 'parent',
+          executionPlane: 'LOCAL',
+          acceptanceCriteria: ['Archive exists'],
+          budget: {},
+          state: 'PENDING',
+          evidence: '',
+          updatedAt: at,
+        },
+      ],
+    };
+    return store;
+  });
+
+  let reads = 0;
+  const payload = new Proxy({
+    nodeId: 'archive',
+    specialistId: 'native-companion',
+    requestedCapabilityIds: ['filesystem.archive'],
+    parentCapabilityIds: ['filesystem.archive'],
+    policyEnvelopeId: 'policy:wrapper',
+    deadlineAt: '2026-09-23T13:00:00Z',
+    at,
+  }, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const prepared = await manager.prepareSpecialistHandoff('job-wrapper-boundary', payload);
+  assert.equal(prepared.assignment.state, 'READY');
+  assert.equal(reads, 0, 'Browser Agent wrapper must not ordinary-read a caller Proxy payload');
+
+  let getterCalls = 0;
+  const hostileAcrossJobs = { at };
+  Object.defineProperty(hostileAcrossJobs, 'maxConcurrentHandoffs', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 1;
+    },
+  });
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs(hostileAcrossJobs),
+    /maxConcurrentHandoffs must be an enumerable data property/,
+  );
+  assert.equal(getterCalls, 0, 'cross-job capacity getter must never execute');
+
+  let coercions = 0;
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs({
+      maxConcurrentHandoffs: {
+        valueOf() {
+          coercions += 1;
+          return 1;
+        },
+      },
+      at,
+    }),
+    /maxConcurrentHandoffs must be an integer/,
+  );
+  assert.equal(coercions, 0, 'cross-job capacity must never be coerced');
 });

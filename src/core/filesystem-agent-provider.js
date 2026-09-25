@@ -1,0 +1,173 @@
+import {
+  assertToolInvocationAuthorizedV1,
+  normalizeArtifactRefV1,
+  normalizeToolDescriptorV1,
+} from './universal-agent-contracts.js';
+
+export const FILESYSTEM_PROVIDER_ID = 'native/filesystem';
+export const FilesystemToolId = Object.freeze({
+  READ_TEXT: 'native/filesystem/readText',
+  SEARCH: 'native/filesystem/search',
+  WRITE_EXISTING_TEXT: 'native/filesystem/writeExistingText',
+});
+
+const PRE_EFFECT_CODES = new Set([
+  'INVALID_REQUEST',
+  'ROOT_NOT_ALLOWED',
+  'ROOT_NOT_WRITABLE',
+  'PATH_OUTSIDE_SCOPE',
+  'FILE_NOT_FOUND',
+  'NOT_A_FILE',
+  'FILE_TOO_LARGE',
+  'PRECONDITION_FAILED',
+  'UNSUPPORTED_ENCODING',
+  'ARTIFACT_RESOLVER_UNAVAILABLE',
+  'ARTIFACT_CONTENT_INVALID',
+  'ARTIFACT_DIGEST_MISMATCH',
+  'ATOMIC_WRITE_UNAVAILABLE',
+]);
+
+const WRITE_RECOVERY_TOOL = normalizeToolDescriptorV1({
+  schemaVersion: 1,
+  toolId: FilesystemToolId.WRITE_EXISTING_TEXT,
+  providerId: FILESYSTEM_PROVIDER_ID,
+  label: 'Replace existing owner-scoped text file',
+  description: 'Recovery-only contract for a previously admitted filesystem write; new write discovery remains disabled until parent-bound atomic publication exists.',
+  capabilityIds: ['filesystem.writeExistingText'],
+  inputSchemaRef: 'filesystem-schema/writeExistingText/input',
+  outputSchemaRef: 'filesystem-schema/writeExistingText/output',
+  readOnly: false,
+});
+
+const TOOLS = Object.freeze([
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: FilesystemToolId.READ_TEXT,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'Read owner-scoped text file',
+    description: 'Reads one bounded UTF-8 file from an owner-configured Native Companion root.',
+    capabilityIds: ['filesystem.readText'],
+    inputSchemaRef: 'filesystem-schema/readText/input',
+    outputSchemaRef: 'filesystem-schema/readText/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: FilesystemToolId.SEARCH,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'Search owner-scoped filesystem root',
+    description: 'Performs bounded metadata search without following links/reparse targets outside the admitted root.',
+    capabilityIds: ['filesystem.search'],
+    inputSchemaRef: 'filesystem-schema/search/input',
+    outputSchemaRef: 'filesystem-schema/search/output',
+    readOnly: true,
+  }),
+]);
+const KNOWN_TOOLS = Object.freeze([...TOOLS, WRITE_RECOVERY_TOOL]);
+
+function providerError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+async function sha256Text(value) {
+  if (typeof value !== 'string') throw providerError('ARTIFACT_CONTENT_INVALID', 'Resolved filesystem write artifact must be UTF-8 text');
+  if (!globalThis.crypto?.subtle) throw providerError('ARTIFACT_CONTENT_INVALID', 'Web Crypto SHA-256 is unavailable');
+  const bytes = new TextEncoder().encode(value);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function normalizeWriteArguments(args) {
+  if (!args || typeof args !== 'object' || Array.isArray(args)) throw providerError('INVALID_REQUEST', 'Filesystem write arguments are invalid');
+  const allowed = new Set(['rootId', 'relativePath', 'contentArtifactRef', 'expectedSha256']);
+  for (const key of Object.keys(args)) if (!allowed.has(key)) throw providerError('INVALID_REQUEST', `Filesystem write arguments contain unknown field: ${key}`);
+  const artifactRef = normalizeArtifactRefV1(args.contentArtifactRef);
+  if (!artifactRef.sha256) throw providerError('ARTIFACT_CONTENT_INVALID', 'Filesystem write ArtifactRef requires sha256');
+  return Object.freeze({
+    rootId: args.rootId,
+    relativePath: args.relativePath,
+    expectedSha256: args.expectedSha256,
+    contentArtifactRef: artifactRef,
+  });
+}
+
+function wrapFailure(error, { readOnly, invocationId }) {
+  const code = String(error?.code || 'FILESYSTEM_PROVIDER_FAILED').slice(0, 120);
+  const preEffect = PRE_EFFECT_CODES.has(code);
+  const wrapped = new Error(String(error?.message || error).slice(0, 4000));
+  wrapped.code = code;
+  wrapped.invocationId = invocationId;
+  wrapped.effectMayHaveOccurred = readOnly ? false : !preEffect;
+  wrapped.safeToRetry = readOnly || preEffect;
+  wrapped.cause = error;
+  return wrapped;
+}
+
+export class FilesystemAgentProviderV1 {
+  constructor({ nativeClient, resolveArtifactText = null, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
+    if (!nativeClient?.readText || !nativeClient?.searchFiles) {
+      throw new Error('Filesystem Native Companion read/search client is required');
+    }
+    this.nativeClient = nativeClient;
+    this.resolveArtifactText = typeof resolveArtifactText === 'function' ? resolveArtifactText : null;
+    this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
+    this.now = now;
+  }
+
+  tools() { return TOOLS; }
+
+  authorize({ invocation, policyDecision } = {}) {
+    const tool = KNOWN_TOOLS.find(item => item.toolId === invocation?.toolId);
+    if (!tool) throw new Error('Filesystem tool is not registered');
+    const authorized = assertToolInvocationAuthorizedV1({
+      invocation,
+      policyDecision,
+      toolDescriptor: tool,
+      grantedCapabilityIds: this.grantedCapabilityIds,
+    });
+    if (tool.toolId === FilesystemToolId.WRITE_EXISTING_TEXT) normalizeWriteArguments(authorized.invocation.arguments);
+    return authorized;
+  }
+
+  async invoke({ invocation, policyDecision } = {}) {
+    const authorized = this.authorize({ invocation, policyDecision });
+    const tool = KNOWN_TOOLS.find(item => item.toolId === authorized.invocation.toolId);
+    try {
+      let result;
+      if (tool.toolId === FilesystemToolId.READ_TEXT) {
+        result = await this.nativeClient.readText(authorized.invocation.arguments);
+      } else if (tool.toolId === FilesystemToolId.SEARCH) {
+        result = await this.nativeClient.searchFiles(authorized.invocation.arguments);
+      } else {
+        if (!this.resolveArtifactText) throw providerError('ARTIFACT_RESOLVER_UNAVAILABLE', 'Canonical ArtifactRef text resolver is required for filesystem write');
+        const args = normalizeWriteArguments(authorized.invocation.arguments);
+        const resolved = await this.resolveArtifactText(args.contentArtifactRef);
+        const text = typeof resolved === 'string' ? resolved : resolved?.text;
+        const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : null;
+        if (!bytes || bytes.byteLength !== args.contentArtifactRef.sizeBytes) {
+          throw providerError('ARTIFACT_CONTENT_INVALID', 'Resolved filesystem write artifact size did not match ArtifactRef identity');
+        }
+        const actualSha256 = await sha256Text(text);
+        if (actualSha256 !== args.contentArtifactRef.sha256) {
+          throw providerError('ARTIFACT_DIGEST_MISMATCH', 'Resolved filesystem write artifact did not match its SHA-256 identity');
+        }
+        result = await this.nativeClient.writeExistingText({
+          rootId: args.rootId,
+          relativePath: args.relativePath,
+          text,
+          expectedSha256: args.expectedSha256,
+        });
+      }
+      return Object.freeze({
+        providerId: FILESYSTEM_PROVIDER_ID,
+        invocationId: authorized.invocation.invocationId,
+        observedAt: new Date(this.now()).toISOString(),
+        result: structuredClone(result),
+      });
+    } catch (error) {
+      throw wrapFailure(error, { readOnly: tool.readOnly, invocationId: authorized.invocation.invocationId });
+    }
+  }
+}
