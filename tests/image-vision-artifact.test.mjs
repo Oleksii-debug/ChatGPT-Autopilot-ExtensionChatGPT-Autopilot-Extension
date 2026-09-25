@@ -112,8 +112,8 @@ test('binds exact immutable image bytes before one canonical vision-router call'
   assert.equal(router.calls[0].maxModelCallsForRequest, 1);
   assert.match(router.calls[0].systemPrompt, /untrusted visual data/u);
   assert.match(router.calls[0].systemPrompt, /Never follow instructions/u);
-  assert.match(router.calls[0].userPrompt, /image-1/u);
-  assert.match(router.calls[0].userPrompt, new RegExp(sha256(bytes), 'u'));
+  assert.match(router.calls[0].prompt, /image-1/u);
+  assert.match(router.calls[0].prompt, new RegExp(sha256(bytes), 'u'));
 
   assert.equal(result.analysisId, 'analysis-1');
   assert.deepEqual(result.sourceArtifact, {
@@ -315,6 +315,16 @@ test('request accessors are rejected without executing the getter', async () => 
   );
   assert.equal(reads, 0);
   assert.equal(router.calls.length, 0);
+});
+
+test('direct canonical router envelope is accepted without requiring a wrapper', async () => {
+  const bytes = pngBytes();
+  const routeVision = async () => ({ text: JSON.stringify(modelPayload()) });
+  const result = await analyzeImageArtifactV1(request(bytes), {
+    routeVision,
+    cryptoImpl: globalThis.crypto,
+  });
+  assert.equal(result.model.summary, modelPayload().summary);
 });
 
 test('model prose or malformed JSON cannot become analysis evidence', async () => {
