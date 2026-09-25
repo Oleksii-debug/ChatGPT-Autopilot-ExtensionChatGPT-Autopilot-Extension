@@ -458,7 +458,7 @@ test('Action Center public envelopes reject accessor-backed fields without execu
   assert.equal(resolverGetterCalls, 0);
 });
 
-test('Browser Agent approval authority records are snapshotted without executing accessors', async () => {
+test('Browser Agent approval authority fields reject accessors without executing getters', async () => {
   const makeJob = () => agentJob('descriptor-safe', {
     config: { name: 'Descriptor safe approval' },
     runtime: {
@@ -474,10 +474,9 @@ test('Browser Agent approval authority records are snapshotted without executing
       },
     },
   });
-  const mutations = [
+  const authorityMutations = [
     (job, getter) => Object.defineProperty(job, 'id', { enumerable: true, get: getter }),
     (job, getter) => Object.defineProperty(job, 'runtime', { enumerable: true, get: getter }),
-    (job, getter) => Object.defineProperty(job.config, 'name', { enumerable: true, get: getter }),
     (job, getter) => Object.defineProperty(job.runtime, 'runState', { enumerable: true, get: getter }),
     (job, getter) => Object.defineProperty(job.runtime, 'controlEpoch', { enumerable: true, get: getter }),
     (job, getter) => Object.defineProperty(job.runtime, 'updatedAt', { enumerable: true, get: getter }),
@@ -486,10 +485,9 @@ test('Browser Agent approval authority records are snapshotted without executing
     (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'snapshotId', { enumerable: true, get: getter }),
     (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'snapshotSignature', { enumerable: true, get: getter }),
     (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'action', { enumerable: true, get: getter }),
-    (job, getter) => Object.defineProperty(job.runtime.pendingApproval.action, 'type', { enumerable: true, get: getter }),
   ];
 
-  for (const mutate of mutations) {
+  for (const mutate of authorityMutations) {
     let getterCalls = 0;
     const job = makeJob();
     mutate(job, () => {
@@ -498,6 +496,45 @@ test('Browser Agent approval authority records are snapshotted without executing
     });
     const projection = await projectRuntimeActionCenter({ agentJobs: [job] });
     assert.equal(projection.summary.openCount, 0);
+    assert.equal(getterCalls, 0);
+  }
+});
+
+test('non-authority Browser Agent presentation fields never execute accessors or suppress a valid approval', async () => {
+  const makeJob = () => agentJob('presentation-safe', {
+    config: { name: 'Presentation safe approval' },
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      controlEpoch: 10,
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: {
+        snapshotId: 'snapshot-10',
+        snapshotSignature: 'signature-10',
+        requestedAt: T1,
+        action: { type: 'CLICK', ref: 'control-10' },
+      },
+    },
+  });
+  const presentationMutations = [
+    (job, getter) => Object.defineProperty(job, 'config', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.config, 'name', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job, 'createdAt', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job, 'updatedAt', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime, 'lastError', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime.pendingApproval.action, 'type', { enumerable: true, get: getter }),
+  ];
+
+  for (const mutate of presentationMutations) {
+    let getterCalls = 0;
+    const job = makeJob();
+    mutate(job, () => {
+      getterCalls += 1;
+      return 'hostile';
+    });
+    const projection = await projectRuntimeActionCenter({ agentJobs: [job] });
+    assert.equal(projection.summary.openCount, 1);
+    assert.equal(projection.items[0].ownerActionKind, 'APPROVE_OR_DENY');
     assert.equal(getterCalls, 0);
   }
 });

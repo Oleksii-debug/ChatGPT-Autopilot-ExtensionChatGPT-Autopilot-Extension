@@ -52,81 +52,23 @@ const RESOLVE_RUNTIME_INPUT_KEYS = new Set([
   'decision',
   'cryptoApi',
 ]);
-const BROWSER_JOB_FIELDS = ['id', 'config', 'createdAt', 'updatedAt', 'runtime'];
-const BROWSER_CONFIG_FIELDS = ['name'];
-const BROWSER_RUNTIME_FIELDS = [
-  'runState',
-  'controlEpoch',
-  'updatedAt',
-  'lastError',
-  'pendingApproval',
-];
-const BROWSER_PENDING_FIELDS = [
-  'snapshotId',
-  'snapshotSignature',
-  'requestedAt',
-  'action',
-];
+const INVALID_DATA_FIELD = Symbol('invalid-data-field');
 
-function snapshotExactOptions(input, allowed, label) {
-  const value = input == null ? {} : input;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`${label} must be a plain or null-prototype object`);
-  }
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) {
-    throw new Error(`${label} must be a plain or null-prototype object`);
-  }
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const out = Object.create(null);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string' || !allowed.has(key)) {
-      throw new Error(`${label} contains unknown field: ${String(key)}`);
-    }
-    const descriptor = descriptors[key];
-    if (!descriptor
-        || descriptor.enumerable !== true
-        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-      throw new Error(`${label} fields must be enumerable own data properties`);
-    }
-    out[key] = descriptor.value;
-  }
-  return out;
-}
-
-function snapshotSelectedFields(input, fields) {
+function plainRecordDescriptors(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const prototype = Object.getPrototypeOf(input);
   if (prototype !== Object.prototype && prototype !== null) return null;
-  const descriptors = Object.getOwnPropertyDescriptors(input);
-  const out = Object.create(null);
-  for (const field of fields) {
-    const descriptor = descriptors[field];
-    if (!descriptor) continue;
-    if (descriptor.enumerable !== true
-        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-      return null;
-    }
-    out[field] = descriptor.value;
-  }
-  return Object.freeze(out);
+  return Object.getOwnPropertyDescriptors(input);
 }
 
-function isPlainEnumerableDataRecord(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
-  const prototype = Object.getPrototypeOf(input);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  const descriptors = Object.getOwnPropertyDescriptors(input);
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string') return false;
-    const descriptor = descriptors[key];
-    if (!descriptor
-        || descriptor.enumerable !== true
-        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
-      return false;
-    }
+function dataField(descriptors, key, required = false) {
+  const descriptor = descriptors?.[key];
+  if (!descriptor) return required ? INVALID_DATA_FIELD : undefined;
+  if (descriptor.enumerable !== true
+      || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    return INVALID_DATA_FIELD;
   }
-  return true;
+  return descriptor.value;
 }
 
 function snapshotDenseArrayValues(input) {
@@ -147,43 +89,85 @@ function snapshotDenseArrayValues(input) {
   return Object.freeze(out);
 }
 
+function optionalPresentationName(jobDescriptors) {
+  const config = dataField(jobDescriptors, 'config');
+  if (config === INVALID_DATA_FIELD || config == null) return undefined;
+  const configDescriptors = plainRecordDescriptors(config);
+  if (!configDescriptors) return undefined;
+  const name = dataField(configDescriptors, 'name');
+  return name === INVALID_DATA_FIELD ? undefined : name;
+}
+
+function optionalDataValue(descriptors, key, fallback) {
+  const value = dataField(descriptors, key);
+  return value === INVALID_DATA_FIELD ? fallback : value;
+}
+
 function snapshotBrowserAgentJob(input) {
-  const job = snapshotSelectedFields(input, BROWSER_JOB_FIELDS);
-  if (!job || typeof job.id !== 'string') return null;
+  const jobDescriptors = plainRecordDescriptors(input);
+  if (!jobDescriptors) return null;
 
-  const config = job.config == null
-    ? Object.freeze(Object.create(null))
-    : snapshotSelectedFields(job.config, BROWSER_CONFIG_FIELDS);
-  if (!config) return null;
+  const id = dataField(jobDescriptors, 'id', true);
+  const runtimeInput = dataField(jobDescriptors, 'runtime', true);
+  if (id === INVALID_DATA_FIELD || typeof id !== 'string'
+      || runtimeInput === INVALID_DATA_FIELD) {
+    return null;
+  }
 
-  const runtime = job.runtime == null
-    ? Object.freeze(Object.create(null))
-    : snapshotSelectedFields(job.runtime, BROWSER_RUNTIME_FIELDS);
-  if (!runtime) return null;
+  const runtimeDescriptors = plainRecordDescriptors(runtimeInput);
+  if (!runtimeDescriptors) return null;
+  const runState = dataField(runtimeDescriptors, 'runState', true);
+  if (runState === INVALID_DATA_FIELD || typeof runState !== 'string') return null;
 
+  const createdAt = optionalDataValue(jobDescriptors, 'createdAt', undefined);
+  const jobUpdatedAt = optionalDataValue(jobDescriptors, 'updatedAt', undefined);
+  const name = optionalPresentationName(jobDescriptors);
+
+  let controlEpoch;
+  let runtimeUpdatedAt = optionalDataValue(runtimeDescriptors, 'updatedAt', undefined);
+  let lastError = optionalDataValue(runtimeDescriptors, 'lastError', '');
   let pendingApproval = null;
-  if (runtime.pendingApproval != null) {
-    const pending = snapshotSelectedFields(runtime.pendingApproval, BROWSER_PENDING_FIELDS);
-    if (!pending) return null;
-    const hasAction = pending.action != null && isPlainEnumerableDataRecord(pending.action);
+
+  if (runState === 'WAITING_APPROVAL') {
+    controlEpoch = dataField(runtimeDescriptors, 'controlEpoch', true);
+    runtimeUpdatedAt = dataField(runtimeDescriptors, 'updatedAt', true);
+    const pendingInput = dataField(runtimeDescriptors, 'pendingApproval', true);
+    if (controlEpoch === INVALID_DATA_FIELD
+        || runtimeUpdatedAt === INVALID_DATA_FIELD
+        || pendingInput === INVALID_DATA_FIELD) {
+      return null;
+    }
+
+    const pendingDescriptors = plainRecordDescriptors(pendingInput);
+    if (!pendingDescriptors) return null;
+    const snapshotId = dataField(pendingDescriptors, 'snapshotId');
+    const snapshotSignature = dataField(pendingDescriptors, 'snapshotSignature');
+    const requestedAt = dataField(pendingDescriptors, 'requestedAt');
+    const action = dataField(pendingDescriptors, 'action', true);
+    if (snapshotId === INVALID_DATA_FIELD
+        || snapshotSignature === INVALID_DATA_FIELD
+        || requestedAt === INVALID_DATA_FIELD
+        || action === INVALID_DATA_FIELD) {
+      return null;
+    }
     pendingApproval = Object.freeze({
-      snapshotId: pending.snapshotId,
-      snapshotSignature: pending.snapshotSignature,
-      requestedAt: pending.requestedAt,
-      hasAction,
+      snapshotId,
+      snapshotSignature,
+      requestedAt,
+      hasAction: action != null && typeof action === 'object' && !Array.isArray(action),
     });
   }
 
   return Object.freeze({
-    id: job.id,
-    config: Object.freeze({ name: config.name }),
-    createdAt: job.createdAt,
-    updatedAt: job.updatedAt,
+    id,
+    config: Object.freeze({ name }),
+    createdAt,
+    updatedAt: jobUpdatedAt,
     runtime: Object.freeze({
-      runState: runtime.runState,
-      controlEpoch: runtime.controlEpoch,
-      updatedAt: runtime.updatedAt,
-      lastError: runtime.lastError,
+      runState,
+      controlEpoch,
+      updatedAt: runtimeUpdatedAt,
+      lastError,
       pendingApproval,
     }),
   });
