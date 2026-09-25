@@ -360,6 +360,32 @@ test('arrays are dense plain data arrays and execute zero index getters', () => 
   assert.throws(() => normalizeGlobalSearchProviderResultV1(batch({ hits: subclass })), /bounded plain array/);
 });
 
+test('dense array normalization performs zero ordinary Proxy property reads', () => {
+  let reads = 0;
+  const readTrap = {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  };
+
+  const proxiedHits = new Proxy([hit()], readTrap);
+  const normalized = normalizeGlobalSearchProviderResultV1(batch({ hits: proxiedHits }));
+  assert.equal(normalized.hits.length, 1);
+  assert.equal(normalized.hits[0].sourceId, 'source-1');
+  assert.equal(reads, 0, 'hit-array normalization must use descriptors instead of ordinary property reads');
+
+  const providerResults = new Proxy([batch()], readTrap);
+  const admittedSearchScopes = new Proxy([{
+    providerId: 'provider-project',
+    domain: 'PROJECT',
+    visibilityScopeId: 'scope-project',
+  }], readTrap);
+  const fused = fuseGlobalSearchV1(fusion({ providerResults, admittedSearchScopes }));
+  assert.equal(fused.resultCount, 1);
+  assert.equal(reads, 0, 'fusion array boundaries must not ordinary-read caller-owned Proxy arrays');
+});
+
 test('null-prototype JSON-style records remain valid', () => {
   const h = Object.assign(Object.create(null), hit());
   const b = Object.assign(Object.create(null), batch({ hits: [h] }));
