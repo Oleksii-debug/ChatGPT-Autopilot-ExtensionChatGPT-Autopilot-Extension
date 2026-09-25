@@ -496,6 +496,69 @@ test('transform lineage rejects an output artifact materialized before execution
   );
 });
 
+test('extended-year analytics chronology uses epoch order for transform causality and freshness', () => {
+  const beforeBoundary = '9999-12-31T23:59:59.999Z';
+  const executionAt = '+010000-01-01T00:00:00.000Z';
+  const afterBoundary = '+010000-01-01T00:00:00.001Z';
+
+  const input = dataset({
+    observedAt: beforeBoundary,
+    sourceRefs: [source({ at: beforeBoundary })],
+  });
+  const output = dataset({
+    datasetId: 'dataset-extended-out',
+    revisionId: 'dataset-extended-out-r1',
+    digest: sha('7'),
+    sourceRefs: [source({
+      id: 'source-extended-out',
+      revisionId: 'source-extended-out-r1',
+      digest: sha('8'),
+      uri: 'file:///owner/extended.csv',
+      at: beforeBoundary,
+    })],
+    artifactId: 'artifact-dataset-extended-out',
+    observedAt: afterBoundary,
+  });
+  const raw = lineage({ inputs: [input], output });
+  raw.executedAt = executionAt;
+
+  assert.doesNotThrow(() => assertDataTransformLineageMatchesSnapshotsV1({
+    lineage: raw,
+    inputSnapshots: [input],
+    outputSnapshot: output,
+  }));
+
+  const fresh = assessDataDatasetFreshnessV1(input, [
+    source({ at: afterBoundary }),
+  ]);
+  assert.equal(fresh.status, 'FRESH');
+  assert.deepEqual(fresh.sources[0].reasons, []);
+
+  const currentInput = dataset({
+    observedAt: executionAt,
+    sourceRefs: [source({ at: executionAt })],
+  });
+  const preExecutionOutput = dataset({
+    datasetId: 'dataset-pre-execution-out',
+    revisionId: 'dataset-pre-execution-out-r1',
+    digest: sha('9'),
+    sourceRefs: [],
+    artifactId: 'artifact-pre-execution-out',
+    observedAt: beforeBoundary,
+  });
+  const invalid = lineage({ inputs: [currentInput], output: preExecutionOutput });
+  invalid.executedAt = afterBoundary;
+
+  assert.throws(
+    () => assertDataTransformLineageMatchesSnapshotsV1({
+      lineage: invalid,
+      inputSnapshots: [currentInput],
+      outputSnapshot: preExecutionOutput,
+    }),
+    /transform output dataset predates execution/,
+  );
+});
+
 test('dataset delta is deterministic advisory structural change evidence and detects revision identity conflicts', () => {
   const before = dataset();
   const after = dataset({
