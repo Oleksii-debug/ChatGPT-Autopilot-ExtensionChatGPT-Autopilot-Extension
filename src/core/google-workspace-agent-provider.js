@@ -10,6 +10,7 @@ export const GoogleWorkspaceToolId = Object.freeze({
   GMAIL_MESSAGE_GET: 'remote/google-workspace/gmail.message.get',
   GMAIL_THREAD_GET: 'remote/google-workspace/gmail.thread.get',
   GMAIL_ATTACHMENT_GET: 'remote/google-workspace/gmail.attachment.get',
+  GMAIL_DRAFT_CREATE: 'remote/google-workspace/gmail.draft.create',
 });
 
 export const GoogleWorkspaceCapabilityId = Object.freeze({
@@ -18,6 +19,7 @@ export const GoogleWorkspaceCapabilityId = Object.freeze({
   GMAIL_SEARCH: 'google.gmail.search',
   GMAIL_MESSAGE_READ: 'google.gmail.message.read',
   GMAIL_ATTACHMENT_READ: 'google.gmail.attachment.read',
+  GMAIL_DRAFT_CREATE: 'google.gmail.draft.create',
 });
 
 const TOOLS = Object.freeze([
@@ -97,6 +99,17 @@ const TOOLS = Object.freeze([
     inputSchemaRef: 'google-workspace-schema/gmail.attachment.get/input',
     outputSchemaRef: 'google-workspace-schema/gmail.attachment.get/output',
     readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE,
+    providerId: GOOGLE_WORKSPACE_PROVIDER_ID,
+    label: 'Create owner-authorized Gmail draft',
+    description: 'Creates a bounded Gmail draft through the canonical exact-effect path. It does not send mail.',
+    capabilityIds: [GoogleWorkspaceCapabilityId.GMAIL_DRAFT_CREATE],
+    inputSchemaRef: 'google-workspace-schema/gmail.draft.create/input',
+    outputSchemaRef: 'google-workspace-schema/gmail.draft.create/output',
+    readOnly: false,
   }),
 ]);
 
@@ -271,18 +284,24 @@ function methodFor(toolId) {
   if (toolId === GoogleWorkspaceToolId.GMAIL_MESSAGE_GET) return 'getGmailMessage';
   if (toolId === GoogleWorkspaceToolId.GMAIL_THREAD_GET) return 'getGmailThread';
   if (toolId === GoogleWorkspaceToolId.GMAIL_ATTACHMENT_GET) return 'getGmailAttachment';
+  if (toolId === GoogleWorkspaceToolId.GMAIL_DRAFT_CREATE) return 'createGmailDraft';
   return '';
 }
 
-function wrapFailure(error, invocationId) {
+function wrapFailure(error, invocationId, readOnly) {
   const rawCode = typeof error?.code === 'string' ? error.code : '';
   const code = /^GOOGLE_[A-Z0-9_]{1,100}$/u.test(rawCode) ? rawCode : 'GOOGLE_WORKSPACE_PROVIDER_FAILED';
-  const wrapped = new Error('Google Workspace read failed');
+  const wrapped = new Error(readOnly ? 'Google Workspace read failed' : 'Google Workspace mutation outcome is uncertain');
   wrapped.name = 'GoogleWorkspaceAgentProviderError';
   wrapped.code = code;
   wrapped.invocationId = invocationId;
-  wrapped.effectMayHaveOccurred = false;
-  wrapped.safeToRetry = true;
+  if (readOnly) {
+    wrapped.effectMayHaveOccurred = false;
+    wrapped.safeToRetry = true;
+  } else {
+    wrapped.effectMayHaveOccurred = error?.effectMayHaveOccurred === false ? false : true;
+    wrapped.safeToRetry = wrapped.effectMayHaveOccurred === false && error?.safeToRetry === true;
+  }
   if (Number.isInteger(error?.status)) wrapped.status = error.status;
   return wrapped;
 }
@@ -330,7 +349,7 @@ export class GoogleWorkspaceAgentProviderV1 {
         result: structuredClone(result),
       });
     } catch (error) {
-      throw wrapFailure(error, authorized.invocation.invocationId);
+      throw wrapFailure(error, authorized.invocation.invocationId, tool.readOnly);
     }
   }
 }
