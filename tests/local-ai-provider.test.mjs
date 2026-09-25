@@ -43,9 +43,30 @@ test('rejects non-local Local AI endpoints', () => {
 });
 
 test('normalizes defaults and validates timeout', () => {
+  assert.equal(normalizeLocalAiSettings({}).providerType, 'ollama');
   assert.equal(normalizeLocalAiSettings({ providerType: 'ollama' }).baseUrl, 'http://127.0.0.1:11434');
   assert.equal(normalizeLocalAiSettings({ providerType: 'openai-compatible' }).baseUrl, 'http://127.0.0.1:1234/v1');
   assert.throws(() => normalizeLocalAiSettings({ timeoutSeconds: 4 }), /5 to 600/);
+});
+
+test('explicit unknown Local AI provider fails before fetch', async () => {
+  let fetchCalls = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+
+  assert.throws(
+    () => normalizeLocalAiSettings({ providerType: 'future-provider' }),
+    /provider type must be ollama or openai-compatible/,
+  );
+  await assert.rejects(
+    () => client.listModels({ providerType: 'future-provider' }),
+    /provider type must be ollama or openai-compatible/,
+  );
+  assert.equal(fetchCalls, 0);
 });
 
 test('Local AI settings are descriptor-snapshotted and reject coercive/exotic authority', () => {
