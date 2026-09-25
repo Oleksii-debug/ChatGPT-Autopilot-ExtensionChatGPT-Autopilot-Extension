@@ -12,6 +12,16 @@ export const SharedProjectCollaborationKind = Object.freeze({
 });
 
 const KINDS = new Set(Object.values(SharedProjectCollaborationKind));
+const EVENT_CAPABILITY_REQUIREMENTS = Object.freeze({
+  [SharedProjectCollaborationKind.COMMENT]: Object.freeze({
+    actorCapabilityId: 'project.comment',
+    recipientCapabilityId: 'project.read',
+  }),
+  [SharedProjectCollaborationKind.HANDOFF]: Object.freeze({
+    actorCapabilityId: 'project.handoff',
+    recipientCapabilityId: 'project.read',
+  }),
+});
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_IDS = 512;
 const MAX_MESSAGE = 8_000;
@@ -422,11 +432,11 @@ export function normalizeSharedProjectCollaborationEventV1(input) {
   });
 }
 
-function emptyResolvedRequest(principalId, at) {
+function eventResolvedRequest(principalId, at, capabilityId) {
   return {
     principalId,
     at,
-    requestedCapabilityIds: Object.freeze([]),
+    requestedCapabilityIds: Object.freeze([capabilityId]),
     requestedProviderIds: Object.freeze([]),
     requestedOutboundDataClassIds: Object.freeze([]),
   };
@@ -461,12 +471,20 @@ export async function assessSharedProjectCollaborationEventV1(input, trustedReso
     }
   }
 
+  const requirements = EVENT_CAPABILITY_REQUIREMENTS[event.kind];
   const actor = assessResolvedAccess(
     context,
-    emptyResolvedRequest(event.actorPrincipalId, at),
+    eventResolvedRequest(event.actorPrincipalId, at, requirements.actorCapabilityId),
   );
   const recipient = event.recipientPrincipalId
-    ? assessResolvedAccess(context, emptyResolvedRequest(event.recipientPrincipalId, at))
+    ? assessResolvedAccess(
+      context,
+      eventResolvedRequest(
+        event.recipientPrincipalId,
+        at,
+        requirements.recipientCapabilityId,
+      ),
+    )
     : null;
 
   const eventAdmissibleForCollaboration = actor.collaborationEligible
@@ -484,6 +502,8 @@ export async function assessSharedProjectCollaborationEventV1(input, trustedReso
     organizationId: binding.organizationId,
     governanceRegistryId: binding.governanceRegistryId,
     governanceRegistryRevision: binding.governanceRegistryRevision,
+    actorRequiredCapabilityId: requirements.actorCapabilityId,
+    recipientRequiredCapabilityId: recipient ? requirements.recipientCapabilityId : '',
     actorAccessReasonCode: actor.reasonCode,
     recipientAccessReasonCode: recipient ? recipient.reasonCode : '',
     eventAdmissibleForCollaboration,
