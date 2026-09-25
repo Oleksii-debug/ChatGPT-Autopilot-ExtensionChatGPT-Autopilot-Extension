@@ -644,3 +644,33 @@ test('extension manifest and Windows installer expose the exact native host cont
   assert.match(installer, /allowed_origins/);
   assert.doesNotMatch(installer, /chrome-extension:\/\/\*/);
 });
+
+test('filesystem.readBinary rejects signed-zero offset while preserving canonical zero', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-native-binary-zero-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  await fs.writeFile(path.join(root, 'asset.bin'), Buffer.from([0x01, 0x02, 0x03]));
+
+  const canonicalZero = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 0,
+    maxBytes: 1,
+    expectedSha256: '',
+  }), { config: config(root), callerOrigin: ORIGIN });
+  assert.equal(canonicalZero.ok, true);
+  assert.equal(canonicalZero.result.offsetBytes, 0);
+  assert.equal(Object.is(canonicalZero.result.offsetBytes, -0), false);
+
+  const signedZero = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: -0,
+    maxBytes: 1,
+    expectedSha256: '',
+  }), { config: config(root), callerOrigin: ORIGIN });
+  assert.equal(signedZero.ok, false);
+  assert.equal(signedZero.error.code, 'INVALID_REQUEST');
+});
+
