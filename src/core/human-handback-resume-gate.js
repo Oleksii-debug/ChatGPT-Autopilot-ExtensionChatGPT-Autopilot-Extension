@@ -21,7 +21,6 @@ const REQUEST_KEYS = new Set([
   'currentJobId',
   'currentPlanId',
   'currentNodeId',
-  'exactEffectState',
   'at',
 ]);
 const MAX_CURRENT_OBSERVATIONS = 256;
@@ -134,11 +133,8 @@ function normalizeCurrentObservations(value) {
   return normalized;
 }
 
-function assertEffectResolution(packet, rawEffectState, assessedAt) {
+function assertEffectResolution(packet, assessedAt, resolveTrustedExactEffectState) {
   if (!packet.effectId) {
-    if (rawEffectState !== undefined && rawEffectState !== null) {
-      throw new Error('effect-free handback cannot supply exactEffectState');
-    }
     return {
       effectId: '',
       executionId: '',
@@ -147,8 +143,26 @@ function assertEffectResolution(packet, rawEffectState, assessedAt) {
     };
   }
 
+  if (typeof resolveTrustedExactEffectState !== 'function') {
+    throw new Error('effectful handback requires the canonical trusted exact-effect resolver');
+  }
+  const lookup = freezeDeep({
+    schemaVersion: HUMAN_HANDBACK_RESUME_GATE_VERSION,
+    takeoverId: packet.takeoverId,
+    jobId: packet.jobId,
+    planId: packet.planId,
+    nodeId: packet.nodeId,
+    effectId: packet.effectId,
+    executionId: packet.executionId,
+    attempt: packet.attempt,
+    handbackVerificationId: packet.handbackVerification.verificationId,
+  });
+  const rawEffectState = resolveTrustedExactEffectState(lookup);
+  if (rawEffectState && typeof rawEffectState.then === 'function') {
+    throw new Error('canonical trusted exact-effect resolver must synchronously return a durable snapshot');
+  }
   if (rawEffectState === undefined || rawEffectState === null) {
-    throw new Error('effectful handback requires exactEffectState');
+    throw new Error('canonical trusted exact-effect resolver did not resolve the interrupted effect');
   }
   const effect = normalizeExactEffectStateV1(rawEffectState);
   if (effect.effectId !== packet.effectId) throw new Error('exact-effect effectId mismatch');
@@ -177,7 +191,9 @@ function assertEffectResolution(packet, rawEffectState, assessedAt) {
  * no new provider/policy/effect capability. resumeAuthorized means only that
  * the existing durable job may be handed back to the canonical runtime.
  */
-export function authorizeHumanHandbackResumeV1(input = {}) {
+export function authorizeHumanHandbackResumeV1(input = {}, {
+  resolveTrustedExactEffectState,
+} = {}) {
   const raw = strictRecord(input, 'HumanHandbackResumeGateRequestV1');
   const handback = normalizeHumanTakeoverV1(
     ownRequired(raw, 'handback', 'HumanHandbackResumeGateRequestV1'),
@@ -237,7 +253,7 @@ export function authorizeHumanHandbackResumeV1(input = {}) {
     throw new Error('takeover resource must be freshly observed after handback verification');
   }
 
-  const effect = assertEffectResolution(packet, raw.exactEffectState, assessedAt);
+  const effect = assertEffectResolution(packet, assessedAt, resolveTrustedExactEffectState);
 
   return freezeDeep({
     schemaVersion: HUMAN_HANDBACK_RESUME_GATE_VERSION,
