@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -131,6 +132,11 @@ test('host hello, health and capabilities are versioned and caller-bound', async
   });
   assert.equal(capabilities.ok, true);
   assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'filesystem.readText'));
+  const binaryCapability = capabilities.result.capabilities.find(item => item.capabilityId === 'filesystem.readBinary');
+  assert.ok(binaryCapability);
+  assert.equal(binaryCapability.readOnly, true);
+  assert.ok(binaryCapability.maxChunkBytes > 0);
+  assert.ok(binaryCapability.maxFileBytes >= binaryCapability.maxChunkBytes);
   assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'credentials.list'));
   assert.ok(capabilities.result.capabilities.some(item => item.capabilityId === 'credentials.resolve'));
   assert.equal(capabilities.result.credentialBrokerAvailable, false);
@@ -276,6 +282,157 @@ test('filesystem.readText reads only a valid UTF-8 file inside an explicitly con
   assert.equal(response.result.relativePath, 'docs/note.txt');
   assert.equal(response.result.text, 'Привіт Native Companion\n');
   assert.ok(response.result.sizeBytes > 0);
+});
+
+test('filesystem.readBinary returns digest-bound chunks and rejects drift or noncanonical bounds', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-native-binary-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const bytes = Buffer.from([0x00, 0xff, 0x10, 0x20, 0x30, 0x40, 0x7f]);
+  const target = path.join(root, 'asset.bin');
+  await fs.writeFile(target, bytes);
+  const sha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+
+  const first = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 0,
+    maxBytes: 3,
+    expectedSha256: '',
+  }), { config: config(root), callerOrigin: ORIGIN });
+  assert.equal(first.ok, true);
+  assert.equal(first.result.relativePath, 'asset.bin');
+  assert.equal(first.result.sizeBytes, bytes.length);
+  assert.equal(first.result.chunkSizeBytes, 3);
+  assert.equal(first.result.offsetBytes, 0);
+  assert.equal(first.result.sha256, sha256);
+  assert.equal(first.result.dataBase64, bytes.subarray(0, 3).toString('base64'));
+  assert.equal(first.result.eof, false);
+
+  const second = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 3,
+    maxBytes: 32,
+    expectedSha256: sha256,
+  }), { config: config(root), callerOrigin: ORIGIN });
+  assert.equal(second.ok, true);
+  assert.equal(second.result.dataBase64, bytes.subarray(3).toString('base64'));
+  assert.equal(second.result.eof, true);
+  assert.equal(second.result.sha256, sha256);
+
+  const wrongDigest = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 0,
+    maxBytes: 3,
+    expectedSha256: 'a'.repeat(64),
+  }), { config: config(root), callerOrigin: ORIGIN });
+  assert.equal(wrongDigest.ok, false);
+  assert.equal(wrongDigest.error.code, 'PRECONDITION_FAILED');
+
+  for (const payload of [
+    { rootId: 'workspace', relativePath: 'asset.bin', offsetBytes: '0', maxBytes: 3, expectedSha256: '' },
+    { rootId: 'workspace', relativePath: 'asset.bin', offsetBytes: 0, maxBytes: 524289, expectedSha256: '' },
+    { rootId: 'workspace', relativePath: 'asset.bin', offsetBytes: 0, maxBytes: 3, expectedSha256: sha256.toUpperCase() },
+    { rootId: 'workspace', relativePath: 'asset.bin', offsetBytes: 0, maxBytes: 3, expectedSha256: '', extra: true },
+  ]) {
+    const rejected = await handleNativeCompanionRequest(
+      request('filesystem.readBinary', payload),
+      { config: config(root), callerOrigin: ORIGIN },
+    );
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.error.code, 'INVALID_REQUEST');
+  }
+});
+
+test('filesystem.readBinary refuses traversal and a target swapped to an out-of-scope symlink', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-native-binary-swap-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'asset.bin');
+  const outside = path.join(temp, 'private.bin');
+  await fs.writeFile(target, Buffer.from([1, 2, 3]));
+  await fs.writeFile(outside, Buffer.from('outside-secret'));
+
+  const traversal = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+    rootId: 'workspace',
+    relativePath: '../private.bin',
+    offsetBytes: 0,
+    maxBytes: 8,
+    expectedSha256: '',
+  }), { config: config(root), callerOrigin: ORIGIN });
+  assert.equal(traversal.ok, false);
+  assert.equal(traversal.error.code, 'PATH_OUTSIDE_SCOPE');
+
+  let symlinkReady = true;
+  try {
+    const swapped = await handleNativeCompanionRequest(request('filesystem.readBinary', {
+      rootId: 'workspace',
+      relativePath: 'asset.bin',
+      offsetBytes: 0,
+      maxBytes: 8,
+      expectedSha256: '',
+    }), {
+      config: config(root),
+      callerOrigin: ORIGIN,
+      fsBinaryBeforeOpen: async () => {
+        await fs.rm(target);
+        await fs.symlink(outside, target, 'file');
+      },
+    });
+    assert.equal(swapped.ok, false);
+    assert.equal(swapped.error.code, 'PATH_OUTSIDE_SCOPE');
+    assert.equal(JSON.stringify(swapped).includes('outside-secret'), false);
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error?.code)) symlinkReady = false;
+    else throw error;
+  }
+  if (!symlinkReady) t.diagnostic('symlink swap unavailable in this test environment');
+});
+
+test('Native Companion extension client emits exact filesystem.readBinary payload without digest rewriting', async () => {
+  const messages = [];
+  const chromeApi = {
+    runtime: {
+      async sendNativeMessage(_host, message) {
+        messages.push(structuredClone(message));
+        return {
+          protocolVersion: 1,
+          requestId: message.requestId,
+          type: message.type,
+          ok: true,
+          result: {
+            rootId: 'workspace',
+            relativePath: 'asset.bin',
+            offsetBytes: 4,
+            chunkSizeBytes: 2,
+            sizeBytes: 6,
+            sha256: 'a'.repeat(64),
+            dataBase64: 'AQI=',
+            eof: true,
+          },
+        };
+      },
+    },
+  };
+  const client = new NativeCompanionClient({ chromeApi, createId: () => 'binary-1' });
+  await client.readBinary({
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 4,
+    maxBytes: 2,
+    expectedSha256: 'a'.repeat(64),
+  });
+  assert.deepEqual(messages[0].payload, {
+    rootId: 'workspace',
+    relativePath: 'asset.bin',
+    offsetBytes: 4,
+    maxBytes: 2,
+    expectedSha256: 'a'.repeat(64),
+  });
 });
 
 test('filesystem.readText rejects traversal, absolute paths, unknown roots and oversized files', async t => {
