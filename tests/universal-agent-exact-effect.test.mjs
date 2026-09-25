@@ -502,3 +502,262 @@ test('commit is impossible without verified evidence', () => {
   assert.equal(result.reason, 'COMMIT_REQUIRES_VERIFIED_EFFECT');
   assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
 });
+
+
+test('exact-effect envelope rejects coercive durable state aliases', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, schemaVersion: '1' }),
+    /schemaVersion/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, effectId: 1 }),
+    /effectId is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, phase: ' prepared ' }),
+    /phase is invalid/,
+  );
+
+  const executing = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'strict-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...executing, attempt: '1' }),
+    /attempt is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...executing, executionId: 1 }),
+    /executionId is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, commitId: true }),
+    /commitId is invalid/,
+  );
+});
+
+test('state, nested metadata and create options reject accessors before getter execution', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  let reads = 0;
+
+  const hostileState = { ...state };
+  Object.defineProperty(hostileState, 'phase', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'PREPARED';
+    },
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1(hostileState),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const hostileAmbiguity = { ...state.ambiguity };
+  Object.defineProperty(hostileAmbiguity, 'reasonCode', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'FORGED';
+    },
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, ambiguity: hostileAmbiguity }),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const options = {};
+  Object.defineProperty(options, 'createdAt', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return AT;
+    },
+  });
+  assert.throws(
+    () => createExactEffectStateV1(invocation(), options),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('state envelope rejects hidden, symbol and inherited authority aliases', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+
+  const hidden = { ...state };
+  Object.defineProperty(hidden, 'authorityGranted', {
+    value: true,
+    enumerable: false,
+    configurable: true,
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1(hidden),
+    /unknown field: authorityGranted/,
+  );
+
+  const symbolic = { ...state };
+  symbolic[Symbol('authority')] = true;
+  assert.throws(
+    () => normalizeExactEffectStateV1(symbolic),
+    /symbol fields/,
+  );
+
+  const inherited = Object.assign(Object.create({ phase: 'COMMITTED' }), state);
+  assert.throws(
+    () => normalizeExactEffectStateV1(inherited),
+    /plain data object/,
+  );
+});
+
+test('processed event IDs require a plain dense data array', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'dense-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+
+  const custom = [...state.processedEventIds];
+  custom.authority = true;
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, processedEventIds: custom }),
+    /non-index fields/,
+  );
+
+  const sparse = new Array(1);
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, processedEventIds: sparse }),
+    /enumerable own data item/,
+  );
+
+  let reads = 0;
+  const accessor = [...state.processedEventIds];
+  Object.defineProperty(accessor, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'dense-start';
+    },
+  });
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, processedEventIds: accessor }),
+    /enumerable own data item/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('event envelope rejects coercion and accessors before transition logic', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const good = event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'strict-event',
+    '2026-09-19T12:00:01Z',
+  );
+
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, schemaVersion: '1' }),
+    /schemaVersion/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, eventId: 1 }),
+    /eventId is invalid/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, type: ' begin_execution ' }),
+    /event type is invalid/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, effectId: true }),
+    /event\.effectId is invalid/,
+  );
+  assert.throws(
+    () => reduceExactEffectV1(state, { ...good, executionId: 1 }),
+    /event\.executionId is invalid/,
+  );
+
+  let reads = 0;
+  const accessor = { ...good };
+  Object.defineProperty(accessor, 'type', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ExactEffectEventType.BEGIN_EXECUTION;
+    },
+  });
+  assert.throws(
+    () => reduceExactEffectV1(state, accessor),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('nested reconciliation outcome uses exact enum representation and strict data fields', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'reconcile-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'reconcile-ambiguous',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'reconcile-alias',
+      '2026-09-19T12:00:03Z',
+      {
+        outcome: 'safe_retry',
+        reasonCode: 'NO_EFFECT_PROVEN',
+        observation: observation({
+          observationId: 'reconcile-alias-observation',
+          status: 'ERROR',
+          summary: 'Effect absent.',
+        }),
+        verification: verification({
+          verificationId: 'reconcile-alias-verification',
+          observationId: 'reconcile-alias-observation',
+          status: 'FAILED',
+          reasonCode: 'POSTCONDITION_ABSENT',
+        }),
+      },
+    )),
+    /Reconciliation outcome is invalid/,
+  );
+
+  const persisted = { ...state.reconciliation };
+  persisted[Symbol('authority')] = true;
+  assert.throws(
+    () => normalizeExactEffectStateV1({ ...state, reconciliation: persisted }),
+    /symbol fields/,
+  );
+});
+
+test('null-prototype durable state and event records remain supported', () => {
+  const state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  const nullState = Object.assign(Object.create(null), JSON.parse(JSON.stringify(state)));
+  const normalized = normalizeExactEffectStateV1(nullState);
+  assert.equal(normalized.phase, ExactEffectPhase.PREPARED);
+
+  const rawEvent = Object.assign(Object.create(null), event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'null-proto-event',
+    '2026-09-19T12:00:01Z',
+  ));
+  const result = reduceExactEffectV1(normalized, rawEvent);
+  assert.equal(result.state.phase, ExactEffectPhase.EXECUTING);
+});
