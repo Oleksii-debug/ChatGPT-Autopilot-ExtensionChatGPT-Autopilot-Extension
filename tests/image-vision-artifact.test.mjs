@@ -6,12 +6,25 @@ import {
   IMAGE_VISION_ARTIFACT_SCHEMA_VERSION,
   IMAGE_VISION_CAPABILITY_ID,
   MAX_IMAGE_VISION_BYTES,
+  MAX_IMAGE_VISION_DIMENSION,
+  MAX_IMAGE_VISION_PIXELS,
   analyzeImageArtifactV1,
 } from '../src/core/image-vision-artifact.js';
 
-function pngBytes() {
+function pngBytes(width = 100, height = 50) {
+  const u32 = value => [
+    (value >>> 24) & 0xff,
+    (value >>> 16) & 0xff,
+    (value >>> 8) & 0xff,
+    value & 0xff,
+  ];
   return Uint8Array.from([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52,
+    ...u32(width),
+    ...u32(height),
+    0x08, 0x06, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00,
   ]);
 }
@@ -117,6 +130,11 @@ test('binds exact immutable image bytes before one canonical vision-router call'
 
   assert.equal(result.analysisId, 'analysis-1');
   assert.deepEqual(result.sourceArtifact, artifactRef(bytes));
+  assert.deepEqual(result.technical, {
+    widthPx: 100,
+    heightPx: 50,
+    pixelCount: 5000,
+  });
   assert.equal(result.model.altText, modelPayload().altText);
   assert.equal(result.sourceTrust, 'MODEL_OBSERVATION');
   assert.equal(result.advisoryOnly, true);
@@ -158,6 +176,35 @@ test('analysis provenance retains the full canonical ArtifactRef identity for sa
   assert.deepEqual(second.sourceArtifact, secondRef);
   assert.notDeepEqual(first.sourceArtifact, second.sourceArtifact);
   assert.equal(first.sourceArtifact.sha256, second.sourceArtifact.sha256);
+});
+
+test('oversized declared dimensions fail before any model call even when compressed bytes are small', async () => {
+  const bytes = pngBytes(MAX_IMAGE_VISION_DIMENSION + 1, 1);
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    new RegExp(`dimensions must be 1\\.\\.${MAX_IMAGE_VISION_DIMENSION}`, 'u'),
+  );
+  assert.equal(router.calls.length, 0);
+});
+
+test('pixel-count ceiling fails before model routing', async () => {
+  const side = Math.floor(Math.sqrt(MAX_IMAGE_VISION_PIXELS)) + 1;
+  const bytes = pngBytes(side, side);
+  const router = routerWith();
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    new RegExp(`pixel count must not exceed ${MAX_IMAGE_VISION_PIXELS}`, 'u'),
+  );
+  assert.equal(router.calls.length, 0);
 });
 
 test('hash mismatch fails before any model call', async () => {
