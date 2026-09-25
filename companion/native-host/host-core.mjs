@@ -208,7 +208,6 @@ export async function handleNativeCompanionRequest(input, {
           { capabilityId: 'native.health', readOnly: true },
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
           { capabilityId: 'filesystem.search', readOnly: true, scoped: true },
-          { capabilityId: 'filesystem.writeExistingText', readOnly: false, scoped: true },
           { capabilityId: 'credentials.list', readOnly: true, scoped: true },
           { capabilityId: 'credentials.resolve', readOnly: false, scoped: true, sensitive: true },
           { capabilityId: 'mcp.localStdio', readOnly: false, scoped: true },
