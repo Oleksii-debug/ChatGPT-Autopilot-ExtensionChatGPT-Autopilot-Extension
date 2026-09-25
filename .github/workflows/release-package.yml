@@ -77,3 +77,54 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
+
+
+  windows-package:
+    name: Windows release package gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run release packaging regressions on Windows
+        run: npm run test:release
+      - name: Build release candidate twice on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Remove-Item -LiteralPath dist -Recurse -Force -ErrorAction SilentlyContinue
+          npm run package:release
+          $candidate = Join-Path $PWD 'dist/ChatGPT-Autopilot-0.9.19.zip'
+          if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Windows release candidate was not created: $candidate"
+          }
+          $firstHash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
+          $firstCopy = Join-Path $env:RUNNER_TEMP 'ChatGPT-Autopilot-first-windows.zip'
+          Copy-Item -LiteralPath $candidate -Destination $firstCopy -Force
+
+          Remove-Item -LiteralPath dist -Recurse -Force
+          npm run package:release
+          if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Second Windows release candidate was not created: $candidate"
+          }
+          $secondHash = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($firstHash -ne $secondHash) {
+            throw "Windows release package is not deterministic: $firstHash != $secondHash"
+          }
+
+          $extract = Join-Path $env:RUNNER_TEMP 'ChatGPT-Autopilot-windows-zip-check'
+          Remove-Item -LiteralPath $extract -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -LiteralPath $candidate -DestinationPath $extract -Force
+          if (-not (Test-Path -LiteralPath (Join-Path $extract 'ChatGPT-Autopilot-0.9.19/manifest.json') -PathType Leaf)) {
+            throw 'Windows release ZIP is missing the canonical manifest path'
+          }
+          Write-Output "Windows release candidate deterministic SHA-256: $secondHash"
+      - name: Upload Windows-built release candidate ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatGPT-Autopilot-0.9.19-candidate-windows
+          path: dist/ChatGPT-Autopilot-0.9.19.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

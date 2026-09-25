@@ -9,17 +9,39 @@ import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
 import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
-import { importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
+import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
 const MANAGER_SCHEMA_VERSION = 1;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
+const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
 
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function safeName(value, fallback = 'Оркестр') { return text(value).slice(0, 120) || fallback; }
+function plainIntent(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error(`${label} must be a plain object`);
+  const normalized = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !SUBAGENT_ADMISSION_INTENT_KEYS.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    normalized[key] = descriptor.value;
+  }
+  return normalized;
+}
+function storedSubagentPolicy(value) {
+  return { ...normalizeSubagentStructurePolicyV1(value === undefined ? {} : value) };
+}
 function configKey(id) { return `${ORCHESTRATION_CONFIG_STORAGE_KEY}:${id}`; }
 function runtimeKey(id) { return `${ORCHESTRATION_RUNTIME_STORAGE_KEY}:${id}`; }
 function alarmName(id) { return `${ORCHESTRATION_V2_ALARM_PREFIX}${id}`; }
@@ -83,6 +105,7 @@ function normalizeMeta(raw) {
       name: safeName(item.name, 'Оркестр'),
       ownerPaused: item.ownerPaused === true,
       pausedSessionIds: Array.isArray(item.pausedSessionIds) ? [...new Set(item.pausedSessionIds.filter(v => typeof v === 'string'))] : [],
+      subagentPolicy: storedSubagentPolicy(item.subagentPolicy),
       createdAt: Math.max(0, Number(item.createdAt || 0)),
       updatedAt: Math.max(0, Number(item.updatedAt || 0)),
     };
@@ -220,7 +243,7 @@ export class OrchestrationV2Manager {
     const nowMs = this.now();
     await this.updateMeta(meta => {
       if (meta.byId[id]) throw new Error('Orchestra id already exists');
-      meta.byId[id] = { id, name: safeName(name), ownerPaused: false, pausedSessionIds: [], createdAt: nowMs, updatedAt: nowMs };
+      meta.byId[id] = { id, name: safeName(name), ownerPaused: false, pausedSessionIds: [], subagentPolicy: storedSubagentPolicy(), createdAt: nowMs, updatedAt: nowMs };
       meta.order.push(id);
       if (select || !meta.selectedId) meta.selectedId = id;
       return meta;
@@ -481,6 +504,33 @@ export class OrchestrationV2Manager {
     return { id: meta.selectedId, item: meta.byId[meta.selectedId], controller: this.controllerFor(meta.selectedId) };
   }
 
+  /**
+   * Advisory structural precheck only. Caller supplies intent; owner policy comes
+   * from manager metadata and topology comes from the selected orchestra's durable
+   * runtime repository. This method never reserves capacity or grants spawn
+   * authority. A future child-creation path must atomically re-read/revalidate
+   * canonical hierarchy state and the global resource budget at mutation time.
+   */
+  async previewSelectedSubagentStructureAdmission(intent = {}) {
+    const raw = plainIntent(intent, 'Subagent structural precheck intent');
+    const { item, controller } = await this.selectedController();
+    const runtime = await controller.runtimeRepository.load();
+    const graph = runtime?.hierarchy?.graph;
+    if (!graph) throw new Error('Configure a durable orchestration hierarchy before subagent precheck.');
+    const decision = evaluateSubagentStructureAdmissionV1({
+      policy: item.subagentPolicy,
+      initiator: raw.initiator,
+      graph,
+      parentNodeId: raw.parentNodeId,
+      requestedChildren: raw.requestedChildren,
+    });
+    return Object.freeze({
+      ...decision,
+      advisoryOnly: true,
+      spawnAuthority: false,
+    });
+  }
+
   async configureHierarchyTemplate(options = {}) {
     const { id, item, controller } = await this.selectedController();
     const { config } = await controller.getStatus();
@@ -535,7 +585,16 @@ export class OrchestrationV2Manager {
   }
 
   async previewProfile(profile) { return previewOrchestrationProfile(profile); }
-  async exportProfile(name = 'Orchestration') { return this.selectedController().then(({ controller }) => controller.exportProfile(name)); }
+  async exportProfile(name = 'Orchestration') {
+    const { item, controller } = await this.selectedController();
+    const config = await controller.configRepository.load();
+    const runtime = await controller.runtimeRepository.load();
+    return exportOrchestrationProfile(config, {
+      name,
+      hierarchy: runtime?.hierarchy?.graph || null,
+      subagentPolicy: item.subagentPolicy,
+    });
+  }
   async importProfile(profile) {
     const importedDocument = importOrchestrationProfileDocument(profile);
     const imported = importedDocument.config;
@@ -594,6 +653,14 @@ export class OrchestrationV2Manager {
       }
       await selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
     }
+    const importedPolicy = storedSubagentPolicy(importedDocument.subagentPolicy);
+    await this.updateMeta(meta => {
+      const record = meta.byId[selected.id];
+      if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
+      record.subagentPolicy = importedPolicy;
+      record.updatedAt = this.now();
+      return meta;
+    });
     return {
       config: status.config,
       hierarchy: importedDocument.hierarchy,
