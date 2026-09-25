@@ -212,14 +212,15 @@
           </select>
           <label for="agent-interval-seconds">Інтервал між завершеними циклами, секунд</label>
           <input id="agent-interval-seconds" type="number" min="1" max="604800" step="1" inputmode="numeric" value="60">
+          <p id="agent-schedule-text-help" class="field-help">Вводьте дату й час звичайним текстом. Рекомендований формат: ДД.ММ.РРРР ГГ:ХХ, наприклад 25.09.2026 04:00. Також приймається 2026-09-25 04:00. Для щоденного вікна використовуйте лише ГГ:ХХ.</p>
           <label for="agent-schedule-start">Почати не раніше, необов’язково</label>
-          <input id="agent-schedule-start" type="datetime-local">
+          <input id="agent-schedule-start" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026 04:00" aria-describedby="agent-schedule-text-help">
           <label for="agent-schedule-end">Завершити не пізніше, необов’язково</label>
-          <input id="agent-schedule-end" type="datetime-local">
+          <input id="agent-schedule-end" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026 23:00" aria-describedby="agent-schedule-text-help">
           <label for="agent-active-window-start">Щоденне активне вікно — початок, необов’язково</label>
-          <input id="agent-active-window-start" type="time">
+          <input id="agent-active-window-start" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="09:00" aria-describedby="agent-schedule-text-help">
           <label for="agent-active-window-end">Щоденне активне вікно — кінець, необов’язково</label>
-          <input id="agent-active-window-end" type="time">
+          <input id="agent-active-window-end" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="21:00" aria-describedby="agent-schedule-text-help">
         </fieldset>
         <fieldset class="settings-group">
           <legend>Модель цього Agent</legend>
@@ -491,6 +492,9 @@
 
       <fieldset class="settings-group" id="scenario-work-common-settings">
         <legend>Загальні параметри</legend>
+        <label for="scenario-work-start-at">Запустити сценарій не раніше, необов’язково</label>
+        <input id="scenario-work-start-at" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026 04:00" aria-describedby="scenario-work-start-help">
+        <p id="scenario-work-start-help" class="field-help">Порожньо — запуск одразу. Формат: ДД.ММ.РРРР ГГ:ХХ. Це час старту всього алгоритму; внутрішні промпти після старту йдуть за правилами сценарію.</p>
         <label for="scenario-work-rounds">Кіл у одному поколінні чатів</label>
         <input id="scenario-work-rounds" type="number" min="1" max="10000" step="1" inputmode="numeric" value="10">
         <label for="scenario-work-generations">Кількість поколінь чатів</label>
@@ -953,7 +957,7 @@
 
         <fieldset id="calendar-schedule-settings">
           <legend>Календарний розклад</legend>
-          <p id="calendar-help">Усі дати й час можна вводити без миші. Формат дати: YYYY-MM-DD. Формат часу: HH:MM. Для кількох часів або явних запусків використовуйте по одному запису в рядку.</p>
+          <p id="calendar-help">Усі дати й час вводяться звичайним текстом без миші. Рекомендований формат дати: ДД.ММ.РРРР, наприклад 25.09.2026. Формат часу: ГГ:ХХ, наприклад 09:15. Старий формат YYYY-MM-DD теж приймається. Для кількох часів або запусків використовуйте по одному запису в рядку.</p>
 
           <label for="calendar-mode">Режим календаря</label>
           <select id="calendar-mode" aria-describedby="calendar-help">
@@ -961,6 +965,7 @@
             <option value="ONE_TIME">Одноразово у точну дату й час</option>
             <option value="DAILY">Щоденний повторюваний розклад</option>
             <option value="WEEKLY">Щотижневий розклад за вибраними днями</option>
+            <option value="INTERVAL">Повторювати через заданий інтервал</option>
             <option value="EXPLICIT">Явний список дат і часу</option>
           </select>
 
@@ -974,14 +979,14 @@
 
           <div id="calendar-one-time-fields" hidden>
             <label for="calendar-one-time-date">Дата запуску</label>
-            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026" aria-describedby="calendar-help">
             <label for="calendar-one-time-time">Час запуску</label>
             <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off" placeholder="21:00" aria-describedby="calendar-help">
           </div>
 
           <div id="calendar-recurring-fields" hidden>
             <label for="calendar-start-date">Дата початку повторення</label>
-            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026" aria-describedby="calendar-help">
 
             <label for="calendar-times">Часи запуску, по одному в рядку</label>
             <textarea id="calendar-times" rows="4" spellcheck="false" aria-describedby="calendar-times-help"></textarea>
@@ -999,14 +1004,40 @@
             </fieldset>
 
             <label for="calendar-end-date">Необов’язкова кінцева дата</label>
-            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-12-31" aria-describedby="calendar-help">
+            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="31.12.2026" aria-describedby="calendar-help">
             <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
             <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
           </div>
 
+          <div id="calendar-interval-fields" hidden>
+            <label for="calendar-interval-start-mode">Коли почати інтервальний розклад</label>
+            <select id="calendar-interval-start-mode" aria-describedby="calendar-interval-help">
+              <option value="NOW">Зараз</option>
+              <option value="LATER">У задану дату й час</option>
+            </select>
+            <div id="calendar-interval-later-fields" hidden>
+              <label for="calendar-interval-start-date">Дата початку</label>
+              <input id="calendar-interval-start-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026" aria-describedby="calendar-interval-help">
+              <label for="calendar-interval-start-time">Час початку</label>
+              <input id="calendar-interval-start-time" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="04:00" aria-describedby="calendar-interval-help">
+            </div>
+            <label for="calendar-interval-value">Інтервал</label>
+            <input id="calendar-interval-value" type="number" min="1" max="31536000" step="1" inputmode="numeric" value="60" aria-describedby="calendar-interval-help">
+            <label for="calendar-interval-unit">Одиниця інтервалу</label>
+            <select id="calendar-interval-unit" aria-describedby="calendar-interval-help">
+              <option value="seconds">Секунди</option>
+              <option value="minutes" selected>Хвилини</option>
+              <option value="hours">Години</option>
+              <option value="days">Дні</option>
+            </select>
+            <label for="calendar-interval-max-occurrences">Необов’язкова максимальна кількість запусків</label>
+            <input id="calendar-interval-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
+            <p id="calendar-interval-help">«Зараз» фіксує точний момент під час збереження. «У задану дату й час» використовує формат ДД.ММ.РРРР та ГГ:ХХ. Інтервал вимірюється від зафіксованої стартової точки; для однакового часу щодня використовуйте режим «Щоденний».</p>
+          </div>
+
           <div id="calendar-explicit-fields" hidden>
             <label for="calendar-explicit-occurrences">Явні дати й час, по одному запуску в рядку</label>
-            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="2026-09-25 09:00&#10;2026-09-25 14:00&#10;2026-09-25 21:00" aria-describedby="calendar-help"></textarea>
+            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="25.09.2026 09:00&#10;25.09.2026 14:00&#10;25.09.2026 21:00" aria-describedby="calendar-help"></textarea>
           </div>
 
           <p id="calendar-runtime-status" role="status" tabindex="0">Календарний розклад вимкнено.</p>

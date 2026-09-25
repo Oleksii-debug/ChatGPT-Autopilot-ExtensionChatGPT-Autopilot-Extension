@@ -824,3 +824,40 @@ test('manager bounds persisted collection length and recursive depth bombs', asy
   assert.equal(listed.selectedId, '');
   assert.deepEqual(listed.scenarios, []);
 });
+
+
+test('Scenario manager schedules exact wake and creates no managed chat before startNotBeforeAt', async () => {
+  let now = 1_000;
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => now,
+    createId: () => 'scheduled-manager',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+
+  await manager.create({
+    mode: ScenarioWorkMode.CHAT_CYCLE,
+    config: { startNotBeforeAt: 5_000, steps: [{ prompt: 'ONE' }] },
+  });
+  await manager.start('scheduled-manager');
+
+  let snapshot = (await manager.get('scheduled-manager')).scenario;
+  assert.equal(snapshot.runtime.runState, ScenarioWorkRunState.WAITING_SCHEDULE);
+  assert.equal(snapshot.runtime.scheduledStartAt, 5_000);
+  assert.equal(core.state.sessionOrder.filter(id => core.state.sessionsById[id]?.scenarioWork?.managed).length, 0);
+  assert.equal(chrome.alarms.created.at(-1).when, 5_000);
+
+  now = 4_999;
+  await manager.cycleAll();
+  assert.equal(core.state.sessionOrder.filter(id => core.state.sessionsById[id]?.scenarioWork?.managed).length, 0);
+
+  now = 5_000;
+  await manager.cycleAll();
+  snapshot = (await manager.get('scheduled-manager')).scenario;
+  assert.equal(snapshot.runtime.runState, ScenarioWorkRunState.RUNNING);
+  assert.equal(snapshot.runtime.scheduledStartAt, 0);
+  assert.equal(core.state.sessionOrder.filter(id => core.state.sessionsById[id]?.scenarioWork?.managed).length, 1);
+});

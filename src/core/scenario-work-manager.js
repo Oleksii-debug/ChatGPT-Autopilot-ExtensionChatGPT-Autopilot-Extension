@@ -6,6 +6,7 @@ import {
   normalizeScenarioWorkConfig,
   createScenarioWorkRuntime,
   startScenarioWork,
+  activateScheduledScenarioWork,
   pauseScenarioWork,
   resumeScenarioWork,
   stopScenarioWork,
@@ -172,6 +173,7 @@ function compatiblePersistedConfig(persisted, canonical) {
   for (const [key, defaultValue] of [
     ['schemaVersion', 1],
     ['timeoutPolicy', 'REPLACE_MEMBER'],
+    ['startNotBeforeAt', 0],
   ]) {
     if (!Object.hasOwn(persisted, key) && Object.is(legacyCanonical[key], defaultValue)) {
       delete legacyCanonical[key];
@@ -200,6 +202,8 @@ function ensureManagerRuntimeFields(runtime) {
   out.generationRetiredVerifiedSends = Math.max(0, Number(out.generationRetiredVerifiedSends || 0));
   out.nextLaunchAt = Math.max(0, Number(out.nextLaunchAt || 0));
   if (!Number.isFinite(out.nextLaunchAt)) out.nextLaunchAt = 0;
+  out.scheduledStartAt = Math.max(0, Number(out.scheduledStartAt || 0));
+  if (!Number.isFinite(out.scheduledStartAt)) out.scheduledStartAt = 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
   out.deletePending = out.deletePending === true;
   return out;
@@ -448,7 +452,7 @@ export class ScenarioWorkManager {
     await this.update(store => {
       const item = store.byId[id];
       if (!item) throw new Error('Сценарій не знайдено.');
-      if ([ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.PAUSED].includes(item.runtime.runState)) {
+      if ([ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.WAITING_SCHEDULE, ScenarioWorkRunState.PAUSED].includes(item.runtime.runState)) {
         throw new Error('Перед зміною налаштувань зупиніть сценарій.');
       }
       const config = normalizeScenarioWorkConfig({ ...rawConfig, id, name: rawConfig?.name || item.name });
@@ -547,7 +551,7 @@ export class ScenarioWorkManager {
   async delete(id) {
     const target = await this.get(id);
     if (!target.scenario) return {};
-    if (target.scenario.runtime.runState === ScenarioWorkRunState.RUNNING) throw new Error('Спочатку зупиніть сценарій.');
+    if ([ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.WAITING_SCHEDULE].includes(target.scenario.runtime.runState)) throw new Error('Спочатку зупиніть сценарій.');
     const sessionIds = [...new Set([
       ...scenarioWorkParticipants(target.scenario.runtime).map(item => item.sessionId).filter(Boolean),
       ...(target.scenario.runtime.cleanupPendingSessionIds || []),
@@ -983,6 +987,19 @@ export class ScenarioWorkManager {
           }
           if (cleanup.pending.length) continue;
         }
+        if (live.scenario.runtime.runState === ScenarioWorkRunState.WAITING_SCHEDULE) {
+          const scheduledStartAt = Number(live.scenario.runtime.scheduledStartAt || 0);
+          if (scheduledStartAt > this.now()) continue;
+          await this.update(store => {
+            const item = store.byId[id];
+            if (!item || item.runtime.runState !== ScenarioWorkRunState.WAITING_SCHEDULE) return store;
+            item.runtime = ensureManagerRuntimeFields(activateScheduledScenarioWork(item.runtime, this.now()));
+            item.updatedAt = this.now();
+            return store;
+          });
+          live = await this.get(id);
+          if (live.scenario) await this.syncManagedCoreRunState(id, live.scenario.runtime);
+        }
         if (live.scenario.runtime.runState !== ScenarioWorkRunState.RUNNING) continue;
         results.push({ id, result: await this.cycleOne(id) });
       }
@@ -1005,6 +1022,12 @@ export class ScenarioWorkManager {
       const item = store.byId[id];
       if ((item.runtime.cleanupPendingSessionIds || []).length) {
         next = Math.min(next, now + Math.min(5_000, item.config.pollSeconds * 1000));
+      }
+      if (item.runtime.runState === ScenarioWorkRunState.WAITING_SCHEDULE) {
+        const scheduledStartAt = Number(item.runtime.scheduledStartAt || 0);
+        if (scheduledStartAt > now) next = Math.min(next, scheduledStartAt);
+        else next = Math.min(next, now + 250);
+        continue;
       }
       if (item.runtime.runState !== ScenarioWorkRunState.RUNNING) continue;
       const participants = scenarioWorkParticipants(item.runtime);

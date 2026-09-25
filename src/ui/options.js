@@ -3,6 +3,14 @@ import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
+import {
+  parseAccessibleLocalDateTime,
+  formatAccessibleLocalDateTime,
+  normalizeAccessibleClockTime,
+  normalizeAccessibleCalendarDate,
+  formatAccessibleCalendarDate,
+  parseAccessibleOccurrenceLine,
+} from './accessible-date-time.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -1531,12 +1539,13 @@ function syncScenarioWorkButtons() {
   const has = Boolean(item);
   const running = state === 'RUNNING';
   const paused = state === 'PAUSED';
-  $('save-scenario-work-button').disabled = !has || running || paused;
-  $('start-scenario-work-button').disabled = !has || running || paused;
-  $('pause-scenario-work-button').disabled = !has || !running;
+  const waitingSchedule = state === 'WAITING_SCHEDULE';
+  $('save-scenario-work-button').disabled = !has || running || paused || waitingSchedule;
+  $('start-scenario-work-button').disabled = !has || running || paused || waitingSchedule;
+  $('pause-scenario-work-button').disabled = !has || (!running && !waitingSchedule);
   $('resume-scenario-work-button').disabled = !has || !paused;
-  $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running;
+  $('stop-scenario-work-button').disabled = !has || (!running && !paused && !waitingSchedule);
+  $('delete-scenario-work-button').disabled = !has || running || waitingSchedule;
   $('scenario-work-run-now').disabled = !has || !running;
   $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
 }
@@ -1545,6 +1554,7 @@ function clearScenarioWorkState() {
   ui.selectedScenarioWorkId = '';
   ui.selectedScenarioWork = null;
   $('scenario-work-name').value = '';
+  $('scenario-work-start-at').value = '';
   $('scenario-work-mode-label').textContent = 'Формат не вибрано.';
   $('scenario-work-state').replaceChildren();
   $('scenario-work-summary').textContent = 'Сценарій не вибрано.';
@@ -1582,6 +1592,9 @@ function renderScenarioWorkState(item) {
   }
   const runtime = item.runtime || {};
   addScenarioStateLine('Стан', runtime.runState || 'STOPPED');
+  if (runtime.runState === 'WAITING_SCHEDULE' && Number(runtime.scheduledStartAt || 0) > 0) {
+    addScenarioStateLine('Запланований старт', formatAccessibleLocalDateTime(runtime.scheduledStartAt));
+  }
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
   addScenarioStateLine('Покоління', runtime.generation ?? 1);
   addScenarioStateLine('Фаза', runtime.phase || '—');
@@ -1724,6 +1737,7 @@ function scenarioWorkConfigFromForm() {
     busyCheckDelaySeconds: scenarioWorkInt('scenario-work-busy-check', 1, 30, 'Повторна перевірка зайнятого чату'),
     retryBackoffSeconds: scenarioWorkInt('scenario-work-retry', 5, 3600, 'Повтор після технічної помилки'),
     timeoutPolicy: $('scenario-work-timeout-policy').value,
+    startNotBeforeAt: parseAccessibleLocalDateTime($('scenario-work-start-at').value, { optional: true }),
   };
   if (mode === 'CHAT_CYCLE') {
     return {
@@ -1771,6 +1785,7 @@ function fillScenarioWorkForm(item) {
   ui.selectedScenarioWork = clone(item);
   const config = item.config || {};
   $('scenario-work-name').value = item.name || config.name || '';
+  $('scenario-work-start-at').value = formatAccessibleLocalDateTime(config.startNotBeforeAt || 0);
   $('scenario-work-mode-label').textContent = `Формат: ${SCENARIO_WORK_MODE_LABELS[config.mode] || config.mode || 'невідомий'}.`;
   $('scenario-work-rounds').value = String(config.roundsPerGeneration ?? 10);
   $('scenario-work-generations').value = String(config.maxGenerations ?? 0);
@@ -1986,20 +2001,15 @@ function browserAgentNumber(id, min, max, label) {
 }
 
 function browserAgentDateTimeLocalToEpoch(id) {
-  const raw = $(id).value.trim();
-  if (!raw) return 0;
-  const value = new Date(raw).getTime();
-  if (!Number.isFinite(value)) throw new Error('Некоректна дата або час у полі розкладу Agent.');
-  return value;
+  try {
+    return parseAccessibleLocalDateTime($(id).value, { optional: true });
+  } catch (error) {
+    throw new Error(`Поле розкладу Agent: ${error.message}`);
+  }
 }
 
 function browserAgentEpochToDateTimeLocal(value) {
-  const time = Number(value || 0);
-  if (!time) return '';
-  const date = new Date(time);
-  if (!Number.isFinite(date.getTime())) return '';
-  const pad = number => String(number).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return formatAccessibleLocalDateTime(value);
 }
 
 function browserAgentSiteRulesFromText(raw) {
@@ -2051,8 +2061,14 @@ function browserAgentPolicyFromForm() {
   const scheduleStartAt = browserAgentDateTimeLocalToEpoch('agent-schedule-start');
   const scheduleEndAt = browserAgentDateTimeLocalToEpoch('agent-schedule-end');
   if (scheduleStartAt && scheduleEndAt && scheduleEndAt <= scheduleStartAt) throw new Error('Кінець розкладу Agent має бути пізніше початку.');
-  const activeWindowStart = $('agent-active-window-start').value.trim();
-  const activeWindowEnd = $('agent-active-window-end').value.trim();
+  let activeWindowStart = '';
+  let activeWindowEnd = '';
+  try {
+    activeWindowStart = normalizeAccessibleClockTime($('agent-active-window-start').value, { optional: true });
+    activeWindowEnd = normalizeAccessibleClockTime($('agent-active-window-end').value, { optional: true });
+  } catch (error) {
+    throw new Error(`Щоденне активне вікно Agent: ${error.message}`);
+  }
   if (Boolean(activeWindowStart) !== Boolean(activeWindowEnd)) throw new Error('Для щоденного активного вікна вкажіть і початок, і кінець.');
   return {
     startUrl: $('agent-start-url').value.trim(),
@@ -3024,6 +3040,34 @@ function defaultCalendarTimeZone() {
 function calendarLines(id) {
   return String($(id)?.value || '').split(/[\n,;]+/u).map(value => value.trim()).filter(Boolean);
 }
+function calendarNowFields(timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const value = type => parts.find(part => part.type === type)?.value || '';
+  return {
+    date: `${value('year')}-${value('month')}-${value('day')}`,
+    time: `${value('hour')}:${value('minute')}:${value('second')}`,
+  };
+}
+function intervalSecondsFromUi() {
+  const value = Number($('calendar-interval-value').value);
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error('Інтервал має бути додатним цілим числом.');
+  const multiplier = { seconds: 1, minutes: 60, hours: 3600, days: 86400 }[$('calendar-interval-unit').value] || 60;
+  const seconds = value * multiplier;
+  if (!Number.isSafeInteger(seconds) || seconds < 1 || seconds > 31_536_000) throw new Error('Інтервал має бути від 1 секунди до 365 днів.');
+  return seconds;
+}
+function intervalUiValue(secondsRaw) {
+  const seconds = Math.max(1, Number(secondsRaw || 60));
+  for (const [unit, factor] of [['days', 86400], ['hours', 3600], ['minutes', 60], ['seconds', 1]]) {
+    if (seconds % factor === 0) return { unit, value: seconds / factor };
+  }
+  return { unit: 'seconds', value: seconds };
+}
 function collectCalendarSchedule() {
   const kind = $('calendar-mode').value;
   if (kind === 'NONE') return null;
@@ -3033,16 +3077,16 @@ function collectCalendarSchedule() {
     catchUp: $('calendar-catch-up').checked ? 'ON' : 'OFF',
   };
   if (kind === 'ONE_TIME') {
-    schedule.date = $('calendar-one-time-date').value.trim();
-    schedule.time = $('calendar-one-time-time').value.trim();
+    schedule.date = normalizeAccessibleCalendarDate($('calendar-one-time-date').value);
+    schedule.time = normalizeAccessibleClockTime($('calendar-one-time-time').value, { optional: false });
     return schedule;
   }
   if (kind === 'DAILY' || kind === 'WEEKLY') {
-    schedule.startDate = $('calendar-start-date').value.trim();
-    schedule.times = calendarLines('calendar-times');
+    schedule.startDate = normalizeAccessibleCalendarDate($('calendar-start-date').value);
+    schedule.times = calendarLines('calendar-times').map(value => normalizeAccessibleClockTime(value, { optional: false }));
     const endDate = $('calendar-end-date').value.trim();
     const maxOccurrences = $('calendar-max-occurrences').value.trim();
-    if (endDate) schedule.endDate = endDate;
+    if (endDate) schedule.endDate = normalizeAccessibleCalendarDate(endDate);
     if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
     if (kind === 'WEEKLY') {
       schedule.weekdays = Array.from({ length: 7 }, (_, index) => index + 1)
@@ -3050,9 +3094,27 @@ function collectCalendarSchedule() {
     }
     return schedule;
   }
-  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map(line => {
-    const match = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)$/u.exec(line);
-    return match ? { date: match[1], time: match[2] } : { date: line, time: '' };
+  if (kind === 'INTERVAL') {
+    const startMode = $('calendar-interval-start-mode').value === 'LATER' ? 'LATER' : 'NOW';
+    const start = startMode === 'NOW'
+      ? calendarNowFields(schedule.timeZone)
+      : {
+          date: normalizeAccessibleCalendarDate($('calendar-interval-start-date').value),
+          time: normalizeAccessibleClockTime($('calendar-interval-start-time').value, { optional: false, allowSeconds: true }),
+        };
+    schedule.startDate = start.date;
+    schedule.startTime = start.time;
+    schedule.intervalSeconds = intervalSecondsFromUi();
+    const maxOccurrences = $('calendar-interval-max-occurrences').value.trim();
+    if (maxOccurrences) schedule.maxOccurrences = Number(maxOccurrences);
+    return schedule;
+  }
+  schedule.occurrences = calendarLines('calendar-explicit-occurrences').map((line, index) => {
+    try {
+      return parseAccessibleOccurrenceLine(line);
+    } catch (error) {
+      throw new Error(`Запуск ${index + 1}: ${error.message}`);
+    }
   });
   return schedule;
 }
@@ -3062,6 +3124,8 @@ function syncCalendarVisibility() {
   $('calendar-one-time-fields').hidden = kind !== 'ONE_TIME';
   $('calendar-recurring-fields').hidden = kind !== 'DAILY' && kind !== 'WEEKLY';
   $('calendar-weekdays').hidden = kind !== 'WEEKLY';
+  $('calendar-interval-fields').hidden = kind !== 'INTERVAL';
+  $('calendar-interval-later-fields').hidden = kind !== 'INTERVAL' || $('calendar-interval-start-mode').value !== 'LATER';
   $('calendar-explicit-fields').hidden = kind !== 'EXPLICIT';
 }
 function formatCalendarInstant(value) {
@@ -3081,21 +3145,28 @@ function renderCalendarRuntimeStatus(session = ui.selected) {
 }
 function renderCalendarEditor() {
   const schedule = ui.selected?.calendarSchedule || null;
-  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
+  const kind = ['ONE_TIME', 'DAILY', 'WEEKLY', 'INTERVAL', 'EXPLICIT'].includes(schedule?.kind) ? schedule.kind : 'NONE';
   $('calendar-mode').value = kind;
   $('calendar-time-zone').value = schedule?.timeZone || defaultCalendarTimeZone();
   $('calendar-catch-up').checked = schedule?.catchUp === 'ON';
   $('calendar-revision-confirm').checked = false;
-  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? (schedule.date || '') : '';
+  $('calendar-one-time-date').value = schedule?.kind === 'ONE_TIME' ? formatAccessibleCalendarDate(schedule.date || '') : '';
   $('calendar-one-time-time').value = schedule?.kind === 'ONE_TIME' ? (schedule.time || '') : '';
-  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.startDate || '') : '';
+  $('calendar-start-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? formatAccessibleCalendarDate(schedule.startDate || '') : '';
   $('calendar-times').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.times || []).join('\n') : '';
-  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? (schedule.endDate || '') : '';
+  $('calendar-end-date').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) ? formatAccessibleCalendarDate(schedule.endDate || '') : '';
   $('calendar-max-occurrences').value = ['DAILY', 'WEEKLY'].includes(schedule?.kind) && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
+  $('calendar-interval-start-mode').value = schedule?.kind === 'INTERVAL' ? 'LATER' : 'NOW';
+  $('calendar-interval-start-date').value = schedule?.kind === 'INTERVAL' ? formatAccessibleCalendarDate(schedule.startDate || '') : '';
+  $('calendar-interval-start-time').value = schedule?.kind === 'INTERVAL' ? String(schedule.startTime || '').replace(/:00$/u, '') : '';
+  const intervalUi = intervalUiValue(schedule?.kind === 'INTERVAL' ? schedule.intervalSeconds : 60);
+  $('calendar-interval-value').value = String(intervalUi.value);
+  $('calendar-interval-unit').value = intervalUi.unit;
+  $('calendar-interval-max-occurrences').value = schedule?.kind === 'INTERVAL' && schedule.maxOccurrences != null ? String(schedule.maxOccurrences) : '';
   const weekdays = new Set(schedule?.kind === 'WEEKLY' ? (schedule.weekdays || []) : []);
   for (let day = 1; day <= 7; day += 1) $(`calendar-weekday-${day}`).checked = weekdays.has(day);
   $('calendar-explicit-occurrences').value = schedule?.kind === 'EXPLICIT'
-    ? (schedule.occurrences || []).map(item => `${item.date} ${item.time}`).join('\n')
+    ? (schedule.occurrences || []).map(item => `${formatAccessibleCalendarDate(item.date)} ${item.time}`).join('\n')
     : '';
   syncCalendarVisibility();
   renderCalendarRuntimeStatus(ui.selected);
@@ -3118,12 +3189,12 @@ function validateCalendarScheduleUi(session, errors) {
   try { new Intl.DateTimeFormat('uk-UA', { timeZone: schedule.timeZone }).format(0); }
   catch { errors.push(['calendar-time-zone', 'Вкажіть чинний IANA часовий пояс, наприклад Europe/Bratislava.']); }
   if (schedule.kind === 'ONE_TIME') {
-    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Дата одноразового запуску має бути у форматі YYYY-MM-DD.']);
+    if (!validCalendarDate(schedule.date)) errors.push(['calendar-one-time-date', 'Вкажіть коректну дату одноразового запуску.']);
     if (!validCalendarTime(schedule.time)) errors.push(['calendar-one-time-time', 'Час одноразового запуску має бути у форматі HH:MM або HH:MM:SS.']);
     return;
   }
   if (schedule.kind === 'DAILY' || schedule.kind === 'WEEKLY') {
-    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Дата початку має бути у форматі YYYY-MM-DD.']);
+    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-start-date', 'Вкажіть коректну дату початку.']);
     if (!Array.isArray(schedule.times) || schedule.times.length < 1 || schedule.times.length > 48 || schedule.times.some(value => !validCalendarTime(value))) {
       errors.push(['calendar-times', 'Додайте від 1 до 48 коректних часів, по одному в рядку, у форматі HH:MM.']);
     }
@@ -3139,10 +3210,21 @@ function validateCalendarScheduleUi(session, errors) {
     }
     return;
   }
+  if (schedule.kind === 'INTERVAL') {
+    if (!validCalendarDate(schedule.startDate)) errors.push(['calendar-interval-start-date', 'Вкажіть коректну дату початку інтервального розкладу.']);
+    if (!validCalendarTime(schedule.startTime)) errors.push(['calendar-interval-start-time', 'Вкажіть коректний час початку інтервального розкладу.']);
+    if (!Number.isSafeInteger(schedule.intervalSeconds) || schedule.intervalSeconds < 1 || schedule.intervalSeconds > 31_536_000) {
+      errors.push(['calendar-interval-value', 'Інтервал має бути від 1 секунди до 365 днів.']);
+    }
+    if (schedule.maxOccurrences != null && (!Number.isSafeInteger(schedule.maxOccurrences) || schedule.maxOccurrences < 1 || schedule.maxOccurrences > 1000000)) {
+      errors.push(['calendar-interval-max-occurrences', 'Кількість запусків має бути цілим числом від 1 до 1000000.']);
+    }
+    return;
+  }
   if (schedule.kind === 'EXPLICIT') {
     if (!Array.isArray(schedule.occurrences) || schedule.occurrences.length < 1 || schedule.occurrences.length > 10000
       || schedule.occurrences.some(item => !validCalendarDate(item.date) || !validCalendarTime(item.time))) {
-      errors.push(['calendar-explicit-occurrences', 'Додайте від 1 до 10000 рядків у форматі YYYY-MM-DD HH:MM.']);
+      errors.push(['calendar-explicit-occurrences', 'Додайте від 1 до 10000 запусків у форматі ДД.ММ.РРРР ГГ:ХХ.']);
     }
   }
 }
@@ -4105,6 +4187,7 @@ for (const id of [
   field?.addEventListener(eventName, scheduleDraftPersistence);
 }
 $('calendar-mode').addEventListener('change', () => { syncCalendarVisibility(); renderCalendarRuntimeStatus(ui.selected); });
+$('calendar-interval-start-mode').addEventListener('change', syncCalendarVisibility);
 $('retry-backoff-unit').addEventListener('change', onRetryBackoffUnitChange);
 $('minimum-send-interval-unit').addEventListener('change', onMinimumSendIntervalUnitChange);
 $('apply-default-prompt-button').addEventListener('click', applyDefaultPrompt);

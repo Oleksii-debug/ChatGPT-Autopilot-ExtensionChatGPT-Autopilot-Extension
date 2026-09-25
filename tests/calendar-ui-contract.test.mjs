@@ -36,3 +36,41 @@ test('calendar mode visibility is semantic and explicit list remains direct text
   assert.match(html, /Щоб додати час, додайте новий рядок/);
   assert.match(html, /value="WEEKLY"/);
 });
+
+
+test('Agent and Scenario scheduling are text-first and do not require inaccessible native date/time pickers', () => {
+  assert.match(html, /id="agent-schedule-start" type="text"[^>]*placeholder="25\.09\.2026 04:00"/);
+  assert.match(html, /id="agent-schedule-end" type="text"/);
+  assert.match(html, /id="agent-active-window-start" type="text"[^>]*placeholder="09:00"/);
+  assert.match(html, /id="scenario-work-start-at" type="text"[^>]*placeholder="25\.09\.2026 04:00"/);
+  assert.doesNotMatch(html, /id="agent-schedule-start" type="datetime-local"/);
+  assert.doesNotMatch(html, /id="agent-active-window-start" type="time"/);
+  assert.match(js, /parseAccessibleLocalDateTime/);
+  assert.match(js, /formatAccessibleLocalDateTime/);
+});
+
+
+test('Session calendar presents dotted owner format while preserving canonical schedule storage', () => {
+  assert.match(html, /placeholder="25\.09\.2026"/);
+  assert.match(html, /placeholder="25\.09\.2026 09:00/);
+  assert.match(html, /Рекомендований формат дати: ДД\.ММ\.РРРР/);
+  assert.match(js, /normalizeAccessibleCalendarDate/);
+  assert.match(js, /formatAccessibleCalendarDate/);
+  assert.match(js, /parseAccessibleOccurrenceLine/);
+});
+
+
+test('Session calendar exposes accessible interval recurrence with now or later start', () => {
+  for (const id of [
+    'calendar-interval-fields', 'calendar-interval-start-mode',
+    'calendar-interval-start-date', 'calendar-interval-start-time',
+    'calendar-interval-value', 'calendar-interval-unit',
+    'calendar-interval-max-occurrences',
+  ]) assert.match(html, new RegExp(`id=["']${id}["']`));
+  assert.match(html, /<option value="INTERVAL">/);
+  assert.match(html, /value="NOW">Зараз/);
+  assert.match(html, /value="LATER">У задану дату й час/);
+  assert.match(js, /intervalSecondsFromUi/);
+  assert.match(js, /calendarNowFields/);
+  assert.match(js, /kind === 'INTERVAL'/);
+});
