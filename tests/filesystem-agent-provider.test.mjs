@@ -49,6 +49,12 @@ function allow(id = 'fs-inv-1') {
   };
 }
 
+function nativeCapabilities(...capabilityIds) {
+  return {
+    capabilities: capabilityIds.map(capabilityId => ({ capabilityId })),
+  };
+}
+
 function nativeClient(overrides = {}) {
   return {
     readText: async payload => ({ ...payload, text: 'hello' }),
@@ -68,6 +74,12 @@ test('filesystem provider advertises only executable read/search/list/stat tools
   delete client.writeExistingText;
   const provider = new FilesystemAgentProviderV1({
     nativeClient: client,
+    nativeCapabilities: nativeCapabilities(
+      'filesystem.readText',
+      'filesystem.search',
+      'filesystem.list',
+      'filesystem.stat',
+    ),
     grantedCapabilityIds: ['filesystem.search'],
     now: () => Date.parse(at),
   });
@@ -194,6 +206,12 @@ test('read-only filesystem list/stat dispatch through canonical policy authoriza
         return { rootId: payload.rootId, relativePath: payload.relativePath, kind: 'FILE', sizeBytes: 3, modifiedAt: at, hashed: true, sha256: digest('abc') };
       },
     }),
+    nativeCapabilities: nativeCapabilities(
+      'filesystem.readText',
+      'filesystem.search',
+      'filesystem.list',
+      'filesystem.stat',
+    ),
     grantedCapabilityIds: ['filesystem.list', 'filesystem.stat'],
     now: () => Date.parse(at),
   });
@@ -223,6 +241,34 @@ test('read-only filesystem list/stat dispatch through canonical policy authoriza
       policyDecision: { ...allow('fs-list-1'), decision: 'DENY' },
     }),
     /not authorized/u,
+  );
+});
+
+test('filesystem provider does not infer LIST/STAT support from client method presence', async () => {
+  const client = nativeClient();
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: client,
+    nativeCapabilities: nativeCapabilities('filesystem.readText', 'filesystem.search'),
+    grantedCapabilityIds: ['filesystem.readText', 'filesystem.search', 'filesystem.list', 'filesystem.stat'],
+  });
+
+  assert.deepEqual(provider.tools().map(tool => tool.toolId), [
+    FilesystemToolId.READ_TEXT,
+    FilesystemToolId.SEARCH,
+  ]);
+
+  const listInvocation = invocation(
+    FilesystemToolId.LIST,
+    'filesystem.list',
+    { rootId: 'workspace', relativePath: '.', maxEntries: 10 },
+    'fs-list-host-unavailable',
+  );
+  await assert.rejects(
+    () => provider.invoke({
+      invocation: listInvocation,
+      policyDecision: allow('fs-list-host-unavailable'),
+    }),
+    error => error.code === 'TOOL_UNAVAILABLE',
   );
 });
 
