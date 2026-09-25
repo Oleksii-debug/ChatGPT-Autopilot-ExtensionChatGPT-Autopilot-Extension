@@ -31,9 +31,9 @@ const PROVIDER_RESULT_KEYS = new Set([
   'schemaVersion', 'searchId', 'providerId', 'domain', 'visibilityScopeId',
   'queriedAt', 'completedAt', 'hits',
 ]);
+const ADMISSION_KEYS = new Set(['providerId', 'domain', 'visibilityScopeId']);
 const FUSION_KEYS = new Set([
-  'schemaVersion', 'searchId', 'query', 'providerResults', 'admittedProviderIds',
-  'admittedDomains', 'admittedVisibilityScopeIds', 'limit',
+  'schemaVersion', 'searchId', 'query', 'providerResults', 'admittedSearchScopes', 'limit',
 ]);
 
 function snapshotRecord(value, allowed, label) {
@@ -141,24 +141,33 @@ function deepFreeze(value) {
   return Object.freeze(value);
 }
 
-function exactIdSet(value, label, max) {
-  const items = denseArray(value, label, max).map((item, index) => id(item, `${label}[${index}]`));
-  if (!items.length || new Set(items).size !== items.length) {
-    throw new Error(`${label} must contain unique admitted values`);
-  }
-  return new Set(items);
+function admissionKey(providerId, domain, visibilityScopeId) {
+  return JSON.stringify([providerId, domain, visibilityScopeId]);
 }
 
-function exactDomainSet(value, label) {
-  const items = denseArray(value, label, DOMAINS.size);
-  const out = [];
-  for (let index = 0; index < items.length; index += 1) {
-    const domain = items[index];
-    if (typeof domain !== 'string' || !DOMAINS.has(domain)) throw new Error(`${label}[${index}] is invalid`);
-    out.push(domain);
+function normalizeAdmissionScopeV1(input, index) {
+  const raw = snapshotRecord(input, ADMISSION_KEYS, `admittedSearchScopes[${index}]`);
+  if (typeof raw.domain !== 'string' || !DOMAINS.has(raw.domain)) {
+    throw new Error(`admittedSearchScopes[${index}].domain is invalid`);
   }
-  if (!out.length || new Set(out).size !== out.length) throw new Error(`${label} must contain unique admitted values`);
-  return new Set(out);
+  return deepFreeze({
+    providerId: id(raw.providerId, `admittedSearchScopes[${index}].providerId`),
+    domain: raw.domain,
+    visibilityScopeId: id(raw.visibilityScopeId, `admittedSearchScopes[${index}].visibilityScopeId`),
+  });
+}
+
+function admittedScopeSet(value) {
+  const items = denseArray(value, 'admittedSearchScopes', MAX_PROVIDER_RESULTS);
+  if (!items.length) throw new Error('admittedSearchScopes must not be empty');
+  const keys = new Set();
+  for (let index = 0; index < items.length; index += 1) {
+    const scope = normalizeAdmissionScopeV1(items[index], index);
+    const key = admissionKey(scope.providerId, scope.domain, scope.visibilityScopeId);
+    if (keys.has(key)) throw new Error('admittedSearchScopes must contain unique tuples');
+    keys.add(key);
+  }
+  return keys;
 }
 
 export function normalizeGlobalSearchHitV1(input) {
@@ -239,13 +248,7 @@ export function fuseGlobalSearchV1(input) {
   const raw = snapshotRecord(input, FUSION_KEYS, 'GlobalSearchFusionV1');
   const searchId = id(raw.searchId, 'searchId');
   const query = text(raw.query, 'query', MAX_QUERY);
-  const admittedProviderIds = exactIdSet(raw.admittedProviderIds, 'admittedProviderIds', MAX_PROVIDER_RESULTS);
-  const admittedDomains = exactDomainSet(raw.admittedDomains, 'admittedDomains');
-  const admittedVisibilityScopeIds = exactIdSet(
-    raw.admittedVisibilityScopeIds,
-    'admittedVisibilityScopeIds',
-    MAX_PROVIDER_RESULTS,
-  );
+  const admittedScopes = admittedScopeSet(raw.admittedSearchScopes);
   const limit = integer(raw.limit, 'limit', 1, MAX_RESULTS);
   const providerResults = denseArray(raw.providerResults, 'providerResults', MAX_PROVIDER_RESULTS)
     .map(normalizeGlobalSearchProviderResultV1);
@@ -254,10 +257,9 @@ export function fuseGlobalSearchV1(input) {
   const fused = new Map();
   for (const batch of providerResults) {
     if (batch.searchId !== searchId) throw new Error('provider result searchId mismatch');
-    if (!admittedProviderIds.has(batch.providerId)) throw new Error(`provider is not admitted: ${batch.providerId}`);
-    if (!admittedDomains.has(batch.domain)) throw new Error(`domain is not admitted: ${batch.domain}`);
-    if (!admittedVisibilityScopeIds.has(batch.visibilityScopeId)) {
-      throw new Error(`visibility scope is not admitted: ${batch.visibilityScopeId}`);
+    const scopeKey = admissionKey(batch.providerId, batch.domain, batch.visibilityScopeId);
+    if (!admittedScopes.has(scopeKey)) {
+      throw new Error(`provider/domain/visibility scope tuple is not admitted: ${batch.providerId}`);
     }
     const batchKey = providerBatchKey(batch);
     if (batchKeys.has(batchKey)) throw new Error(`duplicate provider/domain batch: ${batchKey}`);
