@@ -54,3 +54,44 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     tabStrategy: ['keep-open', 'worker', 'open-close'].includes(fields.tabs) ? fields.tabs : 'keep-open',
   };
 }
+
+
+export function assertSimplifiedPortableProfile(profile) {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+    throw new Error('Файл спрощених сесій має містити portable profile.');
+  }
+  const profilePrototype = Object.getPrototypeOf(profile);
+  if (profilePrototype !== Object.prototype && profilePrototype !== null) {
+    throw new Error('Файл спрощених сесій має містити portable profile.');
+  }
+  const sessionsDescriptor = Object.getOwnPropertyDescriptor(profile, 'sessions');
+  if (!sessionsDescriptor?.enumerable || !Object.hasOwn(sessionsDescriptor, 'value')) {
+    throw new Error('Файл спрощених сесій має містити список sessions.');
+  }
+  const sessions = sessionsDescriptor.value;
+  if (!Array.isArray(sessions) || Object.getPrototypeOf(sessions) !== Array.prototype || sessions.length < 1) {
+    throw new Error('Файл спрощених сесій має містити хоча б одну сесію.');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(sessions);
+  for (let index = 0; index < sessions.length; index += 1) {
+    const itemDescriptor = descriptors[String(index)];
+    if (!itemDescriptor?.enumerable || !Object.hasOwn(itemDescriptor, 'value')) {
+      throw new Error('Список sessions у файлі спрощених сесій має бути суцільним масивом даних.');
+    }
+    const session = itemDescriptor.value;
+    if (!session || typeof session !== 'object' || Array.isArray(session)) {
+      throw new Error('Файл спрощених сесій містить некоректну сесію.');
+    }
+    const sessionPrototype = Object.getPrototypeOf(session);
+    if (sessionPrototype !== Object.prototype && sessionPrototype !== null) {
+      throw new Error('Файл спрощених сесій містить некоректну сесію.');
+    }
+    const simplifiedDescriptor = Object.getOwnPropertyDescriptor(session, 'simplifiedSession');
+    if (!simplifiedDescriptor?.enumerable
+        || !Object.hasOwn(simplifiedDescriptor, 'value')
+        || simplifiedDescriptor.value !== true) {
+      throw new Error('Через «Спрощені сесії» можна імпортувати лише сесії з explicit simplifiedSession=true.');
+    }
+  }
+  return profile;
+}
