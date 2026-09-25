@@ -31,6 +31,8 @@ const TAKEOVER_KEYS = new Set([
   'nodeId',
   'resourceId',
   'effectId',
+  'executionId',
+  'attempt',
   'agentId',
   'humanPrincipalId',
   'verificationAuthorityId',
@@ -119,16 +121,14 @@ function exactInteger(value, label, min = 1, max = Number.MAX_SAFE_INTEGER) {
   return value;
 }
 
+function exactAttempt(value, label) {
+  return exactInteger(value, label, 0, 64);
+}
+
 function assertAtOrAfter(later, earlier, label) {
   if (Date.parse(later) < Date.parse(earlier)) {
     throw new Error(`${label} violates causal timestamp ordering`);
   }
-}
-
-function compareIds(a, b) {
-  if (a < b) return -1;
-  if (a > b) return 1;
-  return 0;
 }
 
 function cloneDataOnly(value, label, state = { depth: 0, nodes: 0 }) {
@@ -272,7 +272,8 @@ function requirePhaseFields(state) {
       && state.handbackVerification.status === VerificationStatus.VERIFIED
       && state.handbackVerification.evidenceArtifactIds.length > 0,
     [HumanTakeoverPhase.MANUAL_REVIEW]: hasControl && hasHandback && hasObservation && hasVerification
-      && state.handbackVerification.status !== VerificationStatus.VERIFIED,
+      && (state.handbackVerification.status !== VerificationStatus.VERIFIED
+        || state.handbackVerification.evidenceArtifactIds.length === 0),
   };
 
   if (!expected[state.phase]) {
@@ -301,6 +302,12 @@ export function normalizeHumanTakeoverV1(input) {
     nodeId: exactId(ownValue(raw, 'nodeId', 'HumanTakeoverV1'), 'nodeId'),
     resourceId: exactId(ownValue(raw, 'resourceId', 'HumanTakeoverV1'), 'resourceId'),
     effectId: exactId(ownValue(raw, 'effectId', 'HumanTakeoverV1', { optional: true }), 'effectId', { optional: true }),
+    executionId: exactId(
+      ownValue(raw, 'executionId', 'HumanTakeoverV1', { optional: true }),
+      'executionId',
+      { optional: true },
+    ),
+    attempt: exactAttempt(ownValue(raw, 'attempt', 'HumanTakeoverV1')),
     agentId: exactId(ownValue(raw, 'agentId', 'HumanTakeoverV1'), 'agentId'),
     humanPrincipalId: exactId(ownValue(raw, 'humanPrincipalId', 'HumanTakeoverV1'), 'humanPrincipalId'),
     verificationAuthorityId: exactId(ownValue(raw, 'verificationAuthorityId', 'HumanTakeoverV1'), 'verificationAuthorityId'),
@@ -346,6 +353,16 @@ export function normalizeHumanTakeoverV1(input) {
     requiresCanonicalResumeGate: true,
   };
 
+  if (Boolean(state.effectId) !== Boolean(state.executionId)) {
+    throw new Error('HumanTakeoverV1 effectId and executionId must be present together');
+  }
+  if (state.effectId && state.attempt < 1) {
+    throw new Error('HumanTakeoverV1 active effect requires attempt >= 1');
+  }
+  if (!state.effectId && state.attempt !== 0) {
+    throw new Error('HumanTakeoverV1 without active effect requires attempt = 0');
+  }
+
   if (Object.hasOwn(raw, 'advisoryOnly') && ownValue(raw, 'advisoryOnly', 'HumanTakeoverV1') !== true) {
     throw new Error('HumanTakeoverV1 advisoryOnly must remain true');
   }
@@ -368,6 +385,8 @@ export function createHumanTakeoverV1({
   nodeId,
   resourceId,
   effectId = '',
+  executionId = '',
+  attempt = 0,
   agentId,
   humanPrincipalId,
   verificationAuthorityId,
@@ -383,6 +402,8 @@ export function createHumanTakeoverV1({
     nodeId,
     resourceId,
     effectId,
+    executionId,
+    attempt,
     agentId,
     humanPrincipalId,
     verificationAuthorityId,
@@ -490,8 +511,18 @@ export function recordHumanHandbackVerificationV1(raw, {
   if (verified.verificationAuthorityId !== current.verificationAuthorityId) {
     throw new Error('handback verification authority mismatch');
   }
-  if (current.effectId && verified.effectId && verified.effectId !== current.effectId) {
-    throw new Error('handback verification effectId mismatch');
+  if (current.effectId) {
+    if (verified.effectId !== current.effectId) {
+      throw new Error('handback verification effectId mismatch');
+    }
+    if (verified.executionId !== current.executionId) {
+      throw new Error('handback verification executionId mismatch');
+    }
+    if (verified.attempt !== current.attempt) {
+      throw new Error('handback verification attempt mismatch');
+    }
+  } else if (verified.effectId || verified.executionId || verified.attempt !== 0) {
+    throw new Error('handback verification cannot introduce unrelated exact-effect identity');
   }
   assertAtOrAfter(verified.verifiedAt, current.postTakeoverObservation.observedAt, 'handback verification');
 
@@ -519,6 +550,8 @@ export function buildHumanHandbackResumePacketV1(raw) {
     nodeId: current.nodeId,
     resourceId: current.resourceId,
     effectId: current.effectId,
+    executionId: current.executionId,
+    attempt: current.attempt,
     agentId: current.agentId,
     humanPrincipalId: current.humanPrincipalId,
     verificationAuthorityId: current.verificationAuthorityId,
@@ -535,24 +568,4 @@ export function buildHumanHandbackResumePacketV1(raw) {
 
 export function humanTakeoverResumeCandidateV1(raw) {
   return normalizeHumanTakeoverV1(raw).phase === HumanTakeoverPhase.RECONCILED;
-}
-
-export function compareHumanTakeoverIdentityV1(leftRaw, rightRaw) {
-  const left = normalizeHumanTakeoverV1(leftRaw);
-  const right = normalizeHumanTakeoverV1(rightRaw);
-  return [
-    left.takeoverId,
-    left.jobId,
-    left.planId,
-    left.nodeId,
-    left.resourceId,
-    left.effectId,
-  ].map((value, index) => compareIds(value, [
-    right.takeoverId,
-    right.jobId,
-    right.planId,
-    right.nodeId,
-    right.resourceId,
-    right.effectId,
-  ][index])).find(result => result !== 0) || 0;
 }
