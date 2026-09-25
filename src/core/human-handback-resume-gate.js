@@ -171,7 +171,17 @@ function assertEffectResolution(packet, assessedAt, resolveTrustedExactEffectSta
   if (effect.phase !== ExactEffectPhase.COMMITTED || !effect.commitId) {
     throw new Error('interrupted exact effect must be COMMITTED before handback resume');
   }
-  if (Date.parse(effect.updatedAt) < Date.parse(packet.handbackVerification.verifiedAt)) {
+  if (!effect.observation || !effect.verification) {
+    throw new Error('committed interrupted effect requires canonical observation and verification');
+  }
+  const handbackVerifiedAt = Date.parse(packet.handbackVerification.verifiedAt);
+  if (Date.parse(effect.observation.observedAt) < handbackVerifiedAt) {
+    throw new Error('exact-effect observation must not predate handback verification');
+  }
+  if (Date.parse(effect.verification.verifiedAt) < handbackVerifiedAt) {
+    throw new Error('exact-effect verification must not predate handback verification');
+  }
+  if (Date.parse(effect.updatedAt) < handbackVerifiedAt) {
     throw new Error('exact-effect resolution must not predate handback verification');
   }
   if (Date.parse(effect.updatedAt) > Date.parse(assessedAt)) {
