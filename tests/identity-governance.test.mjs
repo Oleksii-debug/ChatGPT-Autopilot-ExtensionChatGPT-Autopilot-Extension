@@ -237,6 +237,70 @@ test('registry normalizes deterministic identity inventory for all required prin
   assert.equal(inventory.credentialUseAuthorized, false);
 });
 
+test('ceiling derivation request envelope is strict data-only before authority reads', () => {
+  const base = {
+    registry: registry(),
+    principalId: 'user-owner',
+    resourceKey: RESOURCE,
+    at: T1,
+  };
+
+  for (const field of ['registry', 'principalId', 'resourceKey', 'at']) {
+    let reads = 0;
+    const request = { ...base };
+    const value = request[field];
+    Object.defineProperty(request, field, {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+        return value;
+      },
+    });
+    assert.throws(
+      () => derivePrincipalGovernanceCeilingV1(request),
+      /enumerable data properties only/,
+    );
+    assert.equal(reads, 0, `${field} getter must never execute`);
+  }
+
+  const hidden = { ...base };
+  Object.defineProperty(hidden, 'resourceKey', {
+    enumerable: false,
+    configurable: true,
+    value: RESOURCE,
+  });
+  assert.throws(
+    () => derivePrincipalGovernanceCeilingV1(hidden),
+    /enumerable data properties only/,
+  );
+
+  const symbol = { ...base, [Symbol('hidden-authority')]: true };
+  assert.throws(
+    () => derivePrincipalGovernanceCeilingV1(symbol),
+    /unknown field/,
+  );
+
+  assert.throws(
+    () => derivePrincipalGovernanceCeilingV1({ ...base, authorizationGranted: true }),
+    /unknown field/,
+  );
+
+  const exotic = Object.assign(Object.create({ inheritedAuthority: true }), base);
+  assert.throws(
+    () => derivePrincipalGovernanceCeilingV1(exotic),
+    /plain object/,
+  );
+
+  const nullProto = Object.assign(Object.create(null), base);
+  const result = derivePrincipalGovernanceCeilingV1(nullProto);
+  assert.equal(result.principalId, 'user-owner');
+  assert.equal(result.resourceKey, RESOURCE);
+  assert.equal(result.policyDecision, 'NONE');
+  assert.equal(result.authorizationGranted, false);
+  assert.equal(result.credentialUseAuthorized, false);
+});
+
 test('root user ceiling is resource-scoped policy input and never an authorization decision', () => {
   const result = derivePrincipalGovernanceCeilingV1({
     registry: registry(),
