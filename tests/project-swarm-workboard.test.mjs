@@ -151,6 +151,7 @@ test('workboard derives deterministic keyboard order, visual lanes, dependencies
   assert.deepEqual(publish.dependencyTaskRefs, [{ planId: 'plan-a', nodeId: 'a-source' }]);
   assert.deepEqual(publish.unmetDependencyTaskRefs, []);
   assert.deepEqual(publish.activeConflictTaskRefs, [{ planId: 'plan-b', nodeId: 'a-audit' }]);
+  assert.equal(publish.needsAttention, true);
 
   const audit = entry(board, 'plan-b', 'a-audit');
   assert.equal(audit.lane, WorkboardLane.ACTIVE);
@@ -321,9 +322,9 @@ test('workboard arrays are descriptor-snapshotted without ordinary Proxy reads',
     },
   });
   const input = validInput();
+  input.planSnapshots[0].plan.nodes = wrap(input.planSnapshots[0].plan.nodes);
   input.planSnapshots = wrap(input.planSnapshots);
   input.reviews = wrap(input.reviews);
-  input.planSnapshots[0].plan.nodes = wrap(input.planSnapshots[0].plan.nodes);
   const board = buildProjectSwarmWorkboardV1(input);
   assert.equal(board.taskCount, 4);
   assert.equal(reads, 0);
