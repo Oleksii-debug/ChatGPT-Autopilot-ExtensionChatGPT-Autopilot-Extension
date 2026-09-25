@@ -9,9 +9,11 @@ import {
   MISTRAL_ENDPOINT_PRESET,
   PINNED_COMPATIBLE_CREDENTIAL_BINDINGS,
   applyCompatibleEndpointPreset,
+  applyDefaultCompatibleEndpoint,
   buildNamedProviderCredentialPlan,
   loadNamedProviderCredentialPlan,
   writeCompatibleEndpointPreset,
+  writeDefaultCompatibleEndpoint,
 } from '../companion/ai-gateway/provider-presets.mjs';
 
 test('Mistral preset uses the existing OpenAI-compatible authority with a named secret reference', () => {
@@ -53,6 +55,77 @@ test('Mistral preset migrates the legacy compatibleBaseUrl into the default endp
     MISTRAL_ENDPOINT_PRESET,
   ]);
   assert.doesNotThrow(() => normalizeCompatibleEndpointRegistry(settings.compatibleEndpoints));
+});
+
+test('default endpoint updates stay canonical after Mistral migration instead of splitting compatibleBaseUrl from the registry', () => {
+  const migrated = applyCompatibleEndpointPreset({
+    compatibleBaseUrl: 'http://127.0.0.1:4321/v1',
+    marker: 'preserve-me',
+  });
+  const updated = applyDefaultCompatibleEndpoint(migrated, 'https://new-compatible.example/v1/');
+
+  assert.equal(updated.compatibleBaseUrl, 'https://new-compatible.example/v1');
+  assert.equal(updated.marker, 'preserve-me');
+  assert.deepEqual(updated.compatibleEndpoints, [
+    {
+      endpointId: 'default',
+      baseUrl: 'https://new-compatible.example/v1',
+      apiKeyEnv: 'COMPATIBLE_API_KEY',
+    },
+    MISTRAL_ENDPOINT_PRESET,
+  ]);
+  const registry = normalizeCompatibleEndpointRegistry(updated.compatibleEndpoints);
+  assert.equal(registry.find(item => item.endpointId === 'default')?.baseUrl, 'https://new-compatible.example/v1');
+  assert.deepEqual(registry.find(item => item.endpointId === 'mistral'), MISTRAL_ENDPOINT_PRESET);
+});
+
+test('default endpoint writer atomically updates canonical registry while preserving Mistral', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'autopilot-compatible-default-'));
+  const file = path.join(dir, 'gateway-settings.json');
+  try {
+    const migrated = applyCompatibleEndpointPreset({ compatibleBaseUrl: 'http://127.0.0.1:4321/v1' });
+    fs.writeFileSync(file, JSON.stringify(migrated), 'utf8');
+    const updated = writeDefaultCompatibleEndpoint(file, 'http://127.0.0.1:1234/v1');
+    const persisted = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(persisted, updated);
+    assert.deepEqual(updated.compatibleEndpoints, [
+      {
+        endpointId: 'default',
+        baseUrl: 'http://127.0.0.1:1234/v1',
+        apiKeyEnv: 'COMPATIBLE_API_KEY',
+      },
+      MISTRAL_ENDPOINT_PRESET,
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('default endpoint helper keeps remote transport fail closed', () => {
+  assert.throws(
+    () => applyDefaultCompatibleEndpoint({}, 'http://remote.example/v1'),
+    /must use HTTPS/i,
+  );
+  assert.throws(
+    () => applyDefaultCompatibleEndpoint({}, 'https://user:secret@remote.example/v1'),
+    /credential-free/i,
+  );
+  assert.throws(
+    () => applyDefaultCompatibleEndpoint({}, 'https://remote.example/v1?key=value'),
+    /without query or fragment/i,
+  );
+});
+
+test('OpenAI-compatible address setup delegates canonical registry writes to provider-presets', () => {
+  const script = fs.readFileSync(
+    new URL('../companion/ai-gateway/НАЛАШТУВАТИ OPENAI-COMPATIBLE АДРЕСУ.ps1', import.meta.url),
+    'utf8',
+  );
+  assert.match(script, /NODE-HELPER\.ps1/);
+  assert.match(script, /provider-presets\.mjs/);
+  assert.match(script, /--apply-default/);
+  assert.doesNotMatch(script, /compatibleBaseUrl'\]\s*=/);
+  assert.doesNotMatch(script, /ConvertTo-Json\s*\|\s*Set-Content/);
 });
 
 test('Mistral preset writer keeps secrets out of gateway-settings.json', () => {
