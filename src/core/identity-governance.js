@@ -49,6 +49,10 @@ const CREDENTIAL_KEYS = new Set([
   'status', 'createdAt', 'revokedAt',
 ]);
 
+const CEILING_REQUEST_KEYS = new Set([
+  'registry', 'principalId', 'resourceKey', 'at',
+]);
+
 function asciiCompare(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
@@ -478,12 +482,16 @@ function activeCredentialBindingsForPrincipal(registry, principalId, atMillis) {
     .sort((a, b) => asciiCompare(a.bindingId, b.bindingId));
 }
 
-export function derivePrincipalGovernanceCeilingV1({
-  registry: registryInput,
-  principalId: principalIdInput,
-  resourceKey: resourceKeyInput,
-  at: atInput,
-} = {}) {
+export function derivePrincipalGovernanceCeilingV1(requestInput = {}) {
+  const request = strictRecord(
+    requestInput,
+    CEILING_REQUEST_KEYS,
+    'PrincipalGovernanceCeilingRequestV1',
+  );
+  const registryInput = request.registry;
+  const principalIdInput = request.principalId;
+  const resourceKeyInput = request.resourceKey;
+  const atInput = request.at;
   const registry = normalizeIdentityGovernanceRegistryV1(registryInput);
   const principalId = id(principalIdInput, 'principalId');
   const resourceKey = id(resourceKeyInput, 'resourceKey');
