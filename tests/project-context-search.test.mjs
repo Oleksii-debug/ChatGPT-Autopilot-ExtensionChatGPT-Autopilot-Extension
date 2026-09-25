@@ -106,6 +106,39 @@ test('permission identities and authorities are exact and never string-coerced',
   );
 });
 
+test('top-level search request is snapshotted before any caller getter can run', () => {
+  let reads = 0;
+  const request = {
+    candidates: [candidate()],
+    currentSourceRefs: [source()],
+    allowedSourceIds: ['src-1'],
+  };
+  Object.defineProperty(request, 'query', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'runtime';
+    },
+  });
+  assert.throws(
+    () => searchProjectContextV1(request),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  assert.throws(
+    () => searchProjectContextV1({
+      query: 'runtime',
+      candidates: [candidate()],
+      currentSourceRefs: [source()],
+      allowedSourceIds: ['src-1'],
+      hiddenAuthority: 'CANONICAL',
+    }),
+    /unknown field/,
+  );
+});
+
 test('search list and candidate boundaries reject accessors before reading caller values', () => {
   let reads = 0;
   const allowedSourceIds = [];
