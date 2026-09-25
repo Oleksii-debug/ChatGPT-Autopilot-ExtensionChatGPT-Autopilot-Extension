@@ -319,3 +319,31 @@ test('atomic publish revalidates target identity after staging and never writes 
   const entries = await fs.readdir(root);
   assert.equal(entries.some(name => name.startsWith('.chatgpt-autopilot-write-')), false);
 });
+
+
+test('concurrent same-inode edit during staging fails the optimistic digest fence', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-host-concurrent-edit-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const root = path.join(temp, 'root');
+  await fs.mkdir(root);
+  const target = path.join(root, 'note.txt');
+  await fs.writeFile(target, 'before', 'utf8');
+
+  await assert.rejects(
+    () => writeExistingTextScopedV1({
+      rootId: 'workspace',
+      relativePath: 'note.txt',
+      text: 'after',
+      expectedSha256: digest('before'),
+    }, config(root, true), {
+      beforePublish: async () => {
+        await fs.writeFile(target, 'concurrent', 'utf8');
+      },
+    }),
+    error => error.code === 'PRECONDITION_FAILED',
+  );
+
+  assert.equal(await fs.readFile(target, 'utf8'), 'concurrent');
+  const entries = await fs.readdir(root);
+  assert.equal(entries.some(name => name.startsWith('.chatgpt-autopilot-write-')), false);
+});
