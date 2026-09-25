@@ -18,7 +18,7 @@ test('quick command popup uses native keyboard-accessible controls with explicit
     assert.match(html, new RegExp('<label for="' + id + '">', 'u'));
   }
   assert.match(html, /<select id="source-kind">/u);
-  assert.match(html, /<textarea id="source-text"/u);
+  assert.match(html, /<textarea id="source-text"[^>]*readonly/u);
   assert.match(html, /<button id="capture-source" type="button">/u);
   assert.match(html, /<button id="run-command" type="button">/u);
   assert.match(html, /id="status" role="status" aria-live="polite"/u);
@@ -39,6 +39,29 @@ test('clipboard is explicit paste and page capture happens only from the capture
   assert.match(js, /captureButton\.addEventListener\('click'/u);
   assert.match(js, /chrome\.scripting\.executeScript/u);
   assert.match(js, /Ctrl\+V/u);
+});
+
+test('captured page or selection material keeps exact provenance until run', () => {
+  assert.match(js, /let capturedSource = null/u);
+  assert.match(js, /const capturedAt = new Date\(\)\.toISOString\(\)/u);
+  assert.match(js, /capturedSource = Object\.freeze/u);
+  assert.match(js, /capturedAt: capturedSource\.capturedAt/u);
+  assert.match(js, /text: capturedSource\.text/u);
+  assert.match(js, /sourceText\.readOnly = true/u);
+});
+
+test('changing source kind invalidates captured material and requires recapture', () => {
+  assert.match(js, /sourceKind\.addEventListener\('change', \(\) => updateSourceHelp\(\{ reset: true \}\)\)/u);
+  assert.match(js, /function resetSourceState\(\)[\s\S]*capturedSource = null[\s\S]*sourceText\.value = ''[\s\S]*sourceUri\.value = ''/u);
+  assert.match(js, /capturedSource\.kind !== sourceKind\.value/u);
+  assert.match(js, /Захопити джерело/u);
+});
+
+test('page capture rejects oversize material instead of silently truncating it', () => {
+  assert.doesNotMatch(js, /\.slice\(0,\s*100000\)/u);
+  assert.match(js, /text\.length > maxSourceText/u);
+  assert.match(js, /tooLarge: true/u);
+  assert.match(js, /перевищує 100000 символів/u);
 });
 
 test('execution reuses canonical Core Session commands and preserves recoverability on start failure', () => {
