@@ -28,7 +28,7 @@ const HIT_KEYS = new Set([
   'observedAt', 'rank', 'contentSha256',
 ]);
 const PROVIDER_RESULT_KEYS = new Set([
-  'schemaVersion', 'searchId', 'providerId', 'domain', 'visibilityScopeId',
+  'schemaVersion', 'searchId', 'query', 'providerId', 'domain', 'visibilityScopeId',
   'queriedAt', 'completedAt', 'hits',
 ]);
 const ADMISSION_KEYS = new Set(['providerId', 'domain', 'visibilityScopeId']);
@@ -219,6 +219,7 @@ export function normalizeGlobalSearchProviderResultV1(input) {
   return deepFreeze({
     schemaVersion: version(raw.schemaVersion, 'GlobalSearchProviderResultV1'),
     searchId: id(raw.searchId, 'searchId'),
+    query: text(raw.query, 'query', MAX_QUERY),
     providerId: id(raw.providerId, 'providerId'),
     domain: raw.domain,
     visibilityScopeId: id(raw.visibilityScopeId, 'visibilityScopeId'),
@@ -257,6 +258,7 @@ export function fuseGlobalSearchV1(input) {
   const fused = new Map();
   for (const batch of providerResults) {
     if (batch.searchId !== searchId) throw new Error('provider result searchId mismatch');
+    if (batch.query !== query) throw new Error('provider result query mismatch');
     const scopeKey = admissionKey(batch.providerId, batch.domain, batch.visibilityScopeId);
     if (!admittedScopes.has(scopeKey)) {
       throw new Error(`provider/domain/visibility scope tuple is not admitted: ${batch.providerId}`);
