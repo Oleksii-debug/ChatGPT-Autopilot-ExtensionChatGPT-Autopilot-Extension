@@ -151,6 +151,10 @@ function stateInput({ snapshotValue = snapshot(), capsuleValue = capsule(), curr
   return { snapshot: snapshotValue, capsule: capsuleValue, currentSourceRefs: currentSources };
 }
 
+function deriveDigest(args, allowedSourceIds = ['github-main']) {
+  return deriveProjectCurrentStateDigestV1({ allowedSourceIds, ...args });
+}
+
 test('current-state rejects substituted source provenance even when revision and hash match', () => {
   const state = deriveProjectCurrentStateV1({
     snapshot: snapshot(),
@@ -166,7 +170,7 @@ test('current-state rejects substituted source provenance even when revision and
 
 test('digest is deterministic and unchanged for the same fresh provenance-bound state', () => {
   const input = stateInput();
-  const digest = deriveProjectCurrentStateDigestV1({ baseline: input, current: input });
+  const digest = deriveDigest({ baseline: input, current: input });
   assert.equal(digest.status, 'UNCHANGED');
   assert.equal(digest.changeViewAvailable, true);
   assert.equal(digest.advisoryOnly, true);
@@ -195,7 +199,7 @@ test('digest reports source revision movement across fresh project revisions', (
     }],
   });
 
-  const digest = deriveProjectCurrentStateDigestV1({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: nextSnapshot,
@@ -248,7 +252,7 @@ test('digest reports artifact identity changes while both endpoint states remain
     artifactRefs: [nextArtifact],
   });
 
-  const digest = deriveProjectCurrentStateDigestV1({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: nextSnapshot,
@@ -263,27 +267,25 @@ test('digest reports artifact identity changes while both endpoint states remain
     change: 'CHANGED',
     before: {
       kind: 'report',
-      uri: 'artifact://report',
       mediaType: 'text/plain',
       sha256: 'b'.repeat(64),
       sizeBytes: 10,
-      producerInvocationId: 'invoke-1',
       sensitive: false,
+      redacted: false,
     },
     after: {
       kind: 'report',
-      uri: 'artifact://report',
       mediaType: 'text/plain',
       sha256: 'd'.repeat(64),
       sizeBytes: 12,
-      producerInvocationId: 'invoke-2',
       sensitive: false,
+      redacted: false,
     },
   }]);
 });
 
 test('digest fails closed instead of producing a what-changed view from stale substituted sources', () => {
-  const digest = deriveProjectCurrentStateDigestV1({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       currentSources: [source({ uri: 'github://attacker/substituted' })],
@@ -306,7 +308,7 @@ test('digest fails closed instead of producing a what-changed view from stale su
 
 test('digest refuses cross-project comparison', () => {
   const otherSource = source({ projectId: 'other-project' });
-  assert.throws(() => deriveProjectCurrentStateDigestV1({
+  assert.throws(() => deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: snapshot({ projectId: 'other-project', sourceRefs: [otherSource] }),
@@ -331,7 +333,7 @@ test('digest reports aligned source provenance changes even when revision and ha
     projectRevisionId: 'project-rev-2',
   });
 
-  const digest = deriveProjectCurrentStateDigestV1({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       snapshotValue: movedSnapshot,
@@ -351,7 +353,7 @@ test('digest reports aligned source provenance changes even when revision and ha
 });
 
 test('stale artifact identity suppresses what-changed and exposes explicit drift evidence', () => {
-  const digest = deriveProjectCurrentStateDigestV1({
+  const digest = deriveDigest({
     baseline: stateInput(),
     current: stateInput({
       capsuleValue: capsule({ artifactRefs: [artifact({ sha256: 'd'.repeat(64) })] }),
@@ -366,4 +368,170 @@ test('stale artifact identity suppresses what-changed and exposes explicit drift
     artifactId: 'report',
     status: 'IDENTITY_DRIFT',
   }]);
+});
+
+
+test('digest requires an explicit source visibility envelope', () => {
+  const input = stateInput();
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+  }), /allowedSourceIds must be an explicit bounded array/);
+});
+
+test('unadmitted source provenance changes are classified without disclosing source identity or location', () => {
+  const baselineSource = source({
+    sourceId: 'private-source',
+    uri: 'github://private.example/secret-old',
+  });
+  const currentSource = source({
+    sourceId: 'private-source',
+    uri: 'github://private.example/secret-new',
+  });
+  const baselineInput = stateInput({
+    snapshotValue: snapshot({ sourceRefs: [baselineSource] }),
+    capsuleValue: capsule({
+      sourceBindings: [{
+        sourceId: 'private-source',
+        revisionId: 'commit-1',
+        contentSha256: 'a'.repeat(64),
+      }],
+    }),
+    currentSources: [baselineSource],
+  });
+  const currentInput = stateInput({
+    snapshotValue: snapshot({ revisionId: 'project-rev-2', sourceRefs: [currentSource] }),
+    capsuleValue: capsule({
+      capsuleId: 'capsule-2',
+      projectRevisionId: 'project-rev-2',
+      sourceBindings: [{
+        sourceId: 'private-source',
+        revisionId: 'commit-1',
+        contentSha256: 'a'.repeat(64),
+      }],
+    }),
+    currentSources: [currentSource],
+  });
+
+  const result = deriveDigest({ baseline: baselineInput, current: currentInput }, []);
+  assert.equal(result.status, 'CHANGED');
+  assert.equal(result.totalSourceChangeCount, 1);
+  assert.equal(result.visibleSourceChangeCount, 0);
+  assert.equal(result.hiddenSourceChangeCount, 1);
+  assert.deepEqual(result.sourceChanges, []);
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes('private-source'), false);
+  assert.equal(serialized.includes('private.example'), false);
+  assert.equal(serialized.includes('secret-old'), false);
+  assert.equal(serialized.includes('secret-new'), false);
+});
+
+test('sensitive artifact changes never expose identity, location or producer provenance', () => {
+  const oldArtifact = artifact({
+    artifactId: 'secret-artifact-id',
+    uri: 'artifact://secret/location-old',
+    producerInvocationId: 'secret-producer-old',
+    sensitive: true,
+  });
+  const newArtifact = artifact({
+    artifactId: 'secret-artifact-id',
+    uri: 'artifact://secret/location-new',
+    producerInvocationId: 'secret-producer-new',
+    sha256: 'd'.repeat(64),
+    sensitive: true,
+  });
+
+  const result = deriveDigest({
+    baseline: stateInput({
+      snapshotValue: snapshot({ artifactRefs: [oldArtifact] }),
+      capsuleValue: capsule({ artifactRefs: [oldArtifact] }),
+    }),
+    current: stateInput({
+      snapshotValue: snapshot({ revisionId: 'project-rev-2', artifactRefs: [newArtifact] }),
+      capsuleValue: capsule({
+        capsuleId: 'capsule-2',
+        projectRevisionId: 'project-rev-2',
+        artifactRefs: [newArtifact],
+      }),
+    }),
+  });
+
+  assert.equal(result.status, 'CHANGED');
+  assert.equal(result.totalArtifactChangeCount, 1);
+  assert.equal(result.visibleArtifactChangeCount, 0);
+  assert.equal(result.hiddenSensitiveArtifactChangeCount, 1);
+  assert.deepEqual(result.artifactChanges, []);
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes('secret-artifact-id'), false);
+  assert.equal(serialized.includes('artifact://secret'), false);
+  assert.equal(serialized.includes('secret-producer'), false);
+});
+
+test('unadmitted stale source evidence is hidden while staleness remains owner-visible', () => {
+  const result = deriveDigest({
+    baseline: stateInput(),
+    current: stateInput({
+      currentSources: [source({ uri: 'github://private.example/substituted' })],
+    }),
+  }, []);
+
+  assert.equal(result.status, 'STALE_INPUT');
+  assert.equal(result.changeViewAvailable, false);
+  assert.deepEqual(result.staleEvidence, []);
+  assert.equal(result.hiddenStaleSourceCount, 1);
+  assert.equal(JSON.stringify(result).includes('private.example'), false);
+});
+
+
+test('sensitive artifact drift evidence is aggregated without artifact identity disclosure', () => {
+  const sensitiveSnapshotArtifact = artifact({
+    artifactId: 'secret-drift-artifact',
+    uri: 'artifact://secret/drift-snapshot',
+    producerInvocationId: 'secret-drift-producer',
+    sensitive: true,
+  });
+  const sensitiveCapsuleArtifact = {
+    ...sensitiveSnapshotArtifact,
+    sha256: 'e'.repeat(64),
+    uri: 'artifact://secret/drift-capsule',
+  };
+
+  const result = deriveDigest({
+    baseline: stateInput(),
+    current: stateInput({
+      snapshotValue: snapshot({
+        revisionId: 'project-rev-2',
+        artifactRefs: [sensitiveSnapshotArtifact],
+      }),
+      capsuleValue: capsule({
+        capsuleId: 'capsule-2',
+        projectRevisionId: 'project-rev-2',
+        artifactRefs: [sensitiveCapsuleArtifact],
+      }),
+    }),
+  });
+
+  assert.equal(result.status, 'STALE_INPUT');
+  assert.equal(result.changeViewAvailable, false);
+  assert.deepEqual(result.artifactDriftEvidence, []);
+  assert.equal(result.hiddenSensitiveArtifactDriftCount, 1);
+  const serialized = JSON.stringify(result);
+  assert.equal(serialized.includes('secret-drift-artifact'), false);
+  assert.equal(serialized.includes('artifact://secret'), false);
+  assert.equal(serialized.includes('secret-drift-producer'), false);
+});
+
+
+test('current-state visibility envelope rejects type-coerced source identities', () => {
+  const input = stateInput();
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: [1],
+  }), /string ids/);
+  assert.throws(() => deriveProjectCurrentStateDigestV1({
+    baseline: input,
+    current: input,
+    allowedSourceIds: [true],
+  }), /string ids/);
 });
