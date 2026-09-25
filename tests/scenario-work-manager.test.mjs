@@ -97,6 +97,13 @@ test('manager recovery rejects persisted accessors without executing getters', a
     configurable: true,
     get() { getterCalls += 1; return ['valid']; },
   });
+  // Chrome storage serializes persisted values and cannot persist accessors.
+  // Return the adversarial object directly here so this regression measures
+  // ScenarioWork normalization itself rather than structuredClone invoking
+  // the getter inside the in-memory transport fake.
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
 
   const listed = await manager.list();
   assert.equal(getterCalls, 0);
@@ -145,11 +152,43 @@ test('manager omits accessor-backed or hidden scenario records while preserving 
     writable: true,
     value: hiddenItem,
   });
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
 
   const listed = await manager.list();
   assert.equal(getterCalls, 0);
   assert.equal(listed.selectedId, 'valid');
   assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+});
+
+test('manager accepts repeated persisted data references while still rejecting cycles', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+
+  const stored = chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY];
+  const shared = { evidence: 'same-object' };
+  stored.byId.valid.runtime.sharedAliasA = shared;
+  stored.byId.valid.runtime.sharedAliasB = shared;
+  let listed = await manager.list();
+  assert.deepEqual(listed.scenarios.map(item => item.id), ['valid']);
+
+  const cyclic = {};
+  cyclic.self = cyclic;
+  stored.byId.valid.runtime.cyclic = cyclic;
+  chrome.storage.local.get = async key => key === SCENARIO_WORK_STORAGE_KEY
+    ? { [SCENARIO_WORK_STORAGE_KEY]: stored }
+    : {};
+  listed = await manager.list();
+  assert.deepEqual(listed.scenarios, []);
 });
 
 test('manager materializes scenario turns only as canonical one-pass core sessions', async () => {
