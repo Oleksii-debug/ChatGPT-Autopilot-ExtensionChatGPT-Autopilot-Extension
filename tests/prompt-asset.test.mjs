@@ -151,6 +151,20 @@ test('render comparison fails closed on mismatched, missing, duplicate or type-a
     /identity fields must be strings/,
   );
   assert.throws(
+    () => normalizePromptAssetV1(asset({ assetId: ' prompt-main' })),
+    /exact canonical ID representation/,
+  );
+  for (const nonCanonical of [
+    { sourceId: ' spec', revisionId: 'rev-1', contentSha256: SHA_A },
+    { sourceId: 'spec', revisionId: 'rev-1 ', contentSha256: SHA_A },
+    { sourceId: 'spec', revisionId: 'rev-1', contentSha256: SHA_A.toUpperCase() },
+  ]) {
+    assert.throws(
+      () => normalizePromptAssetV1(asset({ sourceBindings: [nonCanonical] })),
+      /exact canonical representation/,
+    );
+  }
+  assert.throws(
     () => normalizePromptAssetV1(asset({ sourceBindings: [source(), source()] })),
     /duplicate sourceId/,
   );
@@ -186,7 +200,7 @@ test('cadence matching is comparison-only and never invents scheduler authority'
   const result = renderPromptAssetV1(scheduled, {
     values: { target: 'main' },
     sourceBindingAssertions: [source()],
-    trigger: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
+    triggerAssertion: { mode: PromptAssetCadenceMode.SCHEDULE, referenceId: 'schedule:nightly' },
   });
   assert.equal(result.cadence.referenceId, 'schedule:nightly');
 
