@@ -406,6 +406,22 @@ test('observation kinds and confidence bounds are strict', async () => {
   );
 });
 
+test('non-decorative image analysis cannot silently omit alt text', async () => {
+  const bytes = pngBytes();
+  const router = routerWith(modelPayload({
+    decorative: false,
+    altText: '',
+  }));
+
+  await assert.rejects(
+    analyzeImageArtifactV1(request(bytes), {
+      routeVision: router.routeVision,
+      cryptoImpl: globalThis.crypto,
+    }),
+    /requires a non-empty altText/u,
+  );
+});
+
 test('empty alt text is permitted only as bounded model data for decorative decisions', async () => {
   const bytes = pngBytes();
   const router = routerWith(modelPayload({
