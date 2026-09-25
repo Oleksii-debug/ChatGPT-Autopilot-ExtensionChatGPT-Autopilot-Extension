@@ -115,6 +115,23 @@ test('strict boundary rejects accessors, symbols, hidden fields, exotic records 
   assert.throws(() => normalizeVariantLabV1(lab({ candidates: sparse })), /must not be sparse/);
 });
 
+test('array authority boundary snapshots length and indices without ordinary Proxy reads', () => {
+  let reads = 0;
+  const candidates = new Proxy(
+    [candidate('variant-b', 'producer-b'), candidate('variant-a', 'producer-a')],
+    {
+      get(target, key, receiver) {
+        reads += 1;
+        return Reflect.get(target, key, receiver);
+      },
+    },
+  );
+
+  const normalized = normalizeVariantLabV1(lab({ candidates }));
+  assert.deepEqual(normalized.candidates.map(item => item.candidateId), ['variant-a', 'variant-b']);
+  assert.equal(reads, 0, 'variant array admission must use descriptor snapshots only');
+});
+
 test('lab requires at least two isolated candidates on one exact lab/base and disjoint outputs', () => {
   const value = normalizeVariantLabV1(lab());
   assert.deepEqual(value.candidates.map(item => item.candidateId), ['variant-a', 'variant-b']);

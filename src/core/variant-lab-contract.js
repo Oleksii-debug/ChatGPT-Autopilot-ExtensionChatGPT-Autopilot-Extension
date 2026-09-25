@@ -54,22 +54,31 @@ function strictRecord(input, allowed, label) {
 
 function strictArray(input, label, { min = 0, max = MAX_IDS } = {}) {
   if (!Array.isArray(input) || Object.getPrototypeOf(input) !== Array.prototype) throw new Error(`${label} must be a plain array`);
-  if (input.length < min || input.length > max) throw new Error(`${label} must contain ${min}-${max} items`);
   const descriptors = Object.getOwnPropertyDescriptors(input);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)) {
+    throw new Error(`${label} must have a canonical data length`);
+  }
+  const length = lengthDescriptor.value;
+  if (length < min || length > max) throw new Error(`${label} must contain ${min}-${max} items`);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) throw new Error(`${label} contains non-index field`);
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index < 0 || index >= input.length) throw new Error(`${label} contains invalid index`);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length) throw new Error(`${label} contains invalid index`);
     const descriptor = descriptors[key];
     if (!descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label}[${index}] must be an enumerable data property`);
     }
   }
   const out = [];
-  for (let index = 0; index < input.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
-    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) throw new Error(`${label} must not be sparse`);
+    if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} must not be sparse or accessor-backed`);
+    }
     out.push(descriptor.value);
   }
   return out;
