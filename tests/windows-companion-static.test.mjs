@@ -28,14 +28,18 @@ test('all Windows launch modes share portable-or-system Node helper', () => {
 
 test('OpenAI key can be stored only as Windows DPAPI ciphertext for unattended startup', () => {
   const save = read('НАЛАШТУВАТИ OPENAI API КЛЮЧ.ps1');
+  const launch = read('ЗАПУСТИТИ GATEWAY.ps1');
   const auto = read('СТАРТ GATEWAY — АВТО.ps1');
   assert.match(save, /Read-Host[\s\S]*-AsSecureString/);
   assert.match(save, /ConvertFrom-SecureString/);
   assert.match(save, /openai-key\.dpapi/);
   assert.doesNotMatch(save, /Set-Content[^\n]*OPENAI_API_KEY/);
-  assert.match(auto, /ConvertTo-SecureString/);
-  assert.match(auto, /SecureStringToBSTR/);
-  assert.match(auto, /Remove-Item Env:OPENAI_API_KEY/);
+  assert.match(launch, /ConvertTo-SecureString/);
+  assert.match(launch, /SecureStringToBSTR/);
+  assert.match(launch, /Remove-Item -Path "Env:\$envName"/);
+  assert.match(auto, /ЗАПУСТИТИ GATEWAY\.ps1/);
+  assert.match(auto, /-NonInteractive/);
+  assert.doesNotMatch(auto, /ConvertTo-SecureString|SecureStringToBSTR/);
 });
 
 test('Windows startup shortcut launches hidden automatic Gateway starter', () => {
@@ -45,15 +49,18 @@ test('Windows startup shortcut launches hidden automatic Gateway starter', () =>
   assert.match(enable, /ChatGPT Автопілот AI Gateway\.lnk/);
   assert.match(enable, /WindowStyle Hidden/);
   assert.match(enable, /СТАРТ GATEWAY — АВТО\.ps1/);
-  assert.match(auto, /Gateway-IsRunning/);
-  assert.match(auto, /Start-Process[\s\S]*gateway\.mjs/);
-  assert.match(auto, /Ensure-AutopilotNodeExe -NonInteractive/);
+  assert.match(auto, /ЗАПУСТИТИ GATEWAY\.ps1/);
+  assert.match(auto, /-NonInteractive/);
+  assert.match(auto, /Test-Path -LiteralPath \$launcher/);
+  assert.doesNotMatch(auto, /Start-Process[\s\S]*gateway\.mjs/);
 });
 
 test('one-click Gateway launcher prepares Node if needed and starts hidden Gateway with saved DPAPI key when present', () => {
   const launch = read('ЗАПУСТИТИ GATEWAY.ps1');
   const cmd = read('ЗАПУСТИТИ GATEWAY.cmd');
+  assert.match(launch, /param\([\s\S]*\[switch\]\$NonInteractive/);
   assert.match(launch, /Ensure-AutopilotNodeExe/);
+  assert.match(launch, /Ensure-AutopilotNodeExe -NonInteractive/);
   assert.match(launch, /openai-key\.dpapi/);
   assert.match(launch, /ConvertTo-SecureString/);
   assert.match(launch, /Start-Process[\s\S]*-WindowStyle Hidden/);
@@ -98,12 +105,13 @@ test('OpenAI-compatible API key can persist via DPAPI for one-click and autostar
   assert.match(save, /compatible-key\.dpapi/);
   assert.doesNotMatch(save, /Set-Content[^\n]*COMPATIBLE_API_KEY/);
   assert.match(remove, /compatible-key\.dpapi/);
-  for (const script of [launch, auto]) {
-    assert.match(script, /compatible-key\.dpapi/);
-    assert.match(script, /ConvertTo-SecureString/);
-    assert.match(script, /COMPATIBLE_API_KEY/);
-    assert.match(script, /Remove-Item Env:COMPATIBLE_API_KEY/);
-  }
+  assert.match(launch, /compatible-key\.dpapi/);
+  assert.match(launch, /ConvertTo-SecureString/);
+  assert.match(launch, /COMPATIBLE_API_KEY/);
+  assert.match(launch, /Remove-Item -Path "Env:\$envName"/);
+  assert.match(auto, /ЗАПУСТИТИ GATEWAY\.ps1/);
+  assert.match(auto, /-NonInteractive/);
+  assert.doesNotMatch(auto, /compatible-key\.dpapi|ConvertTo-SecureString|COMPATIBLE_API_KEY/);
   assert.match(interactive, /compatible-key\.dpapi/);
   assert.match(menu, /НАЛАШТУВАТИ OPENAI-COMPATIBLE API КЛЮЧ\.ps1/);
   assert.match(menu, /ВИДАЛИТИ ЗБЕРЕЖЕНИЙ OPENAI-COMPATIBLE КЛЮЧ\.ps1/);
@@ -150,4 +158,25 @@ test('Windows companion exposes explicit bounded Chrome-extension pairing and re
   assert.match(menu, /ВІДКРИТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ\.ps1/);
   assert.match(menu, /СКИНУТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ\.ps1/);
   assert.match(installer, /ВІДКРИТИ ПРИВЯЗКУ CHROME РОЗШИРЕННЯ\.ps1/);
+});
+
+test('manual and autostart Gateway launch share one fail-closed named-provider credential binding path', () => {
+  const launch = read('ЗАПУСТИТИ GATEWAY.ps1');
+  const auto = read('СТАРТ GATEWAY — АВТО.ps1');
+  const enable = read('УВІМКНУТИ АВТОЗАПУСК GATEWAY.ps1');
+  assert.match(launch, /provider-presets\.mjs/);
+  assert.match(launch, /--credential-plan/);
+  assert.match(launch, /provider-keys/);
+  assert.match(launch, /if \(\$LASTEXITCODE -ne 0\)[\s\S]*throw/);
+  assert.match(launch, /Import-DpapiEnvironmentKey/);
+  assert.match(launch, /Start-Process[\s\S]*gateway\.mjs/);
+  const planAt = launch.indexOf("$planOutput = @(& $nodeExe $presetTool '--credential-plan'");
+  const firstSecretReleaseAt = launch.indexOf("if (Import-DpapiEnvironmentKey -KeyFile $openAiKeyFile");
+  const childStartAt = launch.indexOf('Start-Process -FilePath $nodeExe');
+  assert.ok(planAt >= 0 && firstSecretReleaseAt > planAt, 'credential plan must validate before any DPAPI secret release');
+  assert.ok(childStartAt > firstSecretReleaseAt, 'Gateway child must start only after validated credential loading');
+  assert.match(auto, /ЗАПУСТИТИ GATEWAY\.ps1/);
+  assert.match(auto, /-NonInteractive/);
+  assert.doesNotMatch(auto, /provider-keys|ConvertTo-SecureString|SecureStringToBSTR/);
+  assert.match(enable, /СТАРТ GATEWAY — АВТО\.ps1/);
 });

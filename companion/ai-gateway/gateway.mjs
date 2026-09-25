@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { URL, pathToFileURL, fileURLToPath } from 'node:url';
+import { PINNED_COMPATIBLE_CREDENTIAL_BINDINGS } from './provider-presets.mjs';
 
 const GATEWAY_VERSION = '0.7.0';
 const HOST = '127.0.0.1';
@@ -10,6 +11,7 @@ const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434'
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
 const COMPATIBLE_BASE_URL = normalizeCompatibleBaseUrl(process.env.COMPATIBLE_BASE_URL || 'http://127.0.0.1:1234/v1');
 const MAX_BODY_BYTES = 4_000_000;
+export const MAX_UPSTREAM_RESPONSE_BYTES = 4_000_000;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = Math.min(900_000, Math.max(5_000, Number(process.env.AUTOPILOT_UPSTREAM_TIMEOUT_MS || 180_000)));
 const STATUS_PROBE_TIMEOUT_MS = Math.min(15_000, Math.max(1_000, Number(process.env.AUTOPILOT_STATUS_TIMEOUT_MS || 3_000)));
 const DEFAULT_MAX_PENDING_INFERENCE = Math.min(256, Math.max(1, Number(process.env.AUTOPILOT_AI_MAX_PENDING || 32)));
@@ -74,6 +76,7 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
   }];
   if (entries.length > 16) throw gatewayError('OpenAI-compatible endpoint registry is limited to 16 entries', 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
   const seen = new Set();
+  const seenPinnedCredentialRefs = new Set();
   return Object.freeze(entries.map((item, index) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw gatewayError(`OpenAI-compatible endpoint ${index + 1} must be an object`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
     const extra = Object.keys(item).filter(key => !['endpointId', 'baseUrl', 'apiKeyEnv'].includes(key));
@@ -84,7 +87,22 @@ export function normalizeCompatibleEndpointRegistry(raw = '') {
     seen.add(endpointId);
     const apiKeyEnv = clean(item.apiKeyEnv);
     if (apiKeyEnv && !/^[A-Z_][A-Z0-9_]{0,127}$/.test(apiKeyEnv)) throw gatewayError(`OpenAI-compatible endpoint ${endpointId} has an invalid apiKeyEnv`, 500, 'INVALID_COMPATIBLE_ENDPOINT_REGISTRY');
-    return Object.freeze({ endpointId, baseUrl: normalizeCompatibleBaseUrl(item.baseUrl), apiKeyEnv });
+    const baseUrl = normalizeCompatibleBaseUrl(item.baseUrl);
+    const pinnedCredential = apiKeyEnv ? PINNED_COMPATIBLE_CREDENTIAL_BINDINGS[apiKeyEnv] : null;
+    if (pinnedCredential) {
+      if (endpointId !== pinnedCredential.endpointId || new URL(baseUrl).origin !== pinnedCredential.origin) {
+        throw gatewayError(
+          `Credential ${apiKeyEnv} is pinned to endpoint ${pinnedCredential.endpointId} at ${pinnedCredential.origin}`,
+          500,
+          'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH',
+        );
+      }
+      if (seenPinnedCredentialRefs.has(apiKeyEnv)) {
+        throw gatewayError(`Pinned credential reference is duplicated: ${apiKeyEnv}`, 500, 'AI_COMPATIBLE_CREDENTIAL_BINDING_MISMATCH');
+      }
+      seenPinnedCredentialRefs.add(apiKeyEnv);
+    }
+    return Object.freeze({ endpointId, baseUrl, apiKeyEnv });
   }));
 }
 
@@ -288,6 +306,66 @@ async function readBody(req) {
   return text ? JSON.parse(text) : {};
 }
 
+function upstreamResponseTooLarge() {
+  return gatewayError(
+    `Upstream response exceeds ${MAX_UPSTREAM_RESPONSE_BYTES} bytes`,
+    502,
+    'AI_PROVIDER_RESPONSE_TOO_LARGE',
+  );
+}
+
+async function cancelUpstreamResponse(response, reader, controller) {
+  try {
+    if (reader?.cancel) await reader.cancel('response byte limit exceeded');
+    else if (response?.body?.cancel) await response.body.cancel('response byte limit exceeded');
+  } catch (_) {}
+  try { controller?.abort(); } catch (_) {}
+}
+
+async function readBoundedUpstreamText(response, controller) {
+  const contentLength = clean(response?.headers?.get?.('content-length'));
+  if (/^[0-9]+$/u.test(contentLength) && Number(contentLength) > MAX_UPSTREAM_RESPONSE_BYTES) {
+    await cancelUpstreamResponse(response, null, controller);
+    throw upstreamResponseTooLarge();
+  }
+
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const decoded = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!(value instanceof Uint8Array)) {
+          await cancelUpstreamResponse(response, reader, controller);
+          throw gatewayError('Upstream returned an invalid response body stream', 502, 'AI_PROVIDER_INVALID_RESPONSE');
+        }
+        size += value.byteLength;
+        if (size > MAX_UPSTREAM_RESPONSE_BYTES) {
+          await cancelUpstreamResponse(response, reader, controller);
+          throw upstreamResponseTooLarge();
+        }
+        decoded.push(decoder.decode(value, { stream: true }));
+      }
+      decoded.push(decoder.decode());
+      return decoded.join('');
+    } finally {
+      try { reader.releaseLock(); } catch (_) {}
+    }
+  }
+
+  // Compatibility for deterministic injected fetch shims that expose only text().
+  // Native production fetch responses use the streaming branch above.
+  const text = typeof response?.text === 'function' ? await response.text() : '';
+  if (Buffer.byteLength(text, 'utf8') > MAX_UPSTREAM_RESPONSE_BYTES) {
+    await cancelUpstreamResponse(response, null, controller);
+    throw upstreamResponseTooLarge();
+  }
+  return text;
+}
+
 async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM_TIMEOUT_MS } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -295,8 +373,9 @@ async function fetchJson(fetchFn, url, init = {}, { timeoutMs = DEFAULT_UPSTREAM
   let text;
   try {
     response = await fetchFn(url, { ...init, signal: controller.signal, headers: { accept: 'application/json', ...(init.body ? { 'content-type': 'application/json' } : {}), ...(init.headers || {}) } });
-    text = await response.text();
+    text = await readBoundedUpstreamText(response, controller);
   } catch (error) {
+    if (error?.code === 'AI_PROVIDER_RESPONSE_TOO_LARGE' || error?.code === 'AI_PROVIDER_INVALID_RESPONSE') throw error;
     if (error?.name === 'AbortError') throw gatewayError(`Upstream request timed out after ${Math.ceil(timeoutMs / 1000)} seconds`, 504, 'AI_PROVIDER_TIMEOUT');
     throw gatewayError(`Upstream provider is unavailable: ${clean(error?.message || error).slice(0, 500) || 'network failure'}`, 503, 'AI_PROVIDER_UNAVAILABLE');
   } finally {
@@ -324,8 +403,21 @@ function openAiHeaders() {
 }
 
 function compatibleHeaders(endpoint, env = process.env) {
-  const key = endpoint?.apiKeyEnv ? clean(env[endpoint.apiKeyEnv]) : '';
-  return key ? { authorization: `Bearer ${key}` } : {};
+  const apiKeyEnv = clean(endpoint?.apiKeyEnv);
+  if (!apiKeyEnv) return {};
+  const key = clean(env[apiKeyEnv]);
+  if (!key) {
+    let loopback = false;
+    try { loopback = isLoopbackHostname(new URL(clean(endpoint?.baseUrl)).hostname); }
+    catch (_) {}
+    if (loopback) return {};
+    throw gatewayError(
+      `Credential ${apiKeyEnv} is not configured for OpenAI-compatible endpoint ${clean(endpoint?.endpointId) || 'unknown'}`,
+      428,
+      'AI_PROVIDER_API_KEY_NOT_CONFIGURED',
+    );
+  }
+  return { authorization: `Bearer ${key}` };
 }
 
 function normalizeImageDataUrl(value) {
