@@ -18,3 +18,46 @@ test('DAILY far-future startDate is not truncated by lookahead window', () => { 
 test('revision watermark prevents replay even after bounded identity history prunes old IDs', () => { const schedule = { kind: 'DAILY', startDate: '2026-01-01', times: ['08:00'], timeZone: 'UTC', catchUp: 'ON' }; const now = Date.parse('2026-02-01T10:00:00Z'); let runtime = {}; for (let i = 0; i < 10; i += 1) runtime = commitCalendarOccurrence(runtime, nextCalendarOccurrence({ sessionId: 's', schedule, runtime, now }), { maxHistory: 2 }); const next = nextCalendarOccurrence({ sessionId: 's', schedule, runtime, now }); assert.equal(next.localDate, '2026-01-11'); assert.equal(runtime.committedOccurrenceIds.length, 2); });
 test('explicit occurrence list is sorted and rejects duplicate local occurrence', () => { const schedule = normalizeCalendarSchedule({ kind: 'EXPLICIT', timeZone: 'UTC', occurrences: [{ date: '2026-09-20', time: '09:00' }, { date: '2026-09-19', time: '09:00' }] }); assert.equal(schedule.occurrences[0].date, '2026-09-19'); assert.throws(() => normalizeCalendarSchedule({ kind: 'EXPLICIT', timeZone: 'UTC', occurrences: [{ date: '2026-09-19', time: '09:00' }, { date: '2026-09-19', time: '09:00:00' }] }), /duplicate occurrence/); });
 test('timezone conversion follows DST and rejects spring-forward gaps and fall-back ambiguity', () => { const winter = zonedDateTimeToEpochMs({ date: '2026-01-15', time: '09:00', timeZone: 'Europe/Bratislava' }); const summer = zonedDateTimeToEpochMs({ date: '2026-07-15', time: '09:00', timeZone: 'Europe/Bratislava' }); assert.equal(new Date(winter).toISOString(), '2026-01-15T08:00:00.000Z'); assert.equal(new Date(summer).toISOString(), '2026-07-15T07:00:00.000Z'); assert.throws(() => zonedDateTimeToEpochMs({ date: '2026-03-29', time: '02:30', timeZone: 'Europe/Bratislava' }), /does not exist/); assert.throws(() => zonedDateTimeToEpochMs({ date: '2026-10-25', time: '02:30', timeZone: 'Europe/Bratislava' }), /ambiguous/); assert.throws(() => normalizeCalendarSchedule({ kind: 'EXPLICIT', timeZone: 'Europe/Bratislava', occurrences: [{ date: '2026-10-25', time: '02:30' }] }), /ambiguous/); });
+
+
+test('INTERVAL produces deterministic elapsed-time occurrences from an exact local anchor', () => {
+  const schedule = {
+    kind: 'INTERVAL',
+    timeZone: 'Europe/Bratislava',
+    catchUp: 'OFF',
+    startDate: '2026-09-25',
+    startTime: '04:00',
+    intervalSeconds: 5 * 60 * 60,
+  };
+  const normalized = normalizeCalendarSchedule(schedule);
+  assert.equal(normalized.startTime, '04:00:00');
+  const firstAt = zonedDateTimeToEpochMs({ date: '2026-09-25', time: '04:00', timeZone: 'Europe/Bratislava' });
+  const before = nextCalendarOccurrence({ sessionId: 'interval', schedule, now: firstAt - 1 });
+  assert.equal(before.scheduledAt, firstAt);
+  const later = nextCalendarOccurrence({ sessionId: 'interval', schedule, now: firstAt + 1 });
+  assert.equal(later.scheduledAt, firstAt + 5 * 60 * 60 * 1000);
+  assert.equal(later.catchUp, false);
+});
+
+test('INTERVAL catch-up ON returns each missed occurrence in chronological order', () => {
+  const start = Date.parse('2026-09-25T04:00:00Z');
+  const schedule = { kind: 'INTERVAL', timeZone: 'UTC', catchUp: 'ON', startDate: '2026-09-25', startTime: '04:00', intervalSeconds: 3600 };
+  const now = Date.parse('2026-09-25T07:30:00Z');
+  const first = nextCalendarOccurrence({ sessionId: 'interval', schedule, now });
+  assert.equal(first.scheduledAt, start);
+  assert.equal(first.catchUp, true);
+  const runtime = commitCalendarOccurrence({}, first);
+  const second = nextCalendarOccurrence({ sessionId: 'interval', schedule, runtime, now });
+  assert.equal(second.scheduledAt, start + 3600_000);
+  assert.equal(second.catchUp, true);
+});
+
+test('INTERVAL maxOccurrences exhausts without fabricating another occurrence', () => {
+  const schedule = { kind: 'INTERVAL', timeZone: 'UTC', catchUp: 'ON', startDate: '2026-09-25', startTime: '04:00', intervalSeconds: 60, maxOccurrences: 2 };
+  const now = Date.parse('2026-09-25T05:00:00Z');
+  const first = nextCalendarOccurrence({ sessionId: 'interval', schedule, now });
+  let runtime = commitCalendarOccurrence({}, first);
+  const second = nextCalendarOccurrence({ sessionId: 'interval', schedule, runtime, now });
+  runtime = commitCalendarOccurrence(runtime, second);
+  assert.equal(nextCalendarOccurrence({ sessionId: 'interval', schedule, runtime, now }), null);
+});
