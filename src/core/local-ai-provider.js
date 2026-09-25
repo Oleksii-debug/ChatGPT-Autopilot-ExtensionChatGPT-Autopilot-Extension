@@ -73,6 +73,25 @@ export function normalizeLocalAiBaseUrl(value, providerType = DEFAULT_LOCAL_AI_S
   return parsed.toString().replace(/\/$/, '');
 }
 
+function assertLocalAiRequestUrl(value) {
+  if (typeof value !== 'string' || !value) {
+    throw new Error('Local AI request URL must be text');
+  }
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Local AI request URL is invalid');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)
+      || !LOCAL_HOSTS.has(parsed.hostname.toLowerCase())
+      || parsed.username
+      || parsed.password) {
+    throw new Error('Local AI request URL must stay on localhost or 127.0.0.1 without credentials');
+  }
+  return parsed.toString();
+}
+
 export function normalizeLocalAiSettings(raw = {}) {
   const source = snapshotSettingsRecord(raw);
   const providerType = source.providerType === undefined
@@ -278,13 +297,15 @@ export class LocalAiClient {
 
   async request(settings, url, init = {}, consumeResponse = null) {
     const normalized = normalizeLocalAiSettings(settings);
+    const requestUrl = assertLocalAiRequestUrl(url);
     const controller = new AbortController();
     const timer = this.setTimeoutFn(() => controller.abort(), normalized.timeoutSeconds * 1000);
     let responseReceived = false;
     try {
-      const response = await this.fetchFn(url, {
+      const response = await this.fetchFn(requestUrl, {
         ...init,
         cache: 'no-store',
+        redirect: 'error',
         signal: controller.signal,
         headers: {
           Accept: 'application/json',
