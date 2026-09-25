@@ -65,6 +65,19 @@ test('config rejects accessor-backed authority without executing getter', () => 
   assert.equal(getterReads, 0);
 });
 
+test('config allowlists are descriptor-snapshotted without ordinary array reads', () => {
+  let reads = 0;
+  const users = new Proxy([userId], {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({ allowedGmailUsers: users }));
+  assert.deepEqual(client.allowedGmailUsers, [userId]);
+  assert.equal(reads, 0, 'owner allowlist normalization must not read caller properties');
+});
+
 test('Drive search is root-scoped, bounded, credential-origin-bound and secret-free', async () => {
   const credentialCalls = [];
   const fetchCalls = [];
