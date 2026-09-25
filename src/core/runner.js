@@ -148,6 +148,23 @@ export class DurableSubmissionCoordinator {
     }
 
     const finishedAt = this.now();
+    if (result?.status === InteractionResult.TEMPORARY_ERROR
+      && result?.submissionEvidence === 'PROVEN_NO_EFFECT'
+      && result?.safeDiagnosticCode === 'SEND_TAB_NOT_VISIBLE_BEFORE_EFFECT') {
+      let proven = false;
+      await this.repo.update(draft => {
+        const session = requireSession(draft, sessionId);
+        const operation = requireOperation(session, operationId);
+        if (operation.phase !== OperationPhase.SUBMITTING || operation.nativeSubmitDispatched === true) return draft;
+        operation.phase = OperationPhase.FAILED_SAFE;
+        operation.submitStartedAt = 0;
+        operation.updatedAt = finishedAt;
+        applyInteractionResult(session, taskIndexForOperation(session, operation), result, { now:finishedAt });
+        proven = true;
+        return draft;
+      });
+      if (proven) return result;
+    }
     if (result?.status !== InteractionResult.SENT_VERIFIED) {
       submitDiagnosticCode ||= result?.safeDiagnosticCode || '';
       await this.repo.update(draft => {

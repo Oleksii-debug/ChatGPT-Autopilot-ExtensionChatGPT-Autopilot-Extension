@@ -114,17 +114,26 @@ function sensitivity(value, label = 'dataSensitivity') {
 
 function strictArray(value, label, { optional = false, max = MAX_LIST } = {}) {
   if (value == null && optional) return [];
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
   const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
       throw new Error(`${label} contains an invalid array property`);
     }
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length) {
       throw new Error(`${label} contains an invalid array index`);
     }
     const descriptor = descriptors[key];
@@ -133,7 +142,7 @@ function strictArray(value, label, { optional = false, max = MAX_LIST } = {}) {
     }
   }
   const out = [];
-  for (let index = 0; index < value.length; index += 1) {
+  for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} must not be sparse`);

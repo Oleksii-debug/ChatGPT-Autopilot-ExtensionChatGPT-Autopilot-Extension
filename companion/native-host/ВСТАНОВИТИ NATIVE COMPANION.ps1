@@ -16,6 +16,7 @@ $copyNames = @(
   'host.mjs',
   'host-core.mjs',
   'filesystem-provider.mjs',
+  'filesystem-host-provider.mjs',
   'credential-broker.mjs',
   'mcp-stdio-bridge.mjs',
   'windows-provider.mjs',
