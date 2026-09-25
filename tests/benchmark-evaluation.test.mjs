@@ -722,3 +722,32 @@ test('caller run identity and interval must match separately trusted execution p
   );
 });
 
+test('benchmark array boundaries consume descriptor snapshots without ordinary Proxy reads', () => {
+  let reads = 0;
+  const trackReads = target => new Proxy(target, {
+    get(object, property, receiver) {
+      reads += 1;
+      return Reflect.get(object, property, receiver);
+    },
+  });
+
+  const suiteInput = suite();
+  suiteInput.cases = trackReads(suiteInput.cases);
+  const normalizedSuite = normalizeBenchmarkSuiteV1(suiteInput);
+  assert.equal(normalizedSuite.cases.length, 2);
+  assert.equal(reads, 0, 'suite cases must not perform ordinary caller reads');
+
+  reads = 0;
+  const runInput = run();
+  runInput.results = trackReads(runInput.results);
+  const evidence = trackReads(trustedEvidenceArtifacts());
+  const report = evaluateBenchmarkRunV1({
+    suite: suite(),
+    run: runInput,
+    expectedSubject,
+    trustedEvidenceArtifacts: evidence,
+  });
+  assert.equal(report.status, BenchmarkEvaluationStatus.PASS);
+  assert.equal(reads, 0, 'run results and trusted evidence arrays must not perform ordinary caller reads');
+});
+
