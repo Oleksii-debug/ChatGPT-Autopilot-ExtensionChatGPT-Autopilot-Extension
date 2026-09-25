@@ -44,7 +44,10 @@ const RESULT_KEYS = new Set([
   'caseId', 'outcome', 'metrics', 'evidenceArtifactIds', 'reasonCode',
 ]);
 const SUBJECT_KEYS = new Set(['subjectId', 'subjectRevisionId']);
-const EXECUTION_KEYS = new Set(['runId', 'producerInvocationId', 'startedAt', 'completedAt']);
+const EXECUTION_KEYS = new Set([
+  'runId', 'suiteId', 'suiteRevisionId', 'subjectId', 'subjectRevisionId',
+  'producerInvocationId', 'startedAt', 'completedAt', 'results',
+]);
 const EVALUATION_REQUEST_KEYS = new Set([
   'suite', 'run', 'expectedSubject', 'trustedExecution', 'trustedEvidenceArtifacts',
 ]);
@@ -348,6 +351,51 @@ function normalizeCaseResult(input, suiteCase, trustedEvidenceById, trustedExecu
   });
 }
 
+function normalizeResultSet(input, suite, trustedEvidenceById, trustedExecution, label) {
+  const rawResults = denseArray(input, label, {
+    min: suite.cases.length,
+    max: suite.cases.length,
+  });
+  const byCase = new Map();
+  for (let index = 0; index < rawResults.length; index += 1) {
+    const itemLabel = label + '[' + index + ']';
+    const raw = record(rawResults[index], itemLabel);
+    exactKeys(raw, RESULT_KEYS, itemLabel);
+    const caseId = id(raw.caseId, itemLabel + ' caseId');
+    if (byCase.has(caseId)) throw new Error(label + ' contains duplicate case result: ' + caseId);
+    byCase.set(caseId, raw);
+  }
+
+  const suiteCaseIds = new Set(suite.cases.map((item) => item.caseId));
+  for (const caseId of byCase.keys()) {
+    if (!suiteCaseIds.has(caseId)) throw new Error(label + ' contains unknown case result: ' + caseId);
+  }
+
+  const normalized = [];
+  for (const suiteCase of suite.cases) {
+    if (!byCase.has(suiteCase.caseId)) {
+      throw new Error(label + ' is missing case result: ' + suiteCase.caseId);
+    }
+    normalized.push(normalizeCaseResult(
+      byCase.get(suiteCase.caseId),
+      suiteCase,
+      trustedEvidenceById,
+      trustedExecution,
+    ));
+  }
+  return Object.freeze(normalized);
+}
+
+function canonicalCaseResult(value) {
+  return JSON.stringify([
+    value.caseId,
+    value.outcome,
+    value.reasonCode,
+    Object.entries(value.metrics),
+    value.evidenceArtifactIds,
+  ]);
+}
+
 function assertionPasses(operator, observed, threshold) {
   if (operator === BenchmarkAssertionOperator.AT_LEAST) return observed >= threshold;
   if (operator === BenchmarkAssertionOperator.AT_MOST) return observed <= threshold;
@@ -375,6 +423,24 @@ export function evaluateBenchmarkRunV1(input = {}) {
   const execution = record(trustedExecution, 'TrustedBenchmarkExecutionV1');
   exactKeys(execution, EXECUTION_KEYS, 'TrustedBenchmarkExecutionV1');
   const trustedRunId = id(execution.runId, 'TrustedBenchmarkExecutionV1 runId');
+  const trustedSuiteId = id(execution.suiteId, 'TrustedBenchmarkExecutionV1 suiteId');
+  const trustedSuiteRevisionId = id(
+    execution.suiteRevisionId,
+    'TrustedBenchmarkExecutionV1 suiteRevisionId',
+  );
+  if (trustedSuiteId !== normalizedSuite.suiteId
+    || trustedSuiteRevisionId !== normalizedSuite.suiteRevisionId) {
+    throw new Error('TrustedBenchmarkExecutionV1 suite identity/revision mismatch');
+  }
+  const trustedSubjectId = id(execution.subjectId, 'TrustedBenchmarkExecutionV1 subjectId');
+  const trustedSubjectRevisionId = id(
+    execution.subjectRevisionId,
+    'TrustedBenchmarkExecutionV1 subjectRevisionId',
+  );
+  if (trustedSubjectId !== expectedSubjectId
+    || trustedSubjectRevisionId !== expectedSubjectRevisionId) {
+    throw new Error('TrustedBenchmarkExecutionV1 subject identity/revision mismatch');
+  }
   const trustedProducerInvocationId = id(
     execution.producerInvocationId,
     'TrustedBenchmarkExecutionV1 producerInvocationId',
@@ -392,11 +458,22 @@ export function evaluateBenchmarkRunV1(input = {}) {
   }
   const normalizedTrustedExecution = freeze({
     runId: trustedRunId,
+    suiteId: trustedSuiteId,
+    suiteRevisionId: trustedSuiteRevisionId,
+    subjectId: trustedSubjectId,
+    subjectRevisionId: trustedSubjectRevisionId,
     producerInvocationId: trustedProducerInvocationId,
     startedAt: trustedStartedAt,
     completedAt: trustedCompletedAt,
   });
   const trustedEvidenceById = normalizeTrustedEvidenceArtifacts(trustedEvidenceArtifacts);
+  const trustedResults = normalizeResultSet(
+    execution.results,
+    normalizedSuite,
+    trustedEvidenceById,
+    normalizedTrustedExecution,
+    'TrustedBenchmarkExecutionV1 results',
+  );
 
   const rawRun = record(run, 'BenchmarkRunV1');
   exactKeys(rawRun, RUN_KEYS, 'BenchmarkRunV1');
@@ -428,38 +505,28 @@ export function evaluateBenchmarkRunV1(input = {}) {
     throw new Error('BenchmarkRunV1 execution identity/time does not match trusted execution');
   }
 
-  const rawResults = denseArray(rawRun.results, 'BenchmarkRunV1 results', {
-    min: normalizedSuite.cases.length,
-    max: normalizedSuite.cases.length,
-  });
-  const byCase = new Map();
-  for (let index = 0; index < rawResults.length; index += 1) {
-    const raw = record(rawResults[index], 'BenchmarkRunV1 result[' + index + ']');
-    const caseId = id(raw.caseId, 'BenchmarkRunV1 result[' + index + '] caseId');
-    if (byCase.has(caseId)) throw new Error('BenchmarkRunV1 contains duplicate case result: ' + caseId);
-    byCase.set(caseId, raw);
-  }
-
-  const suiteCaseIds = new Set(normalizedSuite.cases.map((item) => item.caseId));
-  for (const caseId of byCase.keys()) {
-    if (!suiteCaseIds.has(caseId)) throw new Error('BenchmarkRunV1 contains unknown case result: ' + caseId);
-  }
-  for (const suiteCase of normalizedSuite.cases) {
-    if (!byCase.has(suiteCase.caseId)) {
-      throw new Error('BenchmarkRunV1 is missing case result: ' + suiteCase.caseId);
+  const runResults = normalizeResultSet(
+    rawRun.results,
+    normalizedSuite,
+    trustedEvidenceById,
+    normalizedTrustedExecution,
+    'BenchmarkRunV1 results',
+  );
+  for (let index = 0; index < runResults.length; index += 1) {
+    if (canonicalCaseResult(runResults[index]) !== canonicalCaseResult(trustedResults[index])) {
+      throw new Error(
+        'BenchmarkRunV1 results do not match trusted benchmark execution: '
+          + normalizedSuite.cases[index].caseId,
+      );
     }
   }
 
   const evaluatedResults = [];
   let passedCaseCount = 0;
 
-  for (const suiteCase of normalizedSuite.cases) {
-    const result = normalizeCaseResult(
-      byCase.get(suiteCase.caseId),
-      suiteCase,
-      trustedEvidenceById,
-      normalizedTrustedExecution,
-    );
+  for (let caseIndex = 0; caseIndex < normalizedSuite.cases.length; caseIndex += 1) {
+    const suiteCase = normalizedSuite.cases[caseIndex];
+    const result = trustedResults[caseIndex];
     const assertionResults = [];
 
     if (result.outcome === BenchmarkCaseOutcome.MEASURED) {
