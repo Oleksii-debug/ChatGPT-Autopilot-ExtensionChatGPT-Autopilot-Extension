@@ -16,6 +16,8 @@ import {
 function definition(canaryId, capabilityId, overrides = {}) {
   return {
     schemaVersion:1,
+    definitionRevisionId:'def-1',
+    definitionSha256:'a'.repeat(64),
     canaryId,
     providerId:'github/main',
     capabilityId,
@@ -32,6 +34,8 @@ function definition(canaryId, capabilityId, overrides = {}) {
 function observation(observationId, canaryId, capabilityId, status = 'PASS', overrides = {}) {
   return {
     schemaVersion:1,
+    definitionRevisionId:'def-1',
+    definitionSha256:'a'.repeat(64),
     observationId,
     canaryId,
     providerId:'github/main',
@@ -87,6 +91,8 @@ test('probe plan is closed-kind, read-only and never authorizes destructive or e
   });
   assert.equal(plan.executionAuthorized, false);
   assert.deepEqual(plan.probes.map(item => item.canaryId), ['github.read', 'native.health']);
+  assert.equal(plan.probes[0].definitionRevisionId, 'def-1');
+  assert.equal(plan.probes[0].definitionSha256, 'a'.repeat(64));
   for (const probe of plan.probes) {
     assert.equal(probe.readOnly, true);
     assert.equal(probe.destructiveAllowed, false);
@@ -208,6 +214,27 @@ test('mismatched, unknown, future and duplicate evidence fails closed', () => {
   assert.throws(() => evaluate([def], [duplicate, duplicate]), /duplicate observationId/);
 });
 
+test('old observations cannot satisfy a changed canary definition under the same canaryId', () => {
+  const oldObservation = observation('old.pass', 'github.read', 'github.read', 'PASS');
+
+  const changedProbe = definition('github.read', 'github.read', {
+    requiredPasses:1,
+    probeKind:ProviderCanaryProbeKind.NATIVE_HEALTH,
+    definitionRevisionId:'def-2',
+    definitionSha256:'b'.repeat(64),
+  });
+  assert.throws(() => evaluate([changedProbe], [oldObservation]), /definition identity does not match/);
+
+  const changedThresholds = definition('github.read', 'github.read', {
+    requiredPasses:1,
+    failureThreshold:3,
+    critical:false,
+    definitionRevisionId:'def-3',
+    definitionSha256:'c'.repeat(64),
+  });
+  assert.throws(() => evaluate([changedThresholds], [oldObservation]), /definition identity does not match/);
+});
+
 test('definitions must match canonical current provider identity', () => {
   assert.throws(() => evaluate([
     definition('other', 'github.read', { providerId:'github/other' }),
@@ -235,6 +262,10 @@ test('closed probe/status enums and canonical identities reject coercive aliases
   assert.throws(() => normalizeProviderCanaryDefinitionV1(
     definition(' x', 'github.read'),
   ), /exact canonical identity/);
+
+  assert.throws(() => normalizeProviderCanaryDefinitionV1(
+    definition('x', 'github.read', { definitionSha256:'A'.repeat(64) }),
+  ), /exact lowercase SHA-256/);
 
   assert.throws(() => normalizeProviderCanaryObservationV1(
     observation('x', 'github.read', 'github.read', 'pass'),

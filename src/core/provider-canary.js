@@ -26,6 +26,7 @@ export const ProviderCanaryObservationStatus = Object.freeze({
 const PROBE_KINDS = new Set(Object.values(ProviderCanaryProbeKind));
 const OBSERVATION_STATUSES = new Set(Object.values(ProviderCanaryObservationStatus));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_DEFINITIONS = 128;
 const MAX_OBSERVATIONS = 2048;
 const MAX_LATENCY_MS = 10 * 60_000;
@@ -78,6 +79,13 @@ function version(value, label) {
 function exactId(value, label) {
   if (typeof value !== 'string' || value !== value.trim() || !ID.test(value)) {
     throw new Error(`${label} must use exact canonical identity representation`);
+  }
+  return value;
+}
+
+function digest(value, label) {
+  if (typeof value !== 'string' || !SHA256.test(value)) {
+    throw new Error(`${label} must be an exact lowercase SHA-256 digest`);
   }
   return value;
 }
@@ -168,6 +176,8 @@ function asciiCompare(a, b) {
 
 const DEFINITION_KEYS = new Set([
   'schemaVersion',
+  'definitionRevisionId',
+  'definitionSha256',
   'canaryId',
   'providerId',
   'capabilityId',
@@ -184,6 +194,8 @@ export function normalizeProviderCanaryDefinitionV1(input) {
   exactKeys(raw, DEFINITION_KEYS, 'ProviderCanaryDefinitionV1');
   return deepFreeze({
     schemaVersion: version(raw.schemaVersion, 'ProviderCanaryDefinitionV1'),
+    definitionRevisionId: exactId(raw.definitionRevisionId, 'definitionRevisionId'),
+    definitionSha256: digest(raw.definitionSha256, 'definitionSha256'),
     canaryId: exactId(raw.canaryId, 'canaryId'),
     providerId: exactId(raw.providerId, 'providerId'),
     capabilityId: exactId(raw.capabilityId, 'capabilityId'),
@@ -203,6 +215,8 @@ export function normalizeProviderCanaryDefinitionV1(input) {
 
 const OBSERVATION_KEYS = new Set([
   'schemaVersion',
+  'definitionRevisionId',
+  'definitionSha256',
   'observationId',
   'canaryId',
   'providerId',
@@ -218,6 +232,8 @@ export function normalizeProviderCanaryObservationV1(input) {
   exactKeys(raw, OBSERVATION_KEYS, 'ProviderCanaryObservationV1');
   return deepFreeze({
     schemaVersion: version(raw.schemaVersion, 'ProviderCanaryObservationV1'),
+    definitionRevisionId: exactId(raw.definitionRevisionId, 'definitionRevisionId'),
+    definitionSha256: digest(raw.definitionSha256, 'definitionSha256'),
     observationId: exactId(raw.observationId, 'observationId'),
     canaryId: exactId(raw.canaryId, 'canaryId'),
     providerId: exactId(raw.providerId, 'providerId'),
@@ -270,6 +286,8 @@ export function buildProviderCanaryProbePlanV1(input) {
     schemaVersion: ProviderCanaryContractVersion,
     asOf,
     probes: definitions.map(definition => deepFreeze({
+      definitionRevisionId: definition.definitionRevisionId,
+      definitionSha256: definition.definitionSha256,
       canaryId: definition.canaryId,
       providerId: definition.providerId,
       capabilityId: definition.capabilityId,
@@ -293,13 +311,19 @@ function evaluateCanary(definition, observations, asOfMs) {
   const matching = observations.filter(observation =>
     observation.canaryId === definition.canaryId
       && observation.providerId === definition.providerId
-      && observation.capabilityId === definition.capabilityId);
+      && observation.capabilityId === definition.capabilityId
+      && observation.definitionRevisionId === definition.definitionRevisionId
+      && observation.definitionSha256 === definition.definitionSha256);
 
   for (const observation of observations) {
     if (observation.canaryId !== definition.canaryId) continue;
     if (observation.providerId !== definition.providerId
         || observation.capabilityId !== definition.capabilityId) {
       throw new Error(`observation ${observation.observationId} identity does not match canary definition`);
+    }
+    if (observation.definitionRevisionId !== definition.definitionRevisionId
+        || observation.definitionSha256 !== definition.definitionSha256) {
+      throw new Error(`observation ${observation.observationId} definition identity does not match canary definition`);
     }
   }
 
@@ -318,6 +342,8 @@ function evaluateCanary(definition, observations, asOfMs) {
 
   if (!fresh.length) {
     return deepFreeze({
+      definitionRevisionId: definition.definitionRevisionId,
+      definitionSha256: definition.definitionSha256,
       canaryId: definition.canaryId,
       capabilityId: definition.capabilityId,
       critical: definition.critical,
@@ -359,6 +385,8 @@ function evaluateCanary(definition, observations, asOfMs) {
   }
 
   return deepFreeze({
+    definitionRevisionId: definition.definitionRevisionId,
+    definitionSha256: definition.definitionSha256,
     canaryId: definition.canaryId,
     capabilityId: definition.capabilityId,
     critical: definition.critical,
