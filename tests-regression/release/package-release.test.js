@@ -130,6 +130,30 @@ test('release fails closed on NUL bytes in packaged text sources', async t => {
 });
 
 
+test('release fails closed on NUL bytes in packaged YAML text sources', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-yaml-nul-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const yamlPath = path.join(fixtureRoot, 'src', 'benign-config.yaml');
+  await fs.writeFile(
+    yamlPath,
+    Buffer.concat([
+      Buffer.from('fixture: true\ncomment: harmless-prefix\n', 'utf8'),
+      Buffer.from([0]),
+      Buffer.from('sk-example-secret-material-abcdefghijklmnopqrstuvwxyz\n', 'utf8'),
+    ]),
+  );
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /NUL byte found in packaged text source: src\/benign-config\.yaml/,
+  );
+});
+
+
 test('release rejects common credential data filenames even when their contents look benign', async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-credential-files-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
