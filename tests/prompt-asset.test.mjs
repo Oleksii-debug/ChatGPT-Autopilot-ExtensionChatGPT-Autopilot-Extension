@@ -445,6 +445,48 @@ test('prompt asset record boundaries snapshot descriptors before ordinary caller
   assert.equal(rendered.cadenceComparison.authority, 'UNVERIFIED_INPUT');
 });
 
+test('nested prompt authority records consume descriptor snapshots without ordinary Proxy reads', () => {
+  let reads = 0;
+  const proxy = value => new Proxy(value, {
+    get(target, property, receiver) {
+      reads += 1;
+      if (property === 'name') return 'swapped-name';
+      if (property === 'sourceId') return 'swapped-source';
+      if (property === 'mode') return PromptAssetCadenceMode.EVENT;
+      if (property === 'credentialId') return 'swapped-credential';
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalized = normalizePromptAssetV1(asset({
+    variables: [proxy({ name: 'target', required: true, maxChars: 400, defaultValue: null, sensitive: false })],
+    sourceBindings: [proxy(source())],
+    cadence: proxy({ mode: PromptAssetCadenceMode.MANUAL, referenceId: null }),
+    template: 'Use {{target}}',
+  }));
+  assert.equal(reads, 0, 'nested variable/source/cadence records must not perform ordinary Proxy reads');
+  assert.equal(normalized.variables[0].name, 'target');
+  assert.equal(normalized.sourceBindings[0].sourceId, 'spec');
+  assert.equal(normalized.cadence.mode, PromptAssetCadenceMode.MANUAL);
+
+  const secretAsset = normalizePromptAssetV1(asset({
+    template: 'Use {{secret}}',
+    variables: [{ name: 'secret', required: true, maxChars: 200, defaultValue: null, sensitive: true }],
+  }));
+  const rendered = renderPromptAssetV1(secretAsset, {
+    values: {
+      secret: proxy({ schemaVersion: 1, brokerId: 'native-companion', credentialId: 'ais-main' }),
+    },
+    sourceBindingAssertions: [source()],
+  });
+  assert.equal(reads, 0, 'nested sensitive credential references must not perform ordinary Proxy reads');
+  assert.deepEqual(rendered.sensitiveBindings, [{
+    variableName: 'secret',
+    credentialRef: { schemaVersion: 1, brokerId: 'native-companion', credentialId: 'ais-main' },
+  }]);
+  assert.equal(rendered.executionAuthorized, false);
+});
+
 test('authority-bearing prompt asset arrays reject accessors before reading values', () => {
   for (const field of ['variables', 'sourceBindings']) {
     let reads = 0;
