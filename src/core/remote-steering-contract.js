@@ -21,7 +21,7 @@ const ACTIONS = new Set(Object.values(RemoteSteeringAction));
 const REDIRECT_KINDS = new Set(Object.values(RemoteSteeringRedirectKind));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
-const REQUEST_KEYS = new Set(['command', 'currentSnapshot', 'assessmentAt']);
+const REQUEST_KEYS = new Set(['command', 'assessmentAt']);
 const COMMAND_KEYS = new Set([
   'schemaVersion',
   'commandId',
@@ -48,7 +48,7 @@ const SNAPSHOT_KEYS = new Set([
   'observedAt',
 ]);
 const REDIRECT_KEYS = new Set(['kind', 'targetId']);
-const OPTIONS_KEYS = new Set(['cryptoApi']);
+const OPTIONS_KEYS = new Set(['cryptoApi', 'resolveCurrentSnapshot']);
 
 function snapshotRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -205,13 +205,18 @@ function normalizeCurrentSnapshot(value) {
   });
 }
 
-function resolveCryptoApi(options) {
-  if (options === undefined) return globalThis.crypto;
-  const raw = snapshotRecord(options, 'RemoteSteering assessment options', OPTIONS_KEYS);
-  if (!Object.hasOwn(raw, 'cryptoApi')) {
-    throw new Error('RemoteSteering assessment options must contain cryptoApi when supplied');
+function normalizeOptions(options) {
+  if (options === undefined) {
+    throw new Error('remote steering requires a trusted current-state resolver');
   }
-  return raw.cryptoApi;
+  const raw = snapshotRecord(options, 'RemoteSteering assessment options', OPTIONS_KEYS);
+  if (typeof raw.resolveCurrentSnapshot !== 'function') {
+    throw new Error('remote steering requires a trusted current-state resolver');
+  }
+  return Object.freeze({
+    cryptoApi: Object.hasOwn(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto,
+    resolveCurrentSnapshot: raw.resolveCurrentSnapshot,
+  });
 }
 
 function assertExactCurrentBinding(command, snapshot) {
@@ -276,31 +281,38 @@ function canonicalFingerprintInput(command) {
 }
 
 /**
- * Validates a remote steering proposal against a freshly materialized durable
- * job/plan snapshot. This function is deliberately non-authorizing: callers
- * must re-evaluate policy and state in the canonical runtime before mutating
- * PAUSE/RESUME/STOP/RECONCILE/REDIRECT state.
+ * Validates a remote steering proposal against state independently resolved
+ * through the canonical durable-state boundary. This function is deliberately
+ * non-authorizing: source identity is still an unverified reference and the
+ * canonical runtime must authenticate the principal, re-evaluate policy,
+ * deduplicate the command, and recheck state before any mutation.
  */
 export async function assessRemoteSteeringCommandV1(input, options = undefined) {
   const request = snapshotRecord(input, 'RemoteSteeringAssessmentRequestV1', REQUEST_KEYS);
   const command = normalizeCommand(request.command);
-  const currentSnapshot = normalizeCurrentSnapshot(request.currentSnapshot);
   const assessmentAt = requireTimestamp(
     request.assessmentAt,
     'RemoteSteeringAssessmentRequestV1 assessmentAt',
   );
+  const trusted = normalizeOptions(options);
+
+  const resolvedSnapshot = await trusted.resolveCurrentSnapshot(Object.freeze({
+    jobId: command.jobId,
+    planId: command.planId,
+  }));
+  const currentSnapshot = normalizeCurrentSnapshot(resolvedSnapshot);
 
   assertExactCurrentBinding(command, currentSnapshot);
   assertChronology(command, currentSnapshot, assessmentAt);
 
   const commandFingerprint = await createSha256FingerprintV1(
     canonicalFingerprintInput(command),
-    { cryptoApi: resolveCryptoApi(options) },
+    { cryptoApi: trusted.cryptoApi },
   );
 
   return Object.freeze({
     schemaVersion: REMOTE_STEERING_SCHEMA_VERSION,
-    status: 'READY_FOR_CANONICAL_RUNTIME_EVALUATION',
+    status: 'READY_FOR_CANONICAL_AUTHORIZATION',
     commandFingerprint,
     commandId: command.commandId,
     action: command.action,
@@ -316,12 +328,17 @@ export async function assessRemoteSteeringCommandV1(input, options = undefined) 
     expiresAt: command.expiresAt,
     assessmentAt,
     redirectTarget: command.redirectTarget,
+    trustedCurrentStateBound: true,
+    sourceIdentityAuthority: 'UNVERIFIED_REFERENCE',
+    sourceAuthenticated: false,
     advisoryOnly: true,
     executionAuthorized: false,
     mutationAuthorized: false,
     credentialUseAuthorized: false,
     policyDecisionGranted: false,
+    requiresCanonicalPrincipalAuthentication: true,
     requiresCanonicalRuntime: true,
+    requiresCanonicalCommandDeduplication: true,
     requiresFreshPolicy: true,
     requiresFreshStateRecheck: true,
   });
