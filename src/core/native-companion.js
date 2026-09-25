@@ -5,7 +5,7 @@ export const NativeCompanionRequestType = Object.freeze({
   HELLO: 'hello', HEALTH: 'health', CAPABILITIES: 'capabilities', FILESYSTEM_READ_TEXT: 'filesystem.readText',
   FILESYSTEM_SEARCH: 'filesystem.search', FILESYSTEM_LIST: 'filesystem.list', FILESYSTEM_STAT: 'filesystem.stat', FILESYSTEM_WRITE_EXISTING_TEXT: 'filesystem.writeExistingText',
   CREDENTIALS_LIST: 'credentials.list', CREDENTIALS_RESOLVE: 'credentials.resolve', MCP_REQUEST: 'mcp.request', MCP_CLOSE: 'mcp.close',
-  WINDOWS_EXEC_PINNED: 'windows.execPinned', WINDOWS_UIA_QUERY: 'windows.uia.query',
+  WINDOWS_EXEC_PINNED: 'windows.execPinned', WINDOWS_UIA_QUERY: 'windows.uia.query', WINDOWS_UIA_INVOKE: 'windows.uia.invoke',
 });
 const REQUEST_TYPES = new Set(Object.values(NativeCompanionRequestType));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -29,6 +29,6 @@ export class NativeCompanionClient{
  writeExistingText({rootId,relativePath,text,expectedSha256}={}){return this.send(NativeCompanionRequestType.FILESYSTEM_WRITE_EXISTING_TEXT,{rootId:clean(rootId,128),relativePath:typeof relativePath==='string'?relativePath:'',text:typeof text==='string'?text:'',expectedSha256:clean(expectedSha256,64).toLowerCase()});}
  listCredentials({targetOrigin}={}){return this.send(NativeCompanionRequestType.CREDENTIALS_LIST,{targetOrigin:clean(targetOrigin,2048)});} resolveCredential({credentialId,targetOrigin}={}){return this.send(NativeCompanionRequestType.CREDENTIALS_RESOLVE,{credentialId:clean(credentialId,128),targetOrigin:clean(targetOrigin,2048)});}
  mcpRequest(payload){return this.send(NativeCompanionRequestType.MCP_REQUEST,payload);} mcpClose(commandId){return this.send(NativeCompanionRequestType.MCP_CLOSE,{commandId});}
- windowsExecPinned(payload){return this.send(NativeCompanionRequestType.WINDOWS_EXEC_PINNED,payload);} windowsQueryUia(payload){return this.send(NativeCompanionRequestType.WINDOWS_UIA_QUERY,payload);}
+ windowsExecPinned(payload){return this.send(NativeCompanionRequestType.WINDOWS_EXEC_PINNED,payload);} windowsQueryUia(payload){return this.send(NativeCompanionRequestType.WINDOWS_UIA_QUERY,payload);} windowsInvokeUia(payload){return this.send(NativeCompanionRequestType.WINDOWS_UIA_INVOKE,payload);}
 }
 export function createNativeMcpTransportFactory(nativeClient){return async(server)=>({request:async(method,params,meta={})=>nativeClient.mcpRequest({commandId:server.commandId,method,params,timeoutMs:meta.timeoutMs??server.timeoutMs,invocationId:meta.invocationId??''}),notify:async(method,params,meta={})=>nativeClient.mcpRequest({commandId:server.commandId,method,params,timeoutMs:meta.timeoutMs??server.timeoutMs,notification:true}),close:async()=>{await nativeClient.mcpClose(server.commandId);}});}
