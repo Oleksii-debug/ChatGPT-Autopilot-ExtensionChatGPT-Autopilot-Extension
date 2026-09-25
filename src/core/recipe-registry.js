@@ -645,6 +645,10 @@ export async function assertRecipePromotionAuthorizedV1(
   { cryptoApi = globalThis.crypto } = {},
 ) {
   const recipe = normalizeRecipeDefinitionV1(recipeInput);
+  if (recipe.lifecycle !== RecipeLifecycleState.PROMOTED) throw new Error('recipe is not PROMOTED');
+  if (recipe.qualification.status !== RecipeQualificationStatus.PASS) {
+    throw new Error('recipe qualification is not PASS');
+  }
   const trusted = normalizeTrustedBenchmarkEvaluationV1(trustedEvaluationInput);
   return assertNormalizedRecipePromotionAuthorizedV1(recipe, trusted, { cryptoApi });
 }
@@ -700,6 +704,18 @@ export function assessRecipeSourceFreshnessV1(recipeInput, currentSourceBindings
   });
 }
 
+function assertNormalizedRecipeSourceFreshnessV1(
+  recipe,
+  currentSourceBindingsInput,
+) {
+  const freshness = assessRecipeSourceFreshnessV1(recipe, currentSourceBindingsInput);
+  if (freshness.status !== RecipeFreshnessStatus.FRESH) {
+    const evidence = freshness.drift.map(item => `${item.sourceId}:${item.reason}`).join(', ');
+    throw new Error(`recipe source binding is stale: ${evidence}`);
+  }
+  return recipe;
+}
+
 export async function assertRecipeReplayEligibleV1(
   recipeInput,
   currentSourceBindingsInput,
@@ -711,12 +727,7 @@ export async function assertRecipeReplayEligibleV1(
     trustedEvaluationInput,
     { cryptoApi },
   );
-  const freshness = assessRecipeSourceFreshnessV1(recipe, currentSourceBindingsInput);
-  if (freshness.status !== RecipeFreshnessStatus.FRESH) {
-    const evidence = freshness.drift.map(item => `${item.sourceId}:${item.reason}`).join(', ');
-    throw new Error(`recipe source binding is stale: ${evidence}`);
-  }
-  return recipe;
+  return assertNormalizedRecipeSourceFreshnessV1(recipe, currentSourceBindingsInput);
 }
 
 export async function resolveReplayEligibleRecipeV1(
@@ -726,7 +737,6 @@ export async function resolveReplayEligibleRecipeV1(
   trustedEvaluationsInput = [],
   { cryptoApi = globalThis.crypto } = {},
 ) {
-  const trustedByRunId = normalizeTrustedBenchmarkEvaluationsV1(trustedEvaluationsInput);
   const recipe = await resolvePromotedRecipeV1(
     registryInput,
     recipeIdInput,
@@ -734,14 +744,7 @@ export async function resolveReplayEligibleRecipeV1(
     { cryptoApi },
   );
   if (!recipe) throw new Error('recipe has no active trusted PROMOTED version');
-  const trusted = trustedByRunId.get(recipe.qualification.evaluationId);
-  if (!trusted) throw new Error('recipe trusted evaluation is unavailable');
-  return assertRecipeReplayEligibleV1(
-    recipe,
-    currentSourceBindingsInput,
-    trusted,
-    { cryptoApi },
-  );
+  return assertNormalizedRecipeSourceFreshnessV1(recipe, currentSourceBindingsInput);
 }
 
 export function recipeRequiredCapabilityIdsV1(recipeInput) {
