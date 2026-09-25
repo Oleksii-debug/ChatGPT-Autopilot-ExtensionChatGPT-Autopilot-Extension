@@ -261,6 +261,7 @@ test('requires exact VERIFIED signature including signature artifact binding', a
         scheme: query.scheme,
         keyId: query.keyId,
         signatureArtifactId: query.signatureArtifactId,
+        signatureArtifactSha256: query.signatureArtifactSha256,
         signedSha256: query.signedSha256,
         status: 'VERIFIED',
         verifiedAt: T2,
