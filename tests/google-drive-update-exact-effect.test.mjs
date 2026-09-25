@@ -100,6 +100,7 @@ function workspace({ onUpdate } = {}) {
     getGmailThread: async () => ({}),
     getGmailAttachment: async () => ({}),
     createGmailDraft: async () => ({}),
+    sendGmailDraft: async () => ({}),
     get updateCalls() { return updateCalls; },
   };
   return api;
