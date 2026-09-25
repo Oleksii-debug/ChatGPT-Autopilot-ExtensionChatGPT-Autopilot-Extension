@@ -841,6 +841,7 @@ export class BrowserAgentManager {
     const runtime = job.runtime;
     const reservation = normalizeModelBudgetReservation(runtime.modelBudgetReservation);
     const reservedCalls = reservation?.modelCalls || 0;
+    const reservedInput = reservation?.inputTokens || 0;
     const reservedOutput = reservation?.outputTokens || 0;
     const reservedTotal = reservation?.totalTokens || 0;
     const reservedCost = reservation?.estimatedCostUsd || 0;
