@@ -116,7 +116,8 @@ export function normalizeLocalAiSettings(raw = {}) {
       || timeoutSeconds > MAX_TIMEOUT_SECONDS) {
     throw new Error(`Local AI timeout must be a whole number from ${MIN_TIMEOUT_SECONDS} to ${MAX_TIMEOUT_SECONDS} seconds`);
   }
-  const model = nonEmptyString(source.model);
+  const model = source.model ?? '';
+  if (model !== model.trim()) throw new Error('Local AI model must use exact trimmed spelling');
   if (model.length > 300) throw new Error('Local AI model name is too long');
   return {
     enabled: source.enabled === true,
@@ -331,7 +332,8 @@ export class LocalAiClient {
   async listModels(rawSettings) {
     const settings = normalizeLocalAiSettings(rawSettings);
     const body = await this.request(settings, endpointFor(settings, 'models'), {}, readJsonResponse);
-    const models = [...new Set(modelNamesFromResponse(settings, body))].sort((a, b) => a.localeCompare(b));
+    const models = [...new Set(modelNamesFromResponse(settings, body))]
+      .sort((a, b) => (a < b ? -1 : (a > b ? 1 : 0)));
     return {
       ok: true,
       providerType: settings.providerType,
