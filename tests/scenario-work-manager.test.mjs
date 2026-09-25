@@ -78,6 +78,48 @@ test('manager preserves a valid persisted scenario while omitting an invalid sib
 });
 
 
+test('manager recovery never turns malformed persisted config into runnable defaults or coercive aliases', async () => {
+  const chrome = chromeFake();
+  const core = new CoreRepo();
+  const manager = new ScenarioWorkManager({
+    coreRepository: core,
+    chromeApi: chrome,
+    now: () => 1000,
+    createId: () => 'valid',
+    collectAssistantReport: async () => ({ status: 'WAITING', assistantComplete: false }),
+  });
+  await manager.create({ name: 'Valid', mode: ScenarioWorkMode.CHAT_CYCLE, config: { steps: [{ prompt: 'ONE' }] } });
+  const canonical = structuredClone(chrome.storage.local.data[SCENARIO_WORK_STORAGE_KEY]);
+
+  const corruptions = [
+    ['missing executable steps', store => { delete store.byId.valid.config.steps; }],
+    ['numeric-string coercion', store => { store.byId.valid.config.roundsPerGeneration = String(store.byId.valid.config.roundsPerGeneration); }],
+    ['mismatched persisted config id', store => { store.byId.valid.config.id = 'other'; }],
+    ['unknown persisted config authority', store => { store.byId.valid.config.hiddenAuthority = 'RUN'; }],
+  ];
+  for (const [name, mutate] of corruptions) {
+    const stored = structuredClone(canonical);
+    mutate(stored);
+    await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: stored });
+    const listed = await manager.list();
+    assert.equal(listed.selectedId, '', name);
+    assert.deepEqual(listed.scenarios, [], name);
+  }
+
+  const executable = structuredClone(canonical);
+  delete executable.byId.valid.config.steps;
+  executable.byId.valid.runtime.runState = ScenarioWorkRunState.RUNNING;
+  await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: executable });
+  const cycle = await manager.cycleAll();
+  assert.equal(cycle.kind, 'IDLE');
+  assert.deepEqual((await core.load()).sessionOrder, [], 'corrupt RUNNING persistence must not materialize a managed Session');
+
+  await chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: canonical });
+  const valid = await manager.list();
+  assert.equal(valid.selectedId, 'valid');
+  assert.deepEqual(valid.scenarios.map(item => item.id), ['valid']);
+});
+
 test('manager recovery rejects persisted accessors without executing getters', async () => {
   const chrome = chromeFake();
   const core = new CoreRepo();
