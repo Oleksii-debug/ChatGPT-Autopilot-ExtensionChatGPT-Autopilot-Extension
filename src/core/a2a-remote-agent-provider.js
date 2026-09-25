@@ -9,7 +9,7 @@ import {
 } from './universal-agent-contracts.js';
 
 export const A2A_REMOTE_AGENT_PROVIDER_VERSION = 1;
-export const A2A_JSONRPC_METHOD_SEND_MESSAGE = 'message/send';
+export const A2A_JSONRPC_METHOD_SEND_MESSAGE = 'SendMessage';
 
 const MAX_MESSAGE_BYTES = 32 * 1024;
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -292,27 +292,26 @@ function assertPolicy(policy, delegation, runtimeNowMs) {
   }
 }
 
-function jsonRpcRequest(delegation, messageText) {
+function jsonRpcRequest(delegation, messageText, tenant) {
+  const message = {
+    messageId: delegation.delegationId,
+    role: 'ROLE_USER',
+    parts: [{ text: messageText, mediaType: 'text/plain' }],
+    metadata: {
+      'autopilot/delegationId': delegation.delegationId,
+      'autopilot/localAgentId': delegation.localAgentId,
+      'autopilot/localTaskId': delegation.localTaskId,
+      'autopilot/effectId': delegation.effectId,
+      'autopilot/taskEnvelopeArtifactId': delegation.taskEnvelopeArtifactId,
+      'autopilot/inputArtifactIds': [...delegation.inputArtifactIds],
+    },
+  };
+  const params = tenant ? { tenant, message } : { message };
   return freeze({
     jsonrpc: '2.0',
     id: delegation.effectId,
     method: A2A_JSONRPC_METHOD_SEND_MESSAGE,
-    params: {
-      message: {
-        kind: 'message',
-        messageId: delegation.delegationId,
-        role: 'user',
-        parts: [{ kind: 'text', text: messageText }],
-        metadata: {
-          'autopilot/delegationId': delegation.delegationId,
-          'autopilot/localAgentId': delegation.localAgentId,
-          'autopilot/localTaskId': delegation.localTaskId,
-          'autopilot/effectId': delegation.effectId,
-          'autopilot/taskEnvelopeArtifactId': delegation.taskEnvelopeArtifactId,
-          'autopilot/inputArtifactIds': [...delegation.inputArtifactIds],
-        },
-      },
-    },
+    params,
   });
 }
 
@@ -363,8 +362,18 @@ export class A2ARemoteAgentProviderV1 {
         `A2A protocol binding is not implemented: ${assessment.selectedInterface.protocolBinding}`,
       );
     }
+    if (assessment.selectedInterface.protocolVersion !== '1.0') {
+      fail(
+        'A2A_PROTOCOL_VERSION_NOT_IMPLEMENTED',
+        `A2A protocol version is not implemented by this provider: ${assessment.selectedInterface.protocolVersion}`,
+      );
+    }
 
-    const request = jsonRpcRequest(delegation, messageText);
+    const request = jsonRpcRequest(
+      delegation,
+      messageText,
+      assessment.selectedInterface.tenant,
+    );
     let rawResponse;
     try {
       rawResponse = await this.transport.sendJsonRpc(freeze({
