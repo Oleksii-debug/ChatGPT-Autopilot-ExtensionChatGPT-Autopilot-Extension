@@ -120,11 +120,13 @@ function browserApprovalOwnerReference(job, runtime, pending) {
   const requestedAt = pending.requestedAt;
   const snapshotId = pending.snapshotId;
   const snapshotSignature = pending.snapshotSignature;
-  if (!Number.isSafeInteger(controlEpoch) || controlEpoch < 0
-      || !Number.isSafeInteger(updatedAt) || updatedAt < 0
-      || !Number.isSafeInteger(requestedAt) || requestedAt < 0
-      || typeof snapshotId !== 'string' || snapshotId.length > 160
-      || typeof snapshotSignature !== 'string' || snapshotSignature.length > 256) {
+  if (!Number.isSafeInteger(controlEpoch) || Object.is(controlEpoch, -0) || controlEpoch < 0
+      || !Number.isSafeInteger(updatedAt) || Object.is(updatedAt, -0) || updatedAt < 0
+      || !Number.isSafeInteger(requestedAt) || Object.is(requestedAt, -0) || requestedAt < 0
+      || typeof snapshotId !== 'string' || snapshotId.length < 1 || snapshotId.length > 160
+      || typeof snapshotSignature !== 'string'
+      || snapshotSignature.length < 1
+      || snapshotSignature.length > 256) {
     return null;
   }
   return Object.freeze({
