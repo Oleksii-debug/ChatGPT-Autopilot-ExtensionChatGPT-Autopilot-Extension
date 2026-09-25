@@ -152,8 +152,8 @@ export function normalizeSelectionActionSourceV1(input) {
   if ((artifactId === null) !== (contentSha256 === '')) {
     throw new Error('artifactId and contentSha256 must be provided together');
   }
-  if (!text && !artifactId) {
-    throw new Error('SelectionActionSourceV1 requires bounded text or an exact artifact binding');
+  if (Boolean(text) === Boolean(artifactId)) {
+    throw new Error('SelectionActionSourceV1 requires exactly one of bounded text or an exact artifact binding');
   }
   if (kind === SelectionActionSourceKind.CURRENT_PAGE && !uri) {
     throw new Error('CURRENT_PAGE source requires uri');
