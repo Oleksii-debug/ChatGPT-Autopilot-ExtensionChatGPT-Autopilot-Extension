@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AiGatewayClient, MAX_RESPONSE_BYTES, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
+import { AiGatewayClient, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, normalizeGatewayUrl } from '../src/core/ai-gateway-client.js';
 
 test('gateway URL is restricted to localhost', () => {
   assert.equal(normalizeGatewayUrl('http://127.0.0.1:17621/'), 'http://127.0.0.1:17621');
@@ -159,4 +159,45 @@ test('gateway client enforces the response ceiling in UTF-8 bytes rather than Ja
     error => error?.code === 'AI_GATEWAY_RESPONSE_TOO_LARGE',
   );
   assert.equal(response.cancelled, true);
+});
+
+
+test('gateway client enforces the exact request byte ceiling before fetch', async () => {
+  let calls = 0;
+  const client = new AiGatewayClient({ fetchFn: async () => {
+    calls += 1;
+    return new Response('{"ok":true}', { status: 200 });
+  } });
+
+  await client.request('http://127.0.0.1:17621', 30, '/complete', {
+    method: 'POST',
+    body: 'x'.repeat(MAX_REQUEST_BYTES),
+  });
+  assert.equal(calls, 1);
+
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, '/complete', {
+      method: 'POST',
+      body: 'x'.repeat(MAX_REQUEST_BYTES + 1),
+    }),
+    error => error?.code === 'AI_GATEWAY_REQUEST_TOO_LARGE',
+  );
+  assert.equal(calls, 1);
+});
+
+test('gateway client counts request size in UTF-8 bytes before fetch', async () => {
+  let calls = 0;
+  const client = new AiGatewayClient({ fetchFn: async () => {
+    calls += 1;
+    return new Response('{"ok":true}', { status: 200 });
+  } });
+  const body = '€'.repeat(Math.floor(MAX_REQUEST_BYTES / 3) + 1);
+  assert.ok(body.length < MAX_REQUEST_BYTES);
+  assert.ok(new TextEncoder().encode(body).byteLength > MAX_REQUEST_BYTES);
+
+  await assert.rejects(
+    () => client.request('http://127.0.0.1:17621', 30, '/complete', { method: 'POST', body }),
+    error => error?.code === 'AI_GATEWAY_REQUEST_TOO_LARGE',
+  );
+  assert.equal(calls, 0);
 });
