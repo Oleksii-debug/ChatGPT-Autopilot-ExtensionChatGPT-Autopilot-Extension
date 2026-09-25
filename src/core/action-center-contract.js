@@ -287,6 +287,9 @@ export function buildActionCenterProjectionV1(rawItems) {
     if (Date.parse(successor.createdAt) > Date.parse(item.closedAt)) {
       throw new Error(`superseding attention item postdates superseded item closure: ${item.itemId}`);
     }
+    if (successor.closedAt && Date.parse(successor.closedAt) < Date.parse(item.closedAt)) {
+      throw new Error(`superseding attention item closed before predecessor supersession: ${item.itemId}`);
+    }
   }
 
   for (const item of items) {
