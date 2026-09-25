@@ -19,11 +19,16 @@ test('a shared replacement budget follows whichever persistent chat finishes fir
     createId: () => `pool-slot-${++nextId}`,
     collectAssistantReport: async () => ({ status: 'READY', assistantComplete: true, assistantText: 'OK' }) });
   const first = manager();
-  const config = { mode: 'CHAT_CYCLE', roundsPerGeneration: 1, steps: [
+  const config = { mode: 'CHAT_CYCLE', roundsPerGeneration: 5, maxGenerations: 9, steps: [
     { prompt: 'FIRST', repeat: 1 }, { prompt: 'CONTINUE', repeat: 1 } ], launchUrl: 'https://chatgpt.com/' };
   const { pool, ids } = await first.createChatPool({ name: 'Приклад', count: 3, replacementBudget: 2, config });
   assert.equal(ids.length, 3);
-  for (const id of ids) await first.start(id);
+  for (const id of ids) {
+    const created = (await first.get(id)).scenario;
+    assert.equal(created.config.roundsPerGeneration, 1);
+    assert.equal(created.config.maxGenerations, 0);
+    await first.start(id);
+  }
   async function finish(id, expectedPrompt, expectedUrl) {
     const before = (await first.get(id)).scenario.runtime;
     const session = state.sessionsById[before.chat.sessionId];
