@@ -275,6 +275,23 @@ test('self-verification is surfaced as negative evidence and never becomes synth
   assert.equal(out.summary.selfVerificationRiskCount, 1);
 });
 
+test('verification cannot depend on evidence created after verifiedAt', () => {
+  const input = request();
+  input.evidenceArtifacts[0] = artifact('evidence-a', SHA_A, {
+    createdAt: '2026-09-25T10:11:00.000Z',
+  });
+  input.results[0] = result('a', 'evidence-a', SHA_C, {
+    verification: verification('a', ['evidence-a'], {
+      verifiedAt: '2026-09-25T10:10:00.000Z',
+    }),
+  });
+
+  assert.throws(
+    () => buildParallelFanInEvidenceV1(input),
+    /evidence created after verification: evidence-a/u,
+  );
+});
+
 test('verification chronology must follow the terminal node and precede fan-in evaluation', () => {
   const early = request();
   early.results[0] = result('a', 'evidence-a', SHA_C, {
