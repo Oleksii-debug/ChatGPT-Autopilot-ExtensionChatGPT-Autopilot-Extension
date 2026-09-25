@@ -143,6 +143,32 @@ test('Native Companion list/stat keep absolute roots private and advertise read-
   assert.equal(statResponse.ok, true); assert.equal(statResponse.result.sha256, digest('note'));
 });
 
+test('Native Companion filesystem failures never expose configured absolute roots', async t => {
+  const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-redact-'));
+  t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
+  const root = path.join(sandbox, 'private-owner-root');
+  await fs.mkdir(root);
+  await fs.writeFile(path.join(root, 'plain-file.txt'), 'x');
+
+  // Traversing through a regular file deterministically produces a native
+  // ENOTDIR-style diagnostic on supported platforms; the public envelope must
+  // replace that raw message rather than returning a path-bearing Node error.
+  const response = await handleNativeCompanionRequest(
+    request(
+      'filesystem.list',
+      { rootId: 'workspace', relativePath: 'plain-file.txt/child', maxEntries: 8 },
+      'list-redacted-error',
+    ),
+    { config: config(root), callerOrigin: ORIGIN },
+  );
+
+  assert.equal(response.ok, false);
+  assert.equal(response.error.code, 'FILESYSTEM_IO_ERROR');
+  assert.equal(response.error.message, 'Filesystem operation failed');
+  assert.equal(JSON.stringify(response).includes(root), false);
+  assert.equal(JSON.stringify(response).includes('plain-file.txt/child'), false);
+});
+
 test('list/stat adapter payloads reject coercive bounds and inherited authority', async t => {
   const sandbox = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-fs-read-boundary-'));
   t.after(() => fs.rm(sandbox, { recursive: true, force: true }));
