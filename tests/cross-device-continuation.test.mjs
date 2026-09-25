@@ -384,7 +384,7 @@ test('handoff checkpoint binding requires canonical checkpoint digest and exact 
     cp.checkpointDigest.toUpperCase(),
   ]) {
     await assert.rejects(
-      () => assessCrossDeviceContinuationV1(
+      async () => assessCrossDeviceContinuationV1(
         request(),
         await options({
           resolveExecutionOwnership: async () => ownership,
@@ -420,7 +420,7 @@ test('handoff checkpoint binding time is causally bounded by ownership, checkpoi
     '2026-09-25T13:10:00.001Z',
   ]) {
     await assert.rejects(
-      () => assessCrossDeviceContinuationV1(
+      async () => assessCrossDeviceContinuationV1(
         request(),
         await options({
           resolveExecutionOwnership: async () => ownership,
