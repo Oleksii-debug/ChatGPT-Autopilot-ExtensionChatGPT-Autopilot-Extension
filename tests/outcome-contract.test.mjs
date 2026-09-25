@@ -96,6 +96,7 @@ function assessment(criterionId, overrides = {}) {
     criterionId,
     status: 'VERIFIED',
     evidenceArtifactIds: [`evidence-${criterionId}`],
+    evidenceKinds: ['test-report'],
     assessedBy: 'verifier-1',
     assessedAt: VERIFIED_AT,
     ...overrides,
@@ -267,6 +268,7 @@ test('FAILED, PARTIAL and AMBIGUOUS criteria cannot be projected as evidence-rea
         assessment('criterion-b', {
           status,
           evidenceArtifactIds: [],
+          evidenceKinds: [],
         }),
       ],
     });
@@ -307,6 +309,14 @@ test('criterion evidence must be complete, unique, attributed to declared verifi
       assessment('criterion-b'),
     ],
   }), /at least 1 item/);
+
+  assert.throws(() => projectOutcomeEvidenceV1({
+    contract,
+    assessments: [
+      assessment('criterion-a', { evidenceKinds: ['screenshot'] }),
+      assessment('criterion-b'),
+    ],
+  }), /lacks required evidence kind: test-report/);
 });
 
 test('strict descriptor boundary rejects getters, hidden fields, symbols and sparse arrays without executing accessors', () => {
