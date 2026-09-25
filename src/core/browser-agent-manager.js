@@ -406,10 +406,21 @@ export class BrowserAgentManager {
     if (!current.job) throw new Error('Browser Agent job not found');
     const projectId = current.job.config?.projectId || '';
     if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+
+    let planId = '';
+    if (current.job.runtime?.plan) {
+      const plan = normalizeAgentPlanV1(current.job.runtime.plan);
+      if (plan.jobId !== current.job.id) {
+        throw new Error('Browser Agent AgentPlan jobId does not match the durable job');
+      }
+      planId = plan.planId;
+    }
+
     return Object.freeze({
       schemaVersion: BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION,
       jobId: current.job.id,
       projectId,
+      planId,
     });
   }
 
