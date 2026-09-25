@@ -102,6 +102,118 @@ test('Windows provider config rejects inherited authority and type-coerced readO
   );
 });
 
+test('Windows provider rejects accessor and hidden owner config without reading getters', () => {
+  let getterCalls = 0;
+  const accessorExecutable = {
+    executableId: 'git',
+    readOnly: false,
+  };
+  Object.defineProperty(accessorExecutable, 'path', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 'C:\\Program Files\\Git\\cmd\\git.exe';
+    },
+  });
+  assert.throws(
+    () => normalizeWindowsProviderConfig({ schemaVersion: 1, executables: [accessorExecutable] }),
+    /data properties/,
+  );
+  assert.equal(getterCalls, 0);
+
+  const hidden = {
+    schemaVersion: 1,
+    executables: [],
+  };
+  Object.defineProperty(hidden, 'schemaVersion', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: 1,
+  });
+  assert.throws(() => normalizeWindowsProviderConfig(hidden), /data properties/);
+});
+
+test('Windows provider request and args reject accessors without executing them', async () => {
+  let getterCalls = 0;
+  let adapterCalls = 0;
+  const provider = createWindowsProvider({
+    config,
+    platform: 'win32',
+    execFile: async () => ({}),
+    uiaAdapter: {
+      query: async () => {
+        adapterCalls += 1;
+        return [];
+      },
+    },
+  });
+
+  const request = { limit: 2 };
+  Object.defineProperty(request, 'windowId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 'desktop';
+    },
+  });
+  await assert.rejects(() => provider.queryUia(request), /data properties/);
+  assert.equal(getterCalls, 0);
+  assert.equal(adapterCalls, 0);
+
+  const hiddenRequest = { windowId: 'desktop', limit: 2 };
+  Object.defineProperty(hiddenRequest, 'windowId', {
+    enumerable: false,
+    configurable: true,
+    writable: true,
+    value: 'desktop',
+  });
+  await assert.rejects(() => provider.queryUia(hiddenRequest), /data properties/);
+  assert.equal(adapterCalls, 0);
+
+  const args = [];
+  Object.defineProperty(args, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 'status';
+    },
+  });
+  args.length = 1;
+  await assert.rejects(
+    () => provider.execPinned({ executableId: 'git', args }),
+    /enumerable data items/,
+  );
+  assert.equal(getterCalls, 0);
+});
+
+test('Windows provider rejects accessor-backed UIA results without executing getters', async () => {
+  let getterCalls = 0;
+  const row = { elementId: 'el-1', role: 'button', name: 'Save', enabled: true };
+  Object.defineProperty(row, 'offscreen', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return false;
+    },
+  });
+  const provider = createWindowsProvider({
+    config,
+    platform: 'win32',
+    execFile: async () => ({}),
+    uiaAdapter: { query: async () => [row] },
+  });
+  await assert.rejects(
+    () => provider.queryUia({ windowId: 'window-1' }),
+    error => error.code === 'WINDOWS_UIA_INVALID_RESPONSE',
+  );
+  assert.equal(getterCalls, 0);
+});
+
 test('Windows provider fails closed off Windows', async () => {
   const provider = createWindowsProvider({
     config,
