@@ -240,13 +240,22 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   return Object.freeze({ allocationMode, minWorkers, maxParallelWorkers, manualRouteWorkers: Object.freeze(manualRouteWorkers) });
 }
 
-function stateNumber(value, label) {
+function stateInteger(value, label) {
   if (value == null) return 0;
-  if (typeof value !== 'number' && typeof value !== 'string') {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
     throw new Error(`${label} is invalid`);
   }
-  const out = Number(value);
-  if (!Number.isFinite(out) || out < 0) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+function checkedStateAdd(value, increment, label) {
+  const out = value + increment;
+  if (!Number.isSafeInteger(out) || Object.is(out, -0) || out < 0) {
+    throw new Error(`${label} exceeds the exact durable-state range`);
+  }
   return out;
 }
 
@@ -279,16 +288,16 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
     const value = descriptor.value;
     const state = dataRecord(value, AI_ROUTE_STATE_FIELDS, `AI route state ${routeId}`);
     Object.defineProperty(out, routeId, { value:{
-      consecutiveFailures: Math.floor(stateNumber(own(state, 'consecutiveFailures'), `AI route state ${routeId}.consecutiveFailures`)),
-      successes: Math.floor(stateNumber(own(state, 'successes'), `AI route state ${routeId}.successes`)),
-      failures: Math.floor(stateNumber(own(state, 'failures'), `AI route state ${routeId}.failures`)),
-      backoffUntil: stateNumber(own(state, 'backoffUntil'), `AI route state ${routeId}.backoffUntil`),
-      circuitOpenUntil: stateNumber(own(state, 'circuitOpenUntil'), `AI route state ${routeId}.circuitOpenUntil`),
+      consecutiveFailures: stateInteger(own(state, 'consecutiveFailures'), `AI route state ${routeId}.consecutiveFailures`),
+      successes: stateInteger(own(state, 'successes'), `AI route state ${routeId}.successes`),
+      failures: stateInteger(own(state, 'failures'), `AI route state ${routeId}.failures`),
+      backoffUntil: stateInteger(own(state, 'backoffUntil'), `AI route state ${routeId}.backoffUntil`),
+      circuitOpenUntil: stateInteger(own(state, 'circuitOpenUntil'), `AI route state ${routeId}.circuitOpenUntil`),
       lastErrorCode: clean(own(state, 'lastErrorCode'), 120),
       lastErrorCategory: clean(own(state, 'lastErrorCategory'), 80),
-      lastErrorAt: stateNumber(own(state, 'lastErrorAt'), `AI route state ${routeId}.lastErrorAt`),
-      lastSuccessAt: stateNumber(own(state, 'lastSuccessAt'), `AI route state ${routeId}.lastSuccessAt`),
-      lastLatencyMs: stateNumber(own(state, 'lastLatencyMs'), `AI route state ${routeId}.lastLatencyMs`),
+      lastErrorAt: stateInteger(own(state, 'lastErrorAt'), `AI route state ${routeId}.lastErrorAt`),
+      lastSuccessAt: stateInteger(own(state, 'lastSuccessAt'), `AI route state ${routeId}.lastSuccessAt`),
+      lastLatencyMs: stateInteger(own(state, 'lastLatencyMs'), `AI route state ${routeId}.lastLatencyMs`),
     }, enumerable:true, writable:true, configurable:true });
   }
   return out;
@@ -410,21 +419,38 @@ export function recordAiRouteOutcome(routeStates, route, policy, { ok, classific
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const states = normalizeAiRouteStates(routeStates, [route]);
   const current = own(states, route.routeId) || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
+  const recordedAt = stateInteger(at, 'AI route outcome at');
+  const recordedLatencyMs = stateInteger(latencyMs, 'AI route outcome latencyMs');
   if (ok) {
-    return { ...current, consecutiveFailures:0, successes:current.successes + 1, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastSuccessAt:at, lastLatencyMs:Math.max(0, Number(latencyMs) || 0) };
+    return {
+      ...current,
+      consecutiveFailures:0,
+      successes:checkedStateAdd(current.successes, 1, 'AI route state successes'),
+      backoffUntil:0,
+      circuitOpenUntil:0,
+      lastErrorCode:'',
+      lastErrorCategory:'',
+      lastSuccessAt:recordedAt,
+      lastLatencyMs:recordedLatencyMs,
+    };
   }
-  const failures = current.consecutiveFailures + 1;
+  const failures = checkedStateAdd(current.consecutiveFailures, 1, 'AI route state consecutiveFailures');
+  const totalFailures = checkedStateAdd(current.failures, 1, 'AI route state failures');
   const retryable = classification?.retryable === true;
   return {
     ...current,
     consecutiveFailures: failures,
-    failures: current.failures + 1,
-    backoffUntil: retryable ? at + normalizedPolicy.retryBackoffSeconds * 1000 : current.backoffUntil,
-    circuitOpenUntil: retryable && failures >= normalizedPolicy.circuitBreakerFailures ? at + normalizedPolicy.circuitBreakerSeconds * 1000 : current.circuitOpenUntil,
+    failures: totalFailures,
+    backoffUntil: retryable
+      ? checkedStateAdd(recordedAt, normalizedPolicy.retryBackoffSeconds * 1000, 'AI route state backoffUntil')
+      : current.backoffUntil,
+    circuitOpenUntil: retryable && failures >= normalizedPolicy.circuitBreakerFailures
+      ? checkedStateAdd(recordedAt, normalizedPolicy.circuitBreakerSeconds * 1000, 'AI route state circuitOpenUntil')
+      : current.circuitOpenUntil,
     lastErrorCode: clean(classification?.code || 'AI_ROUTE_FAILURE', 120),
     lastErrorCategory: clean(classification?.category || 'unknown', 80),
-    lastErrorAt: at,
-    lastLatencyMs: Math.max(0, Number(latencyMs) || 0),
+    lastErrorAt: recordedAt,
+    lastLatencyMs: recordedLatencyMs,
   };
 }
 
