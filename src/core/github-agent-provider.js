@@ -7,6 +7,8 @@ export const GitHubToolId = Object.freeze({
   FILE_READ: 'remote/github/file.read',
   TREE_READ: 'remote/github/tree.read',
   BRANCH_READ: 'remote/github/branch.read',
+  WORKFLOW_LIST: 'remote/github/workflow.list',
+  WORKFLOW_RUN_LIST: 'remote/github/workflowRun.list',
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
   PULL_REQUEST_READ: 'remote/github/pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'remote/github/pullRequest.comment.read',
@@ -26,6 +28,7 @@ export const GitHubCapabilityId = Object.freeze({
   FILE_READ: 'github.file.read',
   TREE_READ: 'github.tree.read',
   BRANCH_READ: 'github.branch.read',
+  WORKFLOW_READ: 'github.workflow.read',
   PULL_REQUEST_READ: 'github.pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'github.pullRequest.comment.read',
   ISSUE_READ: 'github.issue.read',
@@ -82,6 +85,28 @@ const TOOLS = Object.freeze([
     capabilityIds: [GitHubCapabilityId.BRANCH_READ],
     inputSchemaRef: 'github-schema/branch.read/input',
     outputSchemaRef: 'github-schema/branch.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_LIST,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'List bounded GitHub Actions workflows',
+    description: 'Reads a bounded page of workflows from one owner-allowlisted repository without granting Actions mutation authority.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_READ],
+    inputSchemaRef: 'github-schema/workflow.list/input',
+    outputSchemaRef: 'github-schema/workflow.list/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_RUN_LIST,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'List bounded GitHub Actions workflow runs',
+    description: 'Reads a bounded page of workflow runs from one owner-allowlisted repository without granting rerun, cancel, or dispatch authority.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_READ],
+    inputSchemaRef: 'github-schema/workflowRun.list/input',
+    outputSchemaRef: 'github-schema/workflowRun.list/output',
     readOnly: true,
   }),
   normalizeToolDescriptorV1({
@@ -249,6 +274,8 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.FILE_READ) return 'readFile';
   if (toolId === GitHubToolId.TREE_READ) return 'readTree';
   if (toolId === GitHubToolId.BRANCH_READ) return 'readBranch';
+  if (toolId === GitHubToolId.WORKFLOW_LIST) return 'listWorkflows';
+  if (toolId === GitHubToolId.WORKFLOW_RUN_LIST) return 'listWorkflowRuns';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
   if (toolId === GitHubToolId.PULL_REQUEST_READ) return 'readPullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_READ) return 'readPullRequestComment';
