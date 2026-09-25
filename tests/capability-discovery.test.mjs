@@ -534,3 +534,59 @@ test('collection boundaries reject sparse, hidden, custom, symbol and exotic arr
     requestedCapabilityIds:[],
   }), /bounded plain array/);
 });
+
+
+test('capability discovery rejects canonical-looking identity and enum aliases instead of normalizing them', () => {
+  const canonical = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs')],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+  assert.equal(canonical.plan[0].toolId, 'fs.inspect');
+
+  for (const badState of [
+    state(' local/fs'),
+    state('local/fs ', { toolId:'fs.inspect' }),
+    state('local/fs', { health:'ready' }),
+    state('local/fs', { pathKind:'api' }),
+    state('local/fs', { reasonCode:' reason.code' }),
+  ]) {
+    assert.throws(() => normalizeProviderReadinessV1(badState), /exact canonical/);
+  }
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[state('local/fs')],
+    requestedCapabilityIds:[' filesystem.read'],
+  }), /exact canonical identity/);
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability(' filesystem.read')],
+    tools:[],
+    providerStates:[],
+    requestedCapabilityIds:[],
+  }), /exact canonical identity/);
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool(' fs.inspect', 'local/fs', ['filesystem.read'], true)],
+    providerStates:[],
+    requestedCapabilityIds:['filesystem.read'],
+  }), /exact canonical identity/);
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', ' local/fs', ['filesystem.read'], true)],
+    providerStates:[],
+    requestedCapabilityIds:['filesystem.read'],
+  }), /exact canonical identity/);
+
+  assert.throws(() => discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[tool('fs.inspect', 'local/fs', ['filesystem.read '], true)],
+    providerStates:[],
+    requestedCapabilityIds:['filesystem.read'],
+  }), /exact canonical identity/);
+});

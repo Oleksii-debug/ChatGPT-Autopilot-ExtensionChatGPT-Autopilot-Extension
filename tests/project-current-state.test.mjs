@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { deriveProjectCurrentStateDigestV1, deriveProjectCurrentStateV1 } from '../src/core/project-current-state.js';
 
-const AT = '2026-09-20T19:37:00Z';
+const AT = '2026-09-20T19:37:00.000Z';
 
 function source(overrides = {}) {
   return {
