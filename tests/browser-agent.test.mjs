@@ -137,6 +137,138 @@ test('prompt-first config allows empty URL and keeps policy as optional ceilings
   assert.equal(value.allowCrossOriginNavigation, true);
 });
 
+test('Browser Agent project identity uses the canonical Project id grammar', () => {
+  assert.equal(config({ projectId: 'project-1' }).projectId, 'project-1');
+  assert.equal(config().projectId, '');
+  assert.throws(() => config({ projectId: ' project-1 ' }), /projectId is invalid/);
+  assert.throws(() => config({ projectId: 'project id' }), /projectId is invalid/);
+  assert.throws(() => config({ projectId: 1 }), /projectId is invalid/);
+});
+
+test('Browser Agent persists immutable job-to-Project identity across restart', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-project', projectId:'project-1', goal:'Produce project evidence' });
+
+  const binding = await manager.resolveJobProjectBinding('job-project');
+  assert.deepEqual(binding, { schemaVersion:1, jobId:'job-project', projectId:'project-1', planId:'' });
+  assert.equal(Object.isFrozen(binding), true);
+
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  assert.deepEqual(await restarted.resolveJobProjectBinding('job-project'), binding);
+  await assert.rejects(
+    () => restarted.updateConfig('job-project', { projectId:'project-2' }),
+    /projectId is immutable/,
+  );
+  await assert.rejects(
+    () => restarted.updateConfig('job-project', { projectId:'' }),
+    /projectId is immutable/,
+  );
+});
+
+test('legacy Browser Agent may bind a Project exactly once before execution history exists', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-legacy', goal:'Bind before execution' });
+  await assert.rejects(() => manager.resolveJobProjectBinding('job-legacy'), /not bound to a Project/);
+
+  await manager.updateConfig('job-legacy', { projectId:'project-legacy' });
+  assert.deepEqual(await manager.resolveJobProjectBinding('job-legacy'), {
+    schemaVersion:1,
+    jobId:'job-legacy',
+    projectId:'project-legacy',
+    planId:'',
+  });
+
+  await assert.rejects(
+    () => manager.updateConfig('job-legacy', { projectId:'project-other' }),
+    /projectId is immutable/,
+  );
+});
+
+test('Browser Agent refuses retroactive Project binding after execution evidence exists', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-history', goal:'Already executed' });
+  await manager.update(store => {
+    store.byId['job-history'].runtime.history.push({ at:1, type:'effect', message:'existing evidence' });
+    return store;
+  });
+  await assert.rejects(
+    () => manager.updateConfig('job-history', { projectId:'project-late' }),
+    /must be bound before the job produces execution history/,
+  );
+  await assert.rejects(() => manager.resolveJobProjectBinding('job-history'), /not bound to a Project/);
+});
+
+test('Browser Agent Project update rejects accessor-backed identity without executing it', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-accessor', goal:'No getter execution' });
+  let reads = 0;
+  const update = {};
+  Object.defineProperty(update, 'projectId', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'project-accessor';
+    },
+  });
+  await assert.rejects(
+    () => manager.updateConfig('job-accessor', update),
+    /enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('job-to-Project resolver composes exact persisted AgentPlan identity and fails closed on mismatch', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-plan-project', projectId:'project-plan', goal:'Plan within project' });
+  await manager.update(store => {
+    store.byId['job-plan-project'].runtime.plan = {
+      schemaVersion:1,
+      planId:'plan-project',
+      jobId:'job-plan-project',
+      objective:'Produce verified project result',
+      successCriteria:['Verified'],
+      createdAt:'2026-09-25T03:00:00.000Z',
+      updatedAt:'2026-09-25T03:00:00.000Z',
+      revision:1,
+      nodes:[{
+        nodeId:'work',
+        title:'Work',
+        objective:'Produce result',
+        dependsOn:[],
+        conflictKeys:[],
+        ownerId:'parent',
+        executionPlane:'BROWSER',
+        acceptanceCriteria:[],
+        budget:{},
+        state:'PENDING',
+        evidence:'',
+        updatedAt:'2026-09-25T03:00:00.000Z',
+      }],
+    };
+    return store;
+  });
+  assert.deepEqual(await manager.resolveJobProjectBinding('job-plan-project'), {
+    schemaVersion:1,
+    jobId:'job-plan-project',
+    projectId:'project-plan',
+    planId:'plan-project',
+  });
+
+  await manager.update(store => {
+    store.byId['job-plan-project'].runtime.plan.jobId = 'other-job';
+    return store;
+  });
+  await assert.rejects(
+    () => manager.resolveJobProjectBinding('job-plan-project'),
+    /AgentPlan jobId does not match the durable job/,
+  );
+});
+
 test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
   const chrome = makeChrome();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00Z') });
