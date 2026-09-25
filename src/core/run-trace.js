@@ -1,6 +1,6 @@
 export const RUN_TRACE_SCHEMA_VERSION = 1;
 export const MAX_RUN_TRACE_EVENTS = 2048;
-export const MAX_RUN_TRACE_ARTIFACT_IDS = 64;
+export const MAX_RUN_TRACE_ARTIFACT_REFS = 64;
 
 export const RunTraceEventKind = Object.freeze({
   PLAN: 'PLAN',
@@ -15,7 +15,7 @@ export const RunTraceEventKind = Object.freeze({
 });
 
 const EVENT_KINDS = new Set(Object.values(RunTraceEventKind));
-const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;\nconst SHA256 = /^[a-f0-9]{64}$/u;\nconst ARTIFACT_REF_KEYS = new Set(['artifactId', 'versionId', 'sha256']);
 const EVENT_KEYS = new Set([
   'schemaVersion',
   'eventId',
@@ -27,7 +27,7 @@ const EVENT_KEYS = new Set([
   'actorId',
   'parentEventId',
   'sourceRevisionId',
-  'artifactIds',
+  'artifactRefs',
   'effectId',
   'verificationId',
   'checkpointId',
@@ -147,11 +147,40 @@ function freezeDeep(value) {
   return Object.freeze(value);
 }
 
-function idList(value, label, { min = 0, max = MAX_RUN_TRACE_ARTIFACT_IDS } = {}) {
-  const items = denseArray(value, label, { min, max })
-    .map((item, index) => id(item, label + '[' + index + ']'));
-  if (new Set(items).size !== items.length) throw new Error(label + ' contains duplicates');
-  return items.sort(compare);
+function sha256(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !SHA256.test(value)) {
+    throw new Error(label + ' must be canonical lowercase SHA-256');
+  }
+  return value;
+}
+
+function normalizeArtifactRef(input, label) {
+  const raw = record(input, label);
+  exactKeys(raw, ARTIFACT_REF_KEYS, label);
+  return freezeDeep({
+    artifactId: id(own(raw, 'artifactId'), label + '.artifactId'),
+    versionId: id(own(raw, 'versionId'), label + '.versionId'),
+    sha256: sha256(own(raw, 'sha256'), label + '.sha256'),
+  });
+}
+
+function artifactRefs(value, label) {
+  const items = denseArray(value, label, { max: MAX_RUN_TRACE_ARTIFACT_REFS })
+    .map((item, index) => normalizeArtifactRef(item, label + '[' + index + ']'));
+  const exactKeysSeen = new Set();
+  const versionIds = new Set();
+  for (const item of items) {
+    const exactKey = item.artifactId + '\\u0000' + item.versionId + '\\u0000' + item.sha256;
+    if (exactKeysSeen.has(exactKey)) throw new Error(label + ' contains duplicate immutable ArtifactRef');
+    if (versionIds.has(item.versionId)) throw new Error(label + ' contains duplicate versionId');
+    exactKeysSeen.add(exactKey);
+    versionIds.add(item.versionId);
+  }
+  return items.sort((left, right) => (
+    compare(left.artifactId, right.artifactId)
+    || compare(left.versionId, right.versionId)
+    || compare(left.sha256, right.sha256)
+  ));
 }
 
 function kindList(value, label) {
@@ -173,7 +202,7 @@ function normalizeKindBoundFields(event) {
   if (event.kind === RunTraceEventKind.VERIFICATION && !event.verificationId) {
     throw new Error('VERIFICATION event requires verificationId');
   }
-  if (event.kind === RunTraceEventKind.ARTIFACT && event.artifactIds.length === 0) {
+  if (event.kind === RunTraceEventKind.ARTIFACT && event.artifactRefs.length === 0) {
     throw new Error('ARTIFACT event requires at least one artifactId');
   }
   if (event.kind === RunTraceEventKind.CHECKPOINT && !event.checkpointId) {
@@ -218,7 +247,7 @@ export function normalizeRunTraceEventV1(input) {
     actorId: id(own(raw, 'actorId'), 'actorId'),
     parentEventId: id(own(raw, 'parentEventId'), 'parentEventId', { optional: true }),
     sourceRevisionId: id(own(raw, 'sourceRevisionId'), 'sourceRevisionId'),
-    artifactIds: idList(own(raw, 'artifactIds') ?? [], 'artifactIds'),
+    artifactRefs: artifactRefs(own(raw, 'artifactRefs') ?? [], 'artifactRefs'),
     effectId: id(own(raw, 'effectId'), 'effectId', { optional: true }),
     verificationId: id(own(raw, 'verificationId'), 'verificationId', { optional: true }),
     checkpointId: id(own(raw, 'checkpointId'), 'checkpointId', { optional: true }),
