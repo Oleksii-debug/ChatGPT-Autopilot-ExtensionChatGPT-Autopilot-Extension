@@ -278,7 +278,7 @@ test('dispatch receipt is exact-bound and its result artifact is causal to recei
   );
   await assert.rejects(
     () => executeAutopilotProgrammaticControlV1(request(), dependencies),
-    /cannot be created after requestedAt/u,
+    /cannot be created after receipt\.observedAt/u,
   );
 });
 
