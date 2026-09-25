@@ -148,7 +148,7 @@ test('foreign Drive destination is rejected before any mutation dispatch', async
 
   await assert.rejects(
     () => client.updateDriveFile({ fileId, destinationParentId: 'foreign_folder' }),
-    error => error.code === 'GOOGLE_DRIVE_RESOURCE_NOT_ALLOWED',
+    error => error.code === 'GOOGLE_DRIVE_MUTATION_IDENTITY_NOT_ALLOWED',
   );
   assert.equal(patchCalls, 0);
 });
