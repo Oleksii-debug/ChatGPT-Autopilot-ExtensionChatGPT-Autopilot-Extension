@@ -442,7 +442,7 @@ test('rejected events do not mutate durable state and may later apply with the s
   assert.equal(result.accepted, false);
   assert.deepEqual(result.state, before);
   assert.deepEqual(result.state.processedEventIds, []);
-  assert.equal(result.state.updatedAt, AT);
+  assert.equal(result.state.updatedAt, new Date(AT).toISOString());
 
   state = reduceExactEffectV1(state, event(
     ExactEffectEventType.BEGIN_EXECUTION,
@@ -473,7 +473,7 @@ test('new events cannot regress durable time while old accepted duplicates remai
   const replay = reduceExactEffectV1(state, start);
   assert.equal(replay.accepted, true);
   assert.equal(replay.deduplicated, true);
-  assert.equal(replay.state.updatedAt, '2026-09-19T12:00:03Z');
+  assert.equal(replay.state.updatedAt, '2026-09-19T12:00:03.000Z');
 
   assert.throws(
     () => reduceExactEffectV1(state, event(
@@ -484,7 +484,7 @@ test('new events cannot regress durable time while old accepted duplicates remai
     )),
     /cannot predate current durable state/,
   );
-  assert.equal(state.updatedAt, '2026-09-19T12:00:03Z');
+  assert.equal(state.updatedAt, '2026-09-19T12:00:03.000Z');
   assert.equal(state.processedEventIds.includes('stale-new-event'), false);
 });
 
