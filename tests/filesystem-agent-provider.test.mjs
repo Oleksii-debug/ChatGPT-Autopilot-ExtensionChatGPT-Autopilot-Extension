@@ -143,3 +143,30 @@ test('artifact resolver mismatch fails before Native Companion mutation', async 
   });
   assert.equal(calls, 0);
 });
+
+
+test('unavailable atomic filesystem publication is classified as a pre-effect failure', async () => {
+  let calls = 0;
+  const unavailable = Object.assign(new Error('parent-bound publication unavailable'), { code: 'ATOMIC_WRITE_UNAVAILABLE' });
+  const provider = new FilesystemAgentProviderV1({
+    nativeClient: nativeClient({
+      writeExistingText: async () => { calls += 1; throw unavailable; },
+    }),
+    resolveArtifactText: async () => 'x',
+    grantedCapabilityIds: ['filesystem.writeExistingText'],
+  });
+  const inv = invocation(FilesystemToolId.WRITE_EXISTING_TEXT, 'filesystem.writeExistingText', {
+    rootId: 'workspace',
+    relativePath: 'a.txt',
+    contentArtifactRef: artifactRef('x'),
+    expectedSha256: 'b'.repeat(64),
+  });
+
+  await assert.rejects(() => provider.invoke({ invocation: inv, policyDecision: allow() }), error => {
+    assert.equal(error.code, 'ATOMIC_WRITE_UNAVAILABLE');
+    assert.equal(error.effectMayHaveOccurred, false);
+    assert.equal(error.safeToRetry, true);
+    return true;
+  });
+  assert.equal(calls, 1);
+});
