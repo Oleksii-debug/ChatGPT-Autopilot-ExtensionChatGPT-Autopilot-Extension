@@ -176,6 +176,39 @@ function exactSet(actual, expected, label) {
   }
 }
 
+function sameNormalizedValue(left, right) {
+  if (Object.is(left, right)) return true;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+    for (let index = 0; index < left.length; index += 1) {
+      if (!sameNormalizedValue(left[index], right[index])) return false;
+    }
+    return true;
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') {
+    return false;
+  }
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    if (leftKeys[index] !== rightKeys[index]) return false;
+    const key = leftKeys[index];
+    if (!sameNormalizedValue(left[key], right[key])) return false;
+  }
+  return true;
+}
+
+function assertCanonicalOutcomeContractMatches(trustedContract, requestedContract) {
+  if (!sameNormalizedValue(trustedContract, requestedContract)) {
+    throw new Error(
+      'Trusted canonical Outcome Contract does not match the requested exact contract revision semantics',
+    );
+  }
+}
+
 function normalizeTrustedCriterion(input) {
   const raw = record(input, 'TrustedOutcomeCriterionV1');
   exactKeys(raw, TRUSTED_CRITERION_KEYS, 'TrustedOutcomeCriterionV1');
@@ -402,8 +435,14 @@ function criterionResult({
 
 export async function adjudicateOutcomeVerificationV1(
   input = {},
-  { resolveTrustedVerificationRecord } = {},
+  {
+    resolveTrustedOutcomeContract,
+    resolveTrustedVerificationRecord,
+  } = {},
 ) {
+  if (typeof resolveTrustedOutcomeContract !== 'function') {
+    throw new Error('Canonical trusted outcome contract resolver is required');
+  }
   if (typeof resolveTrustedVerificationRecord !== 'function') {
     throw new Error('Canonical trusted verification record resolver is required');
   }
@@ -411,7 +450,23 @@ export async function adjudicateOutcomeVerificationV1(
   const request = record(input, 'OutcomeVerificationBridgeRequestV1');
   exactKeys(request, REQUEST_KEYS, 'OutcomeVerificationBridgeRequestV1');
 
-  const contract = normalizeOutcomeContractV1(request.contract);
+  const requestedContract = normalizeOutcomeContractV1(request.contract);
+  const trustedContractLookup = deepFreeze({
+    contractId: requestedContract.contractId,
+    contractRevision: requestedContract.revision,
+  });
+  const rawTrustedContract = await resolveTrustedOutcomeContract(trustedContractLookup);
+  if (rawTrustedContract == null) {
+    throw new Error(
+      'Trusted canonical Outcome Contract was not found for contractId/revision: '
+        + requestedContract.contractId
+        + '/'
+        + requestedContract.revision,
+    );
+  }
+  const contract = normalizeOutcomeContractV1(rawTrustedContract);
+  assertCanonicalOutcomeContractMatches(contract, requestedContract);
+
   const evaluatedAt = canonicalTimestamp(request.evaluatedAt, 'evaluatedAt');
   if (evaluatedAt < contract.createdAt) {
     throw new Error('evaluatedAt predates the exact outcome contract');
