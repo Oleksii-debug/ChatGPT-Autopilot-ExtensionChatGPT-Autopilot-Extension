@@ -2,6 +2,7 @@ const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
 const DEFAULT_GATEWAY_URL = 'http://127.0.0.1:17621';
 const MIN_TIMEOUT_SECONDS = 5;
 const MAX_TIMEOUT_SECONDS = 900;
+const MAX_REQUEST_BYTES = 4_000_000;
 const MAX_RESPONSE_BYTES = 4_000_000;
 
 function clean(value) {
@@ -17,6 +18,12 @@ export function normalizeGatewayUrl(value) {
   parsed.search = '';
   parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
   return parsed.toString().replace(/\/$/, '');
+}
+
+function requestTooLargeError() {
+  const error = new Error('AI Gateway request is too large');
+  error.code = 'AI_GATEWAY_REQUEST_TOO_LARGE';
+  return error;
 }
 
 function responseTooLargeError() {
@@ -110,6 +117,9 @@ export class AiGatewayClient {
     if (!Number.isInteger(timeout) || timeout < MIN_TIMEOUT_SECONDS || timeout > MAX_TIMEOUT_SECONDS) {
       throw new Error(`AI Gateway timeout must be ${MIN_TIMEOUT_SECONDS}-${MAX_TIMEOUT_SECONDS} seconds`);
     }
+    if (typeof init.body === 'string' && new TextEncoder().encode(init.body).byteLength > MAX_REQUEST_BYTES) {
+      throw requestTooLargeError();
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout * 1000);
     try {
@@ -161,4 +171,4 @@ export class AiGatewayClient {
   }
 }
 
-export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, MAX_RESPONSE_BYTES };
+export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES };
