@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ChatGPT Autopilot</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+<header>
+  <div class="header-copy">
+    <div class="brand-row"><img class="app-icon" src="../../icons/icon48.png" width="48" height="48" alt=""><h1 id="page-title">ChatGPT Autopilot</h1></div>
+    <p class="app-subtitle">Керування сеансами, оркестрами та AI-моделями в одному місці.</p>
+    <p id="app-status" role="status">Готово.</p>
+  </div>
+  <div class="header-actions" aria-label="Глобальні дії">
+    <button id="reload-extension-button" type="button">Перезавантажити</button>
+    <button id="master-pause-button" type="button">Призупинити все</button>
+    <button id="master-resume-button" type="button">Продовжити все</button>
+  </div>
+</header>
+<div id="mode-tabs" class="mode-tabs" role="tablist" aria-label="Режим">
+  <button id="mode-sessions" type="button" role="tab" aria-selected="true">Сеанси</button>
+  <button id="mode-simplified" type="button" role="tab" aria-selected="false">Спрощені сесії</button>
+  <button id="mode-orchestration" type="button" role="tab" aria-selected="false">Оркестрація</button>
+  <button id="mode-scenario-work" type="button" role="tab" aria-selected="false">Сценарна робота</button>
+  <button id="mode-agent" type="button" role="tab" aria-selected="false">Агент</button>
+  <button id="mode-ai" type="button" role="tab" aria-selected="false">Моделі</button>
+</div>
+<div class="layout">
+  <nav id="session-navigation" aria-label="Сеанси" data-app-mode="sessions">
+    <h2>Сеанси</h2>
+    <button id="create-session-button" type="button">Новий сеанс</button>
+    <section id="global-runtime-panel" aria-labelledby="global-runtime-heading">
+      <h3 id="global-runtime-heading">Весь Autopilot зараз</h3>
+      <p id="global-runtime-summary" tabindex="0">Завантаження стану…</p>
+      <h4>Спрощені сеанси</h4><ul id="global-simplified-sessions"></ul>
+      <h4>Сценарні чати</h4><ul id="global-scenario-slots"></ul>
+      <h4>Оркестрація</h4><ul id="global-orchestration"></ul>
+      <h4>Агент</h4><ul id="global-agents"></ul>
+      <h4>Моделі</h4><ul id="global-models"></ul>
+    </section>
+    <section id="action-center-panel" aria-labelledby="action-center-heading">
+      <h3 id="action-center-heading">Потребує вашої уваги</h3>
+      <p id="action-center-summary" tabindex="0">Завантаження центру уваги…</p>
+      <ul id="action-center-list" aria-label="Питання, що потребують уваги"></ul>
+    </section>
+    <section id="project-workspace-panel" aria-labelledby="project-workspace-heading">
+      <h3 id="project-workspace-heading">Проєкти</h3>
+      <p id="project-workspace-summary" tabindex="0">Завантаження сховища проєктів…</p>
+      <button id="project-workspace-refresh-button" type="button">Оновити проєкти</button>
+      <ul id="project-workspace-list" aria-label="Збережені проєкти"></ul>
+    </section>
+    <p id="session-overview" tabindex="0"></p>
+    <ul id="session-list"></ul>
+  </nav>
+  <main id="main" tabindex="-1">
+    <section data-app-mode="simplified" aria-labelledby="simplified-heading" hidden>
+      <h2 id="simplified-heading">Спрощені сесії</h2>
+      <p>Один чат і один промпт можна повторювати без обмеження часу. Цей режим використовує той самий Core і збережений стан, що й звичайні сеанси.</p>
+      <button id="simplified-new" type="button">Новий сеанс</button>
+      <label for="simplified-list">Збережені спрощені сеанси</label>
+      <select id="simplified-list" size="5"></select>
+      <p id="simplified-overview" tabindex="0"></p>
+      <div class="settings-group">
+        <label for="simplified-name">Назва</label><input id="simplified-name" type="text" maxlength="120" autocomplete="off">
+        <label for="simplified-config-mode">Посилання та промпти</label>
+        <select id="simplified-config-mode">
+          <option value="shared-shared">Одне посилання + один промпт</option>
+          <option value="shared-unique">Одне посилання + різні промпти</option>
+          <option value="unique-shared">Різні посилання + один промпт</option>
+          <option value="unique-unique">Різні посилання + різні промпти</option>
+        </select>
+        <div id="simplified-url-group"><label for="simplified-url">Посилання ChatGPT</label><input id="simplified-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://chatgpt.com/"></div>
+        <div id="simplified-prompt-group"><label for="simplified-prompt">Промпт</label><textarea id="simplified-prompt" rows="8"></textarea></div>
+        <div id="simplified-urls-group" hidden><label for="simplified-urls">Різні посилання: одне на рядок</label><textarea id="simplified-urls" rows="5" spellcheck="false"></textarea></div>
+        <div id="simplified-prompts-group" hidden><label for="simplified-prompts">Різні промпти: розділіть окремим рядком ---</label><textarea id="simplified-prompts" rows="7"></textarea></div>
+        <label for="simplified-run-mode">Робота</label><select id="simplified-run-mode"><option value="continuous">Постійно по колу</option><option value="one-pass">Один прохід</option></select>
+        <label for="simplified-cycles">Кількість логічних циклів за один прохід, до 1 000 000</label><input id="simplified-cycles" type="number" min="1" max="1000000" step="1" value="1" inputmode="numeric" aria-describedby="simplified-cycle-help">
+        <p id="simplified-cycle-help">У режимі «Постійно по колу» ліміту немає. Для різних URL або промптів кількість позицій визначається списком.</p>
+        <label for="simplified-interval">Інтервал</label><input id="simplified-interval" type="number" min="1" max="86400" step="1" value="2" inputmode="numeric">
+        <label for="simplified-interval-unit">Одиниця інтервалу</label><select id="simplified-interval-unit"><option value="minutes">Хвилини</option><option value="seconds">Секунди</option></select>
+        <label for="simplified-delay">Пауза перед Send, секунд</label><input id="simplified-delay" type="number" min="1" max="30" step="1" value="20" inputmode="numeric">
+        <label for="simplified-busy">Повторна перевірка зайнятого чату, секунд</label><input id="simplified-busy" type="number" min="1" max="30" step="1" value="2" inputmode="numeric">
+        <label for="simplified-retry">Затримка технічного повтору, секунд</label><input id="simplified-retry" type="number" min="5" max="3600" step="1" value="30" inputmode="numeric">
+        <label for="simplified-retry-policy">Помилка</label><select id="simplified-retry-policy"><option value="safe">Автоматичне безпечне відновлення</option><option value="manual">Ручна перевірка</option></select>
+        <label for="simplified-tabs">Вкладки</label><select id="simplified-tabs"><option value="keep-open">Зберігати вкладки</option><option value="worker">Одна робоча вкладка</option><option value="open-close">Відкривати й закривати</option></select>
+      </div>
+      <div class="button-row" aria-label="Керування спрощеним сеансом">
+        <button id="simplified-save" type="button">Зберегти</button><button id="simplified-start" type="button">Старт</button>
+        <button id="simplified-pause" type="button">Пауза</button><button id="simplified-resume" type="button">Продовжити</button>
+        <button id="simplified-stop" type="button">Стоп</button><button id="simplified-duplicate" type="button">Дублювати</button>
+        <button id="simplified-delete" type="button">Видалити</button>
+      </div>
+      <p id="simplified-state" tabindex="0">Сеанс не вибрано.</p>
+      <p id="simplified-command-result" role="status"></p>
+      <h3>JSON</h3>
+      <button id="simplified-template" type="button">Шаблон</button>
+      <label for="simplified-import-file">Імпорт JSON</label><input id="simplified-import-file" type="file" accept="application/json,.json">
+      <button id="simplified-import" type="button">Імпорт</button><button id="simplified-import-start" type="button">Імпорт + старт</button>
+      <button id="simplified-export" type="button">Експорт</button>
+      <button id="simplified-diagnostics" type="button">Експорт діагностики</button>
+    </section>
+    <section aria-labelledby="rate-limit-settings-heading" data-app-mode="sessions">
+      <h2 id="rate-limit-settings-heading">Rate-limit recovery</h2>
+      <label for="rate-limit-cooldown-minutes">Rate-limit пауза, хв</label>
+      <input id="rate-limit-cooldown-minutes" type="number" min="0" max="120" step="1" inputmode="numeric">
+      <button id="save-rate-limit-cooldown-button" type="button">Зберегти</button>
+      <p id="rate-limit-setting-status" role="status">Завантаження…</p>
+    </section>
+
+    <section aria-labelledby="agent-heading" data-app-mode="agent" hidden>
+      <h2 id="agent-heading">Агент</h2>
+      <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
+      <p class="field-help">Опишіть результат звичайною мовою. AI сам планує роботу та керує браузерними інструментами Autopilot. Налаштування нижче є лише політикою й лімітами; для звичайного запуску їх заповнювати не потрібно.</p>
+
+      <label for="agent-prompt">Що потрібно зробити?</label>
+      <textarea id="agent-prompt" rows="9" spellcheck="true" placeholder="Наприклад: перевір предмети зимового семестру, підбери розклад без конфліктів і виконай задачу відповідно до вибраної нижче політики автономності."></textarea>
+      <div class="agent-actions" aria-label="Основні дії агента">
+        <button id="agent-run-prompt-button" type="button">Запустити агента</button>
+        <button id="agent-pause-button" type="button" disabled>Пауза</button>
+        <button id="agent-resume-button" type="button" disabled>Продовжити</button>
+        <button id="agent-stop-button" type="button" disabled>Стоп</button>
+      </div>
+      <p id="agent-status" role="status">Агент готовий до нового завдання.</p>
+      <p id="agent-usage" tabindex="0">Використання моделі: ще немає.</p>
+
+      <div id="agent-approval-panel" class="settings-group" hidden>
+        <h3>Потрібне підтвердження дії</h3>
+        <p id="agent-approval-status" role="status">Немає дії, що очікує підтвердження.</p>
+        <pre id="agent-approval-script" tabindex="0" hidden aria-label="JavaScript, який Agent просить виконати"></pre>
+        <div class="agent-actions" aria-label="Підтвердження важливої дії">
+          <button id="agent-approve-action-button" type="button" disabled>Підтвердити дію</button>
+          <button id="agent-reject-action-button" type="button" disabled>Відхилити дію</button>
+        </div>
+      </div>
+
+      <label for="agent-follow-up">Уточнення під час роботи</label>
+      <textarea id="agent-follow-up" rows="3" spellcheck="true" placeholder="Наприклад: не обирай п’ятницю; якщо є два варіанти — вибирай ранковий."></textarea>
+      <button id="agent-send-follow-up-button" type="button" disabled>Надіслати уточнення агенту</button>
+
+      <details id="agent-current-task-details" open>
+        <summary>Поточне завдання та історія</summary>
+        <label for="agent-job-list">Завдання агента</label>
+        <select id="agent-job-list" size="4"></select>
+        <div class="agent-actions" aria-label="Дії з вибраним завданням">
+          <button id="agent-step-button" type="button" disabled>Один крок</button>
+          <button id="agent-run-now-button" type="button" disabled>Продовжити зараз</button>
+          <button id="agent-delete-button" type="button" disabled>Видалити завдання</button>
+        </div>
+        <div id="agent-history" tabindex="0" aria-label="Історія роботи агента">Історії ще немає.</div>
+      </details>
+
+      <fieldset class="settings-group" id="agent-native-companion-group">
+        <legend>Windows Native Companion</legend>
+        <p class="field-help">Native Companion дає Agent керовані локальні capabilities. У першій версії це health/capabilities і читання текстових файлів тільки з папок, які ви явно дозволили. Наступний шар використовуватиме цей самий Companion для CredentialBroker.</p>
+        <button id="agent-native-companion-check-button" type="button" aria-describedby="agent-native-companion-status">Перевірити Native Companion</button>
+        <p id="agent-native-companion-status" role="status">Native Companion ще не перевіряли.</p>
+      </fieldset>
+
+      <fieldset class="settings-group" id="agent-permission-group">
+        <legend>Доступ до сайтів</legend>
+        <p class="field-help">Chrome вимагає явного дозволу перед керуванням новим сайтом. Якщо Agent зупинився зі станом WAITING_PERMISSION, надайте потрібний дозвіл і натисніть «Продовжити».</p>
+        <button id="agent-allow-current-site-button" type="button">Дозволити потрібний сайт</button>
+        <button id="agent-allow-all-sites-button" type="button">Дозволити всі HTTP/HTTPS сайти</button>
+        <button id="agent-allow-downloads-button" type="button">Дозволити Agent відстежувати завантаження</button>
+        <button id="agent-allow-notifications-button" type="button">Дозволити Agent показувати системні сповіщення</button>
+        <p id="agent-permission-status" role="status">Дозволи не запитувалися.</p>
+      </fieldset>
+
+      <details id="agent-policy-details">
+        <summary>Політика й ліміти — необов’язково</summary>
+        <p class="field-help">0 означає «без окремого ліміту». Ці поля обмежують AI, але не є передумовою запуску природномовної задачі.</p>
+        <fieldset class="settings-group">
+          <legend>Старт і браузер</legend>
+          <label for="agent-start-url">Стартова адреса, необов’язково</label>
+          <input id="agent-start-url" type="url" autocomplete="off" spellcheck="false" placeholder="Порожньо — використати активну вкладку">
+          <label for="agent-max-steps">Safety ceiling дій</label>
+          <input id="agent-max-steps" type="number" min="1" max="10000" step="1" inputmode="numeric" value="500">
+          <label for="agent-step-delay-ms">Пауза між швидкими діями, мс</label>
+          <input id="agent-step-delay-ms" type="number" min="0" max="60000" step="50" inputmode="numeric" value="0">
+          <label><input id="agent-allow-cross-origin" type="checkbox" checked>Дозволяти переходи між дозволеними сайтами</label>
+          <label><input id="agent-close-tabs-on-stop" type="checkbox">Закривати вкладки, створені Agent, після Stop</label>
+          <label for="agent-approval-mode">Глобальна автономність дій</label>
+          <select id="agent-approval-mode">
+            <option value="CONSEQUENTIAL">ASK — питати перед важливими/фінальними діями</option>
+            <option value="ALLOW_ALL">ALLOW ALL — виконувати всі дозволені дії автономно без підтверджень</option>
+          </select>
+          <label for="agent-credential-decision">Глобальна політика логінів і credentials</label>
+          <select id="agent-credential-decision">
+            <option value="ASK">ASK — питати перед використанням дозволеного credential</option>
+            <option value="ALLOW">ALLOW — використовувати дозволені credentials автономно</option>
+            <option value="DENY">DENY — не використовувати credentials у цьому завданні</option>
+          </select>
+          <label for="agent-site-rules">Правила для окремих сайтів, необов’язково</label>
+          <textarea id="agent-site-rules" rows="6" spellcheck="false" placeholder="example.com | ALLOW&#10;bank.example | ASK | trusted_script=DENY,upload_download=ASK&#10;*.example.org | DENY"></textarea>
+          <p class="field-help">Один сайт на рядок: домен | ALLOW, ASK або DENY. Необов’язково після третьої риски можна перевизначити окремі дії, наприклад trusted_script=DENY або upload_download=ASK. Спеціальний ключ credentials=ALLOW/ASK/DENY керує логіном для цього сайту. Правило сайту має пріоритет над глобальною політикою.</p>
+          <label><input id="agent-vision-on-demand" type="checkbox" checked>Дозволяти Agent запитувати знімок видимої області для vision, коли DOM/ARIA недостатньо</label>
+          <label><input id="agent-trusted-script-enabled" type="checkbox">Дозволяти Trusted Script fallback для складних сайтів. Потреба в підтвердженні визначається вибраною вище політикою; у режимі повної автономії окремого підтвердження немає.</label>
+          <label for="agent-acceptance-criteria">Критерії завершеного результату, необов’язково</label>
+          <textarea id="agent-acceptance-criteria" rows="4" spellcheck="true" aria-describedby="agent-acceptance-criteria-help" placeholder="Наприклад: На сторінці видно підтвердження бронювання&#10;Наприклад: Вибрано саме ранковий варіант"></textarea>
+          <p id="agent-acceptance-criteria-help" class="field-help">Один перевірюваний критерій на рядок. Якщо вони задані, Agent не може позначити завдання завершеним без свіжого доказу для кожного критерію з поточної сторінки.</p>
+        </fieldset>
+        <fieldset class="settings-group">
+          <legend>Розклад і повторення</legend>
+          <p class="field-help">За замовчуванням задача виконується один раз. Ці параметри потрібні лише для моніторингу, періодичної або тривалої роботи.</p>
+          <label for="agent-repeat-mode">Режим після завершення одного циклу</label>
+          <select id="agent-repeat-mode">
+            <option value="ONCE">Один раз</option>
+            <option value="CONTINUOUS">Безперервно 24/7 у дозволене вікно</option>
+            <option value="INTERVAL">Повторювати з інтервалом</option>
+          </select>
+          <label for="agent-interval-seconds">Інтервал між завершеними циклами, секунд</label>
+          <input id="agent-interval-seconds" type="number" min="1" max="604800" step="1" inputmode="numeric" value="60">
+          <label for="agent-schedule-start">Почати не раніше, необов’язково</label>
+          <input id="agent-schedule-start" type="datetime-local">
+          <label for="agent-schedule-end">Завершити не пізніше, необов’язково</label>
+          <input id="agent-schedule-end" type="datetime-local">
+          <label for="agent-active-window-start">Щоденне активне вікно — початок, необов’язково</label>
+          <input id="agent-active-window-start" type="time">
+          <label for="agent-active-window-end">Щоденне активне вікно — кінець, необов’язково</label>
+          <input id="agent-active-window-end" type="time">
+        </fieldset>
+        <fieldset class="settings-group">
+          <legend>Модель цього Agent</legend>
+          <p class="field-help">За замовчуванням Agent успадковує глобальний AI Router. Тут можна для конкретного завдання вибрати primary/strong/hybrid і окремі provider/model без зміни інших Agent jobs.</p>
+          <label for="agent-ai-routing-mode">Маршрут моделі</label>
+          <select id="agent-ai-routing-mode">
+            <option value="inherit">Успадкувати глобальний AI Router</option>
+            <option value="primary">Завжди primary</option>
+            <option value="strong">Завжди strong</option>
+            <option value="hybrid-auto">Hybrid AUTO</option>
+            <option value="hybrid-rules">Hybrid за глобальними правилами</option>
+          </select>
+          <label for="agent-ai-primary-provider">Primary provider</label>
+          <select id="agent-ai-primary-provider">
+            <option value="inherit">Успадкувати</option>
+            <option value="ollama">Локальна Ollama</option>
+            <option value="openai">OpenAI API</option>
+            <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
+          </select>
+          <label for="agent-ai-primary-model">Primary model, необов’язково</label>
+          <input id="agent-ai-primary-model" type="text" autocomplete="off" spellcheck="false" placeholder="Порожньо — успадкувати глобальну модель">
+          <label for="agent-ai-strong-provider">Strong provider</label>
+          <select id="agent-ai-strong-provider">
+            <option value="inherit">Успадкувати</option>
+            <option value="openai">OpenAI API</option>
+            <option value="ollama">Локальна Ollama</option>
+            <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
+          </select>
+          <label for="agent-ai-strong-model">Strong model, необов’язково</label>
+          <input id="agent-ai-strong-model" type="text" autocomplete="off" spellcheck="false" placeholder="Порожньо — успадкувати глобальну модель">
+        </fieldset>
+        <fieldset class="settings-group">
+          <legend>AI budgets</legend>
+          <label for="agent-max-model-calls">Максимум model calls</label>
+          <input id="agent-max-model-calls" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="0">
+          <label for="agent-max-input-tokens">Максимум вхідних токенів</label>
+          <input id="agent-max-input-tokens" type="number" min="0" max="2000000000" step="1" inputmode="numeric" value="0">
+          <label for="agent-max-output-tokens">Максимум вихідних токенів</label>
+          <input id="agent-max-output-tokens" type="number" min="0" max="2000000000" step="1" inputmode="numeric" value="0">
+          <label for="agent-max-total-tokens">Максимум усіх токенів</label>
+          <input id="agent-max-total-tokens" type="number" min="0" max="2000000000" step="1" inputmode="numeric" value="0">
+          <label for="agent-max-output-per-call">Максимум output tokens на один model call</label>
+          <input id="agent-max-output-per-call" type="number" min="128" max="200000" step="1" inputmode="numeric" value="4096">
+          <label for="agent-max-runtime-minutes">Максимальний час роботи, хв</label>
+          <input id="agent-max-runtime-minutes" type="number" min="0" max="525600" step="1" inputmode="numeric" value="0">
+          <label for="agent-max-cost-usd">Максимальна орієнтовна вартість, USD</label>
+          <input id="agent-max-cost-usd" type="number" min="0" max="1000000" step="0.01" inputmode="decimal" value="0">
+          <label for="agent-input-price">Ціна input за 1M токенів, USD</label>
+          <input id="agent-input-price" type="number" min="0" max="1000000" step="0.0001" inputmode="decimal" value="0">
+          <label for="agent-output-price">Ціна output за 1M токенів, USD</label>
+          <input id="agent-output-price" type="number" min="0" max="1000000" step="0.0001" inputmode="decimal" value="0">
+        </fieldset>
+        <button id="agent-save-policy-button" type="button" disabled>Зберегти політику вибраного завдання</button>
+      </details>
+    </section>
+
+    <section aria-labelledby="orchestration-v2-heading" data-app-mode="orchestration">
+      <h2 id="orchestration-v2-heading">Оркестрація</h2>
+      <p class="field-help">Кожен оркестр має власні налаштування, runtime і керування. Пауза або аварійний стоп вибраного оркестру не зупиняє інші.</p>
+      <div id="orchestration-v2-tabs" class="mode-tabs" role="tablist" aria-label="Оркестрація">
+        <button id="orchestration-v2-tab-orchestras" type="button" role="tab" aria-selected="true">Оркестри</button>
+        <button id="orchestration-v2-tab-settings" type="button" role="tab" aria-selected="false" tabindex="-1">Налаштування</button>
+        <button id="orchestration-v2-tab-state" type="button" role="tab" aria-selected="false" tabindex="-1">Стан</button>
+      </div>
+
+      <div id="orchestration-v2-orchestras-panel" data-orchestration-panel="orchestras">
+        <label for="orchestration-v2-orchestra-list">Оркестри</label>
+        <select id="orchestration-v2-orchestra-list" size="5" aria-describedby="orchestration-v2-orchestra-summary"></select>
+        <label for="orchestration-v2-orchestra-name">Назва</label>
+        <input id="orchestration-v2-orchestra-name" type="text" maxlength="120" autocomplete="off">
+        <div class="orchestra-actions" aria-label="Дії з вибраним оркестром">
+          <button id="new-orchestration-v2-orchestra-button" type="button">Новий оркестр</button>
+          <button id="rename-orchestration-v2-orchestra-button" type="button">Перейменувати</button>
+          <button id="start-orchestration-v2-orchestra-button" type="button" aria-describedby="orchestration-v2-start-help">Запустити оркестр</button>
+          <button id="pause-orchestration-v2-orchestra-button" type="button" aria-describedby="orchestration-v2-pause-help">Призупинити оркестр</button>
+          <button id="resume-orchestration-v2-orchestra-button" type="button" aria-describedby="orchestration-v2-pause-help">Продовжити оркестр</button>
+          <button id="delete-orchestration-v2-orchestra-button" type="button">Видалити оркестр</button>
+        </div>
+        <div class="notice" id="orchestration-v2-start-help"><strong>Запуск без очікування watchdog.</strong> «Запустити оркестр» одразу починає перший Coordinator-cycle. Фізичний Send відбувається після налаштованої Coordinator pre-send затримки.</div>
+        <div class="notice" id="orchestration-v2-pause-help"><strong>Безпечна локальна пауза.</strong> Пауза стосується лише вибраного оркестру: стан зберігається, налаштування можна змінити й зберегти, а інші оркестри продовжують працювати. «Продовжити оркестр» одразу запускає recovery/reconciliation, не чекаючи watchdog.</div>
+
+        <fieldset class="settings-group" id="orchestration-v2-import-group">
+          <legend>Завантажити JSON оркестру</legend>
+          <p class="field-help">Працює навіть якщо оркестрів ще немає. Валідний файл створює новий оркестр автоматично. Імпорт ніколи не запускає оркестр самостійно.</p>
+          <label for="orchestration-v2-profile-file">JSON-файл оркестру</label>
+          <input id="orchestration-v2-profile-file" type="file" accept="application/json,.json">
+          <p id="orchestration-v2-profile-preview" tabindex="0">Файл не вибрано.</p>
+          <button id="import-orchestration-v2-profile-button" type="button" disabled>Імпортувати JSON</button>
+        </fieldset>
+
+        <fieldset class="settings-group" id="orchestration-v2-hierarchy-template-group">
+          <legend>Стандартна ієрархія Director → Managers → Workers</legend>
+          <p class="field-help" id="orchestration-v2-hierarchy-template-help">Створює детерміновану безперервну Level-1 ієрархію до першого запуску. Після повного Director → Managers → Workers → reconciliation циклу автоматично починається наступний раунд, доки оркестр не призупинено або не зупинено. Один рядок нижче — один Manager: спочатку короткий ID, потім вертикальна риска і його область відповідальності. Workers отримують фіксовані слоти та не повинні вигадувати роботу, якщо в їхній області немає вільного завдання.</p>
+          <label for="orchestration-v2-hierarchy-domains">Managers та їхні області</label>
+          <textarea id="orchestration-v2-hierarchy-domains" rows="6" spellcheck="true" aria-describedby="orchestration-v2-hierarchy-template-help" placeholder="runtime | Runtime, execution, recovery and reliability.&#10;science | Scientific model, evidence and validation."></textarea>
+          <label for="orchestration-v2-hierarchy-workers">Workers на одного Manager</label>
+          <input id="orchestration-v2-hierarchy-workers" type="number" min="1" max="40" step="1" inputmode="numeric" value="5">
+          <label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково</label>
+          <textarea id="orchestration-v2-hierarchy-drive-sources" rows="4" spellcheck="false" aria-describedby="orchestration-v2-hierarchy-drive-help" placeholder="runtime | https://docs.google.com/document/d/FILE_ID/edit&#10;science | FILE_ID"></textarea>
+          <p class="field-help" id="orchestration-v2-hierarchy-drive-help">Один рядок — один напрям: ID напряму з поля Managers вище | посилання Google Drive/Docs або file ID. Наприклад: runtime | FILE_ID. Файл повинен містити тільки одне ціле число від 0 до кількості Workers цього Manager. Drive не може змінити ієрархію або вибрати чужі слоти.</p>
+          <label for="orchestration-v2-hierarchy-drive-folders">Drive-папки з versioned dispatch, необов’язково</label>
+          <textarea id="orchestration-v2-hierarchy-drive-folders" rows="4" spellcheck="false" aria-describedby="orchestration-v2-hierarchy-drive-folder-help" placeholder="runtime | https://drive.google.com/drive/folders/FOLDER_ID&#10;science | FOLDER_ID"></textarea>
+          <p class="field-help" id="orchestration-v2-hierarchy-drive-folder-help">Level 3: один рядок — Manager ID | exact Drive folder. Усередині Autopilot читає тільки generation-NNNNNN з READY і валідними dispatch JSON для безпосередніх Workers. Один Manager не може одночасно мати scalar-файл і dispatch-папку.</p>
+          <label for="orchestration-v2-hierarchy-drive-poll">Перевіряти Drive, хв</label>
+          <input id="orchestration-v2-hierarchy-drive-poll" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3" aria-describedby="orchestration-v2-hierarchy-drive-help">
+          <button id="authorize-orchestration-v2-drive-button" type="button">Авторизувати Google Drive</button>
+          <p id="orchestration-v2-drive-auth-status" role="status">Стан авторизації Drive ще не перевірено.</p>
+          <label><input id="orchestration-v2-hierarchy-integration" type="checkbox">Додати окремого Integration Manager</label>
+          <label><input id="orchestration-v2-hierarchy-qa" type="checkbox">Додати окремий QA / Red Team</label>
+          <button id="configure-orchestration-v2-hierarchy-button" type="button" disabled>Створити ієрархію</button>
+          <p id="orchestration-v2-hierarchy-template-status" tabindex="0">Ієрархію ще не створено цим шаблоном.</p>
+        </fieldset>
+
+        <p id="orchestration-v2-orchestra-summary" role="status">Оркестри ще не створені. Створіть новий оркестр або завантажте JSON-файл.</p>
+      </div>
+
+      <div id="orchestration-v2-settings-panel" data-orchestration-panel="settings" hidden>
+      <div class="notice"><strong>Налаштування вибраного оркестру.</strong> Якщо треба змінити identity або критичні параметри під час роботи, спочатку натисніть «Призупинити оркестр», внесіть зміни, збережіть і натисніть «Продовжити оркестр».</div>
+      <label><input id="orchestration-v2-enabled" type="checkbox">Увімкнути цей оркестр</label>
+
+      <fieldset class="settings-group" id="orchestration-v2-project-group">
+        <legend>Проєкт і control</legend>
+        <label for="orchestration-v2-project-id">Проєкт</label>
+        <input id="orchestration-v2-project-id" type="text" autocomplete="off" spellcheck="false" placeholder="nika-main">
+        <label for="orchestration-v2-target-repository">Робочий репозиторій</label>
+        <input id="orchestration-v2-target-repository" type="text" autocomplete="off" spellcheck="false" placeholder="Oleksii-debug/project">
+        <label for="orchestration-v2-control-repository">Control репозиторій</label>
+        <input id="orchestration-v2-control-repository" type="text" autocomplete="off" spellcheck="false" placeholder="Oleksii-debug/project">
+        <label for="orchestration-v2-control-issue">Control Issue</label>
+        <input id="orchestration-v2-control-issue" type="number" min="1" step="1" inputmode="numeric">
+        <label for="orchestration-v2-control-comment">Control comment</label>
+        <input id="orchestration-v2-control-comment" type="number" min="0" step="1" inputmode="numeric" aria-describedby="orchestration-v2-control-comment-help">
+        <p class="field-help" id="orchestration-v2-control-comment-help">Порожньо або 0 — авто-пошук.</p>
+        <label><input id="orchestration-v2-bootstrap-pinned-control" type="checkbox">Перед першим ходом прочитати закріплене керування GitHub</label>
+        <p class="field-help">Працює лише для нового оркестру з указаним Control comment. Спочатку застосовує нові завдання з цього коментаря, потім запускає перший хід координатора.</p>
+      </fieldset>
+
+      <fieldset class="settings-group" id="orchestration-v2-coordinator-group">
+        <legend>Coordinator</legend>
+        <label for="orchestration-v2-coordinator-provider">Coordinator provider</label>
+        <select id="orchestration-v2-coordinator-provider">
+          <option value="chatgpt-browser">ChatGPT Browser</option>
+        </select>
+        <label for="orchestration-v2-worker-provider">Worker provider</label>
+        <select id="orchestration-v2-worker-provider">
+          <option value="chatgpt-browser">ChatGPT Browser</option>
+        </select>
+        <label for="orchestration-v2-coordinator-url">Coordinator URL</label>
+        <input id="orchestration-v2-coordinator-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://chatgpt.com/">
+        <label for="orchestration-v2-master-prompt">Master prompt</label>
+        <textarea id="orchestration-v2-master-prompt" rows="10" spellcheck="true"></textarea>
+        <label for="orchestration-v2-tick-prompt">Tick prompt</label>
+        <textarea id="orchestration-v2-tick-prompt" rows="3" spellcheck="true"></textarea>
+        <label for="orchestration-v2-prompt-version">Prompt version</label>
+        <input id="orchestration-v2-prompt-version" type="number" min="1" max="100000" step="1" inputmode="numeric">
+      </fieldset>
+
+      <fieldset class="settings-group" id="orchestration-v2-limits-group">
+        <legend>Локальні ліміти</legend>
+        <label for="orchestration-v2-desired-workers">Start workers</label>
+        <input id="orchestration-v2-desired-workers" type="number" min="0" max="200" step="1" inputmode="numeric">
+        <label for="orchestration-v2-max-workers">Max active workers</label>
+        <input id="orchestration-v2-max-workers" type="number" min="1" max="200" step="1" inputmode="numeric">
+        <label for="orchestration-v2-max-launches-window">Launch limit</label>
+        <input id="orchestration-v2-max-launches-window" type="number" min="0" max="10000" step="1" inputmode="numeric" aria-describedby="orchestration-v2-launch-limit-help">
+        <p class="field-help" id="orchestration-v2-launch-limit-help">0 — без window limit.</p>
+        <label for="orchestration-v2-launch-window">Launch window, s</label>
+        <input id="orchestration-v2-launch-window" type="number" min="10" max="86400" step="1" inputmode="numeric">
+        <label for="orchestration-v2-min-launch-gap">Launch gap, s</label>
+        <input id="orchestration-v2-min-launch-gap" type="number" min="0" max="3600" step="1" inputmode="numeric">
+        <label for="orchestration-v2-worker-probe">Worker probe, s</label>
+        <input id="orchestration-v2-worker-probe" type="number" min="30" max="600" step="1" inputmode="numeric">
+        <label for="orchestration-v2-watchdog">Watchdog, с</label>
+        <input id="orchestration-v2-watchdog" type="number" min="60" max="3600" step="1" inputmode="numeric">
+        <label for="orchestration-v2-max-turns">Coordinator turns</label>
+        <input id="orchestration-v2-max-turns" type="number" min="1" max="1000" step="1" inputmode="numeric">
+        <label for="orchestration-v2-stale-worker">Stale threshold, s</label>
+        <input id="orchestration-v2-stale-worker" type="number" min="300" max="86400" step="1" inputmode="numeric">
+      </fieldset>
+
+      <details id="orchestration-v2-timing">
+        <summary>Таймінги</summary>
+        <label for="orchestration-v2-worker-pre-send">Worker pre-send, с</label>
+        <input id="orchestration-v2-worker-pre-send" type="number" min="1" max="30" step="1" inputmode="numeric">
+        <label for="orchestration-v2-worker-busy">Worker busy-check, с</label>
+        <input id="orchestration-v2-worker-busy" type="number" min="1" max="30" step="1" inputmode="numeric">
+        <label for="orchestration-v2-worker-retry">Worker retry, с</label>
+        <input id="orchestration-v2-worker-retry" type="number" min="5" max="3600" step="1" inputmode="numeric">
+        <label for="orchestration-v2-coordinator-pre-send">Coordinator pre-send, с</label>
+        <input id="orchestration-v2-coordinator-pre-send" type="number" min="1" max="30" step="1" inputmode="numeric">
+        <label for="orchestration-v2-coordinator-retry">Coordinator retry, с</label>
+        <input id="orchestration-v2-coordinator-retry" type="number" min="5" max="3600" step="1" inputmode="numeric">
+      </details>
+
+      <details id="orchestration-v2-file-tools">
+        <summary>Файл конфігурації</summary>
+        <a id="download-orchestration-v2-template" href="../config/orchestration-v2-template.json" download="ChatGPT-Autopilot-Orchestration-template.json">Шаблон JSON</a>
+        <button id="export-orchestration-v2-profile-button" type="button">Експортувати вибраний оркестр</button>
+      </details>
+
+      <button id="save-orchestration-v2-button" type="button">Зберегти</button>
+      <button id="save-start-orchestration-v2-button" type="button" aria-describedby="orchestration-v2-save-start-help">Зберегти й запустити зараз</button>
+      <p class="field-help" id="orchestration-v2-save-start-help">Зберігає налаштування, вмикає цей оркестр і негайно починає Coordinator-cycle. Watchdog не використовується як затримка першого старту.</p>
+      <button id="test-orchestration-v2-button" type="button">Перевірити GitHub</button>
+      </div>
+
+      <div id="orchestration-v2-state-panel" data-orchestration-panel="state" hidden>
+        <button id="run-orchestration-v2-button" type="button">Оновити стан</button>
+        <button id="stop-orchestration-v2-button" type="button" aria-describedby="orchestration-v2-stop-help">Аварійно зупинити вибраний оркестр</button>
+        <div class="notice" id="orchestration-v2-stop-help"><strong>Аварійна дія лише для вибраного оркестру.</strong> Стоп відкликає authority у цього оркестру. Інші оркестри не зупиняються.</div>
+        <p id="orchestration-v2-status" role="status">Orchestration V2 ще не налаштовано.</p>
+        <p id="orchestration-v2-runtime" tabindex="0">Coordinator і worker pool ще не запущені.</p>
+      </div>
+    </section>
+
+    <details id="remote-dispatch-legacy" data-app-mode="orchestration">
+      <summary id="remote-dispatch-heading">Legacy</summary>
+      <label><input id="remote-dispatch-enabled" type="checkbox">Увімкнути Legacy</label>
+      <label><input id="remote-dispatch-intake-paused" type="checkbox">Пауза intake</label>
+
+      <label for="remote-dispatch-project-id">project_id цього Chrome-профілю</label>
+      <input id="remote-dispatch-project-id" type="text" autocomplete="off" spellcheck="false" placeholder="nika-main">
+      <label for="remote-dispatch-repository">GitHub repository, owner/name</label>
+      <input id="remote-dispatch-repository" type="text" autocomplete="off" spellcheck="false" placeholder="Oleksii-debug/project">
+      <label for="remote-dispatch-issue">Номер GitHub Issue з dispatch-чергою</label>
+      <input id="remote-dispatch-issue" type="number" min="1" step="1" inputmode="numeric">
+
+      <label for="remote-dispatch-poll">Локальний мінімум між GitHub polls, секунд</label>
+      <input id="remote-dispatch-poll" type="number" min="180" max="3600" step="1" inputmode="numeric">
+      <label><input id="remote-dispatch-fallback-enabled" type="checkbox">Локальний fallback</label>
+      <label for="remote-dispatch-fallback-session">Локальна fallback Session</label>
+      <select id="remote-dispatch-fallback-session"><option value="">Не запускати fallback Session</option></select>
+      <label for="remote-dispatch-fallback-after">Поріг для fallback, секунд</label>
+      <input id="remote-dispatch-fallback-after" type="number" min="180" max="86400" step="1" inputmode="numeric">
+      <label><input id="remote-dispatch-auto-start" type="checkbox">Автоматично запускати eligible remote Sessions</label>
+
+      <button id="save-remote-dispatch-button" type="button">Зберегти</button>
+      <button id="test-remote-dispatch-button" type="button">Перевірити GitHub</button>
+      <button id="run-remote-dispatch-button" type="button">Застосувати зараз</button>
+      <p id="remote-dispatch-status" role="status">Remote Dispatch ще не налаштовано.</p>
+      <p id="remote-dispatch-runtime" tabindex="0">Поточний dispatch ще не завантажено.</p>
+    </details>
+
+
+    <section aria-labelledby="scenario-work-heading" data-app-mode="scenario-work">
+      <h2 id="scenario-work-heading" tabindex="-1">Сценарна робота</h2>
+      <p class="field-help">Конструктор циклів і командної роботи. Усі фактичні надсилання виконує звичайне ядро сеансів; цей модуль лише визначає черговість, ролі, кола, покоління та відновлення.</p>
+
+      <label for="scenario-work-list">Сценарії</label>
+      <select id="scenario-work-list" size="6" aria-describedby="scenario-work-summary"></select>
+      <div class="orchestra-actions" aria-label="Створення сценарію">
+        <button id="new-scenario-cycle-button" type="button">Новий цикл у чаті</button>
+        <button id="new-scenario-pairs-button" type="button">Нові двійки</button>
+        <button id="new-scenario-group-button" type="button">Новий аудитор + група</button>
+        <button id="new-scenario-pipeline-button" type="button">Новий FIRST → аудитор → SECOND</button>
+      </div>
+
+      <label for="scenario-work-name">Назва</label>
+      <input id="scenario-work-name" type="text" maxlength="120" autocomplete="off">
+      <p id="scenario-work-mode-label" class="field-help">Формат не вибрано.</p>
+      <div class="orchestra-actions" aria-label="Дії зі сценарієм">
+        <button id="save-scenario-work-button" type="button">Зберегти</button>
+        <button id="start-scenario-work-button" type="button">Запустити</button>
+        <button id="pause-scenario-work-button" type="button">Призупинити</button>
+        <button id="resume-scenario-work-button" type="button">Продовжити</button>
+        <button id="stop-scenario-work-button" type="button">Зупинити</button>
+        <button id="delete-scenario-work-button" type="button">Видалити</button>
+      </div>
+
+      <fieldset class="settings-group" id="scenario-work-common-settings">
+        <legend>Загальні параметри</legend>
+        <label for="scenario-work-rounds">Кіл у одному поколінні чатів</label>
+        <input id="scenario-work-rounds" type="number" min="1" max="10000" step="1" inputmode="numeric" value="10">
+        <label for="scenario-work-generations">Кількість поколінь чатів</label>
+        <input id="scenario-work-generations" type="number" min="0" max="10000" step="1" inputmode="numeric" value="0" aria-describedby="scenario-work-generations-help">
+        <p id="scenario-work-generations-help" class="field-help">0 — без обмеження. Після кожного покоління старі фізичні чати більше не використовуються.</p>
+        <label for="scenario-work-timeout">Скільки чекати завершення відповіді, хв</label>
+        <input id="scenario-work-timeout" type="number" min="1" max="1440" step="1" inputmode="numeric" value="40">
+        <label for="scenario-work-poll">Перевірка завершення відповіді, с</label>
+        <input id="scenario-work-poll" type="number" min="5" max="600" step="1" inputmode="numeric" value="15">
+        <label for="scenario-work-launch-gap">Пауза після завершення відповіді перед наступною роботою, с</label>
+        <input id="scenario-work-launch-gap" type="number" min="0" max="3600" step="1" inputmode="numeric" value="0" aria-describedby="scenario-work-launch-gap-help">
+        <p id="scenario-work-launch-gap-help" class="field-help">Відлік починається після фактичного завершення відповіді ChatGPT. Це саме значення також не дозволяє створювати кілька нових робіт частіше заданого інтервалу. 0 — запускати наступний готовий крок одразу.</p>
+        <label for="scenario-work-pre-send">Пауза перед надсиланням, с</label>
+        <input id="scenario-work-pre-send" type="number" min="1" max="30" step="1" inputmode="numeric" value="10">
+        <label for="scenario-work-busy-check">Повторна перевірка зайнятого чату, с</label>
+        <input id="scenario-work-busy-check" type="number" min="1" max="30" step="1" inputmode="numeric" value="3">
+        <label for="scenario-work-retry">Повтор після технічної помилки, с</label>
+        <input id="scenario-work-retry" type="number" min="5" max="3600" step="1" inputmode="numeric" value="30">
+        <label for="scenario-work-timeout-policy">Як діяти, якщо учасник завис</label>
+        <select id="scenario-work-timeout-policy">
+          <option value="REPLACE_MEMBER">Замінити тільки завислого учасника</option>
+          <option value="RESTART_GROUP">Після аварійного ходу аудитора створити всю команду заново</option>
+        </select>
+      </fieldset>
+
+      <div id="scenario-work-tabs" class="mode-tabs" role="tablist" aria-label="Формат сценарної роботи">
+        <button id="scenario-work-tab-cycle" type="button" role="tab" aria-selected="true">Цикли в чаті</button>
+        <button id="scenario-work-tab-pairs" type="button" role="tab" aria-selected="false" tabindex="-1">Двійки</button>
+        <button id="scenario-work-tab-group" type="button" role="tab" aria-selected="false" tabindex="-1">Аудитор + група</button>
+        <button id="scenario-work-tab-state" type="button" role="tab" aria-selected="false" tabindex="-1">Стан</button>
+      </div>
+
+      <div data-scenario-work-panel="cycle">
+        <fieldset class="settings-group">
+          <legend>Цикли в одному чаті</legend>
+          <label for="scenario-cycle-url">Початкова адреса ChatGPT</label>
+          <input id="scenario-cycle-url" type="url" autocomplete="off" spellcheck="false" value="https://chatgpt.com/">
+          <label><input id="scenario-cycle-restart-round-timeout" type="checkbox" checked>Після зависання нового чату повторити поточне коло з першого промпта</label>
+          <h3>Послідовність промптів</h3>
+          <p class="field-help">Кожен крок має власну кількість повторів. Наприклад: головний ×1 → «продовжуй» ×20 → фінальний ×1.</p>
+          <div id="scenario-cycle-steps"></div>
+          <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
+        </fieldset>
+      </div>
+
+      <div data-scenario-work-panel="pairs" hidden>
+        <fieldset class="settings-group">
+          <legend>Незалежні двійки «аудитор ↔ розробник»</legend>
+          <label for="scenario-pair-count">Кількість двійок</label>
+          <input id="scenario-pair-count" type="number" min="1" max="100" step="1" inputmode="numeric" value="1">
+          <label for="scenario-pair-auditor-url">Початкова адреса аудитора</label>
+          <input id="scenario-pair-auditor-url" type="url" value="https://chatgpt.com/">
+          <label for="scenario-pair-worker-url">Початкова адреса розробника</label>
+          <input id="scenario-pair-worker-url" type="url" value="https://chatgpt.com/">
+          <label for="scenario-pair-auditor-bootstrap">Початковий промпт новому аудитору</label>
+          <textarea id="scenario-pair-auditor-bootstrap" rows="6"></textarea>
+          <label for="scenario-pair-worker-bootstrap">Початковий промпт новому розробнику</label>
+          <textarea id="scenario-pair-worker-bootstrap" rows="6"></textarea>
+          <label for="scenario-pair-auditor-cycle">Постійний промпт аудитору в кожному колі</label>
+          <textarea id="scenario-pair-auditor-cycle" rows="3">Є на Drive.</textarea>
+          <label for="scenario-pair-worker-cycle">Постійний промпт розробнику в кожному колі</label>
+          <textarea id="scenario-pair-worker-cycle" rows="3">Є на Drive.</textarea>
+          <label for="scenario-pair-timeout-auditor">Спеціальний промпт аудитору, якщо хтось завис</label>
+          <textarea id="scenario-pair-timeout-auditor" rows="5"></textarea>
+          <label for="scenario-pair-replacement-auditor">Промпт новому аудитору при повній заміні двійки</label>
+          <textarea id="scenario-pair-replacement-auditor" rows="5"></textarea>
+        </fieldset>
+      </div>
+
+      <div data-scenario-work-panel="group" hidden>
+        <fieldset class="settings-group">
+          <legend>Один аудитор + кілька розробників</legend>
+          <label for="scenario-group-worker-count">Кількість розробників</label>
+          <input id="scenario-group-worker-count" type="number" min="1" max="200" step="1" inputmode="numeric" value="5">
+          <p class="field-help">Наступний хід аудитора дозволяється тільки після завершення всіх розробників або після спрацювання налаштованого тайм-ауту.</p>
+          <label for="scenario-group-auditor-url">Початкова адреса аудитора</label>
+          <input id="scenario-group-auditor-url" type="url" value="https://chatgpt.com/">
+          <label for="scenario-group-worker-url">Початкова адреса розробників</label>
+          <input id="scenario-group-worker-url" type="url" value="https://chatgpt.com/">
+          <label for="scenario-group-auditor-bootstrap">Початковий промпт новому аудитору</label>
+          <textarea id="scenario-group-auditor-bootstrap" rows="6"></textarea>
+          <label for="scenario-group-worker-bootstrap">Початковий промпт новому розробнику</label>
+          <textarea id="scenario-group-worker-bootstrap" rows="6"></textarea>
+          <label for="scenario-group-auditor-cycle">Постійний промпт аудитору</label>
+          <textarea id="scenario-group-auditor-cycle" rows="3">Є на Drive.</textarea>
+          <label for="scenario-group-worker-cycle">Постійний промпт розробникам</label>
+          <textarea id="scenario-group-worker-cycle" rows="3">Є на Drive.</textarea>
+          <label for="scenario-group-timeout-auditor">Спеціальний промпт аудитору при зависанні одного/кількох розробників</label>
+          <textarea id="scenario-group-timeout-auditor" rows="5"></textarea>
+          <label for="scenario-group-replacement-auditor">Промпт новому аудитору при повному перезапуску команди</label>
+          <textarea id="scenario-group-replacement-auditor" rows="5"></textarea>
+
+          <fieldset id="scenario-pipeline-settings" class="settings-group" hidden>
+            <legend>FIRST → аудитор → SECOND з перевіркою доказів</legend>
+            <p id="scenario-pipeline-help" class="field-help">Цей режим не запускає залежний слот, доки його внутрішні task_id-залежності не мають перевіреного фінального результату. Надісланий промпт або просто завершена відповідь не вважаються виконанням.</p>
+            <label for="scenario-pipeline-first-count">Кількість FIRST-воркерів</label>
+            <input id="scenario-pipeline-first-count" type="number" min="1" max="100" step="1" inputmode="numeric" value="10" aria-describedby="scenario-pipeline-help">
+            <label for="scenario-pipeline-second-count">Кількість SECOND-воркерів</label>
+            <input id="scenario-pipeline-second-count" type="number" min="0" max="100" step="1" inputmode="numeric" value="9">
+            <label for="scenario-pipeline-barrier-policy">Коли дозволити аудит</label>
+            <select id="scenario-pipeline-barrier-policy" aria-describedby="scenario-pipeline-barrier-help">
+              <option value="WAIT_ALL_TERMINAL">Лише після перевіреного завершення всіх FIRST</option>
+              <option value="TIMEBOXED_AUDIT">Після ліміту часу, але залежні SECOND все одно чекають prerequisites</option>
+            </select>
+            <p id="scenario-pipeline-barrier-help" class="field-help">Часовий ліміт дозволяє аудитору класифікувати незавершені роботи, але ніколи сам не робить залежність виконаною.</p>
+            <label for="scenario-pipeline-audit-timebox">Ліміт до аудиту, хв</label>
+            <input id="scenario-pipeline-audit-timebox" type="number" min="1" max="1440" step="1" inputmode="numeric" value="30">
+            <label for="scenario-pipeline-max-corrections">Максимум виправлень машинного результату в тому самому чаті</label>
+            <input id="scenario-pipeline-max-corrections" type="number" min="0" max="10" step="1" inputmode="numeric" value="2">
+            <label for="scenario-pipeline-first-prompt">Промпт FIRST-воркеру</label>
+            <textarea id="scenario-pipeline-first-prompt" rows="5">Є на Drive. Виконай поточний FIRST slot.</textarea>
+            <label for="scenario-pipeline-second-prompt">Промпт SECOND-воркеру</label>
+            <textarea id="scenario-pipeline-second-prompt" rows="5">Є на Drive. Виконай поточний SECOND slot.</textarea>
+            <label for="scenario-pipeline-auditor-prompt">Промпт аудитору</label>
+            <textarea id="scenario-pipeline-auditor-prompt" rows="6">Є на Drive. Проаудитуй поточний раунд і створи наступну allocation.</textarea>
+            <label for="scenario-pipeline-worker-correction">Промпт виправлення воркеру при невалідному фінальному результаті</label>
+            <textarea id="scenario-pipeline-worker-correction" rows="5">Попередня відповідь не містила валідного машинного результату. Не повторюй виконану роботу. Перевір фактичний стан і поверни правильний фінальний AUTOPILOT_SCENARIO_RESULT.</textarea>
+            <label for="scenario-pipeline-auditor-correction">Промпт виправлення аудитору при невалідній allocation</label>
+            <textarea id="scenario-pipeline-auditor-correction" rows="5">Попередня allocation не пройшла машинну перевірку. Не створюй другу конкуруючу allocation. Виправ поточну відповідь/Drive readback і поверни один валідний AUTOPILOT_AUDITOR_ALLOCATION.</textarea>
+          </fieldset>
+        </fieldset>
+      </div>
+
+      <div data-scenario-work-panel="state" hidden>
+        <h3>Поточний стан</h3>
+        <dl id="scenario-work-state"></dl>
+        <button id="scenario-work-run-now" type="button">Перевірити зараз</button>
+      </div>
+      <p id="scenario-work-summary" role="status">Сценарії ще не завантажені.</p>
+    </section>
+
+    <section aria-labelledby="local-ai-heading" data-app-mode="ai">
+      <h2 id="local-ai-heading">Локальний ШІ / модель</h2>
+      <label><input id="local-ai-enabled" type="checkbox" aria-describedby="local-ai-status">Увімкнути локальний ШІ</label>
+
+      <label for="local-ai-provider">Провайдер</label>
+      <select id="local-ai-provider">
+        <option value="ollama">Ollama</option>
+        <option value="openai-compatible">OpenAI-compatible / LM Studio</option>
+      </select>
+
+      <label for="local-ai-base-url">Адреса</label>
+      <input id="local-ai-base-url" type="url" autocomplete="off" spellcheck="false">
+
+      <label for="local-ai-model">Модель</label>
+      <input id="local-ai-model" type="text" list="local-ai-model-list" autocomplete="off" spellcheck="false">
+      <datalist id="local-ai-model-list"></datalist>
+
+      <label for="local-ai-timeout">Тайм-аут, с</label>
+      <input id="local-ai-timeout" type="number" min="5" max="600" step="1" inputmode="numeric">
+
+      <button id="save-local-ai-button" type="button">Зберегти</button>
+      <button id="test-local-ai-button" type="button">Перевірити</button>
+      <p id="local-ai-status" role="status">Локальний ШІ ще не перевірено.</p>
+
+      <label for="local-ai-test-prompt">Тестовий prompt</label>
+      <textarea id="local-ai-test-prompt" rows="5">Відповідай одним коротким реченням українською: локальна модель працює.</textarea>
+      <button id="run-local-ai-test-button" type="button">Запустити тест</button>
+      <pre id="local-ai-test-response" tabindex="0" aria-label="Відповідь локальної моделі"></pre>
+    </section>
+
+    <section aria-labelledby="ai-router-heading" data-app-mode="ai">
+      <h2 id="ai-router-heading">AI Router</h2>
+      <label><input id="ai-router-enabled" type="checkbox" aria-describedby="ai-router-status">Увімкнути AI Router</label>
+
+      <div class="notice" id="ai-router-openai-help">
+        <strong>OpenAI API.</strong> Для безпеки API key не зберігається у Chrome-розширенні.
+        У локальному пакеті запустіть файл «НАЛАШТУВАТИ OPENAI API КЛЮЧ.ps1»: ключ буде зашифровано Windows DPAPI для поточного Windows-користувача.
+        Потім запустіть AI Gateway, натисніть «Перевірити Gateway» і «Оновити моделі».
+        Підписка ChatGPT і OpenAI API — окремі продукти; API потребує окремого API-акаунта/ключа та білінгу.
+      </div>
+      <p id="ai-router-openai-key-status" role="status">OpenAI API key: статус ще не перевірено.</p>
+
+      <label for="ai-router-gateway-url">Gateway</label>
+      <input id="ai-router-gateway-url" type="url" autocomplete="off" spellcheck="false" value="http://127.0.0.1:17621">
+      <p class="field-help">Стандартна адреса локального Gateway: http://127.0.0.1:17621. OpenAI key залишається у Windows і не передається в налаштування розширення.</p>
+
+      <label for="ai-router-mode">Режим</label>
+      <select id="ai-router-mode">
+        <option value="primary">Завжди основна модель</option>
+        <option value="strong">Завжди сильна модель</option>
+        <option value="hybrid-auto">Гібрид AUTO — основна сама просить сильну</option>
+        <option value="hybrid-rules">Гібрид за правилами — сильна раз на N запитів / N хвилин</option>
+      </select>
+
+      <fieldset>
+        <legend>Основна модель</legend>
+        <label for="ai-router-primary-provider">Провайдер</label>
+        <select id="ai-router-primary-provider">
+          <option value="ollama">Локальна Ollama</option>
+          <option value="openai">OpenAI API через локальний Gateway</option>
+          <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
+        </select>
+        <label for="ai-router-primary-model">Модель</label>
+        <select id="ai-router-primary-model" aria-describedby="ai-router-model-help"></select>
+        <button id="ai-router-primary-models-button" type="button">Оновити моделі</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>Сильна / ескалаційна модель</legend>
+        <label for="ai-router-strong-provider">Провайдер</label>
+        <select id="ai-router-strong-provider">
+          <option value="openai">OpenAI API через локальний Gateway</option>
+          <option value="ollama">Локальна Ollama</option>
+          <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
+        </select>
+        <label for="ai-router-strong-model">Модель</label>
+        <select id="ai-router-strong-model" aria-describedby="ai-router-model-help"></select>
+        <button id="ai-router-strong-models-button" type="button">Оновити моделі</button>
+      </fieldset>
+
+      <p class="field-help" id="ai-router-model-help">Для OpenAI спочатку показуються рекомендовані GPT-5.6 Sol / Terra / Luna. «Оновити моделі» звертається через локальний Gateway до вашого API-акаунта і додає моделі, які реально повертає OpenAI. Модель повинна підтримувати текстовий Responses API.</p>
+
+      <h3 id="ai-router-route-pool-heading">Пул маршрутів моделей</h3>
+      <div id="ai-model-price-tabs" role="tablist" aria-label="Моделі за вартістю">
+        <button id="ai-model-free-tab" type="button" role="tab" aria-selected="true" aria-controls="ai-model-free-panel">Безкоштовні моделі</button>
+        <button id="ai-model-paid-tab" type="button" role="tab" aria-selected="false" aria-controls="ai-model-paid-panel" tabindex="-1">Платні моделі</button>
+      </div>
+      <section id="ai-model-free-panel" role="tabpanel" aria-labelledby="ai-model-free-tab" tabindex="0"><h4>Безкоштовні моделі</h4><ul id="ai-model-free-list"></ul></section>
+      <section id="ai-model-paid-panel" role="tabpanel" aria-labelledby="ai-model-paid-tab" tabindex="0" hidden><h4>Платні моделі</h4><ul id="ai-model-paid-list"></ul><h4>Вартість невідома</h4><ul id="ai-model-unknown-list"></ul></section>
+      <p class="field-help">Списки читаються зі збережених маршрутів Core. Віддалена модель без підтвердженої вартості належить до «Вартість невідома» й не запускається, доки не підтверджено безкоштовність або не задано ціну платної моделі.</p>
+      <p class="field-help" id="ai-router-route-pool-help">Необовʼязково. Якщо додано хоча б один маршрут, ролі planner, coder, fast-worker, verifier, critic і vision обираються з цього пулу. Порядок карток є порядком переваги. API keys тут не вводяться: OpenAI-compatible маршрут посилається лише на endpoint ID локального Gateway.</p>
+      <div id="ai-router-route-list" aria-labelledby="ai-router-route-pool-heading" aria-describedby="ai-router-route-pool-help"></div>
+      <button id="ai-router-add-route-button" type="button">Додати маршрут</button>
+      <button id="ai-router-add-mistral-button" type="button">Додати Містраль</button>
+      <button id="ai-router-add-openrouter-button" type="button">Додати OpenRouter</button>
+      <p class="field-help">Для Містраль ключ налаштовується локальним скриптом «НАЛАШТУВАТИ MISTRAL API.ps1» у папці companion/ai-gateway. Він зберігається захищено у Windows; у цю форму ключ не вставляйте. Після запуску Gateway натисніть «Отримати моделі цього постачальника» у маршруті Містраль.</p>
+      <p class="field-help">Для OpenRouter використайте «НАЛАШТУВАТИ OPENROUTER API.ps1» у тій самій папці. Ключ зберігається локально через Windows DPAPI. Після запуску Gateway отримайте каталог моделей у маршруті OpenRouter. Новий маршрут вимкнений і має невідому вартість, доки ви не налаштуєте його явно.</p>
+
+      <fieldset id="ai-router-route-policy">
+        <legend>Політика власника для пулу маршрутів</legend>
+        <label><input id="ai-router-auto-switch" type="checkbox">Автоматично переходити на наступний маршрут після quota, rate limit, timeout або недоступності</label>
+        <label for="ai-router-pinned-route">Закріпити один маршрут</label>
+        <select id="ai-router-pinned-route"><option value="">Не закріплювати</option></select>
+        <label><input id="ai-router-free-only" type="checkbox">Дозволяти лише безкоштовні маршрути</label>
+        <label for="ai-router-locality">Розташування</label>
+        <select id="ai-router-locality"><option value="any">Будь-яке</option><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
+        <label for="ai-router-max-input-price">Макс. ціна input за 1M токенів, USD (0 = без межі)</label>
+        <input id="ai-router-max-input-price" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+        <label for="ai-router-max-output-price">Макс. ціна output за 1M токенів, USD (0 = без межі)</label>
+        <input id="ai-router-max-output-price" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+        <label for="ai-router-backoff-seconds">Backoff після тимчасової помилки, с</label>
+        <input id="ai-router-backoff-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric">
+        <label for="ai-router-circuit-failures">Помилок до відкриття circuit breaker</label>
+        <input id="ai-router-circuit-failures" type="number" min="1" max="100" step="1" inputmode="numeric">
+        <label for="ai-router-circuit-seconds">Circuit breaker, с</label>
+        <input id="ai-router-circuit-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric">
+        <label for="ai-router-allow-routes">Allowlist маршрутів (порожньо = усі)</label>
+        <select id="ai-router-allow-routes" multiple size="4" aria-describedby="ai-router-route-select-help"></select>
+        <label for="ai-router-deny-routes">Denylist маршрутів</label>
+        <select id="ai-router-deny-routes" multiple size="4" aria-describedby="ai-router-route-select-help"></select>
+        <p class="field-help" id="ai-router-route-select-help">У multi-select використовуйте Ctrl+Space для вибору кількох маршрутів. Один маршрут не може одночасно бути в allowlist і denylist.</p>
+      </fieldset>
+
+      <fieldset id="ai-worker-allocation-policy"><legend>Кількість Agent workers</legend>
+        <label><input id="ai-worker-count-auto" type="radio" name="ai-worker-count-mode" value="auto" checked> Агент сам визначає кількість у межах політики</label>
+        <label><input id="ai-worker-count-manual" type="radio" name="ai-worker-count-mode" value="manual"> Задати кількість вручну за маршрутами</label>
+        <label for="ai-worker-min">Мінімум workers в автоматичному режимі</label><input id="ai-worker-min" type="number" min="1" max="200" step="1" inputmode="numeric" value="1">
+        <label for="ai-worker-max-parallel">Максимум одночасних workers</label><input id="ai-worker-max-parallel" type="number" min="1" max="200" step="1" inputmode="numeric" value="8">
+        <p class="field-help">У ручному режимі вкажіть кількість workers у кожному маршруті. Сума не може перевищувати загальну межу. Недоступні моделі не допускаються до запуску.</p>
+      </fieldset>
+
+      <template id="ai-router-route-template">
+        <fieldset class="ai-route-card" data-ai-route>
+          <legend data-route-legend>Маршрут</legend>
+          <label data-label-for="routeId">ID маршруту</label><input data-route-field="routeId" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="provider">Провайдер</label><select data-route-field="provider"><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="openai-compatible">OpenAI-compatible endpoint</option></select>
+          <label data-label-for="endpointId">Endpoint ID (лише OpenAI-compatible)</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="model">Модель</label><input data-route-field="model" type="text" autocomplete="off" spellcheck="false">
+          <button type="button" data-route-action="discover-models">Отримати моделі цього постачальника</button>
+          <label data-label-for="discoveredModel">Моделі постачальника</label><select data-route-field="discoveredModel"><option value="">Оберіть модель після оновлення</option></select>
+          <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>
+          <label data-label-for="capabilityIds">Capabilities через кому (порожньо = будь-які)</label><input data-route-field="capabilityIds" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="priority">Пріоритет</label><input data-route-field="priority" type="number" min="0" max="1000000" step="1" inputmode="numeric">
+          <label data-label-for="maxWorkers">Максимум workers цього маршруту, 0 = загальна межа</label><input data-route-field="maxWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
+          <label data-label-for="manualWorkers">Workers вручну для цього маршруту</label><input data-route-field="manualWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
+          <label data-label-for="locality">Розташування</label><select data-route-field="locality"><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
+          <label data-label-for="costClass">Вартість</label><select data-route-field="costClass"><option value="unknown">Невідомо</option><option value="free">Безкоштовний</option><option value="paid">Платний</option></select>
+          <label data-label-for="inputPricePerMillionUsd">Input USD / 1M</label><input data-route-field="inputPricePerMillionUsd" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+          <label data-label-for="outputPricePerMillionUsd">Output USD / 1M</label><input data-route-field="outputPricePerMillionUsd" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
+          <label><input type="checkbox" data-route-field="enabled">Маршрут увімкнений</label>
+          <label><input type="checkbox" data-route-field="supportsVision">Підтримує vision</label>
+          <p data-route-health tabindex="0">Статистика маршруту ще відсутня.</p>
+          <div class="ai-route-actions"><button type="button" data-route-action="up">Вище</button><button type="button" data-route-action="down">Нижче</button><button type="button" data-route-action="remove">Видалити маршрут</button></div>
+        </fieldset>
+      </template>
+
+      <label for="ai-router-every-n">Сильна кожні N запитів</label>
+      <input id="ai-router-every-n" type="number" min="0" max="10000" step="1" inputmode="numeric">
+
+      <label for="ai-router-every-minutes">Сильна кожні N хв</label>
+      <input id="ai-router-every-minutes" type="number" min="0" max="10080" step="1" inputmode="numeric">
+
+      <label for="ai-router-strong-min-gap">Мін. пауза сильної, хв</label>
+      <input id="ai-router-strong-min-gap" type="number" min="0" max="1440" step="1" inputmode="numeric">
+
+      <label for="ai-router-strong-max-hour">Макс. сильних/год</label>
+      <input id="ai-router-strong-max-hour" type="number" min="0" max="1000" step="1" inputmode="numeric">
+
+      <label><input id="ai-router-carry-strong" type="checkbox">Передавати strong handoff</label>
+
+      <label><input id="ai-router-fallback-strong" type="checkbox">Fallback на strong</label>
+      <label><input id="ai-router-keep-primary" type="checkbox">Зберегти primary при strong error</label>
+
+      <label for="ai-router-handoff-max">Handoff, символів</label>
+      <input id="ai-router-handoff-max" type="number" min="1000" max="50000" step="1000" inputmode="numeric">
+
+      <label for="ai-router-timeout">Тайм-аут, с</label>
+      <input id="ai-router-timeout" type="number" min="5" max="900" step="1" inputmode="numeric">
+
+      <button id="save-ai-router-button" type="button">Зберегти</button>
+      <button id="test-ai-gateway-button" type="button">Перевірити Gateway</button>
+      <button id="reset-ai-router-runtime-button" type="button">Скинути лічильники</button>
+      <p id="ai-router-status" role="status">AI-координатор ще не перевірено.</p>
+      <p id="ai-router-runtime" tabindex="0">Лічильники ще не завантажені.</p>
+
+      <label for="ai-router-test-prompt">Тестовий prompt</label>
+      <textarea id="ai-router-test-prompt" rows="6">Проаналізуй це коротке завдання і дай практичну відповідь українською.</textarea>
+      <button id="run-ai-router-test-button" type="button">Запустити</button>
+      <button id="run-ai-router-strong-button" type="button">Запустити strong</button>
+      <pre id="ai-router-test-response" tabindex="0" aria-label="Відповідь AI-координатора"></pre>
+    </section>
+
+    <section aria-labelledby="ai-manager-heading" data-app-mode="ai">
+      <h2 id="ai-manager-heading">AI Manager</h2>
+      <label><input id="ai-manager-enabled" type="checkbox" aria-describedby="ai-manager-status">Увімкнути AI Manager</label>
+      <label><input id="ai-manager-auto-apply" type="checkbox">Автозастосування</label>
+
+      <label for="ai-manager-every-n">Аналіз кожні N Send</label>
+      <input id="ai-manager-every-n" type="number" min="0" max="10000" step="1" inputmode="numeric">
+
+      <label for="ai-manager-every-minutes">Аналіз кожні N хв</label>
+      <input id="ai-manager-every-minutes" type="number" min="0" max="10080" step="1" inputmode="numeric">
+
+      <label><input id="ai-manager-on-complete" type="checkbox">Аналіз завершення</label>
+      <label><input id="ai-manager-on-errors" type="checkbox">Аналіз помилок</label>
+      <label for="ai-manager-error-threshold">Поріг помилок</label>
+      <input id="ai-manager-error-threshold" type="number" min="1" max="100" step="1" inputmode="numeric">
+
+      <label><input id="ai-manager-handoff-enabled" type="checkbox">Handoff у наступний prompt</label>
+      <label><input id="ai-manager-restart-completed" type="checkbox">Restart завершених one-pass</label>
+      <label><input id="ai-manager-session-tuning" type="checkbox">Безпечний tuning таймінгів</label>
+      <label for="ai-manager-handoff-max">Handoff, символів</label>
+      <input id="ai-manager-handoff-max" type="number" min="500" max="50000" step="500" inputmode="numeric">
+      <label for="ai-manager-context-max">Контекст, символів</label>
+      <input id="ai-manager-context-max" type="number" min="2000" max="100000" step="1000" inputmode="numeric">
+
+      <label for="ai-manager-failure-retry">Повтор після помилки, с</label>
+      <input id="ai-manager-failure-retry" type="number" min="10" max="3600" step="10" inputmode="numeric">
+
+      <fieldset>
+        <legend>Web-звіти</legend>
+        <label><input id="ai-manager-capture-web-reports" type="checkbox">Збирати фінальні відповіді</label>
+        <label><input id="ai-manager-on-web-report" type="checkbox">Аналіз нового звіту</label>
+        <label for="ai-manager-report-poll">Перевірка відповіді, с</label>
+        <input id="ai-manager-report-poll" type="number" min="5" max="3600" step="1" inputmode="numeric">
+        <label for="ai-manager-report-max-wait">Макс. очікування, хв</label>
+        <input id="ai-manager-report-max-wait" type="number" min="1" max="1440" step="1" inputmode="numeric">
+        <label for="ai-manager-report-max-chars">Макс. звіт, символів</label>
+        <input id="ai-manager-report-max-chars" type="number" min="1000" max="100000" step="1000" inputmode="numeric">
+      </fieldset>
+
+      <button id="save-ai-manager-button" type="button">Зберегти</button>
+      <button id="run-ai-manager-now-button" type="button">Аналіз зараз</button>
+      <button id="reset-ai-manager-runtime-button" type="button">Скинути стан</button>
+      <p id="ai-manager-status" role="status">AI Manager ще не налаштовано.</p>
+      <p id="ai-manager-runtime" tabindex="0">Стан менеджера ще не завантажено.</p>
+      <h3>Останні рішення AI Manager</h3>
+      <ol id="ai-manager-history" aria-live="polite"><li>Рішень ще немає.</li></ol>
+    </section>
+
+    <section aria-labelledby="portable-profile-heading" data-app-mode="sessions">
+      <h2 id="portable-profile-heading">Файл сесій</h2>
+      <a id="download-profile-template" href="../config/portable-profile-template.json" download="ChatGPT-Autopilot-profile-template.json">Шаблон JSON</a>
+      <label for="portable-profile-file">Імпорт JSON</label>
+      <input id="portable-profile-file" type="file" accept="application/json,.json" aria-describedby="portable-profile-preview">
+      <p id="portable-profile-preview" tabindex="0">Файл не вибрано.</p>
+      <button id="import-profile-button" type="button" disabled>Імпортувати</button>
+      <button id="import-profile-start-button" type="button" disabled>Імпорт + старт</button>
+      <button id="export-profile-button" type="button">Експортувати</button>
+    </section>
+
+    <section id="session-editor" aria-labelledby="session-heading" data-app-mode="sessions" hidden>
+      <h2 id="session-heading" tabindex="-1">Session</h2>
+      <div id="form-error-summary" tabindex="-1" role="region" aria-label="Configuration errors" hidden></div>
+
+      <section aria-labelledby="configuration-heading">
+        <h3 id="configuration-heading">Configuration</h3>
+        <label for="session-name">Session name</label>
+        <input id="session-name" type="text" autocomplete="off">
+
+        <fieldset id="task-configuration-mode">
+          <legend>Task configuration mode</legend>
+          <label><input id="mode-same-url-shared-prompt" type="radio" name="taskConfigurationMode" value="same-url-shared-prompt"> One ChatGPT link + one shared prompt</label>
+          <label><input id="mode-same-url-unique-prompts" type="radio" name="taskConfigurationMode" value="same-url-unique-prompts"> One ChatGPT link + different prompts</label>
+          <label><input id="mode-unique-urls-shared-prompt" type="radio" name="taskConfigurationMode" value="unique-urls-shared-prompt"> Different ChatGPT links + one shared prompt</label>
+          <label><input id="mode-unique-urls-unique-prompts" type="radio" name="taskConfigurationMode" value="unique-urls-unique-prompts"> Different ChatGPT links + different prompts</label>
+        </fieldset>
+
+        <div id="shared-url-container">
+          <label for="shared-task-url">ChatGPT link used for every task</label>
+          <input id="shared-task-url" type="url" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div id="shared-prompt-container">
+          <label for="shared-prompt">Shared prompt for every task</label>
+          <textarea id="shared-prompt" rows="8"></textarea>
+        </div>
+        <div id="unique-default-container" hidden>
+          <label for="default-unique-prompt">Optional default for empty prompt editors</label>
+          <textarea id="default-unique-prompt" rows="5"></textarea>
+          <button id="apply-default-prompt-button" type="button">Fill empty prompt editors with this text</button>
+        </div>
+
+        <fieldset id="prompt-cadence-settings">
+          <legend>Додаткові промпти за підтвердженими надсиланнями</legend>
+          <p id="prompt-cadence-help">Лічильник змінюється лише після підтвердженого успішного Send. BUSY, retry або непідтверджена спроба номер не змінюють. Якщо Prompt 2 і Prompt 3 збігаються на одному номері, використовується Prompt 3.</p>
+
+          <label><input id="prompt-2-enabled" type="checkbox" aria-describedby="prompt-cadence-help"> Увімкнути Prompt 2</label>
+          <label for="prompt-2-every">Prompt 2: кожне N-те підтверджене надсилання</label>
+          <input id="prompt-2-every" type="number" min="2" max="1000000" step="1" inputmode="numeric" value="10">
+          <label for="prompt-2-text">Prompt 2</label>
+          <textarea id="prompt-2-text" rows="6"></textarea>
+
+          <label><input id="prompt-3-enabled" type="checkbox" aria-describedby="prompt-cadence-help"> Увімкнути Prompt 3</label>
+          <label for="prompt-3-every">Prompt 3: кожне N-те підтверджене надсилання</label>
+          <input id="prompt-3-every" type="number" min="2" max="1000000" step="1" inputmode="numeric" value="20">
+          <label for="prompt-3-text">Prompt 3</label>
+          <textarea id="prompt-3-text" rows="6"></textarea>
+        </fieldset>
+
+        <fieldset id="drive-prompt-source-settings">
+          <legend>Google Drive — джерело промпта</legend>
+          <label><input id="drive-prompt-enabled" type="checkbox" aria-describedby="drive-prompt-help"> Автоматично оновлювати промпт з одного Google Drive / Google Docs файла</label>
+          <p id="drive-prompt-help">Використовується stable read: version до читання → повний текст → version після читання. Якщо версії різні, файл короткий або Drive недоступний, останній успішний локальний промпт не змінюється.</p>
+          <button id="authorize-session-drive-button" type="button">Авторизувати Google Drive</button>
+
+          <label for="drive-prompt-file">Google Drive / Docs посилання або file ID</label>
+          <input id="drive-prompt-file" type="text" autocomplete="off" spellcheck="false">
+
+          <label for="drive-prompt-target">Куди застосовувати файл</label>
+          <select id="drive-prompt-target">
+            <option value="PRIMARY">Primary prompt</option>
+            <option value="PROMPT_2">Prompt 2</option>
+            <option value="PROMPT_3">Prompt 3</option>
+          </select>
+
+          <label for="drive-prompt-interval">Перевіряти кожні, хвилин</label>
+          <input id="drive-prompt-interval" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3">
+
+          <label for="drive-prompt-min-chars">Мінімальна довжина прийнятого промпта, символів</label>
+          <input id="drive-prompt-min-chars" type="number" min="1" max="1000000" step="1" inputmode="numeric" value="1000">
+
+          <p id="drive-prompt-status" role="status">Drive source вимкнено.</p>
+        </fieldset>
+
+        <fieldset id="calendar-schedule-settings">
+          <legend>Календарний розклад</legend>
+          <p id="calendar-help">Усі дати й час можна вводити без миші. Формат дати: YYYY-MM-DD. Формат часу: HH:MM. Для кількох часів або явних запусків використовуйте по одному запису в рядку.</p>
+
+          <label for="calendar-mode">Режим календаря</label>
+          <select id="calendar-mode" aria-describedby="calendar-help">
+            <option value="NONE">Зараз / без календаря</option>
+            <option value="ONE_TIME">Одноразово у точну дату й час</option>
+            <option value="DAILY">Щоденний повторюваний розклад</option>
+            <option value="WEEKLY">Щотижневий розклад за вибраними днями</option>
+            <option value="EXPLICIT">Явний список дат і часу</option>
+          </select>
+
+          <div id="calendar-common-fields" hidden>
+            <label for="calendar-time-zone">Часовий пояс IANA</label>
+            <input id="calendar-time-zone" type="text" autocomplete="off" spellcheck="false" placeholder="Europe/Bratislava" aria-describedby="calendar-help">
+            <label><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски</label>
+            <label><input id="calendar-revision-confirm" type="checkbox" aria-describedby="calendar-revision-help"> Підтверджую зміну вже існуючого календарного розкладу</label>
+            <p id="calendar-revision-help">Зміна дати, часу, часового поясу, recurrence або catch-up створює нову revision occurrence identity. Для вже збереженого календаря Core не прийме таку зміну без цього явного підтвердження.</p>
+          </div>
+
+          <div id="calendar-one-time-fields" hidden>
+            <label for="calendar-one-time-date">Дата запуску</label>
+            <input id="calendar-one-time-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+            <label for="calendar-one-time-time">Час запуску</label>
+            <input id="calendar-one-time-time" type="text" inputmode="numeric" autocomplete="off" placeholder="21:00" aria-describedby="calendar-help">
+          </div>
+
+          <div id="calendar-recurring-fields" hidden>
+            <label for="calendar-start-date">Дата початку повторення</label>
+            <input id="calendar-start-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-09-25" aria-describedby="calendar-help">
+
+            <label for="calendar-times">Часи запуску, по одному в рядку</label>
+            <textarea id="calendar-times" rows="4" spellcheck="false" aria-describedby="calendar-times-help"></textarea>
+            <p id="calendar-times-help">Щоб додати час, додайте новий рядок. Щоб видалити час, видаліть відповідний рядок.</p>
+
+            <fieldset id="calendar-weekdays" hidden>
+              <legend>Дні тижня</legend>
+              <label><input id="calendar-weekday-1" type="checkbox"> Понеділок</label>
+              <label><input id="calendar-weekday-2" type="checkbox"> Вівторок</label>
+              <label><input id="calendar-weekday-3" type="checkbox"> Середа</label>
+              <label><input id="calendar-weekday-4" type="checkbox"> Четвер</label>
+              <label><input id="calendar-weekday-5" type="checkbox"> П’ятниця</label>
+              <label><input id="calendar-weekday-6" type="checkbox"> Субота</label>
+              <label><input id="calendar-weekday-7" type="checkbox"> Неділя</label>
+            </fieldset>
+
+            <label for="calendar-end-date">Необов’язкова кінцева дата</label>
+            <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" placeholder="2026-12-31" aria-describedby="calendar-help">
+            <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
+            <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
+          </div>
+
+          <div id="calendar-explicit-fields" hidden>
+            <label for="calendar-explicit-occurrences">Явні дати й час, по одному запуску в рядку</label>
+            <textarea id="calendar-explicit-occurrences" rows="6" spellcheck="false" placeholder="2026-09-25 09:00&#10;2026-09-25 14:00&#10;2026-09-25 21:00" aria-describedby="calendar-help"></textarea>
+          </div>
+
+          <p id="calendar-runtime-status" role="status" tabindex="0">Календарний розклад вимкнено.</p>
+        </fieldset>
+
+        <fieldset id="run-mode">
+          <legend>Run mode</legend>
+          <label><input id="run-mode-one-pass" type="radio" name="runMode" value="one-pass"> One pass</label>
+          <label><input id="run-mode-continuous" type="radio" name="runMode" value="continuous"> Continuous monitor</label>
+        </fieldset>
+      </section>
+
+      <section aria-labelledby="tasks-heading">
+        <h3 id="tasks-heading">Tasks / cycles</h3>
+        <label for="task-count">Number of tasks / cycles</label>
+        <input id="task-count" type="number" min="1" max="1000000" step="1" inputmode="numeric" aria-describedby="task-count-help">
+        <p id="task-count-help">Up to 1,000,000 cycles are available when one shared ChatGPT link and one shared prompt are used. Modes with separate links or prompts support up to 1,000 physical tasks.</p>
+        <div id="bulk-url-region" hidden>
+          <label for="bulk-task-urls">Bulk ChatGPT links</label>
+          <textarea id="bulk-task-urls" rows="6"></textarea>
+          <button id="bulk-add-urls-button" type="button">Add recognized links</button>
+          <button id="bulk-replace-urls-button" type="button">Replace task links with recognized links</button>
+          <p id="bulk-task-result" tabindex="0">No bulk link operation has been run.</p>
+        </div>
+        <p id="generated-task-summary" tabindex="0"></p>
+        <ol id="task-list"></ol>
+      </section>
+
+      <section aria-labelledby="timing-heading">
+        <h3 id="timing-heading">Timing and behavior</h3>
+        <label for="minimum-send-interval">Minimum interval between actual sends</label>
+        <input id="minimum-send-interval" type="number" min="1" step="1" inputmode="numeric">
+        <label for="minimum-send-interval-unit">Interval unit</label>
+        <select id="minimum-send-interval-unit">
+          <option value="minutes">Minutes</option>
+          <option value="seconds">Seconds</option>
+        </select>
+
+        <label for="pre-send-delay">Delay after prompt insertion before Send, seconds</label>
+        <input id="pre-send-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
+
+        <label for="busy-check-delay">Busy-check, с</label>
+        <input id="busy-check-delay" type="number" min="1" max="30" step="1" inputmode="numeric">
+
+        <label for="retry-backoff">Retry/backoff wait</label>
+        <input id="retry-backoff" type="number" min="5" max="3600" step="1" inputmode="numeric">
+        <label for="retry-backoff-unit">Retry/backoff unit</label>
+        <select id="retry-backoff-unit">
+          <option value="seconds">Seconds</option>
+          <option value="minutes">Minutes</option>
+        </select>
+
+        <fieldset id="retry-policy">
+          <legend>Retry policy</legend>
+          <label><input type="radio" name="retryPolicy" value="safe" checked> Unattended automatic retries (recommended)</label>
+          <label><input type="radio" name="retryPolicy" value="manual"> Manual review after temporary failure</label>
+        </fieldset>
+
+        <label for="busy-chat-behavior">Busy chat behavior</label>
+        <select id="busy-chat-behavior">
+          <option value="skip-next">Skip immediately to next enabled task</option>
+        </select>
+
+        <fieldset id="tab-strategy">
+          <legend>Tab strategy</legend>
+          <label><input id="tab-strategy-keep-open" type="radio" name="tabStrategy" value="keep-open"> Keep task tabs open</label>
+          <label><input id="tab-strategy-worker" type="radio" name="tabStrategy" value="worker"> Use one worker tab for this session</label>
+          <label><input id="tab-strategy-open-close" type="radio" name="tabStrategy" value="open-close"> Open and close per task</label>
+        </fieldset>
+      </section>
+
+      <section aria-labelledby="controls-heading">
+        <h3 id="controls-heading">Controls</h3>
+        <button id="save-session-button" type="button">Save session</button>
+        <button id="start-session-button" type="button">Start</button>
+        <button id="pause-session-button" type="button">Pause</button>
+        <button id="resume-session-button" type="button">Resume</button>
+        <button id="stop-session-button" type="button">Stop</button>
+        <p id="draft-status" tabindex="0">No unsaved draft changes.</p>
+        <p id="command-result" tabindex="0">No runtime command has been issued.</p>
+      </section>
+
+      <section aria-labelledby="status-heading">
+        <h3 id="status-heading">Status</h3>
+        <div id="session-status-region"></div>
+        <div id="uncertain-recovery" hidden>
+          <h4>Відновлення непідтвердженого надсилання</h4>
+          <p id="uncertain-help">Перевірити ще раз — лише перевірка, без нового надсилання. Якщо обираєте повтор, перевірте останні повідомлення розмови: повтор може створити дублікат. Пропуск вимикає це завдання; інші залишаються увімкненими.</p>
+          <button id="uncertain-check" type="button" aria-describedby="uncertain-help">Перевірити ще раз без надсилання</button>
+          <label><input id="uncertain-confirm" type="checkbox">Я розумію: повтор може створити дублікат, а пропуск вимкне поточне завдання.</label>
+          <button id="uncertain-retry" type="button" disabled>Дозволити повтор поточного завдання</button>
+          <button id="uncertain-skip" type="button" disabled>Пропустити й вимкнути поточне завдання</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="log-heading">
+        <h3 id="log-heading">Log</h3>
+        <p id="session-log-count">0 Core log entries shown.</p>
+        <pre id="session-log-region" tabindex="0" aria-label="Session log"></pre>
+        <button id="clear-log-button" type="button">Clear log</button>
+      </section>
+
+      <section aria-labelledby="run-timeline-heading">
+        <h3 id="run-timeline-heading">Хронологія виконання та докази</h3>
+        <p id="run-timeline-help">Лише читання: структуровані стани Core і вже зредаговані ідентифікатори ChatGPT. Довільний текст журналів, помилок, промптів, ключі доступу, дані входу й приватні посилання тут не показуються.</p>
+        <label for="run-timeline-source-filter">Показувати джерела</label>
+        <select id="run-timeline-source-filter" aria-describedby="run-timeline-help">
+          <option value="ALL">Усі події</option>
+          <option value="LOG">Core log</option>
+          <option value="DIAGNOSTIC">Діагностика</option>
+        </select>
+        <button id="refresh-run-timeline-button" type="button" aria-describedby="run-timeline-help run-timeline-status">Оновити хронологію</button>
+        <p id="run-timeline-status" tabindex="0">Хронологію ще не завантажено.</p>
+        <ol id="run-timeline-list" aria-label="Хронологія виконання вибраного сеансу"></ol>
+      </section>
+
+      <section aria-labelledby="diagnostics-heading">
+        <h3 id="diagnostics-heading">Діагностика</h3>
+        <button id="download-diagnostic-report-button" type="button" aria-describedby="diagnostic-report-status">Діагностичний звіт</button>
+        <p id="diagnostic-report-status" tabindex="0">Діагностичний звіт ще не завантажували.</p>
+      </section>
+    </section>
+
+    <section id="empty-state" aria-labelledby="empty-heading">
+      <h2 id="empty-heading">No session selected</h2>
+      <p>Create or open a session to configure automation.</p>
+    </section>
+  </main>
+</div>
+<div id="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-heading" aria-describedby="delete-dialog-description" hidden>
+  <h2 id="delete-dialog-heading">Delete session?</h2>
+  <p id="delete-dialog-description">This removes the selected session configuration.</p>
+  <button id="confirm-delete-button" type="button">Delete session</button>
+  <button id="cancel-delete-button" type="button">Cancel</button>
+</div>
+<div id="live-announcer" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+<script type="module" src="uk-localization.js"></script>
+<script type="module" src="runtime-reload-guard.js"></script>
+<script type="module" src="start-save-guard.js"></script>
+<script type="module" src="options.js"></script>
+</body>
+</html>

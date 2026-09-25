@@ -1,0 +1,13 @@
+ChatGPT Автопілот 0.9.16 — VISION COMPUTER-USE / COORDINATE NATIVE INPUT
+
+WIP/FROZEN CHANGELOG — 2026-09-14
+
+- Browser Agent vision тепер має bounded computer-use fallback `click_at` для visible custom/canvas/icon UI без usable DOM/ARIA ref.
+- `click_at` дозволений тільки в reasoning-turn, де runtime реально прикріпив screenshot; координати з минулого turn не приймаються.
+- Координати валідовані в межах поточного CSS viewport; top-frame live target повторно визначається перед виконанням.
+- Runtime під координатою піднімає semantic actionable ancestor (button/link/input/etc.) коли він існує; для pure visual surface зберігається visualOnly evidence.
+- Default CONSEQUENTIAL policy повторно використовує approval boundary: submit/consequential semantic targets потребують approval; visual-only/canvas target fail-closed до approval. ALLOW_ALL лишається явним owner opt-in.
+- Approval TOCTOU захист поширено на coordinate action: target fingerprint повторно перевіряється після owner approval і ще раз безпосередньо перед CDP mouse dispatch.
+- Native coordinate click використовує Chrome DevTools Protocol Input.dispatchMouseEvent; модель не отримує raw Chrome tab ids.
+- Real Chromium generic Agent smoke тепер включає visual-only canvas coordinate click E2E.
+- Старі Ordinary/Scenario/Orchestration timing/cadence contracts не змінені.

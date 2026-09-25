@@ -1,0 +1,49 @@
+QA 0.4.0 — AUTONOMOUS AI MANAGER + HYBRID MODELS + WINDOWS GATEWAY
+
+FINAL AUTOMATED MATRIX ПІСЛЯ ОСТАННІХ ЗМІН:
+- New AI / Gateway / Windows companion: 75/75 PASS.
+- Core + integration regression: 233/233 PASS.
+- ChatGPT interaction regression: 111/111 PASS.
+- UI regression: 45/45 PASS.
+- Reliability regression: 22/22 PASS, включно з randomized unattended states.
+- Legacy AI Manager regression: 18/18 PASS.
+- Release gates: 7/7 PASS.
+- JavaScript/MJS/CJS syntax check: PASS.
+- Product JSON parse: PASS.
+- Разом автоматизованих тестів: 511/511 PASS.
+
+ОКРЕМО ПЕРЕВІРЕНО:
+- extension client -> real localhost HTTP Gateway -> mocked Ollama/OpenAI/OpenAI-compatible upstream;
+- Gateway /health та /status;
+- direct Gateway process PID lifecycle: PID створюється, health повертає той самий PID, SIGTERM прибирає PID-файл;
+- provider/model selection для primary та strong;
+- primary / strong / hybrid-auto / hybrid-rules;
+- primary сам просить strong через [[ESCALATE]];
+- strong review кожні N AI-запитів та/або N хвилин;
+- time rule не викликає strong на першому запиті;
+- strong result може перейти назад у контекст primary;
+- primary failure -> optional strong fallback;
+- strong failure -> optional primary result preservation;
+- minimum-gap та max-per-hour guards для автоматичних strong-pass;
+- manual one-shot strong bypasses only automatic spend guard by explicit user action;
+- durable AI Router runtime;
+- AI Manager event capture / durable queue / decision / single-use handoff;
+- durable decision history останніх 50 рішень без дублювання handoff text;
+- web report baseline correlation і streaming retry;
+- pending web-report jobs та manager events survive restart;
+- COMPLETE -> manager handoff -> optional safe one-pass restart;
+- manual Stop не перезапускається;
+- ambiguous Send/rate-limit hold не обходиться AI Manager;
+- Gateway/model failure preserves queue і використовує bounded exponential backoff;
+- localhost-only Gateway URL у Chrome extension;
+- normal web-page Origin відхиляється Gateway, chrome-extension Origin приймається;
+- Windows scripts: pinned portable Node download + SHA256 gate, DPAPI OpenAI key, LocalAppData install/update, Startup shortcut, one-click start, PID-safe stop/restart;
+- updater preserves config/runtime/logs і безпечно зупиняє керований попередній Gateway перед заміною;
+- old multi-session/rate-limit/recovery/interaction regressions remain green.
+
+НЕ ЗАЯВЛЕНО ЯК ФІЗИЧНО ПЕРЕВІРЕНЕ:
+- реальний запуск PowerShell installer/DPAPI/Startup на ПК користувача;
+- реальна Ollama/LM Studio installation і конкретна локальна модель на ПК користувача;
+- реальний OpenAI API account/key та billing;
+- overnight physical run із AI Manager на реальних Chrome-акаунтах;
+- physical NVDA acceptance.
