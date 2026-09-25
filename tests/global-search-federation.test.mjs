@@ -150,6 +150,50 @@ test('same exact source revision from multiple providers is fused deterministica
   assert.deepEqual(fusedSource.providerRefs.map(ref => ref.providerId), ['provider-index', 'provider-project']);
 });
 
+test('source revision identity is digest-independent and conflicting digests fail closed', () => {
+  const withoutDigest = batch({
+    hits: [hit({ contentSha256: '' })],
+  });
+  const withDigest = batch({
+    providerId: 'provider-index',
+    hits: [hit({ hitId: 'hit-2', contentSha256: SHA })],
+  });
+  const admittedSearchScopes = [
+    { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+    { providerId: 'provider-index', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+  ];
+
+  const first = fuseGlobalSearchV1(fusion({
+    providerResults: [withoutDigest, withDigest],
+    admittedSearchScopes,
+  }));
+  const reversed = fuseGlobalSearchV1(fusion({
+    providerResults: [withDigest, withoutDigest],
+    admittedSearchScopes: [...admittedSearchScopes].reverse(),
+  }));
+
+  assert.deepEqual(first, reversed);
+  assert.equal(first.results.length, 1);
+  assert.equal(first.results[0].contentSha256, SHA);
+  assert.deepEqual(
+    first.results[0].providerRefs.map(ref => [ref.providerId, ref.contentSha256]),
+    [['provider-index', SHA], ['provider-project', '']],
+  );
+
+  const conflicting = batch({
+    providerId: 'provider-index',
+    hits: [hit({ hitId: 'hit-2', contentSha256: 'b'.repeat(64) })],
+  });
+  assert.throws(() => fuseGlobalSearchV1(fusion({
+    providerResults: [batch(), conflicting],
+    admittedSearchScopes,
+  })), /conflicting content digest/);
+
+  assert.throws(() => normalizeGlobalSearchProviderResultV1(batch({
+    hits: [hit(), hit({ hitId: 'hit-2', rank: 2, contentSha256: 'b'.repeat(64) })],
+  })), /duplicate provider source identity/);
+});
+
 test('different revisions never collapse into one result', () => {
   const second = batch({
     providerId: 'provider-index',
