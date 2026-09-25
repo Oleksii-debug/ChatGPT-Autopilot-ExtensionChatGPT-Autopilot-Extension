@@ -363,6 +363,15 @@ function normalizeEffectBinding(input) {
   if (!state.verification || state.verification.status !== VerificationStatus.VERIFIED) {
     throw new Error('Deployment effect requires VERIFIED canonical exact-effect evidence');
   }
+  if (!state.verification.verifierId || !state.verification.verificationAuthorityId) {
+    throw new Error('Deployment effect requires verifier and verification-authority identity');
+  }
+  if (state.verification.verifiedAt > state.updatedAt) {
+    throw new Error('Deployment exact-effect verification cannot postdate durable effect state');
+  }
+  if (state.observation?.observedAt && state.observation.observedAt > state.updatedAt) {
+    throw new Error('Deployment exact-effect observation cannot postdate durable effect state');
+  }
   return deepFreeze({
     schemaVersion: 1,
     effectId,
@@ -693,6 +702,9 @@ function resolveEffect(resolver, event, state, expectedKind, artifact, expectedE
     throw new Error('Resolved exact-effect identity mismatch');
   }
   if (binding.kind !== expectedKind) throw new Error('Resolved exact-effect kind mismatch');
+  if (binding.state.verification.verifierId === state.publisherId) {
+    throw new Error('Deployment exact-effect verifier must be independent from publisher');
+  }
   if (binding.projectId !== state.projectId || binding.targetId !== state.targetId) {
     throw new Error('Resolved exact-effect subject project/target mismatch');
   }
