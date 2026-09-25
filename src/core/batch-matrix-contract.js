@@ -21,11 +21,6 @@ export const BatchMatrixState = Object.freeze({
 });
 
 const STATUSES = new Set(Object.values(BatchItemStatus));
-const TERMINAL = new Set([
-  BatchItemStatus.PASS,
-  BatchItemStatus.FAIL,
-  BatchItemStatus.CANCELLED,
-]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 
@@ -42,6 +37,7 @@ const SPEC_KEYS = new Set([
 ]);
 const AXIS_KEYS = new Set(['axisId', 'values']);
 const VALUE_KEYS = new Set(['valueId', 'valueRef', 'sensitive']);
+const EVIDENCE_REF_KEYS = new Set(['projectId', 'artifactId', 'versionId', 'sha256']);
 const RESULT_KEYS = new Set([
   'schemaVersion',
   'batchId',
@@ -51,7 +47,7 @@ const RESULT_KEYS = new Set([
   'actorId',
   'verifierId',
   'reasonCode',
-  'evidenceArtifactIds',
+  'evidenceRefs',
   'startedAt',
   'completedAt',
 ]);
@@ -234,10 +230,17 @@ export function normalizeBatchMatrixSpecV1(input) {
   }).map(normalizeAxis);
 
   const axisIds = new Set();
+  const globalValueRefs = new Set();
   let product = 1;
   for (const axis of axes) {
     if (axisIds.has(axis.axisId)) throw new Error('axes contains duplicate axisId');
     axisIds.add(axis.axisId);
+    for (const value of axis.values) {
+      if (globalValueRefs.has(value.valueRef)) {
+        throw new Error('axes contains duplicate valueRef alias');
+      }
+      globalValueRefs.add(value.valueRef);
+    }
     if (product > Math.floor(MAX_BATCH_ITEMS / axis.values.length)) {
       throw new Error('batch matrix Cartesian product exceeds item bound');
     }
@@ -311,7 +314,7 @@ export async function expandBatchMatrixV1(
 
   for (const parameters of assignments) {
     const digest = await itemDigest(spec, parameters, cryptoApi);
-    const itemId = spec.batchId + ':item:' + digest.slice(0, 24);
+    const itemId = 'batch-item:' + digest.slice(0, 32);
     if (itemIds.has(itemId)) throw new Error('batch item identity collision');
     itemIds.add(itemId);
     items.push(freezeDeep({
@@ -337,6 +340,33 @@ export async function expandBatchMatrixV1(
   });
 }
 
+function normalizeEvidenceRef(input, label) {
+  const raw = record(input, label);
+  exactKeys(raw, EVIDENCE_REF_KEYS, label);
+  return freezeDeep({
+    projectId: id(raw.projectId, label + ' projectId'),
+    artifactId: id(raw.artifactId, label + ' artifactId'),
+    versionId: id(raw.versionId, label + ' versionId'),
+    sha256: sha256(raw.sha256, label + ' sha256'),
+  });
+}
+
+function normalizeEvidenceRefs(input, label) {
+  const refs = denseArray(input, label, { max: 128 })
+    .map((item, index) => normalizeEvidenceRef(item, label + '[' + index + ']'));
+  const seen = new Set();
+  for (const ref of refs) {
+    const identity = ref.projectId + '\\u0000' + ref.artifactId + '\\u0000' + ref.versionId;
+    if (seen.has(identity)) throw new Error(label + ' contains duplicate artifact version identity');
+    seen.add(identity);
+  }
+  refs.sort((left, right) =>
+    compareText(left.projectId, right.projectId)
+    || compareText(left.artifactId, right.artifactId)
+    || compareText(left.versionId, right.versionId));
+  return refs;
+}
+
 function normalizeResult(input, index, spec, itemById) {
   const label = 'results[' + index + ']';
   const raw = record(input, label);
@@ -359,10 +389,9 @@ function normalizeResult(input, index, spec, itemById) {
   const actorId = id(raw.actorId, label + ' actorId', { optional: true });
   const verifierId = id(raw.verifierId, label + ' verifierId', { optional: true });
   const reasonCode = id(raw.reasonCode, label + ' reasonCode', { optional: true });
-  const evidenceArtifactIds = normalizeIds(
-    raw.evidenceArtifactIds ?? [],
-    label + ' evidenceArtifactIds',
-    { max: 128 },
+  const evidenceRefs = normalizeEvidenceRefs(
+    raw.evidenceRefs ?? [],
+    label + ' evidenceRefs',
   );
   const startedAt = timestamp(raw.startedAt, label + ' startedAt', { optional: true });
   const completedAt = timestamp(raw.completedAt, label + ' completedAt', { optional: true });
@@ -379,16 +408,16 @@ function normalizeResult(input, index, spec, itemById) {
   }
 
   if (status === BatchItemStatus.PENDING) {
-    if (actorId || verifierId || reasonCode || evidenceArtifactIds.length || startedAt || completedAt) {
+    if (actorId || verifierId || reasonCode || evidenceRefs.length || startedAt || completedAt) {
       throw new Error(label + ' PENDING cannot carry execution or terminal evidence');
     }
   } else if (status === BatchItemStatus.RUNNING) {
     if (!actorId || !startedAt) throw new Error(label + ' RUNNING requires actorId and startedAt');
-    if (verifierId || reasonCode || evidenceArtifactIds.length || completedAt) {
+    if (verifierId || reasonCode || evidenceRefs.length || completedAt) {
       throw new Error(label + ' RUNNING cannot carry terminal evidence');
     }
   } else {
-    if (!actorId || !verifierId || !startedAt || !completedAt || !evidenceArtifactIds.length) {
+    if (!actorId || !verifierId || !startedAt || !completedAt || !evidenceRefs.length) {
       throw new Error(label + ' terminal result requires actor, verifier, times and evidence');
     }
     if (actorId === verifierId) {
@@ -411,7 +440,7 @@ function normalizeResult(input, index, spec, itemById) {
     actorId,
     verifierId,
     reasonCode,
-    evidenceArtifactIds: Object.freeze(evidenceArtifactIds),
+    evidenceRefs: Object.freeze(evidenceRefs),
     startedAt,
     completedAt,
   });
@@ -427,7 +456,7 @@ function implicitPending(spec, item) {
     actorId: '',
     verifierId: '',
     reasonCode: '',
-    evidenceArtifactIds: Object.freeze([]),
+    evidenceRefs: Object.freeze([]),
     startedAt: '',
     completedAt: '',
   });
