@@ -4,6 +4,7 @@ import {
   classifyAiRouteError,
   normalizeAiRoutePolicy,
   normalizeAiRoutePool,
+  normalizeAiWorkerPolicy,
   recordAiRouteOutcome,
   selectAiRouteCandidates,
 } from '../src/core/ai-route-pool.js';
@@ -353,6 +354,54 @@ test('economic route and policy arrays snapshot length without ordinary Proxy re
   const policy = normalizeAiRoutePolicy({ orderedRouteIds:ordered });
   assert.deepEqual(policy.orderedRouteIds, ['proxy-safe']);
   assert.equal(reads, 0, 'policy authority arrays must not perform ordinary caller reads');
+});
+
+test('worker allocation policy snapshots outer and per-route authority without getters', () => {
+  let reads = 0;
+  const manualTarget = { 'free-local': 1 };
+  const manual = new Proxy(manualTarget, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+  const policyTarget = {
+    allocationMode:'manual',
+    maxParallelWorkers:2,
+    manualRouteWorkers:manual,
+  };
+  const policy = new Proxy(policyTarget, {
+    get(target, property, receiver) {
+      reads += 1;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalized = normalizeAiWorkerPolicy(policy, routes());
+  assert.equal(normalized.allocationMode, 'manual');
+  assert.equal(normalized.manualRouteWorkers['free-local'], 1);
+  assert.equal(reads, 0, 'worker allocation authority must use descriptor snapshots only');
+
+  const hidden = { 'free-local': 1 };
+  Object.defineProperty(hidden, 'paid-remote', { value:1, enumerable:false });
+  assert.throws(
+    () => normalizeAiWorkerPolicy({ allocationMode:'manual', manualRouteWorkers:hidden }, routes()),
+    /enumerable own data property/u,
+  );
+
+  const accessor = {};
+  Object.defineProperty(accessor, 'free-local', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 1;
+    },
+  });
+  assert.throws(
+    () => normalizeAiWorkerPolicy({ allocationMode:'manual', manualRouteWorkers:accessor }, routes()),
+    /enumerable own data property/u,
+  );
+  assert.equal(reads, 0, 'manual allocation getters must never execute');
 });
 
 test('route final tie-break uses locale-independent code-unit order', () => {
