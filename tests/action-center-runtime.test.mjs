@@ -420,3 +420,160 @@ test('malformed Browser Agent approval fences fail closed instead of manufacturi
     assert.equal(projection.items.length, 0);
   }
 });
+
+
+test('Action Center public envelopes reject accessor-backed fields without executing getters', async () => {
+  let projectionGetterCalls = 0;
+  const projectionInput = {};
+  Object.defineProperty(projectionInput, 'agentJobs', {
+    enumerable: true,
+    get() {
+      projectionGetterCalls += 1;
+      return [];
+    },
+  });
+  await assert.rejects(
+    () => projectRuntimeActionCenter(projectionInput),
+    /enumerable own data properties/u,
+  );
+  assert.equal(projectionGetterCalls, 0);
+
+  let resolverGetterCalls = 0;
+  const resolverInput = {
+    itemId: 'item',
+    sourceRevisionId: 'revision',
+    decision: 'APPROVE',
+  };
+  Object.defineProperty(resolverInput, 'agentJobs', {
+    enumerable: true,
+    get() {
+      resolverGetterCalls += 1;
+      return [];
+    },
+  });
+  await assert.rejects(
+    () => resolveRuntimeActionCenterBrowserApproval(resolverInput),
+    /enumerable own data properties/u,
+  );
+  assert.equal(resolverGetterCalls, 0);
+});
+
+test('Browser Agent approval authority records are snapshotted without executing accessors', async () => {
+  const makeJob = () => agentJob('descriptor-safe', {
+    config: { name: 'Descriptor safe approval' },
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      controlEpoch: 9,
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: {
+        snapshotId: 'snapshot-9',
+        snapshotSignature: 'signature-9',
+        requestedAt: T1,
+        action: { type: 'CLICK', ref: 'control-9' },
+      },
+    },
+  });
+  const mutations = [
+    (job, getter) => Object.defineProperty(job, 'id', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job, 'runtime', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.config, 'name', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime, 'runState', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime, 'controlEpoch', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime, 'updatedAt', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime, 'pendingApproval', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'requestedAt', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'snapshotId', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'snapshotSignature', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime.pendingApproval, 'action', { enumerable: true, get: getter }),
+    (job, getter) => Object.defineProperty(job.runtime.pendingApproval.action, 'type', { enumerable: true, get: getter }),
+  ];
+
+  for (const mutate of mutations) {
+    let getterCalls = 0;
+    const job = makeJob();
+    mutate(job, () => {
+      getterCalls += 1;
+      return 'hostile';
+    });
+    const projection = await projectRuntimeActionCenter({ agentJobs: [job] });
+    assert.equal(projection.summary.openCount, 0);
+    assert.equal(getterCalls, 0);
+  }
+});
+
+test('Browser approval resolver fails closed on hostile changed authority without executing getters', async () => {
+  const job = agentJob('resolver-hostile', {
+    runtime: {
+      runState: 'WAITING_APPROVAL',
+      controlEpoch: 11,
+      updatedAt: T2,
+      lastError: '',
+      pendingApproval: {
+        snapshotId: 'snapshot-11',
+        snapshotSignature: 'signature-11',
+        requestedAt: T1,
+        action: { type: 'CLICK', ref: 'control-11' },
+      },
+    },
+  });
+  const projection = await projectRuntimeActionCenter({ agentJobs: [job] });
+  const item = projection.items[0];
+
+  let getterCalls = 0;
+  Object.defineProperty(job.runtime.pendingApproval, 'snapshotId', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return 'changed-snapshot';
+    },
+  });
+  await assert.rejects(
+    () => resolveRuntimeActionCenterBrowserApproval({
+      agentJobs: [job],
+      itemId: item.itemId,
+      sourceRevisionId: item.sourceRevisionId,
+      decision: 'APPROVE',
+    }),
+    /no longer current/u,
+  );
+  assert.equal(getterCalls, 0);
+});
+
+test('null-prototype Action Center envelopes and Browser approval records remain compatible', async () => {
+  const action = Object.assign(Object.create(null), { type: 'CLICK', ref: 'control-null' });
+  const pendingApproval = Object.assign(Object.create(null), {
+    snapshotId: 'snapshot-null',
+    snapshotSignature: 'signature-null',
+    requestedAt: T1,
+    action,
+  });
+  const runtime = Object.assign(Object.create(null), {
+    runState: 'WAITING_APPROVAL',
+    controlEpoch: 12,
+    updatedAt: T2,
+    lastError: '',
+    pendingApproval,
+  });
+  const config = Object.assign(Object.create(null), { name: 'Null prototype approval' });
+  const job = Object.assign(Object.create(null), {
+    id: 'null-prototype-job',
+    config,
+    createdAt: T0,
+    updatedAt: T1,
+    runtime,
+  });
+  const projectionInput = Object.assign(Object.create(null), { agentJobs: [job] });
+  const projection = await projectRuntimeActionCenter(projectionInput);
+  assert.equal(projection.summary.openCount, 1);
+
+  const resolveInput = Object.assign(Object.create(null), {
+    agentJobs: [job],
+    itemId: projection.items[0].itemId,
+    sourceRevisionId: projection.items[0].sourceRevisionId,
+    decision: 'APPROVE',
+  });
+  const resolved = await resolveRuntimeActionCenterBrowserApproval(resolveInput);
+  assert.equal(resolved.jobId, 'null-prototype-job');
+  assert.equal(resolved.expectedApproval.snapshotId, 'snapshot-null');
+});

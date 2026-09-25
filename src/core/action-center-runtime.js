@@ -43,6 +43,152 @@ function canonicalRecords(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+const PROJECT_RUNTIME_INPUT_KEYS = new Set(['coreState', 'agentJobs', 'cryptoApi']);
+const RESOLVE_RUNTIME_INPUT_KEYS = new Set([
+  'coreState',
+  'agentJobs',
+  'itemId',
+  'sourceRevisionId',
+  'decision',
+  'cryptoApi',
+]);
+const BROWSER_JOB_FIELDS = ['id', 'config', 'createdAt', 'updatedAt', 'runtime'];
+const BROWSER_CONFIG_FIELDS = ['name'];
+const BROWSER_RUNTIME_FIELDS = [
+  'runState',
+  'controlEpoch',
+  'updatedAt',
+  'lastError',
+  'pendingApproval',
+];
+const BROWSER_PENDING_FIELDS = [
+  'snapshotId',
+  'snapshotSignature',
+  'requestedAt',
+  'action',
+];
+
+function snapshotExactOptions(input, allowed, label) {
+  const value = input == null ? {} : input;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain or null-prototype object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain or null-prototype object`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const out = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    out[key] = descriptor.value;
+  }
+  return out;
+}
+
+function snapshotSelectedFields(input, fields) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const prototype = Object.getPrototypeOf(input);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const out = Object.create(null);
+  for (const field of fields) {
+    const descriptor = descriptors[field];
+    if (!descriptor) continue;
+    if (descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return null;
+    }
+    out[field] = descriptor.value;
+  }
+  return Object.freeze(out);
+}
+
+function isPlainEnumerableDataRecord(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
+  const prototype = Object.getPrototypeOf(input);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') return false;
+    const descriptor = descriptors[key];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function snapshotDenseArrayValues(input) {
+  if (!Array.isArray(input)) return Object.freeze([]);
+  const descriptors = Object.getOwnPropertyDescriptors(input);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0) return Object.freeze([]);
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor
+        || descriptor.enumerable !== true
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      return Object.freeze([]);
+    }
+    out.push(descriptor.value);
+  }
+  return Object.freeze(out);
+}
+
+function snapshotBrowserAgentJob(input) {
+  const job = snapshotSelectedFields(input, BROWSER_JOB_FIELDS);
+  if (!job || typeof job.id !== 'string') return null;
+
+  const config = job.config == null
+    ? Object.freeze(Object.create(null))
+    : snapshotSelectedFields(job.config, BROWSER_CONFIG_FIELDS);
+  if (!config) return null;
+
+  const runtime = job.runtime == null
+    ? Object.freeze(Object.create(null))
+    : snapshotSelectedFields(job.runtime, BROWSER_RUNTIME_FIELDS);
+  if (!runtime) return null;
+
+  let pendingApproval = null;
+  if (runtime.pendingApproval != null) {
+    const pending = snapshotSelectedFields(runtime.pendingApproval, BROWSER_PENDING_FIELDS);
+    if (!pending) return null;
+    const hasAction = pending.action != null && isPlainEnumerableDataRecord(pending.action);
+    pendingApproval = Object.freeze({
+      snapshotId: pending.snapshotId,
+      snapshotSignature: pending.snapshotSignature,
+      requestedAt: pending.requestedAt,
+      hasAction,
+    });
+  }
+
+  return Object.freeze({
+    id: job.id,
+    config: Object.freeze({ name: config.name }),
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    runtime: Object.freeze({
+      runState: runtime.runState,
+      controlEpoch: runtime.controlEpoch,
+      updatedAt: runtime.updatedAt,
+      lastError: runtime.lastError,
+      pendingApproval,
+    }),
+  });
+}
+
 function compare(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -142,23 +288,20 @@ function browserApprovalOwnerReference(job, runtime, pending) {
 }
 
 function addBrowserAgentCandidates(agentJobs, candidates) {
-  if (!Array.isArray(agentJobs)) return;
-  for (const job of agentJobs) {
-    if (!job || typeof job !== 'object' || typeof job.id !== 'string') continue;
-    const runtime = job.runtime && typeof job.runtime === 'object' ? job.runtime : {};
-    const name = displayName(job.config?.name, 'Browser Agent');
+  for (const rawJob of snapshotDenseArrayValues(agentJobs)) {
+    const job = snapshotBrowserAgentJob(rawJob);
+    if (!job) continue;
+    const runtime = job.runtime;
+    const pending = runtime.pendingApproval;
+    const name = displayName(job.config.name, 'Browser Agent');
     const updatedAt = finiteTimestamp(runtime.updatedAt, job.updatedAt);
     const createdAt = finiteTimestamp(job.createdAt, updatedAt);
 
-    if (runtime.runState === 'WAITING_APPROVAL'
-        && runtime.pendingApproval
-        && typeof runtime.pendingApproval === 'object'
-        && runtime.pendingApproval.action
-        && typeof runtime.pendingApproval.action === 'object') {
-      const snapshot = typeof runtime.pendingApproval.snapshotSignature === 'string'
-        ? runtime.pendingApproval.snapshotSignature
+    if (runtime.runState === 'WAITING_APPROVAL' && pending?.hasAction === true) {
+      const snapshot = typeof pending.snapshotSignature === 'string'
+        ? pending.snapshotSignature
         : '';
-      const ownerReference = browserApprovalOwnerReference(job, runtime, runtime.pendingApproval);
+      const ownerReference = browserApprovalOwnerReference(job, runtime, pending);
       if (!ownerReference) continue;
       candidates.push({
         identityKind: 'browser-agent-approval',
@@ -167,9 +310,9 @@ function addBrowserAgentCandidates(agentJobs, candidates) {
         revisionParts: [
           job.id,
           snapshot,
-          ownerReference?.expectedApproval.snapshotId || '',
-          String(ownerReference?.expectedApproval.requestedAt ?? ''),
-          String(ownerReference?.expectedApproval.controlEpoch ?? ''),
+          ownerReference.expectedApproval.snapshotId,
+          String(ownerReference.expectedApproval.requestedAt),
+          String(ownerReference.expectedApproval.controlEpoch),
           String(updatedAt),
         ],
         ownerReference,
@@ -253,11 +396,11 @@ function exactLookupId(value, label) {
   return value;
 }
 
-export async function projectRuntimeActionCenter({
-  coreState = {},
-  agentJobs = [],
-  cryptoApi = globalThis.crypto,
-} = {}) {
+export async function projectRuntimeActionCenter(input = {}) {
+  const raw = snapshotExactOptions(input, PROJECT_RUNTIME_INPUT_KEYS, 'Action Center projection input');
+  const coreState = Object.prototype.hasOwnProperty.call(raw, 'coreState') ? raw.coreState : {};
+  const agentJobs = Object.prototype.hasOwnProperty.call(raw, 'agentJobs') ? raw.agentJobs : [];
+  const cryptoApi = Object.prototype.hasOwnProperty.call(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto;
   const candidates = runtimeCandidates(coreState, agentJobs);
   const selected = selectCandidates(candidates);
   const items = await Promise.all(selected.map(candidate => materializeCandidate(candidate, cryptoApi)));
@@ -272,14 +415,14 @@ export async function projectRuntimeActionCenter({
   });
 }
 
-export async function resolveRuntimeActionCenterBrowserApproval({
-  coreState = {},
-  agentJobs = [],
-  itemId,
-  sourceRevisionId,
-  decision,
-  cryptoApi = globalThis.crypto,
-} = {}) {
+export async function resolveRuntimeActionCenterBrowserApproval(input = {}) {
+  const raw = snapshotExactOptions(input, RESOLVE_RUNTIME_INPUT_KEYS, 'Action Center approval input');
+  const coreState = Object.prototype.hasOwnProperty.call(raw, 'coreState') ? raw.coreState : {};
+  const agentJobs = Object.prototype.hasOwnProperty.call(raw, 'agentJobs') ? raw.agentJobs : [];
+  const itemId = raw.itemId;
+  const sourceRevisionId = raw.sourceRevisionId;
+  const decision = raw.decision;
+  const cryptoApi = Object.prototype.hasOwnProperty.call(raw, 'cryptoApi') ? raw.cryptoApi : globalThis.crypto;
   const exactItemId = exactLookupId(itemId, 'Action Center itemId');
   const exactRevisionId = exactLookupId(sourceRevisionId, 'Action Center sourceRevisionId');
   if (decision !== 'APPROVE' && decision !== 'REJECT') throw new Error('Action Center approval decision is invalid');
