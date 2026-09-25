@@ -261,6 +261,47 @@ function assertPortableEntryPath(name, label) {
   return directory;
 }
 
+function assertEntryTypeMetadata(versionMadeBy, externalAttributes, directory, label) {
+  const hostSystem = versionMadeBy >>> 8;
+  if (hostSystem === 3) {
+    const unixMode = (externalAttributes >>> 16) & 0xffff;
+    const fileType = unixMode & 0xf000;
+    if (fileType !== 0) {
+      const expectedType = directory ? 0x4000 : 0x8000;
+      if (fileType !== expectedType) {
+        throw new Error(label + ' Unix symlink or special-file metadata is not admitted');
+      }
+    }
+  }
+  if (!directory && (externalAttributes & 0x10) !== 0) {
+    throw new Error(label + ' file entry carries conflicting directory attributes');
+  }
+}
+
+function assertEntryTopology(entries) {
+  const byFoldedPath = new Map();
+  for (const entry of entries) {
+    const folded = entry.logicalName.toLowerCase();
+    byFoldedPath.set(folded, entry);
+  }
+  for (const entry of entries) {
+    const segments = entry.logicalName.split('/');
+    let ancestor = '';
+    for (let index = 0; index < segments.length - 1; index += 1) {
+      ancestor = ancestor ? ancestor + '/' + segments[index] : segments[index];
+      const parent = byFoldedPath.get(ancestor.toLowerCase());
+      if (parent && !parent.directory) {
+        throw new Error(
+          'ZIP entry path descends through a file entry: '
+            + parent.name
+            + ' -> '
+            + entry.name,
+        );
+      }
+    }
+  }
+}
+
 function validateFlags(flags, method, label) {
   if ((flags & ~ALLOWED_FLAGS) !== 0) {
     throw new Error(label + ' ZIP general-purpose flags are not admitted');
@@ -321,9 +362,12 @@ function parseCentralDirectory(bytes, eocd) {
     if (cursor + CENTRAL_FIXED > end || u32(bytes, cursor, label) !== CENTRAL_SIGNATURE) {
       throw new Error(label + ' header is missing or truncated');
     }
+    const versionMadeBy = u16(bytes, cursor + 4, label + ' versionMadeBy');
     const versionNeeded = u16(bytes, cursor + 6, label + ' versionNeeded');
     const flags = u16(bytes, cursor + 8, label + ' flags');
     const method = u16(bytes, cursor + 10, label + ' method');
+    const modifiedTime = u16(bytes, cursor + 12, label + ' modifiedTime');
+    const modifiedDate = u16(bytes, cursor + 14, label + ' modifiedDate');
     const crc32 = u32(bytes, cursor + 16, label + ' crc32');
     const compressedSize = u32(bytes, cursor + 20, label + ' compressedSize');
     const uncompressedSize = u32(bytes, cursor + 24, label + ' uncompressedSize');
@@ -331,6 +375,7 @@ function parseCentralDirectory(bytes, eocd) {
     const extraLength = u16(bytes, cursor + 30, label + ' extraLength');
     const commentLength = u16(bytes, cursor + 32, label + ' commentLength');
     const diskStart = u16(bytes, cursor + 34, label + ' diskStart');
+    const externalAttributes = u32(bytes, cursor + 38, label + ' externalAttributes');
     const localOffset = u32(bytes, cursor + 42, label + ' localHeaderOffset');
 
     if (versionNeeded > 20) throw new Error(label + ' requires unsupported ZIP features');
@@ -349,13 +394,17 @@ function parseCentralDirectory(bytes, eocd) {
     const nameOffset = cursor + CENTRAL_FIXED;
     const name = decodeEntryName(bytes, nameOffset, nameLength, flags, label);
     const directory = assertPortableEntryPath(name, label);
-    if (exactNames.has(name)) throw new Error('ZIP contains duplicate entry path: ' + name);
-    exactNames.add(name);
-    const folded = name.toLowerCase();
+    const logicalName = directory ? name.slice(0, -1) : name;
+    if (exactNames.has(logicalName)) {
+      throw new Error('ZIP contains duplicate logical entry path: ' + name);
+    }
+    exactNames.add(logicalName);
+    const folded = logicalName.toLowerCase();
     if (foldedNames.has(folded)) {
-      throw new Error('ZIP contains case-folding path collision: ' + name);
+      throw new Error('ZIP contains case-folding logical path collision: ' + name);
     }
     foldedNames.add(folded);
+    assertEntryTypeMetadata(versionMadeBy, externalAttributes, directory, label);
 
     const extras = parseExtraFields(
       bytes,
@@ -366,8 +415,8 @@ function parseCentralDirectory(bytes, eocd) {
     unknownExtraFieldCount += extras.unknownCount;
 
     if (directory) {
-      if (compressedSize !== 0 || uncompressedSize !== 0 || method !== 0) {
-        throw new Error(label + ' directory entry must be zero-size STORED metadata');
+      if (compressedSize !== 0 || uncompressedSize !== 0 || method !== 0 || crc32 !== 0) {
+        throw new Error(label + ' directory entry must be zero-size STORED metadata with zero CRC');
       }
     } else {
       if (uncompressedSize > MAX_ZIP_ENTRY_UNCOMPRESSED_BYTES) {
@@ -406,9 +455,13 @@ function parseCentralDirectory(bytes, eocd) {
     entries.push({
       index,
       name,
+      logicalName,
       directory,
+      versionNeeded,
       flags,
       method,
+      modifiedTime,
+      modifiedDate,
       crc32,
       compressedSize,
       uncompressedSize,
@@ -426,6 +479,7 @@ function parseCentralDirectory(bytes, eocd) {
   if (entryCount === 0 && (centralOffset !== 0 || centralSize !== 0)) {
     throw new Error('empty ZIP archive has a non-empty central directory');
   }
+  assertEntryTopology(entries);
 
   return {
     entryCount,
@@ -456,6 +510,8 @@ function validateLocalEntries(bytes, central) {
     const versionNeeded = u16(bytes, offset + 4, label + ' versionNeeded');
     const flags = u16(bytes, offset + 6, label + ' flags');
     const method = u16(bytes, offset + 8, label + ' method');
+    const modifiedTime = u16(bytes, offset + 10, label + ' modifiedTime');
+    const modifiedDate = u16(bytes, offset + 12, label + ' modifiedDate');
     const crc32 = u32(bytes, offset + 14, label + ' crc32');
     const compressedSize = u32(bytes, offset + 18, label + ' compressedSize');
     const uncompressedSize = u32(bytes, offset + 22, label + ' uncompressedSize');
@@ -464,8 +520,11 @@ function validateLocalEntries(bytes, central) {
 
     if (versionNeeded > 20) throw new Error(label + ' requires unsupported ZIP features');
     validateFlags(flags, method, label);
-    if (flags !== entry.flags
+    if (versionNeeded !== entry.versionNeeded
+        || flags !== entry.flags
         || method !== entry.method
+        || modifiedTime !== entry.modifiedTime
+        || modifiedDate !== entry.modifiedDate
         || crc32 !== entry.crc32
         || compressedSize !== entry.compressedSize
         || uncompressedSize !== entry.uncompressedSize
@@ -510,10 +569,18 @@ function validateLocalEntries(bytes, central) {
   }
 
   ranges.sort((left, right) => left.start - right.start || left.index - right.index);
-  for (let index = 1; index < ranges.length; index += 1) {
-    if (ranges[index].start < ranges[index - 1].end) {
-      throw new Error('ZIP local entry ranges overlap or alias one another');
+  let expectedOffset = 0;
+  for (const range of ranges) {
+    if (range.start !== expectedOffset) {
+      if (range.start < expectedOffset) {
+        throw new Error('ZIP local entry ranges overlap or alias one another');
+      }
+      throw new Error('ZIP archive body contains unclaimed bytes between local entries');
     }
+    expectedOffset = range.end;
+  }
+  if (expectedOffset !== central.centralOffset) {
+    throw new Error('ZIP archive body contains unclaimed bytes before the central directory');
   }
 
   return { unknownExtraFieldCount };
@@ -595,6 +662,7 @@ export async function preflightZipArtifactV1(input, {
     entries: sensitive ? null : Object.freeze(publicEntries),
     materialIdentityVerified: true,
     structuralMetadataVerified: true,
+    localEntryRangesContiguous: true,
     payloadContentVerified: false,
     crcContentVerified: false,
     decompressionPerformed: false,
