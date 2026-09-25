@@ -36,40 +36,60 @@ function strictRecord(value, label) {
   if (prototype !== Object.prototype && prototype !== null) {
     throw new Error(`${label} must be a plain data object`);
   }
+  const snapshot = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol fields`);
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label}.${key} must be an enumerable data property`);
     }
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      configurable: false,
+      writable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 
 function strictArray(value, label, max, { min = 0 } = {}) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a plain dense array`);
   }
-  if (value.length < min || value.length > max) {
+  const keys = Reflect.ownKeys(value);
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+  if (!lengthDescriptor || !('value' in lengthDescriptor) || !Number.isSafeInteger(lengthDescriptor.value)) {
+    throw new Error(`${label} has an invalid length descriptor`);
+  }
+  const length = lengthDescriptor.value;
+  if (length < min || length > max) {
     throw new Error(`${label} length must be ${min}-${max}`);
   }
-  for (const key of Reflect.ownKeys(value)) {
+  const values = new Map();
+  for (const key of keys) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(?:0|[1-9][0-9]*)$/u.test(key)) {
       throw new Error(`${label} contains non-index fields`);
     }
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index >= value.length) {
+    if (!Number.isSafeInteger(index) || index >= length) {
       throw new Error(`${label} contains invalid indices`);
     }
-  }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
       throw new Error(`${label}[${index}] must be an enumerable data item`);
     }
+    values.set(index, descriptor.value);
   }
-  return value;
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    if (!values.has(index)) {
+      throw new Error(`${label}[${index}] must be an enumerable data item`);
+    }
+    snapshot[index] = values.get(index);
+  }
+  return Object.freeze(snapshot);
 }
 
 function guardJsonData(value, label, depth = 0) {
@@ -80,16 +100,21 @@ function guardJsonData(value, label, depth = 0) {
     return value;
   }
   if (Array.isArray(value)) {
-    strictArray(value, label, MAX_JSON_ARRAY);
-    for (let index = 0; index < value.length; index += 1) {
-      guardJsonData(value[index], `${label}[${index}]`, depth + 1);
-    }
-    return value;
+    const snapshot = strictArray(value, label, MAX_JSON_ARRAY);
+    return Object.freeze(snapshot.map((item, index) => guardJsonData(item, `${label}[${index}]`, depth + 1)));
   }
   if (value && typeof value === 'object') {
-    strictRecord(value, label);
-    for (const key of Object.keys(value)) guardJsonData(value[key], `${label}.${key}`, depth + 1);
-    return value;
+    const snapshot = strictRecord(value, label);
+    const normalized = Object.create(null);
+    for (const key of Object.keys(snapshot)) {
+      Object.defineProperty(normalized, key, {
+        value: guardJsonData(snapshot[key], `${label}.${key}`, depth + 1),
+        enumerable: true,
+        configurable: false,
+        writable: false,
+      });
+    }
+    return Object.freeze(normalized);
   }
   throw new Error(`${label} must contain JSON data only`);
 }
@@ -185,8 +210,11 @@ function strictProjectSourceRef(input, label = 'ProjectSourceRefV1') {
   if (typeof raw.authority !== 'string' || raw.authority !== raw.authority.trim() || raw.authority !== raw.authority.toUpperCase()) {
     throw new Error(`${label}.authority must be canonical text`);
   }
-  if (raw.metadata !== undefined) guardJsonData(raw.metadata, `${label}.metadata`);
-  return normalizeProjectSourceRefV1(raw);
+  const normalizedInput = { ...raw };
+  if (raw.metadata !== undefined) {
+    normalizedInput.metadata = guardJsonData(raw.metadata, `${label}.metadata`);
+  }
+  return normalizeProjectSourceRefV1(normalizedInput);
 }
 
 function strictArtifactRef(input, label = 'ArtifactRefV1') {
@@ -344,11 +372,13 @@ function bindingIdentity(binding) {
   ]);
 }
 
-export function assertDataTransformLineageMatchesSnapshotsV1({
-  lineage,
-  inputSnapshots,
-  outputSnapshot,
-} = {}) {
+const TRANSFORM_ASSERT_REQUEST_KEYS = new Set(['lineage', 'inputSnapshots', 'outputSnapshot']);
+
+export function assertDataTransformLineageMatchesSnapshotsV1(request = {}) {
+  const raw = strictRecord(request, 'assertDataTransformLineageMatchesSnapshotsV1 request');
+  exactKeys(raw, TRANSFORM_ASSERT_REQUEST_KEYS, 'assertDataTransformLineageMatchesSnapshotsV1 request');
+  for (const key of TRANSFORM_ASSERT_REQUEST_KEYS) requireOwn(raw, key, 'assertDataTransformLineageMatchesSnapshotsV1 request');
+  const { lineage, inputSnapshots, outputSnapshot } = raw;
   const normalizedLineage = normalizeDataTransformLineageV1(lineage);
   const inputs = unique(
     strictArray(inputSnapshots, 'inputSnapshots', MAX_DATASETS, { min: 1 }).map((snapshot, index) => {
@@ -397,9 +427,14 @@ function sourceIdentity(source) {
   ]);
 }
 
-export function assertDataDatasetSourcesMatchProjectSnapshotV1({ dataset, projectSnapshot } = {}) {
-  const normalizedDataset = normalizeDataDatasetSnapshotV1(dataset);
-  guardJsonData(projectSnapshot, 'projectSnapshot');
+const DATASET_PROJECT_REQUEST_KEYS = new Set(['dataset', 'projectSnapshot']);
+
+export function assertDataDatasetSourcesMatchProjectSnapshotV1(request = {}) {
+  const raw = strictRecord(request, 'assertDataDatasetSourcesMatchProjectSnapshotV1 request');
+  exactKeys(raw, DATASET_PROJECT_REQUEST_KEYS, 'assertDataDatasetSourcesMatchProjectSnapshotV1 request');
+  for (const key of DATASET_PROJECT_REQUEST_KEYS) requireOwn(raw, key, 'assertDataDatasetSourcesMatchProjectSnapshotV1 request');
+  const normalizedDataset = normalizeDataDatasetSnapshotV1(raw.dataset);
+  const projectSnapshot = guardJsonData(raw.projectSnapshot, 'projectSnapshot');
   const normalizedProject = normalizeProjectSnapshotV1(projectSnapshot);
   if (normalizedProject.projectId !== normalizedDataset.projectId) {
     throw new Error('dataset projectId does not match ProjectSnapshotV1');
@@ -513,9 +548,14 @@ function columnDeltaView(column) {
   });
 }
 
-export function deriveDataDatasetDeltaV1({ baseline, current } = {}) {
-  const before = normalizeDataDatasetSnapshotV1(baseline);
-  const after = normalizeDataDatasetSnapshotV1(current);
+const DATASET_DELTA_REQUEST_KEYS = new Set(['baseline', 'current']);
+
+export function deriveDataDatasetDeltaV1(request = {}) {
+  const raw = strictRecord(request, 'deriveDataDatasetDeltaV1 request');
+  exactKeys(raw, DATASET_DELTA_REQUEST_KEYS, 'deriveDataDatasetDeltaV1 request');
+  for (const key of DATASET_DELTA_REQUEST_KEYS) requireOwn(raw, key, 'deriveDataDatasetDeltaV1 request');
+  const before = normalizeDataDatasetSnapshotV1(raw.baseline);
+  const after = normalizeDataDatasetSnapshotV1(raw.current);
   if (before.projectId !== after.projectId || before.datasetId !== after.datasetId) {
     throw new Error('dataset delta requires the same projectId and datasetId');
   }
