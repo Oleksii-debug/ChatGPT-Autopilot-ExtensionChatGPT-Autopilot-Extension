@@ -330,6 +330,7 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   if (!ROLES.has(normalizedRole)) throw new Error('AI route requested role is invalid');
   const capabilities = ids(capabilityIds || [], 'AI route requested capabilityIds', 64);
   const states = normalizeAiRouteStates(routeStates, pool);
+  const selectionNow = stateInteger(now, 'AI route selection now');
   const allow = new Set(normalizedPolicy.allowRouteIds);
   const deny = new Set(normalizedPolicy.denyRouteIds);
   const order = new Map(normalizedPolicy.orderedRouteIds.map((routeId, index) => [routeId, index]));
@@ -359,13 +360,13 @@ export function selectAiRouteCandidates({ routes, policy, routeStates = {}, role
   });
   const available = candidates.filter(route => {
     const state = own(states, route.routeId);
-    return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= now;
+    return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0) <= selectionNow;
   });
   const retryAt = candidates.length && !available.length
     ? Math.min(...candidates.map(route => {
       const state = own(states, route.routeId);
       return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
-    }).filter(value => value > now))
+    }).filter(value => value > selectionNow))
     : 0;
   return Object.freeze({ candidates: Object.freeze((normalizedPolicy.autoSwitch ? available : available.slice(0, 1))), eligibleRouteIds: Object.freeze(candidates.map(route => route.routeId)), retryAt });
 }
@@ -419,6 +420,7 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
 }
 
 export function recordAiRouteOutcome(routeStates, route, policy, { ok, classification = null, at = Date.now(), latencyMs = 0 } = {}) {
+  if (typeof ok !== 'boolean') throw new Error('AI route outcome ok must be boolean');
   const normalizedPolicy = normalizeAiRoutePolicy(policy);
   const states = normalizeAiRouteStates(routeStates, [route]);
   const current = own(states, route.routeId) || { consecutiveFailures:0, successes:0, failures:0, backoffUntil:0, circuitOpenUntil:0, lastErrorCode:'', lastErrorCategory:'', lastErrorAt:0, lastSuccessAt:0, lastLatencyMs:0 };
