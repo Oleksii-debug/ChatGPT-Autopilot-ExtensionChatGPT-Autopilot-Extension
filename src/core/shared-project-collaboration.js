@@ -318,6 +318,14 @@ function assessResolvedAccess(context, request) {
     resourceKey: binding.resourceKey,
     at,
   });
+  const ownerCeiling = derivePrincipalGovernanceCeilingV1({
+    registry,
+    principalId: binding.ownerPrincipalId,
+    resourceKey: binding.resourceKey,
+    at,
+  });
+  const projectOwnerCurrentlyBound = ownerCeiling.active
+    && ownerCeiling.effectiveGrantIds.length > 0;
 
   const missingCapabilityIds = missingFrom(requestedCapabilityIds, ceiling.capabilityCeilingIds);
   const missingProviderIds = missingFrom(requestedProviderIds, ceiling.providerCeilingIds);
@@ -327,7 +335,8 @@ function assessResolvedAccess(context, request) {
   );
 
   let reasonCode = 'ELIGIBLE_FOR_CANONICAL_POLICY';
-  if (!ceiling.active) reasonCode = ceiling.reasonCode;
+  if (!projectOwnerCurrentlyBound) reasonCode = 'PROJECT_OWNER_INACTIVE_OR_UNBOUND';
+  else if (!ceiling.active) reasonCode = ceiling.reasonCode;
   else if (ceiling.effectiveGrantIds.length === 0) reasonCode = 'NO_PROJECT_GRANT';
   else if (missingCapabilityIds.length) reasonCode = 'CAPABILITY_OUTSIDE_CEILING';
   else if (missingProviderIds.length) reasonCode = 'PROVIDER_OUTSIDE_CEILING';
@@ -347,6 +356,7 @@ function assessResolvedAccess(context, request) {
     resourceKey: binding.resourceKey,
     evaluatedAt: at,
     active: ceiling.active,
+    projectOwnerCurrentlyBound,
     collaborationEligible,
     reasonCode,
     effectiveRoleIds: Object.freeze([...ceiling.effectiveRoleIds]),
