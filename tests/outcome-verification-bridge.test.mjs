@@ -211,7 +211,7 @@ function happyFixture(options = {}) {
 
 function resolverFor(records, calls = []) {
   return async lookup => {
-    calls.push(structuredClone(lookup));
+    calls.push(lookup);
     const item = records.get(lookup.verificationId);
     return item == null ? null : item;
   };
