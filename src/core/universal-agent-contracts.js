@@ -121,23 +121,30 @@ function bool(value, label, fallback = false) {
 }
 
 function dataArray(value, label, max) {
-  if (!Array.isArray(value) || value.length > max) {
-    throw new Error(`${label} must be a bounded array`);
-  }
-  if (Object.getPrototypeOf(value) !== Array.prototype) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
-  const out = [];
-  for (const key of Reflect.ownKeys(value)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded array`);
+  }
+  const length = lengthDescriptor.value;
+  const out = new Array(length);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(?:0|[1-9]\d*)$/u.test(key)) {
       throw new Error(`${label} contains a non-index field`);
     }
     const index = Number(key);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!Number.isSafeInteger(index)
         || index < 0
-        || index >= value.length
+        || index >= length
         || String(index) !== key
         || !descriptor
         || descriptor.enumerable !== true
@@ -145,18 +152,17 @@ function dataArray(value, label, max) {
       throw new Error(`${label} entries must be enumerable own data properties`);
     }
   }
-  for (let index = 0; index < value.length; index += 1) {
-    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
     if (!descriptor
         || descriptor.enumerable !== true
         || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} must be a dense data-only array`);
     }
-    out.push(descriptor.value);
+    out[index] = descriptor.value;
   }
   return out;
 }
-
 function idList(value, label, { optional = true, max = MAX_LIST } = {}) {
   if (value == null && optional) return [];
   const items = dataArray(value, label, max);
