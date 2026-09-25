@@ -35,6 +35,14 @@ const ACCESS_KEYS = new Set([
   'bindingId', 'principalId', 'at',
   'requestedCapabilityIds', 'requestedProviderIds', 'requestedOutboundDataClassIds',
 ]);
+const ACCESS_BATCH_KEYS = new Set(['bindingId', 'at', 'requests']);
+const ACCESS_BATCH_ITEM_KEYS = new Set([
+  'principalId',
+  'requestedCapabilityIds',
+  'requestedProviderIds',
+  'requestedOutboundDataClassIds',
+]);
+const MAX_ACCESS_BATCH = 129;
 const EVENT_KEYS = new Set([
   'schemaVersion', 'eventId', 'kind', 'bindingId', 'projectId',
   'projectRevisionId', 'actorPrincipalId', 'recipientPrincipalId',
@@ -397,6 +405,64 @@ export async function assessSharedProjectAccessV1(input, trustedResolver) {
   const request = normalizeAccessRequest(input);
   const context = await resolveTrustedContext(request.bindingId, trustedResolver);
   return assessResolvedAccess(context, request);
+}
+
+export async function assessSharedProjectAccessBatchV1(input, trustedResolver) {
+  const raw = strictRecord(
+    input,
+    ACCESS_BATCH_KEYS,
+    'SharedProjectAccessBatchRequestV1',
+  );
+  const bindingId = id(raw.bindingId, 'bindingId');
+  const at = timestamp(raw.at, 'at');
+  const requests = strictArray(raw.requests, 'requests', MAX_ACCESS_BATCH)
+    .map((item, index) => {
+      const entry = strictRecord(
+        item,
+        ACCESS_BATCH_ITEM_KEYS,
+        'requests[' + index + ']',
+      );
+      return {
+        principalId: id(entry.principalId, 'requests[' + index + '].principalId'),
+        at,
+        requestedCapabilityIds: idList(
+          entry.requestedCapabilityIds,
+          'requests[' + index + '].requestedCapabilityIds',
+        ),
+        requestedProviderIds: idList(
+          entry.requestedProviderIds,
+          'requests[' + index + '].requestedProviderIds',
+        ),
+        requestedOutboundDataClassIds: idList(
+          entry.requestedOutboundDataClassIds,
+          'requests[' + index + '].requestedOutboundDataClassIds',
+        ),
+      };
+    });
+
+  const context = await resolveTrustedContext(bindingId, trustedResolver);
+  const { binding } = context;
+  const assessments = requests.map(request => assessResolvedAccess(context, request));
+
+  return freezeDeep({
+    schemaVersion: SHARED_PROJECT_COLLABORATION_SCHEMA_VERSION,
+    bindingId: binding.bindingId,
+    projectId: binding.projectId,
+    projectRevisionId: binding.projectRevisionId,
+    organizationId: binding.organizationId,
+    governanceRegistryId: binding.governanceRegistryId,
+    governanceRegistryRevision: binding.governanceRegistryRevision,
+    resourceKey: binding.resourceKey,
+    evaluatedAt: at,
+    assessments: Object.freeze(assessments),
+    canonicalSourcesResolved: true,
+    advisoryOnly: true,
+    authorizationGranted: false,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    credentialUseAuthorized: false,
+    requiresCanonicalPolicyDecision: true,
+  });
 }
 
 export function normalizeSharedProjectCollaborationEventV1(input) {
