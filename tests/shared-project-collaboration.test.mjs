@@ -189,11 +189,33 @@ function binding(overrides = {}) {
   };
 }
 
+function trusted(overrides = {}) {
+  const calls = [];
+  const values = {
+    binding: overrides.bindingValue || binding(),
+    snapshot: overrides.snapshotValue || snapshot(),
+    registry: overrides.registryValue || registry(),
+  };
+  return {
+    calls,
+    async resolveSharedProjectBinding(bindingId) {
+      calls.push(['binding', bindingId]);
+      return values.binding;
+    },
+    async resolveProjectSnapshot(query) {
+      calls.push(['snapshot', structuredClone(query)]);
+      return values.snapshot;
+    },
+    async resolveIdentityGovernanceRegistry(query) {
+      calls.push(['registry', structuredClone(query)]);
+      return values.registry;
+    },
+  };
+}
+
 function access(principalId = 'agent-worker', overrides = {}) {
   return {
-    binding: binding(),
-    snapshot: snapshot(),
-    governanceRegistry: registry(),
+    bindingId: 'shared-project-1',
     principalId,
     at: T3,
     requestedCapabilityIds: ['project.comment', 'project.read'],
@@ -235,10 +257,12 @@ test('binding exactly couples one project revision to one governance registry re
   );
 });
 
-test('agent access reuses parent-intersected governance ceilings without granting policy or credentials', () => {
-  const result = assessSharedProjectAccessV1(access());
+test('access resolves exact trusted binding, Project snapshot and governance registry before membership evidence', async () => {
+  const resolver = trusted();
+  const result = await assessSharedProjectAccessV1(access(), resolver);
   assert.equal(result.collaborationEligible, true);
   assert.equal(result.reasonCode, 'ELIGIBLE_FOR_CANONICAL_POLICY');
+  assert.equal(result.canonicalSourcesResolved, true);
   assert.deepEqual(result.effectiveGrantIds, ['grant-agent', 'grant-owner']);
   assert.deepEqual(result.capabilityCeilingIds, ['project.comment', 'project.read']);
   assert.deepEqual(result.providerCeilingIds, ['drive']);
@@ -250,75 +274,88 @@ test('agent access reuses parent-intersected governance ceilings without grantin
   assert.equal(result.mutationAuthorized, false);
   assert.equal(result.credentialUseAuthorized, false);
   assert.equal(result.requiresCanonicalPolicyDecision, true);
+  assert.deepEqual(resolver.calls, [
+    ['binding', 'shared-project-1'],
+    ['snapshot', { projectId: 'project-a', projectRevisionId: 'project-r1' }],
+    ['registry', {
+      governanceRegistryId: 'identity-registry-1',
+      governanceRegistryRevision: 7,
+      organizationId: 'org-1',
+    }],
+  ]);
 });
 
-test('requested authority outside the inherited ceiling is visible but never admitted', () => {
-  const result = assessSharedProjectAccessV1(access('agent-worker', {
+test('requested authority outside inherited ceiling is visible but never admitted', async () => {
+  const result = await assessSharedProjectAccessV1(access('agent-worker', {
     requestedCapabilityIds: ['project.handoff', 'project.read'],
-  }));
+  }), trusted());
   assert.equal(result.collaborationEligible, false);
   assert.equal(result.reasonCode, 'CAPABILITY_OUTSIDE_CEILING');
   assert.deepEqual(result.missingCapabilityIds, ['project.handoff']);
   assert.equal(result.authorizationGranted, false);
 });
 
-test('an active principal without a project resource grant is not a collaborator', () => {
-  const result = assessSharedProjectAccessV1(access('user-guest', {
+test('active principal without a project resource grant is not a collaborator', async () => {
+  const result = await assessSharedProjectAccessV1(access('user-guest', {
     requestedCapabilityIds: [],
     requestedProviderIds: [],
     requestedOutboundDataClassIds: [],
-  }));
+  }), trusted());
   assert.equal(result.active, true);
   assert.equal(result.collaborationEligible, false);
   assert.equal(result.reasonCode, 'NO_PROJECT_GRANT');
   assert.deepEqual(result.effectiveGrantIds, []);
 });
 
-test('revoked principals fail closed at the assessment instant', () => {
-  const result = assessSharedProjectAccessV1(access('user-revoked', {
+test('revoked principals fail closed at assessment instant', async () => {
+  const result = await assessSharedProjectAccessV1(access('user-revoked', {
     requestedCapabilityIds: [],
     requestedProviderIds: [],
     requestedOutboundDataClassIds: [],
-  }));
+  }), trusted());
   assert.equal(result.active, false);
   assert.equal(result.collaborationEligible, false);
   assert.equal(result.reasonCode, 'PRINCIPAL_INACTIVE');
 });
 
-test('project, organization and governance revision drift cannot reuse a shared-project binding', () => {
-  assert.throws(
-    () => assessSharedProjectAccessV1(access('agent-worker', {
-      snapshot: snapshot({ revisionId: 'project-r2' }),
+test('trusted source identity, project revision and governance revision drift fail closed', async () => {
+  await assert.rejects(
+    assessSharedProjectAccessV1(access(), trusted({
+      bindingValue: binding({ bindingId: 'shared-project-other' }),
     })),
-    /does not match canonical project snapshot/,
+    /binding identity mismatch/,
   );
-  assert.throws(
-    () => assessSharedProjectAccessV1(access('agent-worker', {
-      governanceRegistry: registry({ revision: 8 }),
+  await assert.rejects(
+    assessSharedProjectAccessV1(access(), trusted({
+      snapshotValue: snapshot({ revisionId: 'project-r2' }),
     })),
-    /does not match canonical identity governance registry/,
+    /does not match trusted project snapshot/,
   );
-  assert.throws(
-    () => assessSharedProjectAccessV1(access('agent-worker', {
-      binding: binding({ organizationId: 'org-other' }),
+  await assert.rejects(
+    assessSharedProjectAccessV1(access(), trusted({
+      registryValue: registry({ revision: 8 }),
     })),
-    /does not match canonical identity governance registry/,
+    /does not match trusted identity governance registry/,
+  );
+  await assert.rejects(
+    assessSharedProjectAccessV1(access(), trusted({
+      bindingValue: binding({ organizationId: 'org-other' }),
+    })),
+    /does not match trusted identity governance registry/,
   );
 });
 
-test('a handoff is bound to current collaborator identities and canonical project artifacts but remains non-authorizing', () => {
-  const result = assessSharedProjectCollaborationEventV1({
-    binding: binding(),
-    snapshot: snapshot(),
-    governanceRegistry: registry(),
+test('handoff is bound to trusted collaborators and canonical project artifacts but remains non-authorizing', async () => {
+  const result = await assessSharedProjectCollaborationEventV1({
     event: event(),
     at: T3,
-  });
+  }, trusted());
   assert.equal(result.eventAdmissibleForCollaboration, true);
   assert.equal(result.reasonCode, 'ELIGIBLE_FOR_CANONICAL_AUDIT_APPEND');
   assert.equal(result.actorAccessReasonCode, 'ELIGIBLE_FOR_CANONICAL_POLICY');
   assert.equal(result.recipientAccessReasonCode, 'ELIGIBLE_FOR_CANONICAL_POLICY');
   assert.equal(result.event.artifactIds[0], 'build');
+  assert.equal(result.canonicalSourcesResolved, true);
   assert.equal(result.contentTrust, 'UNTRUSTED_DATA');
   assert.equal(result.auditAppendAuthorized, false);
   assert.equal(result.commentPublishAuthorized, false);
@@ -348,79 +385,87 @@ test('comments may be project-wide while handoffs require a distinct recipient',
   );
 });
 
-test('recipient revocation blocks current handoff admission without rewriting the audit payload', () => {
-  const result = assessSharedProjectCollaborationEventV1({
-    binding: binding(),
-    snapshot: snapshot(),
-    governanceRegistry: registry(),
+test('recipient revocation blocks current handoff admission without rewriting audit payload', async () => {
+  const result = await assessSharedProjectCollaborationEventV1({
     event: event({ recipientPrincipalId: 'user-revoked' }),
     at: T3,
-  });
+  }, trusted());
   assert.equal(result.eventAdmissibleForCollaboration, false);
   assert.equal(result.reasonCode, 'RECIPIENT_PRINCIPAL_INACTIVE');
   assert.equal(result.event.recipientPrincipalId, 'user-revoked');
   assert.equal(result.handoffAuthorized, false);
 });
 
-test('event revision, time and artifact substitution fail closed', () => {
-  assert.throws(
-    () => assessSharedProjectCollaborationEventV1({
-      binding: binding(),
-      snapshot: snapshot(),
-      governanceRegistry: registry(),
+test('event revision, time and artifact substitution fail closed', async () => {
+  await assert.rejects(
+    assessSharedProjectCollaborationEventV1({
       event: event({ projectRevisionId: 'project-r2' }),
       at: T3,
-    }),
-    /does not match shared project binding/,
+    }, trusted()),
+    /does not match trusted shared project binding/,
   );
-  assert.throws(
-    () => assessSharedProjectCollaborationEventV1({
-      binding: binding(),
-      snapshot: snapshot(),
-      governanceRegistry: registry(),
+  await assert.rejects(
+    assessSharedProjectCollaborationEventV1({
       event: event({ artifactIds: ['foreign'] }),
       at: T3,
-    }),
-    /outside canonical project snapshot/,
+    }, trusted()),
+    /outside trusted project snapshot/,
   );
-  assert.throws(
-    () => assessSharedProjectCollaborationEventV1({
-      binding: binding(),
-      snapshot: snapshot(),
-      governanceRegistry: registry(),
+  await assert.rejects(
+    assessSharedProjectCollaborationEventV1({
       event: event({ createdAt: T25 }),
       at: T3,
-    }),
+    }, trusted()),
     /must equal admission assessment time/,
   );
 });
 
-test('descriptor-hostile binding fields reject without invoking getters', () => {
+test('trusted resolver methods must be data methods and accessor injection executes zero getters', async () => {
   let reads = 0;
-  const hostile = binding();
-  Object.defineProperty(hostile, 'projectId', {
+  const hostile = trusted();
+  Object.defineProperty(hostile, 'resolveSharedProjectBinding', {
     enumerable: true,
     configurable: true,
     get() {
       reads += 1;
-      return 'project-a';
+      return async () => binding();
     },
   });
-  assert.throws(
-    () => assessSharedProjectAccessV1(access('agent-worker', { binding: hostile })),
+  await assert.rejects(
+    assessSharedProjectAccessV1(access(), hostile),
+    /must expose resolveSharedProjectBinding as a data method/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('descriptor-hostile request fields reject without invoking getters', async () => {
+  let reads = 0;
+  const hostile = access();
+  Object.defineProperty(hostile, 'bindingId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'shared-project-1';
+    },
+  });
+  await assert.rejects(
+    assessSharedProjectAccessV1(hostile, trusted()),
     /enumerable own data property/,
   );
   assert.equal(reads, 0);
 });
 
-test('sparse arrays and symbol event fields are rejected before collaboration admission', () => {
+test('sparse arrays and symbol event fields reject before trusted resolution', async () => {
   const sparse = new Array(1);
-  assert.throws(
-    () => assessSharedProjectAccessV1(access('agent-worker', {
+  const resolver = trusted();
+  await assert.rejects(
+    assessSharedProjectAccessV1(access('agent-worker', {
       requestedCapabilityIds: sparse,
-    })),
+    }), resolver),
     /must not be sparse/,
   );
+  assert.deepEqual(resolver.calls, []);
 
   const withSymbol = event();
   withSymbol[Symbol('hidden')] = 'hidden';
@@ -430,12 +475,12 @@ test('sparse arrays and symbol event fields are rejected before collaboration ad
   );
 });
 
-test('requested scope and artifact IDs are canonically sorted for deterministic evidence', () => {
-  const result = assessSharedProjectAccessV1(access('user-owner', {
+test('requested scope and artifact IDs are canonically sorted for deterministic evidence', async () => {
+  const result = await assessSharedProjectAccessV1(access('user-owner', {
     requestedCapabilityIds: ['project.read', 'project.comment'],
     requestedProviderIds: ['github', 'drive'],
     requestedOutboundDataClassIds: ['public', 'internal'],
-  }));
+  }), trusted());
   assert.deepEqual(result.requestedCapabilityIds, ['project.comment', 'project.read']);
   assert.deepEqual(result.requestedProviderIds, ['drive', 'github']);
   assert.deepEqual(result.requestedOutboundDataClassIds, ['internal', 'public']);
