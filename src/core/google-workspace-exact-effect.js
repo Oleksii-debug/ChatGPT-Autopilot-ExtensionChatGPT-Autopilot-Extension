@@ -24,9 +24,8 @@ const MAX_CLOCK_SKEW_MS = 60 * 1000;
 
 function requireId(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
-  const out = value.trim();
-  if (!ID.test(out)) throw new Error(`${label} is invalid`);
-  return out;
+  if (value !== value.trim() || !ID.test(value)) throw new Error(`${label} is invalid`);
+  return value;
 }
 
 function exactKeys(value, allowed, label) {

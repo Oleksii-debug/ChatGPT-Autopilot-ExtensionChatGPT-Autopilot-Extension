@@ -598,7 +598,9 @@ test('Gmail draft create rejects aliases before network and treats post-dispatch
   }));
   await assert.rejects(
     () => client.createGmailDraft({ userId: 'me', rawMessageBase64Url: 'QUJD' }),
-    error => error.code === 'GOOGLE_GMAIL_USER_NOT_ALLOWED' && error.effectMayHaveOccurred === false,
+    error => error.code === 'GOOGLE_SCHEMA_INVALID'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
   );
   assert.equal(calls, 0);
   await assert.rejects(

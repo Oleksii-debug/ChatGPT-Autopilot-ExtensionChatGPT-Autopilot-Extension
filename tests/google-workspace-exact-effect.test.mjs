@@ -148,3 +148,41 @@ test('Gmail verifier identity, policy, effect, execution and attempt bindings ar
   });
   assert.equal(counter.calls, 1);
 });
+
+test('reconciliation rejects whitespace aliases for durable invocation identity without changing stored effect state', async () => {
+  const store = memoryStore();
+  const counter = { calls: 0 };
+  let now = baseMs;
+  const executor = new GoogleWorkspaceExactEffectExecutorV1({
+    provider: provider(counter, {
+      fail: () => Object.assign(new Error('lost POST response'), {
+        effectMayHaveOccurred: true,
+        safeToRetry: false,
+      }),
+    }),
+    store,
+    verify: verification,
+    now: () => { now += 1000; return now; },
+  });
+  const inv = invocation('gmail-draft-exact-id');
+  const decision = policy(inv.invocationId);
+
+  await assert.rejects(() => executor.invoke({ invocation: inv, policyDecision: decision }));
+  const before = await store.load(inv.invocationId);
+  assert.equal(before.phase, ExactEffectPhase.RECONCILE);
+
+  for (const alias of [` ${inv.invocationId}`, `${inv.invocationId} `]) {
+    await assert.rejects(
+      () => executor.reconcile({
+        invocationId: alias,
+        outcome: 'MANUAL_REVIEW',
+        reasonCode: 'OWNER_REVIEW_REQUIRED',
+        summary: 'Alias must fail before durable effect lookup or transition.',
+      }),
+      /invocationId is invalid/,
+    );
+    assert.deepEqual(await store.load(inv.invocationId), before);
+  }
+  assert.equal(counter.calls, 1, 'invalid reconciliation aliases must never replay Gmail mutation');
+});
+
