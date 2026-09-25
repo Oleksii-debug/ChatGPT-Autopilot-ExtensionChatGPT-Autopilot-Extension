@@ -149,8 +149,8 @@ function unique(items, key, label) {
   return items;
 }
 
-function idList(value, label, max = MAX_REQUIREMENTS) {
-  const items = array(value, label, max).map((item, index) => identifier(item, `${label}[${index}]`));
+function idList(value, label, max = MAX_REQUIREMENTS, { min = 0 } = {}) {
+  const items = array(value, label, max, { min }).map((item, index) => identifier(item, `${label}[${index}]`));
   if (new Set(items).size !== items.length) throw new Error(`${label} contains duplicates`);
   return items.sort(ascii);
 }
@@ -233,7 +233,7 @@ function normalizeEvaluationRequirement(input, label) {
     suiteId: identifier(raw.suiteId, `${label}.suiteId`),
     suiteRevisionId: identifier(raw.suiteRevisionId, `${label}.suiteRevisionId`),
     subjectSha256: digest(raw.subjectSha256, `${label}.subjectSha256`),
-    requiredEvidenceKinds: idList(raw.requiredEvidenceKinds, `${label}.requiredEvidenceKinds`, 32),
+    requiredEvidenceKinds: idList(raw.requiredEvidenceKinds, `${label}.requiredEvidenceKinds`, 32, { min: 1 }),
   });
 }
 
@@ -401,6 +401,9 @@ function stableProjection(manifest) {
   return JSON.stringify([
     manifest.skillPackId,
     manifest.version,
+    manifest.displayName,
+    manifest.description,
+    manifest.publishedAt,
     manifest.sourceArtifactId,
     manifest.artifactRefs.map(item => [
       item.artifactId, item.kind, item.uri, item.mediaType || '', item.sha256,
@@ -433,6 +436,9 @@ export function assessSkillPackDriftV1(baselineInput, currentInput) {
 
   const signals = [];
   if (baseline.version !== current.version) signals.push('VERSION_CHANGED');
+  if (baseline.displayName !== current.displayName || baseline.description !== current.description) signals.push('METADATA_CHANGED');
+  if (baseline.publishedAt !== current.publishedAt) signals.push('PUBLISHED_AT_CHANGED');
+  if (JSON.stringify(baseline.artifactRefs) !== JSON.stringify(current.artifactRefs)) signals.push('ARTIFACTS_CHANGED');
   const baselineSource = baseline.artifactRefs.find(item => item.artifactId === baseline.sourceArtifactId);
   const currentSource = current.artifactRefs.find(item => item.artifactId === current.sourceArtifactId);
   if (baseline.sourceArtifactId !== current.sourceArtifactId || baselineSource.sha256 !== currentSource.sha256) {
