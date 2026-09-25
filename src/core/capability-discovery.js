@@ -42,15 +42,23 @@ function plain(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
   const proto = Object.getPrototypeOf(value);
   if (proto !== Object.prototype && proto !== null) throw new Error(`${label} must be a plain object`);
-  for (const key of Reflect.ownKeys(value)) {
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(`${label} contains symbol field`);
-    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    const descriptor = descriptors[key];
     if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} fields must be own data properties`);
     }
     if (!descriptor.enumerable) throw new Error(`${label} contains non-enumerable field: ${key}`);
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
   }
-  return value;
+  return Object.freeze(snapshot);
 }
 
 function exact(raw, allowed, label) {
@@ -78,17 +86,26 @@ function optionalInteger(value, label, max) {
 }
 
 function boundedArray(value, label, max) {
-  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a bounded plain array`);
   }
   const descriptors = Object.getOwnPropertyDescriptors(value);
+  const lengthDescriptor = descriptors.length;
+  if (!lengthDescriptor
+      || !Object.prototype.hasOwnProperty.call(lengthDescriptor, 'value')
+      || !Number.isSafeInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+      || lengthDescriptor.value > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const length = lengthDescriptor.value;
   for (const key of Reflect.ownKeys(descriptors)) {
     if (key === 'length') continue;
     if (typeof key !== 'string' || !/^(0|[1-9][0-9]*)$/u.test(key)) {
       throw new Error(`${label} contains non-index array data`);
     }
     const index = Number(key);
-    if (!Number.isSafeInteger(index) || index < 0 || index >= value.length) {
+    if (!Number.isSafeInteger(index) || index < 0 || index >= length) {
       throw new Error(`${label} contains an invalid array index`);
     }
     const descriptor = descriptors[key];
@@ -96,13 +113,15 @@ function boundedArray(value, label, max) {
       throw new Error(`${label}[${index}] must be an enumerable data property`);
     }
   }
-  const out = [];
-  for (let index = 0; index < value.length; index += 1) {
+  const out = new Array(length);
+  for (let index = 0; index < length; index += 1) {
     const descriptor = descriptors[String(index)];
-    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+    if (!descriptor
+        || !descriptor.enumerable
+        || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
       throw new Error(`${label} must not be sparse`);
     }
-    out.push(descriptor.value);
+    out[index] = descriptor.value;
   }
   return out;
 }
@@ -302,12 +321,20 @@ function buildPlan(candidates, knownRequestedIds) {
   return { steps: frozen(steps), uncovered };
 }
 
-export function discoverCapabilityPathsV1({
-  capabilities = [],
-  tools = [],
-  providerStates = [],
-  requestedCapabilityIds = [],
-} = {}) {
+const DISCOVERY_REQUEST_KEYS = new Set([
+  'capabilities',
+  'tools',
+  'providerStates',
+  'requestedCapabilityIds',
+]);
+
+export function discoverCapabilityPathsV1(input = {}) {
+  const request = plain(input, 'CapabilityDiscoveryRequestV1');
+  exact(request, DISCOVERY_REQUEST_KEYS, 'CapabilityDiscoveryRequestV1');
+  const capabilities = request.capabilities ?? [];
+  const tools = request.tools ?? [];
+  const providerStates = request.providerStates ?? [];
+  const requestedCapabilityIds = request.requestedCapabilityIds ?? [];
   const inventory = normalizeInventory({ capabilities, tools, providerStates });
   const requested = requestedIds(requestedCapabilityIds);
   const requestedSet = new Set(requested);
