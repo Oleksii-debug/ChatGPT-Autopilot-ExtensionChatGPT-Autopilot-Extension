@@ -68,7 +68,9 @@ function timestamp(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} must be a timestamp string`);
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) throw new Error(`${label} must be a timestamp`);
-  return new Date(ms).toISOString();
+  const canonical = new Date(ms).toISOString();
+  if (canonical !== value) throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  return value;
 }
 function strictInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
