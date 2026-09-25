@@ -225,6 +225,21 @@ test('indirect or missing stream Length makes passive safety screening incomplet
   }]);
 });
 
+test('duplicate stream Length is parser-ambiguous and cannot produce passive-ready state', async () => {
+  const duplicate = await run(pdf([
+    '<< /Length 3 /Length 99 >>',
+    'stream',
+    'abc',
+    'endstream',
+  ].join('\n')));
+  assert.equal(duplicate.passiveSafetyScreenComplete, false);
+  assert.equal(duplicate.safePassiveReviewReady, false);
+  assert.deepEqual(duplicate.unsupportedSafetyFeatures, [{
+    name: 'stream:/Length',
+    reason: 'AMBIGUOUS_STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER',
+  }]);
+});
+
 test('object streams and encrypted PDFs fail closed because lightweight screening cannot inspect hidden objects', async () => {
   const objectStream = await run(pdf('<< /Type /ObjStm /N 1 /First 8 /Length 4 >>'));
   assert.equal(objectStream.activeContentDetected, false);
