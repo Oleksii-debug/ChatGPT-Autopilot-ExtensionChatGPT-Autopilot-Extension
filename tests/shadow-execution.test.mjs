@@ -89,19 +89,19 @@ test('ShadowExecutionV1 is immutable, non-authorizing, and stores no invocation 
 
 test('private proposal arguments neither persist nor influence a durable fingerprint', async () => {
   const first = await createShadowExecutionV1(shadow({
-    invocation: invocation({ arguments: { target: 'A', secret: 'one' } }),
+    invocation: invocation({ arguments: { target: 'A', secret: 'SECRET_ALPHA_4bd27f' } }),
   }));
   const second = await createShadowExecutionV1(shadow({
-    invocation: invocation({ arguments: { target: 'A', secret: 'two' } }),
+    invocation: invocation({ arguments: { target: 'A', secret: 'SECRET_BETA_93ac51' } }),
   }));
   assert.equal(first.invocationIdentityFingerprint, second.invocationIdentityFingerprint);
   assert.equal(first.argumentDerivedFingerprintRetained, false);
   assert.equal(second.argumentDerivedFingerprintRetained, false);
-  assert.equal(JSON.stringify(first).includes('one'), false);
-  assert.equal(JSON.stringify(second).includes('two'), false);
+  assert.equal(JSON.stringify(first).includes('SECRET_ALPHA_4bd27f'), false);
+  assert.equal(JSON.stringify(second).includes('SECRET_BETA_93ac51'), false);
 
   const differentIdentity = await createShadowExecutionV1(shadow({
-    invocation: invocation({ invocationId: 'invoke-shadow-2', arguments: { secret: 'one' } }),
+    invocation: invocation({ invocationId: 'invoke-shadow-2', arguments: { secret: 'SECRET_ALPHA_4bd27f' } }),
   }));
   assert.notEqual(first.invocationIdentityFingerprint, differentIdentity.invocationIdentityFingerprint);
 });
