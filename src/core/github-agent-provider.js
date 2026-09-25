@@ -7,6 +7,9 @@ export const GitHubToolId = Object.freeze({
   FILE_READ: 'remote/github/file.read',
   TREE_READ: 'remote/github/tree.read',
   BRANCH_READ: 'remote/github/branch.read',
+  WORKFLOW_LIST: 'remote/github/workflow.list',
+  WORKFLOW_RUN_LIST: 'remote/github/workflowRun.list',
+  WORKFLOW_RUN_JOBS_LIST: 'remote/github/workflowRun.jobs.list',
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
   PULL_REQUEST_READ: 'remote/github/pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'remote/github/pullRequest.comment.read',
@@ -16,6 +19,7 @@ export const GitHubToolId = Object.freeze({
   FILE_PUT: 'remote/github/file.put',
   FILE_DELETE: 'remote/github/file.delete',
   PULL_REQUEST_CREATE: 'remote/github/pullRequest.create',
+  PULL_REQUEST_MERGE: 'remote/github/pullRequest.merge',
   PULL_REQUEST_COMMENT_CREATE: 'remote/github/pullRequest.comment.create',
   ISSUE_CREATE: 'remote/github/issue.create',
   ISSUE_COMMENT_CREATE: 'remote/github/issueComment.create',
@@ -26,6 +30,7 @@ export const GitHubCapabilityId = Object.freeze({
   FILE_READ: 'github.file.read',
   TREE_READ: 'github.tree.read',
   BRANCH_READ: 'github.branch.read',
+  WORKFLOW_READ: 'github.workflow.read',
   PULL_REQUEST_READ: 'github.pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'github.pullRequest.comment.read',
   ISSUE_READ: 'github.issue.read',
@@ -34,6 +39,7 @@ export const GitHubCapabilityId = Object.freeze({
   FILE_WRITE: 'github.file.write',
   FILE_DELETE: 'github.file.delete',
   PULL_REQUEST_CREATE: 'github.pullRequest.create',
+  PULL_REQUEST_MERGE: 'github.pullRequest.merge',
   PULL_REQUEST_COMMENT_CREATE: 'github.pullRequest.comment.create',
   ISSUE_CREATE: 'github.issue.create',
   ISSUE_COMMENT_CREATE: 'github.issueComment.create',
@@ -82,6 +88,39 @@ const TOOLS = Object.freeze([
     capabilityIds: [GitHubCapabilityId.BRANCH_READ],
     inputSchemaRef: 'github-schema/branch.read/input',
     outputSchemaRef: 'github-schema/branch.read/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_LIST,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'List bounded GitHub Actions workflows',
+    description: 'Reads a bounded page of workflow definitions from one owner-allowlisted repository without granting Actions mutation authority.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_READ],
+    inputSchemaRef: 'github-schema/workflow.list/input',
+    outputSchemaRef: 'github-schema/workflow.list/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_RUN_LIST,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'List bounded GitHub Actions workflow runs',
+    description: 'Reads a bounded explicit page of workflow runs with visible truncation and no rerun, cancel, or dispatch authority.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_READ],
+    inputSchemaRef: 'github-schema/workflowRun.list/input',
+    outputSchemaRef: 'github-schema/workflowRun.list/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_RUN_JOBS_LIST,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'List bounded jobs for exact GitHub Actions run',
+    description: 'Reads one bounded explicit page of jobs and steps for an exact workflow run without log-download or rerun authority.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_READ],
+    inputSchemaRef: 'github-schema/workflowRun.jobs.list/input',
+    outputSchemaRef: 'github-schema/workflowRun.jobs.list/output',
     readOnly: true,
   }),
   normalizeToolDescriptorV1({
@@ -185,6 +224,17 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: GitHubToolId.PULL_REQUEST_MERGE,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Merge GitHub pull request at exact head',
+    description: 'Merges one exact open pull request only when its current head SHA matches the owner-authorized expected head. Ambiguous outcomes require reconciliation.',
+    capabilityIds: [GitHubCapabilityId.PULL_REQUEST_MERGE],
+    inputSchemaRef: 'github-schema/pullRequest.merge/input',
+    outputSchemaRef: 'github-schema/pullRequest.merge/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: GitHubToolId.PULL_REQUEST_COMMENT_CREATE,
     providerId: GITHUB_PROVIDER_ID,
     label: 'Create GitHub pull request timeline comment',
@@ -249,6 +299,9 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.FILE_READ) return 'readFile';
   if (toolId === GitHubToolId.TREE_READ) return 'readTree';
   if (toolId === GitHubToolId.BRANCH_READ) return 'readBranch';
+  if (toolId === GitHubToolId.WORKFLOW_LIST) return 'listWorkflows';
+  if (toolId === GitHubToolId.WORKFLOW_RUN_LIST) return 'listWorkflowRuns';
+  if (toolId === GitHubToolId.WORKFLOW_RUN_JOBS_LIST) return 'listWorkflowRunJobs';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
   if (toolId === GitHubToolId.PULL_REQUEST_READ) return 'readPullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_READ) return 'readPullRequestComment';
@@ -258,6 +311,7 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.FILE_PUT) return 'putFile';
   if (toolId === GitHubToolId.FILE_DELETE) return 'deleteFile';
   if (toolId === GitHubToolId.PULL_REQUEST_CREATE) return 'createPullRequest';
+  if (toolId === GitHubToolId.PULL_REQUEST_MERGE) return 'mergePullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_CREATE) return 'createPullRequestComment';
   if (toolId === GitHubToolId.ISSUE_CREATE) return 'createIssue';
   if (toolId === GitHubToolId.ISSUE_COMMENT_CREATE) return 'createIssueComment';
@@ -266,11 +320,27 @@ function methodFor(toolId) {
 
 export class GitHubAgentProviderV1 {
   constructor({ githubClient, grantedCapabilityIds = [], now = () => Date.now() } = {}) {
-    const methods = Object.values(GitHubToolId).map(methodFor);
+    if (!Array.isArray(grantedCapabilityIds)) throw new Error('grantedCapabilityIds must be an array');
+    const methods = Object.values(GitHubToolId)
+      .filter(toolId => ![
+        GitHubToolId.PULL_REQUEST_MERGE,
+        GitHubToolId.WORKFLOW_LIST,
+        GitHubToolId.WORKFLOW_RUN_LIST,
+        GitHubToolId.WORKFLOW_RUN_JOBS_LIST,
+      ].includes(toolId))
+      .map(methodFor);
     if (!githubClient || methods.some(method => typeof githubClient[method] !== 'function')) {
       throw new Error('GitHub REST client with the complete V1 operation set is required');
     }
-    if (!Array.isArray(grantedCapabilityIds)) throw new Error('grantedCapabilityIds must be an array');
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.PULL_REQUEST_MERGE)
+        && typeof githubClient.mergePullRequest !== 'function') {
+      throw new Error('GitHub REST client with pull-request merge support is required for the granted merge capability');
+    }
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.WORKFLOW_READ)
+        && ['listWorkflows', 'listWorkflowRuns', 'listWorkflowRunJobs']
+          .some(method => typeof githubClient?.[method] !== 'function')) {
+      throw new Error('GitHub REST client with complete workflow read support is required for the granted workflow capability');
+    }
     this.githubClient = githubClient;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
     this.now = now;

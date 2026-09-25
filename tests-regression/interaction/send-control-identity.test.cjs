@@ -156,6 +156,27 @@ test('stable send-button test id works even when aria label is localized', async
   assert.equal(actual.clicks(), 1);
 });
 
+test('localized exact Send control without a test id outranks an unrelated composer button', async () => {
+  const adapter = loadAdapter();
+  let fx;
+  const actual = makeButton({ ariaLabel: 'Надіслати повідомлення', onClick: () => fx.appendSubmission() });
+  const dictate = makeButton({ ariaLabel: 'Диктувати' });
+  fx = fixture([dictate, actual]);
+  const result = await adapter.execute(request('SUBMIT_EXISTING'), { document: fx.document, wait: async () => {} });
+  assert.equal(result.status, adapter.STATUS.SENT_VERIFIED);
+  assert.equal(actual.clicks(), 1);
+  assert.equal(dictate.clicks(), 0);
+});
+
+test('localized feedback control is never mistaken for Send', async () => {
+  const adapter = loadAdapter();
+  const feedback = makeButton({ ariaLabel: 'Надіслати відгук' });
+  const fx = fixture([feedback]);
+  const result = await adapter.execute(request('PREPARE_SEND'), { document: fx.document });
+  assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
+  assert.equal(feedback.clicks(), 0);
+});
+
 test('two equally strong visible Send controls fail closed', async () => {
   const adapter = loadAdapter();
   const first = makeButton({ ariaLabel: 'Send message', testId: 'send-button' });

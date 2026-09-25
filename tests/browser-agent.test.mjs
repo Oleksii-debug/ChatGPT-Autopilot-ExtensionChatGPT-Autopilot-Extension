@@ -274,20 +274,20 @@ test('job-to-Project resolver composes exact persisted AgentPlan identity and fa
 
 test('Browser Agent persists a bounded external specialist handoff and requires an independent verifier', async () => {
   const chrome = makeChrome();
-  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00Z') });
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:00.000Z') });
   await manager.create({ id:'job-1', goal:'Complete a mixed-plane task' });
   await manager.update(store => {
     store.byId['job-1'].runtime.plan = {
-      schemaVersion:1, planId:'plan-1', jobId:'job-1', objective:'Complete safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      schemaVersion:1, planId:'plan-1', jobId:'job-1', objective:'Complete safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00.000Z', updatedAt:'2026-09-23T12:00:00.000Z', revision:1,
       nodes:[
-        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
-        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00.000Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00.000Z' },
       ],
     };
     return store;
   });
   const prepared = await manager.prepareSpecialistHandoff('job-1', {
-    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00Z', priority:5,
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:archive', deadlineAt:'2026-09-23T13:00:00.000Z', priority:5,
   });
   assert.equal(prepared.reused, false);
   assert.equal((await manager.listSpecialistHandoffs('job-1')).handoffs.length, 1);
@@ -316,21 +316,21 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
 
 test('Browser Agent keeps ambiguous specialist effect fenced across forged proof and restart', async () => {
   const chrome = makeChrome();
-  let clock = Date.parse('2026-09-23T12:00:00Z');
+  let clock = Date.parse('2026-09-23T12:00:00.000Z');
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => clock });
   await manager.create({ id:'job-retry', goal:'Recover an ambiguous specialist effect' });
   await manager.update(store => {
     store.byId['job-retry'].runtime.plan = {
-      schemaVersion:1, planId:'plan-retry', jobId:'job-retry', objective:'Recover safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00Z', updatedAt:'2026-09-23T12:00:00Z', revision:1,
+      schemaVersion:1, planId:'plan-retry', jobId:'job-retry', objective:'Recover safely', successCriteria:['Verified'], createdAt:'2026-09-23T12:00:00.000Z', updatedAt:'2026-09-23T12:00:00.000Z', revision:1,
       nodes:[
-        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web:retry'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00Z' },
-        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files:retry'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00Z' },
+        { nodeId:'inspect', title:'Inspect', objective:'Inspect page', dependsOn:[], conflictKeys:['web:retry'], ownerId:'parent', executionPlane:'BROWSER', acceptanceCriteria:[], budget:{}, state:'VERIFIED', evidence:'Observed', updatedAt:'2026-09-23T12:00:00.000Z' },
+        { nodeId:'archive', title:'Archive', objective:'Create archive', dependsOn:['inspect'], conflictKeys:['files:retry'], ownerId:'parent', executionPlane:'LOCAL', acceptanceCriteria:['Archive exists'], budget:{}, state:'PENDING', evidence:'', updatedAt:'2026-09-23T12:00:00.000Z' },
       ],
     };
     return store;
   });
   await manager.prepareSpecialistHandoff('job-retry', {
-    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:retry', deadlineAt:'2026-09-23T13:00:00Z',
+    nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:'policy:retry', deadlineAt:'2026-09-23T13:00:00.000Z',
   });
   const claimed = await manager.claimSpecialistHandoffs('job-retry', { availableSlots:1, leaseSeconds:30 });
   const agentId = claimed.claimed[0];
@@ -378,7 +378,7 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
 
 test('product-wide specialist admission is durable across Browser Agent jobs and restart', async () => {
   const chrome = makeChrome();
-  const at = '2026-09-23T12:00:00Z';
+  const at = '2026-09-23T12:00:00.000Z';
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse(at) });
   for (const jobId of ['job-1', 'job-2']) {
     await manager.create({ id:jobId, goal:`Complete ${jobId}` });
@@ -392,20 +392,20 @@ test('product-wide specialist admission is durable across Browser Agent jobs and
       };
       return store;
     });
-    await manager.prepareSpecialistHandoff(jobId, { nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:`policy:${jobId}`, deadlineAt:'2026-09-23T13:00:00Z' });
+    await manager.prepareSpecialistHandoff(jobId, { nodeId:'archive', specialistId:'native-companion', requestedCapabilityIds:['filesystem.archive'], parentCapabilityIds:['filesystem.archive'], policyEnvelopeId:`policy:${jobId}`, deadlineAt:'2026-09-23T13:00:00.000Z' });
   }
   const first = await manager.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at });
   assert.deepEqual(first.claimed.map(item => item.jobId), ['job-1']);
   assert.equal((await manager.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
-  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30Z') });
-  const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30Z' });
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => Date.parse('2026-09-23T12:00:30.000Z') });
+  const afterRestart = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs:1, leaseSeconds:60, at:'2026-09-23T12:00:30.000Z' });
   assert.equal(afterRestart.claimed.length, 0, 'a restart must retain the product-wide lease fence');
   assert.equal((await restarted.listSpecialistHandoffs('job-2')).handoffs[0].state, 'READY');
 
   const afterExpiry = await restarted.claimSpecialistHandoffsAcrossJobs({
     maxConcurrentHandoffs:1,
     leaseSeconds:60,
-    at:'2026-09-23T12:02:00Z',
+    at:'2026-09-23T12:02:00.000Z',
   });
   assert.equal(afterExpiry.activeLeases, 0, 'expired lease labels are not the capacity authority');
   assert.equal(afterExpiry.capacityObligations, 1, 'unresolved canonical effect ownership still consumes one slot');
@@ -2812,7 +2812,7 @@ test('Trusted Script consequential approval is invalidated if the approved brows
 
 test('Browser Agent specialist wrappers snapshot caller payloads before authority reads', async () => {
   const chrome = makeChrome();
-  const at = '2026-09-23T12:00:00Z';
+  const at = '2026-09-23T12:00:00.000Z';
   const manager = new BrowserAgentManager({
     chromeApi: chrome,
     routePrompt: async () => ({ text: '{}' }),
@@ -2870,7 +2870,7 @@ test('Browser Agent specialist wrappers snapshot caller payloads before authorit
     requestedCapabilityIds: ['filesystem.archive'],
     parentCapabilityIds: ['filesystem.archive'],
     policyEnvelopeId: 'policy:wrapper',
-    deadlineAt: '2026-09-23T13:00:00Z',
+    deadlineAt: '2026-09-23T13:00:00.000Z',
     at,
   }, {
     get(target, property, receiver) {
@@ -2913,4 +2913,317 @@ test('Browser Agent specialist wrappers snapshot caller payloads before authorit
     /maxConcurrentHandoffs must be an integer/,
   );
   assert.equal(coercions, 0, 'cross-job capacity must never be coerced');
+});
+
+
+test('Browser Agent input-token admission includes an existing durable reservation without throwing', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text:'{}' }),
+    now: () => 49_000,
+  });
+  await manager.create({
+    id:'job-input-reservation-headroom',
+    goal:'Respect reserved input-token headroom',
+    maxInputTokens:12,
+  });
+  await manager.update(store => {
+    const job = store.byId['job-input-reservation-headroom'];
+    job.runtime.inputTokens = 3;
+    job.runtime.totalTokens = 3;
+    job.runtime.modelBudgetReservation = {
+      reservationId:'job-input-reservation-headroom:model-budget:1',
+      controlEpoch:0,
+      modelCalls:1,
+      inputTokens:4,
+      outputTokens:2,
+      totalTokens:6,
+      estimatedCostUsd:0,
+      createdAt:48_000,
+      routeId:'primary',
+      provider:'ollama',
+      model:'qwen:8b',
+      callNumber:1,
+    };
+    return store;
+  });
+
+  const current = await manager.get('job-input-reservation-headroom');
+  assert.doesNotThrow(() => manager.budgetReason(current.job, { pendingInputTokens:5 }));
+  assert.equal(manager.budgetReason(current.job, { pendingInputTokens:5 }), '');
+  assert.equal(
+    manager.budgetReason(current.job, { pendingInputTokens:6 }),
+    'maximum input-token budget reached',
+  );
+});
+
+test('Browser Agent persists provider-call budget before I/O and restart cannot regain the reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 50_000 });
+  await manager.create({
+    id:'job-budget-restart',
+    goal:'Use a bounded model budget safely',
+    maxModelCalls:1,
+    maxOutputTokensPerCall:128,
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:2,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-restart'].runtime.runState = 'RUNNING';
+    return store;
+  });
+
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-budget-restart',
+    controlEpoch:0,
+    prompt:'bounded prompt',
+    systemPrompt:'bounded system',
+    maxOutputTokens:128,
+    route:{ routeId:'primary', provider:'ollama', model:'qwen:8b' },
+    callNumber:1,
+  });
+  const beforeRestart = await manager.get('job-budget-restart');
+  assert.equal(beforeRestart.job.runtime.modelCalls, 0);
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.reservationId, reservation.reservationId);
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.modelCalls, 1);
+  assert.equal(beforeRestart.job.runtime.modelBudgetReservation.outputTokens, 128);
+
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({
+      jobId:'job-budget-restart',
+      controlEpoch:0,
+      prompt:'must not double reserve',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+    }),
+    error => {
+      assert.equal(error.code, 'AI_MODEL_BUDGET_RESERVATION_PENDING');
+      return true;
+    },
+  );
+
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 51_000 });
+  assert.equal(await restarted.reconcileProviderModelBudgetReservation('job-budget-restart'), true);
+  const recovered = await restarted.get('job-budget-restart');
+  assert.equal(recovered.job.runtime.modelBudgetReservation, null);
+  assert.equal(recovered.job.runtime.modelCalls, 1);
+  assert.ok(recovered.job.runtime.inputTokens > 0);
+  assert.equal(recovered.job.runtime.outputTokens, 128);
+  assert.equal(recovered.job.runtime.history.at(-1).type, 'model-budget-recovered-after-restart');
+
+  await assert.rejects(
+    () => restarted.reserveProviderModelBudget({
+      jobId:'job-budget-restart',
+      controlEpoch:0,
+      prompt:'must remain exhausted after restart',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+    }),
+    error => {
+      assert.equal(error.code, 'AI_MODEL_BUDGET_EXHAUSTED');
+      assert.match(error.safeBudgetReason, /model-call budget/);
+      return true;
+    },
+  );
+});
+
+test('Browser Agent successful provider settlement uses exact usage once and clears its reservation', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 60_000 });
+  await manager.create({
+    id:'job-budget-success',
+    goal:'Settle actual model usage',
+    maxModelCalls:3,
+    maxOutputTokensPerCall:256,
+    inputPricePerMillionUsd:2,
+    outputPricePerMillionUsd:4,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-success'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-budget-success',
+    controlEpoch:0,
+    prompt:'prompt',
+    systemPrompt:'system',
+    maxOutputTokens:256,
+  });
+  assert.deepEqual(
+    await manager.settleProviderModelBudget({
+      jobId:'job-budget-success',
+      reservationId:reservation.reservationId,
+      ok:true,
+      result:{ text:'done', usage:{ inputTokens:11, outputTokens:7, totalTokens:18 } },
+    }),
+    { settled:true },
+  );
+  const current = await manager.get('job-budget-success');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 1);
+  assert.equal(current.job.runtime.inputTokens, 11);
+  assert.equal(current.job.runtime.outputTokens, 7);
+  assert.equal(current.job.runtime.totalTokens, 18);
+  assert.equal(current.job.runtime.estimatedCostUsd, (11 / 1_000_000) * 2 + (7 / 1_000_000) * 4);
+  assert.equal(current.job.runtime.history.at(-1).type, 'model-budget-settled');
+  assert.deepEqual(
+    await manager.settleProviderModelBudget({
+      jobId:'job-budget-success',
+      reservationId:reservation.reservationId,
+      ok:true,
+      result:{ text:'duplicate', usage:{ inputTokens:999, outputTokens:999, totalTokens:1998 } },
+    }),
+    { settled:false },
+  );
+  assert.equal((await manager.get('job-budget-success')).job.runtime.modelCalls, 1);
+});
+
+test('Browser Agent conservatively consumes the bounded reservation after an admitted provider failure', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }), now: () => 70_000 });
+  await manager.create({
+    id:'job-budget-failure',
+    goal:'Fail closed on uncertain provider spend',
+    maxModelCalls:2,
+    maxOutputTokensPerCall:192,
+    inputPricePerMillionUsd:1,
+    outputPricePerMillionUsd:3,
+  });
+  await manager.update(store => {
+    store.byId['job-budget-failure'].runtime.runState = 'RUNNING';
+    return store;
+  });
+  const reservation = await manager.reserveProviderModelBudget({
+    jobId:'job-budget-failure',
+    controlEpoch:0,
+    prompt:'prompt with bounded input',
+    systemPrompt:'system',
+    maxOutputTokens:192,
+  });
+  await manager.settleProviderModelBudget({
+    jobId:'job-budget-failure',
+    reservationId:reservation.reservationId,
+    ok:false,
+  });
+  const current = await manager.get('job-budget-failure');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 1);
+  assert.equal(current.job.runtime.inputTokens, reservation.inputTokens);
+  assert.equal(current.job.runtime.outputTokens, 192);
+  assert.equal(current.job.runtime.totalTokens, reservation.totalTokens);
+  assert.equal(current.job.runtime.estimatedCostUsd, reservation.estimatedCostUsd);
+  assert.equal(current.job.runtime.history.at(-1).type, 'model-budget-conservative-settlement');
+});
+
+test('Browser Agent reservation fails closed when owner authority changes before dispatch', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text:'{}' }) });
+  await manager.create({ id:'job-budget-owner', goal:'Respect owner cancellation', maxModelCalls:2, maxOutputTokensPerCall:128 });
+  await manager.update(store => {
+    store.byId['job-budget-owner'].runtime.runState = 'RUNNING';
+    store.byId['job-budget-owner'].runtime.controlEpoch = 4;
+    return store;
+  });
+  await assert.rejects(
+    () => manager.reserveProviderModelBudget({
+      jobId:'job-budget-owner',
+      controlEpoch:3,
+      prompt:'stale owner context',
+      systemPrompt:'system',
+      maxOutputTokens:128,
+    }),
+    error => {
+      assert.equal(error.code, 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED');
+      return true;
+    },
+  );
+  const current = await manager.get('job-budget-owner');
+  assert.equal(current.job.runtime.modelBudgetReservation, null);
+  assert.equal(current.job.runtime.modelCalls, 0);
+});
+
+
+test('owner approval fence rejects a replacement pending action that races with asynchronous tab verification', async () => {
+  const chrome = makeChrome();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: (() => { let n = 200_000; return () => ++n; })(),
+  });
+  await manager.create({ id: 'approval-race-job', goal: 'Never execute a stale approval' });
+  await manager.update(store => {
+    const job = store.byId['approval-race-job'];
+    job.runtime.runState = 'WAITING_APPROVAL';
+    job.runtime.controlEpoch = 10;
+    job.runtime.updatedAt = 200_010;
+    job.runtime.pendingApproval = {
+      action: { type: 'click', frameId: 0, ref: 'r1' },
+      snapshotId: 'snapshot-old',
+      snapshotSignature: 'signature-old',
+      url: 'https://ais.example.edu/app',
+      tabId: 1,
+      targetName: 'Old action',
+      targetFingerprint: null,
+      dragStartFingerprint: null,
+      dragEndFingerprint: null,
+      reason: 'Old approval',
+      requestedAt: 200_009,
+    };
+    return store;
+  });
+  const before = await manager.get('approval-race-job');
+  const oldFence = {
+    controlEpoch: before.job.runtime.controlEpoch,
+    updatedAt: before.job.runtime.updatedAt,
+    snapshotId: before.job.runtime.pendingApproval.snapshotId,
+    snapshotSignature: before.job.runtime.pendingApproval.snapshotSignature,
+    requestedAt: before.job.runtime.pendingApproval.requestedAt,
+  };
+
+  const originalGet = chrome.tabs.get.bind(chrome.tabs);
+  let swapped = false;
+  chrome.tabs.get = async id => {
+    if (!swapped) {
+      swapped = true;
+      await manager.update(store => {
+        const job = store.byId['approval-race-job'];
+        job.runtime.controlEpoch = 11;
+        job.runtime.updatedAt = 200_012;
+        job.runtime.pendingApproval = {
+          ...job.runtime.pendingApproval,
+          action: { type: 'click', frameId: 0, ref: 'r2' },
+          snapshotId: 'snapshot-new',
+          snapshotSignature: 'signature-new',
+          targetName: 'New action',
+          reason: 'New approval',
+          requestedAt: 200_011,
+        };
+        return store;
+      });
+    }
+    return originalGet(id);
+  };
+
+  await assert.rejects(
+    () => manager.approvePendingAction('approval-race-job', {
+      runInitial: false,
+      expectedApproval: oldFence,
+    }),
+    error => error?.code === 'BROWSER_AGENT_APPROVAL_STALE',
+  );
+  chrome.tabs.get = originalGet;
+  let live = await manager.get('approval-race-job');
+  assert.equal(chrome._actionCalls.length, 0, 'raced stale approval must execute nothing');
+  assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
+  assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new');
+  assert.equal(live.job.runtime.pendingApproval.action.ref, 'r2');
+
+  await assert.rejects(
+    () => manager.rejectPendingAction('approval-race-job', { expectedApproval: oldFence }),
+    error => error?.code === 'BROWSER_AGENT_APPROVAL_STALE',
+  );
+  live = await manager.get('approval-race-job');
+  assert.equal(live.job.runtime.runState, 'WAITING_APPROVAL');
+  assert.equal(live.job.runtime.pendingApproval.snapshotId, 'snapshot-new', 'stale reject must not clear the replacement approval');
 });

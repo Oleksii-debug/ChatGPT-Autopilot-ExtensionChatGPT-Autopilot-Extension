@@ -191,6 +191,7 @@ function happyFixture(options = {}) {
     ],
   ]);
   return {
+    trustedContract: outcomeContract,
     input: {
       contract: outcomeContract,
       criterionVerifications: [
@@ -217,8 +218,22 @@ function resolverFor(records, calls = []) {
   };
 }
 
+function contractResolverFor(outcomeContract, calls = []) {
+  return async lookup => {
+    calls.push(lookup);
+    if (lookup.contractId !== outcomeContract.contractId
+      || lookup.contractRevision !== outcomeContract.revision) {
+      return null;
+    }
+    return outcomeContract;
+  };
+}
+
 async function adjudicate(fixture) {
   return adjudicateOutcomeVerificationV1(fixture.input, {
+    resolveTrustedOutcomeContract: contractResolverFor(
+      fixture.trustedContract ?? fixture.input.contract,
+    ),
     resolveTrustedVerificationRecord: resolverFor(fixture.records),
   });
 }
@@ -226,7 +241,12 @@ async function adjudicate(fixture) {
 test('all criteria require trusted ledger records with canonical verification and hashed artifacts', async () => {
   const fixture = happyFixture();
   const calls = [];
+  const contractCalls = [];
   const result = await adjudicateOutcomeVerificationV1(fixture.input, {
+    resolveTrustedOutcomeContract: contractResolverFor(
+      fixture.trustedContract,
+      contractCalls,
+    ),
     resolveTrustedVerificationRecord: resolverFor(fixture.records, calls),
   });
 
@@ -248,6 +268,11 @@ test('all criteria require trusted ledger records with canonical verification an
     ['criterion-artifact', 'criterion-tests'],
   );
   assert.deepEqual(
+    contractCalls,
+    [{ contractId: 'outcome-1', contractRevision: 1 }],
+  );
+  assert.ok(contractCalls.every(item => Object.isFrozen(item)));
+  assert.deepEqual(
     calls.map(item => item.criterionId),
     ['criterion-artifact', 'criterion-tests'],
   );
@@ -256,11 +281,26 @@ test('all criteria require trusted ledger records with canonical verification an
   assert.ok(Object.isFrozen(result.criteria));
 });
 
-test('missing trusted resolver or missing trusted record fails closed', async () => {
+test('missing trusted contract/verification resolvers or records fail closed', async () => {
   const fixture = happyFixture();
   await assert.rejects(
-    () => adjudicateOutcomeVerificationV1(fixture.input),
+    () => adjudicateOutcomeVerificationV1(fixture.input, {
+      resolveTrustedVerificationRecord: resolverFor(fixture.records),
+    }),
+    /trusted outcome contract resolver is required/i,
+  );
+  await assert.rejects(
+    () => adjudicateOutcomeVerificationV1(fixture.input, {
+      resolveTrustedOutcomeContract: contractResolverFor(fixture.trustedContract),
+    }),
     /trusted verification record resolver is required/i,
+  );
+  await assert.rejects(
+    () => adjudicateOutcomeVerificationV1(fixture.input, {
+      resolveTrustedOutcomeContract: async () => null,
+      resolveTrustedVerificationRecord: resolverFor(fixture.records),
+    }),
+    /Trusted canonical Outcome Contract was not found/i,
   );
 
   fixture.records.delete('verification-tests');
@@ -268,6 +308,66 @@ test('missing trusted resolver or missing trusted record fails closed', async ()
     () => adjudicate(fixture),
     /trusted verification record was not found/i,
   );
+});
+
+test('same id/revision cannot substitute canonical Outcome Contract semantics', async () => {
+  const cases = [
+    ['desiredResult', value => { value.desiredResult = 'Ship something else.'; }],
+    ['sourceTruth', value => { value.sourceTruth[0].revisionId = 'rev-main-2'; }],
+    ['constraints', value => { value.constraints = ['Changed constraint.']; }],
+    ['allowedAuthority', value => {
+      value.allowedAuthority = [{
+        authorityId: 'authority-1',
+        scopeId: 'scope-1',
+        purpose: 'Changed authority requirement.',
+        authorityEffect: 'REQUIREMENT_ONLY',
+      }];
+    }],
+    ['budgetBoundaries', value => { value.budgetBoundaries.maxModelCalls += 1; }],
+    ['deliverables', value => { value.deliverables[0].description = 'Changed deliverable.'; }],
+    ['triggerRefs', value => {
+      value.triggerRefs = [{
+        triggerId: 'trigger-1',
+        kind: 'EVENT',
+        schedulingAuthority: 'REFERENCE_ONLY',
+      }];
+    }],
+  ];
+
+  for (const [name, mutate] of cases) {
+    const fixture = happyFixture();
+    const substituted = structuredClone(fixture.input.contract);
+    mutate(substituted);
+    fixture.input.contract = substituted;
+    await assert.rejects(
+      () => adjudicate(fixture),
+      /does not match the requested exact contract revision semantics/,
+      name,
+    );
+  }
+});
+
+test('trusted canonical contract boundary rejects accessors without executing them', async () => {
+  const fixture = happyFixture();
+  const hostile = structuredClone(fixture.trustedContract);
+  let getterCalls = 0;
+  Object.defineProperty(hostile, 'desiredResult', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      return 'Forged result';
+    },
+  });
+
+  await assert.rejects(
+    () => adjudicateOutcomeVerificationV1(fixture.input, {
+      resolveTrustedOutcomeContract: async () => hostile,
+      resolveTrustedVerificationRecord: resolverFor(fixture.records),
+    }),
+    /field desiredResult must be an enumerable data property/,
+  );
+  assert.equal(getterCalls, 0);
 });
 
 test('caller-forged verifier, authority and VERIFIED status cannot enter the trusted boundary', async () => {

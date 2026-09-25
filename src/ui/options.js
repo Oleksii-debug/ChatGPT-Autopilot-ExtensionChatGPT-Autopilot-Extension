@@ -890,6 +890,7 @@ function aiRouterRoutesFromForm({ validate = true } = {}) {
       roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
       capabilityIds,
       priority:routeNumber(card, 'priority', 0, 1_000_000, `Маршрут ${routeId}, пріоритет`),
+      maxWorkers:routeNumber(card, 'maxWorkers', 0, 200, `Маршрут ${routeId}, максимум workers`),
       enabled:card.querySelector('[data-route-field="enabled"]').checked,
       locality:text('locality'),
       costClass:text('costClass'),
@@ -954,7 +955,14 @@ function renderAiModelPriceCatalog(routes = [], routeStates = {}) {
   }
 }
 
-function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
+function manualWorkerCountsFromCards() {
+  return Object.fromEntries([...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map(card => [
+    card.querySelector('[data-route-field="routeId"]').value.trim(),
+    Number(card.querySelector('[data-route-field="manualWorkers"]').value),
+  ]).filter(([id]) => id));
+}
+
+function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, workerPolicy = {}) {
   const list = $('ai-router-route-list');
   list.replaceChildren();
   for (const [index, route] of routes.entries()) {
@@ -969,6 +977,7 @@ function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}) {
     const values = {
       routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
       capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
+      maxWorkers:route.maxWorkers ?? 0, manualWorkers:workerPolicy.manualRouteWorkers?.[route.routeId] ?? 0,
       locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'unknown'),
       inputPricePerMillionUsd:route.inputPricePerMillionUsd ?? 0, outputPricePerMillionUsd:route.outputPricePerMillionUsd ?? 0,
     };
@@ -990,7 +999,7 @@ function addAiRouterRoute() {
   renderAiRouterRoutes(current, {}, {
     pinnedRouteId:$('ai-router-pinned-route').value,
     allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
-  });
+  }, { manualRouteWorkers:manualWorkerCountsFromCards() });
   $('ai-router-route-list').lastElementChild?.querySelector('[data-route-field="routeId"]')?.focus();
 }
 
@@ -1098,6 +1107,17 @@ function aiRouterSettingsFromForm() {
       circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'Поріг circuit breaker'),
       circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Тривалість circuit breaker'),
     },
+    workerPolicy: {
+      allocationMode:$('ai-worker-count-manual').checked ? 'manual' : 'auto',
+      minWorkers:integer('ai-worker-min', 1, 200, 'Мінімум workers'),
+      maxParallelWorkers:integer('ai-worker-max-parallel', 1, 200, 'Максимум одночасних workers'),
+      manualRouteWorkers:Object.fromEntries([...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map(card => {
+        const routeId = card.querySelector('[data-route-field="routeId"]').value.trim();
+        const value = Number(card.querySelector('[data-route-field="manualWorkers"]').value);
+        if (!Number.isInteger(value) || value < 0 || value > 200) throw new Error(`Маршрут ${routeId}: workers вручну від 0 до 200.`);
+        return [routeId, value];
+      })),
+    },
   };
 }
 
@@ -1106,7 +1126,7 @@ function setAiRouterBusy(busy) {
     'save-ai-router-button', 'test-ai-gateway-button', 'reset-ai-router-runtime-button',
     'ai-router-primary-models-button', 'ai-router-strong-models-button',
     'run-ai-router-test-button', 'run-ai-router-strong-button',
-    'ai-router-add-route-button',
+    'ai-router-add-route-button', 'ai-router-add-mistral-button', 'ai-router-add-openrouter-button',
   ]) $(id).disabled = Boolean(busy);
   $('ai-router-route-list').querySelectorAll('button, input, select').forEach(control => { control.disabled = Boolean(busy); });
 }
@@ -1215,7 +1235,12 @@ async function loadAiRouterSettings() {
     $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
     $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
     $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
-    renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy);
+    const workerPolicy = settings.workerPolicy || {};
+    $('ai-worker-count-auto').checked = workerPolicy.allocationMode !== 'manual';
+    $('ai-worker-count-manual').checked = workerPolicy.allocationMode === 'manual';
+    $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
+    $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
+    renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -2543,6 +2568,135 @@ async function loadGlobalStatus() {
   catch (error) { $('global-runtime-summary').textContent = `Не вдалося прочитати стан Autopilot: ${error.message}`; }
 }
 
+const ACTION_CENTER_ACTION_LABELS = Object.freeze({
+  APPROVE_OR_DENY: 'схвалити або відхилити',
+  RECONCILE: 'узгодити неоднозначний ефект',
+  REVIEW: 'переглянути',
+  CLARIFY: 'уточнити',
+  TAKE_OVER: 'взяти під контроль',
+  REAUTHENTICATE: 'повторно авторизувати',
+});
+
+const ACTION_CENTER_SEVERITY_LABELS = Object.freeze({
+  BLOCKING: 'блокує роботу',
+  HIGH: 'високий пріоритет',
+  NORMAL: 'звичайний пріоритет',
+  LOW: 'низький пріоритет',
+});
+
+async function decideActionCenterBrowserApproval(item, decision, container) {
+  const summary = $('action-center-summary');
+  const controls = [...container.querySelectorAll('button')];
+  controls.forEach(button => { button.disabled = true; });
+  try {
+    await core('DECIDE_ACTION_CENTER_BROWSER_APPROVAL', {
+      itemId: item.itemId,
+      sourceRevisionId: item.sourceRevisionId,
+      decision,
+    });
+    await loadActionCenter();
+    summary.focus();
+  } catch (error) {
+    summary.textContent = `Не вдалося застосувати рішення: ${error.message}`;
+    controls.forEach(button => { button.disabled = false; });
+    summary.focus();
+  }
+}
+
+function renderActionCenter(data) {
+  const items = Array.isArray(data?.items) ? data.items.filter(item => item?.status === 'OPEN') : [];
+  const summary = data?.summary || {};
+  const runtimeSummary = data?.runtimeSummary || {};
+  const truncation = runtimeSummary.truncated
+    ? ` Показано ${runtimeSummary.projectedCount || items.length} із ${runtimeSummary.candidateCount || items.length}; спочатку блокуючі та найстаріші питання.`
+    : '';
+  $('action-center-summary').textContent = items.length
+    ? `Потребують уваги: ${summary.openCount || items.length}. Блокують роботу: ${summary.blockingOpenCount || 0}.${truncation} Очікувані дії Browser Agent можна схвалити або відхилити тут; інші питання вирішуються у відповідному канонічному розділі.`
+    : 'Зараз немає питань, які потребують вашої дії.';
+  const list = $('action-center-list');
+  const signature = JSON.stringify(items.map(item => [
+    item.itemId, item.sourceRevisionId, item.severity, item.ownerActionKind, item.title, item.materialityReason,
+  ]));
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  list.replaceChildren();
+  for (const item of items) {
+    const li = document.createElement('li');
+    const severity = ACTION_CENTER_SEVERITY_LABELS[item.severity] || item.severity;
+    const action = ACTION_CENTER_ACTION_LABELS[item.ownerActionKind] || item.ownerActionKind;
+    const description = document.createElement('span');
+    description.textContent = `${severity}. ${item.title}. Потрібно: ${action}. ${item.materialityReason}`;
+    li.append(description);
+    if (item.ownerActionKind === 'APPROVE_OR_DENY' && item.sourceKind === 'APPROVAL') {
+      const approve = document.createElement('button');
+      approve.type = 'button';
+      approve.textContent = 'Схвалити';
+      approve.setAttribute('aria-label', `Схвалити: ${item.title}`);
+      approve.addEventListener('click', () => { void decideActionCenterBrowserApproval(item, 'APPROVE', li); });
+      const reject = document.createElement('button');
+      reject.type = 'button';
+      reject.textContent = 'Відхилити';
+      reject.setAttribute('aria-label', `Відхилити: ${item.title}`);
+      reject.addEventListener('click', () => { void decideActionCenterBrowserApproval(item, 'REJECT', li); });
+      li.append(' ', approve, ' ', reject);
+    }
+    list.append(li);
+  }
+}
+
+async function loadActionCenter() {
+  if (document.visibilityState !== 'visible') return;
+  try { renderActionCenter(await core('GET_ACTION_CENTER')); }
+  catch (error) { $('action-center-summary').textContent = `Не вдалося прочитати центр уваги: ${error.message}`; }
+}
+
+function renderProjectWorkspaceSummary(data) {
+  const projects = Array.isArray(data?.projects) ? data.projects : [];
+  const totals = data?.summary || {};
+  $('project-workspace-summary').textContent = projects.length
+    ? `Проєктів: ${projects.length}. Джерел: ${totals.sourceCount || 0}. Артефактів: ${totals.artifactCount || 0}. Капсул контексту: ${totals.capsuleCount || 0}. Застарілих за ревізією капсул: ${totals.staleRevisionCapsuleCount || 0}.`
+    : 'У сховищі проєктів ще немає збережених проєктів.';
+
+  const list = $('project-workspace-list');
+  const signature = JSON.stringify(projects.map(project => [
+    project.projectId,
+    project.projectRevisionId,
+    project.sourceCount,
+    project.artifactCount,
+    project.sensitiveArtifactCount,
+    project.capsuleCount,
+    project.staleRevisionCapsuleCount,
+    project.provenanceCount,
+  ]));
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  list.replaceChildren();
+  for (const project of projects) {
+    const li = document.createElement('li');
+    const capsuleState = project.capsuleRevisionStatus === 'HAS_STALE'
+      ? 'є капсули від попередньої ревізії'
+      : project.capsuleRevisionStatus === 'CURRENT'
+        ? 'капсули відповідають поточній ревізії'
+        : 'капсул ще немає';
+    li.textContent = `Проєкт ${project.projectId}; ревізія ${project.projectRevisionId}; джерел ${project.sourceCount}; артефактів ${project.artifactCount}; капсул ${project.capsuleCount}; provenance-записів ${project.provenanceCount}; ${capsuleState}.`;
+    list.append(li);
+  }
+}
+
+async function loadProjectWorkspace({ focusSummary = false } = {}) {
+  if (document.visibilityState !== 'visible') return;
+  const summary = $('project-workspace-summary');
+  try {
+    renderProjectWorkspaceSummary(await core('GET_PROJECT_WORKSPACE_SUMMARY'));
+  } catch (error) {
+    const list = $('project-workspace-list');
+    list.dataset.signature = '';
+    list.replaceChildren();
+    summary.textContent = `Не вдалося прочитати сховище проєктів: ${error.message}`;
+  }
+  if (focusSummary) summary.focus();
+}
+
 async function loadSessions({ preserveFocus = true } = {}) {
   const active = preserveFocus ? document.activeElement : null;
   const activeId = preserveFocus ? active?.id || null : null;
@@ -3689,6 +3843,7 @@ $('mode-simplified').addEventListener('click', () => setUiMode('simplified', { f
 $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration', { focus: true }));
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
+$('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -3849,7 +4004,7 @@ function addNamedCompatibleRoute(endpointId, label) {
     renderAiRouterRoutes(routes, {}, {
       pinnedRouteId:$('ai-router-pinned-route').value,
       allowRouteIds:selectedValues('ai-router-allow-routes'), denyRouteIds:selectedValues('ai-router-deny-routes'),
-    });
+    }, { manualRouteWorkers:manualWorkerCountsFromCards() });
     $('ai-router-route-list').lastElementChild?.querySelector('[data-route-action="discover-models"]')?.focus();
     $('ai-router-status').textContent = `Маршрут ${label} додано до форми. Отримайте моделі, визначте вартість і збережіть налаштування.`;
   } catch (error) { $('ai-router-status').textContent = `Не вдалося додати ${label}: ${error.message}`; }
@@ -3882,6 +4037,7 @@ $('run-ai-router-strong-button').addEventListener('click', () => runAiRouterProm
 $('save-ai-manager-button').addEventListener('click', saveAiManagerSettings);
 $('run-ai-manager-now-button').addEventListener('click', runAiManagerNow);
 $('reset-ai-manager-runtime-button').addEventListener('click', resetAiManagerRuntime);
+$('project-workspace-refresh-button').addEventListener('click', () => { void loadProjectWorkspace({ focusSummary: true }); });
 $('create-session-button').addEventListener('click', createSession);
 $('master-pause-button').addEventListener('click', () => masterAction('MASTER_PAUSE', 'master pause', true));
 $('master-resume-button').addEventListener('click', () => masterAction('MASTER_RESUME', 'master resume', false));
@@ -3982,6 +4138,8 @@ async function initialLoad() {
   if (firstSimplified) await selectSimplifiedSession(firstSimplified.id);
   else showSimplifiedSession(null);
   await loadGlobalStatus();
+  await loadActionCenter();
+  await loadProjectWorkspace();
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
@@ -3995,7 +4153,12 @@ window.setInterval(() => {
   if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'agent') void loadBrowserAgentJobs({ selectId: ui.selectedBrowserAgentId });
 }, 2000);
 
-window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') void loadGlobalStatus(); }, 5000);
+window.setInterval(() => {
+  if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'sessions') {
+    void loadGlobalStatus();
+    void loadActionCenter();
+  }
+}, 5000);
 window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };

@@ -78,6 +78,9 @@ function isHttpUrl(value) {
 }
 
 function clone(value) { return structuredClone(value); }
+const BROWSER_APPROVAL_FENCE_KEYS = new Set([
+  'controlEpoch', 'updatedAt', 'snapshotId', 'snapshotSignature', 'requestedAt',
+]);
 function snapshotOwnDataRequest(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
   const prototype = Object.getPrototypeOf(value);
@@ -93,6 +96,57 @@ function snapshotOwnDataRequest(value, label) {
     snapshot[key] = descriptor.value;
   }
   return snapshot;
+}
+function nonNegativeSafeInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
+  return value;
+}
+function boundedExactString(value, label, max) {
+  if (typeof value !== 'string' || value.length > max) throw new Error(`${label} must be a bounded string`);
+  return value;
+}
+function normalizeBrowserApprovalFence(value) {
+  if (value == null) return null;
+  const raw = snapshotOwnDataRequest(value, 'Browser Agent expected approval');
+  const keys = Object.keys(raw);
+  if (keys.length !== BROWSER_APPROVAL_FENCE_KEYS.size || keys.some(key => !BROWSER_APPROVAL_FENCE_KEYS.has(key))) {
+    throw new Error('Browser Agent expected approval contains unexpected or missing fields');
+  }
+  return Object.freeze({
+    controlEpoch: nonNegativeSafeInteger(raw.controlEpoch, 'Browser Agent expected approval controlEpoch'),
+    updatedAt: nonNegativeSafeInteger(raw.updatedAt, 'Browser Agent expected approval updatedAt'),
+    snapshotId: boundedExactString(raw.snapshotId, 'Browser Agent expected approval snapshotId', 160),
+    snapshotSignature: boundedExactString(raw.snapshotSignature, 'Browser Agent expected approval snapshotSignature', 256),
+    requestedAt: nonNegativeSafeInteger(raw.requestedAt, 'Browser Agent expected approval requestedAt'),
+  });
+}
+function browserApprovalFenceFromJob(job) {
+  const runtime = job?.runtime;
+  const pending = runtime?.pendingApproval;
+  if (!runtime || !pending || typeof pending !== 'object') return null;
+  return Object.freeze({
+    controlEpoch: nonNegativeSafeInteger(runtime.controlEpoch, 'Browser Agent approval controlEpoch'),
+    updatedAt: nonNegativeSafeInteger(runtime.updatedAt, 'Browser Agent approval updatedAt'),
+    snapshotId: boundedExactString(pending.snapshotId || '', 'Browser Agent approval snapshotId', 160),
+    snapshotSignature: boundedExactString(pending.snapshotSignature || '', 'Browser Agent approval snapshotSignature', 256),
+    requestedAt: nonNegativeSafeInteger(pending.requestedAt || 0, 'Browser Agent approval requestedAt'),
+  });
+}
+function browserApprovalFenceMatches(job, fence) {
+  if (!fence || job?.runtime?.runState !== BrowserAgentRunState.WAITING_APPROVAL || !job.runtime.pendingApproval?.action) return false;
+  let live;
+  try { live = browserApprovalFenceFromJob(job); } catch { return false; }
+  return Boolean(live)
+    && live.controlEpoch === fence.controlEpoch
+    && live.updatedAt === fence.updatedAt
+    && live.snapshotId === fence.snapshotId
+    && live.snapshotSignature === fence.snapshotSignature
+    && live.requestedAt === fence.requestedAt;
+}
+function staleBrowserApprovalError() {
+  const error = new Error('Browser Agent pending approval changed; refresh before deciding');
+  error.code = 'BROWSER_AGENT_APPROVAL_STALE';
+  return error;
 }
 function specialistRequestTimestamp(value, fallback, label = 'Specialist request at') {
   const candidate = value === undefined ? fallback : value;
@@ -145,6 +199,33 @@ function appendHistory(runtime, entry) {
   runtime.history = [...(runtime.history || []), sanitizeHistoryValue(entry)].slice(-MAX_HISTORY);
 }
 
+function normalizeModelBudgetReservation(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const reservationId = clean(raw.reservationId, 240);
+  const controlEpoch = Math.max(0, Math.floor(Number(raw.controlEpoch || 0)));
+  const modelCalls = Math.max(1, Math.floor(Number(raw.modelCalls || 1)));
+  const inputTokens = Math.max(0, Math.floor(Number(raw.inputTokens || 0)));
+  const outputTokens = Math.max(0, Math.floor(Number(raw.outputTokens || 0)));
+  const totalTokens = Math.max(inputTokens + outputTokens, Math.floor(Number(raw.totalTokens || 0)));
+  const estimatedCostUsd = Math.max(0, Number(raw.estimatedCostUsd || 0));
+  const createdAt = Math.max(0, Number(raw.createdAt || 0));
+  if (!reservationId || !Number.isFinite(estimatedCostUsd)) return null;
+  return {
+    reservationId,
+    controlEpoch,
+    modelCalls,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostUsd,
+    createdAt,
+    routeId: clean(raw.routeId, 180),
+    provider: clean(raw.provider, 80),
+    model: clean(raw.model, 300),
+    callNumber: Math.max(1, Math.floor(Number(raw.callNumber || 1))),
+  };
+}
+
 function normalizeRuntime(raw, now) {
   const base = createBrowserAgentRuntime(now);
   if (!raw || typeof raw !== 'object') return base;
@@ -168,6 +249,8 @@ function normalizeRuntime(raw, now) {
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
     modelCalls: Math.max(0, Number(raw.modelCalls || 0)),
+    modelBudgetReservationSeq: Math.max(0, Math.floor(Number(raw.modelBudgetReservationSeq || 0))),
+    modelBudgetReservation: normalizeModelBudgetReservation(raw.modelBudgetReservation),
     aiRouterRuntime: normalizeAiRouterRuntime(raw.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
     inputTokens: Math.max(0, Number(raw.inputTokens || 0)),
     outputTokens: Math.max(0, Number(raw.outputTokens || 0)),
@@ -343,6 +426,7 @@ export class BrowserAgentManager {
     const remainingCalls = job.config.maxModelCalls
       ? Math.max(0, job.config.maxModelCalls - Math.max(0, Number(job.runtime.modelCalls || 0)))
       : 0;
+    const modelCallsBeforeRoute = Math.max(0, Number(job.runtime.modelCalls || 0));
     let verifierReply;
     try {
       verifierReply = await this.routePrompt({
@@ -354,23 +438,31 @@ export class BrowserAgentManager {
         routerOverride: browserAgentRouterOverride(job.config),
         taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
-      });
-    } catch (error) { return { ok: false, error }; }
+      }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
+    } catch (error) {
+      if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
+      return { ok: false, error };
+    }
     const verifier = verifierReply?.result || verifierReply;
     const usage = verifier?.usage || verifierReply?.usage || {};
     const inputTokens = Math.max(1, Number(usage.inputTokens || usage.input_tokens || verifierInputTokens));
     const outputTokens = Math.max(1, Number(usage.outputTokens || usage.output_tokens || estimateAgentTokens(verifier?.text || '')));
     const totalTokens = Math.max(inputTokens + outputTokens, Number(usage.totalTokens || usage.total_tokens || 0));
     const modelCalls = Math.max(1, Number(usage.modelCalls || usage.calls || 1));
+    const afterProvider = await this.get(id);
+    const lifecycleAccounted = Math.max(0, Number(afterProvider.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+      || Boolean(afterProvider.job?.runtime?.modelBudgetReservation);
     await this.update(store => {
       const live = store.byId[id];
       if (!live || live.runtime.controlEpoch !== epoch) return store;
-      live.runtime.modelCalls += modelCalls;
+      if (!lifecycleAccounted) {
+        live.runtime.modelCalls += modelCalls;
+        live.runtime.inputTokens += inputTokens;
+        live.runtime.outputTokens += outputTokens;
+        live.runtime.totalTokens += totalTokens;
+        live.runtime.estimatedCostUsd += agentUsageCostUsd(live.config, { inputTokens, outputTokens });
+      }
       if (verifier?.runtime && typeof verifier.runtime === 'object') live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(verifier.runtime);
-      live.runtime.inputTokens += inputTokens;
-      live.runtime.outputTokens += outputTokens;
-      live.runtime.totalTokens += totalTokens;
-      live.runtime.estimatedCostUsd += agentUsageCostUsd(live.config, { inputTokens, outputTokens });
       live.runtime.updatedAt = this.now();
       return store;
     });
@@ -798,27 +890,40 @@ export class BrowserAgentManager {
     return false;
   }
 
-  budgetReason(job, { pendingInputTokens = 0, pendingOutputTokens = 0 } = {}) {
+  budgetReason(job, { pendingInputTokens = 0, pendingOutputTokens = 0, pendingModelCalls = 0 } = {}) {
     const config = job.config;
     const runtime = job.runtime;
+    const reservation = normalizeModelBudgetReservation(runtime.modelBudgetReservation);
+    const reservedCalls = reservation?.modelCalls || 0;
+    const reservedInput = reservation?.inputTokens || 0;
+    const reservedOutput = reservation?.outputTokens || 0;
+    const reservedTotal = reservation?.totalTokens || 0;
+    const reservedCost = reservation?.estimatedCostUsd || 0;
+    const calls = Math.max(0, Math.floor(Number(pendingModelCalls || 0)));
     const input = Math.max(0, Number(pendingInputTokens || 0));
     const output = Math.max(0, Number(pendingOutputTokens || 0));
-    if (config.maxModelCalls && runtime.modelCalls >= config.maxModelCalls) return 'maximum model-call budget reached';
-    if (config.maxInputTokens && runtime.inputTokens + input > config.maxInputTokens) return 'maximum input-token budget reached';
-    if (config.maxOutputTokens && runtime.outputTokens + output >= config.maxOutputTokens) return 'maximum output-token budget reached';
-    if (config.maxTotalTokens && runtime.totalTokens + input + output >= config.maxTotalTokens) return 'maximum total-token budget reached';
+    const effectiveCalls = Math.max(0, Number(runtime.modelCalls || 0)) + reservedCalls;
+    if (config.maxModelCalls && (effectiveCalls >= config.maxModelCalls || effectiveCalls + calls > config.maxModelCalls)) return 'maximum model-call budget reached';
+    if (config.maxInputTokens && runtime.inputTokens + reservedInput + input > config.maxInputTokens) return 'maximum input-token budget reached';
+    if (config.maxOutputTokens && runtime.outputTokens + reservedOutput + output >= config.maxOutputTokens) return 'maximum output-token budget reached';
+    if (config.maxTotalTokens && runtime.totalTokens + reservedTotal + input + output >= config.maxTotalTokens) return 'maximum total-token budget reached';
     if (config.maxRuntimeMinutes && runtime.startedAt && this.now() - runtime.startedAt >= config.maxRuntimeMinutes * 60_000) return 'maximum runtime duration reached';
     const pendingCost = agentUsageCostUsd(config, { inputTokens: input, outputTokens: output });
-    if (config.maxCostUsd && runtime.estimatedCostUsd + pendingCost >= config.maxCostUsd) return 'maximum monetary budget reached';
+    if (config.maxCostUsd && runtime.estimatedCostUsd + reservedCost + pendingCost >= config.maxCostUsd) return 'maximum monetary budget reached';
     return '';
   }
 
   outputBudgetForCall(job, pendingInputTokens) {
+    const reservation = normalizeModelBudgetReservation(job.runtime.modelBudgetReservation);
+    const reservedInput = reservation?.inputTokens || 0;
+    const reservedOutput = reservation?.outputTokens || 0;
+    const reservedTotal = reservation?.totalTokens || 0;
+    const reservedCost = reservation?.estimatedCostUsd || 0;
     let limit = Math.max(128, Number(job.config.maxOutputTokensPerCall || 4096));
-    if (job.config.maxOutputTokens) limit = Math.min(limit, Math.max(0, job.config.maxOutputTokens - job.runtime.outputTokens));
-    if (job.config.maxTotalTokens) limit = Math.min(limit, Math.max(0, job.config.maxTotalTokens - job.runtime.totalTokens - pendingInputTokens));
+    if (job.config.maxOutputTokens) limit = Math.min(limit, Math.max(0, job.config.maxOutputTokens - job.runtime.outputTokens - reservedOutput));
+    if (job.config.maxTotalTokens) limit = Math.min(limit, Math.max(0, job.config.maxTotalTokens - job.runtime.totalTokens - reservedTotal - pendingInputTokens));
     if (job.config.maxCostUsd) {
-      const remainingUsd = Math.max(0, Number(job.config.maxCostUsd) - Number(job.runtime.estimatedCostUsd || 0));
+      const remainingUsd = Math.max(0, Number(job.config.maxCostUsd) - Number(job.runtime.estimatedCostUsd || 0) - reservedCost);
       const inputCost = agentUsageCostUsd(job.config, { inputTokens: pendingInputTokens, outputTokens: 0 });
       const remainingAfterInput = Math.max(0, remainingUsd - inputCost);
       const outputPrice = Number(job.config.outputPricePerMillionUsd || 0);
@@ -826,6 +931,134 @@ export class BrowserAgentManager {
       else if (remainingAfterInput <= 0) limit = 0;
     }
     return Math.max(0, Math.floor(limit));
+  }
+
+  async reserveProviderModelBudget({ jobId, controlEpoch, prompt = '', systemPrompt = '', maxOutputTokens = 0, route = {}, callNumber = 1 } = {}) {
+    const pendingInputTokens = Math.max(1, estimateAgentTokens(`${clean(systemPrompt, 50000)}\n${clean(prompt, 100000)}`));
+    const pendingOutputTokens = Math.max(0, Math.floor(Number(maxOutputTokens || 0)));
+    if (pendingOutputTokens < 1) {
+      const error = new Error('Browser Agent model call requires a bounded output-token reservation');
+      error.code = 'AI_MODEL_BUDGET_RESERVATION_UNBOUNDED';
+      throw error;
+    }
+    let reservation = null;
+    await this.update(store => {
+      const job = store.byId[jobId];
+      if (!job) throw new Error('Browser Agent job not found');
+      if (job.runtime.controlEpoch !== Number(controlEpoch) || job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+        const error = new Error('Browser Agent owner authority changed before model budget reservation');
+        error.code = 'BROWSER_AGENT_OWNER_AUTHORITY_CHANGED';
+        throw error;
+      }
+      if (normalizeModelBudgetReservation(job.runtime.modelBudgetReservation)) {
+        const error = new Error('Browser Agent already has an unsettled model budget reservation');
+        error.code = 'AI_MODEL_BUDGET_RESERVATION_PENDING';
+        throw error;
+      }
+      const reason = this.budgetReason(job, {
+        pendingInputTokens,
+        pendingOutputTokens,
+        pendingModelCalls: 1,
+      });
+      if (reason) {
+        const error = new Error(`Browser Agent budget admission denied: ${reason}`);
+        error.code = 'AI_MODEL_BUDGET_EXHAUSTED';
+        error.safeBudgetReason = reason;
+        throw error;
+      }
+      const sequence = Math.max(0, Number(job.runtime.modelBudgetReservationSeq || 0)) + 1;
+      const estimatedCostUsd = agentUsageCostUsd(job.config, {
+        inputTokens: pendingInputTokens,
+        outputTokens: pendingOutputTokens,
+      });
+      reservation = {
+        reservationId: `${jobId}:model-budget:${sequence}`,
+        controlEpoch: Number(controlEpoch),
+        modelCalls: 1,
+        inputTokens: pendingInputTokens,
+        outputTokens: pendingOutputTokens,
+        totalTokens: pendingInputTokens + pendingOutputTokens,
+        estimatedCostUsd,
+        createdAt: this.now(),
+        routeId: clean(route?.routeId, 180),
+        provider: clean(route?.provider, 80),
+        model: clean(route?.model, 300),
+        callNumber: Math.max(1, Math.floor(Number(callNumber || 1))),
+      };
+      job.runtime.modelBudgetReservationSeq = sequence;
+      job.runtime.modelBudgetReservation = clone(reservation);
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'model-budget-reserved',
+        message: `Reserved bounded model budget before provider call ${reservation.callNumber}.`,
+      });
+      return store;
+    });
+    return Object.freeze(clone(reservation));
+  }
+
+  async settleProviderModelBudget({ jobId, reservationId, ok = false, result = null } = {}) {
+    let settled = false;
+    await this.update(store => {
+      const job = store.byId[jobId];
+      if (!job) return store;
+      const reservation = normalizeModelBudgetReservation(job.runtime.modelBudgetReservation);
+      if (!reservation || reservation.reservationId !== reservationId) return store;
+      let inputTokens = reservation.inputTokens;
+      let outputTokens = reservation.outputTokens;
+      let totalTokens = reservation.totalTokens;
+      let estimatedCostUsd = reservation.estimatedCostUsd;
+      if (ok) {
+        const usage = result?.usage || {};
+        inputTokens = Math.max(1, Math.floor(Number(usage.inputTokens || usage.input_tokens || reservation.inputTokens)));
+        outputTokens = Math.max(1, Math.floor(Number(usage.outputTokens || usage.output_tokens || estimateAgentTokens(result?.text || ''))));
+        totalTokens = Math.max(inputTokens + outputTokens, Math.floor(Number(usage.totalTokens || usage.total_tokens || 0)));
+        estimatedCostUsd = agentUsageCostUsd(job.config, { inputTokens, outputTokens });
+      }
+      job.runtime.modelCalls += reservation.modelCalls;
+      job.runtime.inputTokens += inputTokens;
+      job.runtime.outputTokens += outputTokens;
+      job.runtime.totalTokens += totalTokens;
+      job.runtime.estimatedCostUsd += estimatedCostUsd;
+      job.runtime.modelBudgetReservation = null;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: ok ? 'model-budget-settled' : 'model-budget-conservative-settlement',
+        message: ok
+          ? 'Provider call usage settled against its durable pre-dispatch reservation.'
+          : 'Provider call failed after admission; reserved budget was conservatively consumed.',
+      });
+      settled = true;
+      return store;
+    });
+    return { settled };
+  }
+
+  async reconcileProviderModelBudgetReservation(id) {
+    let reconciled = false;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job) return store;
+      const reservation = normalizeModelBudgetReservation(job.runtime.modelBudgetReservation);
+      if (!reservation) return store;
+      job.runtime.modelCalls += reservation.modelCalls;
+      job.runtime.inputTokens += reservation.inputTokens;
+      job.runtime.outputTokens += reservation.outputTokens;
+      job.runtime.totalTokens += reservation.totalTokens;
+      job.runtime.estimatedCostUsd += reservation.estimatedCostUsd;
+      job.runtime.modelBudgetReservation = null;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'model-budget-recovered-after-restart',
+        message: 'An unsettled pre-dispatch model reservation survived runtime interruption and was conservatively consumed before any retry.',
+      });
+      reconciled = true;
+      return store;
+    });
+    return reconciled;
   }
 
   async pauseForBudget(id, epoch, reason) {
@@ -1597,31 +1830,46 @@ export class BrowserAgentManager {
     return stored ? { kind: 'WAITING_APPROVAL' } : { kind: 'CANCELLED_BY_OWNER' };
   }
 
-  async approvePendingAction(id, { runInitial = true } = {}) {
+  async approvePendingAction(id, { runInitial = true, expectedApproval = null } = {}) {
+    const requiredFence = normalizeBrowserApprovalFence(expectedApproval);
     const before = await this.get(id);
     if (!before.job) throw new Error('Browser Agent job not found');
     if (before.job.runtime.runState !== BrowserAgentRunState.WAITING_APPROVAL || !before.job.runtime.pendingApproval?.action) {
       throw new Error('Browser Agent has no pending action to approve');
     }
+    const observedFence = browserApprovalFenceFromJob(before.job);
+    if (requiredFence && !browserApprovalFenceMatches(before.job, requiredFence)) throw staleBrowserApprovalError();
+    const executionFence = requiredFence || observedFence;
     const pending = clone(before.job.runtime.pendingApproval);
     const now = this.now();
-    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
-    const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
-    if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
+    const pauseStaleApproval = async (message, action = null) => {
+      let matched = false;
       await this.update(store => {
         const job = store.byId[id];
-        if (!job) return store;
+        if (!job || !browserApprovalFenceMatches(job, executionFence)) return store;
+        matched = true;
         job.runtime.controlEpoch += 1;
         job.runtime.runState = BrowserAgentRunState.PAUSED;
         job.runtime.pendingApproval = null;
-        job.runtime.lastError = 'Approved action could not run because its browser tab is no longer available.';
+        job.runtime.lastError = message;
         job.runtime.nextWakeAt = 0;
         job.runtime.updatedAt = now;
-        appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
+        appendHistory(job.runtime, {
+          at: now,
+          type: 'approval-stale',
+          message: job.runtime.lastError,
+          ...(action ? { action: clone(action) } : {}),
+        });
         return store;
       });
+      if (!matched) throw staleBrowserApprovalError();
       await this.reconcileAlarm();
       return this.get(id);
+    };
+    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
+    if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
+      return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
     }
     if (pending.action?.ref && pending.targetFingerprint) {
       let proof = null;
@@ -1634,20 +1882,7 @@ export class BrowserAgentManager {
         proof = verified?.[0]?.result || null;
       } catch { proof = null; }
       if (!proof?.ok) {
-        await this.update(store => {
-          const job = store.byId[id];
-          if (!job) return store;
-          job.runtime.controlEpoch += 1;
-          job.runtime.runState = BrowserAgentRunState.PAUSED;
-          job.runtime.pendingApproval = null;
-          job.runtime.lastError = 'Approved action became stale because the target control changed; nothing was executed.';
-          job.runtime.nextWakeAt = 0;
-          job.runtime.updatedAt = now;
-          appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
-          return store;
-        });
-        await this.reconcileAlarm();
-        return this.get(id);
+        return pauseStaleApproval('Approved action became stale because the target control changed; nothing was executed.', pending.action);
       }
     } else if ([BrowserAgentActionType.CLICK_AT, BrowserAgentActionType.TYPE_AT].includes(pending.action?.type) && pending.targetFingerprint) {
       let proof = null;
@@ -1660,20 +1895,7 @@ export class BrowserAgentManager {
         proof = verified?.[0]?.result || null;
       } catch { proof = null; }
       if (!proof?.ok) {
-        await this.update(store => {
-          const job = store.byId[id];
-          if (!job) return store;
-          job.runtime.controlEpoch += 1;
-          job.runtime.runState = BrowserAgentRunState.PAUSED;
-          job.runtime.pendingApproval = null;
-          job.runtime.lastError = 'Approved visual action became stale because the target under that coordinate changed; nothing was executed.';
-          job.runtime.nextWakeAt = 0;
-          job.runtime.updatedAt = now;
-          appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
-          return store;
-        });
-        await this.reconcileAlarm();
-        return this.get(id);
+        return pauseStaleApproval('Approved visual action became stale because the target under that coordinate changed; nothing was executed.', pending.action);
       }
     } else if (pending.action?.type === BrowserAgentActionType.DRAG_AT && pending.dragStartFingerprint && pending.dragEndFingerprint) {
       let startProof = null;
@@ -1696,26 +1918,17 @@ export class BrowserAgentManager {
         endProof = null;
       }
       if (!startProof?.ok || !endProof?.ok) {
-        await this.update(store => {
-          const job = store.byId[id];
-          if (!job) return store;
-          job.runtime.controlEpoch += 1;
-          job.runtime.runState = BrowserAgentRunState.PAUSED;
-          job.runtime.pendingApproval = null;
-          job.runtime.lastError = 'Approved drag became stale because its source or destination changed; nothing was executed.';
-          job.runtime.nextWakeAt = 0;
-          job.runtime.updatedAt = now;
-          appendHistory(job.runtime, { at: now, type: 'approval-stale', message: job.runtime.lastError });
-          return store;
-        });
-        await this.reconcileAlarm();
-        return this.get(id);
+        return pauseStaleApproval('Approved drag became stale because its source or destination changed; nothing was executed.', pending.action);
       }
     }
     let epoch = 0;
+    let approvalChanged = false;
     await this.update(store => {
       const job = store.byId[id];
-      if (!job || job.runtime.runState !== BrowserAgentRunState.WAITING_APPROVAL) return store;
+      if (!job || !browserApprovalFenceMatches(job, executionFence)) {
+        approvalChanged = true;
+        return store;
+      }
       job.runtime.controlEpoch += 1;
       epoch = job.runtime.controlEpoch;
       job.runtime.runState = BrowserAgentRunState.RUNNING;
@@ -1725,6 +1938,7 @@ export class BrowserAgentManager {
       appendHistory(job.runtime, { at: now, type: 'approval-approved', message: `Owner approved: ${pending.targetName || pending.action.type}`, action: clone(pending.action) });
       return store;
     });
+    if (approvalChanged) throw staleBrowserApprovalError();
     const live = await this.get(id);
     if (!live.job || !epoch) return this.get(id);
     try {
@@ -1776,12 +1990,18 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async rejectPendingAction(id) {
+  async rejectPendingAction(id, { expectedApproval = null } = {}) {
+    const requiredFence = normalizeBrowserApprovalFence(expectedApproval);
     const now = this.now();
+    let approvalChanged = false;
     await this.update(store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState !== BrowserAgentRunState.WAITING_APPROVAL || !job.runtime.pendingApproval) throw new Error('Browser Agent has no pending action to reject');
+      if (requiredFence && !browserApprovalFenceMatches(job, requiredFence)) {
+        approvalChanged = true;
+        return store;
+      }
       const target = job.runtime.pendingApproval.targetName || job.runtime.pendingApproval.action?.type || 'action';
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.PAUSED;
@@ -1792,6 +2012,7 @@ export class BrowserAgentManager {
       appendHistory(job.runtime, { at: now, type: 'approval-rejected', message: job.runtime.lastError });
       return store;
     });
+    if (approvalChanged) throw staleBrowserApprovalError();
     await this.reconcileAlarm();
     return this.get(id);
   }
@@ -2222,6 +2443,11 @@ export class BrowserAgentManager {
     let current = await this.get(id);
     if (!current.job) return { kind: 'NOT_FOUND' };
     if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) return { kind: 'IDLE' };
+    if (await this.reconcileProviderModelBudgetReservation(id)) {
+      current = await this.get(id);
+      if (!current.job) return { kind: 'NOT_FOUND' };
+      if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) return { kind: 'IDLE' };
+    }
     const schedule = browserAgentScheduleDecision(current.job.config, now);
     if (!schedule.allowed) return this.applyScheduleGate(id);
     const externalNode = current.job.runtime.plan?.nodes?.find(node => node.state === AgentPlanNodeState.READY && node.executionPlane !== 'BROWSER');
@@ -2489,6 +2715,7 @@ export class BrowserAgentManager {
     const maxModelCallsForRequest = current.job.config.maxModelCalls
       ? Math.max(0, current.job.config.maxModelCalls - Math.max(0, Number(current.job.runtime.modelCalls || 0)))
       : 0;
+    const modelCallsBeforeRoute = Math.max(0, Number(current.job.runtime.modelCalls || 0));
     let routed;
     try {
       routed = await this.routePrompt({
@@ -2501,10 +2728,14 @@ export class BrowserAgentManager {
         taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
-      });
+      }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
+      if (error?.safeBudgetReason) return this.pauseForBudget(id, epoch, error.safeBudgetReason);
       const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
-      if (failedCalls) {
+      const afterFailure = await this.get(id);
+      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
+      if (failedCalls && !lifecycleAccounted) {
         await this.update(store => {
           const job = store.byId[id];
           if (!job || job.runtime.controlEpoch !== epoch) return store;
@@ -2530,17 +2761,22 @@ export class BrowserAgentManager {
     const outputTokens = Math.max(1, Number(reportedUsage.outputTokens || reportedUsage.output_tokens || estimateAgentTokens(planner?.text || '')));
     const totalTokens = Math.max(inputTokens + outputTokens, Number(reportedUsage.totalTokens || reportedUsage.total_tokens || 0));
     const modelCalls = Math.max(1, Number(reportedUsage.modelCalls || reportedUsage.calls || 1));
+    const afterProvider = await this.get(id);
+    const lifecycleAccounted = Math.max(0, Number(afterProvider.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+      || Boolean(afterProvider.job?.runtime?.modelBudgetReservation);
     await this.update(store => {
       const job = store.byId[id];
       if (!job) return store;
-      job.runtime.modelCalls += modelCalls;
+      if (!lifecycleAccounted) {
+        job.runtime.modelCalls += modelCalls;
+        job.runtime.inputTokens += inputTokens;
+        job.runtime.outputTokens += outputTokens;
+        job.runtime.totalTokens += totalTokens;
+        job.runtime.estimatedCostUsd += agentUsageCostUsd(job.config, { inputTokens, outputTokens });
+      }
       if (planner?.runtime && typeof planner.runtime === 'object') {
         job.runtime.aiRouterRuntime = normalizeAiRouterRuntime(planner.runtime);
       }
-      job.runtime.inputTokens += inputTokens;
-      job.runtime.outputTokens += outputTokens;
-      job.runtime.totalTokens += totalTokens;
-      job.runtime.estimatedCostUsd += agentUsageCostUsd(job.config, { inputTokens, outputTokens });
       if (imageDataUrl) job.runtime.visionPending = false;
       job.runtime.updatedAt = this.now();
       return store;

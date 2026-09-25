@@ -37,6 +37,7 @@ export const DEFAULT_AI_ROUTE_POLICY = Object.freeze({
 
 export const DEFAULT_AI_WORKER_POLICY = Object.freeze({
   allocationMode: AiWorkerAllocationMode.AUTO,
+  minWorkers: 1,
   maxParallelWorkers: 8,
   manualRouteWorkers: Object.freeze({}),
 });
@@ -201,10 +202,11 @@ export function normalizeAiRoutePolicy(raw = {}) {
 
 export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   if (raw == null) raw = {};
-  const policy = dataRecord(raw, new Set(['allocationMode','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
+  const policy = dataRecord(raw, new Set(['allocationMode','minWorkers','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
   const allocationMode = clean(own(policy, 'allocationMode') || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
   if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
   const maxParallelWorkers = strictInteger(own(policy, 'maxParallelWorkers') ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
+  const minWorkers = strictInteger(own(policy, 'minWorkers') ?? DEFAULT_AI_WORKER_POLICY.minWorkers, 'AI worker minWorkers', 1, maxParallelWorkers);
   const pool = normalizeAiRoutePool(routes);
   const routeIds = new Set(pool.map(route => route.routeId));
   const source = own(policy, 'manualRouteWorkers') ?? {};
@@ -235,7 +237,7 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   if (allocationMode === AiWorkerAllocationMode.MANUAL && manualTotal > maxParallelWorkers) {
     throw new Error('AI worker manual allocation exceeds maxParallelWorkers');
   }
-  return Object.freeze({ allocationMode, maxParallelWorkers, manualRouteWorkers: Object.freeze(manualRouteWorkers) });
+  return Object.freeze({ allocationMode, minWorkers, maxParallelWorkers, manualRouteWorkers: Object.freeze(manualRouteWorkers) });
 }
 
 function stateNumber(value, label) {
@@ -360,7 +362,8 @@ export function allocateAiRouteWorkers({ routes, routePolicy = {}, workerPolicy 
   const pool = normalizeAiRoutePool(routes);
   const normalizedWorkerPolicy = normalizeAiWorkerPolicy(workerPolicy, pool);
   const requested = strictInteger(desiredWorkers, 'AI worker desiredWorkers', 0, MAX_PARALLEL_WORKERS);
-  const target = Math.min(requested, normalizedWorkerPolicy.maxParallelWorkers);
+  const target = Math.min(requested > 0 && normalizedWorkerPolicy.allocationMode === AiWorkerAllocationMode.AUTO
+    ? Math.max(requested, normalizedWorkerPolicy.minWorkers) : requested, normalizedWorkerPolicy.maxParallelWorkers);
   const selected = selectAiRouteCandidates({
     routes: pool,
     policy: { ...normalizeAiRoutePolicy(routePolicy), autoSwitch: true },
