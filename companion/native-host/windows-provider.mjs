@@ -184,41 +184,41 @@ function canonicalRuntimeId(value, code, label) {
 
 function canonicalPowerShellWindowId(value) {
   const windowId = id(value, 'windowId');
-  if (windowId === 'desktop') return windowId;
-  const match = /^win:([1-9][0-9]{0,18}):pid:([1-9][0-9]{0,9}):rid:(.+)$/u.exec(windowId);
-  if (!match) {
-    fail('WINDOWS_INVALID_REQUEST', 'windowId must be desktop or an observation-bound win:<hwnd>:pid:<pid>:rid:<runtimeId> reference');
+  if (windowId !== 'desktop') {
+    fail(
+      'WINDOWS_INVALID_REQUEST',
+      'Production PowerShell UIA accepts only desktop; select a current window with currentWindowProcessId + currentWindowName in the same observation',
+    );
   }
-  const handle = BigInt(match[1]);
-  const processId = BigInt(match[2]);
-  if (handle > 9223372036854775807n) {
-    fail('WINDOWS_INVALID_REQUEST', 'windowId exceeds the supported Windows handle range');
-  }
-  if (processId > 2147483647n) {
-    fail('WINDOWS_INVALID_REQUEST', 'windowId process identity exceeds the supported range');
-  }
-  const runtimeId = canonicalRuntimeId(match[3], 'WINDOWS_INVALID_REQUEST', 'windowId runtime identity');
-  const canonical = 'win:' + match[1] + ':pid:' + match[2] + ':rid:' + runtimeId;
-  if (canonical !== windowId) {
-    fail('WINDOWS_INVALID_REQUEST', 'windowId must use canonical observation identity encoding');
-  }
-  return canonical;
+  return 'desktop';
 }
 
 function canonicalPowerShellElementId(value) {
   const elementId = id(value, 'UIA elementId');
-  if (elementId.startsWith('win:')) {
-    try {
-      return canonicalPowerShellWindowId(elementId);
-    } catch {
-      fail('WINDOWS_UIA_INVALID_RESPONSE', 'UI Automation returned an invalid observation-bound window identity');
-    }
-  }
   const match = /^rid:(.+)$/u.exec(elementId);
   if (!match) {
-    fail('WINDOWS_UIA_INVALID_RESPONSE', 'UI Automation returned a non-canonical element identity');
+    fail(
+      'WINDOWS_UIA_INVALID_RESPONSE',
+      'UI Automation elementId must be an observation-only runtime identity and cannot be reused as a window target',
+    );
   }
   return 'rid:' + canonicalRuntimeId(match[1], 'WINDOWS_UIA_INVALID_RESPONSE', 'UIA runtime identity');
+}
+
+function currentWindowSelector(data) {
+  const hasProcessId = data.currentWindowProcessId != null;
+  const processId = hasProcessId
+    ? strictInteger(data.currentWindowProcessId, 'currentWindowProcessId', 1, 2147483647)
+    : null;
+  const windowName = boundedOptionalText(data.currentWindowName, 'currentWindowName', 512);
+  const hasWindowName = windowName.length > 0;
+  if (hasProcessId !== hasWindowName) {
+    fail(
+      'WINDOWS_INVALID_REQUEST',
+      'currentWindowProcessId and currentWindowName must be supplied together for fresh current-state selection',
+    );
+  }
+  return hasProcessId ? Object.freeze({ processId, windowName }) : null;
 }
 
 function windowsChildEnvironment() {
@@ -244,30 +244,32 @@ function encodePowerShellUiaScript(request) {
     "$limit = [int]$request.limit",
     "$maxVisited = " + UIA_MAX_VISITED,
     "$walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker",
-    "$root = $null",
-    "$desktop = $false",
-    "if ([string]$request.windowId -eq 'desktop') {",
-    "  $root = [System.Windows.Automation.AutomationElement]::RootElement",
-    "  $desktop = $true",
-    "} elseif ([string]$request.windowId -match '^win:([1-9][0-9]{0,18}):pid:([1-9][0-9]{0,9}):rid:(-?[0-9]+(?:\\.-?[0-9]+){0,31})$') {",
-    "  $expectedHandle = [Int64]$Matches[1]",
-    "  $expectedProcessId = [Int32]$Matches[2]",
-    "  $expectedRuntimeId = [string]$Matches[3]",
-    "  if ($expectedHandle -le 0 -or $expectedProcessId -le 0) { throw 'Invalid UIA window reference' }",
-    "  $root = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$expectedHandle)",
-    "  if ($null -eq $root) { throw 'UIA window reference is stale' }",
-    "  $rootCurrent = $root.Current",
-    "  $rootHandle = [Int64]$rootCurrent.NativeWindowHandle",
-    "  if ($rootHandle -lt 0) { $rootHandle += 4294967296 }",
-    "  $rootProcessId = [Int32]$rootCurrent.ProcessId",
-    "  $rootRuntime = $root.GetRuntimeId()",
-    "  if ($null -eq $rootRuntime -or $rootRuntime.Count -eq 0) { throw 'UIA window reference is stale' }",
-    "  $rootRuntimeId = (($rootRuntime | ForEach-Object { [string]$_ }) -join '.')",
-    "  if ($rootHandle -ne $expectedHandle -or $rootProcessId -ne $expectedProcessId -or -not [string]::Equals($rootRuntimeId, $expectedRuntimeId, [StringComparison]::Ordinal)) {",
-    "    throw 'UIA window reference is stale'",
+    "$root = [System.Windows.Automation.AutomationElement]::RootElement",
+    "$desktop = $true",
+    "if ($null -ne $request.currentWindowProcessId -or -not [string]::IsNullOrEmpty([string]$request.currentWindowName)) {",
+    "  if ($null -eq $request.currentWindowProcessId -or [string]::IsNullOrEmpty([string]$request.currentWindowName)) { throw 'Fresh UIA window selector is incomplete' }",
+    "  $expectedProcessId = [Int32]$request.currentWindowProcessId",
+    "  $expectedWindowName = [string]$request.currentWindowName",
+    "  $matchedWindow = $null",
+    "  $matchCount = 0",
+    "  $candidate = $walker.GetFirstChild($root)",
+    "  $selectorVisited = 0",
+    "  while ($null -ne $candidate) {",
+    "    $selectorVisited++",
+    "    if ($selectorVisited -gt $maxVisited) { throw 'UIA window selection exceeded bounded visit limit' }",
+    "    try {",
+    "      $candidateCurrent = $candidate.Current",
+    "      if ([Int32]$candidateCurrent.ProcessId -eq $expectedProcessId -and [string]::Equals([string]$candidateCurrent.Name, $expectedWindowName, [StringComparison]::Ordinal)) {",
+    "        $matchedWindow = $candidate",
+    "        $matchCount++",
+    "        if ($matchCount -gt 1) { break }",
+    "      }",
+    "    } catch { }",
+    "    $candidate = $walker.GetNextSibling($candidate)",
     "  }",
-    "} else {",
-    "  throw 'windowId must be desktop or observation-bound win:<hwnd>:pid:<pid>:rid:<runtimeId>'",
+    "  if ($matchCount -ne 1 -or $null -eq $matchedWindow) { throw 'Fresh UIA window selector did not resolve exactly one current window' }",
+    "  $root = $matchedWindow",
+    "  $desktop = $false",
     "}",
     "$results = New-Object System.Collections.Generic.List[object]",
     "function Add-UiRow([System.Windows.Automation.AutomationElement]$element) {",
@@ -281,16 +283,11 @@ function encodePowerShellUiaScript(request) {
     "    $runtimeId = $element.GetRuntimeId()",
     "    if ($null -eq $runtimeId -or $runtimeId.Count -eq 0) { return }",
     "    $runtimeText = (($runtimeId | ForEach-Object { [string]$_ }) -join '.')",
-    "    $nativeHandle = [Int64]$current.NativeWindowHandle",
-    "    if ($nativeHandle -lt 0) { $nativeHandle += 4294967296 }",
     "    $processId = [Int32]$current.ProcessId",
-    "    if ($nativeHandle -gt 0 -and $processId -gt 0) {",
-    "      $elementId = 'win:' + [string]$nativeHandle + ':pid:' + [string]$processId + ':rid:' + $runtimeText",
-    "    } else {",
-    "      $elementId = 'rid:' + $runtimeText",
-    "    }",
+    "    if ($processId -le 0) { return }",
     "    $results.Add([pscustomobject]@{",
-    "      elementId = $elementId",
+    "      elementId = 'rid:' + $runtimeText",
+    "      processId = $processId",
     "      role = $role",
     "      name = $name",
     "      enabled = [bool]$current.IsEnabled",
@@ -348,7 +345,7 @@ function normalizeUiaRows(rows, limit) {
   return Object.freeze(items.map((row, index) => {
     const data = exactObject(
       row,
-      new Set(['elementId', 'role', 'name', 'enabled', 'offscreen']),
+      new Set(['elementId', 'processId', 'role', 'name', 'enabled', 'offscreen']),
       'UIA result[' + index + ']',
       'WINDOWS_UIA_INVALID_RESPONSE',
     );
@@ -361,13 +358,22 @@ function normalizeUiaRows(rows, limit) {
     if (typeof data.enabled !== 'boolean' || typeof data.offscreen !== 'boolean') {
       fail('WINDOWS_UIA_INVALID_RESPONSE', 'UIA result[' + index + '] state must be boolean');
     }
-    return Object.freeze({
+    if (data.processId != null
+      && (typeof data.processId !== 'number'
+        || !Number.isInteger(data.processId)
+        || data.processId < 1
+        || data.processId > 2147483647)) {
+      fail('WINDOWS_UIA_INVALID_RESPONSE', 'UIA result[' + index + '].processId is invalid');
+    }
+    const normalized = {
       elementId: id(data.elementId, 'UIA result[' + index + '].elementId'),
       role: data.role.trim(),
       name: data.name.trim(),
       enabled: data.enabled,
       offscreen: data.offscreen,
-    });
+    };
+    if (data.processId != null) normalized.processId = data.processId;
+    return Object.freeze(normalized);
   }));
 }
 
@@ -375,13 +381,22 @@ export function createPowerShellUiaAdapter({ execFile, powershellPath = null } =
   if (typeof execFile !== 'function') fail('WINDOWS_CONFIG_INVALID', 'execFile adapter is required');
   return Object.freeze({
     async query(payload = {}) {
-      const data = exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'PowerShell UIA query');
+      const data = exactObject(
+        payload,
+        new Set(['windowId', 'currentWindowProcessId', 'currentWindowName', 'role', 'name', 'limit']),
+        'PowerShell UIA query',
+      );
+      const selector = currentWindowSelector(data);
       const request = {
         windowId: canonicalPowerShellWindowId(data.windowId),
         role: boundedOptionalText(data.role, 'role', 120),
         name: boundedOptionalText(data.name, 'name', 512),
         limit: strictInteger(data.limit, 'limit', 1, MAX_UIA_RESULTS, 64),
       };
+      if (selector) {
+        request.currentWindowProcessId = selector.processId;
+        request.currentWindowName = selector.windowName;
+      }
       const encoded = encodePowerShellUiaScript(request);
       let result;
       try {
@@ -440,7 +455,9 @@ export function createWindowsProvider({
           readOnly: true,
           scoped: true,
           available: typeof effectiveUiaAdapter?.query === 'function',
-          windowIdFormat: 'desktop | win:<hwnd>:pid:<pid>:rid:<runtimeId>',
+          windowIdFormat: 'desktop',
+          windowSelection: 'fresh currentWindowProcessId + currentWindowName, re-resolved in the same observation',
+          elementIdSemantics: 'observation-only; never reusable as a window target',
         },
       ]);
     },
@@ -471,12 +488,22 @@ export function createWindowsProvider({
       if (!effectiveUiaAdapter || typeof effectiveUiaAdapter.query !== 'function') {
         fail('WINDOWS_UIA_UNAVAILABLE', 'UI Automation adapter is unavailable');
       }
-      const data = exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'UIA query');
+      const data = exactObject(
+        payload,
+        new Set(['windowId', 'currentWindowProcessId', 'currentWindowName', 'role', 'name', 'limit']),
+        'UIA query',
+      );
       const windowId = id(data.windowId, 'windowId');
+      const selector = currentWindowSelector(data);
       const role = boundedOptionalText(data.role, 'role', 120);
       const name = boundedOptionalText(data.name, 'name', 512);
       const limit = strictInteger(data.limit, 'limit', 1, MAX_UIA_RESULTS, 64);
-      const rows = await effectiveUiaAdapter.query({ windowId, role, name, limit });
+      const request = { windowId, role, name, limit };
+      if (selector) {
+        request.currentWindowProcessId = selector.processId;
+        request.currentWindowName = selector.windowName;
+      }
+      const rows = await effectiveUiaAdapter.query(request);
       return normalizeUiaRows(rows, limit);
     },
   });
