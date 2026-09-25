@@ -12,9 +12,10 @@ const ARTIFACT_KEYS = new Set([
   'sizeBytes', 'createdAt', 'producerInvocationId', 'sensitive',
 ]);
 const SOURCE_BINDING_KEYS = new Set(['sourceId', 'revisionId', 'contentSha256']);
+const INPUT_ARTIFACT_BINDING_KEYS = new Set(['artifactId', 'versionId', 'sha256']);
 const PROVENANCE_KEYS = new Set([
   'schemaVersion', 'projectId', 'artifactRef', 'sourceBindings',
-  'inputArtifactIds', 'createdAt',
+  'inputArtifactIds', 'inputArtifactBindings', 'createdAt',
 ]);
 const VERSION_KEYS = new Set([
   'schemaVersion', 'projectId', 'versionId', 'parentVersionId',
@@ -23,7 +24,7 @@ const VERSION_KEYS = new Set([
 const ENTRY_KEYS = new Set(['artifactId', 'currentVersionId', 'versions']);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'projectId', 'revision', 'artifacts']);
 
-function snapshotRecord(value, allowed, label) {
+function snapshotRecord(value, allowed, label, { optionalKeys = new Set() } = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`${label} must be a plain object`);
   }
@@ -48,7 +49,9 @@ function snapshotRecord(value, allowed, label) {
     seen.add(key);
   }
   for (const key of allowed) {
-    if (!seen.has(key)) throw new Error(`${label} is missing field: ${key}`);
+    if (!seen.has(key) && !optionalKeys.has(key)) {
+      throw new Error(`${label} is missing field: ${key}`);
+    }
   }
   return out;
 }
@@ -216,8 +219,23 @@ function artifactRefEqual(left, right) {
     && left.sensitive === right.sensitive;
 }
 
+function exactInputArtifactBinding(input, index) {
+  const label = `inputArtifactBindings[${index}]`;
+  const raw = snapshotRecord(input, INPUT_ARTIFACT_BINDING_KEYS, label);
+  return deepFrozen({
+    artifactId: exactId(raw.artifactId, `${label}.artifactId`),
+    versionId: exactId(raw.versionId, `${label}.versionId`),
+    sha256: exactSha256(raw.sha256, `${label}.sha256`),
+  });
+}
+
 function exactProvenance(input) {
-  const raw = snapshotRecord(input, PROVENANCE_KEYS, 'ArtifactProvenanceV1');
+  const raw = snapshotRecord(
+    input,
+    PROVENANCE_KEYS,
+    'ArtifactProvenanceV1',
+    { optionalKeys: new Set(['inputArtifactBindings']) },
+  );
   const projectId = exactId(raw.projectId, 'provenance.projectId');
   const artifactRef = exactArtifactRef(raw.artifactRef);
   const sourceBindings = dataArray(raw.sourceBindings, 'sourceBindings', 128)
@@ -233,6 +251,27 @@ function exactProvenance(input) {
   if (new Set(inputArtifactIds).size !== inputArtifactIds.length) {
     throw new Error('inputArtifactIds contains duplicates');
   }
+  const inputArtifactBindings = Object.prototype.hasOwnProperty.call(raw, 'inputArtifactBindings')
+    ? dataArray(raw.inputArtifactBindings, 'inputArtifactBindings', 128)
+      .map((item, index) => exactInputArtifactBinding(item, index))
+      .sort((left, right) =>
+        compareCodeUnits(left.artifactId, right.artifactId)
+        || compareCodeUnits(left.versionId, right.versionId))
+    : [];
+  const boundArtifactIds = inputArtifactBindings.map(binding => binding.artifactId);
+  const boundVersionIds = inputArtifactBindings.map(binding => binding.versionId);
+  if (new Set(boundArtifactIds).size !== boundArtifactIds.length) {
+    throw new Error('inputArtifactBindings contains duplicate artifactId');
+  }
+  if (new Set(boundVersionIds).size !== boundVersionIds.length) {
+    throw new Error('inputArtifactBindings contains duplicate versionId');
+  }
+  if (inputArtifactBindings.length) {
+    if (boundArtifactIds.length !== inputArtifactIds.length
+        || boundArtifactIds.some((artifactId, index) => artifactId !== inputArtifactIds[index])) {
+      throw new Error('inputArtifactBindings must exactly bind inputArtifactIds');
+    }
+  }
   const createdAt = exactTimestamp(raw.createdAt, 'provenance.createdAt');
   const normalized = normalizeArtifactProvenanceV1({
     schemaVersion: exactVersion(raw.schemaVersion, 'ArtifactProvenanceV1'),
@@ -240,6 +279,7 @@ function exactProvenance(input) {
     artifactRef,
     sourceBindings,
     inputArtifactIds,
+    inputArtifactBindings,
     createdAt,
   });
   return normalized;
@@ -307,6 +347,69 @@ function exactEntry(input, projectId) {
   return deepFrozen({ artifactId, currentVersionId, versions });
 }
 
+function assertVersionInputDependencies(artifacts, version) {
+  const { inputArtifactIds, inputArtifactBindings } = version.provenance;
+  if (inputArtifactIds.length !== inputArtifactBindings.length) {
+    throw new Error('Artifact provenance with inputs requires exact inputArtifactBindings');
+  }
+  for (const binding of inputArtifactBindings) {
+    const entry = artifacts.find(item => item.artifactId === binding.artifactId);
+    if (!entry) {
+      throw new Error(`Artifact input dependency not found: ${binding.artifactId}`);
+    }
+    const dependency = entry.versions.find(item => item.versionId === binding.versionId);
+    if (!dependency) {
+      throw new Error(`Artifact input version not found: ${binding.artifactId}/${binding.versionId}`);
+    }
+    if (dependency.versionId === version.versionId) {
+      throw new Error('Artifact version cannot depend on itself');
+    }
+    if (dependency.artifactRef.sha256 !== binding.sha256) {
+      throw new Error(`Artifact input SHA-256 mismatch: ${binding.artifactId}/${binding.versionId}`);
+    }
+    const derivedAt = Date.parse(version.artifactRef.createdAt);
+    if (Date.parse(dependency.artifactRef.createdAt) > derivedAt) {
+      throw new Error(`Artifact input materialization is from the future: ${binding.artifactId}/${binding.versionId}`);
+    }
+    if (Date.parse(dependency.registeredAt) > derivedAt) {
+      throw new Error(`Artifact input registration is from the future: ${binding.artifactId}/${binding.versionId}`);
+    }
+  }
+}
+
+function assertAcyclicInputDependencies(artifacts) {
+  const versions = artifacts.flatMap(entry => entry.versions);
+  const indegree = new Map(versions.map(version => [version.versionId, 0]));
+  const dependents = new Map(versions.map(version => [version.versionId, []]));
+
+  for (const version of versions) {
+    for (const binding of version.provenance.inputArtifactBindings) {
+      indegree.set(version.versionId, indegree.get(version.versionId) + 1);
+      dependents.get(binding.versionId).push(version.versionId);
+    }
+  }
+
+  const ready = [];
+  for (const version of versions) {
+    if (indegree.get(version.versionId) === 0) ready.push(version.versionId);
+  }
+
+  let visited = 0;
+  for (let cursor = 0; cursor < ready.length; cursor += 1) {
+    const versionId = ready[cursor];
+    visited += 1;
+    for (const dependentId of dependents.get(versionId)) {
+      const next = indegree.get(dependentId) - 1;
+      indegree.set(dependentId, next);
+      if (next === 0) ready.push(dependentId);
+    }
+  }
+
+  if (visited !== versions.length) {
+    throw new Error('Artifact provenance input dependencies must be acyclic');
+  }
+}
+
 export function normalizeArtifactRegistryV1(input) {
   const raw = snapshotRecord(input, REGISTRY_KEYS, 'ArtifactRegistryV1');
   const projectId = exactId(raw.projectId, 'registry.projectId');
@@ -325,6 +428,10 @@ export function normalizeArtifactRegistryV1(input) {
   if (revision !== versionIds.length) {
     throw new Error('ArtifactRegistryV1 revision must equal immutable version count');
   }
+  for (const entry of artifacts) {
+    for (const version of entry.versions) assertVersionInputDependencies(artifacts, version);
+  }
+  assertAcyclicInputDependencies(artifacts);
   return deepFrozen({
     schemaVersion: exactVersion(raw.schemaVersion, 'ArtifactRegistryV1'),
     projectId,
@@ -350,6 +457,7 @@ export function putArtifactVersionV1(registryInput, versionInput) {
   const registry = normalizeArtifactRegistryV1(registryInput);
   const version = exactArtifactVersion(versionInput);
   if (version.projectId !== registry.projectId) throw new Error('Artifact version projectId mismatch');
+  assertVersionInputDependencies(registry.artifacts, version);
 
   const existingEntry = registry.artifacts.find(item => item.artifactId === version.artifactRef.artifactId);
   const versionOwner = registry.artifacts.find(entry => entry.versions.some(item => item.versionId === version.versionId));
@@ -452,8 +560,14 @@ export function compareArtifactVersionsV1(leftInput, rightInput) {
   const changedFields = listChangedArtifactFields(left.artifactRef, right.artifactRef);
   const leftSources = JSON.stringify(left.provenance.sourceBindings);
   const rightSources = JSON.stringify(right.provenance.sourceBindings);
-  const leftInputs = JSON.stringify(left.provenance.inputArtifactIds);
-  const rightInputs = JSON.stringify(right.provenance.inputArtifactIds);
+  const leftInputs = JSON.stringify({
+    ids: left.provenance.inputArtifactIds,
+    bindings: left.provenance.inputArtifactBindings,
+  });
+  const rightInputs = JSON.stringify({
+    ids: right.provenance.inputArtifactIds,
+    bindings: right.provenance.inputArtifactBindings,
+  });
   const provenanceChanged = versionSignature(left.provenance) !== versionSignature(right.provenance);
   return deepFrozen({
     schemaVersion: ArtifactRegistrySchemaVersion,
