@@ -396,12 +396,17 @@ test('malformed Browser Agent approval fences fail closed instead of manufacturi
   const mutations = [
     runtime => { delete runtime.controlEpoch; },
     runtime => { runtime.controlEpoch = -1; },
+    runtime => { runtime.controlEpoch = -0; },
     runtime => { runtime.updatedAt = '123'; },
+    runtime => { runtime.updatedAt = -0; },
     runtime => { delete runtime.pendingApproval.requestedAt; },
     runtime => { runtime.pendingApproval.requestedAt = -1; },
+    runtime => { runtime.pendingApproval.requestedAt = -0; },
     runtime => { delete runtime.pendingApproval.snapshotId; },
+    runtime => { runtime.pendingApproval.snapshotId = ''; },
     runtime => { runtime.pendingApproval.snapshotId = 7; },
     runtime => { delete runtime.pendingApproval.snapshotSignature; },
+    runtime => { runtime.pendingApproval.snapshotSignature = ''; },
     runtime => { runtime.pendingApproval.snapshotSignature = 7; },
   ];
 
