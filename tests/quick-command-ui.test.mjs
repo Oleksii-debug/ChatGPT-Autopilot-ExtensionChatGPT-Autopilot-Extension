@@ -19,6 +19,7 @@ test('quick command popup uses native keyboard-accessible controls with explicit
   }
   assert.match(html, /<select id="source-kind">/u);
   assert.match(html, /<textarea id="source-text"[^>]*readonly/u);
+  assert.doesNotMatch(html, /<textarea id="source-text"[^>]*maxlength=/u);
   assert.match(html, /<button id="capture-source" type="button">/u);
   assert.match(html, /<button id="run-command" type="button">/u);
   assert.match(html, /id="status" role="status" aria-live="polite"/u);
@@ -62,6 +63,11 @@ test('page capture rejects oversize material instead of silently truncating it',
   assert.match(js, /text\.length > maxSourceText/u);
   assert.match(js, /tooLarge: true/u);
   assert.match(js, /перевищує 100000 символів/u);
+});
+
+test('clipboard oversize input is rejected explicitly instead of being browser-truncated', () => {
+  assert.match(js, /text\.length > MAX_SOURCE_TEXT/u);
+  assert.match(js, /Текст буфера перевищує 100000 символів/u);
 });
 
 test('execution reuses canonical Core Session commands and preserves recoverability on start failure', () => {
