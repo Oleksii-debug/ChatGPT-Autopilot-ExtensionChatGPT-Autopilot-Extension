@@ -41,12 +41,15 @@ function githubClient(overrides = {}) {
     readTree: async args => ({ operation: 'readTree', args }),
     readBranch: async args => ({ operation: 'readBranch', args }),
     findPullRequests: async args => ({ operation: 'findPullRequests', args }),
+    readPullRequest: async args => ({ operation: 'readPullRequest', args }),
+    readPullRequestComment: async args => ({ operation: 'readPullRequestComment', args }),
     readIssue: async args => ({ operation: 'readIssue', args }),
     readIssueComment: async args => ({ operation: 'readIssueComment', args }),
     createBranch: async args => ({ operation: 'createBranch', args }),
     putFile: async args => ({ operation: 'putFile', args }),
     deleteFile: async args => ({ operation: 'deleteFile', args }),
     createPullRequest: async args => ({ operation: 'createPullRequest', args }),
+    createPullRequestComment: async args => ({ operation: 'createPullRequestComment', args }),
     createIssue: async args => ({ operation: 'createIssue', args }),
     createIssueComment: async args => ({ operation: 'createIssueComment', args }),
     ...overrides,
@@ -260,4 +263,43 @@ test('GitHub issue and issue-comment operations are separately capability-gated'
     }),
     /granted|capabilit/i,
   );
+});
+
+
+test('pull request timeline comment operations are separately capability-gated', async () => {
+  const provider = new GitHubAgentProviderV1({
+    githubClient: githubClient(),
+    grantedCapabilityIds: [
+      GitHubCapabilityId.PULL_REQUEST_READ,
+      GitHubCapabilityId.PULL_REQUEST_COMMENT_READ,
+      GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE,
+    ],
+    now: () => Date.parse(at),
+  });
+  const readInv = { ...invocation(GitHubToolId.PULL_REQUEST_READ, GitHubCapabilityId.PULL_REQUEST_READ, {
+    repositoryFullName: 'owner/repo', pullRequestNumber: 7,
+  }), invocationId: 'github-inv-pr-read', policyDecisionId: 'decision-pr-read' };
+  assert.equal((await provider.invoke({ invocation: readInv, policyDecision: {
+    ...allow, decisionId: 'decision-pr-read', invocationId: 'github-inv-pr-read',
+  } })).result.operation, 'readPullRequest');
+
+  const commentReadInv = { ...invocation(GitHubToolId.PULL_REQUEST_COMMENT_READ, GitHubCapabilityId.PULL_REQUEST_COMMENT_READ, {
+    repositoryFullName: 'owner/repo', pullRequestNumber: 7, commentId: 99,
+  }), invocationId: 'github-inv-pr-comment-read', policyDecisionId: 'decision-pr-comment-read' };
+  assert.equal((await provider.invoke({ invocation: commentReadInv, policyDecision: {
+    ...allow, decisionId: 'decision-pr-comment-read', invocationId: 'github-inv-pr-comment-read',
+  } })).result.operation, 'readPullRequestComment');
+
+  const createInv = { ...invocation(GitHubToolId.PULL_REQUEST_COMMENT_CREATE, GitHubCapabilityId.PULL_REQUEST_COMMENT_CREATE, {
+    repositoryFullName: 'owner/repo', pullRequestNumber: 7, body: 'Exact PR timeline comment',
+  }), invocationId: 'github-inv-pr-comment-create', policyDecisionId: 'decision-pr-comment-create' };
+  assert.equal((await provider.invoke({ invocation: createInv, policyDecision: {
+    ...allow, decisionId: 'decision-pr-comment-create', invocationId: 'github-inv-pr-comment-create',
+  } })).result.operation, 'createPullRequestComment');
+
+  const underGranted = new GitHubAgentProviderV1({ githubClient: githubClient(), grantedCapabilityIds: [GitHubCapabilityId.PULL_REQUEST_READ] });
+  await assert.rejects(() => underGranted.invoke({
+    invocation: createInv,
+    policyDecision: { ...allow, decisionId: 'decision-pr-comment-create', invocationId: 'github-inv-pr-comment-create' },
+  }), /granted|capabilit/i);
 });
