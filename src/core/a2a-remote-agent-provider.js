@@ -224,7 +224,21 @@ function sameStringSet(left, right) {
 function normalizeSendMessageResult(value, {
   effectMayHaveOccurred = false,
 } = {}) {
-  const raw = dataRecord(value, SEND_MESSAGE_RESULT_KEYS, 'A2A SendMessageResponse');
+  const raw = dataObject(
+    value,
+    'A2A SendMessageResponse',
+    'A2A_RESPONSE_INVALID',
+    effectMayHaveOccurred,
+  );
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !SEND_MESSAGE_RESULT_KEYS.has(key)) {
+      fail(
+        'A2A_RESPONSE_INVALID',
+        `A2A SendMessageResponse contains unknown field: ${String(key)}`,
+        { effectMayHaveOccurred },
+      );
+    }
+  }
   const hasTask = Object.prototype.hasOwnProperty.call(raw, 'task');
   const hasMessage = Object.prototype.hasOwnProperty.call(raw, 'message');
   if (hasTask === hasMessage) {
