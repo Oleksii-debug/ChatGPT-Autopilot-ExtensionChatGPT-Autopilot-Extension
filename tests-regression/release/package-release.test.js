@@ -151,6 +151,26 @@ test('release rejects common credential data filenames even when their contents 
     () => collectProductFiles(fixtureRoot),
     /Forbidden private\/sensitive path in release package: src\/credentials\.json/,
   );
+  await fs.rm(credentialsPath);
+
+  const googleClientPath = path.join(
+    fixtureRoot,
+    'companion',
+    'client_secret_123.apps.googleusercontent.com.json',
+  );
+  await fs.writeFile(googleClientPath, '{"installed":{"client_id":"fixture","client_secret":"benign-looking"}}\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: companion\/client_secret_123\.apps\.googleusercontent\.com\.json/,
+  );
+  await fs.rm(googleClientPath);
+
+  const oauthClientPath = path.join(fixtureRoot, 'src', 'oauth2-client-prod.yaml');
+  await fs.writeFile(oauthClientPath, 'client: fixture\nsecret: benign-looking\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: src\/oauth2-client-prod\.yaml/,
+  );
 });
 
 test('release ZIP is byte-for-byte reproducible and has one canonical root folder', async t => {
