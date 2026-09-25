@@ -529,3 +529,33 @@ test('canonical timestamps, exact numeric types and dense schema ordinals fail c
   badColumns[0].ordinal = 2;
   assert.throws(() => normalizeDataDatasetSnapshotV1(dataset({ schemaColumns: badColumns })), /contiguous/);
 });
+
+
+test('transform lineage rejects output source provenance first observed after execution', () => {
+  const input = dataset();
+  const futureAt = '2026-09-24T22:00:00.000Z';
+  const output = dataset({
+    datasetId: 'dataset-out-future-source',
+    revisionId: 'dataset-out-future-r1',
+    digest: sha('6'),
+    sourceRefs: [source({
+      id: 'source-output-future',
+      revisionId: 'source-output-future-r1',
+      digest: sha('5'),
+      uri: 'file:///owner/future.csv',
+      at: futureAt,
+    })],
+    artifactId: 'artifact-dataset-out-future',
+    observedAt: futureAt,
+  });
+  const raw = lineage({ inputs: [input], output });
+
+  assert.throws(
+    () => assertDataTransformLineageMatchesSnapshotsV1({
+      lineage: raw,
+      inputSnapshots: [input],
+      outputSnapshot: output,
+    }),
+    /transform output source observed after execution/,
+  );
+});
