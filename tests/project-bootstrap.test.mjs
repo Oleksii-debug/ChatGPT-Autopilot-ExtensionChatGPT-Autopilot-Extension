@@ -4,6 +4,7 @@ import {
   ProjectBootstrapBlockerCode,
   ProjectBootstrapStatus,
   buildProjectBootstrapV1,
+  resolveTrustedProjectBootstrapSnapshotV1,
 } from '../src/core/project-bootstrap.js';
 import { normalizeArtifactRefV1 } from '../src/core/universal-agent-contracts.js';
 
@@ -287,4 +288,163 @@ test('bootstrap requires at least one required source and at least one source re
     () => buildProjectBootstrapV1(input({ requiredSourceIds:[] })),
     /requiredSourceIds must contain between 1/,
   );
+});
+
+
+test('trusted resolver composition emits a canonical snapshot without granting workspace commit authority', async () => {
+  const raw = input({
+    sourceRefs: [
+      source('repo', SHA_A, { authority:'ADVISORY' }),
+      source('drive', SHA_C, { kind:'drive.folder', uri:'drive://folder-1', authority:'ADVISORY' }),
+    ],
+  });
+  const bySourceId = new Map(raw.sourceRefs.map(item => [
+    item.sourceId,
+    { ...item, authority:'CANONICAL' },
+  ]));
+  const byArtifactId = new Map(raw.artifactRefs.map(item => [item.artifactId, item]));
+  const sourceQueries = [];
+  const artifactQueries = [];
+
+  const result = await resolveTrustedProjectBootstrapSnapshotV1(raw, {
+    async resolveSourceRef(query) {
+      assert.equal(Object.isFrozen(query), true);
+      sourceQueries.push(query);
+      return bySourceId.get(query.sourceId);
+    },
+    async resolveArtifactRef(query) {
+      assert.equal(Object.isFrozen(query), true);
+      artifactQueries.push(query);
+      return byArtifactId.get(query.artifactId);
+    },
+  });
+
+  assert.equal(result.trustedSourceResolution, true);
+  assert.equal(result.trustedArtifactResolution, true);
+  assert.equal(result.workspaceAdmissionAuthorized, false);
+  assert.equal(result.requiresCanonicalProjectWorkspaceCommit, true);
+  assert.equal(result.snapshot.projectId, 'project-1');
+  assert.equal(result.snapshot.revisionId, 'project-rev-1');
+  assert.deepEqual(result.snapshot.sourceRefs.map(item => item.sourceId), ['drive', 'repo']);
+  assert.deepEqual(result.snapshot.sourceRefs.map(item => item.authority), ['CANONICAL', 'CANONICAL']);
+  assert.deepEqual(result.snapshot.artifactRefs.map(item => item.artifactId), ['inventory']);
+  assert.deepEqual(sourceQueries.map(item => item.sourceId), ['drive', 'repo']);
+  assert.deepEqual(artifactQueries.map(item => item.artifactId), ['inventory']);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.snapshot), true);
+});
+
+test('caller-supplied CANONICAL authority cannot replace trusted canonical source admission', async () => {
+  let sourceCalls = 0;
+  await assert.rejects(
+    () => resolveTrustedProjectBootstrapSnapshotV1(input(), {
+      async resolveSourceRef(query) {
+        sourceCalls += 1;
+        const requested = input().sourceRefs.find(item => item.sourceId === query.sourceId);
+        return { ...requested, authority:'DERIVED' };
+      },
+      async resolveArtifactRef(query) {
+        return input().artifactRefs.find(item => item.artifactId === query.artifactId);
+      },
+    }),
+    /not canonically admitted/,
+  );
+  assert.equal(sourceCalls, 1);
+});
+
+test('trusted resolver substitution of source or artifact material fails closed', async () => {
+  const raw = input();
+  const sources = new Map(raw.sourceRefs.map(item => [item.sourceId, item]));
+  const artifacts = new Map(raw.artifactRefs.map(item => [item.artifactId, item]));
+
+  await assert.rejects(
+    () => resolveTrustedProjectBootstrapSnapshotV1(raw, {
+      async resolveSourceRef(query) {
+        const item = sources.get(query.sourceId);
+        return query.sourceId === 'drive'
+          ? { ...item, metadata:{ ...item.metadata, branch:'other' } }
+          : item;
+      },
+      async resolveArtifactRef(query) {
+        return artifacts.get(query.artifactId);
+      },
+    }),
+    /does not exactly match bootstrap source: drive/,
+  );
+
+  await assert.rejects(
+    () => resolveTrustedProjectBootstrapSnapshotV1(raw, {
+      async resolveSourceRef(query) {
+        return sources.get(query.sourceId);
+      },
+      async resolveArtifactRef(query) {
+        return { ...artifacts.get(query.artifactId), sizeBytes:13 };
+      },
+    }),
+    /does not exactly match bootstrap artifact: inventory/,
+  );
+});
+
+test('blocked bootstrap performs zero trusted resolver calls', async () => {
+  let calls = 0;
+  const blocked = input({
+    sourceRefs: [
+      source('repo', ''),
+      source('drive', SHA_C, { kind:'drive.folder', uri:'drive://folder-1' }),
+    ],
+  });
+  await assert.rejects(
+    () => resolveTrustedProjectBootstrapSnapshotV1(blocked, {
+      async resolveSourceRef() { calls += 1; throw new Error('must not run'); },
+      async resolveArtifactRef() { calls += 1; throw new Error('must not run'); },
+    }),
+    /bootstrap is blocked/,
+  );
+  assert.equal(calls, 0);
+});
+
+test('trusted resolver records reject accessor-backed evidence without executing getters', async () => {
+  const raw = input();
+  const sources = new Map(raw.sourceRefs.map(item => [item.sourceId, item]));
+  let reads = 0;
+  await assert.rejects(
+    () => resolveTrustedProjectBootstrapSnapshotV1(raw, {
+      async resolveSourceRef(query) {
+        const item = { ...sources.get(query.sourceId) };
+        Object.defineProperty(item, 'uri', {
+          enumerable:true,
+          configurable:true,
+          get() {
+            reads += 1;
+            return 'https://attacker.invalid/';
+          },
+        });
+        return item;
+      },
+      async resolveArtifactRef(query) {
+        return raw.artifactRefs.find(item => item.artifactId === query.artifactId);
+      },
+    }),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+});
+
+test('trusted snapshot resolution requires exact material identity for every optional source and artifact', async () => {
+  const raw = input({
+    sourceRefs: [
+      source('repo', SHA_A),
+      source('drive', '', { kind:'drive.folder', uri:'drive://folder-1' }),
+    ],
+    requiredSourceIds:['repo'],
+  });
+  let calls = 0;
+  await assert.rejects(
+    () => resolveTrustedProjectBootstrapSnapshotV1(raw, {
+      async resolveSourceRef() { calls += 1; return source('repo', SHA_A); },
+      async resolveArtifactRef() { calls += 1; return artifact('inventory', SHA_B); },
+    }),
+    /requires source SHA-256: drive/,
+  );
+  assert.equal(calls, 0);
 });
