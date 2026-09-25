@@ -1,0 +1,1 @@
+Повний legacy regression harness використовував окремі historical profile fixtures для двох release-contract тестів. Готові імпортні profile JSON навмисно не включені в цей source archive. Основний product source і AI tests самодостатні.
