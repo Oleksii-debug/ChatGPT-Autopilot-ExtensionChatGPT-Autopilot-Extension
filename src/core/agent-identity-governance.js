@@ -327,6 +327,16 @@ export function normalizeAgentGovernanceSnapshotV1(input) {
     if (principal.parentPrincipalId && !principalsById.has(principal.parentPrincipalId)) {
       throw new Error('Unknown parent principal');
     }
+    if (principal.kind === AgentPrincipalKind.AGENT) {
+      const parent = principalsById.get(principal.parentPrincipalId);
+      if (!parent || ![
+        AgentPrincipalKind.OWNER,
+        AgentPrincipalKind.HUMAN,
+        AgentPrincipalKind.AGENT,
+      ].includes(parent.kind)) {
+        throw new Error('AGENT parent must be OWNER, HUMAN, or AGENT');
+      }
+    }
   }
   assertNoCycles(principalsById);
 
