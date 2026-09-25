@@ -66,6 +66,172 @@ test('release allowlist contains release docs, extension files and complete comp
   assert.ok(!files.some(file => /(?:^|\/)(?:credentials|secrets|private-data)(?:\/|$)/i.test(file)));
 });
 
+
+test('release rejects top-level file and directory symlinks before source traversal', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-symlink-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const originalSrc = path.join(fixtureRoot, 'src');
+  const outsideSrc = path.join(temp, 'outside-src');
+  await fs.rename(originalSrc, outsideSrc);
+  try {
+    await fs.symlink(outsideSrc, originalSrc, 'dir');
+  } catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error?.code)) {
+      t.skip(`symbolic links are unavailable on this platform: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Release source must not contain symlinks: src/,
+  );
+
+  await fs.rm(originalSrc, { force: true });
+  await fs.rename(outsideSrc, originalSrc);
+
+  const originalReadme = path.join(fixtureRoot, 'README.txt');
+  const outsideReadme = path.join(temp, 'outside-readme.txt');
+  await fs.rename(originalReadme, outsideReadme);
+  await fs.symlink(outsideReadme, originalReadme, 'file');
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Release source must not contain symlinks: README\.txt/,
+  );
+});
+
+
+test('release fails closed on NUL bytes in packaged text sources', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-nul-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  await fs.writeFile(
+    path.join(fixtureRoot, 'README.txt'),
+    Buffer.concat([
+      Buffer.from(`ChatGPT Autopilot ${RELEASE_VERSION}\n`, 'utf8'),
+      Buffer.from([0]),
+      Buffer.from('sk-example-secret-material-abcdefghijklmnopqrstuvwxyz', 'utf8'),
+    ]),
+  );
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /NUL byte found in packaged text source: README\.txt/,
+  );
+});
+
+
+test('release fails closed on NUL bytes in packaged YAML text sources', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-yaml-nul-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const yamlPath = path.join(fixtureRoot, 'src', 'benign-config.yaml');
+  await fs.writeFile(
+    yamlPath,
+    Buffer.concat([
+      Buffer.from('fixture: true\ncomment: harmless-prefix\n', 'utf8'),
+      Buffer.from([0]),
+      Buffer.from('sk-example-secret-material-abcdefghijklmnopqrstuvwxyz\n', 'utf8'),
+    ]),
+  );
+
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /NUL byte found in packaged text source: src\/benign-config\.yaml/,
+  );
+});
+
+
+test('release rejects common credential data filenames even when their contents look benign', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-credential-files-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const tokenPath = path.join(fixtureRoot, 'companion', 'token.json');
+  await fs.writeFile(tokenPath, '{"fixture":true}\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: companion\/token\.json/,
+  );
+  await fs.rm(tokenPath);
+
+  const credentialsPath = path.join(fixtureRoot, 'src', 'credentials.json');
+  await fs.writeFile(credentialsPath, '{"fixture":true}\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: src\/credentials\.json/,
+  );
+  await fs.rm(credentialsPath);
+
+  const googleClientPath = path.join(
+    fixtureRoot,
+    'companion',
+    'client_secret_123.apps.googleusercontent.com.json',
+  );
+  await fs.writeFile(googleClientPath, '{"installed":{"client_id":"fixture","client_secret":"benign-looking"}}\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: companion\/client_secret_123\.apps\.googleusercontent\.com\.json/,
+  );
+  await fs.rm(googleClientPath);
+
+  const oauthClientPath = path.join(fixtureRoot, 'src', 'oauth2-client-prod.yaml');
+  await fs.writeFile(oauthClientPath, 'client: fixture\nsecret: benign-looking\n', 'utf8');
+  await assert.rejects(
+    () => collectProductFiles(fixtureRoot),
+    /Forbidden private\/sensitive path in release package: src\/oauth2-client-prod\.yaml/,
+  );
+});
+
+test('release build packages the exact validated byte snapshot even if source paths mutate after scan', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-snapshot-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const readmePath = path.join(fixtureRoot, 'README.txt');
+  const originalReadme = await fs.readFile(readmePath);
+  const triggerPath = path.resolve(fixtureRoot, files.at(-1));
+  const mutated = Buffer.from('MUTATED_AFTER_VALIDATION_SENTINEL\n', 'utf8');
+  const originalReadFile = fs.readFile.bind(fs);
+  let armed = true;
+  fs.readFile = async (...args) => {
+    const data = await originalReadFile(...args);
+    const requested = typeof args[0] === 'string' ? path.resolve(args[0]) : '';
+    if (armed && requested === triggerPath) {
+      armed = false;
+      await fs.writeFile(readmePath, mutated);
+    }
+    return data;
+  };
+  t.after(() => { fs.readFile = originalReadFile; });
+
+  const built = await buildReleasePackage({ root: fixtureRoot, outDir: path.join(temp, 'out') });
+  fs.readFile = originalReadFile;
+
+  assert.equal(armed, false, 'fixture must mutate a previously validated source before collectProductFiles returns');
+  assert.deepEqual(await fs.readFile(path.join(built.unpackedDir, 'README.txt')), originalReadme);
+  const zip = await fs.readFile(built.zipPath);
+  assert.equal(zip.includes(mutated), false, 'post-validation source bytes must not enter the ZIP');
+  assert.equal(zip.includes(originalReadme), true, 'ZIP must contain the validated README snapshot');
+  assert.deepEqual(await fs.readFile(readmePath), mutated, 'fixture must prove the source path really changed after validation');
+});
+
 test('release ZIP is byte-for-byte reproducible and has one canonical root folder', async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
