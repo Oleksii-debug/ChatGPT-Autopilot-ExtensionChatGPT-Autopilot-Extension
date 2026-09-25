@@ -80,20 +80,34 @@ function trackedStreamResponse(text, { declaredLength = null, chunks = null } = 
   let index = 0;
   let reads = 0;
   let cancelled = false;
-  const body = new ReadableStream({
-    pull(controller) {
-      if (index >= parts.length) {
-        controller.close();
-        return;
-      }
-      reads += 1;
-      controller.enqueue(parts[index]);
+  let released = false;
+  let readerTaken = false;
+
+  const reader = {
+    async read() {
+      if (index >= parts.length) return { done: true, value: undefined };
+      const value = parts[index];
       index += 1;
+      reads += 1;
+      return { done: false, value };
     },
-    cancel() {
+    async cancel() {
       cancelled = true;
     },
-  });
+    releaseLock() {
+      released = true;
+    },
+  };
+  const body = {
+    getReader() {
+      if (readerTaken) throw new TypeError('ReadableStream is already locked');
+      readerTaken = true;
+      return reader;
+    },
+    async cancel() {
+      cancelled = true;
+    },
+  };
   return {
     ok: true,
     status: 200,
@@ -104,6 +118,7 @@ function trackedStreamResponse(text, { declaredLength = null, chunks = null } = 
     },
     get reads() { return reads; },
     get cancelled() { return cancelled; },
+    get released() { return released; },
   };
 }
 
