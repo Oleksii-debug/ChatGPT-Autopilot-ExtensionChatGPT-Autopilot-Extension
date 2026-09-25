@@ -60,6 +60,7 @@ const ARTIFACT_KEYS = new Set([
 ]);
 
 const ASSESSMENT_KEYS = new Set(['checkpoint', 'current', 'snapshotUtf8']);
+const CRYPTO_OPTION_KEYS = new Set(['cryptoApi']);
 
 function strictRecord(value, label, allowedKeys) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -82,6 +83,13 @@ function strictRecord(value, label, allowedKeys) {
     out[key] = descriptor.value;
   }
   return out;
+}
+
+function checkpointCryptoApi(options) {
+  const raw = strictRecord(options, 'AgentCheckpoint crypto options', CRYPTO_OPTION_KEYS);
+  return Object.prototype.hasOwnProperty.call(raw, 'cryptoApi')
+    ? raw.cryptoApi
+    : globalThis.crypto;
 }
 
 function strictArray(value, label, { max }) {
@@ -244,11 +252,11 @@ function canonicalCheckpointMaterial(value) {
   ]);
 }
 
-async function materialDigest(material, { cryptoApi = globalThis.crypto } = {}) {
+async function materialDigest(material, cryptoApi) {
   return createSha256FingerprintV1(canonicalCheckpointMaterial(material), { cryptoApi });
 }
 
-async function verifySnapshotUtf8(snapshotUtf8, artifact, { cryptoApi = globalThis.crypto } = {}) {
+async function verifySnapshotUtf8(snapshotUtf8, artifact, cryptoApi) {
   if (typeof snapshotUtf8 !== 'string') {
     throw new Error('AgentCheckpoint rewind snapshotUtf8 must be text');
   }
@@ -267,8 +275,9 @@ async function verifySnapshotUtf8(snapshotUtf8, artifact, { cryptoApi = globalTh
 }
 
 export async function createAgentCheckpointV1(raw, options = {}) {
+  const cryptoApi = checkpointCryptoApi(options);
   const material = normalizeCheckpointMaterial(raw, CHECKPOINT_CREATE_KEYS);
-  const checkpointDigest = await materialDigest(material, options);
+  const checkpointDigest = await materialDigest(material, cryptoApi);
   return freezeDeep({ ...material, checkpointDigest });
 }
 
@@ -282,8 +291,9 @@ export function normalizeAgentCheckpointV1(raw) {
 }
 
 export async function verifyAgentCheckpointV1(raw, options = {}) {
+  const cryptoApi = checkpointCryptoApi(options);
   const checkpoint = normalizeAgentCheckpointV1(raw);
-  const expected = await materialDigest(checkpoint, options);
+  const expected = await materialDigest(checkpoint, cryptoApi);
   if (checkpoint.checkpointDigest !== expected) {
     throw new Error('AgentCheckpointV1 checkpointDigest does not match checkpoint material');
   }
@@ -326,8 +336,9 @@ function blocked(checkpoint, current, reasonCode) {
 }
 
 export async function assessAgentCheckpointRewindV1(raw, options = {}) {
+  const cryptoApi = checkpointCryptoApi(options);
   const request = strictRecord(raw, 'AgentCheckpoint rewind request', ASSESSMENT_KEYS);
-  const checkpoint = await verifyAgentCheckpointV1(request.checkpoint, options);
+  const checkpoint = await verifyAgentCheckpointV1(request.checkpoint, { cryptoApi });
   const current = normalizeAgentCheckpointHeadV1(request.current);
 
   for (const key of ['agentId', 'jobId', 'planId']) {
@@ -335,7 +346,7 @@ export async function assessAgentCheckpointRewindV1(raw, options = {}) {
       throw new Error(`AgentCheckpoint rewind ${key} does not match checkpoint`);
     }
   }
-  await verifySnapshotUtf8(request.snapshotUtf8, checkpoint.snapshotArtifact, options);
+  await verifySnapshotUtf8(request.snapshotUtf8, checkpoint.snapshotArtifact, cryptoApi);
   if (current.planRevision < checkpoint.planRevision
       || current.internalStateRevision < checkpoint.internalStateRevision
       || current.exactEffectLedgerRevision < checkpoint.exactEffectLedgerRevision) {
