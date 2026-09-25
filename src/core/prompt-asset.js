@@ -140,7 +140,7 @@ function deepFreeze(value) {
 }
 
 function normalizeVariable(raw, index) {
-  plain(raw, `variables[${index}]`);
+  raw = plain(raw, `variables[${index}]`);
   exactKeys(raw, VARIABLE_KEYS, `variables[${index}]`);
   if (typeof raw.name !== 'string' || !VARIABLE.test(raw.name)) {
     throw new Error(`variables[${index}].name is invalid`);
@@ -166,7 +166,7 @@ function normalizeVariable(raw, index) {
 }
 
 function normalizeSourceBinding(raw, index) {
-  plain(raw, `sourceBindings[${index}]`);
+  raw = plain(raw, `sourceBindings[${index}]`);
   exactKeys(raw, SOURCE_KEYS, `sourceBindings[${index}]`);
   if (typeof raw.sourceId !== 'string' || typeof raw.revisionId !== 'string' || typeof raw.contentSha256 !== 'string') {
     throw new Error(`sourceBindings[${index}] identity fields must be strings`);
@@ -188,7 +188,7 @@ function normalizeSourceBinding(raw, index) {
 }
 
 function normalizeCadence(raw) {
-  plain(raw, 'cadence');
+  raw = plain(raw, 'cadence');
   exactKeys(raw, CADENCE_KEYS, 'cadence');
   if (typeof raw.mode !== 'string' || !CADENCE_MODES.has(raw.mode)) {
     throw new Error('cadence.mode is invalid');
@@ -343,7 +343,7 @@ function assertCadenceComparison(asset, triggerAssertionRaw) {
 }
 
 function normalizeSensitiveReference(raw, label) {
-  plain(raw, label);
+  raw = plain(raw, label);
   exactKeys(raw, SENSITIVE_REF_KEYS, label);
   if (raw.schemaVersion !== 1) throw new Error(`${label}.schemaVersion must be 1`);
   return deepFreeze({
