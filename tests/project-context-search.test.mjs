@@ -28,12 +28,13 @@ function candidate(overrides = {}) {
   };
 }
 function search(query, candidates, options = {}) {
+  const { current, ...requestOptions } = options;
   return searchProjectContextV1({
     query,
     candidates,
-    currentSourceRefs: options.currentSourceRefs || [source(options.current || {})],
-    allowedSourceIds: options.allowedSourceIds || ['src-1'],
-    ...options,
+    currentSourceRefs: requestOptions.currentSourceRefs || [source(current || {})],
+    allowedSourceIds: requestOptions.allowedSourceIds || ['src-1'],
+    ...requestOptions,
   });
 }
 
