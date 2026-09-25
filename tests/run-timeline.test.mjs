@@ -98,3 +98,43 @@ test('timeline boundary rejects coerced identities, coerced limits and missing s
   }
   assert.throws(() => buildRunTimelineV1(canonical, { sessionId: 'missing' }), /not found/);
 });
+
+
+test('timeline options boundary rejects accessors, hidden fields, symbols and exotic records before reads', () => {
+  const canonical = state();
+  let reads = 0;
+  const accessor = { limit: 10 };
+  Object.defineProperty(accessor, 'sessionId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'session-a';
+    },
+  });
+  assert.throws(() => buildRunTimelineV1(canonical, accessor), /enumerable own data property/);
+  assert.equal(reads, 0);
+
+  const hidden = { limit: 10 };
+  Object.defineProperty(hidden, 'sessionId', {
+    enumerable: false,
+    configurable: true,
+    value: 'session-a',
+  });
+  assert.throws(() => buildRunTimelineV1(canonical, hidden), /enumerable own data property/);
+
+  const symbol = { sessionId: 'session-a', limit: 10 };
+  symbol[Symbol('authority')] = true;
+  assert.throws(() => buildRunTimelineV1(canonical, symbol), /unknown field/);
+
+  assert.throws(
+    () => buildRunTimelineV1(canonical, { sessionId: 'session-a', limit: 10, authority: true }),
+    /unknown field/,
+  );
+
+  const exotic = Object.assign(Object.create({ sessionId: 'session-a' }), { limit: 10 });
+  assert.throws(() => buildRunTimelineV1(canonical, exotic), /plain object/);
+
+  const nullPrototype = Object.assign(Object.create(null), { sessionId: 'session-a', limit: 10 });
+  assert.equal(buildRunTimelineV1(canonical, nullPrototype).sessionId, 'session-a');
+});
