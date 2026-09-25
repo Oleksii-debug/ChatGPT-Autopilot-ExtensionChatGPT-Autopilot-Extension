@@ -342,3 +342,58 @@ test('acyclic multi-level fragments remain reusable in dependency order independ
   );
   assert.equal(plan.staleFragments.length, 0);
 });
+
+
+test('public compiler hashing authority is runtime-owned and ignores caller digest injection', async () => {
+  const current = snapshot([source({ sourceId: 'stable' })]);
+  const valid = await fragment({
+    fragmentId: 'stable-summary-runtime-hash',
+    sourceBindings: [binding({ sourceId: 'stable' })],
+    summary: 'trusted cached summary bytes',
+  });
+  const forged = {
+    ...valid,
+    summary: 'tampered cached summary bytes',
+    summarySha256: `sha256:${'0'.repeat(64)}`,
+  };
+
+  let optionReads = 0;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, 'cryptoApi', {
+    enumerable: true,
+    get() {
+      optionReads += 1;
+      throw new Error('caller crypto getter must not execute');
+    },
+  });
+
+  await assert.rejects(
+    compileDeltaContextPlanV1(
+      await request({ projectSnapshot: current, fragments: [forged] }),
+      accessorOptions,
+    ),
+    /summary hash mismatch/,
+  );
+  assert.equal(optionReads, 0);
+
+  let fakeDigests = 0;
+  const fakeDigestOptions = {
+    cryptoApi: {
+      subtle: {
+        async digest() {
+          fakeDigests += 1;
+          return new Uint8Array(32);
+        },
+      },
+    },
+  };
+
+  await assert.rejects(
+    compileDeltaContextPlanV1(
+      await request({ projectSnapshot: current, fragments: [forged] }),
+      fakeDigestOptions,
+    ),
+    /summary hash mismatch/,
+  );
+  assert.equal(fakeDigests, 0);
+});
