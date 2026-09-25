@@ -552,7 +552,7 @@ test('noncanonical timestamp, opaque change-id aliases and unsafe revisions fail
 
 test('opaque change identity rejects backslash and quote delimiters before any resolver call', async () => {
   const badIds = [
-    'change\\\\path',
+    'change\\path',
     'change"quote',
     "change'quote",
   ];
