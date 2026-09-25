@@ -5,6 +5,7 @@ import {
 } from '../core/selection-action.js';
 import { buildQuickCommandSessionPlanV1 } from '../core/quick-command-runtime.js';
 
+const MAX_SOURCE_TEXT = 100000;
 const sourceKind = document.getElementById('source-kind');
 const sourceText = document.getElementById('source-text');
 const sourceUri = document.getElementById('source-uri');
@@ -14,6 +15,7 @@ const runButton = document.getElementById('run-command');
 const optionsButton = document.getElementById('open-options');
 const status = document.getElementById('status');
 const captureHelp = document.getElementById('capture-help');
+let capturedSource = null;
 
 function announce(message, focus = false) {
   status.textContent = message;
@@ -51,55 +53,82 @@ async function captureCurrentTab(kind) {
   const tab = await getActiveTab();
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: requestedKind => {
+    func: (requestedKind, maxSourceText) => {
       const uri = String(globalThis.location?.href || '');
-      if (requestedKind === 'SELECTION') {
-        const text = String(globalThis.getSelection?.()?.toString() || '').slice(0, 100000);
-        return { text, uri };
+      const text = requestedKind === 'SELECTION'
+        ? String(globalThis.getSelection?.()?.toString() || '')
+        : String(globalThis.document?.body?.innerText || '');
+      const capturedAt = new Date().toISOString();
+      if (text.length > maxSourceText) {
+        return { tooLarge: true, textLength: text.length, uri, capturedAt };
       }
-      const text = String(globalThis.document?.body?.innerText || '').slice(0, 100000);
-      return { text, uri };
+      return { tooLarge: false, text, uri, capturedAt };
     },
-    args: [kind],
+    args: [kind, MAX_SOURCE_TEXT],
   });
   const value = results?.[0]?.result;
-  if (!value || typeof value.text !== 'string') {
+  if (!value || typeof value.capturedAt !== 'string') {
     throw new Error('Не вдалося прочитати поточну сторінку.');
   }
   return value;
 }
 
-function updateSourceHelp() {
-  if (sourceKind.value === SelectionActionSourceKind.CLIPBOARD) {
-    captureHelp.textContent = 'Натисніть «Захопити джерело», потім вставте текст у поле через Ctrl+V. Буфер не читається автоматично.';
-    sourceUri.value = '';
-    return;
-  }
-  captureHelp.textContent = 'Захоплення виконується тільки після натискання цієї кнопки.';
+function resetSourceState() {
+  capturedSource = null;
+  sourceText.value = '';
+  sourceUri.value = '';
+  sourceText.readOnly = sourceKind.value !== SelectionActionSourceKind.CLIPBOARD;
 }
 
-sourceKind.addEventListener('change', updateSourceHelp);
+function updateSourceHelp({ reset = false } = {}) {
+  if (reset) resetSourceState();
+  if (sourceKind.value === SelectionActionSourceKind.CLIPBOARD) {
+    captureHelp.textContent = 'Натисніть «Захопити джерело», потім вставте текст у поле через Ctrl+V. Буфер не читається автоматично.';
+    sourceText.readOnly = false;
+    return;
+  }
+  sourceText.readOnly = true;
+  captureHelp.textContent = 'Захоплення виконується тільки після натискання цієї кнопки. Захоплений текст не редагується, щоб зберегти точне походження.';
+}
+
+sourceKind.addEventListener('change', () => updateSourceHelp({ reset: true }));
 
 captureButton.addEventListener('click', async () => {
   try {
     if (sourceKind.value === SelectionActionSourceKind.CLIPBOARD) {
+      capturedSource = null;
       sourceUri.value = '';
+      sourceText.readOnly = false;
       sourceText.focus();
-      announce('Вставте текст з буфера обміну через Ctrl+V.');
+      announce('Вставте текст з буфера обміну через Ctrl+V. Поточний текст буде точно прив’язано під час запуску.');
       return;
     }
     setBusy(true);
     announce('Захоплення джерела…');
-    const captured = await captureCurrentTab(sourceKind.value);
+    const kind = sourceKind.value;
+    const captured = await captureCurrentTab(kind);
+    if (captured.tooLarge) {
+      throw new Error('Текст джерела перевищує 100000 символів. Скоротіть джерело або виберіть менший фрагмент.');
+    }
     if (!captured.text.trim()) {
-      throw new Error(sourceKind.value === SelectionActionSourceKind.SELECTION
+      throw new Error(kind === SelectionActionSourceKind.SELECTION
         ? 'На сторінці немає виділеного тексту.'
         : 'Текст поточної сторінки порожній.');
     }
-    sourceText.value = captured.text;
-    sourceUri.value = captured.uri || '';
-    announce('Джерело захоплено.', true);
+    capturedSource = Object.freeze({
+      kind,
+      text: captured.text,
+      uri: captured.uri || '',
+      capturedAt: captured.capturedAt,
+    });
+    sourceText.value = capturedSource.text;
+    sourceText.readOnly = true;
+    sourceUri.value = capturedSource.uri;
+    announce('Джерело захоплено і прив’язано до точного часу та типу.', true);
   } catch (error) {
+    capturedSource = null;
+    sourceText.value = '';
+    sourceUri.value = '';
     announce('Не вдалося захопити джерело: ' + (error?.message || 'невідома помилка'), true);
   } finally {
     setBusy(false);
@@ -109,24 +138,35 @@ captureButton.addEventListener('click', async () => {
 runButton.addEventListener('click', async () => {
   let createdSessionId = '';
   try {
-    const text = sourceText.value;
-    if (!text.trim()) throw new Error('Введіть або захопіть текст джерела.');
-    if (sourceKind.value === SelectionActionSourceKind.CURRENT_PAGE && !sourceUri.value) {
-      throw new Error('Для поточної сторінки спочатку натисніть «Захопити джерело».');
+    const createdAt = new Date().toISOString();
+    let rawSource;
+
+    if (sourceKind.value === SelectionActionSourceKind.CLIPBOARD) {
+      const text = sourceText.value;
+      if (!text.trim()) throw new Error('Вставте текст джерела через Ctrl+V.');
+      rawSource = {
+        schemaVersion: SelectionActionContractVersion,
+        sourceId: 'quick-source-' + crypto.randomUUID(),
+        kind: SelectionActionSourceKind.CLIPBOARD,
+        capturedAt: createdAt,
+        text,
+      };
+    } else {
+      if (!capturedSource || capturedSource.kind !== sourceKind.value) {
+        throw new Error('Після вибору джерела натисніть «Захопити джерело» ще раз.');
+      }
+      rawSource = {
+        schemaVersion: SelectionActionContractVersion,
+        sourceId: 'quick-source-' + crypto.randomUUID(),
+        kind: capturedSource.kind,
+        capturedAt: capturedSource.capturedAt,
+        text: capturedSource.text,
+      };
+      if (capturedSource.uri) rawSource.uri = capturedSource.uri;
     }
 
     setBusy(true);
     announce('Створення одноразового сеансу…');
-
-    const capturedAt = new Date().toISOString();
-    const rawSource = {
-      schemaVersion: SelectionActionContractVersion,
-      sourceId: 'quick-source-' + crypto.randomUUID(),
-      kind: sourceKind.value,
-      capturedAt,
-      text,
-    };
-    if (sourceUri.value) rawSource.uri = sourceUri.value;
 
     const request = normalizeSelectionActionRequestV1({
       schemaVersion: SelectionActionContractVersion,
@@ -135,7 +175,7 @@ runButton.addEventListener('click', async () => {
       operation: operation.value,
       ownerInstruction: '',
       target: {},
-      createdAt: capturedAt,
+      createdAt,
     });
     const plan = buildQuickCommandSessionPlanV1(request);
     const created = await core('CREATE_SESSION', { config: plan.sessionConfig });
