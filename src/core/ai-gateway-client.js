@@ -9,6 +9,35 @@ function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function snapshotDataRecord(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain data object`);
+  }
+  let prototype;
+  try { prototype = Object.getPrototypeOf(value); } catch {
+    throw new Error(`${label} must be a plain data object`);
+  }
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain data object`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error(`${label} cannot contain symbol fields`);
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
+  }
+  return Object.freeze(snapshot);
+}
+
 export function normalizeGatewayUrl(value) {
   const parsed = new URL(clean(value) || DEFAULT_GATEWAY_URL);
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('AI Gateway must use http:// or https://');
@@ -119,8 +148,11 @@ export class AiGatewayClient {
 
   async request(gatewayUrl, timeoutSeconds, path, init = {}) {
     const base = normalizeGatewayUrl(gatewayUrl);
-    const timeout = Number(timeoutSeconds);
-    if (!Number.isInteger(timeout) || timeout < MIN_TIMEOUT_SECONDS || timeout > MAX_TIMEOUT_SECONDS) {
+    const timeout = timeoutSeconds;
+    if (typeof timeout !== 'number'
+        || !Number.isInteger(timeout)
+        || timeout < MIN_TIMEOUT_SECONDS
+        || timeout > MAX_TIMEOUT_SECONDS) {
       throw new Error(`AI Gateway timeout must be ${MIN_TIMEOUT_SECONDS}-${MAX_TIMEOUT_SECONDS} seconds`);
     }
     if (init.body != null && typeof init.body !== 'string') throw invalidRequestBodyError();
@@ -151,31 +183,65 @@ export class AiGatewayClient {
     }
   }
 
-  async health({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30 } = {}) {
+  async health(input = {}) {
+    const request = snapshotDataRecord(input, 'AI Gateway health request');
+    const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
+    const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
     return this.request(gatewayUrl, timeoutSeconds, '/health');
   }
 
-  async status({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30 } = {}) {
+  async status(input = {}) {
+    const request = snapshotDataRecord(input, 'AI Gateway status request');
+    const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
+    const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
     return this.request(gatewayUrl, timeoutSeconds, '/status');
   }
 
-  async listModels({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 30, provider, endpointId = '' }) {
+  async listModels(input = {}) {
+    const request = snapshotDataRecord(input, 'AI Gateway model-list request');
+    const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
+    const timeoutSeconds = request.timeoutSeconds === undefined ? 30 : request.timeoutSeconds;
+    const provider = request.provider;
+    const endpointId = request.endpointId === undefined ? '' : request.endpointId;
     const p = encodeURIComponent(clean(provider));
     if (!p) throw new Error('AI provider is required');
     const endpoint = clean(endpointId);
     return this.request(gatewayUrl, timeoutSeconds, `/models?provider=${p}${endpoint ? `&endpointId=${encodeURIComponent(endpoint)}` : ''}`);
   }
 
-  async complete({ gatewayUrl = DEFAULT_GATEWAY_URL, timeoutSeconds = 180, provider, model, endpointId = '', prompt, systemPrompt = '', maxOutputTokens = 0, imageDataUrl = '' }) {
+  async complete(input = {}) {
+    const request = snapshotDataRecord(input, 'AI Gateway completion request');
+    const gatewayUrl = request.gatewayUrl === undefined ? DEFAULT_GATEWAY_URL : request.gatewayUrl;
+    const timeoutSeconds = request.timeoutSeconds === undefined ? 180 : request.timeoutSeconds;
+    const provider = request.provider;
+    const model = request.model;
+    const endpointId = request.endpointId === undefined ? '' : request.endpointId;
+    const prompt = request.prompt;
+    const systemPrompt = request.systemPrompt === undefined ? '' : request.systemPrompt;
+    const maxOutputTokens = request.maxOutputTokens === undefined ? 0 : request.maxOutputTokens;
+    const imageDataUrl = request.imageDataUrl === undefined ? '' : request.imageDataUrl;
+    if (request.maxOutputTokens !== undefined
+        && (typeof maxOutputTokens !== 'number' || !Number.isFinite(maxOutputTokens))) {
+      throw new Error('AI Gateway maxOutputTokens must be a number');
+    }
     const normalizedPrompt = clean(prompt);
     if (!normalizedPrompt) throw new Error('AI prompt is empty');
     if (!clean(provider)) throw new Error('AI provider is required');
     if (!clean(model)) throw new Error('AI model is required');
     return this.request(gatewayUrl, timeoutSeconds, '/complete', {
       method: 'POST',
-      body: JSON.stringify({ provider: clean(provider), model: clean(model), ...(clean(endpointId) ? { endpointId:clean(endpointId) } : {}), prompt: normalizedPrompt, systemPrompt: clean(systemPrompt), ...(Number(maxOutputTokens) > 0 ? { maxOutputTokens: Math.floor(Number(maxOutputTokens)) } : {}), ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}) }),
+      body: JSON.stringify({
+        provider: clean(provider),
+        model: clean(model),
+        ...(clean(endpointId) ? { endpointId: clean(endpointId) } : {}),
+        prompt: normalizedPrompt,
+        systemPrompt: clean(systemPrompt),
+        ...(maxOutputTokens > 0 ? { maxOutputTokens: Math.floor(maxOutputTokens) } : {}),
+        ...(clean(imageDataUrl) ? { imageDataUrl: clean(imageDataUrl) } : {}),
+      }),
     });
   }
+
 }
 
 export { DEFAULT_GATEWAY_URL, MIN_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES };
