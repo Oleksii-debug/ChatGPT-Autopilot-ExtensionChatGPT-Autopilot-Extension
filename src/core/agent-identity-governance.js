@@ -475,10 +475,14 @@ export function projectAgentGovernanceAccessV1(snapshotInput, projectionInput) {
   }
 
   const declaredCredentialRefIds = blockedPrincipalId ? [] : sortIds(
-    snapshot.credentialOwnerships.filter(item => (
-      active(item.createdAt, item.revokedAt, at)
-      && (item.ownerPrincipalId === principalId || item.delegatePrincipalIds.includes(principalId))
-    )).map(item => item.credentialRefId),
+    snapshot.credentialOwnerships.filter(item => {
+      const credentialOwner = principals.get(item.ownerPrincipalId);
+      const ownerActive = credentialOwner
+        && (!credentialOwner.disabledAt || Date.parse(credentialOwner.disabledAt) > at);
+      return ownerActive
+        && active(item.createdAt, item.revokedAt, at)
+        && (item.ownerPrincipalId === principalId || item.delegatePrincipalIds.includes(principalId));
+    }).map(item => item.credentialRefId),
   );
 
   return freeze({
