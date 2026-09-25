@@ -233,6 +233,8 @@ test('registry normalizes deterministic identity inventory for all required prin
     'user-owner',
   ]);
   assert.deepEqual(inventory.credentialBindingIds, ['binding-child', 'binding-owner']);
+  assert.equal(inventory.authorizationGranted, false);
+  assert.equal(inventory.credentialUseAuthorized, false);
 });
 
 test('root user ceiling is resource-scoped policy input and never an authorization decision', () => {
@@ -246,6 +248,9 @@ test('root user ceiling is resource-scoped policy input and never an authorizati
   assert.equal(result.active, true);
   assert.equal(result.reasonCode, 'ACTIVE_POLICY_INPUT');
   assert.equal(result.policyDecision, 'NONE');
+  assert.equal(result.authorizationGranted, false);
+  assert.equal(result.credentialUseAuthorized, false);
+  assert.equal(result.requiresPolicyDecision, true);
   assert.deepEqual(result.capabilityCeilingIds, ['fs.read', 'fs.write', 'web.navigate']);
   assert.deepEqual(result.providerCeilingIds, ['browser', 'native']);
   assert.deepEqual(result.outboundDataClassIds, ['internal', 'public']);
@@ -400,6 +405,9 @@ test('principal or ancestor revocation makes the evaluated identity inactive at 
   assert.equal(after.reasonCode, 'ANCESTOR_INACTIVE');
   assert.deepEqual(after.capabilityCeilingIds, []);
   assert.deepEqual(after.ownedCredentialBindings, []);
+  assert.equal(after.authorizationGranted, false);
+  assert.equal(after.credentialUseAuthorized, false);
+  assert.equal(after.requiresPolicyDecision, true);
 });
 
 test('registry rejects unknown references, invalid hierarchy and invalid grant/credential causality', () => {
@@ -526,6 +534,26 @@ test('strict trust boundary rejects coercion, symbols, accessors, exotic prototy
   assert.throws(
     () => normalizeIdentityGovernanceRegistryV1(numericPrincipal),
     /principalId is invalid/,
+  );
+});
+
+test('record normalization snapshots verified descriptors before authority values can change', () => {
+  const input = registry();
+  const original = input.roles[0];
+  let valueReads = 0;
+  input.roles[0] = new Proxy(original, {
+    get(target, property, receiver) {
+      valueReads += 1;
+      if (property === 'capabilityCeilingIds') return ['os.admin'];
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  const normalized = normalizeIdentityGovernanceRegistryV1(input);
+  assert.equal(valueReads, 0);
+  assert.deepEqual(
+    normalized.roles.find((item) => item.roleId === 'role-owner').capabilityCeilingIds,
+    ['fs.read', 'fs.write', 'web.navigate'],
   );
 });
 
