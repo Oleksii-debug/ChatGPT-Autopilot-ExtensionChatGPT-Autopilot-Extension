@@ -161,6 +161,66 @@ test('OpenAI-compatible model discovery and completion work end to end', async (
   });
 });
 
+test('transport revalidates the final Local AI URL and rejects direct remote egress before fetch', async () => {
+  let fetchCalls = 0;
+  const client = new LocalAiClient({
+    fetchFn: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await assert.rejects(
+    () => client.request(settings, 'https://example.com/api/chat'),
+    /must stay on localhost or 127\.0\.0\.1/,
+  );
+  await assert.rejects(
+    () => client.request(settings, 'http://user:pass@127.0.0.1:11434/api/chat'),
+    /must stay on localhost or 127\.0\.0\.1/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
+test('transport forces redirect error so a local endpoint cannot redirect prompt traffic off-host', async () => {
+  let observedUrl = '';
+  let observedRedirect = '';
+  const client = new LocalAiClient({
+    fetchFn: async (url, init) => {
+      observedUrl = url;
+      observedRedirect = init.redirect;
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        body: null,
+        async text() { return '{}'; },
+      };
+    },
+  });
+  const settings = {
+    enabled: true,
+    providerType: 'ollama',
+    baseUrl: 'http://127.0.0.1:11434',
+    model: 'qwen3:8b',
+    timeoutSeconds: 30,
+  };
+
+  await client.request(
+    settings,
+    'http://127.0.0.1:11434/api/chat',
+    { redirect: 'follow' },
+  );
+  assert.equal(observedUrl, 'http://127.0.0.1:11434/api/chat');
+  assert.equal(observedRedirect, 'error');
+});
+
 test('completion requires enabled integration and selected model', async () => {
   const client = new LocalAiClient({ fetchFn: async () => { throw new Error('should not fetch'); } });
   await assert.rejects(() => client.complete({ enabled: false, providerType: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'x', timeoutSeconds: 30 }, 'x'), /disabled/);
