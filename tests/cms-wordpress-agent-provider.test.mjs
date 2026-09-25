@@ -243,7 +243,10 @@ test('WordPress provider fails closed when materialized artifact does not bind e
       ),
       policyDecision: decision(id),
     }),
-    /SHA-256 does not match exact provider result/u,
+    error => error.code === 'WORDPRESS_PROVIDER_FAILED'
+      && error.message === 'WordPress read failed'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
   );
 });
 
