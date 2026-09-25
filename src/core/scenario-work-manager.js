@@ -146,6 +146,25 @@ function snapshotPersistedData(value, ancestors = new Set(), memo = new Map(), b
     ancestors.delete(value);
   }
 }
+function samePersistedData(actual, canonical, depth = 0) {
+  if (Object.is(actual, canonical)) return true;
+  if (depth > MAX_PERSISTED_DEPTH || typeof actual !== typeof canonical || actual === null || canonical === null) return false;
+  if (Array.isArray(actual) || Array.isArray(canonical)) {
+    if (!Array.isArray(actual) || !Array.isArray(canonical) || actual.length !== canonical.length) return false;
+    for (let index = 0; index < actual.length; index += 1) {
+      if (!samePersistedData(actual[index], canonical[index], depth + 1)) return false;
+    }
+    return true;
+  }
+  if (!plainRecord(actual) || !plainRecord(canonical)) return false;
+  const actualKeys = Object.keys(actual);
+  const canonicalKeys = Object.keys(canonical);
+  if (actualKeys.length !== canonicalKeys.length) return false;
+  for (const key of canonicalKeys) {
+    if (!Object.hasOwn(actual, key) || !samePersistedData(actual[key], canonical[key], depth + 1)) return false;
+  }
+  return true;
+}
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
@@ -204,7 +223,13 @@ function normalizeStore(raw, now = Date.now()) {
     if (!itemSnapshot.ok) continue;
     try {
       const item = itemSnapshot.value;
-      const config = normalizeScenarioWorkConfig({ ...item.config, id });
+      if (!plainRecord(item.config) || item.config.id !== id) continue;
+      const config = normalizeScenarioWorkConfig(item.config);
+      // Persistence recovery is not the interactive create/update boundary. A
+      // malformed stored config must never gain executable defaults/coercions
+      // after restart. Current-schema persisted bytes must already equal the
+      // canonical config that this version itself writes.
+      if (!samePersistedData(item.config, config)) continue;
       const runtime = ensureManagerRuntimeFields(item.runtime && item.runtime.mode === config.mode
         ? clone(item.runtime)
         : createScenarioWorkRuntime(config, now));
