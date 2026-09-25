@@ -148,7 +148,7 @@ test('trusted file change is exact-bound and handed once to canonical scheduler'
   assert.equal(seen.triggerId, 'file-trigger-1');
   assert.equal(seen.providerId, 'local-filesystem-watch');
   assert.equal(seen.sourceBindingId, 'file-watch-binding-1');
-  assert.equal(seen.sourceEventId, 'change-1');
+  assert.match(seen.sourceEventId, /^file:[a-f0-9]{64}$/u);
   assert.equal(seen.payloadArtifactId, 'file-change-evidence-1');
   assert.equal(seen.payloadSha256, SHA_A);
   assert.match(seen.occurrenceId, /^event:[a-f0-9]{64}$/u);
@@ -438,6 +438,40 @@ test('disabled FILE trigger performs zero canonical scheduler calls', async () =
   assert.equal(out.schedulerCalled, false);
   assert.equal(out.canonicalWorkPresent, false);
   assert.equal(calls, 0);
+});
+
+test('same provider change id in a different watch scope cannot collapse to one occurrence', async () => {
+  const scheduler = async schedulerRequest => ({
+    schemaVersion: 1,
+    status: EventTriggerSchedulerReceiptStatus.ACCEPTED,
+    occurrenceId: schedulerRequest.occurrenceId,
+    materialFingerprint: schedulerRequest.materialFingerprint,
+    canonicalTaskId: 'task-' + schedulerRequest.sourceEventId.slice(-12),
+    schedulerRevision: 11,
+    reason: '',
+  });
+
+  const first = await admitTrustedFileChangeV1(
+    request(),
+    deps({ admitCanonicalOccurrence: scheduler }),
+  );
+  const second = await admitTrustedFileChangeV1(
+    request({ bindingId: 'file-binding-2' }),
+    deps({
+      trustedBinding: binding({
+        bindingId: 'file-binding-2',
+        watchId: 'watch-2',
+      }),
+      trustedChange: change({
+        bindingId: 'file-binding-2',
+        watchId: 'watch-2',
+      }),
+      admitCanonicalOccurrence: scheduler,
+    }),
+  );
+
+  assert.notEqual(first.sourceEventId, second.sourceEventId);
+  assert.notEqual(first.occurrenceId, second.occurrenceId);
 });
 
 test('same provider change keeps occurrence identity while changed evidence remains visible', async () => {
