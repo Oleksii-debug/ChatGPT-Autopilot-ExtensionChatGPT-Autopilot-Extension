@@ -219,6 +219,22 @@ function strictCapabilities(value) {
   return Object.freeze(out);
 }
 
+function bindDataMethod(target, method, label) {
+  if (!target || (typeof target !== 'object' && typeof target !== 'function')) fail(`${label} is required`);
+  let current = target;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, method);
+    if (descriptor) {
+      if (!Object.prototype.hasOwnProperty.call(descriptor, 'value') || typeof descriptor.value !== 'function') {
+        fail(`${label}.${method} must be a data method`);
+      }
+      return descriptor.value.bind(target);
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  fail(`${label}.${method} is required`);
+}
+
 function methodFor(toolId) {
   if (toolId === GoogleWorkspaceToolId.DRIVE_SEARCH) return 'searchDrive';
   if (toolId === GoogleWorkspaceToolId.DRIVE_FILE_GET) return 'getDriveFile';
@@ -246,10 +262,9 @@ export class GoogleWorkspaceAgentProviderV1 {
   constructor(config = {}) {
     const raw = snapshotRecord(config, new Set(['workspaceClient', 'grantedCapabilityIds', 'now']), 'Google Workspace provider config');
     const requiredMethods = Object.values(GoogleWorkspaceToolId).map(methodFor);
-    if (!raw.workspaceClient || requiredMethods.some(method => typeof raw.workspaceClient[method] !== 'function')) {
-      fail('Google Workspace REST client with the complete read operation set is required');
-    }
-    this.workspaceClient = raw.workspaceClient;
+    const workspaceMethods = Object.create(null);
+    for (const method of requiredMethods) workspaceMethods[method] = bindDataMethod(raw.workspaceClient, method, 'workspaceClient');
+    this.workspaceMethods = Object.freeze(workspaceMethods);
     this.grantedCapabilityIds = strictCapabilities(raw.grantedCapabilityIds ?? []);
     this.now = raw.now ?? (() => Date.now());
     if (typeof this.now !== 'function') fail('now must be a function');
@@ -276,7 +291,7 @@ export class GoogleWorkspaceAgentProviderV1 {
     const tool = TOOLS.find(item => item.toolId === authorized.invocation.toolId);
     const method = methodFor(tool.toolId);
     try {
-      const result = await this.workspaceClient[method](authorized.invocation.arguments);
+      const result = await this.workspaceMethods[method](authorized.invocation.arguments);
       const observedAt = new Date(this.now());
       if (!Number.isFinite(observedAt.getTime())) fail('now returned an invalid timestamp');
       return Object.freeze({
