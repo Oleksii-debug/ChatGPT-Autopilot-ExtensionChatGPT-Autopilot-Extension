@@ -11,6 +11,8 @@ export const GitHubToolId = Object.freeze({
   WORKFLOW_RUN_LIST: 'remote/github/workflowRun.list',
   WORKFLOW_RUN_JOBS_LIST: 'remote/github/workflowRun.jobs.list',
   WORKFLOW_DISPATCH: 'remote/github/workflow.dispatch',
+  WORKFLOW_RUN_RERUN: 'remote/github/workflowRun.rerun',
+  WORKFLOW_RUN_CANCEL: 'remote/github/workflowRun.cancel',
   PULL_REQUEST_FIND: 'remote/github/pullRequest.find',
   PULL_REQUEST_READ: 'remote/github/pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'remote/github/pullRequest.comment.read',
@@ -33,6 +35,8 @@ export const GitHubCapabilityId = Object.freeze({
   BRANCH_READ: 'github.branch.read',
   WORKFLOW_READ: 'github.workflow.read',
   WORKFLOW_DISPATCH: 'github.workflow.dispatch',
+  WORKFLOW_RUN_RERUN: 'github.workflow.rerun',
+  WORKFLOW_RUN_CANCEL: 'github.workflow.cancel',
   PULL_REQUEST_READ: 'github.pullRequest.read',
   PULL_REQUEST_COMMENT_READ: 'github.pullRequest.comment.read',
   ISSUE_READ: 'github.issue.read',
@@ -134,6 +138,28 @@ const TOOLS = Object.freeze([
     capabilityIds: [GitHubCapabilityId.WORKFLOW_DISPATCH],
     inputSchemaRef: 'github-schema/workflow.dispatch/input',
     outputSchemaRef: 'github-schema/workflow.dispatch/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_RUN_RERUN,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Re-run exact GitHub Actions workflow run',
+    description: 'Re-runs one exact owner-allowlisted workflow run only after a trusted run-attempt/head preflight. Ambiguous outcomes require reconciliation before retry.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_RUN_RERUN],
+    inputSchemaRef: 'github-schema/workflowRun.rerun/input',
+    outputSchemaRef: 'github-schema/workflowRun.rerun/output',
+    readOnly: false,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: GitHubToolId.WORKFLOW_RUN_CANCEL,
+    providerId: GITHUB_PROVIDER_ID,
+    label: 'Cancel exact GitHub Actions workflow run',
+    description: 'Requests normal cancellation of one exact owner-allowlisted workflow run after trusted run-attempt/head preflight. Ambiguous outcomes require reconciliation before retry.',
+    capabilityIds: [GitHubCapabilityId.WORKFLOW_RUN_CANCEL],
+    inputSchemaRef: 'github-schema/workflowRun.cancel/input',
+    outputSchemaRef: 'github-schema/workflowRun.cancel/output',
     readOnly: false,
   }),
   normalizeToolDescriptorV1({
@@ -316,6 +342,8 @@ function methodFor(toolId) {
   if (toolId === GitHubToolId.WORKFLOW_RUN_LIST) return 'listWorkflowRuns';
   if (toolId === GitHubToolId.WORKFLOW_RUN_JOBS_LIST) return 'listWorkflowRunJobs';
   if (toolId === GitHubToolId.WORKFLOW_DISPATCH) return 'dispatchWorkflow';
+  if (toolId === GitHubToolId.WORKFLOW_RUN_RERUN) return 'rerunWorkflowRun';
+  if (toolId === GitHubToolId.WORKFLOW_RUN_CANCEL) return 'cancelWorkflowRun';
   if (toolId === GitHubToolId.PULL_REQUEST_FIND) return 'findPullRequests';
   if (toolId === GitHubToolId.PULL_REQUEST_READ) return 'readPullRequest';
   if (toolId === GitHubToolId.PULL_REQUEST_COMMENT_READ) return 'readPullRequestComment';
@@ -342,6 +370,8 @@ export class GitHubAgentProviderV1 {
         GitHubToolId.WORKFLOW_RUN_LIST,
         GitHubToolId.WORKFLOW_RUN_JOBS_LIST,
         GitHubToolId.WORKFLOW_DISPATCH,
+        GitHubToolId.WORKFLOW_RUN_RERUN,
+        GitHubToolId.WORKFLOW_RUN_CANCEL,
       ].includes(toolId))
       .map(methodFor);
     if (!githubClient || methods.some(method => typeof githubClient[method] !== 'function')) {
@@ -359,6 +389,14 @@ export class GitHubAgentProviderV1 {
     if (grantedCapabilityIds.includes(GitHubCapabilityId.WORKFLOW_DISPATCH)
         && typeof githubClient?.dispatchWorkflow !== 'function') {
       throw new Error('GitHub REST client with workflow dispatch support is required for the granted workflow dispatch capability');
+    }
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.WORKFLOW_RUN_RERUN)
+        && typeof githubClient?.rerunWorkflowRun !== 'function') {
+      throw new Error('GitHub REST client with workflow-run rerun support is required for the granted rerun capability');
+    }
+    if (grantedCapabilityIds.includes(GitHubCapabilityId.WORKFLOW_RUN_CANCEL)
+        && typeof githubClient?.cancelWorkflowRun !== 'function') {
+      throw new Error('GitHub REST client with workflow-run cancel support is required for the granted cancel capability');
     }
     this.githubClient = githubClient;
     this.grantedCapabilityIds = Object.freeze([...grantedCapabilityIds]);
