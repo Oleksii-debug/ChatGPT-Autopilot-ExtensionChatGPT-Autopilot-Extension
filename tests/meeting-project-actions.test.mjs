@@ -5,6 +5,7 @@ import {
   assertMeetingEvidenceMatchesProjectSnapshotV1,
   assertMeetingProjectActionsMatchesEvidenceV1,
   meetingEvidenceBindingFromBundleV1,
+  normalizeMeetingEvidenceBindingV1,
   normalizeMeetingEvidenceBundleV1,
   normalizeMeetingProjectActionsV1,
 } from '../src/core/meeting-project-actions.js';
@@ -448,4 +449,36 @@ test('canonical primitive representation cannot gain authority through coercion/
   const nonCanonicalTime = evidenceBundle();
   nonCanonicalTime.sourceRefs[0].observedAt = '2026-09-24T20:00:00Z';
   assert.throws(() => normalizeMeetingEvidenceBundleV1(nonCanonicalTime), /canonical timestamp/);
+});
+
+
+test('meeting artifact size evidence rejects signed zero while preserving canonical zero', () => {
+  const canonicalZero = evidenceBundle({
+    transcriptRef: transcript(),
+  });
+  canonicalZero.transcriptArtifactRef.sizeBytes = 0;
+  const normalizedBundle = normalizeMeetingEvidenceBundleV1(canonicalZero);
+  assert.equal(Object.is(normalizedBundle.transcriptArtifactRef.sizeBytes, 0), true);
+  assert.equal(Object.is(normalizedBundle.transcriptArtifactRef.sizeBytes, -0), false);
+
+  const negativeZeroBundle = evidenceBundle();
+  negativeZeroBundle.transcriptArtifactRef.sizeBytes = -0;
+  assert.throws(
+    () => normalizeMeetingEvidenceBundleV1(negativeZeroBundle),
+    /sizeBytes must be a safe integer in range/,
+  );
+
+  const binding = meetingEvidenceBindingFromBundleV1(evidenceBundle());
+  const canonicalBinding = structuredClone(binding);
+  canonicalBinding.transcriptArtifactBinding.sizeBytes = 0;
+  const normalizedBinding = normalizeMeetingEvidenceBindingV1(canonicalBinding);
+  assert.equal(Object.is(normalizedBinding.transcriptArtifactBinding.sizeBytes, 0), true);
+  assert.equal(Object.is(normalizedBinding.transcriptArtifactBinding.sizeBytes, -0), false);
+
+  const negativeZeroBinding = structuredClone(binding);
+  negativeZeroBinding.transcriptArtifactBinding.sizeBytes = -0;
+  assert.throws(
+    () => normalizeMeetingEvidenceBindingV1(negativeZeroBinding),
+    /sizeBytes must be a safe integer in range/,
+  );
 });
