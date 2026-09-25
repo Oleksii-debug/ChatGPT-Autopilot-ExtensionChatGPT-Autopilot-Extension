@@ -371,10 +371,16 @@ export function assertDataTransformLineageMatchesSnapshotsV1({
     if (bindingIdentity(dataDatasetBindingFromSnapshotV1(snapshot)) !== bindingIdentity(expected)) {
       throw new Error(`transform input dataset revision mismatch: ${expected.datasetId}`);
     }
+    if (snapshot.observedAt > normalizedLineage.executedAt) {
+      throw new Error(`transform input dataset observed after execution: ${expected.datasetId}`);
+    }
   }
   if (output.projectId !== normalizedLineage.projectId) throw new Error('transform output projectId mismatch');
   if (bindingIdentity(dataDatasetBindingFromSnapshotV1(output)) !== bindingIdentity(normalizedLineage.outputDataset)) {
     throw new Error('transform output dataset revision mismatch');
+  }
+  if (output.observedAt < normalizedLineage.executedAt) {
+    throw new Error('transform output dataset predates execution');
   }
   return frozen({ lineage: normalizedLineage, inputSnapshots: inputs, outputSnapshot: output });
 }
@@ -446,6 +452,7 @@ export function assessDataDatasetFreshnessV1(snapshot, currentSourceRefs = []) {
       if (actual.kind !== expected.kind) reasons.push('KIND_CHANGED');
       if (actual.uri !== expected.uri) reasons.push('URI_CHANGED');
       if (actual.authority !== expected.authority) reasons.push('AUTHORITY_CHANGED');
+      if (actual.observedAt < expected.observedAt) reasons.push('OBSERVATION_REGRESSED');
       if (actual.revisionId !== expected.revisionId) reasons.push('REVISION_CHANGED');
       if (actual.contentSha256 !== expected.contentSha256) reasons.push('CONTENT_CHANGED');
     }
