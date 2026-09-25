@@ -1,3 +1,4 @@
+import { createSha256FingerprintV1 } from './fingerprint.js';
 import {
   PolicyDecisionKind,
   normalizeCapabilityV1,
@@ -199,8 +200,7 @@ export function normalizePolicyClassificationV1(input) {
     invocationId: id(raw.invocationId, 'classification invocationId'),
     invocationFingerprint: (() => {
       if (typeof raw.invocationFingerprint !== 'string'
-          || !raw.invocationFingerprint
-          || raw.invocationFingerprint.length > 300_000) {
+          || !/^sha256:[a-f0-9]{64}$/u.test(raw.invocationFingerprint)) {
         throw new Error('invocationFingerprint is invalid');
       }
       return raw.invocationFingerprint;
@@ -316,9 +316,12 @@ function canonicalFingerprintValue(value) {
   return out;
 }
 
-export function createPolicyInvocationFingerprintV1(invocationInput) {
+export async function createPolicyInvocationFingerprintV1(
+  invocationInput,
+  { cryptoApi = globalThis.crypto } = {},
+) {
   const invocation = strictInvocation(invocationInput);
-  return JSON.stringify([
+  const canonical = JSON.stringify([
     'chatgpt-autopilot-policy-invocation-v1',
     invocation.schemaVersion,
     invocation.invocationId,
@@ -330,6 +333,7 @@ export function createPolicyInvocationFingerprintV1(invocationInput) {
     invocation.createdAt,
     invocation.parentInvocationId,
   ]);
+  return createSha256FingerprintV1(canonical, { cryptoApi });
 }
 
 function strictToolDescriptor(input) {
@@ -443,7 +447,7 @@ function denyResult(context, reasonCode, reason) {
  * may raise risk, but cannot lower a requested capability below its declared
  * CapabilityV1.riskClass.
  */
-export function evaluateOwnerPolicyV1({
+export async function evaluateOwnerPolicyV1({
   profile,
   classification,
   invocation,
@@ -452,6 +456,7 @@ export function evaluateOwnerPolicyV1({
   grantedCapabilityIds,
   decisionId,
   decidedAt,
+  cryptoApi = globalThis.crypto,
 } = {}) {
   const normalizedProfile = normalizeOwnerPolicyProfileV1(profile);
   const normalizedClassification = normalizePolicyClassificationV1(classification);
@@ -484,7 +489,10 @@ export function evaluateOwnerPolicyV1({
   if (normalizedClassification.invocationId !== normalizedInvocation.invocationId) {
     return denyResult(baseContext, 'CLASSIFICATION_INVOCATION_MISMATCH', 'Policy classification is not bound to this invocation.');
   }
-  const invocationFingerprint = createPolicyInvocationFingerprintV1(normalizedInvocation);
+  const invocationFingerprint = await createPolicyInvocationFingerprintV1(
+    normalizedInvocation,
+    { cryptoApi },
+  );
   if (normalizedClassification.invocationFingerprint !== invocationFingerprint) {
     return denyResult(baseContext, 'CLASSIFICATION_INVOCATION_FINGERPRINT_MISMATCH', 'Policy classification does not match the exact invocation bytes.');
   }
