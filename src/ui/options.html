@@ -965,6 +965,7 @@
             <option value="ONE_TIME">Одноразово у точну дату й час</option>
             <option value="DAILY">Щоденний повторюваний розклад</option>
             <option value="WEEKLY">Щотижневий розклад за вибраними днями</option>
+            <option value="INTERVAL">Повторювати через заданий інтервал</option>
             <option value="EXPLICIT">Явний список дат і часу</option>
           </select>
 
@@ -1006,6 +1007,32 @@
             <input id="calendar-end-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="31.12.2026" aria-describedby="calendar-help">
             <label for="calendar-max-occurrences">Необов’язкова максимальна кількість запусків</label>
             <input id="calendar-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
+          </div>
+
+          <div id="calendar-interval-fields" hidden>
+            <label for="calendar-interval-start-mode">Коли почати інтервальний розклад</label>
+            <select id="calendar-interval-start-mode" aria-describedby="calendar-interval-help">
+              <option value="NOW">Зараз</option>
+              <option value="LATER">У задану дату й час</option>
+            </select>
+            <div id="calendar-interval-later-fields" hidden>
+              <label for="calendar-interval-start-date">Дата початку</label>
+              <input id="calendar-interval-start-date" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="25.09.2026" aria-describedby="calendar-interval-help">
+              <label for="calendar-interval-start-time">Час початку</label>
+              <input id="calendar-interval-start-time" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="04:00" aria-describedby="calendar-interval-help">
+            </div>
+            <label for="calendar-interval-value">Інтервал</label>
+            <input id="calendar-interval-value" type="number" min="1" max="31536000" step="1" inputmode="numeric" value="60" aria-describedby="calendar-interval-help">
+            <label for="calendar-interval-unit">Одиниця інтервалу</label>
+            <select id="calendar-interval-unit" aria-describedby="calendar-interval-help">
+              <option value="seconds">Секунди</option>
+              <option value="minutes" selected>Хвилини</option>
+              <option value="hours">Години</option>
+              <option value="days">Дні</option>
+            </select>
+            <label for="calendar-interval-max-occurrences">Необов’язкова максимальна кількість запусків</label>
+            <input id="calendar-interval-max-occurrences" type="number" min="1" max="1000000" step="1" inputmode="numeric">
+            <p id="calendar-interval-help">«Зараз» фіксує точний момент під час збереження. «У задану дату й час» використовує формат ДД.ММ.РРРР та ГГ:ХХ. Інтервал вимірюється від зафіксованої стартової точки; для однакового часу щодня використовуйте режим «Щоденний».</p>
           </div>
 
           <div id="calendar-explicit-fields" hidden>
