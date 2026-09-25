@@ -17,6 +17,7 @@ const FORBIDDEN_PATH_PATTERNS = [
   /(^|\/)(Cookies?|Login Data|Local State|Web Data)(\/|$)/i,
   /\.(?:sqlite|sqlite3|db|pem|key|p12|pfx|dpapi)$/i,
   /(^|\/)(?:credentials|secrets|private-data)(\/|$)/i,
+  /(^|\/)(?:token(?:s)?|credentials|client[_-]?secret|service[_-]?account)\.(?:json|ya?ml|txt)$/i,
 ];
 const FORBIDDEN_TEXT_PATTERNS = [
   { name: 'private ChatGPT conversation URL', pattern: /https:\/\/chatgpt\.com\/(?:c|share)\/[A-Za-z0-9_-]{8,}/i },
