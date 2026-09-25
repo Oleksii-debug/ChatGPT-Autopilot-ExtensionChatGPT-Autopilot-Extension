@@ -203,6 +203,36 @@ test('reported FAILED or AMBIGUOUS verification keeps fan-in negative', () => {
   }
 });
 
+test('FAILED or CANCELLED participant state remains negative even with caller-reported VERIFIED evidence', () => {
+  for (const state of ['FAILED', 'CANCELLED']) {
+    const p = plan([
+      node('a'),
+      node('b', {
+        state,
+        evidence: state === 'FAILED' ? 'failure evidence' : 'cancel evidence',
+      }),
+    ]);
+    const out = buildParallelFanInEvidenceV1(request({ plan: p }));
+
+    assert.equal(out.status, ParallelFanInStatus.REPORTED_NEGATIVE);
+    assert.equal(out.summary.reportedNegativeCount, 1);
+    assert.equal(out.summary.negativeTerminalNodeCount, 1);
+    assert.equal(out.results.find(item => item.nodeId === 'b').nodeState, state);
+  }
+});
+
+test('result artifacts must be covered by the exact result verification evidence set', () => {
+  const input = request();
+  input.results[0] = result('a', 'evidence-a', SHA_C, {
+    resultArtifactIds: ['evidence-b'],
+  });
+
+  assert.throws(
+    () => buildParallelFanInEvidenceV1(input),
+    /result artifact must be included in result verification evidence/u,
+  );
+});
+
 test('verification and claim evidence must resolve to materialized exact artifacts', () => {
   const missingVerification = request();
   missingVerification.results[0] = result('a', 'unknown-artifact', SHA_C);
