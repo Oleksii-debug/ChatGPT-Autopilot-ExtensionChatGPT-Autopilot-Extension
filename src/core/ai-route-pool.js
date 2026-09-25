@@ -241,7 +241,6 @@ export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
 }
 
 function stateInteger(value, label) {
-  if (value == null) return 0;
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
       || Object.is(value, -0)
@@ -249,6 +248,11 @@ function stateInteger(value, label) {
     throw new Error(`${label} is invalid`);
   }
   return value;
+}
+
+function stateIntegerField(state, key, label) {
+  if (!Object.prototype.hasOwnProperty.call(state, key)) return 0;
+  return stateInteger(own(state, key), label);
 }
 
 function checkedStateAdd(value, increment, label) {
@@ -273,7 +277,6 @@ const AI_ROUTE_STATE_FIELDS = new Set([
 ]);
 
 export function normalizeAiRouteStates(raw = {}, routes = []) {
-  if (raw == null) raw = {};
   object(raw, 'AI route states');
   const stateDescriptors = Object.getOwnPropertyDescriptors(raw);
   const allowed = new Set(routes.map(route => route.routeId));
@@ -288,16 +291,16 @@ export function normalizeAiRouteStates(raw = {}, routes = []) {
     const value = descriptor.value;
     const state = dataRecord(value, AI_ROUTE_STATE_FIELDS, `AI route state ${routeId}`);
     Object.defineProperty(out, routeId, { value:{
-      consecutiveFailures: stateInteger(own(state, 'consecutiveFailures'), `AI route state ${routeId}.consecutiveFailures`),
-      successes: stateInteger(own(state, 'successes'), `AI route state ${routeId}.successes`),
-      failures: stateInteger(own(state, 'failures'), `AI route state ${routeId}.failures`),
-      backoffUntil: stateInteger(own(state, 'backoffUntil'), `AI route state ${routeId}.backoffUntil`),
-      circuitOpenUntil: stateInteger(own(state, 'circuitOpenUntil'), `AI route state ${routeId}.circuitOpenUntil`),
+      consecutiveFailures: stateIntegerField(state, 'consecutiveFailures', `AI route state ${routeId}.consecutiveFailures`),
+      successes: stateIntegerField(state, 'successes', `AI route state ${routeId}.successes`),
+      failures: stateIntegerField(state, 'failures', `AI route state ${routeId}.failures`),
+      backoffUntil: stateIntegerField(state, 'backoffUntil', `AI route state ${routeId}.backoffUntil`),
+      circuitOpenUntil: stateIntegerField(state, 'circuitOpenUntil', `AI route state ${routeId}.circuitOpenUntil`),
       lastErrorCode: clean(own(state, 'lastErrorCode'), 120),
       lastErrorCategory: clean(own(state, 'lastErrorCategory'), 80),
-      lastErrorAt: stateInteger(own(state, 'lastErrorAt'), `AI route state ${routeId}.lastErrorAt`),
-      lastSuccessAt: stateInteger(own(state, 'lastSuccessAt'), `AI route state ${routeId}.lastSuccessAt`),
-      lastLatencyMs: stateInteger(own(state, 'lastLatencyMs'), `AI route state ${routeId}.lastLatencyMs`),
+      lastErrorAt: stateIntegerField(state, 'lastErrorAt', `AI route state ${routeId}.lastErrorAt`),
+      lastSuccessAt: stateIntegerField(state, 'lastSuccessAt', `AI route state ${routeId}.lastSuccessAt`),
+      lastLatencyMs: stateIntegerField(state, 'lastLatencyMs', `AI route state ${routeId}.lastLatencyMs`),
     }, enumerable:true, writable:true, configurable:true });
   }
   return out;
