@@ -163,6 +163,18 @@ test('analytics authority boundary rejects getters, hidden fields, symbols, exot
 });
 
 test('materialized provenance never aliases missing or noncanonical evidence to safe defaults', () => {
+  const stringVersion = dataset();
+  stringVersion.artifactRef.schemaVersion = '1';
+  assert.throws(() => normalizeDataDatasetSnapshotV1(stringVersion), /schemaVersion/);
+
+  const numericArtifactId = dataset();
+  numericArtifactId.artifactRef.artifactId = 7;
+  assert.throws(() => normalizeDataDatasetSnapshotV1(numericArtifactId), /artifactId is invalid/);
+
+  const paddedKind = dataset();
+  paddedKind.artifactRef.kind = ' data.snapshot ';
+  assert.throws(() => normalizeDataDatasetSnapshotV1(paddedKind), /kind is invalid/);
+
   const missingSensitive = dataset();
   delete missingSensitive.artifactRef.sensitive;
   assert.throws(() => normalizeDataDatasetSnapshotV1(missingSensitive), /sensitive is required/);

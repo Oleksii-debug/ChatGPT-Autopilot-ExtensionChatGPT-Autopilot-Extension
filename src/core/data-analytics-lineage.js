@@ -193,6 +193,14 @@ function strictArtifactRef(input, label = 'ArtifactRefV1') {
   for (const key of ['schemaVersion', 'artifactId', 'kind', 'uri', 'sha256', 'sizeBytes', 'createdAt', 'sensitive']) {
     requireOwn(raw, key, label);
   }
+  version(raw.schemaVersion, label);
+  id(raw.artifactId, `${label}.artifactId`);
+  id(raw.kind, `${label}.kind`);
+  text(raw.uri, `${label}.uri`, { max: 4096 });
+  if (raw.mediaType !== undefined) text(raw.mediaType, `${label}.mediaType`, { optional: true, max: 300 });
+  if (raw.producerInvocationId !== undefined && raw.producerInvocationId !== null && raw.producerInvocationId !== '') {
+    id(raw.producerInvocationId, `${label}.producerInvocationId`);
+  }
   digest(raw.sha256, `${label}.sha256`);
   integer(raw.sizeBytes, `${label}.sizeBytes`);
   bool(raw.sensitive, `${label}.sensitive`);
