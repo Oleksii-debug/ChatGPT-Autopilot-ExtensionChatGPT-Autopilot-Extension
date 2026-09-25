@@ -35,6 +35,29 @@ test('owned tab activation occurs before Send and restores the prior tab after d
  assert.equal(activeTabId,3);
 });
 
+test('post-submit observation may activate only the owned newly created conversation',async()=>{
+ const f=setup();let activeTabId=3;let observedUrl='https://chatgpt.com/c/created';
+ await f.repo.update(state=>{
+  state.sessionsById.s.operation.targetUrl='https://chatgpt.com/';
+  state.sessionsById.s.tasksById.t.url='https://chatgpt.com/';
+  state.sessionsById.s.tasksById.t.normalizedUrl='https://chatgpt.com/';
+  state.tabHintsByTaskId.t.normalizedUrl='https://chatgpt.com/';
+  return state;
+ });
+ f.chrome.tabs.get=async id=>({id,url:id===7?observedUrl:'https://example.com/',active:id===activeTabId,windowId:9});
+ f.chrome.tabs.query=async()=>[{id:activeTabId,windowId:9}];
+ f.chrome.tabs.update=async id=>{activeTabId=id;return {id,active:true};};
+ await assert.rejects(activateOwnedSendTab(f.chrome,f.repo,f.message,f.sender),/NATIVE_INPUT_URL_MISMATCH/);
+ assert.equal(activeTabId,3);
+ assert.deepEqual(await activateOwnedSendTab(f.chrome,f.repo,{...f.message,observationOnly:true},f.sender),{previousTabId:3});
+ assert.equal(activeTabId,7);
+ await restoreOwnedSendTab(f.chrome,f.repo,{...f.message,previousTabId:3},f.sender);
+ assert.equal(activeTabId,3);
+ observedUrl='https://chatgpt.com/g/other';
+ await assert.rejects(activateOwnedSendTab(f.chrome,f.repo,{...f.message,observationOnly:true},f.sender),/NATIVE_INPUT_URL_MISMATCH/);
+ assert.equal(activeTabId,3);
+});
+
 test('invalid sender cannot activate a tab and never reaches Chrome tab mutation',async()=>{
  const f=setup();let touched=0;
  f.chrome.tabs.update=async()=>{touched++;};
