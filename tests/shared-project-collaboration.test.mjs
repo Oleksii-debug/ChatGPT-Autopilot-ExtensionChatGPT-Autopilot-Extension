@@ -77,6 +77,7 @@ function registry(overrides = {}) {
       principal('user-owner', GovernancePrincipalKind.USER),
       principal('agent-worker', GovernancePrincipalKind.AGENT),
       principal('user-collab', GovernancePrincipalKind.USER),
+      principal('user-handoff-only', GovernancePrincipalKind.USER),
       principal('user-guest', GovernancePrincipalKind.USER),
       principal('user-revoked', GovernancePrincipalKind.USER, {
         status: GovernancePrincipalStatus.REVOKED,
@@ -102,6 +103,13 @@ function registry(overrides = {}) {
         roleId: 'role-collab',
         title: 'Human collaborator',
         capabilityCeilingIds: ['project.read', 'project.handoff'],
+        providerCeilingIds: ['github'],
+        outboundDataClassIds: ['public'],
+      },
+      {
+        roleId: 'role-handoff-only',
+        title: 'Handoff-only collaborator',
+        capabilityCeilingIds: ['project.handoff'],
         providerCeilingIds: ['github'],
         outboundDataClassIds: ['public'],
       },
@@ -131,6 +139,16 @@ function registry(overrides = {}) {
         grantId: 'grant-collab',
         principalId: 'user-collab',
         roleId: 'role-collab',
+        resourceKeys: [RESOURCE],
+        grantedByPrincipalId: 'user-owner',
+        createdAt: T1,
+        expiresAt: '',
+        revokedAt: '',
+      },
+      {
+        grantId: 'grant-handoff-only',
+        principalId: 'user-handoff-only',
+        roleId: 'role-handoff-only',
         resourceKeys: [RESOURCE],
         grantedByPrincipalId: 'user-owner',
         createdAt: T1,
@@ -373,6 +391,8 @@ test('handoff is bound to trusted collaborators and canonical project artifacts 
   }, trusted());
   assert.equal(result.eventAdmissibleForCollaboration, true);
   assert.equal(result.reasonCode, 'ELIGIBLE_FOR_CANONICAL_AUDIT_APPEND');
+  assert.equal(result.actorRequiredCapabilityId, 'project.handoff');
+  assert.equal(result.recipientRequiredCapabilityId, 'project.read');
   assert.equal(result.actorAccessReasonCode, 'ELIGIBLE_FOR_CANONICAL_POLICY');
   assert.equal(result.recipientAccessReasonCode, 'ELIGIBLE_FOR_CANONICAL_POLICY');
   assert.equal(result.event.artifactIds[0], 'build');
@@ -383,6 +403,47 @@ test('handoff is bound to trusted collaborators and canonical project artifacts 
   assert.equal(result.handoffAuthorized, false);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.requiresCanonicalAuditAppend, true);
+});
+
+test('collaboration event kinds enforce actor and recipient capability ceilings before policy', async () => {
+  const commentByNoCommentPrincipal = await assessSharedProjectCollaborationEventV1({
+    event: event({
+      kind: SharedProjectCollaborationKind.COMMENT,
+      actorPrincipalId: 'user-collab',
+      recipientPrincipalId: '',
+      taskId: '',
+      artifactIds: [],
+      message: 'Attempted note.',
+    }),
+    at: T3,
+  }, trusted());
+  assert.equal(commentByNoCommentPrincipal.eventAdmissibleForCollaboration, false);
+  assert.equal(commentByNoCommentPrincipal.actorRequiredCapabilityId, 'project.comment');
+  assert.equal(commentByNoCommentPrincipal.actorAccessReasonCode, 'CAPABILITY_OUTSIDE_CEILING');
+  assert.equal(commentByNoCommentPrincipal.auditAppendAuthorized, false);
+
+  const handoffByNoHandoffPrincipal = await assessSharedProjectCollaborationEventV1({
+    event: event({
+      actorPrincipalId: 'agent-worker',
+      recipientPrincipalId: 'user-collab',
+    }),
+    at: T3,
+  }, trusted());
+  assert.equal(handoffByNoHandoffPrincipal.eventAdmissibleForCollaboration, false);
+  assert.equal(handoffByNoHandoffPrincipal.actorRequiredCapabilityId, 'project.handoff');
+  assert.equal(handoffByNoHandoffPrincipal.actorAccessReasonCode, 'CAPABILITY_OUTSIDE_CEILING');
+
+  const handoffToNoReadPrincipal = await assessSharedProjectCollaborationEventV1({
+    event: event({
+      actorPrincipalId: 'user-owner',
+      recipientPrincipalId: 'user-handoff-only',
+    }),
+    at: T3,
+  }, trusted());
+  assert.equal(handoffToNoReadPrincipal.eventAdmissibleForCollaboration, false);
+  assert.equal(handoffToNoReadPrincipal.recipientRequiredCapabilityId, 'project.read');
+  assert.equal(handoffToNoReadPrincipal.recipientAccessReasonCode, 'CAPABILITY_OUTSIDE_CEILING');
+  assert.equal(handoffToNoReadPrincipal.handoffAuthorized, false);
 });
 
 test('comments may be project-wide while handoffs require a distinct recipient', () => {
