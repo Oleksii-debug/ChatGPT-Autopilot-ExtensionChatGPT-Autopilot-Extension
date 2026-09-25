@@ -50,8 +50,8 @@ function validInput() {
       entry('evidence/verification.json', JobArtifactCategory.EVIDENCE, 'evidence-1', 'e', { sensitive: true, mediaType: 'application/json' }),
       entry('diagnostics/Журнал.txt', JobArtifactCategory.DIAGNOSTIC, 'diag-1', 'f', { mediaType: 'text/plain' }),
     ],
-    disclosure: {
-      allowedSensitiveArtifactIds: ['evidence-1'],
+    sensitiveDisclosureRequest: {
+      requestedSensitiveArtifactIds: ['evidence-1'],
     },
   };
 }
@@ -94,6 +94,10 @@ test('builds deterministic Windows-safe job artifact bundle and derived checksum
   assert.equal(Object.isFrozen(bundle.entries[0]), true);
   assert.equal(Object.isFrozen(bundle.entries[0].artifactRef), true);
   assert.equal(Object.isFrozen(bundle.checksumFile), true);
+  assert.equal(bundle.disclosureAuthorized, false);
+  assert.equal(bundle.distributionAuthorized, false);
+  assert.equal(bundle.requiresCanonicalDisclosureAuthorization, true);
+  assert.deepEqual(bundle.sensitiveArtifactIds, ['evidence-1']);
 });
 
 test('accepts a null-prototype top-level record but rejects exotic or symbol-bearing authority shapes', () => {
@@ -172,18 +176,26 @@ test('binds entry category to canonical bundle directory', () => {
   assert.throws(() => buildJobArtifactBundleV1(wrongControl), /wrong category/);
 });
 
-test('requires explicit exact disclosure for every sensitive artifact and rejects stale grants', () => {
-  const missingGrant = validInput();
-  missingGrant.disclosure.allowedSensitiveArtifactIds = [];
-  assert.throws(() => buildJobArtifactBundleV1(missingGrant), /not explicitly admitted: evidence-1/);
+test('sensitive disclosure request is exact metadata but never authorization', () => {
+  const missingRequest = validInput();
+  missingRequest.sensitiveDisclosureRequest.requestedSensitiveArtifactIds = [];
+  assert.throws(() => buildJobArtifactBundleV1(missingRequest), /missing from disclosure request: evidence-1/);
 
-  const staleGrant = validInput();
-  staleGrant.disclosure.allowedSensitiveArtifactIds.push('result');
-  assert.throws(() => buildJobArtifactBundleV1(staleGrant), /does not match a sensitive bundle artifact: result/);
+  const staleRequest = validInput();
+  staleRequest.sensitiveDisclosureRequest.requestedSensitiveArtifactIds.push('result');
+  assert.throws(() => buildJobArtifactBundleV1(staleRequest), /request does not match a sensitive bundle artifact: result/);
 
-  const duplicateGrant = validInput();
-  duplicateGrant.disclosure.allowedSensitiveArtifactIds.push('evidence-1');
-  assert.throws(() => buildJobArtifactBundleV1(duplicateGrant), /duplicate artifactId/);
+  const duplicateRequest = validInput();
+  duplicateRequest.sensitiveDisclosureRequest.requestedSensitiveArtifactIds.push('evidence-1');
+  assert.throws(() => buildJobArtifactBundleV1(duplicateRequest), /duplicate artifactId/);
+
+  const bundle = buildJobArtifactBundleV1(validInput());
+  assert.deepEqual(bundle.sensitiveArtifactIds, ['evidence-1']);
+  assert.deepEqual(bundle.sensitiveDisclosureRequest.requestedSensitiveArtifactIds, ['evidence-1']);
+  assert.equal(bundle.disclosureAuthorized, false);
+  assert.equal(bundle.distributionAuthorized, false);
+  assert.equal(bundle.requiresCanonicalDisclosureAuthorization, true);
+  assert.equal(Object.hasOwn(bundle, 'disclosure'), false);
 });
 
 test('fails closed on coerced bundle, disclosure, entry and ArtifactRef field types', () => {
@@ -196,8 +208,8 @@ test('fails closed on coerced bundle, disclosure, entry and ArtifactRef field ty
   assert.throws(() => buildJobArtifactBundleV1(numericId), /bundleId/);
 
   const numericGrant = validInput();
-  numericGrant.disclosure.allowedSensitiveArtifactIds = [1];
-  assert.throws(() => buildJobArtifactBundleV1(numericGrant), /allowedSensitiveArtifactId/);
+  numericGrant.sensitiveDisclosureRequest.requestedSensitiveArtifactIds = [1];
+  assert.throws(() => buildJobArtifactBundleV1(numericGrant), /requestedSensitiveArtifactId/);
 
   const numericCategory = validInput();
   numericCategory.entries[0].category = 1;
@@ -214,6 +226,25 @@ test('fails closed on coerced bundle, disclosure, entry and ArtifactRef field ty
   const missingDigest = validInput();
   missingDigest.entries[0].artifactRef.sha256 = '';
   assert.throws(() => buildJobArtifactBundleV1(missingDigest), /sha256 is required/);
+});
+
+test('permission-like disclosure aliases fail closed instead of minting authority', () => {
+  const topLevel = validInput();
+  topLevel.disclosure = { allowedSensitiveArtifactIds: ['evidence-1'] };
+  assert.throws(() => buildJobArtifactBundleV1(topLevel), /unknown field: disclosure/);
+
+  const nested = validInput();
+  nested.sensitiveDisclosureRequest.allowedSensitiveArtifactIds = ['evidence-1'];
+  assert.throws(() => buildJobArtifactBundleV1(nested), /unknown field: allowedSensitiveArtifactIds/);
+
+  const noSensitive = validInput();
+  noSensitive.entries.find((item) => item.artifactRef.artifactId === 'evidence-1').artifactRef.sensitive = false;
+  noSensitive.sensitiveDisclosureRequest.requestedSensitiveArtifactIds = [];
+  const bundle = buildJobArtifactBundleV1(noSensitive);
+  assert.deepEqual(bundle.sensitiveArtifactIds, []);
+  assert.equal(bundle.disclosureAuthorized, false);
+  assert.equal(bundle.distributionAuthorized, false);
+  assert.equal(bundle.requiresCanonicalDisclosureAuthorization, false);
 });
 
 test('requires canonical ISO timestamps and exact known fields', () => {
@@ -283,14 +314,14 @@ test('requires exact canonical ArtifactRef identity, digest, URI and timestamp f
   assert.throws(() => buildJobArtifactBundleV1(unknownArtifactField), /unknown field: permission/);
 });
 
-test('rejects sparse entry and disclosure arrays instead of silently skipping holes', () => {
+test('rejects sparse entry and disclosure-request arrays instead of silently skipping holes', () => {
   const sparseEntries = validInput();
   delete sparseEntries.entries[1];
   assert.throws(() => buildJobArtifactBundleV1(sparseEntries), /entries must not be sparse/);
 
   const sparseDisclosure = validInput();
-  sparseDisclosure.disclosure.allowedSensitiveArtifactIds.length = 2;
-  assert.throws(() => buildJobArtifactBundleV1(sparseDisclosure), /allowedSensitiveArtifactIds must not be sparse/);
+  sparseDisclosure.sensitiveDisclosureRequest.requestedSensitiveArtifactIds.length = 2;
+  assert.throws(() => buildJobArtifactBundleV1(sparseDisclosure), /requestedSensitiveArtifactIds must not be sparse/);
 });
 
 
@@ -336,7 +367,7 @@ test('canonical control paths are bound to their semantic media type', () => {
   assert.equal(buildJobArtifactBundleV1(withParameter).bundleId, 'bundle-1');
 });
 
-test('bundle collection boundaries reject accessor-backed entries and disclosure without executing getters', () => {
+test('bundle collection boundaries reject accessor-backed entries and disclosure request without executing getters', () => {
   let entryReads = 0;
   const input = validInput();
   const hostileEntries = [...input.entries];
@@ -363,12 +394,12 @@ test('bundle collection boundaries reject accessor-backed entries and disclosure
       return 'evidence-1';
     },
   });
-  disclosureInput.disclosure.allowedSensitiveArtifactIds = hostileDisclosure;
+  disclosureInput.sensitiveDisclosureRequest.requestedSensitiveArtifactIds = hostileDisclosure;
   assert.throws(
     () => buildJobArtifactBundleV1(disclosureInput),
-    /allowedSensitiveArtifactIds\[0\] must be an enumerable data property/,
+    /requestedSensitiveArtifactIds\[0\] must be an enumerable data property/,
   );
-  assert.equal(disclosureReads, 0, 'sensitive-disclosure getter must never execute');
+  assert.equal(disclosureReads, 0, 'sensitive-disclosure-request getter must never execute');
 });
 
 test('bundle collection boundaries reject hidden, custom, symbol and exotic array data', () => {
@@ -386,8 +417,8 @@ test('bundle collection boundaries reject hidden, custom, symbol and exotic arra
   assert.throws(() => buildJobArtifactBundleV1(custom), /entries contains non-index array data/);
 
   const symbolic = validInput();
-  symbolic.disclosure.allowedSensitiveArtifactIds[Symbol('authority')] = 'result';
-  assert.throws(() => buildJobArtifactBundleV1(symbolic), /allowedSensitiveArtifactIds contains non-index array data/);
+  symbolic.sensitiveDisclosureRequest.requestedSensitiveArtifactIds[Symbol('authority')] = 'result';
+  assert.throws(() => buildJobArtifactBundleV1(symbolic), /requestedSensitiveArtifactIds contains non-index array data/);
 
   const exotic = validInput();
   Object.setPrototypeOf(exotic.entries, null);
