@@ -548,3 +548,28 @@ test('noncanonical timestamp, opaque change-id aliases and unsafe revisions fail
     /positive safe integer/u,
   );
 });
+
+
+test('opaque change identity rejects backslash and quote delimiters before any resolver call', async () => {
+  const badIds = [
+    'change\\\\path',
+    'change"quote',
+    "change'quote",
+  ];
+  for (const changeId of badIds) {
+    let resolverCalls = 0;
+    await assert.rejects(
+      admitSiteChangeV1(
+        request({ changeId }),
+        {
+          resolveTriggerDefinition: async () => { resolverCalls += 1; return trigger(); },
+          resolveSiteMonitorBinding: async () => { resolverCalls += 1; return binding(); },
+          resolveSiteChange: async () => { resolverCalls += 1; return change(); },
+          admitCanonicalOccurrence: async () => { resolverCalls += 1; throw new Error('must not run'); },
+        },
+      ),
+      /bounded opaque ASCII without quotes or backslashes/u,
+    );
+    assert.equal(resolverCalls, 0);
+  }
+});
