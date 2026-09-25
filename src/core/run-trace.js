@@ -15,7 +15,9 @@ export const RunTraceEventKind = Object.freeze({
 });
 
 const EVENT_KINDS = new Set(Object.values(RunTraceEventKind));
-const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;\nconst SHA256 = /^[a-f0-9]{64}$/u;\nconst ARTIFACT_REF_KEYS = new Set(['artifactId', 'versionId', 'sha256']);
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
+const ARTIFACT_REF_KEYS = new Set(['artifactId', 'versionId', 'sha256']);
 const EVENT_KEYS = new Set([
   'schemaVersion',
   'eventId',
