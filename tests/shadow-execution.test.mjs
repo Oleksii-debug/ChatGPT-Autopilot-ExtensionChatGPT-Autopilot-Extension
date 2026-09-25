@@ -250,6 +250,40 @@ test('authority-bearing arrays use descriptor snapshots without ordinary caller 
   );
 });
 
+test('public shadow fingerprinting ignores caller-supplied crypto authority', async () => {
+  let optionReads = 0;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, 'cryptoApi', {
+    enumerable: true,
+    get() {
+      optionReads += 1;
+      throw new Error('caller crypto getter must not execute');
+    },
+  });
+
+  const first = await createShadowExecutionV1(shadow({
+    invocation: invocation({ invocationId: 'invoke-shadow-runtime-hash-a' }),
+  }), accessorOptions);
+  assert.equal(optionReads, 0);
+
+  const fixedDigestOptions = {
+    cryptoApi: {
+      subtle: {
+        async digest() {
+          return new Uint8Array(32);
+        },
+      },
+    },
+  };
+  const second = await createShadowExecutionV1(shadow({
+    invocation: invocation({ invocationId: 'invoke-shadow-runtime-hash-b' }),
+  }), fixedDigestOptions);
+
+  assert.notEqual(first.invocationIdentityFingerprint, second.invocationIdentityFingerprint);
+  assert.match(first.invocationIdentityFingerprint, /^sha256:[a-f0-9]{64}$/u);
+  assert.match(second.invocationIdentityFingerprint, /^sha256:[a-f0-9]{64}$/u);
+});
+
 test('canonical proposal policy identity is comparison-only and never upgrades shadow authority', async () => {
   const value = await createShadowExecutionV1(shadow({
     invocation: invocation({ policyDecisionId: 'policy-allow-looking-id' }),
