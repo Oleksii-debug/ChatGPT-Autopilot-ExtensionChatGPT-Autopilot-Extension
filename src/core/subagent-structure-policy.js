@@ -33,6 +33,11 @@ const CAPACITY_REQUEST_KEYS = new Set([
   'parentNodeId',
 ]);
 
+const FACTS_REQUEST_KEYS = new Set([
+  'graph',
+  'parentNodeId',
+]);
+
 const ADMISSION_REQUEST_KEYS = new Set([
   ...CAPACITY_REQUEST_KEYS,
   'requestedChildren',
@@ -79,7 +84,10 @@ function boolean(value, label) {
 function requiredId(value, label) {
   if (typeof value !== 'string') throw new Error(`${label} is invalid`);
   const normalized = value.trim();
-  if (!normalized || normalized.length > 180 || !/^[A-Za-z0-9._:@/+-]+$/u.test(normalized)) {
+  if (normalized !== value
+      || !normalized
+      || normalized.length > 180
+      || !/^[A-Za-z0-9._:@/+-]+$/u.test(normalized)) {
     throw new Error(`${label} is invalid`);
   }
   return normalized;
@@ -119,9 +127,10 @@ export function normalizeSubagentStructurePolicyV1(input = {}) {
  * atomically re-read/revalidate canonical hierarchy state and the global
  * resource governor at mutation time.
  */
-export function deriveSubagentStructureFactsFromGraphV1({ graph, parentNodeId } = {}) {
-  const canonicalGraph = validateOrchestrationGraphV1(graph);
-  const parentId = requiredId(parentNodeId, 'parentNodeId');
+export function deriveSubagentStructureFactsFromGraphV1(input = {}) {
+  const request = strictRecord(input, FACTS_REQUEST_KEYS, 'SubagentStructureFactsRequestV1');
+  const canonicalGraph = validateOrchestrationGraphV1(own(request, 'graph', undefined));
+  const parentId = requiredId(own(request, 'parentNodeId', undefined), 'parentNodeId');
   const parent = canonicalGraph.nodesById[parentId];
   if (!parent) throw new Error('parentNodeId is not present in canonical orchestration graph');
 
