@@ -30,10 +30,13 @@ function toPosix(relativePath) {
   return relativePath.split(path.sep).join('/');
 }
 
-async function readPackagedBytes(root, relativePath) {
-  const data = await fs.readFile(path.join(root, relativePath));
-  if (!NORMALIZED_TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) return data;
+function normalizePackagedBytes(relativePath, data) {
+  if (!NORMALIZED_TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) return Buffer.from(data);
   return Buffer.from(data.toString('utf8').replace(/\r\n?/g, '\n'), 'utf8');
+}
+
+async function readPackagedBytes(root, relativePath) {
+  return normalizePackagedBytes(relativePath, await fs.readFile(path.join(root, relativePath)));
 }
 
 async function walkFiles(root, relativeDirectory) {
@@ -112,25 +115,28 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
     }
   }
 
+  const fileContents = new Map();
   for (const relativePath of files) {
     if (FORBIDDEN_PATH_PATTERNS.some(pattern => pattern.test(relativePath))) {
       throw new Error(`Forbidden private/sensitive path in release package: ${relativePath}`);
     }
     const absolutePath = path.join(root, relativePath);
     const data = await fs.readFile(absolutePath);
-    if (data.includes(0)) {
-      if (NORMALIZED_TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) {
-        throw new Error(`NUL byte found in packaged text source: ${relativePath}`);
+    if (data.includes(0) && NORMALIZED_TEXT_EXTENSIONS.has(path.extname(relativePath).toLowerCase())) {
+      throw new Error(`NUL byte found in packaged text source: ${relativePath}`);
+    }
+    if (!data.includes(0)) {
+      const text = data.toString('utf8');
+      for (const { name, pattern } of FORBIDDEN_TEXT_PATTERNS) {
+        if (pattern.test(text)) throw new Error(`Potential ${name} found in packaged source: ${relativePath}`);
       }
-      continue;
     }
-    const text = data.toString('utf8');
-    for (const { name, pattern } of FORBIDDEN_TEXT_PATTERNS) {
-      if (pattern.test(text)) throw new Error(`Potential ${name} found in packaged source: ${relativePath}`);
-    }
+    // This exact read is the release byte authority. Packaging below must
+    // consume only this validated snapshot and never re-open source paths.
+    fileContents.set(relativePath, normalizePackagedBytes(relativePath, data));
   }
 
-  return { manifest, files };
+  return { manifest, files, fileContents };
 }
 
 let crcTable;
@@ -204,13 +210,21 @@ function endOfCentralDirectory(entryCount, centralSize, centralOffset) {
   return end;
 }
 
-export async function createDeterministicZip(root, files, { prefix = RELEASE_NAME } = {}) {
+export async function createDeterministicZip(root, files, { prefix = RELEASE_NAME, fileContents = null } = {}) {
   const localParts = [];
   const centralParts = [];
   let offset = 0;
 
   for (const relativePath of [...files].sort()) {
-    const data = await readPackagedBytes(root, relativePath);
+    let data;
+    if (fileContents === null) {
+      data = await readPackagedBytes(root, relativePath);
+    } else {
+      if (!(fileContents instanceof Map) || !fileContents.has(relativePath)) {
+        throw new Error(`Validated release snapshot is missing: ${relativePath}`);
+      }
+      data = Buffer.from(fileContents.get(relativePath));
+    }
     const normalized = toPosix(relativePath);
     const zipPath = prefix ? `${prefix}/${normalized}` : normalized;
     const local = localHeader(zipPath, data);
@@ -231,7 +245,7 @@ export async function buildReleasePackage({
   root = REPOSITORY_ROOT,
   outDir = path.join(root, 'dist'),
 } = {}) {
-  const { files } = await collectProductFiles(root);
+  const { files, fileContents } = await collectProductFiles(root);
   const unpackedDir = path.join(outDir, RELEASE_NAME);
   const zipPath = path.join(outDir, `${RELEASE_NAME}.zip`);
 
@@ -242,10 +256,11 @@ export async function buildReleasePackage({
   for (const relativePath of files) {
     const destination = path.join(unpackedDir, relativePath);
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, await readPackagedBytes(root, relativePath));
+    if (!fileContents.has(relativePath)) throw new Error(`Validated release snapshot is missing: ${relativePath}`);
+    await fs.writeFile(destination, Buffer.from(fileContents.get(relativePath)));
   }
 
-  const zip = await createDeterministicZip(root, files);
+  const zip = await createDeterministicZip(root, files, { fileContents });
   await fs.writeFile(zipPath, zip);
   const sha256 = createHash('sha256').update(zip).digest('hex');
   return { files, unpackedDir, zipPath, sha256 };
