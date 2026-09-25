@@ -1,5 +1,7 @@
 import { projectGlobalStatus } from '../core/global-status.js';
 import { projectRuntimeActionCenter, resolveRuntimeActionCenterBrowserApproval } from '../core/action-center-runtime.js';
+import { ProjectWorkspaceRepository } from '../core/project-workspace.js';
+import { ProjectWorkspaceRuntimeReader } from '../core/project-workspace-runtime.js';
 import { StorageRepository } from '../core/storage.js';
 import { CoreCommandDispatcher } from '../core/commands.js';
 import { AutomaticSessionExecutor } from '../core/automatic-executor.js';
@@ -62,12 +64,14 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_SCENARIO_WORK',
   'GET_GLOBAL_STATUS',
   'GET_ACTION_CENTER',
+  'GET_PROJECT_WORKSPACE_SUMMARY',
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
+const projectWorkspaceRuntime = new ProjectWorkspaceRuntimeReader(new ProjectWorkspaceRepository(chrome));
 const chatgptProvider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
 const chatgptTransport = new ChromeInteractionTransport(chrome, { siteAdapterId: chatgptProvider.siteAdapterId });
 const transport = new InteractionProviderRouter().register(AgentProviderId.CHATGPT_BROWSER, chatgptTransport);
@@ -505,6 +509,8 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'GET_ACTION_CENTER') {
     const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
     result = await projectRuntimeActionCenter({ coreState, agentJobs: agentState.jobs });
+  } else if (message.command === 'GET_PROJECT_WORKSPACE_SUMMARY') {
+    result = await projectWorkspaceRuntime.readSummary();
   } else if (message.command === 'DECIDE_ACTION_CENTER_BROWSER_APPROVAL') {
     const [coreState, agentState] = await Promise.all([repo.load(), browserAgent.list()]);
     const resolution = await resolveRuntimeActionCenterBrowserApproval({
