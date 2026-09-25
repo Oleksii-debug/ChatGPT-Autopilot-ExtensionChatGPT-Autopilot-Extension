@@ -586,18 +586,16 @@ export async function computeRecipeSubjectSha256V1(
   return computeNormalizedRecipeSubjectSha256V1(recipe, cryptoApi);
 }
 
-export async function assertRecipePromotionAuthorizedV1(
-  recipeInput,
-  trustedEvaluationInput,
+async function assertNormalizedRecipePromotionAuthorizedV1(
+  recipe,
+  trusted,
   { cryptoApi = globalThis.crypto } = {},
 ) {
-  const recipe = normalizeRecipeDefinitionV1(recipeInput);
   if (recipe.lifecycle !== RecipeLifecycleState.PROMOTED) throw new Error('recipe is not PROMOTED');
   if (recipe.qualification.status !== RecipeQualificationStatus.PASS) {
     throw new Error('recipe qualification is not PASS');
   }
 
-  const trusted = normalizeTrustedBenchmarkEvaluationV1(trustedEvaluationInput);
   const report = trusted.report;
   const qualification = recipe.qualification;
 
@@ -641,6 +639,16 @@ export async function assertRecipePromotionAuthorizedV1(
   return recipe;
 }
 
+export async function assertRecipePromotionAuthorizedV1(
+  recipeInput,
+  trustedEvaluationInput,
+  { cryptoApi = globalThis.crypto } = {},
+) {
+  const recipe = normalizeRecipeDefinitionV1(recipeInput);
+  const trusted = normalizeTrustedBenchmarkEvaluationV1(trustedEvaluationInput);
+  return assertNormalizedRecipePromotionAuthorizedV1(recipe, trusted, { cryptoApi });
+}
+
 export async function resolvePromotedRecipeV1(
   registryInput,
   recipeIdInput,
@@ -659,7 +667,7 @@ export async function resolvePromotedRecipeV1(
     if (recipe.lifecycle !== RecipeLifecycleState.PROMOTED) continue;
     const trusted = trustedByRunId.get(recipe.qualification.evaluationId);
     if (!trusted) return null;
-    return assertRecipePromotionAuthorizedV1(recipe, trusted, { cryptoApi });
+    return assertNormalizedRecipePromotionAuthorizedV1(recipe, trusted, { cryptoApi });
   }
   return null;
 }
