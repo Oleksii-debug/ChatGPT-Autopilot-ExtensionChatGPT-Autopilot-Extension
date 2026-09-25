@@ -169,7 +169,7 @@ test('trusted terminal fact must match every requested causal identity field', a
       () => createTerminalAgentTriggerObservationV1({
         trigger: t,
         terminalIdentity: identity(),
-        payloadArtifactRef: payload({}, terminalFact),
+        payloadArtifactRef: await payload({}, terminalFact),
         observedAt: T3,
       }, dependencies(terminalFact)),
       /does not match requested terminal identity/u,
