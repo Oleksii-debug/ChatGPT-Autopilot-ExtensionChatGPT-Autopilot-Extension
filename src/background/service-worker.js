@@ -74,8 +74,7 @@ const transport = new InteractionProviderRouter().register(AgentProviderId.CHATG
 const executor = new AutomaticSessionExecutor(repo, chrome, transport);
 const localAiClient = new LocalAiClient({ fetchFn: (...args) => fetch(...args) });
 const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...args) });
-let browserAgent = null;
-const aiOrchestrator = new AiOrchestrator({
+const const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
   providerCallLifecycle: {
     beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
