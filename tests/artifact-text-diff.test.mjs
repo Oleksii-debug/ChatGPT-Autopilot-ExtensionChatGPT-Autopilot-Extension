@@ -194,12 +194,19 @@ test('ill-formed UTF-16 aliases are rejected before UTF-8 identity while valid s
   const encodedA = new TextEncoder().encode(loneHighA);
   const encodedB = new TextEncoder().encode(loneHighB);
   assert.deepEqual(encodedA, encodedB);
-  assert.equal(
-    await createSha256FingerprintV1(loneHighA),
-    await createSha256FingerprintV1(loneHighB),
+  await assert.rejects(
+    () => createSha256FingerprintV1(loneHighA),
+    /well-formed Unicode/u,
+  );
+  await assert.rejects(
+    () => createSha256FingerprintV1(loneHighB),
+    /well-formed Unicode/u,
   );
 
-  const aliasedRegistry = await registryFor(loneHighA, loneHighB);
+  // Keep the immutable refs independently valid so this assertion exercises
+  // ArtifactTextDiff's own pre-encoding boundary rather than failing while
+  // constructing deliberately ill-formed test fixtures.
+  const aliasedRegistry = await registryFor('valid from material', 'valid to material');
   await assert.rejects(
     buildArtifactTextDiffV1(request(aliasedRegistry, loneHighA, loneHighB)),
     /fromText must be well-formed UTF-16 before UTF-8 encoding/u,
