@@ -209,6 +209,10 @@ test('dependencies are exact version/hash references and cannot self-reference',
 });
 
 test('eval and signature references bind exact source bytes but never assert trusted PASS/signature authority', () => {
+  const emptyEvidence = manifest();
+  emptyEvidence.evaluationRequirements[0].requiredEvidenceKinds = [];
+  assert.throws(() => normalizeSkillPackManifestV1(emptyEvidence), /length must be 1-32/);
+
   const badEval = manifest();
   badEval.evaluationRequirements[0].subjectSha256 = sha('e');
   assert.throws(() => normalizeSkillPackManifestV1(badEval), /subjectSha256 must bind source artifact/);
@@ -235,6 +239,12 @@ test('drift is deterministic and same-version semantic mutation is an explicit c
   const unchanged = assessSkillPackDriftV1(baseline, same);
   assert.equal(unchanged.status, 'UNCHANGED');
   assert.deepEqual(unchanged.signals, []);
+
+  const artifactConflict = structuredClone(baseline);
+  artifactConflict.artifactRefs.find(item => item.artifactId === 'skill-entry').sha256 = sha('f');
+  const artifactConflictState = assessSkillPackDriftV1(baseline, artifactConflict);
+  assert.equal(artifactConflictState.status, 'VERSION_CONFLICT');
+  assert.deepEqual(artifactConflictState.signals, ['ARTIFACTS_CHANGED']);
 
   const conflict = structuredClone(baseline);
   conflict.entrypoints[0].exportName = 'differentExport';
