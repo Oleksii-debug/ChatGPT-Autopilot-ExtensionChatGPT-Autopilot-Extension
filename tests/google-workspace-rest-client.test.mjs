@@ -9,7 +9,7 @@ import {
 const rootId = 'root_123';
 const folderId = 'folder_456';
 const fileId = 'file_789';
-const userId = 'me';
+const userId = 'owner@example.com';
 
 function response(status, body, { binary = false } = {}) {
   const bytes = binary ? body : new TextEncoder().encode(typeof body === 'string' ? body : JSON.stringify(body));
@@ -59,7 +59,7 @@ test('config rejects accessor-backed authority without executing getter', () => 
   const config = baseConfig();
   Object.defineProperty(config, 'allowedGmailUsers', {
     enumerable: true,
-    get() { getterReads += 1; return ['me']; },
+    get() { getterReads += 1; return [userId]; },
   });
   assert.throws(() => new GoogleWorkspaceRestClientV1(config), /enumerable data property/i);
   assert.equal(getterReads, 0);
@@ -89,7 +89,7 @@ test('Drive search is root-scoped, bounded, credential-origin-bound and secret-f
   assert.equal(result.files.length, 1);
   assert.equal(result.files[0].id, fileId);
   assert.equal(result.nextPageToken, 'next-token');
-  assert.equal(fetchCalls.length, 2);
+  assert.equal(fetchCalls.length, 3);
   const listUrl = new URL(fetchCalls[1].url);
   assert.equal(listUrl.origin, GOOGLE_DRIVE_API_ORIGIN);
   assert.match(listUrl.searchParams.get('q'), /root_123/);
@@ -100,6 +100,7 @@ test('Drive search is root-scoped, bounded, credential-origin-bound and secret-f
   assert.equal(fetchCalls[1].options.headers.Authorization, 'Bearer oauth-super-secret');
   assert.equal(JSON.stringify(result).includes('oauth-super-secret'), false);
   assert.deepEqual(credentialCalls, [
+    { credentialId: 'google-drive-main', targetOrigin: GOOGLE_DRIVE_API_ORIGIN },
     { credentialId: 'google-drive-main', targetOrigin: GOOGLE_DRIVE_API_ORIGIN },
     { credentialId: 'google-drive-main', targetOrigin: GOOGLE_DRIVE_API_ORIGIN },
   ]);
@@ -126,7 +127,7 @@ test('Drive descendant text read validates ancestry before downloading bytes', a
   assert.equal(result.text, 'привіт');
   assert.equal(result.mediaType, 'text/plain');
   assert.equal(urls.filter(url => new URL(url).searchParams.get('alt') === 'media').length, 1);
-  assert.equal(urls.at(-1), `${GOOGLE_DRIVE_API_ORIGIN}/drive/v3/files/${fileId}?alt=media`);
+  assert.ok(urls.includes(`${GOOGLE_DRIVE_API_ORIGIN}/drive/v3/files/${fileId}?alt=media`));
 });
 
 test('Drive native document uses only admitted text export types', async () => {
@@ -145,8 +146,31 @@ test('Drive native document uses only admitted text export types', async () => {
   const exported = await client.readDriveText({ fileId: docId, exportMimeType: 'text/markdown' });
   assert.equal(exported.mediaType, 'text/markdown');
   assert.equal(exported.text, '# title\n');
-  assert.equal(new URL(urls.at(-1)).searchParams.get('mimeType'), 'text/markdown');
+  assert.ok(urls.some(url => new URL(url).pathname.endsWith(`/${docId}/export`) && new URL(url).searchParams.get('mimeType') === 'text/markdown'));
   await assert.rejects(() => client.readDriveText({ fileId: docId, exportMimeType: 'application/pdf' }), error => error.code === 'GOOGLE_DRIVE_EXPORT_NOT_ALLOWED');
+});
+
+test('Drive search revalidates descendant scope after list observation before returning data', async () => {
+  let listed = false;
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    fetchImpl: async (url) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === '/drive/v3/files') {
+        listed = true;
+        return response(200, { files: [driveFile(fileId, { parents: [folderId], mimeType: 'text/plain' })] });
+      }
+      if (parsed.pathname === `/drive/v3/files/${folderId}`) {
+        return response(200, driveFile(folderId, { parents: [listed ? 'foreign_root' : rootId] }));
+      }
+      if (parsed.pathname === `/drive/v3/files/${rootId}`) return response(200, driveFile(rootId));
+      if (parsed.pathname === '/drive/v3/files/foreign_root') return response(200, driveFile('foreign_root'));
+      return response(404, { error: { message: 'missing' } });
+    },
+  }));
+  await assert.rejects(
+    () => client.searchDrive({ parentId: folderId }),
+    error => ['GOOGLE_DRIVE_RESOURCE_NOT_ALLOWED', 'GOOGLE_DRIVE_SCOPE_CHANGED'].includes(error.code),
+  );
 });
 
 test('Drive resource outside admitted roots is rejected before content download', async () => {
@@ -161,6 +185,46 @@ test('Drive resource outside admitted roots is rejected before content download'
   }));
   await assert.rejects(() => client.readDriveText({ fileId: 'foreign_1' }), error => error.code === 'GOOGLE_DRIVE_RESOURCE_NOT_ALLOWED');
   assert.equal(mediaReads, 0);
+});
+
+test('Gmail principal must be an exact explicit owner email and never ambiguous me', async () => {
+  for (const invalid of ['me', ' owner@example.com', 'owner@example.com ', 'owner\\u0000@example.com', 'owner@example.com\\u007f']) {
+    assert.throws(
+      () => new GoogleWorkspaceRestClientV1(baseConfig({ allowedGmailUsers: [invalid] })),
+      /exact owner-configured email address/i,
+    );
+  }
+  const credentialCalls = [];
+  let fetchCount = 0;
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    nativeClient: credentialResolver(credentialCalls),
+    fetchImpl: async () => { fetchCount += 1; return response(200, {}); },
+  }));
+  await assert.rejects(
+    () => client.searchGmail({ userId: 'me' }),
+    error => error.code === 'GOOGLE_SCHEMA_INVALID',
+  );
+  assert.equal(fetchCount, 0);
+  assert.deepEqual(credentialCalls, []);
+});
+
+test('transport binds each Google service origin to its configured credential before resolver or fetch', async () => {
+  const credentialCalls = [];
+  let fetchCount = 0;
+  const client = new GoogleWorkspaceRestClientV1(baseConfig({
+    nativeClient: credentialResolver(credentialCalls),
+    fetchImpl: async () => { fetchCount += 1; return response(200, {}); },
+  }));
+  await assert.rejects(
+    () => client.request(GOOGLE_DRIVE_API_ORIGIN, '/drive/v3/files', new URLSearchParams(), 'google-gmail-main', 1024),
+    error => error.code === 'GOOGLE_CREDENTIAL_SCOPE_MISMATCH',
+  );
+  await assert.rejects(
+    () => client.request(GMAIL_API_ORIGIN, `/gmail/v1/users/${encodeURIComponent(userId)}/messages`, new URLSearchParams(), 'google-drive-main', 1024),
+    error => error.code === 'GOOGLE_CREDENTIAL_SCOPE_MISMATCH',
+  );
+  assert.equal(fetchCount, 0);
+  assert.deepEqual(credentialCalls, []);
 });
 
 test('Gmail user outside owner allowlist is denied before credential resolution or network', async () => {
@@ -191,9 +255,9 @@ test('Gmail search and message read use fixed API origin and bounded formats', a
       return response(200, { messages: [{ id: messageId, threadId }], resultSizeEstimate: 1 });
     },
   }));
-  const listed = await client.searchGmail({ userId: 'me', q: 'is:unread', labelIds: ['INBOX'], pageSize: 10 });
+  const listed = await client.searchGmail({ userId, q: 'is:unread', labelIds: ['INBOX'], pageSize: 10 });
   assert.deepEqual(listed.messages.map(item => item.id), [messageId]);
-  const got = await client.getGmailMessage({ userId: 'me', messageId, format: 'metadata', metadataHeaders: ['Subject', 'From'] });
+  const got = await client.getGmailMessage({ userId, messageId, format: 'metadata', metadataHeaders: ['Subject', 'From'] });
   assert.equal(got.id, messageId);
   assert.equal(got.payload.mimeType, 'text/plain');
   assert.equal(new URL(urls[0]).origin, GMAIL_API_ORIGIN);
@@ -202,7 +266,7 @@ test('Gmail search and message read use fixed API origin and bounded formats', a
   assert.deepEqual(new URL(urls[1]).searchParams.getAll('metadataHeaders'), ['Subject', 'From']);
   assert.equal(JSON.stringify(got).includes('oauth-super-secret'), false);
   assert.deepEqual(credentialCalls.map(item => item.targetOrigin), [GMAIL_API_ORIGIN, GMAIL_API_ORIGIN]);
-  await assert.rejects(() => client.getGmailMessage({ userId: 'me', messageId, format: 'RAW' }), error => error.code === 'GOOGLE_SCHEMA_INVALID');
+  await assert.rejects(() => client.getGmailMessage({ userId, messageId, format: 'RAW' }), error => error.code === 'GOOGLE_SCHEMA_INVALID');
 });
 
 test('Gmail thread rejects a foreign message and attachment is exact-size bounded', async () => {
@@ -222,9 +286,9 @@ test('Gmail thread rejects a foreign message and attachment is exact-size bounde
       });
     },
   }));
-  const thread = await client.getGmailThread({ userId: 'me', threadId });
+  const thread = await client.getGmailThread({ userId, threadId });
   assert.equal(thread.messages[0].threadId, threadId);
-  const attachment = await client.getGmailAttachment({ userId: 'me', messageId, attachmentId });
+  const attachment = await client.getGmailAttachment({ userId, messageId, attachmentId });
   assert.equal(attachment.sizeBytes, 2);
   assert.equal(attachment.dataBase64Url, data);
 
@@ -232,7 +296,7 @@ test('Gmail thread rejects a foreign message and attachment is exact-size bounde
     maxAttachmentBytes: 1024,
     fetchImpl: async () => response(200, { size: 3, data }),
   }));
-  await assert.rejects(() => bad.getGmailAttachment({ userId: 'me', messageId, attachmentId }), error => error.code === 'GOOGLE_RESPONSE_INVALID');
+  await assert.rejects(() => bad.getGmailAttachment({ userId, messageId, attachmentId }), error => error.code === 'GOOGLE_RESPONSE_INVALID');
 });
 
 test('read timeout is no-effect/retry-safe and malformed/oversized API data fails closed', async () => {
@@ -249,25 +313,25 @@ test('read timeout is no-effect/retry-safe and malformed/oversized API data fail
     },
   }));
   await assert.rejects(
-    () => client.searchGmail({ userId: 'me' }),
+    () => client.searchGmail({ userId }),
     error => error.code === 'GOOGLE_REQUEST_TIMEOUT' && error.effectMayHaveOccurred === false && error.safeToRetry === true,
   );
 
   const malformed = new GoogleWorkspaceRestClientV1(baseConfig({ fetchImpl: async () => response(200, '{bad json') }));
-  await assert.rejects(() => malformed.searchGmail({ userId: 'me' }), error => error.code === 'GOOGLE_RESPONSE_INVALID');
+  await assert.rejects(() => malformed.searchGmail({ userId }), error => error.code === 'GOOGLE_RESPONSE_INVALID');
 
   const oversized = new GoogleWorkspaceRestClientV1(baseConfig({
     maxJsonBytes: 1024,
     fetchImpl: async () => response(200, { messages: [], padding: 'x'.repeat(2000) }),
   }));
-  await assert.rejects(() => oversized.searchGmail({ userId: 'me' }), error => error.code === 'GOOGLE_RESPONSE_TOO_LARGE');
+  await assert.rejects(() => oversized.searchGmail({ userId }), error => error.code === 'GOOGLE_RESPONSE_TOO_LARGE');
 });
 
 test('public method rejects accessor request with zero getter execution', async () => {
   let reads = 0;
   const client = new GoogleWorkspaceRestClientV1(baseConfig());
   const request = {};
-  Object.defineProperty(request, 'userId', { enumerable: true, get() { reads += 1; return 'me'; } });
+  Object.defineProperty(request, 'userId', { enumerable: true, get() { reads += 1; return userId; } });
   await assert.rejects(() => client.searchGmail(request), error => error.code === 'GOOGLE_SCHEMA_INVALID');
   assert.equal(reads, 0);
 });
@@ -320,7 +384,7 @@ test('credential and transport failures redact provider-controlled secret text',
     },
   }));
   await assert.rejects(
-    () => badCredential.searchGmail({ userId: 'me' }),
+    () => badCredential.searchGmail({ userId }),
     error => error.code === 'GOOGLE_CREDENTIAL_UNAVAILABLE'
       && !String(error.message).includes(credentialSecret),
   );
@@ -333,7 +397,7 @@ test('credential and transport failures redact provider-controlled secret text',
     },
   }));
   await assert.rejects(
-    () => badTransport.searchGmail({ userId: 'me' }),
+    () => badTransport.searchGmail({ userId }),
     error => error.code === 'GOOGLE_TRANSPORT_ERROR'
       && !String(error.message).includes(transportSecret),
   );
