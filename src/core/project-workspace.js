@@ -22,10 +22,10 @@ function record(value, label) {
 }
 
 function workspaceId(value, label) {
-  if (typeof value !== 'string') throw new Error(`Invalid ${label}`);
-  const normalized = value.trim();
-  if (!WORKSPACE_ID.test(normalized)) throw new Error(`Invalid ${label}`);
-  return normalized;
+  if (typeof value !== 'string' || value !== value.trim() || !WORKSPACE_ID.test(value)) {
+    throw new Error(`Invalid ${label}`);
+  }
+  return value;
 }
 
 function hasOwn(value, key) {
