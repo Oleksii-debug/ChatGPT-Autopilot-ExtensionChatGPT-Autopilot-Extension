@@ -26,6 +26,15 @@ function pdf(body = '<< /Type /Catalog >>', { version = '1.7' } = {}) {
   ].join('\n');
 }
 
+function directStream(payload) {
+  return [
+    '<< /Length ' + Buffer.byteLength(payload, 'binary') + ' >>',
+    'stream',
+    payload,
+    'endstream',
+  ].join('\n');
+}
+
 function artifactFor(material, overrides = {}) {
   const bytes = Buffer.from(material, 'binary');
   return {
@@ -161,17 +170,59 @@ test('active structural action names block passive-ready state, including #xx na
 });
 
 test('stream payload is not misclassified as structural active content', async () => {
-  const material = pdf([
-    '<< /Length 37 >>',
-    'stream',
-    '/JavaScript /Launch /OpenAction /AA',
-    'endstream',
-  ].join('\n'));
+  const material = pdf(directStream('/JavaScript /Launch /OpenAction /AA'));
   const result = await run(material);
 
   assert.equal(result.streamCount, 1);
   assert.equal(result.activeContentDetected, false);
   assert.equal(result.safePassiveReviewReady, true);
+});
+
+test('direct Length prevents fake endstream/stream payload bytes from hiding later structural actions', async () => {
+  const payload = 'abc\nendstream\nstream\nxyz';
+  const body = [
+    directStream(payload),
+    'endobj',
+    '2 0 obj',
+    '<< /Type /Catalog /OpenAction 3 0 R >>',
+  ].join('\n');
+  const result = await run(pdf(body));
+
+  assert.equal(result.streamCount, 1);
+  assert.equal(result.activeContentDetected, true);
+  assert.deepEqual(
+    result.activeContentFindings.map(item => item.name),
+    ['/OpenAction'],
+  );
+  assert.equal(result.safePassiveReviewReady, false);
+});
+
+test('indirect or missing stream Length makes passive safety screening incomplete instead of guessing a boundary', async () => {
+  const indirect = await run(pdf([
+    '<< /Length 3 0 R >>',
+    'stream',
+    'abc',
+    'endstream',
+  ].join('\n')));
+  assert.equal(indirect.passiveSafetyScreenComplete, false);
+  assert.equal(indirect.safePassiveReviewReady, false);
+  assert.deepEqual(indirect.unsupportedSafetyFeatures, [{
+    name: 'stream:/Length',
+    reason: 'INDIRECT_STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER',
+  }]);
+
+  const missing = await run(pdf([
+    '<< >>',
+    'stream',
+    'abc',
+    'endstream',
+  ].join('\n')));
+  assert.equal(missing.passiveSafetyScreenComplete, false);
+  assert.equal(missing.safePassiveReviewReady, false);
+  assert.deepEqual(missing.unsupportedSafetyFeatures, [{
+    name: 'stream:/Length',
+    reason: 'STREAM_LENGTH_REQUIRES_QUALIFIED_PARSER',
+  }]);
 });
 
 test('object streams and encrypted PDFs fail closed because lightweight screening cannot inspect hidden objects', async () => {
@@ -301,7 +352,7 @@ test('unknown request fields and malformed structural tokens fail closed', async
 
   await assert.rejects(
     () => run(pdf('<< /Length 5 >>\nstream\nabcde')),
-    /stream is not terminated/,
+    /direct stream length does not resolve to endstream/,
   );
 
   await assert.rejects(
