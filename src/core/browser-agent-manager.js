@@ -52,6 +52,7 @@ import {
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
 
+export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
@@ -395,6 +396,23 @@ export class BrowserAgentManager {
     return { selectedId: target || '', job: target && store.byId[target] ? clone(store.byId[target]) : null };
   }
 
+  /**
+   * Canonical read-only job -> Project identity edge. Project context and
+   * artifact provenance resolvers must consume this persisted binding instead
+   * of accepting caller-supplied job/project pairs.
+   */
+  async resolveJobProjectBinding(id = '') {
+    const current = await this.get(id);
+    if (!current.job) throw new Error('Browser Agent job not found');
+    const projectId = current.job.config?.projectId || '';
+    if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+    return Object.freeze({
+      schemaVersion: BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION,
+      jobId: current.job.id,
+      projectId,
+    });
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -615,6 +633,7 @@ export class BrowserAgentManager {
     const now = this.now();
     const config = normalizeBrowserAgentConfig({
       id,
+      projectId: raw.projectId ?? '',
       name: raw.name || 'Нове завдання агента',
       startUrl: raw.startUrl || '',
       startFromActiveTab: raw.startFromActiveTab !== false,
@@ -675,8 +694,38 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+
+      let nextProjectId = job.config.projectId || '';
+      if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {
+        const descriptor = Object.getOwnPropertyDescriptor(rawConfig, 'projectId');
+        if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+          throw new Error('Browser Agent projectId must be an enumerable own data property');
+        }
+        nextProjectId = normalizeBrowserAgentConfig({ ...job.config, projectId: descriptor.value, id }, { id }).projectId;
+        if (job.config.projectId && nextProjectId !== job.config.projectId) {
+          throw new Error('Browser Agent projectId is immutable; create a new job for another Project');
+        }
+        if (!job.config.projectId && nextProjectId) {
+          const runtime = job.runtime || {};
+          const alreadyExecuted = Boolean(
+            runtime.plan
+            || Number(runtime.stepCount || 0) > 0
+            || Number(runtime.modelCalls || 0) > 0
+            || Number(runtime.startedAt || 0) > 0
+            || Number(runtime.completedCycles || 0) > 0
+            || runtime.verifiedOutcome
+            || (runtime.specialistHandoffs || []).length
+            || (runtime.specialistExecutionOwnerships || []).length
+            || (runtime.history || []).length
+          );
+          if (alreadyExecuted) {
+            throw new Error('Browser Agent projectId must be bound before the job produces execution history');
+          }
+        }
+      }
+
       const previousCriteria = JSON.stringify(job.config.acceptanceCriteria || []);
-      job.config = normalizeBrowserAgentConfig({ ...job.config, ...rawConfig, id }, { id });
+      job.config = normalizeBrowserAgentConfig({ ...job.config, ...rawConfig, projectId: nextProjectId, id }, { id });
       if (JSON.stringify(job.config.acceptanceCriteria || []) !== previousCriteria) job.runtime.verifiedOutcome = null;
       job.updatedAt = now;
       return store;
