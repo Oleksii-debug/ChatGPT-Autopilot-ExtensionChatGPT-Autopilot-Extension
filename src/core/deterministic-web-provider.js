@@ -17,6 +17,52 @@ const PROVIDER_ID = 'deterministic-web';
 const MAX_URL = 4096;
 const MAX_SELECTOR = 2000;
 const ACTIONS = new Set(['NAVIGATE', 'CLICK', 'FILL']);
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+
+function plainObject(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(`${label} must be a plain object`);
+  }
+  return value;
+}
+
+function exactEnvelope(value, allowed, label) {
+  const raw = plainObject(value, label);
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error(`${label} contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(raw, key);
+    if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      throw new Error(`${label} field ${key} must be an enumerable data property`);
+    }
+  }
+  for (const key of allowed) {
+    if (key in raw && !Object.prototype.hasOwnProperty.call(raw, key)) {
+      throw new Error(`${label} contains inherited field: ${key}`);
+    }
+  }
+  return raw;
+}
+
+function idText(value, label) {
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  const out = value.trim();
+  if (!ID.test(out)) throw new Error(`${label} is invalid`);
+  return out;
+}
+
+function plainMap(value, label) {
+  return plainObject(value, label);
+}
+
+function own(map, key) {
+  return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+}
 
 function text(value, label, max) {
   if (typeof value !== 'string') throw new Error(`${label} must be text`);
@@ -35,18 +81,17 @@ function normalizeUrl(value) {
 }
 
 export function normalizeDeterministicWebActionV1(input) {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('web action must be an object');
-  const allowed = new Set(['kind', 'url', 'selector', 'value']);
-  for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`web action contains unknown field: ${key}`);
-  const kind = String(input.kind || '').trim().toUpperCase();
+  const raw = exactEnvelope(input, new Set(['kind', 'url', 'selector', 'value']), 'web action');
+  if (typeof raw.kind !== 'string') throw new Error('web action kind must be text');
+  const kind = raw.kind.trim().toUpperCase();
   if (!ACTIONS.has(kind)) throw new Error('web action kind is invalid');
-  if (kind === 'NAVIGATE') return Object.freeze({ kind, url: normalizeUrl(input.url) });
-  const selector = text(input.selector, 'selector', MAX_SELECTOR);
+  if (kind === 'NAVIGATE') return Object.freeze({ kind, url: normalizeUrl(raw.url) });
+  const selector = text(raw.selector, 'selector', MAX_SELECTOR);
   if (kind === 'CLICK') return Object.freeze({ kind, selector });
-  return Object.freeze({ kind, selector, value: text(input.value, 'value', 16_000) });
+  return Object.freeze({ kind, selector, value: text(raw.value, 'value', 16_000) });
 }
 
-function verifyPostcondition({ invocationId, effectId, executionId, attempt, observation, expected, now }) {
+export function verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now }) {
   const observed = observation.data || {};
   let ok = false;
   let reasonCode = 'POSTCONDITION_FAILED';
@@ -70,19 +115,16 @@ function verifyPostcondition({ invocationId, effectId, executionId, attempt, obs
     summary: ok ? 'Independent browser postcondition verified.' : 'Independent browser postcondition failed.',
     evidenceArtifactIds: observation.artifactRefs.map(ref => ref.artifactId),
     verifiedAt: now,
-    effectId,
-    executionId,
-    attempt,
   });
 }
 
 function normalizePostcondition(expected) {
-  if (!expected || typeof expected !== 'object' || Array.isArray(expected)) throw new Error('independent verifier requires a postcondition');
-  const keys = Object.keys(expected);
+  const raw = exactEnvelope(expected, new Set(['url', 'selector']), 'web postcondition');
+  const keys = Object.keys(raw);
   if (keys.length !== 1 || !['url', 'selector'].includes(keys[0])) throw new Error('independent verifier requires exactly one url or selector postcondition');
   return Object.freeze(keys[0] === 'url'
-    ? { url: normalizeUrl(expected.url) }
-    : { selector: text(expected.selector, 'expected.selector', MAX_SELECTOR) });
+    ? { url: normalizeUrl(raw.url) }
+    : { selector: text(raw.selector, 'expected.selector', MAX_SELECTOR) });
 }
 
 export function createDeterministicWebProviderV1({ transport, store, reconcileVerify, now = () => new Date().toISOString(), leaseId = () => `web-${Date.now()}` } = {}) {
@@ -101,15 +143,15 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
     let result;
     await store.update(draft => {
       if (!draft || typeof draft !== 'object' || Array.isArray(draft)) throw new Error('exact-effect store is invalid');
-      draft.effectsById ||= {};
-      draft.leasesByTargetId ||= {};
+      plainMap(draft.effectsById, 'exact-effect store effectsById');
+      plainMap(draft.leasesByTargetId, 'exact-effect store leasesByTargetId');
       result = mutator(draft);
       return draft;
     });
     return result;
   }
   function release(draft, targetId, invocationId) {
-    const lease = draft.leasesByTargetId[targetId];
+    const lease = own(draft.leasesByTargetId, targetId);
     if (!lease || lease.ownerInvocationId !== invocationId) throw new Error('web effect target lease ownership changed');
     draft.leasesByTargetId[targetId] = releaseBrowserTargetLeaseV1(lease, {
       ownerInvocationId: invocationId, leaseId: lease.leaseId,
@@ -117,19 +159,45 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
   }
   return Object.freeze({
     id: PROVIDER_ID,
+    async recoverInterrupted() {
+      return atomic(draft => {
+        const recovered = [];
+        for (const [invocationId, entry] of Object.entries(draft.effectsById || {})) {
+          if (!entry?.state) continue;
+          const state = normalizeExactEffectStateV1(entry.state);
+          if (![ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) continue;
+          entry.state = event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'cold-start-ambiguity', {
+            reasonCode: 'WEB_DISPATCH_INTERRUPTED',
+            summary: 'Interrupted browser dispatch requires independent reconciliation before any retry.',
+          });
+          recovered.push(Object.freeze({ invocationId, targetId: entry.targetId, phase: entry.state.phase }));
+        }
+        return Object.freeze(recovered);
+      });
+    },
     async invoke({ invocation, policyDecision, toolDescriptor, grantedCapabilityIds, targetId, action, postcondition }) {
       const authorized = assertToolInvocationAuthorizedV1({ invocation, policyDecision, toolDescriptor, grantedCapabilityIds });
       if (authorized.invocation.providerId !== PROVIDER_ID) throw new Error('invocation provider is not deterministic-web');
       const invocationId = authorized.invocation.invocationId;
       const normalizedAction = normalizeDeterministicWebActionV1(action);
       const expected = normalizePostcondition(postcondition);
+      if (transport.preflight != null) {
+        if (typeof transport.preflight !== 'function') throw new Error('deterministic web transport preflight is invalid');
+        await transport.preflight({
+          targetId,
+          action: normalizedAction,
+          postcondition: expected,
+          invocationId,
+        });
+      }
       const binding = JSON.stringify({ targetId, action: normalizedAction, postcondition: expected });
-      // The lease and canonical EXECUTING state share ONE atomic durable write.
+      // Permission/target preflight above is side-effect-free; this atomic write is
+      // still the sole authority to cross into physical browser execution.
       // A crashed dispatch remains fenced even when its lease timestamp expires.
       const admitted = await atomic(draft => {
-        let entry = draft.effectsById[invocationId];
+        let entry = own(draft.effectsById, invocationId);
         if (entry && entry.binding !== binding) throw new Error('web invocation binding changed');
-        const current = draft.leasesByTargetId[targetId];
+        const current = own(draft.leasesByTargetId, targetId);
         if (entry && [ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(entry.state.phase)) {
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.DECLARE_AMBIGUITY, 'restart-ambiguity', {
             reasonCode: 'WEB_DISPATCH_INTERRUPTED', summary: 'Interrupted browser dispatch requires independent reconciliation.',
@@ -166,12 +234,32 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
           observedAt: now(),
         });
         await atomic(draft => {
-          const entry = draft.effectsById[invocationId];
+          const entry = own(draft.effectsById, invocationId);
           entry.state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_OBSERVATION, 'observe', { observation });
         });
-        const verification = verifyPostcondition({ invocationId, effectId: admitted.effectState.effectId, executionId: admitted.effectState.executionId, attempt: admitted.effectState.attempt, observation, expected, now: now() });
+        const verification = verifyDeterministicWebPostconditionV1({ invocationId, observation, expected, now: now() });
+        if (verification.status !== VerificationStatus.VERIFIED) {
+          const effectState = await atomic(draft => {
+            const entry = own(draft.effectsById, invocationId);
+            const state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.DECLARE_AMBIGUITY, 'postcondition-ambiguity', {
+              reasonCode: verification.reasonCode,
+              summary: 'The browser action may have occurred, but its postcondition was not independently verified.',
+            });
+            entry.state = state;
+            return state;
+          });
+          return Object.freeze({
+            status: 'AMBIGUOUS',
+            reconcileRequired: true,
+            lease: admitted.lease,
+            observation,
+            verification,
+            effectState,
+            error: 'WEB_POSTCONDITION_UNCERTAIN',
+          });
+        }
         const effectState = await atomic(draft => {
-          const entry = draft.effectsById[invocationId];
+          const entry = own(draft.effectsById, invocationId);
           let state = event(normalizeExactEffectStateV1(entry.state), ExactEffectEventType.RECORD_VERIFICATION, 'verify', { verification });
           if (state.phase === ExactEffectPhase.VERIFIED) {
             state = event(state, ExactEffectEventType.COMMIT, 'commit', { commitId: `${invocationId}:commit` });
@@ -183,7 +271,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
         return Object.freeze({ status: verification.status, observation, verification, effectState });
       } catch (error) {
         const effectState = await atomic(draft => {
-          const entry = draft.effectsById[invocationId];
+          const entry = own(draft.effectsById, invocationId);
           let state = normalizeExactEffectStateV1(entry.state);
           if ([ExactEffectPhase.EXECUTING, ExactEffectPhase.OBSERVED].includes(state.phase)) {
             state = event(state, ExactEffectEventType.DECLARE_AMBIGUITY, 'dispatch-ambiguity', {
@@ -198,23 +286,43 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
         return Object.freeze({ status: 'AMBIGUOUS', reconcileRequired: true, lease: admitted.lease, effectState, error: 'WEB_DISPATCH_UNCERTAIN' });
       }
     },
-    async reconcile({ invocationId, outcome, reasonCode = 'WEB_RECONCILED' }) {
+    async reconcile(request = {}) {
+      const rawRequest = exactEnvelope(request, new Set(['invocationId', 'outcome', 'reasonCode']), 'web reconciliation request');
+      const invocationId = idText(rawRequest.invocationId, 'reconciliation invocationId');
+      if (typeof rawRequest.outcome !== 'string') throw new Error('reconciliation outcome must be text');
+      const normalizedOutcome = rawRequest.outcome.trim().toUpperCase();
+      if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('reconciliation outcome is invalid');
+      const reasonCode = rawRequest.reasonCode == null ? 'WEB_RECONCILED' : idText(rawRequest.reasonCode, 'reconciliation reasonCode');
       const snapshot = await atomic(draft => {
-        const entry = draft.effectsById[invocationId];
+        const entry = own(draft.effectsById, invocationId);
         if (!entry || entry.state.phase !== ExactEffectPhase.RECONCILE) throw new Error('web effect is not awaiting reconciliation');
         return structuredClone(entry);
       });
-      const normalizedOutcome = String(outcome || '').toUpperCase();
-      if (!Object.values(ReconciliationOutcome).includes(normalizedOutcome)) throw new Error('reconciliation outcome is invalid');
       let proof = null;
       if (typeof reconcileVerify !== 'function') throw new Error('independent web reconciliation verifier is required');
-      proof = await reconcileVerify({ invocation: snapshot.state.invocation, executionId: snapshot.state.executionId, outcome: normalizedOutcome });
-      const observation = normalizeObservationV1(proof?.observation);
-      const verification = normalizeVerificationV1(proof?.verification);
+      let binding;
+      try { binding = JSON.parse(snapshot.binding); } catch { throw new Error('web effect binding is invalid'); }
+      proof = await reconcileVerify({
+        invocation: snapshot.state.invocation,
+        executionId: snapshot.state.executionId,
+        attempt: snapshot.state.attempt,
+        outcome: normalizedOutcome,
+        targetId: snapshot.targetId,
+        action: structuredClone(binding.action),
+        postcondition: structuredClone(binding.postcondition),
+        ambiguity: structuredClone(snapshot.state.ambiguity),
+      });
+      exactEnvelope(proof, new Set(['verifierId', 'targetId', 'observation', 'verification']), 'independent web reconciliation proof');
+      if (typeof proof.verifierId !== 'string' || typeof proof.targetId !== 'string') {
+        throw new Error('independent web reconciliation proof identity must be text');
+      }
+      const observation = normalizeObservationV1(proof.observation);
+      const verification = normalizeVerificationV1(proof.verification);
       const proofAt = Date.parse(now());
       const observedAt = Date.parse(observation.observedAt);
       const verifiedAt = Date.parse(verification.verifiedAt);
       if (proof?.verifierId === PROVIDER_ID || !proof?.verifierId
+        || proof?.targetId !== snapshot.targetId
         || verification.verifierId !== proof.verifierId
         || verification.verificationAuthorityId !== snapshot.state.invocation.policyDecisionId
         || verification.effectId !== invocationId
@@ -240,7 +348,7 @@ export function createDeterministicWebProviderV1({ transport, store, reconcileVe
       }
       proof = { observation, verification };
       return atomic(draft => {
-        const entry = draft.effectsById[invocationId];
+        const entry = own(draft.effectsById, invocationId);
         const state = normalizeExactEffectStateV1(entry?.state);
         if (state.phase !== ExactEffectPhase.RECONCILE || state.executionId !== snapshot.state.executionId) throw new Error('web effect changed during reconciliation');
         let next = event(state, ExactEffectEventType.RESOLVE_RECONCILIATION, 'reconcile', {
