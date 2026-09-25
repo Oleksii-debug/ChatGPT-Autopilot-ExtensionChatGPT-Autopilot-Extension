@@ -49,9 +49,11 @@ function denseDataArray(value, label, maxLength, code = 'WINDOWS_INVALID_REQUEST
   if (!lengthDescriptor
       || !Object.hasOwn(lengthDescriptor, 'value')
       || !Number.isSafeInteger(lengthDescriptor.value)
-      || lengthDescriptor.value < 0
-      || lengthDescriptor.value > maxLength) {
+      || lengthDescriptor.value < 0) {
     fail(code, label + ' must be a bounded dense array');
+  }
+  if (lengthDescriptor.value > maxLength) {
+    fail(code, label + ' must contain at most ' + maxLength + ' items');
   }
   const length = lengthDescriptor.value;
   const ownKeys = Reflect.ownKeys(descriptors);

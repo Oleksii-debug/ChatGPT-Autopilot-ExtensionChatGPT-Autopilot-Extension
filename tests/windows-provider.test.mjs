@@ -633,7 +633,9 @@ test('Windows provider array boundaries snapshot length without ordinary Proxy r
   let reads = 0;
   const countReads = target => new Proxy(target, {
     get(object, property, receiver) {
-      reads += 1;
+      // Promise/await assimilation probes "then" on an object returned by an async
+      // adapter. That language-level probe is not an authority-bearing array read.
+      if (property !== 'then') reads += 1;
       return Reflect.get(object, property, receiver);
     },
   });
