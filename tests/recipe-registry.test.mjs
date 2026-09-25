@@ -8,6 +8,7 @@ import {
   assertRecipeRegistryExtensionV1,
   assertRecipeReplayEligibleV1,
   assessRecipeSourceFreshnessV1,
+  computeRecipeSubjectSha256V1,
   getCurrentRecipeVersionV1,
   normalizeRecipeDefinitionV1,
   normalizeRecipeRegistryV1,
@@ -98,6 +99,55 @@ function registry(recipes, overrides = {}) {
     recipes,
     updatedAt: AT,
     ...overrides,
+  };
+}
+
+async function authorizedRecipe(overrides = {}) {
+  const value = recipe(overrides);
+  const subjectSha256 = await computeRecipeSubjectSha256V1(value);
+  return {
+    ...value,
+    qualification: {
+      ...value.qualification,
+      subjectSha256,
+    },
+  };
+}
+
+function trustedEvaluationFor(value, overrides = {}) {
+  const base = {
+    verifierId: value.qualification.verifierId,
+    report: {
+      schemaVersion: 1,
+      runId: value.qualification.evaluationId,
+      suiteId: value.qualification.benchmarkSuiteId,
+      suiteRevisionId: value.qualification.benchmarkSuiteRevision,
+      subjectId: value.recipeId,
+      subjectRevisionId: value.qualification.subjectSha256,
+      startedAt: value.createdAt,
+      completedAt: value.qualification.evaluatedAt,
+      status: 'PASS',
+      caseCount: 1,
+      passedCaseCount: 1,
+      failedCaseCount: 0,
+      results: [{
+        caseId: 'recipe-replay',
+        outcome: 'MEASURED',
+        passed: true,
+        reasonCode: '',
+        metrics: { score: 1 },
+        evidenceArtifactIds: [...value.qualification.evidenceArtifactIds],
+        assertionResults: [],
+      }],
+    },
+  };
+  return {
+    ...base,
+    ...overrides,
+    report: {
+      ...base.report,
+      ...(overrides.report || {}),
+    },
   };
 }
 
@@ -254,8 +304,85 @@ test('registry extension is append-only and preserves existing version bytes', (
   assert.throws(() => assertRecipeRegistryExtensionV1(before, { ...after, revision: 3 }), /registry revision must advance exactly once/);
 });
 
-test('promoted resolution keeps prior promoted version while a candidate is evaluated, but latest RETIRED disables replay', () => {
-  const promoted = recipe();
+test('effective promotion requires exact trusted EVAL binding to immutable recipe content', async () => {
+  const promoted = await authorizedRecipe();
+  const trusted = trustedEvaluationFor(promoted);
+
+  assert.equal(
+    (await resolvePromotedRecipeV1(
+      registry([promoted]),
+      promoted.recipeId,
+      [trusted],
+    )).version,
+    1,
+  );
+
+  const callerOnlyPass = recipe();
+  assert.equal(
+    await resolvePromotedRecipeV1(
+      registry([callerOnlyPass]),
+      callerOnlyPass.recipeId,
+      [],
+    ),
+    null,
+    'caller-owned PASS metadata is never promotion authority',
+  );
+
+  const mutated = { ...promoted, title: 'Mutated after evaluation' };
+  await assert.rejects(
+    () => resolvePromotedRecipeV1(
+      registry([mutated]),
+      mutated.recipeId,
+      [trusted],
+    ),
+    /subjectSha256 does not match immutable recipe content/,
+  );
+
+  await assert.rejects(
+    () => resolvePromotedRecipeV1(
+      registry([promoted]),
+      promoted.recipeId,
+      [{ ...trusted, verifierId: 'verifier-other' }],
+    ),
+    /verifier does not match recipe qualification/,
+  );
+
+  await assert.rejects(
+    () => resolvePromotedRecipeV1(
+      registry([promoted]),
+      promoted.recipeId,
+      [trustedEvaluationFor(promoted, {
+        report: { suiteRevisionId: 'suite-rev-other' },
+      })],
+    ),
+    /suite identity does not match recipe qualification/,
+  );
+
+  await assert.rejects(
+    () => resolvePromotedRecipeV1(
+      registry([promoted]),
+      promoted.recipeId,
+      [trustedEvaluationFor(promoted, {
+        report: {
+          results: [{
+            caseId: 'recipe-replay',
+            outcome: 'MEASURED',
+            passed: true,
+            reasonCode: '',
+            metrics: { score: 1 },
+            evidenceArtifactIds: ['artifact-other'],
+            assertionResults: [],
+          }],
+        },
+      })],
+    ),
+    /evidence does not match recipe qualification/,
+  );
+});
+
+test('retirement is a durable barrier until a newer version is explicitly re-promoted', async () => {
+  const promoted = await authorizedRecipe();
+  const trustedV1 = trustedEvaluationFor(promoted);
   const candidate = recipe({
     version: 2,
     parentVersion: 1,
@@ -266,8 +393,19 @@ test('promoted resolution keeps prior promoted version while a candidate is eval
   const withCandidate = registry([promoted, candidate], {
     updatedAt: '2026-09-24T22:22:00.000Z',
   });
-  assert.equal(resolvePromotedRecipeV1(withCandidate, promoted.recipeId).version, 1);
-  assert.equal(resolveReplayEligibleRecipeV1(withCandidate, promoted.recipeId, [binding()]).version, 1);
+  assert.equal(
+    (await resolvePromotedRecipeV1(withCandidate, promoted.recipeId, [trustedV1])).version,
+    1,
+  );
+  assert.equal(
+    (await resolveReplayEligibleRecipeV1(
+      withCandidate,
+      promoted.recipeId,
+      [binding()],
+      [trustedV1],
+    )).version,
+    1,
+  );
 
   const retired = recipe({
     version: 3,
@@ -276,26 +414,89 @@ test('promoted resolution keeps prior promoted version while a candidate is eval
     qualification: qualification('UNQUALIFIED'),
     createdAt: '2026-09-24T22:23:00.000Z',
   });
-  const retiredRegistry = registry([promoted, candidate, retired], {
-    updatedAt: '2026-09-24T22:23:00.000Z',
+  const candidateAfterRetirement = recipe({
+    version: 4,
+    parentVersion: 3,
+    lifecycle: 'CANDIDATE',
+    qualification: qualification('FAIL', { evaluatedAt: '2026-09-24T22:24:00.000Z' }),
+    createdAt: '2026-09-24T22:24:00.000Z',
   });
-  assert.equal(resolvePromotedRecipeV1(retiredRegistry, promoted.recipeId), null);
-  assert.throws(() => resolveReplayEligibleRecipeV1(retiredRegistry, promoted.recipeId, [binding()]), /no active PROMOTED/);
+  const retiredRegistry = registry([promoted, candidate, retired, candidateAfterRetirement], {
+    updatedAt: '2026-09-24T22:24:00.000Z',
+  });
+  assert.equal(
+    await resolvePromotedRecipeV1(retiredRegistry, promoted.recipeId, [trustedV1]),
+    null,
+    'PROMOTED v1 must not resurrect through RETIRED v3 when v4 is only a candidate',
+  );
+  await assert.rejects(
+    () => resolveReplayEligibleRecipeV1(
+      retiredRegistry,
+      promoted.recipeId,
+      [binding()],
+      [trustedV1],
+    ),
+    /no active trusted PROMOTED/,
+  );
+
+  const rePromoted = await authorizedRecipe({
+    version: 5,
+    parentVersion: 4,
+    title: 'Safe repository review v5',
+    qualification: qualification('PASS', {
+      evaluationId: 'eval-5',
+      evaluatedAt: '2026-09-24T22:25:00.000Z',
+    }),
+    createdAt: '2026-09-24T22:25:00.000Z',
+  });
+  const trustedV5 = trustedEvaluationFor(rePromoted);
+  const reactivated = registry(
+    [promoted, candidate, retired, candidateAfterRetirement, rePromoted],
+    {
+      updatedAt: '2026-09-24T22:25:00.000Z',
+    },
+  );
+  assert.equal(
+    (await resolvePromotedRecipeV1(
+      reactivated,
+      promoted.recipeId,
+      [trustedV1, trustedV5],
+    )).version,
+    5,
+  );
 });
 
-test('source drift is explicit and replay eligibility fails closed on missing/revised/substituted bytes', () => {
-  const value = recipe();
+test('source drift is explicit and replay eligibility fails closed on missing/revised/substituted bytes', async () => {
+  const value = await authorizedRecipe();
+  const trusted = trustedEvaluationFor(value);
   assert.equal(assessRecipeSourceFreshnessV1(value, [binding()]).status, RecipeFreshnessStatus.FRESH);
-  assert.equal(assertRecipeReplayEligibleV1(value, [binding()]).recipeId, value.recipeId);
+  assert.equal(
+    (await assertRecipeReplayEligibleV1(value, [binding()], trusted)).recipeId,
+    value.recipeId,
+  );
 
   let report = assessRecipeSourceFreshnessV1(value, [binding({ revisionId: 'commit-new' })]);
   assert.equal(report.status, 'STALE');
   assert.deepEqual(report.drift, [{ sourceId: 'github-main', reason: 'REVISION_CHANGED' }]);
-  assert.throws(() => assertRecipeReplayEligibleV1(value, [binding({ revisionId: 'commit-new' })]), /REVISION_CHANGED/);
+  await assert.rejects(
+    () => assertRecipeReplayEligibleV1(
+      value,
+      [binding({ revisionId: 'commit-new' })],
+      trusted,
+    ),
+    /REVISION_CHANGED/,
+  );
 
   report = assessRecipeSourceFreshnessV1(value, [binding({ contentSha256: HASH_B })]);
   assert.deepEqual(report.drift, [{ sourceId: 'github-main', reason: 'CONTENT_CHANGED' }]);
-  assert.throws(() => assertRecipeReplayEligibleV1(value, [binding({ contentSha256: HASH_B })]), /CONTENT_CHANGED/);
+  await assert.rejects(
+    () => assertRecipeReplayEligibleV1(
+      value,
+      [binding({ contentSha256: HASH_B })],
+      trusted,
+    ),
+    /CONTENT_CHANGED/,
+  );
 
   const otherOnly = [{ sourceId: 'other', revisionId: 'r1', contentSha256: HASH_B }];
   assert.deepEqual(assessRecipeSourceFreshnessV1(value, otherOnly).drift, [
@@ -306,11 +507,18 @@ test('source drift is explicit and replay eligibility fails closed on missing/re
   ]);
 });
 
-test('replay eligibility never upgrades non-promoted or failed candidates', () => {
-  assert.throws(() => assertRecipeReplayEligibleV1(recipe({
-    lifecycle: 'CANDIDATE',
-    qualification: qualification('PASS'),
-  }), [binding()]), /not PROMOTED/);
+test('replay eligibility never upgrades non-promoted or failed candidates', async () => {
+  await assert.rejects(
+    () => assertRecipeReplayEligibleV1(
+      recipe({
+        lifecycle: 'CANDIDATE',
+        qualification: qualification('PASS'),
+      }),
+      [binding()],
+      null,
+    ),
+    /not PROMOTED/,
+  );
 
   assert.throws(() => normalizeRecipeDefinitionV1(recipe({
     lifecycle: 'PROMOTED',
