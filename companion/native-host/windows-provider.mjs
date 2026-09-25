@@ -18,19 +18,49 @@ function clean(value, max = MAX_TEXT) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
-function exactObject(value, allowed, label) {
+function exactObject(value, allowed, label, code = 'WINDOWS_INVALID_REQUEST') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    fail('WINDOWS_INVALID_REQUEST', label + ' must be an object');
+    fail(code, label + ' must be an object');
   }
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== Object.prototype && prototype !== null) {
-    fail('WINDOWS_INVALID_REQUEST', label + ' must be a plain object');
+    fail(code, label + ' must be a plain object');
   }
+  const out = Object.create(null);
   for (const key of Reflect.ownKeys(value)) {
     if (typeof key !== 'string' || !allowed.has(key)) {
-      fail('WINDOWS_INVALID_REQUEST', label + ' contains unknown field: ' + String(key));
+      fail(code, label + ' contains unknown field: ' + String(key));
     }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      fail(code, label + ' fields must be enumerable data properties');
+    }
+    out[key] = descriptor.value;
   }
+  return out;
+}
+
+function denseDataArray(value, label, maxLength, code = 'WINDOWS_INVALID_REQUEST') {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > maxLength) {
+    fail(code, label + ' must be a bounded dense array');
+  }
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.some(key => typeof key === 'symbol')) {
+    fail(code, label + ' must contain only canonical data indices');
+  }
+  const names = ownKeys.filter(key => key !== 'length');
+  if (names.length !== value.length) {
+    fail(code, label + ' must be a bounded dense array');
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      fail(code, label + ' must contain only enumerable data items');
+    }
+    out.push(descriptor.value);
+  }
+  return out;
 }
 
 function id(value, label) {
@@ -48,11 +78,9 @@ function boundedOptionalText(value, label, max) {
 
 function boundedArgs(value) {
   if (value == null) return [];
-  if (!Array.isArray(value) || value.length > MAX_ARGS) {
-    fail('WINDOWS_INVALID_REQUEST', 'args must contain at most ' + MAX_ARGS + ' items');
-  }
+  const items = denseDataArray(value, 'args', MAX_ARGS);
   let chars = 0;
-  return value.map((item, index) => {
+  return items.map((item, index) => {
     if (typeof item !== 'string') fail('WINDOWS_INVALID_REQUEST', 'args[' + index + '] must be text');
     chars += item.length;
     if (chars > MAX_ARG_CHARS) fail('WINDOWS_INVALID_REQUEST', 'args are too large');
@@ -61,25 +89,38 @@ function boundedArgs(value) {
 }
 
 function normalizeExecutable(raw, index) {
-  exactObject(raw, new Set(['executableId', 'path', 'readOnly']), 'executables[' + index + ']');
-  const executableId = id(raw.executableId, 'executables[' + index + '].executableId');
-  const executablePath = clean(raw.path, 32000);
+  const data = exactObject(
+    raw,
+    new Set(['executableId', 'path', 'readOnly']),
+    'executables[' + index + ']',
+    'WINDOWS_CONFIG_INVALID',
+  );
+  const executableId = id(data.executableId, 'executables[' + index + '].executableId');
+  const executablePath = clean(data.path, 32000);
   if (!executablePath || !WINDOWS_ABSOLUTE_PATH.test(executablePath)) {
     fail('WINDOWS_CONFIG_INVALID', 'executables[' + index + '].path must be an absolute Windows path');
   }
-  if (raw.readOnly != null && typeof raw.readOnly !== 'boolean') {
+  if (data.readOnly != null && typeof data.readOnly !== 'boolean') {
     fail('WINDOWS_CONFIG_INVALID', 'executables[' + index + '].readOnly must be boolean');
   }
-  return Object.freeze({ executableId, path: executablePath, readOnly: raw.readOnly === true });
+  return Object.freeze({ executableId, path: executablePath, readOnly: data.readOnly === true });
 }
 
 export function normalizeWindowsProviderConfig(raw) {
-  exactObject(raw, new Set(['schemaVersion', 'executables']), 'windows provider config');
-  if (raw.schemaVersion !== 1) fail('WINDOWS_CONFIG_INVALID', 'windows provider config schemaVersion must be 1');
-  if (!Array.isArray(raw.executables) || raw.executables.length > 64) {
-    fail('WINDOWS_CONFIG_INVALID', 'executables must be a bounded array');
-  }
-  const executables = raw.executables.map(normalizeExecutable);
+  const data = exactObject(
+    raw,
+    new Set(['schemaVersion', 'executables']),
+    'windows provider config',
+    'WINDOWS_CONFIG_INVALID',
+  );
+  if (data.schemaVersion !== 1) fail('WINDOWS_CONFIG_INVALID', 'windows provider config schemaVersion must be 1');
+  const rawExecutables = denseDataArray(
+    data.executables,
+    'executables',
+    64,
+    'WINDOWS_CONFIG_INVALID',
+  );
+  const executables = rawExecutables.map(normalizeExecutable);
   if (new Set(executables.map(item => item.executableId)).size !== executables.length) {
     fail('WINDOWS_CONFIG_INVALID', 'executableId values must be unique');
   }
@@ -298,26 +339,34 @@ function encodePowerShellUiaScript(request) {
 }
 
 function normalizeUiaRows(rows, limit) {
-  if (!Array.isArray(rows) || rows.length > limit) {
-    fail('WINDOWS_UIA_INVALID_RESPONSE', 'UI Automation adapter returned an invalid result set');
-  }
-  return Object.freeze(rows.map((row, index) => {
-    exactObject(row, new Set(['elementId', 'role', 'name', 'enabled', 'offscreen']), 'UIA result[' + index + ']');
-    if (typeof row.role !== 'string' || row.role.length > 120) {
+  const items = denseDataArray(
+    rows,
+    'UI Automation adapter result',
+    limit,
+    'WINDOWS_UIA_INVALID_RESPONSE',
+  );
+  return Object.freeze(items.map((row, index) => {
+    const data = exactObject(
+      row,
+      new Set(['elementId', 'role', 'name', 'enabled', 'offscreen']),
+      'UIA result[' + index + ']',
+      'WINDOWS_UIA_INVALID_RESPONSE',
+    );
+    if (typeof data.role !== 'string' || data.role.length > 120) {
       fail('WINDOWS_UIA_INVALID_RESPONSE', 'UIA result[' + index + '].role is invalid');
     }
-    if (typeof row.name !== 'string' || row.name.length > 512) {
+    if (typeof data.name !== 'string' || data.name.length > 512) {
       fail('WINDOWS_UIA_INVALID_RESPONSE', 'UIA result[' + index + '].name is invalid');
     }
-    if (typeof row.enabled !== 'boolean' || typeof row.offscreen !== 'boolean') {
+    if (typeof data.enabled !== 'boolean' || typeof data.offscreen !== 'boolean') {
       fail('WINDOWS_UIA_INVALID_RESPONSE', 'UIA result[' + index + '] state must be boolean');
     }
     return Object.freeze({
-      elementId: id(row.elementId, 'UIA result[' + index + '].elementId'),
-      role: row.role.trim(),
-      name: row.name.trim(),
-      enabled: row.enabled,
-      offscreen: row.offscreen,
+      elementId: id(data.elementId, 'UIA result[' + index + '].elementId'),
+      role: data.role.trim(),
+      name: data.name.trim(),
+      enabled: data.enabled,
+      offscreen: data.offscreen,
     });
   }));
 }
@@ -326,12 +375,12 @@ export function createPowerShellUiaAdapter({ execFile, powershellPath = null } =
   if (typeof execFile !== 'function') fail('WINDOWS_CONFIG_INVALID', 'execFile adapter is required');
   return Object.freeze({
     async query(payload = {}) {
-      exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'PowerShell UIA query');
+      const data = exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'PowerShell UIA query');
       const request = {
-        windowId: canonicalPowerShellWindowId(payload.windowId),
-        role: boundedOptionalText(payload.role, 'role', 120),
-        name: boundedOptionalText(payload.name, 'name', 512),
-        limit: strictInteger(payload.limit, 'limit', 1, MAX_UIA_RESULTS, 64),
+        windowId: canonicalPowerShellWindowId(data.windowId),
+        role: boundedOptionalText(data.role, 'role', 120),
+        name: boundedOptionalText(data.name, 'name', 512),
+        limit: strictInteger(data.limit, 'limit', 1, MAX_UIA_RESULTS, 64),
       };
       const encoded = encodePowerShellUiaScript(request);
       let result;
@@ -398,12 +447,12 @@ export function createWindowsProvider({
 
     async execPinned(payload) {
       requireWindows(platform);
-      exactObject(payload, new Set(['executableId', 'args', 'timeoutMs']), 'windows process request');
-      const executableId = id(payload.executableId, 'executableId');
+      const data = exactObject(payload, new Set(['executableId', 'args', 'timeoutMs']), 'windows process request');
+      const executableId = id(data.executableId, 'executableId');
       const executable = normalized.executables.find(item => item.executableId === executableId);
       if (!executable) fail('WINDOWS_EXECUTABLE_NOT_ALLOWED', 'Executable identity is not owner-configured');
-      const args = boundedArgs(payload.args);
-      const timeoutMs = strictInteger(payload.timeoutMs, 'timeoutMs', 100, 120_000, 30_000);
+      const args = boundedArgs(data.args);
+      const timeoutMs = strictInteger(data.timeoutMs, 'timeoutMs', 100, 120_000, 30_000);
       const result = await execFile(executable.path, args, {
         windowsHide: true,
         timeout: timeoutMs,
@@ -422,11 +471,11 @@ export function createWindowsProvider({
       if (!effectiveUiaAdapter || typeof effectiveUiaAdapter.query !== 'function') {
         fail('WINDOWS_UIA_UNAVAILABLE', 'UI Automation adapter is unavailable');
       }
-      exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'UIA query');
-      const windowId = id(payload.windowId, 'windowId');
-      const role = boundedOptionalText(payload.role, 'role', 120);
-      const name = boundedOptionalText(payload.name, 'name', 512);
-      const limit = strictInteger(payload.limit, 'limit', 1, MAX_UIA_RESULTS, 64);
+      const data = exactObject(payload, new Set(['windowId', 'role', 'name', 'limit']), 'UIA query');
+      const windowId = id(data.windowId, 'windowId');
+      const role = boundedOptionalText(data.role, 'role', 120);
+      const name = boundedOptionalText(data.name, 'name', 512);
+      const limit = strictInteger(data.limit, 'limit', 1, MAX_UIA_RESULTS, 64);
       const rows = await effectiveUiaAdapter.query({ windowId, role, name, limit });
       return normalizeUiaRows(rows, limit);
     },
