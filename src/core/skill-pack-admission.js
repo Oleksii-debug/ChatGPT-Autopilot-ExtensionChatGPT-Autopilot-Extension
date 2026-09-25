@@ -1,5 +1,6 @@
 import { normalizeSkillPackManifestV1 } from './skill-pack-contract.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
+import { createSha256FingerprintV1 } from './fingerprint.js';
 
 export const SKILL_PACK_ADMISSION_SCHEMA_VERSION = 1;
 
@@ -18,7 +19,7 @@ const EVALUATION_PROOF_KEYS = new Set([
   'subjectSha256', 'status', 'completedAt', 'evidenceKinds', 'verificationAuthorityId',
 ]);
 const SIGNATURE_PROOF_KEYS = new Set([
-  'signatureId', 'scheme', 'keyId', 'signedSha256', 'status',
+  'signatureId', 'scheme', 'keyId', 'signatureArtifactId', 'signedSha256', 'status',
   'verifiedAt', 'verificationAuthorityId',
 ]);
 const DEPENDENCY_PROOF_KEYS = new Set([
@@ -218,6 +219,7 @@ async function bindSignature(reference, source, admittedAt, resolveSignature) {
     signatureId: id(raw.signatureId, 'signatureId'),
     scheme: id(raw.scheme, 'scheme'),
     keyId: id(raw.keyId, 'keyId'),
+    signatureArtifactId: id(raw.signatureArtifactId, 'signatureArtifactId'),
     signedSha256: digest(raw.signedSha256, 'signedSha256'),
     status: raw.status,
     verifiedAt: timestamp(raw.verifiedAt, 'verifiedAt'),
@@ -227,6 +229,7 @@ async function bindSignature(reference, source, admittedAt, resolveSignature) {
   if (proof.signatureId !== reference.signatureId
       || proof.scheme !== reference.scheme
       || proof.keyId !== reference.keyId
+      || proof.signatureArtifactId !== reference.signatureArtifactId
       || proof.signedSha256 !== reference.signedSha256
       || proof.signedSha256 !== source.sha256) {
     throw new Error('Skill pack signature proof does not match signature/source identity');
@@ -342,10 +345,20 @@ export async function createSkillPackAdmissionV1(input = {}, options = {}) {
     ...trustedManifest.requiredPermissionIds,
     ...entrypoint.requiredPermissionIds,
   ])].sort();
+  const admissionFingerprint = await createSha256FingerprintV1(JSON.stringify([
+    'chatgpt-autopilot-skill-pack-admission-v1',
+    trustedManifest.skillPackId,
+    trustedManifest.version,
+    source.sha256,
+    entrypoint.entrypointId,
+    dependencyProofs.map(item => item.admissionId),
+    evaluationProofs.map(item => item.evaluationId),
+    signatureProofs.map(item => item.signatureId),
+  ]));
 
   return frozen({
     schemaVersion: SKILL_PACK_ADMISSION_SCHEMA_VERSION,
-    admissionId: `skill:${trustedManifest.skillPackId}@${trustedManifest.version}:${entrypoint.entrypointId}`,
+    admissionId: `skill-admission:${admissionFingerprint.slice('sha256:'.length)}`,
     status: 'READY_FOR_POLICY',
     skillPackId: trustedManifest.skillPackId,
     version: trustedManifest.version,
