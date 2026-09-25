@@ -144,6 +144,55 @@ test('effectful GitHub mutation persists EXECUTING before provider dispatch and 
   assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
 });
 
+test('initial GitHub verification must be independently bound to the exact durable attempt before commit', async t => {
+  const cases = [
+    ['missing verifier identity', value => {
+      delete value.verifierId;
+      return value;
+    }, {}, /verification\.verifierId is invalid/],
+    ['executor self-verification', value => ({ ...value, verifierId: 'github-exact-effect-executor' }), {}, /must be independent/],
+    ['parent-controller self-verification', value => ({ ...value, verifierId: 'github-parent-controller' }), { parentActorId: 'github-parent-controller' }, /must be independent/],
+    ['provider self-verification', value => ({ ...value, verifierId: 'remote\/github' }), {}, /must be independent/],
+    ['wrong verification authority', value => ({ ...value, verificationAuthorityId: 'decision-other' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong effect identity', value => ({ ...value, effectId: 'github-effect-other' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong execution identity', value => ({ ...value, executionId: 'github-effect-other:attempt:1' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong attempt', value => ({ ...value, attempt: 2 }), {}, /does not match the current exact-effect attempt/],
+    ['wrong invocation binding', value => ({ ...value, invocationId: 'github-effect-other' }), {}, /does not match the current exact-effect attempt/],
+    ['wrong observation binding', value => ({ ...value, observationId: 'github-effect-other:observation' }), {}, /does not match the current exact-effect attempt/],
+    ['verification predates observation', value => ({ ...value, verifiedAt: '2026-09-24T17:09:59.000Z' }), {}, /invalid chronology/],
+    ['verification is too far in the future', value => ({ ...value, verifiedAt: '2026-09-24T17:11:01.000Z' }), {}, /invalid chronology/],
+  ];
+
+  for (const [index, [label, mutate, executorOptions, expected]] of cases.entries()) {
+    await t.test(label, async () => {
+      const id = `verify-binding-${index}`;
+      const fx = storeFixture();
+      const p = providerFixture();
+      const executor = new GitHubExactEffectExecutorV1({
+        provider: p.provider,
+        store: fx.store,
+        now: () => Date.parse(at),
+        ...executorOptions,
+        verify: async ({ invocation: inv, observation }) => mutate(verified(inv, observation)),
+      });
+
+      await assert.rejects(
+        () => executor.invoke({ invocation: invocation(id), policyDecision: policy(id) }),
+        error => {
+          assert.match(error.message, expected);
+          assert.equal(error.effectState.phase, 'RECONCILE');
+          assert.equal(error.safeToRetry, false);
+          assert.equal(error.reconcileRequired, true);
+          return true;
+        },
+      );
+      assert.equal(fx.snapshot(id).phase, 'RECONCILE');
+      assert.equal(p.calls.filter(([name]) => name === 'invoke').length, 1);
+      assert.equal(fx.writes.some(item => item.phase === 'COMMITTED'), false);
+    });
+  }
+});
+
 test('concurrent same-invocation contenders atomically admit exactly one GitHub mutation', async () => {
   const fx = storeFixture();
   const calls = [];
