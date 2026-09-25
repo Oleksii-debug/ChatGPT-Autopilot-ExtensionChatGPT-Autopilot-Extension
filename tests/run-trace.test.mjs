@@ -24,7 +24,7 @@ function event(overrides = {}) {
     actorId: 'actor-1',
     parentEventId: '',
     sourceRevisionId: 'source-revision-1',
-    artifactIds: [],
+    artifactRefs: [],
     effectId: '',
     verificationId: '',
     checkpointId: '',
@@ -57,7 +57,7 @@ test('normalizes a bounded event without granting any authority', () => {
   assert.equal(normalized.eventId, 'event-1');
   assert.equal(normalized.kind, RunTraceEventKind.STATUS);
   assert.ok(Object.isFrozen(normalized));
-  assert.ok(Object.isFrozen(normalized.artifactIds));
+  assert.ok(Object.isFrozen(normalized.artifactRefs));
 });
 
 test('projection is deterministic and emits parents before children even from reversed input', () => {
@@ -78,7 +78,7 @@ test('projection is deterministic and emits parents before children even from re
     eventId: 'event-later',
     parentEventId: 'event-child',
     kind: RunTraceEventKind.ARTIFACT,
-    artifactIds: ['artifact-1'],
+    artifactRefs: [{ artifactId:'artifact-1', versionId:'version-1', sha256:'a'.repeat(64) }],
     status: 'MATERIALIZED',
     occurredAt: t2,
   });
@@ -173,7 +173,7 @@ test('kind-specific evidence identities fail closed', () => {
   })));
 
   assert.throws(
-    () => normalizeRunTraceEventV1(event({ kind: RunTraceEventKind.ARTIFACT, artifactIds: [] })),
+    () => normalizeRunTraceEventV1(event({ kind: RunTraceEventKind.ARTIFACT, artifactRefs: [] })),
     /requires at least one artifactId/u,
   );
 
@@ -235,6 +235,51 @@ test('unknown transcript and hidden-reasoning fields are rejected without access
   assert.equal(getterCalls, 0);
 });
 
+test('artifact references require immutable artifact/version/SHA binding', () => {
+  const exact = normalizeRunTraceEventV1(event({
+    kind: RunTraceEventKind.ARTIFACT,
+    artifactRefs: [{
+      artifactId:'artifact-1',
+      versionId:'version-1',
+      sha256:'a'.repeat(64),
+    }],
+  }));
+  assert.deepEqual(exact.artifactRefs, [{
+    artifactId:'artifact-1',
+    versionId:'version-1',
+    sha256:'a'.repeat(64),
+  }]);
+
+  assert.throws(
+    () => normalizeRunTraceEventV1(event({
+      kind: RunTraceEventKind.ARTIFACT,
+      artifactRefs: [{ artifactId:'artifact-1' }],
+    })),
+    /versionId/u,
+  );
+  assert.throws(
+    () => normalizeRunTraceEventV1(event({
+      kind: RunTraceEventKind.ARTIFACT,
+      artifactRefs: [{
+        artifactId:'artifact-1',
+        versionId:'version-1',
+        sha256:'A'.repeat(64),
+      }],
+    })),
+    /lowercase SHA-256/u,
+  );
+  assert.throws(
+    () => normalizeRunTraceEventV1(event({
+      kind: RunTraceEventKind.ARTIFACT,
+      artifactRefs: [
+        { artifactId:'artifact-1', versionId:'version-1', sha256:'a'.repeat(64) },
+        { artifactId:'artifact-2', versionId:'version-1', sha256:'b'.repeat(64) },
+      ],
+    })),
+    /duplicate versionId/u,
+  );
+});
+
 test('descriptor and dense-array boundaries reject accessors, symbols and sparse aliases', () => {
   let getterCalls = 0;
   const hostile = event();
@@ -262,18 +307,18 @@ test('descriptor and dense-array boundaries reject accessors, symbols and sparse
     /enumerable own data property/u,
   );
 
-  const artifacts = ['artifact-1'];
+  const artifacts = [{ artifactId:'artifact-1', versionId:'version-1', sha256:'a'.repeat(64) }];
   Object.defineProperty(artifacts, '0', {
     enumerable: true,
     get() {
       getterCalls += 1;
-      return 'artifact-1';
+      return { artifactId:'artifact-1', versionId:'version-1', sha256:'a'.repeat(64) };
     },
   });
   assert.throws(
     () => normalizeRunTraceEventV1(event({
       kind: RunTraceEventKind.ARTIFACT,
-      artifactIds: artifacts,
+      artifactRefs: artifacts,
     })),
     /enumerable own data property/u,
   );
