@@ -14,6 +14,7 @@ export const WebhookVerificationStatus = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const SHA256 = /^[a-f0-9]{64}$/u;
 const MAX_DELIVERY_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 const REQUEST_KEYS = new Set([
@@ -54,6 +55,19 @@ const DELIVERY_KEYS = new Set([
   'payloadArtifactRef',
   'receivedAt',
   'verifiedAt',
+]);
+
+const PAYLOAD_ARTIFACT_KEYS = new Set([
+  'schemaVersion',
+  'artifactId',
+  'kind',
+  'uri',
+  'mediaType',
+  'sha256',
+  'sizeBytes',
+  'createdAt',
+  'producerInvocationId',
+  'sensitive',
 ]);
 
 function strictRecord(value, label, allowedKeys) {
@@ -122,6 +136,84 @@ function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
   return Object.freeze(value);
+}
+
+function normalizePayloadArtifactRef(value) {
+  const raw = strictRecord(
+    value,
+    'VerifiedWebhookDeliveryV1 payloadArtifactRef',
+    PAYLOAD_ARTIFACT_KEYS,
+  );
+  if (raw.schemaVersion !== WEBHOOK_EVENT_TRIGGER_ADAPTER_VERSION) {
+    throw new Error('VerifiedWebhookDeliveryV1 payloadArtifactRef schemaVersion must be numeric 1');
+  }
+
+  const artifactId = exactId(
+    raw.artifactId,
+    'VerifiedWebhookDeliveryV1 payloadArtifactRef artifactId',
+  );
+  const kind = exactId(
+    raw.kind,
+    'VerifiedWebhookDeliveryV1 payloadArtifactRef kind',
+  );
+  if (typeof raw.uri !== 'string'
+      || raw.uri !== raw.uri.trim()
+      || !raw.uri
+      || raw.uri.length > 4096) {
+    throw new Error(
+      'VerifiedWebhookDeliveryV1 payloadArtifactRef uri must be canonical bounded text',
+    );
+  }
+  if (raw.mediaType != null && raw.mediaType !== '') {
+    if (typeof raw.mediaType !== 'string'
+        || raw.mediaType !== raw.mediaType.trim()
+        || raw.mediaType.length > 300) {
+      throw new Error(
+        'VerifiedWebhookDeliveryV1 payloadArtifactRef mediaType must be canonical bounded text',
+      );
+    }
+  }
+  if (typeof raw.sha256 !== 'string'
+      || raw.sha256 !== raw.sha256.trim()
+      || !SHA256.test(raw.sha256)) {
+    throw new Error(
+      'VerifiedWebhookDeliveryV1 payloadArtifactRef sha256 must be canonical lowercase SHA-256',
+    );
+  }
+  if (!Number.isSafeInteger(raw.sizeBytes) || raw.sizeBytes < 1) {
+    throw new Error(
+      'VerifiedWebhookDeliveryV1 payloadArtifactRef requires non-empty integer sizeBytes',
+    );
+  }
+  const createdAt = canonicalTimestamp(
+    raw.createdAt,
+    'VerifiedWebhookDeliveryV1 payloadArtifactRef createdAt',
+  );
+  let producerInvocationId = null;
+  if (raw.producerInvocationId != null && raw.producerInvocationId !== '') {
+    producerInvocationId = exactId(
+      raw.producerInvocationId,
+      'VerifiedWebhookDeliveryV1 payloadArtifactRef producerInvocationId',
+    );
+  }
+  if (typeof raw.sensitive !== 'boolean') {
+    throw new Error(
+      'VerifiedWebhookDeliveryV1 payloadArtifactRef sensitive must be explicit boolean',
+    );
+  }
+
+  return deepFreeze({
+    schemaVersion: WEBHOOK_EVENT_TRIGGER_ADAPTER_VERSION,
+    artifactId,
+    kind,
+    uri: raw.uri,
+    mediaType: raw.mediaType ?? '',
+    sha256: raw.sha256,
+    sizeBytes: raw.sizeBytes,
+    createdAt,
+    producerInvocationId,
+    sensitive: raw.sensitive,
+  });
 }
 
 function normalizeRequest(value) {
@@ -202,7 +294,7 @@ export function normalizeVerifiedWebhookDeliveryV1(value) {
       'VerifiedWebhookDeliveryV1 verificationProfileId',
     ),
     verificationStatus: raw.verificationStatus,
-    payloadArtifactRef: raw.payloadArtifactRef,
+    payloadArtifactRef: normalizePayloadArtifactRef(raw.payloadArtifactRef),
     receivedAt,
     verifiedAt,
   });
