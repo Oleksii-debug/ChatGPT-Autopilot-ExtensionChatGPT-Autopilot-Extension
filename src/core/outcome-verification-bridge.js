@@ -138,7 +138,7 @@ function exactSet(actual, expected, label) {
 }
 
 function normalizeEvidenceArtifacts(value) {
-  const items = denseArray(value, 'Outcome verification evidenceArtifacts', { min: 1 });
+  const items = denseArray(value, 'Outcome verification evidenceArtifacts', { min: 0 });
   const byId = new Map();
   for (let index = 0; index < items.length; index += 1) {
     const artifact = normalizeArtifactRefV1(items[index]);
