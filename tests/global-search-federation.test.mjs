@@ -150,6 +150,66 @@ test('same exact source revision from multiple providers is fused deterministica
   assert.deepEqual(fusedSource.providerRefs.map(ref => ref.providerId), ['provider-index', 'provider-project']);
 });
 
+test('fusion recency uses epoch ordering across canonical extended years', () => {
+  const older = '9999-12-31T23:59:59.999Z';
+  const newer = '+010000-01-01T00:00:00.000Z';
+
+  const oldBatch = batch({
+    queriedAt: older,
+    completedAt: older,
+    hits: [hit({ observedAt: older })],
+  });
+  const newBatch = batch({
+    providerId: 'provider-index',
+    queriedAt: newer,
+    completedAt: newer,
+    hits: [hit({ hitId: 'hit-2', observedAt: newer })],
+  });
+  const fused = fuseGlobalSearchV1(fusion({
+    providerResults: [newBatch, oldBatch],
+    admittedSearchScopes: [
+      { providerId: 'provider-project', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+      { providerId: 'provider-index', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+    ],
+  }));
+  assert.equal(fused.results.length, 1);
+  assert.equal(fused.results[0].latestObservedAt, newer);
+  assert.equal(fused.results[0].latestSearchCompletedAt, newer);
+
+  const oldOnly = batch({
+    providerId: 'provider-old',
+    queriedAt: older,
+    completedAt: newer,
+    hits: [hit({
+      hitId: 'old-hit',
+      sourceId: 'old-source',
+      revisionId: 'old-rev',
+      uri: 'https://example.test/old',
+      observedAt: older,
+    })],
+  });
+  const newOnly = batch({
+    providerId: 'provider-new',
+    queriedAt: newer,
+    completedAt: newer,
+    hits: [hit({
+      hitId: 'new-hit',
+      sourceId: 'new-source',
+      revisionId: 'new-rev',
+      uri: 'https://example.test/new',
+      observedAt: newer,
+    })],
+  });
+  const ranked = fuseGlobalSearchV1(fusion({
+    providerResults: [oldOnly, newOnly],
+    admittedSearchScopes: [
+      { providerId: 'provider-old', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+      { providerId: 'provider-new', domain: 'PROJECT', visibilityScopeId: 'scope-project' },
+    ],
+  }));
+  assert.deepEqual(ranked.results.map(item => item.sourceId), ['new-source', 'old-source']);
+});
+
 test('source revision identity is digest-independent and conflicting digests fail closed', () => {
   const withoutDigest = batch({
     hits: [hit({ contentSha256: '' })],
