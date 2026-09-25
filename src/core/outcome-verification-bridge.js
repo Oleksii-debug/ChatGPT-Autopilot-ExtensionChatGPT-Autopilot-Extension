@@ -14,15 +14,35 @@ export const OutcomeVerificationVerdict = Object.freeze({
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_ITEMS = 128;
+const MAX_TEXT = 16_000;
 const REQUEST_KEYS = new Set([
   'contract',
   'criterionVerifications',
-  'evidenceArtifacts',
   'evaluatedAt',
 ]);
 const ROW_KEYS = new Set([
   'criterionId',
+  'verificationId',
+]);
+const TRUSTED_RECORD_KEYS = new Set([
+  'schemaVersion',
+  'recordId',
+  'contractId',
+  'contractRevision',
+  'verifierPlanId',
+  'criterion',
+  'verifierId',
+  'verificationAuthorityId',
   'verification',
+  'evidenceArtifacts',
+  'recordedAt',
+  'validThrough',
+]);
+const TRUSTED_CRITERION_KEYS = new Set([
+  'criterionId',
+  'description',
+  'observable',
+  'requiredEvidenceKinds',
 ]);
 
 function record(value, label) {
@@ -97,6 +117,26 @@ function exactId(value, label) {
   return value;
 }
 
+function exactText(value, label, max = MAX_TEXT) {
+  if (typeof value !== 'string'
+    || value !== value.trim()
+    || !value
+    || value.length > max) {
+    throw new Error(label + ' must be bounded exact text');
+  }
+  return value;
+}
+
+function exactInteger(value, label, min = 1, max = Number.MAX_SAFE_INTEGER) {
+  if (typeof value !== 'number'
+    || !Number.isSafeInteger(value)
+    || value < min
+    || value > max) {
+    throw new Error(label + ' must be an exact integer');
+  }
+  return value;
+}
+
 function canonicalTimestamp(value, label) {
   if (typeof value !== 'string' || !value) {
     throw new Error(label + ' must be a canonical timestamp');
@@ -112,6 +152,15 @@ function compareCodeUnit(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function exactIdList(value, label, { min = 0, max = MAX_ITEMS } = {}) {
+  const items = denseArray(value, label, { min, max });
+  const out = items.map((item, index) => exactId(item, label + '[' + index + ']'));
+  if (new Set(out).size !== out.length) {
+    throw new Error(label + ' contains duplicate ids');
+  }
+  return Object.freeze(out.sort(compareCodeUnit));
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -123,76 +172,193 @@ function exactSet(actual, expected, label) {
   const right = [...expected].sort(compareCodeUnit);
   if (left.length !== right.length
     || left.some((item, index) => item !== right[index])) {
-    throw new Error(label + ' must exactly cover the outcome criteria');
+    throw new Error(label + ' must exactly match trusted identity');
   }
 }
 
-function normalizeEvidenceArtifacts(value) {
-  const items = denseArray(value, 'Outcome verification evidenceArtifacts', { min: 0 });
+function normalizeTrustedCriterion(input) {
+  const raw = record(input, 'TrustedOutcomeCriterionV1');
+  exactKeys(raw, TRUSTED_CRITERION_KEYS, 'TrustedOutcomeCriterionV1');
+  return deepFreeze({
+    criterionId: exactId(raw.criterionId, 'trusted criterionId'),
+    description: exactText(raw.description, 'trusted criterion description', 8_000),
+    observable: exactText(raw.observable, 'trusted criterion observable', 8_000),
+    requiredEvidenceKinds: exactIdList(
+      raw.requiredEvidenceKinds,
+      'trusted criterion requiredEvidenceKinds',
+      { min: 1, max: 32 },
+    ),
+  });
+}
+
+function assertTrustedCriterionMatches(actual, expected) {
+  if (actual.criterionId !== expected.criterionId
+    || actual.description !== expected.description
+    || actual.observable !== expected.observable) {
+    throw new Error('Trusted verification record criterion does not match the exact outcome criterion');
+  }
+  exactSet(
+    actual.requiredEvidenceKinds,
+    expected.requiredEvidenceKinds,
+    'Trusted verification criterion requiredEvidenceKinds',
+  );
+}
+
+function normalizeTrustedEvidenceArtifacts(value, verification) {
+  const items = denseArray(value, 'TrustedVerificationRecordV1 evidenceArtifacts', {
+    min: 0,
+    max: MAX_ITEMS,
+  });
   const byId = new Map();
   for (let index = 0; index < items.length; index += 1) {
     const artifact = normalizeArtifactRefV1(items[index]);
     if (!artifact.sha256) {
-      throw new Error('Outcome verification evidence artifact must have sha256: ' + artifact.artifactId);
+      throw new Error(
+        'Trusted verification evidence artifact must have sha256: ' + artifact.artifactId,
+      );
     }
     if (byId.has(artifact.artifactId)) {
-      throw new Error('Outcome verification evidenceArtifacts contains duplicate artifactId: ' + artifact.artifactId);
+      throw new Error(
+        'Trusted verification record contains duplicate artifactId: ' + artifact.artifactId,
+      );
     }
     byId.set(artifact.artifactId, artifact);
   }
+  exactSet(
+    byId.keys(),
+    verification.evidenceArtifactIds,
+    'Trusted verification evidenceArtifactIds',
+  );
   return byId;
 }
 
+function normalizeTrustedVerificationRecord(input) {
+  const raw = record(input, 'TrustedVerificationRecordV1');
+  exactKeys(raw, TRUSTED_RECORD_KEYS, 'TrustedVerificationRecordV1');
+  if (raw.schemaVersion !== OUTCOME_VERIFICATION_BRIDGE_VERSION) {
+    throw new Error('Unsupported TrustedVerificationRecordV1 schemaVersion');
+  }
+
+  const verification = normalizeVerificationV1(raw.verification);
+  const verifierId = exactId(raw.verifierId, 'trusted verifierId');
+  const verificationAuthorityId = exactId(
+    raw.verificationAuthorityId,
+    'trusted verificationAuthorityId',
+  );
+  if (verification.verifierId !== verifierId) {
+    throw new Error('Trusted verification record verifierId binding is mismatched');
+  }
+  if (verification.verificationAuthorityId !== verificationAuthorityId) {
+    throw new Error('Trusted verification record verificationAuthorityId binding is mismatched');
+  }
+
+  const recordedAt = canonicalTimestamp(raw.recordedAt, 'trusted record recordedAt');
+  const validThrough = canonicalTimestamp(raw.validThrough, 'trusted record validThrough');
+  if (recordedAt < verification.verifiedAt) {
+    throw new Error('Trusted verification record predates its verification');
+  }
+  if (validThrough < recordedAt) {
+    throw new Error('Trusted verification record validity interval is invalid');
+  }
+
+  const evidenceArtifacts = normalizeTrustedEvidenceArtifacts(
+    raw.evidenceArtifacts,
+    verification,
+  );
+
+  return deepFreeze({
+    schemaVersion: OUTCOME_VERIFICATION_BRIDGE_VERSION,
+    recordId: exactId(raw.recordId, 'trusted recordId'),
+    contractId: exactId(raw.contractId, 'trusted contractId'),
+    contractRevision: exactInteger(raw.contractRevision, 'trusted contractRevision'),
+    verifierPlanId: exactId(raw.verifierPlanId, 'trusted verifierPlanId'),
+    criterion: normalizeTrustedCriterion(raw.criterion),
+    verifierId,
+    verificationAuthorityId,
+    verification,
+    evidenceArtifacts: [...evidenceArtifacts.values()],
+    recordedAt,
+    validThrough,
+  });
+}
+
 function normalizeRow(input, index) {
-  const label = 'OutcomeCriterionVerificationV1[' + index + ']';
+  const label = 'OutcomeCriterionVerificationRefV1[' + index + ']';
   const raw = record(input, label);
   exactKeys(raw, ROW_KEYS, label);
   return Object.freeze({
     criterionId: exactId(raw.criterionId, label + ' criterionId'),
-    verification: normalizeVerificationV1(raw.verification),
+    verificationId: exactId(raw.verificationId, label + ' verificationId'),
   });
 }
 
 function criterionResult({
-  row,
+  trustedRecord,
   criterion,
   contract,
-  artifactsById,
   evaluatedAt,
-  referencedArtifactIds,
 }) {
-  const verification = row.verification;
-  if (!verification.verifierId
-    || verification.verifierId !== contract.verifierPlan.verifierId) {
-    throw new Error('Criterion ' + row.criterionId + ' verification is not from the declared independent verifier');
+  if (trustedRecord.contractId !== contract.contractId
+    || trustedRecord.contractRevision !== contract.revision) {
+    throw new Error(
+      'Trusted verification record is not bound to the exact outcome contract revision',
+    );
+  }
+  if (trustedRecord.verifierPlanId !== contract.verifierPlan.planId) {
+    throw new Error('Trusted verification record verifierPlanId is mismatched');
+  }
+  assertTrustedCriterionMatches(trustedRecord.criterion, criterion);
+
+  const verification = trustedRecord.verification;
+  if (verification.verifierId !== contract.verifierPlan.verifierId) {
+    throw new Error(
+      'Trusted verification is not from the declared independent verifier',
+    );
   }
   if (verification.verifierId === contract.verifierPlan.actorId) {
-    throw new Error('Criterion ' + row.criterionId + ' verification cannot be attributed to the actor');
+    throw new Error('Trusted verification cannot be attributed to the actor');
   }
-  if (!verification.verificationAuthorityId) {
-    throw new Error('Criterion ' + row.criterionId + ' verification lacks external verificationAuthorityId');
+  if (!verification.verificationAuthorityId
+    || verification.verificationAuthorityId !== trustedRecord.verificationAuthorityId) {
+    throw new Error('Trusted verification authority binding is missing or mismatched');
   }
   if (verification.verifiedAt < contract.createdAt) {
-    throw new Error('Criterion ' + row.criterionId + ' verification predates the exact outcome contract');
+    throw new Error('Trusted verification predates the exact outcome contract');
   }
   if (verification.verifiedAt > evaluatedAt) {
-    throw new Error('Criterion ' + row.criterionId + ' verification is future-dated');
+    throw new Error('Trusted verification is future-dated');
+  }
+  if (trustedRecord.recordedAt < contract.createdAt
+    || trustedRecord.recordedAt > evaluatedAt) {
+    throw new Error('Trusted verification record chronology is invalid');
+  }
+  if (evaluatedAt > trustedRecord.validThrough) {
+    throw new Error('Trusted verification record is stale');
   }
 
+  const artifactsById = new Map(
+    trustedRecord.evidenceArtifacts.map(artifact => [artifact.artifactId, artifact]),
+  );
   const evidenceKinds = new Set();
   for (const artifactId of verification.evidenceArtifactIds) {
     const artifact = artifactsById.get(artifactId);
     if (!artifact) {
-      throw new Error('Criterion ' + row.criterionId + ' references unknown evidence artifact: ' + artifactId);
+      throw new Error(
+        'Trusted verification references missing evidence artifact: ' + artifactId,
+      );
     }
     if (artifact.createdAt < contract.createdAt) {
-      throw new Error('Criterion ' + row.criterionId + ' evidence predates the exact outcome contract: ' + artifactId);
+      throw new Error(
+        'Trusted verification evidence predates the exact outcome contract: ' + artifactId,
+      );
     }
-    if (artifact.createdAt > verification.verifiedAt || artifact.createdAt > evaluatedAt) {
-      throw new Error('Criterion ' + row.criterionId + ' evidence is future-dated relative to verification: ' + artifactId);
+    if (artifact.createdAt > verification.verifiedAt
+      || artifact.createdAt > evaluatedAt) {
+      throw new Error(
+        'Trusted verification evidence is future-dated relative to verification: ' + artifactId,
+      );
     }
     evidenceKinds.add(artifact.kind);
-    referencedArtifactIds.add(artifactId);
   }
 
   const missingKinds = criterion.requiredEvidenceKinds
@@ -200,7 +366,8 @@ function criterionResult({
     .sort(compareCodeUnit);
   const missingArtifactCount = Math.max(
     0,
-    contract.verifierPlan.requiredEvidenceArtifactCount - verification.evidenceArtifactIds.length,
+    contract.verifierPlan.requiredEvidenceArtifactCount
+      - verification.evidenceArtifactIds.length,
   );
 
   let accepted = verification.status === VerificationStatus.VERIFIED;
@@ -213,15 +380,14 @@ function criterionResult({
     accepted = false;
     reasonCode = 'EVIDENCE_KIND_INCOMPLETE';
   }
-  if (!accepted && verification.status !== VerificationStatus.VERIFIED) {
-    reasonCode = verification.reasonCode || 'VERIFICATION_NOT_VERIFIED';
-  }
 
   return deepFreeze({
-    criterionId: row.criterionId,
+    criterionId: criterion.criterionId,
+    trustedRecordId: trustedRecord.recordId,
     verificationId: verification.verificationId,
     verificationStatus: verification.status,
-    verificationAuthorityId: verification.verificationAuthorityId,
+    verifierId: trustedRecord.verifierId,
+    verificationAuthorityId: trustedRecord.verificationAuthorityId,
     accepted,
     reasonCode,
     evidenceArtifactIds: [...verification.evidenceArtifactIds].sort(compareCodeUnit),
@@ -229,10 +395,19 @@ function criterionResult({
     missingEvidenceKinds: missingKinds,
     missingEvidenceArtifactCount: missingArtifactCount,
     verifiedAt: verification.verifiedAt,
+    trustedRecordedAt: trustedRecord.recordedAt,
+    trustedValidThrough: trustedRecord.validThrough,
   });
 }
 
-export function adjudicateOutcomeVerificationV1(input = {}) {
+export async function adjudicateOutcomeVerificationV1(
+  input = {},
+  { resolveTrustedVerificationRecord } = {},
+) {
+  if (typeof resolveTrustedVerificationRecord !== 'function') {
+    throw new Error('Canonical trusted verification record resolver is required');
+  }
+
   const request = record(input, 'OutcomeVerificationBridgeRequestV1');
   exactKeys(request, REQUEST_KEYS, 'OutcomeVerificationBridgeRequestV1');
 
@@ -242,16 +417,16 @@ export function adjudicateOutcomeVerificationV1(input = {}) {
     throw new Error('evaluatedAt predates the exact outcome contract');
   }
 
-  const artifactsById = normalizeEvidenceArtifacts(request.evidenceArtifacts);
   const rows = denseArray(
     request.criterionVerifications,
     'Outcome verification criterionVerifications',
     { min: 1 },
   ).map(normalizeRow);
-
   const rowIds = rows.map(row => row.criterionId);
   if (new Set(rowIds).size !== rowIds.length) {
-    throw new Error('Outcome verification criterionVerifications contains duplicate criterionId');
+    throw new Error(
+      'Outcome verification criterionVerifications contains duplicate criterionId',
+    );
   }
   exactSet(
     rowIds,
@@ -262,21 +437,44 @@ export function adjudicateOutcomeVerificationV1(input = {}) {
   const criteriaById = new Map(
     contract.completionCriteria.map(criterion => [criterion.criterionId, criterion]),
   );
-  const referencedArtifactIds = new Set();
-  const results = rows
-    .sort((left, right) => compareCodeUnit(left.criterionId, right.criterionId))
-    .map(row => criterionResult({
-      row,
+  const trustedRecordIds = new Set();
+  const results = [];
+
+  for (const row of [...rows].sort(
+    (left, right) => compareCodeUnit(left.criterionId, right.criterionId),
+  )) {
+    const lookup = deepFreeze({
+      contractId: contract.contractId,
+      contractRevision: contract.revision,
+      verifierPlanId: contract.verifierPlan.planId,
+      criterionId: row.criterionId,
+      verificationId: row.verificationId,
+    });
+    const rawTrustedRecord = await resolveTrustedVerificationRecord(lookup);
+    if (rawTrustedRecord == null) {
+      throw new Error(
+        'Trusted verification record was not found for verificationId: '
+          + row.verificationId,
+      );
+    }
+    const trustedRecord = normalizeTrustedVerificationRecord(rawTrustedRecord);
+    if (trustedRecord.verification.verificationId !== row.verificationId) {
+      throw new Error('Trusted verification record verificationId is mismatched');
+    }
+    if (trustedRecord.criterion.criterionId !== row.criterionId) {
+      throw new Error('Trusted verification record criterionId is mismatched');
+    }
+    if (trustedRecordIds.has(trustedRecord.recordId)) {
+      throw new Error('Trusted verification recordId cannot be reused across criteria');
+    }
+    trustedRecordIds.add(trustedRecord.recordId);
+    results.push(criterionResult({
+      trustedRecord,
       criterion: criteriaById.get(row.criterionId),
       contract,
-      artifactsById,
       evaluatedAt,
-      referencedArtifactIds,
     }));
-
-  const suppliedArtifactIds = [...artifactsById.keys()].sort(compareCodeUnit);
-  const referenced = [...referencedArtifactIds].sort(compareCodeUnit);
-  exactSet(referenced, suppliedArtifactIds, 'Outcome verification evidenceArtifacts');
+  }
 
   const reopenCriterionIds = results
     .filter(result => !result.accepted)
@@ -299,7 +497,9 @@ export function adjudicateOutcomeVerificationV1(input = {}) {
     totalCriteria: results.length,
     reopenCriterionIds,
     criteria: results,
-    verificationProvenance: 'CANONICAL_VERIFICATION_V1_WITH_HASHED_ARTIFACT_REFS',
+    verificationProvenance:
+      'TRUSTED_CANONICAL_VERIFICATION_RECORD_WITH_HASHED_ARTIFACT_REFS',
+    trustedVerificationResolverRequired: true,
     completionEvidenceReady: evidenceReady,
     completionAuthorized: false,
     executionAuthorized: false,
