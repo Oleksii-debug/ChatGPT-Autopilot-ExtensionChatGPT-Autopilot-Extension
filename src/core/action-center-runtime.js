@@ -122,7 +122,11 @@ function addBrowserAgentCandidates(agentJobs, candidates) {
     const updatedAt = finiteTimestamp(runtime.updatedAt, job.updatedAt);
     const createdAt = finiteTimestamp(job.createdAt, updatedAt);
 
-    if (runtime.pendingApproval && typeof runtime.pendingApproval === 'object') {
+    if (runtime.runState === 'WAITING_APPROVAL'
+        && runtime.pendingApproval
+        && typeof runtime.pendingApproval === 'object'
+        && runtime.pendingApproval.action
+        && typeof runtime.pendingApproval.action === 'object') {
       const snapshot = typeof runtime.pendingApproval.snapshotSignature === 'string'
         ? runtime.pendingApproval.snapshotSignature
         : '';
