@@ -349,6 +349,8 @@ test('malformed reconciliation request authority is rejected before durable stat
     [{ invocationId: 7, outcome: 'VERIFIED' }, /invocationId must be text/],
     [{ invocationId: 'inv-1', outcome: { toString: () => 'VERIFIED' } }, /outcome must be text/],
     [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: true }, /reasonCode must be text/],
+    [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: ' WEB_RECONCILED' }, /reasonCode is invalid/],
+    [{ invocationId: 'inv-1', outcome: 'VERIFIED', reasonCode: 'WEB_RECONCILED ' }, /reasonCode is invalid/],
     [inherited, /plain object/],
     [symbolic, /unknown field/],
   ];
