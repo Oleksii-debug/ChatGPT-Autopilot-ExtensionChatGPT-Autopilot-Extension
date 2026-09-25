@@ -334,6 +334,10 @@ export function assessA2ADelegationV1({
   const selectedInterface = card.supportedInterfaces.find(iface => sameInterface(admission, iface)) || null;
   if (!selectedInterface) reasons.push('INTERFACE_NOT_IN_CARD');
 
+  if (!subset(admission.allowedSkillIds, card.skillIds)) reasons.push('ADMISSION_SKILL_SET_NOT_IN_CARD');
+  if (!subset(admission.allowedSecuritySchemeIds, card.securitySchemeIds)) {
+    reasons.push('ADMISSION_SECURITY_SET_NOT_IN_CARD');
+  }
   if (!card.skillIds.includes(delegation.requestedSkillId)) reasons.push('SKILL_NOT_IN_CARD');
   if (!admission.allowedSkillIds.includes(delegation.requestedSkillId)) reasons.push('SKILL_NOT_ADMITTED');
 
