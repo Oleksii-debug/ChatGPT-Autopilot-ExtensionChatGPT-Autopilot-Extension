@@ -197,6 +197,41 @@ test('release rejects common credential data filenames even when their contents 
   );
 });
 
+test('release build packages the exact validated byte snapshot even if source paths mutate after scan', async t => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-snapshot-'));
+  t.after(() => fs.rm(temp, { recursive: true, force: true }));
+  const { files } = await collectProductFiles(root);
+  const fixtureRoot = path.join(temp, 'source');
+  await writeLineEndingVariant(fixtureRoot, files, '\n');
+
+  const readmePath = path.join(fixtureRoot, 'README.txt');
+  const originalReadme = await fs.readFile(readmePath);
+  const triggerPath = path.resolve(fixtureRoot, files.at(-1));
+  const mutated = Buffer.from('MUTATED_AFTER_VALIDATION_SENTINEL\n', 'utf8');
+  const originalReadFile = fs.readFile.bind(fs);
+  let armed = true;
+  fs.readFile = async (...args) => {
+    const data = await originalReadFile(...args);
+    const requested = typeof args[0] === 'string' ? path.resolve(args[0]) : '';
+    if (armed && requested === triggerPath) {
+      armed = false;
+      await fs.writeFile(readmePath, mutated);
+    }
+    return data;
+  };
+  t.after(() => { fs.readFile = originalReadFile; });
+
+  const built = await buildReleasePackage({ root: fixtureRoot, outDir: path.join(temp, 'out') });
+  fs.readFile = originalReadFile;
+
+  assert.equal(armed, false, 'fixture must mutate a previously validated source before collectProductFiles returns');
+  assert.deepEqual(await fs.readFile(path.join(built.unpackedDir, 'README.txt')), originalReadme);
+  const zip = await fs.readFile(built.zipPath);
+  assert.equal(zip.includes(mutated), false, 'post-validation source bytes must not enter the ZIP');
+  assert.equal(zip.includes(originalReadme), true, 'ZIP must contain the validated README snapshot');
+  assert.deepEqual(await fs.readFile(readmePath), mutated, 'fixture must prove the source path really changed after validation');
+});
+
 test('release ZIP is byte-for-byte reproducible and has one canonical root folder', async t => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'autopilot-release-'));
   t.after(() => fs.rm(temp, { recursive: true, force: true }));
