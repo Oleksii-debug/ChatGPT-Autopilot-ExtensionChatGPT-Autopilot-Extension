@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  authorizeHumanHandbackResumeV1,
+  authorizeHumanHandbackResumeV1 as authorizeHumanHandbackResumeRawV1,
 } from '../src/core/human-handback-resume-gate.js';
 import {
   createHumanTakeoverV1,
@@ -502,14 +502,79 @@ function gateInput(overrides = {}) {
     handback: effectfulHandback(),
     ...runtimeIdentity(),
     ...worldMaterial(),
-    exactEffectState: exactEffectState(),
     at: T7,
     ...overrides,
   };
 }
 
+function authorize(input, trustedEffectState = exactEffectState(), onLookup = null) {
+  return authorizeHumanHandbackResumeRawV1(input, {
+    resolveTrustedExactEffectState(lookup) {
+      if (typeof onLookup === 'function') onLookup(lookup);
+      return trustedEffectState;
+    },
+  });
+}
+
+test('effectful handback requires trusted exact-effect resolution and rejects caller-owned state', () => {
+  const request = gateInput();
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(request),
+    /canonical trusted exact-effect resolver/,
+  );
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(request, {
+      resolveTrustedExactEffectState() {
+        return null;
+      },
+    }),
+    /did not resolve the interrupted effect/,
+  );
+
+  const fabricated = structuredClone(exactEffectState());
+  fabricated.processedEventIds = [];
+  assert.throws(
+    () => authorize({
+      ...request,
+      exactEffectState: fabricated,
+    }),
+    /unknown field: exactEffectState/,
+  );
+});
+
+test('trusted exact-effect resolver is bound to exact takeover and interrupted-effect identity', () => {
+  let observedLookup = null;
+  const result = authorize(gateInput(), exactEffectState(), lookup => {
+    observedLookup = lookup;
+  });
+  assert.deepEqual(observedLookup, {
+    schemaVersion: 1,
+    takeoverId: 'takeover-1',
+    jobId: 'job-1',
+    planId: 'plan-1',
+    nodeId: 'node-1',
+    effectId: 'effect-1',
+    executionId: 'effect-1:attempt:1',
+    attempt: 1,
+    handbackVerificationId: 'verify-handback',
+  });
+  assert.equal(Object.isFrozen(observedLookup), true);
+  assert.equal(result.resumeAuthorized, true);
+});
+
+test('async exact-effect resolver is rejected so resume cannot race a changing durable snapshot', () => {
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(gateInput(), {
+      resolveTrustedExactEffectState() {
+        return Promise.resolve(exactEffectState());
+      },
+    }),
+    /must synchronously return a durable snapshot/,
+  );
+});
+
 test('effectful handback resumes only after fresh world state and committed exact effect', () => {
-  const result = authorizeHumanHandbackResumeV1(gateInput());
+  const result = authorize(gateInput());
   assert.equal(result.resumeAuthorized, true);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.newEffectAuthorized, false);
@@ -528,7 +593,7 @@ test('effectful handback resumes only after fresh world state and committed exac
 });
 
 test('effect-free handback can resume without fabricating an exact-effect ledger', () => {
-  const result = authorizeHumanHandbackResumeV1({
+  const result = authorize({
     handback: effectFreeHandback(),
     ...runtimeIdentity(),
     ...worldMaterial(),
@@ -540,13 +605,12 @@ test('effect-free handback can resume without fabricating an exact-effect ledger
   assert.equal(result.exactEffectAttempt, 0);
   assert.equal(result.exactEffectCommitId, '');
 
-  assert.throws(() => authorizeHumanHandbackResumeV1({
+  assert.throws(() => authorize({
     handback: effectFreeHandback(),
     ...runtimeIdentity(),
     ...worldMaterial(),
-    exactEffectState: exactEffectState(),
     at: T7,
-  }), /effect-free handback cannot supply exactEffectState/);
+  }), /unknown field: exactEffectState/);
 });
 
 test('handback identity must match the current durable job, plan and node', () => {
@@ -555,7 +619,7 @@ test('handback identity must match the current durable job, plan and node', () =
     ['currentPlanId', 'plan-other', /planId does not match/],
     ['currentNodeId', 'node-other', /nodeId does not match/],
   ]) {
-    assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+    assert.throws(() => authorize(gateInput({
       ...runtimeIdentity({ [field]: value }),
     })), pattern);
   }
@@ -563,22 +627,20 @@ test('handback identity must match the current durable job, plan and node', () =
 
 test('stale or substituted world state fails closed before resume', () => {
   const stale = worldMaterial({ currentRevisionId: 'revision-substituted' });
-  assert.throws(() => authorizeHumanHandbackResumeV1({
+  assert.throws(() => authorize({
     handback: effectfulHandback(),
     ...runtimeIdentity(),
     ...stale,
-    exactEffectState: exactEffectState(),
     at: T7,
   }), /world-state snapshot is stale/);
 });
 
 test('world-state guard must bind the exact takeover resource', () => {
   const material = worldMaterial({ bindTakeoverResource: false });
-  assert.throws(() => authorizeHumanHandbackResumeV1({
+  assert.throws(() => authorize({
     handback: effectfulHandback(),
     ...runtimeIdentity(),
     ...material,
-    exactEffectState: exactEffectState(),
     at: T7,
   }), /does not bind takeover resource/);
 });
@@ -589,11 +651,10 @@ test('world-state guard and resource observation must be causally newer than han
     currentObservedAt: T6A,
     preconditionCreatedAt: '2026-09-25T00:03:55.000Z',
   });
-  assert.throws(() => authorizeHumanHandbackResumeV1({
+  assert.throws(() => authorize({
     handback: effectfulHandback(),
     ...runtimeIdentity(),
     ...oldGuard,
-    exactEffectState: exactEffectState(),
     at: T7,
   }), /precondition must be created after handback verification/);
 
@@ -602,11 +663,10 @@ test('world-state guard and resource observation must be causally newer than han
     currentObservedAt: '2026-09-25T00:03:50.000Z',
     preconditionCreatedAt: T6,
   });
-  assert.throws(() => authorizeHumanHandbackResumeV1({
+  assert.throws(() => authorize({
     handback: effectfulHandback(),
     ...runtimeIdentity(),
     ...oldObservation,
-    exactEffectState: exactEffectState(),
     at: T7,
   }), /freshly observed after handback verification/);
 });
@@ -618,26 +678,27 @@ test('unresolved exact-effect phases never authorize handback resume', () => {
     ExactEffectPhase.SAFE_RETRY,
     ExactEffectPhase.MANUAL_REVIEW,
   ]) {
-    assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
-      exactEffectState: exactEffectState(phase),
-    })), /must be COMMITTED before handback resume/);
+    assert.throws(
+      () => authorize(gateInput(), exactEffectState(phase)),
+      /must be COMMITTED before handback resume/,
+    );
   }
 });
 
 test('exact-effect identity, execution and attempt drift fail closed', () => {
-  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
-    exactEffectState: exactEffectState(ExactEffectPhase.COMMITTED, 'effect-2'),
-  })), /effectId mismatch/);
+  assert.throws(
+    () => authorize(gateInput(), exactEffectState(ExactEffectPhase.COMMITTED, 'effect-2')),
+    /effectId mismatch/,
+  );
 
   const attempt2 = secondAttemptCommittedEffect();
-  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+  assert.throws(() => authorize(gateInput({
     handback: effectfulHandback({
       effectId: 'effect-1',
       executionId: 'effect-1:attempt:2',
       attempt: 1,
     }),
-    exactEffectState: attempt2,
-  })), /attempt mismatch/);
+  }), attempt2), /attempt mismatch/);
 });
 
 test('matching committed exact-effect state from before handback verification cannot authorize resume', () => {
@@ -648,17 +709,18 @@ test('matching committed exact-effect state from before handback verification ca
   assert.equal(staleCommitted.attempt, 1);
   assert.ok(Date.parse(staleCommitted.updatedAt) < Date.parse(T4));
 
-  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
-    exactEffectState: staleCommitted,
-  })), /exact-effect resolution must not predate handback verification/);
+  assert.throws(
+    () => authorize(gateInput(), staleCommitted),
+    /exact-effect resolution must not predate handback verification/,
+  );
 });
 
 test('resume assessment cannot use future exact-effect state or predate handback verification', () => {
-  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+  assert.throws(() => authorize(gateInput({
     at: '2026-09-25T00:03:59.000Z',
   })), /causal timestamp ordering/);
 
-  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+  assert.throws(() => authorize(gateInput({
     ...worldMaterial({
       snapshotObservedAt: '2026-09-25T00:04:01.000Z',
       currentObservedAt: '2026-09-25T00:04:10.000Z',
@@ -678,10 +740,10 @@ test('top-level accessors and unknown authority fields fail without getter execu
       return effectfulHandback();
     },
   });
-  assert.throws(() => authorizeHumanHandbackResumeV1(input), /enumerable own data property/);
+  assert.throws(() => authorize(input), /enumerable own data property/);
   assert.equal(reads, 0);
 
-  assert.throws(() => authorizeHumanHandbackResumeV1({
+  assert.throws(() => authorize({
     ...gateInput(),
     forceResume: true,
   }), /unknown field: forceResume/);
@@ -696,12 +758,11 @@ test('current world-state arrays are consumed from descriptors without ordinary 
       return Reflect.get(target, property, receiver);
     },
   });
-  const result = authorizeHumanHandbackResumeV1({
+  const result = authorize({
     handback: effectfulHandback(),
     ...runtimeIdentity(),
     ...material,
     currentWorldStateObservations: proxied,
-    exactEffectState: exactEffectState(),
     at: T7,
   });
   assert.equal(result.resumeAuthorized, true);
@@ -710,9 +771,9 @@ test('current world-state arrays are consumed from descriptors without ordinary 
 
 test('null-prototype request records remain supported and timestamp aliases fail closed', () => {
   const input = Object.assign(Object.create(null), gateInput());
-  assert.equal(authorizeHumanHandbackResumeV1(input).resumeAuthorized, true);
+  assert.equal(authorize(input).resumeAuthorized, true);
 
-  assert.throws(() => authorizeHumanHandbackResumeV1(gateInput({
+  assert.throws(() => authorize(gateInput({
     at: '2026-09-25T00:07:00Z',
   })), /canonical ISO-8601 UTC/);
 });
