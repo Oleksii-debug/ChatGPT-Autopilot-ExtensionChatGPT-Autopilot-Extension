@@ -215,8 +215,8 @@ test('route profile names and prompts persist through the canonical router setti
       provider: 'ollama',
       model: 'qwen',
       displayName: 'Implementer',
-      systemPrompt: 'Preserve project policy.',
-      workerPrompt: 'Implement the assigned slice.',
+      systemPrompt: '  Preserve project policy.\nKeep spacing.  ',
+      workerPrompt: '\nImplement the assigned slice.  ',
       roles: ['coder'],
       priority: 10,
     }],
@@ -224,6 +224,6 @@ test('route profile names and prompts persist through the canonical router setti
   await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings });
   const loaded = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
   assert.equal(loaded.settings.routes[0].displayName, 'Implementer');
-  assert.equal(loaded.settings.routes[0].systemPrompt, 'Preserve project policy.');
-  assert.equal(loaded.settings.routes[0].workerPrompt, 'Implement the assigned slice.');
+  assert.equal(loaded.settings.routes[0].systemPrompt, '  Preserve project policy.\nKeep spacing.  ');
+  assert.equal(loaded.settings.routes[0].workerPrompt, '\nImplement the assigned slice.  ');
 });

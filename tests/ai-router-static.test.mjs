@@ -82,3 +82,10 @@ test('route model profiles expose bounded native controls and round-trip form wi
   assert.match(optionsJs, /systemPrompt:route\.systemPrompt \|\| ''/);
   assert.match(optionsJs, /workerPrompt:route\.workerPrompt \|\| ''/);
 });
+
+
+test('route prompt fields preserve owner-authored whitespace instead of trimming it in the UI', () => {
+  assert.match(optionsJs, /const exactText = field => card\.querySelector/);
+  assert.match(optionsJs, /systemPrompt:exactText\('systemPrompt'\)/);
+  assert.match(optionsJs, /workerPrompt:exactText\('workerPrompt'\)/);
+});

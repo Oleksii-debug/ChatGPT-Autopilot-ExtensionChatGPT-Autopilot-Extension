@@ -109,6 +109,12 @@ function denseDataArray(value, label, max) {
   return out;
 }
 function clean(value, max = 4000) { const out = typeof value === 'string' ? value.trim() : ''; if (out.length > max) throw new Error('AI route text is too long'); return out; }
+function exactPromptText(value, label, max = 8_000) {
+  if (value == null) return '';
+  if (typeof value !== 'string') throw new Error(`${label} must be text`);
+  if (value.length > max) throw new Error(`${label} is too long`);
+  return value;
+}
 function id(value, label, optional = false) { if (optional && (value == null || value === '')) return ''; const out = clean(value, 180); if (!ID.test(out)) throw new Error(`${label} is invalid`); return out; }
 function integer(value, label, min, max) { if (typeof value !== 'number' && typeof value !== 'string') throw new Error(`${label} is invalid`); const out = Number(value); if (!Number.isInteger(out) || out < min || out > max) throw new Error(`${label} is invalid`); return out; }
 function strictInteger(value, label, min, max) { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) throw new Error(`${label} is invalid`); return value; }
@@ -161,8 +167,8 @@ export function normalizeAiRoutePool(raw = []) {
       provider,
       model,
       displayName: clean(own(item, 'displayName'), 160),
-      systemPrompt: clean(own(item, 'systemPrompt'), 8_000),
-      workerPrompt: clean(own(item, 'workerPrompt'), 8_000),
+      systemPrompt: exactPromptText(own(item, 'systemPrompt'), 'AI route systemPrompt'),
+      workerPrompt: exactPromptText(own(item, 'workerPrompt'), 'AI route workerPrompt'),
       endpointId: id(own(item, 'endpointId'), 'AI route endpointId', true),
       roles,
       capabilityIds: ids(own(item, 'capabilityIds') || [], `AI route ${index + 1} capabilityIds`, 64),

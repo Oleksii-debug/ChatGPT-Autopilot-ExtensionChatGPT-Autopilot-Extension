@@ -875,6 +875,7 @@ function selectedValues(id) {
 function aiRouterRoutesFromForm({ validate = true } = {}) {
   return [...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map((card, index) => {
     const text = field => card.querySelector(`[data-route-field="${field}"]`).value.trim();
+    const exactText = field => card.querySelector(`[data-route-field="${field}"]`).value;
     const provider = text('provider');
     const routeId = text('routeId');
     const model = text('model');
@@ -887,8 +888,8 @@ function aiRouterRoutesFromForm({ validate = true } = {}) {
       provider,
       model,
       displayName:text('displayName'),
-      systemPrompt:text('systemPrompt'),
-      workerPrompt:text('workerPrompt'),
+      systemPrompt:exactText('systemPrompt'),
+      workerPrompt:exactText('workerPrompt'),
       ...(provider === 'openai-compatible' && text('endpointId') ? { endpointId:text('endpointId') } : {}),
       roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
       capabilityIds,
