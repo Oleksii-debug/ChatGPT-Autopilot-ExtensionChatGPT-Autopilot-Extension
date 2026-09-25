@@ -8,6 +8,7 @@ import { appendLog } from './logger.js';
 import { EXECUTION_UNAVAILABLE_MESSAGE, healUnattendedManualHolds } from './recovery.js';
 import { applyPortableProfile, exportPortableProfile, previewPortableProfile } from './portable-profile.js';
 import { appendDiagnostic, createDiagnosticReport } from './diagnostics.js';
+import { buildRunTimelineV1 } from './run-timeline.js';
 import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
@@ -634,6 +635,10 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.GET_SNAPSHOT) { const state=await this.repo.load(); return { snapshot: structuredClone(state) }; }
     if (command === CoreCommand.GET_SESSION) { const state=await this.repo.load(); const s=state.sessionsById[payload.sessionId]; if(!s) throw new Error('Session not found'); return { session: sessionToUi(s,state) }; }
+    if (command === CoreCommand.GET_RUN_TIMELINE) {
+      const state = await this.repo.load();
+      return { timeline: buildRunTimelineV1(state, { sessionId: payload.sessionId, limit: payload.limit }) };
+    }
     if (command === CoreCommand.GET_DIAGNOSTIC_REPORT) {
       const state = await this.repo.load();
       return {
