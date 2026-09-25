@@ -344,6 +344,13 @@ test('dataset source admission composes with canonical ProjectSnapshotV1 instead
     projectSnapshot: staleProject,
   }), /not admitted/);
 
+  const olderObservation = structuredClone(projectSnapshot);
+  olderObservation.sourceRefs[0].observedAt = '2026-09-24T19:00:00.000Z';
+  assert.throws(() => assertDataDatasetSourcesMatchProjectSnapshotV1({
+    dataset: snap,
+    projectSnapshot: olderObservation,
+  }), /not admitted/);
+
   const wrongProject = { ...projectSnapshot, projectId: 'project-other', sourceRefs: [source({ projectId: 'project-other' })] };
   assert.throws(() => assertDataDatasetSourcesMatchProjectSnapshotV1({
     dataset: snap,
@@ -476,6 +483,14 @@ test('dataset delta is deterministic advisory structural change evidence and det
 
   const conflict = dataset({ digest: sha('f'), artifactId: 'artifact-conflict' });
   assert.throws(() => deriveDataDatasetDeltaV1({ baseline: before, current: conflict }), /revision identity conflict/);
+
+  const observationAliasConflict = structuredClone(before);
+  observationAliasConflict.sourceRefs[0].observedAt = T2;
+  assert.throws(
+    () => deriveDataDatasetDeltaV1({ baseline: before, current: observationAliasConflict }),
+    /revision identity conflict/,
+  );
+
 
   const unchanged = deriveDataDatasetDeltaV1({ baseline: before, current: structuredClone(before) });
   assert.equal(unchanged.status, 'UNCHANGED');
