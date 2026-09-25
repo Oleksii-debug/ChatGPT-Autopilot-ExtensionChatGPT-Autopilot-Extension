@@ -342,12 +342,17 @@ function parseVisionResponse(text) {
     .map((item, index) => normalizeObservation(item, index));
   const cropProposals = denseArray(raw.cropProposals, 'cropProposals', 16)
     .map((item, index) => normalizeCrop(item, index));
+  const altText = exactText(raw.altText, 'altText', { max: 2000, allowEmpty: true });
+  const caption = exactText(raw.caption, 'caption', { max: 2000, allowEmpty: true });
+  if (!raw.decorative && !altText) {
+    throw new Error('Non-decorative image analysis requires a non-empty altText proposal');
+  }
   return deepFreeze({
     schemaVersion: IMAGE_VISION_ARTIFACT_SCHEMA_VERSION,
     summary: exactText(raw.summary, 'summary', { max: 4000 }),
     decorative: raw.decorative,
-    altText: exactText(raw.altText, 'altText', { max: 2000, allowEmpty: true }),
-    caption: exactText(raw.caption, 'caption', { max: 2000, allowEmpty: true }),
+    altText,
+    caption,
     observations,
     cropProposals,
   });
