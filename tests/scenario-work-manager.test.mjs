@@ -682,7 +682,7 @@ test('owner Pause racing assistant observation cannot be overwritten by stale Sc
   assert.equal(state.sessionsById[sid].runState, 'PAUSED');
 });
 
-test('generation completion checkpoint survives tab-close failure and blocks next launch until restart cleanup succeeds', async () => {
+test('generation completion stops the retired Session and permits next launch while tab cleanup is retried', async () => {
   let now = 30_000;
   const chrome = chromeFake();
   const liveTabs = new Set([55]);
@@ -705,14 +705,16 @@ test('generation completion checkpoint survives tab-close failure and blocks nex
   ready = true;
   now += 100;
   const first = await manager.cycleOne('cleanup1');
-  assert.equal(first.kind, 'CLEANUP_PENDING');
+  assert.equal(first.kind, 'CYCLED');
   let scenario = (await manager.get('cleanup1')).scenario;
   assert.deepEqual(scenario.runtime.cleanupPendingSessionIds, [sid]);
   assert.equal(scenario.runtime.generation, 2, 'generation transition must be durable before physical cleanup');
   state = await core.load();
   assert.ok(state.sessionsById[sid]);
+  assert.equal(state.sessionsById[sid].enabled, false);
+  assert.equal(state.sessionsById[sid].runState, 'STOPPED');
   assert.equal(state.tabHintsByTaskId[taskId].retirePending, true);
-  assert.equal(state.sessionOrder.filter(id => state.sessionsById[id]?.scenarioWork?.managed && id !== sid).length, 0, 'next turn must not launch while cleanup is pending');
+  assert.equal(state.sessionOrder.filter(id => state.sessionsById[id]?.scenarioWork?.managed && id !== sid).length, 1, 'next generation may launch after retired Session is durably stopped');
 
   manager = build();
   failClose = false;
