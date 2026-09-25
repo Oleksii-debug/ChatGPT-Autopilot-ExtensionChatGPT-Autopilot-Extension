@@ -60,20 +60,24 @@ function input(overrides = {}) {
   };
 }
 
-test('builds deterministic READY bootstrap over canonical ProjectSnapshot authority', () => {
+test('builds deterministic READY advisory candidate without canonical ProjectSnapshot authority', () => {
   const result = buildProjectBootstrapV1(input({
     sourceRefs: [source('repo', SHA_A), source('drive', SHA_C, { kind:'drive.folder', uri:'drive://folder-1' })].reverse(),
   }));
 
   assert.equal(result.status, ProjectBootstrapStatus.READY);
   assert.deepEqual(result.blockers, []);
-  assert.deepEqual(result.snapshot.sourceRefs.map((item) => item.sourceId), ['drive', 'repo']);
-  assert.deepEqual(result.snapshot.artifactRefs.map((item) => item.artifactId), ['inventory']);
+  assert.deepEqual(result.candidate.sourceCandidates.map((item) => item.sourceId), ['drive', 'repo']);
+  assert.deepEqual(result.candidate.artifactCandidates.map((item) => item.artifactId), ['inventory']);
   assert.deepEqual(result.requiredSourceIds, ['drive', 'repo']);
-  assert.equal(result.snapshot.projectId, 'project-1');
-  assert.equal(result.snapshot.revisionId, 'project-rev-1');
+  assert.equal(result.candidate.projectId, 'project-1');
+  assert.equal(result.candidate.revisionId, 'project-rev-1');
+  assert.equal(Object.hasOwn(result, 'snapshot'), false);
+  assert.equal(Object.hasOwn(result.candidate.sourceCandidates[0], 'authority'), false);
+  assert.equal(Object.hasOwn(result.candidate.sourceCandidates[0], 'schemaVersion'), false);
+  assert.equal(Object.hasOwn(result.candidate.artifactCandidates[0], 'schemaVersion'), false);
   assert.equal(Object.isFrozen(result), true);
-  assert.equal(Object.isFrozen(result.snapshot), true);
+  assert.equal(Object.isFrozen(result.candidate), true);
 });
 
 test('identical canonical inputs produce identical output regardless of input ordering', () => {
@@ -151,6 +155,8 @@ test('READY bootstrap is advisory-only until trusted source admission is supplie
   assert.equal(result.admissionAuthorized, false);
   assert.equal(result.requiresTrustedSourceAdmission, true);
   assert.equal(Object.hasOwn(result, 'project'), false);
+  assert.equal(Object.hasOwn(result, 'snapshot'), false);
+  assert.equal(Object.hasOwn(result.candidate.sourceCandidates[0], 'authority'), false);
 });
 
 test('top-level accessor authority is rejected without executing getter', () => {
