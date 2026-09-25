@@ -171,6 +171,12 @@ function normalizeSourceBinding(raw, index) {
   if (typeof raw.sourceId !== 'string' || typeof raw.revisionId !== 'string' || typeof raw.contentSha256 !== 'string') {
     throw new Error(`sourceBindings[${index}] identity fields must be strings`);
   }
+  const exactSourceId = raw.sourceId === raw.sourceId.trim() && ID.test(raw.sourceId);
+  const exactRevisionId = raw.revisionId === raw.revisionId.trim() && ID.test(raw.revisionId);
+  const exactDigest = raw.contentSha256 === '' || SHA256.test(raw.contentSha256);
+  if (!exactSourceId || !exactRevisionId || !exactDigest) {
+    throw new Error(`sourceBindings[${index}] must use exact canonical representation`);
+  }
   const normalized = normalizeSourceRevisionBindingV1(raw);
   if (normalized.sourceId !== raw.sourceId
     || normalized.revisionId !== raw.revisionId
