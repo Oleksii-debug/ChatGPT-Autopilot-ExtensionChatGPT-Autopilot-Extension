@@ -201,19 +201,29 @@ export function normalizeAiRoutePolicy(raw = {}) {
 
 export function normalizeAiWorkerPolicy(raw = {}, routes = []) {
   if (raw == null) raw = {};
-  object(raw, 'AI worker policy');
-  exact(raw, new Set(['allocationMode','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
-  const allocationMode = clean(raw.allocationMode || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
+  const policy = dataRecord(raw, new Set(['allocationMode','maxParallelWorkers','manualRouteWorkers']), 'AI worker policy');
+  const allocationMode = clean(own(policy, 'allocationMode') || DEFAULT_AI_WORKER_POLICY.allocationMode, 20);
   if (!WORKER_ALLOCATION_MODES.has(allocationMode)) throw new Error('AI worker allocationMode is invalid');
-  const maxParallelWorkers = strictInteger(raw.maxParallelWorkers ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
+  const maxParallelWorkers = strictInteger(own(policy, 'maxParallelWorkers') ?? DEFAULT_AI_WORKER_POLICY.maxParallelWorkers, 'AI worker maxParallelWorkers', 1, MAX_PARALLEL_WORKERS);
   const pool = normalizeAiRoutePool(routes);
   const routeIds = new Set(pool.map(route => route.routeId));
-  const source = raw.manualRouteWorkers ?? {};
+  const source = own(policy, 'manualRouteWorkers') ?? {};
   object(source, 'AI worker manualRouteWorkers');
-  if (Object.keys(source).length > MAX_ROUTES) throw new Error('AI worker manualRouteWorkers is too large');
+  const descriptors = Object.getOwnPropertyDescriptors(source);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > MAX_ROUTES) throw new Error('AI worker manualRouteWorkers is too large');
+  const entries = [];
+  for (const key of keys) {
+    if (typeof key !== 'string') throw new Error('AI worker manualRouteWorkers contains a symbol field');
+    const descriptor = descriptors[key];
+    if (!descriptor || !('value' in descriptor) || descriptor.enumerable !== true) {
+      throw new Error(`AI worker manualRouteWorkers.${key} must be an enumerable own data property`);
+    }
+    entries.push([key, descriptor.value]);
+  }
   const manualRouteWorkers = {};
   let manualTotal = 0;
-  for (const [rawRouteId, value] of Object.entries(source)) {
+  for (const [rawRouteId, value] of entries) {
     const routeId = id(rawRouteId, 'AI worker manual routeId');
     if (!routeIds.has(routeId)) throw new Error(`AI worker manual route is unknown: ${routeId}`);
     const count = strictInteger(value, `AI worker manualRouteWorkers.${routeId}`, 0, MAX_PARALLEL_WORKERS);
