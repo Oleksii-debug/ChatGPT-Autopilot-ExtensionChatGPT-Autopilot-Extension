@@ -73,9 +73,23 @@ test('chronology and canonical timestamps fail closed', async()=>{
 });
 
 test('event material requires exact non-empty sha-bound ArtifactRef',()=>{
- assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,sha256:''}})),/requires sha256/);
+ assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,sha256:''}})),/canonical lowercase SHA-256/);
  assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,sizeBytes:0}})),/requires non-empty material/);
  assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,createdAt:T2}})),/cannot postdate observation/);
+});
+
+test('ArtifactRef aliases and coercions fail before canonical normalization',()=>{
+ const variants=[
+  [{schemaVersion:'1'},/schemaVersion must be numeric 1/],
+  [{artifactId:' artifact-event-42'},/artifactId is invalid/],
+  [{sha256:'A'.repeat(64)},/canonical lowercase SHA-256/],
+  [{sizeBytes:'120'},/integer sizeBytes/],
+  [{createdAt:'2026-09-25T03:01:00Z'},/canonical ISO-8601 UTC/],
+  [{sensitive:'false'},/explicit boolean/],
+ ];
+ for(const [patch,pattern] of variants){
+  assert.throws(()=>normalizeEventTriggerObservationV1(observation({payloadArtifactRef:{...observation().payloadArtifactRef,...patch}})),pattern);
+ }
 });
 
 test('outer records and capability arrays are descriptor-snapshotted without ordinary getter execution', async()=>{
