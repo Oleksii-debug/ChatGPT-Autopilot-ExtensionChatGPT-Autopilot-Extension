@@ -14,6 +14,7 @@ export const CmsWordPressToolId = Object.freeze({
   MEDIA_SEARCH: 'remote/cms-wordpress/media.search',
   MEDIA_GET: 'remote/cms-wordpress/media.get',
   TAXONOMY_SEARCH: 'remote/cms-wordpress/taxonomy.search',
+  CONTENT_DRAFT_CREATE: 'remote/cms-wordpress/content.draft.create',
 });
 
 export const CmsWordPressCapabilityId = Object.freeze({
@@ -21,6 +22,7 @@ export const CmsWordPressCapabilityId = Object.freeze({
   CONTENT_READ: 'cms.wordpress.content.read',
   MEDIA_READ: 'cms.wordpress.media.read',
   TAXONOMY_READ: 'cms.wordpress.taxonomy.read',
+  CONTENT_DRAFT_CREATE: 'cms.wordpress.content.draft.create',
 });
 
 const TOOLS = Object.freeze([
@@ -89,6 +91,17 @@ const TOOLS = Object.freeze([
     inputSchemaRef: 'cms-wordpress-schema/taxonomy.search/input',
     outputSchemaRef: 'cms-wordpress-schema/taxonomy.search/output',
     readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
+    toolId: CmsWordPressToolId.CONTENT_DRAFT_CREATE,
+    providerId: CMS_WORDPRESS_PROVIDER_ID,
+    label: 'Create an owner-authorized WordPress draft',
+    description: 'Creates one draft post or page with an invocation-bound deterministic slug. This tool never publishes content.',
+    capabilityIds: [CmsWordPressCapabilityId.CONTENT_DRAFT_CREATE],
+    inputSchemaRef: 'cms-wordpress-schema/content.draft.create/input',
+    outputSchemaRef: 'cms-wordpress-schema/content.draft.create/output',
+    readOnly: false,
   }),
 ]);
 
@@ -337,18 +350,19 @@ function methodFor(toolId) {
   if (toolId === CmsWordPressToolId.MEDIA_SEARCH) return 'searchMedia';
   if (toolId === CmsWordPressToolId.MEDIA_GET) return 'getMedia';
   if (toolId === CmsWordPressToolId.TAXONOMY_SEARCH) return 'searchTaxonomy';
+  if (toolId === CmsWordPressToolId.CONTENT_DRAFT_CREATE) return 'createDraft';
   return '';
 }
 
-function wrapFailure(error, invocationId) {
+function wrapFailure(error, invocationId, readOnly) {
   const rawCode = typeof error?.code === 'string' ? error.code : '';
   const code = /^WORDPRESS_[A-Z0-9_]{1,100}$/u.test(rawCode) ? rawCode : 'WORDPRESS_PROVIDER_FAILED';
-  const wrapped = new Error('WordPress read failed');
+  const wrapped = new Error(readOnly ? 'WordPress read failed' : 'WordPress mutation failed');
   wrapped.name = 'CmsWordPressAgentProviderError';
   wrapped.code = code;
   wrapped.invocationId = invocationId;
-  wrapped.effectMayHaveOccurred = false;
-  wrapped.safeToRetry = true;
+  wrapped.effectMayHaveOccurred = readOnly ? false : error?.effectMayHaveOccurred === true;
+  wrapped.safeToRetry = readOnly ? true : (error?.effectMayHaveOccurred === false && error?.safeToRetry === true);
   if (Number.isInteger(error?.status)) wrapped.status = error.status;
   return wrapped;
 }
@@ -392,7 +406,14 @@ export class CmsWordPressAgentProviderV1 {
     const tool = TOOLS.find(item => item.toolId === authorized.invocation.toolId);
     const method = methodFor(tool.toolId);
     try {
-      const result = await this.wordpressMethods[method](authorized.invocation.arguments);
+      let requestArguments = authorized.invocation.arguments;
+      if (tool.toolId === CmsWordPressToolId.CONTENT_DRAFT_CREATE) {
+        const fingerprint = await createSha256FingerprintV1(authorized.invocation.invocationId);
+        const slug = 'autopilot-' + fingerprint.slice('sha256:'.length);
+        if (!/^autopilot-[a-f0-9]{64}$/u.test(slug)) fail('WordPress draft invocation fingerprint is invalid');
+        requestArguments = { ...authorized.invocation.arguments, slug };
+      }
+      const result = await this.wordpressMethods[method](requestArguments);
       const observed = new Date(this.now());
       if (!Number.isFinite(observed.getTime())) fail('now returned an invalid timestamp');
       const observedAt = observed.toISOString();
@@ -413,7 +434,7 @@ export class CmsWordPressAgentProviderV1 {
         requiresCanonicalUntrustedContentGuardAssessment: true,
       });
     } catch (error) {
-      throw wrapFailure(error, authorized.invocation.invocationId);
+      throw wrapFailure(error, authorized.invocation.invocationId, tool.readOnly);
     }
   }
 }
