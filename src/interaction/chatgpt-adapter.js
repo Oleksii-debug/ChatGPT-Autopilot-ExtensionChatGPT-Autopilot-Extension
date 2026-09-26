@@ -881,7 +881,10 @@
   function userMessageText(el) {
     // Read the message body without the turn heading, copy/edit buttons or footer.
     if (el.getAttribute?.('data-user-message-bubble') === 'true') return textOf(el).trim();
-    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [data-user-message-bubble="true"]') || []);
+    const bodies = [...new Set([
+      ...Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []),
+      ...Array.from(el.querySelectorAll?.('[data-user-message-bubble="true"]') || []),
+    ])];
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
     return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
