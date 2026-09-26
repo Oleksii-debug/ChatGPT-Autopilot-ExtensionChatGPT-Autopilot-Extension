@@ -280,7 +280,10 @@ function poolSummary(store, poolId, coreState = null) {
       ? sequence.reduce((sum, item) => sum + item.completedResponses, 0)
       : members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
     verifiedSends,
-    transportVerifiedSends: verifiedSends,
+    transportVerifiedSends: coreState
+      ? sequence.reduce((sum, item) => sum + item.transportVerifiedSends, 0)
+      : verifiedSends,
+    transportVerifiedSendsOverall: verifiedSends,
     sequenceVerifiedSends,
     retryVerifiedSends,
   };
@@ -313,22 +316,29 @@ function verifiedSendProjection(item, coreState) {
 function scenarioSequenceProjection(item, coreState) {
   const runtime = item.runtime || {};
   const total = scenarioMessagesPerChat(item.config);
-  const completedResponses = Math.max(0, Math.min(total, Number(runtime.totalCompletedTurns || 0)));
+  const generation = Math.max(1, Number(runtime.generation || 1));
+  const completedResponses = Math.max(
+    0,
+    Math.min(total, Number(runtime.totalCompletedTurns || 0) - (generation - 1) * total),
+  );
   const sessionId = runtime.chat?.sessionId;
   const session = sessionId ? coreState?.sessionsById?.[sessionId] : null;
   const inFlight = runtime.chat?.state === ScenarioParticipantState.WAITING
     && session?.operation?.phase === OperationPhase.SENT_VERIFIED
     && Number(session?.successfulSendCount || 0) > 0;
   const sequenceVerifiedSends = Math.min(total, completedResponses + Number(inFlight));
+  const activeVerified = Math.max(0, Number(session?.successfulSendCount || 0));
+  const transportVerifiedSends = Math.max(0, Number(runtime.generationRetiredVerifiedSends || 0)) + activeVerified;
   const raw = verifiedSendProjection(item, coreState || { sessionsById: {} });
-  const transportVerifiedSends = raw.confirmedOverall == null
-    ? Math.max(0, Number(raw.confirmedInThisChat || 0))
+  const transportVerifiedSendsOverall = raw.confirmedOverall == null
+    ? transportVerifiedSends
     : Math.max(0, Number(raw.confirmedOverall || 0));
   return {
     total,
     completedResponses,
     sequenceVerifiedSends,
     transportVerifiedSends,
+    transportVerifiedSendsOverall,
     retryVerifiedSends: Math.max(0, transportVerifiedSends - sequenceVerifiedSends),
   };
 }
