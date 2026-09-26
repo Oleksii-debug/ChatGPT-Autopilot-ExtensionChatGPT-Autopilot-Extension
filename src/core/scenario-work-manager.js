@@ -512,13 +512,22 @@ export class ScenarioWorkManager {
         && !next.chat?.sessionId;
       if (replacingChat) {
         const summary = poolSummary(store, item.pool.id);
+        const completedSequence = Number(next.totalCompletedTurns || 0) > Number(item.runtime.totalCompletedTurns || 0)
+          && Number(next.generation || 0) > Number(item.runtime.generation || 0);
         if (summary.replacementsUsed >= summary.replacementBudget) {
-          next.runState = ScenarioWorkRunState.ERROR;
-          next.phase = 'ERROR';
-          next.generation = item.runtime.generation;
-          next.chat.state = ScenarioParticipantState.RETIRED;
-          next.chat.chatUrl = '';
-          next.lastError = 'Відповідь не була підтверджена до timeout, а ліміт replacement-чатів вичерпано. Сценарій зупинено без вигаданого завершення.';
+          if (completedSequence) {
+            next.runState = ScenarioWorkRunState.COMPLETED;
+            next.phase = 'COMPLETE';
+            next.chat.state = ScenarioParticipantState.RETIRED;
+            next.chat.chatUrl = '';
+          } else {
+            next.runState = ScenarioWorkRunState.ERROR;
+            next.phase = 'ERROR';
+            next.generation = item.runtime.generation;
+            next.chat.state = ScenarioParticipantState.RETIRED;
+            next.chat.chatUrl = '';
+            next.lastError = 'Відповідь не була підтверджена до timeout, а ліміт replacement-чатів вичерпано. Сценарій зупинено без вигаданого завершення.';
+          }
         } else {
           next.poolReplacementsUsed = item.runtime.poolReplacementsUsed + 1;
         }
