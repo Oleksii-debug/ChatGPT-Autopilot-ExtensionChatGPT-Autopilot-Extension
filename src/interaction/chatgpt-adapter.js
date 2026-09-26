@@ -258,7 +258,7 @@
 
   function normalizeEffortText(value) {
     let text = String(value || '').trim().toLowerCase();
-    try { text = text.normalize('NFKD').replace(/\p{M}+/gu, ''); } catch (_) {}
+    try { text = text.normalize('NFKC'); } catch (_) {}
     return text.replace(/[–—_]+/gu, '-').replace(/\s+/gu, ' ');
   }
 
