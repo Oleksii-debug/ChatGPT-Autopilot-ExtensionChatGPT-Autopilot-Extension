@@ -143,7 +143,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
         scenario: scenario.pool?.name || scenario.name,
         role: participant.role,
         poolId: scenario.pool?.id || '',
-        slotIndex: num(scenario.pool?.slotIndex),
+        slotIndex: num(scenario.pool?.slotIndex) || num(String(scenario.name || '').match(/\s+—\s+чат\s+(\d+)$/u)?.[1]),
         generation: num(participant.generation || runtime.generation),
         message: runtime.mode === 'CHAT_CYCLE' ? Math.min(stepPosition, turnsPerGeneration) : null,
         messagesPerGeneration: runtime.mode === 'CHAT_CYCLE' ? turnsPerGeneration : null,
