@@ -1,0 +1,57 @@
+10 ПІЛОТ — TECHNICAL 10.0.0 — CURRENT DAILY RELEASE LINE
+
+CANDIDATE CHANGELOG — 2026-09-26
+
+BASELINE
+- Last frozen canonical release: 0.9.19.
+- Candidate source is not the user-supplied 0.9.19 ZIP renamed. It is built from live GitHub source after canonical main 372cf294eec087fa7c355d14885140af1ad9f13d plus the converged Scenario Work lanes below.
+- Scenario recovery/pool lane: PR #418 head fc10ac376255f174e35f5e44b0a5834df746e41a.
+- Portable Scenario Work profile lane: PR #420 head 91097879c3757e753d1484a7407414926f27e9a0.
+- Pre-rebase rollback for #420: backup/scenario-profile-import-20260926-059c462.
+
+USER-DIAGNOSTIC FIX
+- Real 7-chat run accepted the first prompt in every physical ChatGPT Work chat, but Core recorded zero confirmed sends and stayed in SUBMISSION_UNCERTAIN / AMBIGUOUS with RECOVERY_TEXT_ACK_PENDING.
+- Work-specific semantic message surfaces are now part of acknowledgement/recovery evidence, so an accepted Send can advance durable accounting instead of holding the scenario indefinitely.
+- Blind resend remains prohibited while effect is unresolved.
+
+CHAT_CYCLE SEMANTICS
+- One physical chat executes the configured prompt sequence exactly once.
+- Pool replacement generations are governed only by the shared replacement budget.
+- Legacy persisted pool configs that carried roundsPerGeneration > 1 are normalized to the one-sequence pool contract.
+- A start ×1 + continue ×10 + final ×1 sequence is exactly 12 messages per physical chat.
+- Duplicate round/generation editors are hidden for CHAT_CYCLE.
+- Status reports physical chat number, message current/total, prompt position and repeat instead of multiplying prompts by generic rounds.
+
+PORTABLE SCENARIO CONFIG
+- Added a single keyboard-usable file-control group with:
+  - Завантажити шаблон;
+  - Імпортувати файл;
+  - Експортувати вибраний сценарій.
+- The template is versioned portable JSON and contains a 12-message CHAT_CYCLE example.
+- Import creates a fresh STOPPED scenario with new identity; runtime/send counters are not restored and work is not auto-started.
+- Imported CHAT_CYCLE status immediately reports messages per physical chat.
+
+VERSION / RELEASE INTEGRITY
+- package.json is now the single release-version authority.
+- manifest.json must exactly match that version during packaging.
+- source package version derives from the same authority.
+- GitHub Actions resolves candidate ZIP/artifact names from package.json instead of hardcoding 0.9.19.
+- This removes the previous failure mode where later bytes could still be packaged/labeled as 0.9.19.
+
+HISTORY / HANDOFF
+- Added DEVELOPMENT_HISTORY.md for repository-local cross-chat/Codex/Work continuity.
+- Mirrored exact source/head/root-cause/acceptance checkpoint to Drive 09_ІСТОРІЯ_ЗМІН and 01_CURRENT_STATUS.
+
+NOT CLAIMED
+- This changelog describes a release candidate, not a completed release.
+- Exact-head CI and deterministic Linux/Windows package gates must pass on the 10.0.0 candidate head.
+- Installed extension acceptance against current ChatGPT Work must still be run.
+- HUMAN_TESTED=false.
+- NVDA_VERIFIED=false.
+- OWNER_WINDOWS_CHROME_VERIFIED=false.
+
+DAILY USER-FACING IDENTITY
+- Daily Pilot number for 2026-09-26: 10.
+- Same-day corrections keep number 10.
+- User archive name is derived from exact commit time in Europe/Bratislava: 10 Пілот HHMM DDMM.zip.
+- The next development day advances to the next whole Pilot number instead of 10.1 / 10.2 / 10.3.
