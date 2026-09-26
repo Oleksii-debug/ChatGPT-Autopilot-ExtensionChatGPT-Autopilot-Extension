@@ -82,3 +82,11 @@ LONG PROMPT INSERTION STALL — SIMPLIFIED SESSIONS
 AGENT / MISTRAL PROVIDER VISIBILITY
 - AI Router Gateway status now names each compatible endpoint separately and reports whether its key is actually loaded locally, including Mistral. The status contains no key bytes.
 - Mistral's existing Windows DPAPI setup script and existing route pool are documented together for screen-reader users. The key remains outside the extension ZIP, profile, routes and GitHub.
+
+
+EMERGENCY HOTFIX — 2026-09-26 — SESSION / SCENARIO EFFORT CONTROL
+- Production ChatGPT data-selected-reasoning-effort is now authoritative for High/Medium detection.
+- The obsolete fixed 0..2 slider assumption no longer blocks the current UI.
+- The legacy announced three-step slider remains supported only as a bounded compatibility fallback.
+- Pre-send TEMPORARY_ERROR/UNKNOWN_UI effort retries keep the extension-owned tab alive instead of causing a close/reopen storm.
+- Regression coverage added for explicit High and Medium-to-High current-production states.
