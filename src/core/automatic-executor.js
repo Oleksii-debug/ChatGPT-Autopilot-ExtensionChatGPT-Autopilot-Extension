@@ -732,7 +732,7 @@ export class AutomaticSessionExecutor {
       liveOperation.phase = OperationPhase.FAILED_SAFE;
       liveOperation.updatedAt = now;
       liveTask.retryAfterAt = Math.max(liveTask.retryAfterAt || 0, wakeAt);
-      live.lastError = 'Interrupted pre-submit operation failed safe; retry scheduled.';
+      live.lastError = 'Pre-submit operation was interrupted; automatic retry scheduled.';
       live.lastActionAt = now;
       live.updatedAt = now;
       reconciled = true;
@@ -955,7 +955,7 @@ export class AutomaticSessionExecutor {
               candidate.retryAfterAt = Math.max(candidate.retryAfterAt || 0, wakeAt);
             }
           }
-          live.lastError = `Вставлення не вдалося підтвердити; безпечний автоматичний повтор заплановано. Код: ${inserted.safeDiagnosticCode || 'INSERTION_NOT_PROVEN'}.`;
+          live.lastError = `Вставлення не вдалося підтвердити; автоматичний повтор заплановано. Код: ${inserted.safeDiagnosticCode || 'INSERTION_NOT_PROVEN'}.`;
           live.lastActionAt = now;
           live.updatedAt = now;
           appendDiagnostic(draft, {
