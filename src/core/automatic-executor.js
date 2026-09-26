@@ -894,31 +894,10 @@ export class AutomaticSessionExecutor {
       return { kind: check.status, result: check };
     }
 
-    const effort = await this.executeInteraction(
-      sessionId,
-      session,
-      task,
-      tab.id,
-      'ENSURE_HIGH_EFFORT',
-      `${checkId}:effort`,
-      '',
-    );
-
-    const postEffort = await this.repo.load();
-    const postEffortSession = requireSession(postEffort, sessionId);
-    if (!ACTIVE_STATES.has(postEffortSession.runState)) {
-      return { kind: 'QUIESCED', runState: postEffortSession.runState };
-    }
-    if (effort.status !== InteractionResult.READY) {
-      await this.applyResult(sessionId, task.id, effort);
-      // Effort selection is pre-send. Keep the extension-owned tab for
-      // bounded TEMPORARY_ERROR/UNKNOWN_UI retries instead of creating the
-      // 10.0.0 close/reopen storm that can break the interaction receiver.
-      if (![InteractionResult.TEMPORARY_ERROR, InteractionResult.UNKNOWN_UI].includes(effort.status)) {
-        await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, effort);
-      }
-      return { kind: effort.status, result: effort };
-    }
+    // Reasoning-effort selection is intentionally deferred. Ordinary Sessions,
+    // Simplified Sessions, Scenario Work and Orchestration must not inspect,
+    // open, change or wait on ChatGPT's reasoning-effort UI in the active
+    // execution path. Proceed directly from readiness to prompt insertion.
 
     const fresh = await this.repo.load();
     const liveSession = requireSession(fresh, sessionId);
