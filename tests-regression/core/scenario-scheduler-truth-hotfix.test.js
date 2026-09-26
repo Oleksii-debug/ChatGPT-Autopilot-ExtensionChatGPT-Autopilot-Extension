@@ -484,3 +484,144 @@ test('pool get returns one aggregate controller while keeping physical member id
   assert.equal(detail.scenario.poolController, true);
   assert.equal(detail.memberIds.length, 10);
 });
+
+
+test('3 physical Sends plus 1 completed response can never be displayed as logical 3/12 progress', () => {
+  const coreState = {
+    sessionOrder: ['managed-current'],
+    sessionsById: {
+      'managed-current': {
+        id: 'managed-current',
+        successfulSendCount: 1,
+        operation: { phase: 'SENT_VERIFIED' },
+        scenarioWork: { managed: true, scenarioId: 'slot-1', generation: 1 },
+      },
+    },
+  };
+  const scenarios = [{
+    id: 'slot-1',
+    name: 'шахи. — чат 1',
+    pool: { id: 'chess-pool', name: 'шахи.', slotIndex: 1, replacementBudget: 3 },
+    config: {
+      mode: 'CHAT_CYCLE',
+      roundsPerGeneration: 1,
+      steps: [{ repeat: 1 }, { repeat: 10 }, { repeat: 1 }],
+    },
+    runtime: {
+      mode: 'CHAT_CYCLE',
+      runState: 'RUNNING',
+      generation: 1,
+      totalCompletedTurns: 1,
+      retiredVerifiedSends: 2,
+      generationRetiredVerifiedSends: 2,
+      verifiedSendHistoryComplete: true,
+      round: 0,
+      stepIndex: 0,
+      repeatIndex: 0,
+      cleanupPendingSessionIds: [],
+      chat: {
+        key: 'chat', role: 'CHAT', state: 'WAITING', generation: 1,
+        sessionId: 'managed-current', stage: 'STEP:0:0:0',
+      },
+    },
+  }];
+
+  const status = projectGlobalStatus({ coreState, scenarios });
+  const row = status.scenarioSlots[0];
+  assert.equal(row.transportVerifiedSends, 3, 'physical transport truth is preserved');
+  assert.equal(row.completedResponses, 1, 'only one assistant response was actually confirmed');
+  assert.equal(row.sequenceVerifiedSends, 2, 'one completed response permits only one current in-flight logical Send');
+  assert.equal(row.retryVerifiedSends, 1, 'the extra physical Send is exposed as retry/replacement history');
+  assert.equal(row.message, 2, 'logical step is derived from confirmed sequence progress, never stale rewound cursor');
+  assert.equal(status.scenarioPools[0].sequenceVerifiedSends, 2);
+  assert.equal(status.scenarioPools[0].transportVerifiedSends, 3);
+  assert.equal(status.scenarioPools[0].retryVerifiedSends, 1);
+});
+
+test('CHAT_CYCLE timeout retries the same logical prompt and never rewinds completed progress to START', async () => {
+  let reportMode = 'READY';
+  const h = harness({
+    report: async () => reportMode === 'READY'
+      ? { status: 'READY', assistantComplete: true, safeDiagnosticCode: 'ASSISTANT_RESPONSE_READY', assistantText: 'done' }
+      : { status: 'WAITING', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_NOT_READY' },
+  });
+  const created = await h.manager.createChatPool({
+    name: 'Chess timeout truth',
+    count: 1,
+    replacementBudget: 1,
+    staggerSeconds: 0,
+    autoStart: true,
+    config: { ...chessConfig, responseTimeoutMinutes: 1 },
+  });
+  const id = created.ids[0];
+
+  let scenario = (await h.manager.get(id)).scenario;
+  let session = h.state.sessionsById[scenario.runtime.chat.sessionId];
+  let task = session.tasksById[scenario.runtime.chat.taskId];
+  task.lastVerifiedSendAt = h.now + 1;
+  task.lastConversationUrl = 'https://chatgpt.com/c/first';
+  session.successfulSendCount = 1;
+  session.onePassCompletedCount = 1;
+  session.onePassCompletedTaskIds = [task.id];
+  session.runState = 'COMPLETED';
+
+  h.now += 10;
+  await h.manager.cycleOne(id);
+  scenario = (await h.manager.get(id)).scenario;
+  assert.equal(scenario.runtime.totalCompletedTurns, 1);
+  assert.equal(scenario.runtime.stepIndex, 1);
+  assert.equal(scenario.runtime.repeatIndex, 0);
+  assert.equal(scenario.runtime.chat.stage, 'STEP:0:1:0');
+  session = h.state.sessionsById[scenario.runtime.chat.sessionId];
+  task = session.tasksById[scenario.runtime.chat.taskId];
+  assert.equal(task.promptOverride, 'CONTINUE');
+
+  reportMode = 'WAITING';
+  task.lastVerifiedSendAt = h.now + 1;
+  task.lastConversationUrl = 'https://chatgpt.com/c/first';
+  session.successfulSendCount += 1;
+  session.onePassCompletedCount = 1;
+  session.onePassCompletedTaskIds = [task.id];
+  session.runState = 'COMPLETED';
+
+  scenario = (await h.manager.get(id)).scenario;
+  h.now = scenario.runtime.chat.deadlineAt + 1;
+  await h.manager.cycleOne(id);
+  scenario = (await h.manager.get(id)).scenario;
+
+  assert.equal(scenario.runtime.totalCompletedTurns, 1, 'timeout is not a completed assistant response');
+  assert.equal(scenario.runtime.stepIndex, 1, 'completed START progress is never rewound');
+  assert.equal(scenario.runtime.repeatIndex, 0);
+  assert.equal(scenario.runtime.chat.stage, 'STEP:0:1:0', 'replacement retries the current logical CONTINUE turn');
+  const replacementSession = h.state.sessionsById[scenario.runtime.chat.sessionId];
+  const replacementTask = replacementSession.tasksById[scenario.runtime.chat.taskId];
+  assert.equal(replacementTask.promptOverride, 'CONTINUE');
+});
+
+test('timeout with no replacement budget is ERROR, never false COMPLETED', async () => {
+  const h = harness({
+    report: async () => ({ status: 'WAITING', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_NOT_READY' }),
+  });
+  const created = await h.manager.createChatPool({
+    name: 'No fake completion',
+    count: 1,
+    replacementBudget: 0,
+    staggerSeconds: 0,
+    autoStart: true,
+    config: { ...chessConfig, responseTimeoutMinutes: 1 },
+  });
+  const id = created.ids[0];
+  let scenario = (await h.manager.get(id)).scenario;
+  const session = h.state.sessionsById[scenario.runtime.chat.sessionId];
+  const task = session.tasksById[scenario.runtime.chat.taskId];
+  task.lastVerifiedSendAt = h.now + 1;
+  task.lastConversationUrl = 'https://chatgpt.com/c/no-response';
+  session.successfulSendCount = 1;
+  scenario = (await h.manager.get(id)).scenario;
+  h.now = scenario.runtime.chat.deadlineAt + 1;
+  await h.manager.cycleOne(id);
+  scenario = (await h.manager.get(id)).scenario;
+  assert.equal(scenario.runtime.runState, 'ERROR');
+  assert.match(scenario.runtime.lastError, /timeout/u);
+  assert.equal(scenario.runtime.totalCompletedTurns, 0);
+});
