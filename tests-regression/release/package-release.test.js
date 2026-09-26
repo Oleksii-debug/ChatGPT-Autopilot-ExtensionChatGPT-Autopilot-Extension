@@ -39,7 +39,7 @@ test('release version is coherent across manifest, package metadata and README',
   const readme = await fs.readFile(path.join(root, 'README.txt'), 'utf8');
   assert.equal(manifest.version, RELEASE_VERSION);
   assert.equal(packageMetadata.version, manifest.version);
-  assert.match(readme.split(/\r?\n/, 1)[0], new RegExp(`^${manifest.version_name} ПІЛОТ\\b`, 'u'));
+  assert.match(readme.split(/\r?\n/, 1)[0], new RegExp(`^${manifest.version_name} ПІЛОТ(?:\\s|$)`, 'u'));
 });
 
 test('release allowlist contains release docs, extension files and complete companion distribution only', async () => {
