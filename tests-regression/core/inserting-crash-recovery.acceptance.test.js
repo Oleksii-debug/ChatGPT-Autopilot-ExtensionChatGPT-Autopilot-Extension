@@ -85,7 +85,7 @@ test('network loss during INSERT_ONLY cannot become an active INSERTING retry zo
 
   const afterFailure = await repo.load();
   assert.equal(first.outcomes[0].result.kind, 'TEMPORARY_RUNTIME_ERROR');
-  assert.deepEqual(modes, ['CHECK_ONLY', 'ENSURE_HIGH_EFFORT', 'INSERT_ONLY']);
+  assert.deepEqual(modes, ['CHECK_ONLY', 'INSERT_ONLY']);
   assert.equal(afterFailure.sessionsById.s1.operation.phase, OperationPhase.INSERTING);
   assert.equal(afterFailure.sessionsById.s1.tasksById.t1.retryAfterAt, 40000);
   assert.equal(first.wakeAt, 40000);
