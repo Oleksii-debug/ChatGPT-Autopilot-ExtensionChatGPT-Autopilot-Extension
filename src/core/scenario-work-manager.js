@@ -207,10 +207,12 @@ function poolMembers(store, poolId) {
 }
 function poolAggregateRunState(members) {
   if (!members.length) return ScenarioWorkRunState.STOPPED;
-  if (members.some(item => item.runtime.runState === ScenarioWorkRunState.ERROR)) return ScenarioWorkRunState.ERROR;
+  // Control authority follows live work first. A partially failed pool must
+  // still expose Pause/Stop for the slots that are actually running.
   if (members.some(item => item.runtime.runState === ScenarioWorkRunState.RUNNING)) return ScenarioWorkRunState.RUNNING;
   if (members.some(item => item.runtime.runState === ScenarioWorkRunState.PAUSED)) return ScenarioWorkRunState.PAUSED;
   if (members.every(item => item.runtime.runState === ScenarioWorkRunState.COMPLETED)) return ScenarioWorkRunState.COMPLETED;
+  if (members.some(item => item.runtime.runState === ScenarioWorkRunState.ERROR)) return ScenarioWorkRunState.ERROR;
   return ScenarioWorkRunState.STOPPED;
 }
 function sameChatCycleProgram(left, right) {
