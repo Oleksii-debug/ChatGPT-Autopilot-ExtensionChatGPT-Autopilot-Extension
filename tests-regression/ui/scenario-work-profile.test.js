@@ -113,6 +113,7 @@ test('Scenario Work UI exposes template, import and export controls together', a
 });
 
 test('Scenario Work import status reports the physical-chat message count for CHAT_CYCLE', async () => {
+  const html = await readFile(new URL('../../src/ui/options.html', import.meta.url), 'utf8');
   const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
   assert.match(js, /Повідомлень у кожному чаті:/u);
   assert.match(js, /config\.steps\.reduce\(\(sum, step\) => sum \+ step\.repeat, 0\)/u);
@@ -127,10 +128,12 @@ test('Scenario Work import status reports the physical-chat message count for CH
 test('Sessions dashboard distinguishes canonical scenario facts and ordinary-session sublist', async () => {
   const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
   assert.match(js, /Сценарних фізичних чатів:/u);
-  assert.match(js, /Перший Send підтверджено у/u);
+  assert.match(js, /Перший логічний Send підтверджено у/u);
   assert.match(js, /Чекають завершення відповіді/u);
   assert.match(js, /Підтверджено завершених відповідей/u);
-  assert.match(js, /Усього підтверджених Send/u);
+  assert.match(js, /Логічних Send у послідовностях/u);
+  assert.match(js, /Фізично підтверджених Send-спроб/u);
+  assert.match(js, /Повторних або replacement-спроб/u);
   assert.match(js, /Звичайних ручних сеансів у цьому списку/u);
   assert.doesNotMatch(js, /активних \$\{pool\.active\}/u);
 });
