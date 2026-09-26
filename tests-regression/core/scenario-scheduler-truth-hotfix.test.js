@@ -159,5 +159,176 @@ test('global status separates eight scenario chats from ten whole-product work u
   assert.equal(status.scenarioSlots.length, 8);
   assert.equal(status.scenarioPools.length, 1);
   assert.equal(status.scenarioPools[0].slots, 8);
-  assert.equal(status.scenarioPools[0].active, 8);
+  assert.equal(status.scenarioPools[0].launching, 8);
+});
+
+
+test('dormant configuration scenario is not an eleventh physical chat and pool progress is canonical', () => {
+  const coreState = { sessionsById: {}, sessionOrder: [] };
+  const dormant = {
+    id: 'template',
+    name: 'Accessible Chess — 5 потоків × 12 повідомлень',
+    config: { mode: 'CHAT_CYCLE', roundsPerGeneration: 1, steps: [{ repeat: 1 }, { repeat: 10 }, { repeat: 1 }] },
+    runtime: {
+      mode: 'CHAT_CYCLE',
+      runState: 'STOPPED',
+      generation: 1,
+      totalLaunches: 0,
+      totalCompletedTurns: 0,
+      retiredVerifiedSends: 0,
+      generationRetiredVerifiedSends: 0,
+      verifiedSendHistoryComplete: true,
+      round: 0,
+      stepIndex: 0,
+      repeatIndex: 0,
+      cleanupPendingSessionIds: [],
+      chat: { key: 'chat', role: 'CHAT', state: 'NEW', generation: 1, sessionId: '' },
+    },
+  };
+  const scenarios = [dormant];
+  for (let i = 1; i <= 10; i += 1) {
+    const scenarioId = `chess-${i}`;
+    const sessionId = i <= 7 ? `managed-${i}` : '';
+    if (sessionId) {
+      coreState.sessionOrder.push(sessionId);
+      coreState.sessionsById[sessionId] = {
+        id: sessionId,
+        runState: 'STOPPED',
+        runMode: 'ONE_PASS',
+        successfulSendCount: 1,
+        operation: { phase: 'SENT_VERIFIED' },
+        tasksById: {},
+        taskOrder: [],
+        scenarioWork: { managed: true, scenarioId, generation: 1 },
+      };
+    }
+    scenarios.push({
+      id: scenarioId,
+      name: `Accessible Chess — чат ${i}`,
+      pool: {
+        id: 'chess-pool',
+        name: 'Accessible Chess',
+        slotIndex: i,
+        initialCount: 10,
+        initialStaggerSeconds: 120,
+        replacementBudget: 0,
+      },
+      config: {
+        mode: 'CHAT_CYCLE',
+        roundsPerGeneration: 1,
+        steps: [{ repeat: 1 }, { repeat: 10 }, { repeat: 1 }],
+      },
+      runtime: {
+        mode: 'CHAT_CYCLE',
+        runState: 'RUNNING',
+        generation: 1,
+        totalLaunches: sessionId ? 1 : 0,
+        totalCompletedTurns: 0,
+        retiredVerifiedSends: 0,
+        generationRetiredVerifiedSends: 0,
+        verifiedSendHistoryComplete: true,
+        round: 0,
+        stepIndex: 0,
+        repeatIndex: 0,
+        cleanupPendingSessionIds: [],
+        chat: {
+          key: 'chat',
+          role: 'CHAT',
+          state: sessionId ? 'WAITING' : 'NEW',
+          generation: 1,
+          sessionId,
+        },
+      },
+    });
+  }
+
+  const status = projectGlobalStatus({ coreState, scenarios });
+  assert.equal(status.summary.total, 10);
+  assert.equal(status.scenarioSlots.length, 10);
+  assert.equal(status.scenarioPools.length, 1);
+  const pool = status.scenarioPools[0];
+  assert.equal(pool.name, 'Accessible Chess');
+  assert.equal(pool.slots, 10);
+  assert.equal(pool.messagesPerChat, 12);
+  assert.equal(pool.plannedSends, 120);
+  assert.equal(pool.initialStaggerSeconds, 120);
+  assert.equal(pool.firstPromptSent, 7);
+  assert.equal(pool.firstPromptPending, 3);
+  assert.equal(pool.waitingResponse, 7);
+  assert.equal(pool.launching, 3);
+  assert.equal(pool.verifiedSends, 7);
+  assert.equal(pool.completedResponses, 0);
+});
+
+test('two-minute first-prompt stagger cannot launch slot two or three early', async () => {
+  const h = harness();
+  const created = await h.manager.createChatPool({
+    name: 'Accessible Chess — 5 потоків × 12 повідомлень',
+    count: 3,
+    replacementBudget: 0,
+    staggerSeconds: 120,
+    autoStart: true,
+    config: chessConfig,
+  });
+  assert.equal(created.pool.name, 'Accessible Chess');
+  assert.equal(created.pool.slots, 3);
+  assert.equal(created.pool.messagesPerChat, 12);
+  assert.equal(created.pool.initialStaggerSeconds, 120);
+
+  let list = await h.manager.list();
+  let members = list.scenarios.filter(item => item.pool?.id === created.pool.id);
+  assert.deepEqual(members.map(item => item.name), [
+    'Accessible Chess — чат 1',
+    'Accessible Chess — чат 2',
+    'Accessible Chess — чат 3',
+  ]);
+  assert.deepEqual(members.map(item => item.runtime.totalLaunches), [1, 0, 0]);
+
+  h.now += 119_999;
+  await h.manager.cycleAll();
+  list = await h.manager.list();
+  members = list.scenarios.filter(item => item.pool?.id === created.pool.id);
+  assert.deepEqual(members.map(item => item.runtime.totalLaunches), [1, 0, 0]);
+
+  h.now += 1;
+  await h.manager.cycleAll();
+  list = await h.manager.list();
+  members = list.scenarios.filter(item => item.pool?.id === created.pool.id);
+  assert.deepEqual(members.map(item => item.runtime.totalLaunches), [1, 1, 0]);
+
+  h.now += 119_999;
+  await h.manager.cycleAll();
+  list = await h.manager.list();
+  members = list.scenarios.filter(item => item.pool?.id === created.pool.id);
+  assert.deepEqual(members.map(item => item.runtime.totalLaunches), [1, 1, 0]);
+
+  h.now += 1;
+  await h.manager.cycleAll();
+  list = await h.manager.list();
+  members = list.scenarios.filter(item => item.pool?.id === created.pool.id);
+  assert.deepEqual(members.map(item => item.runtime.totalLaunches), [1, 1, 1]);
+});
+
+test('continuous simplified sessions count verified sends as completed send-cycles, not assistant responses', () => {
+  const coreState = {
+    sessionOrder: ['simple'],
+    sessionsById: {
+      simple: {
+        id: 'simple',
+        name: 'Autosport — спрощена сесія',
+        simplifiedSession: true,
+        runState: 'RUNNING',
+        runMode: 'CONTINUOUS',
+        successfulSendCount: 9,
+        nextAllowedSendAt: 1_800_000_120_000,
+        tasksById: {},
+        taskOrder: [],
+      },
+    },
+  };
+  const status = projectGlobalStatus({ coreState });
+  assert.equal(status.simplifiedSessions.length, 1);
+  assert.equal(status.simplifiedSessions[0].verifiedSends, 9);
+  assert.equal(status.simplifiedSessions[0].completedCycles, 9);
+  assert.equal(status.summary.completedResponses, 0);
 });
