@@ -9,6 +9,7 @@ AGENT DRAFT IMPORT — AFTER THE FIRST DELIVERED PILOT 10 ARCHIVE
 AGENT ROUTE SELECTION — AFTER THE 74EC0D2 ARCHIVE
 - Agent can pin one saved, enabled global route by its route ID. Its goal/policy JSON draft retains that choice. The route pool passes the chosen endpoint ID (including `mistral`) to Gateway without changing the global profile.
 - A missing/disabled route or conflict with the globally pinned route stops the model call with an explicit error. Other global constraints, role requirements, cooldown, and budget still apply. Leave the selection on inheritance for automatic failover.
+- Agent status refresh no longer erases policy edits typed before Save. A save that completes after newer typing keeps the newer edits visible and marked unsaved; switching jobs loads the selected job's saved policy.
 
 BASELINE
 - Last frozen canonical release: 0.9.19.
