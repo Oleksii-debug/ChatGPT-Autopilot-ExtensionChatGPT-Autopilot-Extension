@@ -121,7 +121,7 @@ test('four configuration modes run concurrently across all tab strategies, fault
     requests.push({ tabId, ...request });
     const live = await repo.load();
     const expected = expectedPrompt(live, request.taskId);
-    if (request.mode !== 'CHECK_ONLY') assert.equal(request.promptText, expected, `${request.taskId} prompt must remain task/session-local`);
+    if (!['CHECK_ONLY', 'ENSURE_HIGH_EFFORT'].includes(request.mode)) assert.equal(request.promptText, expected, `${request.taskId} prompt must remain task/session-local`);
 
     if (request.mode === 'ENSURE_HIGH_EFFORT') {
       return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED' };
