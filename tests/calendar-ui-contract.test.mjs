@@ -20,7 +20,8 @@ test('Session calendar editor exposes keyboard-native labelled controls and owne
   assert.match(html, /<label for="calendar-time-zone">/);
   assert.match(html, /<label[^>]*><input id="calendar-catch-up" type="checkbox"> Наздоганяти пропущені запуски<\/label>/);
   assert.match(html, /id="calendar-runtime-status" role="status" tabindex="0"/);
-  assert.match(html, /id="calendar-revision-confirm" type="checkbox" aria-describedby="calendar-revision-help"/);
+  assert.match(html, /id="calendar-revision-confirm" type="checkbox"/);
+  assert.doesNotMatch(html, /calendar-revision-help/);
   assert.doesNotMatch(html, /calendar[^\n]*onclick=/i);
 });
 
@@ -33,6 +34,7 @@ test('Session editor persists calendarSchedule but never writes caller-shaped ca
 test('calendar mode visibility is semantic and explicit list remains direct text-entry', () => {
   assert.match(js, /function syncCalendarVisibility\(\)/);
   assert.match(js, /calendar-explicit-occurrences/);
-  assert.match(html, /Щоб додати час, додайте новий рядок/);
+  assert.match(html, /<label for="calendar-times">Часи запуску, по одному в рядку<\/label>/);
+  assert.doesNotMatch(html, /Щоб додати час, додайте новий рядок/);
   assert.match(html, /value="WEEKLY"/);
 });
