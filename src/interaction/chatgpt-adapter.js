@@ -333,10 +333,13 @@
     const identity = effortSemanticText(el);
     if (classifyEffortLabel(identity) !== 'high') return 0;
     const role = normalizeEffortText(el.getAttribute?.('role'));
+    const choiceRole = ['menuitemradio', 'option', 'radio', 'menuitem'].includes(role);
+    const choiceSurface = el.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]');
+    if (!choiceRole && !choiceSurface && !effortSemanticHint(identity)) return 0;
     let score = 10;
-    if (['menuitemradio', 'option', 'radio', 'menuitem'].includes(role)) score += 100;
+    if (choiceRole) score += 100;
     if (el.getAttribute?.('aria-checked') === 'true' || el.getAttribute?.('aria-selected') === 'true') score += 20;
-    if (el.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]')) score += 30;
+    if (choiceSurface) score += 30;
     return score;
   }
 
