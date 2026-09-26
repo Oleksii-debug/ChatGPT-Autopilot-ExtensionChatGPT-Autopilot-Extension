@@ -74,3 +74,7 @@ LONG PROMPT INSERTION STALL — SIMPLIFIED SESSIONS
 - In a contenteditable editor that renders a different draft after initial insertion, perform one alternate paragraph/input replacement and require two consecutive exact observations before PREPARE_SEND can proceed. An editor whose framework state still differs is never sent.
 - Safe diagnostics now expose only compact/non-whitespace equality flags, never prompt contents, to distinguish layout differences from changed characters in a subsequent owner log.
 - Installed extension E2E is still unavailable; deterministic malformed-long-prompt and fail-closed regressions pass.
+
+AGENT / MISTRAL PROVIDER VISIBILITY
+- AI Router Gateway status now names each compatible endpoint separately and reports whether its key is actually loaded locally, including Mistral. The status contains no key bytes.
+- Mistral's existing Windows DPAPI setup script and existing route pool are documented together for screen-reader users. The key remains outside the extension ZIP, profile, routes and GitHub.

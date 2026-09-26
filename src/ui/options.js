@@ -1305,8 +1305,17 @@ async function testAiGateway() {
     const result = data.result || {};
     const providerStatus = Array.isArray(result.providerStatus) ? result.providerStatus : [];
     const providerText = providerStatus.length
-      ? providerStatus.map(item => `${item.provider}: ${item.ok ? `готовий (${item.models || 0} моделей)` : (item.configured === false ? 'не налаштований' : 'недоступний')}`).join('; ')
+      ? providerStatus.map(item => `${item.endpointId || item.provider}: ${item.ok ? `готовий (${item.models || 0} моделей)` : (item.configured === false ? 'не налаштований' : 'недоступний')}`).join('; ')
       : ((result.providers || []).join(', ') || 'не вказано');
+    const endpointStatus = Array.isArray(result.compatibleEndpoints)
+      ? result.compatibleEndpoints.map(item => {
+        const name = item.endpointId === 'mistral' ? 'Містраль' : (item.endpointId || 'endpoint');
+        return `${name}: ${item.apiKeyConfigured ? 'ключ завантажений у локальний Gateway' : 'ключ не завантажений у локальний Gateway'}`;
+      }).join('; ')
+      : '';
+    $('ai-router-provider-key-status').textContent = endpointStatus
+      ? `Ключі постачальників: ${endpointStatus}.`
+      : 'Ключі постачальників: Gateway не повідомив про окремі endpoint-и.';
     const compatibleCredential = result.compatibleApiKeyConfigured
       ? 'compatible key завантажений у Gateway'
       : 'compatible key не збережений (для локального сервера без авторизації це нормально)';
@@ -1317,6 +1326,7 @@ async function testAiGateway() {
     announce('AI Gateway відповідає.');
   } catch (error) {
     $('ai-router-openai-key-status').textContent = 'OpenAI API key: не вдалося перевірити, бо Gateway недоступний.';
+    $('ai-router-provider-key-status').textContent = 'Ключі Містраль та інших постачальників: Gateway недоступний, статус невідомий.';
     $('ai-router-status').textContent = `AI Gateway недоступний: ${error.message}`;
   } finally {
     setAiRouterBusy(false);
