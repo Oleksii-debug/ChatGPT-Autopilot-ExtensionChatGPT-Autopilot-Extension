@@ -226,9 +226,12 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       if (category === 'ERROR') aggregate.error += 1;
       if (category === 'AMBIGUOUS_EFFECT') aggregate.ambiguousEffect += 1;
       const sequenceVerified = Math.min(turnsPerGeneration, completedInGeneration + inFlightVerified);
-      const retryVerified = Math.max(0, scenarioTotalVerified - sequenceVerified);
+      const generationTransportVerified = historyKnown
+        ? num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed
+        : Math.max(sequenceVerified, num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed);
+      const retryVerified = Math.max(0, generationTransportVerified - sequenceVerified);
       aggregate.verifiedSends += scenarioTotalVerified;
-      aggregate.transportVerifiedSends += scenarioTotalVerified;
+      aggregate.transportVerifiedSends += generationTransportVerified;
       aggregate.sequenceVerifiedSends += sequenceVerified;
       aggregate.retryVerifiedSends += retryVerified;
       aggregate.completedResponses += completedInGeneration;
