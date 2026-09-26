@@ -99,10 +99,17 @@ async function loadProfileSettings() {
   try {
     const data = await core('GET_PROFILE_SETTINGS');
     const minutes = Number(data?.rateLimitCooldownMinutes ?? 0);
+    const concurrency = Number(data?.maxConcurrentSessionOperations ?? 10);
     $('rate-limit-cooldown-minutes').value = String(minutes);
-    $('rate-limit-setting-status').textContent = `Current fallback rate-limit pause: ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+    if ($('simplified-rate-limit-cooldown-minutes')) $('simplified-rate-limit-cooldown-minutes').value = String(minutes);
+    if ($('simplified-max-concurrent-session-operations')) $('simplified-max-concurrent-session-operations').value = String(concurrency);
+    $('rate-limit-setting-status').textContent = `Активна пауза: ${minutes} хв.`;
+    if ($('simplified-profile-setting-status')) {
+      $('simplified-profile-setting-status').textContent = `Активна пауза: ${minutes} хв. Паралельність: ${concurrency} одночасних операцій.`;
+    }
   } catch (error) {
-    $('rate-limit-setting-status').textContent = `Could not load fallback rate-limit pause: ${error.message}`;
+    $('rate-limit-setting-status').textContent = `Не вдалося завантажити налаштування: ${error.message}`;
+    if ($('simplified-profile-setting-status')) $('simplified-profile-setting-status').textContent = `Не вдалося завантажити налаштування: ${error.message}`;
   }
 }
 
@@ -114,13 +121,36 @@ async function saveProfileSettings() {
     return;
   }
   try {
-    const data = await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
-    $('rate-limit-setting-status').textContent = data.rateLimitCooldownMinutes === 0
-      ? 'Збережено: додаткову спільну паузу після rate-limit вимкнено. Серверне обмеження та технічний retry залишаються чинними.'
-      : `Збережено резервну паузу: ${data.rateLimitCooldownMinutes} хв.`;
-    announce('Rate-limit pause saved.');
+    await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
+    await loadProfileSettings();
+    announce('Налаштування паузи збережено.');
   } catch (error) {
-    $('rate-limit-setting-status').textContent = `Could not save fallback rate-limit pause: ${error.message}`;
+    $('rate-limit-setting-status').textContent = `Не вдалося зберегти налаштування: ${error.message}`;
+  }
+}
+
+async function saveSimplifiedProfileSettings() {
+  const minutes = Number($('simplified-rate-limit-cooldown-minutes').value);
+  const concurrency = Number($('simplified-max-concurrent-session-operations').value);
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+    $('simplified-profile-setting-status').textContent = 'Пауза: введіть ціле число від 0 до 120.';
+    $('simplified-rate-limit-cooldown-minutes').focus();
+    return;
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) {
+    $('simplified-profile-setting-status').textContent = 'Паралельність: введіть ціле число від 1 до 32.';
+    $('simplified-max-concurrent-session-operations').focus();
+    return;
+  }
+  try {
+    await core('UPDATE_PROFILE_SETTINGS', {
+      rateLimitCooldownMinutes: minutes,
+      maxConcurrentSessionOperations: concurrency,
+    });
+    await loadProfileSettings();
+    announce('Налаштування виконання збережено.');
+  } catch (error) {
+    $('simplified-profile-setting-status').textContent = `Не вдалося зберегти налаштування: ${error.message}`;
   }
 }
 
@@ -1927,10 +1957,7 @@ async function importScenarioWorkProfile() {
     await loadScenarioWork({ preservePanel: false });
     if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
     setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
-    const messageSummary = config.mode === 'CHAT_CYCLE'
-      ? ` У кожному фізичному чаті: ${config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень.`
-      : '';
-    status.textContent = `Імпортовано новий зупинений сценарій: ${config.name}.${messageSummary}`;
+    status.textContent = `Імпортовано новий зупинений сценарій: ${config.name}.`;
     $('scenario-work-list').focus();
   } catch (error) {
     status.textContent = `Не вдалося імпортувати: ${error.message}`;
@@ -2550,7 +2577,8 @@ function simplifiedFields() {
     runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
     interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
     delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
-    retryPolicy: field('simplified-retry-policy'), tabs: field('simplified-tabs'),
+    retryUnit: field('simplified-retry-unit'), retryPolicy: field('simplified-retry-policy'),
+    busyBehavior: field('simplified-busy-behavior'), tabs: field('simplified-tabs'),
   };
 }
 
@@ -2561,6 +2589,17 @@ function updateSimplifiedMode() {
   $('simplified-urls-group').hidden = !mode.startsWith('unique-');
   $('simplified-prompts-group').hidden = !mode.endsWith('-unique');
   $('simplified-cycles').disabled = mode !== 'shared-shared';
+}
+
+function renderSimplifiedLog(session) {
+  const entries = Array.isArray(session?.log) ? session.log : [];
+  const visible = entries.slice(-VISIBLE_LOG_LIMIT);
+  $('simplified-log-count').textContent = `Показано ${visible.length} із ${entries.length} записів журналу.`;
+  $('simplified-log-region').textContent = visible
+    .map(entry => typeof entry === 'string'
+      ? translateText(entry)
+      : `${formatTime(entry.at)} — ${translateText(entry.message)}`)
+    .join('\n');
 }
 
 function showSimplifiedSession(session) {
@@ -2579,16 +2618,22 @@ function showSimplifiedSession(session) {
   $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
   $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
   $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
-  $('simplified-retry').value = String(session?.retryBackoffSeconds || 30);
+  const retryUnit = session?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
+  $('simplified-retry-unit').value = retryUnit;
+  $('simplified-retry').value = String(retryUnit === 'minutes'
+    ? Math.max(1, Math.round(Number(session?.retryBackoffSeconds || 30) / 60))
+    : Number(session?.retryBackoffSeconds || 30));
   $('simplified-retry-policy').value = session?.retryPolicy || 'safe';
+  $('simplified-busy-behavior').value = session?.busyChatBehavior || 'skip-next';
   $('simplified-tabs').value = session?.tabStrategy || 'keep-open';
   updateSimplifiedMode();
   $('simplified-list').value = session?.id || '';
   $('simplified-state').textContent = session
     ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
-    : 'Новий сеанс ще не збережено.';
+    : 'Сеанс не вибрано.';
+  $('simplified-draft-status').textContent = 'Незбережених змін немає.';
+  renderSimplifiedLog(session);
 }
-
 function renderSimplifiedList() {
   const rows = ui.sessions.filter(item => item.simplifiedSession);
   const signature = JSON.stringify(rows.map(row => [row.id, row.name, row.displayRunState, row.successfulSendCount]));
@@ -2622,6 +2667,7 @@ async function refreshSimplifiedSessionStatus() {
     const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
     const session = data.session;
     $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`;
+    renderSimplifiedLog(session);
   } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
 }
 
@@ -2634,6 +2680,7 @@ async function saveSimplifiedSession() {
     ui.simplifiedSelectedId = data.session.id;
     await loadSessions();
     showSimplifiedSession(data.session);
+    $('simplified-draft-status').textContent = 'Незбережених змін немає.';
     $('simplified-command-result').textContent = 'Сеанс збережено.';
   } catch (error) { $('simplified-command-result').textContent = `Не вдалося зберегти: ${error.message}`; }
 }
@@ -3941,6 +3988,18 @@ async function downloadDiagnosticReport() {
   }
 }
 
+async function downloadSimplifiedDiagnosticReport() {
+  try {
+    const extensionVersion = globalThis.chrome?.runtime?.getManifest?.().version || 'невідомо';
+    const data = await core('GET_DIAGNOSTIC_REPORT', { extensionVersion });
+    downloadText(data.report, diagnosticFileName());
+    $('simplified-diagnostic-report-status').textContent = 'Діагностичний звіт завантажено.';
+    $('simplified-command-result').textContent = 'Діагностичний звіт завантажено.';
+  } catch (error) {
+    $('simplified-diagnostic-report-status').textContent = `Не вдалося завантажити діагностичний звіт: ${error.message}`;
+  }
+}
+
 let diagnosticSnapshotInFlight = false;
 async function recordDashboardDiagnosticSnapshot() {
   if (diagnosticSnapshotInFlight || !ui.selectedSessionId || !ui.selected) return;
@@ -4005,6 +4064,7 @@ $('mode-tabs').addEventListener('keydown', (event) => {
 });
 
 $('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
+$('simplified-profile-apply').addEventListener('click', () => { void saveSimplifiedProfileSettings(); });
 $('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });
 $('simplified-list').addEventListener('change', () => { void selectSimplifiedSession($('simplified-list').value); });
 $('simplified-save').addEventListener('click', () => { void saveSimplifiedSession(); });
@@ -4023,6 +4083,23 @@ $('simplified-duplicate').addEventListener('click', async () => {
 $('simplified-delete').addEventListener('click', event => {
   if (ui.simplifiedSelectedId) openDeleteDialog(ui.simplifiedSelectedId, event.currentTarget);
 });
+$('simplified-clear-log').addEventListener('click', async () => {
+  if (!ui.simplifiedSelectedId) {
+    $('simplified-command-result').textContent = 'Сеанс не вибрано.';
+    return;
+  }
+  try {
+    const data = await core('CLEAR_LOG', { sessionId: ui.simplifiedSelectedId });
+    renderSimplifiedLog(data.session);
+    $('simplified-command-result').textContent = 'Журнал очищено.';
+  } catch (error) {
+    $('simplified-command-result').textContent = `Не вдалося очистити журнал: ${error.message}`;
+  }
+});
+$('simplified-import-file').addEventListener('change', () => {
+  const file = $('simplified-import-file').files?.[0];
+  $('simplified-import-status').textContent = file ? `Імпорт JSON: ${file.name}` : 'Імпорт JSON: Файл не вибрано.';
+});
 $('simplified-import').addEventListener('click', () => { void importSimplifiedProfile(false); });
 $('simplified-import-start').addEventListener('click', () => { void importSimplifiedProfile(true); });
 $('simplified-export').addEventListener('click', async () => {
@@ -4034,11 +4111,25 @@ $('simplified-export').addEventListener('click', async () => {
   } catch (error) { $('simplified-command-result').textContent = error.message; }
 });
 $('simplified-template').addEventListener('click', () => {
-  const config = buildSimplifiedSessionConfig({ name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/', prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1', interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2', retry: '30', retryPolicy: 'safe', tabs: 'keep-open' });
+  const config = buildSimplifiedSessionConfig({
+    name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/',
+    prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1',
+    interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2',
+    retry: '30', retryUnit: 'seconds', retryPolicy: 'safe',
+    busyBehavior: 'skip-next', tabs: 'keep-open',
+  });
   downloadJson({ format: 'chatgpt-autopilot-profile', version: 1, profileName: 'Спрощений сеанс', autoStart: false, sessions: [{ ...config, autoStart: false }] }, 'Спрощений-сеанс-шаблон.json');
   $('simplified-command-result').textContent = 'Шаблон JSON експортовано.';
 });
-$('simplified-diagnostics').addEventListener('click', () => { void downloadDiagnosticReport(); });
+$('simplified-diagnostics').addEventListener('click', () => { void downloadSimplifiedDiagnosticReport(); });
+$('simplified-editor').addEventListener('input', event => {
+  if (event.target.closest('button')) return;
+  $('simplified-draft-status').textContent = 'Є незбережені зміни.';
+});
+$('simplified-editor').addEventListener('change', event => {
+  if (event.target.closest('button')) return;
+  $('simplified-draft-status').textContent = 'Є незбережені зміни.';
+});
 
 for (const panel of SCENARIO_WORK_PANELS) $('scenario-work-tab-' + panel).addEventListener('click', () => setScenarioWorkPanel(panel, { focus: true }));
 $('scenario-work-tabs').addEventListener('keydown', (event) => {
