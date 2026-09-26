@@ -10,6 +10,7 @@ BASELINE
 - Pre-rebase rollback for #420: backup/scenario-profile-import-20260926-059c462.
 
 USER-DIAGNOSTIC FIX
+- Follow-up inspection of the real seven-chat 0.9.19 diagnostic found zero confirmed sends and repeated RECOVERY_TEXT_ACK_PENDING despite the first message appearing in every chat. The old reader did not recognize ChatGPT Work user bubbles. Pilot 10 now reads a Work bubble's prompt body precisely and keeps its history confined to canonical Work bubbles; response observation additionally accepts a keyed assistant unit with a semantic assistant markdown body. The second prompt only follows an acknowledged Send and a completed assistant reply.
 - Real 7-chat run accepted the first prompt in every physical ChatGPT Work chat, but Core recorded zero confirmed sends and stayed in SUBMISSION_UNCERTAIN / AMBIGUOUS with RECOVERY_TEXT_ACK_PENDING.
 - Work-specific semantic message surfaces are now part of acknowledgement/recovery evidence, so an accepted Send can advance durable accounting instead of holding the scenario indefinitely.
 - Blind resend remains prohibited while effect is unresolved.

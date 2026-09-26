@@ -861,17 +861,19 @@
   }
 
   function semanticUserMessages(doc) {
+    // Work renders a user turn as a keyed bubble without the legacy author
+    // attributes. When these bubbles exist, article headings and assistant
+    // quotations must not be mistaken for additional user messages: the
+    // pre-send history and post-send history have to use the same units.
+    const workBubbles = Array.from(doc.querySelectorAll('[data-user-message-bubble="true"]'));
+    if (workBubbles.length) return workBubbles.filter(el => !workBubbles.some(other => other !== el && el.contains?.(other)));
     const candidates = [...new Set([
       ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
       ...doc.querySelectorAll('[data-testid="user-message"]'),
-      // ChatGPT Work uses an explicit message bubble inside a keyed turn,
-      // without the older author-role attributes or article wrapper.
-      ...doc.querySelectorAll('[data-user-message-bubble="true"]'),
     ])]
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
         return role === 'user' || el.getAttribute?.('data-testid') === 'user-message'
-          || el.getAttribute?.('data-user-message-bubble') === 'true'
           || /you said|user|ви сказали|вы сказали/.test(accessibleName(el));
       });
     // A turn article and its author-role child are ONE message, not two.
@@ -880,7 +882,10 @@
 
   function userMessageText(el) {
     // Read the message body without the turn heading, copy/edit buttons or footer.
-    if (el.getAttribute?.('data-user-message-bubble') === 'true') return textOf(el).trim();
+    if (el.getAttribute?.('data-user-message-bubble') === 'true') {
+      const body = el.querySelector?.('.whitespace-pre-wrap, [data-message-content]');
+      return textOf(body || el).trim();
+    }
     const bodies = [...new Set([
       ...Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []),
       ...Array.from(el.querySelectorAll?.('[data-user-message-bubble="true"]') || []),
@@ -900,8 +905,10 @@
         // Work exposes separate keyed units for the user and assistant within
         // one turn. The assistant unit has a role marker even when its heading
         // is localized; an arbitrary non-user search unit is not a reply.
+        const workKey = String(el.getAttribute?.('data-chatgpt-search-unit-key') || '');
         const workUnit = el.hasAttribute?.('data-chatgpt-search-unit-key')
-          && el.querySelector?.('[data-conversation-role="assistant"]')
+          && (el.querySelector?.('[data-conversation-role="assistant"]')
+            || /:assistant$/.test(workKey))
           && el.querySelector?.('[data-markdown-text-style="assistant-message"]');
         return role === 'assistant' || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
           || workUnit;

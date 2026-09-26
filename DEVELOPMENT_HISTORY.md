@@ -1,5 +1,13 @@
 # ChatGPT Autopilot — development history
 
+## 2026-09-26 — Seven-chat Scenario first-send stall: diagnostic-to-code analysis
+
+- Owner's 0.9.19 report at 23:19:55 UTC: seven Scenario CHAT_CYCLE sessions all RECOVERING with zero confirmed sends; repeated RECOVERY_TEXT_ACK_PENDING. Safe diagnostics said messagesBefore=0, messagesAfter=1, composer empty, mainExactMatches=0, hidden tab. The first physical Send appeared, but exact operation-bound user-message acknowledgement failed. Core therefore never entered response observation and Scenario could not advance to prompt two.
+- The attached 0.9.19 adapter searched historical author-role/test-id/article nodes. The supplied ChatGPT Work HTML represents user messages with data-user-message-bubble="true" inside keyed units and has none of those old role/article markers. A cleared composer and new chat URL alone are insufficient to confirm the exact Send.
+- Pilot 10 already introduced Work-bubble acknowledgement. This repair chooses Work bubbles as the sole message units when present, reads the precise whitespace-pre-wrap prompt body to exclude surrounding controls, and recognizes a keyed assistant unit ending :assistant when it contains the semantic assistant markdown body. This strengthens Send confirmation and assistant completion before the second prompt.
+- Scenario manager code review: completed assistant response marks the same CHAT_CYCLE participant READY, increments the step, preserves chat URL/Core Session, and schedules each pool slot independently. Completed sequence retires that chat and consumes one replacement from the shared budget; there is no all-seven completion barrier.
+- Evidence boundary: old diagnostic proves the installed 0.9.19 stall, not an installed Pilot 10 success. Supplied HTML captures thinking but no completed assistant reply; keyed-assistant fallback remains to be verified in installed Chrome. At the owner's explicit request no tests were run for this checkpoint. No orchestration code was changed; ambiguous effects never trigger blind resend.
+
 This file is the repository-local handoff ledger for material product repairs and release checkpoints. It supplements Git history and the Drive documents `09_ІСТОРІЯ_ЗМІН` and `01_CURRENT_STATUS`. Never treat a status line as acceptance unless the listed evidence gate is actually complete.
 
 ## 2026-09-26 — Scenario Work real-run recovery and version integrity
