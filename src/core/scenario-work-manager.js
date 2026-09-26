@@ -14,6 +14,7 @@ import {
   applyScenarioLaunch,
   applyScenarioCompletion,
   applyScenarioTimeout,
+  expectedChatCycleStage,
   scenarioWorkParticipants,
 } from './scenario-work.js';
 
@@ -476,11 +477,12 @@ export class ScenarioWorkManager {
       if (replacingChat) {
         const summary = poolSummary(store, item.pool.id);
         if (summary.replacementsUsed >= summary.replacementBudget) {
-          next.runState = ScenarioWorkRunState.COMPLETED;
-          next.phase = 'COMPLETE';
+          next.runState = ScenarioWorkRunState.ERROR;
+          next.phase = 'ERROR';
           next.generation = item.runtime.generation;
           next.chat.state = ScenarioParticipantState.RETIRED;
           next.chat.chatUrl = '';
+          next.lastError = 'Відповідь не була підтверджена до timeout, а ліміт replacement-чатів вичерпано. Сценарій зупинено без вигаданого завершення.';
         } else {
           next.poolReplacementsUsed = item.runtime.poolReplacementsUsed + 1;
         }
@@ -1314,6 +1316,23 @@ export class ScenarioWorkManager {
       if (report?.status !== 'READY' || report.assistantComplete !== true) continue;
       const completedSessionId = participant.sessionId;
       const completedGeneration = participant.generation;
+      const expectedStage = scenario.config.mode === ScenarioWorkMode.CHAT_CYCLE
+        ? expectedChatCycleStage(scenario.config, runtime)
+        : '';
+      const observedStage = String(participant.stage || '').trim();
+      const stageMismatch = Boolean(expectedStage && observedStage && expectedStage !== observedStage);
+      if (stageMismatch) {
+        await this.appendScenarioDiagnostic({
+          scenario,
+          participant,
+          task,
+          event: 'СЦЕНАРІЙ_ДУБЛЬОВАНИЙ_КРОК_НЕ_ЗАРАХОВАНО',
+          status: 'READY',
+          code: 'SCENARIO_STAGE_MISMATCH_NON_ADVANCING',
+          message: `expectedStage=${expectedStage}; observedStage=${observedStage}; verified physical Send/response are real, but logical 12-step progress is not advanced.`,
+          now,
+        });
+      }
       let next = applyScenarioCompletion(scenario.config, runtime, participant.key, {
         chatUrl: task.lastConversationUrl,
         assistantText: report.assistantText || report.text || '',
