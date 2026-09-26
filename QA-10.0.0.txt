@@ -59,3 +59,8 @@ HIGH EFFORT GATE
 - A model-only top-level picker can be reopened to prove the selected High/Extra High option.
 - Failure paths close an opened effort picker before returning fail-closed.
 - Regression coverage includes direct High, Medium->High, Extra High preservation, model-picker-only UI, unrelated High controls, missing controls, and failed-picker cleanup.
+
+
+EMERGENCY USER-DIAGNOSTIC HOTFIX — 2026-09-26
+Observed evidence: ordinary Sessions reached CHECK_ONLY=READY and then failed in ENSURE_HIGH_EFFORT before prompt insertion; Scenario Work cycled on EFFORT_SLIDER_UNRECOGNIZED. Supplied production HTML exposed explicit data-selected-reasoning-effort=high/medium state.
+Qualification: Core deterministic gate passed on the hotfix branch; interaction compatibility and release packaging are requalified after this compatibility correction. Live ChatGPT acceptance remains required for event-handler behavior that saved HTML cannot execute.
