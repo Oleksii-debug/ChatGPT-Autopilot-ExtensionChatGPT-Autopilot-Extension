@@ -234,7 +234,8 @@ test('a long malformed background insertion is replaced once and proved before S
     document: env.buildDocument(composer), wait: async () => {}
   });
   assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
-  assert.equal(result.safeDiagnosticCode, 'INSERTION_REPAIRED_TEXT_PROVEN');
+  assert.equal(result.safeDiagnosticCode, 'INSERTION_TEXT_PROVEN');
+  assert.match(result.safeDiagnosticMessage, /repair=alternate/);
   assert.equal(composer.innerText, promptText);
   assert.equal(env.events.filter(event => event === 'execCommand:insertText').length, 1);
   assert.equal(env.clicks(), 0);

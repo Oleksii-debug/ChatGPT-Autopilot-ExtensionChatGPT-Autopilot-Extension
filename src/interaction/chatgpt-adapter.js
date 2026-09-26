@@ -1278,8 +1278,8 @@
               return resultBase(request, start, {
                 status: STATUS.INSERTED_NOT_SENT,
                 composerState: 'VISIBLE_NONEMPTY',
-                safeDiagnosticCode: 'INSERTION_REPAIRED_TEXT_PROVEN',
-                safeDiagnosticMessage: safeTextProofMessage(editorText(finalElement), request.promptText, finalElement)
+                safeDiagnosticCode: 'INSERTION_TEXT_PROVEN',
+                safeDiagnosticMessage: 'repair=alternate; ' + safeTextProofMessage(editorText(finalElement), request.promptText, finalElement)
               });
             }
           } else consecutiveMatches = 0;
