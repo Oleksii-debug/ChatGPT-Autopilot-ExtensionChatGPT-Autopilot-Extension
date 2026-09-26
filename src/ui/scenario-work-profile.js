@@ -13,7 +13,7 @@ const BOUNDS = Object.freeze({
 const POOL_BOUNDS = Object.freeze({
   count: [1, 20],
   replacementBudget: [0, 100000],
-  staggerSeconds: [0, 60],
+  staggerSeconds: [0, 604800],
 });
 
 function normalizePoolPreset(raw, mode) {
