@@ -10,6 +10,9 @@ SCENARIO POOL CONTROL + RESPONSE TELEMETRY — 2026-09-26
 - Scenario Work list shows one aggregate pool entry. Controls are moved directly below the list for keyboard/NVDA discoverability.
 - Assistant-response diagnostics now record bounded state-change/heartbeat evidence: BUSY/READY/completion/probe error, wait age, deadline remaining, baseline status, streaming deadline extension and actual response timeout. Prompt/response bodies remain excluded.
 - Response telemetry is rate-bounded (state changes immediately, normal heartbeat every 5 minutes, near-deadline heartbeat at most once per minute).
+- Truth correction after owner example “step 1/12; Send 3/12; completed responses 1/12”: raw transport Sends are no longer projected as logical X/12 progress. CHAT_CYCLE logical progress is completed assistant responses plus at most one current in-flight verified Send. Physical retry/replacement Sends remain separately auditable.
+- Timeout/replacement no longer rewinds completed CHAT_CYCLE cursor to START. A response to a historically duplicated old stage is recorded as real physical evidence but does not increment logical completedResponses. Timeout with no response proof and exhausted replacement budget is ERROR, never fake COMPLETED.
+
 
 AGENT DRAFT IMPORT — AFTER THE FIRST DELIVERED PILOT 10 ARCHIVE
 - Agent tab now imports/exports a versioned JSON goal and policy draft. Import only fills the form and never creates or starts a job. Unknown fields, runtime state, and credentials are rejected; the two-second status refresh preserves an imported draft. This change will appear in a later archive, not the Pilot 10 ZIP delivered at the initial 2026-09-26 checkpoint.
