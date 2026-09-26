@@ -43,7 +43,6 @@ This file is the repository-local handoff ledger for material product repairs an
 - No green result is inferred from queue state.
 - No installed-extension Windows/Chrome acceptance has been run from this release-prep lane yet.
 - HUMAN_TESTED=false.
-- NVDA_VERIFIED=false.
 - OWNER_WINDOWS_CHROME_VERIFIED=false.
 
 ### Secrets and rollback
@@ -88,3 +87,29 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 ### Integration authority
 - PR #422 is the only final Pilot 10 integration/package target.
 - Source PRs #418/#420 and closed #421 are provenance only.
+
+
+## 2026-09-26 03:54 Europe/Bratislava — Pilot 10 CI repair and live-main convergence
+
+### Problem
+- High-effort enforcement changed the intentional executor sequence, while older deterministic fixtures still modeled CHECK_ONLY -> INSERT_ONLY.
+- Owner-requested concise UI removed tutorial/help prose, while older UI tests still required those paragraphs and aria-describedby targets.
+- Release tests still contained stale 0.9.19/version-boundary assumptions.
+- Standalone CHAT_CYCLE tests still expected a manufactured second generation, contrary to the one-sequence-per-physical-chat contract.
+- Pilot 10 was 13 commits behind live main because parallel workers had landed native filesystem/companion work.
+
+### Repair
+- Updated Core/reliability/parallel fake transports to model CHECK_ONLY -> ENSURE_HIGH_EFFORT -> INSERT_ONLY without weakening product fail-closed behavior.
+- Updated UI contracts to require native controls and concise status while forbidding field-help/notice/tutorial prose.
+- Scenario import reports a short per-chat message count dynamically.
+- Version tests derive technical identity from package.json / manifest.version_name; Unicode Pilot README boundary fixed.
+- Release security fixture now carries daily Pilot version_name so the forbidden gateway runtime-state check reaches its intended assertion.
+- Standalone CHAT_CYCLE manager tests now assert one physical sequence and no automatic replacement generation.
+- Copied exact current-main blobs for the six disjoint native filesystem/companion files and tests, then merged current-main ancestry without force-push.
+
+### Verification
+- Pre-main-convergence repair head 27e6e92d82161e5c36581889e43c2d8f6c1badf1: Core deterministic tests SUCCESS.
+- Interaction High-effort suite had already passed on the preceding canonical Pilot 10 implementation.
+- Main convergence head 42fb45f03cd074937c35625a6460669b06e688a2: behind current main = 0, merge-base = b7cf6dd3e505a574b52d3409aa79f48a64953c59.
+- Full exact-head UI / Interaction / Linux+Windows release qualification remains authoritative; queued is not PASS.
+- OWNER_WINDOWS_CHROME_VERIFIED=false.

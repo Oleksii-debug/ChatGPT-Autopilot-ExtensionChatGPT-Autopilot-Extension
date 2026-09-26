@@ -47,7 +47,6 @@ NOT CLAIMED
 - Exact-head CI and deterministic Linux/Windows package gates must pass on the 10.0.0 candidate head.
 - Installed extension acceptance against current ChatGPT Work must still be run.
 - HUMAN_TESTED=false.
-- NVDA_VERIFIED=false.
 - OWNER_WINDOWS_CHROME_VERIFIED=false.
 
 DAILY USER-FACING IDENTITY
