@@ -15,6 +15,7 @@ test('release version has one authority across package, manifest and packagers',
   assert.equal(RELEASE_VERSION, packageJson.version);
   assert.equal(SOURCE_VERSION, packageJson.version);
   assert.equal(manifest.version, packageJson.version);
+  assert.equal(manifest.version_name, packageJson.version.split('.')[0]);
 });
 
 test('current release metadata files exist for the authoritative version', async () => {
@@ -25,9 +26,12 @@ test('current release metadata files exist for the authoritative version', async
   assert.match(qa, new RegExp(packageJson.version.replaceAll('.', '\\.')));
 });
 
-test('release workflow derives candidate names from resolved version instead of frozen 0.9.19', async () => {
+test('release workflow derives user-facing Pilot daily names from the authoritative version and commit time', async () => {
   const workflow = await text('.github/workflows/release-package.yml');
   assert.ok(workflow.includes('steps.release_meta.outputs.version'));
+  assert.ok(workflow.includes('steps.release_meta.outputs.friendly'));
+  assert.match(workflow, /Пілот/u);
+  assert.match(workflow, /Europe\/Bratislava/u);
   assert.doesNotMatch(workflow, /ChatGPT-Autopilot-0\.9\.19(?:\.zip|-candidate)/u);
   assert.match(workflow, /QA-\*\.txt/u);
   assert.match(workflow, /scripts\/package-source\.mjs/u);
