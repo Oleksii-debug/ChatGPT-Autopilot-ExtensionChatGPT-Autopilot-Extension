@@ -141,3 +141,183 @@ test('two equally plausible visible composers fail closed', () => {
   assert.equal(found.element, null);
   assert.equal(found.ambiguous, true);
 });
+
+// Minimal DOM surface copied from the Work UI's keyed turn structure. The
+// second/third sends matter: an existing assistant reply must be the baseline,
+// and a new user bubble must be appended rather than matched in old history.
+function workChat() {
+  const users = [];
+  const assistants = [];
+  let sends = 0;
+  const visible = { isConnected: true, hidden: false, disabled: false,
+    getBoundingClientRect: () => ({ width: 100, height: 20 }) };
+  const node = (attrs, innerText, children = {}) => ({
+    ...visible, innerText,
+    getAttribute: key => attrs[key] ?? null,
+    hasAttribute: key => Object.hasOwn(attrs, key),
+    querySelector: key => children[key] || null,
+    querySelectorAll: key => key.includes('data-markdown-text-style')
+      ? [children['[data-markdown-text-style="assistant-message"]']].filter(Boolean) : [],
+    contains: other => Object.values(children).includes(other),
+  });
+  const bubble = text => node({ 'data-user-message-bubble': 'true' }, text);
+  const reply = text => {
+    const heading = node({ 'data-conversation-role': 'assistant' }, 'ChatGPT сказал:');
+    const body = node({ 'data-markdown-text-style': 'assistant-message' }, text);
+    return node({ 'data-chatgpt-search-unit-key': 'fallback-turn:assistant' }, `ChatGPT сказал:\n${text}`, {
+      '[data-conversation-role="assistant"]': heading,
+      '[data-markdown-text-style="assistant-message"]': body,
+    });
+  };
+  const form = { querySelectorAll: key => key.includes('button') ? [send] : [] };
+  const composer = { ...visible, tagName: 'DIV', innerText: '',
+    getAttribute: key => ({ contenteditable: 'true', 'aria-label': 'Спросить ChatGPT' })[key] ?? null,
+    closest: key => key === 'form' ? form : null };
+  const send = { ...visible, tagName: 'BUTTON', type: 'button',
+    getAttribute: key => key === 'aria-label' ? 'Отправить' : null,
+    click() { sends += 1; users.push(bubble(composer.innerText)); composer.innerText = ''; } };
+  const main = { querySelector: key => key.includes('data-user-message-bubble') ? users[0] || null : null,
+    querySelectorAll: () => [] };
+  const document = { body: { innerText: '' }, visibilityState: 'visible',
+    querySelector: key => key.includes('main') ? main : null,
+    querySelectorAll(key) {
+      if (key === '[data-user-message-bubble="true"]') return users;
+      if (key.includes('[data-message-author-role="assistant"]')) return assistants;
+      if (key.includes('[contenteditable="true"]')) return [composer];
+      if (key === 'button, [role="button"]') return [send];
+      return [];
+    } };
+  return { document, users, assistants, composer, bubble, reply, get sends() { return sends; } };
+}
+
+test('Work UI verifies second and third prompts only after a new user bubble, then reads each new reply', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  chat.users.push(chat.bubble('START'));
+  chat.assistants.push(chat.reply('Перша відповідь.'));
+  for (let turn = 2; turn <= 3; turn++) {
+    const prompt = `Продовжуй ${turn}`;
+    chat.composer.innerText = prompt;
+    const request = validRequest({ requestId: `op-${turn}`, promptText: prompt, mode: 'SUBMIT_EXISTING' });
+    const sent = await adapter.execute(request, { document: chat.document, wait: async () => {} });
+    assert.equal(sent.status, adapter.STATUS.SENT_VERIFIED, `turn ${turn}: ${sent.safeDiagnosticCode}`);
+    assert.equal(sent.assistantBaselineCount, turn - 1);
+    assert.equal(chat.sends, turn - 1);
+    const reportRequest = validRequest({ mode: 'READ_ASSISTANT_REPORT',
+      assistantBaselineKnown: true, assistantBaselineCount: sent.assistantBaselineCount });
+    const beforeReply = await adapter.execute(reportRequest, { document: chat.document });
+    assert.equal(beforeReply.assistantComplete, false);
+    chat.assistants.push(chat.reply(`Відповідь ${turn}.`));
+    const afterReply = await adapter.execute(reportRequest, { document: chat.document });
+    assert.equal(afterReply.status, adapter.STATUS.READY);
+    assert.equal(afterReply.assistantText, `Відповідь ${turn}.`);
+    assert.equal(afterReply.assistantComplete, true);
+  }
+});
+
+test('Work UI ignores sidebar bubbles and reads only the user prompt body', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  const sidebar = chat.bubble('Продовжуй 2');
+  sidebar.closest = () => null;
+  chat.users.push(sidebar);
+  const prior = chat.bubble('START\nКопіювати повідомлення');
+  prior.closest = () => ({ tagName: 'MAIN' });
+  prior.querySelector = selector => selector.includes('whitespace-pre-wrap') ? { innerText: 'START' } : null;
+  chat.users.push(prior);
+  chat.composer.innerText = 'Продовжуй 2';
+  const sent = await adapter.execute(validRequest({ requestId: 'sidebar-op',
+    promptText: 'Продовжуй 2', mode: 'SUBMIT_EXISTING' }),
+  { document: chat.document, wait: async () => {} });
+  assert.equal(sent.status, adapter.STATUS.SENT_VERIFIED);
+  assert.equal(chat.sends, 1);
+});
+
+test('Work UI recognizes a keyed assistant reply without a localized role heading', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  const outside = chat.reply('Sidebar preview');
+  outside.closest = () => null;
+  const reply = chat.reply('Відповідь після першого промпта.');
+  reply.closest = () => ({ tagName: 'MAIN' });
+  reply.querySelector = selector => selector.includes('data-conversation-role') ? null
+    : selector.includes('data-markdown-text-style') ? { innerText: 'Відповідь після першого промпта.' }
+    : null;
+  chat.assistants.push(outside, reply);
+  const result = await adapter.execute(validRequest({ mode: 'READ_ASSISTANT_REPORT',
+    assistantBaselineKnown: true, assistantBaselineCount: 0 }), { document: chat.document });
+  assert.equal(result.status, adapter.STATUS.READY);
+  assert.equal(result.assistantText, 'Відповідь після першого промпта.');
+});
+
+function powerSliderPage({ start = 1, reacts = true, total = 3 } = {}) {
+  let value = start;
+  let open = false;
+  let keypresses = 0;
+  const visible = { isConnected: true, getBoundingClientRect: () => ({ width: 100, height: 20 }) };
+  const menu = { ...visible };
+  const control = {
+    ...visible, innerText: 'Средний',
+    getAttribute: name => ({ 'aria-label': 'Выбрать модель ChatGPT', 'aria-haspopup': 'menu' })[name] || null,
+    closest: () => null, focus() {}, click() { open = !open; }
+  };
+  const thumb = { getAttribute: name => ({
+    'aria-valuemin': '0', 'aria-valuemax': '2', 'aria-valuenow': String(value)
+  })[name] || null };
+  const row = {
+    ...visible,
+    getAttribute: name => ({
+      'aria-keyshortcuts': 'ArrowLeft ArrowRight', 'aria-describedby': 'effort-status effort-help'
+    })[name] || null,
+    closest: selector => selector === '[role="menu"]' ? menu : null,
+    querySelector: selector => selector === '[role="slider"]' ? thumb : null,
+    focus() {},
+    dispatchEvent(event) {
+      assert.equal(event.key, 'ArrowRight');
+      keypresses += 1;
+      if (reacts) value = Math.min(2, value + 1);
+      return true;
+    }
+  };
+  const document = {
+    body: { innerText: '' },
+    getElementById(id) {
+      if (id !== 'effort-status') return null;
+      return {
+        innerText: ['Низкий', 'Средний', 'Высокий'][value] + `, ${value + 1} из ${total}.`,
+        getAttribute: name => name === 'role' ? 'status' : null
+      };
+    },
+    querySelectorAll(selector) {
+      if (selector.includes('[data-reasoning-slider="true"]')) return open ? [row] : [];
+      if (selector.includes('button, [role="button"], [role="combobox"]')) return [control];
+      return [];
+    }
+  };
+  return { document, state: () => ({ value, open, keypresses }) };
+}
+
+test('current ChatGPT three-step effort slider reaches High and proves its announced state', async () => {
+  const { adapter } = loadAdapter({ KeyboardEvent: class KeyboardEvent {
+    constructor(type, options) { this.type = type; Object.assign(this, options); }
+  } });
+  const page = powerSliderPage();
+  const result = await adapter.execute(validRequest({ mode: 'ENSURE_HIGH_EFFORT' }),
+    { document: page.document, wait: async () => {} });
+  assert.equal(result.status, adapter.STATUS.READY);
+  assert.equal(result.effortLevel, 'high');
+  assert.equal(result.safeDiagnosticCode, 'EFFORT_HIGH_SLIDER_CONFIRMED');
+  assert.deepEqual(page.state(), { value: 2, open: false, keypresses: 1 });
+});
+
+test('effort slider fails closed if its key action is ignored or shape changes', async () => {
+  const { adapter } = loadAdapter({ KeyboardEvent: class KeyboardEvent {
+    constructor(type, options) { this.type = type; Object.assign(this, options); }
+  } });
+  for (const page of [powerSliderPage({ reacts: false }), powerSliderPage({ total: 4 })]) {
+    const result = await adapter.execute(validRequest({ mode: 'ENSURE_HIGH_EFFORT' }),
+      { document: page.document, wait: async () => {} });
+    assert.notEqual(result.status, adapter.STATUS.READY);
+    assert.equal(page.state().open, false);
+  }
+});

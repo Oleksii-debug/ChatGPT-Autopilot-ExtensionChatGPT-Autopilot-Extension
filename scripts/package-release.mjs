@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto';
-import { promises as fs } from 'node:fs';
+import { promises as fs, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const RELEASE_VERSION = '0.9.19';
+const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const PACKAGE_METADATA = JSON.parse(readFileSync(path.join(REPOSITORY_ROOT, 'package.json'), 'utf8'));
+export const RELEASE_VERSION = String(PACKAGE_METADATA.version || '').trim();
+if (!/^\d+\.\d+\.\d+$/u.test(RELEASE_VERSION)) {
+  throw new Error(`package.json must contain a numeric extension version, found: ${RELEASE_VERSION || 'missing'}`);
+}
+export const RELEASE_DAY = RELEASE_VERSION.split('.')[0];
 export const RELEASE_NAME = `ChatGPT-Autopilot-${RELEASE_VERSION}`;
 const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
@@ -11,7 +17,6 @@ const UTF8_FLAG = 0x0800;
 const ZIP_STORE = 0;
 const NORMALIZED_TEXT_EXTENSIONS = new Set(['.cmd', '.cs', '.css', '.html', '.js', '.json', '.md', '.mjs', '.ps1', '.txt', '.yaml', '.yml']);
 
-const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FORBIDDEN_PATH_PATTERNS = [
   /(^|\/)\.env(?:\.|$)/i,
   /(^|\/)(Cookies?|Login Data|Local State|Web Data)(\/|$)/i,
@@ -107,6 +112,7 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
   if (manifest.version !== RELEASE_VERSION) throw new Error(`v${RELEASE_VERSION} package requires manifest version ${RELEASE_VERSION}, found ${manifest.version || 'missing'}`);
+  if (String(manifest.version_name || '') !== RELEASE_DAY) throw new Error(`manifest version_name must be daily Pilot number ${RELEASE_DAY}`);
 
   const files = [`CHANGES-${RELEASE_VERSION}.txt`, `QA-${RELEASE_VERSION}.txt`, 'README.txt', 'manifest.json', ...await walkFiles(root, 'companion'), ...await walkFiles(root, 'icons'), ...await walkFiles(root, 'src')].sort();
   const fileSet = new Set(files);

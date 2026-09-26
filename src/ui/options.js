@@ -1,8 +1,10 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
+import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
+import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -33,6 +35,7 @@ const ui = {
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
+  agentDraftActive: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -98,10 +101,17 @@ async function loadProfileSettings() {
   try {
     const data = await core('GET_PROFILE_SETTINGS');
     const minutes = Number(data?.rateLimitCooldownMinutes ?? 0);
+    const concurrency = Number(data?.maxConcurrentSessionOperations ?? 10);
     $('rate-limit-cooldown-minutes').value = String(minutes);
-    $('rate-limit-setting-status').textContent = `Current fallback rate-limit pause: ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+    if ($('simplified-rate-limit-cooldown-minutes')) $('simplified-rate-limit-cooldown-minutes').value = String(minutes);
+    if ($('simplified-max-concurrent-session-operations')) $('simplified-max-concurrent-session-operations').value = String(concurrency);
+    $('rate-limit-setting-status').textContent = `Активна пауза: ${minutes} хв.`;
+    if ($('simplified-profile-setting-status')) {
+      $('simplified-profile-setting-status').textContent = `Активна пауза: ${minutes} хв. Паралельність: ${concurrency} одночасних операцій.`;
+    }
   } catch (error) {
-    $('rate-limit-setting-status').textContent = `Could not load fallback rate-limit pause: ${error.message}`;
+    $('rate-limit-setting-status').textContent = `Не вдалося завантажити налаштування: ${error.message}`;
+    if ($('simplified-profile-setting-status')) $('simplified-profile-setting-status').textContent = `Не вдалося завантажити налаштування: ${error.message}`;
   }
 }
 
@@ -113,13 +123,36 @@ async function saveProfileSettings() {
     return;
   }
   try {
-    const data = await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
-    $('rate-limit-setting-status').textContent = data.rateLimitCooldownMinutes === 0
-      ? 'Збережено: додаткову спільну паузу після rate-limit вимкнено. Серверне обмеження та технічний retry залишаються чинними.'
-      : `Збережено резервну паузу: ${data.rateLimitCooldownMinutes} хв.`;
-    announce('Rate-limit pause saved.');
+    await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
+    await loadProfileSettings();
+    announce('Налаштування паузи збережено.');
   } catch (error) {
-    $('rate-limit-setting-status').textContent = `Could not save fallback rate-limit pause: ${error.message}`;
+    $('rate-limit-setting-status').textContent = `Не вдалося зберегти налаштування: ${error.message}`;
+  }
+}
+
+async function saveSimplifiedProfileSettings() {
+  const minutes = Number($('simplified-rate-limit-cooldown-minutes').value);
+  const concurrency = Number($('simplified-max-concurrent-session-operations').value);
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+    $('simplified-profile-setting-status').textContent = 'Пауза: введіть ціле число від 0 до 120.';
+    $('simplified-rate-limit-cooldown-minutes').focus();
+    return;
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) {
+    $('simplified-profile-setting-status').textContent = 'Паралельність: введіть ціле число від 1 до 32.';
+    $('simplified-max-concurrent-session-operations').focus();
+    return;
+  }
+  try {
+    await core('UPDATE_PROFILE_SETTINGS', {
+      rateLimitCooldownMinutes: minutes,
+      maxConcurrentSessionOperations: concurrency,
+    });
+    await loadProfileSettings();
+    announce('Налаштування виконання збережено.');
+  } catch (error) {
+    $('simplified-profile-setting-status').textContent = `Не вдалося зберегти налаштування: ${error.message}`;
   }
 }
 
@@ -1274,8 +1307,17 @@ async function testAiGateway() {
     const result = data.result || {};
     const providerStatus = Array.isArray(result.providerStatus) ? result.providerStatus : [];
     const providerText = providerStatus.length
-      ? providerStatus.map(item => `${item.provider}: ${item.ok ? `готовий (${item.models || 0} моделей)` : (item.configured === false ? 'не налаштований' : 'недоступний')}`).join('; ')
+      ? providerStatus.map(item => `${item.endpointId || item.provider}: ${item.ok ? `готовий (${item.models || 0} моделей)` : (item.configured === false ? 'не налаштований' : 'недоступний')}`).join('; ')
       : ((result.providers || []).join(', ') || 'не вказано');
+    const endpointStatus = Array.isArray(result.compatibleEndpoints)
+      ? result.compatibleEndpoints.map(item => {
+        const name = item.endpointId === 'mistral' ? 'Містраль' : (item.endpointId || 'endpoint');
+        return `${name}: ${item.apiKeyConfigured ? 'ключ завантажений у локальний Gateway' : 'ключ не завантажений у локальний Gateway'}`;
+      }).join('; ')
+      : '';
+    $('ai-router-provider-key-status').textContent = endpointStatus
+      ? `Ключі постачальників: ${endpointStatus}.`
+      : 'Ключі постачальників: Gateway не повідомив про окремі endpoint-и.';
     const compatibleCredential = result.compatibleApiKeyConfigured
       ? 'compatible key завантажений у Gateway'
       : 'compatible key не збережений (для локального сервера без авторизації це нормально)';
@@ -1286,6 +1328,7 @@ async function testAiGateway() {
     announce('AI Gateway відповідає.');
   } catch (error) {
     $('ai-router-openai-key-status').textContent = 'OpenAI API key: не вдалося перевірити, бо Gateway недоступний.';
+    $('ai-router-provider-key-status').textContent = 'Ключі Містраль та інших постачальників: Gateway недоступний, статус невідомий.';
     $('ai-router-status').textContent = `AI Gateway недоступний: ${error.message}`;
   } finally {
     setAiRouterBusy(false);
@@ -1512,12 +1555,43 @@ function scenarioWorkInt(id, min, max, label) {
   return parseStrictBoundedInteger($(id).value, { min, max, label });
 }
 
+function syncScenarioInitialStaggerBounds() {
+  const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
+  $('scenario-cycle-initial-stagger').max = unit === 'minutes' ? '10080' : '604800';
+}
+
+function scenarioInitialStaggerSecondsFromForm() {
+  const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
+  const value = scenarioWorkInt(
+    'scenario-cycle-initial-stagger',
+    0,
+    unit === 'minutes' ? 10080 : 604800,
+    'Пауза між першими промптами',
+  );
+  return value * (unit === 'minutes' ? 60 : 1);
+}
+
+function setScenarioInitialStaggerForm(rawSeconds) {
+  const seconds = Math.max(0, Math.min(604800, Math.floor(Number(rawSeconds) || 0)));
+  const useMinutes = seconds >= 60 && seconds % 60 === 0;
+  $('scenario-cycle-initial-stagger-unit').value = useMinutes ? 'minutes' : 'seconds';
+  syncScenarioInitialStaggerBounds();
+  $('scenario-cycle-initial-stagger').value = String(useMinutes ? seconds / 60 : seconds);
+}
+
+function formatScenarioInitialStagger(seconds) {
+  const value = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (value > 0 && value % 60 === 0) return `${value / 60} хв`;
+  return `${value} с`;
+}
+
 function setScenarioWorkBusy(busy) {
   for (const id of [
     'new-scenario-cycle-button', 'new-scenario-pairs-button', 'new-scenario-group-button', 'new-scenario-pipeline-button',
     'save-scenario-work-button', 'start-scenario-work-button', 'pause-scenario-work-button',
     'resume-scenario-work-button', 'stop-scenario-work-button', 'delete-scenario-work-button',
     'scenario-work-run-now', 'scenario-cycle-start-parallel',
+    'scenario-work-template-button', 'scenario-work-import-button', 'scenario-work-export-button',
   ]) {
     const element = $(id);
     if (element) element.disabled = busy;
@@ -1531,12 +1605,13 @@ function syncScenarioWorkButtons() {
   const has = Boolean(item);
   const running = state === 'RUNNING';
   const paused = state === 'PAUSED';
-  $('save-scenario-work-button').disabled = !has || running || paused;
+  $('save-scenario-work-button').disabled = !has || running || paused || Boolean(item?.pool);
   $('start-scenario-work-button').disabled = !has || running || paused;
   $('pause-scenario-work-button').disabled = !has || !running;
   $('resume-scenario-work-button').disabled = !has || !paused;
   $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running;
+  $('delete-scenario-work-button').disabled = !has || running || (Boolean(item?.pool)
+    && (ui.scenarioWorkPools || []).find(pool => pool.id === item.pool.id)?.active > 0);
   $('scenario-work-run-now').disabled = !has || !running;
   $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
 }
@@ -1583,18 +1658,51 @@ function renderScenarioWorkState(item) {
   const runtime = item.runtime || {};
   addScenarioStateLine('Стан', runtime.runState || 'STOPPED');
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
-  addScenarioStateLine('Покоління', runtime.generation ?? 1);
-  addScenarioStateLine('Фаза', runtime.phase || '—');
+  if (item.pool) {
+    const pool = (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
+    addScenarioStateLine('Пул: фізичних чатів', pool?.slots ?? '—');
+    addScenarioStateLine('Пул: план повідомлень на один чат', pool?.messagesPerChat ?? '—');
+    addScenarioStateLine('Пул: план усіх Send', pool?.plannedSends ?? '—');
+    addScenarioStateLine('Пул: перший Send підтверджено', pool ? `${pool.firstPromptSent ?? 0}/${pool.slots}` : '—');
+    addScenarioStateLine('Пул: ще не отримали перший Send', pool?.firstPromptPending ?? '—');
+    addScenarioStateLine('Пул: чекають завершення відповіді', pool?.waitingResponse ?? '—');
+    addScenarioStateLine('Пул: підтверджено завершених відповідей', pool?.completedResponses ?? '—');
+    addScenarioStateLine('Пул: усього підтверджених Send', pool?.verifiedSends ?? '—');
+    addScenarioStateLine('Пул: завершених чатів', pool?.completed ?? '—');
+    addScenarioStateLine('Пул: призупинено', pool?.paused ?? '—');
+    addScenarioStateLine('Пул: помилок', pool?.error ?? '—');
+    addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${item.pool.replacementBudget}`);
+    addScenarioStateLine('Фактична пауза лише між першими промптами', formatScenarioInitialStagger(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0));
+    addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
+  }
   if (runtime.mode === 'CHAT_CYCLE') {
-    addScenarioStateLine('Коло', `${runtime.round ?? 0}/${item.config?.roundsPerGeneration ?? 0}`);
-    addScenarioStateLine('Крок промпта', `${(runtime.stepIndex ?? 0) + 1}`);
-    addScenarioStateLine('Повтор кроку', `${(runtime.repeatIndex ?? 0) + 1}`);
+    const steps = Array.isArray(item.config?.steps) ? item.config.steps : [];
+    const totalMessages = steps.reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
+    const stepIndex = Math.max(0, Math.min(steps.length - 1, Number(runtime.stepIndex || 0)));
+    const repeatIndex = Math.max(0, Number(runtime.repeatIndex || 0));
+    const beforeCurrent = steps.slice(0, stepIndex).reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
+    const currentMessage = totalMessages ? Math.min(totalMessages, beforeCurrent + repeatIndex + 1) : 0;
+    const currentRepeatTotal = Math.max(0, Number(steps[stepIndex]?.repeat || 0));
+    addScenarioStateLine(item.pool ? 'Фізичний чат у цьому слоті' : 'Фізичний чат', `№${runtime.generation ?? 1}`);
+    const confirmed = Number.isInteger(item.verifiedSends?.confirmedInThisChat)
+      ? item.verifiedSends.confirmedInThisChat : null;
+    addScenarioStateLine('Підтверджено повідомлень у цьому чаті', `${confirmed ?? '—'}/${totalMessages}`);
+    addScenarioStateLine('Наступне повідомлення', `${currentMessage}/${totalMessages}`);
+    addScenarioStateLine('Підтверджено за весь сценарій', item.verifiedSends?.confirmedOverall ?? '—');
+    addScenarioStateLine('Промпт у послідовності', `${steps.length ? stepIndex + 1 : 0}/${steps.length}`);
+    addScenarioStateLine('Повтор цього промпта', `${currentRepeatTotal ? Math.min(currentRepeatTotal, repeatIndex + 1) : 0}/${currentRepeatTotal}`);
   } else if (runtime.mode === 'AUDITOR_GROUP') {
+    addScenarioStateLine('Покоління', runtime.generation ?? 1);
+    addScenarioStateLine('Фаза', runtime.phase || '—');
     addScenarioStateLine('Коло групи', `${runtime.group?.round ?? 0}/${item.config?.roundsPerGeneration ?? 0}`);
   } else if (runtime.mode === 'PAIRS') {
+    addScenarioStateLine('Покоління', runtime.generation ?? 1);
+    addScenarioStateLine('Фаза', runtime.phase || '—');
     const rounds = Object.values(runtime.pairs || {}).map(pair => `№${pair.index}: ${pair.round ?? 0}`).join('; ');
     addScenarioStateLine('Кола двійок', rounds || '—');
   } else if (runtime.mode === 'AUDITOR_PIPELINE') {
+    addScenarioStateLine('Покоління', runtime.generation ?? 1);
+    addScenarioStateLine('Фаза', runtime.phase || '—');
     const first = Object.values(runtime.firstSlots || {});
     const second = Object.values(runtime.secondSlots || {});
     const firstVerified = first.filter(slot => slot.state === 'COMPLETE').length;
@@ -1669,6 +1777,7 @@ function createScenarioCycleStep(step = {}, index = 0) {
       || $('scenario-cycle-add-step');
     fieldset.remove();
     renumberScenarioCycleSteps();
+    updateScenarioCycleMessageCount();
     nextFocus?.focus();
     announce('Промпт видалено.');
   });
@@ -1683,12 +1792,24 @@ function renumberScenarioCycleSteps() {
   });
 }
 
+function updateScenarioCycleMessageCount() {
+  const rows = [...$('scenario-cycle-steps').querySelectorAll('[data-scenario-step]')];
+  const total = rows.reduce((sum, row) => {
+    const value = Number(row.querySelector('[data-scenario-step-repeat]')?.value);
+    return sum + (Number.isSafeInteger(value) && value > 0 ? value : 0);
+  }, 0);
+  $('scenario-cycle-message-count').textContent = total
+    ? `Повідомлень у кожному чаті: ${total}.`
+    : 'Повідомлень у кожному чаті: перевірте кількість повторів.';
+}
+
 function renderScenarioCycleSteps(steps = []) {
   const container = $('scenario-cycle-steps');
   container.replaceChildren();
   const actual = steps.length ? steps : [{ prompt: 'Продовжуй.', repeat: 1 }];
   actual.forEach((step, index) => container.append(createScenarioCycleStep(step, index)));
   renumberScenarioCycleSteps();
+  updateScenarioCycleMessageCount();
 }
 
 function readScenarioCycleSteps() {
@@ -1715,8 +1836,8 @@ function scenarioWorkConfigFromForm() {
     id: current.id,
     name: $('scenario-work-name').value.trim() || current.name || 'Сценарна робота',
     mode,
-    roundsPerGeneration: scenarioWorkInt('scenario-work-rounds', 1, 10000, 'Кіл у поколінні'),
-    maxGenerations: scenarioWorkInt('scenario-work-generations', 0, 10000, 'Кількість поколінь'),
+    roundsPerGeneration: mode === 'CHAT_CYCLE' ? 1 : scenarioWorkInt('scenario-work-rounds', 1, 10000, 'Кіл у поколінні'),
+    maxGenerations: mode === 'CHAT_CYCLE' ? 1 : scenarioWorkInt('scenario-work-generations', 0, 10000, 'Кількість поколінь'),
     responseTimeoutMinutes: scenarioWorkInt('scenario-work-timeout', 1, 1440, 'Час очікування відповіді'),
     pollSeconds: scenarioWorkInt('scenario-work-poll', 5, 600, 'Інтервал перевірки'),
     minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Пауза після завершення відповіді'),
@@ -1770,10 +1891,12 @@ function fillScenarioWorkForm(item) {
   ui.selectedScenarioWorkId = item.id;
   ui.selectedScenarioWork = clone(item);
   const config = item.config || {};
+  const runtime = item.runtime || {};
   $('scenario-work-name').value = item.name || config.name || '';
   $('scenario-work-mode-label').textContent = `Формат: ${SCENARIO_WORK_MODE_LABELS[config.mode] || config.mode || 'невідомий'}.`;
-  $('scenario-work-rounds').value = String(config.roundsPerGeneration ?? 10);
-  $('scenario-work-generations').value = String(config.maxGenerations ?? 0);
+  $('scenario-work-round-generation-settings').hidden = config.mode === 'CHAT_CYCLE';
+  $('scenario-work-rounds').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.roundsPerGeneration ?? 10));
+  $('scenario-work-generations').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.maxGenerations ?? 0));
   $('scenario-work-timeout').value = String(config.responseTimeoutMinutes ?? 40);
   $('scenario-work-poll').value = String(config.pollSeconds ?? 15);
   $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
@@ -1786,6 +1909,16 @@ function fillScenarioWorkForm(item) {
     $('scenario-cycle-url').value = config.launchUrl || 'https://chatgpt.com/';
     $('scenario-cycle-restart-round-timeout').checked = config.restartCurrentRoundOnTimeout !== false;
     renderScenarioCycleSteps(config.steps || []);
+    const pool = item.pool ? (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id) : null;
+    if (item.pool) {
+      $('scenario-cycle-parallel-count').value = String(pool?.slots ?? 1);
+      $('scenario-cycle-replacement-budget').value = String(item.pool.replacementBudget ?? 0);
+      setScenarioInitialStaggerForm(runtime.initialStaggerSeconds || 0);
+    } else {
+      $('scenario-cycle-parallel-count').value = '1';
+      $('scenario-cycle-replacement-budget').value = '0';
+      setScenarioInitialStaggerForm(0);
+    }
   } else {
     const prefix = config.mode === 'PAIRS' ? 'scenario-pair' : 'scenario-group';
     if (config.mode === 'PAIRS') $('scenario-pair-count').value = String(config.pairCount ?? 1);
@@ -1819,6 +1952,7 @@ function fillScenarioWorkForm(item) {
 
 function renderScenarioWorkList(data = {}) {
   const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
+  ui.scenarioWorkPools = Array.isArray(data.pools) ? data.pools.map(item => clone(item)) : [];
   ui.scenarioWorkScenarios = scenarios.map(item => clone(item));
   const list = $('scenario-work-list');
   list.replaceChildren();
@@ -1863,7 +1997,8 @@ async function createScenarioWork(mode) {
   const label = SCENARIO_WORK_MODE_LABELS[mode] || 'Сценарна робота';
   try {
     setScenarioWorkBusy(true);
-    const data = await core('CREATE_SCENARIO_WORK', { name: `Новий: ${label}`, mode });
+    const config = mode === 'CHAT_CYCLE' ? { roundsPerGeneration: 1, maxGenerations: 1 } : {};
+    const data = await core('CREATE_SCENARIO_WORK', { name: `Новий: ${label}`, mode, config });
     await loadScenarioWork({ preservePanel: false });
     if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
     setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[mode] || 'cycle');
@@ -1874,37 +2009,114 @@ async function createScenarioWork(mode) {
   } finally { setScenarioWorkBusy(false); }
 }
 
+async function importScenarioWorkProfile() {
+  const status = $('scenario-work-profile-status');
+  const file = $('scenario-work-profile-file').files?.[0];
+  if (!file) {
+    status.textContent = 'Виберіть JSON-файл сценарію.';
+    $('scenario-work-profile-file').focus();
+    return;
+  }
+  try {
+    if (file.size > 10_000_000) throw new Error('Файл сценарію перевищує 10 МБ.');
+    setScenarioWorkBusy(true);
+    const { config, pool } = parseScenarioWorkProfileDocument(await file.text());
+    const data = await core('CREATE_SCENARIO_WORK', { name: config.name, mode: config.mode, config });
+    await loadScenarioWork({ preservePanel: false });
+    if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
+    if (pool && config.mode === 'CHAT_CYCLE') {
+      $('scenario-cycle-parallel-count').value = String(pool.count);
+      $('scenario-cycle-replacement-budget').value = String(pool.replacementBudget);
+      setScenarioInitialStaggerForm(pool.staggerSeconds);
+    }
+    setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
+    const messageCount = config.mode === 'CHAT_CYCLE'
+      ? config.steps.reduce((sum, step) => sum + step.repeat, 0)
+      : 0;
+    status.textContent = config.mode === 'CHAT_CYCLE'
+      ? `Імпортовано новий зупинений сценарій: ${config.name}. Повідомлень у кожному чаті: ${messageCount}.${pool ? ` Паралельних чатів: ${pool.count}; додаткових чатів: ${pool.replacementBudget}; пауза лише між першими промптами: ${formatScenarioInitialStagger(pool.staggerSeconds)}.` : ''}`
+      : `Імпортовано новий зупинений сценарій: ${config.name}.`;
+    $('scenario-work-list').focus();
+  } catch (error) {
+    status.textContent = `Не вдалося імпортувати: ${error.message}`;
+  } finally {
+    setScenarioWorkBusy(false);
+  }
+}
+
+function exportScenarioWorkProfile() {
+  const status = $('scenario-work-profile-status');
+  if (!ui.selectedScenarioWork?.config) {
+    status.textContent = 'Спочатку виберіть сценарій.';
+    return;
+  }
+  try {
+    const pool = ui.selectedScenarioWork.config.mode === 'CHAT_CYCLE' ? {
+      count: scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів'),
+      replacementBudget: scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати'),
+      staggerSeconds: scenarioInitialStaggerSecondsFromForm(),
+    } : null;
+    const profile = makeScenarioWorkProfile(ui.selectedScenarioWork.config, { pool });
+    downloadJson(profile, `${safeFileName(profile.config.name)}-сценарій.json`);
+    status.textContent = 'Конфігурацію вибраного сценарію експортовано.';
+  } catch (error) {
+    status.textContent = `Не вдалося експортувати: ${error.message}`;
+  }
+}
+
+function downloadScenarioWorkTemplate() {
+  const status = $('scenario-work-profile-status');
+  try {
+    const profile = makeScenarioWorkTemplate();
+    downloadJson(profile, 'Шаблон-сценарної-роботи-12-повідомлень.json');
+    status.textContent = 'Шаблон JSON завантажено: 12 повідомлень у кожному фізичному чаті.';
+  } catch (error) {
+    status.textContent = `Не вдалося створити шаблон: ${error.message}`;
+  }
+}
+
 async function startParallelScenarioChats() {
   if (ui.selectedScenarioWork?.config?.mode !== 'CHAT_CYCLE') return;
-  let created = 0;
-  let started = 0;
-  let firstId = '';
   try {
-    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість незалежних чатів');
+    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів');
+    const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати');
+    const staggerSeconds = scenarioInitialStaggerSecondsFromForm();
     const config = scenarioWorkConfigFromForm();
     const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
     setScenarioWorkBusy(true);
-    for (let index = 1; index <= count; index += 1) {
-      const result = await core('CREATE_SCENARIO_WORK', {
-        name: `${baseName} — чат ${index}`, mode: 'CHAT_CYCLE', config,
-      });
-      const id = result?.scenario?.id;
-      if (!id) throw new Error('Створений цикл не повернув ідентифікатор.');
-      created++;
-      firstId ||= id;
-      await core('START_SCENARIO_WORK', { id });
-      started++;
+    const sourceScenarioId = ui.selectedScenarioWorkId;
+    const sourceIsDormantTemplate = Boolean(
+      sourceScenarioId
+      && !ui.selectedScenarioWork?.pool?.id
+      && ui.selectedScenarioWork?.runtime?.runState === 'STOPPED'
+      && Number(ui.selectedScenarioWork?.runtime?.totalLaunches || 0) === 0
+      && Number(ui.selectedScenarioWork?.runtime?.totalCompletedTurns || 0) === 0
+    );
+    const result = await core('CREATE_SCENARIO_CHAT_POOL', {
+      name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
+    });
+    const ids = result?.ids || [];
+    if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
+    if (Number(result?.pool?.slots) !== count) throw new Error('Core повернув іншу кількість фізичних чатів, ніж було задано.');
+    if (Number(result?.pool?.initialStaggerSeconds) !== staggerSeconds) throw new Error('Core повернув іншу паузу між першими промптами, ніж було задано. Запуск зупинено як непідтверджений.');
+    // The imported/configuration-only CHAT_CYCLE source is consumed by the
+    // physical pool. Keeping it as an eleventh "scenario" made a 10-chat launch
+    // look like 11. Delete only a never-started unpooled source; never touch a
+    // real/previously-run scenario.
+    if (sourceIsDormantTemplate && !ids.includes(sourceScenarioId)) {
+      try { await core('DELETE_SCENARIO_WORK', { id: sourceScenarioId }); }
+      catch (_) { /* Global projection still excludes this dormant template. */ }
     }
     await loadScenarioWork();
-    if (firstId) {
-      $('scenario-work-list').value = firstId;
-      await openScenarioWork(firstId);
+    if (ids[0]) {
+      $('scenario-work-list').value = ids[0];
+      await openScenarioWork(ids[0]);
     }
     setScenarioWorkPanel('state');
-    announce(`Запущено ${started} незалежних чатів. Кожен чекає своєї відповіді.`);
+    announce(`Пул підтверджено Core: ${ids.length} фізичних чатів; ${result?.pool?.messagesPerChat || config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень на чат; фактична пауза між першими промптами ${formatScenarioInitialStagger(result?.pool?.initialStaggerSeconds ?? staggerSeconds)}; додаткових чатів ${replacementBudget}.`);
   } catch (error) {
     await loadScenarioWork();
-    const message = `Створено ${created}, запущено ${started} чатів. Помилка: ${error.message}`;
+    const message = `Не вдалося підтвердити запуск пулу. Перевірте список сценаріїв: ${error.message}`;
     $('scenario-work-summary').textContent = message;
     announce(message);
   } finally { setScenarioWorkBusy(false); }
@@ -1946,7 +2158,9 @@ async function deleteScenarioWork() {
   if (!id) return;
   try {
     setScenarioWorkBusy(true);
-    await core('DELETE_SCENARIO_WORK', { id });
+    if (ui.selectedScenarioWork?.pool?.id) {
+      await core('DELETE_SCENARIO_CHAT_POOL', { id: ui.selectedScenarioWork.pool.id });
+    } else await core('DELETE_SCENARIO_WORK', { id });
     await loadScenarioWork({ preservePanel: false });
     $('scenario-work-list').focus();
     announce('Сценарій видалено.');
@@ -2176,7 +2390,7 @@ ${pendingScript}` : '';
   $('agent-history').textContent = history.length
     ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
     : 'Історії ще немає.';
-  fillBrowserAgentPolicy(config);
+  if (!ui.agentDraftActive) fillBrowserAgentPolicy(config);
 }
 
 function renderBrowserAgentList() {
@@ -2207,6 +2421,7 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
 }
 
 async function selectBrowserAgentJob() {
+  ui.agentDraftActive = false;
   const id = $('agent-job-list').value;
   if (!id) { ui.selectedBrowserAgentId = ''; renderBrowserAgentJob(null); return; }
   try {
@@ -2231,6 +2446,7 @@ async function runBrowserAgentPrompt() {
     const id = created?.job?.id || created?.selectedId;
     if (!id) throw new Error('Core не повернув id завдання Agent.');
     ui.selectedBrowserAgentId = id;
+    ui.agentDraftActive = false;
     await core('START_BROWSER_AGENT_JOB', { id });
     await loadBrowserAgentJobs({ selectId: id });
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
@@ -2246,6 +2462,28 @@ async function runBrowserAgentPrompt() {
   } catch (error) {
     $('agent-status').textContent = `Agent не запущено: ${error.message}`;
   } finally { $('agent-run-prompt-button').disabled = false; }
+}
+
+async function importBrowserAgentDraft() {
+  const file = $('agent-import-file').files?.[0];
+  if (!file) { $('agent-import-status').textContent = 'Оберіть JSON-файл чернетки.'; return; }
+  try {
+    if (file.size > 1024 * 1024) throw new Error('Файл чернетки має бути не більший за 1 МБ.');
+    const draft = parseAgentDraftProfile(parsePortableJson(await file.text()));
+    fillBrowserAgentPolicy(draft.policy);
+    $('agent-prompt').value = draft.goal;
+    ui.agentDraftActive = true;
+    $('agent-import-status').textContent = 'Чернетку завантажено у форму. Перевірте її та окремо натисніть «Запустити агента».';
+    $('agent-prompt').focus();
+  } catch (error) { $('agent-import-status').textContent = `Імпорт не вдався: ${error.message}`; }
+}
+
+function exportBrowserAgentDraft() {
+  try {
+    const draft = makeAgentDraftProfile($('agent-prompt').value, browserAgentPolicyFromForm());
+    downloadJson(draft, 'ChatGPT-Autopilot-Agent-draft.json');
+    $('agent-import-status').textContent = 'Чернетку експортовано без ключів API та стану виконання.';
+  } catch (error) { $('agent-import-status').textContent = `Експорт не вдався: ${error.message}`; }
 }
 
 async function browserAgentLifecycle(command) {
@@ -2454,7 +2692,8 @@ function simplifiedFields() {
     runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
     interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
     delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
-    retryPolicy: field('simplified-retry-policy'), tabs: field('simplified-tabs'),
+    retryUnit: field('simplified-retry-unit'), retryPolicy: field('simplified-retry-policy'),
+    busyBehavior: field('simplified-busy-behavior'), tabs: field('simplified-tabs'),
   };
 }
 
@@ -2465,6 +2704,41 @@ function updateSimplifiedMode() {
   $('simplified-urls-group').hidden = !mode.startsWith('unique-');
   $('simplified-prompts-group').hidden = !mode.endsWith('-unique');
   $('simplified-cycles').disabled = mode !== 'shared-shared';
+}
+
+function renderSimplifiedLog(session) {
+  const entries = Array.isArray(session?.log) ? session.log : [];
+  const visible = entries.slice(-VISIBLE_LOG_LIMIT);
+  $('simplified-log-count').textContent = `Показано ${visible.length} із ${entries.length} записів журналу.`;
+  $('simplified-log-region').textContent = visible
+    .map(entry => typeof entry === 'string'
+      ? translateText(entry)
+      : `${formatTime(entry.at)} — ${translateText(entry.message)}`)
+    .join('\n');
+}
+
+function renderSimplifiedActions(session = ui.simplifiedSelected, { busy = false } = {}) {
+  const controls = {
+    start: $('simplified-start'),
+    pause: $('simplified-pause'),
+    resume: $('simplified-resume'),
+    stop: $('simplified-stop'),
+  };
+  if (busy) {
+    Object.values(controls).forEach((button) => { button.disabled = true; });
+    return;
+  }
+  if (!session?.id) {
+    Object.values(controls).forEach((button) => { button.disabled = true; });
+    return;
+  }
+  const state = session.runState || 'STOPPED';
+  const a = session.actionAvailability || {};
+  const active = state === 'RUNNING' || state === 'RECOVERING';
+  controls.start.disabled = active || state === 'PAUSED' || a.start === false;
+  controls.pause.disabled = !active || a.pause === false;
+  controls.resume.disabled = state !== 'PAUSED' || a.resume === false;
+  controls.stop.disabled = state === 'STOPPED' || a.stop === false;
 }
 
 function showSimplifiedSession(session) {
@@ -2483,16 +2757,23 @@ function showSimplifiedSession(session) {
   $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
   $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
   $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
-  $('simplified-retry').value = String(session?.retryBackoffSeconds || 30);
+  const retryUnit = session?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
+  $('simplified-retry-unit').value = retryUnit;
+  $('simplified-retry').value = String(retryUnit === 'minutes'
+    ? Math.max(1, Math.round(Number(session?.retryBackoffSeconds || 30) / 60))
+    : Number(session?.retryBackoffSeconds || 30));
   $('simplified-retry-policy').value = session?.retryPolicy || 'safe';
+  $('simplified-busy-behavior').value = session?.busyChatBehavior || 'skip-next';
   $('simplified-tabs').value = session?.tabStrategy || 'keep-open';
   updateSimplifiedMode();
   $('simplified-list').value = session?.id || '';
   $('simplified-state').textContent = session
     ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
-    : 'Новий сеанс ще не збережено.';
+    : 'Сеанс не вибрано.';
+  $('simplified-draft-status').textContent = 'Незбережених змін немає.';
+  renderSimplifiedActions(session);
+  renderSimplifiedLog(session);
 }
-
 function renderSimplifiedList() {
   const rows = ui.sessions.filter(item => item.simplifiedSession);
   const signature = JSON.stringify(rows.map(row => [row.id, row.name, row.displayRunState, row.successfulSendCount]));
@@ -2525,7 +2806,10 @@ async function refreshSimplifiedSessionStatus() {
   try {
     const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
     const session = data.session;
+    ui.simplifiedSelected = clone(session);
     $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`;
+    renderSimplifiedActions(session);
+    renderSimplifiedLog(session);
   } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
 }
 
@@ -2538,6 +2822,7 @@ async function saveSimplifiedSession() {
     ui.simplifiedSelectedId = data.session.id;
     await loadSessions();
     showSimplifiedSession(data.session);
+    $('simplified-draft-status').textContent = 'Незбережених змін немає.';
     $('simplified-command-result').textContent = 'Сеанс збережено.';
   } catch (error) { $('simplified-command-result').textContent = `Не вдалося зберегти: ${error.message}`; }
 }
@@ -2545,14 +2830,26 @@ async function saveSimplifiedSession() {
 async function simplifiedAction(command) {
   if (!ui.simplifiedSelectedId) {
     $('simplified-command-result').textContent = 'Спочатку збережіть сеанс.';
+    renderSimplifiedActions(null);
     return;
   }
+  renderSimplifiedActions(ui.simplifiedSelected, { busy: true });
+  $('simplified-command-result').textContent = 'Команду передано Core…';
   try {
     const data = await core(command, { sessionId: ui.simplifiedSelectedId });
     await loadSessions();
-    showSimplifiedSession(data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session);
-    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${ui.simplifiedSelected.runState}.`;
-  } catch (error) { $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`; }
+    const session = data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session;
+    showSimplifiedSession(session);
+    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${session.runState}.`;
+  } catch (error) {
+    $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`;
+    try {
+      const current = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
+      showSimplifiedSession(current.session);
+    } catch {
+      renderSimplifiedActions(ui.simplifiedSelected);
+    }
+  }
 }
 
 async function importSimplifiedProfile(start) {
@@ -2575,12 +2872,31 @@ async function importSimplifiedProfile(start) {
 }
 
 
+function globalStateLabel(value) {
+  return ({
+    RUNNING: 'ПРАЦЮЄ',
+    WAITING_NEXT_SEND: 'ЧЕКАЄ НАСТУПНОГО SEND',
+    WAITING_RESPONSE: 'ЧЕКАЄ ЗАВЕРШЕННЯ ВІДПОВІДІ',
+    READY: 'ГОТОВО',
+    PAUSED: 'ПРИЗУПИНЕНО',
+    RECOVERING: 'ВІДНОВЛЮЄТЬСЯ',
+    ERROR: 'ПОМИЛКА',
+    AMBIGUOUS_EFFECT: 'ПОТРІБНО УЗГОДИТИ НАДСИЛАННЯ',
+    STOPPED: 'ЗУПИНЕНО',
+    COMPLETED: 'ЗАВЕРШЕНО',
+  })[value] || String(value || 'НЕВІДОМО');
+}
+
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених надсилань${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
+  $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Оркестраційних одиниць: ${(data.orchestration || []).length}. Агентів: ${(data.agents || []).length}. Помилок: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Детальний прогрес кожного типу роботи наведено нижче один раз у його власному розділі.`;
+  const scenarioPools = data.scenarioPools || [];
+  $('global-scenario-summary').textContent = scenarioPools.length
+    ? scenarioPools.map(pool => `${pool.name}. План: ${pool.slots} фізичних чатів × ${pool.messagesPerChat || 0} повідомлень на чат = ${pool.plannedSends || 0} Send. Фактична пауза між першими промптами: ${formatScenarioInitialStagger(pool.initialStaggerSeconds || 0)}. Перший Send підтверджено у ${pool.firstPromptSent || 0}/${pool.slots} чатів. Ще не отримали перший Send: ${pool.firstPromptPending || 0}. Чекають завершення відповіді: ${pool.waitingResponse || 0}. Підтверджено завершених відповідей: ${pool.completedResponses || 0}. Усього підтверджених Send: ${pool.verifiedSends || 0}/${pool.plannedSends || 0}. Завершених чатів: ${pool.completed || 0}. Призупинено: ${pool.paused || 0}. Помилок: ${pool.error || 0}.`).join(' | ')
+    : `Запущених сценарних фізичних чатів: ${(data.scenarioSlots || []).length}.`;
   const lists = [
-    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${row.category}; підтверджених Send ${row.verifiedSends}; циклів ${row.completedCycles}`],
-    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених надсилань ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${row.category}`],
+    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених Send ${row.verifiedSends}; завершених циклів надсилання ${row.completedCycles}; наступний Send не раніше ${row.nextAllowedSendAt ? new Date(row.nextAllowedSendAt).toLocaleString() : 'зараз'}`],
+    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}${row.slotIndex ? `, чат ${row.slotIndex}` : ''}: поточний сценарний крок ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджено Send ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; підтверджено завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${globalStateLabel(row.category)}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
     ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
     ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
@@ -2788,7 +3104,7 @@ function renderSessionList() {
   const paused = ordinarySessions.filter(s => s.runState === 'PAUSED').length;
   const errors = ordinarySessions.filter(s => s.runState === 'ERROR').length;
   const sent = ordinarySessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
-  if ($('session-overview')) $('session-overview').textContent = `Sessions: ${total}. Running: ${running}. Completed: ${completed}. Paused: ${paused}. Errors: ${errors}. Successfully sent total: ${sent}.`;
+  if ($('session-overview')) $('session-overview').textContent = `Звичайних ручних сеансів у цьому списку: ${total}. Працює: ${running}. Завершено: ${completed}. Призупинено: ${paused}. Помилок: ${errors}. Успішно надіслано цими звичайними сеансами: ${sent}. Спрощені й сценарні чати рахуються у зведенні «Весь Autopilot зараз» вище.`;
   syncCurrentSessionMarker();
 }
 
@@ -3831,6 +4147,18 @@ async function downloadDiagnosticReport() {
   }
 }
 
+async function downloadSimplifiedDiagnosticReport() {
+  try {
+    const extensionVersion = globalThis.chrome?.runtime?.getManifest?.().version || 'невідомо';
+    const data = await core('GET_DIAGNOSTIC_REPORT', { extensionVersion });
+    downloadText(data.report, diagnosticFileName());
+    $('simplified-diagnostic-report-status').textContent = 'Діагностичний звіт завантажено.';
+    $('simplified-command-result').textContent = 'Діагностичний звіт завантажено.';
+  } catch (error) {
+    $('simplified-diagnostic-report-status').textContent = `Не вдалося завантажити діагностичний звіт: ${error.message}`;
+  }
+}
+
 let diagnosticSnapshotInFlight = false;
 async function recordDashboardDiagnosticSnapshot() {
   if (diagnosticSnapshotInFlight || !ui.selectedSessionId || !ui.selected) return;
@@ -3895,6 +4223,7 @@ $('mode-tabs').addEventListener('keydown', (event) => {
 });
 
 $('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
+$('simplified-profile-apply').addEventListener('click', () => { void saveSimplifiedProfileSettings(); });
 $('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });
 $('simplified-list').addEventListener('change', () => { void selectSimplifiedSession($('simplified-list').value); });
 $('simplified-save').addEventListener('click', () => { void saveSimplifiedSession(); });
@@ -3913,6 +4242,23 @@ $('simplified-duplicate').addEventListener('click', async () => {
 $('simplified-delete').addEventListener('click', event => {
   if (ui.simplifiedSelectedId) openDeleteDialog(ui.simplifiedSelectedId, event.currentTarget);
 });
+$('simplified-clear-log').addEventListener('click', async () => {
+  if (!ui.simplifiedSelectedId) {
+    $('simplified-command-result').textContent = 'Сеанс не вибрано.';
+    return;
+  }
+  try {
+    const data = await core('CLEAR_LOG', { sessionId: ui.simplifiedSelectedId });
+    renderSimplifiedLog(data.session);
+    $('simplified-command-result').textContent = 'Журнал очищено.';
+  } catch (error) {
+    $('simplified-command-result').textContent = `Не вдалося очистити журнал: ${error.message}`;
+  }
+});
+$('simplified-import-file').addEventListener('change', () => {
+  const file = $('simplified-import-file').files?.[0];
+  $('simplified-import-status').textContent = file ? `Імпорт JSON: ${file.name}` : 'Імпорт JSON: Файл не вибрано.';
+});
 $('simplified-import').addEventListener('click', () => { void importSimplifiedProfile(false); });
 $('simplified-import-start').addEventListener('click', () => { void importSimplifiedProfile(true); });
 $('simplified-export').addEventListener('click', async () => {
@@ -3924,11 +4270,25 @@ $('simplified-export').addEventListener('click', async () => {
   } catch (error) { $('simplified-command-result').textContent = error.message; }
 });
 $('simplified-template').addEventListener('click', () => {
-  const config = buildSimplifiedSessionConfig({ name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/', prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1', interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2', retry: '30', retryPolicy: 'safe', tabs: 'keep-open' });
+  const config = buildSimplifiedSessionConfig({
+    name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/',
+    prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1',
+    interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2',
+    retry: '30', retryUnit: 'seconds', retryPolicy: 'safe',
+    busyBehavior: 'skip-next', tabs: 'keep-open',
+  });
   downloadJson({ format: 'chatgpt-autopilot-profile', version: 1, profileName: 'Спрощений сеанс', autoStart: false, sessions: [{ ...config, autoStart: false }] }, 'Спрощений-сеанс-шаблон.json');
   $('simplified-command-result').textContent = 'Шаблон JSON експортовано.';
 });
-$('simplified-diagnostics').addEventListener('click', () => { void downloadDiagnosticReport(); });
+$('simplified-diagnostics').addEventListener('click', () => { void downloadSimplifiedDiagnosticReport(); });
+$('simplified-editor').addEventListener('input', event => {
+  if (event.target.closest('button')) return;
+  $('simplified-draft-status').textContent = 'Є незбережені зміни.';
+});
+$('simplified-editor').addEventListener('change', event => {
+  if (event.target.closest('button')) return;
+  $('simplified-draft-status').textContent = 'Є незбережені зміни.';
+});
 
 for (const panel of SCENARIO_WORK_PANELS) $('scenario-work-tab-' + panel).addEventListener('click', () => setScenarioWorkPanel(panel, { focus: true }));
 $('scenario-work-tabs').addEventListener('keydown', (event) => {
@@ -3943,6 +4303,10 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
 });
 $('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
+$('scenario-work-template-button').addEventListener('click', downloadScenarioWorkTemplate);
+$('scenario-work-import-button').addEventListener('click', importScenarioWorkProfile);
+$('scenario-work-export-button').addEventListener('click', exportScenarioWorkProfile);
+$('scenario-cycle-initial-stagger-unit').addEventListener('change', syncScenarioInitialStaggerBounds);
 $('scenario-cycle-start-parallel').addEventListener('click', startParallelScenarioChats);
 $('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
 $('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
@@ -3959,9 +4323,11 @@ $('scenario-cycle-add-step').addEventListener('click', () => {
   const row = createScenarioCycleStep({ prompt: '', repeat: 1 }, container.querySelectorAll('[data-scenario-step]').length);
   container.append(row);
   renumberScenarioCycleSteps();
+  updateScenarioCycleMessageCount();
   row.querySelector('textarea')?.focus();
   announce('Додано новий промпт.');
 });
+$('scenario-cycle-steps').addEventListener('input', updateScenarioCycleMessageCount);
 
 for (const panel of ORCHESTRATION_PANELS) $('orchestration-v2-tab-' + panel).addEventListener('click', () => setOrchestrationPanel(panel, { focus: true }));
 $('orchestration-v2-tabs').addEventListener('keydown', (event) => {
@@ -3986,6 +4352,8 @@ $('export-orchestration-v2-profile-button').addEventListener('click', exportOrch
 $('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
 $('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
+$('agent-import-button').addEventListener('click', importBrowserAgentDraft);
+$('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
 $('agent-resume-button').addEventListener('click', () => browserAgentLifecycle('RESUME_BROWSER_AGENT_JOB'));
@@ -4164,6 +4532,7 @@ if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener(
 });
 
 async function initialLoad() {
+  syncScenarioInitialStaggerBounds();
   setUiMode(storageGet(UI_MODE_KEY) || 'sessions');
   setOrchestrationPanel(storageGet(ORCHESTRATION_PANEL_KEY) || 'orchestras');
   setScenarioWorkPanel(storageGet(SCENARIO_WORK_PANEL_KEY) || 'cycle');

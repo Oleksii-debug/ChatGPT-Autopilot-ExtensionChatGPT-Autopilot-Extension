@@ -1,0 +1,92 @@
+10 ПІЛОТ — TECHNICAL 10.0.0 — CURRENT DAILY RELEASE LINE
+
+CANDIDATE CHANGELOG — 2026-09-26
+
+AGENT DRAFT IMPORT — AFTER THE FIRST DELIVERED PILOT 10 ARCHIVE
+- Agent tab now imports/exports a versioned JSON goal and policy draft. Import only fills the form and never creates or starts a job. Unknown fields, runtime state, and credentials are rejected; the two-second status refresh preserves an imported draft. This change will appear in a later archive, not the Pilot 10 ZIP delivered at the initial 2026-09-26 checkpoint.
+- The Models tab displays Mistral's endpoint key-loaded status as reported by the local Gateway. The key itself is never part of the archive or repository; owner Windows verification remains pending.
+
+BASELINE
+- Last frozen canonical release: 0.9.19.
+- Candidate source is not the user-supplied 0.9.19 ZIP renamed. It is built from live GitHub source after canonical main 372cf294eec087fa7c355d14885140af1ad9f13d plus the converged Scenario Work lanes below.
+- Scenario recovery/pool lane: PR #418 head fc10ac376255f174e35f5e44b0a5834df746e41a.
+- Portable Scenario Work profile lane: PR #420 head 91097879c3757e753d1484a7407414926f27e9a0.
+- Pre-rebase rollback for #420: backup/scenario-profile-import-20260926-059c462.
+
+USER-DIAGNOSTIC FIX
+- The seven-chat initial stagger now belongs to the persisted Scenario pool. All slots enter RUNNING atomically in one background command, then the manager releases one initial chat per configured gap, even after an options-page close or service-worker restart. Overdue initial starts do not all launch in one burst.
+- Follow-up inspection of the real seven-chat 0.9.19 diagnostic found zero confirmed sends and repeated RECOVERY_TEXT_ACK_PENDING despite the first message appearing in every chat. The old reader did not recognize ChatGPT Work user bubbles. Pilot 10 now reads a Work bubble's prompt body precisely and keeps its history confined to canonical Work bubbles; response observation additionally accepts a keyed assistant unit with a semantic assistant markdown body. The second prompt only follows an acknowledged Send and a completed assistant reply.
+- Real 7-chat run accepted the first prompt in every physical ChatGPT Work chat, but Core recorded zero confirmed sends and stayed in SUBMISSION_UNCERTAIN / AMBIGUOUS with RECOVERY_TEXT_ACK_PENDING.
+- Work-specific semantic message surfaces are now part of acknowledgement/recovery evidence, so an accepted Send can advance durable accounting instead of holding the scenario indefinitely.
+- Blind resend remains prohibited while effect is unresolved.
+
+CHAT_CYCLE SEMANTICS
+- One physical chat executes the configured prompt sequence exactly once.
+- Pool replacement generations are governed only by the shared replacement budget.
+- Legacy persisted pool configs that carried roundsPerGeneration > 1 are normalized to the one-sequence pool contract.
+- A start ×1 + continue ×10 + final ×1 sequence is exactly 12 messages per physical chat.
+- Duplicate round/generation editors are hidden for CHAT_CYCLE.
+- Status reports physical chat number, message current/total, prompt position and repeat instead of multiplying prompts by generic rounds.
+
+PORTABLE SCENARIO CONFIG
+- Added a single keyboard-usable file-control group with:
+  - Завантажити шаблон;
+  - Імпортувати файл;
+  - Експортувати вибраний сценарій.
+- The template is versioned portable JSON and contains a 12-message CHAT_CYCLE example.
+- Import creates a fresh STOPPED scenario with new identity; runtime/send counters are not restored and work is not auto-started.
+- Imported CHAT_CYCLE status immediately reports messages per physical chat.
+
+VERSION / RELEASE INTEGRITY
+- package.json is now the single release-version authority.
+- manifest.json must exactly match that version during packaging.
+- source package version derives from the same authority.
+- GitHub Actions resolves candidate ZIP/artifact names from package.json instead of hardcoding 0.9.19.
+- This removes the previous failure mode where later bytes could still be packaged/labeled as 0.9.19.
+
+HISTORY / HANDOFF
+- Added DEVELOPMENT_HISTORY.md for repository-local cross-chat/Codex/Work continuity.
+- Mirrored exact source/head/root-cause/acceptance checkpoint to Drive 09_ІСТОРІЯ_ЗМІН and 01_CURRENT_STATUS.
+
+NOT CLAIMED
+- This changelog describes a release candidate, not a completed release.
+- Exact-head CI and deterministic Linux/Windows package gates must pass on the 10.0.0 candidate head.
+- Installed extension acceptance against current ChatGPT Work must still be run.
+- HUMAN_TESTED=false.
+- OWNER_WINDOWS_CHROME_VERIFIED=false.
+
+DAILY USER-FACING IDENTITY
+- Daily Pilot number for 2026-09-26: 10.
+- Same-day corrections keep number 10.
+- User archive name is derived from exact commit time in Europe/Bratislava: 10 Пілот HHMM DDMM.zip.
+- The next development day advances to the next whole Pilot number instead of 10.1 / 10.2 / 10.3.
+
+HIGH EFFORT BEFORE AUTOMATIC PROMPTS
+- Added an idempotent ENSURE_HIGH_EFFORT interaction phase before prompt insertion.
+- The executor will not create/insert a pending prompt until ChatGPT reports High or Extra High, or High has been selected and independently re-verified.
+- Extra High is treated as satisfying the minimum and is not downgraded.
+- Unknown/ambiguous ChatGPT effort UI fails closed without prompt insertion or Send.
+- Fixed a #418 regression where adding the Work user-bubble selector to a combined body selector broke the nested article/body acknowledgement contract in deterministic interaction tests.
+
+CURRENT CHATGPT POWER SLIDER
+- The live 2026-09-26 model picker uses a three-step reasoning power slider (Medium 2/3, High 3/3) instead of a separate High menu option.
+- ENSURE_HIGH_EFFORT now recognizes only the semantic three-step reasoning slider, moves it with ArrowRight, and confirms the announced High level and 3/3 thumb value before prompt insertion.
+- An ignored key action or changed slider shape fails closed without Send; old menu option behavior remains supported.
+
+LONG PROMPT INSERTION STALL — SIMPLIFIED SESSIONS
+- Owner's two 0.9.19 diagnostics show repeated INSERTION_NOT_PROVEN (109 and 107 retries in their recent log slices), with equal normalized lengths but unequal text; in those slices only one and three sends succeeded.
+- In a contenteditable editor that renders a different draft after initial insertion, perform one alternate paragraph/input replacement and require two consecutive exact observations before PREPARE_SEND can proceed. An editor whose framework state still differs is never sent.
+- Safe diagnostics now expose only compact/non-whitespace equality flags, never prompt contents, to distinguish layout differences from changed characters in a subsequent owner log.
+- Installed extension E2E is still unavailable; deterministic malformed-long-prompt and fail-closed regressions pass.
+
+AGENT / MISTRAL PROVIDER VISIBILITY
+- AI Router Gateway status now names each compatible endpoint separately and reports whether its key is actually loaded locally, including Mistral. The status contains no key bytes.
+- Mistral's existing Windows DPAPI setup script and existing route pool are documented together for screen-reader users. The key remains outside the extension ZIP, profile, routes and GitHub.
+
+
+EMERGENCY HOTFIX — 2026-09-26 — SESSION / SCENARIO EFFORT CONTROL
+- Production ChatGPT data-selected-reasoning-effort is now authoritative for High/Medium detection.
+- The obsolete fixed 0..2 slider assumption no longer blocks the current UI.
+- The legacy announced three-step slider remains supported only as a bounded compatibility fallback.
+- Pre-send TEMPORARY_ERROR/UNKNOWN_UI effort retries keep the extension-owned tab alive instead of causing a close/reopen storm.
+- Regression coverage added for explicit High and Medium-to-High current-production states.

@@ -64,6 +64,7 @@ async function simulate({ ambiguousAt = 0 } = {}) {
   const transport = {
     async execute(tabId, request) {
       if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY, safeDiagnosticCode: 'READY', normalizedObservedUrl: request.expectedUrl };
+      if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'INSERT_ONLY') return { status: InteractionResult.INSERTED_NOT_SENT, composerState: 'VISIBLE_NONEMPTY', safeDiagnosticCode: 'INSERTION_TEXT_PROVEN', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'PREPARE_SEND') return { status: InteractionResult.READY, safeDiagnosticCode: 'PENDING_PROMPT_READY_TO_SUBMIT', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'SUBMIT_EXISTING') {

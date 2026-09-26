@@ -1,0 +1,66 @@
+QA — 10 ПІЛОТ / TECHNICAL 10.0.0
+
+Version: 10.0.0
+Candidate opened: 2026-09-26
+Status: QUALIFICATION IN PROGRESS — no final PASS claimed.
+
+SOURCE PROVENANCE
+- Canonical main baseline observed: 372cf294eec087fa7c355d14885140af1ad9f13d.
+- PR #418 exact source head: fc10ac376255f174e35f5e44b0a5834df746e41a.
+- PR #420 exact source head before release-prep branch: 91097879c3757e753d1484a7407414926f27e9a0.
+- Final integration PR: #422 (`release/0.10.0-candidate`; legacy branch path, user-facing identity is Pilot 10).
+- #420 rollback: backup/scenario-profile-import-20260926-059c462 -> 059c462b7211d9e5d459600eef1f9320ffa6b164.
+
+USER-DIAGNOSTIC EVIDENCE
+- Seven real Scenario Work chats accepted the first prompt while durable state stayed at zero confirmed sends.
+- Diagnostic signature: SUBMISSION_UNCERTAIN / AMBIGUOUS / RECOVERY_TEXT_ACK_PENDING on ChatGPT Work.
+- Configured prompt sequence was 1 + 10 + 1 = 12 messages; legacy rounds=5 incorrectly projected 60.
+- Source fixes and regression tests address both defects.
+
+AUTOMATED GATES REQUIRED BEFORE FINAL QA
+- Core deterministic tests.
+- Interaction deterministic tests, including Work-surface acknowledgement.
+- UI/accessibility contract tests, including Scenario Work clarity and portable profiles.
+- Release tests.
+- Reliability gates affected by scenario/runtime changes.
+- Deterministic release ZIP build twice on Ubuntu.
+- Deterministic release ZIP build twice on Windows.
+- Secret/private-path scan from release packager.
+
+CURRENT AUTOMATED STATUS
+- #418 exact-head Core and UI passed; its Interaction workflow exposed a pre-existing nested user-message acknowledgement regression and failed. That regression is repaired in #422 by preserving the legacy body selector and querying the Work user bubble separately.
+- Pilot 10 High-effort enforcement checkpoint before this ledger update: 4c6d654314731c8f13c3c363a5b84145aa77b09d.
+- Exact-head #422 qualification is still required after the latest repair; queued/pending is not PASS.
+- No local-container test PASS is inferred where GitHub Actions is the qualification authority.
+
+PHYSICAL ACCEPTANCE STILL REQUIRED
+- Load the exact 10.0.0 candidate as unpacked extension in owner Chrome.
+- Create/import a 12-message CHAT_CYCLE profile.
+- Start a multi-chat pool (5 or 7 slots), verify prompt 2 follows the completed first response without manual intervention.
+- Verify each physical chat receives exactly 12 messages before replacement.
+- Verify pool replacement count and restart/recovery.
+- Export a diagnostic report after the run and reconcile confirmed sends/responses against real chats.
+
+FLAGS
+AUTOMATED_TESTED=false
+HUMAN_TESTED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+SECRETS_ADDED=false
+
+USER-FACING PACKAGE IDENTITY
+- manifest.version_name = 10.
+- Technical manifest/package version = 10.0.0.
+- User archive name must match: 10 Пілот HHMM DDMM.zip, with HHMM/DDMM derived from the exact source commit in Europe/Bratislava.
+
+HIGH EFFORT GATE
+- Automatic Session execution now performs CHECK_ONLY -> ENSURE_HIGH_EFFORT -> INSERT_ONLY.
+- High is the minimum accepted reasoning effort; an already selected Extra High is preserved and never downgraded.
+- If the effort control/menu is missing, ambiguous, cannot be selected, or cannot be re-verified, prompt insertion and Send do not occur.
+- A model-only top-level picker can be reopened to prove the selected High/Extra High option.
+- Failure paths close an opened effort picker before returning fail-closed.
+- Regression coverage includes direct High, Medium->High, Extra High preservation, model-picker-only UI, unrelated High controls, missing controls, and failed-picker cleanup.
+
+
+EMERGENCY USER-DIAGNOSTIC HOTFIX — 2026-09-26
+Observed evidence: ordinary Sessions reached CHECK_ONLY=READY and then failed in ENSURE_HIGH_EFFORT before prompt insertion; Scenario Work cycled on EFFORT_SLIDER_UNRECOGNIZED. Supplied production HTML exposed explicit data-selected-reasoning-effort=high/medium state.
+Qualification: Core deterministic gate passed on the hotfix branch; interaction compatibility and release packaging are requalified after this compatibility correction. Live ChatGPT acceptance remains required for event-handler behavior that saved HTML cannot execute.

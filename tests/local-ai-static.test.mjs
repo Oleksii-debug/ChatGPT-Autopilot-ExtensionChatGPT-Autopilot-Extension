@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+const packageMetadata = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const html = fs.readFileSync(new URL('../src/ui/options.html', import.meta.url), 'utf8');
 const protocol = fs.readFileSync(new URL('../src/shared/protocol.js', import.meta.url), 'utf8');
 
@@ -10,7 +11,8 @@ test('manifest grants only explicit local AI hosts in addition to ChatGPT', () =
   for (const host of ['http://localhost/*', 'http://127.0.0.1/*', 'https://localhost/*', 'https://127.0.0.1/*']) {
     assert.ok(manifest.host_permissions.includes(host));
   }
-  assert.equal(manifest.version, '0.9.19');
+  assert.equal(manifest.version, packageMetadata.version);
+  assert.equal(manifest.version_name, packageMetadata.version.split('.')[0]);
 });
 
 test('Local AI UI controls and commands are present', () => {

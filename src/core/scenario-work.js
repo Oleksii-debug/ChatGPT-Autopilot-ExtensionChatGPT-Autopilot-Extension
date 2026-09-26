@@ -294,6 +294,10 @@ function launchAction(item, prompt, stage, launchUrl, now, config, reason = '') 
 }
 
 function canLaunch(runtime, config, now) {
+  // Pool members are started together by the owner UI. Their first launch
+  // schedule lives in durable Scenario runtime, so closing that UI cannot
+  // strand or prematurely fan out the remaining physical chats.
+  if (!runtime.totalLaunches && Number(runtime.initialStartAt || 0) > now) return false;
   if (!config.minimumLaunchGapSeconds) return true;
   const launchSpacingAt = runtime.lastLaunchAt
     ? runtime.lastLaunchAt + config.minimumLaunchGapSeconds * 1000
@@ -443,6 +447,7 @@ export function applyScenarioLaunch(runtimeRaw, action, { sessionId, taskId, now
   item.deadlineAt = Number(action.deadlineAt || 0);
   item.completedAt = 0;
   item.lastError = '';
+  if (!runtime.totalLaunches) runtime.firstLaunchAt = now;
   runtime.lastLaunchAt = now;
   runtime.lastActionAt = now;
   runtime.totalLaunches += 1;

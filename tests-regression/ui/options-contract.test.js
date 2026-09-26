@@ -261,8 +261,9 @@ test('Multi-Agent Orchestration V2 exposes concise owner limits, profile files a
     assert.ok(html.includes(`<fieldset class="settings-group" id="${id}">`), `missing semantic group ${id}`);
     assert.ok(html.includes(`<legend>${legend}</legend>`), `missing semantic group legend ${legend}`);
   }
-  has(/id="orchestration-v2-control-comment"[^>]*aria-describedby="orchestration-v2-control-comment-help"/, 'control comment auto-discovery help must be programmatically associated');
-  has(/id="orchestration-v2-max-launches-window"[^>]*aria-describedby="orchestration-v2-launch-limit-help"/, 'launch window zero semantics must be programmatically associated');
+  has(/id="orchestration-v2-control-comment"[^>]*type="number"/, 'control comment field must remain a native numeric control');
+  has(/id="orchestration-v2-max-launches-window"[^>]*type="number"/, 'launch window field must remain a native numeric control');
+  assert.doesNotMatch(html, /orchestration-v2-control-comment-help|orchestration-v2-launch-limit-help/, 'removed tutorial help must not return');
   assert.match(js, /launch \${launch}, gap \${preview\.minimumLaunchIntervalSeconds \?\? 0}s; \${preview\.coordinatorProviderId \|\| '\?'} → \${preview\.workerProviderId \|\| '\?'}; Issue \${preview\.controlIssueNumber \|\| 0}, \${comment}/, 'profile preview must expose launch policy, providers and control comment before import');
   assert.match(js, /orchestration-v2-control-comment'\)\.value = config\.controlCommentId \? String\(config\.controlCommentId\) : ''/, 'auto-discovered provider comment must not silently pin the editable config field');
   assert.match(js, /Control \${controlCommentText}/, 'runtime summary must show discovered-vs-pinned control comment state');
@@ -276,6 +277,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-ai-routing-mode','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
     'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
+    'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
   has(/id="agent-status" role="status"/, 'Agent status must be announced');
@@ -297,6 +299,10 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');
+  assert.match(js, /parseAgentDraftProfile\(parsePortableJson\(await file\.text\(\)\)\)/, 'Agent JSON must be validated before form insertion');
+  assert.match(js, /ui\.agentDraftActive = true/, 'periodic status refresh must preserve the imported draft');
+  assert.doesNotMatch(js.match(/async function importBrowserAgentDraft\(\)[\s\S]*?\n}\n/)?.[0] || '', /CREATE_BROWSER_AGENT_JOB|START_BROWSER_AGENT_JOB/, 'Agent import must never create or start a job');
 });
 
 test('Remote Dispatch exposes keyboard/NVDA-readable GitHub feed configuration and status', () => {
@@ -319,10 +325,10 @@ test('Remote Dispatch exposes keyboard/NVDA-readable GitHub feed configuration a
 test('orchestration controls explain per-orchestra pause/resume/stop and expose no inert fallback toggle', () => {
   assert.match(html, /Призупинити оркестр/);
   assert.match(html, /Продовжити оркестр/);
-  assert.match(html, /Пауза стосується лише вибраного оркестру/);
-  assert.match(html, /інші оркестри продовжують працювати/);
-  assert.match(html, /Аварійно зупинити вибраний оркестр/);
-  assert.match(html, /Інші оркестри не зупиняються/);
+  assert.match(html, /id="pause-orchestration-v2-orchestra-button"[^>]*>Призупинити оркестр</);
+  assert.match(html, /id="resume-orchestration-v2-orchestra-button"[^>]*>Продовжити оркестр</);
+  assert.match(html, /id="stop-orchestration-v2-button"[^>]*>Аварійно зупинити вибраний оркестр</);
+  assert.doesNotMatch(html, /Пауза стосується лише вибраного оркестру|Інші оркестри не зупиняються/);
   assert.doesNotMatch(html, /orchestration-v2-fallback-prompt/);
 });
 
@@ -380,9 +386,10 @@ test('Orchestration Drive scalar controls are keyboard-native, explicit, and do 
     'orchestration-v2-drive-auth-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Drive scalar control ${id}`);
 
-  has(/<label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково<\/label>/);
-  has(/id="orchestration-v2-hierarchy-drive-sources"[^>]*aria-describedby="orchestration-v2-hierarchy-drive-help"/s);
-  has(/id="orchestration-v2-hierarchy-drive-poll"[^>]*min="1"[^>]*max="1440"[^>]*aria-describedby="orchestration-v2-hierarchy-drive-help"/s);
+  has(/<label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers<\/label>/);
+  has(/id="orchestration-v2-hierarchy-drive-sources"/s);
+  has(/id="orchestration-v2-hierarchy-drive-poll"[^>]*min="1"[^>]*max="1440"/s);
+  assert.doesNotMatch(html, /orchestration-v2-hierarchy-drive-help/);
   has(/id="orchestration-v2-drive-auth-status" role="status"/);
   assert.match(js, /function orchestrationDriveScalarSourcesFromForm\(domains\)/);
   assert.match(js, /driveScalarSources,/);
