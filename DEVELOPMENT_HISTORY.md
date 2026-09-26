@@ -49,10 +49,10 @@ This file is the repository-local handoff ledger for material product repairs an
 ### Secrets and rollback
 - No API keys, OAuth credentials, token.json, cookies, browser profiles, private conversation bodies or private diagnostic text are committed.
 - #420 pre-rebase bytes remain recoverable through the backup branch above.
-- Frozen 0.9.19 SOURCE_TRUTH.json is intentionally left unchanged until a 0.10.0 candidate is actually built and its hashes/qualification are known.
+- Frozen 0.9.19 SOURCE_TRUTH.json is intentionally left unchanged until a Pilot 10 candidate is actually built and its hashes/qualification are known.
 
 ### Next gate
-Qualify the exact 0.10.0 candidate head in GitHub Actions; repair any release-test assumptions that still hardcode 0.9.19; build deterministic Ubuntu and Windows candidates; only then update SOURCE_TRUTH.json with measured 0.10.0 artifact hashes and run the real installed-extension multi-chat acceptance.
+Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-test assumptions that still hardcode 0.9.19; build deterministic Ubuntu and Windows candidates; only then update SOURCE_TRUTH.json with measured 0.10.0 artifact hashes and run the real installed-extension multi-chat acceptance.
 
 ## 2026-09-26 — Daily Pilot identity policy
 
@@ -63,3 +63,28 @@ Qualify the exact 0.10.0 candidate head in GitHub Actions; repair any release-te
 - Chrome/npm technical constraints use `10.0.0`; manifest `version_name` exposes `10` as the human-facing release number.
 - This file is the concise English technical handoff ledger; append material changes with date/time, exact SHA, problem, repair and verification state.
 - Drive history mirrors material checkpoints; user-facing archives do not carry parallel historical release names.
+
+## 2026-09-26 — High-effort pre-insert gate and interaction regression repair
+
+### Requirement
+- Every automatic ChatGPT prompt must run with reasoning effort High or higher.
+- The extension must verify/select effort before it inserts the prompt, not after Send.
+- Extra High satisfies the policy and must not be downgraded.
+
+### Implementation
+- Added replay-safe `ENSURE_HIGH_EFFORT` between `CHECK_ONLY` and `INSERT_ONLY`.
+- Added semantic detection for direct thinking/reasoning controls and model-picker layouts.
+- High selection is re-verified; missing/ambiguous/unproven controls fail closed with zero prompt insertion and zero Send.
+- Picker cleanup runs on failed proof paths.
+- Fixed inherited #418 nested-user-message acknowledgement regression by keeping the established body selector query separate from the new Work user-bubble query.
+
+### Verification checkpoint
+- Implementation/test checkpoint before this ledger commit: `4c6d654314731c8f13c3c363a5b84145aa77b09d`.
+- The first #422 Interaction CI exposed two failures: Ukrainian `Середній` normalization and inherited #418 nested-body acknowledgement.
+- Ukrainian normalization now uses NFKC so Cyrillic `й` is preserved.
+- Nested-body acknowledgement selector compatibility is repaired.
+- Exact post-repair CI remains authoritative; no PASS is claimed until terminal success.
+
+### Integration authority
+- PR #422 is the only final Pilot 10 integration/package target.
+- Source PRs #418/#420 and closed #421 are provenance only.
