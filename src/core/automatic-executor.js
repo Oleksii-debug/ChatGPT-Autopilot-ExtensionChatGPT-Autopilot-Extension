@@ -894,6 +894,27 @@ export class AutomaticSessionExecutor {
       return { kind: check.status, result: check };
     }
 
+    const effort = await this.executeInteraction(
+      sessionId,
+      session,
+      task,
+      tab.id,
+      'ENSURE_HIGH_EFFORT',
+      `${checkId}:effort`,
+      '',
+    );
+
+    const postEffort = await this.repo.load();
+    const postEffortSession = requireSession(postEffort, sessionId);
+    if (!ACTIVE_STATES.has(postEffortSession.runState)) {
+      return { kind: 'QUIESCED', runState: postEffortSession.runState };
+    }
+    if (effort.status !== InteractionResult.READY) {
+      await this.applyResult(sessionId, task.id, effort);
+      await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, effort);
+      return { kind: effort.status, result: effort };
+    }
+
     const fresh = await this.repo.load();
     const liveSession = requireSession(fresh, sessionId);
     if (!ACTIVE_STATES.has(liveSession.runState)) {
