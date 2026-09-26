@@ -34,7 +34,7 @@
       <h3 id="global-runtime-heading">Весь Autopilot зараз</h3>
       <p id="global-runtime-summary" tabindex="0">Завантаження стану…</p>
       <h4>Спрощені сеанси</h4><ul id="global-simplified-sessions"></ul>
-      <h4>Сценарні чати</h4><ul id="global-scenario-slots"></ul>
+      <h4>Сценарні чати</h4><p id="global-scenario-summary">Сценарних чатів: 0.</p><ul id="global-scenario-slots"></ul>
       <h4>Оркестрація</h4><ul id="global-orchestration"></ul>
       <h4>Агент</h4><ul id="global-agents"></ul>
       <h4>Моделі</h4><ul id="global-models"></ul>
@@ -131,13 +131,14 @@
         <section aria-labelledby="simplified-timing-heading">
           <h3 id="simplified-timing-heading">Час і поведінка</h3>
 
-          <label for="simplified-interval">Інтервал відправлення</label>
+          <label for="simplified-interval">Мінімальний інтервал після підтвердженого надсилання</label>
           <input id="simplified-interval" type="number" min="1" max="86400" step="1" value="2" inputmode="numeric">
           <label for="simplified-interval-unit">Одиниця</label>
           <select id="simplified-interval-unit">
             <option value="minutes">Хвилини</option>
             <option value="seconds">Секунди</option>
           </select>
+          <p>Відлік починається після підтвердженого надсилання. Фактичне наступне надсилання може бути на кілька секунд пізніше через перевірку сторінки та паузу перед Send.</p>
 
           <label for="simplified-delay">Пауза перед відправленням, с</label>
           <input id="simplified-delay" type="number" min="1" max="30" step="1" value="20" inputmode="numeric">
@@ -638,11 +639,17 @@
           <div id="scenario-cycle-steps"></div>
           <button id="scenario-cycle-add-step" type="button">Додати промпт</button>
           <label for="scenario-cycle-parallel-count">Скільки чатів тримати одночасно в пулі</label>
-          <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="5">
+          <input id="scenario-cycle-parallel-count" type="number" min="1" max="20" step="1" inputmode="numeric" value="1">
           <label for="scenario-cycle-replacement-budget">Скільки додаткових чатів створити після початкових</label>
           <input id="scenario-cycle-replacement-budget" type="number" min="0" max="100000" step="1" inputmode="numeric" value="0">
-          <label for="scenario-cycle-initial-stagger">Пауза між початковими чатами, секунд</label>
-          <input id="scenario-cycle-initial-stagger" type="number" min="0" max="60" step="1" inputmode="numeric" value="3">
+          <label for="scenario-cycle-initial-stagger">Пауза між запуском перших промптів</label>
+          <input id="scenario-cycle-initial-stagger" type="number" min="0" max="604800" step="1" inputmode="numeric" value="0">
+          <label for="scenario-cycle-initial-stagger-unit">Одиниця паузи між першими промптами</label>
+          <select id="scenario-cycle-initial-stagger-unit">
+            <option value="seconds">Секунди</option>
+            <option value="minutes">Хвилини</option>
+          </select>
+          <p>Ця пауза застосовується лише до першого промпта кожного стартового чату. Наступні промпти надсилаються незалежно — коли відповідний чат завершив відповідь.</p>
           <button id="scenario-cycle-start-parallel" type="button">Створити й запустити пул чатів</button>
         </fieldset>
       </div>

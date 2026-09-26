@@ -92,12 +92,14 @@ test('CHAT_CYCLE profile round-trips an explicit five-chat pool preset and valid
   const parsed = parseScenarioWorkProfileDocument(JSON.stringify(profile));
   assert.equal(parsed.config.steps.reduce((sum, step) => sum + step.repeat, 0), 12);
   assert.deepEqual(parsed.pool, { count: 5, replacementBudget: 0, staggerSeconds: 3 });
+  assert.deepEqual(parseScenarioWorkProfileDocument(JSON.stringify({ ...profile, pool: { count: 15, replacementBudget: 0, staggerSeconds: 180 } })).pool,
+    { count: 15, replacementBudget: 0, staggerSeconds: 180 });
 
   for (const pool of [
     { count: 0, replacementBudget: 0, staggerSeconds: 3 },
     { count: 21, replacementBudget: 0, staggerSeconds: 3 },
     { count: 5, replacementBudget: -1, staggerSeconds: 3 },
-    { count: 5, replacementBudget: 0, staggerSeconds: 61 },
+    { count: 5, replacementBudget: 0, staggerSeconds: 604801 },
   ]) assert.throws(() => parseScenarioWorkProfileDocument(JSON.stringify({ ...profile, pool })));
 });
 
@@ -116,5 +118,7 @@ test('Scenario Work import status reports the physical-chat message count for CH
   assert.match(js, /config\.steps\.reduce\(\(sum, step\) => sum \+ step\.repeat, 0\)/u);
   assert.match(js, /scenario-cycle-parallel-count'\)\.value = String\(pool\.count\)/u);
   assert.match(js, /scenario-cycle-replacement-budget'\)\.value = String\(pool\.replacementBudget\)/u);
-  assert.match(js, /scenario-cycle-initial-stagger'\)\.value = String\(pool\.staggerSeconds\)/u);
+  assert.match(js, /setScenarioInitialStaggerForm\(pool\.staggerSeconds\)/u);
+  assert.match(html, /id="scenario-cycle-initial-stagger-unit"/u);
+  assert.match(html, /value="minutes">Хвилини/u);
 });
