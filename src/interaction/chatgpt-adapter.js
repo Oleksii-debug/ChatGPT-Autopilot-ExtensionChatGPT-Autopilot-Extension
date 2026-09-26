@@ -278,8 +278,14 @@
     return null;
   }
 
+  function declaredEffortLevel(el) {
+    const raw = normalizeEffortText(el?.getAttribute?.('data-selected-reasoning-effort'));
+    return classifyEffortLabel(raw);
+  }
+
   function effortSemanticText(el) {
     return normalizeEffortText([
+      el?.getAttribute?.('data-selected-reasoning-effort'),
       el?.getAttribute?.('aria-label'),
       el?.getAttribute?.('aria-valuetext'),
       el?.getAttribute?.('data-testid'),
@@ -299,13 +305,29 @@
   }
 
   function findEffortControl(doc) {
+    const declared = Array.from(doc.querySelectorAll(
+      '[data-selected-reasoning-effort][data-codex-intelligence-trigger="true"], '
+      + '[data-selected-reasoning-effort][data-composer-navigation-target="reasoning"]'
+    ) || []).filter(isVisible).filter((el) => !isInsideEffortChoiceSurface(el))
+      .map((element) => ({ element, level: declaredEffortLevel(element) }))
+      .filter((entry) => entry.level);
+    const uniqueDeclared = Array.from(new Set(declared.map((entry) => entry.element)))
+      .map((element) => declared.find((entry) => entry.element === element));
+    if (uniqueDeclared.length === 1) {
+      return { ...uniqueDeclared[0], score: 1000, ambiguous: false };
+    }
+    if (uniqueDeclared.length > 1) {
+      return { element: null, level: null, ambiguous: true };
+    }
+
     const candidates = Array.from(doc.querySelectorAll(
       'button, [role="button"], [role="combobox"], [role="slider"], input[type="range"]'
     ) || []).filter(isVisible).map((el) => {
       if (isInsideEffortChoiceSurface(el)) return null;
       const identity = effortSemanticText(el);
       const ariaValue = normalizeEffortText(el.getAttribute?.('aria-valuetext'));
-      const level = classifyEffortLabel(ariaValue) || classifyEffortLabel(identity);
+      const declaredLevel = declaredEffortLevel(el);
+      const level = declaredLevel || classifyEffortLabel(ariaValue) || classifyEffortLabel(identity);
       const role = normalizeEffortText(el.getAttribute?.('role'));
       const popup = normalizeEffortText(el.getAttribute?.('aria-haspopup'));
       const testId = normalizeEffortText(el.getAttribute?.('data-testid'));
@@ -314,6 +336,7 @@
       const modelPicker = hasPopup && (/\bmodel\b|модель|модел|gpt[- ]?\d/u.test(identity)
         || /(model[-_](?:picker|selector|switcher)|model-switcher)/u.test(testId));
       let score = 0;
+      if (declaredLevel) score += 500;
       if (semantic) score += 100;
       if (classifyEffortLabel(ariaValue)) score += 100;
       if (/(thinking|reasoning|effort)/u.test(testId)) score += 80;
@@ -408,55 +431,84 @@
     return levels.length >= 2 && (effortSemanticHint(text) || /instant|medium|high/u.test(text));
   }
 
-  // The current ChatGPT model picker exposes reasoning effort as a keyboard
-  // slider. Its thumb is aria-hidden; the menuitem's described status is the
-  // only semantic proof of the selected level. Keep the three-step shape
-  // narrow so a different slider cannot silently choose an unrelated value.
+  // ChatGPT reasoning effort is keyboard-adjustable, but the number of
+  // positions is not a stable contract. Verify the result from the explicit
+  // data-selected-reasoning-effort state on the model/intelligence trigger.
   function findReasoningPowerSlider(doc) {
-    const rows = Array.from(doc.querySelectorAll(
-      '[data-reasoning-slider="true"][role="menuitem"]'
-    ) || []).filter(isVisible).filter((row) => {
-      const menu = row.closest?.('[role="menu"]');
-      return menu && isVisible(menu) && row.getAttribute?.('aria-keyshortcuts')?.includes('ArrowRight');
+    const raw = Array.from(doc.querySelectorAll('[data-reasoning-slider="true"]') || [])
+      .filter(isVisible);
+    const rows = Array.from(new Set(raw.map((node) => {
+      if (normalizeEffortText(node.getAttribute?.('role')) === 'menuitem') return node;
+      return node.closest?.('[role="menuitem"]') || node;
+    }).filter(Boolean))).filter(isVisible).filter((row) => {
+      const surface = row.closest?.('[role="menu"], [role="listbox"], [role="dialog"]');
+      return !surface || isVisible(surface);
     });
     if (rows.length > 1) return { element: null, ambiguous: true };
     if (!rows.length) return { element: null, ambiguous: false };
     const row = rows[0];
-    const thumb = row.querySelector?.('[role="slider"]');
-    const min = Number(thumb?.getAttribute?.('aria-valuemin'));
-    const max = Number(thumb?.getAttribute?.('aria-valuemax'));
-    const value = Number(thumb?.getAttribute?.('aria-valuenow'));
-    const ids = String(row.getAttribute?.('aria-describedby') || '').split(/\s+/u);
-    const status = ids.map((id) => doc.getElementById?.(id))
-      .find((node) => node?.getAttribute?.('role') === 'status');
-    const label = textOf(status).trim();
-    const level = classifyEffortLabel(label.split(/[,،，.]/u)[0]);
-    const ordinal = label.match(/(\d+)\s+(?:из|із|of)\s+(\d+)/iu);
-    if (min !== 0 || max !== 2 || !Number.isInteger(value) || value < 0 || value > 2
-        || !ordinal || Number(ordinal[1]) !== value + 1 || Number(ordinal[2]) !== 3
-        || !level || (value === 2 && level !== 'high')
-        || (value === 1 && level !== 'medium') || (value === 0 && level !== 'low')) {
-      return { element: row, invalid: true };
-    }
-    return { element: row, value, level };
+    const thumb = normalizeEffortText(row.getAttribute?.('role')) === 'slider'
+      ? row : row.querySelector?.('[role="slider"]');
+    const valueRaw = thumb?.getAttribute?.('aria-valuenow');
+    const minRaw = thumb?.getAttribute?.('aria-valuemin');
+    const maxRaw = thumb?.getAttribute?.('aria-valuemax');
+    const value = valueRaw == null || valueRaw === '' ? null : Number(valueRaw);
+    const min = minRaw == null || minRaw === '' ? null : Number(minRaw);
+    const max = maxRaw == null || maxRaw === '' ? null : Number(maxRaw);
+    const ids = String(row.getAttribute?.('aria-describedby') || '').split(/\s+/u).filter(Boolean);
+    const described = ids.map((id) => doc.getElementById?.(id)).filter(Boolean);
+    // Legacy ChatGPT exposed the slider's announced value through an
+    // accessibility-only role=status node. It may be visually hidden and is
+    // still authoritative because aria-describedby binds it to this control.
+    const status = described.find((node) => normalizeEffortText(node.getAttribute?.('role')) === 'status')
+      || described.find((node) => isVisible(node)) || null;
+    const statusText = textOf(status);
+    const legacyOrdinal = normalizeEffortText(statusText)
+      .match(/\b(\d+)\s*(?:of|из|із|з)\s*(\d+)\b/u);
+    const legacyShapeCompatible = !legacyOrdinal || Number(legacyOrdinal[2]) === 3;
+    const label = [
+      thumb?.getAttribute?.('aria-valuetext'),
+      row.getAttribute?.('aria-valuetext'),
+      legacyShapeCompatible ? statusText.replace(/[,.;:!?]+/gu, ' ') : '',
+    ].filter(Boolean).join(' ');
+    return {
+      element: row,
+      thumb,
+      value: Number.isFinite(value) ? value : null,
+      min: Number.isFinite(min) ? min : null,
+      max: Number.isFinite(max) ? max : null,
+      level: classifyEffortLabel(label),
+      ambiguous: false,
+    };
   }
 
   async function selectHighPowerSlider(doc, request, start, deps, control) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const waitFn = deps?.wait || wait;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const declared = findEffortControl(doc);
+      if (!declared.ambiguous && HIGH_EFFORT_LEVELS.has(declared.level)) {
+        closeEffortPickerIfOpen(doc, control || declared.element);
+        return resultBase(request, start, {
+          status: STATUS.READY, effortLevel: declared.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_DECLARED_STATE_CONFIRMED'
+        });
+      }
       const slider = findReasoningPowerSlider(doc);
-      if (slider.ambiguous || slider.invalid || !slider.element) {
+      if (slider.ambiguous || !slider.element) {
         closeEffortPickerIfOpen(doc, control);
         return resultBase(request, start, {
           status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SLIDER_UNRECOGNIZED'
         });
       }
-      if (slider.value === 2 && slider.level === 'high') {
+      if (HIGH_EFFORT_LEVELS.has(slider.level)) {
         closeEffortPickerIfOpen(doc, control);
         return resultBase(request, start, {
-          status: STATUS.READY, effortLevel: 'high',
+          status: STATUS.READY, effortLevel: slider.level,
           safeDiagnosticCode: 'EFFORT_HIGH_SLIDER_CONFIRMED'
         });
       }
+      const beforeValue = slider.value;
+      const beforeDeclaredLevel = declared.level;
       try {
         slider.element.focus?.();
         slider.element.dispatchEvent(new KeyboardEvent('keydown', {
@@ -468,12 +520,32 @@
           status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_KEY_FAILED'
         });
       }
-      await (deps?.wait || wait)(150);
+      await waitFn(180);
+      const afterDeclared = findEffortControl(doc);
+      if (!afterDeclared.ambiguous && HIGH_EFFORT_LEVELS.has(afterDeclared.level)) {
+        closeEffortPickerIfOpen(doc, control || afterDeclared.element);
+        return resultBase(request, start, {
+          status: STATUS.READY, effortLevel: afterDeclared.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED'
+        });
+      }
       const changed = findReasoningPowerSlider(doc);
-      if (!changed.element || changed.invalid || changed.ambiguous || changed.value <= slider.value) {
+      if (changed.ambiguous || !changed.element) {
         closeEffortPickerIfOpen(doc, control);
         return resultBase(request, start, {
           status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
+        });
+      }
+      const numericProgress = beforeValue != null && changed.value != null && changed.value > beforeValue;
+      const semanticProgress = beforeDeclaredLevel && afterDeclared.level
+        && beforeDeclaredLevel !== afterDeclared.level;
+      const internalSemanticProgress = slider.level && changed.level && slider.level !== changed.level;
+      if (!numericProgress && !semanticProgress && !internalSemanticProgress) {
+        const atMaximum = changed.value != null && changed.max != null && changed.value >= changed.max;
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: atMaximum ? STATUS.UNKNOWN_UI : STATUS.TEMPORARY_ERROR,
+          safeDiagnosticCode: atMaximum ? 'EFFORT_HIGH_STATE_NOT_RECOGNIZED' : 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
         });
       }
     }
