@@ -1631,7 +1631,11 @@ function renderScenarioWorkState(item) {
     const currentMessage = totalMessages ? Math.min(totalMessages, beforeCurrent + repeatIndex + 1) : 0;
     const currentRepeatTotal = Math.max(0, Number(steps[stepIndex]?.repeat || 0));
     addScenarioStateLine(item.pool ? 'Фізичний чат у цьому слоті' : 'Фізичний чат', `№${runtime.generation ?? 1}`);
-    addScenarioStateLine('Повідомлення у цьому чаті', `${currentMessage}/${totalMessages}`);
+    const confirmed = Number.isInteger(item.verifiedSends?.confirmedInThisChat)
+      ? item.verifiedSends.confirmedInThisChat : null;
+    addScenarioStateLine('Підтверджено повідомлень у цьому чаті', `${confirmed ?? '—'}/${totalMessages}`);
+    addScenarioStateLine('Наступне повідомлення', `${currentMessage}/${totalMessages}`);
+    addScenarioStateLine('Підтверджено за весь сценарій', item.verifiedSends?.confirmedOverall ?? '—');
     addScenarioStateLine('Промпт у послідовності', `${steps.length ? stepIndex + 1 : 0}/${steps.length}`);
     addScenarioStateLine('Повтор цього промпта', `${currentRepeatTotal ? Math.min(currentRepeatTotal, repeatIndex + 1) : 0}/${currentRepeatTotal}`);
   } else if (runtime.mode === 'AUDITOR_GROUP') {

@@ -148,3 +148,16 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 ### Verification state
 - Previous head evidence remains: Core PASS; Interaction PASS; UI PASS; Windows release gate PASS.
 - Exact post-repair CI on the current head is authoritative and must be checked before final release delivery.
+
+## 2026-09-26 05:05 Europe/Bratislava — Scenario Work five-slot truth and lifecycle
+
+### Owner report and source
+- Owner's installed 0.9.19 diagnostic recorded seven Scenario chat sessions in RECOVERING / AMBIGUOUS with zero confirmed sends after their first visible message; subsequent prompts never launched. This evidence predates Pilot 10 and does not prove the same defect in current source.
+- Based on canonical Pilot 10 PR #422 head `05f103814fdadfe17ee250326700415f192a396a`; no orchestration code changed.
+
+### Repair and verification
+- Scenario state now obtains confirmed Send counts from the Core session and durable retired counts. The UI labels confirmed sends separately from the next prompt position; an ambiguous click does not advance the confirmed count.
+- Added a Core-gated five-slot 17-turn regression: independent initial slots, turns 2–17 in the same conversation URL, service-worker restart, single-slot retirement and replacement, old-session disabling despite a temporary tab-close failure, and other slots unchanged. Replaced the stale legacy direct test entry point with this current contract.
+- Focused tests: 12/12 passed, including Work second/third prompt recognition, shared replacement budget after restart, three-slot 50-replacement load, and the new five-slot lifecycle. These are simulated deterministic tests, not installed-extension E2E.
+- REAL_EXTENSION_E2E=BLOCKED: local Chrome/Chromium with MV3 load-unpacked is unavailable in this execution environment; cloud browser does not expose local extension installation. OWNER_WINDOWS_CHROME_VERIFIED=false.
+- GitHub commit/CI/ZIP identity to be filled by the succeeding material checkpoint; do not claim release PASS from an in-progress run.

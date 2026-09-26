@@ -188,6 +188,19 @@ function poolSummary(store, poolId) {
     replacementsUsed: members.reduce((sum, item) => sum + Number(item.runtime.poolReplacementsUsed || 0), 0),
     active: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING).length };
 }
+function verifiedSendProjection(item, coreState) {
+  const runtime = item.runtime || {};
+  const sessionId = runtime.chat?.sessionId;
+  const session = sessionId ? coreState.sessionsById?.[sessionId] : null;
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  const activeVerified = count(session?.successfulSendCount);
+  const retiredInGeneration = count(runtime.generationRetiredVerifiedSends);
+  const retiredTotal = count(runtime.retiredVerifiedSends);
+  return {
+    confirmedInThisChat: activeVerified || retiredInGeneration,
+    confirmedOverall: runtime.verifiedSendHistoryComplete === true ? retiredTotal + activeVerified : null,
+  };
+}
 function managedSessionId(scenarioId, participantKey, ordinal) {
   const safe = `${scenarioId}:${participantKey}`.replace(/[^A-Za-z0-9._:-]+/gu, '-').slice(0, 120);
   return `scenario-work:${safe}:${ordinal}`;
@@ -438,12 +451,14 @@ export class ScenarioWorkManager {
 
   async list() {
     const store = await this.load();
+    const core = await this.coreRepository.load();
     return {
       selectedId: store.selectedId,
       pools: [...new Set(store.order.map(id => store.byId[id]?.pool?.id).filter(Boolean))].map(id => poolSummary(store, id)),
       scenarios: store.order.map(id => {
         const item = store.byId[id];
-        return { id, name: item.name, config: clone(item.config), runtime: clone(item.runtime), pool: item.pool ? clone(item.pool) : null, selected: id === store.selectedId };
+        return { id, name: item.name, config: clone(item.config), runtime: clone(item.runtime), pool: item.pool ? clone(item.pool) : null, selected: id === store.selectedId,
+          verifiedSends: verifiedSendProjection(item, core) };
       }),
     };
   }
@@ -452,7 +467,9 @@ export class ScenarioWorkManager {
     const store = await this.load();
     const target = id || store.selectedId;
     const item = target ? store.byId[target] : null;
-    return { selectedId: target || '', scenario: item ? clone(item) : null };
+    if (!item) return { selectedId: target || '', scenario: null };
+    const core = await this.coreRepository.load();
+    return { selectedId: target || '', scenario: { ...clone(item), verifiedSends: verifiedSendProjection(item, core) } };
   }
 
   async create({ name = 'Сценарна робота', mode = ScenarioWorkMode.CHAT_CYCLE, config = {} } = {}) {
