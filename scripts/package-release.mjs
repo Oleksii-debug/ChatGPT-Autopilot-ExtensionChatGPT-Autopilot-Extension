@@ -9,6 +9,7 @@ export const RELEASE_VERSION = String(PACKAGE_METADATA.version || '').trim();
 if (!/^\d+\.\d+\.\d+$/u.test(RELEASE_VERSION)) {
   throw new Error(`package.json must contain a numeric extension version, found: ${RELEASE_VERSION || 'missing'}`);
 }
+export const RELEASE_DAY = RELEASE_VERSION.split('.')[0];
 export const RELEASE_NAME = `ChatGPT-Autopilot-${RELEASE_VERSION}`;
 const FIXED_DOS_DATE = 0x0021; // 1980-01-01
 const FIXED_DOS_TIME = 0x0000;
@@ -111,6 +112,7 @@ export async function collectProductFiles(root = REPOSITORY_ROOT) {
   const manifest = JSON.parse(manifestText);
   if (manifest.manifest_version !== 3) throw new Error('manifest.json must use Manifest V3');
   if (manifest.version !== RELEASE_VERSION) throw new Error(`v${RELEASE_VERSION} package requires manifest version ${RELEASE_VERSION}, found ${manifest.version || 'missing'}`);
+  if (String(manifest.version_name || '') !== RELEASE_DAY) throw new Error(`manifest version_name must be daily Pilot number ${RELEASE_DAY}`);
 
   const files = [`CHANGES-${RELEASE_VERSION}.txt`, `QA-${RELEASE_VERSION}.txt`, 'README.txt', 'manifest.json', ...await walkFiles(root, 'companion'), ...await walkFiles(root, 'icons'), ...await walkFiles(root, 'src')].sort();
   const fileSet = new Set(files);
