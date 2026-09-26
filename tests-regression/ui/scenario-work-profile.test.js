@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfile } from '../../src/ui/scenario-work-profile.js';
+import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfile, parseScenarioWorkProfileDocument } from '../../src/ui/scenario-work-profile.js';
 import { ScenarioWorkManager } from '../../src/core/scenario-work-manager.js';
 
 for (const [mode, extra] of [
@@ -79,6 +79,26 @@ test('downloadable scenario template is valid and contains exactly twelve messag
   assert.equal(config.maxGenerations, 1);
   assert.equal(config.steps.reduce((sum, step) => sum + step.repeat, 0), 12);
   assert.deepEqual(config.steps.map(step => step.repeat), [1, 10, 1]);
+  assert.deepEqual(parseScenarioWorkProfileDocument(JSON.stringify(profile)).pool,
+    { count: 5, replacementBudget: 0, staggerSeconds: 3 });
+});
+
+test('CHAT_CYCLE profile round-trips an explicit five-chat pool preset and validates its bounds', () => {
+  const profile = makeScenarioWorkProfile({
+    name: '5 потоків',
+    mode: 'CHAT_CYCLE',
+    steps: [{ prompt: 'START', repeat: 1 }, { prompt: 'CONTINUE', repeat: 10 }, { prompt: 'FINAL', repeat: 1 }],
+  }, { pool: { count: 5, replacementBudget: 0, staggerSeconds: 3 } });
+  const parsed = parseScenarioWorkProfileDocument(JSON.stringify(profile));
+  assert.equal(parsed.config.steps.reduce((sum, step) => sum + step.repeat, 0), 12);
+  assert.deepEqual(parsed.pool, { count: 5, replacementBudget: 0, staggerSeconds: 3 });
+
+  for (const pool of [
+    { count: 0, replacementBudget: 0, staggerSeconds: 3 },
+    { count: 21, replacementBudget: 0, staggerSeconds: 3 },
+    { count: 5, replacementBudget: -1, staggerSeconds: 3 },
+    { count: 5, replacementBudget: 0, staggerSeconds: 61 },
+  ]) assert.throws(() => parseScenarioWorkProfileDocument(JSON.stringify({ ...profile, pool })));
 });
 
 test('Scenario Work UI exposes template, import and export controls together', async () => {
@@ -94,4 +114,7 @@ test('Scenario Work import status reports the physical-chat message count for CH
   const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
   assert.match(js, /Повідомлень у кожному чаті:/u);
   assert.match(js, /config\.steps\.reduce\(\(sum, step\) => sum \+ step\.repeat, 0\)/u);
+  assert.match(js, /scenario-cycle-parallel-count'\)\.value = String\(pool\.count\)/u);
+  assert.match(js, /scenario-cycle-replacement-budget'\)\.value = String\(pool\.replacementBudget\)/u);
+  assert.match(js, /scenario-cycle-initial-stagger'\)\.value = String\(pool\.staggerSeconds\)/u);
 });
