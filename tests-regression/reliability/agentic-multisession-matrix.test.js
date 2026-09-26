@@ -123,6 +123,9 @@ test('four configuration modes run concurrently across all tab strategies, fault
     const expected = expectedPrompt(live, request.taskId);
     if (request.mode !== 'CHECK_ONLY') assert.equal(request.promptText, expected, `${request.taskId} prompt must remain task/session-local`);
 
+    if (request.mode === 'ENSURE_HIGH_EFFORT') {
+      return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED' };
+    }
     if (request.mode === 'CHECK_ONLY') {
       if (request.taskId === 's1-t2' && !faulted.has('s1-temp')) {
         faulted.add('s1-temp');
