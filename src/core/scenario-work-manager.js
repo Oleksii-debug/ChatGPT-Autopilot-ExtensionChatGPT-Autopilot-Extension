@@ -242,8 +242,17 @@ function poolSummary(store, poolId, coreState = null) {
   const verifiedSends = coreState
     ? members.reduce((sum, item) => sum + verifiedFor(item), 0)
     : null;
+  const sequence = coreState
+    ? members.map(item => scenarioSequenceProjection(item, coreState))
+    : [];
+  const sequenceVerifiedSends = coreState
+    ? sequence.reduce((sum, item) => sum + item.sequenceVerifiedSends, 0)
+    : null;
+  const retryVerifiedSends = coreState
+    ? sequence.reduce((sum, item) => sum + item.retryVerifiedSends, 0)
+    : null;
   const firstPromptSent = coreState
-    ? members.filter(item => verifiedFor(item) > 0).length
+    ? sequence.filter(item => item.sequenceVerifiedSends > 0).length
     : members.filter(item => Number(item.runtime.totalLaunches || 0) > 0).length;
   const messagesPerChat = scenarioMessagesPerChat(first?.config);
   return {
@@ -267,8 +276,13 @@ function poolSummary(store, poolId, coreState = null) {
       && item.runtime.chat?.state === ScenarioParticipantState.WAITING).length,
     firstPromptSent,
     firstPromptPending: Math.max(0, members.length - firstPromptSent),
-    completedResponses: members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
+    completedResponses: coreState
+      ? sequence.reduce((sum, item) => sum + item.completedResponses, 0)
+      : members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
     verifiedSends,
+    transportVerifiedSends: verifiedSends,
+    sequenceVerifiedSends,
+    retryVerifiedSends,
   };
 }
 function initialPoolLaunchGate(store, item) {
@@ -294,6 +308,28 @@ function verifiedSendProjection(item, coreState) {
   return {
     confirmedInThisChat: activeVerified || retiredInGeneration,
     confirmedOverall: runtime.verifiedSendHistoryComplete === true ? retiredTotal + activeVerified : null,
+  };
+}
+function scenarioSequenceProjection(item, coreState) {
+  const runtime = item.runtime || {};
+  const total = scenarioMessagesPerChat(item.config);
+  const completedResponses = Math.max(0, Math.min(total, Number(runtime.totalCompletedTurns || 0)));
+  const sessionId = runtime.chat?.sessionId;
+  const session = sessionId ? coreState?.sessionsById?.[sessionId] : null;
+  const inFlight = runtime.chat?.state === ScenarioParticipantState.WAITING
+    && session?.operation?.phase === OperationPhase.SENT_VERIFIED
+    && Number(session?.successfulSendCount || 0) > 0;
+  const sequenceVerifiedSends = Math.min(total, completedResponses + Number(inFlight));
+  const raw = verifiedSendProjection(item, coreState || { sessionsById: {} });
+  const transportVerifiedSends = raw.confirmedOverall == null
+    ? Math.max(0, Number(raw.confirmedInThisChat || 0))
+    : Math.max(0, Number(raw.confirmedOverall || 0));
+  return {
+    total,
+    completedResponses,
+    sequenceVerifiedSends,
+    transportVerifiedSends,
+    retryVerifiedSends: Math.max(0, transportVerifiedSends - sequenceVerifiedSends),
   };
 }
 function managedSessionId(scenarioId, participantKey, ordinal) {
