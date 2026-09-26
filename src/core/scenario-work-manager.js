@@ -221,7 +221,6 @@ function sameChatCycleProgram(left, right) {
   return a.every((step, index) => {
     const other = b[index];
     return step?.id === other?.id
-      && step?.label === other?.label
       && step?.prompt === other?.prompt
       && Number(step?.repeat) === Number(other?.repeat);
   });
