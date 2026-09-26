@@ -6,7 +6,8 @@ test('CHAT_CYCLE presents one prompt sequence per physical chat without duplicat
   const html = await readFile(new URL('../../src/ui/options.html', import.meta.url), 'utf8');
   const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
   assert.match(html, /id="scenario-work-round-generation-settings"/u);
-  assert.match(html, /Один фізичний чат виконує цю послідовність рівно один раз/u);
+  assert.match(html, /id="scenario-cycle-replacement-budget"/u);
+  assert.doesNotMatch(html, /Один фізичний чат виконує цю послідовність рівно один раз/u);
   assert.match(html, /id="scenario-cycle-message-count"[^>]*role="status"/u);
   assert.match(js, /roundsPerGeneration: mode === 'CHAT_CYCLE' \? 1 : scenarioWorkInt/u);
   assert.match(js, /maxGenerations: mode === 'CHAT_CYCLE' \? 1 : scenarioWorkInt/u);
