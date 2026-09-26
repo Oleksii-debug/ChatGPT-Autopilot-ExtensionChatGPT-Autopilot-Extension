@@ -48,8 +48,8 @@ test('OpenAI API UI exposes real model selection and keeps the secret out of ext
   assert.match(optionsJs, /gpt-5\.6-sol/);
   assert.match(optionsJs, /gpt-5\.6-terra/);
   assert.match(optionsJs, /gpt-5\.6-luna/);
-  assert.match(html, /Windows DPAPI/);
-  assert.match(html, /НАЛАШТУВАТИ OPENAI API КЛЮЧ\.ps1/);
+  assert.doesNotMatch(html, /Windows DPAPI/);
+  assert.doesNotMatch(html, /НАЛАШТУВАТИ OPENAI API КЛЮЧ\.ps1/);
   assert.doesNotMatch(html, /type="password"[^>]*openai/i);
   assert.doesNotMatch(optionsJs, /OPENAI_API_KEY/);
 });
