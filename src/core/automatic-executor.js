@@ -911,7 +911,12 @@ export class AutomaticSessionExecutor {
     }
     if (effort.status !== InteractionResult.READY) {
       await this.applyResult(sessionId, task.id, effort);
-      await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, effort);
+      // Effort selection is pre-send. Keep the extension-owned tab for
+      // bounded TEMPORARY_ERROR/UNKNOWN_UI retries instead of creating the
+      // 10.0.0 close/reopen storm that can break the interaction receiver.
+      if (![InteractionResult.TEMPORARY_ERROR, InteractionResult.UNKNOWN_UI].includes(effort.status)) {
+        await this.closeOpenCloseTabAfterTerminalResult(sessionId, task.id, effort);
+      }
       return { kind: effort.status, result: effort };
     }
 
