@@ -188,6 +188,16 @@ function poolSummary(store, poolId) {
     replacementsUsed: members.reduce((sum, item) => sum + Number(item.runtime.poolReplacementsUsed || 0), 0),
     active: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING).length };
 }
+function initialPoolLaunchGate(store, item) {
+  if (!item?.pool || item.config?.mode !== ScenarioWorkMode.CHAT_CYCLE
+      || Number(item.runtime?.totalLaunches || 0) > 0) return 0;
+  const seconds = Number(item.runtime?.initialStaggerSeconds || 0);
+  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > 60) return 0;
+  const latest = Object.values(store.byId || {}).reduce((at, sibling) =>
+    sibling.pool?.id === item.pool.id
+      ? Math.max(at, Number(sibling.runtime?.firstLaunchAt || 0)) : at, 0);
+  return latest ? latest + seconds * 1000 : 0;
+}
 function verifiedSendProjection(item, coreState) {
   const runtime = item.runtime || {};
   const sessionId = runtime.chat?.sessionId;
@@ -220,6 +230,10 @@ function ensureManagerRuntimeFields(runtime) {
   out.generationRetiredVerifiedSends = Math.max(0, Number(out.generationRetiredVerifiedSends || 0));
   out.nextLaunchAt = Math.max(0, Number(out.nextLaunchAt || 0));
   if (!Number.isFinite(out.nextLaunchAt)) out.nextLaunchAt = 0;
+  out.initialStartAt = Number.isFinite(Number(out.initialStartAt))
+    ? Math.max(0, Math.floor(Number(out.initialStartAt))) : 0;
+  out.initialStaggerSeconds = Number.isInteger(Number(out.initialStaggerSeconds))
+    ? Math.max(0, Math.min(60, Number(out.initialStaggerSeconds))) : 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
   out.deletePending = out.deletePending === true;
   out.poolReplacementsUsed = Math.max(0, Math.floor(Number(out.poolReplacementsUsed || 0)));
@@ -492,10 +506,13 @@ export class ScenarioWorkManager {
     return this.get(id);
   }
 
-  async createChatPool({ name = 'Пул чатів', count, replacementBudget, config = {} } = {}) {
+  async createChatPool({ name = 'Пул чатів', count, replacementBudget, staggerSeconds = 0, autoStart = false, config = {} } = {}) {
     if (!Number.isInteger(count) || count < 1 || count > 20) throw new Error('Кількість одночасних чатів: від 1 до 20.');
     if (!Number.isInteger(replacementBudget) || replacementBudget < 0 || replacementBudget > 100000) {
       throw new Error('Кількість нових чатів після початкових: від 0 до 100000.');
+    }
+    if (!Number.isInteger(staggerSeconds) || staggerSeconds < 0 || staggerSeconds > 60) {
+      throw new Error('Пауза між початковими чатами: від 0 до 60 секунд.');
     }
     const poolId = this.createId();
     const ids = Array.from({ length: count }, () => this.createId());
@@ -508,6 +525,9 @@ export class ScenarioWorkManager {
         const normalized = normalizeScenarioWorkConfig({ ...config, id, name: slotName,
           mode: ScenarioWorkMode.CHAT_CYCLE, roundsPerGeneration: 1, maxGenerations: 0 });
         const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalized, now));
+        runtime.initialStartAt = now + index * staggerSeconds * 1000;
+        runtime.initialStaggerSeconds = staggerSeconds;
+        if (autoStart === true) runtime.runState = ScenarioWorkRunState.RUNNING;
         runtime.verifiedSendHistoryComplete = true;
         store.byId[id] = { id, name: slotName, config: normalized, runtime,
           pool: { id: poolId, replacementBudget }, createdAt: now, updatedAt: now };
@@ -517,7 +537,9 @@ export class ScenarioWorkManager {
       return store;
     });
     await this.reconcileAlarm();
-    return { pool: { id: poolId, slots: count, replacementBudget, replacementsUsed: 0 }, ids };
+    if (autoStart === true) await this.cycleAll();
+    return { pool: { id: poolId, slots: count, replacementBudget,
+      replacementsUsed: 0, active: autoStart === true ? count : 0 }, ids };
   }
 
   async select(id) {
@@ -1003,6 +1025,11 @@ export class ScenarioWorkManager {
       return { kind: 'CLEANUP_PENDING', pending: [...runtime.cleanupPendingSessionIds], runtime: clone(runtime) };
     }
 
+    const poolStartGate = initialPoolLaunchGate(await this.load(), scenario);
+    if (poolStartGate > now) {
+      await this.reconcileAlarm();
+      return { kind: 'INITIAL_START_PENDING', nextAt: poolStartGate, runtime: clone(runtime) };
+    }
     let planned = planScenarioWorkActions(scenario.config, runtime, now);
     runtime = ensureManagerRuntimeFields(planned.runtime);
     scenario = { ...scenario, runtime };
@@ -1140,7 +1167,10 @@ export class ScenarioWorkManager {
       const completionSpacingAt = item.config.minimumLaunchGapSeconds > 0
         ? Number(item.runtime.nextLaunchAt || 0)
         : 0;
-      const launchGateAt = Math.max(launchSpacingAt, completionSpacingAt);
+      const initialStartAt = item.config.mode === ScenarioWorkMode.CHAT_CYCLE
+        && !item.runtime.totalLaunches ? Number(item.runtime.initialStartAt || 0) : 0;
+      const launchGateAt = Math.max(launchSpacingAt, completionSpacingAt,
+        initialStartAt, initialPoolLaunchGate(store, item));
 
       if (waiting.length) {
         // Assistant completion is observed by polling; keep the existing

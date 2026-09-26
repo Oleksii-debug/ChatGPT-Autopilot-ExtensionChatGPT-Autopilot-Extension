@@ -10,6 +10,7 @@ BASELINE
 - Pre-rebase rollback for #420: backup/scenario-profile-import-20260926-059c462.
 
 USER-DIAGNOSTIC FIX
+- The seven-chat initial stagger now belongs to the persisted Scenario pool. All slots enter RUNNING atomically in one background command, then the manager releases one initial chat per configured gap, even after an options-page close or service-worker restart. Overdue initial starts do not all launch in one burst.
 - Follow-up inspection of the real seven-chat 0.9.19 diagnostic found zero confirmed sends and repeated RECOVERY_TEXT_ACK_PENDING despite the first message appearing in every chat. The old reader did not recognize ChatGPT Work user bubbles. Pilot 10 now reads a Work bubble's prompt body precisely and keeps its history confined to canonical Work bubbles; response observation additionally accepts a keyed assistant unit with a semantic assistant markdown body. The second prompt only follows an acknowledged Send and a completed assistant reply.
 - Real 7-chat run accepted the first prompt in every physical ChatGPT Work chat, but Core recorded zero confirmed sends and stayed in SUBMISSION_UNCERTAIN / AMBIGUOUS with RECOVERY_TEXT_ACK_PENDING.
 - Work-specific semantic message surfaces are now part of acknowledgement/recovery evidence, so an accepted Send can advance durable accounting instead of holding the scenario indefinitely.

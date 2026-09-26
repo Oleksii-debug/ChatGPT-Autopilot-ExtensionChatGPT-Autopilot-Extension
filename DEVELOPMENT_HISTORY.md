@@ -1,5 +1,12 @@
 # ChatGPT Autopilot — development history
 
+## 2026-09-26 — Scenario pool starts survive closing the options page
+
+- Found a separate real launch defect: the Scenario UI previously started pool members in a JavaScript loop with setTimeout between START commands. Closing the options page partway through could strand the remaining slots STOPPED; delayed Core execution could bunch physical first sends after that UI timer.
+- Replaced this with one CREATE_SCENARIO_CHAT_POOL command using autoStart=true and staggerSeconds=0..60. The manager persists all slots as RUNNING in one store update, records each slot's initialStartAt, and schedules starts through its existing background alarm. The first launch time and pool-specific spacing survive service-worker restart. A delayed wake releases one overdue initial slot, then waits the requested gap before the next, avoiding a catch-up burst. Explicit physical Send timing still depends on Core and Chrome; installed-browser confirmation remains outstanding.
+- Added a seven-chat regression: options page closes after one command, manager restarts, at t+30s only two chats have launched, repeated wake at the same time launches no duplicate, then one more launches at each 10s boundary until seven active chats. Existing five-slot 17-turn, three-slot 10-turn/50-replacement and shared budget regressions remain green; Work interaction 11/11 and current UI 32/32 were also verified locally on relevant source.
+- No Orchestration changes. This source-level checkpoint is not a claimed installed Chrome PASS.
+
 ## 2026-09-26 — Seven-chat Scenario first-send stall: diagnostic-to-code analysis
 
 - Owner's 0.9.19 report at 23:19:55 UTC: seven Scenario CHAT_CYCLE sessions all RECOVERING with zero confirmed sends; repeated RECOVERY_TEXT_ACK_PENDING. Safe diagnostics said messagesBefore=0, messagesAfter=1, composer empty, mainExactMatches=0, hidden tab. The first physical Send appeared, but exact operation-bound user-message acknowledgement failed. Core therefore never entered response observation and Scenario could not advance to prompt two.

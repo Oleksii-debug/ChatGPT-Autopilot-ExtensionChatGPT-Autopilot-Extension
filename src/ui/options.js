@@ -2003,9 +2003,6 @@ function downloadScenarioWorkTemplate() {
 
 async function startParallelScenarioChats() {
   if (ui.selectedScenarioWork?.config?.mode !== 'CHAT_CYCLE') return;
-  let created = 0;
-  let started = 0;
-  let firstId = '';
   try {
     const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів');
     const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати');
@@ -2014,27 +2011,20 @@ async function startParallelScenarioChats() {
     const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
     setScenarioWorkBusy(true);
     const result = await core('CREATE_SCENARIO_CHAT_POOL', {
-      name: baseName, count, replacementBudget, config,
+      name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
     });
     const ids = result?.ids || [];
     if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
-    created = ids.length;
-    for (const [index, id] of ids.entries()) {
-      if (index && staggerSeconds) await new Promise(resolve => setTimeout(resolve, staggerSeconds * 1000));
-      firstId ||= id;
-      await core('START_SCENARIO_WORK', { id });
-      started++;
-    }
     await loadScenarioWork();
-    if (firstId) {
-      $('scenario-work-list').value = firstId;
-      await openScenarioWork(firstId);
+    if (ids[0]) {
+      $('scenario-work-list').value = ids[0];
+      await openScenarioWork(ids[0]);
     }
     setScenarioWorkPanel('state');
-    announce(`Запущено пул: ${started} одночасних чатів, спільний ліміт додаткових чатів ${replacementBudget}.`);
+    announce(`Пул із ${ids.length} чатів заплановано. Пауза між початковими чатами: ${staggerSeconds} с. Ліміт додаткових чатів: ${replacementBudget}.`);
   } catch (error) {
     await loadScenarioWork();
-    const message = `Створено ${created}, запущено ${started} чатів. Помилка: ${error.message}`;
+    const message = `Не вдалося підтвердити запуск пулу. Перевірте список сценаріїв: ${error.message}`;
     $('scenario-work-summary').textContent = message;
     announce(message);
   } finally { setScenarioWorkBusy(false); }
