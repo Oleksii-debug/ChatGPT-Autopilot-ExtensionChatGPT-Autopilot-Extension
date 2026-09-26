@@ -1,0 +1,54 @@
+QA — 10 ПІЛОТ / TECHNICAL 10.0.0
+
+Version: 10.0.0
+Candidate opened: 2026-09-26
+Status: QUALIFICATION IN PROGRESS — no final PASS claimed.
+
+SOURCE PROVENANCE
+- Canonical main baseline observed: 372cf294eec087fa7c355d14885140af1ad9f13d.
+- PR #418 exact source head: fc10ac376255f174e35f5e44b0a5834df746e41a.
+- PR #420 exact source head before release-prep branch: 91097879c3757e753d1484a7407414926f27e9a0.
+- Release candidate branch: release/10.0.0-candidate.
+- #420 rollback: backup/scenario-profile-import-20260926-059c462 -> 059c462b7211d9e5d459600eef1f9320ffa6b164.
+
+USER-DIAGNOSTIC EVIDENCE
+- Seven real Scenario Work chats accepted the first prompt while durable state stayed at zero confirmed sends.
+- Diagnostic signature: SUBMISSION_UNCERTAIN / AMBIGUOUS / RECOVERY_TEXT_ACK_PENDING on ChatGPT Work.
+- Configured prompt sequence was 1 + 10 + 1 = 12 messages; legacy rounds=5 incorrectly projected 60.
+- Source fixes and regression tests address both defects.
+
+AUTOMATED GATES REQUIRED BEFORE FINAL QA
+- Core deterministic tests.
+- Interaction deterministic tests, including Work-surface acknowledgement.
+- UI/accessibility contract tests, including Scenario Work clarity and portable profiles.
+- Release tests.
+- Reliability gates affected by scenario/runtime changes.
+- Deterministic release ZIP build twice on Ubuntu.
+- Deterministic release ZIP build twice on Windows.
+- Secret/private-path scan from release packager.
+
+CURRENT AUTOMATED STATUS AT FILE CREATION
+- #418 exact-head Core / Interaction / UI / Release workflows: queued, no PASS claimed.
+- #420 exact-head UI / Release workflows: queued, no PASS claimed.
+- 10.0.0 candidate exact-head workflows: pending first push/PR.
+- Local git clone in the current ChatGPT execution container is unavailable because outbound DNS to github.com is blocked; no local test PASS is inferred.
+
+PHYSICAL ACCEPTANCE STILL REQUIRED
+- Load the exact 10.0.0 candidate as unpacked extension in owner Chrome.
+- Create/import a 12-message CHAT_CYCLE profile.
+- Start a multi-chat pool (5 or 7 slots), verify prompt 2 follows the completed first response without manual intervention.
+- Verify each physical chat receives exactly 12 messages before replacement.
+- Verify pool replacement count and restart/recovery.
+- Export a diagnostic report after the run and reconcile confirmed sends/responses against real chats.
+
+FLAGS
+AUTOMATED_TESTED=false
+HUMAN_TESTED=false
+NVDA_VERIFIED=false
+OWNER_WINDOWS_CHROME_VERIFIED=false
+SECRETS_ADDED=false
+
+USER-FACING PACKAGE IDENTITY
+- manifest.version_name = 10.
+- Technical manifest/package version = 10.0.0.
+- User archive name must match: 10 Пілот HHMM DDMM.zip, with HHMM/DDMM derived from the exact source commit in Europe/Bratislava.
