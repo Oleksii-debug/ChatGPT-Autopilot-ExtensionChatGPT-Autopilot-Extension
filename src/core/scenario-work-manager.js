@@ -29,6 +29,18 @@ const MAX_INITIAL_STAGGER_SECONDS = 604800; // 7 days; UI may express this in se
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function safeName(value, fallback = 'Сценарна робота') { return text(value).slice(0, 120) || fallback; }
+function scenarioPoolBaseName(value) {
+  const raw = safeName(value, 'Сценарний пул');
+  return raw
+    .replace(/\s+—\s+\d+\s+(?:поток(?:ів|и|а)?|чат(?:ів|и|а)?)\s*[×x]\s*\d+\s+повідомлен(?:ь|ня|ні).*$/iu, '')
+    .trim()
+    || 'Сценарний пул';
+}
+function scenarioMessagesPerChat(config) {
+  return Array.isArray(config?.steps)
+    ? config.steps.reduce((sum, step) => sum + Math.max(1, Number(step?.repeat) || 1), 0)
+    : 0;
+}
 function plainRecord(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
@@ -182,13 +194,32 @@ function compatiblePersistedConfig(persisted, canonical) {
   return migrated && samePersistedData(persisted, legacyCanonical);
 }
 function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
-function poolSummary(store, poolId) {
+function poolSummary(store, poolId, coreState = null) {
   const members = store.order.map(id => store.byId[id]).filter(item => item?.pool?.id === poolId);
-  const budget = members[0]?.pool?.replacementBudget || 0;
+  const first = members[0] || null;
+  const budget = first?.pool?.replacementBudget || 0;
   const countState = state => members.filter(item => item.runtime.runState === state).length;
+  const verifiedFor = item => {
+    if (!coreState) return null;
+    const projection = verifiedSendProjection(item, coreState);
+    return projection.confirmedOverall == null
+      ? Math.max(0, Number(projection.confirmedInThisChat || 0))
+      : Math.max(0, Number(projection.confirmedOverall || 0));
+  };
+  const verifiedSends = coreState
+    ? members.reduce((sum, item) => sum + verifiedFor(item), 0)
+    : null;
+  const firstPromptSent = coreState
+    ? members.filter(item => verifiedFor(item) > 0).length
+    : members.filter(item => Number(item.runtime.totalLaunches || 0) > 0).length;
+  const messagesPerChat = scenarioMessagesPerChat(first?.config);
   return {
     id: poolId,
+    name: first?.pool?.name || scenarioPoolBaseName(first?.name || first?.config?.name || 'Сценарний пул'),
     slots: members.length,
+    messagesPerChat,
+    plannedSends: messagesPerChat * members.length,
+    initialStaggerSeconds: Math.max(0, Number(first?.pool?.initialStaggerSeconds ?? first?.runtime?.initialStaggerSeconds ?? 0)),
     replacementBudget: budget,
     replacementsUsed: members.reduce((sum, item) => sum + Number(item.runtime.poolReplacementsUsed || 0), 0),
     active: countState(ScenarioWorkRunState.RUNNING),
@@ -198,8 +229,10 @@ function poolSummary(store, poolId) {
     error: countState(ScenarioWorkRunState.ERROR),
     waitingResponse: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING
       && item.runtime.chat?.state === ScenarioParticipantState.WAITING).length,
-    notStarted: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING
-      && Number(item.runtime.totalLaunches || 0) === 0).length,
+    firstPromptSent,
+    firstPromptPending: Math.max(0, members.length - firstPromptSent),
+    completedResponses: members.reduce((sum, item) => sum + Math.max(0, Number(item.runtime.totalCompletedTurns || 0)), 0),
+    verifiedSends,
   };
 }
 function initialPoolLaunchGate(store, item) {
@@ -303,7 +336,15 @@ function normalizeStore(raw, now = Date.now()) {
         && /^[A-Za-z0-9._:-]{1,120}$/u.test(item.pool.id)
         && Number.isInteger(item.pool.replacementBudget)
         && item.pool.replacementBudget >= 0 && item.pool.replacementBudget <= 100000
-        ? { id: item.pool.id, replacementBudget: item.pool.replacementBudget } : null;
+        ? {
+            id: item.pool.id,
+            replacementBudget: item.pool.replacementBudget,
+            slotIndex: Number.isInteger(item.pool.slotIndex) && item.pool.slotIndex > 0 ? item.pool.slotIndex : 0,
+            initialCount: Number.isInteger(item.pool.initialCount) && item.pool.initialCount > 0 ? item.pool.initialCount : 0,
+            initialStaggerSeconds: Number.isInteger(item.pool.initialStaggerSeconds)
+              ? Math.max(0, Math.min(MAX_INITIAL_STAGGER_SECONDS, item.pool.initialStaggerSeconds)) : 0,
+            name: typeof item.pool.name === 'string' ? scenarioPoolBaseName(item.pool.name) : '',
+          } : null;
       // CHAT_CYCLE pools have one unambiguous contract: one physical chat runs
       // the configured prompt sequence exactly once. Replacement generations
       // are governed only by the shared pool replacement budget.
@@ -482,7 +523,7 @@ export class ScenarioWorkManager {
     const core = await this.coreRepository.load();
     return {
       selectedId: store.selectedId,
-      pools: [...new Set(store.order.map(id => store.byId[id]?.pool?.id).filter(Boolean))].map(id => poolSummary(store, id)),
+      pools: [...new Set(store.order.map(id => store.byId[id]?.pool?.id).filter(Boolean))].map(id => poolSummary(store, id, core)),
       scenarios: store.order.map(id => {
         const item = store.byId[id];
         return { id, name: item.name, config: clone(item.config), runtime: clone(item.runtime), pool: item.pool ? clone(item.pool) : null, selected: id === store.selectedId,
@@ -529,13 +570,14 @@ export class ScenarioWorkManager {
       throw new Error('Пауза між початковими чатами: від 0 до 604800 секунд (до 7 діб).');
     }
     const poolId = this.createId();
+    const poolName = scenarioPoolBaseName(name);
     const ids = Array.from({ length: count }, () => this.createId());
     if (new Set([poolId, ...ids]).size !== count + 1) throw new Error('Повторний ідентифікатор пулу.');
     const now = this.now();
     await this.update(store => {
       if (ids.some(id => store.byId[id])) throw new Error('Пул містить зайнятий ідентифікатор.');
       for (const [index, id] of ids.entries()) {
-        const slotName = `${safeName(name).slice(0, 100)} — чат ${index + 1}`;
+        const slotName = `${poolName.slice(0, 100)} — чат ${index + 1}`;
         const normalized = normalizeScenarioWorkConfig({ ...config, id, name: slotName,
           mode: ScenarioWorkMode.CHAT_CYCLE, roundsPerGeneration: 1, maxGenerations: 0 });
         const runtime = ensureManagerRuntimeFields(createScenarioWorkRuntime(normalized, now));
@@ -544,7 +586,14 @@ export class ScenarioWorkManager {
         if (autoStart === true) runtime.runState = ScenarioWorkRunState.RUNNING;
         runtime.verifiedSendHistoryComplete = true;
         store.byId[id] = { id, name: slotName, config: normalized, runtime,
-          pool: { id: poolId, replacementBudget }, createdAt: now, updatedAt: now };
+          pool: {
+            id: poolId,
+            name: poolName,
+            replacementBudget,
+            slotIndex: index + 1,
+            initialCount: count,
+            initialStaggerSeconds: staggerSeconds,
+          }, createdAt: now, updatedAt: now };
         store.order.push(id);
       }
       store.selectedId = ids[0];
@@ -552,8 +601,21 @@ export class ScenarioWorkManager {
     });
     await this.reconcileAlarm();
     if (autoStart === true) await this.cycleAll();
-    return { pool: { id: poolId, slots: count, replacementBudget,
-      replacementsUsed: 0, active: autoStart === true ? count : 0 }, ids };
+    return { pool: {
+      id: poolId,
+      name: poolName,
+      slots: count,
+      messagesPerChat: scenarioMessagesPerChat(config),
+      plannedSends: scenarioMessagesPerChat(config) * count,
+      initialStaggerSeconds: staggerSeconds,
+      replacementBudget,
+      replacementsUsed: 0,
+      active: autoStart === true ? count : 0,
+      firstPromptSent: 0,
+      firstPromptPending: count,
+      completedResponses: 0,
+      verifiedSends: 0,
+    }, ids };
   }
 
   async select(id) {
