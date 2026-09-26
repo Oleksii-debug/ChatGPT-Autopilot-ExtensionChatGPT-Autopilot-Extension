@@ -131,3 +131,20 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 - Repair commit: `18aa6f0e6231fcb424ecba027e6e88c7a65180e8`.
 - Previous exact-head evidence: Core SUCCESS; Interaction SUCCESS; UI SUCCESS; Windows release package gate SUCCESS; Linux/package job blocked only by this reliability harness failure.
 - Exact post-repair Actions remain authoritative; no final release PASS or installed-Chrome claim until terminal CI and owner acceptance.
+
+
+## 2026-09-26 04:43 Europe/Bratislava — High-effort reliability assertion repair
+
+### Problem
+- Exact head `9125a84c59718ad27f565bb50c94bb5443fa93f1` had Core, Interaction and UI workflows PASS, and the Windows release package gate PASS.
+- Linux/package reliability still failed in `agentic-multisession-matrix.test.js`.
+- The fixture had learned the new `ENSURE_HIGH_EFFORT` mode, but a legacy pre-branch assertion still required every mode except `CHECK_ONLY` to carry the task prompt.
+- `ENSURE_HIGH_EFFORT` intentionally carries an empty prompt because effort is proven before insertion, so the fixture threw before reaching its High-effort handler.
+
+### Repair
+- Commit `f30e8f45bcc2aaa5675ecfc70001acda1524f9be` excludes both `CHECK_ONLY` and `ENSURE_HIGH_EFFORT` from the prompt-payload assertion.
+- Product runtime and fail-closed High enforcement are unchanged.
+
+### Verification state
+- Previous head evidence remains: Core PASS; Interaction PASS; UI PASS; Windows release gate PASS.
+- Exact post-repair CI on the current head is authoritative and must be checked before final release delivery.
