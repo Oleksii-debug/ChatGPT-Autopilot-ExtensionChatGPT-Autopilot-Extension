@@ -61,7 +61,13 @@ jobs:
         run: |
           version="$(node -p "require('./package.json').version")"
           test -n "$version"
+          day="${version%%.*}"
+          epoch="$(git show -s --format=%ct HEAD)"
+          stamp="$(TZ=Europe/Bratislava date -d "@$epoch" '+%H%M %d%m')"
+          friendly="$day Пілот $stamp"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "day=$day" >> "$GITHUB_OUTPUT"
+          echo "friendly=$friendly" >> "$GITHUB_OUTPUT"
       - name: Run deterministic Node qualification
         run: npm test
       - name: Build release candidate twice and verify deterministic bytes
@@ -81,12 +87,15 @@ jobs:
           test "$first_sha" = "$second_sha"
           cmp -s /tmp/ChatGPT-Autopilot-first.zip "$candidate"
           unzip -t "$candidate"
+          friendly="dist/${{ steps.release_meta.outputs.friendly }}.zip"
+          cp "$candidate" "$friendly"
+          cmp -s "$candidate" "$friendly"
           echo "release candidate deterministic SHA-256: $second_sha"
       - name: Upload release candidate ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}-candidate
-          path: dist/ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}.zip
+          name: ${{ steps.release_meta.outputs.friendly }}
+          path: dist/${{ steps.release_meta.outputs.friendly }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
@@ -106,7 +115,15 @@ jobs:
         run: |
           $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'package.json version is missing' }
+          $day = $version.Split('.')[0]
+          $epoch = [int64](git show -s --format=%ct HEAD)
+          $utc = [DateTimeOffset]::FromUnixTimeSeconds($epoch).UtcDateTime
+          $tz = [TimeZoneInfo]::FindSystemTimeZoneById('Central Europe Standard Time')
+          $local = [TimeZoneInfo]::ConvertTimeFromUtc($utc, $tz)
+          $friendly = "$day Пілот $($local.ToString('HHmm ddMM'))"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "day=$day" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "friendly=$friendly" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Run release packaging regressions on Windows
         run: npm run test:release
       - name: Build release candidate twice on Windows
@@ -139,12 +156,16 @@ jobs:
           if (-not (Test-Path -LiteralPath (Join-Path $extract 'ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}/manifest.json') -PathType Leaf)) {
             throw 'Windows release ZIP is missing the canonical manifest path'
           }
+          $friendly = Join-Path $PWD 'dist/${{ steps.release_meta.outputs.friendly }}.zip'
+          Copy-Item -LiteralPath $candidate -Destination $friendly -Force
+          $friendlyHash = (Get-FileHash -LiteralPath $friendly -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($friendlyHash -ne $secondHash) { throw "Friendly archive copy differs from canonical ZIP" }
           Write-Output "Windows release candidate deterministic SHA-256: $secondHash"
       - name: Upload Windows-built release candidate ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}-candidate-windows
-          path: dist/ChatGPT-Autopilot-${{ steps.release_meta.outputs.version }}.zip
+          name: ${{ steps.release_meta.outputs.friendly }}-windows
+          path: dist/${{ steps.release_meta.outputs.friendly }}.zip
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
