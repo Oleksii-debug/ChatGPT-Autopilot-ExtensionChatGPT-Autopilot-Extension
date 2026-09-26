@@ -10,10 +10,38 @@ const BOUNDS = Object.freeze({
   pairCount: [1, 100], workerCount: [1, 200], firstCount: [1, 100],
   secondCount: [0, 100], auditTimeboxMinutes: [1, 1440], maxCorrectionAttempts: [0, 10],
 });
+const POOL_BOUNDS = Object.freeze({
+  count: [1, 20],
+  replacementBudget: [0, 100000],
+  staggerSeconds: [0, 60],
+});
 
-export function makeScenarioWorkProfile(config) {
+function normalizePoolPreset(raw, mode) {
+  if (raw === undefined || raw === null) return null;
+  if (mode !== 'CHAT_CYCLE') throw new Error('Параметри паралельних чатів дозволені лише для циклу в чаті.');
+  if (!raw || Array.isArray(raw) || typeof raw !== 'object') {
+    throw new Error('Некоректні параметри паралельних чатів.');
+  }
+  const normalized = {};
+  for (const [key, [min, max]] of Object.entries(POOL_BOUNDS)) {
+    const value = raw[key];
+    if (!Number.isSafeInteger(value) || value < min || value > max) {
+      throw new Error(`Некоректне значення pool.${key}: потрібно ціле число ${min}–${max}.`);
+    }
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
+export function makeScenarioWorkProfile(config, { pool = null } = {}) {
   const { id, ...portable } = normalizeScenarioWorkConfig(config);
-  return { format: SCENARIO_PROFILE_FORMAT, version: 1, config: portable };
+  const normalizedPool = normalizePoolPreset(pool, portable.mode);
+  return {
+    format: SCENARIO_PROFILE_FORMAT,
+    version: 1,
+    config: portable,
+    ...(normalizedPool ? { pool: normalizedPool } : {}),
+  };
 }
 
 export function makeScenarioWorkTemplate() {
@@ -35,10 +63,12 @@ export function makeScenarioWorkTemplate() {
       { id: 'continue', label: 'Продовження', prompt: 'Продовжуй розробку.', repeat: 10 },
       { id: 'finish', label: 'Фінальний промпт', prompt: 'Вставте фінальний промпт.', repeat: 1 },
     ],
+  }, {
+    pool: { count: 5, replacementBudget: 0, staggerSeconds: 3 },
   });
 }
 
-export function parseScenarioWorkProfile(text) {
+export function parseScenarioWorkProfileDocument(text) {
   if (typeof text !== 'string' || text.length > 10_000_000) throw new Error('Файл сценарію перевищує 10 МБ.');
   let profile;
   try { profile = JSON.parse(text); } catch { throw new Error('Файл сценарію не є коректним JSON.'); }
@@ -61,6 +91,11 @@ export function parseScenarioWorkProfile(text) {
     }
   }
   const { id, ...config } = normalizeScenarioWorkConfig(raw);
+  const pool = normalizePoolPreset(profile.pool, config.mode);
   // A profile is configuration only. Creating a fresh scenario establishes new runtime and identity.
-  return config;
+  return { config, pool };
+}
+
+export function parseScenarioWorkProfile(text) {
+  return parseScenarioWorkProfileDocument(text).config;
 }
