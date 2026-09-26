@@ -30,7 +30,9 @@ const ui = {
   orchestrationV2Orchestras: [],
   selectedOrchestraId: '',
   scenarioWorkScenarios: [],
+  scenarioWorkPools: [],
   selectedScenarioWorkId: '',
+  selectedScenarioPoolId: '',
   selectedScenarioWork: null,
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
@@ -1599,25 +1601,65 @@ function setScenarioWorkBusy(busy) {
   if (!busy) syncScenarioWorkButtons();
 }
 
+function setScenarioPoolStructuralControlsDisabled(disabled) {
+  for (const id of ['scenario-cycle-url', 'scenario-cycle-parallel-count', 'scenario-cycle-add-step']) {
+    const element = $(id);
+    if (element) element.disabled = disabled;
+  }
+  $('scenario-cycle-steps').querySelectorAll('[data-scenario-step-repeat], [data-scenario-step-prompt], button').forEach(element => {
+    element.disabled = disabled;
+  });
+}
+
 function syncScenarioWorkButtons() {
   const item = ui.selectedScenarioWork;
-  const state = item?.runtime?.runState || '';
+  const pool = ui.selectedScenarioPoolId
+    ? (ui.scenarioWorkPools || []).find(value => value.id === ui.selectedScenarioPoolId)
+    : null;
+  const state = pool?.runState || item?.runtime?.runState || '';
   const has = Boolean(item);
+  const isPool = Boolean(pool);
   const running = state === 'RUNNING';
   const paused = state === 'PAUSED';
-  $('save-scenario-work-button').disabled = !has || running || paused || Boolean(item?.pool);
-  $('start-scenario-work-button').disabled = !has || running || paused;
+  const stopped = state === 'STOPPED';
+  const completed = state === 'COMPLETED';
+  const error = state === 'ERROR';
+
+  $('save-scenario-work-button').textContent = isPool ? 'Зберегти параметри всього сценарію' : 'Зберегти';
+  $('start-scenario-work-button').textContent = isPool ? 'Запустити весь сценарій' : 'Запустити';
+  $('pause-scenario-work-button').textContent = isPool ? 'Призупинити весь сценарій' : 'Призупинити';
+  $('resume-scenario-work-button').textContent = isPool ? 'Продовжити весь сценарій' : 'Продовжити';
+  $('stop-scenario-work-button').textContent = isPool ? 'Зупинити весь сценарій' : 'Зупинити';
+  $('delete-scenario-work-button').textContent = isPool ? 'Видалити весь сценарій' : 'Видалити';
+
+  $('save-scenario-work-button').disabled = !has || running || error || completed || (!isPool && paused);
+  $('start-scenario-work-button').disabled = !has || running || paused || completed || error;
   $('pause-scenario-work-button').disabled = !has || !running;
   $('resume-scenario-work-button').disabled = !has || !paused;
   $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running || (Boolean(item?.pool)
-    && (ui.scenarioWorkPools || []).find(pool => pool.id === item.pool.id)?.active > 0);
+  $('delete-scenario-work-button').disabled = !has || running || paused;
   $('scenario-work-run-now').disabled = !has || !running;
-  $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
+  $('scenario-cycle-start-parallel').disabled = !has || isPool || item?.config?.mode !== 'CHAT_CYCLE';
+  setScenarioPoolStructuralControlsDisabled(isPool);
+
+  if ($('scenario-work-control-help')) {
+    $('scenario-work-control-help').textContent = !has
+      ? 'Виберіть сценарій зі списку.'
+      : isPool
+        ? running
+          ? 'Керується весь пул. Щоб змінити таймаути та інші runtime-параметри, спочатку призупиніть весь сценарій.'
+          : paused
+            ? 'Весь пул призупинено. Можна змінити таймаути, інтервали перевірки, retry, політику timeout, додаткові чати та стартову паузу; структура промптів не змінюється.'
+            : stopped
+              ? 'Пул зупинено. Runtime-параметри можна змінити і зберегти без скидання прогресу.'
+              : 'Керування застосовується до всіх фізичних чатів цього сценарію.'
+        : 'Керування застосовується до вибраного сценарію.';
+  }
 }
 
 function clearScenarioWorkState() {
   ui.selectedScenarioWorkId = '';
+  ui.selectedScenarioPoolId = '';
   ui.selectedScenarioWork = null;
   $('scenario-work-name').value = '';
   $('scenario-work-mode-label').textContent = 'Формат не вибрано.';
@@ -1889,10 +1931,14 @@ function scenarioWorkConfigFromForm() {
 function fillScenarioWorkForm(item) {
   if (!item) { clearScenarioWorkState(); return; }
   ui.selectedScenarioWorkId = item.id;
+  ui.selectedScenarioPoolId = item.poolController === true ? (item.poolSummary?.id || item.pool?.id || '') : '';
   ui.selectedScenarioWork = clone(item);
   const config = item.config || {};
   const runtime = item.runtime || {};
-  $('scenario-work-name').value = item.name || config.name || '';
+  const selectedPool = ui.selectedScenarioPoolId
+    ? (item.poolSummary || (ui.scenarioWorkPools || []).find(value => value.id === ui.selectedScenarioPoolId))
+    : null;
+  $('scenario-work-name').value = selectedPool?.name || item.name || config.name || '';
   $('scenario-work-mode-label').textContent = `Формат: ${SCENARIO_WORK_MODE_LABELS[config.mode] || config.mode || 'невідомий'}.`;
   $('scenario-work-round-generation-settings').hidden = config.mode === 'CHAT_CYCLE';
   $('scenario-work-rounds').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.roundsPerGeneration ?? 10));
@@ -1909,11 +1955,11 @@ function fillScenarioWorkForm(item) {
     $('scenario-cycle-url').value = config.launchUrl || 'https://chatgpt.com/';
     $('scenario-cycle-restart-round-timeout').checked = config.restartCurrentRoundOnTimeout !== false;
     renderScenarioCycleSteps(config.steps || []);
-    const pool = item.pool ? (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id) : null;
+    const pool = selectedPool || (item.pool ? (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id) : null);
     if (item.pool) {
       $('scenario-cycle-parallel-count').value = String(pool?.slots ?? 1);
-      $('scenario-cycle-replacement-budget').value = String(item.pool.replacementBudget ?? 0);
-      setScenarioInitialStaggerForm(runtime.initialStaggerSeconds || 0);
+      $('scenario-cycle-replacement-budget').value = String(pool?.replacementBudget ?? item.pool.replacementBudget ?? 0);
+      setScenarioInitialStaggerForm(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0);
     } else {
       $('scenario-cycle-parallel-count').value = '1';
       $('scenario-cycle-replacement-budget').value = '0';
@@ -1946,7 +1992,9 @@ function fillScenarioWorkForm(item) {
   renderScenarioWorkState(item);
   const panel = SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle';
   if (storageGet(SCENARIO_WORK_PANEL_KEY) !== 'state') setScenarioWorkPanel(panel);
-  $('scenario-work-summary').textContent = `${item.name}. Стан: ${item.runtime?.runState || 'STOPPED'}.`;
+  $('scenario-work-summary').textContent = selectedPool
+    ? `${selectedPool.name}. Весь сценарій: ${selectedPool.slots} фізичних чатів. Стан: ${selectedPool.runState || 'STOPPED'}.`
+    : `${item.name}. Стан: ${item.runtime?.runState || 'STOPPED'}.`;
   syncScenarioWorkButtons();
 }
 
