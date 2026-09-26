@@ -456,7 +456,7 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
   });
   await manager.create({
     id: 'job-1', goal: 'Use the strong API model for this job',
-    aiRoutingMode: 'strong', aiStrongProvider: 'openai', aiStrongModel: 'gpt-strong', stepDelayMs: 0,
+    aiRoutingMode: 'strong', aiPinnedRouteId: 'mistral-agent', aiStrongProvider: 'openai', aiStrongModel: 'gpt-strong', stepDelayMs: 0,
   });
   await manager.start('job-1', { runInitial: false });
   const result = await manager.cycleOne('job-1');
@@ -464,9 +464,11 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
   assert.equal(payloads.length, 1);
   assert.equal(payloads[0].isolatedRuntime, true);
   assert.equal(payloads[0].routerOverride.mode, 'strong');
+  assert.equal(payloads[0].routerOverride.routeId, 'mistral-agent');
   assert.equal(payloads[0].routerOverride.strong.provider, 'openai');
   assert.equal(payloads[0].routerOverride.strong.model, 'gpt-strong');
   const live = await manager.get('job-1');
+  assert.equal(live.job.config.aiPinnedRouteId, 'mistral-agent');
   assert.equal(live.job.runtime.aiRouterRuntime.requestCount, 1);
   assert.equal(live.job.runtime.aiRouterRuntime.strongCount, 1);
   assert.equal(live.job.runtime.aiRouterRuntime.lastRoute, 'strong');

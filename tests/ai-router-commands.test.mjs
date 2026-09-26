@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CoreCommandDispatcher } from '../src/core/commands.js';
+import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
 import { createEmptyState, validateState } from '../src/core/schema.js';
 
 class MemoryRepo {
@@ -24,6 +25,51 @@ test('model discovery forwards exact compatible endpoint identity to Gateway', a
   assert.equal(request.provider, 'openai-compatible');
   assert.equal(request.endpointId, 'mistral');
   assert.deepEqual(result.result.models, ['mistral-model']);
+});
+
+test('Agent pins its own Mistral route and passes endpointId to Gateway without changing global routing', async () => {
+  const calls = [];
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true, mode:'primary', routes:[
+      { routeId:'local', provider:'ollama', model:'local-model', priority:100 },
+      { routeId:'mistral-agent', provider:'openai-compatible', endpointId:'mistral', model:'mistral-small-latest',
+        priority:1, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+    ],
+  } });
+  const before = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task', isolatedRuntime:true, routerOverride:{ routeId:'mistral-agent' },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => [call.provider, call.endpointId, call.model]),
+    [['openai-compatible','mistral','mistral-small-latest']]);
+  const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.deepEqual(after, before, 'Agent route binding cannot mutate global config or runtime');
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task', isolatedRuntime:true, routerOverride:{ routeId:'removed-route' },
+  }), /missing or disabled/);
+  assert.equal(calls.length, 1, 'missing route must never silently call another provider');
+});
+
+test('Agent route binding respects a conflicting global pin', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, { aiOrchestrator: { async run() { throw new Error('must not call provider'); } } });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true, routes:[
+      { routeId:'local', provider:'ollama', model:'local-model' },
+      { routeId:'mistral-agent', provider:'openai-compatible', endpointId:'mistral', model:'mistral-small-latest',
+        costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+    ], routePolicy:{ pinnedRouteId:'local' },
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task', isolatedRuntime:true, routerOverride:{ routeId:'mistral-agent' },
+  }), /conflicts with the global pinned route/);
 });
 
 test('AI router settings persist and old states without router fields stay valid', async () => {

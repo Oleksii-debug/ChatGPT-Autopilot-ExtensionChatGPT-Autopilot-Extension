@@ -6,6 +6,10 @@ AGENT DRAFT IMPORT — AFTER THE FIRST DELIVERED PILOT 10 ARCHIVE
 - Agent tab now imports/exports a versioned JSON goal and policy draft. Import only fills the form and never creates or starts a job. Unknown fields, runtime state, and credentials are rejected; the two-second status refresh preserves an imported draft. This change will appear in a later archive, not the Pilot 10 ZIP delivered at the initial 2026-09-26 checkpoint.
 - The Models tab displays Mistral's endpoint key-loaded status as reported by the local Gateway. The key itself is never part of the archive or repository; owner Windows verification remains pending.
 
+AGENT ROUTE SELECTION — AFTER THE 74EC0D2 ARCHIVE
+- Agent can pin one saved, enabled global route by its route ID. Its goal/policy JSON draft retains that choice. The route pool passes the chosen endpoint ID (including `mistral`) to Gateway without changing the global profile.
+- A missing/disabled route or conflict with the globally pinned route stops the model call with an explicit error. Other global constraints, role requirements, cooldown, and budget still apply. Leave the selection on inheritance for automatic failover.
+
 BASELINE
 - Last frozen canonical release: 0.9.19.
 - Candidate source is not the user-supplied 0.9.19 ZIP renamed. It is built from live GitHub source after canonical main 372cf294eec087fa7c355d14885140af1ad9f13d plus the converged Scenario Work lanes below.

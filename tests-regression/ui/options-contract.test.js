@@ -274,7 +274,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'mode-agent','agent-prompt','agent-run-prompt-button','agent-pause-button','agent-resume-button','agent-stop-button',
     'agent-follow-up','agent-send-follow-up-button','agent-job-list','agent-history','agent-allow-current-site-button','agent-allow-all-sites-button',
     'agent-repeat-mode','agent-interval-seconds','agent-schedule-start','agent-schedule-end','agent-active-window-start','agent-active-window-end',
-    'agent-ai-routing-mode','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
+    'agent-ai-routing-mode','agent-ai-pinned-route-id','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
     'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
     'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
@@ -299,6 +299,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.ok(js.includes("aiPinnedRouteId: $('agent-ai-pinned-route-id').value"), 'Agent route choice must persist through Core');
   assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');
   assert.match(js, /parseAgentDraftProfile\(parsePortableJson\(await file\.text\(\)\)\)/, 'Agent JSON must be validated before form insertion');
   assert.match(js, /ui\.agentDraftActive = true/, 'periodic status refresh must preserve the imported draft');

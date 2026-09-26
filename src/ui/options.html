@@ -337,6 +337,11 @@
             <option value="hybrid-auto">Hybrid AUTO</option>
             <option value="hybrid-rules">Hybrid за глобальними правилами</option>
           </select>
+          <label for="agent-ai-pinned-route-id">Маршрут лише для цього Agent</label>
+          <select id="agent-ai-pinned-route-id">
+            <option value="">Успадкувати глобальну політику маршрутів</option>
+          </select>
+          <p>Обраний маршрут використовується для всіх викликів моделі цього Agent і має підтримувати потрібні ролі. Якщо він вимкнений, видалений або тимчасово недоступний, виклик зупиниться. Для автоматичного переходу між моделями залиште глобальну політику.</p>
           <label for="agent-ai-primary-provider">Primary provider</label>
           <select id="agent-ai-primary-provider">
             <option value="inherit">Успадкувати</option>

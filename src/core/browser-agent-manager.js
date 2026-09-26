@@ -169,6 +169,7 @@ function originPattern(value) {
 function browserAgentRouterOverride(config = {}) {
   const out = {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
+  if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
   if (config.aiPrimaryProvider && config.aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT) primary.provider = config.aiPrimaryProvider;
   if (clean(config.aiPrimaryModel, 300)) primary.model = clean(config.aiPrimaryModel, 300);
@@ -761,6 +762,7 @@ export class BrowserAgentManager {
       inputPricePerMillionUsd: raw.inputPricePerMillionUsd ?? 0,
       outputPricePerMillionUsd: raw.outputPricePerMillionUsd ?? 0,
       aiRoutingMode: raw.aiRoutingMode || BrowserAgentAiRoutingMode.INHERIT,
+      aiPinnedRouteId: raw.aiPinnedRouteId || '',
       aiPrimaryProvider: raw.aiPrimaryProvider || BrowserAgentAiProvider.INHERIT,
       aiPrimaryModel: raw.aiPrimaryModel || '',
       aiStrongProvider: raw.aiStrongProvider || BrowserAgentAiProvider.INHERIT,

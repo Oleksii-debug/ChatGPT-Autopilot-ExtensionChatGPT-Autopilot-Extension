@@ -1239,6 +1239,30 @@ function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
   fillModelSelect(modelId, $(providerId).value, [], selected);
 }
 
+function renderBrowserAgentRouteChoices(routes = []) {
+  const select = $('agent-ai-pinned-route-id');
+  const selected = select.value;
+  select.replaceChildren();
+  const inherited = document.createElement('option');
+  inherited.value = '';
+  inherited.textContent = 'Успадкувати глобальну політику маршрутів';
+  select.append(inherited);
+  for (const route of routes) {
+    if (route.enabled === false) continue;
+    const option = document.createElement('option');
+    option.value = route.routeId;
+    option.textContent = `${route.routeId}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}`;
+    select.append(option);
+  }
+  if (selected && ![...select.options].some(option => option.value === selected)) {
+    const unavailable = document.createElement('option');
+    unavailable.value = selected;
+    unavailable.textContent = `${selected} — маршрут відсутній у збереженому пулі`;
+    select.append(unavailable);
+  }
+  select.value = selected;
+}
+
 async function loadAiRouterSettings() {
   try {
     const data = await core('GET_AI_ROUTER_SETTINGS');
@@ -1274,6 +1298,7 @@ async function loadAiRouterSettings() {
     $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
     $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
     renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
+    renderBrowserAgentRouteChoices(settings.routes || []);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -1289,6 +1314,7 @@ async function saveAiRouterSettings() {
     setAiRouterBusy(true);
     const settings = aiRouterSettingsFromForm();
     const data = await core('UPDATE_AI_ROUTER_SETTINGS', { settings });
+    renderBrowserAgentRouteChoices(data.settings?.routes || []);
     $('ai-router-status').textContent = `AI-координатор збережено: режим ${data.settings.mode}.`;
     announce('Налаштування AI-координатора збережено.');
   } catch (error) {
@@ -2218,6 +2244,7 @@ function browserAgentPolicyFromForm() {
     activeWindowStart,
     activeWindowEnd,
     aiRoutingMode: $('agent-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-ai-pinned-route-id').value,
     aiPrimaryProvider: $('agent-ai-primary-provider').value,
     aiPrimaryModel: $('agent-ai-primary-model').value.trim(),
     aiStrongProvider: $('agent-ai-strong-provider').value,
@@ -2253,6 +2280,14 @@ function fillBrowserAgentPolicy(config = {}) {
   $('agent-active-window-start').value = config.activeWindowStart || '';
   $('agent-active-window-end').value = config.activeWindowEnd || '';
   $('agent-ai-routing-mode').value = ['inherit','primary','strong','hybrid-auto','hybrid-rules'].includes(config.aiRoutingMode) ? config.aiRoutingMode : 'inherit';
+  $('agent-ai-pinned-route-id').value = config.aiPinnedRouteId || '';
+  if ($('agent-ai-pinned-route-id').value !== (config.aiPinnedRouteId || '')) {
+    const option = document.createElement('option');
+    option.value = config.aiPinnedRouteId;
+    option.textContent = `${config.aiPinnedRouteId} — маршрут відсутній у збереженому пулі`;
+    $('agent-ai-pinned-route-id').append(option);
+    $('agent-ai-pinned-route-id').value = option.value;
+  }
   $('agent-ai-primary-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiPrimaryProvider) ? config.aiPrimaryProvider : 'inherit';
   $('agent-ai-primary-model').value = config.aiPrimaryModel || '';
   $('agent-ai-strong-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiStrongProvider) ? config.aiStrongProvider : 'inherit';
