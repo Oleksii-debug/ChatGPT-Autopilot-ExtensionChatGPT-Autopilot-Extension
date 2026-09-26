@@ -66,6 +66,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_ACTION_CENTER',
   'GET_PROJECT_WORKSPACE_SUMMARY',
   'GET_SCENARIO_WORK',
+  'GET_SCENARIO_CHAT_POOL',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
@@ -621,6 +622,21 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.create(message.payload || {});
   } else if (message.command === 'CREATE_SCENARIO_CHAT_POOL') {
     result = await scenarioWork.createChatPool(message.payload || {});
+  } else if (message.command === 'GET_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.getChatPool(message.payload?.id || '');
+  } else if (message.command === 'UPDATE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.updateChatPool(message.payload?.id || '', message.payload?.config || {}, {
+      replacementBudget: message.payload?.replacementBudget,
+      staggerSeconds: message.payload?.staggerSeconds,
+    });
+  } else if (message.command === 'START_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.startChatPool(message.payload?.id || '');
+  } else if (message.command === 'PAUSE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.pauseChatPool(message.payload?.id || '');
+  } else if (message.command === 'RESUME_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.resumeChatPool(message.payload?.id || '');
+  } else if (message.command === 'STOP_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.stopChatPool(message.payload?.id || '');
   } else if (message.command === 'DELETE_SCENARIO_CHAT_POOL') {
     result = await scenarioWork.deleteChatPool(message.payload?.id || '');
   } else if (message.command === 'SELECT_SCENARIO_WORK') {
