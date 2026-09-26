@@ -53,3 +53,13 @@ This file is the repository-local handoff ledger for material product repairs an
 
 ### Next gate
 Qualify the exact 0.10.0 candidate head in GitHub Actions; repair any release-test assumptions that still hardcode 0.9.19; build deterministic Ubuntu and Windows candidates; only then update SOURCE_TRUTH.json with measured 0.10.0 artifact hashes and run the real installed-extension multi-chat acceptance.
+
+## 2026-09-26 — Daily Pilot identity policy
+
+- User-facing builds use one whole-number Pilot identity per development day.
+- 2026-09-26 is Pilot 10. Same-day fixes do not create 10.1/10.2/etc.; only the archive timestamp changes.
+- Friendly archive format: `10 Пілот HHMM DDMM.zip`, timestamped from the exact source commit in Europe/Bratislava.
+- The next development day advances to the next whole Pilot number.
+- Chrome/npm technical constraints use `10.0.0`; manifest `version_name` exposes `10` as the human-facing release number.
+- This file is the concise English technical handoff ledger; append material changes with date/time, exact SHA, problem, repair and verification state.
+- Drive history mirrors material checkpoints; user-facing archives do not carry parallel historical release names.
