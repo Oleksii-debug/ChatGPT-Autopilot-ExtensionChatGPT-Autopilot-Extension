@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Автопілот",
-  "version": "10.0.0",
+  "version": "10.0.1",
   "description": "Керує ChatGPT-сеансами та multi-agent оркестрацією з відновленням, GitHub control і локальними лімітами.",
   "permissions": [
     "storage",
