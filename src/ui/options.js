@@ -2875,7 +2875,8 @@ async function importSimplifiedProfile(start) {
 function globalStateLabel(value) {
   return ({
     RUNNING: 'ПРАЦЮЄ',
-    WAITING_RESPONSE: 'ОЧІКУЄ ВІДПОВІДІ',
+    WAITING_NEXT_SEND: 'ЧЕКАЄ НАСТУПНОГО SEND',
+    WAITING_RESPONSE: 'ЧЕКАЄ ЗАВЕРШЕННЯ ВІДПОВІДІ',
     READY: 'ГОТОВО',
     PAUSED: 'ПРИЗУПИНЕНО',
     RECOVERING: 'ВІДНОВЛЮЄТЬСЯ',
@@ -2888,7 +2889,7 @@ function globalStateLabel(value) {
 
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Готують або очікують наступний Send: ${summary.RUNNING || 0}. Чекають підтвердженого завершення відповіді ChatGPT: ${summary.WAITING_RESPONSE || 0}. Готові до наступного сценарного кроку: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Підтверджено завершених відповідей ChatGPT у сценарній роботі: ${summary.completedResponses || 0}.`;
+  $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Оркестраційних одиниць: ${(data.orchestration || []).length}. Агентів: ${(data.agents || []).length}. Помилок: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Детальний прогрес кожного типу роботи наведено нижче один раз у його власному розділі.`;
   const scenarioPools = data.scenarioPools || [];
   $('global-scenario-summary').textContent = scenarioPools.length
     ? scenarioPools.map(pool => `${pool.name}. План: ${pool.slots} фізичних чатів × ${pool.messagesPerChat || 0} повідомлень на чат = ${pool.plannedSends || 0} Send. Фактична пауза між першими промптами: ${formatScenarioInitialStagger(pool.initialStaggerSeconds || 0)}. Перший Send підтверджено у ${pool.firstPromptSent || 0}/${pool.slots} чатів. Ще не отримали перший Send: ${pool.firstPromptPending || 0}. Чекають завершення відповіді: ${pool.waitingResponse || 0}. Підтверджено завершених відповідей: ${pool.completedResponses || 0}. Усього підтверджених Send: ${pool.verifiedSends || 0}/${pool.plannedSends || 0}. Завершених чатів: ${pool.completed || 0}. Призупинено: ${pool.paused || 0}. Помилок: ${pool.error || 0}.`).join(' | ')
