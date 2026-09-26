@@ -635,7 +635,7 @@ export class ScenarioWorkManager {
       || !previous
       || previous.signature !== signature
       || now - previous.loggedAt >= ASSISTANT_OBSERVATION_HEARTBEAT_MS
-      || nearDeadline;
+      || (nearDeadline && now - previous.loggedAt >= 60_000);
     if (!shouldLog) return false;
     this.assistantObservationLogState.set(key, { signature, loggedAt: now });
     const textLength = typeof report?.assistantText === 'string' ? report.assistantText.length : 0;
@@ -1312,7 +1312,6 @@ export class ScenarioWorkManager {
         continue;
       }
       if (report?.status !== 'READY' || report.assistantComplete !== true) continue;
-      await this.recordAssistantObservation({ scenario, participant, task, report, now, force: true });
       const completedSessionId = participant.sessionId;
       const completedGeneration = participant.generation;
       let next = applyScenarioCompletion(scenario.config, runtime, participant.key, {
