@@ -131,7 +131,7 @@
         <section aria-labelledby="simplified-timing-heading">
           <h3 id="simplified-timing-heading">Час і поведінка</h3>
 
-          <label for="simplified-interval">Мінімальний інтервал після підтвердженого надсилання</label>
+          <label for="simplified-interval">Інтервал відправлення після підтвердженого Send</label>
           <input id="simplified-interval" type="number" min="1" max="86400" step="1" value="2" inputmode="numeric">
           <label for="simplified-interval-unit">Одиниця</label>
           <select id="simplified-interval-unit">
@@ -563,6 +563,16 @@
 
       <label for="scenario-work-list">Сценарії</label>
       <select id="scenario-work-list" size="6"></select>
+      <p id="scenario-work-list-help">Один пункт пулу означає весь запущений сценарій. Окремі фізичні чати дивіться у вкладці «Сеанси» та в діагностиці.</p>
+      <div class="orchestra-actions" aria-label="Керування вибраним сценарієм">
+        <button id="save-scenario-work-button" type="button">Зберегти</button>
+        <button id="start-scenario-work-button" type="button">Запустити</button>
+        <button id="pause-scenario-work-button" type="button">Призупинити</button>
+        <button id="resume-scenario-work-button" type="button">Продовжити</button>
+        <button id="stop-scenario-work-button" type="button">Зупинити</button>
+        <button id="delete-scenario-work-button" type="button">Видалити</button>
+      </div>
+      <p id="scenario-work-control-help" role="status">Виберіть сценарій зі списку.</p>
       <div class="orchestra-actions" aria-label="Створення сценарію">
         <button id="new-scenario-cycle-button" type="button">Новий цикл у чаті</button>
         <button id="new-scenario-pairs-button" type="button">Нові двійки</button>
@@ -585,15 +595,6 @@
       <label for="scenario-work-name">Назва</label>
       <input id="scenario-work-name" type="text" maxlength="120" autocomplete="off">
       <p id="scenario-work-mode-label" role="status">Формат не вибрано.</p>
-      <div class="orchestra-actions" aria-label="Дії зі сценарієм">
-        <button id="save-scenario-work-button" type="button">Зберегти</button>
-        <button id="start-scenario-work-button" type="button">Запустити</button>
-        <button id="pause-scenario-work-button" type="button">Призупинити</button>
-        <button id="resume-scenario-work-button" type="button">Продовжити</button>
-        <button id="stop-scenario-work-button" type="button">Зупинити</button>
-        <button id="delete-scenario-work-button" type="button">Видалити</button>
-      </div>
-
       <fieldset class="settings-group" id="scenario-work-common-settings">
         <legend>Загальні параметри</legend>
         <div id="scenario-work-round-generation-settings">

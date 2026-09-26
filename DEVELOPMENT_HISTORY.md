@@ -1,5 +1,20 @@
 # ChatGPT Autopilot — development history
 
+## 2026-09-26 — Pool-level Scenario Work control and response-observation diagnostics
+- Follow-up truth defect from owner live UI: “current step 1/12; confirmed Send 3/12; completed responses 1/12”. The projection had mixed physical transport attempts with logical sequence progress. New invariant: sequenceVerifiedSends = completedResponses + at most one current in-flight verified Send. A row may therefore truthfully show logical 2/12, completed responses 1/12, physical Send attempts 3, retry/replacement attempts 1.
+- CHAT_CYCLE timeout/replacement never rewinds already completed logical steps. The planner reconstructs the next cursor from durable confirmed completions. If an old corrupted runtime already resent START after progress, the eventual duplicate-stage response is observable but non-advancing. Exhausted timeout replacement budget yields ERROR instead of a false COMPLETED state.
+
+
+- Owner live testing showed that physical CHAT_CYCLE members were manageable only one-by-one even though the user thinks of a launched 3/8/10/15-chat pool as one scenario. The Scenario Work tab could display individual slots but had no pool-level pause/resume/stop/edit path; pool member Save was deliberately disabled.
+- Product direction: Scenario Work is the aggregate control surface. One pool is one list item. Physical chats remain execution/detail objects visible in Sessions/global status/diagnostics.
+- Added pool-wide lifecycle authority for Start, Pause, Resume and Stop. Transitions update every member under one durable manager update, bump owner epochs to cancel stale in-flight work, synchronize managed Core sessions, and reconcile alarms.
+- Added safe in-place pool editing while PAUSED/STOPPED. Runtime timing/recovery controls, replacement budget and first-prompt stagger propagate to all members without resetting step/repeat/launch counters. Waiting-response deadlines are renewed from the edit point using the new configured timeout.
+- Existing pool program structure is fail-closed: launch URL, step identities, prompt bodies and repeat counts cannot be changed in place. This prevents a partially advanced pool from silently switching programs.
+- Scenario Work list now collapses physical members into one pool item and places lifecycle controls directly beneath the list for NVDA/keyboard discoverability. Structural prompt controls are read-only for created pools; aggregate runtime state explains what can be edited.
+- Added bounded assistant-response telemetry to Core diagnostics. It records observation state/code, completion flag, wait duration, timeout remaining, baseline evidence, probe errors, streaming-based timeout extension, and actual timeout. No prompt or assistant body is logged. State changes log immediately; stable waits heartbeat every five minutes, with at most one-minute cadence near deadline.
+- Regression coverage added for whole-pool pause/edit/resume without progress loss, structural mutation rejection, aggregate pool retrieval, response-observation diagnostics, command routing, and aggregate UI contracts.
+- Branch authority while under qualification: `hotfix/pilot10-scenario-pool-control-diagnostics-20260926` based on release head `5a3595716a3c450c6aba55d638bada2b16c06a8e`. Exact merge SHA and archive hash must be recorded after terminal qualification.
+
 ## 2026-09-26 — Scenario pool starts survive closing the options page
 
 - Found a separate real launch defect: the Scenario UI previously started pool members in a JavaScript loop with setTimeout between START commands. Closing the options page partway through could strand the remaining slots STOPPED; delayed Core execution could bunch physical first sends after that UI timer.

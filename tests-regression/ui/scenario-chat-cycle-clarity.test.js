@@ -13,7 +13,8 @@ test('CHAT_CYCLE presents one prompt sequence per physical chat without duplicat
   assert.match(js, /maxGenerations: mode === 'CHAT_CYCLE' \? 1 : scenarioWorkInt/u);
   assert.match(js, /'scenario-work-round-generation-settings'\)\.hidden = config\.mode === 'CHAT_CYCLE'/u);
   assert.match(js, /Фізичний чат у цьому слоті/u);
-  assert.match(js, /фізичний чат №\$\{row\.generation\}/u);
+  assert.match(js, /поточний логічний крок \$\{row\.message/u);
+  assert.match(js, /фізично підтверджених Send-спроб/u);
   assert.doesNotMatch(js, /стан \$\{row\.category\}/u);
 });
 test('scenario cycle message count is recalculated after prompt edits', async () => {
