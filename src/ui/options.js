@@ -1957,7 +1957,12 @@ async function importScenarioWorkProfile() {
     await loadScenarioWork({ preservePanel: false });
     if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
     setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
-    status.textContent = `Імпортовано новий зупинений сценарій: ${config.name}.`;
+    const messageCount = config.mode === 'CHAT_CYCLE'
+      ? config.steps.reduce((sum, step) => sum + step.repeat, 0)
+      : 0;
+    status.textContent = config.mode === 'CHAT_CYCLE'
+      ? `Імпортовано новий зупинений сценарій: ${config.name}. Повідомлень у кожному чаті: ${messageCount}.`
+      : `Імпортовано новий зупинений сценарій: ${config.name}.`;
     $('scenario-work-list').focus();
   } catch (error) {
     status.textContent = `Не вдалося імпортувати: ${error.message}`;
