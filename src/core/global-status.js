@@ -124,9 +124,9 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       .reduce((n, session) => n + num(session.successfulSendCount), 0);
     const historyKnown = runtime.verifiedSendHistoryComplete === true;
     if (!historyKnown) verifiedSendHistoryComplete = false;
-    const stepPosition = num(runtime.round) * generationSize
-      + steps.slice(0, num(runtime.stepIndex)).reduce((n, step) => n + Math.max(1, Number(step.repeat) || 1), 0)
-      + num(runtime.repeatIndex) + 1;
+    const nextLogicalMessage = runtime.mode === 'CHAT_CYCLE' && turnsPerGeneration
+      ? Math.min(turnsPerGeneration, completedInGeneration + 1)
+      : null;
     const participants = scenarioWorkParticipants(runtime);
     const isDormantTemplate = !scenario.pool?.id
       && runtime.runState === 'STOPPED'
@@ -138,6 +138,16 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       const session = sessionsById[participant.sessionId];
       const verifiedPending = verifiedScenarioTurn(participant, session);
       if (verifiedPending) inFlightVerified += 1;
+      const transportVerifiedSends = runtime.mode === 'CHAT_CYCLE'
+        ? (historyKnown
+          ? num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed
+          : Math.max(completedInGeneration + Number(verifiedPending),
+            num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed))
+        : num(session?.successfulSendCount);
+      const sequenceVerifiedSends = runtime.mode === 'CHAT_CYCLE'
+        ? Math.min(turnsPerGeneration, completedInGeneration + Number(verifiedPending))
+        : transportVerifiedSends;
+      const retryVerifiedSends = Math.max(0, transportVerifiedSends - sequenceVerifiedSends);
       const row = {
         id: `${scenario.id}:${participant.key}`,
         scenario: scenario.pool?.name || scenario.name,
@@ -145,14 +155,14 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
         poolId: scenario.pool?.id || '',
         slotIndex: num(scenario.pool?.slotIndex) || num(String(scenario.name || '').match(/\s+—\s+чат\s+(\d+)$/u)?.[1]),
         generation: num(participant.generation || runtime.generation),
-        message: runtime.mode === 'CHAT_CYCLE' ? Math.min(stepPosition, turnsPerGeneration) : null,
+        message: nextLogicalMessage,
         messagesPerGeneration: runtime.mode === 'CHAT_CYCLE' ? turnsPerGeneration : null,
-        verifiedSends: runtime.mode === 'CHAT_CYCLE'
-          ? (historyKnown
-            ? num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed
-            : Math.max(completedInGeneration + Number(verifiedPending),
-              num(runtime.generationRetiredVerifiedSends) + generationActiveConfirmed))
-          : num(session?.successfulSendCount),
+        // verifiedSends remains the raw/transport total for backward-compatible
+        // machine consumers. Human progress uses sequenceVerifiedSends.
+        verifiedSends: transportVerifiedSends,
+        transportVerifiedSends,
+        sequenceVerifiedSends,
+        retryVerifiedSends,
         completedResponses: runtime.mode === 'CHAT_CYCLE' ? completedInGeneration : completedTurns,
         category: scenarioCategory(runtime, participant, session),
       };
@@ -192,6 +202,9 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
         firstPromptPending: 0,
         completedResponses: 0,
         verifiedSends: 0,
+        sequenceVerifiedSends: 0,
+        transportVerifiedSends: 0,
+        retryVerifiedSends: 0,
         verifiedSendHistoryComplete: true,
       };
       const participant = scenarioWorkParticipants(runtime)[0] || null;
@@ -212,9 +225,14 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       if (category === 'STOPPED') aggregate.stopped += 1;
       if (category === 'ERROR') aggregate.error += 1;
       if (category === 'AMBIGUOUS_EFFECT') aggregate.ambiguousEffect += 1;
+      const sequenceVerified = Math.min(turnsPerGeneration, completedInGeneration + inFlightVerified);
+      const retryVerified = Math.max(0, scenarioTotalVerified - sequenceVerified);
       aggregate.verifiedSends += scenarioTotalVerified;
-      aggregate.completedResponses += completedTurns;
-      if (scenarioTotalVerified > 0) aggregate.firstPromptSent += 1;
+      aggregate.transportVerifiedSends += scenarioTotalVerified;
+      aggregate.sequenceVerifiedSends += sequenceVerified;
+      aggregate.retryVerifiedSends += retryVerified;
+      aggregate.completedResponses += completedInGeneration;
+      if (sequenceVerified > 0) aggregate.firstPromptSent += 1;
       aggregate.verifiedSendHistoryComplete = aggregate.verifiedSendHistoryComplete && historyKnown;
       scenarioPoolMap.set(poolId, aggregate);
     }
