@@ -55,3 +55,10 @@ DAILY USER-FACING IDENTITY
 - Same-day corrections keep number 10.
 - User archive name is derived from exact commit time in Europe/Bratislava: 10 Пілот HHMM DDMM.zip.
 - The next development day advances to the next whole Pilot number instead of 10.1 / 10.2 / 10.3.
+
+HIGH EFFORT BEFORE AUTOMATIC PROMPTS
+- Added an idempotent ENSURE_HIGH_EFFORT interaction phase before prompt insertion.
+- The executor will not create/insert a pending prompt until ChatGPT reports High or Extra High, or High has been selected and independently re-verified.
+- Extra High is treated as satisfying the minimum and is not downgraded.
+- Unknown/ambiguous ChatGPT effort UI fails closed without prompt insertion or Send.
+- Fixed a #418 regression where adding the Work user-bubble selector to a combined body selector broke the nested article/body acknowledgement contract in deterministic interaction tests.
