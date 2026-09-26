@@ -1,0 +1,14 @@
+Pilot 10.0.1 regression evidence — 2026-09-26
+
+Observed:
+- ordinary Sessions reached CHECK_ONLY=READY, then ENSURE_HIGH_EFFORT=EFFORT_CONTROL_NOT_READY and repeatedly closed/reopened tabs;
+- Scenario Work repeatedly returned EFFORT_SLIDER_UNRECOGNIZED;
+- supplied production HTML exposed data-selected-reasoning-effort=high/medium on the ChatGPT intelligence trigger.
+
+Local qualification:
+- 196 packaged JavaScript files passed node --check;
+- manifest and referenced extension paths validated;
+- dedicated High and Medium->High regression fixtures passed;
+- release ZIP integrity passed.
+
+Live browser acceptance is still required after loading 10.0.1 because static saved HTML cannot execute ChatGPT's live React event handlers.
