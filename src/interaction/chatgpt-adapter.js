@@ -469,7 +469,7 @@
     const label = [
       thumb?.getAttribute?.('aria-valuetext'),
       row.getAttribute?.('aria-valuetext'),
-      legacyShapeCompatible ? statusText : '',
+      legacyShapeCompatible ? statusText.replace(/[,.;:!?]+/gu, ' ') : '',
     ].filter(Boolean).join(' ');
     return {
       element: row,
