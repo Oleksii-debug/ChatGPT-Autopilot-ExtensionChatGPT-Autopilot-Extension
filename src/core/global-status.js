@@ -73,6 +73,7 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
   const sessions = [];
   const simplifiedSessions = [];
   const scenarioSlots = [];
+  const scenarioPoolMap = new Map();
   const orchestration = [];
   const agents = [];
   const models = [];
@@ -140,9 +141,50 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       add({ ...row, kind: 'SCENARIO' });
     }
     const durableTotal = num(runtime.retiredVerifiedSends) + activeConfirmed;
-    scenarioVerifiedSends += historyKnown
+    const scenarioTotalVerified = historyKnown
       ? durableTotal
       : Math.max(completedTurns + inFlightVerified, durableTotal);
+    scenarioVerifiedSends += scenarioTotalVerified;
+
+    if (scenario.pool?.id && runtime.mode === 'CHAT_CYCLE') {
+      const poolId = scenario.pool.id;
+      const baseName = String(scenario.name || '').replace(/\s+—\s+чат\s+\d+$/u, '') || 'Сценарний пул';
+      const aggregate = scenarioPoolMap.get(poolId) || {
+        id: poolId,
+        name: baseName,
+        slots: 0,
+        active: 0,
+        waitingResponse: 0,
+        ready: 0,
+        paused: 0,
+        completed: 0,
+        stopped: 0,
+        error: 0,
+        ambiguousEffect: 0,
+        verifiedSends: 0,
+        verifiedSendHistoryComplete: true,
+      };
+      const participant = scenarioWorkParticipants(runtime)[0] || null;
+      const participantSession = participant ? sessionsById[participant.sessionId] : null;
+      const category = participant
+        ? scenarioCategory(runtime, participant, participantSession)
+        : runtime.runState === 'COMPLETED' ? 'COMPLETED'
+          : runtime.runState === 'PAUSED' ? 'PAUSED'
+            : runtime.runState === 'ERROR' ? 'ERROR'
+              : runtime.runState === 'STOPPED' ? 'STOPPED' : 'RUNNING';
+      aggregate.slots += 1;
+      if (runtime.runState === 'RUNNING') aggregate.active += 1;
+      if (category === 'WAITING_RESPONSE') aggregate.waitingResponse += 1;
+      if (category === 'READY') aggregate.ready += 1;
+      if (category === 'PAUSED') aggregate.paused += 1;
+      if (category === 'COMPLETED') aggregate.completed += 1;
+      if (category === 'STOPPED') aggregate.stopped += 1;
+      if (category === 'ERROR') aggregate.error += 1;
+      if (category === 'AMBIGUOUS_EFFECT') aggregate.ambiguousEffect += 1;
+      aggregate.verifiedSends += scenarioTotalVerified;
+      aggregate.verifiedSendHistoryComplete = aggregate.verifiedSendHistoryComplete && historyKnown;
+      scenarioPoolMap.set(poolId, aggregate);
+    }
   }
 
   for (const orchestra of orchestras) {
@@ -198,6 +240,6 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       verifiedSendHistoryComplete,
       completedResponses: scenarios.reduce((n, scenario) => n + num(scenario.runtime?.totalCompletedTurns), 0),
     },
-    sessions, simplifiedSessions, scenarioSlots, orchestration, agents, models,
+    sessions, simplifiedSessions, scenarioSlots, scenarioPools: [...scenarioPoolMap.values()], orchestration, agents, models,
   };
 }
