@@ -60,6 +60,7 @@ test('bundled Nika profile completes all 30 one-pass cycles unattended with conf
   const chrome = fakeOpenCloseChrome();
   const submitted = [];
   const transport = { async execute(_tabId, request) {
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
     if (request.mode === 'INSERT_ONLY') {
       return {
@@ -150,6 +151,7 @@ test('bundled Nika profile survives mixed transient faults across 30 cycles with
     const ordinal = Number(request.taskId.match(/(\d+)$/)?.[1] || 0);
     const key = `${request.mode}:${request.taskId}`;
 
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
     if (request.mode === 'CHECK_ONLY') {
       if (ordinal === 5 && !once.has(key)) {
         once.add(key);
