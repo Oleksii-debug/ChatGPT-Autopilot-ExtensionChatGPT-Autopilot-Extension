@@ -1660,15 +1660,19 @@ function renderScenarioWorkState(item) {
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
   if (item.pool) {
     const pool = (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
-    addScenarioStateLine('Пул: усього стартових чатів', pool?.slots ?? '—');
-    addScenarioStateLine('Пул: активних чатів', pool?.active ?? '—');
-    addScenarioStateLine('Пул: очікують відповіді', pool?.waitingResponse ?? '—');
-    addScenarioStateLine('Пул: ще не надіслали перший промпт', pool?.notStarted ?? '—');
-    addScenarioStateLine('Пул: завершено', pool?.completed ?? '—');
+    addScenarioStateLine('Пул: фізичних чатів', pool?.slots ?? '—');
+    addScenarioStateLine('Пул: план повідомлень на один чат', pool?.messagesPerChat ?? '—');
+    addScenarioStateLine('Пул: план усіх Send', pool?.plannedSends ?? '—');
+    addScenarioStateLine('Пул: перший Send підтверджено', pool ? `${pool.firstPromptSent ?? 0}/${pool.slots}` : '—');
+    addScenarioStateLine('Пул: ще не отримали перший Send', pool?.firstPromptPending ?? '—');
+    addScenarioStateLine('Пул: чекають завершення відповіді', pool?.waitingResponse ?? '—');
+    addScenarioStateLine('Пул: підтверджено завершених відповідей', pool?.completedResponses ?? '—');
+    addScenarioStateLine('Пул: усього підтверджених Send', pool?.verifiedSends ?? '—');
+    addScenarioStateLine('Пул: завершених чатів', pool?.completed ?? '—');
     addScenarioStateLine('Пул: призупинено', pool?.paused ?? '—');
     addScenarioStateLine('Пул: помилок', pool?.error ?? '—');
     addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${item.pool.replacementBudget}`);
-    addScenarioStateLine('Пауза лише між першими промптами', formatScenarioInitialStagger(runtime.initialStaggerSeconds || 0));
+    addScenarioStateLine('Фактична пауза лише між першими промптами', formatScenarioInitialStagger(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0));
     addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
   }
   if (runtime.mode === 'CHAT_CYCLE') {
@@ -2080,18 +2084,36 @@ async function startParallelScenarioChats() {
     const config = scenarioWorkConfigFromForm();
     const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
     setScenarioWorkBusy(true);
+    const sourceScenarioId = ui.selectedScenarioWorkId;
+    const sourceIsDormantTemplate = Boolean(
+      sourceScenarioId
+      && !ui.selectedScenarioWork?.pool?.id
+      && ui.selectedScenarioWork?.runtime?.runState === 'STOPPED'
+      && Number(ui.selectedScenarioWork?.runtime?.totalLaunches || 0) === 0
+      && Number(ui.selectedScenarioWork?.runtime?.totalCompletedTurns || 0) === 0
+    );
     const result = await core('CREATE_SCENARIO_CHAT_POOL', {
       name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
     });
     const ids = result?.ids || [];
     if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
+    if (Number(result?.pool?.slots) !== count) throw new Error('Core повернув іншу кількість фізичних чатів, ніж було задано.');
+    if (Number(result?.pool?.initialStaggerSeconds) !== staggerSeconds) throw new Error('Core повернув іншу паузу між першими промптами, ніж було задано. Запуск зупинено як непідтверджений.');
+    // The imported/configuration-only CHAT_CYCLE source is consumed by the
+    // physical pool. Keeping it as an eleventh "scenario" made a 10-chat launch
+    // look like 11. Delete only a never-started unpooled source; never touch a
+    // real/previously-run scenario.
+    if (sourceIsDormantTemplate && !ids.includes(sourceScenarioId)) {
+      try { await core('DELETE_SCENARIO_WORK', { id: sourceScenarioId }); }
+      catch (_) { /* Global projection still excludes this dormant template. */ }
+    }
     await loadScenarioWork();
     if (ids[0]) {
       $('scenario-work-list').value = ids[0];
       await openScenarioWork(ids[0]);
     }
     setScenarioWorkPanel('state');
-    announce(`Пул із ${ids.length} чатів заплановано. Пауза лише між першими промптами: ${formatScenarioInitialStagger(staggerSeconds)}. Ліміт додаткових чатів: ${replacementBudget}.`);
+    announce(`Пул підтверджено Core: ${ids.length} фізичних чатів; ${result?.pool?.messagesPerChat || config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень на чат; фактична пауза між першими промптами ${formatScenarioInitialStagger(result?.pool?.initialStaggerSeconds ?? staggerSeconds)}; додаткових чатів ${replacementBudget}.`);
   } catch (error) {
     await loadScenarioWork();
     const message = `Не вдалося підтвердити запуск пулу. Перевірте список сценаріїв: ${error.message}`;
@@ -2853,7 +2875,8 @@ async function importSimplifiedProfile(start) {
 function globalStateLabel(value) {
   return ({
     RUNNING: 'ПРАЦЮЄ',
-    WAITING_RESPONSE: 'ОЧІКУЄ ВІДПОВІДІ',
+    WAITING_NEXT_SEND: 'ЧЕКАЄ НАСТУПНОГО SEND',
+    WAITING_RESPONSE: 'ЧЕКАЄ ЗАВЕРШЕННЯ ВІДПОВІДІ',
     READY: 'ГОТОВО',
     PAUSED: 'ПРИЗУПИНЕНО',
     RECOVERING: 'ВІДНОВЛЮЄТЬСЯ',
@@ -2866,14 +2889,14 @@ function globalStateLabel(value) {
 
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Усього робочих одиниць у всьому Autopilot: ${summary.total || 0}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених надсилань${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
+  $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Оркестраційних одиниць: ${(data.orchestration || []).length}. Агентів: ${(data.agents || []).length}. Помилок: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Детальний прогрес кожного типу роботи наведено нижче один раз у його власному розділі.`;
   const scenarioPools = data.scenarioPools || [];
   $('global-scenario-summary').textContent = scenarioPools.length
-    ? scenarioPools.map(pool => `${pool.name}: чатів ${pool.slots}; активних ${pool.active}; очікують відповіді ${pool.waitingResponse}; завершено ${pool.completed}; підтверджених Send ${pool.verifiedSends}`).join(' | ')
-    : `Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}.`;
+    ? scenarioPools.map(pool => `${pool.name}. План: ${pool.slots} фізичних чатів × ${pool.messagesPerChat || 0} повідомлень на чат = ${pool.plannedSends || 0} Send. Фактична пауза між першими промптами: ${formatScenarioInitialStagger(pool.initialStaggerSeconds || 0)}. Перший Send підтверджено у ${pool.firstPromptSent || 0}/${pool.slots} чатів. Ще не отримали перший Send: ${pool.firstPromptPending || 0}. Чекають завершення відповіді: ${pool.waitingResponse || 0}. Підтверджено завершених відповідей: ${pool.completedResponses || 0}. Усього підтверджених Send: ${pool.verifiedSends || 0}/${pool.plannedSends || 0}. Завершених чатів: ${pool.completed || 0}. Призупинено: ${pool.paused || 0}. Помилок: ${pool.error || 0}.`).join(' | ')
+    : `Запущених сценарних фізичних чатів: ${(data.scenarioSlots || []).length}.`;
   const lists = [
-    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених надсилань ${row.verifiedSends}; завершених циклів ${row.completedCycles}`],
-    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: фізичний чат №${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджено надсилань ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; завершено відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${globalStateLabel(row.category)}`],
+    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених Send ${row.verifiedSends}; завершених циклів надсилання ${row.completedCycles}; наступний Send не раніше ${row.nextAllowedSendAt ? new Date(row.nextAllowedSendAt).toLocaleString() : 'зараз'}`],
+    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}${row.slotIndex ? `, чат ${row.slotIndex}` : ''}: поточний сценарний крок ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджено Send ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; підтверджено завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${globalStateLabel(row.category)}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
     ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
     ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
@@ -3081,7 +3104,7 @@ function renderSessionList() {
   const paused = ordinarySessions.filter(s => s.runState === 'PAUSED').length;
   const errors = ordinarySessions.filter(s => s.runState === 'ERROR').length;
   const sent = ordinarySessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
-  if ($('session-overview')) $('session-overview').textContent = `Sessions: ${total}. Running: ${running}. Completed: ${completed}. Paused: ${paused}. Errors: ${errors}. Successfully sent total: ${sent}.`;
+  if ($('session-overview')) $('session-overview').textContent = `Звичайних ручних сеансів у цьому списку: ${total}. Працює: ${running}. Завершено: ${completed}. Призупинено: ${paused}. Помилок: ${errors}. Успішно надіслано цими звичайними сеансами: ${sent}. Спрощені й сценарні чати рахуються у зведенні «Весь Autopilot зараз» вище.`;
   syncCurrentSessionMarker();
 }
 

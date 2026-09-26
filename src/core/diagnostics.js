@@ -85,12 +85,17 @@ function reportSession(session) {
     : 0;
   const isCompleted = session.runMode === 'ONE_PASS' && enabledIds.length > 0 && completedTaskCount >= enabledIds.length;
   const successfulSendCount = Math.max(completedTaskCount, Number(session.successfulSendCount || 0));
+  const scenarioAwaitingAssistant = session.scenarioWork?.managed === true
+    && isCompleted
+    && successfulSendCount > 0
+    && session.operation?.phase === OperationPhase.SENT_VERIFIED;
   return [
     `Сеанс: ${safeText(session.name || 'без назви', 160)} (${safeText(session.id, 120)})`,
-    line('  стан', isCompleted ? 'COMPLETED' : session.runState),
+    line('  стан', scenarioAwaitingAssistant ? 'WAITING_RESPONSE' : (isCompleted ? 'COMPLETED' : session.runState)),
+    ...(scenarioAwaitingAssistant ? [line('  пояснення стану', 'Core підтвердив Send; Scenario Work ще має підтвердити завершення відповіді ChatGPT перед наступним промптом.')] : []),
     line('  успішно надіслано', successfulSendCount),
-    line('  виконано завдань', `${completedTaskCount}/${enabledIds.length}`),
-    line('  залишилось завдань', Math.max(0, enabledIds.length - completedTaskCount)),
+    line('  виконано завдань', session.runMode === 'CONTINUOUS' ? 'не застосовується — постійний цикл' : `${completedTaskCount}/${enabledIds.length}`),
+    line('  залишилось завдань', session.runMode === 'CONTINUOUS' ? 'не застосовується — постійний цикл' : Math.max(0, enabledIds.length - completedTaskCount)),
     line('  поточне завдання', safeText(currentTask?.label || currentTask?.id || '', 160)),
     line('  стан завдання', currentTask?.status),
     line('  етап операції', session.operation?.phase || OperationPhase.NONE),
