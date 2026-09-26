@@ -456,12 +456,20 @@
     const min = minRaw == null || minRaw === '' ? null : Number(minRaw);
     const max = maxRaw == null || maxRaw === '' ? null : Number(maxRaw);
     const ids = String(row.getAttribute?.('aria-describedby') || '').split(/\s+/u).filter(Boolean);
-    const status = ids.map((id) => doc.getElementById?.(id))
-      .find((node) => node && isVisible(node)) || null;
+    const described = ids.map((id) => doc.getElementById?.(id)).filter(Boolean);
+    // Legacy ChatGPT exposed the slider's announced value through an
+    // accessibility-only role=status node. It may be visually hidden and is
+    // still authoritative because aria-describedby binds it to this control.
+    const status = described.find((node) => normalizeEffortText(node.getAttribute?.('role')) === 'status')
+      || described.find((node) => isVisible(node)) || null;
+    const statusText = textOf(status);
+    const legacyOrdinal = normalizeEffortText(statusText)
+      .match(/\b(\d+)\s*(?:of|из|із|з)\s*(\d+)\b/u);
+    const legacyShapeCompatible = !legacyOrdinal || Number(legacyOrdinal[2]) === 3;
     const label = [
       thumb?.getAttribute?.('aria-valuetext'),
       row.getAttribute?.('aria-valuetext'),
-      textOf(status),
+      legacyShapeCompatible ? statusText : '',
     ].filter(Boolean).join(' ');
     return {
       element: row,
