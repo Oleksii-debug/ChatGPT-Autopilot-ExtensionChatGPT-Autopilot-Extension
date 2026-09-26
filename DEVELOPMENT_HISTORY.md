@@ -181,8 +181,11 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 
 ## 2026-09-26 13:50 Europe/Bratislava — Current model-picker slider blocker
 
-- Read the live chatgpt.com picker in the user's secondary profile. Medium appeared as `Средний, 2 из 3`, a menuitem marked `data-reasoning-slider=true` with a hidden thumb at aria-valuenow=1. ArrowRight produced `Высокий, 3 из 3`, aria-valuenow=2. No prompt was sent.
-- Pilot 10's previous High selector expected an explicit High option; with this live markup it returned EFFORT_HIGH_OPTION_NOT_READY, so automatic prompts could stop before insertion. The adapter now handles this specific three-step semantic slider with keyboard movement and post-action proof. Unrecognized slider geometry or ignored movement remains fail-closed.
-- Interaction focused tests 22/22 PASS, including old effort options, Work turns two and three, the live slider contract and fail-closed cases. This is deterministic local coverage; installed Chrome MV3 acceptance still BLOCKED in this environment.
-- Scenario manager's preceding c93d9ea change keeps seven pool slots durable across options-page closure and applies launch spacing in background. Orchestration untouched.
-- Exact GitHub commit/CI identity follows this entry; HUMAN_TESTED=false and OWNER_WINDOWS_CHROME_VERIFIED=false.
+- Read live chatgpt.com model picker in user's secondary profile. Medium status 2/3 and High status 3/3 were observed after ArrowRight. No prompt sent. Adapter now verifies that semantic slider before insertion; 22/22 focused tests passed. Commit 22ccec3dc0d15b5e45088e786c225dc3ecfa74c9.
+
+## 2026-09-26 14:00 Europe/Bratislava — Simplified Sessions insertion stall
+
+- Owner provided two fresh 0.9.19 reports at 11:47 UTC. `трейд.` has cumulative confirmed send count 74; recent 1,000 event slice has 109 INSERTION_NOT_PROVEN retry events and one confirmed Send. `спорт.` has cumulative 112; recent slice has 107 retries and three confirmed Sends. These are old installed-version observations; they do not prove behavior of Pilot 10.
+- For both, CHECK_ONLY frequently returns READY, then INSERT_ONLY reports observedLength > expectedLength, equal normalized lengths, normalizedMatch=no. Thus the configured two-minute schedule is not the current bottleneck in the supplied slice; repeated failed exact insertion prevents Send. Logs omit prompt text, so the exact differing character(s) cannot be determined.
+- Pilot 10 now attempts one alternate DOM paragraph/input replacement after a failed insertion proof, waits for two consecutive exact editor observations, then allows the normal PREPARE_SEND gate. If editor model remains different, it still fails closed. Safe diagnostic adds compactMatch/nonWhitespaceMatch to separate whitespace reflow and changed characters next time.
+- Focused 28/28 tests PASS, including malformed long prompt recovered and model mismatch never sent; physical MV3 E2E remains blocked. This is a candidate repair pending installed Chrome verification.

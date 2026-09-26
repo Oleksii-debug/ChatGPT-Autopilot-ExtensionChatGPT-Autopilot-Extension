@@ -776,7 +776,9 @@
       `observedLength=${String(observed ?? '').length}`,
       `expectedNormalizedLength=${normalizePromptText(expected).length}`,
       `observedNormalizedLength=${normalizePromptText(observed).length}`,
-      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`
+      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`,
+      `compactMatch=${compactPromptText(observed) === compactPromptText(expected) ? 'yes' : 'no'}`,
+      `nonWhitespaceMatch=${normalizePromptText(observed).replace(/\s+/gu, '') === normalizePromptText(expected).replace(/\s+/gu, '') ? 'yes' : 'no'}`
     ].join('; ');
   }
 
@@ -1246,6 +1248,44 @@
     } while (nowMs() < insertionDeadline);
 
     const finalElement = lastFound?.element || found?.element;
+    // On some background ProseMirror editors execCommand reports success yet
+    // the rendered long prompt differs from the requested text. Never Send
+    // that draft. Replace it once through the alternate paragraph/input path
+    // and accept only a fresh, exact, stable editor observation.
+    if (finalElement?.getAttribute?.('contenteditable') === 'true'
+        && !attachmentNodes(finalElement).length) {
+      const repairDoc = finalElement.ownerDocument;
+      const allowed = dispatchEditorEvent(finalElement, 'beforeinput', {
+        bubbles: true, composed: true, cancelable: true,
+        inputType: 'insertReplacementText', data: request.promptText
+      });
+      if (allowed !== false && replaceContentEditableText(finalElement, request.promptText, repairDoc)) {
+        dispatchEditorEvent(finalElement, 'input', {
+          bubbles: true, composed: true, inputType: 'insertReplacementText',
+          data: request.promptText
+        });
+        const repairDeadline = nowMs() + 1200;
+        let consecutiveMatches = 0;
+        do {
+          await (deps.wait || wait)(100);
+          const repaired = findVisibleComposer(doc);
+          if (repaired.ambiguous || repaired.element !== finalElement
+              || attachmentNodes(finalElement).length) break;
+          if (promptTextMatches(editorText(finalElement), request.promptText)) {
+            consecutiveMatches += 1;
+            if (consecutiveMatches >= 2) {
+              acceptedRepresentationEvidence.delete(evidenceKey(request));
+              return resultBase(request, start, {
+                status: STATUS.INSERTED_NOT_SENT,
+                composerState: 'VISIBLE_NONEMPTY',
+                safeDiagnosticCode: 'INSERTION_REPAIRED_TEXT_PROVEN',
+                safeDiagnosticMessage: safeTextProofMessage(editorText(finalElement), request.promptText, finalElement)
+              });
+            }
+          } else consecutiveMatches = 0;
+        } while (nowMs() < repairDeadline);
+      }
+    }
     const finalText = finalElement ? editorText(finalElement) : '';
     return resultBase(request, start, {
       status: STATUS.INSERTED_NOT_SENT,

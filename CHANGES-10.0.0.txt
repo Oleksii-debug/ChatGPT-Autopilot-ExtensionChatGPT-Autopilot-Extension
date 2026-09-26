@@ -68,3 +68,9 @@ CURRENT CHATGPT POWER SLIDER
 - The live 2026-09-26 model picker uses a three-step reasoning power slider (Medium 2/3, High 3/3) instead of a separate High menu option.
 - ENSURE_HIGH_EFFORT now recognizes only the semantic three-step reasoning slider, moves it with ArrowRight, and confirms the announced High level and 3/3 thumb value before prompt insertion.
 - An ignored key action or changed slider shape fails closed without Send; old menu option behavior remains supported.
+
+LONG PROMPT INSERTION STALL — SIMPLIFIED SESSIONS
+- Owner's two 0.9.19 diagnostics show repeated INSERTION_NOT_PROVEN (109 and 107 retries in their recent log slices), with equal normalized lengths but unequal text; in those slices only one and three sends succeeded.
+- In a contenteditable editor that renders a different draft after initial insertion, perform one alternate paragraph/input replacement and require two consecutive exact observations before PREPARE_SEND can proceed. An editor whose framework state still differs is never sent.
+- Safe diagnostics now expose only compact/non-whitespace equality flags, never prompt contents, to distinguish layout differences from changed characters in a subsequent owner log.
+- Installed extension E2E is still unavailable; deterministic malformed-long-prompt and fail-closed regressions pass.
