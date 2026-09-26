@@ -299,6 +299,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');
   assert.match(js, /parseAgentDraftProfile\(parsePortableJson\(await file\.text\(\)\)\)/, 'Agent JSON must be validated before form insertion');
   assert.match(js, /ui\.agentDraftActive = true/, 'periodic status refresh must preserve the imported draft');
   assert.doesNotMatch(js.match(/async function importBrowserAgentDraft\(\)[\s\S]*?\n}\n/)?.[0] || '', /CREATE_BROWSER_AGENT_JOB|START_BROWSER_AGENT_JOB/, 'Agent import must never create or start a job');
