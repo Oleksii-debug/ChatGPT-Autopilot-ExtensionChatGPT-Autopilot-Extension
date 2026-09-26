@@ -1698,10 +1698,13 @@ function renderScenarioWorkState(item) {
     return;
   }
   const runtime = item.runtime || {};
-  addScenarioStateLine('Стан', runtime.runState || 'STOPPED');
+  const selectedPool = item.poolController === true
+    ? (item.poolSummary || (ui.scenarioWorkPools || []).find(value => value.id === item.pool?.id))
+    : null;
+  addScenarioStateLine('Стан', selectedPool?.runState || runtime.runState || 'STOPPED');
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
   if (item.pool) {
-    const pool = (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
+    const pool = selectedPool || (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
     addScenarioStateLine('Пул: фізичних чатів', pool?.slots ?? '—');
     addScenarioStateLine('Пул: план повідомлень на один чат', pool?.messagesPerChat ?? '—');
     addScenarioStateLine('Пул: план усіх Send', pool?.plannedSends ?? '—');
@@ -1713,8 +1716,12 @@ function renderScenarioWorkState(item) {
     addScenarioStateLine('Пул: завершених чатів', pool?.completed ?? '—');
     addScenarioStateLine('Пул: призупинено', pool?.paused ?? '—');
     addScenarioStateLine('Пул: помилок', pool?.error ?? '—');
-    addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${item.pool.replacementBudget}`);
+    addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${pool?.replacementBudget ?? item.pool.replacementBudget}`);
     addScenarioStateLine('Фактична пауза лише між першими промптами', formatScenarioInitialStagger(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0));
+    if (item.poolController === true) {
+      addScenarioStateLine('Керування', 'Дії на цій вкладці застосовуються до всіх фізичних чатів сценарію. Деталі кожного чату дивіться у «Сеансах» та діагностиці.');
+      return;
+    }
     addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
   }
   if (runtime.mode === 'CHAT_CYCLE') {
