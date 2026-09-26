@@ -239,3 +239,64 @@ test('model-only picker label can still select and prove High', async () => {
   assert.equal(optionClicks, 1);
   assert.ok(pickerClicks >= 1);
 });
+
+
+test('model-only picker preserves selected Extra High without downgrade', async () => {
+  const adapter = loadAdapter();
+  let menuOpen = false;
+  let selected = 'Extra High';
+  let highClicks = 0;
+  const menu = {
+    ...visibleBase(),
+    innerText: 'Instant Medium High Extra High',
+    getAttribute(name) { return name === 'role' ? 'menu' : null; },
+  };
+  const picker = {
+    ...visibleBase(),
+    tagName: 'BUTTON',
+    innerText: 'GPT-5.6',
+    getAttribute(name) {
+      if (name === 'aria-label') return 'Model selector GPT-5.6';
+      if (name === 'aria-haspopup') return 'menu';
+      if (name === 'data-testid') return 'model-switcher-dropdown-button';
+      return null;
+    },
+    closest() { return null; },
+    focus() {},
+    click() { menuOpen = !menuOpen; },
+  };
+  const option = (label) => ({
+    ...visibleBase(),
+    tagName: 'DIV',
+    innerText: label,
+    getAttribute(name) {
+      if (name === 'role') return 'menuitemradio';
+      if (name === 'aria-checked') return selected === label ? 'true' : 'false';
+      return null;
+    },
+    closest(selector) { return menuOpen && /role="menu"/.test(selector) ? menu : null; },
+    focus() {},
+    click() { if (label === 'High') highClicks += 1; selected = label; menuOpen = false; },
+  });
+  const high = option('High');
+  const extra = option('Extra High');
+  const doc = {
+    body: { innerText: '' },
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog' || selector === '[role="alertdialog"]' || selector === '[aria-modal="true"]') return [];
+      if (selector === '[role="alert"], [role="status"], [aria-live="assertive"]') return [];
+      if (selector === 'button, [role="button"]') return menuOpen ? [picker, high, extra] : [picker];
+      if (selector.includes('[role="combobox"]') || selector.includes('[role="slider"]') || selector.includes('input[type="range"]')) return [picker];
+      if (selector === '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"]') return menuOpen ? [high, extra] : [];
+      if (selector.includes('[role="menuitemradio"]')) return menuOpen ? [high, extra, picker] : [picker];
+      return [];
+    },
+  };
+  const result = await adapter.execute(request(), { document: doc, wait: async () => {} });
+  assert.equal(result.status, adapter.STATUS.READY);
+  assert.equal(result.safeDiagnosticCode, 'EFFORT_HIGH_CONFIRMED_IN_PICKER');
+  assert.equal(result.effortLevel, 'extra-high');
+  assert.equal(selected, 'Extra High');
+  assert.equal(highClicks, 0);
+  assert.equal(menuOpen, false);
+});
