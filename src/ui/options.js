@@ -36,6 +36,8 @@ const ui = {
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
   agentDraftActive: false,
+  agentPolicyDirty: false,
+  agentPolicyEditEpoch: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -1239,6 +1241,30 @@ function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
   fillModelSelect(modelId, $(providerId).value, [], selected);
 }
 
+function renderBrowserAgentRouteChoices(routes = []) {
+  const select = $('agent-ai-pinned-route-id');
+  const selected = select.value;
+  select.replaceChildren();
+  const inherited = document.createElement('option');
+  inherited.value = '';
+  inherited.textContent = 'Успадкувати глобальну політику маршрутів';
+  select.append(inherited);
+  for (const route of routes) {
+    if (route.enabled === false) continue;
+    const option = document.createElement('option');
+    option.value = route.routeId;
+    option.textContent = `${route.routeId}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}`;
+    select.append(option);
+  }
+  if (selected && ![...select.options].some(option => option.value === selected)) {
+    const unavailable = document.createElement('option');
+    unavailable.value = selected;
+    unavailable.textContent = `${selected} — маршрут відсутній у збереженому пулі`;
+    select.append(unavailable);
+  }
+  select.value = selected;
+}
+
 async function loadAiRouterSettings() {
   try {
     const data = await core('GET_AI_ROUTER_SETTINGS');
@@ -1274,6 +1300,7 @@ async function loadAiRouterSettings() {
     $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
     $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
     renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
+    renderBrowserAgentRouteChoices(settings.routes || []);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -1289,6 +1316,7 @@ async function saveAiRouterSettings() {
     setAiRouterBusy(true);
     const settings = aiRouterSettingsFromForm();
     const data = await core('UPDATE_AI_ROUTER_SETTINGS', { settings });
+    renderBrowserAgentRouteChoices(data.settings?.routes || []);
     $('ai-router-status').textContent = `AI-координатор збережено: режим ${data.settings.mode}.`;
     announce('Налаштування AI-координатора збережено.');
   } catch (error) {
@@ -2218,6 +2246,7 @@ function browserAgentPolicyFromForm() {
     activeWindowStart,
     activeWindowEnd,
     aiRoutingMode: $('agent-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-ai-pinned-route-id').value,
     aiPrimaryProvider: $('agent-ai-primary-provider').value,
     aiPrimaryModel: $('agent-ai-primary-model').value.trim(),
     aiStrongProvider: $('agent-ai-strong-provider').value,
@@ -2253,6 +2282,14 @@ function fillBrowserAgentPolicy(config = {}) {
   $('agent-active-window-start').value = config.activeWindowStart || '';
   $('agent-active-window-end').value = config.activeWindowEnd || '';
   $('agent-ai-routing-mode').value = ['inherit','primary','strong','hybrid-auto','hybrid-rules'].includes(config.aiRoutingMode) ? config.aiRoutingMode : 'inherit';
+  $('agent-ai-pinned-route-id').value = config.aiPinnedRouteId || '';
+  if ($('agent-ai-pinned-route-id').value !== (config.aiPinnedRouteId || '')) {
+    const option = document.createElement('option');
+    option.value = config.aiPinnedRouteId;
+    option.textContent = `${config.aiPinnedRouteId} — маршрут відсутній у збереженому пулі`;
+    $('agent-ai-pinned-route-id').append(option);
+    $('agent-ai-pinned-route-id').value = option.value;
+  }
   $('agent-ai-primary-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiPrimaryProvider) ? config.aiPrimaryProvider : 'inherit';
   $('agent-ai-primary-model').value = config.aiPrimaryModel || '';
   $('agent-ai-strong-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiStrongProvider) ? config.aiStrongProvider : 'inherit';
@@ -2320,7 +2357,7 @@ ${pendingScript}` : '';
   $('agent-history').textContent = history.length
     ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
     : 'Історії ще немає.';
-  if (!ui.agentDraftActive) fillBrowserAgentPolicy(config);
+  if (!ui.agentDraftActive && !ui.agentPolicyDirty) fillBrowserAgentPolicy(config);
 }
 
 function renderBrowserAgentList() {
@@ -2339,9 +2376,15 @@ function renderBrowserAgentList() {
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
+    const previousId = ui.selectedBrowserAgentId;
     ui.browserAgentJobs = Array.isArray(data?.jobs) ? data.jobs : [];
-    ui.selectedBrowserAgentId = selectId || data?.selectedId || ui.selectedBrowserAgentId || ui.browserAgentJobs[0]?.id || '';
+    ui.selectedBrowserAgentId = selectId || ui.selectedBrowserAgentId || data?.selectedId || ui.browserAgentJobs[0]?.id || '';
     if (ui.selectedBrowserAgentId && !ui.browserAgentJobs.some(job => job.id === ui.selectedBrowserAgentId)) ui.selectedBrowserAgentId = ui.browserAgentJobs[0]?.id || '';
+    if (previousId && previousId !== ui.selectedBrowserAgentId) {
+      ui.agentPolicyDirty = false;
+      ui.agentPolicyEditEpoch += 1;
+      $('agent-policy-edit-status').textContent = 'Вибране завдання змінилося; показано його збережену політику.';
+    }
     renderBrowserAgentList();
     const job = ui.browserAgentJobs.find(item => item.id === ui.selectedBrowserAgentId) || null;
     renderBrowserAgentJob(job);
@@ -2352,6 +2395,9 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
 
 async function selectBrowserAgentJob() {
   ui.agentDraftActive = false;
+  ui.agentPolicyDirty = false;
+  ui.agentPolicyEditEpoch += 1;
+  $('agent-policy-edit-status').textContent = 'Змін політики немає.';
   const id = $('agent-job-list').value;
   if (!id) { ui.selectedBrowserAgentId = ''; renderBrowserAgentJob(null); return; }
   try {
@@ -2377,6 +2423,8 @@ async function runBrowserAgentPrompt() {
     if (!id) throw new Error('Core не повернув id завдання Agent.');
     ui.selectedBrowserAgentId = id;
     ui.agentDraftActive = false;
+    ui.agentPolicyDirty = false;
+    $('agent-policy-edit-status').textContent = 'Політику нового завдання збережено.';
     await core('START_BROWSER_AGENT_JOB', { id });
     await loadBrowserAgentJobs({ selectId: id });
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
@@ -2403,6 +2451,8 @@ async function importBrowserAgentDraft() {
     fillBrowserAgentPolicy(draft.policy);
     $('agent-prompt').value = draft.goal;
     ui.agentDraftActive = true;
+    ui.agentPolicyDirty = false;
+    $('agent-policy-edit-status').textContent = 'Чернетка завантажена; Agent не запущено.';
     $('agent-import-status').textContent = 'Чернетку завантажено у форму. Перевірте її та окремо натисніть «Запустити агента».';
     $('agent-prompt').focus();
   } catch (error) { $('agent-import-status').textContent = `Імпорт не вдався: ${error.message}`; }
@@ -2443,7 +2493,16 @@ async function saveBrowserAgentPolicy() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
   try {
+    const editEpoch = ui.agentPolicyEditEpoch;
     await core('UPDATE_BROWSER_AGENT_JOB', { id, config: browserAgentPolicyFromForm() });
+    if (ui.selectedBrowserAgentId !== id) return;
+    if (editEpoch === ui.agentPolicyEditEpoch) {
+      ui.agentPolicyDirty = false;
+      ui.agentDraftActive = false;
+      $('agent-policy-edit-status').textContent = 'Політику Agent збережено.';
+    } else {
+      $('agent-policy-edit-status').textContent = 'Попередні зміни збережено; нові зміни ще не збережені.';
+    }
     await loadBrowserAgentJobs({ selectId: id });
     announce('Політику Agent збережено.');
   } catch (error) { $('agent-status').textContent = `Політику не збережено: ${error.message}`; }
@@ -4289,6 +4348,16 @@ $('agent-send-follow-up-button').addEventListener('click', sendBrowserAgentFollo
 $('agent-approve-action-button').addEventListener('click', approveBrowserAgentAction);
 $('agent-reject-action-button').addEventListener('click', rejectBrowserAgentAction);
 $('agent-save-policy-button').addEventListener('click', saveBrowserAgentPolicy);
+$('agent-policy-details').addEventListener('input', () => {
+  ui.agentPolicyEditEpoch += 1;
+  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
+  ui.agentPolicyDirty = true;
+});
+$('agent-policy-details').addEventListener('change', () => {
+  ui.agentPolicyEditEpoch += 1;
+  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
+  ui.agentPolicyDirty = true;
+});
 $('agent-native-companion-check-button').addEventListener('click', checkNativeCompanion);
 $('agent-allow-current-site-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: false }));
 $('agent-allow-all-sites-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: true }));

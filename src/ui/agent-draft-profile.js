@@ -9,6 +9,7 @@ const POLICY_KEYS = new Set([
   'acceptanceCriteria', 'repeatMode', 'intervalSeconds', 'scheduleStartAt',
   'scheduleEndAt', 'activeWindowStart', 'activeWindowEnd', 'aiRoutingMode',
   'aiPrimaryProvider', 'aiPrimaryModel', 'aiStrongProvider', 'aiStrongModel',
+  'aiPinnedRouteId',
   'maxModelCalls', 'maxInputTokens', 'maxOutputTokens', 'maxTotalTokens',
   'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxCostUsd',
   'inputPricePerMillionUsd', 'outputPricePerMillionUsd',
