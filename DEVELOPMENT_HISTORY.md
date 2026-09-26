@@ -178,3 +178,11 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 - Focused tests: 12/12 passed, including Work second/third prompt recognition, shared replacement budget after restart, three-slot 50-replacement load, and the new five-slot lifecycle. These are simulated deterministic tests, not installed-extension E2E.
 - REAL_EXTENSION_E2E=BLOCKED: local Chrome/Chromium with MV3 load-unpacked is unavailable in this execution environment; cloud browser does not expose local extension installation. OWNER_WINDOWS_CHROME_VERIFIED=false.
 - GitHub commit/CI/ZIP identity to be filled by the succeeding material checkpoint; do not claim release PASS from an in-progress run.
+
+## 2026-09-26 13:50 Europe/Bratislava — Current model-picker slider blocker
+
+- Read the live chatgpt.com picker in the user's secondary profile. Medium appeared as `Средний, 2 из 3`, a menuitem marked `data-reasoning-slider=true` with a hidden thumb at aria-valuenow=1. ArrowRight produced `Высокий, 3 из 3`, aria-valuenow=2. No prompt was sent.
+- Pilot 10's previous High selector expected an explicit High option; with this live markup it returned EFFORT_HIGH_OPTION_NOT_READY, so automatic prompts could stop before insertion. The adapter now handles this specific three-step semantic slider with keyboard movement and post-action proof. Unrecognized slider geometry or ignored movement remains fail-closed.
+- Interaction focused tests 22/22 PASS, including old effort options, Work turns two and three, the live slider contract and fail-closed cases. This is deterministic local coverage; installed Chrome MV3 acceptance still BLOCKED in this environment.
+- Scenario manager's preceding c93d9ea change keeps seven pool slots durable across options-page closure and applies launch spacing in background. Orchestration untouched.
+- Exact GitHub commit/CI identity follows this entry; HUMAN_TESTED=false and OWNER_WINDOWS_CHROME_VERIFIED=false.

@@ -383,6 +383,7 @@
   }
 
   function effortChoiceSurfaceOpen(doc) {
+    if (findReasoningPowerSlider(doc).element) return true;
     return Array.from(doc.querySelectorAll(
       '[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]'
     ) || []).filter(isVisible).some(isEffortPickerSurface);
@@ -407,6 +408,81 @@
     return levels.length >= 2 && (effortSemanticHint(text) || /instant|medium|high/u.test(text));
   }
 
+  // The current ChatGPT model picker exposes reasoning effort as a keyboard
+  // slider. Its thumb is aria-hidden; the menuitem's described status is the
+  // only semantic proof of the selected level. Keep the three-step shape
+  // narrow so a different slider cannot silently choose an unrelated value.
+  function findReasoningPowerSlider(doc) {
+    const rows = Array.from(doc.querySelectorAll(
+      '[data-reasoning-slider="true"][role="menuitem"]'
+    ) || []).filter(isVisible).filter((row) => {
+      const menu = row.closest?.('[role="menu"]');
+      return menu && isVisible(menu) && row.getAttribute?.('aria-keyshortcuts')?.includes('ArrowRight');
+    });
+    if (rows.length > 1) return { element: null, ambiguous: true };
+    if (!rows.length) return { element: null, ambiguous: false };
+    const row = rows[0];
+    const thumb = row.querySelector?.('[role="slider"]');
+    const min = Number(thumb?.getAttribute?.('aria-valuemin'));
+    const max = Number(thumb?.getAttribute?.('aria-valuemax'));
+    const value = Number(thumb?.getAttribute?.('aria-valuenow'));
+    const ids = String(row.getAttribute?.('aria-describedby') || '').split(/\s+/u);
+    const status = ids.map((id) => doc.getElementById?.(id))
+      .find((node) => node?.getAttribute?.('role') === 'status');
+    const label = textOf(status).trim();
+    const level = classifyEffortLabel(label.split(/[,،，.]/u)[0]);
+    const ordinal = label.match(/(\d+)\s+(?:из|із|of)\s+(\d+)/iu);
+    if (min !== 0 || max !== 2 || !Number.isInteger(value) || value < 0 || value > 2
+        || !ordinal || Number(ordinal[1]) !== value + 1 || Number(ordinal[2]) !== 3
+        || !level || (value === 2 && level !== 'high')
+        || (value === 1 && level !== 'medium') || (value === 0 && level !== 'low')) {
+      return { element: row, invalid: true };
+    }
+    return { element: row, value, level };
+  }
+
+  async function selectHighPowerSlider(doc, request, start, deps, control) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const slider = findReasoningPowerSlider(doc);
+      if (slider.ambiguous || slider.invalid || !slider.element) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SLIDER_UNRECOGNIZED'
+        });
+      }
+      if (slider.value === 2 && slider.level === 'high') {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.READY, effortLevel: 'high',
+          safeDiagnosticCode: 'EFFORT_HIGH_SLIDER_CONFIRMED'
+        });
+      }
+      try {
+        slider.element.focus?.();
+        slider.element.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true
+        }));
+      } catch (_) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_KEY_FAILED'
+        });
+      }
+      await (deps?.wait || wait)(150);
+      const changed = findReasoningPowerSlider(doc);
+      if (!changed.element || changed.invalid || changed.ambiguous || changed.value <= slider.value) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
+        });
+      }
+    }
+    closeEffortPickerIfOpen(doc, control);
+    return resultBase(request, start, {
+      status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_HIGH_NOT_PROVEN'
+    });
+  }
+
   async function ensureHighEffort(doc, request, start, deps) {
     if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_MISMATCH_BEFORE_EFFORT' });
@@ -424,6 +500,11 @@
         effortLevel: current.level,
         safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
       });
+    }
+
+    const openSlider = findReasoningPowerSlider(doc);
+    if (openSlider.element || openSlider.ambiguous) {
+      return selectHighPowerSlider(doc, request, start, deps, current.element);
     }
 
     let highOption = findHighEffortOption(doc);
@@ -454,6 +535,10 @@
             effortLevel: alreadySelected.level,
             safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED_IN_PICKER',
           });
+        }
+        const slider = findReasoningPowerSlider(doc);
+        if (slider.element || slider.ambiguous) {
+          return selectHighPowerSlider(doc, request, start, deps, current.element);
         }
         highOption = findHighEffortOption(doc);
         if (highOption.ambiguous) {

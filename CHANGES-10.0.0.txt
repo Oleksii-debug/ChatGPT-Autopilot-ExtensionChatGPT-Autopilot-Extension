@@ -63,3 +63,8 @@ HIGH EFFORT BEFORE AUTOMATIC PROMPTS
 - Extra High is treated as satisfying the minimum and is not downgraded.
 - Unknown/ambiguous ChatGPT effort UI fails closed without prompt insertion or Send.
 - Fixed a #418 regression where adding the Work user-bubble selector to a combined body selector broke the nested article/body acknowledgement contract in deterministic interaction tests.
+
+CURRENT CHATGPT POWER SLIDER
+- The live 2026-09-26 model picker uses a three-step reasoning power slider (Medium 2/3, High 3/3) instead of a separate High menu option.
+- ENSURE_HIGH_EFFORT now recognizes only the semantic three-step reasoning slider, moves it with ArrowRight, and confirms the announced High level and 3/3 thumb value before prompt insertion.
+- An ignored key action or changed slider shape fails closed without Send; old menu option behavior remains supported.

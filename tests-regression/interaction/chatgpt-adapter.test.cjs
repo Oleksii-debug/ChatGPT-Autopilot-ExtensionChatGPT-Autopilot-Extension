@@ -249,3 +249,75 @@ test('Work UI recognizes a keyed assistant reply without a localized role headin
   assert.equal(result.status, adapter.STATUS.READY);
   assert.equal(result.assistantText, 'Відповідь після першого промпта.');
 });
+
+function powerSliderPage({ start = 1, reacts = true, total = 3 } = {}) {
+  let value = start;
+  let open = false;
+  let keypresses = 0;
+  const visible = { isConnected: true, getBoundingClientRect: () => ({ width: 100, height: 20 }) };
+  const menu = { ...visible };
+  const control = {
+    ...visible, innerText: 'Средний',
+    getAttribute: name => ({ 'aria-label': 'Выбрать модель ChatGPT', 'aria-haspopup': 'menu' })[name] || null,
+    closest: () => null, focus() {}, click() { open = !open; }
+  };
+  const thumb = { getAttribute: name => ({
+    'aria-valuemin': '0', 'aria-valuemax': '2', 'aria-valuenow': String(value)
+  })[name] || null };
+  const row = {
+    ...visible,
+    getAttribute: name => ({
+      'aria-keyshortcuts': 'ArrowLeft ArrowRight', 'aria-describedby': 'effort-status effort-help'
+    })[name] || null,
+    closest: selector => selector === '[role="menu"]' ? menu : null,
+    querySelector: selector => selector === '[role="slider"]' ? thumb : null,
+    focus() {},
+    dispatchEvent(event) {
+      assert.equal(event.key, 'ArrowRight');
+      keypresses += 1;
+      if (reacts) value = Math.min(2, value + 1);
+      return true;
+    }
+  };
+  const document = {
+    body: { innerText: '' },
+    getElementById(id) {
+      if (id !== 'effort-status') return null;
+      return {
+        innerText: ['Низкий', 'Средний', 'Высокий'][value] + `, ${value + 1} из ${total}.`,
+        getAttribute: name => name === 'role' ? 'status' : null
+      };
+    },
+    querySelectorAll(selector) {
+      if (selector.includes('[data-reasoning-slider="true"]')) return open ? [row] : [];
+      if (selector.includes('button, [role="button"], [role="combobox"]')) return [control];
+      return [];
+    }
+  };
+  return { document, state: () => ({ value, open, keypresses }) };
+}
+
+test('current ChatGPT three-step effort slider reaches High and proves its announced state', async () => {
+  const { adapter } = loadAdapter({ KeyboardEvent: class KeyboardEvent {
+    constructor(type, options) { this.type = type; Object.assign(this, options); }
+  } });
+  const page = powerSliderPage();
+  const result = await adapter.execute(validRequest({ mode: 'ENSURE_HIGH_EFFORT' }),
+    { document: page.document, wait: async () => {} });
+  assert.equal(result.status, adapter.STATUS.READY);
+  assert.equal(result.effortLevel, 'high');
+  assert.equal(result.safeDiagnosticCode, 'EFFORT_HIGH_SLIDER_CONFIRMED');
+  assert.deepEqual(page.state(), { value: 2, open: false, keypresses: 1 });
+});
+
+test('effort slider fails closed if its key action is ignored or shape changes', async () => {
+  const { adapter } = loadAdapter({ KeyboardEvent: class KeyboardEvent {
+    constructor(type, options) { this.type = type; Object.assign(this, options); }
+  } });
+  for (const page of [powerSliderPage({ reacts: false }), powerSliderPage({ total: 4 })]) {
+    const result = await adapter.execute(validRequest({ mode: 'ENSURE_HIGH_EFFORT' }),
+      { document: page.document, wait: async () => {} });
+    assert.notEqual(result.status, adapter.STATUS.READY);
+    assert.equal(page.state().open, false);
+  }
+});
