@@ -1,5 +1,5 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
-import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfile } from './scenario-work-profile.js';
+import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
@@ -1968,16 +1968,21 @@ async function importScenarioWorkProfile() {
   try {
     if (file.size > 10_000_000) throw new Error('Файл сценарію перевищує 10 МБ.');
     setScenarioWorkBusy(true);
-    const config = parseScenarioWorkProfile(await file.text());
+    const { config, pool } = parseScenarioWorkProfileDocument(await file.text());
     const data = await core('CREATE_SCENARIO_WORK', { name: config.name, mode: config.mode, config });
     await loadScenarioWork({ preservePanel: false });
     if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
+    if (pool && config.mode === 'CHAT_CYCLE') {
+      $('scenario-cycle-parallel-count').value = String(pool.count);
+      $('scenario-cycle-replacement-budget').value = String(pool.replacementBudget);
+      $('scenario-cycle-initial-stagger').value = String(pool.staggerSeconds);
+    }
     setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
     const messageCount = config.mode === 'CHAT_CYCLE'
       ? config.steps.reduce((sum, step) => sum + step.repeat, 0)
       : 0;
     status.textContent = config.mode === 'CHAT_CYCLE'
-      ? `Імпортовано новий зупинений сценарій: ${config.name}. Повідомлень у кожному чаті: ${messageCount}.`
+      ? `Імпортовано новий зупинений сценарій: ${config.name}. Повідомлень у кожному чаті: ${messageCount}.${pool ? ` Паралельних чатів: ${pool.count}; додаткових чатів: ${pool.replacementBudget}; пауза старту: ${pool.staggerSeconds} с.` : ''}`
       : `Імпортовано новий зупинений сценарій: ${config.name}.`;
     $('scenario-work-list').focus();
   } catch (error) {
@@ -1994,7 +1999,12 @@ function exportScenarioWorkProfile() {
     return;
   }
   try {
-    const profile = makeScenarioWorkProfile(ui.selectedScenarioWork.config);
+    const pool = ui.selectedScenarioWork.config.mode === 'CHAT_CYCLE' ? {
+      count: scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів'),
+      replacementBudget: scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати'),
+      staggerSeconds: scenarioWorkInt('scenario-cycle-initial-stagger', 0, 60, 'Пауза між початковими чатами'),
+    } : null;
+    const profile = makeScenarioWorkProfile(ui.selectedScenarioWork.config, { pool });
     downloadJson(profile, `${safeFileName(profile.config.name)}-сценарій.json`);
     status.textContent = 'Конфігурацію вибраного сценарію експортовано.';
   } catch (error) {
