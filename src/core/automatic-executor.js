@@ -60,6 +60,19 @@ function resumeUnlessQuiesced(session, priorRunState) {
   session.runState = QUIESCENT_STATES.has(priorRunState) ? priorRunState : RunState.RUNNING;
 }
 
+function promptSourceForSession(session) {
+  const ordinal = Math.max(0, Number(session?.successfulSendCount || 0)) + 1;
+  const cadence = session?.promptCadence || {};
+  const p3 = cadence.prompt3 || {};
+  const p2 = cadence.prompt2 || {};
+  if (p3.enabled === true && Number.isInteger(Number(p3.everyN)) && ordinal % Number(p3.everyN) === 0) return 'PROMPT_CADENCE_3';
+  if (p2.enabled === true && Number.isInteger(Number(p2.everyN)) && ordinal % Number(p2.everyN) === 0) return 'PROMPT_CADENCE_2';
+  if (session?.scenarioWork?.managed === true) return 'SCENARIO_WORK_STEP';
+  if (session?.orchestrationWorker?.managed === true) return 'ORCHESTRATION_WORKER_PROMPT';
+  if (session?.orchestrationCoordinator?.managed === true) return 'ORCHESTRATION_COORDINATOR_PROMPT';
+  return session?.promptMode === PromptMode.UNIQUE ? 'TASK_PROMPT_OVERRIDE' : 'SHARED_SESSION_PROMPT';
+}
+
 function matchesOperation(operation, expected, phase) {
   return operation?.phase === phase
     && operation.operationId === expected.operationId
@@ -910,6 +923,19 @@ export class AutomaticSessionExecutor {
     const identity = await this.coordinator.begin({ sessionId, taskId: task.id, promptText, generation });
     await this.coordinator.markReady({ sessionId, operationId: identity.operationId });
     await this.coordinator.markInserting({ sessionId, operationId: identity.operationId });
+    await this.repo.update(draft => {
+      appendDiagnostic(draft, {
+        event: 'ПРОМПТ_ПІДГОТОВЛЕНО_ДО_ВСТАВЛЕННЯ',
+        sessionId,
+        taskId: liveTask.id,
+        phase: OperationPhase.INSERTING,
+        target: liveTask.normalizedUrl || liveTask.url,
+        promptFingerprint: identity.promptFingerprint,
+        promptSource: promptSourceForSession(liveSession),
+        message: `Довжина промпта: ${promptText.length} символів. Текст промпта у діагностику не записується.`,
+      }, { at: this.now() });
+      return draft;
+    });
 
     const inserted = await this.executeInteraction(
       sessionId,
