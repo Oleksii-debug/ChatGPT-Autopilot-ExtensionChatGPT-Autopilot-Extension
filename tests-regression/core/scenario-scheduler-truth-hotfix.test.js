@@ -629,3 +629,42 @@ test('timeout with no replacement budget is ERROR, never false COMPLETED', async
   assert.match(scenario.runtime.lastError, /timeout/u);
   assert.equal(scenario.runtime.totalCompletedTurns, 0);
 });
+
+
+test('one ERROR slot never removes whole-pool Pause control from still-running siblings', async () => {
+  const h = harness({
+    report: async () => ({ status: 'WAITING', assistantComplete: false, safeDiagnosticCode: 'ASSISTANT_RESPONSE_NOT_READY' }),
+  });
+  const created = await h.manager.createChatPool({
+    name: 'Partial failure control',
+    count: 2,
+    replacementBudget: 0,
+    staggerSeconds: 0,
+    autoStart: true,
+    config: { ...chessConfig, responseTimeoutMinutes: 1 },
+  });
+  const [failedId, runningId] = created.ids;
+  let failed = (await h.manager.get(failedId)).scenario;
+  const failedSession = h.state.sessionsById[failed.runtime.chat.sessionId];
+  const failedTask = failedSession.tasksById[failed.runtime.chat.taskId];
+  failedTask.lastVerifiedSendAt = h.now + 1;
+  failedTask.lastConversationUrl = 'https://chatgpt.com/c/partial-failure';
+  failedSession.successfulSendCount = 1;
+
+  h.now = failed.runtime.chat.deadlineAt + 1;
+  await h.manager.cycleOne(failedId);
+  failed = (await h.manager.get(failedId)).scenario;
+  assert.equal(failed.runtime.runState, 'ERROR');
+  assert.equal((await h.manager.get(runningId)).scenario.runtime.runState, 'RUNNING');
+
+  let list = await h.manager.list();
+  assert.equal(list.pools[0].runState, 'RUNNING');
+  assert.equal(list.pools[0].active, 1);
+  assert.equal(list.pools[0].error, 1);
+
+  await h.manager.pauseChatPool(created.pool.id);
+  list = await h.manager.list();
+  assert.equal(list.pools[0].runState, 'PAUSED');
+  assert.equal(list.pools[0].paused, 1);
+  assert.equal(list.pools[0].error, 1);
+});
