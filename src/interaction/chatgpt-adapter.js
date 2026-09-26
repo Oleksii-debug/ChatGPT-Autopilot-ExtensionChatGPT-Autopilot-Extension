@@ -311,6 +311,8 @@
       const testId = normalizeEffortText(el.getAttribute?.('data-testid'));
       const semantic = effortSemanticHint(identity);
       const hasPopup = popup === 'menu' || popup === 'listbox' || popup === 'dialog' || popup === 'true';
+      const modelPicker = hasPopup && (/\bmodel\b|модель|модел|gpt[- ]?\d/u.test(identity)
+        || /(model[-_](?:picker|selector|switcher)|model-switcher)/u.test(testId));
       let score = 0;
       if (semantic) score += 100;
       if (classifyEffortLabel(ariaValue)) score += 100;
@@ -318,6 +320,7 @@
       if (role === 'slider') score += 70;
       if (level && hasPopup) score += 60;
       if (level && semantic) score += 30;
+      if (modelPicker) score += 45;
       if (!score) return null;
       return { element: el, level, score };
     }).filter(Boolean).sort((a, b) => b.score - a.score);
@@ -428,7 +431,8 @@
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_CLICK_FAILED' });
     }
 
-    const verifyDeadline = nowMs() + 1500;
+    const verifyDeadline = nowMs() + 1800;
+    let reopenedForProof = false;
     do {
       await (deps?.wait || wait)(100);
       const verified = findEffortControl(doc);
@@ -439,7 +443,7 @@
           safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
         });
       }
-      const selected = findHighEffortOption(doc);
+      let selected = findHighEffortOption(doc);
       if (!selected.ambiguous && selected.element
           && (selected.element.getAttribute?.('aria-checked') === 'true'
             || selected.element.getAttribute?.('aria-selected') === 'true')) {
@@ -448,6 +452,28 @@
           effortLevel: 'high',
           safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
         });
+      }
+
+      // Some ChatGPT layouts keep the top-level model picker labelled only with
+      // the model name (for example GPT-5.6) and hide the selected effort once
+      // the menu closes. Reopen that same semantic picker once and verify the
+      // High option's checked/selected state; then close the picker again.
+      if (!reopenedForProof && !verified.ambiguous && verified.element && !selected.element) {
+        reopenedForProof = true;
+        try { verified.element.click?.(); } catch (_) {}
+        await (deps?.wait || wait)(100);
+        selected = findHighEffortOption(doc);
+        if (!selected.ambiguous && selected.element
+            && (selected.element.getAttribute?.('aria-checked') === 'true'
+              || selected.element.getAttribute?.('aria-selected') === 'true')) {
+          try { verified.element.click?.(); } catch (_) {}
+          return resultBase(request, start, {
+            status: STATUS.READY,
+            effortLevel: 'high',
+            safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
+          });
+        }
+        try { verified.element.click?.(); } catch (_) {}
       }
     } while (nowMs() < verifyDeadline);
 
