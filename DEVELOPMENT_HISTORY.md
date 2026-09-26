@@ -1,6 +1,9 @@
 # ChatGPT Autopilot — development history
 
 ## 2026-09-26 — Pool-level Scenario Work control and response-observation diagnostics
+- Follow-up truth defect from owner live UI: “current step 1/12; confirmed Send 3/12; completed responses 1/12”. The projection had mixed physical transport attempts with logical sequence progress. New invariant: sequenceVerifiedSends = completedResponses + at most one current in-flight verified Send. A row may therefore truthfully show logical 2/12, completed responses 1/12, physical Send attempts 3, retry/replacement attempts 1.
+- CHAT_CYCLE timeout/replacement never rewinds already completed logical steps. The planner reconstructs the next cursor from durable confirmed completions. If an old corrupted runtime already resent START after progress, the eventual duplicate-stage response is observable but non-advancing. Exhausted timeout replacement budget yields ERROR instead of a false COMPLETED state.
+
 
 - Owner live testing showed that physical CHAT_CYCLE members were manageable only one-by-one even though the user thinks of a launched 3/8/10/15-chat pool as one scenario. The Scenario Work tab could display individual slots but had no pool-level pause/resume/stop/edit path; pool member Save was deliberately disabled.
 - Product direction: Scenario Work is the aggregate control surface. One pool is one list item. Physical chats remain execution/detail objects visible in Sessions/global status/diagnostics.
