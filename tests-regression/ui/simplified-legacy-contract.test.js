@@ -49,7 +49,7 @@ test('Simplified Sessions exposes the old global recovery and concurrency contro
   const section = simplifiedSection();
   assert.match(section, /Пауза після обмеження запитів, хв/u);
   assert.match(section, /id="simplified-max-concurrent-session-operations"[^>]*min="1"[^>]*max="32"/u);
-  assert.match(js, /UPDATE_PROFILE_SETTINGS[sS]*maxConcurrentSessionOperations: concurrency/u);
+  assert.match(js, /UPDATE_PROFILE_SETTINGS[\s\S]*maxConcurrentSessionOperations: concurrency/u);
   assert.match(js, /GET_PROFILE_SETTINGS/u);
 });
 
@@ -80,9 +80,8 @@ test('Simplified retry unit preserves the old minutes-or-seconds behavior', () =
 });
 
 test('UI removes tutorial prose globally while keeping runtime and safety status', () => {
-  const fieldHelp = [...html.matchAll(/<p[^>]*class="[^"]*field-help[^"]*"[^>]*>([^<]*)<\/p>/gu)]
-    .map(match => match[1].trim());
-  assert.deepEqual(fieldHelp, ['Формат не вибрано.', 'Повідомлень у кожному чаті: 1.']);
+  assert.doesNotMatch(html, /class="[^"]*field-help/u);
+  assert.doesNotMatch(html, /class="notice"/u);
   assert.doesNotMatch(html, /Один чат і один промпт можна повторювати без обмеження часу/u);
   assert.doesNotMatch(html, /0 означає «без окремого ліміту»/u);
   assert.doesNotMatch(html, /Стандартна адреса локального Gateway/u);
