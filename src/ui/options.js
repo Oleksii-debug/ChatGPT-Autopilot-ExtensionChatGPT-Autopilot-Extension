@@ -2084,6 +2084,14 @@ async function startParallelScenarioChats() {
     const config = scenarioWorkConfigFromForm();
     const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
     setScenarioWorkBusy(true);
+    const sourceScenarioId = ui.selectedScenarioWorkId;
+    const sourceIsDormantTemplate = Boolean(
+      sourceScenarioId
+      && !ui.selectedScenarioWork?.pool?.id
+      && ui.selectedScenarioWork?.runtime?.runState === 'STOPPED'
+      && Number(ui.selectedScenarioWork?.runtime?.totalLaunches || 0) === 0
+      && Number(ui.selectedScenarioWork?.runtime?.totalCompletedTurns || 0) === 0
+    );
     const result = await core('CREATE_SCENARIO_CHAT_POOL', {
       name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
     });
@@ -2091,6 +2099,14 @@ async function startParallelScenarioChats() {
     if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
     if (Number(result?.pool?.slots) !== count) throw new Error('Core повернув іншу кількість фізичних чатів, ніж було задано.');
     if (Number(result?.pool?.initialStaggerSeconds) !== staggerSeconds) throw new Error('Core повернув іншу паузу між першими промптами, ніж було задано. Запуск зупинено як непідтверджений.');
+    // The imported/configuration-only CHAT_CYCLE source is consumed by the
+    // physical pool. Keeping it as an eleventh "scenario" made a 10-chat launch
+    // look like 11. Delete only a never-started unpooled source; never touch a
+    // real/previously-run scenario.
+    if (sourceIsDormantTemplate && !ids.includes(sourceScenarioId)) {
+      try { await core('DELETE_SCENARIO_WORK', { id: sourceScenarioId }); }
+      catch (_) { /* Global projection still excludes this dormant template. */ }
+    }
     await loadScenarioWork();
     if (ids[0]) {
       $('scenario-work-list').value = ids[0];
@@ -2878,7 +2894,7 @@ function renderGlobalStatus(data) {
     ? scenarioPools.map(pool => `${pool.name}. План: ${pool.slots} фізичних чатів × ${pool.messagesPerChat || 0} повідомлень на чат = ${pool.plannedSends || 0} Send. Фактична пауза між першими промптами: ${formatScenarioInitialStagger(pool.initialStaggerSeconds || 0)}. Перший Send підтверджено у ${pool.firstPromptSent || 0}/${pool.slots} чатів. Ще не отримали перший Send: ${pool.firstPromptPending || 0}. Чекають завершення відповіді: ${pool.waitingResponse || 0}. Підтверджено завершених відповідей: ${pool.completedResponses || 0}. Усього підтверджених Send: ${pool.verifiedSends || 0}/${pool.plannedSends || 0}. Завершених чатів: ${pool.completed || 0}. Призупинено: ${pool.paused || 0}. Помилок: ${pool.error || 0}.`).join(' | ')
     : `Запущених сценарних фізичних чатів: ${(data.scenarioSlots || []).length}.`;
   const lists = [
-    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених надсилань ${row.verifiedSends}; завершених циклів ${row.completedCycles}`],
+    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених Send ${row.verifiedSends}; завершених циклів надсилання ${row.completedCycles}; наступний Send не раніше ${row.nextAllowedSendAt ? new Date(row.nextAllowedSendAt).toLocaleString() : 'зараз'}`],
     ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}${row.slotIndex ? `, чат ${row.slotIndex}` : ''}: поточний сценарний крок ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджено Send ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; підтверджено завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${globalStateLabel(row.category)}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
     ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
