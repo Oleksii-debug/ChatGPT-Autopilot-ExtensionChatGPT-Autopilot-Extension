@@ -84,10 +84,16 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
   for (const id of sessionOrder) {
     const session = sessionsById[id];
     if (!session || managed(session)) continue;
+    const verifiedSends = num(session.successfulSendCount);
     const row = {
       id, name: session.name, category: sessionCategory(session),
-      verifiedSends: num(session.successfulSendCount),
-      completedCycles: num(session.cycleCount ?? session.onePassCompletedCount),
+      verifiedSends,
+      // For a continuous Simplified Session, one verified Send is one completed
+      // send-cycle. This is deliberately NOT an assistant-response counter.
+      completedCycles: session.simplifiedSession === true && session.runMode === 'CONTINUOUS'
+        ? verifiedSends
+        : num(session.cycleCount ?? session.onePassCompletedCount),
+      nextAllowedSendAt: num(session.nextAllowedSendAt),
     };
     if (session.simplifiedSession === true) simplifiedSessions.push(row);
     else sessions.push(row);
