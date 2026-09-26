@@ -2209,9 +2209,9 @@ async function startParallelScenarioChats() {
       catch (_) { /* Global projection still excludes this dormant template. */ }
     }
     await loadScenarioWork();
-    if (ids[0]) {
-      $('scenario-work-list').value = ids[0];
-      await openScenarioWork(ids[0]);
+    if (result?.pool?.id) {
+      $('scenario-work-list').value = scenarioPoolListValue(result.pool.id);
+      await openScenarioWorkTarget(scenarioPoolListValue(result.pool.id), { selectSingle: false });
     }
     setScenarioWorkPanel('state');
     announce(`Пул підтверджено Core: ${ids.length} фізичних чатів; ${result?.pool?.messagesPerChat || config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень на чат; фактична пауза між першими промптами ${formatScenarioInitialStagger(result?.pool?.initialStaggerSeconds ?? staggerSeconds)}; додаткових чатів ${replacementBudget}.`);
@@ -2229,10 +2229,26 @@ async function saveScenarioWork() {
   try {
     setScenarioWorkBusy(true);
     const config = scenarioWorkConfigFromForm();
-    const data = await core('UPDATE_SCENARIO_WORK', { id, config });
-    fillScenarioWorkForm(data.scenario);
-    await loadScenarioWork();
-    announce('Сценарій збережено.');
+    if (ui.selectedScenarioPoolId) {
+      const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати');
+      const staggerSeconds = scenarioInitialStaggerSecondsFromForm();
+      const data = await core('UPDATE_SCENARIO_CHAT_POOL', {
+        id: ui.selectedScenarioPoolId,
+        config,
+        replacementBudget,
+        staggerSeconds,
+      });
+      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
+      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
+      fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
+      await loadScenarioWork();
+      announce('Параметри всього сценарію збережено без скидання прогресу фізичних чатів.');
+    } else {
+      const data = await core('UPDATE_SCENARIO_WORK', { id, config });
+      fillScenarioWorkForm(data.scenario);
+      await loadScenarioWork();
+      announce('Сценарій збережено.');
+    }
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося зберегти сценарій: ${error.message}`;
     announce('Помилка збереження сценарію.');
@@ -2244,9 +2260,24 @@ async function scenarioWorkLifecycle(command, successText) {
   if (!id) return;
   try {
     setScenarioWorkBusy(true);
-    const data = await core(command, { id });
-    fillScenarioWorkForm(data.scenario);
-    await loadScenarioWork();
+    if (ui.selectedScenarioPoolId) {
+      const poolCommand = {
+        START_SCENARIO_WORK: 'START_SCENARIO_CHAT_POOL',
+        PAUSE_SCENARIO_WORK: 'PAUSE_SCENARIO_CHAT_POOL',
+        RESUME_SCENARIO_WORK: 'RESUME_SCENARIO_CHAT_POOL',
+        STOP_SCENARIO_WORK: 'STOP_SCENARIO_CHAT_POOL',
+      }[command];
+      if (!poolCommand) throw new Error('Непідтримувана дія для пулу.');
+      const data = await core(poolCommand, { id: ui.selectedScenarioPoolId });
+      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
+      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
+      fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
+      await loadScenarioWork();
+    } else {
+      const data = await core(command, { id });
+      fillScenarioWorkForm(data.scenario);
+      await loadScenarioWork();
+    }
     if (command === 'START_SCENARIO_WORK' || command === 'RESUME_SCENARIO_WORK') setScenarioWorkPanel('state');
     announce(successText);
   } catch (error) {
@@ -2259,8 +2290,9 @@ async function deleteScenarioWork() {
   if (!id) return;
   try {
     setScenarioWorkBusy(true);
-    if (ui.selectedScenarioWork?.pool?.id) {
-      await core('DELETE_SCENARIO_CHAT_POOL', { id: ui.selectedScenarioWork.pool.id });
+    if (ui.selectedScenarioPoolId) {
+      await core('DELETE_SCENARIO_CHAT_POOL', { id: ui.selectedScenarioPoolId });
+      ui.selectedScenarioPoolId = '';
     } else await core('DELETE_SCENARIO_WORK', { id });
     await loadScenarioWork({ preservePanel: false });
     $('scenario-work-list').focus();
@@ -4402,7 +4434,7 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
   event.preventDefault();
   setScenarioWorkPanel(SCENARIO_WORK_PANELS[index], { focus: true });
 });
-$('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
+$('scenario-work-list').addEventListener('change', () => openScenarioWorkTarget($('scenario-work-list').value));
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
 $('scenario-work-template-button').addEventListener('click', downloadScenarioWorkTemplate);
 $('scenario-work-import-button').addEventListener('click', importScenarioWorkProfile);
