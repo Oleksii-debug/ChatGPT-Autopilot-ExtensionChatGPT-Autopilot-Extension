@@ -4,6 +4,7 @@ import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
+import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -34,6 +35,7 @@ const ui = {
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
+  agentDraftActive: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -2308,7 +2310,7 @@ ${pendingScript}` : '';
   $('agent-history').textContent = history.length
     ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
     : 'Історії ще немає.';
-  fillBrowserAgentPolicy(config);
+  if (!ui.agentDraftActive) fillBrowserAgentPolicy(config);
 }
 
 function renderBrowserAgentList() {
@@ -2339,6 +2341,7 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
 }
 
 async function selectBrowserAgentJob() {
+  ui.agentDraftActive = false;
   const id = $('agent-job-list').value;
   if (!id) { ui.selectedBrowserAgentId = ''; renderBrowserAgentJob(null); return; }
   try {
@@ -2363,6 +2366,7 @@ async function runBrowserAgentPrompt() {
     const id = created?.job?.id || created?.selectedId;
     if (!id) throw new Error('Core не повернув id завдання Agent.');
     ui.selectedBrowserAgentId = id;
+    ui.agentDraftActive = false;
     await core('START_BROWSER_AGENT_JOB', { id });
     await loadBrowserAgentJobs({ selectId: id });
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
@@ -2378,6 +2382,28 @@ async function runBrowserAgentPrompt() {
   } catch (error) {
     $('agent-status').textContent = `Agent не запущено: ${error.message}`;
   } finally { $('agent-run-prompt-button').disabled = false; }
+}
+
+async function importBrowserAgentDraft() {
+  const file = $('agent-import-file').files?.[0];
+  if (!file) { $('agent-import-status').textContent = 'Оберіть JSON-файл чернетки.'; return; }
+  try {
+    if (file.size > 1024 * 1024) throw new Error('Файл чернетки має бути не більший за 1 МБ.');
+    const draft = parseAgentDraftProfile(parsePortableJson(await file.text()));
+    fillBrowserAgentPolicy(draft.policy);
+    $('agent-prompt').value = draft.goal;
+    ui.agentDraftActive = true;
+    $('agent-import-status').textContent = 'Чернетку завантажено у форму. Перевірте її та окремо натисніть «Запустити агента».';
+    $('agent-prompt').focus();
+  } catch (error) { $('agent-import-status').textContent = `Імпорт не вдався: ${error.message}`; }
+}
+
+function exportBrowserAgentDraft() {
+  try {
+    const draft = makeAgentDraftProfile($('agent-prompt').value, browserAgentPolicyFromForm());
+    downloadJson(draft, 'ChatGPT-Autopilot-Agent-draft.json');
+    $('agent-import-status').textContent = 'Чернетку експортовано без ключів API та стану виконання.';
+  } catch (error) { $('agent-import-status').textContent = `Експорт не вдався: ${error.message}`; }
 }
 
 async function browserAgentLifecycle(command) {
@@ -4201,6 +4227,8 @@ $('export-orchestration-v2-profile-button').addEventListener('click', exportOrch
 $('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
 $('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
+$('agent-import-button').addEventListener('click', importBrowserAgentDraft);
+$('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
 $('agent-resume-button').addEventListener('click', () => browserAgentLifecycle('RESUME_BROWSER_AGENT_JOB'));

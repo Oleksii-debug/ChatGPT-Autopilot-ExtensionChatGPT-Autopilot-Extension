@@ -277,6 +277,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-ai-routing-mode','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
     'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
+    'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
   has(/id="agent-status" role="status"/, 'Agent status must be announced');
@@ -298,6 +299,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.match(js, /parseAgentDraftProfile\(parsePortableJson\(await file\.text\(\)\)\)/, 'Agent JSON must be validated before form insertion');
+  assert.match(js, /ui\.agentDraftActive = true/, 'periodic status refresh must preserve the imported draft');
+  assert.doesNotMatch(js.match(/async function importBrowserAgentDraft\(\)[\s\S]*?\n}\n/)?.[0] || '', /CREATE_BROWSER_AGENT_JOB|START_BROWSER_AGENT_JOB/, 'Agent import must never create or start a job');
 });
 
 test('Remote Dispatch exposes keyboard/NVDA-readable GitHub feed configuration and status', () => {

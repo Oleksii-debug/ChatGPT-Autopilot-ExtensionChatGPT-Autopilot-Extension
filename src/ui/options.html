@@ -221,6 +221,13 @@
 
       <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true"></textarea>
+      <label for="agent-import-file">Імпорт чернетки Agent (JSON)</label>
+      <input id="agent-import-file" type="file" accept=".json,application/json">
+      <div class="agent-actions" aria-label="Чернетка Agent">
+        <button id="agent-import-button" type="button">Імпортувати чернетку</button>
+        <button id="agent-export-button" type="button">Експортувати чернетку</button>
+      </div>
+      <p id="agent-import-status" role="status">Імпорт не запускає Agent і не переносить ключі API.</p>
       <div class="agent-actions" aria-label="Основні дії агента">
         <button id="agent-run-prompt-button" type="button">Запустити агента</button>
         <button id="agent-pause-button" type="button" disabled>Пауза</button>

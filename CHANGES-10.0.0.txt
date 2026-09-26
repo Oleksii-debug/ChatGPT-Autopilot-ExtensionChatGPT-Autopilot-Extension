@@ -2,6 +2,10 @@
 
 CANDIDATE CHANGELOG — 2026-09-26
 
+AGENT DRAFT IMPORT — AFTER THE FIRST DELIVERED PILOT 10 ARCHIVE
+- Agent tab now imports/exports a versioned JSON goal and policy draft. Import only fills the form and never creates or starts a job. Unknown fields, runtime state, and credentials are rejected; the two-second status refresh preserves an imported draft. This change will appear in a later archive, not the Pilot 10 ZIP delivered at the initial 2026-09-26 checkpoint.
+- The Models tab displays Mistral's endpoint key-loaded status as reported by the local Gateway. The key itself is never part of the archive or repository; owner Windows verification remains pending.
+
 BASELINE
 - Last frozen canonical release: 0.9.19.
 - Candidate source is not the user-supplied 0.9.19 ZIP renamed. It is built from live GitHub source after canonical main 372cf294eec087fa7c355d14885140af1ad9f13d plus the converged Scenario Work lanes below.
