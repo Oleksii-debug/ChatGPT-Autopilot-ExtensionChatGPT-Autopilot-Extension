@@ -181,3 +181,61 @@ test('effort classifier recognizes English and Ukrainian levels', () => {
   assert.equal(adapter.classifyEffortLabel('Середній'), 'medium');
   assert.equal(adapter.classifyEffortLabel('Високий'), 'high');
 });
+
+
+test('model-only picker label can still select and prove High', async () => {
+  const adapter = loadAdapter();
+  let menuOpen = false;
+  let selected = 'Medium';
+  let pickerClicks = 0;
+  let optionClicks = 0;
+  const menu = {
+    ...visibleBase(),
+    innerText: 'Instant Medium High Extra High',
+    getAttribute(name) { return name === 'role' ? 'menu' : null; },
+  };
+  const picker = {
+    ...visibleBase(),
+    tagName: 'BUTTON',
+    innerText: 'GPT-5.6',
+    getAttribute(name) {
+      if (name === 'aria-label') return 'Model selector GPT-5.6';
+      if (name === 'aria-haspopup') return 'menu';
+      if (name === 'data-testid') return 'model-switcher-dropdown-button';
+      return null;
+    },
+    closest() { return null; },
+    focus() {},
+    click() { pickerClicks += 1; menuOpen = !menuOpen; },
+  };
+  const high = {
+    ...visibleBase(),
+    tagName: 'DIV',
+    innerText: 'High',
+    getAttribute(name) {
+      if (name === 'role') return 'menuitemradio';
+      if (name === 'aria-checked') return selected === 'High' ? 'true' : 'false';
+      return null;
+    },
+    closest(selector) { return menuOpen && /role="menu"/.test(selector) ? menu : null; },
+    focus() {},
+    click() { optionClicks += 1; selected = 'High'; menuOpen = false; },
+  };
+  const doc = {
+    body: { innerText: '' },
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog' || selector === '[role="alertdialog"]' || selector === '[aria-modal="true"]') return [];
+      if (selector === '[role="alert"], [role="status"], [aria-live="assertive"]') return [];
+      if (selector === 'button, [role="button"]') return menuOpen ? [picker, high] : [picker];
+      if (selector.includes('[role="combobox"]') || selector.includes('[role="slider"]') || selector.includes('input[type="range"]')) return [picker];
+      if (selector.includes('[role="menuitemradio"]')) return menuOpen ? [high, picker] : [picker];
+      return [];
+    },
+  };
+  const result = await adapter.execute(request(), { document: doc, wait: async () => {} });
+  assert.equal(result.status, adapter.STATUS.READY);
+  assert.equal(result.safeDiagnosticCode, 'EFFORT_HIGH_SELECTED_AND_VERIFIED');
+  assert.equal(selected, 'High');
+  assert.equal(optionClicks, 1);
+  assert.ok(pickerClicks >= 1);
+});
