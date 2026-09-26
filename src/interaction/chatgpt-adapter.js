@@ -382,6 +382,17 @@
     return { element: ranked[0].element, ambiguous: false };
   }
 
+  function effortChoiceSurfaceOpen(doc) {
+    return Array.from(doc.querySelectorAll(
+      '[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]'
+    ) || []).filter(isVisible).some(isEffortPickerSurface);
+  }
+
+  function closeEffortPickerIfOpen(doc, control) {
+    if (!control || !effortChoiceSurfaceOpen(doc)) return;
+    try { control.click?.(); } catch (_) {}
+  }
+
   function isEffortPickerSurface(surface) {
     const text = effortSemanticText(surface);
     if (!text) return false;
@@ -433,6 +444,7 @@
         await (deps?.wait || wait)(100);
         const alreadySelected = findSelectedEffortOption(doc);
         if (alreadySelected.ambiguous) {
+          closeEffortPickerIfOpen(doc, current.element);
           return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SELECTED_OPTION_AMBIGUOUS' });
         }
         if (HIGH_EFFORT_LEVELS.has(alreadySelected.level)) {
@@ -445,6 +457,7 @@
         }
         highOption = findHighEffortOption(doc);
         if (highOption.ambiguous) {
+          closeEffortPickerIfOpen(doc, current.element);
           return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
         }
         if (highOption.element) break;
@@ -460,10 +473,12 @@
           safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
         });
       }
+      closeEffortPickerIfOpen(doc, current.element);
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_NOT_READY' });
     }
 
     try { highOption.element.focus?.(); highOption.element.click?.(); } catch (_) {
+      closeEffortPickerIfOpen(doc, current.element);
       return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_CLICK_FAILED' });
     }
 
@@ -511,6 +526,7 @@
       }
     } while (nowMs() < verifyDeadline);
 
+    closeEffortPickerIfOpen(doc, current.element);
     return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_NOT_PROVEN' });
   }
 
