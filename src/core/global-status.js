@@ -1,7 +1,7 @@
 import { scenarioWorkParticipants } from './scenario-work.js';
 
 const CATEGORIES = Object.freeze([
-  'RUNNING', 'WAITING_RESPONSE', 'READY', 'PAUSED', 'RECOVERING',
+  'RUNNING', 'WAITING_NEXT_SEND', 'WAITING_RESPONSE', 'READY', 'PAUSED', 'RECOVERING',
   'ERROR', 'AMBIGUOUS_EFFECT', 'COMPLETED', 'STOPPED',
 ]);
 const MANAGED_FIELDS = ['scenarioWork', 'orchestrationCoordinator', 'orchestrationWorker', 'remoteDispatch'];
@@ -15,7 +15,10 @@ function sessionCategory(session) {
   if (session.runState === 'RECOVERING') return 'RECOVERING';
   if (session.runState === 'ERROR') return 'ERROR';
   if (session.runState === 'RUNNING') {
-    if (session.operation?.phase === 'SENT_VERIFIED') return 'WAITING_RESPONSE';
+    // Ordinary/Simplified Core Sessions do not use assistant completion as the
+    // scheduling condition. SENT_VERIFIED means the last Send succeeded and
+    // the session is waiting for its next scheduler admission/cooldown.
+    if (session.operation?.phase === 'SENT_VERIFIED') return 'WAITING_NEXT_SEND';
     return 'RUNNING';
   }
   if (session.completedAt && session.runMode === 'ONE_PASS') return 'COMPLETED';
