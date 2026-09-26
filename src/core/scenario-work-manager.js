@@ -239,11 +239,13 @@ function initialPoolLaunchGate(store, item) {
   if (!item?.pool || item.config?.mode !== ScenarioWorkMode.CHAT_CYCLE
       || Number(item.runtime?.totalLaunches || 0) > 0) return 0;
   const seconds = Number(item.runtime?.initialStaggerSeconds || 0);
-  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > MAX_INITIAL_STAGGER_SECONDS) return 0;
+  const plannedAt = Math.max(0, Number(item.runtime?.initialStartAt || 0));
+  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > MAX_INITIAL_STAGGER_SECONDS) return plannedAt;
   const latest = Object.values(store.byId || {}).reduce((at, sibling) =>
     sibling.pool?.id === item.pool.id
       ? Math.max(at, Number(sibling.runtime?.firstLaunchAt || 0)) : at, 0);
-  return latest ? latest + seconds * 1000 : 0;
+  const sequentialAt = latest ? latest + seconds * 1000 : 0;
+  return Math.max(plannedAt, sequentialAt);
 }
 function verifiedSendProjection(item, coreState) {
   const runtime = item.runtime || {};
