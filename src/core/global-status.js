@@ -118,13 +118,23 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
     const stepPosition = num(runtime.round) * generationSize
       + steps.slice(0, num(runtime.stepIndex)).reduce((n, step) => n + Math.max(1, Number(step.repeat) || 1), 0)
       + num(runtime.repeatIndex) + 1;
+    const participants = scenarioWorkParticipants(runtime);
+    const isDormantTemplate = !scenario.pool?.id
+      && runtime.runState === 'STOPPED'
+      && num(runtime.totalLaunches) === 0
+      && completedTurns === 0
+      && participants.every(participant => !participant.sessionId && participant.state === 'NEW');
     let inFlightVerified = 0;
-    for (const participant of scenarioWorkParticipants(runtime)) {
+    for (const participant of participants) {
       const session = sessionsById[participant.sessionId];
       const verifiedPending = verifiedScenarioTurn(participant, session);
       if (verifiedPending) inFlightVerified += 1;
       const row = {
-        id: `${scenario.id}:${participant.key}`, scenario: scenario.name, role: participant.role,
+        id: `${scenario.id}:${participant.key}`,
+        scenario: scenario.pool?.name || scenario.name,
+        role: participant.role,
+        poolId: scenario.pool?.id || '',
+        slotIndex: num(scenario.pool?.slotIndex),
         generation: num(participant.generation || runtime.generation),
         message: runtime.mode === 'CHAT_CYCLE' ? Math.min(stepPosition, turnsPerGeneration) : null,
         messagesPerGeneration: runtime.mode === 'CHAT_CYCLE' ? turnsPerGeneration : null,
@@ -137,23 +147,31 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
         completedResponses: runtime.mode === 'CHAT_CYCLE' ? completedInGeneration : completedTurns,
         category: scenarioCategory(runtime, participant, session),
       };
-      scenarioSlots.push(row);
-      add({ ...row, kind: 'SCENARIO' });
+      if (!isDormantTemplate) {
+        scenarioSlots.push(row);
+        add({ ...row, kind: 'SCENARIO' });
+      }
     }
     const durableTotal = num(runtime.retiredVerifiedSends) + activeConfirmed;
     const scenarioTotalVerified = historyKnown
       ? durableTotal
       : Math.max(completedTurns + inFlightVerified, durableTotal);
-    scenarioVerifiedSends += scenarioTotalVerified;
+    if (!isDormantTemplate) scenarioVerifiedSends += scenarioTotalVerified;
 
     if (scenario.pool?.id && runtime.mode === 'CHAT_CYCLE') {
       const poolId = scenario.pool.id;
-      const baseName = String(scenario.name || '').replace(/\s+—\s+чат\s+\d+$/u, '') || 'Сценарний пул';
+      const baseName = String(scenario.pool?.name || scenario.name || '')
+        .replace(/\s+—\s+чат\s+\d+$/u, '')
+        .replace(/\s+—\s+\d+\s+(?:поток(?:ів|и|а)?|чат(?:ів|и|а)?)\s*[×x]\s*\d+\s+повідомлен(?:ь|ня|ні).*$/iu, '')
+        .trim() || 'Сценарний пул';
       const aggregate = scenarioPoolMap.get(poolId) || {
         id: poolId,
         name: baseName,
         slots: 0,
-        active: 0,
+        messagesPerChat: turnsPerGeneration,
+        plannedSends: 0,
+        initialStaggerSeconds: num(scenario.pool?.initialStaggerSeconds || runtime.initialStaggerSeconds),
+        launching: 0,
         waitingResponse: 0,
         ready: 0,
         paused: 0,
@@ -161,6 +179,9 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
         stopped: 0,
         error: 0,
         ambiguousEffect: 0,
+        firstPromptSent: 0,
+        firstPromptPending: 0,
+        completedResponses: 0,
         verifiedSends: 0,
         verifiedSendHistoryComplete: true,
       };
@@ -173,7 +194,8 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
             : runtime.runState === 'ERROR' ? 'ERROR'
               : runtime.runState === 'STOPPED' ? 'STOPPED' : 'RUNNING';
       aggregate.slots += 1;
-      if (runtime.runState === 'RUNNING') aggregate.active += 1;
+      aggregate.plannedSends += turnsPerGeneration;
+      if (category === 'RUNNING') aggregate.launching += 1;
       if (category === 'WAITING_RESPONSE') aggregate.waitingResponse += 1;
       if (category === 'READY') aggregate.ready += 1;
       if (category === 'PAUSED') aggregate.paused += 1;
@@ -182,6 +204,8 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       if (category === 'ERROR') aggregate.error += 1;
       if (category === 'AMBIGUOUS_EFFECT') aggregate.ambiguousEffect += 1;
       aggregate.verifiedSends += scenarioTotalVerified;
+      aggregate.completedResponses += completedTurns;
+      if (scenarioTotalVerified > 0) aggregate.firstPromptSent += 1;
       aggregate.verifiedSendHistoryComplete = aggregate.verifiedSendHistoryComplete && historyKnown;
       scenarioPoolMap.set(poolId, aggregate);
     }
@@ -229,6 +253,10 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
     models.push(row);
     add({ ...row, kind: 'MODEL' });
   }
+  const scenarioPools = [...scenarioPoolMap.values()].map(pool => ({
+    ...pool,
+    firstPromptPending: Math.max(0, pool.slots - pool.firstPromptSent),
+  }));
   const counts = Object.fromEntries(CATEGORIES.map(key => [key, units.filter(unit => unit.category === key).length]));
   const managedSends = Object.values(sessionsById)
     .filter(session => managed(session) && !session?.scenarioWork?.managed)
@@ -240,6 +268,6 @@ export function projectGlobalStatus({ coreState = {}, scenarios = [], orchestras
       verifiedSendHistoryComplete,
       completedResponses: scenarios.reduce((n, scenario) => n + num(scenario.runtime?.totalCompletedTurns), 0),
     },
-    sessions, simplifiedSessions, scenarioSlots, scenarioPools: [...scenarioPoolMap.values()], orchestration, agents, models,
+    sessions, simplifiedSessions, scenarioSlots, scenarioPools, orchestration, agents, models,
   };
 }
