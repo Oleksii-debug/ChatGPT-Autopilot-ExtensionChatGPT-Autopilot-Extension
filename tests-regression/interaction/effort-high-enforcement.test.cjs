@@ -300,3 +300,47 @@ test('model-only picker preserves selected Extra High without downgrade', async 
   assert.equal(highClicks, 0);
   assert.equal(menuOpen, false);
 });
+
+
+test('failed High proof closes the picker before returning fail-closed', async () => {
+  const adapter = loadAdapter();
+  let menuOpen = false;
+  let pickerClicks = 0;
+  const menu = {
+    ...visibleBase(),
+    innerText: 'Instant Medium',
+    getAttribute(name) { return name === 'role' ? 'menu' : null; },
+  };
+  const picker = {
+    ...visibleBase(),
+    tagName: 'BUTTON',
+    innerText: 'Medium',
+    getAttribute(name) {
+      if (name === 'aria-label') return 'Thinking level: Medium';
+      if (name === 'aria-haspopup') return 'menu';
+      if (name === 'data-testid') return 'thinking-level-control';
+      return null;
+    },
+    closest() { return null; },
+    focus() {},
+    click() { pickerClicks += 1; menuOpen = !menuOpen; },
+  };
+  const doc = {
+    body: { innerText: '' },
+    querySelectorAll(selector) {
+      if (selector === '[role="dialog"], dialog' || selector === '[role="alertdialog"]' || selector === '[aria-modal="true"]') return [];
+      if (selector === '[role="alert"], [role="status"], [aria-live="assertive"]') return [];
+      if (selector === '[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]') return menuOpen ? [menu] : [];
+      if (selector === 'button, [role="button"]') return [picker];
+      if (selector.includes('[role="combobox"]') || selector.includes('[role="slider"]') || selector.includes('input[type="range"]')) return [picker];
+      if (selector.includes('[role="menuitemradio"]')) return [picker];
+      if (selector === '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"]') return [];
+      return [];
+    },
+  };
+  const result = await adapter.execute(request(), { document: doc, wait: async () => {} });
+  assert.equal(result.status, adapter.STATUS.TEMPORARY_ERROR);
+  assert.equal(result.safeDiagnosticCode, 'EFFORT_HIGH_OPTION_NOT_READY');
+  assert.equal(menuOpen, false);
+  assert.equal(pickerClicks, 2);
+});
