@@ -330,5 +330,6 @@ test('continuous simplified sessions count verified sends as completed send-cycl
   assert.equal(status.simplifiedSessions.length, 1);
   assert.equal(status.simplifiedSessions[0].verifiedSends, 9);
   assert.equal(status.simplifiedSessions[0].completedCycles, 9);
+  assert.equal(status.simplifiedSessions[0].category, 'WAITING_NEXT_SEND');
   assert.equal(status.summary.completedResponses, 0);
 });
