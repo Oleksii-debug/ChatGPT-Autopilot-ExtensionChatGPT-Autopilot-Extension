@@ -113,3 +113,21 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 - Main convergence head 42fb45f03cd074937c35625a6460669b06e688a2: behind current main = 0, merge-base = b7cf6dd3e505a574b52d3409aa79f48a64953c59.
 - Full exact-head UI / Interaction / Linux+Windows release qualification remains authoritative; queued is not PASS.
 - OWNER_WINDOWS_CHROME_VERIFIED=false.
+
+
+## 2026-09-26 04:20 Europe/Bratislava — Pilot 10 release-gate reliability harness repair
+
+### Problem
+- Exact head `ccb4e27a0f5608bc54e0b1925dffef22ebc5788d` had Core, Interaction and UI workflows green.
+- Release package qualification had one remaining failure in `agentic-multisession-matrix.test.js`.
+- The product executor correctly required `CHECK_ONLY -> ENSURE_HIGH_EFFORT -> INSERT_ONLY`, but this reliability fake transport still implemented the older sequence and rejected `ENSURE_HIGH_EFFORT`, preventing four one-pass Sessions from terminating.
+
+### Repair
+- Added explicit `ENSURE_HIGH_EFFORT` support to the reliability transport fixture.
+- Fixture returns deterministic READY evidence with `effortLevel=high` and `EFFORT_HIGH_CONFIRMED`.
+- No product bypass or downgrade of the High-effort gate was introduced.
+
+### Verification
+- Repair commit: `18aa6f0e6231fcb424ecba027e6e88c7a65180e8`.
+- Previous exact-head evidence: Core SUCCESS; Interaction SUCCESS; UI SUCCESS; Windows release package gate SUCCESS; Linux/package job blocked only by this reliability harness failure.
+- Exact post-repair Actions remain authoritative; no final release PASS or installed-Chrome claim until terminal CI and owner acceptance.
