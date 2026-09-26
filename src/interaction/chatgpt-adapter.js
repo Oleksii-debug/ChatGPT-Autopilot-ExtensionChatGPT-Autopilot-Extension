@@ -865,7 +865,8 @@
     // attributes. When these bubbles exist, article headings and assistant
     // quotations must not be mistaken for additional user messages: the
     // pre-send history and post-send history have to use the same units.
-    const workBubbles = Array.from(doc.querySelectorAll('[data-user-message-bubble="true"]'));
+    const workBubbles = Array.from(doc.querySelectorAll('[data-user-message-bubble="true"]'))
+      .filter(el => typeof el.closest !== 'function' || Boolean(el.closest('main, [role="main"]')));
     if (workBubbles.length) return workBubbles.filter(el => !workBubbles.some(other => other !== el && el.contains?.(other)));
     const candidates = [...new Set([
       ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
@@ -907,6 +908,7 @@
         // is localized; an arbitrary non-user search unit is not a reply.
         const workKey = String(el.getAttribute?.('data-chatgpt-search-unit-key') || '');
         const workUnit = el.hasAttribute?.('data-chatgpt-search-unit-key')
+          && (typeof el.closest !== 'function' || Boolean(el.closest('main, [role="main"]')))
           && (el.querySelector?.('[data-conversation-role="assistant"]')
             || /:assistant$/.test(workKey))
           && el.querySelector?.('[data-markdown-text-style="assistant-message"]');

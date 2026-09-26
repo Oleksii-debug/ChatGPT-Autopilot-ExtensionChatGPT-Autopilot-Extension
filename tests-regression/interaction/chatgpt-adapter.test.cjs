@@ -214,3 +214,38 @@ test('Work UI verifies second and third prompts only after a new user bubble, th
     assert.equal(afterReply.assistantComplete, true);
   }
 });
+
+test('Work UI ignores sidebar bubbles and reads only the user prompt body', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  const sidebar = chat.bubble('Продовжуй 2');
+  sidebar.closest = () => null;
+  chat.users.push(sidebar);
+  const prior = chat.bubble('START\nКопіювати повідомлення');
+  prior.closest = () => ({ tagName: 'MAIN' });
+  prior.querySelector = selector => selector.includes('whitespace-pre-wrap') ? { innerText: 'START' } : null;
+  chat.users.push(prior);
+  chat.composer.innerText = 'Продовжуй 2';
+  const sent = await adapter.execute(validRequest({ requestId: 'sidebar-op',
+    promptText: 'Продовжуй 2', mode: 'SUBMIT_EXISTING' }),
+  { document: chat.document, wait: async () => {} });
+  assert.equal(sent.status, adapter.STATUS.SENT_VERIFIED);
+  assert.equal(chat.sends, 1);
+});
+
+test('Work UI recognizes a keyed assistant reply without a localized role heading', async () => {
+  const { adapter } = loadAdapter();
+  const chat = workChat();
+  const outside = chat.reply('Sidebar preview');
+  outside.closest = () => null;
+  const reply = chat.reply('Відповідь після першого промпта.');
+  reply.closest = () => ({ tagName: 'MAIN' });
+  reply.querySelector = selector => selector.includes('data-conversation-role') ? null
+    : selector.includes('data-markdown-text-style') ? { innerText: 'Відповідь після першого промпта.' }
+    : null;
+  chat.assistants.push(outside, reply);
+  const result = await adapter.execute(validRequest({ mode: 'READ_ASSISTANT_REPORT',
+    assistantBaselineKnown: true, assistantBaselineCount: 0 }), { document: chat.document });
+  assert.equal(result.status, adapter.STATUS.READY);
+  assert.equal(result.assistantText, 'Відповідь після першого промпта.');
+});
