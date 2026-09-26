@@ -275,7 +275,7 @@
         <summary>Політика й ліміти — необов’язково</summary>
         <fieldset class="settings-group">
           <legend>Старт і браузер</legend>
-          <label for="agent-start-url">Стартова адреса, необов’язково</label>
+          <label for="agent-start-url">Стартова адреса</label>
           <input id="agent-start-url" type="url" autocomplete="off" spellcheck="false">
           <label for="agent-max-steps">Safety ceiling дій</label>
           <input id="agent-max-steps" type="number" min="1" max="10000" step="1" inputmode="numeric" value="500">
@@ -294,11 +294,11 @@
             <option value="ALLOW">ALLOW — використовувати дозволені credentials автономно</option>
             <option value="DENY">DENY — не використовувати credentials у цьому завданні</option>
           </select>
-          <label for="agent-site-rules">Правила для окремих сайтів, необов’язково</label>
+          <label for="agent-site-rules">Правила для окремих сайтів</label>
           <textarea id="agent-site-rules" rows="6" spellcheck="false"></textarea>
-          <label><input id="agent-vision-on-demand" type="checkbox" checked>Дозволяти Agent запитувати знімок видимої області для vision, коли DOM/ARIA недостатньо</label>
-          <label><input id="agent-trusted-script-enabled" type="checkbox">Дозволяти Trusted Script fallback для складних сайтів. Потреба в підтвердженні визначається вибраною вище політикою; у режимі повної автономії окремого підтвердження немає.</label>
-          <label for="agent-acceptance-criteria">Критерії завершеного результату, необов’язково</label>
+          <label><input id="agent-vision-on-demand" type="checkbox" checked>Дозволяти vision-знімок</label>
+          <label><input id="agent-trusted-script-enabled" type="checkbox">Дозволяти Trusted Script fallback</label>
+          <label for="agent-acceptance-criteria">Критерії завершеного результату</label>
           <textarea id="agent-acceptance-criteria" rows="4" spellcheck="true"></textarea>
         </fieldset>
         <fieldset class="settings-group">
@@ -311,13 +311,13 @@
           </select>
           <label for="agent-interval-seconds">Інтервал між завершеними циклами, секунд</label>
           <input id="agent-interval-seconds" type="number" min="1" max="604800" step="1" inputmode="numeric" value="60">
-          <label for="agent-schedule-start">Почати не раніше, необов’язково</label>
+          <label for="agent-schedule-start">Почати не раніше</label>
           <input id="agent-schedule-start" type="datetime-local">
-          <label for="agent-schedule-end">Завершити не пізніше, необов’язково</label>
+          <label for="agent-schedule-end">Завершити не пізніше</label>
           <input id="agent-schedule-end" type="datetime-local">
-          <label for="agent-active-window-start">Щоденне активне вікно — початок, необов’язково</label>
+          <label for="agent-active-window-start">Щоденне активне вікно — початок</label>
           <input id="agent-active-window-start" type="time">
-          <label for="agent-active-window-end">Щоденне активне вікно — кінець, необов’язково</label>
+          <label for="agent-active-window-end">Щоденне активне вікно — кінець</label>
           <input id="agent-active-window-end" type="time">
         </fieldset>
         <fieldset class="settings-group">
@@ -337,7 +337,7 @@
             <option value="openai">OpenAI API</option>
             <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
           </select>
-          <label for="agent-ai-primary-model">Primary model, необов’язково</label>
+          <label for="agent-ai-primary-model">Primary model</label>
           <input id="agent-ai-primary-model" type="text" autocomplete="off" spellcheck="false">
           <label for="agent-ai-strong-provider">Strong provider</label>
           <select id="agent-ai-strong-provider">
@@ -346,7 +346,7 @@
             <option value="ollama">Локальна Ollama</option>
             <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
           </select>
-          <label for="agent-ai-strong-model">Strong model, необов’язково</label>
+          <label for="agent-ai-strong-model">Strong model</label>
           <input id="agent-ai-strong-model" type="text" autocomplete="off" spellcheck="false">
         </fieldset>
         <fieldset class="settings-group">
@@ -395,8 +395,6 @@
           <button id="resume-orchestration-v2-orchestra-button" type="button">Продовжити оркестр</button>
           <button id="delete-orchestration-v2-orchestra-button" type="button">Видалити оркестр</button>
         </div>
-        <div class="notice" id="orchestration-v2-start-help"><strong>Запуск без очікування watchdog.</strong> «Запустити оркестр» одразу починає перший Coordinator-cycle. Фізичний Send відбувається після налаштованої Coordinator pre-send затримки.</div>
-        <div class="notice" id="orchestration-v2-pause-help"><strong>Безпечна локальна пауза.</strong> Пауза стосується лише вибраного оркестру: стан зберігається, налаштування можна змінити й зберегти, а інші оркестри продовжують працювати. «Продовжити оркестр» одразу запускає recovery/reconciliation, не чекаючи watchdog.</div>
 
         <fieldset class="settings-group" id="orchestration-v2-import-group">
           <legend>Завантажити JSON оркестру</legend>
@@ -412,9 +410,9 @@
           <textarea id="orchestration-v2-hierarchy-domains" rows="6" spellcheck="true"></textarea>
           <label for="orchestration-v2-hierarchy-workers">Workers на одного Manager</label>
           <input id="orchestration-v2-hierarchy-workers" type="number" min="1" max="40" step="1" inputmode="numeric" value="5">
-          <label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково</label>
+          <label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers</label>
           <textarea id="orchestration-v2-hierarchy-drive-sources" rows="4" spellcheck="false"></textarea>
-          <label for="orchestration-v2-hierarchy-drive-folders">Drive-папки з versioned dispatch, необов’язково</label>
+          <label for="orchestration-v2-hierarchy-drive-folders">Drive-папки з versioned dispatch</label>
           <textarea id="orchestration-v2-hierarchy-drive-folders" rows="4" spellcheck="false"></textarea>
           <label for="orchestration-v2-hierarchy-drive-poll">Перевіряти Drive, хв</label>
           <input id="orchestration-v2-hierarchy-drive-poll" type="number" min="1" max="1440" step="1" inputmode="numeric" value="3">
@@ -430,7 +428,6 @@
       </div>
 
       <div id="orchestration-v2-settings-panel" data-orchestration-panel="settings" hidden>
-      <div class="notice"><strong>Налаштування вибраного оркестру.</strong> Якщо треба змінити identity або критичні параметри під час роботи, спочатку натисніть «Призупинити оркестр», внесіть зміни, збережіть і натисніть «Продовжити оркестр».</div>
       <label><input id="orchestration-v2-enabled" type="checkbox">Увімкнути цей оркестр</label>
 
       <fieldset class="settings-group" id="orchestration-v2-project-group">
@@ -518,7 +515,6 @@
       <div id="orchestration-v2-state-panel" data-orchestration-panel="state" hidden>
         <button id="run-orchestration-v2-button" type="button">Оновити стан</button>
         <button id="stop-orchestration-v2-button" type="button">Аварійно зупинити вибраний оркестр</button>
-        <div class="notice" id="orchestration-v2-stop-help"><strong>Аварійна дія лише для вибраного оркестру.</strong> Стоп відкликає authority у цього оркестру. Інші оркестри не зупиняються.</div>
         <p id="orchestration-v2-status" role="status">Orchestration V2 ще не налаштовано.</p>
         <p id="orchestration-v2-runtime" tabindex="0">Coordinator і worker pool ще не запущені.</p>
       </div>
@@ -759,13 +755,6 @@
     <section aria-labelledby="ai-router-heading" data-app-mode="ai">
       <h2 id="ai-router-heading">AI Router</h2>
       <label><input id="ai-router-enabled" type="checkbox">Увімкнути AI Router</label>
-
-      <div class="notice" id="ai-router-openai-help">
-        <strong>OpenAI API.</strong> Для безпеки API key не зберігається у Chrome-розширенні.
-        У локальному пакеті запустіть файл «НАЛАШТУВАТИ OPENAI API КЛЮЧ.ps1»: ключ буде зашифровано Windows DPAPI для поточного Windows-користувача.
-        Потім запустіть AI Gateway, натисніть «Перевірити Gateway» і «Оновити моделі».
-        Підписка ChatGPT і OpenAI API — окремі продукти; API потребує окремого API-акаунта/ключа та білінгу.
-      </div>
       <p id="ai-router-openai-key-status" role="status">OpenAI API key: статус ще не перевірено.</p>
 
       <label for="ai-router-gateway-url">Gateway</label>
@@ -826,9 +815,9 @@
         <label><input id="ai-router-free-only" type="checkbox">Дозволяти лише безкоштовні маршрути</label>
         <label for="ai-router-locality">Розташування</label>
         <select id="ai-router-locality"><option value="any">Будь-яке</option><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
-        <label for="ai-router-max-input-price">Макс. ціна input за 1M токенів, USD (0 = без межі)</label>
+        <label for="ai-router-max-input-price">Макс. ціна input за 1M токенів, USD</label>
         <input id="ai-router-max-input-price" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
-        <label for="ai-router-max-output-price">Макс. ціна output за 1M токенів, USD (0 = без межі)</label>
+        <label for="ai-router-max-output-price">Макс. ціна output за 1M токенів, USD</label>
         <input id="ai-router-max-output-price" type="number" min="0" max="1000000" step="0.000001" inputmode="decimal">
         <label for="ai-router-backoff-seconds">Backoff після тимчасової помилки, с</label>
         <input id="ai-router-backoff-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric">
@@ -836,7 +825,7 @@
         <input id="ai-router-circuit-failures" type="number" min="1" max="100" step="1" inputmode="numeric">
         <label for="ai-router-circuit-seconds">Circuit breaker, с</label>
         <input id="ai-router-circuit-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric">
-        <label for="ai-router-allow-routes">Allowlist маршрутів (порожньо = усі)</label>
+        <label for="ai-router-allow-routes">Allowlist маршрутів</label>
         <select id="ai-router-allow-routes" multiple size="4"></select>
         <label for="ai-router-deny-routes">Denylist маршрутів</label>
         <select id="ai-router-deny-routes" multiple size="4"></select>
@@ -854,14 +843,14 @@
           <legend data-route-legend>Маршрут</legend>
           <label data-label-for="routeId">ID маршруту</label><input data-route-field="routeId" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="provider">Провайдер</label><select data-route-field="provider"><option value="ollama">Ollama</option><option value="openai">OpenAI</option><option value="openai-compatible">OpenAI-compatible endpoint</option></select>
-          <label data-label-for="endpointId">Endpoint ID (лише OpenAI-compatible)</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="endpointId">Endpoint ID</label><input data-route-field="endpointId" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="model">Модель</label><input data-route-field="model" type="text" autocomplete="off" spellcheck="false">
           <button type="button" data-route-action="discover-models">Отримати моделі цього постачальника</button>
           <label data-label-for="discoveredModel">Моделі постачальника</label><select data-route-field="discoveredModel"><option value="">Оберіть модель після оновлення</option></select>
           <fieldset><legend>Ролі</legend><label><input type="checkbox" data-route-role="planner"> planner</label><label><input type="checkbox" data-route-role="coder"> coder</label><label><input type="checkbox" data-route-role="fast-worker"> fast-worker</label><label><input type="checkbox" data-route-role="verifier"> verifier</label><label><input type="checkbox" data-route-role="critic"> critic</label><label><input type="checkbox" data-route-role="vision"> vision</label></fieldset>
-          <label data-label-for="capabilityIds">Capabilities через кому (порожньо = будь-які)</label><input data-route-field="capabilityIds" type="text" autocomplete="off" spellcheck="false">
+          <label data-label-for="capabilityIds">Capabilities</label><input data-route-field="capabilityIds" type="text" autocomplete="off" spellcheck="false">
           <label data-label-for="priority">Пріоритет</label><input data-route-field="priority" type="number" min="0" max="1000000" step="1" inputmode="numeric">
-          <label data-label-for="maxWorkers">Максимум workers цього маршруту, 0 = загальна межа</label><input data-route-field="maxWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
+          <label data-label-for="maxWorkers">Максимум workers цього маршруту</label><input data-route-field="maxWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
           <label data-label-for="manualWorkers">Workers вручну для цього маршруту</label><input data-route-field="manualWorkers" type="number" min="0" max="200" step="1" inputmode="numeric">
           <label data-label-for="locality">Розташування</label><select data-route-field="locality"><option value="local">Локальне</option><option value="remote">Віддалене</option></select>
           <label data-label-for="costClass">Вартість</label><select data-route-field="costClass"><option value="unknown">Невідомо</option><option value="free">Безкоштовний</option><option value="paid">Платний</option></select>
