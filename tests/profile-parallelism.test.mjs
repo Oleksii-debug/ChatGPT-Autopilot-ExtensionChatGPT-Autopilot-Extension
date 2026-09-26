@@ -486,8 +486,12 @@ function makeHappyTransport({ failInsertOnceFor = '' } = {}) {
   return {
     async execute(tabId, request) {
       const sessionId = String(request.requestId || '').split(':')[0];
-      if (request.mode === 'CHECK_ONLY' || request.mode === 'PREPARE_SEND') {
-        return { status: InteractionResult.READY, safeDiagnosticCode: 'READY', normalizedObservedUrl: request.expectedUrl };
+      if (request.mode === 'CHECK_ONLY' || request.mode === 'ENSURE_HIGH_EFFORT' || request.mode === 'PREPARE_SEND') {
+        return {
+          status: InteractionResult.READY,
+          safeDiagnosticCode: request.mode === 'ENSURE_HIGH_EFFORT' ? 'EFFORT_HIGH_VERIFIED' : 'READY',
+          normalizedObservedUrl: request.expectedUrl,
+        };
       }
       if (request.mode === 'INSERT_ONLY') {
         if (sessionId === failInsertOnceFor && !failed.has(sessionId)) {
