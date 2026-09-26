@@ -243,7 +243,11 @@ test('release packaging fails closed when local AI gateway state exists even wit
     fs.mkdirSync(path.join(root, 'src'), { recursive: true });
     fs.mkdirSync(path.join(root, 'icons'), { recursive: true });
     fs.mkdirSync(path.join(root, 'companion', 'ai-gateway', 'config'), { recursive: true });
-    fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ manifest_version: 3, version: RELEASE_VERSION }), 'utf8');
+    fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({
+      manifest_version: 3,
+      version: RELEASE_VERSION,
+      version_name: RELEASE_VERSION.split('.')[0],
+    }), 'utf8');
     fs.writeFileSync(path.join(root, 'README.txt'), 'readme', 'utf8');
     fs.writeFileSync(path.join(root, `CHANGES-${RELEASE_VERSION}.txt`), 'changes', 'utf8');
     fs.writeFileSync(path.join(root, `QA-${RELEASE_VERSION}.txt`), 'qa', 'utf8');
