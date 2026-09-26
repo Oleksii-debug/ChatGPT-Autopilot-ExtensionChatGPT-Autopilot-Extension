@@ -1,0 +1,7 @@
+ChatGPT Autopilot 10.0.1 — emergency effort-control/session hotfix
+
+- Read ChatGPT's production data-selected-reasoning-effort state from the intelligence/model trigger.
+- Remove the obsolete requirement that reasoning effort must be a fixed three-position 0..2 slider.
+- Move a visible reasoning slider right with a bounded loop and verify High from ChatGPT's declared trigger state.
+- Keep extension-owned open/close tabs alive for pre-send TEMPORARY_ERROR/UNKNOWN_UI effort retries to prevent close/reopen storms and receiver-restore failures.
+- Add regression coverage for declared High and Medium-to-High with a non-0..2 slider.
