@@ -2005,21 +2005,44 @@ function fillScenarioWorkForm(item) {
   syncScenarioWorkButtons();
 }
 
+function scenarioPoolListValue(id) { return `pool:${id}`; }
+function scenarioSingleListValue(id) { return `scenario:${id}`; }
+
 function renderScenarioWorkList(data = {}) {
   const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
-  ui.scenarioWorkPools = Array.isArray(data.pools) ? data.pools.map(item => clone(item)) : [];
+  const pools = Array.isArray(data.pools) ? data.pools : [];
+  ui.scenarioWorkPools = pools.map(item => clone(item));
   ui.scenarioWorkScenarios = scenarios.map(item => clone(item));
+  const pooledScenarioIds = new Set(scenarios.filter(item => item.pool?.id).map(item => item.id));
+  const unpooled = scenarios.filter(item => !pooledScenarioIds.has(item.id));
   const list = $('scenario-work-list');
   list.replaceChildren();
-  for (const item of scenarios) {
+
+  for (const pool of pools) {
     const option = document.createElement('option');
-    option.value = item.id;
+    option.value = scenarioPoolListValue(pool.id);
+    option.textContent = `${pool.name} — весь сценарій: ${pool.slots} чатів — ${pool.runState || 'STOPPED'}`;
+    list.append(option);
+  }
+  for (const item of unpooled) {
+    const option = document.createElement('option');
+    option.value = scenarioSingleListValue(item.id);
     option.textContent = `${item.name} — ${SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || 'формат'}`;
     list.append(option);
   }
-  const selected = data.selectedId && scenarios.some(item => item.id === data.selectedId)
-    ? data.selectedId
-    : (scenarios[0]?.id || '');
+
+  let selected = '';
+  if (ui.selectedScenarioPoolId && pools.some(item => item.id === ui.selectedScenarioPoolId)) {
+    selected = scenarioPoolListValue(ui.selectedScenarioPoolId);
+  } else if (ui.selectedScenarioWorkId && unpooled.some(item => item.id === ui.selectedScenarioWorkId)) {
+    selected = scenarioSingleListValue(ui.selectedScenarioWorkId);
+  } else if (data.selectedId) {
+    const selectedScenario = scenarios.find(item => item.id === data.selectedId);
+    selected = selectedScenario?.pool?.id
+      ? scenarioPoolListValue(selectedScenario.pool.id)
+      : selectedScenario ? scenarioSingleListValue(selectedScenario.id) : '';
+  }
+  if (!selected) selected = list.options[0]?.value || '';
   list.value = selected;
   if (!selected) clearScenarioWorkState();
   return selected;
@@ -2030,22 +2053,45 @@ async function loadScenarioWork({ preservePanel = true } = {}) {
     const listData = await core('LIST_SCENARIO_WORK');
     const selected = renderScenarioWorkList(listData);
     if (!selected) return;
-    const data = await core('GET_SCENARIO_WORK', { id: selected });
-    fillScenarioWorkForm(data.scenario);
-    if (!preservePanel) setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[data.scenario?.config?.mode] || 'cycle');
+    await openScenarioWorkTarget(selected, { selectSingle: false });
+    if (!preservePanel && ui.selectedScenarioWork) {
+      setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[ui.selectedScenarioWork.config?.mode] || 'cycle');
+    }
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося завантажити сценарну роботу: ${error.message}`;
   }
 }
 
-async function openScenarioWork(id) {
-  if (!id) { clearScenarioWorkState(); return; }
+async function openScenarioWorkTarget(value, { selectSingle = true } = {}) {
+  if (!value) { clearScenarioWorkState(); return; }
   try {
-    const data = await core('SELECT_SCENARIO_WORK', { id });
+    if (value.startsWith('pool:')) {
+      const poolId = value.slice(5);
+      const data = await core('GET_SCENARIO_CHAT_POOL', { id: poolId });
+      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === poolId);
+      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
+      else ui.scenarioWorkPools.push(clone(data.pool));
+      const item = { ...data.scenario, poolController: true, poolSummary: data.pool };
+      ui.selectedScenarioPoolId = poolId;
+      fillScenarioWorkForm(item);
+      $('scenario-work-list').value = scenarioPoolListValue(poolId);
+      return;
+    }
+    const id = value.startsWith('scenario:') ? value.slice(9) : value;
+    const data = selectSingle
+      ? await core('SELECT_SCENARIO_WORK', { id })
+      : await core('GET_SCENARIO_WORK', { id });
+    ui.selectedScenarioPoolId = '';
     fillScenarioWorkForm(data.scenario);
+    $('scenario-work-list').value = scenarioSingleListValue(id);
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося відкрити сценарій: ${error.message}`;
   }
+}
+
+async function openScenarioWork(id) {
+  if (!id) { clearScenarioWorkState(); return; }
+  return openScenarioWorkTarget(scenarioSingleListValue(id));
 }
 
 async function createScenarioWork(mode) {
