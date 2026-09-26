@@ -24,6 +24,7 @@ const MAX_PERSISTED_OBJECT_KEYS = 10000;
 const MAX_PERSISTED_GRAPH_NODES = 50000;
 const MAX_PERSISTED_DEPTH = 64;
 const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
+const MAX_INITIAL_STAGGER_SECONDS = 604800; // 7 days; UI may express this in seconds or minutes.
 
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
@@ -184,15 +185,28 @@ function freshStore() { return { schemaVersion: STORAGE_SCHEMA_VERSION, selected
 function poolSummary(store, poolId) {
   const members = store.order.map(id => store.byId[id]).filter(item => item?.pool?.id === poolId);
   const budget = members[0]?.pool?.replacementBudget || 0;
-  return { id: poolId, slots: members.length, replacementBudget: budget,
+  const countState = state => members.filter(item => item.runtime.runState === state).length;
+  return {
+    id: poolId,
+    slots: members.length,
+    replacementBudget: budget,
     replacementsUsed: members.reduce((sum, item) => sum + Number(item.runtime.poolReplacementsUsed || 0), 0),
-    active: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING).length };
+    active: countState(ScenarioWorkRunState.RUNNING),
+    paused: countState(ScenarioWorkRunState.PAUSED),
+    completed: countState(ScenarioWorkRunState.COMPLETED),
+    stopped: countState(ScenarioWorkRunState.STOPPED),
+    error: countState(ScenarioWorkRunState.ERROR),
+    waitingResponse: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING
+      && item.runtime.chat?.state === ScenarioParticipantState.WAITING).length,
+    notStarted: members.filter(item => item.runtime.runState === ScenarioWorkRunState.RUNNING
+      && Number(item.runtime.totalLaunches || 0) === 0).length,
+  };
 }
 function initialPoolLaunchGate(store, item) {
   if (!item?.pool || item.config?.mode !== ScenarioWorkMode.CHAT_CYCLE
       || Number(item.runtime?.totalLaunches || 0) > 0) return 0;
   const seconds = Number(item.runtime?.initialStaggerSeconds || 0);
-  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > 60) return 0;
+  if (!Number.isInteger(seconds) || seconds <= 0 || seconds > MAX_INITIAL_STAGGER_SECONDS) return 0;
   const latest = Object.values(store.byId || {}).reduce((at, sibling) =>
     sibling.pool?.id === item.pool.id
       ? Math.max(at, Number(sibling.runtime?.firstLaunchAt || 0)) : at, 0);
@@ -233,7 +247,7 @@ function ensureManagerRuntimeFields(runtime) {
   out.initialStartAt = Number.isFinite(Number(out.initialStartAt))
     ? Math.max(0, Math.floor(Number(out.initialStartAt))) : 0;
   out.initialStaggerSeconds = Number.isInteger(Number(out.initialStaggerSeconds))
-    ? Math.max(0, Math.min(60, Number(out.initialStaggerSeconds))) : 0;
+    ? Math.max(0, Math.min(MAX_INITIAL_STAGGER_SECONDS, Number(out.initialStaggerSeconds))) : 0;
   out.cleanupPendingSessionIds = [...new Set((Array.isArray(out.cleanupPendingSessionIds) ? out.cleanupPendingSessionIds : []).filter(value => typeof value === 'string' && value))];
   out.deletePending = out.deletePending === true;
   out.poolReplacementsUsed = Math.max(0, Math.floor(Number(out.poolReplacementsUsed || 0)));
@@ -511,8 +525,8 @@ export class ScenarioWorkManager {
     if (!Number.isInteger(replacementBudget) || replacementBudget < 0 || replacementBudget > 100000) {
       throw new Error('Кількість нових чатів після початкових: від 0 до 100000.');
     }
-    if (!Number.isInteger(staggerSeconds) || staggerSeconds < 0 || staggerSeconds > 60) {
-      throw new Error('Пауза між початковими чатами: від 0 до 60 секунд.');
+    if (!Number.isInteger(staggerSeconds) || staggerSeconds < 0 || staggerSeconds > MAX_INITIAL_STAGGER_SECONDS) {
+      throw new Error('Пауза між початковими чатами: від 0 до 604800 секунд (до 7 діб).');
     }
     const poolId = this.createId();
     const ids = Array.from({ length: count }, () => this.createId());
@@ -952,6 +966,25 @@ export class ScenarioWorkManager {
           assistantBaselineKnown: task.lastAssistantBaselineKnown === true,
         });
       } catch {
+        continue;
+      }
+      // responseTimeoutMinutes means absence of a completed/ongoing assistant response,
+      // not a hard wall-clock cap on a response that is still streaming. If the
+      // page proves the assistant is actively generating exactly when the
+      // deadline is reached, renew the durable inactivity deadline instead of
+      // retiring a healthy long-running chat.
+      const assistantStillResponding = report?.status === 'BUSY'
+        || report?.safeDiagnosticCode === 'ASSISTANT_RESPONSE_STREAMING';
+      if (assistantStillResponding && Number(participant.deadlineAt || 0) <= now) {
+        const refreshed = ensureManagerRuntimeFields(runtime);
+        const liveParticipant = scenarioWorkParticipants(refreshed).find(item => item.key === participant.key);
+        if (liveParticipant?.state === ScenarioParticipantState.WAITING) {
+          liveParticipant.deadlineAt = now + scenario.config.responseTimeoutMinutes * 60_000;
+          refreshed.updatedAt = now;
+          const checkpoint = await this.checkpointRuntime(scenario.id, refreshed, expectedOwnerEpoch, now);
+          if (!checkpoint.applied) return { runtime: checkpoint.runtime || runtime, ownerChanged: true };
+          runtime = checkpoint.runtime;
+        }
         continue;
       }
       if (report?.status !== 'READY' || report.assistantComplete !== true) continue;
