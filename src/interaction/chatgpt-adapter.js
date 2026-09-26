@@ -31,6 +31,7 @@
 
   const MODES = new Set([
     'CHECK_ONLY',
+    'ENSURE_HIGH_EFFORT',
     'INSERT_ONLY',
     'PREPARE_SEND',
     'SUBMIT_EXISTING',
@@ -253,6 +254,203 @@
       .find(predicate) || null;
   }
 
+  const HIGH_EFFORT_LEVELS = new Set(['high', 'extra-high']);
+
+  function normalizeEffortText(value) {
+    let text = String(value || '').trim().toLowerCase();
+    try { text = text.normalize('NFKD').replace(/\p{M}+/gu, ''); } catch (_) {}
+    return text.replace(/[–—_]+/gu, '-').replace(/\s+/gu, ' ');
+  }
+
+  function classifyEffortLabel(value) {
+    const text = normalizeEffortText(value);
+    if (!text) return null;
+    if (/\b(?:extra[ -]?high|xhigh|very high)\b/u.test(text)
+        || /дуже висок|очень высок/u.test(text)) return 'extra-high';
+    if (/\bhigh\b/u.test(text)
+        || /(?:^|\s)(?:високий|высокий|vysoky|wysoki|hoch|eleve|alto)(?:\s|$)/u.test(text)) return 'high';
+    if (/\bmedium\b/u.test(text)
+        || /(?:^|\s)(?:середній|средний|stredny|stredni|sredni|mittel|moyen|medio)(?:\s|$)/u.test(text)) return 'medium';
+    if (/\blow\b/u.test(text)
+        || /(?:^|\s)(?:низький|низкий|nizky|niski|niedrig|faible|bajo)(?:\s|$)/u.test(text)) return 'low';
+    if (/\binstant\b/u.test(text)
+        || /миттєв|мгновенн/u.test(text)) return 'instant';
+    return null;
+  }
+
+  function effortSemanticText(el) {
+    return normalizeEffortText([
+      el?.getAttribute?.('aria-label'),
+      el?.getAttribute?.('aria-valuetext'),
+      el?.getAttribute?.('data-testid'),
+      el?.getAttribute?.('name'),
+      el?.title,
+      textOf(el),
+    ].filter(Boolean).join(' '));
+  }
+
+  function effortSemanticHint(text) {
+    return /thinking|reasoning|effort|think level|thinking level|reasoning level|зусил|мислен|міркуван|размыш|усили/u.test(text);
+  }
+
+  function isInsideEffortChoiceSurface(el) {
+    const parent = el?.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"]');
+    return Boolean(parent);
+  }
+
+  function findEffortControl(doc) {
+    const candidates = Array.from(doc.querySelectorAll(
+      'button, [role="button"], [role="combobox"], [role="slider"], input[type="range"]'
+    ) || []).filter(isVisible).map((el) => {
+      if (isInsideEffortChoiceSurface(el)) return null;
+      const identity = effortSemanticText(el);
+      const ariaValue = normalizeEffortText(el.getAttribute?.('aria-valuetext'));
+      const level = classifyEffortLabel(ariaValue) || classifyEffortLabel(identity);
+      const role = normalizeEffortText(el.getAttribute?.('role'));
+      const popup = normalizeEffortText(el.getAttribute?.('aria-haspopup'));
+      const testId = normalizeEffortText(el.getAttribute?.('data-testid'));
+      const semantic = effortSemanticHint(identity);
+      const hasPopup = popup === 'menu' || popup === 'listbox' || popup === 'dialog' || popup === 'true';
+      let score = 0;
+      if (semantic) score += 100;
+      if (classifyEffortLabel(ariaValue)) score += 100;
+      if (/(thinking|reasoning|effort)/u.test(testId)) score += 80;
+      if (role === 'slider') score += 70;
+      if (level && hasPopup) score += 60;
+      if (level && semantic) score += 30;
+      if (!score) return null;
+      return { element: el, level, score };
+    }).filter(Boolean).sort((a, b) => b.score - a.score);
+
+    if (!candidates.length) return { element: null, level: null, ambiguous: false };
+    if (candidates.length > 1 && candidates[0].score === candidates[1].score) {
+      return { element: null, level: null, ambiguous: true };
+    }
+    return { ...candidates[0], ambiguous: false };
+  }
+
+  function effortOptionScore(el) {
+    const identity = effortSemanticText(el);
+    if (classifyEffortLabel(identity) !== 'high') return 0;
+    const role = normalizeEffortText(el.getAttribute?.('role'));
+    let score = 10;
+    if (['menuitemradio', 'option', 'radio', 'menuitem'].includes(role)) score += 100;
+    if (el.getAttribute?.('aria-checked') === 'true' || el.getAttribute?.('aria-selected') === 'true') score += 20;
+    if (el.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]')) score += 30;
+    return score;
+  }
+
+  function findHighEffortOption(doc) {
+    const ranked = Array.from(doc.querySelectorAll(
+      '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"], button, [role="button"]'
+    ) || []).filter(isVisible)
+      .map((element) => ({ element, score: effortOptionScore(element) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score);
+    if (!ranked.length) return { element: null, ambiguous: false };
+    if (ranked.length > 1 && ranked[0].score === ranked[1].score) return { element: null, ambiguous: true };
+    return { element: ranked[0].element, ambiguous: false };
+  }
+
+  function isEffortPickerSurface(surface) {
+    const text = effortSemanticText(surface);
+    if (!text) return false;
+    const levels = ['instant', 'low', 'medium', 'high', 'extra-high']
+      .filter((level) => {
+        if (level === 'extra-high') return /extra[ -]?high|xhigh|very high|дуже висок|очень высок/u.test(text);
+        if (level === 'high') return /\bhigh\b|високий|высокий/u.test(text);
+        if (level === 'medium') return /\bmedium\b|середній|средний/u.test(text);
+        if (level === 'low') return /\blow\b|низький|низкий/u.test(text);
+        return /\binstant\b|миттєв|мгновенн/u.test(text);
+      });
+    return levels.length >= 2 && (effortSemanticHint(text) || /instant|medium|high/u.test(text));
+  }
+
+  async function ensureHighEffort(doc, request, start, deps) {
+    if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_MISMATCH_BEFORE_EFFORT' });
+    }
+    const blocking = detectBlockingState(doc);
+    if (blocking) return resultBase(request, start, { status: blocking.status, safeDiagnosticCode: blocking.code + '_BEFORE_EFFORT' });
+
+    const current = findEffortControl(doc);
+    if (current.ambiguous) {
+      return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_CONTROL_AMBIGUOUS' });
+    }
+    if (HIGH_EFFORT_LEVELS.has(current.level)) {
+      return resultBase(request, start, {
+        status: STATUS.READY,
+        effortLevel: current.level,
+        safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
+      });
+    }
+
+    let highOption = findHighEffortOption(doc);
+    if (highOption.ambiguous) {
+      return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
+    }
+
+    if (!highOption.element) {
+      if (!current.element) {
+        return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_NOT_READY' });
+      }
+      try { current.element.focus?.(); current.element.click?.(); } catch (_) {
+        return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_OPEN_FAILED' });
+      }
+
+      const deadline = nowMs() + 1500;
+      do {
+        await (deps?.wait || wait)(100);
+        highOption = findHighEffortOption(doc);
+        if (highOption.ambiguous) {
+          return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
+        }
+        if (highOption.element) break;
+      } while (nowMs() < deadline);
+    }
+
+    if (!highOption.element) {
+      const refreshed = findEffortControl(doc);
+      if (!refreshed.ambiguous && HIGH_EFFORT_LEVELS.has(refreshed.level)) {
+        return resultBase(request, start, {
+          status: STATUS.READY,
+          effortLevel: refreshed.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
+        });
+      }
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_NOT_READY' });
+    }
+
+    try { highOption.element.focus?.(); highOption.element.click?.(); } catch (_) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_CLICK_FAILED' });
+    }
+
+    const verifyDeadline = nowMs() + 1500;
+    do {
+      await (deps?.wait || wait)(100);
+      const verified = findEffortControl(doc);
+      if (!verified.ambiguous && HIGH_EFFORT_LEVELS.has(verified.level)) {
+        return resultBase(request, start, {
+          status: STATUS.READY,
+          effortLevel: verified.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
+        });
+      }
+      const selected = findHighEffortOption(doc);
+      if (!selected.ambiguous && selected.element
+          && (selected.element.getAttribute?.('aria-checked') === 'true'
+            || selected.element.getAttribute?.('aria-selected') === 'true')) {
+        return resultBase(request, start, {
+          status: STATUS.READY,
+          effortLevel: 'high',
+          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
+        });
+      }
+    } while (nowMs() < verifyDeadline);
+
+    return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_NOT_PROVEN' });
+  }
+
   function visibleStatusText(doc) {
     return Array.from(doc.querySelectorAll('[role="alert"], [role="status"], [aria-live="assertive"]'))
       .filter(isVisible)
@@ -274,7 +472,7 @@
     // Any visible semantic modal outranks page-underlay evidence. We do not auto-click
     // dialogs here: CAPTCHA/security/account/payment/confirmation and localized/unknown
     // modal surfaces all require manual review unless a future control is explicitly whitelisted.
-    const dialogs = visibleModalSurfaces(doc);
+    const dialogs = visibleModalSurfaces(doc).filter((dialog) => !isEffortPickerSurface(dialog));
     if (dialogs.length) {
       const dialogText = dialogs.map((dialog) => (accessibleName(dialog) + ' ' + textOf(dialog)).toLowerCase()).join('\n');
       if (/captcha|verify|verification|security|confirm|account|payment|billing|purchase|subscribe/.test(dialogText)) {
@@ -1368,6 +1566,7 @@
 
     if (request.mode === 'READ_ASSISTANT_REPORT') return readAssistantReport(doc, request, start);
     if (request.mode === 'CHECK_ONLY') return inspect(doc, request, start);
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return ensureHighEffort(doc, request, start, deps || {});
     if (request.mode === 'INSERT_ONLY') return insertOnly(doc, request, start, deps || {});
     if (request.mode === 'PREPARE_SEND') return prepareSend(doc, request, start);
     if (request.mode === 'SUBMIT_EXISTING') return submitExisting(doc, request, start, deps || {});
@@ -1383,6 +1582,8 @@
     normalizePromptText,
     promptTextMatches,
     findVisibleComposer,
+    classifyEffortLabel,
+    findEffortControl,
     detectBlockingState,
     execute
   };
