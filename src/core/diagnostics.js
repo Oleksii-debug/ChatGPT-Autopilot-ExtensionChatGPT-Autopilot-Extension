@@ -57,6 +57,7 @@ export function appendDiagnostic(state, entry, { at = Date.now() } = {}) {
     observed: redactChatGptUrl(entry?.observed),
     promptFingerprint: entryText(entry, 'promptFingerprint', 80)
       || optionalText(session?.operation?.promptFingerprint, 80),
+    promptSource: entryText(entry, 'promptSource', 80),
     operationIdSuffix: entryText(entry, 'operationIdSuffix', 80)
       || optionalText(session?.operation?.operationId?.slice(-16), 80),
     tabId: Number.isInteger(entry?.tabId) && entry.tabId >= 0 ? entry.tabId : null,
@@ -111,6 +112,7 @@ function reportEvent(entry) {
     entry.code ? `код=${entry.code}` : null,
     entry.target ? `ціль=${entry.target}` : null,
     entry.observed ? `спостережено=${entry.observed}` : null,
+    entry.promptSource ? `джерело_промпта=${entry.promptSource}` : null,
     entry.promptFingerprint ? `відбиток=${entry.promptFingerprint}` : null,
     entry.message ? `пояснення=${entry.message}` : null,
   ].filter(Boolean);

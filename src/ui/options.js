@@ -2647,6 +2647,30 @@ function renderSimplifiedLog(session) {
     .join('\n');
 }
 
+function renderSimplifiedActions(session = ui.simplifiedSelected, { busy = false } = {}) {
+  const controls = {
+    start: $('simplified-start'),
+    pause: $('simplified-pause'),
+    resume: $('simplified-resume'),
+    stop: $('simplified-stop'),
+  };
+  if (busy) {
+    Object.values(controls).forEach((button) => { button.disabled = true; });
+    return;
+  }
+  if (!session?.id) {
+    Object.values(controls).forEach((button) => { button.disabled = true; });
+    return;
+  }
+  const state = session.runState || 'STOPPED';
+  const a = session.actionAvailability || {};
+  const active = state === 'RUNNING' || state === 'RECOVERING';
+  controls.start.disabled = active || state === 'PAUSED' || a.start === false;
+  controls.pause.disabled = !active || a.pause === false;
+  controls.resume.disabled = state !== 'PAUSED' || a.resume === false;
+  controls.stop.disabled = state === 'STOPPED' || a.stop === false;
+}
+
 function showSimplifiedSession(session) {
   ui.simplifiedSelected = session ? clone(session) : null;
   ui.simplifiedSelectedId = session?.id || '';
@@ -2677,6 +2701,7 @@ function showSimplifiedSession(session) {
     ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
     : 'Сеанс не вибрано.';
   $('simplified-draft-status').textContent = 'Незбережених змін немає.';
+  renderSimplifiedActions(session);
   renderSimplifiedLog(session);
 }
 function renderSimplifiedList() {
@@ -2711,7 +2736,9 @@ async function refreshSimplifiedSessionStatus() {
   try {
     const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
     const session = data.session;
+    ui.simplifiedSelected = clone(session);
     $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`;
+    renderSimplifiedActions(session);
     renderSimplifiedLog(session);
   } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
 }
@@ -2733,14 +2760,26 @@ async function saveSimplifiedSession() {
 async function simplifiedAction(command) {
   if (!ui.simplifiedSelectedId) {
     $('simplified-command-result').textContent = 'Спочатку збережіть сеанс.';
+    renderSimplifiedActions(null);
     return;
   }
+  renderSimplifiedActions(ui.simplifiedSelected, { busy: true });
+  $('simplified-command-result').textContent = 'Команду передано Core…';
   try {
     const data = await core(command, { sessionId: ui.simplifiedSelectedId });
     await loadSessions();
-    showSimplifiedSession(data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session);
-    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${ui.simplifiedSelected.runState}.`;
-  } catch (error) { $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`; }
+    const session = data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session;
+    showSimplifiedSession(session);
+    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${session.runState}.`;
+  } catch (error) {
+    $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`;
+    try {
+      const current = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
+      showSimplifiedSession(current.session);
+    } catch {
+      renderSimplifiedActions(ui.simplifiedSelected);
+    }
+  }
 }
 
 async function importSimplifiedProfile(start) {

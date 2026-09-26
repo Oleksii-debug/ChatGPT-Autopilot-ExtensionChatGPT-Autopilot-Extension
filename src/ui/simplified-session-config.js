@@ -16,10 +16,10 @@ export function buildSimplifiedSessionConfig(fields, previous = null, createId =
     ? [String(fields.url || '').trim()]
     : String(fields.urls || '').split(/\r?\n/u).map(url => url.trim()).filter(Boolean);
   const prompts = promptMode === 'shared'
-    ? [String(fields.prompt || '').trim()]
-    : String(fields.prompts || '').split(/^\s*---\s*$/mu).map(prompt => prompt.trim()).filter(Boolean);
+    ? [String(fields.prompt ?? '')]
+    : String(fields.prompts ?? '').split(/^[ \t]*---[ \t]*$/mu).filter(prompt => prompt.trim());
   if (!urls.length || urls.some(url => !url)) throw new Error('Укажіть посилання ChatGPT.');
-  if (!prompts.length || prompts.some(prompt => !prompt)) throw new Error('Укажіть промпт.');
+  if (!prompts.length || prompts.some(prompt => !prompt.trim())) throw new Error('Укажіть промпт.');
   if (urlMode === 'unique' && promptMode === 'unique' && urls.length !== prompts.length) {
     throw new Error('Кількість посилань і промптів повинна збігатися.');
   }

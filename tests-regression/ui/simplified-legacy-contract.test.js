@@ -79,6 +79,39 @@ test('Simplified retry unit preserves the old minutes-or-seconds behavior', () =
   assert.equal(config.busyChatBehavior, 'skip-next');
 });
 
+test('Simplified Sessions preserve prompt bytes and expose truthful lifecycle button states', () => {
+  const exactPrompt = '  перший рядок\nдругий рядок\n';
+  const config = buildSimplifiedSessionConfig({
+    name: 'точний промпт',
+    mode: 'shared-shared',
+    url: 'https://chatgpt.com/',
+    prompt: exactPrompt,
+    runMode: 'continuous',
+    cycles: '1',
+    interval: '2',
+    intervalUnit: 'minutes',
+    delay: '10',
+    busy: '3',
+    retry: '30',
+    retryUnit: 'seconds',
+    retryPolicy: 'safe',
+    busyBehavior: 'skip-next',
+    tabs: 'open-close',
+  }, null, () => 'exact-id');
+
+  assert.equal(config.sharedPrompt, exactPrompt, 'shared prompt must not be trimmed or rewritten');
+  const section = simplifiedSection();
+  for (const id of ['simplified-start','simplified-pause','simplified-resume','simplified-stop']) {
+    assert.match(section, new RegExp(`id="${id}"[^>]*disabled`), `${id} must begin disabled until Core state is loaded`);
+  }
+  assert.match(section, /Автоматично повторювати і продовжувати роботу/u);
+  assert.match(js, /function renderSimplifiedActions\(session = ui\.simplifiedSelected, \{ busy = false \} = \{\}\)/u);
+  assert.match(js, /controls\.start\.disabled = active \|\| state === 'PAUSED' \|\| a\.start === false/u);
+  assert.match(js, /controls\.resume\.disabled = state !== 'PAUSED' \|\| a\.resume === false/u);
+  assert.match(js, /renderSimplifiedActions\(ui\.simplifiedSelected, \{ busy: true \}\)/u);
+  assert.match(js, /ui\.simplifiedSelected = clone\(session\);[\s\S]*renderSimplifiedActions\(session\)/u);
+});
+
 test('UI removes tutorial prose globally while keeping runtime and safety status', () => {
   assert.doesNotMatch(html, /class="[^"]*field-help/u);
   assert.doesNotMatch(html, /class="notice"/u);

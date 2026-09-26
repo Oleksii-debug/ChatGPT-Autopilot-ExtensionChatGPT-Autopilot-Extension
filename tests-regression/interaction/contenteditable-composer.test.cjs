@@ -166,6 +166,21 @@ test('INSERT_ONLY uses the composer ownerDocument editing transaction and never 
   assert.equal(env.clicks(), 0);
 });
 
+test('INSERT_ONLY accepts ProseMirror whitespace reflow when prompt content is intact', async () => {
+  const env = makeEnvironment({ corruptInsert: value => value.replace(/\n/gu, '\n ') });
+  const composer = env.makeComposer();
+  const adapter = loadAdapter();
+
+  const result = await adapter.execute(request({ promptText: 'Line one\nLine two\nLine three' }), {
+    document: env.buildDocument(composer),
+    wait: async () => {}
+  });
+
+  assert.equal(result.status, adapter.STATUS.INSERTED_NOT_SENT);
+  assert.equal(result.safeDiagnosticCode, 'INSERTION_TEXT_PROVEN');
+  assert.equal(env.clicks(), 0);
+});
+
 test('contenteditable fallback is accepted only when resulting editor text is observable', async () => {
   const env = makeEnvironment({ execCommand: false });
   const composer = env.makeComposer({ directMutationUpdatesModel: true });

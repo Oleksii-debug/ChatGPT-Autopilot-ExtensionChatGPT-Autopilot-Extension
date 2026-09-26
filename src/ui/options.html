@@ -155,7 +155,7 @@
 
           <label for="simplified-retry-policy">Політика повторних спроб</label>
           <select id="simplified-retry-policy">
-            <option value="safe">Автоматичні повтори без нагляду</option>
+            <option value="safe">Автоматично повторювати і продовжувати роботу</option>
             <option value="manual">Ручна перевірка після тимчасової помилки</option>
           </select>
 
@@ -176,10 +176,10 @@
           <h3 id="simplified-controls-heading">Керування</h3>
           <div class="button-row" aria-label="Керування спрощеним сеансом">
             <button id="simplified-save" type="button">Зберегти сеанс</button>
-            <button id="simplified-start" type="button">Запустити</button>
-            <button id="simplified-pause" type="button">Призупинити</button>
-            <button id="simplified-resume" type="button">Продовжити</button>
-            <button id="simplified-stop" type="button">Зупинити</button>
+            <button id="simplified-start" type="button" disabled>Запустити</button>
+            <button id="simplified-pause" type="button" disabled>Призупинити</button>
+            <button id="simplified-resume" type="button" disabled>Продовжити</button>
+            <button id="simplified-stop" type="button" disabled>Зупинити</button>
             <button id="simplified-duplicate" type="button">Дублювати</button>
             <button id="simplified-delete" type="button">Видалити</button>
           </div>

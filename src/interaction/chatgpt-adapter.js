@@ -799,7 +799,14 @@
   function promptTextMatches(observed, expected) {
     const a = normalizePromptText(observed);
     const b = normalizePromptText(expected);
-    return a === b;
+    if (a === b) return true;
+    if (!a || !b) return false;
+    // ChatGPT/ProseMirror can preserve every non-whitespace character while
+    // reflowing paragraph/newline boundaries in contenteditable. That is a
+    // presentation change, not a prompt change. Accept only when the complete
+    // compacted text is identical; any changed/missing/extra non-whitespace
+    // character still fails closed.
+    return compactPromptText(a) === compactPromptText(b);
   }
 
   function repeatedUnit(value, unit, separator = '') {
@@ -848,7 +855,8 @@
       `observedLength=${String(observed ?? '').length}`,
       `expectedNormalizedLength=${normalizePromptText(expected).length}`,
       `observedNormalizedLength=${normalizePromptText(observed).length}`,
-      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`,
+      `exactNormalizedMatch=${normalizePromptText(observed) === normalizePromptText(expected) ? 'yes' : 'no'}`,
+      `promptMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`,
       `compactMatch=${compactPromptText(observed) === compactPromptText(expected) ? 'yes' : 'no'}`,
       `nonWhitespaceMatch=${normalizePromptText(observed).replace(/\s+/gu, '') === normalizePromptText(expected).replace(/\s+/gu, '') ? 'yes' : 'no'}`
     ].join('; ');
