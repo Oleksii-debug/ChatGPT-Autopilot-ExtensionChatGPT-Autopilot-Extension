@@ -58,13 +58,13 @@ test('executor persists pre-send wait after verified insertion', async () => {
   const modes = [];
   const transport = { async execute(_tab, request) {
     modes.push(request.mode);
-    if (request.mode === 'CHECK_ONLY' || request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY };
+    if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
     return { status: InteractionResult.INSERTED_NOT_SENT, composerState: 'VISIBLE_NONEMPTY', safeDiagnosticCode: 'INSERTION_TEXT_PROVEN' };
   } };
   const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => clock.value, cryptoApi: webcrypto });
   const result = await executor.runSessionOnce('s1');
   assert.equal(result.kind, 'WAIT_PRE_SEND');
-  assert.deepEqual(modes, ['CHECK_ONLY', 'ENSURE_HIGH_EFFORT', 'INSERT_ONLY']);
+  assert.deepEqual(modes, ['CHECK_ONLY', 'INSERT_ONLY']);
   assert.equal((await repo.load()).sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
 });
 
@@ -192,22 +192,18 @@ test('stale ambiguous verification cannot reconcile a replacement operation', as
 });
 
 
-test('executor blocks insertion when High effort cannot be proven', async () => {
+test('executor does not inspect or change reasoning effort before insertion', async () => {
   const repo = new Repo(setup());
   const modes = [];
   const transport = { async execute(_tab, request) {
     modes.push(request.mode);
+    if (request.mode === 'ENSURE_HIGH_EFFORT') throw new Error('reasoning-effort control is deferred');
     if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
-    if (request.mode === 'ENSURE_HIGH_EFFORT') {
-      return { status: InteractionResult.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_NOT_READY' };
-    }
-    throw new Error('INSERT_ONLY must not run without verified High effort');
+    return { status: InteractionResult.INSERTED_NOT_SENT, composerState: 'VISIBLE_NONEMPTY', safeDiagnosticCode: 'INSERTION_TEXT_PROVEN' };
   } };
   const executor = new AutomaticSessionExecutor(repo, chromeApi, transport, { now: () => 100, cryptoApi: webcrypto });
   const result = await executor.runSessionOnce('s1');
-  assert.equal(result.kind, InteractionResult.TEMPORARY_ERROR);
-  assert.deepEqual(modes, ['CHECK_ONLY', 'ENSURE_HIGH_EFFORT']);
-  const after = await repo.load();
-  assert.ok(!after.sessionsById.s1.operation || after.sessionsById.s1.operation.phase !== OperationPhase.INSERTING);
-  assert.equal(after.sessionsById.s1.successfulSendCount, 0);
+  assert.equal(result.kind, 'WAIT_PRE_SEND');
+  assert.deepEqual(modes, ['CHECK_ONLY', 'INSERT_ONLY']);
+  assert.equal((await repo.load()).sessionsById.s1.operation.phase, OperationPhase.PRE_SEND_WAIT);
 });
