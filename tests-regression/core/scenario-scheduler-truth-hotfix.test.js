@@ -320,6 +320,7 @@ test('continuous simplified sessions count verified sends as completed send-cycl
         runState: 'RUNNING',
         runMode: 'CONTINUOUS',
         successfulSendCount: 9,
+        operation: { phase: 'SENT_VERIFIED' },
         nextAllowedSendAt: 1_800_000_120_000,
         tasksById: {},
         taskOrder: [],
@@ -443,6 +444,9 @@ test('assistant-response diagnostics distinguish streaming, completion and timeo
   task.lastVerifiedSendAt = h.now;
   task.lastConversationUrl = 'https://chatgpt.com/c/diagnostic';
   session.successfulSendCount = 1;
+  session.onePassCompletedCount = 1;
+  session.onePassCompletedTaskIds = [task.id];
+  session.runState = 'COMPLETED';
 
   h.now += 10_000;
   await h.manager.cycleOne(id);
