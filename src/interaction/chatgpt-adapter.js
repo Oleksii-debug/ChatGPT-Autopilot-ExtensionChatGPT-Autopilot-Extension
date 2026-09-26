@@ -332,6 +332,30 @@
     return { ...candidates[0], ambiguous: false };
   }
 
+  function effortOptionSelected(el) {
+    const ariaChecked = normalizeEffortText(el?.getAttribute?.('aria-checked'));
+    const ariaSelected = normalizeEffortText(el?.getAttribute?.('aria-selected'));
+    const dataState = normalizeEffortText(el?.getAttribute?.('data-state'));
+    const dataSelected = normalizeEffortText(el?.getAttribute?.('data-selected'));
+    return ariaChecked === 'true'
+      || ariaSelected === 'true'
+      || dataSelected === 'true'
+      || dataState === 'checked'
+      || dataState === 'on'
+      || dataState === 'selected';
+  }
+
+  function findSelectedEffortOption(doc) {
+    const options = Array.from(doc.querySelectorAll(
+      '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"]'
+    ) || []).filter(isVisible).filter(effortOptionSelected)
+      .map((element) => ({ element, level: classifyEffortLabel(effortSemanticText(element)) }))
+      .filter((entry) => entry.level);
+    if (!options.length) return { element: null, level: null, ambiguous: false };
+    if (options.length > 1) return { element: null, level: null, ambiguous: true };
+    return { ...options[0], ambiguous: false };
+  }
+
   function effortOptionScore(el) {
     const identity = effortSemanticText(el);
     if (classifyEffortLabel(identity) !== 'high') return 0;
@@ -341,7 +365,7 @@
     if (!choiceRole && !choiceSurface && !effortSemanticHint(identity)) return 0;
     let score = 10;
     if (choiceRole) score += 100;
-    if (el.getAttribute?.('aria-checked') === 'true' || el.getAttribute?.('aria-selected') === 'true') score += 20;
+    if (effortOptionSelected(el)) score += 20;
     if (choiceSurface) score += 30;
     return score;
   }
@@ -407,6 +431,18 @@
       const deadline = nowMs() + 1500;
       do {
         await (deps?.wait || wait)(100);
+        const alreadySelected = findSelectedEffortOption(doc);
+        if (alreadySelected.ambiguous) {
+          return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SELECTED_OPTION_AMBIGUOUS' });
+        }
+        if (HIGH_EFFORT_LEVELS.has(alreadySelected.level)) {
+          try { current.element.click?.(); } catch (_) {}
+          return resultBase(request, start, {
+            status: STATUS.READY,
+            effortLevel: alreadySelected.level,
+            safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED_IN_PICKER',
+          });
+        }
         highOption = findHighEffortOption(doc);
         if (highOption.ambiguous) {
           return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
@@ -445,8 +481,7 @@
       }
       let selected = findHighEffortOption(doc);
       if (!selected.ambiguous && selected.element
-          && (selected.element.getAttribute?.('aria-checked') === 'true'
-            || selected.element.getAttribute?.('aria-selected') === 'true')) {
+          && effortOptionSelected(selected.element)) {
         return resultBase(request, start, {
           status: STATUS.READY,
           effortLevel: 'high',
@@ -464,8 +499,7 @@
         await (deps?.wait || wait)(100);
         selected = findHighEffortOption(doc);
         if (!selected.ambiguous && selected.element
-            && (selected.element.getAttribute?.('aria-checked') === 'true'
-              || selected.element.getAttribute?.('aria-selected') === 'true')) {
+            && effortOptionSelected(selected.element)) {
           try { verified.element.click?.(); } catch (_) {}
           return resultBase(request, start, {
             status: STATUS.READY,
