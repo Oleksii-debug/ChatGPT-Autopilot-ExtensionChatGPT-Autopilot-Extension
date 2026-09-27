@@ -105,8 +105,9 @@ const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
   'withProjectHierarchyAuthority',
 ]);
 const ORCHESTRATION_LIFECYCLE_DEPENDENCY_KEYS = new Set([
-  'applyBrowserAgentBoundLifecycle',
+  'withBrowserAgentBoundLifecycleAuthority',
 ]);
+const BROWSER_AGENT_BOUND_LIFECYCLE_RETRY = Object.freeze({});
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -178,16 +179,29 @@ function trustedOrchestrationAuthorityFence(dependencies) {
   return raw.withProjectHierarchyAuthority;
 }
 
-function trustedOrchestrationLifecycleTransition(dependencies) {
+function trustedOrchestrationLifecycleFence(dependencies) {
   const raw = snapshotExactOwnDataRequest(
     dependencies,
     ORCHESTRATION_LIFECYCLE_DEPENDENCY_KEYS,
     'Browser Agent orchestration lifecycle dependencies',
   );
-  if (typeof raw.applyBrowserAgentBoundLifecycle !== 'function') {
-    throw new Error('Canonical Browser Agent orchestration lifecycle adapter is required');
+  if (typeof raw.withBrowserAgentBoundLifecycleAuthority !== 'function') {
+    throw new Error('Canonical Browser Agent orchestration lifecycle authority fence is required');
   }
-  return raw.applyBrowserAgentBoundLifecycle;
+  return raw.withBrowserAgentBoundLifecycleAuthority;
+}
+
+function sameOrchestrationNodeBinding(leftRaw, rightRaw) {
+  const left = normalizeBrowserAgentOrchestrationNodeBindingV1(leftRaw);
+  const right = normalizeBrowserAgentOrchestrationNodeBindingV1(rightRaw);
+  return left.schemaVersion === right.schemaVersion
+    && left.jobId === right.jobId
+    && left.projectId === right.projectId
+    && left.orchestraId === right.orchestraId
+    && left.graphId === right.graphId
+    && left.controlEpoch === right.controlEpoch
+    && left.nodeId === right.nodeId
+    && left.boundAt === right.boundAt;
 }
 
 const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
@@ -2117,31 +2131,40 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async #updateOwnerLifecycleState(id, transition, mutator, dependencies = {}) {
-    if (typeof mutator !== 'function') throw new Error('Browser Agent lifecycle mutator is required');
+  async #commitOwnerLifecycleMutation(
+    id,
+    transition,
+    mutator,
+    { expectedBinding = null, applyBoundLifecycle = null, rejectNewBinding = false } = {},
+  ) {
     const operation = this.updateChain.then(async () => {
       const before = await this.load();
       const draft = clone(before);
       const job = draft.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
 
-      let binding = null;
-      let applyBoundLifecycle = null;
-      if (job.orchestrationNodeBinding) {
-        binding = normalizeBrowserAgentOrchestrationNodeBindingV1(job.orchestrationNodeBinding);
-        if (binding.jobId !== job.id || binding.projectId !== job.config?.projectId) {
+      const liveBinding = job.orchestrationNodeBinding
+        ? normalizeBrowserAgentOrchestrationNodeBindingV1(job.orchestrationNodeBinding)
+        : null;
+      if (rejectNewBinding && liveBinding) return BROWSER_AGENT_BOUND_LIFECYCLE_RETRY;
+      if (expectedBinding) {
+        if (!liveBinding || !sameOrchestrationNodeBinding(liveBinding, expectedBinding)) {
+          throw new Error('Browser Agent orchestration binding changed before lifecycle commit');
+        }
+        if (liveBinding.jobId !== job.id || liveBinding.projectId !== job.config?.projectId) {
           throw new Error('Browser Agent orchestration binding no longer matches the durable job');
         }
-        applyBoundLifecycle = trustedOrchestrationLifecycleTransition(dependencies);
+        if (typeof applyBoundLifecycle !== 'function') {
+          throw new Error('Canonical Browser Agent bound lifecycle transition is required');
+        }
       }
 
       const next = await mutator(draft) || draft;
       const saved = await this.save(next);
-      if (binding) {
+      if (expectedBinding) {
         try {
           const live = saved.byId[id];
           await applyBoundLifecycle(
-            binding,
             transition,
             {
               browserControlEpoch: live.runtime.controlEpoch,
@@ -2164,6 +2187,41 @@ export class BrowserAgentManager {
     });
     this.updateChain = operation.catch(() => undefined);
     return operation;
+  }
+
+  async #updateOwnerLifecycleState(id, transition, mutator, dependencies = {}) {
+    if (typeof mutator !== 'function') throw new Error('Browser Agent lifecycle mutator is required');
+    const initial = await this.get(id);
+    if (!initial.job) throw new Error('Browser Agent job not found');
+
+    const initialBinding = initial.job.orchestrationNodeBinding
+      ? normalizeBrowserAgentOrchestrationNodeBindingV1(initial.job.orchestrationNodeBinding)
+      : null;
+    if (!initialBinding) {
+      const result = await this.#commitOwnerLifecycleMutation(
+        id,
+        transition,
+        mutator,
+        { rejectNewBinding: true },
+      );
+      if (result === BROWSER_AGENT_BOUND_LIFECYCLE_RETRY) {
+        return this.#updateOwnerLifecycleState(id, transition, mutator, dependencies);
+      }
+      return result;
+    }
+
+    const withLifecycleAuthority = trustedOrchestrationLifecycleFence(dependencies);
+    return withLifecycleAuthority(initialBinding, async applyBoundLifecycle => {
+      if (typeof applyBoundLifecycle !== 'function') {
+        throw new Error('Canonical Browser Agent bound lifecycle transition is required');
+      }
+      return this.#commitOwnerLifecycleMutation(
+        id,
+        transition,
+        mutator,
+        { expectedBinding: initialBinding, applyBoundLifecycle },
+      );
+    });
   }
 
   async pause(id, dependencies = {}) {
