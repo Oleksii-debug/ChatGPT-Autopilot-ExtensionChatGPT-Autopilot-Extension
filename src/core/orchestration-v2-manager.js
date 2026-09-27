@@ -314,7 +314,7 @@ export class OrchestrationV2Manager {
           transition,
           browserControlEpoch,
         );
-        const result = await controller.dispatchHierarchyEvent({
+        const result = await controller.dispatchHierarchyScopeEvent({
           type: eventType,
           eventId,
           controlEpoch: binding.controlEpoch,
