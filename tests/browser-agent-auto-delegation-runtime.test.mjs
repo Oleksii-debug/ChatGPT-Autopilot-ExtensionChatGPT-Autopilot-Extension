@@ -395,6 +395,58 @@ async function claimPreparedOpenHands(manager, dependencies) {
   return prepared;
 }
 
+function trustedSpecialistExecutionRecord({
+  executionId,
+  outcome = 'EFFECT_VERIFIED',
+  verificationId = 'verification:job.auto:1',
+  artifactId = 'artifact:job.auto:result',
+} = {}) {
+  const artifact = {
+    schemaVersion: 1,
+    artifactId,
+    kind: outcome === 'NO_EFFECT_VERIFIED' ? 'specialist-no-effect-proof' : 'specialist-result',
+    uri: `file://workspace/${artifactId.replaceAll(':', '-')}.json`,
+    mediaType: 'application/json',
+    sha256: 'b'.repeat(64),
+    sizeBytes: 64,
+    createdAt: T0,
+    producerInvocationId: 'invoke:independent-specialist-verifier',
+    sensitive: false,
+  };
+  return {
+    schemaVersion: 1,
+    recordId: `trusted-record:${verificationId}`,
+    taskId: 'browser-agent-task:plan:auto-runtime',
+    planId: 'plan:auto-runtime',
+    nodeId: 'local-analysis',
+    effectId: 'specialist-effect:plan:auto-runtime:local-analysis',
+    policyEnvelopeId: 'policy:job.auto',
+    executionId,
+    outcome,
+    verification: {
+      schemaVersion: 1,
+      verificationId,
+      invocationId: 'invoke:independent-specialist-verifier',
+      observationId: 'observation:independent-specialist-verifier',
+      status: 'VERIFIED',
+      reasonCode: outcome === 'NO_EFFECT_VERIFIED'
+        ? 'NO_EFFECT_OBSERVED'
+        : 'RESULT_POSTCONDITION_MATCH',
+      summary: 'Independent canonical verifier resolved the exact specialist execution.',
+      evidenceArtifactIds: [artifactId],
+      verifiedAt: T0,
+      verifierId: 'independent-specialist-verifier',
+      verificationAuthorityId: 'policy:job.auto',
+      effectId: 'specialist-effect:plan:auto-runtime:local-analysis',
+      executionId,
+      attempt: 1,
+    },
+    evidenceArtifacts: [artifact],
+    recordedAt: T0,
+    validThrough: T1,
+  };
+}
+
 test('runtime auto-delegation prepares least authority without claiming execution ownership', async () => {
   const { chrome, manager, dependencies } = await fixture();
   const result = await manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies);
@@ -1130,6 +1182,183 @@ test('provider terminal success is durable evidence but never product completion
   const live = await manager.listSpecialistHandoffs('job.auto');
   assert.equal(live.handoffs[0].state, 'LEASED');
   assert.equal(live.handoffs[0].resultArtifactIds.length, 0);
+});
+
+test('BrowserAgentManager advances provider result to VERIFIED only through resolver-backed trusted record', async () => {
+  const { manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  const prepared = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '44444444-4444-4444-8444-444444444444',
+    },
+    dependencies,
+  );
+  await manager.recordSpecialistProviderExecutionOutcome('job.auto', {
+    agentId: prepared.execution.agentId,
+    leaseId: prepared.execution.leaseId,
+    conversationId: prepared.execution.conversationId,
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+    errorCode: '',
+  });
+
+  const artifactId = 'artifact:job.auto:result';
+  await manager.completeSpecialistHandoff('job.auto', {
+    agentId: prepared.execution.agentId,
+    leaseId: prepared.execution.leaseId,
+    resultArtifactIds: [artifactId],
+    at: T0,
+  });
+  const before = await manager.get('job.auto');
+
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job.auto', {
+      agentId: prepared.execution.agentId,
+      leaseId: prepared.execution.leaseId,
+      verificationId: 'verification:job.auto:1',
+    }),
+    /Canonical trusted execution verification resolver is required/u,
+  );
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff(
+      'job.auto',
+      {
+        agentId: prepared.execution.agentId,
+        leaseId: prepared.execution.leaseId,
+        verificationId: 'verification:job.auto:1',
+        at: T1,
+      },
+      { resolveTrustedExecutionVerificationRecord: async () => null },
+    ),
+    /unknown field: at/u,
+  );
+  const afterRejected = await manager.get('job.auto');
+  assert.deepEqual(afterRejected.job.runtime.plan, before.job.runtime.plan);
+  assert.deepEqual(
+    afterRejected.job.runtime.specialistExecutionOwnerships,
+    before.job.runtime.specialistExecutionOwnerships,
+  );
+
+  let lookup = null;
+  const verified = await manager.verifySpecialistHandoff(
+    'job.auto',
+    {
+      agentId: prepared.execution.agentId,
+      leaseId: prepared.execution.leaseId,
+      verificationId: 'verification:job.auto:1',
+    },
+    {
+      resolveTrustedExecutionVerificationRecord: async value => {
+        lookup = value;
+        return trustedSpecialistExecutionRecord({
+          executionId: prepared.execution.leaseId,
+          verificationId: 'verification:job.auto:1',
+          artifactId,
+        });
+      },
+    },
+  );
+
+  assert.equal(lookup.executionId, prepared.execution.leaseId);
+  assert.equal(lookup.expectedOutcome, 'EFFECT_VERIFIED');
+  assert.equal(verified.plan.nodes[0].state, 'VERIFIED');
+  assert.equal(verified.executionOwnerships[0].state, ExecutionOwnershipState.VERIFIED);
+  assert.equal(verified.completionAuthorizedByTrustedVerifier, true);
+  assert.equal(verified.executionAuthorized, false);
+  assert.equal(verified.trustedVerification.recordId, 'trusted-record:verification:job.auto:1');
+
+  const live = await manager.get('job.auto');
+  const history = live.job.runtime.history.at(-1);
+  assert.equal(history.type, 'specialist-handoff-verified');
+  assert.equal(history.trustedRecordId, 'trusted-record:verification:job.auto:1');
+  assert.equal(history.verificationOutcome, 'EFFECT_VERIFIED');
+});
+
+test('BrowserAgentManager releases RECONCILE lease only through trusted NO_EFFECT record', async () => {
+  const { manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  const prepared = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '55555555-5555-4555-8555-555555555555',
+    },
+    dependencies,
+  );
+  await manager.recordSpecialistProviderExecutionOutcome('job.auto', {
+    agentId: prepared.execution.agentId,
+    leaseId: prepared.execution.leaseId,
+    conversationId: prepared.execution.conversationId,
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: true,
+    safeToRetry: false,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_REQUEST_TIMEOUT',
+  });
+
+  const before = await manager.get('job.auto');
+  await assert.rejects(
+    () => manager.authorizeSpecialistSafeRetry('job.auto', {
+      agentId: prepared.execution.agentId,
+      leaseId: prepared.execution.leaseId,
+      verificationId: 'verification:job.auto:no-effect',
+    }),
+    /Canonical trusted execution verification resolver is required/u,
+  );
+  const afterRejected = await manager.get('job.auto');
+  assert.deepEqual(
+    afterRejected.job.runtime.specialistExecutionOwnerships,
+    before.job.runtime.specialistExecutionOwnerships,
+  );
+
+  let lookup = null;
+  const retriable = await manager.authorizeSpecialistSafeRetry(
+    'job.auto',
+    {
+      agentId: prepared.execution.agentId,
+      leaseId: prepared.execution.leaseId,
+      verificationId: 'verification:job.auto:no-effect',
+    },
+    {
+      resolveTrustedExecutionVerificationRecord: async value => {
+        lookup = value;
+        return trustedSpecialistExecutionRecord({
+          executionId: prepared.execution.leaseId,
+          outcome: 'NO_EFFECT_VERIFIED',
+          verificationId: 'verification:job.auto:no-effect',
+          artifactId: 'artifact:job.auto:no-effect',
+        });
+      },
+    },
+  );
+
+  assert.equal(lookup.expectedOutcome, 'NO_EFFECT_VERIFIED');
+  assert.equal(retriable.assignments[0].state, 'READY');
+  assert.equal(retriable.assignments[0].leaseId, '');
+  assert.equal(retriable.executionOwnerships[0].state, ExecutionOwnershipState.AVAILABLE);
+  assert.equal(retriable.plan.nodes[0].state, 'READY');
+  assert.equal(retriable.executionDispatched, false);
+  assert.equal(retriable.trustedVerification.outcome, 'NO_EFFECT_VERIFIED');
+
+  const live = await manager.get('job.auto');
+  const history = live.job.runtime.history.at(-1);
+  assert.equal(history.type, 'specialist-handoff-safe-retry-authorized');
+  assert.equal(history.verificationOutcome, 'NO_EFFECT_VERIFIED');
+  assert.equal(history.trustedRecordId, 'trusted-record:verification:job.auto:no-effect');
 });
 
 test('ambiguous OpenHands effect immediately fences canonical ownership in RECONCILE', async () => {

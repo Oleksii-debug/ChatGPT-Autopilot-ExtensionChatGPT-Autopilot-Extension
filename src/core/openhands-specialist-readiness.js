@@ -55,6 +55,12 @@ function record(value, allowed, label) {
   return out;
 }
 
+function freeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) freeze(child);
+  return Object.freeze(value);
+}
+
 function denseArray(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(label + ' must be a canonical array');
