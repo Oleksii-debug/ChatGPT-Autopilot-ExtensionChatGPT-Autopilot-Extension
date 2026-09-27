@@ -38,7 +38,7 @@ function request(overrides = {}) {
     parentToolIds: ['tool.read', 'tool.write'],
     ownerAllowedToolIds: ['tool.read', 'tool.write'],
     requestedToolIds: ['tool.read'],
-    toolDescriptors: [tool('tool.read')],
+    parentToolDescriptors: [tool('tool.read')],
     ...overrides,
   };
 }
@@ -47,7 +47,7 @@ test('derives only the exact task scope inside parent, owner and provider author
   const result = deriveSubagentAuthorityEnvelopeV1(request({
     taskRequestedCapabilityIds: ['cap.read', 'cap.write'],
     requestedToolIds: ['tool.read', 'tool.write'],
-    toolDescriptors: [
+    parentToolDescriptors: [
       tool('tool.read', ['cap.read']),
       tool('tool.write', ['cap.write']),
     ],
@@ -118,14 +118,14 @@ test('tool identity is independently narrowed by parent and owner scope', () => 
 
 test('tool descriptors cannot smuggle provider or capability authority', () => {
   const capability = deriveSubagentAuthorityEnvelopeV1(request({
-    toolDescriptors: [tool('tool.read', ['cap.read', 'cap.write'])],
+    parentToolDescriptors: [tool('tool.read', ['cap.read', 'cap.write'])],
   }));
   assert.equal(capability.reasonCode, 'TOOL_CAPABILITY_ESCALATION');
   assert.deepEqual(capability.deniedToolIds, ['tool.read']);
   assert.deepEqual(capability.deniedCapabilityIds, ['cap.write']);
 
   const provider = deriveSubagentAuthorityEnvelopeV1(request({
-    toolDescriptors: [tool('tool.read', ['cap.read'], 'provider.other')],
+    parentToolDescriptors: [tool('tool.read', ['cap.read'], 'provider.other')],
   }));
   assert.equal(provider.reasonCode, 'TOOL_PROVIDER_ESCALATION');
   assert.deepEqual(provider.deniedToolIds, ['tool.read']);
@@ -139,18 +139,18 @@ test('tool descriptors cannot smuggle provider or capability authority', () => {
   assert.deepEqual(missing.deniedToolIds, ['tool.unknown']);
 
   const undeclared = deriveSubagentAuthorityEnvelopeV1(request({
-    toolDescriptors: [tool('tool.read', [])],
+    parentToolDescriptors: [tool('tool.read', [])],
   }));
   assert.equal(undeclared.reasonCode, 'TOOL_CAPABILITY_UNDECLARED');
   assert.deepEqual(undeclared.deniedToolIds, ['tool.read']);
 });
 
-test('unused descriptors grant no authority and requested tool order remains deterministic', () => {
+test('unused parent descriptors grant no child authority and requested tool order remains deterministic', () => {
   const result = deriveSubagentAuthorityEnvelopeV1(request({
-    parentToolIds: ['tool.read', 'tool.write', 'tool.second'],
+    parentToolIds: ['tool.read', 'tool.write', 'tool.second', 'tool.unused'],
     ownerAllowedToolIds: ['tool.read', 'tool.write', 'tool.second'],
     requestedToolIds: ['tool.second', 'tool.read'],
-    toolDescriptors: [
+    parentToolDescriptors: [
       tool('tool.unused', ['cap.admin']),
       tool('tool.read', ['cap.read']),
       tool('tool.second', ['cap.read']),
@@ -159,6 +159,25 @@ test('unused descriptors grant no authority and requested tool order remains det
   assert.equal(result.decision, 'ALLOW');
   assert.deepEqual(result.toolIds, ['tool.second', 'tool.read']);
   assert.deepEqual(result.toolDescriptors.map(item => item.toolId), ['tool.second', 'tool.read']);
+});
+
+
+test('task cannot substitute tool descriptor semantics for an authorized tool identity', () => {
+  assert.throws(
+    () => deriveSubagentAuthorityEnvelopeV1({
+      ...request(),
+      parentToolDescriptors: undefined,
+      toolDescriptors: [tool('tool.read', ['cap.read'], 'provider.main')],
+    }),
+    /unknown field: toolDescriptors/,
+  );
+
+  assert.throws(
+    () => deriveSubagentAuthorityEnvelopeV1(request({
+      parentToolDescriptors: [tool('tool.unowned')],
+    })),
+    /parentToolDescriptors exceeds parentToolIds: tool\.unowned/,
+  );
 });
 
 test('parent and child identities must be distinct', () => {
@@ -213,7 +232,7 @@ test('list and ToolDescriptor boundaries reject hostile shapes without evaluatin
     },
   });
   assert.throws(
-    () => deriveSubagentAuthorityEnvelopeV1(request({ toolDescriptors: [descriptor] })),
+    () => deriveSubagentAuthorityEnvelopeV1(request({ parentToolDescriptors: [descriptor] })),
     /enumerable own data properties/,
   );
   assert.equal(reads, 0);
@@ -234,7 +253,7 @@ test('duplicates fail closed instead of creating ambiguous child authority', () 
   );
   assert.throws(
     () => deriveSubagentAuthorityEnvelopeV1(request({
-      toolDescriptors: [tool('tool.read'), tool('tool.read')],
+      parentToolDescriptors: [tool('tool.read'), tool('tool.read')],
     })),
     /duplicate toolId/,
   );
