@@ -18,13 +18,15 @@ const RECORD_KEYS = new Set([
   'leaseId', 'leaseUntil', 'conversationId', 'providerConfig',
   'status', 'providerStatus', 'providerSucceeded', 'manualReviewRequired',
   'reconciliationRequired', 'safeToRetry', 'effectEvidence', 'errorCode',
-  'preparedAt', 'updatedAt',
+  'providerUpdatedAt', 'providerObservedAt', 'preparedAt', 'updatedAt',
 ]);
+const OPTIONAL_RECORD_KEYS = new Set(['providerUpdatedAt', 'providerObservedAt']);
 const OUTCOME_KEYS = new Set([
   'providerStatus', 'providerSucceeded', 'manualReviewRequired',
   'reconciliationRequired', 'safeToRetry', 'effectEvidence', 'errorCode',
-  'at',
+  'providerUpdatedAt', 'providerObservedAt', 'at',
 ]);
+const OPTIONAL_OUTCOME_KEYS = new Set(['providerUpdatedAt', 'providerObservedAt']);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const TERMINAL = new Set(['finished', 'error', 'stuck']);
@@ -156,7 +158,9 @@ function deriveStatus({
 export function normalizeSpecialistProviderExecutionV1(input) {
   const raw = record(input, RECORD_KEYS, 'SpecialistProviderExecutionV1');
   for (const key of RECORD_KEYS) {
-    if (!Object.hasOwn(raw, key)) throw new Error('SpecialistProviderExecutionV1 requires ' + key);
+    if (!OPTIONAL_RECORD_KEYS.has(key) && !Object.hasOwn(raw, key)) {
+      throw new Error('SpecialistProviderExecutionV1 requires ' + key);
+    }
   }
   if (raw.schemaVersion !== SPECIALIST_PROVIDER_EXECUTION_VERSION) {
     throw new Error('Unsupported SpecialistProviderExecutionV1 schemaVersion');
@@ -183,6 +187,21 @@ export function normalizeSpecialistProviderExecutionV1(input) {
   const safeToRetry = bool(raw.safeToRetry, 'safeToRetry');
   const effectEvidence = text(raw.effectEvidence, 'effectEvidence', 1000);
   const errorCode = optionalId(raw.errorCode, 'errorCode');
+  const providerUpdatedAt = raw.providerUpdatedAt == null || raw.providerUpdatedAt === ''
+    ? ''
+    : ts(raw.providerUpdatedAt, 'providerUpdatedAt');
+  const providerObservedAt = raw.providerObservedAt == null || raw.providerObservedAt === ''
+    ? ''
+    : ts(raw.providerObservedAt, 'providerObservedAt');
+  if (Boolean(providerUpdatedAt) !== Boolean(providerObservedAt)) {
+    throw new Error('Specialist provider chronology requires both providerUpdatedAt and providerObservedAt');
+  }
+  if (providerObservedAt && Date.parse(providerObservedAt) > Date.parse(updatedAt)) {
+    throw new Error('Specialist provider observation cannot postdate durable outcome');
+  }
+  if ((providerUpdatedAt || providerObservedAt) && !providerStatus) {
+    throw new Error('Specialist provider chronology requires providerStatus evidence');
+  }
 
   if (raw.status === SpecialistProviderExecutionStatus.PREPARED) {
     if (providerStatus || providerSucceeded || manualReviewRequired
@@ -221,6 +240,8 @@ export function normalizeSpecialistProviderExecutionV1(input) {
     safeToRetry,
     effectEvidence,
     errorCode,
+    providerUpdatedAt,
+    providerObservedAt,
     preparedAt,
     updatedAt,
   });
@@ -249,6 +270,8 @@ export function createSpecialistProviderExecutionV1({
     safeToRetry: false,
     effectEvidence: '',
     errorCode: '',
+    providerUpdatedAt: '',
+    providerObservedAt: '',
     preparedAt: at,
     updatedAt: at,
   });
@@ -259,7 +282,9 @@ export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcome
   if (current.status === SpecialistProviderExecutionStatus.RECONCILE) return current;
   const raw = record(outcomeInput, OUTCOME_KEYS, 'Specialist provider execution outcome');
   for (const key of OUTCOME_KEYS) {
-    if (!Object.hasOwn(raw, key)) throw new Error('Specialist provider execution outcome requires ' + key);
+    if (!OPTIONAL_OUTCOME_KEYS.has(key) && !Object.hasOwn(raw, key)) {
+      throw new Error('Specialist provider execution outcome requires ' + key);
+    }
   }
   const at = ts(raw.at, 'outcome.at');
   if (Date.parse(at) < Date.parse(current.updatedAt)) {
@@ -272,6 +297,8 @@ export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcome
   const safeToRetry = bool(raw.safeToRetry, 'safeToRetry');
   const effectEvidence = text(raw.effectEvidence, 'effectEvidence', 1000);
   const errorCode = optionalId(raw.errorCode, 'errorCode');
+  const providerUpdatedAt = raw.providerUpdatedAt == null ? '' : raw.providerUpdatedAt;
+  const providerObservedAt = raw.providerObservedAt == null ? '' : raw.providerObservedAt;
   const status = deriveStatus({
     providerStatus,
     providerSucceeded,
@@ -291,6 +318,8 @@ export function recordSpecialistProviderExecutionOutcomeV1(currentInput, outcome
     safeToRetry,
     effectEvidence,
     errorCode,
+    providerUpdatedAt,
+    providerObservedAt,
     updatedAt: at,
   });
 }

@@ -119,7 +119,10 @@ const SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS = new Set(['agentId', 'conversa
 const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS = new Set([
   'agentId', 'leaseId', 'conversationId', 'providerStatus', 'providerSucceeded',
   'manualReviewRequired', 'reconciliationRequired', 'safeToRetry',
-  'effectEvidence', 'errorCode',
+  'effectEvidence', 'errorCode', 'providerUpdatedAt', 'providerObservedAt',
+]);
+const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_OPTIONAL_KEYS = new Set([
+  'providerUpdatedAt', 'providerObservedAt',
 ]);
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
@@ -1964,7 +1967,7 @@ export class BrowserAgentManager {
       'Browser Agent Specialist provider execution outcome request',
     );
     for (const key of SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS) {
-      if (!Object.hasOwn(request, key)) {
+      if (!SPECIALIST_PROVIDER_EXECUTION_OUTCOME_OPTIONAL_KEYS.has(key) && !Object.hasOwn(request, key)) {
         throw new Error(`Browser Agent Specialist provider execution outcome request requires ${key}`);
       }
     }
@@ -2006,6 +2009,8 @@ export class BrowserAgentManager {
         safeToRetry: request.safeToRetry,
         effectEvidence: request.effectEvidence,
         errorCode: request.errorCode,
+        providerUpdatedAt: request.providerUpdatedAt || '',
+        providerObservedAt: request.providerObservedAt || '',
         at,
       };
 
@@ -2073,6 +2078,8 @@ export class BrowserAgentManager {
         providerSucceeded: recorded.providerSucceeded,
         reconciliationRequired: recorded.reconciliationRequired,
         manualReviewRequired: recorded.manualReviewRequired,
+        providerUpdatedAt: recorded.providerUpdatedAt,
+        providerObservedAt: recorded.providerObservedAt,
         errorCode: recorded.errorCode,
         message: recorded.providerSucceeded
           ? 'Provider terminal success observed; product completion remains blocked on result artifacts and independent verification.'
