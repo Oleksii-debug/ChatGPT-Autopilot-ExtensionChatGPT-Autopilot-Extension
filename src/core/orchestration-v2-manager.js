@@ -7,7 +7,11 @@ import {
 } from './orchestration-v2-storage.js';
 import { validateOrchestrationConfig } from './orchestration-v2.js';
 import { OperationPhase, RunState } from './schema.js';
-import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './orchestration-hierarchy.js';
+import {
+  OrchestrationHierarchyEventType,
+  compactOrchestrationEventId,
+  validateOrchestrationHierarchyRuntimeV1,
+} from './orchestration-hierarchy.js';
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
@@ -538,6 +542,7 @@ export class OrchestrationV2Manager {
     if (state.graphId !== graph.graphId || state.controlEpoch !== graph.controlEpoch) {
       throw new Error('Canonical orchestration hierarchy runtime provenance is inconsistent');
     }
+    validateOrchestrationHierarchyRuntimeV1(graph, state);
     return createOrchestrationProjectAuthorityV1({
       orchestraId: match.orchestraId,
       projectId,
