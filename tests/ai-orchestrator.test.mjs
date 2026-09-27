@@ -439,6 +439,8 @@ test('an explicit empty quality-evidence list is a no-op rather than cost or lat
       costClass:'paid',
       inputPricePerMillionUsd:5,
       outputPricePerMillionUsd:5,
+      inputPriceKnown:true,
+      outputPriceKnown:true,
     },
     { routeId:'later-free', provider:'ollama', model:'free-model', roles:['planner'], priority:0 },
   ];
