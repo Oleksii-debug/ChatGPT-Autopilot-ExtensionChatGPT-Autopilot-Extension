@@ -67,6 +67,7 @@ test('top-level Agent receives an explicit owner-bounded route projection and ze
   assert.equal(binding.policyAuthority, false);
   assert.equal(binding.persistenceAuthority, false);
   assert.equal(binding.schedulingAuthority, false);
+  assert.equal(binding.currentRouterRevalidationRequired, true);
   assert.equal(Object.isFrozen(binding), true);
   assert.equal(Object.isFrozen(binding.authorityRouteIds), true);
   assert.equal(Object.isFrozen(binding.effectiveRouteIds), true);
@@ -358,6 +359,13 @@ test('durable normalizer rejects binding identity, effective-set and authority t
   assert.throws(
     () => normalizeAgentModelPolicyBindingV1({ ...binding, providerAuthority: true }),
     /providerAuthority must be false/,
+  );
+  assert.throws(
+    () => normalizeAgentModelPolicyBindingV1({
+      ...binding,
+      currentRouterRevalidationRequired: false,
+    }),
+    /currentRouterRevalidationRequired must be true/,
   );
 });
 
