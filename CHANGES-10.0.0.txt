@@ -122,3 +122,22 @@ EMERGENCY HOTFIX — 2026-09-26 — SESSION / SCENARIO EFFORT CONTROL
 - READ_ASSISTANT_REPORT navigation waits are bounded to 10s as a race backstop instead of the generic 90s wait.
 - New Scenario Work default response poll interval is 180s; UI recommends 180–300s.
 - Existing pre-hotfix scenarios still on the legacy default 15s poll are migrated once to 180s automatically; later owner-selected values are preserved.
+
+
+2026-09-27 — LIVE THREE-ACCOUNT SCENARIO STREAM/TAB RECOVERY FORENSIC + HOTFIX #439
+- Three fresh owner diagnostics across three accounts established the recurring chain: verified Send / ASSISTANT_RESPONSE_STREAMING -> ASSISTANT_REPORT_PROBE_ERROR with “Selected ChatGPT tab did not finish navigation before CHECK_ONLY” -> response deadline -> false timeout/replacement risk.
+- Owner-visible “ChatGPT stream recovery polling timed out” is a ChatGPT/frontend string, not emitted by Pilot; Pilot now treats the correlated tab/navigation condition as browser recovery uncertainty rather than immediate assistant failure.
+- Scenario chat identity is durable Task/Session/slot + exact /c/<conversation-id> + tab binding; tab order is never authoritative.
+- Managed active Scenario tabs request autoDiscardable=false best-effort.
+- discarded/frozen/loading/missing managed tabs have explicit non-destructive recovery paths.
+- Missing persistent conversation reopens the exact saved URL and remains resident; no disposable open/probe/close churn for Scenario response polling.
+- READ_ASSISTANT_REPORT navigation backstop is 10s.
+- Explicit tab recovery at response deadline grants bounded 5m grace, max 3 graces, before configured timeout/replacement resumes.
+- Default response polling is 180s; untouched legacy 15s defaults migrate once to 180s; later owner-selected values are preserved.
+- BUSY/streaming conversations are not forcibly closed/reopened on every poll.
+- One-chat-per-window and chrome://settings UI automation were deliberately not made correctness requirements.
+- Exact runtime qualification head: c831e77046652de51687716602c30b04113ddbb2.
+- Exact-head Core deterministic SUCCESS; UI accessibility SUCCESS; Release package SUCCESS; Windows release gate SUCCESS; 198/198 src JS syntax PASS; Linux/Windows installable inner ZIP bytes identical.
+- Owner-test archive: 10 Пілот 0502 2709.zip.
+- SHA-256: 4492fdef89b7a8d2ee91df95c7e3c3076e2df5b2433ce481cd55470b5cc62b1c.
+- OWNER_WINDOWS_CHROME_VERIFIED=false until physical owner acceptance of this exact archive.
