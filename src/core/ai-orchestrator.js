@@ -175,6 +175,14 @@ function automaticStrongGuard(settings, runtime, now) {
   return { allowed: true, reason: '', retryAt: 0 };
 }
 
+function pinnedRouteBackoffBlocksFallback(settings, error) {
+  return Boolean(
+    clean(settings?.routePolicy?.pinnedRouteId)
+    && error?.code === 'AI_ROUTE_POOL_EXHAUSTED'
+    && Number(error?.retryAt || 0) > 0
+  );
+}
+
 function shouldScheduledStrong(settings, runtime, now) {
   const nextRequestNumber = runtime.requestCount + 1;
   const dueByCount = settings.strongEveryNRequests > 0 && nextRequestNumber % settings.strongEveryNRequests === 0;
@@ -382,6 +390,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        if (pinnedRouteBackoffBlocksFallback(settings, error)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
@@ -399,6 +408,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        if (pinnedRouteBackoffBlocksFallback(settings, error)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
