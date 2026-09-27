@@ -128,8 +128,8 @@ async function fixture() {
       orchestration.withProjectHierarchyAuthority(projectId, operation),
   };
   const lifecycleDependencies = {
-    applyBrowserAgentBoundLifecycle: (binding, transition, options) =>
-      orchestration.applyBrowserAgentBoundLifecycle(binding, transition, options),
+    withBrowserAgentBoundLifecycleAuthority: (binding, operation) =>
+      orchestration.withBrowserAgentBoundLifecycleAuthority(binding, operation),
   };
   return {
     chrome,
@@ -1211,9 +1211,10 @@ test('hierarchy transition failure restores exact Browser Agent lifecycle state 
 
   await assert.rejects(
     () => manager.pause('job-1', {
-      applyBrowserAgentBoundLifecycle: async () => {
-        throw new Error('injected hierarchy persistence failure');
-      },
+      withBrowserAgentBoundLifecycleAuthority: async (_binding, operation) =>
+        operation(async () => {
+          throw new Error('injected hierarchy persistence failure');
+        }),
     }),
     /injected hierarchy persistence failure/,
   );
@@ -1233,7 +1234,7 @@ test('bound lifecycle dependency is descriptor-safe and cannot run a getter or a
 
   let reads = 0;
   const hostile = {};
-  Object.defineProperty(hostile, 'applyBrowserAgentBoundLifecycle', {
+  Object.defineProperty(hostile, 'withBrowserAgentBoundLifecycleAuthority', {
     enumerable: true,
     get() {
       reads += 1;
@@ -1249,7 +1250,7 @@ test('bound lifecycle dependency is descriptor-safe and cannot run a getter or a
 
   await assert.rejects(
     () => manager.pause('job-1', {
-      applyBrowserAgentBoundLifecycle: async () => {},
+      withBrowserAgentBoundLifecycleAuthority: async () => {},
       executionAuthorized: true,
     }),
     /unknown field/,
@@ -1260,7 +1261,7 @@ test('bound lifecycle dependency is descriptor-safe and cannot run a getter or a
 test('service worker routes Browser Agent owner lifecycle commands through the canonical hierarchy adapter', async () => {
   const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
   assert.match(source, /const browserAgentOrchestrationLifecycleDependencies = Object\.freeze\(/);
-  assert.match(source, /orchestrationV2\.applyBrowserAgentBoundLifecycle\(binding, transition, options\)/);
+  assert.match(source, /orchestrationV2\.withBrowserAgentBoundLifecycleAuthority\(binding, operation\)/);
   assert.match(source, /browserAgent\.pause\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
   assert.match(source, /browserAgent\.resume\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
   assert.match(source, /browserAgent\.stop\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
@@ -1282,17 +1283,23 @@ test('lifecycle adapter options are exact descriptor-safe data and private Brows
     },
   });
   await assert.rejects(
-    () => orchestration.applyBrowserAgentBoundLifecycle(bound.binding, 'PAUSE', hostileOptions),
+    () => orchestration.withBrowserAgentBoundLifecycleAuthority(
+      bound.binding,
+      applyBoundLifecycle => applyBoundLifecycle('PAUSE', hostileOptions),
+    ),
     /enumerable own data properties/,
   );
   assert.equal(reads, 0);
 
   await assert.rejects(
-    () => orchestration.applyBrowserAgentBoundLifecycle(bound.binding, 'PAUSE', {
-      browserControlEpoch: 1,
-      nowMs: 2000,
-      executionAuthorized: true,
-    }),
+    () => orchestration.withBrowserAgentBoundLifecycleAuthority(
+      bound.binding,
+      applyBoundLifecycle => applyBoundLifecycle('PAUSE', {
+        browserControlEpoch: 1,
+        nowMs: 2000,
+        executionAuthorized: true,
+      }),
+    ),
     /unknown field/,
   );
 });
@@ -1307,11 +1314,12 @@ test('failed bound lifecycle keeps the Browser Agent update chain serialized thr
   let releaseResolve;
   const release = new Promise(resolve => { releaseResolve = resolve; });
   const failing = manager.pause('job-1', {
-    applyBrowserAgentBoundLifecycle: async () => {
-      reachedResolve();
-      await release;
-      throw new Error('blocked lifecycle failure');
-    },
+    withBrowserAgentBoundLifecycleAuthority: async (_binding, operation) =>
+      operation(async () => {
+        reachedResolve();
+        await release;
+        throw new Error('blocked lifecycle failure');
+      }),
   });
   await reached;
 
