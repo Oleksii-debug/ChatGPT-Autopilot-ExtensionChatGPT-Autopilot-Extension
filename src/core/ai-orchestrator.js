@@ -175,6 +175,13 @@ function automaticStrongGuard(settings, runtime, now) {
   return { allowed: true, reason: '', retryAt: 0 };
 }
 
+function routePolicyBlocksAutomaticFallback(settings) {
+  return Boolean(settings?.routes?.length) && (
+    Boolean(clean(settings?.routePolicy?.pinnedRouteId))
+    || settings?.routePolicy?.autoSwitch === false
+  );
+}
+
 function shouldScheduledStrong(settings, runtime, now) {
   const nextRequestNumber = runtime.requestCount + 1;
   const dueByCount = settings.strongEveryNRequests > 0 && nextRequestNumber % settings.strongEveryNRequests === 0;
@@ -324,7 +331,9 @@ export class AiOrchestrator {
       for (const route of selected.candidates) {
         const started = this.now();
         try {
-          const value = await invoke(route, callPrompt, callSystem, bounded);
+          const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
+          const routePrompt = route.workerPrompt ? [route.workerPrompt, callPrompt].filter(Boolean).join('\n\n') : callPrompt;
+          const value = await invoke(route, routePrompt, routeSystem, bounded);
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           selectedRouteId = route.routeId;
           routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
@@ -335,10 +344,29 @@ export class AiOrchestrator {
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:false, classification, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           routeAttempts.push({ routeId:route.routeId, outcome:'FAILED', code:classification.code, category:classification.category });
           attachFailureRuntime(error);
-          if (!classification.retryable || !settings.routePolicy.autoSwitch) throw error;
+          if (!classification.retryable) throw error;
+          if (!settings.routePolicy.autoSwitch) {
+            const failedState = routeStates[route.routeId];
+            const retryAt = Math.max(failedState?.backoffUntil || 0, failedState?.circuitOpenUntil || 0);
+            if (error && typeof error === 'object' && retryAt > now) error.retryAt = retryAt;
+            throw attachFailureRuntime(error);
+          }
         }
       }
-      throw attachFailureRuntime(createAiRoutePoolExhaustedError({ attempts:routeAttempts, message:'Every eligible AI route failed with a retryable provider error' }));
+      const exhausted = selectAiRouteCandidates({
+        routes: settings.routes,
+        policy: settings.routePolicy,
+        routeStates,
+        role: requestedRole,
+        capabilityIds,
+        requiresVision: Boolean(clean(imageDataUrl)),
+        now,
+      });
+      throw attachFailureRuntime(createAiRoutePoolExhaustedError({
+        attempts: routeAttempts,
+        retryAt: exhausted.retryAt,
+        message: 'Every eligible AI route failed with a retryable provider error',
+      }));
     };
 
     let primaryResult = null;
@@ -382,6 +410,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
@@ -399,6 +428,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
+        if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(

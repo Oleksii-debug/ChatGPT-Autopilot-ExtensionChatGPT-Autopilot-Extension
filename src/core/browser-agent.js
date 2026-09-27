@@ -350,6 +350,10 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
   const aiStrongProvider = AGENT_AI_PROVIDERS.has(raw.aiStrongProvider) ? raw.aiStrongProvider : BrowserAgentAiProvider.INHERIT;
   const aiPrimaryModel = clean(raw.aiPrimaryModel, 300);
   const aiStrongModel = clean(raw.aiStrongModel, 300);
+  const aiPinnedRouteId = clean(raw.aiPinnedRouteId, 180);
+  if (aiPinnedRouteId && !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(aiPinnedRouteId)) {
+    throw new Error('Browser Agent route ID is invalid');
+  }
   if (aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT && !aiPrimaryModel) {
     throw new Error('Browser Agent primary provider override requires an explicit primary model');
   }
@@ -397,6 +401,7 @@ export function normalizeBrowserAgentConfig(raw = {}, { id = '' } = {}) {
     inputPricePerMillionUsd,
     outputPricePerMillionUsd,
     aiRoutingMode,
+    aiPinnedRouteId,
     aiPrimaryProvider,
     aiPrimaryModel,
     aiStrongProvider,

@@ -274,8 +274,8 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'mode-agent','agent-prompt','agent-run-prompt-button','agent-pause-button','agent-resume-button','agent-stop-button',
     'agent-follow-up','agent-send-follow-up-button','agent-job-list','agent-history','agent-allow-current-site-button','agent-allow-all-sites-button',
     'agent-repeat-mode','agent-interval-seconds','agent-schedule-start','agent-schedule-end','agent-active-window-start','agent-active-window-end',
-    'agent-ai-routing-mode','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
-    'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd',
+    'agent-ai-routing-mode','agent-ai-pinned-route-id','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
+    'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd','agent-policy-edit-status',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
     'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
@@ -299,6 +299,25 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.ok(js.includes("aiPinnedRouteId: $('agent-ai-pinned-route-id').value"), 'Agent route choice must persist through Core');
+  assert.doesNotMatch(html, /id="agent-ai-pinned-route-id"[^>]*aria-describedby=/, 'Agent route status must use the existing concise live-status pattern instead of adding tutorial aria-describedby prose');
+  assert.match(html, /id="agent-route-binding-status"[^>]*role="status"/, 'Agent route policy/readiness must be announced through a native status surface');
+  assert.ok(js.includes('browserAgentRoutePolicyBlockReason'), 'Agent route choices must project global Models policy before the user starts a job');
+  assert.ok(js.includes('function aiRouteDisplayLabel(route = {})'), 'Agent and Models must share one deterministic route display label');
+  assert.ok(js.includes('return displayName ? \`${displayName} (${routeId})\` : routeId;'), 'profile display name must remain paired with stable route ID for keyboard/NVDA disambiguation');
+  assert.ok(js.includes('option.textContent = \`${aiRouteDisplayLabel(route)}: ${route.model}'), 'Agent route select must announce the profile display label');
+  assert.ok(js.includes('if (status.textContent !== nextText) status.textContent = nextText;'), '2-second Agent refresh must not rewrite an unchanged route-binding live region');
+  assert.ok(js.includes('option.disabled = Boolean(blockReason)'), 'globally blocked Agent routes must not look normally selectable');
+  assert.ok(js.includes("roles.length && !roles.includes('planner')"), 'Agent route readiness must reject an explicit role profile that cannot perform the first planner call');
+  assert.ok(js.includes("option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'))"), 'Agent route choices must retain verifier eligibility for acceptance preflight');
+  assert.ok(js.includes("acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false'"), 'owner acceptance criteria must reject a pinned route that cannot perform verifier calls');
+  assert.ok(js.includes('assertBrowserAgentRouteReadyForLaunch();'), 'new Agent creation must reject a statically blocked saved route before creating a doomed job');
+  const saveAgentPolicy = js.match(/async function saveBrowserAgentPolicy\(\)[\s\S]*?\n}\n/)?.[0] || '';
+  assert.match(saveAgentPolicy, /assertBrowserAgentRouteReadyForLaunch\(\);/, 'existing Agent policy saves must enforce the same pinned-route readiness gate');
+  assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
+  assert.ok(js.includes("item.routeId || '?'"), 'Agent usage must expose bounded route-chain evidence without provider payloads');
+  assert.match(js, /!ui\.agentDraftActive && !ui\.agentPolicyDirty\) fillBrowserAgentPolicy\(config\)/, 'status refresh must preserve unsaved Agent policy fields');
+  assert.match(js, /if \(editEpoch === ui\.agentPolicyEditEpoch\)/, 'late save must not erase edits typed while Core was updating');
   assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');
   assert.match(js, /parseAgentDraftProfile\(parsePortableJson\(await file\.text\(\)\)\)/, 'Agent JSON must be validated before form insertion');
   assert.match(js, /ui\.agentDraftActive = true/, 'periodic status refresh must preserve the imported draft');

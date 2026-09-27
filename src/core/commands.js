@@ -32,6 +32,16 @@ function mergeAiRouterSettingsOverride(rawBase, rawOverride = {}) {
   const override = rawOverride && typeof rawOverride === 'object' ? rawOverride : {};
   const next = structuredClone(base);
   if (AI_ROUTER_OVERRIDE_MODES.has(override.mode)) next.mode = override.mode;
+  if (override.routeId !== undefined && override.routeId !== '') {
+    const routeId = override.routeId;
+    if (typeof routeId !== 'string' || !next.routes.some(route => route.routeId === routeId && route.enabled)) {
+      throw new Error('Selected Agent AI route is missing or disabled in Models');
+    }
+    if (next.routePolicy.pinnedRouteId && next.routePolicy.pinnedRouteId !== routeId) {
+      throw new Error('Selected Agent AI route conflicts with the global pinned route');
+    }
+    next.routePolicy.pinnedRouteId = routeId;
+  }
   for (const slotName of ['primary', 'strong']) {
     const slot = override[slotName];
     if (!slot || typeof slot !== 'object') continue;
