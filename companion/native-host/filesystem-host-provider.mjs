@@ -17,6 +17,8 @@ import {
 } from './filesystem-read-surface.mjs';
 
 export const MAX_WRITE_TEXT_BYTES = 240 * 1024;
+export const MAX_BINARY_FILE_BYTES = 16 * 1024 * 1024;
+export const MAX_BINARY_CHUNK_BYTES = 512 * 1024;
 const SHA256 = /^[a-f0-9]{64}$/u;
 
 function nativeError(code, message) {
@@ -245,6 +247,90 @@ async function verifyPublishedFile(scope, target, desired) {
     }
     return sha256(after);
   });
+}
+
+async function readExactFileSnapshot(handle, admitted) {
+  const sizeBytes = admitted.stat.size;
+  const bytes = Buffer.alloc(sizeBytes);
+  let offset = 0;
+  while (offset < sizeBytes) {
+    const { bytesRead } = await handle.read(bytes, offset, sizeBytes - offset, offset);
+    if (!Number.isInteger(bytesRead) || bytesRead <= 0) {
+      throw nativeError('PRECONDITION_FAILED', 'Filesystem binary snapshot changed during read');
+    }
+    offset += bytesRead;
+  }
+  const after = await handle.stat();
+  if (
+    !sameFileIdentity(after, admitted.stat)
+    || after.size !== admitted.stat.size
+    || after.mtimeMs !== admitted.stat.mtimeMs
+    || after.ctimeMs !== admitted.stat.ctimeMs
+  ) {
+    throw nativeError('PRECONDITION_FAILED', 'Filesystem binary snapshot changed during read');
+  }
+  return bytes;
+}
+
+export async function readBinaryScopedV1(payload, config, { beforeOpen = null } = {}) {
+  exactKeys(
+    payload,
+    new Set(['rootId', 'relativePath', 'offsetBytes', 'maxBytes', 'expectedSha256']),
+    'filesystem.readBinary payload',
+  );
+  const root = configuredRoot(config, payload.rootId);
+  const rel = relativePath(payload.relativePath);
+  const offsetBytes = payload.offsetBytes == null ? 0 : payload.offsetBytes;
+  const maxBytes = payload.maxBytes == null ? 256 * 1024 : payload.maxBytes;
+  const expectedSha256 = payload.expectedSha256 == null ? '' : payload.expectedSha256;
+
+  if (!Number.isSafeInteger(offsetBytes) || Object.is(offsetBytes, -0) || offsetBytes < 0 || offsetBytes > MAX_BINARY_FILE_BYTES) {
+    throw nativeError('INVALID_REQUEST', 'filesystem.readBinary offsetBytes must be a non-negative safe integer within bounds');
+  }
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_BINARY_CHUNK_BYTES) {
+    throw nativeError('INVALID_REQUEST', 'filesystem.readBinary maxBytes must be a safe integer within bounds');
+  }
+  if (typeof expectedSha256 !== 'string' || (expectedSha256 !== '' && !SHA256.test(expectedSha256))) {
+    throw nativeError('INVALID_REQUEST', 'filesystem.readBinary expectedSha256 must be empty or an exact lowercase SHA-256 digest');
+  }
+
+  try {
+    return await withAuthorizedExistingFileV1(
+      scopeFor(root),
+      path.resolve(root.path, rel),
+      { write: false, beforeOpen },
+      async (handle, admitted) => {
+        if (!admitted.stat.isFile()) throw nativeError('NOT_A_FILE', 'Requested path is not a regular file');
+        if (!Number.isSafeInteger(admitted.stat.size) || admitted.stat.size < 0 || admitted.stat.size > MAX_BINARY_FILE_BYTES) {
+          throw nativeError('FILE_TOO_LARGE', `Requested binary file exceeds ${MAX_BINARY_FILE_BYTES} bytes`);
+        }
+        if (offsetBytes > admitted.stat.size) {
+          throw nativeError('INVALID_REQUEST', 'filesystem.readBinary offsetBytes exceeds file size');
+        }
+
+        const bytes = await readExactFileSnapshot(handle, admitted);
+        const digest = sha256(bytes);
+        if (expectedSha256 && digest !== expectedSha256) {
+          throw nativeError('PRECONDITION_FAILED', 'Filesystem binary snapshot does not match expectedSha256');
+        }
+
+        const end = Math.min(bytes.byteLength, offsetBytes + maxBytes);
+        const chunk = bytes.subarray(offsetBytes, end);
+        return {
+          rootId: root.rootId,
+          relativePath: rel.replace(/\\/gu, '/'),
+          offsetBytes,
+          chunkSizeBytes: chunk.byteLength,
+          sizeBytes: bytes.byteLength,
+          sha256: digest,
+          dataBase64: chunk.toString('base64'),
+          eof: end === bytes.byteLength,
+        };
+      },
+    );
+  } catch (error) {
+    throw mapPathError(error);
+  }
 }
 
 export async function listScopedFilesystemV1(payload, config) {
