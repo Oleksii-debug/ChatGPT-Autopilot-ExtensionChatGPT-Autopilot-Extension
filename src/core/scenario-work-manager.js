@@ -505,22 +505,20 @@ export class ScenarioWorkManager {
     // owner chooses after this hotfix (including 15) remains authoritative.
     const migration = await this.chrome.storage.local.get(SCENARIO_TAB_RECOVERY_MIGRATION_KEY);
     if (migration?.[SCENARIO_TAB_RECOVERY_MIGRATION_KEY] !== true) {
-      let changed = false;
       for (const item of Object.values(store.byId || {})) {
         if (Number(item?.config?.pollSeconds) !== LEGACY_DEFAULT_POLL_SECONDS) continue;
         item.config.pollSeconds = SAFE_DEFAULT_POLL_SECONDS;
-        changed = true;
       }
-      const record = { [SCENARIO_TAB_RECOVERY_MIGRATION_KEY]: true };
-      if (changed) record[SCENARIO_WORK_STORAGE_KEY] = store;
-      await this.chrome.storage.local.set(record);
     }
     return store;
   }
 
   async save(store) {
     const normalized = normalizeStore(store, this.now());
-    await this.chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: normalized });
+    await this.chrome.storage.local.set({
+      [SCENARIO_WORK_STORAGE_KEY]: normalized,
+      [SCENARIO_TAB_RECOVERY_MIGRATION_KEY]: true,
+    });
     return normalized;
   }
 
