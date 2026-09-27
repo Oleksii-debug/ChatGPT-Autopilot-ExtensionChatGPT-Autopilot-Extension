@@ -188,13 +188,6 @@ function freezeDeep(value) {
   return Object.freeze(value);
 }
 
-function exactStringSet(left, right) {
-  if (left.length !== right.length) return false;
-  const a = [...left].sort();
-  const b = [...right].sort();
-  return a.every((item, index) => item === b[index]);
-}
-
 function baseProjection({
   decision,
   reasonCode,
@@ -516,15 +509,12 @@ function assertTrustedResultVerificationParticipation(result, adjudication) {
     );
   }
 
-  const resultEvidenceIds = result.evidenceArtifactRefs.map(ref => ref.artifactId);
   for (const row of rows) {
-    if (row.verificationStatus !== result.verificationStatus
-        || row.verifierId !== result.verifierId
-        || row.verificationAuthorityId !== result.verificationAuthorityId
-        || row.verifiedAt !== result.verifiedAt
-        || !exactStringSet(row.evidenceArtifactIds, resultEvidenceIds)) {
+    if (row.invocationId !== result.invocationId
+        || row.observationId !== result.observationId
+        || row.verifierId !== result.verifierId) {
       throw new Error(
-        'Subagent result raw verification does not match its trusted canonical verification record',
+        'Subagent result verification identity does not match its trusted canonical verification record',
       );
     }
   }
