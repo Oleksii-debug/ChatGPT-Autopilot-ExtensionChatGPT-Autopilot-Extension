@@ -21,6 +21,11 @@ const BINDING_KEYS = new Set([
   'controlEpoch', 'nodeId', 'boundAt',
 ]);
 const REQUEST_KEYS = new Set(['nodeId', 'expectedGraphId', 'expectedControlEpoch']);
+const CREATE_AUTHORITY_KEYS = new Set(['orchestraId', 'projectId', 'graph', 'subagentPolicy']);
+const CREATE_BINDING_KEYS = new Set([
+  'jobId', 'projectId', 'boundAt', 'authority', 'request', 'currentBinding',
+]);
+const INSPECT_BINDING_KEYS = new Set(['binding', 'authority']);
 
 function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -95,21 +100,21 @@ export function normalizeBrowserAgentOrchestrationBindingRequestV1(input) {
   });
 }
 
-export function createOrchestrationProjectAuthorityV1({
-  orchestraId,
-  projectId,
-  graph,
-  subagentPolicy,
-} = {}) {
-  const canonicalGraph = validateOrchestrationGraphV1(graph);
+export function createOrchestrationProjectAuthorityV1(input = {}) {
+  const raw = strictRecord(
+    input,
+    CREATE_AUTHORITY_KEYS,
+    'OrchestrationProjectAuthorityCreateRequestV1',
+  );
+  const canonicalGraph = validateOrchestrationGraphV1(raw.graph);
   return normalizeOrchestrationProjectAuthorityV1({
     schemaVersion: BROWSER_AGENT_ORCHESTRATION_BINDING_VERSION,
-    orchestraId,
-    projectId,
+    orchestraId: raw.orchestraId,
+    projectId: raw.projectId,
     graphId: canonicalGraph.graphId,
     controlEpoch: canonicalGraph.controlEpoch,
     graph: canonicalGraph,
-    subagentPolicy,
+    subagentPolicy: raw.subagentPolicy,
   });
 }
 
@@ -135,19 +140,16 @@ export function normalizeOrchestrationProjectAuthorityV1(input) {
   });
 }
 
-export function createBrowserAgentOrchestrationNodeBindingV1({
-  jobId,
-  projectId,
-  nodeId,
-  boundAt,
-  authority,
-  request,
-  currentBinding = null,
-} = {}) {
-  const canonicalAuthority = normalizeOrchestrationProjectAuthorityV1(authority);
-  const canonicalRequest = normalizeBrowserAgentOrchestrationBindingRequestV1(request);
-  const canonicalJobId = id(jobId, 'binding jobId');
-  const canonicalProjectId = id(projectId, 'binding projectId');
+export function createBrowserAgentOrchestrationNodeBindingV1(input = {}) {
+  const raw = strictRecord(
+    input,
+    CREATE_BINDING_KEYS,
+    'BrowserAgentOrchestrationNodeBindingCreateRequestV1',
+  );
+  const canonicalAuthority = normalizeOrchestrationProjectAuthorityV1(raw.authority);
+  const canonicalRequest = normalizeBrowserAgentOrchestrationBindingRequestV1(raw.request);
+  const canonicalJobId = id(raw.jobId, 'binding jobId');
+  const canonicalProjectId = id(raw.projectId, 'binding projectId');
   if (canonicalAuthority.projectId !== canonicalProjectId) {
     throw new Error('Orchestration project authority does not match Browser Agent project');
   }
@@ -170,11 +172,11 @@ export function createBrowserAgentOrchestrationNodeBindingV1({
     graphId: canonicalAuthority.graphId,
     controlEpoch: canonicalAuthority.controlEpoch,
     nodeId: canonicalRequest.nodeId,
-    boundAt: nonNegativeInteger(boundAt, 'binding boundAt'),
+    boundAt: nonNegativeInteger(raw.boundAt, 'binding boundAt'),
   });
 
-  if (currentBinding == null) return candidate;
-  const current = normalizeBrowserAgentOrchestrationNodeBindingV1(currentBinding);
+  if (raw.currentBinding == null) return candidate;
+  const current = normalizeBrowserAgentOrchestrationNodeBindingV1(raw.currentBinding);
   const same = current.jobId === candidate.jobId
     && current.projectId === candidate.projectId
     && current.orchestraId === candidate.orchestraId
@@ -204,12 +206,14 @@ export function normalizeBrowserAgentOrchestrationNodeBindingV1(input) {
   });
 }
 
-export function inspectBrowserAgentOrchestrationNodeBindingV1({
-  binding,
-  authority,
-} = {}) {
-  const canonicalBinding = normalizeBrowserAgentOrchestrationNodeBindingV1(binding);
-  const canonicalAuthority = normalizeOrchestrationProjectAuthorityV1(authority);
+export function inspectBrowserAgentOrchestrationNodeBindingV1(input = {}) {
+  const raw = strictRecord(
+    input,
+    INSPECT_BINDING_KEYS,
+    'BrowserAgentOrchestrationNodeBindingInspectionRequestV1',
+  );
+  const canonicalBinding = normalizeBrowserAgentOrchestrationNodeBindingV1(raw.binding);
+  const canonicalAuthority = normalizeOrchestrationProjectAuthorityV1(raw.authority);
   let status = BrowserAgentOrchestrationBindingStatus.CURRENT;
   if (canonicalAuthority.projectId !== canonicalBinding.projectId
       || canonicalAuthority.orchestraId !== canonicalBinding.orchestraId) {
