@@ -73,6 +73,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES',
   'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
+  'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
 const repo = new StorageRepository(chrome);
 const projectWorkspaceRuntime = new ProjectWorkspaceRuntimeReader(new ProjectWorkspaceRepository(chrome));
@@ -666,6 +667,14 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.updateExecutionPolicy(message.payload || {});
   } else if (message.command === 'GET_BROWSER_AGENT_JOB') {
     result = await browserAgent.get(message.payload?.id || '');
+  } else if (message.command === 'GET_BROWSER_AGENT_ORCHESTRATION_BINDING') {
+    result = await browserAgent.inspectOrchestrationNodeBinding(
+      message.payload?.id || '',
+      {
+        resolveProjectHierarchyAuthority: projectId =>
+          orchestrationV2.resolveProjectHierarchyAuthority(projectId),
+      },
+    );
   } else if (message.command === 'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES') {
     result = await browserAgent.listAgentDefinitionRegistries();
   } else if (message.command === 'GET_BROWSER_AGENT_DEFINITION_REGISTRY') {
@@ -692,6 +701,15 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.select(message.payload?.id || '');
   } else if (message.command === 'UPDATE_BROWSER_AGENT_JOB') {
     result = await browserAgent.updateConfig(message.payload?.id || '', message.payload?.config || {});
+  } else if (message.command === 'BIND_BROWSER_AGENT_ORCHESTRATION_NODE') {
+    result = await browserAgent.bindOrchestrationNode(
+      message.payload?.id || '',
+      message.payload?.binding || {},
+      {
+        withProjectHierarchyAuthority: (projectId, operation) =>
+          orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
+      },
+    );
   } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
     result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
