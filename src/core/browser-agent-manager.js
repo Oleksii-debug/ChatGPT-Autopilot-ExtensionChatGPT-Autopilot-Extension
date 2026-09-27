@@ -339,6 +339,17 @@ function canonicalDelegationIds(value, label, max, min = 0) {
   return Object.freeze([...out].sort());
 }
 
+function exactAutomaticDelegationTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must be a canonical timestamp`);
+  }
+  const millis = Date.parse(value);
+  if (!Number.isFinite(millis) || new Date(millis).toISOString() !== value) {
+    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  }
+  return value;
+}
+
 function normalizeAutomaticDelegationIntent(request) {
   const childBudget = Object.hasOwn(request, 'childBudget')
     ? (() => {
@@ -392,7 +403,7 @@ function normalizeAutomaticDelegationIntent(request) {
     ),
     requiredToolIds: canonicalDelegationIds(request.requiredToolIds, 'requiredToolIds', 128),
     policyEnvelopeId: exactIdentity(request.policyEnvelopeId, 'policyEnvelopeId'),
-    deadlineAt: specialistRequestTimestamp(request.deadlineAt, undefined, 'deadlineAt'),
+    deadlineAt: exactAutomaticDelegationTimestamp(request.deadlineAt, 'deadlineAt'),
     priority,
     childBudget,
     artifactRefs: Object.freeze(artifactRefs),
