@@ -136,6 +136,43 @@ function compareId(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function routeQualityRevisionMaterial(route) {
+  return JSON.stringify([
+    route.schemaVersion,
+    route.routeId,
+    route.provider,
+    route.model,
+    route.endpointId,
+    route.displayName,
+    route.systemPrompt,
+    route.workerPrompt,
+    route.roles,
+    route.capabilityIds,
+    route.priority,
+    route.enabled,
+    route.locality,
+    route.costClass,
+    route.inputPricePerMillionUsd,
+    route.outputPricePerMillionUsd,
+    route.inputPriceKnown,
+    route.outputPriceKnown,
+    route.supportsVision,
+    route.maxWorkers,
+  ]);
+}
+
+export async function deriveAiRouteQualitySubjectRevisionIdV1(rawRoute) {
+  const route = normalizeAiRoutePool([rawRoute])[0];
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle || typeof subtle.digest !== 'function' || typeof TextEncoder !== 'function') {
+    throw new Error('AI route governor requires Web Crypto SHA-256 for route revision binding');
+  }
+  const bytes = new TextEncoder().encode(routeQualityRevisionMaterial(route));
+  const digest = new Uint8Array(await subtle.digest('SHA-256', bytes));
+  const hex = Array.from(digest, (value) => value.toString(16).padStart(2, '0')).join('');
+  return 'routev1-' + hex;
+}
+
 function qualityClass(evaluation) {
   if (!evaluation) return AiRouteQualityClass.MISSING;
   return evaluation.status === BenchmarkEvaluationStatus.PASS
@@ -179,8 +216,9 @@ function compareLatency(left, right) {
   return left.lastLatencyMs - right.lastLatencyMs;
 }
 
-function normalizeBenchmarkBindings(value, routeIds) {
+async function normalizeBenchmarkBindings(value, routes) {
   const items = denseArray(value, 'AI route governor benchmarkRequests', MAX_ROUTES);
+  const routeById = new Map(routes.map((route) => [route.routeId, route]));
   const byRoute = new Map();
   for (let index = 0; index < items.length; index += 1) {
     const raw = record(
@@ -189,7 +227,7 @@ function normalizeBenchmarkBindings(value, routeIds) {
       'AI route governor benchmarkRequests[' + index + ']',
     );
     const routeId = id(raw.routeId, 'AI route governor benchmark routeId');
-    if (!routeIds.has(routeId)) {
+    if (!routeById.has(routeId)) {
       throw new Error('AI route governor benchmark evidence references unknown route: ' + routeId);
     }
     if (byRoute.has(routeId)) {
@@ -200,6 +238,13 @@ function normalizeBenchmarkBindings(value, routeIds) {
       throw new Error(
         'AI route governor benchmark subject must match routeId: '
           + routeId + ' != ' + evaluation.subjectId,
+      );
+    }
+    const expectedRevisionId = await deriveAiRouteQualitySubjectRevisionIdV1(routeById.get(routeId));
+    if (evaluation.subjectRevisionId !== expectedRevisionId) {
+      throw new Error(
+        'AI route governor benchmark subject revision does not match current route configuration: '
+          + routeId,
       );
     }
     byRoute.set(routeId, evaluation);
@@ -230,7 +275,7 @@ function qualityProjection(evaluation) {
   });
 }
 
-export function rankAiRouteCandidatesByEvidenceV1(input = {}) {
+export async function rankAiRouteCandidatesByEvidenceV1(input = {}) {
   const request = record(input, REQUEST_KEYS, 'AiRouteQualityGovernorV1 request');
   const routes = normalizeAiRoutePool(request.routes ?? []);
   const policy = normalizeAiRoutePolicy(request.policy ?? {});
@@ -245,8 +290,7 @@ export function rankAiRouteCandidatesByEvidenceV1(input = {}) {
     : exactEpoch(request.now, 'AI route governor now');
   const benchmarkRequests = request.benchmarkRequests ?? [];
 
-  const routeIds = new Set(routes.map((route) => route.routeId));
-  const benchmarkByRoute = normalizeBenchmarkBindings(benchmarkRequests, routeIds);
+  const benchmarkByRoute = await normalizeBenchmarkBindings(benchmarkRequests, routes);
 
   const selected = selectAiRouteCandidates({
     routes,
