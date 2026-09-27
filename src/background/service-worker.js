@@ -674,6 +674,8 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.createAgentDefinitionRegistry(message.payload || {});
   } else if (message.command === 'MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY') {
     result = await browserAgent.mutateAgentDefinitionRegistry(message.payload || {});
+  } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
+    result = await browserAgent.createFromAgentDefinition(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
