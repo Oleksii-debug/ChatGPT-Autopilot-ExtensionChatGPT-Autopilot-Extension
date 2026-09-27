@@ -1811,19 +1811,9 @@ export class BrowserAgentManager {
         if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId) {
           throw new Error('Specialist provider execution requires the current claimed lease');
         }
-        if (assignment.leaseExpiresAt <= at) {
-          throw new Error('Specialist provider execution lease expired before dispatch');
-        }
         const ownership = (job.runtime.specialistExecutionOwnerships || [])
           .map(normalizeExecutionOwnershipV1)
           .find(item => item.planId === plan.planId && item.nodeId === binding.nodeId);
-        if (!ownership
-            || ownership.state !== ExecutionOwnershipState.OWNED
-            || ownership.ownerId !== agentId
-            || ownership.leaseId !== assignment.leaseId
-            || ownership.leaseUntil !== assignment.leaseExpiresAt) {
-          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
-        }
 
         const configQuarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
         if (Object.hasOwn(configQuarantine, selection.providerId)) {
@@ -1857,6 +1847,21 @@ export class BrowserAgentManager {
             SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
             SpecialistProviderExecutionStatus.MANUAL_REVIEW,
           ].includes(execution.status);
+          const expectedOwnershipState = execution.status === SpecialistProviderExecutionStatus.RECONCILE
+            ? ExecutionOwnershipState.RECONCILE
+            : ExecutionOwnershipState.OWNED;
+          if (!ownership
+              || ownership.state !== expectedOwnershipState
+              || ownership.ownerId !== agentId
+              || ownership.leaseId !== assignment.leaseId
+              || ownership.leaseUntil !== assignment.leaseExpiresAt) {
+            throw new Error(
+              `Specialist provider execution requires matching canonical ${expectedOwnershipState} lease`,
+            );
+          }
+          if (dispatchable && assignment.leaseExpiresAt <= at) {
+            throw new Error('Specialist provider execution lease expired before dispatch');
+          }
           if (dispatchable
               && JSON.stringify(execution.providerConfig) !== JSON.stringify(canonicalConfig)) {
             throw new Error('Specialist provider config changed after execution preparation');
@@ -1871,6 +1876,16 @@ export class BrowserAgentManager {
           return store;
         }
 
+        if (assignment.leaseExpiresAt <= at) {
+          throw new Error('Specialist provider execution lease expired before dispatch');
+        }
+        if (!ownership
+            || ownership.state !== ExecutionOwnershipState.OWNED
+            || ownership.ownerId !== agentId
+            || ownership.leaseId !== assignment.leaseId
+            || ownership.leaseUntil !== assignment.leaseExpiresAt) {
+          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
+        }
         if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
           throw new Error('Specialist provider execution provenance capacity is exhausted');
         }
