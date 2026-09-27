@@ -2117,7 +2117,7 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async updateOwnerLifecycleState(id, transition, mutator, dependencies = {}) {
+  async #updateOwnerLifecycleState(id, transition, mutator, dependencies = {}) {
     if (typeof mutator !== 'function') throw new Error('Browser Agent lifecycle mutator is required');
     const operation = this.updateChain.then(async () => {
       const before = await this.load();
@@ -2168,7 +2168,7 @@ export class BrowserAgentManager {
 
   async pause(id, dependencies = {}) {
     const now = this.now();
-    await this.updateOwnerLifecycleState(id, 'PAUSE', store => {
+    await this.#updateOwnerLifecycleState(id, 'PAUSE', store => {
       const job = store.byId[id];
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING) throw new Error('Only a running Browser Agent can be paused');
       job.runtime.controlEpoch += 1;
@@ -2192,7 +2192,7 @@ export class BrowserAgentManager {
       return this.get(id);
     }
     const now = this.now();
-    await this.updateOwnerLifecycleState(id, 'RESUME', store => {
+    await this.#updateOwnerLifecycleState(id, 'RESUME', store => {
       const job = store.byId[id];
       if (![BrowserAgentRunState.PAUSED, BrowserAgentRunState.STOPPED, BrowserAgentRunState.WAITING_PERMISSION, BrowserAgentRunState.WAITING_CAPABILITY, BrowserAgentRunState.WAITING_SCHEDULE].includes(job.runtime.runState)) throw new Error('Browser Agent cannot be resumed from its current state');
       job.runtime.controlEpoch += 1;
@@ -2216,7 +2216,7 @@ export class BrowserAgentManager {
   async stop(id, dependencies = {}) {
     const now = this.now();
     let closeTabs = false;
-    await this.updateOwnerLifecycleState(id, 'STOP', store => {
+    await this.#updateOwnerLifecycleState(id, 'STOP', store => {
       const job = store.byId[id];
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.STOPPED;
