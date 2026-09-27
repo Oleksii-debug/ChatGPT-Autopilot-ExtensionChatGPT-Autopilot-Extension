@@ -151,6 +151,18 @@ test('install and authentication requirements fail closed before provider use', 
   assert.equal(auth.executable, false);
 });
 
+test('aggregate readiness uses the canonical capability-discovery severity order', () => {
+  const result = inspectSpecialistProviderReadinessV1({
+    selection: selection(),
+    providerStates: [
+      readiness({ toolId: 'fs.read', authenticationRequired: true, authenticated: false }),
+      readiness({ toolId: 'fs.write', health: 'UNKNOWN', reasonCode: 'not-probed' }),
+    ],
+  });
+  assert.equal(result.readiness, 'NEEDS_HEALTH_CHECK');
+  assert.equal(result.executable, false);
+});
+
 test('DEGRADED remains operationally executable exactly like canonical capability discovery', () => {
   const result = inspectSpecialistProviderReadinessV1({
     selection: selection({ grantedToolIds: ['fs.read'] }),
