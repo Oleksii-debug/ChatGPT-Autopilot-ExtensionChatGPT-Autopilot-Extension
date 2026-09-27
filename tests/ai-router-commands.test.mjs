@@ -510,3 +510,306 @@ test('pinned Agent route cannot bypass requested-role filtering through strong f
   );
   assert.equal(calls.length, 0, 'pinned route role mismatch must fail before provider I/O rather than being reclassified as verifier fallback');
 });
+
+
+test('Agent route policy can narrow global Models policy without mutating it', async () => {
+  const calls = [];
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[
+      { routeId:'local-a', provider:'ollama', model:'local-a', priority:10, costClass:'free', locality:'local' },
+      { routeId:'local-b', provider:'ollama', model:'local-b', priority:20, costClass:'free', locality:'local' },
+      { routeId:'paid', provider:'openai', model:'paid', priority:1, costClass:'paid',
+        inputPricePerMillionUsd:2, outputPricePerMillionUsd:4, locality:'remote' },
+    ],
+    routePolicy:{ allowRouteIds:['local-a','local-b','paid'], maxInputPricePerMillionUsd:5 },
+  } });
+  const before = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{
+      routePolicy:{
+        autoSwitch:false,
+        allowRouteIds:['local-b'],
+        freeOnly:true,
+        locality:'local',
+        maxInputPricePerMillionUsd:1,
+      },
+    },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['local-b']);
+  const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.deepEqual(after, before, 'per-Agent policy must never mutate global Models settings');
+});
+
+test('Agent route policy fails closed before real provider I/O when Models has no route pool', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'must-not-run', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    primary:{ provider:'openai', model:'legacy-paid' },
+    strong:{ provider:'openai', model:'legacy-strong' },
+    routes:[],
+  } });
+
+  for (const routePolicy of [
+    { freeOnly:true, locality:'local', maxInputPricePerMillionUsd:0, maxOutputPricePerMillionUsd:0 },
+    { autoSwitch:false },
+  ]) {
+    await assert.rejects(
+      () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+        prompt:'agent task',
+        isolatedRuntime:true,
+        routerOverride:{ routePolicy },
+      }),
+      /requires a configured Models route pool/u,
+    );
+  }
+  assert.equal(calls.length, 0, 'legacy primary/strong slots must not bypass per-Agent route policy or no-switch semantics');
+});
+
+test('Agent route policy fails closed when it widens global allow-list, locality or pin authority', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[
+      { routeId:'local', provider:'ollama', model:'local', costClass:'free', locality:'local' },
+      { routeId:'remote', provider:'openai', model:'remote', costClass:'paid', locality:'remote',
+        inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+    ],
+    routePolicy:{ allowRouteIds:['local'], locality:'local', pinnedRouteId:'local' },
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ allowRouteIds:['remote'] } },
+  }), /exceeds the global allow-list/);
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ locality:'remote' } },
+  }), /exceeds the global locality policy/);
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ pinnedRouteId:'remote' } },
+  }), /conflicts with the global pinned route/);
+});
+
+test('Agent route policy rejects resilience controls and hostile fields instead of creating policy authority', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[{ routeId:'local', provider:'ollama', model:'local' }],
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ retryBackoffSeconds:1 } },
+  }), /unsupported field/);
+});
+
+
+test('Agent route policy composes with legacy per-Agent route pin without mutating frozen policy', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[
+      { routeId:'local-a', provider:'ollama', model:'local-a', priority:1, costClass:'free', locality:'local' },
+      { routeId:'local-b', provider:'ollama', model:'local-b', priority:2, costClass:'free', locality:'local' },
+    ],
+  } });
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{
+      routePolicy:{ allowRouteIds:['local-b'], freeOnly:true, locality:'local' },
+      routeId:'local-b',
+    },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['local-b']);
+});
+
+
+test('Agent router override boundary rejects accessors without executing them', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[{ routeId:'local', provider:'ollama', model:'local' }],
+  } });
+
+  let reads = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'routeId', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'local';
+    },
+  });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'x',
+      isolatedRuntime:true,
+      routerOverride:hostile,
+    }),
+    /data-only fields/,
+  );
+  assert.equal(reads, 0);
+
+  const hostileSlot = {};
+  Object.defineProperty(hostileSlot, 'model', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'local';
+    },
+  });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'x',
+      isolatedRuntime:true,
+      routerOverride:{ primary: hostileSlot },
+    }),
+    /data-only fields/,
+  );
+  assert.equal(reads, 0);
+});
+
+
+test('Agent runtime route policy rejects coercive aliases before provider I/O', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'must-not-run', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{ routeId:'local', provider:'ollama', model:'local', costClass:'free', locality:'local' }],
+  } });
+
+  for (const routePolicy of [
+    { autoSwitch:'false' },
+    { freeOnly:1 },
+    { locality:' local ' },
+    { maxInputPricePerMillionUsd:'0' },
+    { maxOutputPricePerMillionUsd:-0 },
+    { allowRouteIds:[' local '] },
+  ]) {
+    await assert.rejects(
+      () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+        prompt:'agent task',
+        isolatedRuntime:true,
+        routerOverride:{ routePolicy },
+      }),
+      /must already be canonical|invalid/u,
+    );
+  }
+  assert.equal(calls.length, 0);
+});
+
+test('Agent route policy cannot weaken global deny, free-only or price ceilings', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  const routes = [
+    { routeId:'local-free', provider:'ollama', model:'local-free', priority:20, costClass:'free', locality:'local' },
+    { routeId:'paid-cheap', provider:'openai', model:'paid-cheap', priority:1, costClass:'paid', locality:'remote',
+      inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+    { routeId:'paid-expensive', provider:'openai', model:'paid-expensive', priority:0, costClass:'paid', locality:'remote',
+      inputPricePerMillionUsd:10, outputPricePerMillionUsd:20 },
+  ];
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes,
+    routePolicy:{
+      denyRouteIds:['paid-cheap'],
+      freeOnly:true,
+      maxInputPricePerMillionUsd:5,
+      maxOutputPricePerMillionUsd:5,
+    },
+  } });
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{
+      routePolicy:{
+        autoSwitch:true,
+        allowRouteIds:['local-free'],
+        freeOnly:false,
+        locality:'any',
+        maxInputPricePerMillionUsd:null,
+        maxOutputPricePerMillionUsd:null,
+      },
+    },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['local-free']);
+
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ allowRouteIds:['paid-cheap'] } },
+  }), /No AI route satisfies|exceeds the global allow-list/);
+  assert.equal(calls.length, 1);
+});
+
+test('Agent price ceiling takes the stricter minimum of global and per-Agent caps', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[
+      { routeId:'cheap', provider:'openai', model:'cheap', priority:20, costClass:'paid', locality:'remote',
+        inputPricePerMillionUsd:1, outputPricePerMillionUsd:1 },
+      { routeId:'mid', provider:'openai', model:'mid', priority:1, costClass:'paid', locality:'remote',
+        inputPricePerMillionUsd:4, outputPricePerMillionUsd:4 },
+    ],
+    routePolicy:{ maxInputPricePerMillionUsd:5, maxOutputPricePerMillionUsd:5 },
+  } });
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ maxInputPricePerMillionUsd:2, maxOutputPricePerMillionUsd:2 } },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['cheap']);
+});
