@@ -288,6 +288,7 @@ function routeBinding(route) {
 
 function baseResult({
   identities,
+  childAuthorityProviderId,
   role,
   modelCapabilityIds,
   requiresVision,
@@ -302,7 +303,7 @@ function baseResult({
     parentAgentId: identities.parentAgentId,
     childAgentId: identities.childAgentId,
     taskId: identities.taskId,
-    childAuthorityProviderId: childAuthority.providerId,
+    childAuthorityProviderId,
     role,
     modelCapabilityIds: [...modelCapabilityIds],
     requiresVision,
@@ -391,6 +392,7 @@ export function deriveSubagentModelRouteScopeV1(input = {}) {
   const capabilityEscalation = missing(modelCapabilityIds, childCapabilityIds);
   const emptyContext = {
     identities,
+    childAuthorityProviderId: childAuthority.providerId,
     role,
     modelCapabilityIds,
     requiresVision,
@@ -422,6 +424,7 @@ export function deriveSubagentModelRouteScopeV1(input = {}) {
   const commonRouteIds = intersect(parentPolicyRouteIds, ownerPolicyRouteIds);
   const context = {
     identities,
+    childAuthorityProviderId: childAuthority.providerId,
     role,
     modelCapabilityIds,
     requiresVision,
