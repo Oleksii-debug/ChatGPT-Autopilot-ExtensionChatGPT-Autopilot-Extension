@@ -80,7 +80,7 @@ function retryAtFor(required) {
     .filter(item => item.eligibleRouteIds.length > 0 && item.availableRouteIds.length === 0)
     .map(item => item.retryAt)
     .filter(value => Number.isSafeInteger(value) && value > 0);
-  return values.length ? Math.min(...values) : 0;
+  return values.length ? Math.max(...values) : 0;
 }
 
 export function inspectAgentRouteReadinessV1(input = {}) {
