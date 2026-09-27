@@ -248,31 +248,10 @@ export class OrchestrationV2Manager {
    * store operation open while calling this method and restores its previous
    * durable state if this call fails.
    */
-  applyBrowserAgentBoundLifecycle(bindingRaw, transitionRaw, options = {}) {
-    const admittedOptions = plainBrowserAgentLifecycleOptions(options);
-    const browserControlEpoch = admittedOptions.browserControlEpoch;
-    const nowMs = admittedOptions.nowMs === undefined ? this.now() : admittedOptions.nowMs;
+  withBrowserAgentBoundLifecycleAuthority(bindingRaw, operation) {
     const binding = normalizeBrowserAgentOrchestrationNodeBindingV1(bindingRaw);
-    const transition = typeof transitionRaw === 'string' ? transitionRaw.trim().toUpperCase() : '';
-    const eventType = transition === 'PAUSE'
-      ? OrchestrationHierarchyEventType.PAUSE_SCOPE
-      : transition === 'RESUME'
-        ? OrchestrationHierarchyEventType.RESUME_SCOPE
-        : transition === 'STOP'
-          ? OrchestrationHierarchyEventType.STOP_SCOPE
-          : '';
-    if (!eventType) throw new Error('Invalid Browser Agent bound lifecycle transition');
-    if (typeof browserControlEpoch !== 'number'
-        || !Number.isSafeInteger(browserControlEpoch)
-        || Object.is(browserControlEpoch, -0)
-        || browserControlEpoch < 1) {
-      throw new Error('Invalid Browser Agent lifecycle control epoch');
-    }
-    if (typeof nowMs !== 'number'
-        || !Number.isSafeInteger(nowMs)
-        || Object.is(nowMs, -0)
-        || nowMs < 0) {
-      throw new Error('Invalid Browser Agent lifecycle timestamp');
+    if (typeof operation !== 'function') {
+      throw new Error('Browser Agent bound lifecycle authority callback is required');
     }
 
     return this.runProjectAuthorityExclusive(async () => {
@@ -281,63 +260,107 @@ export class OrchestrationV2Manager {
       if (!inspection.current) {
         throw new Error(`Browser Agent orchestration binding is stale: ${inspection.status}`);
       }
-
       const controller = this.controllerFor(authority.orchestraId);
-      const eventId = compactOrchestrationEventId(
-        'browser-agent-lifecycle',
-        binding.jobId,
-        binding.projectId,
-        binding.orchestraId,
-        binding.graphId,
-        binding.controlEpoch,
-        binding.nodeId,
-        transition,
-        browserControlEpoch,
-      );
-      const result = await controller.dispatchHierarchyEvent({
-        type: eventType,
-        eventId,
-        controlEpoch: binding.controlEpoch,
-        nodeId: binding.nodeId,
-      }, { nowMs });
 
-      const expectedReason = transition === 'PAUSE'
-        ? 'PAUSED'
-        : transition === 'STOP'
-          ? 'STOPPED'
-          : 'RUNNING';
-      if (result?.kind !== 'HIERARCHY_EVENT' || result.reason !== expectedReason) {
-        throw new Error(`Browser Agent hierarchy lifecycle transition was not accepted: ${String(result?.reason || result?.kind || 'UNKNOWN')}`);
-      }
+      const applyBoundLifecycle = async (transitionRaw, options = {}) => {
+        const admittedOptions = plainBrowserAgentLifecycleOptions(options);
+        const browserControlEpoch = admittedOptions.browserControlEpoch;
+        const nowMs = admittedOptions.nowMs === undefined ? this.now() : admittedOptions.nowMs;
+        const transition = typeof transitionRaw === 'string' ? transitionRaw.trim().toUpperCase() : '';
+        const eventType = transition === 'PAUSE'
+          ? OrchestrationHierarchyEventType.PAUSE_SCOPE
+          : transition === 'RESUME'
+            ? OrchestrationHierarchyEventType.RESUME_SCOPE
+            : transition === 'STOP'
+              ? OrchestrationHierarchyEventType.STOP_SCOPE
+              : '';
+        if (!eventType) throw new Error('Invalid Browser Agent bound lifecycle transition');
+        if (typeof browserControlEpoch !== 'number'
+            || !Number.isSafeInteger(browserControlEpoch)
+            || Object.is(browserControlEpoch, -0)
+            || browserControlEpoch < 1) {
+          throw new Error('Invalid Browser Agent lifecycle control epoch');
+        }
+        if (typeof nowMs !== 'number'
+            || !Number.isSafeInteger(nowMs)
+            || Object.is(nowMs, -0)
+            || nowMs < 0) {
+          throw new Error('Invalid Browser Agent lifecycle timestamp');
+        }
 
-      // The reducer intentionally refuses to resurrect STOPPED nodes during a
-      // RESUME_SCOPE. Its aggregate reason still describes the requested scope,
-      // so authorization must bind to the durable target node state rather than
-      // trusting the summary string alone.
-      const latestRuntime = await controller.runtimeRepository.load();
-      const latestGraph = latestRuntime?.hierarchy?.graph;
-      const latestState = latestRuntime?.hierarchy?.state;
-      if (!latestGraph
-          || !latestState
-          || latestGraph.graphId !== binding.graphId
-          || latestState.graphId !== binding.graphId
-          || latestState.controlEpoch !== binding.controlEpoch) {
-        throw new Error('Browser Agent hierarchy authority changed during lifecycle transition');
-      }
-      const target = latestState.nodesById?.[binding.nodeId];
-      if (!target || target.scopeState !== expectedReason) {
-        throw new Error(
-          `Browser Agent hierarchy target did not enter requested lifecycle scope: ${String(target?.scopeState || 'MISSING')}`,
+        // Re-check durable hierarchy provenance after the Browser Agent has
+        // queued behind its own update chain but while this Project fence is
+        // still held.
+        const runtimeBefore = await controller.runtimeRepository.load();
+        const graphBefore = runtimeBefore?.hierarchy?.graph;
+        const stateBefore = runtimeBefore?.hierarchy?.state;
+        if (!graphBefore
+            || !stateBefore
+            || graphBefore.graphId !== binding.graphId
+            || graphBefore.controlEpoch !== binding.controlEpoch
+            || stateBefore.graphId !== binding.graphId
+            || stateBefore.controlEpoch !== binding.controlEpoch
+            || !stateBefore.nodesById?.[binding.nodeId]) {
+          throw new Error('Browser Agent hierarchy authority changed before lifecycle transition');
+        }
+
+        const eventId = compactOrchestrationEventId(
+          'browser-agent-lifecycle',
+          binding.jobId,
+          binding.projectId,
+          binding.orchestraId,
+          binding.graphId,
+          binding.controlEpoch,
+          binding.nodeId,
+          transition,
+          browserControlEpoch,
         );
-      }
+        const result = await controller.dispatchHierarchyEvent({
+          type: eventType,
+          eventId,
+          controlEpoch: binding.controlEpoch,
+          nodeId: binding.nodeId,
+        }, { nowMs });
 
-      return Object.freeze({
-        binding,
-        transition,
-        eventId,
-        targetScopeState: target.scopeState,
-        result: structuredClone(result),
-      });
+        const expectedReason = transition === 'PAUSE'
+          ? 'PAUSED'
+          : transition === 'STOP'
+            ? 'STOPPED'
+            : 'RUNNING';
+        if (result?.kind !== 'HIERARCHY_EVENT' || result.reason !== expectedReason) {
+          throw new Error(`Browser Agent hierarchy lifecycle transition was not accepted: ${String(result?.reason || result?.kind || 'UNKNOWN')}`);
+        }
+
+        // RESUME_SCOPE deliberately leaves terminal STOPPED nodes stopped. The
+        // aggregate reducer reason describes the requested scope, so bind
+        // authorization to the actual durable target state.
+        const latestRuntime = await controller.runtimeRepository.load();
+        const latestGraph = latestRuntime?.hierarchy?.graph;
+        const latestState = latestRuntime?.hierarchy?.state;
+        if (!latestGraph
+            || !latestState
+            || latestGraph.graphId !== binding.graphId
+            || latestState.graphId !== binding.graphId
+            || latestState.controlEpoch !== binding.controlEpoch) {
+          throw new Error('Browser Agent hierarchy authority changed during lifecycle transition');
+        }
+        const target = latestState.nodesById?.[binding.nodeId];
+        if (!target || target.scopeState !== expectedReason) {
+          throw new Error(
+            `Browser Agent hierarchy target did not enter requested lifecycle scope: ${String(target?.scopeState || 'MISSING')}`,
+          );
+        }
+
+        return Object.freeze({
+          binding,
+          transition,
+          eventId,
+          targetScopeState: target.scopeState,
+          result: structuredClone(result),
+        });
+      };
+
+      return operation(applyBoundLifecycle);
     });
   }
 
