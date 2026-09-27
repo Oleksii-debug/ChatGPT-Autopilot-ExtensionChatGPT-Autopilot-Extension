@@ -320,6 +320,15 @@ test('spawned children cannot amplify prompt, recovery, chat or provider authori
   assert.equal(child.providerBinding, null);
 });
 
+test('mutation time is explicit trusted input with no ambient clock fallback', () => {
+  const raw = request();
+  delete raw.nowMs;
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(raw),
+    /nowMs is invalid/,
+  );
+});
+
 test('request boundary rejects accessors, hidden authority and unknown fields without getter reads', () => {
   let reads = 0;
   const raw = request();
