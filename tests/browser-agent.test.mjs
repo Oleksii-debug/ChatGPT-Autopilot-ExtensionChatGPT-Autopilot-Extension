@@ -1295,7 +1295,7 @@ test('Browser Agent persists independent verifier route failure runtime before r
   assert.equal(live.job.runtime.aiRouterRuntime.routeStates['mistral-agent'].lastErrorCode, 'HTTP_429');
 });
 
-test('Browser Agent waits until canonical planner route retryAt instead of early exponential retries', async () => {
+test('Browser Agent honors provider retryAt even when no pool-exhausted wrapper is used', async () => {
   const chrome = makeChrome();
   let routeCalls = 0;
   const manager = new BrowserAgentManager({
@@ -1304,7 +1304,7 @@ test('Browser Agent waits until canonical planner route retryAt instead of early
     routePrompt: async () => {
       routeCalls += 1;
       const error = new Error('AI route pool is cooling down');
-      error.code = 'AI_ROUTE_POOL_EXHAUSTED';
+      error.code = 'PROVIDER_RATE_LIMITED';
       error.retryAt = 65000;
       throw error;
     },
@@ -1329,7 +1329,7 @@ test('Browser Agent waits until verifier route retryAt and retains failed verifi
       if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
         verifierCalls += 1;
         const error = new Error('Verifier route is cooling down');
-        error.code = 'AI_ROUTE_POOL_EXHAUSTED';
+        error.code = 'PROVIDER_RATE_LIMITED';
         error.retryAt = 70000;
         error.modelCallsUsed = 1;
         error.routerRuntime = {
