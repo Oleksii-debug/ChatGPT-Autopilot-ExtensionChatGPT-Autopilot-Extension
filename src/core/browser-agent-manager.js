@@ -60,6 +60,12 @@ import {
   materializeAgentDefinitionV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
+import {
+  SPECIALIST_REGISTRY_VERSION,
+  normalizeSpecialistDefinitionV1,
+  normalizeSpecialistRegistryV1,
+  proposeSpecialistRegistryMutationV1,
+} from './specialist-registry.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -69,6 +75,7 @@ const MAX_OWNER_INSTRUCTIONS = 20;
 const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
+const MAX_SPECIALIST_REGISTRIES = 128;
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
@@ -80,6 +87,11 @@ const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
+const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
+const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'specialistId', 'expectedDefinitionRevision',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -130,6 +142,14 @@ function snapshotExactOwnDataRequest(value, allowed, label) {
 function canonicalAgentDefinitionRegistryId(value) {
   return normalizeAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+    registryId: value,
+    revision: 1,
+    definitions: [],
+  }).registryId;
+}
+function canonicalSpecialistRegistryId(value) {
+  return normalizeSpecialistRegistryV1({
+    schemaVersion: SPECIALIST_REGISTRY_VERSION,
     registryId: value,
     revision: 1,
     definitions: [],
@@ -250,6 +270,30 @@ function normalizePersistedAgentDefinitionScope(raw, selection) {
   };
 }
 
+function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine) {
+  const registries = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Chrome storage values are structured-cloneable. Ignore impossible
+      // in-memory exotic values without invoking caller behavior.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+    try {
+      const registry = normalizeSpecialistRegistryV1(value);
+      if (registry.registryId !== key) throw new Error('Stored Specialist registry identity drift');
+      registries[key] = registry;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { registries, quarantine };
+}
+
 function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
   const registries = Object.create(null);
   const quarantine = Object.create(null);
@@ -367,6 +411,8 @@ function freshStore() {
     executionPolicy: normalizeBrowserAgentExecutionPolicy(),
     definitionRegistriesById: Object.create(null),
     definitionRegistryQuarantineById: Object.create(null),
+    specialistRegistriesById: Object.create(null),
+    specialistRegistryQuarantineById: Object.create(null),
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -596,6 +642,12 @@ function normalizeStore(raw, now) {
   );
   out.definitionRegistriesById = definitionState.registries;
   out.definitionRegistryQuarantineById = definitionState.quarantine;
+  const specialistState = normalizePersistedSpecialistRegistryState(
+    raw.specialistRegistriesById,
+    raw.specialistRegistryQuarantineById,
+  );
+  out.specialistRegistriesById = specialistState.registries;
+  out.specialistRegistryQuarantineById = specialistState.quarantine;
   return out;
 }
 
@@ -833,6 +885,99 @@ export class BrowserAgentManager {
       }
       committed = proposeAgentDefinitionRegistryMutationV1(proposalInput);
       store.definitionRegistriesById[registryId] = committed.nextRegistry;
+      return store;
+    });
+    return clone(committed);
+  }
+
+  async listSpecialistRegistries() {
+    const store = await this.load();
+    const registries = Object.keys(store.specialistRegistriesById || {})
+      .sort()
+      .map(registryId => clone(store.specialistRegistriesById[registryId]));
+    const quarantinedRegistryIds = Object.keys(store.specialistRegistryQuarantineById || {}).sort();
+    return { registries, quarantinedRegistryIds };
+  }
+
+  async getSpecialistRegistry(registryId) {
+    const canonicalId = canonicalSpecialistRegistryId(registryId);
+    const store = await this.load();
+    const registries = store.specialistRegistriesById || Object.create(null);
+    const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
+    return {
+      registry: registry ? clone(registry) : null,
+      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async createSpecialistRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_REGISTRY_CREATE_KEYS,
+      'Browser Agent Specialist registry create request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent Specialist registry create request requires registryId');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    let created = null;
+    await this.update(store => {
+      const registries = store.specialistRegistriesById
+        || (store.specialistRegistriesById = Object.create(null));
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(registries, registryId)) throw new Error('Specialist registry already exists');
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot be overwritten');
+      }
+      if (Object.keys(registries).length >= MAX_SPECIALIST_REGISTRIES) {
+        throw new Error('Specialist registry capacity is exhausted');
+      }
+      created = normalizeSpecialistRegistryV1({
+        schemaVersion: SPECIALIST_REGISTRY_VERSION,
+        registryId,
+        revision: 1,
+        definitions: [],
+      });
+      registries[registryId] = created;
+      return store;
+    });
+    return { registry: clone(created) };
+  }
+
+  async mutateSpecialistRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS,
+      'Browser Agent Specialist registry mutation request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent Specialist registry mutation request requires registryId');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    if (Object.hasOwn(request, 'definition')) {
+      request.definition = normalizeSpecialistDefinitionV1(request.definition);
+    }
+    let committed = null;
+    await this.update(store => {
+      const registries = store.specialistRegistriesById || Object.create(null);
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot be mutated');
+      }
+      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!current) throw new Error('Specialist registry not found');
+      const proposalInput = {
+        registry: current,
+        registryId,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        kind: request.kind,
+      };
+      for (const key of ['definition', 'specialistId', 'expectedDefinitionRevision']) {
+        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
+      }
+      committed = proposeSpecialistRegistryMutationV1(proposalInput);
+      store.specialistRegistriesById[registryId] = committed.nextRegistry;
       return store;
     });
     return clone(committed);
