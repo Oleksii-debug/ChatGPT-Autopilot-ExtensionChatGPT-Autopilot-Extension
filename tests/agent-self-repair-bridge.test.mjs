@@ -200,6 +200,16 @@ test('READY_FOR_REPAIR produces an append-only actor work node with no new autho
   assert.equal(result.requiresCanonicalPlanStore, true);
 });
 
+test('READY_FOR_REPAIR preserves failed-node conflict identity even when template omits it', () => {
+  const result = proposeAgentSelfRepairWorkV1(request({
+    workNode: workNode({ conflictKeys: ['repair-specific'] }),
+  }));
+  assert.deepEqual(
+    result.extensionNode.conflictKeys,
+    ['artifact-target', 'repair-specific', 'self-repair-cycle-1'],
+  );
+});
+
 test('READY_FOR_RETEST requires the verified repair node from the same cycle and assigns verifier', () => {
   const origin = originPlan();
   const current = originPlan({
