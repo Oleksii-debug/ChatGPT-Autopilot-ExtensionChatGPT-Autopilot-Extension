@@ -86,6 +86,48 @@ test('successful terminal provider evidence is not promoted to product completio
   assert.equal(value.reconciliationRequired, false);
 });
 
+
+test('fresh provider chronology is durable while legacy records without it remain valid', () => {
+  const current = prepared();
+  const {
+    providerUpdatedAt: _legacyProviderUpdatedAt,
+    providerObservedAt: _legacyProviderObservedAt,
+    ...legacyRecord
+  } = current;
+  const legacy = normalizeSpecialistProviderExecutionV1(legacyRecord);
+  assert.equal(legacy.providerUpdatedAt, '');
+  assert.equal(legacy.providerObservedAt, '');
+
+  const value = recordSpecialistProviderExecutionOutcomeV1(current, {
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+    errorCode: '',
+    providerUpdatedAt: '2026-09-25T08:00:00.000Z',
+    providerObservedAt: T1,
+    at: T1,
+  });
+  assert.equal(value.providerUpdatedAt, '2026-09-25T08:00:00.000Z');
+  assert.equal(value.providerObservedAt, T1);
+
+  assert.throws(
+    () => recordSpecialistProviderExecutionOutcomeV1(current, {
+      providerStatus: 'finished',
+      providerSucceeded: true,
+      manualReviewRequired: false,
+      reconciliationRequired: false,
+      safeToRetry: false,
+      effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+      errorCode: '',
+      providerUpdatedAt: '2026-09-25T08:00:00.000Z',
+      at: T1,
+    }),
+    /requires both providerUpdatedAt and providerObservedAt/,
+  );
+});
 test('negative terminal OpenHands evidence remains provider failure plus manual review', () => {
   const failed = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
     providerStatus: 'error',
