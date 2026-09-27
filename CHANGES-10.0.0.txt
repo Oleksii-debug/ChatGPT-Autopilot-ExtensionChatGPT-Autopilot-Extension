@@ -18,6 +18,17 @@ AGENT DRAFT IMPORT — AFTER THE FIRST DELIVERED PILOT 10 ARCHIVE
 - Agent tab now imports/exports a versioned JSON goal and policy draft. Import only fills the form and never creates or starts a job. Unknown fields, runtime state, and credentials are rejected; the two-second status refresh preserves an imported draft. This change will appear in a later archive, not the Pilot 10 ZIP delivered at the initial 2026-09-26 checkpoint.
 - The Models tab displays Mistral's endpoint key-loaded status as reported by the local Gateway. The key itself is never part of the archive or repository; owner Windows verification remains pending.
 
+AGENT ROUTE SELECTION — AFTER THE 74EC0D2 ARCHIVE
+- Agent can pin one saved, enabled global route by its route ID. Its goal/policy JSON draft retains that choice. The route pool passes the chosen endpoint ID (including `mistral`) to Gateway without changing the global profile.
+- Saved Models routes now retain a bounded human-readable profile name plus exact per-route system/worker prompts. Only the selected route contributes those prompts, and the Agent selector announces the profile name together with its stable route ID for keyboard/NVDA disambiguation.
+- Models price caps now preserve owner intent exactly: an empty maximum-price field remains unbounded, while an explicit 0 remains a real zero-price cap. Loading and saving Models no longer converts an unbounded policy into a zero cap that can silently exclude paid Agent routes.
+- A missing/disabled route or conflict with the globally pinned route stops the model call with an explicit error. Other global constraints, role requirements, cooldown, and budget still apply. Leave the selection on inheritance for automatic failover.
+- Agent status refresh no longer erases policy edits typed before Save. A save that completes after newer typing keeps the newer edits visible and marked unsaved; switching jobs loads the selected job's saved policy.
+- The Agent route selector now projects the saved Models owner-policy: disabled/denied/out-of-allow/free-only/locality/price-ineligible routes are exposed as unavailable instead of looking runnable. The saved route remains visible if it later becomes unavailable, and execution still fails closed before provider I/O.
+- Agent usage now reports the last actual route ID and a bounded failover-chain summary. Regression coverage proves an Agent pin cannot bypass global deny policy, role filtering, or durable route backoff.
+- Starting a new Agent now performs a UI preflight against the already-loaded Models policy: a saved route that is disabled or statically owner-policy-blocked is preserved in the form but does not create a knowingly doomed job. Core remains the authoritative fail-closed enforcement boundary.
+- Agent recovery now preserves AI Router failure runtime from both planner and independent-verifier calls. A fresh retryable provider exhaustion carries the durable route backoff/circuit `retryAt`, and Agent wakes at that canonical time instead of converting one provider cooldown into repeated early model errors.
+
 BASELINE
 - Last frozen canonical release: 0.9.19.
 - Candidate source is not the user-supplied 0.9.19 ZIP renamed. It is built from live GitHub source after canonical main 372cf294eec087fa7c355d14885140af1ad9f13d plus the converged Scenario Work lanes below.
