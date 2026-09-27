@@ -339,15 +339,37 @@ function runtimeFixture({ confirmEffect = true } = {}) {
   return { g, runtime };
 }
 
-function canonicalBindingId(controlEpoch = 7) {
+function canonicalBindingId({
+  parentAgentId = 'parent-1',
+  childAgentId = 'child-1',
+  taskId = 'task-1',
+  taskEnvelopeId = 'envelope-1',
+  planId = 'plan-1',
+  planRevision = 3,
+  outcomeContractId = 'outcome-1',
+  outcomeContractRevision = 1,
+  controlEpoch = 7,
+  activationId = 'child-activation-1',
+  generation = 1,
+  activationPurpose = OrchestrationActivationPurpose.WORK,
+  invocationId = 'invocation-child-1',
+} = {}) {
   return compactOrchestrationEventId(
     'subagent-task-activation-binding',
     'project-1',
-    'envelope-1',
+    parentAgentId,
+    childAgentId,
+    taskId,
+    taskEnvelopeId,
+    planId,
+    String(planRevision),
+    outcomeContractId,
+    String(outcomeContractRevision),
     String(controlEpoch),
-    'child-activation-1',
-    '1',
-    'invocation-child-1',
+    activationId,
+    String(generation),
+    activationPurpose,
+    invocationId,
   );
 }
 
@@ -1066,8 +1088,41 @@ test('already-terminal current activation produces no second terminal proposal',
   assert.equal(replay.requiresCanonicalOrchestrationReducer, false);
 });
 
+test('task activation binding identity changes with exact task, plan and outcome semantics', () => {
+  const baseline = canonicalBindingId();
+  for (const variant of [
+    { parentAgentId: 'parent-other' },
+    { childAgentId: 'child-other' },
+    { taskId: 'task-other' },
+    { taskEnvelopeId: 'envelope-other' },
+    { planId: 'plan-other' },
+    { planRevision: 4 },
+    { outcomeContractId: 'outcome-other' },
+    { outcomeContractRevision: 2 },
+    { activationPurpose: OrchestrationActivationPurpose.RECOVERY },
+    { invocationId: 'invocation-other' },
+  ]) {
+    assert.notEqual(canonicalBindingId(variant), baseline);
+  }
+
+  assert.throws(
+    () => normalizeTrustedSubagentTaskActivationBindingV1({
+      ...binding(),
+      planRevision: 4,
+    }),
+    /bindingId is not canonical/u,
+  );
+
+  const revised = normalizeTrustedSubagentTaskActivationBindingV1({
+    ...binding(),
+    planRevision: 4,
+    bindingId: canonicalBindingId({ planRevision: 4 }),
+  });
+  assert.equal(revised.planRevision, 4);
+});
+
 test('task activation binding identity is scoped to the exact owner control epoch', () => {
-  assert.notEqual(canonicalBindingId(7), canonicalBindingId(8));
+  assert.notEqual(canonicalBindingId({ controlEpoch: 7 }), canonicalBindingId({ controlEpoch: 8 }));
 
   assert.throws(
     () => normalizeTrustedSubagentTaskActivationBindingV1({
@@ -1080,10 +1135,10 @@ test('task activation binding identity is scoped to the exact owner control epoc
   const epochEight = normalizeTrustedSubagentTaskActivationBindingV1({
     ...binding(),
     controlEpoch: 8,
-    bindingId: canonicalBindingId(8),
+    bindingId: canonicalBindingId({ controlEpoch: 8 }),
   });
   assert.equal(epochEight.controlEpoch, 8);
-  assert.equal(epochEight.bindingId, canonicalBindingId(8));
+  assert.equal(epochEight.bindingId, canonicalBindingId({ controlEpoch: 8 }));
 });
 
 test('trusted activation binding boundary rejects authority-bearing extras and accessors without getter execution', () => {
