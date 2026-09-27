@@ -141,3 +141,17 @@ EMERGENCY HOTFIX — 2026-09-26 — SESSION / SCENARIO EFFORT CONTROL
 - Owner-test archive: 10 Пілот 0502 2709.zip.
 - SHA-256: 4492fdef89b7a8d2ee91df95c7e3c3076e2df5b2433ce481cd55470b5cc62b1c.
 - OWNER_WINDOWS_CHROME_VERIFIED=false until physical owner acceptance of this exact archive.
+
+
+2026-09-27 11:58 — POST-HOTFIX RELEASE-LINE RECONCILIATION
+- Hotfix/docs branch head before this reconciliation: 6ac96f9912002c98519ad9bceb27f05c8f852ed3; Core/UI/Release workflows on that docs head all SUCCESS.
+- Live topology vs current release/0.10.0-candidate is now DIVERGED: hotfix is 23 commits ahead and 115 commits behind from merge base 379d5d1c9f215249defe2883cfa634a96cebdb11.
+- Direct source inspection proves the newer release line has NOT source-equivalently absorbed PR #439:
+  - release service-worker still uses create temporary tab -> READ_ASSISTANT_REPORT -> close temporary tab fallback for a missing conversation;
+  - release does not contain the PR #439 assistant-report-probe helper file;
+  - release tabs.js lacks hotfix autoDiscardable protection;
+  - release scenario-work-manager lacks hotfix navigation-pending/tab-recovery markers.
+- PR #439 must therefore be semantically reconverged onto the exact current release head before merge/release use; never force-merge the stale qualified branch or overwrite the 115 newer release commits.
+- After reconvergence, focused recovery tests plus exact-head Core/UI/Release/Windows package gates and a new deterministic ZIP are mandatory.
+- 10 Пілот 0502 2709.zip / SHA256 4492fdef89b7a8d2ee91df95c7e3c3076e2df5b2433ce481cd55470b5cc62b1c remains the qualified evidence artifact for the original PR #439 runtime head only.
+- OWNER_WINDOWS_CHROME_VERIFIED=false remains unchanged.
