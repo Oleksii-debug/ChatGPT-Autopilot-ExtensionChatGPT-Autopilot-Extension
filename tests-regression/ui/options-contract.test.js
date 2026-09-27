@@ -278,6 +278,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd','agent-policy-edit-status',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
     'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
+    'agent-max-concurrent-agents','agent-save-execution-policy-button','agent-execution-policy-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
   has(/id="agent-status" role="status"/, 'Agent status must be announced');
@@ -286,6 +287,14 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.match(js, /core\('START_BROWSER_AGENT_JOB'/);
   assert.match(js, /core\('ADD_BROWSER_AGENT_INSTRUCTION'/);
   assert.match(js, /core\('RUN_BROWSER_AGENT_BURST'/);
+  has(/<label for="agent-max-concurrent-agents">Максимум одночасно активних верхньорівневих Agent<\/label>/, 'global Agent concurrency must have a persistent native label');
+  has(/id="agent-max-concurrent-agents" type="number" min="1" max="32" step="1"/, 'global Agent concurrency must expose bounded native numeric semantics');
+  has(/id="agent-execution-policy-status" role="status"/, 'global Agent concurrency save result must be announced');
+  assert.match(js, /core\('GET_BROWSER_AGENT_EXECUTION_POLICY'\)/, 'Agent UI must read the canonical execution policy through Core');
+  assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must load through the canonical startup sequence');
+  assert.doesNotMatch(js, /export \{ MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName \};\s*void loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must not create a second startup path');
+  assert.match(js, /core\('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', \{ maxConcurrentAgents: value \}\)/, 'Agent UI must update the canonical execution policy through Core');
+  assert.match(js, /!Number\.isInteger\(value\) \|\| value < 1 \|\| value > 32/, 'Agent UI must reject invalid concurrency before Core mutation');
   assert.match(js, /chrome\.permissions\.request\(\{ origins \}\)/, 'site access must be explicit through Chrome optional permissions');
   assert.ok(js.includes("repeatMode: $('agent-repeat-mode').value"), 'schedule/repeat policy must be persisted through Core');
   assert.match(js, /WAITING_SCHEDULE: 'очікує розкладу'/, 'scheduled wait must be exposed in readable status');
