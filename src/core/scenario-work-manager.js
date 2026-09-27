@@ -28,6 +28,16 @@ const MAX_PERSISTED_DEPTH = 64;
 const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const MAX_INITIAL_STAGGER_SECONDS = 604800; // 7 days; UI may express this in seconds or minutes.
 const ASSISTANT_OBSERVATION_HEARTBEAT_MS = 5 * 60 * 1000;
+const ASSISTANT_TAB_RECOVERY_GRACE_MS = 5 * 60 * 1000;
+const ASSISTANT_TAB_RECOVERY_CODES = new Set([
+  'ASSISTANT_RESPONSE_TAB_RELOAD_STARTED',
+  'ASSISTANT_RESPONSE_TAB_DISCARDED',
+  'ASSISTANT_RESPONSE_TAB_FROZEN',
+  'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING',
+  'ASSISTANT_RESPONSE_TAB_REOPENED_WAITING',
+  'TAB_NAVIGATION_TIMEOUT',
+  'TAB_UNAVAILABLE_DURING_READINESS_CHECK',
+]);
 const POOL_RUNTIME_EDITABLE_CONFIG_KEYS = Object.freeze([
   'responseTimeoutMinutes', 'pollSeconds', 'minimumLaunchGapSeconds',
   'preSendDelaySeconds', 'busyCheckDelaySeconds', 'retryBackoffSeconds',
@@ -1321,6 +1331,32 @@ export class ScenarioWorkManager {
   async observeCompletedTurns(scenario, now, expectedOwnerEpoch) {
     let runtime = ensureManagerRuntimeFields(scenario.runtime);
     const core = await this.coreRepository.load();
+
+    const extendForTabRecovery = async (participant, task, code) => {
+      if (Number(participant.deadlineAt || 0) > now) return { ownerChanged: false };
+      const refreshed = ensureManagerRuntimeFields(runtime);
+      const liveParticipant = scenarioWorkParticipants(refreshed).find(item => item.key === participant.key);
+      if (liveParticipant?.state !== ScenarioParticipantState.WAITING) return { ownerChanged: false };
+      liveParticipant.deadlineAt = Math.max(
+        Number(liveParticipant.deadlineAt || 0),
+        now + ASSISTANT_TAB_RECOVERY_GRACE_MS,
+      );
+      refreshed.updatedAt = now;
+      const checkpoint = await this.checkpointRuntime(scenario.id, refreshed, expectedOwnerEpoch, now);
+      if (!checkpoint.applied) return { ownerChanged: true, runtime: checkpoint.runtime || runtime };
+      runtime = checkpoint.runtime;
+      await this.appendScenarioDiagnostic({
+        scenario: { ...scenario, runtime },
+        participant: liveParticipant,
+        task,
+        event: 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ВІДНОВЛЕННЯ_ВКЛАДКИ',
+        status: 'RECOVERING',
+        code: code || 'ASSISTANT_RESPONSE_TAB_RECOVERY',
+        message: `Стан відповіді невідомий через відновлення вкладки; timeout відкладено на ${Math.floor(ASSISTANT_TAB_RECOVERY_GRACE_MS / 1000)} с без replacement.`,
+        now,
+      });
+      return { ownerChanged: false };
+    };
     for (const participant of scenarioWorkParticipants(runtime)) {
       if (participant.state !== ScenarioParticipantState.WAITING || !participant.sessionId) continue;
       const session = core.sessionsById?.[participant.sessionId];
@@ -1335,12 +1371,24 @@ export class ScenarioWorkManager {
           conversationUrl: task.lastConversationUrl,
           assistantBaselineCount: Number(task.lastAssistantBaselineCount || 0),
           assistantBaselineKnown: task.lastAssistantBaselineKnown === true,
+          persistentManagedTab: true,
         });
       } catch (error) {
         await this.recordAssistantObservation({ scenario, participant, task, error, now });
+        const code = String(error?.safeDiagnosticCode || '');
+        if (ASSISTANT_TAB_RECOVERY_CODES.has(code)) {
+          const recovery = await extendForTabRecovery(participant, task, code);
+          if (recovery.ownerChanged) return { runtime: recovery.runtime || runtime, ownerChanged: true };
+        }
         continue;
       }
       await this.recordAssistantObservation({ scenario, participant, task, report, now });
+      const reportCode = String(report?.safeDiagnosticCode || report?.code || '');
+      if (report?.tabRecoveryPending === true || ASSISTANT_TAB_RECOVERY_CODES.has(reportCode)) {
+        const recovery = await extendForTabRecovery(participant, task, reportCode);
+        if (recovery.ownerChanged) return { runtime: recovery.runtime || runtime, ownerChanged: true };
+        continue;
+      }
       // responseTimeoutMinutes means absence of a completed/ongoing assistant response,
       // not a hard wall-clock cap on a response that is still streaming. If the
       // page proves the assistant is actively generating exactly when the
