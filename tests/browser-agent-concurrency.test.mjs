@@ -345,3 +345,128 @@ test('queued admission fails closed instead of hanging when policy storage read 
   assert.equal(recovered.kind, 'BURST');
   assert.equal(recovered.cycles, 1);
 });
+
+test('legacy top-level Agents sharing one persisted tab are serialized even when global capacity is higher', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const store = dueStore(3, ['same-a', 'same-b']);
+  store.byId['same-a'].runtime.tabId = 77;
+  store.byId['same-b'].runtime.tabId = 77;
+  manager.load = async () => structuredClone(store);
+  manager.reconcileAlarm = async () => 0;
+
+  let active = 0;
+  let maxActive = 0;
+  let releaseA;
+  let startedAResolve;
+  const barrierA = new Promise(resolve => { releaseA = resolve; });
+  const startedA = new Promise(resolve => { startedAResolve = resolve; });
+  manager.cycleOne = async id => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    if (id === 'same-a') {
+      startedAResolve();
+      await barrierA;
+    }
+    active -= 1;
+    return { kind: 'COMPLETED', id };
+  };
+
+  const first = manager.runBurst('same-a', { maxCycles: 1 });
+  await startedA;
+  const second = manager.runBurst('same-b', { maxCycles: 1 });
+  await Promise.resolve();
+  assert.equal(maxActive, 1);
+
+  releaseA();
+  await Promise.all([first, second]);
+  assert.equal(maxActive, 1);
+});
+
+test('a shared-target queued Agent does not head-of-line block an unrelated target', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const store = dueStore(3, ['held', 'conflict', 'independent']);
+  store.byId.held.runtime.tabId = 10;
+  store.byId.conflict.runtime.tabId = 10;
+  store.byId.independent.runtime.tabId = 20;
+  manager.load = async () => structuredClone(store);
+  manager.reconcileAlarm = async () => 0;
+
+  let releaseHeld;
+  let heldStartedResolve;
+  let independentStartedResolve;
+  const heldBarrier = new Promise(resolve => { releaseHeld = resolve; });
+  const heldStarted = new Promise(resolve => { heldStartedResolve = resolve; });
+  const independentStarted = new Promise(resolve => { independentStartedResolve = resolve; });
+  const starts = [];
+  manager.cycleOne = async id => {
+    starts.push(id);
+    if (id === 'held') {
+      heldStartedResolve();
+      await heldBarrier;
+    }
+    if (id === 'independent') independentStartedResolve();
+    return { kind: 'COMPLETED', id };
+  };
+
+  const held = manager.runBurst('held', { maxCycles: 1 });
+  await heldStarted;
+  const conflict = manager.runBurst('conflict', { maxCycles: 1 });
+  const independent = manager.runBurst('independent', { maxCycles: 1 });
+  await independentStarted;
+
+  assert.deepEqual(starts, ['held', 'independent']);
+  releaseHeld();
+  await Promise.all([held, conflict, independent]);
+  assert.deepEqual(starts, ['held', 'independent', 'conflict']);
+});
+
+test('concurrent active-tab adoption gives the owner tab to only one Agent and isolates the other', async () => {
+  let state = {
+    schemaVersion: 1,
+    selectedId: 'a',
+    executionPolicy: { maxConcurrentAgents: 2 },
+    order: ['a', 'b'],
+    byId: {
+      a: { id: 'a', runtime: { tabId: null, knownTabIds: [], ownedTabIds: [], currentUrl: '', history: [] } },
+      b: { id: 'b', runtime: { tabId: null, knownTabIds: [], ownedTabIds: [], currentUrl: '', history: [] } },
+    },
+  };
+  let nextCreatedId = 8;
+  const chrome = makeChromeStorage();
+  chrome.tabs = {
+    async query() { return [{ id: 7, url: 'https://example.test/', active: true, lastAccessed: 10 }]; },
+    async get(id) {
+      if (id === 7) return { id: 7, url: 'https://example.test/' };
+      return { id, url: 'https://example.test/' };
+    },
+    async create({ url }) { return { id: nextCreatedId++, url }; },
+  };
+
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  manager.load = async () => structuredClone(state);
+  manager.save = async next => {
+    state = structuredClone(next);
+    return structuredClone(state);
+  };
+  manager.resolveStartContext = async () => ({
+    url: 'https://example.test/',
+    tab: { id: 7, url: 'https://example.test/' },
+    adopt: true,
+  });
+
+  const [tabA, tabB] = await Promise.all([
+    manager.ensureTab(structuredClone(state.byId.a)),
+    manager.ensureTab(structuredClone(state.byId.b)),
+  ]);
+
+  assert.deepEqual(new Set([tabA.id, tabB.id]), new Set([7, 8]));
+  assert.notEqual(state.byId.a.runtime.tabId, state.byId.b.runtime.tabId);
+  const adopted = state.byId.a.runtime.tabId === 7 ? state.byId.a : state.byId.b;
+  const isolated = state.byId.a.runtime.tabId === 8 ? state.byId.a : state.byId.b;
+  assert.deepEqual(adopted.runtime.ownedTabIds, []);
+  assert.deepEqual(isolated.runtime.ownedTabIds, [8]);
+  assert.ok(adopted.runtime.knownTabIds.includes(7));
+  assert.ok(isolated.runtime.knownTabIds.includes(8));
+});
