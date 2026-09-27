@@ -126,7 +126,7 @@ function taskEnvelope(contract = outcomeContract()) {
       conflictKeys: ['artifact:result'],
       ownerId: 'child-1',
       executionPlane: AgentExecutionPlane.CLOUD,
-      acceptanceCriteria: ['Child result is complete.'],
+      acceptanceCriteria: ['Result is complete'],
       budget: {
         maxModelCalls: 5,
         maxRuntimeSeconds: 120,
