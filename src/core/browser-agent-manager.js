@@ -2119,58 +2119,292 @@ export class BrowserAgentManager {
    * method only distributes one product-wide capacity budget, so service
    * worker restart cannot briefly over-admit independent jobs.
    */
-  async claimSpecialistHandoffsAcrossJobs(payload = {}) {
+  async claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = {}) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
     const limit = specialistCapacityLimit(request.maxConcurrentHandoffs);
+    const targetJobId = Object.hasOwn(request, 'targetJobId')
+      ? exactIdentity(request.targetJobId, 'targetJobId', 128)
+      : '';
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     const claimRequest = Object.create(null);
     for (const [key, value] of Object.entries(request)) {
-      if (key !== 'maxConcurrentHandoffs') claimRequest[key] = value;
+      if (key !== 'maxConcurrentHandoffs' && key !== 'targetJobId') claimRequest[key] = value;
     }
     claimRequest.at = at;
-    let result = null;
-    await this.update(store => {
-      const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
-        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
-      const capacity = inspectProductWideSpecialistCapacity(store, limit);
-      let remaining = capacity.remainingSlots;
-      const claimed = [];
-      const reconciliationRequired = [];
-      for (const jobId of store.order) {
-        const job = store.byId[jobId];
-        if (!job?.runtime?.plan) continue;
-        const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...claimRequest,
-          availableSlots: remaining,
-          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-          at,
-        });
-        job.runtime.plan = outcome.plan;
-        job.runtime.specialistHandoffs = outcome.assignments;
-        job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
-        job.runtime.updatedAt = this.now();
-        remaining -= outcome.claimed.length;
-        for (const agentId of outcome.claimed) {
-          claimed.push({ jobId, agentId });
-          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
-        }
-        for (const agentId of outcome.reconciliationRequired) {
-          reconciliationRequired.push({ jobId, agentId });
-          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
-        }
+
+    const initialStore = await this.load();
+    const candidateJobIds = targetJobId
+      ? (initialStore.byId[targetJobId] ? [targetJobId] : [])
+      : [...initialStore.order];
+    if (targetJobId && candidateJobIds.length === 0) {
+      throw new Error('Browser Agent job not found');
+    }
+
+    let trustedDependencies = null;
+    const automaticAdmissions = new Map();
+    for (const jobId of candidateJobIds) {
+      const snapshotJob = initialStore.byId[jobId];
+      if (!snapshotJob?.runtime?.plan) continue;
+      const plan = normalizeAgentPlanV1(snapshotJob.runtime.plan);
+      const readyBindings = (snapshotJob.runtime.specialistDelegationBindings || []).filter(binding => {
+        const agentId = specialistAssignmentIdForPlanNodeV1(plan.planId, binding.nodeId);
+        return (snapshotJob.runtime.specialistHandoffs || [])
+          .some(item => item?.agentId === agentId && item?.state === 'READY');
+      });
+      if (!readyBindings.length) continue;
+
+      if (!trustedDependencies) {
+        trustedDependencies = trustedAutomaticDelegationDependencies(dependencies);
       }
-      result = {
-        maxConcurrentHandoffs: limit,
-        activeLeases: liveLeases.length,
-        capacityObligations: capacity.capacityObligations,
-        remainingSlots: remaining,
-        claimed,
-        reconciliationRequired,
+      const projectId = snapshotJob.config?.projectId || '';
+      if (!projectId) {
+        throw new Error('Automatic specialist claim requires a durable Project binding');
+      }
+      const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(snapshotJob);
+
+      const selections = await trustedDependencies.withProjectHierarchyAuthority(
+        projectId,
+        async authority => {
+          const store = await this.load();
+          const job = store.byId[jobId];
+          if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+          if ((job.config?.projectId || '') !== projectId) {
+            throw new Error('Browser Agent Project changed before specialist claim readiness probe');
+          }
+          const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+            fence: parentRuntimeFence,
+            job,
+          });
+          if (!parentFenceStatus.current) {
+            throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+          }
+          if (!job.definitionScope) {
+            throw new Error('Automatic specialist claim requires durable Agent definition scope');
+          }
+          if (!job.orchestrationNodeBinding) {
+            throw new Error('Automatic specialist claim requires a durable orchestration node binding');
+          }
+          const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+            binding: job.orchestrationNodeBinding,
+            authority,
+          });
+          if (!bindingStatus.current) {
+            throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+          }
+          const structureAdmission = evaluateSubagentStructureAdmissionV1({
+            policy: authority.subagentPolicy,
+            initiator: SubagentSpawnInitiator.AGENT,
+            graph: authority.graph,
+            parentNodeId: job.orchestrationNodeBinding.nodeId,
+            requestedChildren: 1,
+          });
+          if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+            throw new Error(`Automatic specialist claim denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+          }
+
+          const livePlan = normalizeAgentPlanV1(job.runtime.plan);
+          const currentReady = (job.runtime.specialistDelegationBindings || []).filter(binding => {
+            const agentId = specialistAssignmentIdForPlanNodeV1(livePlan.planId, binding.nodeId);
+            return (job.runtime.specialistHandoffs || [])
+              .some(item => item?.agentId === agentId && item?.state === 'READY');
+          });
+          if (currentReady.length !== readyBindings.length
+              || currentReady.some(binding =>
+                !readyBindings.some(expected => expected.nodeId === binding.nodeId))) {
+            throw new Error('Automatic specialist claim set drifted before readiness probe');
+          }
+
+          return currentReady.map(binding => {
+            const registry = store.specialistRegistriesById?.[binding.registryId];
+            if (!registry || registry.revision !== binding.registryRevision) {
+              throw new Error('Automatic specialist claim registry provenance drifted');
+            }
+            bindSpecialistHandoffToRegistryV1({
+              registry,
+              selection: binding.selection,
+              handoff: binding.handoff,
+              parentCapabilityIds: job.definitionScope.capabilityIds,
+              parentToolIds: job.definitionScope.toolIds,
+            });
+            return Object.freeze({
+              nodeId: binding.nodeId,
+              selection: normalizeSpecialistSelectionV1(binding.selection),
+            });
+          });
+        },
+      );
+
+      const readinessByNode = new Map();
+      for (const item of selections) {
+        const readiness = assertTrustedProviderReadinessForSelection(
+          await trustedDependencies.resolveSpecialistReadiness(item.selection),
+          item.selection,
+          this.now(),
+        );
+        readinessByNode.set(item.nodeId, readiness);
+      }
+      automaticAdmissions.set(jobId, Object.freeze({
+        projectId,
+        parentRuntimeFence,
+        selections,
+        readinessByNode,
+      }));
+    }
+
+    const claimed = [];
+    const reconciliationRequired = [];
+    for (const jobId of candidateJobIds) {
+      const admission = automaticAdmissions.get(jobId) || null;
+      const claimOne = async authority => {
+        await this.update(store => {
+          const job = store.byId[jobId];
+          if (!job?.runtime?.plan) return store;
+
+          let effectiveMaxChildren = claimRequest.maxChildrenPerAgent;
+          let effectiveMaxDepth = claimRequest.maxDepth;
+          if (admission) {
+            if ((job.config?.projectId || '') !== admission.projectId) {
+              throw new Error('Browser Agent Project changed during automatic specialist claim');
+            }
+            const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+              fence: admission.parentRuntimeFence,
+              job,
+            });
+            if (!parentFenceStatus.current) {
+              throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+            }
+            if (!job.definitionScope) {
+              throw new Error('Automatic specialist claim requires durable Agent definition scope');
+            }
+            if (!job.orchestrationNodeBinding) {
+              throw new Error('Automatic specialist claim requires a durable orchestration node binding');
+            }
+            const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+              binding: job.orchestrationNodeBinding,
+              authority,
+            });
+            if (!bindingStatus.current) {
+              throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+            }
+            const structureAdmission = evaluateSubagentStructureAdmissionV1({
+              policy: authority.subagentPolicy,
+              initiator: SubagentSpawnInitiator.AGENT,
+              graph: authority.graph,
+              parentNodeId: job.orchestrationNodeBinding.nodeId,
+              requestedChildren: 1,
+            });
+            if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+              throw new Error(`Automatic specialist claim denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+            }
+
+            const livePlan = normalizeAgentPlanV1(job.runtime.plan);
+            const currentReady = (job.runtime.specialistDelegationBindings || []).filter(binding => {
+              const agentId = specialistAssignmentIdForPlanNodeV1(livePlan.planId, binding.nodeId);
+              return (job.runtime.specialistHandoffs || [])
+                .some(item => item?.agentId === agentId && item?.state === 'READY');
+            });
+            if (currentReady.length !== admission.selections.length
+                || currentReady.some(binding =>
+                  !admission.selections.some(expected => expected.nodeId === binding.nodeId))) {
+              throw new Error('Automatic specialist claim set drifted after readiness probe');
+            }
+            for (const binding of currentReady) {
+              const expected = admission.selections.find(item => item.nodeId === binding.nodeId);
+              if (!expected || !sameSpecialistSelection(binding.selection, expected.selection)) {
+                throw new Error('Selected specialist changed after claim readiness probe');
+              }
+              const registry = store.specialistRegistriesById?.[binding.registryId];
+              if (!registry || registry.revision !== binding.registryRevision) {
+                throw new Error('Automatic specialist claim registry provenance drifted');
+              }
+              bindSpecialistHandoffToRegistryV1({
+                registry,
+                selection: binding.selection,
+                handoff: binding.handoff,
+                parentCapabilityIds: job.definitionScope.capabilityIds,
+                parentToolIds: job.definitionScope.toolIds,
+              });
+              assertTrustedProviderReadinessForSelection(
+                admission.readinessByNode.get(binding.nodeId),
+                binding.selection,
+                this.now(),
+              );
+            }
+            const policy = authority.subagentPolicy;
+            const requestedMaxChildren = claimRequest.maxChildrenPerAgent === undefined
+              ? 4
+              : claimRequest.maxChildrenPerAgent;
+            const requestedMaxDepth = claimRequest.maxDepth === undefined
+              ? 2
+              : claimRequest.maxDepth;
+            effectiveMaxChildren = Math.min(requestedMaxChildren, policy.maxChildrenPerAgent);
+            effectiveMaxDepth = Math.min(requestedMaxDepth, policy.maxDepth);
+          }
+
+          const capacity = inspectProductWideSpecialistCapacity(store, limit);
+          const outcome = claimAgentPlanSpecialistHandoffsV1(
+            job.runtime.plan,
+            job.runtime.specialistHandoffs || [],
+            {
+              ...claimRequest,
+              availableSlots: capacity.remainingSlots,
+              maxChildrenPerAgent: effectiveMaxChildren,
+              maxDepth: effectiveMaxDepth,
+              executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+              at,
+            },
+          );
+          job.runtime.plan = outcome.plan;
+          job.runtime.specialistHandoffs = outcome.assignments;
+          job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
+          job.runtime.updatedAt = this.now();
+          for (const agentId of outcome.claimed) {
+            claimed.push({ jobId, agentId });
+            appendHistory(job.runtime, {
+              at: this.now(),
+              type: 'specialist-handoff-claimed',
+              agentId,
+              message: 'Specialist lease admitted within live parent, provider and product-wide capacity authority.',
+            });
+          }
+          for (const agentId of outcome.reconciliationRequired) {
+            reconciliationRequired.push({ jobId, agentId });
+            appendHistory(job.runtime, {
+              at: this.now(),
+              type: 'specialist-handoff-reconcile',
+              agentId,
+              message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.',
+            });
+          }
+          return store;
+        });
       };
-      return store;
-    });
-    return result;
+
+      if (admission) {
+        await trustedDependencies.withProjectHierarchyAuthority(
+          admission.projectId,
+          authority => claimOne(authority),
+        );
+      } else {
+        await claimOne(null);
+      }
+    }
+
+    const finalStore = await this.load();
+    const finalCapacity = inspectProductWideSpecialistCapacity(finalStore, limit);
+    const activeLeases = finalStore.order
+      .flatMap(jobId => finalStore.byId[jobId]?.runtime?.specialistHandoffs || [])
+      .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at))
+      .length;
+    return {
+      maxConcurrentHandoffs: limit,
+      activeLeases,
+      capacityObligations: finalCapacity.capacityObligations,
+      remainingSlots: finalCapacity.remainingSlots,
+      claimed,
+      reconciliationRequired,
+    };
   }
 
   async authorizeSpecialistSafeRetry(id, payload = {}) {
