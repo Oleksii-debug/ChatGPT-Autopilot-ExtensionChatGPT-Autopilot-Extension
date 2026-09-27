@@ -2,7 +2,10 @@ import {
   SubagentSpawnAuthorityBindingDecision,
   bindSubagentSpawnAuthorityV1,
 } from './subagent-spawn-authority-binding.js';
-import { createSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
+import {
+  createSubagentTaskEnvelopeV1,
+  normalizeSubagentTaskEnvelopeV1,
+} from './subagent-task-envelope.js';
 
 export const SUBAGENT_SPAWN_TASK_BINDING_VERSION = 1;
 
@@ -30,12 +33,7 @@ const TASK_ENVELOPE_SPEC_KEYS = new Set([
 const PRIOR_TASK_ENVELOPE_BINDING_KEYS = new Set([
   'childNodeId',
   'taskId',
-  'envelopeId',
-  'planId',
-  'planRevision',
-  'outcomeContractId',
-  'outcomeContractRevision',
-  'createdAt',
+  'taskEnvelope',
 ]);
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -133,44 +131,30 @@ function denied(reasonCode, details = {}) {
   });
 }
 
-function nonNegativeRevision(value, label) {
-  if (!Number.isSafeInteger(value) || value < 1 || Object.is(value, -0)) {
-    throw new Error(label + ' is invalid');
-  }
-  return value;
-}
-
 function normalizePriorTaskEnvelopeBindings(value) {
   const bindings = dataArray(value, 'priorTaskEnvelopeBindings').map((item, index) => {
     const label = 'priorTaskEnvelopeBindings[' + index + ']';
     const raw = strictRecord(item, PRIOR_TASK_ENVELOPE_BINDING_KEYS, label);
-    return {
-      childNodeId: requiredId(own(raw, 'childNodeId', label), label + '.childNodeId'),
-      taskId: requiredId(own(raw, 'taskId', label), label + '.taskId'),
-      envelopeId: requiredId(own(raw, 'envelopeId', label), label + '.envelopeId'),
-      planId: requiredId(own(raw, 'planId', label), label + '.planId'),
-      planRevision: nonNegativeRevision(
-        own(raw, 'planRevision', label),
-        label + '.planRevision',
-      ),
-      outcomeContractId: requiredId(
-        own(raw, 'outcomeContractId', label),
-        label + '.outcomeContractId',
-      ),
-      outcomeContractRevision: nonNegativeRevision(
-        own(raw, 'outcomeContractRevision', label),
-        label + '.outcomeContractRevision',
-      ),
-      createdAt: canonicalBindingTimestamp(
-        own(raw, 'createdAt', label),
-        label + '.createdAt',
-      ),
-    };
+    const childNodeId = requiredId(
+      own(raw, 'childNodeId', label),
+      label + '.childNodeId',
+    );
+    const taskId = requiredId(
+      own(raw, 'taskId', label),
+      label + '.taskId',
+    );
+    const taskEnvelope = normalizeSubagentTaskEnvelopeV1(
+      own(raw, 'taskEnvelope', label),
+    );
+    if (taskEnvelope.childAgentId !== childNodeId || taskEnvelope.taskId !== taskId) {
+      throw new Error(label + ' task envelope identity mismatch');
+    }
+    return { childNodeId, taskId, taskEnvelope };
   });
 
   const children = bindings.map(item => item.childNodeId);
   const tasks = bindings.map(item => item.taskId);
-  const envelopes = bindings.map(item => item.envelopeId);
+  const envelopes = bindings.map(item => item.taskEnvelope.envelopeId);
   if (new Set(children).size !== children.length) {
     throw new Error('priorTaskEnvelopeBindings contains duplicate childNodeId');
   }
@@ -183,27 +167,11 @@ function normalizePriorTaskEnvelopeBindings(value) {
   return bindings;
 }
 
-function canonicalBindingTimestamp(value, label) {
-  if (typeof value !== 'string' || value !== value.trim()) {
-    throw new Error(label + ' is invalid');
-  }
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {
-    throw new Error(label + ' is invalid');
-  }
-  return value;
-}
-
 function taskEnvelopeBinding(taskEnvelope) {
   return {
     childNodeId: taskEnvelope.childAgentId,
     taskId: taskEnvelope.taskId,
-    envelopeId: taskEnvelope.envelopeId,
-    planId: taskEnvelope.planId,
-    planRevision: taskEnvelope.planRevision,
-    outcomeContractId: taskEnvelope.outcome.contractId,
-    outcomeContractRevision: taskEnvelope.outcome.contractRevision,
-    createdAt: taskEnvelope.createdAt,
+    taskEnvelope,
   };
 }
 
@@ -214,12 +182,7 @@ function exactTaskEnvelopeBindingMatch(current, prior) {
     const expected = priorByChild.get(item.childNodeId);
     return expected
       && item.taskId === expected.taskId
-      && item.envelopeId === expected.envelopeId
-      && item.planId === expected.planId
-      && item.planRevision === expected.planRevision
-      && item.outcomeContractId === expected.outcomeContractId
-      && item.outcomeContractRevision === expected.outcomeContractRevision
-      && item.createdAt === expected.createdAt;
+      && JSON.stringify(item.taskEnvelope) === JSON.stringify(expected.taskEnvelope);
   });
 }
 
