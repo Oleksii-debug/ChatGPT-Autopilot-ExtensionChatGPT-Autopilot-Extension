@@ -1406,3 +1406,82 @@ test('bound lifecycle waits for canonical Project authority before mutating Brow
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
   assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
 });
+
+
+test('runtime persistence failure rolls back Core scope projection and Browser Agent lifecycle exactly', async () => {
+  const { chrome, core, manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+
+  const controller = orchestration.controllerFor('orch-1');
+  await controller.startHierarchy({ nowMs: 1800 });
+
+  const projection = state => Object.fromEntries(
+    Object.entries(state.sessionsById || {})
+      .filter(([, session]) => session?.orchestrationHierarchy?.managed
+        && session.orchestrationHierarchy.graphId === 'graph-1')
+      .map(([sessionId, session]) => [sessionId, {
+        enabled: session.enabled,
+        runState: session.runState,
+        scopeState: session.orchestrationHierarchy.scopeState || 'RUNNING',
+      }]),
+  );
+
+  const browserBefore = await manager.get('job-1');
+  const coreBefore = projection(await core.load());
+  const runtimeBefore = await controller.runtimeRepository.load();
+
+  const originalSet = chrome.storage.local.set.bind(chrome.storage.local);
+  let injected = false;
+  chrome.storage.local.set = async record => {
+    if (!injected && Object.hasOwn(record, 'autopilotOrchestrationV2Runtime:orch-1')) {
+      injected = true;
+      throw new Error('injected hierarchy runtime persistence failure');
+    }
+    return originalSet(record);
+  };
+
+  try {
+    await assert.rejects(
+      () => manager.pause('job-1', lifecycleDependencies),
+      /injected hierarchy runtime persistence failure/,
+    );
+  } finally {
+    chrome.storage.local.set = originalSet;
+  }
+  assert.equal(injected, true);
+
+  const browserAfter = await manager.get('job-1');
+  assert.equal(browserAfter.job.runtime.runState, browserBefore.job.runtime.runState);
+  assert.equal(browserAfter.job.runtime.controlEpoch, browserBefore.job.runtime.controlEpoch);
+  assert.deepEqual(browserAfter.job.runtime.history, browserBefore.job.runtime.history);
+
+  const coreAfter = projection(await core.load());
+  assert.deepEqual(coreAfter, coreBefore, 'Core hierarchy scope projection must be restored after runtime persistence failure');
+
+  const runtimeAfter = await controller.runtimeRepository.load();
+  assert.deepEqual(runtimeAfter.hierarchy.state, runtimeBefore.hierarchy.state);
+});
+
+test('scope dispatcher rejects non-lifecycle hierarchy events without mutating canonical state', async () => {
+  const { core, orchestration } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+  const runtimeBefore = await controller.runtimeRepository.load();
+  const coreBefore = await core.load();
+
+  await assert.rejects(
+    () => controller.dispatchHierarchyScopeEvent({
+      type: 'NODE_ACTIVATION_REQUESTED',
+      eventId: 'not-a-scope-event',
+      controlEpoch: 1,
+      nodeId: 'root',
+      generation: 1,
+      activationId: 'root:root:g1:r1',
+      purpose: 'WORK',
+    }, { nowMs: 2000 }),
+    /accepts only PAUSE_SCOPE, RESUME_SCOPE or STOP_SCOPE/,
+  );
+
+  assert.deepEqual((await controller.runtimeRepository.load()).hierarchy.state, runtimeBefore.hierarchy.state);
+  assert.deepEqual(await core.load(), coreBefore);
+});
