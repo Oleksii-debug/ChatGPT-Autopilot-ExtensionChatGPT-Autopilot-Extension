@@ -86,7 +86,7 @@ test('execution policy rejects hidden, symbol and exotic fields and corrupt pers
   await assert.rejects(() => manager.updateExecutionPolicy(new Exotic()), /plain object/);
 
   await chrome.storage.local.set({
-    browserAgentJobsV1: {
+    autopilotBrowserAgentV1: {
       schemaVersion: 1,
       selectedId: '',
       order: [],
