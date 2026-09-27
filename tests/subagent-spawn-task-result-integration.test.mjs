@@ -7,13 +7,26 @@ import {
   normalizeAgentPlanV1,
 } from '../src/core/agent-plan.js';
 import {
+  OrchestrationHierarchyActionType,
+  OrchestrationHierarchyEventType,
   OrchestrationNodeLifecycle,
   createOrchestrationHierarchyRuntime,
+  reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
   validateOrchestrationHierarchyRuntimeV1,
 } from '../src/core/orchestration-hierarchy.js';
 import { createOutcomeContractV1 } from '../src/core/outcome-contract.js';
 import { createSubagentResultEnvelopeV1 } from '../src/core/subagent-result-envelope.js';
+import {
+  SubagentResultReconciliationDecision,
+  deriveSubagentTaskActivationBindingV1,
+  prepareSubagentResultReconciliationV1,
+} from '../src/core/subagent-result-reconciliation.js';
+import {
+  createSubagentTaskActivationBindingRegistryV1,
+  putSubagentTaskActivationBindingV1,
+  resolveSubagentTaskActivationBindingV1,
+} from '../src/core/subagent-task-activation-binding-registry.js';
 import { bindSubagentSpawnTaskAuthorityV1 } from '../src/core/subagent-spawn-task-binding.js';
 import { SubagentSpawnInitiator } from '../src/core/subagent-structure-policy.js';
 import {
@@ -27,6 +40,8 @@ const T2 = '2026-09-27T10:02:00.000Z';
 const T3 = '2026-09-27T10:03:00.000Z';
 const T4 = '2026-09-27T10:04:00.000Z';
 const T5 = '2026-09-27T10:05:00.000Z';
+const T6 = '2026-09-27T10:06:00.000Z';
+const T7 = '2026-09-27T10:07:00.000Z';
 const CHILD_ID = 'subagent:e2e-spawn:1';
 
 function node(id) {
@@ -406,5 +421,181 @@ test('canonical handback rejects a result artifact produced by a different invoc
       completedAt: T5,
     }),
     /producerInvocationId must match child invocation/u,
+  );
+});
+
+
+test('trusted dynamic child result reaches canonical parent reconciliation end to end', async () => {
+  const spawn = spawnTask();
+  assert.equal(spawn.decision, 'ALLOW');
+  const taskEnvelope = spawn.taskBindings[0].taskEnvelope;
+  const contract = outcome();
+  const activationRequest = spawn.activationRequests[0];
+  assert.ok(activationRequest);
+
+  const prepared = reduceOrchestrationHierarchyEvent(
+    spawn.graph,
+    spawn.runtime,
+    activationRequest,
+    251,
+  );
+  const activationAction = prepared.actions.find(
+    item => item.type === OrchestrationHierarchyActionType.ACTIVATE_NODE,
+  );
+  assert.ok(activationAction);
+
+  const effectConfirmed = reduceOrchestrationHierarchyEvent(
+    spawn.graph,
+    prepared.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'e2e-subagent-effect-confirmed',
+      controlEpoch: spawn.graph.controlEpoch,
+      nodeId: CHILD_ID,
+      generation: activationRequest.generation,
+      activationId: activationRequest.activationId,
+      effectRef: 'effect://e2e-subagent',
+    },
+    252,
+  );
+
+  const binding = deriveSubagentTaskActivationBindingV1({
+    taskEnvelope,
+    graph: spawn.graph,
+    runtime: effectConfirmed.runtime,
+    activationAction,
+    invocationId: 'invocation.e2e',
+    boundAt: T2,
+  });
+  const registry = putSubagentTaskActivationBindingV1(
+    createSubagentTaskActivationBindingRegistryV1(),
+    { binding, registeredAt: T2 },
+  );
+
+  const resultArtifact = artifactRef('artifact.result', {
+    sha256: '2'.repeat(64),
+    createdAt: T3,
+  });
+  const evidenceArtifact = {
+    ...artifactRef('artifact.evidence', {
+      sha256: '3'.repeat(64),
+      createdAt: T4,
+      producerInvocationId: 'invocation.verifier.e2e',
+    }),
+    kind: 'artifact',
+  };
+  const verification = {
+    schemaVersion: 1,
+    verificationId: 'verification.e2e',
+    invocationId: 'invocation.e2e',
+    observationId: 'observation.e2e',
+    status: VerificationStatus.VERIFIED,
+    reasonCode: 'INDEPENDENT_CHECK_PASS',
+    summary: 'Verifier confirmed exact child observation.',
+    evidenceArtifactIds: ['artifact.evidence'],
+    verifiedAt: T4,
+    verifierId: 'verifier.e2e',
+    verificationAuthorityId: 'authority.verify.e2e',
+    effectId: null,
+    executionId: null,
+    attempt: 1,
+  };
+  const resultEnvelope = createSubagentResultEnvelopeV1({
+    resultId: 'result.e2e-terminal',
+    taskEnvelope,
+    observation: {
+      schemaVersion: 1,
+      observationId: 'observation.e2e',
+      invocationId: 'invocation.e2e',
+      status: ObservationStatus.OK,
+      summary: 'Child produced result artifact.',
+      data: {},
+      artifactRefs: [resultArtifact],
+      observedAt: T3,
+    },
+    verification,
+    evidenceArtifactRefs: [evidenceArtifact],
+    completedAt: T5,
+  });
+
+  const criterion = contract.completionCriteria[0];
+  const trustedRecord = {
+    schemaVersion: 1,
+    recordId: 'trusted-record.e2e',
+    contractId: contract.contractId,
+    contractRevision: contract.revision,
+    verifierPlanId: contract.verifierPlan.planId,
+    criterion: {
+      criterionId: criterion.criterionId,
+      description: criterion.description,
+      observable: criterion.observable,
+      requiredEvidenceKinds: [...criterion.requiredEvidenceKinds],
+    },
+    verifierId: 'verifier.e2e',
+    verificationAuthorityId: 'authority.verify.e2e',
+    verification,
+    evidenceArtifacts: [evidenceArtifact],
+    recordedAt: T5,
+    validThrough: '2026-09-27T11:00:00.000Z',
+  };
+
+  const reconciliation = await prepareSubagentResultReconciliationV1(
+    {
+      resultEnvelope,
+      outcomeContract: contract,
+      criterionVerifications: [{
+        criterionId: 'criterion.complete',
+        verificationId: 'verification.e2e',
+      }],
+      evaluatedAt: T6,
+      graph: spawn.graph,
+      runtime: effectConfirmed.runtime,
+      taskActivationBindingId: binding.bindingId,
+    },
+    {
+      resolveTrustedTaskActivationBinding: async lookup => (
+        resolveSubagentTaskActivationBindingV1(
+          registry,
+          { bindingId: lookup.bindingId },
+        )
+      ),
+      resolveTrustedOutcomeContract: async lookup => (
+        lookup.contractId === contract.contractId
+        && lookup.contractRevision === contract.revision
+          ? contract
+          : null
+      ),
+      resolveTrustedVerificationRecord: async lookup => (
+        lookup.verificationId === verification.verificationId
+          ? trustedRecord
+          : null
+      ),
+    },
+  );
+
+  assert.equal(
+    reconciliation.decision,
+    SubagentResultReconciliationDecision.ADMIT_TERMINAL,
+  );
+  assert.equal(reconciliation.terminalEvent.status, 'COMPLETED');
+  assert.equal(reconciliation.completionAuthority, false);
+  assert.equal(reconciliation.terminalCommitAuthority, false);
+
+  const terminal = reduceOrchestrationHierarchyEvent(
+    spawn.graph,
+    effectConfirmed.runtime,
+    reconciliation.terminalEvent,
+    253,
+  );
+  assert.equal(
+    terminal.actions.some(action => (
+      action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
+      && action.nodeId === 'root'
+    )),
+    true,
+  );
+  assert.equal(
+    terminal.runtime.nodesById[CHILD_ID].lastTerminalStatus,
+    'COMPLETED',
   );
 });
