@@ -1184,6 +1184,56 @@ test('provider terminal success is durable evidence but never product completion
   assert.equal(live.handoffs[0].resultArtifactIds.length, 0);
 });
 
+test('provider manual-review outcome enters canonical MANUAL_REVIEW and cannot auto-dispatch again', async () => {
+  const { manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  const prepared = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '66666666-6666-4666-8666-666666666666',
+    },
+    dependencies,
+  );
+
+  const recorded = await manager.recordSpecialistProviderExecutionOutcome('job.auto', {
+    agentId: prepared.execution.agentId,
+    leaseId: prepared.execution.leaseId,
+    conversationId: prepared.execution.conversationId,
+    providerStatus: 'waiting_for_confirmation',
+    providerSucceeded: false,
+    manualReviewRequired: true,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'OPENHANDS_CONVERSATION_REQUIRES_HUMAN_INTERVENTION',
+    errorCode: '',
+  });
+
+  assert.equal(recorded.execution.status, SpecialistProviderExecutionStatus.MANUAL_REVIEW);
+  assert.equal(recorded.executionOwnership.state, ExecutionOwnershipState.MANUAL_REVIEW);
+  assert.equal(recorded.executionOwnership.ownerId, '');
+  assert.equal(recorded.executionOwnership.leaseId, '');
+  assert.equal(recorded.executionOwnership.leaseUntil, '');
+  assert.equal(recorded.completionAuthorized, false);
+  assert.equal(recorded.verificationRequired, true);
+
+  const reused = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: prepared.execution.agentId,
+      conversationId: '77777777-7777-4777-8777-777777777777',
+    },
+    dependencies,
+  );
+  assert.equal(reused.reused, true);
+  assert.equal(reused.dispatchable, false);
+  assert.equal(reused.execution.status, SpecialistProviderExecutionStatus.MANUAL_REVIEW);
+  assert.equal(reused.execution.conversationId, prepared.execution.conversationId);
+});
+
 test('BrowserAgentManager advances provider result to VERIFIED only through resolver-backed trusted record', async () => {
   const { manager, dependencies } = await fixture({
     specialistDefinitions: [openHandsSpecialistDefinition()],
