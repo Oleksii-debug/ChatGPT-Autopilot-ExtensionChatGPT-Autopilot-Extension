@@ -39,6 +39,7 @@ const INPUT_KEYS = new Set([
   'parentNodeId',
   'requestedChildren',
   'resourceBudget',
+  'spawnId',
   'nowMs',
 ]);
 
@@ -74,6 +75,17 @@ function integer(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) 
   return value;
 }
 
+function requiredId(value, label, max = 120) {
+  if (typeof value !== 'string'
+      || value.length < 1
+      || value.length > max
+      || value.trim() !== value
+      || !/^[A-Za-z0-9._:@/+-]+$/u.test(value)) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -95,18 +107,11 @@ function graphDocument(graph) {
   };
 }
 
-function allocateChildIds(graph, requestedChildren) {
-  const used = new Set(graph.nodeOrder);
-  const ids = [];
-  let ordinal = 1;
-  while (ids.length < requestedChildren) {
-    const candidate = 'subagent-' + ordinal;
-    ordinal += 1;
-    if (used.has(candidate)) continue;
-    used.add(candidate);
-    ids.push(candidate);
-  }
-  return ids;
+function childIdsForSpawn(spawnId, requestedChildren) {
+  return Array.from(
+    { length: requestedChildren },
+    (_, index) => 'subagent:' + spawnId + ':' + (index + 1),
+  );
 }
 
 function denial(reasonCode, details = {}) {
@@ -115,9 +120,43 @@ function denial(reasonCode, details = {}) {
     decision: SubagentTopologyMutationDecision.DENY,
     reasonCode,
     createdNodeIds: [],
+    reused: false,
     activationAuthority: false,
     executionAuthority: false,
     ...details,
+  });
+}
+
+function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
+  const familyPrefix = 'subagent:' + spawnId + ':';
+  const family = graph.nodeOrder.filter(nodeId => nodeId.startsWith(familyPrefix));
+  if (!family.length) return null;
+  const exactFamily = family.length === expectedChildIds.length
+    && expectedChildIds.every(nodeId => family.includes(nodeId));
+  const exactParent = exactFamily && expectedChildIds.every(nodeId => {
+    const child = graph.nodesById[nodeId];
+    return child?.parentId === parentNodeId
+      && graph.nodesById[parentNodeId]?.childIds.includes(nodeId);
+  });
+  if (!exactParent) {
+    return denial('SPAWN_IDENTITY_CONFLICT', {
+      parentNodeId,
+      spawnId,
+      existingNodeIds: family,
+    });
+  }
+  return freezeDeep({
+    schemaVersion: SUBAGENT_TOPOLOGY_MUTATION_VERSION,
+    decision: SubagentTopologyMutationDecision.ALLOW,
+    reasonCode: 'SUBAGENT_TOPOLOGY_REUSED',
+    parentNodeId,
+    spawnId,
+    createdNodeIds: expectedChildIds,
+    reused: true,
+    graph,
+    runtime,
+    activationAuthority: false,
+    executionAuthority: false,
   });
 }
 
@@ -146,7 +185,8 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     canonicalGraph,
     own(request, 'runtime'),
   );
-  const parentNodeId = own(request, 'parentNodeId');
+  const parentNodeId = requiredId(own(request, 'parentNodeId'), 'parentNodeId', 180);
+  const spawnId = requiredId(own(request, 'spawnId'), 'spawnId');
   const requestedChildren = integer(
     own(request, 'requestedChildren'),
     'requestedChildren',
@@ -158,6 +198,16 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     { min: 0 },
   );
   const initiator = own(request, 'initiator');
+  const expectedChildIds = childIdsForSpawn(spawnId, requestedChildren);
+
+  const replay = replayResult(
+    canonicalGraph,
+    canonicalRuntime,
+    parentNodeId,
+    spawnId,
+    expectedChildIds,
+  );
+  if (replay) return replay;
 
   const structure = evaluateSubagentStructureAdmissionV1({
     policy: own(request, 'policy', {}),
@@ -167,7 +217,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     requestedChildren,
   });
   if (structure.decision !== SubagentStructureDecision.ALLOW) {
-    return denial('STRUCTURE_DENIED', { structure });
+    return denial('STRUCTURE_DENIED', { parentNodeId, spawnId, structure });
   }
 
   const existingChildAgents = canonicalGraph.nodeOrder.reduce(
@@ -180,22 +230,31 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     request: { childAgents: requestedChildren },
   });
   if (resource.decision !== ResourceBudgetDecisionKind.ALLOW) {
-    return denial('RESOURCE_BUDGET_DENIED', { structure, resource });
+    return denial('RESOURCE_BUDGET_DENIED', {
+      parentNodeId,
+      spawnId,
+      structure,
+      resource,
+    });
   }
 
   const parentNode = canonicalGraph.nodesById[parentNodeId];
   const parentRuntime = canonicalRuntime.nodesById[parentNodeId];
   const lifecycleDenial = lifecycleAdmission(initiator, parentNode, parentRuntime);
   if (lifecycleDenial) {
-    return denial(lifecycleDenial.reasonCode, { structure, resource });
+    return denial(lifecycleDenial.reasonCode, {
+      parentNodeId,
+      spawnId,
+      structure,
+      resource,
+    });
   }
 
-  const createdNodeIds = allocateChildIds(canonicalGraph, requestedChildren);
   const rawGraph = graphDocument(canonicalGraph);
   const rawParent = rawGraph.nodes.find(node => node.id === parentNodeId);
-  rawParent.childIds = [...rawParent.childIds, ...createdNodeIds];
+  rawParent.childIds = [...rawParent.childIds, ...expectedChildIds];
 
-  for (const childId of createdNodeIds) {
+  for (const childId of expectedChildIds) {
     rawGraph.nodes.push({
       id: childId,
       parentId: parentNodeId,
@@ -224,7 +283,9 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     decision: SubagentTopologyMutationDecision.ALLOW,
     reasonCode: 'SUBAGENT_TOPOLOGY_CREATED',
     parentNodeId,
-    createdNodeIds,
+    spawnId,
+    createdNodeIds: expectedChildIds,
+    reused: false,
     structure,
     resource,
     graph: nextGraph,
