@@ -15,6 +15,7 @@ const INPUT_KEYS = new Set([
   'authorityRequest',
   'plan',
   'taskEnvelopes',
+  'priorTaskEnvelopeBindings',
 ]);
 
 const TASK_ENVELOPE_SPEC_KEYS = new Set([
@@ -23,6 +24,17 @@ const TASK_ENVELOPE_SPEC_KEYS = new Set([
   'inputSourceIds',
   'inputArtifactRefs',
   'outcomeContract',
+  'createdAt',
+]);
+
+const PRIOR_TASK_ENVELOPE_BINDING_KEYS = new Set([
+  'childNodeId',
+  'taskId',
+  'envelopeId',
+  'planId',
+  'planRevision',
+  'outcomeContractId',
+  'outcomeContractRevision',
   'createdAt',
 ]);
 
@@ -105,7 +117,9 @@ function denied(reasonCode, details = {}) {
     reasonCode,
     createdNodeIds: [],
     authorityBindings: [],
+    authorityTaskBindings: [],
     taskBindings: [],
+    taskEnvelopeBindings: [],
     activationRequests: [],
     activationAuthority: false,
     executionAuthority: false,
@@ -116,6 +130,96 @@ function denied(reasonCode, details = {}) {
     completionAuthority: false,
     verificationAuthority: false,
     ...details,
+  });
+}
+
+function nonNegativeRevision(value, label) {
+  if (!Number.isSafeInteger(value) || value < 1 || Object.is(value, -0)) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function normalizePriorTaskEnvelopeBindings(value) {
+  const bindings = dataArray(value, 'priorTaskEnvelopeBindings').map((item, index) => {
+    const label = 'priorTaskEnvelopeBindings[' + index + ']';
+    const raw = strictRecord(item, PRIOR_TASK_ENVELOPE_BINDING_KEYS, label);
+    return {
+      childNodeId: requiredId(own(raw, 'childNodeId', label), label + '.childNodeId'),
+      taskId: requiredId(own(raw, 'taskId', label), label + '.taskId'),
+      envelopeId: requiredId(own(raw, 'envelopeId', label), label + '.envelopeId'),
+      planId: requiredId(own(raw, 'planId', label), label + '.planId'),
+      planRevision: nonNegativeRevision(
+        own(raw, 'planRevision', label),
+        label + '.planRevision',
+      ),
+      outcomeContractId: requiredId(
+        own(raw, 'outcomeContractId', label),
+        label + '.outcomeContractId',
+      ),
+      outcomeContractRevision: nonNegativeRevision(
+        own(raw, 'outcomeContractRevision', label),
+        label + '.outcomeContractRevision',
+      ),
+      createdAt: canonicalBindingTimestamp(
+        own(raw, 'createdAt', label),
+        label + '.createdAt',
+      ),
+    };
+  });
+
+  const children = bindings.map(item => item.childNodeId);
+  const tasks = bindings.map(item => item.taskId);
+  const envelopes = bindings.map(item => item.envelopeId);
+  if (new Set(children).size !== children.length) {
+    throw new Error('priorTaskEnvelopeBindings contains duplicate childNodeId');
+  }
+  if (new Set(tasks).size !== tasks.length) {
+    throw new Error('priorTaskEnvelopeBindings contains duplicate taskId');
+  }
+  if (new Set(envelopes).size !== envelopes.length) {
+    throw new Error('priorTaskEnvelopeBindings contains duplicate envelopeId');
+  }
+  return bindings;
+}
+
+function canonicalBindingTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error(label + ' is invalid');
+  }
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function taskEnvelopeBinding(taskEnvelope) {
+  return {
+    childNodeId: taskEnvelope.childAgentId,
+    taskId: taskEnvelope.taskId,
+    envelopeId: taskEnvelope.envelopeId,
+    planId: taskEnvelope.planId,
+    planRevision: taskEnvelope.planRevision,
+    outcomeContractId: taskEnvelope.outcome.contractId,
+    outcomeContractRevision: taskEnvelope.outcome.contractRevision,
+    createdAt: taskEnvelope.createdAt,
+  };
+}
+
+function exactTaskEnvelopeBindingMatch(current, prior) {
+  if (current.length !== prior.length) return false;
+  const priorByChild = new Map(prior.map(item => [item.childNodeId, item]));
+  return current.every(item => {
+    const expected = priorByChild.get(item.childNodeId);
+    return expected
+      && item.taskId === expected.taskId
+      && item.envelopeId === expected.envelopeId
+      && item.planId === expected.planId
+      && item.planRevision === expected.planRevision
+      && item.outcomeContractId === expected.outcomeContractId
+      && item.outcomeContractRevision === expected.outcomeContractRevision
+      && item.createdAt === expected.createdAt;
   });
 }
 
@@ -192,6 +296,7 @@ export function bindSubagentSpawnTaskAuthorityV1(input = {}) {
   }
 
   const taskBindings = [];
+  const taskEnvelopeBindings = [];
   for (const binding of authority.authorityBindings) {
     const spec = taskEnvelopeSpecs.get(binding.taskId);
     if (!spec) {
@@ -253,6 +358,44 @@ export function bindSubagentSpawnTaskAuthorityV1(input = {}) {
       authorityEnvelope: binding.authorityEnvelope,
       taskEnvelope,
     });
+    taskEnvelopeBindings.push(taskEnvelopeBinding(taskEnvelope));
+  }
+
+  const hasPriorTaskEnvelopeBindings = Object.hasOwn(
+    request,
+    'priorTaskEnvelopeBindings',
+  );
+  if (authority.reused) {
+    if (!hasPriorTaskEnvelopeBindings) {
+      return denied('REPLAY_TASK_ENVELOPE_BINDING_EVIDENCE_REQUIRED', {
+        projectId: authority.projectId,
+        parentNodeId: authority.parentNodeId,
+        spawnId: authority.spawnId,
+      });
+    }
+    const priorTaskEnvelopeBindings = normalizePriorTaskEnvelopeBindings(
+      own(
+        request,
+        'priorTaskEnvelopeBindings',
+        'SubagentSpawnTaskBindingRequestV1',
+      ),
+    );
+    if (!exactTaskEnvelopeBindingMatch(
+      taskEnvelopeBindings,
+      priorTaskEnvelopeBindings,
+    )) {
+      return denied('REPLAY_TASK_ENVELOPE_BINDING_MISMATCH', {
+        projectId: authority.projectId,
+        parentNodeId: authority.parentNodeId,
+        spawnId: authority.spawnId,
+      });
+    }
+  } else if (hasPriorTaskEnvelopeBindings) {
+    return denied('UNEXPECTED_PRIOR_TASK_ENVELOPE_BINDING_EVIDENCE', {
+      projectId: authority.projectId,
+      parentNodeId: authority.parentNodeId,
+      spawnId: authority.spawnId,
+    });
   }
 
   return freezeDeep({
@@ -265,7 +408,9 @@ export function bindSubagentSpawnTaskAuthorityV1(input = {}) {
     reused: authority.reused,
     createdNodeIds: [...authority.createdNodeIds],
     authorityBindings: [...authority.authorityBindings],
+    authorityTaskBindings: authority.taskBindings.map(item => ({ ...item })),
     taskBindings,
+    taskEnvelopeBindings,
     graph: authority.graph,
     runtime: authority.runtime,
     activationRequests: [...authority.activationRequests],
