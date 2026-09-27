@@ -703,6 +703,40 @@ test('Agent router override boundary rejects accessors without executing them', 
 });
 
 
+test('Agent runtime route policy rejects coercive aliases before provider I/O', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'must-not-run', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{ routeId:'local', provider:'ollama', model:'local', costClass:'free', locality:'local' }],
+  } });
+
+  for (const routePolicy of [
+    { autoSwitch:'false' },
+    { freeOnly:1 },
+    { locality:' local ' },
+    { maxInputPricePerMillionUsd:'0' },
+    { maxOutputPricePerMillionUsd:-0 },
+    { allowRouteIds:[' local '] },
+  ]) {
+    await assert.rejects(
+      () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+        prompt:'agent task',
+        isolatedRuntime:true,
+        routerOverride:{ routePolicy },
+      }),
+      /must already be canonical|invalid/u,
+    );
+  }
+  assert.equal(calls.length, 0);
+});
+
 test('Agent route policy cannot weaken global deny, free-only or price ceilings', async () => {
   const calls = [];
   const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
