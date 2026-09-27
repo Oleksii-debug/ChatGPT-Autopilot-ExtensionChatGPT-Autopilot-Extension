@@ -212,7 +212,7 @@ export function claimEligibleSpecialistAssignmentsV1(rawAssignments, rawOptions 
   const maxChildrenPerAgent = integer(
     request.maxChildrenPerAgent === undefined ? 4 : request.maxChildrenPerAgent,
     'Specialist maxChildrenPerAgent',
-    1,
+    0,
     256,
   );
   const slots = integer(
