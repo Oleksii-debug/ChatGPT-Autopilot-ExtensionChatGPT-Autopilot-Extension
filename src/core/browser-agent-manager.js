@@ -2261,7 +2261,17 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      const automaticAgentIds = new Set(
+        (job.runtime.specialistDelegationBindings || []).map(binding =>
+          specialistAssignmentIdForPlanNodeV1(plan.planId, binding.nodeId)),
+      );
+      const automaticReady = (job.runtime.specialistHandoffs || []).some(item =>
+        item?.state === 'READY' && automaticAgentIds.has(item?.agentId));
+      if (automaticReady) {
+        throw new Error('Automatic specialist delegation must use canonical cross-job claim admission');
+      }
+      const claimed = claimAgentPlanSpecialistHandoffsV1(plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
