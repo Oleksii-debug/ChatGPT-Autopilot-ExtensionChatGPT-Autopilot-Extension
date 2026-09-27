@@ -9,7 +9,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const PLANES = new Set(Object.values(AgentExecutionPlane));
 const DEF_KEYS = new Set(['schemaVersion','specialistId','providerId','label','description','executionPlane','capabilityIds','toolIds','resultContractId','enabled','definitionRevision']);
 const REG_KEYS = new Set(['schemaVersion','registryId','revision','definitions']);
-const DISC_KEYS = new Set(['registry','requiredCapabilityIds','parentCapabilityIds','parentToolIds','executionPlanes']);
+const DISC_KEYS = new Set(['registry','requiredCapabilityIds','requiredToolIds','parentCapabilityIds','parentToolIds','executionPlanes']);
 const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
 const BIND_KEYS = new Set(['registry','selection','handoff','parentCapabilityIds','parentToolIds']);
 
@@ -74,18 +74,19 @@ function plane(value, label) {
 function ids(value, label, max, min = 0) {
   const out = denseArray(value, label, max, min).map((item, index) => id(item, label + '[' + index + ']'));
   if (new Set(out).size !== out.length) throw new Error(label + ' contains duplicate identity');
-  return Object.freeze([...out].sort());
+  return Object.freeze([...out].sort(compareId));
 }
 function planes(value) {
   const out = denseArray(value, 'executionPlanes', PLANES.size, 1).map((item, index) => plane(item, 'executionPlanes[' + index + ']'));
   if (new Set(out).size !== out.length) throw new Error('executionPlanes contains duplicate execution plane');
-  return Object.freeze([...out].sort());
+  return Object.freeze([...out].sort(compareId));
 }
 function subset(requested, allowed, label) {
   const set = new Set(allowed);
   const missing = requested.filter(item => !set.has(item));
   if (missing.length) throw new Error(label + ' exceeds parent or specialist authority: ' + missing.join(', '));
 }
+function compareId(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function same(left, right) { return left.length === right.length && left.every((item, index) => item === right[index]); }
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
@@ -115,7 +116,7 @@ export function normalizeSpecialistRegistryV1(input) {
   const raw = record(input, REG_KEYS, 'SpecialistRegistryV1');
   if (raw.schemaVersion !== SPECIALIST_REGISTRY_VERSION) throw new Error('SpecialistRegistryV1.schemaVersion must be numeric 1');
   const definitions = denseArray(raw.definitions, 'definitions', 128).map(normalizeSpecialistDefinitionV1)
-    .sort((left, right) => left.specialistId.localeCompare(right.specialistId));
+    .sort((left, right) => compareId(left.specialistId, right.specialistId));
   if (new Set(definitions.map(item => item.specialistId)).size !== definitions.length) throw new Error('SpecialistRegistryV1 contains duplicate specialistId');
   return freeze({schemaVersion:1, registryId:id(raw.registryId,'registryId'), revision:integer(raw.revision,'registry revision'), definitions});
 }
@@ -137,14 +138,12 @@ export function normalizeSpecialistSelectionV1(input) {
   });
 }
 
-function selection(registry, definition, requested, parentTools) {
-  const allowed = new Set(parentTools);
+function selection(registry, definition, requestedCapabilities, requestedTools) {
   return normalizeSpecialistSelectionV1({
     schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision,
     specialistId:definition.specialistId, providerId:definition.providerId,
     definitionRevision:definition.definitionRevision, executionPlane:definition.executionPlane,
-    requestedCapabilityIds:requested,
-    grantedToolIds:definition.toolIds.filter(toolId => allowed.has(toolId)),
+    requestedCapabilityIds:requestedCapabilities, grantedToolIds:requestedTools,
     resultContractId:definition.resultContractId,
   });
 }
@@ -153,15 +152,18 @@ export function discoverSpecialistsV1(input = {}) {
   const raw = record(input, DISC_KEYS, 'Specialist discovery request');
   const registry = normalizeSpecialistRegistryV1(raw.registry);
   const required = ids(raw.requiredCapabilityIds, 'requiredCapabilityIds', 64, 1);
+  const requiredTools = ids(raw.requiredToolIds, 'requiredToolIds', 128);
   const parentCapabilities = ids(raw.parentCapabilityIds, 'parentCapabilityIds', 64);
   const parentTools = ids(raw.parentToolIds, 'parentToolIds', 128);
   subset(required, parentCapabilities, 'Requested specialist capabilities');
+  subset(requiredTools, parentTools, 'Requested specialist tools');
   const allowedPlanes = new Set(raw.executionPlanes === undefined ? [...PLANES] : planes(raw.executionPlanes));
   const specialists = registry.definitions
     .filter(item => item.enabled && allowedPlanes.has(item.executionPlane))
     .filter(item => required.every(capabilityId => item.capabilityIds.includes(capabilityId)))
-    .map(item => selection(registry, item, required, parentTools));
-  return freeze({schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, requestedCapabilityIds:required, specialists});
+    .filter(item => requiredTools.every(toolId => item.toolIds.includes(toolId)))
+    .map(item => selection(registry, item, required, requiredTools));
+  return freeze({schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, requestedCapabilityIds:required, requestedToolIds:requiredTools, specialists});
 }
 
 export function bindSpecialistHandoffToRegistryV1(input = {}) {
@@ -177,16 +179,16 @@ export function bindSpecialistHandoffToRegistryV1(input = {}) {
   if (selected.providerId !== definition.providerId || selected.definitionRevision !== definition.definitionRevision || selected.executionPlane !== definition.executionPlane || selected.resultContractId !== definition.resultContractId) {
     throw new Error('Specialist selection drifted from current registry definition');
   }
-  const parentToolSet = new Set(parentTools);
-  const expectedTools = Object.freeze(definition.toolIds.filter(toolId => parentToolSet.has(toolId)).sort());
-  if (!same(selected.grantedToolIds, expectedTools)) throw new Error('Specialist child tool scope changed after selection');
+  subset(selected.grantedToolIds, parentTools, 'Selected child tools');
+  subset(selected.grantedToolIds, definition.toolIds, 'Selected child tools');
   if (handoff.specialistId !== selected.specialistId) throw new Error('Specialist handoff does not match selected specialist identity');
   subset(handoff.requestedCapabilityIds, parentCapabilities, 'Specialist handoff capabilities');
   subset(handoff.requestedCapabilityIds, definition.capabilityIds, 'Specialist handoff capabilities');
-  if (!same(Object.freeze([...handoff.requestedCapabilityIds].sort()), selected.requestedCapabilityIds)) throw new Error('Specialist handoff capability scope changed after selection');
+  if (!same(Object.freeze([...handoff.requestedCapabilityIds].sort(compareId)), selected.requestedCapabilityIds)) throw new Error('Specialist handoff capability scope changed after selection');
   return freeze({
     schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision,
     selection:selected, handoff,
+    childContext:{goal:handoff.goal, artifactRefs:handoff.artifactRefs, credentialRefs:handoff.credentialRefs, parentInvocationId:handoff.parentInvocationId},
     childScope:{capabilityIds:selected.requestedCapabilityIds, toolIds:selected.grantedToolIds},
     authority:{executionAuthorized:false,policyAuthorized:false,schedulingAuthorized:false,recoveryAuthorized:false,credentialAuthorized:false,completionAuthorized:false,verificationAuthorized:false},
   });
