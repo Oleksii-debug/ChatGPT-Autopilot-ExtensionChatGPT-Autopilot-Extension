@@ -55,6 +55,7 @@ import {
   normalizeExecutionOwnershipV1,
   requireExecutionReconciliationV1,
   recoverExpiredExecutionOwnershipV1,
+  resolveExecutionReconciliationV1,
 } from './execution-plane-ownership.js';
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 import {
@@ -1865,16 +1866,21 @@ export class BrowserAgentManager {
           const dispatchable = [
             SpecialistProviderExecutionStatus.PREPARED,
             SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
-            SpecialistProviderExecutionStatus.MANUAL_REVIEW,
           ].includes(execution.status);
           const expectedOwnershipState = execution.status === SpecialistProviderExecutionStatus.RECONCILE
             ? ExecutionOwnershipState.RECONCILE
-            : ExecutionOwnershipState.OWNED;
-          if (!ownership
-              || ownership.state !== expectedOwnershipState
-              || ownership.ownerId !== agentId
-              || ownership.leaseId !== assignment.leaseId
-              || ownership.leaseUntil !== assignment.leaseExpiresAt) {
+            : execution.status === SpecialistProviderExecutionStatus.MANUAL_REVIEW
+              ? ExecutionOwnershipState.MANUAL_REVIEW
+              : ExecutionOwnershipState.OWNED;
+          if (!ownership || ownership.state !== expectedOwnershipState) {
+            throw new Error(
+              `Specialist provider execution requires matching canonical ${expectedOwnershipState} ownership`,
+            );
+          }
+          if (expectedOwnershipState !== ExecutionOwnershipState.MANUAL_REVIEW
+              && (ownership.ownerId !== agentId
+                || ownership.leaseId !== assignment.leaseId
+                || ownership.leaseUntil !== assignment.leaseExpiresAt)) {
             throw new Error(
               `Specialist provider execution requires matching canonical ${expectedOwnershipState} lease`,
             );
@@ -2011,6 +2017,17 @@ export class BrowserAgentManager {
           safeToRetry: false,
           errorCode: 'SPECIALIST_PROVIDER_RESULT_AFTER_LEASE',
         };
+      } else if (request.manualReviewRequired === true) {
+        ownership = requireExecutionReconciliationV1(ownership, {
+          leaseId,
+          reason: `provider requires human intervention: ${request.providerStatus}`,
+          at,
+        });
+        ownership = resolveExecutionReconciliationV1(ownership, {
+          leaseId,
+          outcome: 'MANUAL_REVIEW',
+          at,
+        });
       } else if (request.reconciliationRequired === true) {
         ownership = requireExecutionReconciliationV1(ownership, {
           leaseId,
