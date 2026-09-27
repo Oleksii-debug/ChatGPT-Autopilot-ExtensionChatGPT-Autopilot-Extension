@@ -180,6 +180,16 @@ test('a specialist with no tool grant still requires provider-wide readiness', (
   assert.equal(missing.executable, false);
 });
 
+test('explicit null providerStates is rejected instead of aliasing the omitted empty set', () => {
+  assert.throws(
+    () => inspectSpecialistProviderReadinessV1({
+      selection: selection(),
+      providerStates: null,
+    }),
+    /canonical array/u,
+  );
+});
+
 test('duplicate provider/tool readiness identities fail closed independent of ordering', () => {
   assert.throws(
     () => inspectSpecialistProviderReadinessV1({
