@@ -7,6 +7,8 @@ import {
   discoverSpecialistsV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
+  proposeSpecialistRegistryMutationV1,
+  SpecialistRegistryMutationKind,
 } from '../src/core/specialist-registry.js';
 import {
   OPENHANDS_CODING_PROVIDER_ID,
@@ -247,4 +249,117 @@ test('null-prototype records are accepted and caller-owned registry inputs remai
   assert.equal(normalized.definitions.length, 1);
   assert.equal(JSON.stringify(portable), before);
   assert.equal(portable.definitions[0].enabled, true);
+});
+
+
+test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions without persistence authority', () => {
+  const empty = normalizeSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'specialists:mutations',
+    revision: 1,
+    definitions: [],
+  });
+  const created = proposeSpecialistRegistryMutationV1({
+    registry: empty,
+    registryId: 'specialists:mutations',
+    expectedRegistryRevision: 1,
+    kind: SpecialistRegistryMutationKind.CREATE,
+    definition: definition({ definitionRevision: 1 }),
+  });
+  assert.equal(created.nextRegistryRevision, 2);
+  assert.equal(created.nextDefinitionRevision, 1);
+  assert.equal(created.nextRegistry.definitions[0].definitionRevision, 1);
+  assert.equal(created.authority.persistenceAuthorized, false);
+  assert.equal(created.authority.executionAuthorized, false);
+
+  const updated = proposeSpecialistRegistryMutationV1({
+    registry: created.nextRegistry,
+    registryId: 'specialists:mutations',
+    expectedRegistryRevision: 2,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: OPENHANDS_CODING_SPECIALIST_ID,
+    expectedDefinitionRevision: 1,
+    definition: definition({ label: 'OpenHands Coding v2', definitionRevision: 2 }),
+  });
+  assert.equal(updated.previousRegistryRevision, 2);
+  assert.equal(updated.nextRegistryRevision, 3);
+  assert.equal(updated.previousDefinitionRevision, 1);
+  assert.equal(updated.nextDefinitionRevision, 2);
+  assert.equal(updated.nextRegistry.definitions[0].label, 'OpenHands Coding v2');
+
+  const removed = proposeSpecialistRegistryMutationV1({
+    registry: updated.nextRegistry,
+    registryId: 'specialists:mutations',
+    expectedRegistryRevision: 3,
+    kind: SpecialistRegistryMutationKind.DELETE,
+    specialistId: OPENHANDS_CODING_SPECIALIST_ID,
+    expectedDefinitionRevision: 2,
+  });
+  assert.equal(removed.nextRegistryRevision, 4);
+  assert.equal(removed.nextDefinitionRevision, 0);
+  assert.deepEqual(removed.nextRegistry.definitions, []);
+});
+
+test('registry mutation proposals fail closed on stale or non-monotonic revisions', () => {
+  const current = normalizeSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'specialists:cas',
+    revision: 9,
+    definitions: [definition({ definitionRevision: 4 })],
+  });
+  assert.throws(() => proposeSpecialistRegistryMutationV1({
+    registry: current,
+    registryId: 'specialists:cas',
+    expectedRegistryRevision: 8,
+    kind: SpecialistRegistryMutationKind.DELETE,
+    specialistId: OPENHANDS_CODING_SPECIALIST_ID,
+    expectedDefinitionRevision: 4,
+  }), /registry revision drifted/);
+
+  assert.throws(() => proposeSpecialistRegistryMutationV1({
+    registry: current,
+    registryId: 'specialists:cas',
+    expectedRegistryRevision: 9,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: OPENHANDS_CODING_SPECIALIST_ID,
+    expectedDefinitionRevision: 3,
+    definition: definition({ definitionRevision: 5 }),
+  }), /definition revision drifted/);
+
+  assert.throws(() => proposeSpecialistRegistryMutationV1({
+    registry: current,
+    registryId: 'specialists:cas',
+    expectedRegistryRevision: 9,
+    kind: SpecialistRegistryMutationKind.UPDATE,
+    specialistId: OPENHANDS_CODING_SPECIALIST_ID,
+    expectedDefinitionRevision: 4,
+    definition: definition({ definitionRevision: 6 }),
+  }), /increment definitionRevision exactly once/);
+});
+
+test('registry mutation snapshots nested definitions without executing accessors', () => {
+  let reads = 0;
+  const hostile = definition({ definitionRevision: 1 });
+  Object.defineProperty(hostile, 'toolIds', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ['filesystem.read'];
+    },
+  });
+  const current = normalizeSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'specialists:hostile',
+    revision: 1,
+    definitions: [],
+  });
+  assert.throws(() => proposeSpecialistRegistryMutationV1({
+    registry: current,
+    registryId: 'specialists:hostile',
+    expectedRegistryRevision: 1,
+    kind: SpecialistRegistryMutationKind.CREATE,
+    definition: hostile,
+  }), /toolIds must be an enumerable own data property/);
+  assert.equal(reads, 0);
 });
