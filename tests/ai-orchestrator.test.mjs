@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AiOrchestrator, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
+import { deriveAiRouteQualitySubjectRevisionIdV1 } from '../src/core/ai-route-quality-governor.js';
+import { BenchmarkAssertionOperator, BenchmarkCaseOutcome } from '../src/core/benchmark-evaluation.js';
 
 class FakeGateway {
   constructor(responses = []) { this.responses = [...responses]; this.calls = []; }
@@ -9,6 +11,82 @@ class FakeGateway {
     const text = this.responses.shift() ?? `${args.provider}/${args.model}:${args.prompt}`;
     return { ok: true, provider: args.provider, model: args.model, text };
   }
+}
+
+const QUALITY_START = '2026-09-27T12:00:00.000Z';
+const QUALITY_END = '2026-09-27T12:00:01.000Z';
+const QUALITY_NOW = Date.parse('2026-09-27T12:00:02.000Z');
+
+async function routeQualityBinding(route, { pass = true, suffix = 'runtime' } = {}) {
+  const routeId = route.routeId;
+  const suiteId = 'runtime-route-quality-' + suffix;
+  const suiteRevisionId = 'runtime-suite-' + suffix;
+  const runId = 'runtime-run-' + routeId + '-' + suffix;
+  const subjectRevisionId = await deriveAiRouteQualitySubjectRevisionIdV1(route);
+  const invocationId = 'runtime-benchmark-' + routeId + '-' + suffix;
+  const artifactId = 'runtime-evidence-' + routeId + '-' + suffix;
+  const result = {
+    caseId: 'quality',
+    outcome: BenchmarkCaseOutcome.MEASURED,
+    metrics: { score: pass ? 1 : 0 },
+    evidenceArtifactIds: [artifactId],
+  };
+  return {
+    routeId,
+    maxAgeMs: 60_000,
+    evaluationRequest: {
+      suite: {
+        schemaVersion: 1,
+        suiteId,
+        suiteRevisionId,
+        title: 'Runtime route quality',
+        cases: [{
+          caseId: 'quality',
+          title: 'Quality threshold',
+          assertions: [{
+            metricId: 'score',
+            operator: BenchmarkAssertionOperator.AT_LEAST,
+            threshold: 1,
+          }],
+        }],
+      },
+      run: {
+        schemaVersion: 1,
+        runId,
+        suiteId,
+        suiteRevisionId,
+        subjectId: routeId,
+        subjectRevisionId,
+        startedAt: QUALITY_START,
+        completedAt: QUALITY_END,
+        results: [structuredClone(result)],
+      },
+      expectedSubject: { subjectId: routeId, subjectRevisionId },
+      trustedExecution: {
+        runId,
+        suiteId,
+        suiteRevisionId,
+        subjectId: routeId,
+        subjectRevisionId,
+        producerInvocationId: invocationId,
+        startedAt: QUALITY_START,
+        completedAt: QUALITY_END,
+        results: [structuredClone(result)],
+      },
+      trustedEvidenceArtifacts: [{
+        schemaVersion: 1,
+        artifactId,
+        kind: 'benchmark-evidence',
+        uri: 'artifact://benchmark/' + artifactId,
+        mediaType: 'application/json',
+        sha256: (pass ? '3' : '4').repeat(64),
+        sizeBytes: 1,
+        createdAt: QUALITY_END,
+        producerInvocationId: invocationId,
+        sensitive: false,
+      }],
+    },
+  };
 }
 
 function settings(overrides = {}) {
@@ -300,6 +378,71 @@ test('successful primary-error fallback reports both actual provider attempts', 
   }), DEFAULT_AI_ROUTER_RUNTIME, 'task', { maxModelCallsForRequest: 2 });
   assert.equal(gateway.calls.length, 2);
   assert.equal(result.usage.modelCalls, 2);
+});
+
+test('route quality evidence reorders only canonical Router candidates before provider dispatch', async () => {
+  const routes = [
+    { routeId:'route-a', provider:'ollama', model:'model-a', roles:['planner'], priority:0 },
+    { routeId:'route-b', provider:'ollama', model:'model-b', roles:['planner'], priority:0 },
+  ];
+  const gateway = new FakeGateway(['quality winner']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => QUALITY_NOW });
+  const result = await router.run(
+    settings({ routes }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'quality-routed task',
+    {
+      taskRole:'planner',
+      routeQualityBenchmarkRequests:[await routeQualityBinding(routes[1])],
+    },
+  );
+
+  assert.equal(gateway.calls.length, 1);
+  assert.equal(gateway.calls[0].model, 'model-b');
+  assert.equal(result.routing.selectedRouteId, 'route-b');
+  assert.equal(result.routing.reason, 'quality-evidence');
+});
+
+test('route quality evidence cannot re-admit a route blocked by canonical owner policy', async () => {
+  const routes = [
+    { routeId:'allowed', provider:'ollama', model:'allowed-model', roles:['planner'], priority:0 },
+    { routeId:'blocked', provider:'ollama', model:'blocked-model', roles:['planner'], priority:0 },
+  ];
+  const gateway = new FakeGateway(['allowed result']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => QUALITY_NOW });
+  const result = await router.run(
+    settings({
+      routes,
+      routePolicy:{ allowRouteIds:['allowed'] },
+    }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'policy-bound task',
+    {
+      taskRole:'planner',
+      routeQualityBenchmarkRequests:[await routeQualityBinding(routes[1])],
+    },
+  );
+
+  assert.equal(gateway.calls.length, 1);
+  assert.equal(gateway.calls[0].model, 'allowed-model');
+  assert.equal(result.routing.selectedRouteId, 'allowed');
+});
+
+test('omitting route quality evidence preserves existing canonical Router order', async () => {
+  const routes = [
+    { routeId:'priority-a', provider:'ollama', model:'model-a', roles:['planner'], priority:20 },
+    { routeId:'priority-b', provider:'ollama', model:'model-b', roles:['planner'], priority:10 },
+  ];
+  const gateway = new FakeGateway(['baseline winner']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => QUALITY_NOW });
+  const result = await router.run(
+    settings({ routes }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'baseline task',
+    { taskRole:'planner' },
+  );
+  assert.equal(gateway.calls[0].model, 'model-a');
+  assert.equal(result.routing.reason, 'policy-selection');
 });
 
 test('three-route pool fails over on quota and unavailability without changing request identity or budget accounting', async () => {
