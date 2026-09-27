@@ -89,7 +89,7 @@ function diagnosis({
 }
 
 function repair({
-  id = 'repair-1',
+  id = 'repair-work-1',
   from = '2026-09-27T01:00:00.000Z',
   to = 'subject-revision-2',
   appliedAt = '2026-09-27T01:00:20.000Z',
@@ -296,6 +296,32 @@ test('RETEST rejects stale or unrelated predecessor evidence', () => {
     resourceEnvelope: budget(),
     at: '2026-09-27T01:01:00.000Z',
   }), /predecessor must be owned by repair actor/u);
+
+  const wrongRepairIdCycle = cycle({
+    updatedAt: '2026-09-27T01:00:20.000Z',
+    attempts: [{
+      attemptNumber: 1,
+      failure: failure(),
+      diagnosis: diagnosis(),
+      repair: repair({ id: 'different-repair-node' }),
+      retest: null,
+    }],
+  });
+  const validPredecessorPlan = originPlan({
+    revision: 9,
+    updatedAt: '2026-09-27T01:00:25.000Z',
+    nodes: [...origin.nodes, baseNode],
+  });
+  assert.throws(() => proposeAgentSelfRepairWorkV1({
+    originPlan: origin,
+    currentPlan: validPredecessorPlan,
+    failedNodeId: 'target',
+    cycle: wrongRepairIdCycle,
+    workNode: workNode({ nodeId: 'retest-work-1' }),
+    predecessorNodeId: 'repair-work-1',
+    resourceEnvelope: budget(),
+    at: '2026-09-27T01:01:00.000Z',
+  }), /predecessor nodeId must match cycle repairId/u);
 
   const wrongCycle = originPlan({
     revision: 9,

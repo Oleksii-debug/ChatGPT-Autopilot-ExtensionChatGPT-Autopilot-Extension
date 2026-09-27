@@ -287,6 +287,9 @@ export function proposeAgentSelfRepairWorkV1(input) {
     }
     const latestAttempt = cycle.attempts.at(-1);
     if (!latestAttempt?.repair) throw new Error('Agent self-repair RETEST requires cycle repair evidence');
+    if (latestAttempt.repair.repairId !== predecessor.nodeId) {
+      throw new Error('Agent self-repair RETEST predecessor nodeId must match cycle repairId');
+    }
     if (Date.parse(predecessor.updatedAt) < Date.parse(latestAttempt.repair.appliedAt)) {
       throw new Error('Agent self-repair RETEST predecessor predates applied repair evidence');
     }
