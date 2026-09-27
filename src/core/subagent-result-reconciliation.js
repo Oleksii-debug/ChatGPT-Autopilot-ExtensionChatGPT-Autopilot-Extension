@@ -6,6 +6,7 @@ import {
 import {
   OrchestrationActivationPhase,
   OrchestrationActivationPurpose,
+  OrchestrationHierarchyActionType,
   OrchestrationHierarchyEventType,
   OrchestrationTerminalStatus,
   compactOrchestrationEventId,
@@ -13,6 +14,7 @@ import {
   validateOrchestrationHierarchyRuntimeV1,
 } from './orchestration-hierarchy.js';
 import { normalizeSubagentResultEnvelopeV1 } from './subagent-result-envelope.js';
+import { normalizeSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
 import { ObservationStatus } from './universal-agent-contracts.js';
 
 export const SUBAGENT_RESULT_RECONCILIATION_VERSION = 1;
@@ -37,6 +39,29 @@ const REQUEST_KEYS = new Set([
   'runtime',
   'taskActivationBindingId',
 ]);
+const BINDING_BUILD_KEYS = new Set([
+  'bindingId',
+  'taskEnvelope',
+  'graph',
+  'runtime',
+  'activationAction',
+  'invocationId',
+  'boundAt',
+]);
+const ACTIVATION_ACTION_KEYS = new Set([
+  'type',
+  'nodeId',
+  'activationId',
+  'generation',
+  'round',
+  'purpose',
+  'chatMode',
+  'promptProfileId',
+  'promptPayload',
+  'providerDispatchIdentity',
+  'authority',
+]);
+
 const BINDING_KEYS = new Set([
   'schemaVersion',
   'bindingId',
@@ -201,6 +226,161 @@ function baseProjection({
     credentialAuthority: false,
     persistenceAuthority: false,
     requiresCanonicalOrchestrationReducer: terminalEvent !== null,
+  });
+}
+
+function normalizeTerminalizableActivationAction(input) {
+  const raw = strictRecord(
+    input,
+    ACTIVATION_ACTION_KEYS,
+    'SubagentTerminalizableActivationActionV1',
+  );
+  const purpose = exactId(
+    own(raw, 'purpose', 'SubagentTerminalizableActivationActionV1'),
+    'activationAction.purpose',
+  );
+  if (!ALLOWED_TERMINAL_PURPOSES.has(purpose)) {
+    throw new Error('Subagent activation action purpose cannot terminalize a result');
+  }
+
+  const type = exactId(
+    own(raw, 'type', 'SubagentTerminalizableActivationActionV1'),
+    'activationAction.type',
+  );
+  const expectedType = purpose === OrchestrationActivationPurpose.RECONCILE
+    ? OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
+    : OrchestrationHierarchyActionType.ACTIVATE_NODE;
+  if (type !== expectedType) {
+    throw new Error('Subagent activation action type/purpose is mismatched');
+  }
+  if (own(raw, 'authority', 'SubagentTerminalizableActivationActionV1')
+      !== 'EXISTING_CORE_SESSION_TASK_PATH') {
+    throw new Error('Subagent activation action is not from the canonical Core session/task path');
+  }
+
+  return {
+    type,
+    nodeId: exactId(
+      own(raw, 'nodeId', 'SubagentTerminalizableActivationActionV1'),
+      'activationAction.nodeId',
+    ),
+    activationId: exactId(
+      own(raw, 'activationId', 'SubagentTerminalizableActivationActionV1'),
+      'activationAction.activationId',
+    ),
+    generation: exactInteger(
+      own(raw, 'generation', 'SubagentTerminalizableActivationActionV1'),
+      'activationAction.generation',
+    ),
+    round: exactInteger(
+      own(raw, 'round', 'SubagentTerminalizableActivationActionV1'),
+      'activationAction.round',
+    ),
+    purpose,
+  };
+}
+
+/**
+ * Derive the exact value that an existing durable Orchestration owner may
+ * persist as task↔activation↔invocation evidence.
+ *
+ * This function does not persist the record and does not make it trusted.
+ * prepareSubagentResultReconciliationV1 accepts the record only when it is
+ * re-observed through the injected canonical owner resolver.
+ */
+export function deriveSubagentTaskActivationBindingV1(input = {}) {
+  const request = strictRecord(
+    input,
+    BINDING_BUILD_KEYS,
+    'SubagentTaskActivationBindingBuildV1',
+  );
+  const task = normalizeSubagentTaskEnvelopeV1(
+    own(request, 'taskEnvelope', 'SubagentTaskActivationBindingBuildV1'),
+  );
+  const graph = validateOrchestrationGraphV1(
+    own(request, 'graph', 'SubagentTaskActivationBindingBuildV1'),
+  );
+  const runtime = validateOrchestrationHierarchyRuntimeV1(
+    graph,
+    own(request, 'runtime', 'SubagentTaskActivationBindingBuildV1'),
+  );
+  const action = normalizeTerminalizableActivationAction(
+    own(request, 'activationAction', 'SubagentTaskActivationBindingBuildV1'),
+  );
+
+  const child = graph.nodesById[task.childAgentId];
+  if (!child || child.parentId !== task.parentAgentId) {
+    throw new Error('Subagent task identity is not the exact canonical graph parent/child link');
+  }
+  if (action.nodeId !== task.childAgentId) {
+    throw new Error('Subagent activation action nodeId does not match task childAgentId');
+  }
+
+  const nodeRuntime = runtime.nodesById[task.childAgentId];
+  if (!nodeRuntime || nodeRuntime.currentActivationId !== action.activationId) {
+    throw new Error('Subagent activation action is not the current canonical activation');
+  }
+  if (nodeRuntime.generation !== action.generation) {
+    throw new Error('Subagent activation action generation is not current');
+  }
+  const ledger = dataField(
+    nodeRuntime.activationLedger,
+    action.activationId,
+    'child activationLedger',
+  );
+  const ledgerFields = {
+    generation: dataField(ledger, 'generation', 'current child activation'),
+    round: dataField(ledger, 'round', 'current child activation'),
+    purpose: dataField(ledger, 'purpose', 'current child activation'),
+    phase: dataField(ledger, 'phase', 'current child activation'),
+    preparedAt: dataField(ledger, 'preparedAt', 'current child activation'),
+  };
+  if (ledgerFields.generation !== action.generation
+      || ledgerFields.round !== action.round
+      || ledgerFields.purpose !== action.purpose) {
+    throw new Error('Subagent activation action does not match the canonical runtime ledger');
+  }
+  if (![OrchestrationActivationPhase.PREPARED, OrchestrationActivationPhase.EFFECT_CONFIRMED]
+    .includes(ledgerFields.phase)) {
+    throw new Error('Subagent activation binding cannot be derived from a terminal, ambiguous, or superseded activation');
+  }
+
+  const boundAt = canonicalTimestamp(
+    own(request, 'boundAt', 'SubagentTaskActivationBindingBuildV1'),
+    'boundAt',
+  );
+  if (!Number.isFinite(ledgerFields.preparedAt)
+      || Date.parse(boundAt) < ledgerFields.preparedAt) {
+    throw new Error('Subagent activation binding predates canonical activation preparation');
+  }
+  if (Date.parse(boundAt) < Date.parse(task.createdAt)) {
+    throw new Error('Subagent activation binding predates the task envelope');
+  }
+
+  return freezeDeep({
+    schemaVersion: SUBAGENT_TASK_ACTIVATION_BINDING_VERSION,
+    bindingId: exactId(
+      own(request, 'bindingId', 'SubagentTaskActivationBindingBuildV1'),
+      'bindingId',
+    ),
+    projectId: task.projectId,
+    parentAgentId: task.parentAgentId,
+    childAgentId: task.childAgentId,
+    taskId: task.taskId,
+    taskEnvelopeId: task.envelopeId,
+    planId: task.planId,
+    planRevision: task.planRevision,
+    outcomeContractId: task.outcome.contractId,
+    outcomeContractRevision: task.outcome.contractRevision,
+    invocationId: exactId(
+      own(request, 'invocationId', 'SubagentTaskActivationBindingBuildV1'),
+      'invocationId',
+    ),
+    controlEpoch: runtime.controlEpoch,
+    activationId: action.activationId,
+    generation: action.generation,
+    activationPurpose: action.purpose,
+    boundAt,
   });
 }
 
