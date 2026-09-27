@@ -5,6 +5,7 @@ export const SPECIALIST_PROVIDER_EXECUTION_VERSION = 1;
 export const SpecialistProviderExecutionStatus = Object.freeze({
   PREPARED: 'PREPARED',
   RETRYABLE_FAILURE: 'RETRYABLE_FAILURE',
+  BLOCKED_FAILURE: 'BLOCKED_FAILURE',
   PROVIDER_SUCCEEDED: 'PROVIDER_SUCCEEDED',
   PROVIDER_FAILED: 'PROVIDER_FAILED',
   MANUAL_REVIEW: 'MANUAL_REVIEW',
@@ -136,6 +137,12 @@ function deriveStatus({
       throw new Error('Retryable provider failure is inconsistent');
     }
     return SpecialistProviderExecutionStatus.RETRYABLE_FAILURE;
+  }
+  if (errorCode) {
+    if (providerSucceeded || effectEvidence) {
+      throw new Error('Blocked provider failure is inconsistent');
+    }
+    return SpecialistProviderExecutionStatus.BLOCKED_FAILURE;
   }
   throw new Error('Provider execution outcome is not classifiable');
 }
