@@ -195,6 +195,8 @@ test('READY_FOR_REPAIR produces an append-only actor work node with no new autho
   assert.equal(result.verificationAuthorized, false);
   assert.equal(result.completionAuthorized, false);
   assert.equal(result.policyGranted, false);
+  assert.equal(result.evidenceTrust, 'UNVERIFIED_INPUT');
+  assert.equal(result.requiresCanonicalEvidenceResolution, true);
   assert.equal(result.requiresCanonicalPlanStore, true);
 });
 
