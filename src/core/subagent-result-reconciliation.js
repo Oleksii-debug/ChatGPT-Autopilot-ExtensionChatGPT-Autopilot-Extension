@@ -355,10 +355,18 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
   const bindingId = compactOrchestrationEventId(
     'subagent-task-activation-binding',
     task.projectId,
+    task.parentAgentId,
+    task.childAgentId,
+    task.taskId,
     task.envelopeId,
+    task.planId,
+    String(task.planRevision),
+    task.outcome.contractId,
+    String(task.outcome.contractRevision),
     String(runtime.controlEpoch),
     action.activationId,
     String(action.generation),
+    action.purpose,
     invocationId,
   );
 
@@ -451,10 +459,18 @@ export function normalizeTrustedSubagentTaskActivationBindingV1(input) {
   const expectedBindingId = compactOrchestrationEventId(
     'subagent-task-activation-binding',
     normalized.projectId,
+    normalized.parentAgentId,
+    normalized.childAgentId,
+    normalized.taskId,
     normalized.taskEnvelopeId,
+    normalized.planId,
+    String(normalized.planRevision),
+    normalized.outcomeContractId,
+    String(normalized.outcomeContractRevision),
     String(normalized.controlEpoch),
     normalized.activationId,
     String(normalized.generation),
+    normalized.activationPurpose,
     normalized.invocationId,
   );
   if (normalized.bindingId !== expectedBindingId) {
