@@ -205,6 +205,8 @@ test('returns exact verified child handback through immutable refs without copyi
   assert.equal(value.verifierId, 'verifier-1');
   assert.equal(value.verificationAuthorityId, 'authority-verify-1');
   assert.equal(value.requiredEvidenceArtifactCount, 1);
+  assert.equal(value.verificationProvenance, 'UNVERIFIED_INPUT');
+  assert.equal(value.trustedVerificationRequired, true);
   assert.deepEqual(
     value.resultArtifactRefs.map(ref => [ref.artifactId, ref.sha256]),
     [['result-1', '2'.repeat(64)]],
@@ -411,6 +413,20 @@ test('restart normalization is strict and cannot mint execution or completion au
   assert.throws(
     () => normalizeSubagentResultEnvelopeV1(forgedObservation),
     /observationStatus is invalid/,
+  );
+
+  const forgedTrust = structuredClone(value);
+  forgedTrust.verificationProvenance = 'TRUSTED';
+  assert.throws(
+    () => normalizeSubagentResultEnvelopeV1(forgedTrust),
+    /cannot claim trusted verification provenance/,
+  );
+
+  const bypassTrustedGate = structuredClone(value);
+  bypassTrustedGate.trustedVerificationRequired = false;
+  assert.throws(
+    () => normalizeSubagentResultEnvelopeV1(bypassTrustedGate),
+    /must require canonical trusted verification before completion/,
   );
 });
 
