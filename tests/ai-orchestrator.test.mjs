@@ -50,6 +50,32 @@ test('strong mode uses only the strong model', async () => {
   assert.equal(gateway.calls[0].provider, 'openai');
 });
 
+test('selected model profile adds only its own prompts to the gateway request', async () => {
+  const gateway = new FakeGateway(['coded']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 1000 });
+  const configured = settings({
+    routes:[
+      { routeId:'mistral-code', provider:'openai-compatible', endpointId:'mistral', model:'codestral-latest', displayName:'Implementer', systemPrompt:'Review access before writing', workerPrompt:'Implement this task', roles:['coder'], priority:10, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+      { routeId:'local-review', provider:'ollama', model:'qwen', displayName:'Reviewer', systemPrompt:'Review independently', workerPrompt:'Critique this task', roles:['verifier'], priority:5 },
+    ],
+  });
+  const result = await router.run(configured, DEFAULT_AI_ROUTER_RUNTIME, 'Fix parser', { systemPrompt:'Project rules', taskRole:'coder' });
+  assert.equal(result.text, 'coded');
+  assert.equal(gateway.calls.length, 1);
+  assert.equal(gateway.calls[0].endpointId, 'mistral');
+  assert.equal(gateway.calls[0].systemPrompt, 'Project rules\n\nReview access before writing');
+  assert.equal(gateway.calls[0].prompt, 'Implement this task\n\nFix parser');
+  assert.equal(gateway.calls[0].prompt.includes('Critique this task'), false);
+  assert.equal(configured.routes[0].displayName, 'Implementer');
+});
+
+test('model profile prompts are bounded and legacy routes remain compatible', () => {
+  assert.throws(() => settings({ routes:[{ routeId:'a', provider:'ollama', model:'qwen', systemPrompt:'x'.repeat(8001) }] }), /too long/);
+  const legacy = settings({ routes:[{ routeId:'a', provider:'ollama', model:'qwen' }] });
+  assert.equal(legacy.routes[0].systemPrompt, '');
+  assert.equal(legacy.routes[0].workerPrompt, '');
+});
+
 test('hybrid rules runs primary first and strong every N requests with handoff', async () => {
   const gateway = new FakeGateway(['draft', 'reviewed']);
   const router = new AiOrchestrator({ gatewayClient: gateway, now: () => 5000 });
