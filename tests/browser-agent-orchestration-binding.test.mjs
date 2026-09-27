@@ -114,6 +114,8 @@ async function fixture() {
   const dependencies = {
     resolveProjectHierarchyAuthority: projectId =>
       orchestration.resolveProjectHierarchyAuthority(projectId),
+    withProjectHierarchyAuthority: (projectId, operation) =>
+      orchestration.withProjectHierarchyAuthority(projectId, operation),
   };
   return {
     chrome,
@@ -240,7 +242,10 @@ test('Browser Agent binding rejects cross-Project authority even from the truste
     () => manager.bindOrchestrationNode(
       'job-1',
       { nodeId: 'worker' },
-      { resolveProjectHierarchyAuthority: async () => wrongProjectAuthority },
+      {
+        withProjectHierarchyAuthority: async (_projectId, operation) =>
+          operation(wrongProjectAuthority),
+      },
     ),
     /does not match Browser Agent project/,
   );
@@ -317,53 +322,64 @@ test('current binding exposes control-epoch, graph and node drift without silent
   assert.equal(inspected.status, 'NODE_MISSING');
 });
 
-test('binding rejects Project ownership drift between canonical authority reads before persistence', async () => {
-  const { manager, orchestration } = await fixture();
-  let authorityReads = 0;
-  const dependencies = {
-    resolveProjectHierarchyAuthority: async projectId => {
-      authorityReads += 1;
-      if (authorityReads === 2) {
-        const status = await orchestration.getStatus('orch-1');
-        await orchestration.updateConfig({ ...status.config, projectId: 'project-2' }, 'orch-1');
-      }
-      return orchestration.resolveProjectHierarchyAuthority(projectId);
-    },
+test('binding holds the canonical Project authority fence through durable Browser Agent persistence', async () => {
+  const { chrome, manager, orchestration, dependencies } = await fixture();
+  const beforeAuthorityChange = await orchestration.getStatus('orch-1');
+  const originalSet = chrome.storage.local.set.bind(chrome.storage.local);
+
+  let persistReachedResolve;
+  const persistReached = new Promise(resolve => { persistReachedResolve = resolve; });
+  let releasePersistResolve;
+  const releasePersist = new Promise(resolve => { releasePersistResolve = resolve; });
+  let armed = true;
+  chrome.storage.local.set = async record => {
+    if (armed && Object.hasOwn(record, 'autopilotBrowserAgentV1')) {
+      armed = false;
+      persistReachedResolve();
+      await releasePersist;
+    }
+    return originalSet(record);
   };
 
-  await assert.rejects(
-    () => manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies),
-    /No canonical orchestra owns this Project ID/,
-  );
-  assert.equal(authorityReads, 2);
-  assert.equal((await manager.get('job-1')).job.orchestrationNodeBinding, null);
+  try {
+    const bindPromise = manager.bindOrchestrationNode(
+      'job-1',
+      { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
+      dependencies,
+    );
+    await persistReached;
+
+    let authorityMutationSettled = false;
+    const authorityMutation = orchestration.updateConfig(
+      { ...beforeAuthorityChange.config, projectId: 'project-2' },
+      'orch-1',
+    ).then(result => {
+      authorityMutationSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+      authorityMutationSettled,
+      false,
+      'Project authority mutation must not settle inside the bind persistence window',
+    );
+
+    releasePersistResolve();
+    const bound = await bindPromise;
+    assert.equal(bound.binding.projectId, 'project-1');
+    assert.equal(bound.binding.nodeId, 'worker');
+
+    await authorityMutation;
+    const inspected = await manager.inspectOrchestrationNodeBinding('job-1', dependencies);
+    assert.equal(inspected.status, 'PROJECT_AUTHORITY_DRIFTED');
+    assert.equal(inspected.current, false);
+    assert.equal(inspected.authorityErrorCode, 'PROJECT_UNOWNED');
+  } finally {
+    releasePersistResolve?.();
+    chrome.storage.local.set = originalSet;
+  }
 });
-
-test('binding compensates a Project authority change in the final storage commit window', async () => {
-  const { manager, orchestration } = await fixture();
-  const before = await manager.get('job-1');
-  let authorityReads = 0;
-  const dependencies = {
-    resolveProjectHierarchyAuthority: async projectId => {
-      authorityReads += 1;
-      if (authorityReads === 3) {
-        const status = await orchestration.getStatus('orch-1');
-        await orchestration.updateConfig({ ...status.config, projectId: 'project-2' }, 'orch-1');
-      }
-      return orchestration.resolveProjectHierarchyAuthority(projectId);
-    },
-  };
-
-  await assert.rejects(
-    () => manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies),
-    /Canonical orchestration authority changed during Browser Agent binding/,
-  );
-  assert.equal(authorityReads, 3);
-  const after = await manager.get('job-1');
-  assert.equal(after.job.orchestrationNodeBinding, null);
-  assert.equal(after.job.updatedAt, before.job.updatedAt, 'compensating rollback restores the pre-bind timestamp when untouched');
-});
-
 test('binding inspection returns structured Project drift after durable owner reassignment', async () => {
   const { manager, orchestration, dependencies } = await fixture();
   const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
@@ -575,6 +591,20 @@ test('definition-launched Browser Agent keeps definition provenance when bound t
   assert.equal(persisted.job.orchestrationNodeBinding.projectId, 'project-1');
 });
 
+test('binding inspection returns structured graph drift for corrupt durable hierarchy runtime', async () => {
+  const { chrome, manager, dependencies } = await fixture();
+  const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
+  const key = 'autopilotOrchestrationV2Runtime:orch-1';
+  chrome.data[key].hierarchy.state.nodeOrder = ['root'];
+
+  const inspected = await manager.inspectOrchestrationNodeBinding('job-1', dependencies);
+  assert.equal(inspected.status, 'GRAPH_DRIFTED');
+  assert.equal(inspected.current, false);
+  assert.equal(inspected.currentAuthority, null);
+  assert.equal(inspected.authorityErrorCode, 'HIERARCHY_INCONSISTENT');
+  assert.deepEqual(inspected.binding, bound.binding);
+});
+
 test('Project authority resolver rejects structurally corrupt durable hierarchy runtime', async () => {
   const { chrome, orchestration } = await fixture();
   const key = 'autopilotOrchestrationV2Runtime:orch-1';
@@ -591,5 +621,6 @@ test('service worker exposes one explicit read path and one explicit bind path t
   assert.match(source, /browserAgent\.inspectOrchestrationNodeBinding\(/u);
   assert.match(source, /'BIND_BROWSER_AGENT_ORCHESTRATION_NODE'/u);
   assert.match(source, /browserAgent\.bindOrchestrationNode\(/u);
+  assert.match(source, /orchestrationV2\.withProjectHierarchyAuthority\(projectId, operation\)/u);
   assert.match(source, /orchestrationV2\.resolveProjectHierarchyAuthority\(projectId\)/u);
 });
