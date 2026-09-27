@@ -3364,7 +3364,7 @@ function renderSpecialistProviderRuntime() {
   const selectedExecution = selected
     ? executionsByLease.get(`${selected.agentId}\n${selected.leaseId}`)
     : null;
-  const blockedStatuses = new Set(['BLOCKED_FAILURE', 'PROVIDER_SUCCEEDED', 'PROVIDER_FAILED', 'RECONCILE']);
+  const blockedStatuses = new Set(['BLOCKED_FAILURE', 'PROVIDER_SUCCEEDED', 'PROVIDER_FAILED', 'MANUAL_REVIEW', 'RECONCILE']);
   $('specialist-provider-claim-button').disabled = !jobId;
   $('specialist-provider-run-button').disabled = !selected
     || selected.state !== 'LEASED'
