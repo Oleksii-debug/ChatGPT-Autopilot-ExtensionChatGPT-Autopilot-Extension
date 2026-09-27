@@ -2492,6 +2492,23 @@ function agentDefinitionModelPolicySummary(definition) {
   return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
 }
 
+function syncAgentDefinitionSpecialistDelegationControls() {
+  const configured = $('agent-definition-specialist-delegation-configured').checked;
+  for (const id of [
+    'agent-definition-specialist-delegation-enabled',
+    'agent-definition-specialist-registry-id',
+    'agent-definition-specialist-capabilities',
+    'agent-definition-specialist-tools',
+    'agent-definition-specialist-policy-envelope',
+    'agent-definition-specialist-deadline-seconds',
+    'agent-definition-specialist-max-concurrent',
+    'agent-definition-specialist-lease-seconds',
+    'agent-definition-specialist-priority',
+  ]) {
+    $(id).disabled = !configured;
+  }
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2526,6 +2543,7 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-specialist-max-concurrent').value = String(specialistDelegationProfile?.maxConcurrentHandoffs ?? 4);
   $('agent-definition-specialist-lease-seconds').value = String(specialistDelegationProfile?.leaseSeconds ?? 900);
   $('agent-definition-specialist-priority').value = String(specialistDelegationProfile?.priority ?? 0);
+  syncAgentDefinitionSpecialistDelegationControls();
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
@@ -5762,6 +5780,7 @@ $('agent-definition-create-registry-button').addEventListener('click', createAge
 $('agent-definition-list').addEventListener('change', selectAgentDefinition);
 $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
+$('agent-definition-specialist-delegation-configured').addEventListener('change', syncAgentDefinitionSpecialistDelegationControls);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
