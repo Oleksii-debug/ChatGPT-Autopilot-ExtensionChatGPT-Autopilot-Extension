@@ -16,12 +16,14 @@ export const AI_ROUTE_QUALITY_GOVERNOR_VERSION = 1;
 export const AiRouteQualityClass = Object.freeze({
   PASS: 'PASS',
   MISSING: 'MISSING',
+  STALE: 'STALE',
   FAIL: 'FAIL',
 });
 
 const QUALITY_CLASS_ORDER = new Map([
   [AiRouteQualityClass.PASS, 0],
   [AiRouteQualityClass.MISSING, 1],
+  [AiRouteQualityClass.STALE, 1],
   [AiRouteQualityClass.FAIL, 2],
 ]);
 
@@ -39,6 +41,7 @@ const REQUEST_KEYS = new Set([
 const BENCHMARK_BINDING_KEYS = new Set([
   'routeId',
   'evaluationRequest',
+  'maxAgeMs',
 ]);
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -126,6 +129,17 @@ function exactEpoch(value, label) {
   return value;
 }
 
+function positiveDuration(value, label) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 1
+      || value > 31_536_000_000) {
+    throw new Error(label + ' must be an exact duration from 1 ms to 365 days');
+  }
+  return value;
+}
+
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freeze(child);
@@ -173,9 +187,10 @@ export async function deriveAiRouteQualitySubjectRevisionIdV1(rawRoute) {
   return 'routev1-' + hex;
 }
 
-function qualityClass(evaluation) {
-  if (!evaluation) return AiRouteQualityClass.MISSING;
-  return evaluation.status === BenchmarkEvaluationStatus.PASS
+function qualityClass(binding) {
+  if (!binding) return AiRouteQualityClass.MISSING;
+  if (binding.stale) return AiRouteQualityClass.STALE;
+  return binding.evaluation.status === BenchmarkEvaluationStatus.PASS
     ? AiRouteQualityClass.PASS
     : AiRouteQualityClass.FAIL;
 }
@@ -185,7 +200,8 @@ function compareQuality(left, right) {
     - QUALITY_CLASS_ORDER.get(right.qualityClass);
   if (classDelta) return classDelta;
 
-  if (left.qualityClass === AiRouteQualityClass.MISSING) return 0;
+  if (left.qualityClass === AiRouteQualityClass.MISSING
+      || left.qualityClass === AiRouteQualityClass.STALE) return 0;
 
   const leftPassed = left.quality.passedCaseCount;
   const leftCount = left.quality.caseCount;
@@ -216,7 +232,7 @@ function compareLatency(left, right) {
   return left.lastLatencyMs - right.lastLatencyMs;
 }
 
-async function normalizeBenchmarkBindings(value, routes) {
+async function normalizeBenchmarkBindings(value, routes, now) {
   const items = denseArray(value, 'AI route governor benchmarkRequests', MAX_ROUTES);
   const routeById = new Map(routes.map((route) => [route.routeId, route]));
   const byRoute = new Map();
@@ -233,6 +249,10 @@ async function normalizeBenchmarkBindings(value, routes) {
     if (byRoute.has(routeId)) {
       throw new Error('AI route governor benchmark evidence is duplicated for route: ' + routeId);
     }
+    const maxAgeMs = positiveDuration(
+      raw.maxAgeMs,
+      'AI route governor benchmark maxAgeMs',
+    );
     const evaluation = evaluateBenchmarkRunV1(raw.evaluationRequest);
     if (evaluation.subjectId !== routeId) {
       throw new Error(
@@ -247,28 +267,43 @@ async function normalizeBenchmarkBindings(value, routes) {
           + routeId,
       );
     }
-    byRoute.set(routeId, evaluation);
+    const completedAt = Date.parse(evaluation.completedAt);
+    if (!Number.isFinite(completedAt) || completedAt > now) {
+      throw new Error('AI route governor benchmark completion time is in the future: ' + routeId);
+    }
+    byRoute.set(routeId, Object.freeze({
+      evaluation,
+      maxAgeMs,
+      stale: now - completedAt > maxAgeMs,
+    }));
   }
   return byRoute;
 }
 
-function qualityProjection(evaluation) {
-  if (!evaluation) {
+function qualityProjection(binding) {
+  if (!binding) {
     return freeze({
       class: AiRouteQualityClass.MISSING,
       suiteId: '',
       suiteRevisionId: '',
       subjectRevisionId: '',
+      completedAt: '',
+      maxAgeMs: 0,
+      stale: false,
       caseCount: 0,
       passedCaseCount: 0,
       failedCaseCount: 0,
     });
   }
+  const evaluation = binding.evaluation;
   return freeze({
-    class: qualityClass(evaluation),
+    class: qualityClass(binding),
     suiteId: evaluation.suiteId,
     suiteRevisionId: evaluation.suiteRevisionId,
     subjectRevisionId: evaluation.subjectRevisionId,
+    completedAt: evaluation.completedAt,
+    maxAgeMs: binding.maxAgeMs,
+    stale: binding.stale,
     caseCount: evaluation.caseCount,
     passedCaseCount: evaluation.passedCaseCount,
     failedCaseCount: evaluation.failedCaseCount,
@@ -290,7 +325,7 @@ export async function rankAiRouteCandidatesByEvidenceV1(input = {}) {
     : exactEpoch(request.now, 'AI route governor now');
   const benchmarkRequests = request.benchmarkRequests ?? [];
 
-  const benchmarkByRoute = await normalizeBenchmarkBindings(benchmarkRequests, routes);
+  const benchmarkByRoute = await normalizeBenchmarkBindings(benchmarkRequests, routes, now);
 
   const selected = selectAiRouteCandidates({
     routes,
@@ -312,8 +347,8 @@ export async function rankAiRouteCandidatesByEvidenceV1(input = {}) {
   const rows = selected.candidates.map((route) => {
     const state = routeStates[route.routeId];
     const observations = state ? state.successes + state.failures : 0;
-    const evaluation = benchmarkByRoute.get(route.routeId);
-    const quality = qualityProjection(evaluation);
+    const benchmarkBinding = benchmarkByRoute.get(route.routeId);
+    const quality = qualityProjection(benchmarkBinding);
     return {
       route,
       ownerOrderIndex: ownerOrder.has(route.routeId) ? ownerOrder.get(route.routeId) : null,
