@@ -11,7 +11,7 @@ import {
   BenchmarkCaseOutcome,
 } from '../src/core/benchmark-evaluation.js';
 
-const NOW = 1_790_000_000_000;
+const NOW = Date.parse('2026-09-27T12:00:02.000Z');
 const START = '2026-09-27T12:00:00.000Z';
 const END = '2026-09-27T12:00:01.000Z';
 
@@ -46,7 +46,7 @@ function paid(routeId, inputPrice, outputPrice, overrides = {}) {
   });
 }
 
-async function benchmarkBinding(routeValue, { pass = true, suffix = 'a' } = {}) {
+async function benchmarkBinding(routeValue, { pass = true, suffix = 'a', maxAgeMs = 60_000 } = {}) {
   const routeId = routeValue.routeId;
   const suiteId = 'route-quality-' + suffix;
   const suiteRevisionId = 'suite-' + suffix;
@@ -73,6 +73,7 @@ async function benchmarkBinding(routeValue, { pass = true, suffix = 'a' } = {}) 
   };
   return {
     routeId,
+    maxAgeMs,
     evaluationRequest: {
       suite: {
         schemaVersion: 1,
@@ -201,6 +202,36 @@ test('quality evidence ranks PASS before missing evidence and known FAIL last', 
   );
   assert.equal(report.candidates[0].quality.passedCaseCount, 1);
   assert.equal(report.candidates[2].quality.failedCaseCount, 1);
+});
+
+test('stale quality evidence is explicit and does not retain PASS ranking authority', async () => {
+  const routes = [route('route-stale'), route('route-missing')];
+  const report = await rank({
+    routes,
+    now: NOW + 60_000,
+    benchmarkRequests: [
+      await benchmarkBinding(routes[0], { pass: true, suffix: 'stale', maxAgeMs: 1_000 }),
+    ],
+  });
+
+  const stale = report.candidates.find((item) => item.routeId === 'route-stale');
+  assert.equal(stale.quality.class, AiRouteQualityClass.STALE);
+  assert.equal(stale.quality.stale, true);
+  assert.equal(stale.quality.maxAgeMs, 1_000);
+  assert.equal(stale.quality.completedAt, END);
+});
+
+test('future-dated benchmark evidence fails closed', async () => {
+  const routeA = route('route-a');
+  const binding = await benchmarkBinding(routeA);
+  await assert.rejects(
+    rank({
+      routes: [routeA, route('route-b')],
+      now: Date.parse('2026-09-27T11:59:59.000Z'),
+      benchmarkRequests: [binding],
+    }),
+    /completion time is in the future/,
+  );
 });
 
 test('cost is deterministic after equal owner and quality evidence, then latency breaks remaining ties', async () => {
