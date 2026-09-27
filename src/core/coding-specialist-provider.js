@@ -562,7 +562,24 @@ export class OpenHandsCodingSpecialistClient {
       effectDispatched,
       deadlineMs,
     });
-    return info == null ? null : validateConversationInfo(info, prepared);
+    if (info == null) return null;
+    try {
+      return validateConversationInfo(info, prepared);
+    } catch {
+      // A conversation with our durable identity exists but does not satisfy
+      // the admitted workspace/profile/status contract. Treat that external
+      // state as ambiguous even when this particular GET dispatched no effect.
+      throw new OpenHandsCodingSpecialistError(
+        'OpenHands conversation provenance does not match admitted execution',
+        {
+          code: 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH',
+          conversationId: prepared.conversationId,
+          effectMayHaveOccurred: true,
+          reconciliationRequired: true,
+          safeToRetry: false,
+        },
+      );
+    }
   }
 
   async execute(preparedInput) {
@@ -590,7 +607,20 @@ export class OpenHandsCodingSpecialistClient {
         }
         throw error;
       }
-      conversation = validateConversationInfo(createdInfo, prepared);
+      try {
+        conversation = validateConversationInfo(createdInfo, prepared);
+      } catch {
+        throw new OpenHandsCodingSpecialistError(
+          'Created OpenHands conversation provenance does not match admitted execution',
+          {
+            code: 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH',
+            conversationId: prepared.conversationId,
+            effectMayHaveOccurred: true,
+            reconciliationRequired: true,
+            safeToRetry: false,
+          },
+        );
+      }
       created = true;
     }
 
