@@ -12,6 +12,7 @@ const SAFE_RECEIVER_RECOVERY_MODES = new Set([
   'READ_ASSISTANT_REPORT',
 ]);
 const DEFAULT_CHECK_ONLY_UI_READY_TIMEOUT_MS = 45000;
+const DEFAULT_ASSISTANT_REPORT_TAB_READY_TIMEOUT_MS = 10000;
 const DEFAULT_CHECK_ONLY_UI_READY_POLL_MS = 250;
 
 function waitMs(ms) {
@@ -86,10 +87,15 @@ export class ChromeInteractionTransport {
   }
 
   readinessOptions(request) {
-    return {
+    const options = {
       ...this.tabReadinessOptions,
       allowPostSendNavigation: request?.mode === 'VERIFY_AFTER_UNCERTAIN_SUBMIT',
     };
+    if (request?.mode === 'READ_ASSISTANT_REPORT'
+        && this.tabReadinessOptions.timeoutMs === undefined) {
+      options.timeoutMs = DEFAULT_ASSISTANT_REPORT_TAB_READY_TIMEOUT_MS;
+    }
+    return options;
   }
 
   async waitForCheckOnlyUiReady(tabId, request, initialResponse) {
