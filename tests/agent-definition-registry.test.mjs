@@ -29,9 +29,6 @@ function definition(overrides = {}) {
       aiPinnedRouteId: 'mistral-agent',
       aiPrimaryProvider: 'openai-compatible',
       aiPrimaryModel: 'mistral-small-latest',
-      maxCostUsd: 2,
-      inputPricePerMillionUsd: 1,
-      outputPricePerMillionUsd: 2,
       visionOnDemand: false,
     },
     enabled: true,
@@ -61,6 +58,18 @@ function materialization(overrides = {}) {
     jobId: 'job-research-001',
     projectId: 'project-1',
     goal: 'Compare the two candidate APIs and report documented trade-offs.',
+    ownerBudget: {
+      maxSteps: 500,
+      maxModelCalls: 100,
+      maxInputTokens: 1_000_000,
+      maxOutputTokens: 100_000,
+      maxTotalTokens: 1_000_000,
+      maxOutputTokensPerCall: 8192,
+      maxRuntimeMinutes: 120,
+      maxCostUsd: 5,
+      inputPricePerMillionUsd: 3,
+      outputPricePerMillionUsd: 6,
+    },
     ownerCapabilityIds: ['project.context', 'research.read', 'research.write'],
     ownerToolIds: ['browser.read', 'files.read', 'github.read', 'artifact.write'],
     requestedCapabilityIds: ['research.read', 'project.context'],
@@ -141,7 +150,7 @@ test('selection carries a full immutable definition snapshot so same-revision by
   }), /drifted from current registry definition/);
 });
 
-test('materialization reuses Browser Agent config and binds model, budget, goal and acceptance defaults', () => {
+test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
   const result = materializeAgentDefinitionV1(materialization());
   assert.equal(result.config.id, 'job-research-001');
   assert.equal(result.config.projectId, 'project-1');
@@ -150,12 +159,115 @@ test('materialization reuses Browser Agent config and binds model, budget, goal 
   assert.match(result.config.goal, /Owner task:\nCompare the two candidate APIs/);
   assert.equal(result.config.maxSteps, 120);
   assert.equal(result.config.maxModelCalls, 20);
+  assert.equal(result.config.maxRuntimeMinutes, 30);
   assert.equal(result.config.aiRoutingMode, 'primary');
   assert.equal(result.config.aiPinnedRouteId, 'mistral-agent');
   assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
   assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
-  assert.equal(result.config.maxCostUsd, 2);
+  assert.equal(result.config.maxCostUsd, 5);
+  assert.equal(result.config.inputPricePerMillionUsd, 3);
+  assert.equal(result.config.outputPricePerMillionUsd, 6);
   assert.deepEqual(result.config.acceptanceCriteria, definition().acceptanceCriteria);
+});
+
+test('definition ceilings can only narrow owner budgets and zero/unbounded aliases cannot widen them', () => {
+  const stricterOwner = {
+    maxSteps: 80,
+    maxModelCalls: 10,
+    maxInputTokens: 50_000,
+    maxOutputTokens: 8_000,
+    maxTotalTokens: 55_000,
+    maxOutputTokensPerCall: 1024,
+    maxRuntimeMinutes: 15,
+    maxCostUsd: 0.75,
+    inputPricePerMillionUsd: 4,
+    outputPricePerMillionUsd: 9,
+  };
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        configDefaults: {
+          ...definition().configDefaults,
+          maxModelCalls: 0,
+          maxInputTokens: 0,
+          maxOutputTokens: 12_000,
+          maxTotalTokens: 0,
+          maxOutputTokensPerCall: 4096,
+        },
+      }),
+    ],
+  });
+  const result = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+    ownerBudget: stricterOwner,
+  });
+  assert.equal(result.config.maxSteps, 80);
+  assert.equal(result.config.maxModelCalls, 10);
+  assert.equal(result.config.maxInputTokens, 50_000);
+  assert.equal(result.config.maxOutputTokens, 8_000);
+  assert.equal(result.config.maxTotalTokens, 55_000);
+  assert.equal(result.config.maxOutputTokensPerCall, 1024);
+  assert.equal(result.config.maxRuntimeMinutes, 15);
+  assert.equal(result.config.maxCostUsd, 0.75);
+  assert.equal(result.config.inputPricePerMillionUsd, 4);
+  assert.equal(result.config.outputPricePerMillionUsd, 9);
+
+  const ownerUnbounded = {
+    ...stricterOwner,
+    maxModelCalls: 0,
+    maxInputTokens: 0,
+    maxOutputTokens: 0,
+    maxTotalTokens: 0,
+    maxRuntimeMinutes: 0,
+    maxCostUsd: 0,
+  };
+  const unboundedResult = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+    ownerBudget: ownerUnbounded,
+  });
+  assert.equal(unboundedResult.config.maxModelCalls, 0);
+  assert.equal(unboundedResult.config.maxInputTokens, 0);
+  assert.equal(unboundedResult.config.maxOutputTokens, 12_000);
+  assert.equal(unboundedResult.config.maxTotalTokens, 0);
+  assert.equal(unboundedResult.config.maxRuntimeMinutes, 30);
+  assert.equal(unboundedResult.config.maxCostUsd, 0);
+});
+
+test('owner budget is complete, canonical, descriptor-safe and reusable definitions cannot set accounting rates', () => {
+  for (const [field, value] of [
+    ['maxCostUsd', 0.5],
+    ['inputPricePerMillionUsd', 1],
+    ['outputPricePerMillionUsd', 2],
+  ]) {
+    assert.throws(() => normalizeAgentDefinitionV1(definition({
+      configDefaults: { ...definition().configDefaults, [field]: value },
+    })), /unknown field/);
+  }
+
+  const missing = { ...materialization().ownerBudget };
+  delete missing.maxTotalTokens;
+  assert.throws(() => materializeAgentDefinitionV1(materialization({ ownerBudget: missing })), /missing required field: maxTotalTokens/);
+
+  const nonCanonical = { ...materialization().ownerBudget, maxModelCalls: -0 };
+  assert.throws(() => materializeAgentDefinitionV1(materialization({ ownerBudget: nonCanonical })), /must already be canonical/);
+
+  let reads = 0;
+  const hostile = { ...materialization().ownerBudget };
+  Object.defineProperty(hostile, 'maxSteps', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 1;
+    },
+  });
+  assert.throws(() => materializeAgentDefinitionV1(materialization({ ownerBudget: hostile })), /maxSteps must be an enumerable own data property/);
+  assert.equal(reads, 0);
 });
 
 test('definition never grants owner policy, credential, scheduling, execution or verification authority', () => {
