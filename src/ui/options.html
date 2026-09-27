@@ -338,6 +338,61 @@
         </fieldset>
       </details>
 
+      <details id="specialist-registry-details">
+        <summary>Specialists</summary>
+        <p>Тут налаштовуються reusable Specialist definitions. Ця форма не запускає Specialist і не створює handoff.</p>
+
+        <fieldset class="settings-group" id="specialist-registry-group">
+          <legend>Реєстри Specialists</legend>
+          <label for="specialist-registry-list">Реєстр Specialist definitions</label>
+          <select id="specialist-registry-list" size="4"></select>
+          <label for="specialist-create-registry-id">ID нового Specialist реєстру</label>
+          <input id="specialist-create-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <button id="specialist-create-registry-button" type="button">Створити Specialist реєстр</button>
+          <p id="specialist-quarantine-status" tabindex="0">Пошкоджених Specialist реєстрів у карантині немає.</p>
+        </fieldset>
+
+        <fieldset class="settings-group" id="specialist-selection-group">
+          <legend>Збережені Specialists</legend>
+          <label for="specialist-list">Specialist definition</label>
+          <select id="specialist-list" size="5"></select>
+          <button id="specialist-new-button" type="button" disabled>Новий Specialist</button>
+        </fieldset>
+
+        <fieldset class="settings-group" id="specialist-form-group" disabled>
+          <legend>Specialist definition</legend>
+          <label for="specialist-id">Specialist ID</label>
+          <input id="specialist-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="specialist-provider-id">Provider ID</label>
+          <input id="specialist-provider-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="specialist-label">Назва Specialist</label>
+          <input id="specialist-label" type="text" maxlength="300" autocomplete="off">
+          <label for="specialist-description">Опис — необов’язково</label>
+          <textarea id="specialist-description" rows="3" maxlength="4000" spellcheck="true"></textarea>
+          <label for="specialist-execution-plane">Execution plane</label>
+          <select id="specialist-execution-plane">
+            <option value="BROWSER">BROWSER</option>
+            <option value="LOCAL">LOCAL</option>
+            <option value="CLOUD">CLOUD</option>
+            <option value="REMOTE">REMOTE</option>
+          </select>
+          <label for="specialist-capabilities">Capability IDs — щонайменше один, по одному в рядку</label>
+          <textarea id="specialist-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="specialist-tools">Tool IDs — по одному в рядку</label>
+          <textarea id="specialist-tools" rows="4" spellcheck="false"></textarea>
+          <label for="specialist-result-contract-id">Result contract ID</label>
+          <input id="specialist-result-contract-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label><input id="specialist-enabled" type="checkbox" checked>Specialist увімкнений</label>
+          <p id="specialist-revision" tabindex="0">Specialist реєстр не вибрано.</p>
+          <div class="agent-actions" aria-label="Дії з Specialist definition">
+            <button id="specialist-save-button" type="button" disabled>Зберегти Specialist</button>
+            <button id="specialist-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
+            <button id="specialist-delete-button" type="button" disabled>Видалити Specialist</button>
+          </div>
+        </fieldset>
+        <p id="specialist-status" role="status">Specialist реєстри ще не завантажено.</p>
+      </details>
+
       <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true"></textarea>
       <label for="agent-import-file">Імпорт чернетки Agent (JSON)</label>
