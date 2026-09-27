@@ -1479,9 +1479,6 @@ test('scope dispatcher rejects non-lifecycle hierarchy events without mutating c
       eventId: 'not-a-scope-event',
       controlEpoch: 1,
       nodeId: 'root',
-      generation: 1,
-      activationId: 'root:root:g1:r1',
-      purpose: 'WORK',
     }, { nowMs: 2000 }),
     /accepts only PAUSE_SCOPE, RESUME_SCOPE or STOP_SCOPE/,
   );
@@ -1565,4 +1562,40 @@ test('scope dispatcher rejects accessor event type without executing the getter'
     /type must be an enumerable own data property/,
   );
   assert.equal(reads, 0);
+});
+
+
+test('scope dispatcher snapshots every event field as own data and rejects authority aliases', async () => {
+  const { orchestration } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+
+  let eventIdReads = 0;
+  const hostile = {
+    type: 'PAUSE_SCOPE',
+    controlEpoch: 1,
+    nodeId: 'root',
+  };
+  Object.defineProperty(hostile, 'eventId', {
+    enumerable: true,
+    get() {
+      eventIdReads += 1;
+      return 'getter-event-id';
+    },
+  });
+  await assert.rejects(
+    () => controller.dispatchHierarchyScopeEvent(hostile, { nowMs: 2000 }),
+    /eventId must be an enumerable own data property/,
+  );
+  assert.equal(eventIdReads, 0);
+
+  await assert.rejects(
+    () => controller.dispatchHierarchyScopeEvent({
+      type: 'PAUSE_SCOPE',
+      eventId: 'alias-attempt',
+      controlEpoch: 1,
+      nodeId: 'root',
+      executionAuthorized: true,
+    }, { nowMs: 2000 }),
+    /unknown field: executionAuthorized/,
+  );
 });
