@@ -2623,6 +2623,7 @@ async function saveAgentDefinition() {
     const definition = buildAgentDefinitionFromFormV1(agentDefinitionFormValue(), {
       definitionRevision,
       configDefaults: current?.configDefaults || {},
+      modelRoutePolicy: current?.modelRoutePolicy ?? null,
     });
     const payload = current
       ? {
