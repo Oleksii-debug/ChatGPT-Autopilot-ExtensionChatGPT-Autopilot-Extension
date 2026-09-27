@@ -104,7 +104,7 @@ function mergeAiRouterSettingsOverride(rawBase, rawOverride = {}) {
   const override = rawOverride && typeof rawOverride === 'object' ? rawOverride : {};
   const next = structuredClone(base);
   if (Object.hasOwn(override, 'routePolicy')) {
-    next.routePolicy = narrowAiRoutePolicy(base, override.routePolicy);
+    next.routePolicy = structuredClone(narrowAiRoutePolicy(base, override.routePolicy));
   }
   if (AI_ROUTER_OVERRIDE_MODES.has(override.mode)) next.mode = override.mode;
   if (override.routeId !== undefined && override.routeId !== '') {
