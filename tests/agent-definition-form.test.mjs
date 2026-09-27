@@ -443,3 +443,21 @@ test('Agent definition options save preserves an existing specialist delegation 
     /specialistDelegationProfile:\s*current && Object\.hasOwn\(current, 'specialistDelegationProfile'\)[\s\S]*?\? current\.specialistDelegationProfile[\s\S]*?: undefined/u,
   );
 });
+
+test('inactive Specialist delegation profile removes subordinate controls from keyboard tab flow', async () => {
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const sync = source.match(
+    /function syncAgentDefinitionSpecialistDelegationControls\(\) \{([\s\S]*?)\n\}/u,
+  );
+  assert.ok(sync, 'Specialist delegation control sync must remain structurally identifiable');
+  assert.match(sync[1], /agent-definition-specialist-delegation-configured/u);
+  assert.match(sync[1], /\$\(id\)\.disabled = !configured/u);
+  assert.match(
+    source,
+    /agent-definition-specialist-delegation-configured'\)\.addEventListener\('change', syncAgentDefinitionSpecialistDelegationControls\)/u,
+  );
+  assert.match(
+    source,
+    /specialistProfileConfigured = Boolean\(specialistDelegationProfile\)[\s\S]*?syncAgentDefinitionSpecialistDelegationControls\(\)/u,
+  );
+});
