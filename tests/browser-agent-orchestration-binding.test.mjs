@@ -1599,3 +1599,56 @@ test('scope dispatcher snapshots every event field as own data and rejects autho
     /unknown field: executionAuthorized/,
   );
 });
+
+
+test('child Browser Agent resume cannot bypass a paused hierarchy ancestor', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  await manager.pause('job-1', lifecycleDependencies);
+
+  const controller = orchestration.controllerFor('orch-1');
+  await controller.dispatchHierarchyScopeEvent({
+    type: 'PAUSE_SCOPE',
+    eventId: 'parent-pause-before-child-resume',
+    controlEpoch: 1,
+    nodeId: 'root',
+  }, { nowMs: 2200 });
+
+  const before = await manager.get('job-1');
+  await assert.rejects(
+    () => manager.resume('job-1', { runInitial: false }, lifecycleDependencies),
+    /cannot resume below PAUSED ancestor root/,
+  );
+
+  const after = await manager.get('job-1');
+  assert.equal(after.job.runtime.runState, 'PAUSED');
+  assert.equal(after.job.runtime.controlEpoch, before.job.runtime.controlEpoch);
+  const runtime = await controller.runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
+});
+
+test('Browser Agent resume cannot bypass canonical orchestra owner pause', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  await manager.pause('job-1', lifecycleDependencies);
+
+  await orchestration.pause('orch-1');
+  const ownerStatus = await orchestration.getStatus('orch-1');
+  assert.equal(ownerStatus.ownerPaused, true);
+
+  const before = await manager.get('job-1');
+  await assert.rejects(
+    () => manager.resume('job-1', { runInitial: false }, lifecycleDependencies),
+    /cannot resume while canonical orchestra owner pause is active/,
+  );
+
+  const after = await manager.get('job-1');
+  assert.equal(after.job.runtime.runState, 'PAUSED');
+  assert.equal(after.job.runtime.controlEpoch, before.job.runtime.controlEpoch);
+  const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
+});
