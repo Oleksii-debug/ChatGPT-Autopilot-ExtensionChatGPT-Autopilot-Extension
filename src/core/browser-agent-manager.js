@@ -70,6 +70,11 @@ import {
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
 import {
+  canonicalSpecialistProviderIdV1,
+  createSpecialistProviderConfigV1,
+  normalizeSpecialistProviderConfigV1,
+} from './specialist-provider-config.js';
+import {
   BrowserAgentOrchestrationBindingStatus,
   createBrowserAgentOrchestrationNodeBindingV1,
   inspectBrowserAgentOrchestrationNodeBindingV1,
@@ -96,6 +101,9 @@ const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
+const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
+const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
+const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
@@ -714,6 +722,30 @@ function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine)
   return { registries, quarantine };
 }
 
+function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
+  const configs = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Ignore impossible non-cloneable values; malformed provider config can
+      // never become runtime authority through this recovery path.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawConfigs).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+    try {
+      const config = normalizeSpecialistProviderConfigV1(value);
+      if (config.providerId !== key) throw new Error('Stored Specialist provider config identity drift');
+      configs[key] = config;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { configs, quarantine };
+}
+
 function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
   const registries = Object.create(null);
   const quarantine = Object.create(null);
@@ -833,6 +865,8 @@ function freshStore() {
     definitionRegistryQuarantineById: Object.create(null),
     specialistRegistriesById: Object.create(null),
     specialistRegistryQuarantineById: Object.create(null),
+    specialistProviderConfigsById: Object.create(null),
+    specialistProviderConfigQuarantineById: Object.create(null),
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -1108,6 +1142,12 @@ function normalizeStore(raw, now) {
   );
   out.specialistRegistriesById = specialistState.registries;
   out.specialistRegistryQuarantineById = specialistState.quarantine;
+  const providerConfigState = normalizePersistedSpecialistProviderConfigState(
+    raw.specialistProviderConfigsById,
+    raw.specialistProviderConfigQuarantineById,
+  );
+  out.specialistProviderConfigsById = providerConfigState.configs;
+  out.specialistProviderConfigQuarantineById = providerConfigState.quarantine;
   return out;
 }
 
@@ -1441,6 +1481,117 @@ export class BrowserAgentManager {
       return store;
     });
     return clone(committed);
+  }
+
+  async listSpecialistProviderConfigs() {
+    const store = await this.load();
+    const configs = Object.keys(store.specialistProviderConfigsById || {})
+      .sort()
+      .map(providerId => clone(store.specialistProviderConfigsById[providerId]));
+    const quarantinedProviderIds = Object.keys(
+      store.specialistProviderConfigQuarantineById || {},
+    ).sort();
+    return { configs, quarantinedProviderIds };
+  }
+
+  async getSpecialistProviderConfig(providerId) {
+    const canonicalId = canonicalSpecialistProviderIdV1(providerId);
+    const store = await this.load();
+    const configs = store.specialistProviderConfigsById || Object.create(null);
+    const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+    const config = Object.hasOwn(configs, canonicalId) ? configs[canonicalId] : null;
+    return {
+      config: config ? clone(config) : null,
+      quarantined: !config && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async setSpecialistProviderConfig(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_PROVIDER_CONFIG_SET_KEYS,
+      'Browser Agent Specialist provider config set request',
+    );
+    for (const key of SPECIALIST_PROVIDER_CONFIG_SET_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider config set request requires ${key}`);
+      }
+    }
+    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Specialist provider config expectedRevision',
+    );
+    let committed = null;
+    await this.update(store => {
+      const configs = store.specialistProviderConfigsById
+        || (store.specialistProviderConfigsById = Object.create(null));
+      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, providerId)) {
+        throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
+      }
+      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      const currentRevision = current?.revision || 0;
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Specialist provider config revision drifted before update');
+      }
+      if (!current && Object.keys(configs).length >= MAX_SPECIALIST_PROVIDER_CONFIGS) {
+        throw new Error('Specialist provider config capacity is exhausted');
+      }
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Specialist provider config revision cannot advance');
+      }
+      committed = createSpecialistProviderConfigV1({
+        providerId,
+        kind: request.kind,
+        config: request.config,
+        revision: currentRevision + 1,
+        updatedAt: new Date(this.now()).toISOString(),
+      });
+      configs[providerId] = committed;
+      return store;
+    });
+    return { config: clone(committed) };
+  }
+
+  async clearSpecialistProviderConfig(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS,
+      'Browser Agent Specialist provider config clear request',
+    );
+    for (const key of SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider config clear request requires ${key}`);
+      }
+    }
+    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Specialist provider config expectedRevision',
+    );
+    let cleared = false;
+    await this.update(store => {
+      const configs = store.specialistProviderConfigsById || Object.create(null);
+      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, providerId)) {
+        throw new Error('Specialist provider config is quarantined as corrupt and requires explicit storage recovery');
+      }
+      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      if (!current) {
+        if (expectedRevision !== 0) {
+          throw new Error('Specialist provider config revision drifted before clear');
+        }
+        return store;
+      }
+      if (current.revision !== expectedRevision) {
+        throw new Error('Specialist provider config revision drifted before clear');
+      }
+      delete configs[providerId];
+      cleared = true;
+      return store;
+    });
+    return { providerId, cleared };
   }
 
   #rejectExecutionSlotQueue(error) {
