@@ -121,23 +121,24 @@ test('profile requires non-empty canonical capabilities and exact bounded policy
 
 test('materialization derives existing PREPARE intent without granting runtime authority', () => {
   const intent = materializeAgentSpecialistDelegationIntentV1(request());
-  assert.equal(intent.registryId, 'specialists:project-1');
-  assert.equal(intent.expectedRegistryRevision, 5);
-  assert.equal(intent.expectedPlanRevision, 11);
-  assert.equal(intent.nodeId, 'node:local-analysis');
-  assert.deepEqual(intent.requiredCapabilityIds, ['data.analyze', 'data.read']);
-  assert.deepEqual(intent.requiredToolIds, ['artifact.write', 'data.query']);
-  assert.equal(intent.policyEnvelopeId, 'policy:job.auto');
-  assert.equal(intent.deadlineAt, '2026-09-27T18:15:00.000Z');
-  assert.equal(intent.maxConcurrentHandoffs, 4);
-  assert.equal(intent.leaseSeconds, 600);
-  assert.equal(intent.priority, 7);
-  assert.deepEqual(intent.childBudget, {
+  assert.equal(intent.schemaVersion, 1);
+  assert.equal(intent.request.registryId, 'specialists:project-1');
+  assert.equal(intent.request.expectedRegistryRevision, 5);
+  assert.equal(intent.request.expectedPlanRevision, 11);
+  assert.equal(intent.request.nodeId, 'node:local-analysis');
+  assert.deepEqual(intent.request.requiredCapabilityIds, ['data.analyze', 'data.read']);
+  assert.deepEqual(intent.request.requiredToolIds, ['artifact.write', 'data.query']);
+  assert.equal(intent.request.policyEnvelopeId, 'policy:job.auto');
+  assert.equal(intent.request.deadlineAt, '2026-09-27T18:15:00.000Z');
+  assert.equal(intent.request.maxConcurrentHandoffs, 4);
+  assert.equal(intent.request.leaseSeconds, 600);
+  assert.equal(intent.request.priority, 7);
+  assert.deepEqual(intent.request.childBudget, {
     maxModelCalls: 4,
     maxRuntimeSeconds: 300,
     maxCostUsdMicros: 500000,
   });
-  assert.equal(intent.parentInvocationId, 'invocation:parent-1');
+  assert.equal(intent.request.parentInvocationId, 'invocation:parent-1');
   assert.deepEqual(intent.authority, {
     proposalOnly: true,
     executionAuthorized: false,
@@ -150,7 +151,10 @@ test('materialization derives existing PREPARE intent without granting runtime a
     capacityReserved: false,
   });
   assert.equal(Object.isFrozen(intent), true);
+  assert.equal(Object.isFrozen(intent.request), true);
   assert.equal(Object.isFrozen(intent.authority), true);
+  assert.equal(Object.hasOwn(intent.request, 'authority'), false);
+  assert.equal(Object.hasOwn(intent.request, 'schemaVersion'), false);
 });
 
 test('materialization rejects capability or tool escalation beyond persisted parent scope', () => {
@@ -211,6 +215,6 @@ test('materialization does not retain mutable caller collections', () => {
   input.parentCapabilityIds[0] = 'capability.mutated';
   input.childBudget.maxModelCalls = 99;
 
-  assert.deepEqual(intent.requiredCapabilityIds, ['data.analyze', 'data.read']);
-  assert.equal(intent.childBudget.maxModelCalls, 4);
+  assert.deepEqual(intent.request.requiredCapabilityIds, ['data.analyze', 'data.read']);
+  assert.equal(intent.request.childBudget.maxModelCalls, 4);
 });
