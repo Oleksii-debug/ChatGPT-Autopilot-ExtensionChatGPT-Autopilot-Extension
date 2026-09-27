@@ -396,7 +396,7 @@ test('profile import keeps config, hierarchy and owner policy behind one Project
     const imported = await importing;
     const bound = await bindingPromise;
 
-    assert.equal(imported.status.runtime.hierarchy.graph.graphId, 'graph-2');
+    assert.equal(imported.status.runtime.hierarchy.graphId, 'graph-2');
     assert.deepEqual(imported.status.orchestra.subagentPolicy, {
       schemaVersion: 1,
       allowAgentCreatedChildren: true,
@@ -683,7 +683,7 @@ test('successful owner-paused project rebind purges managed sessions only after 
     const imported = await orchestration.importProfile(profile);
     assert.equal(coreUpdateCalls, 1, 'successful project rebind must perform the deferred managed-session purge exactly once');
     assert.equal(authorityAtPurge.config.projectId, 'project-2');
-    assert.equal(authorityAtPurge.runtime.hierarchy.graph.graphId, 'graph-2');
+    assert.equal(authorityAtPurge.runtime.hierarchy.graphId, 'graph-2');
     assert.deepEqual(authorityAtPurge.orchestra.subagentPolicy, {
       schemaVersion: 1,
       allowAgentCreatedChildren: true,
@@ -691,7 +691,7 @@ test('successful owner-paused project rebind purges managed sessions only after 
       maxChildrenPerAgent: 2,
     });
     assert.equal(imported.status.config.projectId, 'project-2');
-    assert.equal(imported.status.runtime.hierarchy.graph.graphId, 'graph-2');
+    assert.equal(imported.status.runtime.hierarchy.graphId, 'graph-2');
     assert.deepEqual(imported.status.orchestra.subagentPolicy, authorityAtPurge.orchestra.subagentPolicy);
   } finally {
     orchestration.coreRepository.update = originalCoreUpdate;
