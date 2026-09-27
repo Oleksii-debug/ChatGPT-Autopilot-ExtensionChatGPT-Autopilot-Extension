@@ -199,25 +199,40 @@ test('a queued direct burst observes a lowered owner concurrency limit before ad
   manager.getExecutionPolicy = async () => ({ maxConcurrentAgents: limit });
   manager.reconcileAlarm = async () => 0;
 
-  let releaseFirst;
-  const firstBarrier = new Promise(resolve => { releaseFirst = resolve; });
+  let releaseA;
+  let releaseB;
+  let startedAResolve;
+  let startedBResolve;
+  const barrierA = new Promise(resolve => { releaseA = resolve; });
+  const barrierB = new Promise(resolve => { releaseB = resolve; });
+  const startedA = new Promise(resolve => { startedAResolve = resolve; });
+  const startedB = new Promise(resolve => { startedBResolve = resolve; });
   const starts = [];
   manager.cycleOne = async id => {
     starts.push(id);
-    if (id === 'a') await firstBarrier;
-    else await new Promise(resolve => setTimeout(resolve, 10));
+    if (id === 'a') {
+      startedAResolve();
+      await barrierA;
+    } else if (id === 'b') {
+      startedBResolve();
+      await barrierB;
+    }
     return { kind: 'COMPLETED', id };
   };
 
   const a = manager.runBurst('a', { maxCycles: 1 });
   const b = manager.runBurst('b', { maxCycles: 1 });
   const c = manager.runBurst('c', { maxCycles: 1 });
-  await new Promise(resolve => setTimeout(resolve, 5));
+  await Promise.all([startedA, startedB]);
   limit = 1;
-  releaseFirst();
-  await Promise.all([a, b, c]);
-  assert.deepEqual(starts.slice(0, 2), ['a', 'b']);
-  assert.equal(starts.at(-1), 'c');
+
+  releaseB();
+  await b;
+  assert.deepEqual(starts, ['a', 'b'], 'queued Agent must remain blocked while one active Agent still occupies the lowered limit');
+
+  releaseA();
+  await Promise.all([a, c]);
+  assert.deepEqual(starts, ['a', 'b', 'c']);
 });
 
 test('duplicate direct bursts for one Agent coalesce to one exact execution stream', async () => {
@@ -257,21 +272,33 @@ test('raising the owner limit wakes queued direct bursts without waiting for an 
   };
 
   let releaseHeld;
+  let heldStartedResolve;
+  let queuedStartedResolve;
   const heldBarrier = new Promise(resolve => { releaseHeld = resolve; });
-  let queuedStarted = false;
+  const heldStarted = new Promise(resolve => { heldStartedResolve = resolve; });
+  const queuedStarted = new Promise(resolve => { queuedStartedResolve = resolve; });
+  let queuedDidStart = false;
   manager.cycleOne = async id => {
-    if (id === 'held') await heldBarrier;
-    else queuedStarted = true;
+    if (id === 'held') {
+      heldStartedResolve();
+      await heldBarrier;
+    } else {
+      queuedDidStart = true;
+      queuedStartedResolve();
+    }
     return { kind: 'COMPLETED', id };
   };
 
   const held = manager.runBurst('held', { maxCycles: 1 });
+  await heldStarted;
   const queued = manager.runBurst('queued', { maxCycles: 1 });
-  await new Promise(resolve => setTimeout(resolve, 5));
-  assert.equal(queuedStarted, false);
+  await Promise.resolve();
+  assert.equal(queuedDidStart, false);
+
   await manager.updateExecutionPolicy({ maxConcurrentAgents: 2 });
-  await new Promise(resolve => setTimeout(resolve, 5));
-  assert.equal(queuedStarted, true);
+  await queuedStarted;
+  assert.equal(queuedDidStart, true);
+
   releaseHeld();
   await Promise.all([held, queued]);
 });
@@ -312,4 +339,9 @@ test('queued admission fails closed instead of hanging when policy storage read 
   );
   releaseHeld();
   await held;
+
+  manager.getExecutionPolicy = async () => ({ maxConcurrentAgents: 1 });
+  const recovered = await manager.runBurst('queued', { maxCycles: 1 });
+  assert.equal(recovered.kind, 'BURST');
+  assert.equal(recovered.cycles, 1);
 });
