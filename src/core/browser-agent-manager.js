@@ -66,6 +66,12 @@ import {
   normalizeSpecialistRegistryV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
+import {
+  createBrowserAgentOrchestrationNodeBindingV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+  normalizeBrowserAgentOrchestrationBindingRequestV1,
+  normalizeBrowserAgentOrchestrationNodeBindingV1,
+} from './browser-agent-orchestration-binding.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -92,6 +98,7 @@ const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
+const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set(['resolveProjectHierarchyAuthority']);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -139,6 +146,18 @@ function snapshotExactOwnDataRequest(value, allowed, label) {
   }
   return snapshot;
 }
+function trustedOrchestrationAuthorityResolver(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
+    'Browser Agent orchestration binding dependencies',
+  );
+  if (typeof raw.resolveProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority resolver is required');
+  }
+  return raw.resolveProjectHierarchyAuthority;
+}
+
 function canonicalAgentDefinitionRegistryId(value) {
   return normalizeAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
@@ -616,12 +635,23 @@ function normalizeStore(raw, now) {
         ? null
         : normalizeAgentDefinitionSelectionV1(raw.byId[id].definitionSelection);
       const definitionScope = normalizePersistedAgentDefinitionScope(raw.byId[id].definitionScope, definitionSelection);
+      const orchestrationNodeBinding = raw.byId[id].orchestrationNodeBinding == null
+        ? null
+        : normalizeBrowserAgentOrchestrationNodeBindingV1(raw.byId[id].orchestrationNodeBinding);
+      if (orchestrationNodeBinding && orchestrationNodeBinding.jobId !== id) {
+        throw new Error('Browser Agent orchestration binding jobId mismatch');
+      }
+      if (orchestrationNodeBinding && orchestrationNodeBinding.projectId !== config.projectId) {
+        // Preserve a stale Project binding as drift evidence only when the job
+        // itself is otherwise canonical. It can never be consumed as CURRENT.
+      }
       out.byId[id] = {
         id,
         config,
         runtime: normalizeRuntime(raw.byId[id].runtime, now),
         definitionSelection,
         definitionScope,
+        orchestrationNodeBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -1120,6 +1150,69 @@ export class BrowserAgentManager {
     });
   }
 
+  /**
+   * Persist one exact Browser Agent -> canonical OrchestrationHierarchy node
+   * binding through the existing Browser Agent serialized storage authority.
+   * The resolver is re-read inside the mutation boundary to prevent a caller
+   * supplied graph/policy snapshot from minting durable structural authority.
+   */
+  async bindOrchestrationNode(id, rawRequest = {}, dependencies = {}) {
+    const request = normalizeBrowserAgentOrchestrationBindingRequestV1(rawRequest);
+    const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
+    let binding = null;
+    await this.update(async store => {
+      const job = store.byId[id];
+      if (!job) throw new Error('Browser Agent job not found');
+      const projectId = job.config?.projectId || '';
+      if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+      const authority = await resolveProjectHierarchyAuthority(projectId);
+      binding = createBrowserAgentOrchestrationNodeBindingV1({
+        jobId: job.id,
+        projectId,
+        request,
+        authority,
+        currentBinding: job.orchestrationNodeBinding,
+        boundAt: this.now(),
+      });
+      job.orchestrationNodeBinding = clone(binding);
+      job.updatedAt = this.now();
+      return store;
+    });
+    return Object.freeze({ binding });
+  }
+
+  /**
+   * Read the durable node binding and compare it with current canonical
+   * OrchestrationV2 authority. Drift is surfaced; it is never silently healed.
+   */
+  async inspectOrchestrationNodeBinding(id = '', dependencies = {}) {
+    const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
+    const current = await this.get(id);
+    if (!current.job) throw new Error('Browser Agent job not found');
+    if (!current.job.orchestrationNodeBinding) {
+      return Object.freeze({
+        binding: null,
+        status: 'UNBOUND',
+        current: false,
+        currentAuthority: null,
+      });
+    }
+    const projectId = current.job.config?.projectId || '';
+    if (!projectId) {
+      return Object.freeze({
+        binding: current.job.orchestrationNodeBinding,
+        status: 'PROJECT_AUTHORITY_DRIFTED',
+        current: false,
+        currentAuthority: null,
+      });
+    }
+    const authority = await resolveProjectHierarchyAuthority(projectId);
+    return inspectBrowserAgentOrchestrationNodeBindingV1({
+      binding: current.job.orchestrationNodeBinding,
+      authority,
+    });
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -1404,6 +1497,7 @@ export class BrowserAgentManager {
         runtime: createBrowserAgentRuntime(now),
         definitionSelection: clone(selection),
         definitionScope: clone(materialized.scope),
+        orchestrationNodeBinding: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -1464,6 +1558,7 @@ export class BrowserAgentManager {
         runtime: createBrowserAgentRuntime(now),
         definitionSelection: null,
         definitionScope: null,
+        orchestrationNodeBinding: null,
         createdAt: now,
         updatedAt: now,
       };
