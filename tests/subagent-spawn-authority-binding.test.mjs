@@ -183,8 +183,24 @@ test('binds exact canonical topology identities to per-child least authority', (
     [['cap.read'], ['cap.write']],
   );
   assert.deepEqual(result.taskBindings, [
-    { childNodeId: 'subagent:spawn-bind:1', taskId: 'task.read' },
-    { childNodeId: 'subagent:spawn-bind:2', taskId: 'task.write' },
+    {
+      childNodeId: 'subagent:spawn-bind:1',
+      taskId: 'task.read',
+      providerId: 'provider.main',
+      taskRequestedCapabilityIds: ['cap.read'],
+      taskSourceIds: ['source.repo'],
+      taskArtifactIds: ['artifact.input'],
+      requestedToolIds: ['tool.read'],
+    },
+    {
+      childNodeId: 'subagent:spawn-bind:2',
+      taskId: 'task.write',
+      providerId: 'provider.main',
+      taskRequestedCapabilityIds: ['cap.write'],
+      taskSourceIds: ['source.repo'],
+      taskArtifactIds: ['artifact.input'],
+      requestedToolIds: ['tool.write'],
+    },
   ]);
   assert.equal(Object.isFrozen(result.taskBindings), true);
   assert.equal(result.activationAuthority, false);
@@ -649,6 +665,33 @@ test('same spawn and child count cannot silently rebind an existing child to ano
   assert.deepEqual(drift.taskBindings, []);
   assert.deepEqual(drift.activationRequests, []);
   assert.equal(Object.hasOwn(drift, 'graph'), false);
+});
+
+test('same durable taskId cannot silently drift authority-relevant task semantics on replay', () => {
+  const first = bindSubagentSpawnAuthorityV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.deepEqual(first.taskBindings[0].taskRequestedCapabilityIds, ['cap.read']);
+
+  const drift = bindSubagentSpawnAuthorityV1(request({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      spawnId: 'spawn-bind',
+      nowMs: 300,
+    }),
+    priorTaskBindings: first.taskBindings,
+    childTasks: [childTask('task.one', {
+      taskRequestedCapabilityIds: ['cap.write'],
+      requestedToolIds: ['tool.write'],
+    })],
+  }));
+
+  assert.equal(drift.decision, 'DENY');
+  assert.equal(drift.reasonCode, 'REPLAY_TASK_BINDING_MISMATCH');
+  assert.deepEqual(drift.taskBindings, []);
+  assert.deepEqual(drift.activationRequests, []);
+  assert.equal(Object.hasOwn(drift, 'graph'), false);
+  assert.equal(Object.hasOwn(drift, 'runtime'), false);
 });
 
 test('new topology rejects stale prior binding evidence instead of mixing generations', () => {
