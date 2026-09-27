@@ -710,3 +710,47 @@ test('request boundary rejects accessors, hidden authority and unknown fields wi
     /nowMs is invalid/,
   );
 });
+
+test('replay preserves initiator-specific lifecycle admission before preparing activation', () => {
+  const agentCreated = mutateOrchestrationSubagentTopologyV1(request({
+    initiator: SubagentSpawnInitiator.AGENT,
+    requestedChildren: 1,
+    spawnId: 'agent-replay-lifecycle',
+  }));
+  const agentReplayRuntime = structuredClone(agentCreated.runtime);
+  agentReplayRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  const agentReplay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: agentCreated.graph,
+    runtime: agentReplayRuntime,
+    initiator: SubagentSpawnInitiator.AGENT,
+    requestedChildren: 1,
+    spawnId: 'agent-replay-lifecycle',
+    nowMs: T1_MS,
+  }));
+  assert.equal(agentReplay.decision, SubagentTopologyMutationDecision.ALLOW);
+  assert.equal(agentReplay.reused, true);
+  assert.deepEqual(agentReplay.activationRequests, []);
+
+  const ownerBase = request({
+    initiator: SubagentSpawnInitiator.OWNER,
+    requestedChildren: 1,
+    spawnId: 'owner-replay-lifecycle',
+  });
+  const ownerRuntime = structuredClone(ownerBase.runtime);
+  ownerRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  const ownerCreated = mutateOrchestrationSubagentTopologyV1({
+    ...ownerBase,
+    runtime: ownerRuntime,
+  });
+  const ownerReplayRuntime = structuredClone(ownerCreated.runtime);
+  ownerReplayRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  const ownerReplay = mutateOrchestrationSubagentTopologyV1({
+    ...ownerBase,
+    graph: ownerCreated.graph,
+    runtime: ownerReplayRuntime,
+    nowMs: T1_MS,
+  });
+  assert.equal(ownerReplay.decision, SubagentTopologyMutationDecision.ALLOW);
+  assert.equal(ownerReplay.reused, true);
+  assert.deepEqual(ownerReplay.activationRequests, []);
+});
