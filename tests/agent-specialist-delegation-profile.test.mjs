@@ -169,6 +169,49 @@ test('bound materialization fails closed on job, Project or definition provenanc
   );
 });
 
+test('launch binding snapshots mutable caller data and rejects accessor substitution', () => {
+  const input = binding();
+  const normalized = normalizeAgentSpecialistDelegationBindingV1(input);
+  input.profile.requiredCapabilityIds[0] = 'capability.mutated';
+  input.authority.executionAuthorized = true;
+
+  assert.deepEqual(normalized.profile.requiredCapabilityIds, ['data.analyze', 'data.read']);
+  assert.equal(normalized.authority.executionAuthorized, false);
+
+  let reads = 0;
+  const hostile = binding();
+  Object.defineProperty(hostile, 'profile', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return profile();
+    },
+  });
+  assert.throws(
+    () => normalizeAgentSpecialistDelegationBindingV1(hostile),
+    /binding\.profile must be an enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
+});
+
+test('bound materialization rejects disabled bindings and hidden caller fields', () => {
+  assert.throws(
+    () => materializeBoundAgentSpecialistDelegationIntentV1(boundRequest({
+      binding: binding({ profile: profile({ enabled: false }) }),
+    })),
+    /profile is disabled/u,
+  );
+
+  assert.throws(
+    () => materializeBoundAgentSpecialistDelegationIntentV1({
+      ...boundRequest(),
+      hiddenAuthority: true,
+    }),
+    /unknown field/u,
+  );
+});
+
 test('normalizes owner delegation profile deterministically and freezes it', () => {
   const normalized = normalizeAgentSpecialistDelegationProfileV1(profile());
   assert.deepEqual(normalized.requiredCapabilityIds, ['data.analyze', 'data.read']);
