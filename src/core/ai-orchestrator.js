@@ -1,4 +1,5 @@
 import { DEFAULT_GATEWAY_URL, normalizeGatewayUrl } from './ai-gateway-client.js';
+import { rankAiRouteCandidatesByEvidenceV1 } from './ai-route-quality-governor.js';
 import {
   AiRouteRole,
   DEFAULT_AI_ROUTE_POLICY,
@@ -218,7 +219,7 @@ export class AiOrchestrator {
   async run(rawSettings, rawRuntime, prompt, {
     systemPrompt = '', forceStrong = false, maxOutputTokens = 0, maxModelCallsForRequest = 0, imageDataUrl = '',
     taskRole = AiRouteRole.PLANNER, strongTaskRole = AiRouteRole.VERIFIER, capabilityIds = [],
-    providerCallBudgetContext = null,
+    providerCallBudgetContext = null, routeQualityBenchmarkRequests = null,
   } = {}) {
     const settings = normalizeAiRouterSettings(rawSettings);
     const runtime = normalizeAiRouterRuntime(rawRuntime);
@@ -320,7 +321,16 @@ export class AiOrchestrator {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
         return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
-      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
+      const selectionInput = {
+        routes: settings.routes,
+        policy: settings.routePolicy,
+        routeStates,
+        role: requestedRole,
+        capabilityIds,
+        requiresVision: Boolean(clean(imageDataUrl)),
+        now,
+      };
+      const selected = selectAiRouteCandidates(selectionInput);
       if (!selected.candidates.length) {
         throw attachFailureRuntime(createAiRoutePoolExhaustedError({
           attempts:routeAttempts,
@@ -328,7 +338,25 @@ export class AiOrchestrator {
           message:selected.retryAt ? 'Every eligible AI route is in durable backoff' : 'No AI route satisfies the requested role, capabilities, vision and owner policy',
         }));
       }
-      for (const route of selected.candidates) {
+
+      let dispatchCandidates = selected.candidates;
+      let qualityEvidenceApplied = false;
+      if (routeQualityBenchmarkRequests !== null) {
+        const advisory = await rankAiRouteCandidatesByEvidenceV1({
+          ...selectionInput,
+          benchmarkRequests: routeQualityBenchmarkRequests,
+        });
+        const canonicalById = new Map(selected.candidates.map(route => [route.routeId, route]));
+        if (advisory.rankedRouteIds.length !== selected.candidates.length
+            || advisory.rankedRouteIds.some(routeId => !canonicalById.has(routeId))
+            || selected.candidates.some(route => !advisory.rankedRouteIds.includes(route.routeId))) {
+          throw new Error('AI route quality advisory widened or narrowed canonical Router candidates');
+        }
+        dispatchCandidates = advisory.rankedRouteIds.map(routeId => canonicalById.get(routeId));
+        qualityEvidenceApplied = true;
+      }
+
+      for (const route of dispatchCandidates) {
         const started = this.now();
         try {
           const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
@@ -337,7 +365,20 @@ export class AiOrchestrator {
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           selectedRouteId = route.routeId;
           routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
-          return { ...value, routeSelection:{ routeId:route.routeId, provider:route.provider, model:route.model, endpointId:route.endpointId, reason:routeAttempts.length > 1 ? 'failover' : 'policy-selection' } };
+          return {
+            ...value,
+            routeSelection: {
+              routeId: route.routeId,
+              provider: route.provider,
+              model: route.model,
+              endpointId: route.endpointId,
+              reason: routeAttempts.length > 1
+                ? 'failover'
+                : qualityEvidenceApplied
+                  ? 'quality-evidence'
+                  : 'policy-selection',
+            },
+          };
         } catch (error) {
           const classification = classifyAiRouteError(error);
           if (error && typeof error === 'object') error.routeFailureClassification = classification;
