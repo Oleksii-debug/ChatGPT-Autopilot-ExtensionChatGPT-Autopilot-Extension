@@ -153,6 +153,34 @@ test('atomically appends inherited child topology while preserving durable paren
   assert.equal(Object.isFrozen(result), true);
 });
 
+test('replay only prepares activation for children still idle at generation one', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    requestedChildren: 2,
+    spawnId: 'partial-activation',
+    nowMs: 300,
+  }));
+  const activated = reduceOrchestrationHierarchyEvent(
+    first.graph,
+    first.runtime,
+    first.activationRequests[0],
+    301,
+  );
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: activated.runtime,
+    requestedChildren: 2,
+    spawnId: 'partial-activation',
+    nowMs: 400,
+  }));
+
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.deepEqual(
+    replay.activationRequests.map(event => event.nodeId),
+    ['subagent:partial-activation:2'],
+  );
+});
+
 test('same spawn identity is exact-effect idempotent after restart', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
