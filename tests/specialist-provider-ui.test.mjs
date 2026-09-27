@@ -53,6 +53,7 @@ test('readiness button probes only the saved canonical provider config and grant
   assert.match(probe, /providerId: OPENHANDS_CODING_PROVIDER_ID/u);
   assert.match(probe, /result\?\.configRevision !== current\.revision/u);
   assert.match(probe, /ui\.specialistProviderConfig\?\.revision !== current\.revision/u);
+  assert.match(probe, /ui\.specialistProviderConfig !== current[\s\S]*?ui\.specialistProviderQuarantined\) return;/u);
   assert.match(probe, /GET-only probe без claim або provider execution/u);
   assert.match(probe, /не резервує capacity і не дає execution\/completion authority/u);
   assert.doesNotMatch(
@@ -65,6 +66,8 @@ test('provider config load, save and clear reuse only canonical backend config a
   const load = functionBody('loadSpecialistProviderConfig');
   assert.match(load, /LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS/u);
   assert.match(load, /GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG/u);
+  assert.match(load, /generation = \+\+ui\.specialistProviderConfigLoadGeneration/u);
+  assert.match(load, /ui\.specialistProviderConfigLoadGeneration !== generation\) return;/u);
   assert.doesNotMatch(load, /RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION|CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS/u);
 
   const save = functionBody('saveSpecialistProviderConfig');
@@ -90,7 +93,9 @@ test('runtime view joins durable handoffs and provider execution evidence for th
   const load = functionBody('loadSpecialistProviderRuntime');
   assert.match(load, /LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS/u);
   assert.match(load, /LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS/u);
-  assert.match(load, /ui\.selectedBrowserAgentId !== jobId/u);
+  assert.match(load, /generation = \+\+ui\.specialistProviderRuntimeLoadGeneration/u);
+  assert.match(load, /ui\.specialistProviderRuntimeLoadGeneration !== generation[\s\S]*?ui\.selectedBrowserAgentId !== jobId/u);
+  assert.match(load, /catch \(error\)[\s\S]*?ui\.specialistProviderRuntimeLoadGeneration !== generation[\s\S]*?ui\.selectedBrowserAgentId !== jobId[\s\S]*?return;/u);
 });
 
 test('claim keeps product-wide capacity explicit and delegates lease policy to canonical backend defaults', () => {
@@ -114,4 +119,31 @@ test('provider run requires a current LEASED handoff and never grants completion
   assert.doesNotMatch(run, /COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF|VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF|AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY/u);
   assert.match(html, /Provider terminal status не завершує Specialist автоматично/u);
   assert.match(html, /canonical independent verifier provenance/u);
+});
+
+test('stale Specialist async results cannot overwrite the current owner context', () => {
+  assert.match(options, /specialistProviderConfigLoadGeneration:\s*0/u);
+  assert.match(options, /specialistProviderRuntimeLoadGeneration:\s*0/u);
+
+  const configLoad = functionBody('loadSpecialistProviderConfig');
+  assert.match(
+    configLoad,
+    /const generation = \+\+ui\.specialistProviderConfigLoadGeneration[\s\S]*?if \(ui\.specialistProviderConfigLoadGeneration !== generation\) return;/u,
+  );
+  assert.match(
+    configLoad,
+    /catch \(error\)[\s\S]*?if \(ui\.specialistProviderConfigLoadGeneration !== generation\) return;/u,
+  );
+
+  const runtimeLoad = functionBody('loadSpecialistProviderRuntime');
+  assert.match(
+    runtimeLoad,
+    /const generation = \+\+ui\.specialistProviderRuntimeLoadGeneration[\s\S]*?ui\.specialistProviderRuntimeLoadGeneration !== generation[\s\S]*?ui\.selectedBrowserAgentId !== jobId/u,
+  );
+
+  const probe = functionBody('probeSpecialistProviderConfig');
+  assert.match(
+    probe,
+    /catch \(error\)[\s\S]*?ui\.specialistProviderConfig !== current[\s\S]*?ui\.specialistProviderConfig\?\.revision !== current\.revision[\s\S]*?ui\.specialistProviderQuarantined\) return;/u,
+  );
 });
