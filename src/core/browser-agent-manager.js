@@ -772,11 +772,17 @@ function specialistProviderConfigHasLiveExecution(store, providerId, at) {
     }
     for (const raw of runtime?.specialistProviderExecutions || []) {
       const execution = normalizeSpecialistProviderExecutionV1(raw);
-      if (execution.providerId !== providerId || Date.parse(execution.leaseUntil) <= nowMs) continue;
+      if (execution.providerId !== providerId) continue;
+      if ([
+        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+        SpecialistProviderExecutionStatus.RECONCILE,
+      ].includes(execution.status)) {
+        return true;
+      }
+      if (Date.parse(execution.leaseUntil) <= nowMs) continue;
       if ([
         SpecialistProviderExecutionStatus.PREPARED,
         SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
-        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
       ].includes(execution.status)) {
         return true;
       }
