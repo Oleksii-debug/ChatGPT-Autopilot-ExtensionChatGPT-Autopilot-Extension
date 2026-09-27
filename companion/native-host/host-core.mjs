@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 import { createFilesystemScopeV1, withAuthorizedExistingFileV1 } from './filesystem-provider.mjs';
-import { listScopedFilesystemV1, searchScopedFilesystemV1, statScopedFilesystemV1, writeExistingTextScopedV1 } from './filesystem-host-provider.mjs';
+import { MAX_BINARY_CHUNK_BYTES, MAX_BINARY_FILE_BYTES, listScopedFilesystemV1, readBinaryScopedV1, searchScopedFilesystemV1, statScopedFilesystemV1, writeExistingTextScopedV1 } from './filesystem-host-provider.mjs';
 import { normalizeWindowsProviderConfig } from './windows-provider.mjs';
 
 export const HOST_NAME = 'org.chatgpt_autopilot.companion';
@@ -16,6 +16,7 @@ export const RequestType = Object.freeze({
   HEALTH: 'health',
   CAPABILITIES: 'capabilities',
   FILESYSTEM_READ_TEXT: 'filesystem.readText',
+  FILESYSTEM_READ_BINARY: 'filesystem.readBinary',
   FILESYSTEM_SEARCH: 'filesystem.search',
   FILESYSTEM_LIST: 'filesystem.list',
   FILESYSTEM_STAT: 'filesystem.stat',
@@ -182,6 +183,7 @@ export async function handleNativeCompanionRequest(input, {
   callerOrigin,
   fsApi = fs,
   fsReadBeforeOpen = null,
+  fsBinaryBeforeOpen = null,
   fsWriteBeforeOpen = null,
   now = () => Date.now(),
   credentialBroker = null,
@@ -209,6 +211,7 @@ export async function handleNativeCompanionRequest(input, {
         capabilities: [
           { capabilityId: 'native.health', readOnly: true },
           { capabilityId: 'filesystem.readText', readOnly: true, scoped: true, maxBytes: MAX_READ_BYTES },
+          { capabilityId: 'filesystem.readBinary', readOnly: true, scoped: true, maxChunkBytes: MAX_BINARY_CHUNK_BYTES, maxFileBytes: MAX_BINARY_FILE_BYTES, digest: 'sha256' },
           { capabilityId: 'filesystem.search', readOnly: true, scoped: true },
           { capabilityId: 'filesystem.list', readOnly: true, scoped: true },
           { capabilityId: 'filesystem.stat', readOnly: true, scoped: true, boundedHash: true },
@@ -225,6 +228,9 @@ export async function handleNativeCompanionRequest(input, {
     }
     if (request.type === RequestType.FILESYSTEM_READ_TEXT) {
       return response(request, await readScopedText(request.payload, normalizedConfig, fsApi, fsReadBeforeOpen));
+    }
+    if (request.type === RequestType.FILESYSTEM_READ_BINARY) {
+      return response(request, await readBinaryScopedV1(request.payload, normalizedConfig, { beforeOpen: fsBinaryBeforeOpen }));
     }
     if (request.type === RequestType.FILESYSTEM_SEARCH) {
       return response(request, await searchScopedFilesystemV1(request.payload, normalizedConfig));
