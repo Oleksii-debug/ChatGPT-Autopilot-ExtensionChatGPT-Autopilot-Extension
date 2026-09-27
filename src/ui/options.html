@@ -276,6 +276,29 @@
           </div>
         </fieldset>
         <p id="agent-definition-status" role="status">Reusable Agent definitions ще не завантажено.</p>
+
+        <fieldset class="settings-group" id="agent-definition-launch-group" disabled>
+          <legend>Створити завдання з reusable Agent</legend>
+          <p>Створення зберігає нове завдання у стані STOPPED і не запускає Agent. Бюджет береться з поточних полів Safety / Budget нижче.</p>
+          <label for="agent-definition-launch-goal">Завдання власника</label>
+          <textarea id="agent-definition-launch-goal" rows="5" maxlength="50000" spellcheck="true"></textarea>
+          <label for="agent-definition-launch-project-id">Project ID — необов’язково</label>
+          <input id="agent-definition-launch-project-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="agent-definition-launch-job-id">Job ID — необов’язково; якщо порожньо, буде створено автоматично</label>
+          <input id="agent-definition-launch-job-id" type="text" maxlength="128" autocomplete="off" spellcheck="false">
+
+          <label for="agent-definition-launch-owner-capabilities">Дозволені owner capability IDs — по одному в рядку</label>
+          <textarea id="agent-definition-launch-owner-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-launch-owner-tools">Дозволені owner tool IDs — по одному в рядку</label>
+          <textarea id="agent-definition-launch-owner-tools" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-launch-requested-capabilities">Capability IDs для цього завдання — по одному в рядку</label>
+          <textarea id="agent-definition-launch-requested-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-launch-requested-tools">Tool IDs для цього завдання — по одному в рядку</label>
+          <textarea id="agent-definition-launch-requested-tools" rows="4" spellcheck="false"></textarea>
+
+          <button id="agent-definition-launch-button" type="button" disabled>Створити STOPPED-завдання з definition</button>
+          <p id="agent-definition-launch-status" role="status">Оберіть увімкнену Agent definition. Створення не запускає виконання.</p>
+        </fieldset>
       </details>
 
       <label for="agent-prompt">Що потрібно зробити?</label>
