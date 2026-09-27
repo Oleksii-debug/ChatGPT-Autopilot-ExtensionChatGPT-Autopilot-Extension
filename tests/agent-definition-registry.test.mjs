@@ -821,3 +821,18 @@ test('reusable Agent model route policy rejects hidden authority and hostile des
   assert.throws(() => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })), /freeOnly must be an enumerable own data property/);
   assert.equal(reads, 0);
 });
+
+
+test('reusable Agent model route policy rejects coercive aliases so durable bytes stay exact', () => {
+  for (const policy of [
+    { autoSwitch: 'false' },
+    { freeOnly: 1 },
+    { maxInputPricePerMillionUsd: '1' },
+    { maxOutputPricePerMillionUsd: -0 },
+  ]) {
+    assert.throws(
+      () => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })),
+      /must already be canonical|invalid/,
+    );
+  }
+});
