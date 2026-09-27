@@ -126,27 +126,43 @@ function canonicalAgentDefinitionRegistryId(value) {
     definitions: [],
   }).registryId;
 }
-function normalizePersistedAgentDefinitionRegistries(raw) {
-  if (raw === undefined) return Object.create(null);
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return Object.create(null);
+function storedDefinitionMapDescriptors(raw) {
+  if (raw === undefined) return [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
   const prototype = Object.getPrototypeOf(raw);
-  if (prototype !== Object.prototype && prototype !== null) return Object.create(null);
+  if (prototype !== Object.prototype && prototype !== null) return [];
   const descriptors = Object.getOwnPropertyDescriptors(raw);
   const keys = Reflect.ownKeys(descriptors);
-  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return Object.create(null);
-  const out = Object.create(null);
-  for (const key of keys.sort()) {
+  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return [];
+  return keys.sort().flatMap(key => {
     const descriptor = descriptors[key];
-    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) continue;
+    return descriptor && descriptor.enumerable === true && Object.hasOwn(descriptor, 'value')
+      ? [[key, descriptor.value]]
+      : [];
+  });
+}
+function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
+  const registries = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine)) {
     try {
-      const registry = normalizeAgentDefinitionRegistryV1(descriptor.value);
-      if (registry.registryId === key) out[key] = registry;
+      quarantine[key] = clone(value);
     } catch {
-      // Corrupt one persisted definition registry must not poison Agent jobs or
-      // other valid registries. The invalid entry is never exposed as canonical.
+      // Chrome storage values are structured-cloneable. Ignore an impossible
+      // in-memory exotic value rather than executing caller behavior.
     }
   }
-  return out;
+  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries)) {
+    try {
+      const registry = normalizeAgentDefinitionRegistryV1(value);
+      if (registry.registryId !== key) throw new Error('Stored Agent definition registry identity drift');
+      registries[key] = registry;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { registries, quarantine };
 }
 function nonNegativeSafeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
@@ -241,6 +257,7 @@ function freshStore() {
     byId: {},
     executionPolicy: normalizeBrowserAgentExecutionPolicy(),
     definitionRegistriesById: Object.create(null),
+    definitionRegistryQuarantineById: Object.create(null),
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -458,7 +475,12 @@ function normalizeStore(raw, now) {
   } catch {
     out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
   }
-  out.definitionRegistriesById = normalizePersistedAgentDefinitionRegistries(raw.definitionRegistriesById);
+  const definitionState = normalizePersistedAgentDefinitionState(
+    raw.definitionRegistriesById,
+    raw.definitionRegistryQuarantineById,
+  );
+  out.definitionRegistriesById = definitionState.registries;
+  out.definitionRegistryQuarantineById = definitionState.quarantine;
   return out;
 }
 
@@ -616,15 +638,20 @@ export class BrowserAgentManager {
     const registries = Object.keys(store.definitionRegistriesById || {})
       .sort()
       .map(registryId => clone(store.definitionRegistriesById[registryId]));
-    return { registries };
+    const quarantinedRegistryIds = Object.keys(store.definitionRegistryQuarantineById || {}).sort();
+    return { registries, quarantinedRegistryIds };
   }
 
   async getAgentDefinitionRegistry(registryId) {
     const canonicalId = canonicalAgentDefinitionRegistryId(registryId);
     const store = await this.load();
     const registries = store.definitionRegistriesById || Object.create(null);
+    const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
     const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
-    return { registry: registry ? clone(registry) : null };
+    return {
+      registry: registry ? clone(registry) : null,
+      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
+    };
   }
 
   async createAgentDefinitionRegistry(input = {}) {
@@ -641,7 +668,11 @@ export class BrowserAgentManager {
     await this.update(store => {
       const registries = store.definitionRegistriesById
         || (store.definitionRegistriesById = Object.create(null));
+      const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
       if (Object.hasOwn(registries, registryId)) throw new Error('Agent definition registry already exists');
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Agent definition registry is quarantined as corrupt and cannot be overwritten');
+      }
       if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
         throw new Error('Agent definition registry capacity is exhausted');
       }
@@ -670,6 +701,10 @@ export class BrowserAgentManager {
     let committed = null;
     await this.update(store => {
       const registries = store.definitionRegistriesById || Object.create(null);
+      const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Agent definition registry is quarantined as corrupt and cannot be mutated');
+      }
       const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
       if (!current) throw new Error('Agent definition registry not found');
       const proposalInput = {

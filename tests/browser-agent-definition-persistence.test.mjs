@@ -168,8 +168,24 @@ test('one corrupt persisted definition registry does not poison jobs or other va
   const restarted = managerFor(chrome);
   const listed = await restarted.listAgentDefinitionRegistries();
   assert.deepEqual(listed.registries.map(item => item.registryId), ['agents:good']);
-  assert.equal((await restarted.getAgentDefinitionRegistry('agents:bad')).registry, null);
+  assert.deepEqual(listed.quarantinedRegistryIds, ['agents:bad']);
+  const bad = await restarted.getAgentDefinitionRegistry('agents:bad');
+  assert.equal(bad.registry, null);
+  assert.equal(bad.quarantined, true);
   assert.deepEqual(await restarted.getExecutionPolicy(), { maxConcurrentAgents: 1 });
+
+  await assert.rejects(
+    () => restarted.createAgentDefinitionRegistry({ registryId: 'agents:bad' }),
+    /quarantined as corrupt/,
+  );
+  await restarted.updateExecutionPolicy({ maxConcurrentAgents: 2 });
+  assert.ok(data.autopilotBrowserAgentV1.definitionRegistryQuarantineById['agents:bad']);
+  const afterUnrelatedSave = managerFor(chrome);
+  assert.deepEqual(
+    (await afterUnrelatedSave.listAgentDefinitionRegistries()).quarantinedRegistryIds,
+    ['agents:bad'],
+    'unrelated Agent saves must preserve quarantined reusable-definition bytes',
+  );
 });
 
 test('Core routes Agent-definition reads and mutations only through BrowserAgentManager', async () => {
