@@ -26,6 +26,7 @@ class MemoryCoreRepository {
 function chromeHarness() {
   const storage = {};
   return {
+    _storage: storage,
     storage: {
       local: {
         async get(key) { return { [key]: storage[key] }; },
@@ -94,4 +95,40 @@ test('Scenario tab recovery at response deadline extends grace instead of replac
   assert.equal(current.scenario.runtime.chat.deadlineAt, NOW + 5 * 60_000);
   assert.equal(current.scenario.runtime.chat.tabRecoveryGraceCount, 1);
   assert.notEqual(current.scenario.runtime.runState, 'ERROR');
+});
+
+
+test('legacy default 15s polling migrates once to 180s without overriding later owner choice', async () => {
+  const coreRepository = new MemoryCoreRepository();
+  const chromeApi = chromeHarness();
+  let idCounter = 0;
+  const manager = new ScenarioWorkManager({
+    coreRepository,
+    chromeApi,
+    now: () => NOW,
+    createId: () => `scenario-migration-${++idCounter}`,
+    collectAssistantReport: async () => null,
+  });
+
+  const created = await manager.create({
+    name: 'Legacy poll',
+    config: {
+      launchUrl: 'https://chatgpt.com/',
+      steps: [{ prompt: 'test' }],
+      pollSeconds: 15,
+    },
+  });
+  const scenarioId = created.scenario.id;
+  assert.equal((await manager.get(scenarioId)).scenario.config.pollSeconds, 15);
+
+  delete chromeApi._storage.autopilotScenarioTabRecoveryMigrationV1;
+  const migrated = await manager.get(scenarioId);
+  assert.equal(migrated.scenario.config.pollSeconds, 180);
+  assert.equal(chromeApi._storage.autopilotScenarioTabRecoveryMigrationV1, true);
+
+  await manager.update(store => {
+    store.byId[scenarioId].config.pollSeconds = 15;
+    return store;
+  });
+  assert.equal((await manager.get(scenarioId)).scenario.config.pollSeconds, 15);
 });
