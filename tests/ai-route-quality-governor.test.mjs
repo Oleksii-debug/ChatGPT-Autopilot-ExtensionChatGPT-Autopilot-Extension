@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   AiRouteQualityClass,
+  deriveAiRouteQualitySubjectRevisionIdV1,
   rankAiRouteCandidatesByEvidenceV1,
 } from '../src/core/ai-route-quality-governor.js';
 import {
@@ -45,11 +46,12 @@ function paid(routeId, inputPrice, outputPrice, overrides = {}) {
   });
 }
 
-function benchmarkBinding(routeId, { pass = true, suffix = 'a' } = {}) {
+async function benchmarkBinding(routeValue, { pass = true, suffix = 'a' } = {}) {
+  const routeId = routeValue.routeId;
   const suiteId = 'route-quality-' + suffix;
   const suiteRevisionId = 'suite-' + suffix;
   const runId = 'run-' + routeId + '-' + suffix;
-  const subjectRevisionId = 'revision-' + routeId + '-' + suffix;
+  const subjectRevisionId = await deriveAiRouteQualitySubjectRevisionIdV1(routeValue);
   const invocationId = 'benchmark-' + routeId + '-' + suffix;
   const artifactId = 'evidence-' + routeId + '-' + suffix;
   const result = {
@@ -133,11 +135,12 @@ function rank(overrides = {}) {
   });
 }
 
-test('is advisory only and cannot widen canonical Router eligibility', () => {
-  const report = rank({
-    routes: [route('route-a'), route('route-b'), route('route-blocked')],
+test('is advisory only and cannot widen canonical Router eligibility', async () => {
+  const routes = [route('route-a'), route('route-b'), route('route-blocked')];
+  const report = await rank({
+    routes,
     policy: { allowRouteIds: ['route-a', 'route-b'] },
-    benchmarkRequests: [benchmarkBinding('route-b')],
+    benchmarkRequests: [await benchmarkBinding(routes[1])],
   });
 
   assert.equal(report.advisoryOnly, true);
@@ -156,34 +159,38 @@ test('is advisory only and cannot widen canonical Router eligibility', () => {
   assert.equal(report.candidates.some((item) => item.routeId === 'route-blocked'), false);
 });
 
-test('owner orderedRouteIds remain stronger than adaptive evidence', () => {
-  const report = rank({
+test('owner orderedRouteIds remain stronger than adaptive evidence', async () => {
+  const routes = [route('route-a'), route('route-b')];
+  const report = await rank({
+    routes,
     policy: { orderedRouteIds: ['route-a', 'route-b'] },
-    benchmarkRequests: [benchmarkBinding('route-b')],
+    benchmarkRequests: [await benchmarkBinding(routes[1])],
   });
   assert.deepEqual(report.rankedRouteIds, ['route-a', 'route-b']);
   assert.equal(report.candidates[0].ownerOrderIndex, 0);
   assert.equal(report.candidates[1].ownerOrderIndex, 1);
 });
 
-test('owner route priority remains stronger than adaptive evidence', () => {
-  const report = rank({
-    routes: [
-      route('route-a', { priority: 100 }),
-      route('route-b', { priority: 1 }),
-    ],
-    benchmarkRequests: [benchmarkBinding('route-b')],
+test('owner route priority remains stronger than adaptive evidence', async () => {
+  const routes = [
+    route('route-a', { priority: 100 }),
+    route('route-b', { priority: 1 }),
+  ];
+  const report = await rank({
+    routes,
+    benchmarkRequests: [await benchmarkBinding(routes[1])],
   });
   assert.deepEqual(report.rankedRouteIds, ['route-a', 'route-b']);
   assert.equal(report.candidates[0].ownerPriority, 100);
 });
 
-test('quality evidence ranks PASS before missing evidence and known FAIL last', () => {
-  const report = rank({
-    routes: [route('route-pass'), route('route-missing'), route('route-fail')],
+test('quality evidence ranks PASS before missing evidence and known FAIL last', async () => {
+  const routes = [route('route-pass'), route('route-missing'), route('route-fail')];
+  const report = await rank({
+    routes,
     benchmarkRequests: [
-      benchmarkBinding('route-pass', { pass: true, suffix: 'pass' }),
-      benchmarkBinding('route-fail', { pass: false, suffix: 'fail' }),
+      await benchmarkBinding(routes[0], { pass: true, suffix: 'pass' }),
+      await benchmarkBinding(routes[2], { pass: false, suffix: 'fail' }),
     ],
   });
 
@@ -196,7 +203,7 @@ test('quality evidence ranks PASS before missing evidence and known FAIL last', 
   assert.equal(report.candidates[2].quality.failedCaseCount, 1);
 });
 
-test('cost is deterministic after equal owner and quality evidence, then latency breaks remaining ties', () => {
+test('cost is deterministic after equal owner and quality evidence, then latency breaks remaining ties', async () => {
   const routes = [
     route('free-slow'),
     paid('paid-cheap', 1, 2),
@@ -204,10 +211,10 @@ test('cost is deterministic after equal owner and quality evidence, then latency
     route('free-fast'),
     route('free-unknown'),
   ];
-  const benchmarkRequests = routes.map((item, index) => benchmarkBinding(
-    item.routeId,
+  const benchmarkRequests = await Promise.all(routes.map((item, index) => benchmarkBinding(
+    item,
     { pass: true, suffix: String(index + 1) },
-  ));
+  )));
   const routeStates = {
     'free-slow': { successes: 1, lastLatencyMs: 500 },
     'free-fast': { successes: 1, lastLatencyMs: 50 },
@@ -215,7 +222,7 @@ test('cost is deterministic after equal owner and quality evidence, then latency
     'paid-expensive': { successes: 1, lastLatencyMs: 1 },
   };
 
-  const report = rank({ routes, benchmarkRequests, routeStates });
+  const report = await rank({ routes, benchmarkRequests, routeStates });
   assert.deepEqual(report.rankedRouteIds, [
     'free-fast',
     'free-slow',
@@ -227,8 +234,8 @@ test('cost is deterministic after equal owner and quality evidence, then latency
   assert.deepEqual(report.candidates[2].latency, { observed: false, lastLatencyMs: 0 });
 });
 
-test('durable backoff and autoSwitch=false remain canonical Router authority', () => {
-  const report = rank({
+test('durable backoff and autoSwitch=false remain canonical Router authority', async () => {
+  const report = await rank({
     routes: [route('route-a'), route('route-b')],
     policy: { autoSwitch: false },
     routeStates: {
@@ -247,7 +254,7 @@ test('durable backoff and autoSwitch=false remain canonical Router authority', (
   assert.deepEqual(report.rankedRouteIds, ['route-b']);
   assert.equal(report.retryAt, 0);
 
-  const bothBlocked = rank({
+  const bothBlocked = await rank({
     routes: [route('route-a'), route('route-b')],
     routeStates: {
       'route-a': { failures: 1, backoffUntil: NOW + 10_000, lastLatencyMs: 10 },
@@ -258,33 +265,53 @@ test('durable backoff and autoSwitch=false remain canonical Router authority', (
   assert.equal(bothBlocked.retryAt, NOW + 10_000);
 });
 
-test('benchmark evidence is cryptographically/artifact bound by the canonical evaluator and route subject', () => {
-  const binding = benchmarkBinding('route-a');
+test('benchmark subject identity must match the route', async () => {
+  const routeA = route('route-a');
+  const binding = await benchmarkBinding(routeA);
   binding.evaluationRequest.expectedSubject.subjectId = 'route-b';
   binding.evaluationRequest.trustedExecution.subjectId = 'route-b';
   binding.evaluationRequest.run.subjectId = 'route-b';
 
-  assert.throws(
-    () => rank({ benchmarkRequests: [binding] }),
+  await assert.rejects(
+    rank({ benchmarkRequests: [binding] }),
     /benchmark subject must match routeId/,
   );
 });
 
-test('duplicate or unknown route benchmark bindings fail closed', () => {
-  const binding = benchmarkBinding('route-a');
-  assert.throws(
-    () => rank({ benchmarkRequests: [binding, structuredClone(binding)] }),
+test('benchmark subject revision is bound to the exact normalized route configuration', async () => {
+  const originalRoute = route('route-a');
+  const binding = await benchmarkBinding(originalRoute);
+  const changedRoute = route('route-a', { model: 'different-model' });
+
+  await assert.rejects(
+    rank({
+      routes: [changedRoute, route('route-b')],
+      benchmarkRequests: [binding],
+    }),
+    /subject revision does not match current route configuration/,
+  );
+
+  const first = await deriveAiRouteQualitySubjectRevisionIdV1(originalRoute);
+  const second = await deriveAiRouteQualitySubjectRevisionIdV1(structuredClone(originalRoute));
+  assert.equal(first, second);
+  assert.match(first, /^routev1-[0-9a-f]{64}$/u);
+});
+
+test('duplicate or unknown route benchmark bindings fail closed', async () => {
+  const binding = await benchmarkBinding(route('route-a'));
+  await assert.rejects(
+    rank({ benchmarkRequests: [binding, structuredClone(binding)] }),
     /benchmark evidence is duplicated/,
   );
-  assert.throws(
-    () => rank({
-      benchmarkRequests: [benchmarkBinding('route-unknown')],
+  await assert.rejects(
+    rank({
+      benchmarkRequests: [await benchmarkBinding(route('route-unknown'))],
     }),
     /references unknown route/,
   );
 });
 
-test('hostile request accessors and binding accessors are rejected without getter execution', () => {
+test('hostile request accessors and binding accessors are rejected without getter execution', async () => {
   let requestReads = 0;
   const hostileRequest = {};
   Object.defineProperty(hostileRequest, 'routes', {
@@ -294,8 +321,8 @@ test('hostile request accessors and binding accessors are rejected without gette
       return [];
     },
   });
-  assert.throws(
-    () => rankAiRouteCandidatesByEvidenceV1(hostileRequest),
+  await assert.rejects(
+    rankAiRouteCandidatesByEvidenceV1(hostileRequest),
     /enumerable own data property/,
   );
   assert.equal(requestReads, 0);
@@ -306,19 +333,21 @@ test('hostile request accessors and binding accessors are rejected without gette
     enumerable: true,
     get() {
       bindingReads += 1;
-      return benchmarkBinding('route-a').evaluationRequest;
+      return {};
     },
   });
-  assert.throws(
-    () => rank({ benchmarkRequests: [hostileBinding] }),
+  await assert.rejects(
+    rank({ benchmarkRequests: [hostileBinding] }),
     /enumerable own data property/,
   );
   assert.equal(bindingReads, 0);
 });
 
-test('result and nested projections are immutable deterministic evidence', () => {
-  const report = rank({
-    benchmarkRequests: [benchmarkBinding('route-a')],
+test('result and nested projections are immutable deterministic evidence', async () => {
+  const routeA = route('route-a');
+  const report = await rank({
+    routes: [routeA, route('route-b')],
+    benchmarkRequests: [await benchmarkBinding(routeA)],
   });
   assert.equal(Object.isFrozen(report), true);
   assert.equal(Object.isFrozen(report.rankedRouteIds), true);
