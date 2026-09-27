@@ -206,6 +206,20 @@ test('normalization is restart-stable and rejects any attempt to mint authority'
     () => normalizeSubagentTaskEnvelopeV1(unknown),
     /contains unknown field: schedulerId/,
   );
+
+  const noCriteria = structuredClone(value);
+  noCriteria.outcome.criterionIds = [];
+  assert.throws(
+    () => normalizeSubagentTaskEnvelopeV1(noCriteria),
+    /outcome requires completion criteria/,
+  );
+
+  const noDeliverables = structuredClone(value);
+  noDeliverables.outcome.deliverableIds = [];
+  assert.throws(
+    () => normalizeSubagentTaskEnvelopeV1(noDeliverables),
+    /outcome requires deliverables/,
+  );
 });
 
 test('exact project, child actor and existing AgentPlan owner are binding', () => {
