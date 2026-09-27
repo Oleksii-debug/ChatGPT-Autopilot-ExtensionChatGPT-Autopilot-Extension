@@ -15,7 +15,9 @@ import {
 import {
   SubagentSpawnInitiator,
   SubagentStructureDecision,
+  deriveSubagentStructureFactsFromGraphV1,
   evaluateSubagentStructureAdmissionV1,
+  normalizeSubagentStructurePolicyV1,
 } from './subagent-structure-policy.js';
 
 /**
@@ -117,6 +119,65 @@ function childIdsForSpawn(spawnId, requestedChildren) {
   );
 }
 
+function normalizedInitiator(value) {
+  if (value !== SubagentSpawnInitiator.OWNER && value !== SubagentSpawnInitiator.AGENT) {
+    throw new Error('Subagent spawn initiator is invalid');
+  }
+  return value;
+}
+
+function existingChildAgentCount(graph) {
+  return graph.nodeOrder.reduce(
+    (count, nodeId) => count + (graph.nodesById[nodeId].parentId === null ? 0 : 1),
+    0,
+  );
+}
+
+function scopeChainIsRunning(graph, runtime, nodeId) {
+  let currentId = nodeId;
+  while (currentId) {
+    const nodeRuntime = runtime.nodesById[currentId];
+    if (!nodeRuntime || nodeRuntime.scopeState !== 'RUNNING') return false;
+    currentId = graph.nodesById[currentId]?.parentId || null;
+  }
+  return true;
+}
+
+function replayActivationAdmitted({
+  graph,
+  runtime,
+  policy,
+  initiator,
+  parentNodeId,
+  resourceBudget,
+}) {
+  const normalizedPolicy = normalizeSubagentStructurePolicyV1(policy);
+  const normalizedSpawnInitiator = normalizedInitiator(initiator);
+  const facts = deriveSubagentStructureFactsFromGraphV1({ graph, parentNodeId });
+
+  if (normalizedSpawnInitiator === SubagentSpawnInitiator.AGENT
+      && !normalizedPolicy.allowAgentCreatedChildren) {
+    return false;
+  }
+  if (facts.parentDepth + 1 > normalizedPolicy.maxDepth) return false;
+  if (facts.currentDirectChildren > normalizedPolicy.maxChildrenPerAgent) return false;
+
+  const resource = evaluateResourceBudgetV1({
+    budget: resourceBudget,
+    usage: { childAgents: existingChildAgentCount(graph) },
+    request: { childAgents: 0 },
+  });
+  if (resource.decision !== ResourceBudgetDecisionKind.ALLOW) return false;
+
+  const parentRuntime = runtime.nodesById[parentNodeId];
+  if (!parentRuntime
+      || ![OrchestrationNodeLifecycle.ACTIVE, OrchestrationNodeLifecycle.IDLE].includes(parentRuntime.lifecycle)
+      || !scopeChainIsRunning(graph, runtime, parentNodeId)) {
+    return false;
+  }
+  return true;
+}
+
 function activationRequestsForSpawn(graph, runtime, spawnId, childNodeIds) {
   const requests = [];
   childNodeIds.forEach((nodeId, index) => {
@@ -124,7 +185,8 @@ function activationRequestsForSpawn(graph, runtime, spawnId, childNodeIds) {
     if (!nodeRuntime
         || nodeRuntime.generation !== 1
         || nodeRuntime.lifecycle !== OrchestrationNodeLifecycle.IDLE
-        || nodeRuntime.currentActivationId) {
+        || nodeRuntime.currentActivationId
+        || !scopeChainIsRunning(graph, runtime, nodeId)) {
       return;
     }
     requests.push({
@@ -160,7 +222,14 @@ function denial(reasonCode, details = {}) {
   });
 }
 
-function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
+function replayResult(
+  graph,
+  runtime,
+  parentNodeId,
+  spawnId,
+  expectedChildIds,
+  { policy, initiator, resourceBudget },
+) {
   const familyPrefix = 'subagent:' + spawnId + ':';
   const family = graph.nodeOrder.filter(nodeId => {
     if (!nodeId.startsWith(familyPrefix)) return false;
@@ -190,6 +259,14 @@ function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
       existingNodeIds: family,
     });
   }
+  const activationAdmitted = replayActivationAdmitted({
+    graph,
+    runtime,
+    policy,
+    initiator,
+    parentNodeId,
+    resourceBudget,
+  });
   return freezeDeep({
     schemaVersion: SUBAGENT_TOPOLOGY_MUTATION_VERSION,
     decision: SubagentTopologyMutationDecision.ALLOW,
@@ -197,7 +274,9 @@ function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
     parentNodeId,
     spawnId,
     createdNodeIds: expectedChildIds,
-    activationRequests: activationRequestsForSpawn(graph, runtime, spawnId, expectedChildIds),
+    activationRequests: activationAdmitted
+      ? activationRequestsForSpawn(graph, runtime, spawnId, expectedChildIds)
+      : [],
     reused: true,
     graph,
     runtime,
@@ -243,7 +322,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     'nowMs',
     { min: 0 },
   );
-  const initiator = own(request, 'initiator');
+  const initiator = normalizedInitiator(own(request, 'initiator'));
   const expectedChildIds = childIdsForSpawn(spawnId, requestedChildren);
 
   const replay = replayResult(
@@ -252,6 +331,11 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     parentNodeId,
     spawnId,
     expectedChildIds,
+    {
+      policy: own(request, 'policy', {}),
+      initiator,
+      resourceBudget: own(request, 'resourceBudget', {}),
+    },
   );
   if (replay) return replay;
 
@@ -266,10 +350,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     return denial('STRUCTURE_DENIED', { parentNodeId, spawnId, structure });
   }
 
-  const existingChildAgents = canonicalGraph.nodeOrder.reduce(
-    (count, nodeId) => count + (canonicalGraph.nodesById[nodeId].parentId === null ? 0 : 1),
-    0,
-  );
+  const existingChildAgents = existingChildAgentCount(canonicalGraph);
   const resource = evaluateResourceBudgetV1({
     budget: own(request, 'resourceBudget', {}),
     usage: { childAgents: existingChildAgents },
