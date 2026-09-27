@@ -930,6 +930,30 @@ test('canonical trusted FAILED overrides a raw VERIFIED child claim and reconcil
   assert.equal(value.completionAuthority, false);
 });
 
+test('terminal event identity changes when trusted adjudication changes terminal outcome', async () => {
+  const contract = outcomeContract();
+  const fixture = request({ contract });
+
+  const completed = await prepareSubagentResultReconciliationV1(
+    fixture.input,
+    deps({ contract }),
+  );
+  const failed = await prepareSubagentResultReconciliationV1(
+    fixture.input,
+    deps({
+      contract,
+      record: trustedRecord(contract, {
+        status: VerificationStatus.FAILED,
+        reasonCode: 'CHECK_FAILED',
+      }),
+    }),
+  );
+
+  assert.equal(completed.terminalEvent.status, 'COMPLETED');
+  assert.equal(failed.terminalEvent.status, 'FAILED');
+  assert.notEqual(completed.terminalEvent.eventId, failed.terminalEvent.eventId);
+});
+
 test('result observation and completion cannot predate the trusted activation binding', async () => {
   const contract = outcomeContract();
   const fixture = request({ contract });
