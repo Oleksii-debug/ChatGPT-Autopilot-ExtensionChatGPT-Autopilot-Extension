@@ -588,6 +588,115 @@ test('terminal dynamically spawned child drives canonical parent reconciliation 
   );
 });
 
+test('dynamic children reconcile after an in-flight WORK parent terminalizes', () => {
+  const canonicalGraph = graph([node('root')]);
+  let runtime = createOrchestrationHierarchyRuntime(canonicalGraph, 100);
+  const parentPrepared = reduceOrchestrationHierarchyEvent(
+    canonicalGraph,
+    runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: 'dynamic-parent:activate',
+      controlEpoch: 7,
+      nodeId: 'root',
+      generation: 1,
+      activationId: 'dynamic-parent:work',
+      purpose: 'WORK',
+    },
+    101,
+  );
+  const parentConfirmed = reduceOrchestrationHierarchyEvent(
+    canonicalGraph,
+    parentPrepared.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'dynamic-parent:effect',
+      controlEpoch: 7,
+      nodeId: 'root',
+      generation: 1,
+      activationId: 'dynamic-parent:work',
+      effectRef: 'effect://dynamic-parent',
+    },
+    102,
+  );
+
+  const spawned = mutateOrchestrationSubagentTopologyV1(request({
+    graph: canonicalGraph,
+    runtime: parentConfirmed.runtime,
+    spawnId: 'dynamic-parent-child',
+    nowMs: 300,
+  }));
+  assert.equal(spawned.decision, 'ALLOW');
+  const childId = spawned.createdNodeIds[0];
+  const activationRequest = spawned.activationRequests[0];
+
+  const childPrepared = reduceOrchestrationHierarchyEvent(
+    spawned.graph,
+    spawned.runtime,
+    activationRequest,
+    301,
+  );
+  const childConfirmed = reduceOrchestrationHierarchyEvent(
+    spawned.graph,
+    childPrepared.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'dynamic-child:effect',
+      controlEpoch: 7,
+      nodeId: childId,
+      generation: 1,
+      activationId: activationRequest.activationId,
+      effectRef: 'effect://dynamic-child',
+    },
+    302,
+  );
+  const childTerminal = reduceOrchestrationHierarchyEvent(
+    spawned.graph,
+    childConfirmed.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_TERMINAL,
+      eventId: 'dynamic-child:terminal',
+      controlEpoch: 7,
+      nodeId: childId,
+      generation: 1,
+      activationId: activationRequest.activationId,
+      status: 'COMPLETED',
+    },
+    303,
+  );
+
+  assert.equal(
+    childTerminal.actions.some(action => (
+      action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
+      && action.nodeId === 'root'
+    )),
+    false,
+  );
+
+  const parentTerminal = reduceOrchestrationHierarchyEvent(
+    spawned.graph,
+    childTerminal.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_TERMINAL,
+      eventId: 'dynamic-parent:terminal',
+      controlEpoch: 7,
+      nodeId: 'root',
+      generation: 1,
+      activationId: 'dynamic-parent:work',
+      status: 'COMPLETED',
+    },
+    304,
+  );
+
+  assert.equal(
+    parentTerminal.actions.some(action => (
+      action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
+      && action.nodeId === 'root'
+    )),
+    true,
+  );
+});
+
 test('structure policy denial performs no topology mutation', () => {
   const result = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
