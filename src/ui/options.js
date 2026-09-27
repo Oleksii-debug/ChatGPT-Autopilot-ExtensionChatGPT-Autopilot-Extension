@@ -1315,6 +1315,10 @@ function assertBrowserAgentRouteReadyForLaunch() {
   if (blockReason) {
     throw new Error(`Маршрут ${routeId} зараз недоступний: ${blockReason}. Оберіть доступний маршрут або успадкуйте глобальну політику.`);
   }
+  const acceptanceCriteria = browserAgentAcceptanceCriteriaFromText($('agent-acceptance-criteria').value);
+  if (acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false') {
+    throw new Error(`Маршрут ${routeId} не дозволяє роль verifier, потрібну для перевірки заданих критеріїв прийняття. Оберіть інший маршрут або успадкуйте глобальну політику.`);
+  }
 }
 
 function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
@@ -1329,7 +1333,9 @@ function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
     const option = document.createElement('option');
     option.value = route.routeId;
     const blockReason = browserAgentRoutePolicyBlockReason(route, policy);
+    const roles = Array.isArray(route?.roles) ? route.roles : [];
     option.dataset.blockReason = blockReason;
+    option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'));
     option.disabled = Boolean(blockReason);
     option.textContent = `${aiRouteDisplayLabel(route)}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` — недоступний: ${blockReason}` : ''}`;
     select.append(option);
