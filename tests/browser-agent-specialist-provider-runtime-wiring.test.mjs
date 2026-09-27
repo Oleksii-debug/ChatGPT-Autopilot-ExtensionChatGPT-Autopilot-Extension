@@ -7,6 +7,7 @@ test('service worker composes one trusted durable Specialist readiness path', as
 
   assert.match(source, /SpecialistProviderReadinessResolverV1/);
   assert.match(source, /createOpenHandsSpecialistReadinessBindingV1/);
+  assert.match(source, /probeOpenHandsSpecialistProviderConfigV1/);
   assert.match(source, /OpenHandsCodingSpecialistClient/);
   assert.match(source, /browserAgent\.getSpecialistProviderConfig\(providerId\)/);
   assert.match(source, /specialistProviderReadinessResolver/);
@@ -14,6 +15,7 @@ test('service worker composes one trusted durable Specialist readiness path', as
 
   assert.match(source, /'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS'/);
   assert.match(source, /'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
+  assert.match(source, /'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
   assert.match(source, /'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
   assert.match(source, /'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
   assert.match(source, /'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS'/);
@@ -50,6 +52,14 @@ test('service worker composes one trusted durable Specialist readiness path', as
     runProviderCommand[1],
     /completeSpecialistHandoff\(/,
     'provider execution may record evidence but must not grant Specialist completion authority',
+  );
+  assert.match(
+    source,
+    /message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]*?probeOpenHandsSpecialistProviderConfigV1\([\s\S]*?browserAgent\.getSpecialistProviderConfig\(providerId\)[\s\S]*?config changed during readiness probe/iu,
+  );
+  assert.doesNotMatch(
+    source,
+    /message\.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'[\s\S]{0,3000}(?:claimSpecialistHandoffsAcrossJobs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\.execute|completeSpecialistHandoff)/u,
   );
   assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
