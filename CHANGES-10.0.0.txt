@@ -25,6 +25,7 @@ AGENT ROUTE SELECTION — AFTER THE 74EC0D2 ARCHIVE
 - The Agent route selector now projects the saved Models owner-policy: disabled/denied/out-of-allow/free-only/locality/price-ineligible routes are exposed as unavailable instead of looking runnable. The saved route remains visible if it later becomes unavailable, and execution still fails closed before provider I/O.
 - Agent usage now reports the last actual route ID and a bounded failover-chain summary. Regression coverage proves an Agent pin cannot bypass global deny policy, role filtering, or durable route backoff.
 - Starting a new Agent now performs a UI preflight against the already-loaded Models policy: a saved route that is disabled or statically owner-policy-blocked is preserved in the form but does not create a knowingly doomed job. Core remains the authoritative fail-closed enforcement boundary.
+- Agent recovery now preserves AI Router failure runtime from both planner and independent-verifier calls. A fresh retryable provider exhaustion carries the durable route backoff/circuit `retryAt`, and Agent wakes at that canonical time instead of converting one provider cooldown into repeated early model errors.
 
 BASELINE
 - Last frozen canonical release: 0.9.19.
