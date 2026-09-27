@@ -442,6 +442,28 @@ export class BrowserAgentManager {
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
       if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
+      const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
+      const afterFailure = await this.get(id);
+      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
+      if (failedCalls && !lifecycleAccounted) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.modelCalls += failedCalls;
+          if (error?.routerRuntime) live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      } else if (error?.routerRuntime) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      }
       return { ok: false, error };
     }
     const verifier = verifierReply?.result || verifierReply;
