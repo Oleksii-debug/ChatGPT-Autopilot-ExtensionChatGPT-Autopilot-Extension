@@ -40,16 +40,19 @@ test('Agent pins its own Mistral route and passes endpointId to Gateway without 
     enabled:true, mode:'primary', routes:[
       { routeId:'local', provider:'ollama', model:'local-model', priority:100 },
       { routeId:'mistral-agent', provider:'openai-compatible', endpointId:'mistral', model:'mistral-small-latest',
+        displayName:'Agent Implementer', systemPrompt:'Profile system', workerPrompt:'Profile worker',
         priority:1, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
     ],
   } });
   const before = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
   const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
-    prompt:'agent task', isolatedRuntime:true, routerOverride:{ routeId:'mistral-agent' },
+    prompt:'agent task', systemPrompt:'Agent project rules', isolatedRuntime:true, routerOverride:{ routeId:'mistral-agent' },
   });
   assert.equal(result.result.text, 'done');
   assert.deepEqual(calls.map(call => [call.provider, call.endpointId, call.model]),
     [['openai-compatible','mistral','mistral-small-latest']]);
+  assert.equal(calls[0].systemPrompt, 'Agent project rules\n\nProfile system');
+  assert.equal(calls[0].prompt, 'Profile worker\n\nagent task');
   const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
   assert.deepEqual(after, before, 'Agent route binding cannot mutate global config or runtime');
   await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
