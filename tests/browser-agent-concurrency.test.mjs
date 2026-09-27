@@ -168,3 +168,59 @@ test('a queued direct burst observes a lowered owner concurrency limit before ad
   assert.deepEqual(starts.slice(0, 2), ['a', 'b']);
   assert.equal(starts.at(-1), 'c');
 });
+
+test('duplicate direct bursts for one Agent coalesce to one exact execution stream', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  manager.load = async () => dueStore(3, ['same']);
+  manager.getExecutionPolicy = async () => ({ maxConcurrentAgents: 3 });
+  manager.reconcileAlarm = async () => 0;
+
+  let calls = 0;
+  manager.cycleOne = async id => {
+    calls += 1;
+    await new Promise(resolve => setTimeout(resolve, 15));
+    return { kind: 'COMPLETED', id };
+  };
+
+  const first = manager.runBurst('same', { maxCycles: 4 });
+  const second = manager.runBurst('same', { maxCycles: 4 });
+  assert.strictEqual(first, second);
+  await Promise.all([first, second]);
+  assert.equal(calls, 1);
+});
+
+test('raising the owner limit wakes queued direct bursts without waiting for an active Agent to finish', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const ids = ['held', 'queued'];
+  let policy = { maxConcurrentAgents: 1 };
+  manager.load = async () => dueStore(policy.maxConcurrentAgents, ids);
+  manager.getExecutionPolicy = async () => policy;
+  manager.reconcileAlarm = async () => 0;
+  manager.update = async mutator => {
+    const store = dueStore(policy.maxConcurrentAgents, ids);
+    const next = await mutator(store) || store;
+    policy = next.executionPolicy;
+    return next;
+  };
+
+  let releaseHeld;
+  const heldBarrier = new Promise(resolve => { releaseHeld = resolve; });
+  let queuedStarted = false;
+  manager.cycleOne = async id => {
+    if (id === 'held') await heldBarrier;
+    else queuedStarted = true;
+    return { kind: 'COMPLETED', id };
+  };
+
+  const held = manager.runBurst('held', { maxCycles: 1 });
+  const queued = manager.runBurst('queued', { maxCycles: 1 });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(queuedStarted, false);
+  await manager.updateExecutionPolicy({ maxConcurrentAgents: 2 });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(queuedStarted, true);
+  releaseHeld();
+  await Promise.all([held, queued]);
+});
