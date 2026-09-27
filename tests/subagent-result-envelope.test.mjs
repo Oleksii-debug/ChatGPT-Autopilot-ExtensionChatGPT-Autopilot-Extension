@@ -201,7 +201,9 @@ test('returns exact verified child handback through immutable refs without copyi
   assert.equal(value.invocationId, 'invocation-child-1');
   assert.equal(value.observationStatus, ObservationStatus.OK);
   assert.equal(value.verificationId, 'verification-1');
+  assert.equal(value.verificationStatus, VerificationStatus.VERIFIED);
   assert.equal(value.verifierId, 'verifier-1');
+  assert.equal(value.verificationAuthorityId, 'authority-verify-1');
   assert.equal(value.requiredEvidenceArtifactCount, 1);
   assert.deepEqual(
     value.resultArtifactRefs.map(ref => [ref.artifactId, ref.sha256]),
@@ -244,7 +246,7 @@ test('exact ObservationV1 and VerificationV1 identity/provenance must match', ()
   );
 });
 
-test('only independently VERIFIED verification can produce a bounded parent handback', () => {
+test('only independently VERIFIED verification with authority provenance can produce a bounded parent handback', () => {
   for (const status of [
     VerificationStatus.FAILED,
     VerificationStatus.AMBIGUOUS,
@@ -257,6 +259,13 @@ test('only independently VERIFIED verification can produce a bounded parent hand
       /requires VERIFIED VerificationV1/,
     );
   }
+
+  const noAuthority = verification();
+  noAuthority.verificationAuthorityId = null;
+  assert.throws(
+    () => createSubagentResultEnvelopeV1(request({ verification: noAuthority })),
+    /requires independent verificationAuthorityId provenance/,
+  );
 });
 
 test('verified negative child observations remain representable without being promoted to completion', () => {
@@ -388,6 +397,20 @@ test('restart normalization is strict and cannot mint execution or completion au
   assert.throws(
     () => normalizeSubagentResultEnvelopeV1(unknown),
     /contains unknown field: transcript/,
+  );
+
+  const forgedVerification = structuredClone(value);
+  forgedVerification.verificationStatus = VerificationStatus.AMBIGUOUS;
+  assert.throws(
+    () => normalizeSubagentResultEnvelopeV1(forgedVerification),
+    /verificationStatus must remain VERIFIED/,
+  );
+
+  const forgedObservation = structuredClone(value);
+  forgedObservation.observationStatus = 'MADE_UP';
+  assert.throws(
+    () => normalizeSubagentResultEnvelopeV1(forgedObservation),
+    /observationStatus is invalid/,
   );
 });
 
