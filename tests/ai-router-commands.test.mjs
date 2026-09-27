@@ -669,3 +669,81 @@ test('Agent router override boundary rejects accessors without executing them', 
   );
   assert.equal(reads, 0);
 });
+
+
+test('Agent route policy cannot weaken global deny, free-only or price ceilings', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  const routes = [
+    { routeId:'local-free', provider:'ollama', model:'local-free', priority:20, costClass:'free', locality:'local' },
+    { routeId:'paid-cheap', provider:'openai', model:'paid-cheap', priority:1, costClass:'paid', locality:'remote',
+      inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+    { routeId:'paid-expensive', provider:'openai', model:'paid-expensive', priority:0, costClass:'paid', locality:'remote',
+      inputPricePerMillionUsd:10, outputPricePerMillionUsd:20 },
+  ];
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes,
+    routePolicy:{
+      denyRouteIds:['paid-cheap'],
+      freeOnly:true,
+      maxInputPricePerMillionUsd:5,
+      maxOutputPricePerMillionUsd:5,
+    },
+  } });
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{
+      routePolicy:{
+        autoSwitch:true,
+        allowRouteIds:['local-free'],
+        freeOnly:false,
+        locality:'any',
+        maxInputPricePerMillionUsd:null,
+        maxOutputPricePerMillionUsd:null,
+      },
+    },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['local-free']);
+
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ allowRouteIds:['paid-cheap'] } },
+  }), /No AI route satisfies|exceeds the global allow-list/);
+  assert.equal(calls.length, 1);
+});
+
+test('Agent price ceiling takes the stricter minimum of global and per-Agent caps', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[
+      { routeId:'cheap', provider:'openai', model:'cheap', priority:20, costClass:'paid', locality:'remote',
+        inputPricePerMillionUsd:1, outputPricePerMillionUsd:1 },
+      { routeId:'mid', provider:'openai', model:'mid', priority:1, costClass:'paid', locality:'remote',
+        inputPricePerMillionUsd:4, outputPricePerMillionUsd:4 },
+    ],
+    routePolicy:{ maxInputPricePerMillionUsd:5, maxOutputPricePerMillionUsd:5 },
+  } });
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ maxInputPricePerMillionUsd:2, maxOutputPricePerMillionUsd:2 } },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['cheap']);
+});
