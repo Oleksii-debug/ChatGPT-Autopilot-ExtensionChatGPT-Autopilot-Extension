@@ -172,9 +172,13 @@ test('append is idempotent for the exact same run and rejects divergent runId co
     registeredAt:REGISTERED,
   };
   const once = await putAiRouteQualityEvidenceRecordV1(createAiRouteQualityEvidenceRegistryV1(), request);
-  const replay = await putAiRouteQualityEvidenceRecordV1(once, request);
+  const replay = await putAiRouteQualityEvidenceRecordV1(once, {
+    ...request,
+    registeredAt:'2026-09-27T12:00:10.000Z',
+  });
   assert.equal(replay.revision, 1);
   assert.equal(replay.records.length, 1);
+  assert.equal(replay.records[0].registeredAt, REGISTERED);
 
   const divergent = structuredClone(binding);
   divergent.maxAgeMs = 30_000;
