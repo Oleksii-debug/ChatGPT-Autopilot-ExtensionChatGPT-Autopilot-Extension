@@ -1333,3 +1333,24 @@ test('failed bound lifecycle keeps the Browser Agent update chain serialized thr
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'STOPPED');
   assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'STOPPED');
 });
+
+
+test('bound Browser Agent cannot resume over a hierarchy node made terminal by STOP_SCOPE', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  await manager.stop('job-1', lifecycleDependencies);
+  const stopped = await manager.get('job-1');
+
+  await assert.rejects(
+    () => manager.resume('job-1', { runInitial: false }, lifecycleDependencies),
+    /target did not enter requested lifecycle scope: STOPPED/,
+  );
+
+  const after = await manager.get('job-1');
+  assert.equal(after.job.runtime.runState, 'STOPPED');
+  assert.equal(after.job.runtime.controlEpoch, stopped.job.runtime.controlEpoch);
+  const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'STOPPED');
+});
