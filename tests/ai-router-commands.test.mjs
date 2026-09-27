@@ -98,7 +98,7 @@ test('Agent route pin stays fail-closed under global owner policy, role filterin
   assert.equal(calls.length, 0, 'global deny policy must block the Agent pin before provider I/O');
 
   await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
-    enabled:true, mode:'primary', routes, routePolicy:{},
+    enabled:true, mode:'primary', routes, routePolicy:{ denyRouteIds:[] },
   } });
   await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
     prompt:'verify agent outcome', isolatedRuntime:true, taskRole:'verifier',
