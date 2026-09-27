@@ -204,6 +204,22 @@ test('verifier must be independent and bound to exact effect, lease and policy a
   }
 });
 
+test('trusted verification cannot certify an external effect without immutable evidence', async () => {
+  await assert.rejects(
+    verifyExecutionWithTrustedRecordV1(
+      owned(),
+      { leaseId: 'lease-1', verificationId: 'verification-1', at: T5 },
+      {
+        resolveTrustedExecutionVerificationRecord: async () => trustedRecord({
+          artifacts: [],
+          verificationOverrides: { evidenceArtifactIds: [] },
+        }),
+      },
+    ),
+    /requires hashed evidence artifacts/,
+  );
+});
+
 test('trusted evidence is hashed, exact, chronological and non-stale', async () => {
   await assert.rejects(
     verifyExecutionWithTrustedRecordV1(
