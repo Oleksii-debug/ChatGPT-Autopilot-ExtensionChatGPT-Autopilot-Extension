@@ -267,6 +267,12 @@ test('all criteria require trusted ledger records with canonical verification an
     result.criteria.map(item => item.criterionId),
     ['criterion-artifact', 'criterion-tests'],
   );
+  const artifactCriterion = result.criteria.find(
+    item => item.criterionId === 'criterion-artifact',
+  );
+  assert.equal(artifactCriterion.invocationId, 'effect-artifact');
+  assert.equal(artifactCriterion.observationId, 'observation-artifact');
+  assert.equal(artifactCriterion.trustedReasonCode, 'PASS');
   assert.deepEqual(
     contractCalls,
     [{ contractId: 'outcome-1', contractRevision: 1 }],
