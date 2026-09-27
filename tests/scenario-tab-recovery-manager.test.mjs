@@ -92,5 +92,6 @@ test('Scenario tab recovery at response deadline extends grace instead of replac
 
   assert.equal(current.scenario.runtime.chat.state, 'WAITING');
   assert.equal(current.scenario.runtime.chat.deadlineAt, NOW + 5 * 60_000);
+  assert.equal(current.scenario.runtime.chat.tabRecoveryGraceCount, 1);
   assert.notEqual(current.scenario.runtime.runState, 'ERROR');
 });
