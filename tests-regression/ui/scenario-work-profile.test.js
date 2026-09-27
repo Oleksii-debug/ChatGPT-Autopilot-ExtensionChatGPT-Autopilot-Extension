@@ -92,12 +92,14 @@ test('CHAT_CYCLE profile round-trips an explicit five-chat pool preset and valid
   const parsed = parseScenarioWorkProfileDocument(JSON.stringify(profile));
   assert.equal(parsed.config.steps.reduce((sum, step) => sum + step.repeat, 0), 12);
   assert.deepEqual(parsed.pool, { count: 5, replacementBudget: 0, staggerSeconds: 3 });
+  assert.deepEqual(parseScenarioWorkProfileDocument(JSON.stringify({ ...profile, pool: { count: 15, replacementBudget: 0, staggerSeconds: 180 } })).pool,
+    { count: 15, replacementBudget: 0, staggerSeconds: 180 });
 
   for (const pool of [
     { count: 0, replacementBudget: 0, staggerSeconds: 3 },
     { count: 21, replacementBudget: 0, staggerSeconds: 3 },
     { count: 5, replacementBudget: -1, staggerSeconds: 3 },
-    { count: 5, replacementBudget: 0, staggerSeconds: 61 },
+    { count: 5, replacementBudget: 0, staggerSeconds: 604801 },
   ]) assert.throws(() => parseScenarioWorkProfileDocument(JSON.stringify({ ...profile, pool })));
 });
 
@@ -111,10 +113,36 @@ test('Scenario Work UI exposes template, import and export controls together', a
 });
 
 test('Scenario Work import status reports the physical-chat message count for CHAT_CYCLE', async () => {
+  const html = await readFile(new URL('../../src/ui/options.html', import.meta.url), 'utf8');
   const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
   assert.match(js, /Повідомлень у кожному чаті:/u);
   assert.match(js, /config\.steps\.reduce\(\(sum, step\) => sum \+ step\.repeat, 0\)/u);
   assert.match(js, /scenario-cycle-parallel-count'\)\.value = String\(pool\.count\)/u);
   assert.match(js, /scenario-cycle-replacement-budget'\)\.value = String\(pool\.replacementBudget\)/u);
-  assert.match(js, /scenario-cycle-initial-stagger'\)\.value = String\(pool\.staggerSeconds\)/u);
+  assert.match(js, /setScenarioInitialStaggerForm\(pool\.staggerSeconds\)/u);
+  assert.match(html, /id="scenario-cycle-initial-stagger-unit"/u);
+  assert.match(html, /value="minutes">Хвилини/u);
+});
+
+
+test('Sessions dashboard distinguishes canonical scenario facts and ordinary-session sublist', async () => {
+  const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
+  assert.match(js, /Сценарних фізичних чатів:/u);
+  assert.match(js, /Перший логічний Send підтверджено у/u);
+  assert.match(js, /Чекають завершення відповіді/u);
+  assert.match(js, /Підтверджено завершених відповідей/u);
+  assert.match(js, /Логічних Send у послідовностях/u);
+  assert.match(js, /Фізично підтверджених Send-спроб/u);
+  assert.match(js, /Повторних або replacement-спроб/u);
+  assert.match(js, /Звичайних ручних сеансів у цьому списку/u);
+  assert.doesNotMatch(js, /активних \$\{pool\.active\}/u);
+});
+
+test('parallel pool launch consumes a never-started unpooled source scenario and checks Core count/stagger postconditions', async () => {
+  const js = await readFile(new URL('../../src/ui/options.js', import.meta.url), 'utf8');
+  assert.match(js, /sourceIsDormantTemplate/u);
+  assert.match(js, /DELETE_SCENARIO_WORK/u);
+  assert.match(js, /Number\(result\?\.pool\?\.slots\) !== count/u);
+  assert.match(js, /Number\(result\?\.pool\?\.initialStaggerSeconds\) !== staggerSeconds/u);
+  assert.match(js, /Пул підтверджено Core:/u);
 });
