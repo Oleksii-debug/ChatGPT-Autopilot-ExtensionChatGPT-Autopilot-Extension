@@ -247,6 +247,157 @@ test('materialization reuses Browser Agent config and binds model defaults under
   assert.deepEqual(result.config.acceptanceCriteria, definition().acceptanceCriteria);
 });
 
+test('materialization binds enabled specialist profile to the exact job and instantiated scope', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        specialistDelegationProfile: {
+          schemaVersion: 1,
+          registryId: 'specialists:project-1',
+          requiredCapabilityIds: ['research.read', 'project.context'],
+          requiredToolIds: ['browser.read', 'github.read'],
+          policyEnvelopeId: 'policy:agent.research',
+          deadlineSeconds: 900,
+          maxConcurrentHandoffs: 2,
+          leaseSeconds: 600,
+          priority: 5,
+          enabled: true,
+        },
+      }),
+    ],
+  });
+  const result = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+  });
+
+  assert.equal(result.specialistDelegationBinding.schemaVersion, 1);
+  assert.equal(result.specialistDelegationBinding.jobId, 'job-research-001');
+  assert.equal(result.specialistDelegationBinding.projectId, 'project-1');
+  assert.equal(result.specialistDelegationBinding.registryId, 'agents:project-1');
+  assert.equal(result.specialistDelegationBinding.registryRevision, 3);
+  assert.equal(result.specialistDelegationBinding.agentDefinitionId, 'agent.research');
+  assert.equal(result.specialistDelegationBinding.definitionRevision, 7);
+  assert.equal(result.specialistDelegationBinding.profile.registryId, 'specialists:project-1');
+  assert.deepEqual(result.specialistDelegationBinding.profile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(result.specialistDelegationBinding.profile.requiredToolIds, [
+    'browser.read',
+    'github.read',
+  ]);
+  assert.deepEqual(result.specialistDelegationBinding.authority, {
+    proposalOnly: true,
+    executionAuthorized: false,
+    policyAuthorized: false,
+    schedulingAuthorized: false,
+    recoveryAuthorized: false,
+    credentialAuthorized: false,
+    completionAuthorized: false,
+    verificationAuthorized: false,
+    capacityReserved: false,
+  });
+  assert.equal(Object.isFrozen(result.specialistDelegationBinding), true);
+  assert.equal(Object.isFrozen(result.specialistDelegationBinding.profile), true);
+});
+
+test('enabled specialist profile cannot exceed the concrete materialized job scope', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        specialistDelegationProfile: {
+          schemaVersion: 1,
+          registryId: 'specialists:project-1',
+          requiredCapabilityIds: ['research.read', 'project.context'],
+          requiredToolIds: ['browser.read', 'files.read'],
+          policyEnvelopeId: 'policy:agent.research',
+          deadlineSeconds: 900,
+          maxConcurrentHandoffs: 2,
+          leaseSeconds: 600,
+          priority: 5,
+          enabled: true,
+        },
+      }),
+    ],
+  });
+  const selection = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+
+  assert.throws(
+    () => materializeAgentDefinitionV1({
+      ...materialization(),
+      registry: reg,
+      selection,
+      requestedCapabilityIds: ['research.read'],
+    }),
+    /specialist delegation capabilities for materialized job exceeds allowed authority: project\.context/u,
+  );
+
+  assert.throws(
+    () => materializeAgentDefinitionV1({
+      ...materialization(),
+      registry: reg,
+      selection,
+      requestedToolIds: ['browser.read'],
+    }),
+    /specialist delegation tools for materialized job exceeds allowed authority: files\.read/u,
+  );
+});
+
+test('disabled specialist profile stays job-bound but cannot grant runtime authority', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({
+        specialistDelegationProfile: {
+          schemaVersion: 1,
+          registryId: 'specialists:project-1',
+          requiredCapabilityIds: ['research.read'],
+          requiredToolIds: ['files.read'],
+          policyEnvelopeId: 'policy:agent.research',
+          deadlineSeconds: 900,
+          maxConcurrentHandoffs: 2,
+          leaseSeconds: 600,
+          priority: 5,
+          enabled: false,
+        },
+      }),
+    ],
+  });
+  const result = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+    requestedCapabilityIds: ['research.read'],
+    requestedToolIds: ['browser.read'],
+  });
+
+  assert.equal(result.specialistDelegationBinding.profile.enabled, false);
+  assert.equal(result.specialistDelegationBinding.authority.executionAuthorized, false);
+  assert.equal(result.specialistDelegationBinding.authority.capacityReserved, false);
+});
+
+test('materialization omits specialist binding for legacy or explicitly cleared profiles', () => {
+  const legacy = materializeAgentDefinitionV1(materialization());
+  assert.equal(Object.hasOwn(legacy, 'specialistDelegationBinding'), false);
+
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({ specialistDelegationProfile: null }),
+    ],
+  });
+  const cleared = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+  });
+  assert.equal(Object.hasOwn(cleared, 'specialistDelegationBinding'), false);
+});
+
 test('definition ceilings can only narrow owner budgets and zero/unbounded aliases cannot widen them', () => {
   const stricterOwner = {
     maxSteps: 80,
