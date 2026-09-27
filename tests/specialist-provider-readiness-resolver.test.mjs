@@ -145,6 +145,28 @@ test('an unbound provider cannot be made executable by caller-shaped readiness',
   );
 });
 
+test('async live observation may occur after admission start and freshness is measured at resolution completion', async () => {
+  const start = Date.parse('2026-09-27T12:40:00.000Z');
+  const end = start + 25;
+  const ticks = [start, end];
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(async request => {
+      assert.equal(request.asOf, '2026-09-27T12:40:00.000Z');
+      return {
+        observedAt: '2026-09-27T12:40:00.025Z',
+        providerStates: [state()],
+      };
+    })],
+    now: () => ticks.shift(),
+  });
+
+  const result = await resolver.resolve(selection());
+  assert.equal(result.observedAt, '2026-09-27T12:40:00.025Z');
+  assert.equal(result.resolvedAt, '2026-09-27T12:40:00.025Z');
+  assert.equal(result.ageMs, 0);
+  assert.equal(result.executable, true);
+});
+
 test('resolver output must be fresh, canonical, and not from the future', async () => {
   const stale = runtime([binding(async () => ({
     observedAt: '2026-09-27T12:39:29.999Z',
@@ -264,6 +286,19 @@ test('selection boundary and injected clock are exact and non-coercive', async (
     now: () => 'not-a-number',
   });
   await assert.rejects(badClock.resolve(selection()), /clock returned an invalid time/u);
+
+  const outOfDateRangeClock = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(async () => ({ observedAt: NOW, providerStates: [state()] }))],
+    now: () => 8_640_000_000_000_001,
+  });
+  await assert.rejects(outOfDateRangeClock.resolve(selection()), /clock returned an invalid time/u);
+
+  const backwardTicks = [NOW_MS, NOW_MS - 1];
+  const backwardClock = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(async () => ({ observedAt: NOW, providerStates: [state()] }))],
+    now: () => backwardTicks.shift(),
+  });
+  await assert.rejects(backwardClock.resolve(selection()), /clock moved backwards/u);
 });
 
 test('trusted resolver failures propagate and cannot be converted into READY fallback', async () => {
