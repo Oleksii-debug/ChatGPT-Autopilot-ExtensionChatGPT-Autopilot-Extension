@@ -142,6 +142,42 @@ test('same spawn identity is exact-effect idempotent after restart', () => {
   assert.deepEqual(second.runtime, first.runtime);
 });
 
+test('spawn id prefix overlap does not corrupt exact-effect replay families', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'effect',
+    nowMs: 300,
+  }));
+  const second = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: first.runtime,
+    spawnId: 'effect:child',
+    nowMs: 400,
+  }));
+
+  assert.equal(second.decision, 'ALLOW');
+  assert.deepEqual(second.createdNodeIds, ['subagent:effect:child:1']);
+
+  const replayFirst = mutateOrchestrationSubagentTopologyV1(request({
+    graph: second.graph,
+    runtime: second.runtime,
+    spawnId: 'effect',
+    nowMs: 500,
+  }));
+  assert.equal(replayFirst.decision, 'ALLOW');
+  assert.equal(replayFirst.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.deepEqual(replayFirst.createdNodeIds, ['subagent:effect:1']);
+
+  const replaySecond = mutateOrchestrationSubagentTopologyV1(request({
+    graph: second.graph,
+    runtime: second.runtime,
+    spawnId: 'effect:child',
+    nowMs: 600,
+  }));
+  assert.equal(replaySecond.decision, 'ALLOW');
+  assert.equal(replaySecond.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.deepEqual(replaySecond.createdNodeIds, ['subagent:effect:child:1']);
+});
+
 test('same spawn identity cannot be replayed with a different child count', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
