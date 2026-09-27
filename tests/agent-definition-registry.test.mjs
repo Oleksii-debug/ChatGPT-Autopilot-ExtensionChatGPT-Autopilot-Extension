@@ -255,6 +255,30 @@ test('authority envelopes reject accessors, hidden/symbol fields and sparse arra
   });
   assert.throws(() => normalizeAgentDefinitionV1(hostileDefaults), /maxSteps must be an enumerable own data property/);
   assert.equal(defaultReads, 0);
+
+  let coercions = 0;
+  const objectValuedDefaults = definition();
+  objectValuedDefaults.configDefaults = {
+    ...objectValuedDefaults.configDefaults,
+    maxSteps: {
+      valueOf() {
+        coercions += 1;
+        return 50;
+      },
+    },
+  };
+  assert.throws(() => normalizeAgentDefinitionV1(objectValuedDefaults), /maxSteps must be an exact scalar data value/);
+  assert.equal(coercions, 0);
+
+  const objectValuedCriterion = definition();
+  objectValuedCriterion.acceptanceCriteria = [{
+    toString() {
+      coercions += 1;
+      return 'must not coerce';
+    },
+  }];
+  assert.throws(() => normalizeAgentDefinitionV1(objectValuedCriterion), /acceptanceCriteria\[0\] must be exact bounded text/);
+  assert.equal(coercions, 0);
 });
 
 test('null-prototype records are accepted and caller-owned data remains unchanged', () => {
