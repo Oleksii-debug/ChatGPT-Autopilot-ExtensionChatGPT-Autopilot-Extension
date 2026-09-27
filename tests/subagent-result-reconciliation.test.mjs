@@ -626,7 +626,7 @@ test('paused scope and unconfirmed effect produce no terminal event', async () =
   assert.equal(paused.terminalEvent, null);
 });
 
-test('negative child observation is preserved as REOPEN even when canonical outcome evidence is otherwise verified', async () => {
+test('raw negative observation cannot override canonical trusted outcome completion', async () => {
   const contract = outcomeContract();
   const result = resultEnvelope({
     contract,
@@ -637,14 +637,17 @@ test('negative child observation is preserved as REOPEN even when canonical outc
     fixture.input,
     deps({ contract }),
   );
-  assert.equal(value.decision, SubagentResultReconciliationDecision.REOPEN);
-  assert.equal(value.reasonCode, 'RESULT_OBSERVATION_NOT_OK');
+  assert.equal(
+    value.decision,
+    SubagentResultReconciliationDecision.ADMIT_TERMINAL,
+  );
+  assert.equal(value.reasonCode, 'TRUSTED_SUBAGENT_RESULT_TERMINAL_ADMITTED');
   assert.equal(value.trustedVerification.verdict, 'VERIFIED');
-  assert.equal(value.terminalEvent, null);
+  assert.equal(value.terminalEvent.status, 'COMPLETED');
   assert.equal(value.completionAuthority, false);
 });
 
-test('canonical evidence-policy REOPEN cannot be promoted by raw VERIFIED result input', async () => {
+test('canonical evidence-policy REOPEN terminalizes the failed attempt so existing parent reconciliation can replan', async () => {
   const contract = outcomeContract({ requiredEvidenceKinds: ['TEST'] });
   const result = resultEnvelope({ contract });
   const fixture = request({ contract, result });
@@ -655,10 +658,31 @@ test('canonical evidence-policy REOPEN cannot be promoted by raw VERIFIED result
   );
 
   assert.equal(value.decision, SubagentResultReconciliationDecision.REOPEN);
-  assert.equal(value.reasonCode, 'TRUSTED_OUTCOME_REOPEN');
+  assert.equal(value.reasonCode, 'TRUSTED_OUTCOME_REOPEN_TERMINAL_ADMITTED');
   assert.equal(value.trustedVerification.verdict, 'REOPEN');
   assert.deepEqual(value.trustedVerification.reopenCriterionIds, ['criterion-1']);
-  assert.equal(value.terminalEvent, null);
+  assert.equal(value.terminalEvent.status, 'FAILED');
+  assert.equal(value.completionAuthority, false);
+  assert.equal(value.requiresCanonicalOrchestrationReducer, true);
+
+  const reduced = reduceOrchestrationHierarchyEvent(
+    fixture.runtimeState.g,
+    fixture.runtimeState.runtime,
+    value.terminalEvent,
+    Date.parse(T6) + 1,
+  );
+  assert.equal(
+    reduced.runtime.nodesById['child-1'].activationLedger[
+      'child-activation-1'
+    ].terminalStatus,
+    'FAILED',
+  );
+  assert.equal(reduced.actions.length, 1);
+  assert.equal(
+    reduced.actions[0].type,
+    OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT,
+  );
+  assert.equal(reduced.actions[0].nodeId, 'parent-1');
 });
 
 test('raw result verification must participate in the exact trusted outcome adjudication', async () => {
