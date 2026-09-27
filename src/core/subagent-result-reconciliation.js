@@ -15,7 +15,6 @@ import {
 } from './orchestration-hierarchy.js';
 import { normalizeSubagentResultEnvelopeV1 } from './subagent-result-envelope.js';
 import { normalizeSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
-import { ObservationStatus } from './universal-agent-contracts.js';
 
 export const SUBAGENT_RESULT_RECONCILIATION_VERSION = 1;
 export const SUBAGENT_TASK_ACTIVATION_BINDING_VERSION = 1;
@@ -769,27 +768,16 @@ export async function prepareSubagentResultReconciliationV1(
   }
   assertTrustedResultVerificationParticipation(result, adjudication);
 
-  if (result.observationStatus !== ObservationStatus.OK) {
-    return baseProjection({
-      decision: SubagentResultReconciliationDecision.REOPEN,
-      reasonCode: 'RESULT_OBSERVATION_NOT_OK',
-      result,
-      binding,
-      trustedVerification: adjudication,
-    });
-  }
+  const trustedComplete = adjudication.verdict === OutcomeVerificationVerdict.VERIFIED
+    && adjudication.completionEvidenceReady === true;
+  const terminalStatus = trustedComplete
+    ? OrchestrationTerminalStatus.COMPLETED
+    : OrchestrationTerminalStatus.FAILED;
 
-  if (adjudication.verdict !== OutcomeVerificationVerdict.VERIFIED
-      || adjudication.completionEvidenceReady !== true) {
-    return baseProjection({
-      decision: SubagentResultReconciliationDecision.REOPEN,
-      reasonCode: 'TRUSTED_OUTCOME_REOPEN',
-      result,
-      binding,
-      trustedVerification: adjudication,
-    });
-  }
-
+  // A trusted REOPEN is a terminal result for this *attempt*, not a successful
+  // outcome. Marking the activation FAILED lets the existing parent barrier
+  // reconcile/replan it instead of leaving the child permanently in-flight.
+  // The adapter still does not decide or schedule the retry itself.
   const terminalEvent = freezeDeep({
     type: OrchestrationHierarchyEventType.NODE_TERMINAL,
     eventId: compactOrchestrationEventId(
@@ -803,12 +791,16 @@ export async function prepareSubagentResultReconciliationV1(
     nodeId: result.childAgentId,
     generation: binding.generation,
     activationId: binding.activationId,
-    status: OrchestrationTerminalStatus.COMPLETED,
+    status: terminalStatus,
   });
 
   return baseProjection({
-    decision: SubagentResultReconciliationDecision.ADMIT_TERMINAL,
-    reasonCode: 'TRUSTED_SUBAGENT_RESULT_TERMINAL_ADMITTED',
+    decision: trustedComplete
+      ? SubagentResultReconciliationDecision.ADMIT_TERMINAL
+      : SubagentResultReconciliationDecision.REOPEN,
+    reasonCode: trustedComplete
+      ? 'TRUSTED_SUBAGENT_RESULT_TERMINAL_ADMITTED'
+      : 'TRUSTED_OUTCOME_REOPEN_TERMINAL_ADMITTED',
     result,
     binding,
     trustedVerification: adjudication,
