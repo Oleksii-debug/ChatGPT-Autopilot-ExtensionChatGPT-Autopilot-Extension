@@ -249,6 +249,31 @@ test('atomically binds canonical spawn identity, least authority and concrete ch
   assert.equal(result.parentNodeId, 'root');
   assert.deepEqual(result.createdNodeIds, [CHILD_ID]);
   assert.equal(result.taskBindings.length, 1);
+  assert.deepEqual(
+    result.authorityTaskBindings,
+    [{
+      childNodeId: CHILD_ID,
+      projectId: 'project.alpha',
+      taskId: 'task.one',
+      providerId: 'provider.main',
+      taskRequestedCapabilityIds: ['cap.read'],
+      taskSourceIds: ['source.repo'],
+      taskArtifactIds: ['artifact.input'],
+      requestedToolIds: ['tool.read'],
+    }],
+  );
+  assert.deepEqual(result.taskEnvelopeBindings, [{
+    childNodeId: CHILD_ID,
+    taskId: 'task.one',
+    envelopeId: 'envelope.task.one',
+    planId: 'plan.spawn-task',
+    planRevision: 3,
+    outcomeContractId: 'outcome.spawn-task',
+    outcomeContractRevision: 1,
+    createdAt: T2,
+  }]);
+  assert.equal(Object.isFrozen(result.authorityTaskBindings), true);
+  assert.equal(Object.isFrozen(result.taskEnvelopeBindings), true);
   const binding = result.taskBindings[0];
   assert.equal(binding.childNodeId, CHILD_ID);
   assert.equal(binding.taskId, 'task.one');
@@ -374,23 +399,28 @@ test('upstream spawn/authority denial exposes no topology or task contract propo
   assert.equal(Object.hasOwn(result, 'runtime'), false);
 });
 
-test('exact spawn replay reuses canonical child identity while re-deriving current task authority', () => {
+test('exact spawn replay round-trips canonical authority and task-envelope evidence', () => {
   const first = bindSubagentSpawnTaskAuthorityV1(request());
   assert.equal(first.decision, 'ALLOW');
 
-  const replay = bindSubagentSpawnTaskAuthorityV1(request({
-    authorityRequest: authorityRequest({
-      topologyRequest: topologyRequest({
-        graph: first.graph,
-        runtime: first.runtime,
-        nowMs: 300,
-      }),
+  const replayAuthority = authorityRequest({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      nowMs: 300,
     }),
+    priorTaskBindings: first.authorityTaskBindings,
+  });
+  const replay = bindSubagentSpawnTaskAuthorityV1(request({
+    authorityRequest: replayAuthority,
+    priorTaskEnvelopeBindings: first.taskEnvelopeBindings,
   }));
 
   assert.equal(replay.decision, 'ALLOW');
   assert.equal(replay.reused, true);
   assert.deepEqual(replay.createdNodeIds, [CHILD_ID]);
+  assert.deepEqual(replay.authorityTaskBindings, first.authorityTaskBindings);
+  assert.deepEqual(replay.taskEnvelopeBindings, first.taskEnvelopeBindings);
   assert.equal(replay.taskBindings[0].taskEnvelope.childAgentId, CHILD_ID);
 
   const narrowed = bindSubagentSpawnTaskAuthorityV1(request({
@@ -400,11 +430,105 @@ test('exact spawn replay reuses canonical child identity while re-deriving curre
         runtime: first.runtime,
         nowMs: 300,
       }),
+      priorTaskBindings: first.authorityTaskBindings,
       ownerAllowedSourceIds: [],
     }),
+    priorTaskEnvelopeBindings: first.taskEnvelopeBindings,
   }));
   assert.equal(narrowed.decision, 'DENY');
   assert.equal(narrowed.reasonCode, 'SPAWN_AUTHORITY_DENIED');
+});
+
+test('replay requires upstream child-task evidence and does not mask task-set drift', () => {
+  const first = bindSubagentSpawnTaskAuthorityV1(request());
+
+  const missing = bindSubagentSpawnTaskAuthorityV1(request({
+    authorityRequest: authorityRequest({
+      topologyRequest: topologyRequest({
+        graph: first.graph,
+        runtime: first.runtime,
+        nowMs: 300,
+      }),
+    }),
+    priorTaskEnvelopeBindings: first.taskEnvelopeBindings,
+  }));
+  assert.equal(missing.decision, 'DENY');
+  assert.equal(missing.reasonCode, 'SPAWN_AUTHORITY_DENIED');
+  assert.equal(
+    missing.authorityReasonCode,
+    'REPLAY_TASK_BINDING_EVIDENCE_REQUIRED',
+  );
+
+  const drift = bindSubagentSpawnTaskAuthorityV1(request({
+    authorityRequest: authorityRequest({
+      topologyRequest: topologyRequest({
+        graph: first.graph,
+        runtime: first.runtime,
+        nowMs: 300,
+      }),
+      priorTaskBindings: first.authorityTaskBindings,
+      childTasks: [{
+        ...authorityRequest().childTasks[0],
+        taskId: 'task.other',
+      }],
+    }),
+    priorTaskEnvelopeBindings: first.taskEnvelopeBindings,
+  }));
+  assert.equal(drift.decision, 'DENY');
+  assert.equal(drift.reasonCode, 'SPAWN_AUTHORITY_DENIED');
+  assert.equal(drift.authorityReasonCode, 'REPLAY_TASK_BINDING_MISMATCH');
+});
+
+test('replay cannot replace durable task envelope, plan revision or OutcomeContract identity', () => {
+  const first = bindSubagentSpawnTaskAuthorityV1(request());
+  const replayAuthority = authorityRequest({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      nowMs: 300,
+    }),
+    priorTaskBindings: first.authorityTaskBindings,
+  });
+
+  for (const [name, overrides] of [
+    ['envelope', {
+      taskEnvelopes: [taskEnvelopeSpec({ envelopeId: 'envelope.changed' })],
+    }],
+    ['outcome', {
+      taskEnvelopes: [taskEnvelopeSpec({
+        outcomeContract: outcome({ contractId: 'outcome.changed' }),
+      })],
+    }],
+    ['plan-revision', {
+      plan: plan({ plan: { revision: 4 } }),
+    }],
+  ]) {
+    const value = bindSubagentSpawnTaskAuthorityV1(request({
+      ...overrides,
+      authorityRequest: replayAuthority,
+      priorTaskEnvelopeBindings: first.taskEnvelopeBindings,
+    }));
+    assert.equal(value.decision, 'DENY', name);
+    assert.equal(
+      value.reasonCode,
+      'REPLAY_TASK_ENVELOPE_BINDING_MISMATCH',
+      name,
+    );
+    assert.deepEqual(value.createdNodeIds, [], name);
+    assert.equal(Object.hasOwn(value, 'graph'), false, name);
+  }
+});
+
+test('prior task-envelope evidence is forbidden on initial child creation', () => {
+  const initial = bindSubagentSpawnTaskAuthorityV1(request());
+  const unexpected = bindSubagentSpawnTaskAuthorityV1(request({
+    priorTaskEnvelopeBindings: initial.taskEnvelopeBindings,
+  }));
+  assert.equal(unexpected.decision, 'DENY');
+  assert.equal(
+    unexpected.reasonCode,
+    'UNEXPECTED_PRIOR_TASK_ENVELOPE_BINDING_EVIDENCE',
+  );
 });
 
 test('boundary rejects accessors, sparse arrays, symbols and duplicate envelope IDs without reading getters', () => {
