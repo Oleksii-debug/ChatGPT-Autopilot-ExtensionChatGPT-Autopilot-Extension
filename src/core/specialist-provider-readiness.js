@@ -126,7 +126,7 @@ function worstReadiness(checks) {
 export function inspectSpecialistProviderReadinessV1(input = {}) {
   const raw = record(input, REQUEST_KEYS, 'Specialist provider readiness request');
   const selection = normalizeSpecialistSelectionV1(raw.selection);
-  const states = denseArray(raw.providerStates ?? [], 'providerStates', MAX_PROVIDER_STATES)
+  const states = denseArray(raw.providerStates === undefined ? [] : raw.providerStates, 'providerStates', MAX_PROVIDER_STATES)
     .map(normalizeProviderReadinessV1);
 
   const byIdentity = new Map();
