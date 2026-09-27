@@ -461,3 +461,19 @@ test('inactive Specialist delegation profile removes subordinate controls from k
     /specialistProfileConfigured = Boolean\(specialistDelegationProfile\)[\s\S]*?syncAgentDefinitionSpecialistDelegationControls\(\)/u,
   );
 });
+
+test('selected reusable Agent exposes concise Specialist delegation state for screen-reader review', async () => {
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const summary = source.match(
+    /function agentDefinitionSpecialistDelegationSummary\(definition\) \{([\s\S]*?)\n\}/u,
+  );
+  assert.ok(summary, 'Specialist delegation summary must remain structurally identifiable');
+  assert.match(summary[1], /Specialist delegation: не налаштовано/u);
+  assert.match(summary[1], /Specialist delegation: очищено/u);
+  assert.match(summary[1], /profile\.enabled \? 'увімкнено' : 'вимкнено'/u);
+  assert.match(summary[1], /profile\.registryId/u);
+  assert.match(
+    source,
+    /agentDefinitionModelPolicySummary\(definition\)[\s\S]*?agentDefinitionSpecialistDelegationSummary\(definition\)/u,
+  );
+});
