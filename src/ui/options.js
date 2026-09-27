@@ -1263,6 +1263,8 @@ function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
 
 function browserAgentRoutePolicyBlockReason(route, policy = {}) {
   if (route?.enabled === false) return 'маршрут вимкнено у вкладці «Моделі»';
+  const roles = Array.isArray(route?.roles) ? route.roles : [];
+  if (roles.length && !roles.includes('planner')) return 'маршрут не дозволяє роль planner, потрібну для запуску Agent';
   const routeId = String(route?.routeId || '');
   const allow = new Set(Array.isArray(policy?.allowRouteIds) ? policy.allowRouteIds : []);
   const deny = new Set(Array.isArray(policy?.denyRouteIds) ? policy.denyRouteIds : []);
