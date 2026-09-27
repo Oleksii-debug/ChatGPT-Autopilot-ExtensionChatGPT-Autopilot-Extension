@@ -128,6 +128,10 @@ test('Browser Agent uses a dedicated durable manager with fast-burst and owner-i
   assert.match(source, /browserAgent\.addInstruction\(/);
   assert.match(source, /message\.command === 'RUN_BROWSER_AGENT_BURST'/);
   assert.match(source, /browserAgent\.runBurst\(/);
+  assert.match(source, /message\.command === 'GET_BROWSER_AGENT_EXECUTION_POLICY'/);
+  assert.match(source, /browserAgent\.getExecutionPolicy\(\)/);
+  assert.match(source, /message\.command === 'UPDATE_BROWSER_AGENT_EXECUTION_POLICY'/);
+  assert.match(source, /browserAgent\.updateExecutionPolicy\(message\.payload \|\| \{\}\)/);
   assert.match(source, /message\.command === 'APPROVE_BROWSER_AGENT_ACTION'/);
   assert.match(source, /browserAgent\.approvePendingAction\(/);
   assert.match(source, /message\.command === 'REJECT_BROWSER_AGENT_ACTION'/);
