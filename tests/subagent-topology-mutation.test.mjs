@@ -503,6 +503,36 @@ test('spawned children cannot amplify prompt, recovery, chat or provider authori
   assert.equal(child.providerBinding, null);
 });
 
+test('mutation clock cannot move backward across durable restart state', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'monotonic-clock',
+    nowMs: 300,
+  }));
+
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(request({
+      graph: first.graph,
+      runtime: first.runtime,
+      spawnId: 'monotonic-clock',
+      nowMs: 299,
+    })),
+    /nowMs cannot precede durable runtime\.updatedAt/u,
+  );
+
+  const malformedRuntime = structuredClone(first.runtime);
+  malformedRuntime.createdAt = 400;
+  malformedRuntime.updatedAt = 300;
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(request({
+      graph: first.graph,
+      runtime: malformedRuntime,
+      spawnId: 'monotonic-clock',
+      nowMs: 400,
+    })),
+    /runtime\.updatedAt cannot precede runtime\.createdAt/u,
+  );
+});
+
 test('mutation time is explicit trusted input with no ambient clock fallback', () => {
   const raw = request();
   delete raw.nowMs;
