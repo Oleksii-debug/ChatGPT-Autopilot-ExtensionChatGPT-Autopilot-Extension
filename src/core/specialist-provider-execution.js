@@ -115,6 +115,20 @@ function deriveStatus({
     }
     return SpecialistProviderExecutionStatus.RECONCILE;
   }
+  if (providerStatus && TERMINAL.has(providerStatus)) {
+    if (safeToRetry || errorCode || !effectEvidence) {
+      throw new Error('Terminal provider outcome is inconsistent');
+    }
+    if (providerSucceeded !== (providerStatus === 'finished')) {
+      throw new Error('providerSucceeded does not match terminal providerStatus');
+    }
+    if (providerSucceeded === manualReviewRequired) {
+      throw new Error('terminal provider manual-review flag is inconsistent');
+    }
+    return providerSucceeded
+      ? SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED
+      : SpecialistProviderExecutionStatus.PROVIDER_FAILED;
+  }
   if (manualReviewRequired) {
     if (!MANUAL.has(providerStatus) || providerSucceeded || safeToRetry || errorCode) {
       throw new Error('Manual-review provider outcome is inconsistent');
@@ -122,15 +136,7 @@ function deriveStatus({
     return SpecialistProviderExecutionStatus.MANUAL_REVIEW;
   }
   if (providerStatus) {
-    if (!TERMINAL.has(providerStatus) || safeToRetry || errorCode || !effectEvidence) {
-      throw new Error('Terminal provider outcome is inconsistent');
-    }
-    if (providerSucceeded !== (providerStatus === 'finished')) {
-      throw new Error('providerSucceeded does not match terminal providerStatus');
-    }
-    return providerSucceeded
-      ? SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED
-      : SpecialistProviderExecutionStatus.PROVIDER_FAILED;
+    throw new Error('Provider outcome contains unsupported nonterminal status');
   }
   if (safeToRetry) {
     if (providerSucceeded || effectEvidence || !errorCode) {
