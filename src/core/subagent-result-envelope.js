@@ -193,6 +193,16 @@ function assertArtifactChronology(refs, latestAt, label) {
   }
 }
 
+function assertArtifactProducerInvocation(refs, invocationId, label) {
+  for (const ref of refs) {
+    if (!ref.producerInvocationId || ref.producerInvocationId !== invocationId) {
+      throw new Error(
+        label + ' ArtifactRef producerInvocationId must match child invocation: ' + ref.artifactId,
+      );
+    }
+  }
+}
+
 export function normalizeSubagentResultEnvelopeV1(input) {
   const raw = record(input, RESULT_KEYS, 'SubagentResultEnvelopeV1');
   if (own(raw, 'schemaVersion', 'SubagentResultEnvelopeV1') !== SUBAGENT_RESULT_ENVELOPE_VERSION) {
@@ -220,10 +230,15 @@ export function normalizeSubagentResultEnvelopeV1(input) {
     throw new Error('Subagent result must require canonical trusted verification before completion');
   }
 
+  const invocationId = id(
+    own(raw, 'invocationId', 'SubagentResultEnvelopeV1'),
+    'invocationId',
+  );
   const resultArtifactRefs = artifactRefList(
     own(raw, 'resultArtifactRefs', 'SubagentResultEnvelopeV1'),
     'resultArtifactRefs',
   );
+  assertArtifactProducerInvocation(resultArtifactRefs, invocationId, 'resultArtifactRefs');
   const evidenceArtifactRefs = artifactRefList(
     own(raw, 'evidenceArtifactRefs', 'SubagentResultEnvelopeV1'),
     'evidenceArtifactRefs',
@@ -284,7 +299,7 @@ export function normalizeSubagentResultEnvelopeV1(input) {
       1,
     ),
     observationId: id(own(raw, 'observationId', 'SubagentResultEnvelopeV1'), 'observationId'),
-    invocationId: id(own(raw, 'invocationId', 'SubagentResultEnvelopeV1'), 'invocationId'),
+    invocationId,
     observationStatus,
     observationSummary: text(
       own(raw, 'observationSummary', 'SubagentResultEnvelopeV1'),
@@ -365,6 +380,11 @@ export function createSubagentResultEnvelopeV1(input = {}) {
   }
 
   const resultArtifactRefs = artifactRefList(observation.artifactRefs, 'resultArtifactRefs');
+  assertArtifactProducerInvocation(
+    resultArtifactRefs,
+    observation.invocationId,
+    'resultArtifactRefs',
+  );
   const evidenceArtifactRefs = artifactRefList(
     own(raw, 'evidenceArtifactRefs', 'SubagentResultEnvelopeBuildV1'),
     'evidenceArtifactRefs',
