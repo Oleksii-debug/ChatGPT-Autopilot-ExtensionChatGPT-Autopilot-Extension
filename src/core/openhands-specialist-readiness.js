@@ -20,10 +20,12 @@ const REQUEST_KEYS = new Set([
   'providerId',
   'definitionRevision',
   'executionPlane',
+  'requestedCapabilityIds',
   'requestedToolIds',
   'asOf',
 ]);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const MAX_CAPABILITY_IDS = 64;
 const MAX_TOOL_IDS = 128;
 const DEFAULT_MAX_AGE_MS = 15_000;
 const MAX_MAX_AGE_MS = 5 * 60_000;
@@ -113,11 +115,23 @@ function clockMs(now) {
   return value;
 }
 
+function exactIds(value, label, max) {
+  const out = denseArray(value, label, max)
+    .map((item, index) => id(item, label + '[' + index + ']'));
+  if (new Set(out).size !== out.length) throw new Error(label + ' contains duplicate identity');
+  return Object.freeze([...out].sort());
+}
+
+function capabilityIds(value) {
+  return exactIds(value, 'requestedCapabilityIds', MAX_CAPABILITY_IDS);
+}
+
 function toolIds(value) {
-  const out = denseArray(value, 'requestedToolIds', MAX_TOOL_IDS)
-    .map((item, index) => id(item, 'requestedToolIds[' + index + ']'));
-  if (new Set(out).size !== out.length) throw new Error('requestedToolIds contains duplicate identity');
-  return Object.freeze([...out]);
+  return exactIds(value, 'requestedToolIds', MAX_TOOL_IDS);
+}
+
+function sameIds(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
 function ownErrorCode(error) {
@@ -201,6 +215,10 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
     integer(request.definitionRevision, 'definitionRevision', 1, Number.MAX_SAFE_INTEGER);
     if (id(request.executionPlane, 'executionPlane') !== 'LOCAL') {
       throw new Error('OpenHands coding readiness requires LOCAL execution plane');
+    }
+    const requestedCapabilities = capabilityIds(request.requestedCapabilityIds);
+    if (!sameIds(requestedCapabilities, config.qualifiedCapabilityIds)) {
+      throw new Error('OpenHands readiness request capability scope does not match qualified profile');
     }
     toolIds(request.requestedToolIds);
     timestamp(request.asOf, 'asOf');
