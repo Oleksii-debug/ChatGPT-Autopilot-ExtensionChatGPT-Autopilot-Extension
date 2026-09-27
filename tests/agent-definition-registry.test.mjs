@@ -254,7 +254,7 @@ test('owner budget is complete, canonical, descriptor-safe and reusable definiti
   assert.throws(() => materializeAgentDefinitionV1(materialization({ ownerBudget: missing })), /missing required field: maxTotalTokens/);
 
   const nonCanonical = { ...materialization().ownerBudget, maxModelCalls: -0 };
-  assert.throws(() => materializeAgentDefinitionV1(materialization({ ownerBudget: nonCanonical })), /must already be canonical/);
+  assert.throws(() => materializeAgentDefinitionV1(materialization({ ownerBudget: nonCanonical })), /exact scalar data value/);
 
   let reads = 0;
   const hostile = { ...materialization().ownerBudget };
