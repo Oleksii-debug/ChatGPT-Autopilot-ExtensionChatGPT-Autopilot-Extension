@@ -215,7 +215,8 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     }
   }
   for (const key of ['maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
-    if (Object.hasOwn(raw, key) && !Object.is(raw[key], normalized[key])) {
+    if (Object.hasOwn(raw, key)
+        && (Object.is(raw[key], -0) || !Object.is(raw[key], normalized[key]))) {
       throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
     }
   }
