@@ -190,10 +190,7 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
   };
 
   const jobId = boundedText(raw.jobId || '', 'Job ID', 128, { optional: true });
-  if (jobId) {
-    if (!ID.test(jobId)) throw new Error('Job ID is invalid');
-    request.jobId = jobId;
-  }
+  if (jobId) request.jobId = jobId;
 
   return Object.freeze(request);
 }
