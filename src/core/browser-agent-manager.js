@@ -431,6 +431,9 @@ export class BrowserAgentManager {
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
     this.cycleAllInFlight = null;
+    this.executionSlotActive = new Set();
+    this.executionSlotQueue = [];
+    this.executionSlotPump = null;
   }
 
   async load() {
@@ -551,6 +554,54 @@ export class BrowserAgentManager {
     });
     await this.reconcileAlarm();
     return policy;
+  }
+
+  async #pumpExecutionSlots() {
+    if (this.executionSlotPump) return this.executionSlotPump;
+    const operation = (async () => {
+      while (this.executionSlotQueue.length) {
+        const policy = await this.getExecutionPolicy();
+        if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
+        const next = this.executionSlotQueue.shift();
+        if (!next) return;
+        if (this.executionSlotActive.has(next.id)) {
+          next.resolve();
+          continue;
+        }
+        this.executionSlotActive.add(next.id);
+        next.resolve();
+      }
+    })();
+    this.executionSlotPump = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.executionSlotPump === operation) this.executionSlotPump = null;
+    }
+  }
+
+  async #acquireExecutionSlot(id) {
+    if (this.executionSlotActive.has(id)) return false;
+    const policy = await this.getExecutionPolicy();
+    const admission = evaluateResourceBudgetV1({
+      budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
+      usage: { concurrentAgents: this.executionSlotActive.size },
+      request: { concurrentAgents: 1 },
+    });
+    if (admission.decision === ResourceBudgetDecisionKind.ALLOW && this.executionSlotQueue.length === 0) {
+      this.executionSlotActive.add(id);
+      return true;
+    }
+    await new Promise(resolve => {
+      this.executionSlotQueue.push({ id, resolve });
+      void this.#pumpExecutionSlots();
+    });
+    return true;
+  }
+
+  #releaseExecutionSlot(id) {
+    if (!this.executionSlotActive.delete(id)) return;
+    void this.#pumpExecutionSlots();
   }
 
   async list() {
@@ -3229,28 +3280,33 @@ export class BrowserAgentManager {
   }
 
   async runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
-    const startedWall = Date.now();
-    const results = [];
-    for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
-      if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
-      const before = await this.get(id);
-      if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
-      const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
-      if (waitMs > 0) {
-        if (waitMs > maxInlineWaitMs) break;
-        await sleep(waitMs);
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      const startedWall = Date.now();
+      const results = [];
+      for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
+        if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
+        const before = await this.get(id);
+        if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
+        const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
+        if (waitMs > 0) {
+          if (waitMs > maxInlineWaitMs) break;
+          await sleep(waitMs);
+        }
+        const result = await this.cycleOne(id);
+        results.push(result);
+        if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
+        if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
+          const live = await this.get(id);
+          const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
+          if (delay > maxInlineWaitMs) break;
+        }
       }
-      const result = await this.cycleOne(id);
-      results.push(result);
-      if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
-      if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
-        const live = await this.get(id);
-        const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
-        if (delay > maxInlineWaitMs) break;
-      }
+      await this.reconcileAlarm();
+      return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
     }
-    await this.reconcileAlarm();
-    return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
   }
 
   cycleAll() {
@@ -3282,20 +3338,10 @@ export class BrowserAgentManager {
         due.push(id);
       }
 
-      const workerCount = [];
-      for (let index = 0; index < due.length; index += 1) {
-        const admission = evaluateResourceBudgetV1({
-          budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
-          usage: { concurrentAgents: workerCount.length },
-          request: { concurrentAgents: 1 },
-        });
-        if (admission.decision !== ResourceBudgetDecisionKind.ALLOW) break;
-        workerCount.push(index);
-      }
-
       const runResults = new Array(due.length);
       let cursor = 0;
-      const workers = workerCount.map(async () => {
+      const workerCount = Math.min(policy.maxConcurrentAgents, due.length);
+      const workers = Array.from({ length: workerCount }, async () => {
         while (true) {
           const index = cursor;
           cursor += 1;
