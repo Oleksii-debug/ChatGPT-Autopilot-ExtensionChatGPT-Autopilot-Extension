@@ -11,7 +11,6 @@ import {
   createOrchestrationProjectAuthorityV1,
   inspectBrowserAgentOrchestrationNodeBindingV1,
 } from '../src/core/browser-agent-orchestration-binding.js';
-import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
 
 function chromeFake() {
   const data = Object.create(null);
