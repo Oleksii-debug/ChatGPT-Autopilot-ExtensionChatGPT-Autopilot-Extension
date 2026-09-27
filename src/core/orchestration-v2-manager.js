@@ -157,6 +157,10 @@ export class OrchestrationV2Manager {
     this.createId = createId || (() => `orch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
     this.controllers = new Map();
     this.updateChain = Promise.resolve();
+    // Canonical in-process authority fence. Manager-owned mutations that can
+    // change Project ownership, hierarchy provenance or owner subagent policy
+    // serialize with Browser Agent binding admission through this same chain.
+    this.projectAuthorityChain = Promise.resolve();
     this.migrationBarrier = null;
   }
 
@@ -181,6 +185,30 @@ export class OrchestrationV2Manager {
     });
     this.updateChain = operation.catch(() => undefined);
     return operation;
+  }
+
+  runProjectAuthorityExclusive(operation) {
+    if (typeof operation !== 'function') {
+      throw new Error('Orchestration Project authority operation must be a function');
+    }
+    const run = this.projectAuthorityChain.then(operation);
+    this.projectAuthorityChain = run.catch(() => undefined);
+    return run;
+  }
+
+  /**
+   * Keep canonical Project -> hierarchy authority stable while a dependent
+   * durable mutation commits. The callback is awaited under the same fence
+   * used by manager-owned authority mutations.
+   */
+  withProjectHierarchyAuthority(projectId, operation) {
+    if (typeof operation !== 'function') {
+      throw new Error('Orchestration Project authority callback is required');
+    }
+    return this.runProjectAuthorityExclusive(async () => {
+      const authority = await this.resolveProjectHierarchyAuthority(projectId);
+      return operation(authority);
+    });
   }
 
   ensureMigrated() {
@@ -435,6 +463,10 @@ export class OrchestrationV2Manager {
   }
 
   async updateConfig(raw, id = '') {
+    return this.runProjectAuthorityExclusive(() => this._updateConfigUnfenced(raw, id));
+  }
+
+  async _updateConfigUnfenced(raw, id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -489,6 +521,10 @@ export class OrchestrationV2Manager {
   }
 
   async delete(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._deleteUnfenced(id));
+  }
+
+  async _deleteUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -611,6 +647,10 @@ export class OrchestrationV2Manager {
   }
 
   async configureHierarchyTemplate(options = {}) {
+    return this.runProjectAuthorityExclusive(() => this._configureHierarchyTemplateUnfenced(options));
+  }
+
+  async _configureHierarchyTemplateUnfenced(options = {}) {
     const { id, item, controller } = await this.selectedController();
     const { config } = await controller.getStatus();
     if (!config.projectId || !config.targetRepository) {
@@ -730,16 +770,17 @@ export class OrchestrationV2Manager {
       if (safety.managed.length) {
         throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
       }
-      await selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
+      await this.runProjectAuthorityExclusive(() =>
+        selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() }));
     }
     const importedPolicy = storedSubagentPolicy(importedDocument.subagentPolicy);
-    await this.updateMeta(meta => {
+    await this.runProjectAuthorityExclusive(() => this.updateMeta(meta => {
       const record = meta.byId[selected.id];
       if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
       record.subagentPolicy = importedPolicy;
       record.updatedAt = this.now();
       return meta;
-    });
+    }));
     return {
       config: status.config,
       hierarchy: importedDocument.hierarchy,
