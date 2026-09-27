@@ -59,6 +59,7 @@ const MIN_ACTIVE_PROBE_MS = 30_000;
 const MAX_PROBES_PER_CYCLE = 200;
 const MAX_HIERARCHY_PROVIDER_POLLS_PER_CYCLE = 50;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
+const HIERARCHY_SCOPE_EVENT_KEYS = new Set(['type', 'eventId', 'controlEpoch', 'nodeId']);
 
 function isUnresolvedOperation(session) {
   return Boolean(session?.operation && !SAFE_TERMINAL_PHASES.has(session.operation.phase));
@@ -74,6 +75,35 @@ function isManagedOrchestrationSession(session, projectId, hierarchyGraphId = ''
 
 function isTabAlreadyGoneError(error) {
   return /no tab with id|invalid tab id|tab not found/i.test(String(error?.message || error || ''));
+}
+
+function snapshotHierarchyScopeEvent(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Hierarchy scope event must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Hierarchy scope event must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  for (const key of keys) {
+    if (typeof key !== 'string' || !HIERARCHY_SCOPE_EVENT_KEYS.has(key)) {
+      throw new Error(`Hierarchy scope event contains unknown field: ${String(key)}`);
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`Hierarchy scope event ${String(key)} must be an enumerable own data property`);
+    }
+  }
+  for (const key of HIERARCHY_SCOPE_EVENT_KEYS) {
+    if (!Object.hasOwn(descriptors, key)) {
+      throw new Error(`Hierarchy scope event requires ${key}`);
+    }
+  }
+  return Object.freeze(Object.fromEntries(
+    [...HIERARCHY_SCOPE_EVENT_KEYS].map(key => [key, descriptors[key].value]),
+  ));
 }
 
 function hierarchyContainer(runtime) {
@@ -157,24 +187,11 @@ export class OrchestrationV2Controller {
   }
 
   async dispatchHierarchyScopeEvent(eventRaw, { nowMs = this.now() } = {}) {
-    if (!eventRaw || typeof eventRaw !== 'object' || Array.isArray(eventRaw)) {
-      throw new Error('Hierarchy scope event must be a plain object');
-    }
-    const prototype = Object.getPrototypeOf(eventRaw);
-    if (prototype !== Object.prototype && prototype !== null) {
-      throw new Error('Hierarchy scope event must be a plain object');
-    }
-    const typeDescriptor = Object.getOwnPropertyDescriptor(eventRaw, 'type');
-    if (!typeDescriptor
-        || typeDescriptor.enumerable !== true
-        || !Object.hasOwn(typeDescriptor, 'value')
-        || typeof typeDescriptor.value !== 'string') {
-      throw new Error('Hierarchy scope event type must be an enumerable own data property');
-    }
-    const requestedType = typeDescriptor.value;
-    if (![OrchestrationHierarchyEventType.PAUSE_SCOPE,
-      OrchestrationHierarchyEventType.RESUME_SCOPE,
-      OrchestrationHierarchyEventType.STOP_SCOPE].includes(requestedType)) {
+    const event = snapshotHierarchyScopeEvent(eventRaw);
+    if (typeof event.type !== 'string'
+        || ![OrchestrationHierarchyEventType.PAUSE_SCOPE,
+          OrchestrationHierarchyEventType.RESUME_SCOPE,
+          OrchestrationHierarchyEventType.STOP_SCOPE].includes(event.type)) {
       throw new Error('Hierarchy scope dispatcher accepts only PAUSE_SCOPE, RESUME_SCOPE or STOP_SCOPE');
     }
 
@@ -186,7 +203,7 @@ export class OrchestrationV2Controller {
       await this.runtimeRepository.update(async runtime => {
         const hierarchy = hierarchyContainer(runtime);
         if (!hierarchy) return runtime;
-        const reduced = reduceOrchestrationHierarchyEvent(hierarchy.graph, hierarchy.state, eventRaw, nowMs);
+        const reduced = reduceOrchestrationHierarchyEvent(hierarchy.graph, hierarchy.state, event, nowMs);
         rollbackGraphId = hierarchy.graph.graphId;
         let scopeSync = { transitions: [] };
 
