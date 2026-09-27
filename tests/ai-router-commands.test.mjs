@@ -621,3 +621,51 @@ test('Agent route policy composes with legacy per-Agent route pin without mutati
   assert.equal(result.result.text, 'done');
   assert.deepEqual(calls.map(call => call.model), ['local-b']);
 });
+
+
+test('Agent router override boundary rejects accessors without executing them', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[{ routeId:'local', provider:'ollama', model:'local' }],
+  } });
+
+  let reads = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'routeId', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'local';
+    },
+  });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'x',
+      isolatedRuntime:true,
+      routerOverride:hostile,
+    }),
+    /data-only fields/,
+  );
+  assert.equal(reads, 0);
+
+  const hostileSlot = {};
+  Object.defineProperty(hostileSlot, 'model', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 'local';
+    },
+  });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'x',
+      isolatedRuntime:true,
+      routerOverride:{ primary: hostileSlot },
+    }),
+    /data-only fields/,
+  );
+  assert.equal(reads, 0);
+});
