@@ -3,6 +3,7 @@ import {
   normalizeAgentPlanV1,
 } from './agent-plan.js';
 import { normalizeOutcomeContractV1 } from './outcome-contract.js';
+import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
 
 export const SUBAGENT_TASK_ENVELOPE_VERSION = 1;
 
@@ -16,7 +17,7 @@ const INPUT_KEYS = new Set([
   'plan',
   'nodeId',
   'inputSourceIds',
-  'inputArtifactIds',
+  'inputArtifactRefs',
   'outcomeContract',
   'createdAt',
 ]);
@@ -32,8 +33,8 @@ const ENVELOPE_KEYS = new Set([
   'objective',
   'conflictKeys',
   'budget',
-  'inputSourceIds',
-  'inputArtifactIds',
+  'inputSourceRefs',
+  'inputArtifactRefs',
   'outcome',
   'createdAt',
   'executionAuthority',
@@ -43,6 +44,7 @@ const ENVELOPE_KEYS = new Set([
   'completionAuthority',
 ]);
 const BUDGET_KEYS = new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']);
+const SOURCE_REF_KEYS = new Set(['sourceId', 'location', 'revisionId']);
 const OUTCOME_KEYS = new Set([
   'contractId',
   'contractRevision',
@@ -162,6 +164,48 @@ function compareCodeUnit(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function normalizeSourceRef(value) {
+  const raw = record(value, SOURCE_REF_KEYS, 'SubagentTaskSourceRefV1');
+  return {
+    sourceId: id(own(raw, 'sourceId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.sourceId'),
+    location: text(own(raw, 'location', 'SubagentTaskSourceRefV1'), 'inputSourceRef.location', 8_000),
+    revisionId: id(own(raw, 'revisionId', 'SubagentTaskSourceRefV1'), 'inputSourceRef.revisionId'),
+  };
+}
+
+function sourceRefList(value) {
+  const refs = dataArray(value, 'inputSourceRefs').map((item, index) => {
+    try {
+      return normalizeSourceRef(item);
+    } catch (error) {
+      throw new Error('inputSourceRefs[' + index + ']: ' + error.message);
+    }
+  });
+  if (new Set(refs.map(item => item.sourceId)).size !== refs.length) {
+    throw new Error('inputSourceRefs contains duplicate sourceId');
+  }
+  return refs.sort((left, right) => compareCodeUnit(left.sourceId, right.sourceId));
+}
+
+function artifactRefList(value) {
+  const refs = dataArray(value, 'inputArtifactRefs').map((item, index) => {
+    try {
+      return normalizeArtifactRefV1(item);
+    } catch (error) {
+      throw new Error('inputArtifactRefs[' + index + ']: ' + error.message);
+    }
+  });
+  if (new Set(refs.map(item => item.artifactId)).size !== refs.length) {
+    throw new Error('inputArtifactRefs contains duplicate artifactId');
+  }
+  for (const ref of refs) {
+    if (!ref.sha256) {
+      throw new Error('Subagent task input ArtifactRef must carry sha256 immutable identity: ' + ref.artifactId);
+    }
+  }
+  return refs.sort((left, right) => compareCodeUnit(left.artifactId, right.artifactId));
+}
+
 function normalizeBudget(value) {
   const raw = record(value, BUDGET_KEYS, 'SubagentTaskBudgetV1');
   return {
@@ -221,13 +265,19 @@ function assertAcceptanceCoverage(nodeCriteria, outcomeCriteria) {
   }
 }
 
-function assertInputSourcesCovered(inputSourceIds, outcome) {
-  const allowed = new Set(outcome.sourceTruth.map(item => item.sourceId));
-  for (const sourceId of inputSourceIds) {
-    if (!allowed.has(sourceId)) {
+function sourceRefsForIds(inputSourceIds, outcome) {
+  const byId = new Map(outcome.sourceTruth.map(item => [item.sourceId, item]));
+  return inputSourceIds.map(sourceId => {
+    const source = byId.get(sourceId);
+    if (!source) {
       throw new Error('Subagent task input source is not bound to OutcomeContract sourceTruth: ' + sourceId);
     }
-  }
+    return {
+      sourceId: source.sourceId,
+      location: source.location,
+      revisionId: source.revisionId,
+    };
+  });
 }
 
 export function normalizeSubagentTaskEnvelopeV1(input) {
@@ -261,14 +311,12 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
       128,
     ),
     budget: normalizeBudget(own(raw, 'budget', 'SubagentTaskEnvelopeV1')),
-    inputSourceIds: idList(
-      own(raw, 'inputSourceIds', 'SubagentTaskEnvelopeV1'),
-      'inputSourceIds',
-    ).sort(compareCodeUnit),
-    inputArtifactIds: idList(
-      own(raw, 'inputArtifactIds', 'SubagentTaskEnvelopeV1'),
-      'inputArtifactIds',
-    ).sort(compareCodeUnit),
+    inputSourceRefs: sourceRefList(
+      own(raw, 'inputSourceRefs', 'SubagentTaskEnvelopeV1'),
+    ),
+    inputArtifactRefs: artifactRefList(
+      own(raw, 'inputArtifactRefs', 'SubagentTaskEnvelopeV1'),
+    ),
     outcome: normalizeOutcomeBinding(own(raw, 'outcome', 'SubagentTaskEnvelopeV1')),
     createdAt: timestamp(own(raw, 'createdAt', 'SubagentTaskEnvelopeV1'), 'createdAt'),
     executionAuthority: false,
@@ -322,11 +370,10 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
     own(raw, 'inputSourceIds', 'SubagentTaskEnvelopeBuildV1'),
     'inputSourceIds',
   ).sort(compareCodeUnit);
-  assertInputSourcesCovered(inputSourceIds, outcome);
-  const inputArtifactIds = idList(
-    own(raw, 'inputArtifactIds', 'SubagentTaskEnvelopeBuildV1'),
-    'inputArtifactIds',
-  ).sort(compareCodeUnit);
+  const inputSourceRefs = sourceRefsForIds(inputSourceIds, outcome);
+  const inputArtifactRefs = artifactRefList(
+    own(raw, 'inputArtifactRefs', 'SubagentTaskEnvelopeBuildV1'),
+  );
 
   const createdAt = timestamp(
     own(raw, 'createdAt', 'SubagentTaskEnvelopeBuildV1'),
@@ -337,6 +384,11 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
   }
   if (Date.parse(createdAt) < Date.parse(outcome.createdAt)) {
     throw new Error('Subagent task envelope cannot predate OutcomeContract');
+  }
+  for (const artifactRef of inputArtifactRefs) {
+    if (Date.parse(artifactRef.createdAt) > Date.parse(createdAt)) {
+      throw new Error('Subagent task input ArtifactRef cannot postdate envelope: ' + artifactRef.artifactId);
+    }
   }
 
   return normalizeSubagentTaskEnvelopeV1({
@@ -351,8 +403,8 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
     objective: node.objective,
     conflictKeys: [...node.conflictKeys],
     budget: { ...node.budget },
-    inputSourceIds,
-    inputArtifactIds,
+    inputSourceRefs,
+    inputArtifactRefs,
     outcome: {
       contractId: outcome.contractId,
       contractRevision: outcome.revision,
