@@ -224,3 +224,19 @@ test('resolver exposes an explicit read-only zero-execution authority projection
   assert.equal(Object.isFrozen(resolver), true);
   assert.equal(Object.isFrozen(resolver.authority), true);
 });
+
+test('reader bindings must contain the complete governor envelope', async () => {
+  for (const partial of [
+    { routeId:'route-a', evaluationRequest:{} },
+    { routeId:'route-a', maxAgeMs:1000 },
+    { evaluationRequest:{}, maxAgeMs:1000 },
+  ]) {
+    const resolver = createAiRouteQualityEvidenceResolverV1({
+      readBenchmarkRequests:async () => [partial],
+    });
+    await assert.rejects(
+      resolver({ routeIds:['route-a'], role:'planner', requiresVision:false }),
+      /missing field/u,
+    );
+  }
+});
