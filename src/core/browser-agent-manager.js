@@ -51,12 +51,15 @@ import {
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
+const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -158,7 +161,39 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   return new Date(millis).toISOString();
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
-function freshStore() { return { schemaVersion: BROWSER_AGENT_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
+function normalizeBrowserAgentExecutionPolicy(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Browser Agent execution policy must be a plain object');
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error('Browser Agent execution policy must be a plain object');
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== 'string' || !['maxConcurrentAgents'].includes(key))) {
+    throw new Error('Browser Agent execution policy contains an unknown field');
+  }
+  for (const key of keys) {
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Browser Agent execution policy fields must be enumerable data properties');
+    }
+  }
+  const value = Object.hasOwn(descriptors, 'maxConcurrentAgents')
+    ? descriptors.maxConcurrentAgents.value
+    : DEFAULT_BROWSER_AGENT_MAX_CONCURRENT;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
+      || value < 1 || value > MAX_BROWSER_AGENT_CONCURRENT) {
+    throw new Error(`Browser Agent maxConcurrentAgents must be an integer from 1 to ${MAX_BROWSER_AGENT_CONCURRENT}`);
+  }
+  return Object.freeze({ maxConcurrentAgents: value });
+}
+function freshStore() {
+  return {
+    schemaVersion: BROWSER_AGENT_SCHEMA_VERSION,
+    selectedId: '',
+    order: [],
+    byId: {},
+    executionPolicy: normalizeBrowserAgentExecutionPolicy(),
+  };
+}
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
   const url = new URL(value);
@@ -369,6 +404,11 @@ function normalizeStore(raw, now) {
     }
   }
   out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  try {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy(raw.executionPolicy || {});
+  } catch {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
+  }
   return out;
 }
 
@@ -390,6 +430,12 @@ export class BrowserAgentManager {
       : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
+    this.runBurstInFlight = new Map();
+    this.cycleAllInFlight = null;
+    this.executionSlotActive = new Set();
+    this.executionSlotQueue = [];
+    this.executionSlotPump = null;
+    this.executionSlotPumpRequested = false;
   }
 
   async load() {
@@ -495,6 +541,119 @@ export class BrowserAgentManager {
     if (!independent.verified) return { ok: false, error: new Error('Independent Browser Agent verifier could not prove the outcome') };
     verification = { ...verification, checks: independent.checks, independentlyVerified: true };
     return { ok: true, verification };
+  }
+
+  async getExecutionPolicy() {
+    const store = await this.load();
+    return normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+  }
+
+  async updateExecutionPolicy(input = {}) {
+    const policy = normalizeBrowserAgentExecutionPolicy(input);
+    await this.update(store => {
+      store.executionPolicy = policy;
+      return store;
+    });
+    // Concurrency policy changes neither due times nor alarm ownership. Waking
+    // the in-memory admission queue is sufficient and avoids reporting a
+    // failed save after the durable policy already committed.
+    this.#requestExecutionSlotPump();
+    return policy;
+  }
+
+  #rejectExecutionSlotQueue(error) {
+    const pending = this.executionSlotQueue.splice(0);
+    for (const next of pending) next.reject(error);
+  }
+
+  #hasExecutionTargetConflict(store, id) {
+    const requestedTabId = store.byId[id]?.runtime?.tabId;
+    if (!Number.isInteger(requestedTabId)) return false;
+    for (const activeId of this.executionSlotActive) {
+      if (activeId === id) continue;
+      if (store.byId[activeId]?.runtime?.tabId === requestedTabId) return true;
+    }
+    return false;
+  }
+
+  #requestExecutionSlotPump() {
+    if (this.executionSlotPump) {
+      this.executionSlotPumpRequested = true;
+      return;
+    }
+    void this.#pumpExecutionSlots();
+  }
+
+  async #pumpExecutionSlots() {
+    if (this.executionSlotPump) return this.executionSlotPump;
+    this.executionSlotPumpRequested = false;
+    const operation = (async () => {
+      try {
+        while (this.executionSlotQueue.length) {
+          const store = await this.load();
+          const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+          if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
+
+          let eligibleIndex = -1;
+          for (let index = 0; index < this.executionSlotQueue.length; index += 1) {
+            const candidate = this.executionSlotQueue[index];
+            if (!this.executionSlotActive.has(candidate.id) && !this.#hasExecutionTargetConflict(store, candidate.id)) {
+              eligibleIndex = index;
+              break;
+            }
+          }
+          if (eligibleIndex < 0) return;
+
+          const [next] = this.executionSlotQueue.splice(eligibleIndex, 1);
+          if (!next) return;
+          if (this.executionSlotActive.has(next.id)) {
+            next.resolve();
+            continue;
+          }
+          this.executionSlotActive.add(next.id);
+          next.resolve();
+        }
+      } catch (error) {
+        this.#rejectExecutionSlotQueue(error);
+      }
+    })();
+    this.executionSlotPump = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.executionSlotPump === operation) this.executionSlotPump = null;
+      if (this.executionSlotPumpRequested) {
+        this.executionSlotPumpRequested = false;
+        this.#requestExecutionSlotPump();
+      }
+    }
+  }
+
+  async #acquireExecutionSlot(id) {
+    const store = await this.load();
+    const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+    const admission = evaluateResourceBudgetV1({
+      budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
+      usage: { concurrentAgents: this.executionSlotActive.size },
+      request: { concurrentAgents: 1 },
+    });
+    if (admission.decision === ResourceBudgetDecisionKind.ALLOW
+        && this.executionSlotQueue.length === 0
+        && !this.executionSlotActive.has(id)
+        && !this.#hasExecutionTargetConflict(store, id)) {
+      this.executionSlotActive.add(id);
+      return true;
+    }
+    await new Promise((resolve, reject) => {
+      this.executionSlotQueue.push({ id, resolve, reject });
+      this.#requestExecutionSlotPump();
+    });
+    return true;
+  }
+
+  #releaseExecutionSlot(id) {
+    if (!this.executionSlotActive.delete(id)) return;
+    this.#requestExecutionSlotPump();
   }
 
   async list() {
@@ -1406,18 +1565,29 @@ export class BrowserAgentManager {
     }
     const context = await this.resolveStartContext(job);
     if (context.tab?.id != null && context.adopt) {
+      let adopted = false;
       await this.update(store => {
         const live = store.byId[job.id];
         if (!live) return store;
+        const claimedByOtherAgent = store.order.some(otherId =>
+          otherId !== job.id && store.byId[otherId]?.runtime?.tabId === context.tab.id);
+        if (claimedByOtherAgent) return store;
         live.runtime.tabId = context.tab.id;
         if (!live.runtime.knownTabIds.includes(context.tab.id)) live.runtime.knownTabIds.push(context.tab.id);
         // Adopted owner tabs are intentionally NOT placed in ownedTabIds.
         live.runtime.currentUrl = context.tab.url || context.url;
         live.runtime.updatedAt = this.now();
         appendHistory(live.runtime, { at: this.now(), type: 'tab', message: 'Adopted existing browser tab without taking ownership' });
+        adopted = true;
         return store;
       });
-      return context.tab;
+      if (adopted) {
+        this.#requestExecutionSlotPump();
+        return context.tab;
+      }
+      // Another durable Browser Agent already binds this owner tab. Do not
+      // create a competing target-ownership authority; isolate this job onto a
+      // fresh owned tab at the same URL instead.
     }
     const tab = await this.chrome.tabs.create({ url: context.url || DEFAULT_AGENT_START_URL, active: false });
     if (!Number.isInteger(tab?.id)) throw new Error('Browser Agent could not create a browser tab');
@@ -1431,6 +1601,7 @@ export class BrowserAgentManager {
       live.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return tab;
   }
 
@@ -1818,6 +1989,7 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return child;
   }
 
@@ -1895,7 +2067,12 @@ export class BrowserAgentManager {
       await this.reconcileAlarm();
       return this.get(id);
     };
-    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      // Acquire before re-proving the approved target. If this approval waited
+      // behind another Agent on the same tab, all stale-target checks must run
+      // only after exclusive Browser-Agent execution admission is obtained.
+      const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
     const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
@@ -2013,7 +2190,10 @@ export class BrowserAgentManager {
         return store;
       });
     }
-    await this.reconcileAlarm();
+      await this.reconcileAlarm();
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
     if (runInitial) await this.runBurst(id, { maxCycles: 25, maxWallMs: 25_000 });
     await this.reconcileAlarm();
     return this.get(id);
@@ -2217,6 +2397,7 @@ export class BrowserAgentManager {
         live.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: created.url || action.url };
     }
     if (action.type === BrowserAgentActionType.SWITCH_TAB) {
@@ -2243,11 +2424,19 @@ export class BrowserAgentManager {
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+        const activeTargetOwner = [...this.executionSlotActive].find(activeId =>
+          activeId !== job.id && store.byId[activeId]?.runtime?.tabId === action.tabId);
+        if (activeTargetOwner) {
+          const error = new Error('Browser Agent target tab is already in use by another active Agent');
+          error.code = 'AGENT_TAB_TARGET_IN_USE';
+          throw error;
+        }
         current.runtime.tabId = action.tabId;
         current.runtime.currentUrl = targetUrl;
         current.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: targetUrl };
     }
     if (action.type === BrowserAgentActionType.CLOSE_TAB) {
@@ -2278,6 +2467,7 @@ export class BrowserAgentManager {
           if (candidate && isHttpUrl(candidate.pendingUrl || candidate.url)) { fallback = candidate; break; }
         } catch { /* skip stale tab */ }
       }
+      let appliedFallback = fallback;
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -2285,13 +2475,18 @@ export class BrowserAgentManager {
         current.runtime.retirePendingTabIds = current.runtime.retirePendingTabIds.filter(id => id !== action.tabId);
         current.runtime.knownTabIds = current.runtime.knownTabIds.filter(id => id !== action.tabId);
         if (current.runtime.tabId === action.tabId) {
-          current.runtime.tabId = fallback?.id ?? null;
-          current.runtime.currentUrl = fallback?.pendingUrl || fallback?.url || '';
+          const fallbackClaimedByActiveAgent = Number.isInteger(fallback?.id)
+            && [...this.executionSlotActive].some(activeId =>
+              activeId !== job.id && store.byId[activeId]?.runtime?.tabId === fallback.id);
+          if (fallbackClaimedByActiveAgent) appliedFallback = null;
+          current.runtime.tabId = appliedFallback?.id ?? null;
+          current.runtime.currentUrl = appliedFallback?.pendingUrl || appliedFallback?.url || '';
         }
         current.runtime.updatedAt = this.now();
         return store;
       });
-      return { kind: 'ACTION', action, currentUrl: fallback?.pendingUrl || fallback?.url || '' };
+      this.#requestExecutionSlotPump();
+      return { kind: 'ACTION', action, currentUrl: appliedFallback?.pendingUrl || appliedFallback?.url || '' };
     }
     if (action.type === BrowserAgentActionType.DOWNLOAD) {
       if (!(await this.hasChromePermission('downloads'))) {
@@ -3118,20 +3313,29 @@ export class BrowserAgentManager {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (current.job.runtime.runState === BrowserAgentRunState.WAITING_APPROVAL) throw new Error('Approve or reject the pending Browser Agent action before manual Step');
-    if (current.job.runtime.runState === BrowserAgentRunState.RUNNING) return this.cycleOne(id);
-    if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
-    const now = this.now();
-    await this.update(store => {
-      const job = store.byId[id];
-      if (!job) return store;
-      job.runtime.controlEpoch += 1;
-      job.runtime.runState = BrowserAgentRunState.RUNNING;
-      job.runtime.lastError = '';
-      job.runtime.nextWakeAt = now;
-      job.runtime.updatedAt = now;
-      return store;
-    });
-    return this.cycleOne(id, { pauseAfter: true });
+    let pauseAfter = false;
+    if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+      if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
+      const now = this.now();
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job) return store;
+        job.runtime.controlEpoch += 1;
+        job.runtime.runState = BrowserAgentRunState.RUNNING;
+        job.runtime.lastError = '';
+        job.runtime.nextWakeAt = now;
+        job.runtime.updatedAt = now;
+        return store;
+      });
+      pauseAfter = true;
+    }
+
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      return await this.cycleOne(id, { pauseAfter });
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
   }
 
   async addInstruction(id, text) {
@@ -3172,40 +3376,58 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
-    const startedWall = Date.now();
-    const results = [];
-    for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
-      if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
-      const before = await this.get(id);
-      if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
-      const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
-      if (waitMs > 0) {
-        if (waitMs > maxInlineWaitMs) break;
-        await sleep(waitMs);
+  runBurst(id, options = {}) {
+    if (this.runBurstInFlight.has(id)) return this.runBurstInFlight.get(id);
+    const operation = this.#runBurst(id, options).finally(() => {
+      if (this.runBurstInFlight.get(id) === operation) this.runBurstInFlight.delete(id);
+    });
+    this.runBurstInFlight.set(id, operation);
+    return operation;
+  }
+
+  async #runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      const startedWall = Date.now();
+      const results = [];
+      for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
+        if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
+        const before = await this.get(id);
+        if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
+        const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
+        if (waitMs > 0) {
+          if (waitMs > maxInlineWaitMs) break;
+          await sleep(waitMs);
+        }
+        const result = await this.cycleOne(id);
+        results.push(result);
+        if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
+        if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
+          const live = await this.get(id);
+          const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
+          if (delay > maxInlineWaitMs) break;
+        }
       }
-      const result = await this.cycleOne(id);
-      results.push(result);
-      if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
-      if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
-        const live = await this.get(id);
-        const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
-        if (delay > maxInlineWaitMs) break;
-      }
+      await this.reconcileAlarm();
+      return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
     }
-    await this.reconcileAlarm();
-    return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
   }
 
   cycleAll() {
+    if (this.cycleAllInFlight) return this.cycleAllInFlight;
     const operation = (async () => {
       const store = await this.load();
       const now = this.now();
-      const results = [];
+      const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+      const preflightResults = [];
+      const due = [];
+
       for (const id of store.order) {
         let job = store.byId[id];
         if ((job?.runtime?.retirePendingTabIds || []).length) {
-          results.push({ id, result: await this.retryPendingRetirement(id) });
+          preflightResults.push({ id, result: await this.retryPendingRetirement(id) });
           const live = await this.get(id);
           job = live.job;
           if (!job) continue;
@@ -3213,17 +3435,44 @@ export class BrowserAgentManager {
         if (job?.runtime?.runState === BrowserAgentRunState.WAITING_SCHEDULE) {
           if (Number(job.runtime.nextWakeAt || 0) > now) continue;
           const activation = await this.activateScheduledJob(id);
-          results.push({ id, result: activation });
+          preflightResults.push({ id, result: activation });
           const live = await this.get(id);
           job = live.job;
         }
         if (job?.runtime?.runState !== BrowserAgentRunState.RUNNING) continue;
         if (Number(job.runtime.nextWakeAt || 0) > now) continue;
-        results.push({ id, result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }) });
+        due.push(id);
       }
+
+      const runResults = new Array(due.length);
+      let cursor = 0;
+      const workerCount = Math.min(policy.maxConcurrentAgents, due.length);
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (true) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= due.length) return;
+          const id = due[index];
+          runResults[index] = {
+            id,
+            result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }),
+          };
+        }
+      });
+      await Promise.all(workers);
+
       await this.reconcileAlarm();
-      return { kind: results.length ? 'CYCLED' : 'IDLE', results };
+      const results = [...preflightResults, ...runResults.filter(Boolean)];
+      return {
+        kind: results.length ? 'CYCLED' : 'IDLE',
+        results,
+        maxConcurrentAgents: policy.maxConcurrentAgents,
+      };
     })();
+    this.cycleAllInFlight = operation;
+    operation.finally(() => {
+      if (this.cycleAllInFlight === operation) this.cycleAllInFlight = null;
+    }).catch(() => undefined);
     return operation;
   }
 
