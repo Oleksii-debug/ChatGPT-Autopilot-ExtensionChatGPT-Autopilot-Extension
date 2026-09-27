@@ -59,6 +59,15 @@ test('reconciliation transition is idempotent only for the same preserved lease'
     }),
     first,
   );
+  const mutableReplay = { ...first };
+  const canonicalReplay = requireExecutionReconciliationV1(mutableReplay, {
+    leaseId: 'lease:1',
+    reason: 'ignored duplicate',
+    at: T1,
+  });
+  assert.notEqual(canonicalReplay, mutableReplay);
+  assert.ok(Object.isFrozen(canonicalReplay));
+  assert.deepEqual(canonicalReplay, first);
   assert.throws(
     () => requireExecutionReconciliationV1(first, {
       leaseId: 'lease:2',
