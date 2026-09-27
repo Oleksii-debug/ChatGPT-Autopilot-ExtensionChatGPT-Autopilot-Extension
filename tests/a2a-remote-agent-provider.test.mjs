@@ -701,6 +701,101 @@ test('message and request boundaries fail before transport', async () => {
   assert.equal(calls.length, 0);
 });
 
+test('constructor snapshots dependency records without executing option or transport accessors', () => {
+  let optionGetterReads = 0;
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, 'transport', {
+    enumerable: true,
+    get() {
+      optionGetterReads += 1;
+      throw new Error('option getter must not execute');
+    },
+  });
+  assert.throws(
+    () => new A2ARemoteAgentProviderV1(accessorOptions),
+    error => error.code === 'A2A_PROVIDER_INPUT_INVALID',
+  );
+  assert.equal(optionGetterReads, 0);
+
+  let methodGetterReads = 0;
+  let networkCalls = 0;
+  const accessorTransport = {};
+  Object.defineProperty(accessorTransport, 'sendJsonRpc', {
+    enumerable: true,
+    get() {
+      methodGetterReads += 1;
+      networkCalls += 1;
+      throw new Error('transport getter must not execute');
+    },
+  });
+  assert.throws(
+    () => new A2ARemoteAgentProviderV1({ transport: accessorTransport }),
+    error => error.code === 'A2A_TRANSPORT_UNAVAILABLE',
+  );
+  assert.equal(methodGetterReads, 0);
+  assert.equal(networkCalls, 0);
+
+  const hiddenOptions = { transport: { sendJsonRpc: async () => okResponse() } };
+  Object.defineProperty(hiddenOptions, 'now', {
+    enumerable: false,
+    value: () => Date.parse(T4),
+  });
+  assert.throws(
+    () => new A2ARemoteAgentProviderV1(hiddenOptions),
+    error => error.code === 'A2A_PROVIDER_INPUT_INVALID',
+  );
+
+  const symbolOptions = { transport: { sendJsonRpc: async () => okResponse() } };
+  symbolOptions[Symbol('hidden')] = true;
+  assert.throws(
+    () => new A2ARemoteAgentProviderV1(symbolOptions),
+    error => error.code === 'A2A_PROVIDER_INPUT_INVALID',
+  );
+
+  assert.throws(
+    () => new A2ARemoteAgentProviderV1({
+      transport: { sendJsonRpc: async () => okResponse() },
+      unexpected: true,
+    }),
+    error => error.code === 'A2A_PROVIDER_INPUT_INVALID',
+  );
+});
+
+test('constructor captures one transport data method and supports null-prototype dependencies', async () => {
+  let originalCalls = 0;
+  let replacementCalls = 0;
+  const transport = Object.create(null);
+  Object.defineProperty(transport, 'sendJsonRpc', {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: async () => {
+      originalCalls += 1;
+      return okResponse();
+    },
+  });
+  const options = Object.create(null);
+  Object.defineProperty(options, 'transport', {
+    enumerable: true,
+    value: transport,
+  });
+  Object.defineProperty(options, 'now', {
+    enumerable: true,
+    value: () => Date.parse(T4),
+  });
+
+  const provider = new A2ARemoteAgentProviderV1(options);
+  transport.sendJsonRpc = async () => {
+    replacementCalls += 1;
+    return okResponse();
+  };
+
+  const result = await provider.sendMessage(sendInput());
+  assert.equal(result.remoteResult.task.id, 'remote-task-1');
+  assert.equal(originalCalls, 1);
+  assert.equal(replacementCalls, 0);
+});
+
 test('constructor and trusted clock fail closed without network effects', async () => {
   assert.throws(
     () => new A2ARemoteAgentProviderV1({ transport: {} }),
