@@ -56,6 +56,22 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
     }
   }
   const requested = normalizeAiRoutePolicy(rawRequested);
+  for (const key of ['autoSwitch', 'freeOnly', 'pinnedRouteId', 'locality',
+    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
+    if (Object.hasOwn(rawRequested, key)
+        && (Object.is(rawRequested[key], -0) || !Object.is(rawRequested[key], requested[key]))) {
+      throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
+    }
+  }
+  for (const key of ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds']) {
+    if (!Object.hasOwn(rawRequested, key)) continue;
+    const value = rawRequested[key];
+    if (!Array.isArray(value)
+        || value.length !== requested[key].length
+        || value.some((item, index) => item !== requested[key][index])) {
+      throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
+    }
+  }
   const base = baseSettings.routePolicy;
   const knownRoutes = new Set(baseSettings.routes.map(route => route.routeId));
   const globalAllow = new Set(base.allowRouteIds);
