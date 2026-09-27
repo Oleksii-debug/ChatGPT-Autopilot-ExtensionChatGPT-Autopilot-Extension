@@ -175,11 +175,8 @@ function automaticStrongGuard(settings, runtime, now) {
   return { allowed: true, reason: '', retryAt: 0 };
 }
 
-function pinnedRouteSelectionBlocksFallback(settings, error) {
-  return Boolean(
-    clean(settings?.routePolicy?.pinnedRouteId)
-    && error?.code === 'AI_ROUTE_POOL_EXHAUSTED'
-  );
+function pinnedRouteSelectionBlocksFallback(settings) {
+  return Boolean(clean(settings?.routePolicy?.pinnedRouteId));
 }
 
 function shouldScheduledStrong(settings, runtime, now) {
