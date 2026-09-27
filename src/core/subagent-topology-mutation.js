@@ -322,6 +322,14 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     'nowMs',
     { min: 0 },
   );
+  const runtimeCreatedAt = integer(canonicalRuntime.createdAt, 'runtime.createdAt', { min: 0 });
+  const runtimeUpdatedAt = integer(canonicalRuntime.updatedAt, 'runtime.updatedAt', { min: 0 });
+  if (runtimeUpdatedAt < runtimeCreatedAt) {
+    throw new Error('runtime.updatedAt cannot precede runtime.createdAt');
+  }
+  if (nowMs < runtimeUpdatedAt) {
+    throw new Error('nowMs cannot precede durable runtime.updatedAt');
+  }
   const initiator = normalizedInitiator(own(request, 'initiator'));
   const expectedChildIds = childIdsForSpawn(spawnId, requestedChildren);
 
