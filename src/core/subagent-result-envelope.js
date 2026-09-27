@@ -1,5 +1,6 @@
 import { normalizeSubagentTaskEnvelopeV1 } from './subagent-task-envelope.js';
 import {
+  ObservationStatus,
   VerificationStatus,
   normalizeArtifactRefV1,
   normalizeObservationV1,
@@ -36,7 +37,9 @@ const RESULT_KEYS = new Set([
   'observationSummary',
   'observedAt',
   'verificationId',
+  'verificationStatus',
   'verifierId',
+  'verificationAuthorityId',
   'verificationReasonCode',
   'verificationSummary',
   'verifiedAt',
@@ -232,6 +235,21 @@ export function normalizeSubagentResultEnvelopeV1(input) {
   assertArtifactChronology(resultArtifactRefs, observedAt, 'resultArtifactRefs');
   assertArtifactChronology(evidenceArtifactRefs, verifiedAt, 'evidenceArtifactRefs');
 
+  const observationStatus = id(
+    own(raw, 'observationStatus', 'SubagentResultEnvelopeV1'),
+    'observationStatus',
+  );
+  if (!Object.values(ObservationStatus).includes(observationStatus)) {
+    throw new Error('Subagent result observationStatus is invalid');
+  }
+  const verificationStatus = id(
+    own(raw, 'verificationStatus', 'SubagentResultEnvelopeV1'),
+    'verificationStatus',
+  );
+  if (verificationStatus !== VerificationStatus.VERIFIED) {
+    throw new Error('Subagent result stored verificationStatus must remain VERIFIED');
+  }
+
   return freezeDeep({
     schemaVersion: SUBAGENT_RESULT_ENVELOPE_VERSION,
     resultId: id(own(raw, 'resultId', 'SubagentResultEnvelopeV1'), 'resultId'),
@@ -253,17 +271,19 @@ export function normalizeSubagentResultEnvelopeV1(input) {
     ),
     observationId: id(own(raw, 'observationId', 'SubagentResultEnvelopeV1'), 'observationId'),
     invocationId: id(own(raw, 'invocationId', 'SubagentResultEnvelopeV1'), 'invocationId'),
-    observationStatus: id(
-      own(raw, 'observationStatus', 'SubagentResultEnvelopeV1'),
-      'observationStatus',
-    ),
+    observationStatus,
     observationSummary: text(
       own(raw, 'observationSummary', 'SubagentResultEnvelopeV1'),
       'observationSummary',
     ),
     observedAt,
     verificationId: id(own(raw, 'verificationId', 'SubagentResultEnvelopeV1'), 'verificationId'),
+    verificationStatus,
     verifierId: id(own(raw, 'verifierId', 'SubagentResultEnvelopeV1'), 'verifierId'),
+    verificationAuthorityId: id(
+      own(raw, 'verificationAuthorityId', 'SubagentResultEnvelopeV1'),
+      'verificationAuthorityId',
+    ),
     verificationReasonCode: id(
       own(raw, 'verificationReasonCode', 'SubagentResultEnvelopeV1'),
       'verificationReasonCode',
@@ -317,6 +337,9 @@ export function createSubagentResultEnvelopeV1(input = {}) {
   if (verification.verifierId !== task.outcome.verifierId) {
     throw new Error('Subagent result verifier does not match task outcome verifier');
   }
+  if (!verification.verificationAuthorityId) {
+    throw new Error('Subagent result requires independent verificationAuthorityId provenance');
+  }
   if (Date.parse(observation.observedAt) < Date.parse(task.createdAt)) {
     throw new Error('Subagent result observation predates task envelope');
   }
@@ -366,7 +389,9 @@ export function createSubagentResultEnvelopeV1(input = {}) {
     observationSummary: observation.summary,
     observedAt: observation.observedAt,
     verificationId: verification.verificationId,
+    verificationStatus: verification.status,
     verifierId: verification.verifierId,
+    verificationAuthorityId: verification.verificationAuthorityId,
     verificationReasonCode: verification.reasonCode,
     verificationSummary: verification.summary,
     verifiedAt: verification.verifiedAt,
