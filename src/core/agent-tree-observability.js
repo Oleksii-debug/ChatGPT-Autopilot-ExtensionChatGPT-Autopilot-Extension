@@ -190,9 +190,18 @@ function safeDisplayText(value, fallback, max = 300) {
   const normalized = source
     .replace(UNSAFE_DISPLAY_CONTROLS, ' ')
     .replace(/\s+/gu, ' ')
-    .trim()
-    .slice(0, max);
-  return normalized || fallback;
+    .trim();
+  const bounded = [...normalized].slice(0, max).join('');
+  return bounded || fallback;
+}
+
+function safeTelemetryLagMs(runtimeUpdatedAt, observedAt, nodeId) {
+  const observedMs = Date.parse(observedAt);
+  const lagMs = runtimeUpdatedAt - observedMs;
+  if (!Number.isSafeInteger(lagMs) || lagMs < 0) {
+    throw new Error(`telemetry lag is outside safe integer range for nodeId: ${nodeId}`);
+  }
+  return lagMs;
 }
 
 function validateObservableNodeRuntime(nodeRuntime, nodeId) {
@@ -344,7 +353,7 @@ export function buildAgentTreeProjectionV1(input = {}) {
     rows.push(freezeDeep({
       nodeId,
       parentId: node.parentId,
-      childIds: [...node.childIds],
+      childIds: [...node.childIds].sort(compareId),
       depth,
       role: safeDisplayText(profile?.role, ''),
       promptProfileId: node.promptProfileId,
@@ -359,14 +368,17 @@ export function buildAgentTreeProjectionV1(input = {}) {
       needsOwnerAttention: Boolean(reason),
       attentionReason: reason,
       telemetry: nodeTelemetry,
-      telemetryLagMs: nodeTelemetry ? runtimeUpdatedAt - Date.parse(nodeTelemetry.observedAt) : null,
+      telemetryLagMs: nodeTelemetry
+        ? safeTelemetryLagMs(runtimeUpdatedAt, nodeTelemetry.observedAt, nodeId)
+        : null,
       text,
     }));
 
-    for (const childId of node.childIds) visit(childId, depth + 1);
+    for (const childId of [...node.childIds].sort(compareId)) visit(childId, depth + 1);
   }
 
-  for (const rootId of graph.rootIds) visit(rootId, 0);
+  const stableRootIds = [...graph.rootIds].sort(compareId);
+  for (const rootId of stableRootIds) visit(rootId, 0);
   if (rows.length !== graph.nodeOrder.length || new Set(rows.map(row => row.nodeId)).size !== graph.nodeOrder.length) {
     throw new Error('Agent tree projection did not cover canonical hierarchy exactly once');
   }
@@ -376,7 +388,7 @@ export function buildAgentTreeProjectionV1(input = {}) {
     graphId: graph.graphId,
     controlEpoch: graph.controlEpoch,
     runtimeUpdatedAt,
-    rootIds: [...graph.rootIds],
+    rootIds: stableRootIds,
     rows,
     textLines: rows.map(row => row.text),
     summary: {
