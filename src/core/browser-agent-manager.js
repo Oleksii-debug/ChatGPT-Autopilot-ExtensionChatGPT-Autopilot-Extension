@@ -1328,6 +1328,7 @@ export class BrowserAgentManager {
       planId: current.job.runtime.plan?.planId || '',
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
+      delegationBindings: clone(current.job.runtime.specialistDelegationBindings || []),
     };
   }
 
