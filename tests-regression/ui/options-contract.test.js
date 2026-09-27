@@ -306,6 +306,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes('function aiRouteDisplayLabel(route = {})'), 'Agent and Models must share one deterministic route display label');
   assert.ok(js.includes('return displayName ? \`${displayName} (${routeId})\` : routeId;'), 'profile display name must remain paired with stable route ID for keyboard/NVDA disambiguation');
   assert.ok(js.includes('option.textContent = \`${aiRouteDisplayLabel(route)}: ${route.model}'), 'Agent route select must announce the profile display label');
+  assert.ok(js.includes('if (status.textContent !== nextText) status.textContent = nextText;'), '2-second Agent refresh must not rewrite an unchanged route-binding live region');
   assert.ok(js.includes('option.disabled = Boolean(blockReason)'), 'globally blocked Agent routes must not look normally selectable');
   assert.ok(js.includes('assertBrowserAgentRouteReadyForLaunch();'), 'new Agent creation must reject a statically blocked saved route before creating a doomed job');
   assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
