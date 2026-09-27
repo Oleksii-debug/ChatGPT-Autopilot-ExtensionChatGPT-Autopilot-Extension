@@ -16,6 +16,8 @@ test('service worker composes one trusted durable Specialist readiness path', as
   assert.match(source, /'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
   assert.match(source, /'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
   assert.match(source, /'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG'/);
+  assert.match(source, /'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS'/);
+  assert.match(source, /'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION'/);
   assert.match(source, /browserAgent\.listSpecialistProviderConfigs\(\)/);
   assert.match(source, /browserAgent\.getSpecialistProviderConfig\(message\.payload\?\.providerId \|\| ''\)/);
   assert.match(source, /browserAgent\.setSpecialistProviderConfig\(message\.payload \|\| \{\}\)/);
@@ -32,6 +34,17 @@ test('service worker composes one trusted durable Specialist readiness path', as
   assert.doesNotMatch(
     source,
     /message\.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'[\s\S]{0,500}browserAgent\.claimSpecialistHandoffs\(/,
+  );
+  assert.match(
+    source,
+    /browserAgent\.prepareClaimedSpecialistProviderExecution\([\s\S]*?automaticSpecialistDelegationDependencies,[\s\S]*?\);/,
+  );
+  assert.match(source, /openHandsSpecialistClient\.execute\(/);
+  assert.match(source, /browserAgent\.recordSpecialistProviderExecutionOutcome\(/);
+  assert.match(source, /completionAuthorized:\s*false/);
+  assert.doesNotMatch(
+    source,
+    /RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION[\s\S]{0,4000}completeSpecialistHandoff\(/,
   );
   assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
