@@ -24,7 +24,7 @@ const REQUEST_KEYS = new Set([
   'parentToolIds',
   'ownerAllowedToolIds',
   'requestedToolIds',
-  'toolDescriptors',
+  'parentToolDescriptors',
 ]);
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -137,6 +137,8 @@ function denied(reasonCode, identities, details = {}) {
  * authenticate those facts and does not execute tools. It only proves that a
  * requested child scope is no broader than the intersection of parent
  * authority, owner policy, provider capability and task-specific scope.
+ * Tool descriptors are supplied only from the canonical parent authority
+ * snapshot; the task contributes tool IDs, never replacement descriptors.
  */
 export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
   const request = strictRecord(input, REQUEST_KEYS, 'SubagentAuthorityEnvelopeRequestV1');
@@ -163,7 +165,7 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
   const parentToolIds = idList(own(request, 'parentToolIds'), 'parentToolIds');
   const ownerAllowedToolIds = idList(own(request, 'ownerAllowedToolIds'), 'ownerAllowedToolIds');
   const requestedToolIds = idList(own(request, 'requestedToolIds'), 'requestedToolIds');
-  const descriptorInputs = dataArray(own(request, 'toolDescriptors'), 'toolDescriptors');
+  const descriptorInputs = dataArray(own(request, 'parentToolDescriptors'), 'parentToolDescriptors');
 
   const authorityIntersection = intersect(
     parentCapabilityIds,
@@ -203,12 +205,15 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
     try {
       return normalizeToolDescriptorV1(descriptor);
     } catch (error) {
-      throw new Error(`toolDescriptors[${index}]: ${error.message}`);
+      throw new Error(`parentToolDescriptors[${index}]: ${error.message}`);
     }
   });
   const descriptorsById = new Map();
   for (const descriptor of descriptors) {
-    if (descriptorsById.has(descriptor.toolId)) throw new Error('toolDescriptors contains duplicate toolId');
+    if (descriptorsById.has(descriptor.toolId)) throw new Error('parentToolDescriptors contains duplicate toolId');
+    if (!parentToolIds.includes(descriptor.toolId)) {
+      throw new Error(`parentToolDescriptors exceeds parentToolIds: ${descriptor.toolId}`);
+    }
     descriptorsById.set(descriptor.toolId, descriptor);
   }
 
