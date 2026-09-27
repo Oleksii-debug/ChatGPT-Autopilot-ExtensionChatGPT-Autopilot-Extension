@@ -163,7 +163,7 @@ function outcome(overrides = {}) {
   return createOutcomeContractV1({
     contractId: overrides.contractId || 'outcome.spawn-task',
     projectId: 'project.alpha',
-    desiredResult: 'A verified child artifact.',
+    desiredResult: overrides.desiredResult || 'A verified child artifact.',
     completionCriteria: [{
       criterionId: 'criterion.complete',
       description: 'Artifact is complete',
@@ -262,18 +262,25 @@ test('atomically binds canonical spawn identity, least authority and concrete ch
       requestedToolIds: ['tool.read'],
     }],
   );
-  assert.deepEqual(result.taskEnvelopeBindings, [{
-    childNodeId: CHILD_ID,
-    taskId: 'task.one',
-    envelopeId: 'envelope.task.one',
-    planId: 'plan.spawn-task',
-    planRevision: 3,
-    outcomeContractId: 'outcome.spawn-task',
-    outcomeContractRevision: 1,
-    createdAt: T2,
-  }]);
+  assert.equal(result.taskEnvelopeBindings.length, 1);
+  assert.equal(result.taskEnvelopeBindings[0].childNodeId, CHILD_ID);
+  assert.equal(result.taskEnvelopeBindings[0].taskId, 'task.one');
+  assert.equal(
+    result.taskEnvelopeBindings[0].taskEnvelope,
+    result.taskBindings[0].taskEnvelope,
+  );
+  assert.equal(
+    result.taskEnvelopeBindings[0].taskEnvelope.outcome.contractId,
+    'outcome.spawn-task',
+  );
+  assert.equal(
+    result.taskEnvelopeBindings[0].taskEnvelope.planRevision,
+    3,
+  );
   assert.equal(Object.isFrozen(result.authorityTaskBindings), true);
   assert.equal(Object.isFrozen(result.taskEnvelopeBindings), true);
+  assert.equal(Object.isFrozen(result.taskEnvelopeBindings[0]), true);
+  assert.equal(Object.isFrozen(result.taskEnvelopeBindings[0].taskEnvelope), true);
   const binding = result.taskBindings[0];
   assert.equal(binding.childNodeId, CHILD_ID);
   assert.equal(binding.taskId, 'task.one');
@@ -517,6 +524,101 @@ test('replay cannot replace durable task envelope, plan revision or OutcomeContr
     assert.deepEqual(value.createdNodeIds, [], name);
     assert.equal(Object.hasOwn(value, 'graph'), false, name);
   }
+});
+
+test('replay rejects same-identity semantic drift inside the canonical task envelope', () => {
+  const first = bindSubagentSpawnTaskAuthorityV1(request());
+  const replayAuthority = authorityRequest({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      nowMs: 300,
+    }),
+    priorTaskBindings: first.authorityTaskBindings,
+  });
+
+  const cases = [
+    ['artifact-hash', {
+      taskEnvelopes: [taskEnvelopeSpec({
+        inputArtifactRefs: [{
+          ...artifactRef(),
+          sha256: 'b'.repeat(64),
+        }],
+      })],
+    }],
+    ['objective', {
+      plan: plan({ node: { objective: 'Different delegated objective.' } }),
+    }],
+    ['outcome-semantics', {
+      taskEnvelopes: [taskEnvelopeSpec({
+        outcomeContract: outcome({
+          desiredResult: 'A materially different verified result.',
+        }),
+      })],
+    }],
+  ];
+
+  for (const [name, overrides] of cases) {
+    const value = bindSubagentSpawnTaskAuthorityV1(request({
+      ...overrides,
+      authorityRequest: replayAuthority,
+      priorTaskEnvelopeBindings: first.taskEnvelopeBindings,
+    }));
+    assert.equal(value.decision, 'DENY', name);
+    assert.equal(
+      value.reasonCode,
+      'REPLAY_TASK_ENVELOPE_BINDING_MISMATCH',
+      name,
+    );
+    assert.equal(Object.hasOwn(value, 'graph'), false, name);
+  }
+});
+
+test('prior task-envelope replay evidence is descriptor-safe and identity-bound', () => {
+  const first = bindSubagentSpawnTaskAuthorityV1(request());
+  const replayAuthority = authorityRequest({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      nowMs: 300,
+    }),
+    priorTaskBindings: first.authorityTaskBindings,
+  });
+
+  let reads = 0;
+  const hostile = {
+    childNodeId: CHILD_ID,
+    taskId: 'task.one',
+    taskEnvelope: first.taskEnvelopeBindings[0].taskEnvelope,
+  };
+  Object.defineProperty(hostile, 'taskEnvelope', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return first.taskEnvelopeBindings[0].taskEnvelope;
+    },
+  });
+  assert.throws(
+    () => bindSubagentSpawnTaskAuthorityV1(request({
+      authorityRequest: replayAuthority,
+      priorTaskEnvelopeBindings: [hostile],
+    })),
+    /taskEnvelope must be an enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
+
+  const mismatched = {
+    ...first.taskEnvelopeBindings[0],
+    childNodeId: 'subagent:other:1',
+  };
+  assert.throws(
+    () => bindSubagentSpawnTaskAuthorityV1(request({
+      authorityRequest: replayAuthority,
+      priorTaskEnvelopeBindings: [mismatched],
+    })),
+    /task envelope identity mismatch/u,
+  );
 });
 
 test('prior task-envelope evidence is forbidden on initial child creation', () => {
