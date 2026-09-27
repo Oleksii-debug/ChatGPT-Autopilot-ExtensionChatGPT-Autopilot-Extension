@@ -340,11 +340,11 @@ test('observable state fails closed when hierarchy runtime carries invalid prese
 
 test('accessible labels are single-line and strip bidi/control presentation hazards', () => {
   const input = request();
-  input.graph.promptProfiles[0].role = 'coord\n\u202EINATOR';
+  input.graph.promptProfiles[0].role = 'coord\n\u061C\u200E\u200F\u202E\u2067INATOR';
   const result = buildAgentTreeProjectionV1(input);
   assert.equal(result.rows[0].role, 'coord INATOR');
   assert.match(result.textLines[0], /^coord INATOR \[root\]/);
-  assert.doesNotMatch(result.textLines[0], /[\n\r\u202E]/u);
+  assert.doesNotMatch(result.textLines[0], /[\n\r\u061C\u200E\u200F\u202E\u2067]/u);
 });
 
 test('canonical hierarchy mismatch remains authoritative over the projection', () => {
