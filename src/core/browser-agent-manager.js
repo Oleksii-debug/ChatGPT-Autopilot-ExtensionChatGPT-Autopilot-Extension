@@ -2024,7 +2024,11 @@ export class BrowserAgentManager {
         execution: clone(recorded),
         executionOwnership: clone(ownership),
         completionAuthorized: false,
-        verificationRequired: recorded.providerSucceeded,
+        verificationRequired: [
+          SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED,
+          SpecialistProviderExecutionStatus.PROVIDER_FAILED,
+          SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+        ].includes(recorded.status),
       };
       return store;
     });
