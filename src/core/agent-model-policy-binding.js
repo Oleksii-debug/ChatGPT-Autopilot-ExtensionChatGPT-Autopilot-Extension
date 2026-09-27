@@ -51,6 +51,7 @@ const BINDING_KEYS = new Set([
   'policyAuthority',
   'persistenceAuthority',
   'schedulingAuthority',
+  'currentRouterRevalidationRequired',
 ]);
 
 function strictRecord(value, allowed, label) {
@@ -146,6 +147,11 @@ function deepFreeze(value) {
 function exactFalse(value, label) {
   if (value !== false) throw new Error(`${label} must be false`);
   return false;
+}
+
+function exactTrue(value, label) {
+  if (value !== true) throw new Error(`${label} must be true`);
+  return true;
 }
 
 function assertKnownRouteIds(routeIds, routeIdSet, label) {
@@ -408,6 +414,10 @@ export function normalizeAgentModelPolicyBindingV1(input) {
     policyAuthority: exactFalse(own(raw, 'policyAuthority'), 'policyAuthority'),
     persistenceAuthority: exactFalse(own(raw, 'persistenceAuthority'), 'persistenceAuthority'),
     schedulingAuthority: exactFalse(own(raw, 'schedulingAuthority'), 'schedulingAuthority'),
+    currentRouterRevalidationRequired: exactTrue(
+      own(raw, 'currentRouterRevalidationRequired'),
+      'currentRouterRevalidationRequired',
+    ),
   };
   return deepFreeze(normalized);
 }
@@ -505,5 +515,6 @@ export function createAgentModelPolicyBindingV1(input) {
     policyAuthority: false,
     persistenceAuthority: false,
     schedulingAuthority: false,
+    currentRouterRevalidationRequired: true,
   });
 }
