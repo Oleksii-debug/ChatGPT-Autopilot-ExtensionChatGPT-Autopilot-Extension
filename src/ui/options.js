@@ -2512,6 +2512,20 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
   $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
   $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
+  const specialistDelegationProfile = definition && Object.hasOwn(definition, 'specialistDelegationProfile')
+    ? definition.specialistDelegationProfile
+    : undefined;
+  const specialistProfileConfigured = Boolean(specialistDelegationProfile);
+  $('agent-definition-specialist-delegation-configured').checked = specialistProfileConfigured;
+  $('agent-definition-specialist-delegation-enabled').checked = specialistDelegationProfile?.enabled === true;
+  $('agent-definition-specialist-registry-id').value = specialistDelegationProfile?.registryId || '';
+  $('agent-definition-specialist-capabilities').value = agentDefinitionLines(specialistDelegationProfile?.requiredCapabilityIds);
+  $('agent-definition-specialist-tools').value = agentDefinitionLines(specialistDelegationProfile?.requiredToolIds);
+  $('agent-definition-specialist-policy-envelope').value = specialistDelegationProfile?.policyEnvelopeId || '';
+  $('agent-definition-specialist-deadline-seconds').value = String(specialistDelegationProfile?.deadlineSeconds ?? 900);
+  $('agent-definition-specialist-max-concurrent').value = String(specialistDelegationProfile?.maxConcurrentHandoffs ?? 4);
+  $('agent-definition-specialist-lease-seconds').value = String(specialistDelegationProfile?.leaseSeconds ?? 900);
+  $('agent-definition-specialist-priority').value = String(specialistDelegationProfile?.priority ?? 0);
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
@@ -2771,6 +2785,16 @@ function agentDefinitionFormValue() {
     aiPrimaryModel: $('agent-definition-ai-primary-model').value,
     aiStrongProvider: $('agent-definition-ai-strong-provider').value,
     aiStrongModel: $('agent-definition-ai-strong-model').value,
+    specialistDelegationConfigured: $('agent-definition-specialist-delegation-configured').checked,
+    specialistDelegationEnabled: $('agent-definition-specialist-delegation-enabled').checked,
+    specialistRegistryId: $('agent-definition-specialist-registry-id').value,
+    specialistCapabilityIdsText: $('agent-definition-specialist-capabilities').value,
+    specialistToolIdsText: $('agent-definition-specialist-tools').value,
+    specialistPolicyEnvelopeId: $('agent-definition-specialist-policy-envelope').value,
+    specialistDeadlineSeconds: $('agent-definition-specialist-deadline-seconds').value,
+    specialistMaxConcurrentHandoffs: $('agent-definition-specialist-max-concurrent').value,
+    specialistLeaseSeconds: $('agent-definition-specialist-lease-seconds').value,
+    specialistPriority: $('agent-definition-specialist-priority').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }
