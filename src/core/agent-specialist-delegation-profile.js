@@ -260,7 +260,9 @@ export function materializeAgentSpecialistDelegationIntentV1(input = {}) {
       policyEnvelopeId: profile.policyEnvelopeId,
       deadlineAt,
       priority: profile.priority,
-      childBudget: normalizeChildBudget(raw.childBudget),
+      ...(Object.hasOwn(raw, 'childBudget')
+        ? { childBudget: normalizeChildBudget(raw.childBudget) }
+        : {}),
       parentInvocationId,
       maxConcurrentHandoffs: profile.maxConcurrentHandoffs,
       leaseSeconds: profile.leaseSeconds,
