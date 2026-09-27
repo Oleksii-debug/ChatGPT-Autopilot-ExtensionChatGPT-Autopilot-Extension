@@ -17,7 +17,7 @@ function route(routeId, overrides = {}) {
     displayName: routeId,
     systemPrompt: 'PRIVATE ROUTE SYSTEM PROMPT ' + routeId,
     workerPrompt: 'PRIVATE ROUTE WORKER PROMPT ' + routeId,
-    roles: [AiRouteRole.FAST_WORKER, AiRouteRole.CODER],
+    roles: [AiRouteRole.CODER, AiRouteRole.FAST_WORKER],
     capabilityIds: ['model.code'],
     priority: 10,
     enabled: true,
@@ -261,17 +261,23 @@ test('role mismatch yields no common route instead of silently changing child ro
   assert.deepEqual(value.admittedRouteIds ?? [], []);
 });
 
-test('route scope is deterministic across route-pool input ordering', () => {
-  const forward = deriveSubagentModelRouteScopeV1(request());
-  const reverse = deriveSubagentModelRouteScopeV1(request({
+test('set-valued scope inputs are canonical across semantically equivalent ordering', () => {
+  const forward = deriveSubagentModelRouteScopeV1(request({
+    childCapabilityIds: ['model.code', 'model.vision'],
+    taskModelCapabilityIds: ['model.code', 'model.vision'],
+    taskRequestedRouteIds: ['route.vision'],
+  }));
+  const reordered = deriveSubagentModelRouteScopeV1(request({
     routes: [...routes()].reverse(),
+    childCapabilityIds: ['model.vision', 'model.code'],
+    taskModelCapabilityIds: ['model.vision', 'model.code'],
+    taskRequestedRouteIds: ['route.vision'],
   }));
 
-  assert.deepEqual(forward.admittedRouteIds, reverse.admittedRouteIds);
-  assert.deepEqual(
-    forward.routeBindings.map(item => item.routeId),
-    reverse.routeBindings.map(item => item.routeId),
-  );
+  assert.deepEqual(forward.admittedRouteIds, reordered.admittedRouteIds);
+  assert.deepEqual(forward.modelCapabilityIds, ['model.code', 'model.vision']);
+  assert.deepEqual(forward.taskRequestedRouteIds, ['route.vision']);
+  assert.deepEqual(forward.routeBindings, reordered.routeBindings);
 });
 
 test('request boundary rejects accessors without executing them', () => {
