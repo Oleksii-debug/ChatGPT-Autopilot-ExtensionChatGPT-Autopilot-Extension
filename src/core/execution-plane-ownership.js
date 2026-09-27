@@ -1,4 +1,5 @@
 import { AgentExecutionPlane } from './agent-plan.js';
+import { VerificationStatus, normalizeArtifactRefV1, normalizeVerificationV1 } from './universal-agent-contracts.js';
 
 export const EXECUTION_OWNERSHIP_VERSION = 1;
 export const ExecutionOwnershipState = Object.freeze({
@@ -14,6 +15,17 @@ const PLANES = new Set([AgentExecutionPlane.LOCAL, AgentExecutionPlane.CLOUD, Ag
 const STATES = new Set(Object.values(ExecutionOwnershipState));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_LEASE_MS = 24 * 60 * 60 * 1000;
+export const TrustedExecutionVerificationOutcome = Object.freeze({
+  EFFECT_VERIFIED: 'EFFECT_VERIFIED',
+  NO_EFFECT_VERIFIED: 'NO_EFFECT_VERIFIED',
+});
+const TRUSTED_OUTCOMES = new Set(Object.values(TrustedExecutionVerificationOutcome));
+const TRUSTED_RECORD_KEYS = new Set([
+  'schemaVersion', 'recordId', 'taskId', 'planId', 'nodeId', 'effectId',
+  'policyEnvelopeId', 'executionId', 'outcome', 'verification',
+  'evidenceArtifacts', 'recordedAt', 'validThrough',
+]);
+const TRUSTED_REQUEST_KEYS = new Set(['leaseId', 'verificationId', 'at']);
 
 function obj(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be a plain object`);
@@ -47,6 +59,145 @@ function optionalPlane(value) { return value == null || value === '' ? '' : plan
 function boundedText(value, label, max = 1000) { if (typeof value !== 'string' || value !== value.trim() || !value || value.length > max) throw new Error(`${label} is invalid`); return value; }
 function optionalBoundedText(value, label, max = 1000) { return value == null || value === '' ? '' : boundedText(value, label, max); }
 function freeze(value) { if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value; for (const child of Object.values(value)) freeze(child); return Object.freeze(value); }
+
+function dataArray(value, label, max = 128) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > max) {
+    throw new Error(`${label} must be a bounded plain array`);
+  }
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(`${label} contains non-canonical array fields`);
+    }
+  }
+  const output = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable own data property`);
+    }
+    output[index] = descriptor.value;
+  }
+  return output;
+}
+
+function sameIds(actual, expected, label) {
+  const left = [...actual].sort();
+  const right = [...expected].sort();
+  if (left.length !== right.length || left.some((value, index) => value !== right[index])) {
+    throw new Error(`${label} must exactly match trusted evidence identity`);
+  }
+}
+
+export function normalizeTrustedExecutionVerificationRecordV1(input) {
+  const raw = obj(input, 'TrustedExecutionVerificationRecordV1');
+  exact(raw, TRUSTED_RECORD_KEYS, 'TrustedExecutionVerificationRecordV1');
+  if (raw.schemaVersion !== EXECUTION_OWNERSHIP_VERSION) {
+    throw new Error('Unsupported TrustedExecutionVerificationRecordV1 schemaVersion');
+  }
+  if (typeof raw.outcome !== 'string' || raw.outcome !== raw.outcome.trim() || !TRUSTED_OUTCOMES.has(raw.outcome)) {
+    throw new Error('Trusted execution verification outcome is invalid');
+  }
+  const verification = normalizeVerificationV1(raw.verification);
+  if (verification.status !== VerificationStatus.VERIFIED) {
+    throw new Error('Trusted execution verification must have VERIFIED status');
+  }
+  const evidenceArtifacts = dataArray(raw.evidenceArtifacts, 'Trusted execution evidenceArtifacts')
+    .map(normalizeArtifactRefV1);
+  if (new Set(evidenceArtifacts.map(item => item.artifactId)).size !== evidenceArtifacts.length) {
+    throw new Error('Trusted execution verification contains duplicate evidence artifactId');
+  }
+  for (const artifact of evidenceArtifacts) {
+    if (!artifact.sha256) throw new Error(`Trusted execution evidence artifact requires sha256: ${artifact.artifactId}`);
+  }
+  sameIds(
+    evidenceArtifacts.map(item => item.artifactId),
+    verification.evidenceArtifactIds,
+    'Trusted execution verification evidenceArtifactIds',
+  );
+  return freeze({
+    schemaVersion: EXECUTION_OWNERSHIP_VERSION,
+    recordId: id(raw.recordId, 'trusted recordId'),
+    taskId: id(raw.taskId, 'trusted taskId'),
+    planId: id(raw.planId, 'trusted planId'),
+    nodeId: id(raw.nodeId, 'trusted nodeId'),
+    effectId: id(raw.effectId, 'trusted effectId'),
+    policyEnvelopeId: id(raw.policyEnvelopeId, 'trusted policyEnvelopeId'),
+    executionId: id(raw.executionId, 'trusted executionId'),
+    outcome: raw.outcome,
+    verification,
+    evidenceArtifacts,
+    recordedAt: ts(raw.recordedAt, 'trusted recordedAt'),
+    validThrough: ts(raw.validThrough, 'trusted validThrough'),
+  });
+}
+
+async function resolveTrustedExecutionVerificationV1(current, rawOptions, dependencies, expectedOutcome) {
+  const request = obj(rawOptions, 'Trusted execution verification request');
+  exact(request, TRUSTED_REQUEST_KEYS, 'Trusted execution verification request');
+  const leaseId = id(request.leaseId, 'leaseId');
+  const verificationId = id(request.verificationId, 'verificationId');
+  const at = request.at === undefined ? new Date().toISOString() : ts(request.at, 'at');
+  if (current.leaseId !== leaseId) throw new Error('trusted verification execution lease identity mismatch');
+  const resolver = dependencies?.resolveTrustedExecutionVerificationRecord;
+  if (typeof resolver !== 'function') throw new Error('canonical trusted execution verification resolver is required');
+  const lookup = freeze({
+    taskId: current.taskId,
+    planId: current.planId,
+    nodeId: current.nodeId,
+    effectId: current.effectId,
+    policyEnvelopeId: current.policyEnvelopeId,
+    executionId: current.leaseId,
+    verificationId,
+    expectedOutcome,
+  });
+  const rawRecord = await resolver(lookup);
+  if (rawRecord == null) throw new Error('trusted execution verification record was not found');
+  const record = normalizeTrustedExecutionVerificationRecordV1(rawRecord);
+  if (record.taskId !== current.taskId
+      || record.planId !== current.planId
+      || record.nodeId !== current.nodeId
+      || record.effectId !== current.effectId
+      || record.policyEnvelopeId !== current.policyEnvelopeId
+      || record.executionId !== current.leaseId) {
+    throw new Error('trusted execution verification record identity does not match durable ownership');
+  }
+  if (record.outcome !== expectedOutcome) throw new Error('trusted execution verification outcome does not match requested transition');
+  const verification = record.verification;
+  if (verification.verificationId !== verificationId) throw new Error('trusted execution verificationId mismatch');
+  if (verification.effectId !== current.effectId || verification.executionId !== current.leaseId) {
+    throw new Error('trusted VerificationV1 effect/execution binding mismatch');
+  }
+  if (verification.verificationAuthorityId !== current.policyEnvelopeId) {
+    throw new Error('trusted VerificationV1 authority does not match execution policy envelope');
+  }
+  if (!verification.verifierId || verification.verifierId === current.ownerId) {
+    throw new Error('trusted execution verification requires an independent verifier');
+  }
+  const verifiedAt = ts(verification.verifiedAt, 'trusted verifiedAt');
+  if (Date.parse(verifiedAt) < Date.parse(current.updatedAt) || Date.parse(verifiedAt) > Date.parse(at)) {
+    throw new Error('trusted execution verification chronology is invalid');
+  }
+  if (Date.parse(record.recordedAt) < Date.parse(verifiedAt) || Date.parse(record.recordedAt) > Date.parse(at)) {
+    throw new Error('trusted execution verification record chronology is invalid');
+  }
+  if (Date.parse(record.validThrough) < Date.parse(record.recordedAt) || Date.parse(at) > Date.parse(record.validThrough)) {
+    throw new Error('trusted execution verification record is stale');
+  }
+  for (const artifact of record.evidenceArtifacts) {
+    const createdAt = ts(artifact.createdAt, 'trusted evidence createdAt');
+    if (Date.parse(createdAt) < Date.parse(current.updatedAt)
+        || Date.parse(createdAt) > Date.parse(verifiedAt)) {
+      throw new Error(`trusted execution evidence chronology is invalid: ${artifact.artifactId}`);
+    }
+  }
+  return freeze({ record, lookup, evaluatedAt: at });
+}
 
 export function createExecutionOwnershipV1({ taskId, planId, nodeId, effectId, policyEnvelopeId, at = new Date().toISOString() } = {}) {
   return normalizeExecutionOwnershipV1({
@@ -212,4 +363,67 @@ export function verifyExecutionByAuthorityV1(raw, options = {}) {
   }
   assertLeaseLive(current, at);
   throw new Error('canonical trusted verifier provenance is required before execution can be VERIFIED');
+}
+
+
+/**
+ * Completes one exact owned effect only from a canonical trusted verification
+ * record. The resolver is the authority boundary; caller-shaped VerificationV1
+ * data remains rejected by the compatibility functions above.
+ */
+export async function verifyExecutionWithTrustedRecordV1(raw, options = {}, dependencies = {}) {
+  const current = normalizeExecutionOwnershipV1(raw);
+  if (current.state !== ExecutionOwnershipState.OWNED) {
+    throw new Error('trusted completion verification requires current OWNED execution');
+  }
+  const resolved = await resolveTrustedExecutionVerificationV1(
+    current,
+    options,
+    dependencies,
+    TrustedExecutionVerificationOutcome.EFFECT_VERIFIED,
+  );
+  const ownership = next(current, {
+    state: ExecutionOwnershipState.VERIFIED,
+    ownerPlane: '',
+    ownerId: '',
+    leaseId: '',
+    leaseUntil: '',
+    ambiguityReason: '',
+  }, resolved.evaluatedAt);
+  return freeze({
+    ownership,
+    trustedRecord: resolved.record,
+    verificationProvenance: 'TRUSTED_CANONICAL_EXECUTION_VERIFICATION_RECORD_WITH_HASHED_ARTIFACT_REFS',
+  });
+}
+
+/**
+ * Releases an ambiguous expired effect for normal bounded re-admission only
+ * when a trusted independent record verifies that the exact lease committed no
+ * effect. This function never dispatches the retry.
+ */
+export async function authorizeExecutionSafeRetryWithTrustedRecordV1(raw, options = {}, dependencies = {}) {
+  const current = normalizeExecutionOwnershipV1(raw);
+  if (current.state !== ExecutionOwnershipState.RECONCILE) {
+    throw new Error('trusted SAFE_RETRY requires RECONCILE execution ownership');
+  }
+  const resolved = await resolveTrustedExecutionVerificationV1(
+    current,
+    options,
+    dependencies,
+    TrustedExecutionVerificationOutcome.NO_EFFECT_VERIFIED,
+  );
+  const ownership = next(current, {
+    state: ExecutionOwnershipState.AVAILABLE,
+    ownerPlane: '',
+    ownerId: '',
+    leaseId: '',
+    leaseUntil: '',
+    ambiguityReason: '',
+  }, resolved.evaluatedAt);
+  return freeze({
+    ownership,
+    trustedRecord: resolved.record,
+    verificationProvenance: 'TRUSTED_CANONICAL_NO_EFFECT_RECORD_WITH_HASHED_ARTIFACT_REFS',
+  });
 }
