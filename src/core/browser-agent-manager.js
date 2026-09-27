@@ -50,7 +50,12 @@ import {
   verifyAgentPlanSpecialistHandoffV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
-import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import {
+  ExecutionOwnershipState,
+  normalizeExecutionOwnershipV1,
+  requireExecutionReconciliationV1,
+  recoverExpiredExecutionOwnershipV1,
+} from './execution-plane-ownership.js';
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
@@ -74,6 +79,12 @@ import {
   createSpecialistProviderConfigV1,
   normalizeSpecialistProviderConfigV1,
 } from './specialist-provider-config.js';
+import {
+  SpecialistProviderExecutionStatus,
+  createSpecialistProviderExecutionV1,
+  normalizeSpecialistProviderExecutionV1,
+  recordSpecialistProviderExecutionOutcomeV1,
+} from './specialist-provider-execution.js';
 import {
   BrowserAgentOrchestrationBindingStatus,
   createBrowserAgentOrchestrationNodeBindingV1,
@@ -102,6 +113,13 @@ const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
+const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
+const SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS = new Set(['agentId', 'conversationId']);
+const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS = new Set([
+  'agentId', 'leaseId', 'conversationId', 'providerStatus', 'providerSucceeded',
+  'manualReviewRequired', 'reconciliationRequired', 'safeToRetry',
+  'effectEvidence', 'errorCode',
+]);
 const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
@@ -748,6 +766,44 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuaranti
   return { configs, quarantine };
 }
 
+function normalizePersistedSpecialistProviderExecutions(rawExecutions, rawQuarantine, plan) {
+  const executions = [];
+  const quarantine = [];
+  const appendQuarantine = value => {
+    if (quarantine.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) return;
+    try { quarantine.push(clone(value)); } catch { /* preserve fail-closed signal below */ }
+  };
+  if (Array.isArray(rawQuarantine)) {
+    for (const value of rawQuarantine.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS)) {
+      appendQuarantine(value);
+    }
+  }
+  if (rawExecutions === undefined) return { executions, quarantine };
+  if (!Array.isArray(rawExecutions) || Object.getPrototypeOf(rawExecutions) !== Array.prototype) {
+    appendQuarantine({ reason: 'NON_CANONICAL_PROVIDER_EXECUTION_COLLECTION' });
+    return { executions, quarantine };
+  }
+  const seenLeases = new Set();
+  const seenConversations = new Set();
+  for (const raw of rawExecutions.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS)) {
+    try {
+      const execution = normalizeSpecialistProviderExecutionV1(raw);
+      if (!plan || execution.planId !== plan.planId) {
+        throw new Error('Specialist provider execution plan provenance drifted');
+      }
+      if (seenLeases.has(execution.leaseId) || seenConversations.has(execution.conversationId)) {
+        throw new Error('Specialist provider execution identity is duplicated');
+      }
+      seenLeases.add(execution.leaseId);
+      seenConversations.add(execution.conversationId);
+      executions.push(execution);
+    } catch {
+      appendQuarantine(raw);
+    }
+  }
+  return { executions, quarantine };
+}
+
 function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
   const registries = Object.create(null);
   const quarantine = Object.create(null);
@@ -976,12 +1032,19 @@ function normalizeRuntime(raw, now) {
     raw.specialistDelegationBindings,
     plan,
   );
+  const providerExecutionState = normalizePersistedSpecialistProviderExecutions(
+    raw.specialistProviderExecutions,
+    raw.specialistProviderExecutionQuarantine,
+    plan,
+  );
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
     specialistDelegationBindings,
+    specialistProviderExecutions: providerExecutionState.executions,
+    specialistProviderExecutionQuarantine: providerExecutionState.quarantine,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
