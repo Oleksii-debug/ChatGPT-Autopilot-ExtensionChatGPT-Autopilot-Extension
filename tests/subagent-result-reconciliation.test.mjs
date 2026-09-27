@@ -22,6 +22,7 @@ import { createSubagentResultEnvelopeV1 } from '../src/core/subagent-result-enve
 import {
   SUBAGENT_TASK_ACTIVATION_BINDING_VERSION,
   SubagentResultReconciliationDecision,
+  deriveSubagentTaskActivationBindingV1,
   normalizeTrustedSubagentTaskActivationBindingV1,
   prepareSubagentResultReconciliationV1,
 } from '../src/core/subagent-result-reconciliation.js';
@@ -787,4 +788,162 @@ test('request boundary rejects unknown completion aliases and sparse criterion r
   );
   assert.equal(calls.contract.length, 0);
   assert.equal(calls.verification.length, 0);
+});
+
+
+test('derives task activation binding only from canonical task, reducer action and current runtime', () => {
+  const contract = outcomeContract();
+  const task = taskEnvelope(contract);
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, Date.parse(T0));
+  const prepared = reduceOrchestrationHierarchyEvent(
+    g,
+    runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: 'derive-activate-child',
+      controlEpoch: 7,
+      nodeId: 'child-1',
+      generation: 1,
+      activationId: 'child-activation-1',
+      purpose: OrchestrationActivationPurpose.WORK,
+    },
+    EPOCH_T1,
+  );
+  runtime = prepared.runtime;
+
+  const value = deriveSubagentTaskActivationBindingV1({
+    bindingId: 'binding-1',
+    taskEnvelope: task,
+    graph: g,
+    runtime,
+    activationAction: prepared.actions[0],
+    invocationId: 'invocation-child-1',
+    boundAt: T2,
+  });
+
+  assert.deepEqual(value, binding());
+  assert.equal(Object.isFrozen(value), true);
+});
+
+test('binding derivation rejects forged or stale activation actions and never accepts delegation as result completion', () => {
+  const contract = outcomeContract();
+  const task = taskEnvelope(contract);
+  const g = graph();
+  const initial = createOrchestrationHierarchyRuntime(g, Date.parse(T0));
+  const prepared = reduceOrchestrationHierarchyEvent(
+    g,
+    initial,
+    {
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: 'derive-activate-child-2',
+      controlEpoch: 7,
+      nodeId: 'child-1',
+      generation: 1,
+      activationId: 'child-activation-1',
+      purpose: OrchestrationActivationPurpose.WORK,
+    },
+    EPOCH_T1,
+  );
+  const baseInput = {
+    bindingId: 'binding-1',
+    taskEnvelope: task,
+    graph: g,
+    runtime: prepared.runtime,
+    activationAction: prepared.actions[0],
+    invocationId: 'invocation-child-1',
+    boundAt: T2,
+  };
+
+  assert.throws(
+    () => deriveSubagentTaskActivationBindingV1({
+      ...baseInput,
+      activationAction: {
+        ...prepared.actions[0],
+        activationId: 'forged-activation',
+      },
+    }),
+    /not the current canonical activation/u,
+  );
+
+  assert.throws(
+    () => deriveSubagentTaskActivationBindingV1({
+      ...baseInput,
+      activationAction: {
+        ...prepared.actions[0],
+        authority: 'CALLER_ASSERTED',
+      },
+    }),
+    /not from the canonical Core session\/task path/u,
+  );
+
+  assert.throws(
+    () => deriveSubagentTaskActivationBindingV1({
+      ...baseInput,
+      activationAction: {
+        ...prepared.actions[0],
+        purpose: OrchestrationActivationPurpose.DELEGATE,
+      },
+    }),
+    /purpose cannot terminalize a result/u,
+  );
+});
+
+test('binding derivation rejects ambiguous/terminal activation state and pre-activation chronology', () => {
+  const contract = outcomeContract();
+  const task = taskEnvelope(contract);
+  const g = graph();
+  const initial = createOrchestrationHierarchyRuntime(g, Date.parse(T0));
+  const prepared = reduceOrchestrationHierarchyEvent(
+    g,
+    initial,
+    {
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: 'derive-activate-child-3',
+      controlEpoch: 7,
+      nodeId: 'child-1',
+      generation: 1,
+      activationId: 'child-activation-1',
+      purpose: OrchestrationActivationPurpose.WORK,
+    },
+    EPOCH_T1,
+  );
+  const baseInput = {
+    bindingId: 'binding-1',
+    taskEnvelope: task,
+    graph: g,
+    activationAction: prepared.actions[0],
+    invocationId: 'invocation-child-1',
+    boundAt: T2,
+  };
+
+  assert.throws(
+    () => deriveSubagentTaskActivationBindingV1({
+      ...baseInput,
+      runtime: prepared.runtime,
+      boundAt: T0,
+    }),
+    /predates canonical activation preparation|predates the task envelope/u,
+  );
+
+  const ambiguous = reduceOrchestrationHierarchyEvent(
+    g,
+    prepared.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_AMBIGUOUS,
+      eventId: 'derive-ambiguous',
+      controlEpoch: 7,
+      nodeId: 'child-1',
+      generation: 1,
+      activationId: 'child-activation-1',
+    },
+    EPOCH_T1 + 1,
+  ).runtime;
+  assert.throws(
+    () => deriveSubagentTaskActivationBindingV1({
+      ...baseInput,
+      runtime: ambiguous,
+    }),
+    /cannot be derived from a terminal, ambiguous, or superseded activation/u,
+  );
 });
