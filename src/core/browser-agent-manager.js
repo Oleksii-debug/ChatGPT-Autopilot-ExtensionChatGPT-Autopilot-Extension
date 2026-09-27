@@ -742,6 +742,28 @@ function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine)
   return { registries, quarantine };
 }
 
+function specialistProviderConfigHasLiveExecution(store, providerId, at) {
+  const nowMs = Date.parse(at);
+  for (const jobId of store.order || []) {
+    const runtime = store.byId?.[jobId]?.runtime;
+    if ((runtime?.specialistProviderExecutionQuarantine || []).length) {
+      throw new Error('Specialist provider execution provenance is quarantined; provider config mutation is unsafe');
+    }
+    for (const raw of runtime?.specialistProviderExecutions || []) {
+      const execution = normalizeSpecialistProviderExecutionV1(raw);
+      if (execution.providerId !== providerId || Date.parse(execution.leaseUntil) <= nowMs) continue;
+      if ([
+        SpecialistProviderExecutionStatus.PREPARED,
+        SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
+        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+      ].includes(execution.status)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
   const configs = Object.create(null);
   const quarantine = Object.create(null);
@@ -1605,6 +1627,13 @@ export class BrowserAgentManager {
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
       }
+      if (specialistProviderConfigHasLiveExecution(
+        store,
+        providerId,
+        new Date(this.now()).toISOString(),
+      )) {
+        throw new Error('Specialist provider config is bound to a live provider execution lease');
+      }
       const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
       const currentRevision = current?.revision || 0;
       if (currentRevision !== expectedRevision) {
@@ -1651,6 +1680,13 @@ export class BrowserAgentManager {
       const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and requires explicit storage recovery');
+      }
+      if (specialistProviderConfigHasLiveExecution(
+        store,
+        providerId,
+        new Date(this.now()).toISOString(),
+      )) {
+        throw new Error('Specialist provider config is bound to a live provider execution lease');
       }
       const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
       if (!current) {
