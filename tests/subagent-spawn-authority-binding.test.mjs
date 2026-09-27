@@ -92,7 +92,6 @@ function childTask(taskId, overrides = {}) {
   return {
     taskId,
     providerId: 'provider.main',
-    providerCapabilityIds: ['cap.read', 'cap.write'],
     taskRequestedCapabilityIds: ['cap.read'],
     taskSourceIds: ['source.repo'],
     taskArtifactIds: ['artifact.input'],
@@ -107,6 +106,16 @@ function request(overrides = {}) {
     projectId: 'project.alpha',
     parentProviderIds: ['provider.main', 'provider.backup'],
     ownerAllowedProviderIds: ['provider.main'],
+    providerCapabilities: [
+      {
+        providerId: 'provider.main',
+        capabilityIds: ['cap.read', 'cap.write'],
+      },
+      {
+        providerId: 'provider.backup',
+        capabilityIds: ['cap.read'],
+      },
+    ],
     parentCapabilityIds: ['cap.read', 'cap.write', 'cap.admin'],
     ownerAllowedCapabilityIds: ['cap.read', 'cap.write'],
     parentSourceIds: ['source.repo', 'source.drive'],
@@ -185,7 +194,7 @@ test('binds exact canonical topology identities to per-child least authority', (
   assert.equal(Object.isFrozen(result.authorityBindings[0].authorityEnvelope), true);
 });
 
-test('task/model input cannot supply parent or child identity aliases', () => {
+test('task/model input cannot supply parent, child or provider-capability authority aliases', () => {
   assert.throws(
     () => bindSubagentSpawnAuthorityV1(request({
       childTasks: [{
@@ -194,6 +203,16 @@ test('task/model input cannot supply parent or child identity aliases', () => {
       }],
     })),
     /childTasks\[0\] contains unknown field: childAgentId/u,
+  );
+
+  assert.throws(
+    () => bindSubagentSpawnAuthorityV1(request({
+      childTasks: [{
+        ...childTask('task.one'),
+        providerCapabilityIds: ['cap.admin'],
+      }],
+    })),
+    /childTasks\[0\] contains unknown field: providerCapabilityIds/u,
   );
 
   assert.throws(
@@ -215,6 +234,30 @@ test('task/model input cannot supply parent or child identity aliases', () => {
     }),
     /contains unknown field: topologyResult/u,
   );
+});
+
+test('provider capability truth is selected only from the canonical provider snapshot', () => {
+  const missing = bindSubagentSpawnAuthorityV1(request({
+    providerCapabilities: [{
+      providerId: 'provider.backup',
+      capabilityIds: ['cap.read'],
+    }],
+  }));
+  assert.equal(missing.decision, 'DENY');
+  assert.equal(missing.reasonCode, 'PROVIDER_CAPABILITY_SNAPSHOT_MISSING');
+  assert.equal(missing.deniedProviderId, 'provider.main');
+  assert.equal(missing.deniedChildNodeId, 'subagent:spawn-bind:1');
+  assert.deepEqual(missing.createdNodeIds, []);
+  assert.equal(Object.hasOwn(missing, 'graph'), false);
+
+  const narrowed = bindSubagentSpawnAuthorityV1(request({
+    providerCapabilities: [{
+      providerId: 'provider.main',
+      capabilityIds: ['cap.write'],
+    }],
+  }));
+  assert.equal(narrowed.reasonCode, 'CHILD_AUTHORITY_DENIED');
+  assert.equal(narrowed.childReasonCode, 'CAPABILITY_ESCALATION');
 });
 
 test('child task cardinality must exactly match the canonical created child set', () => {
@@ -346,7 +389,7 @@ test('replay under revoked child authority fails closed even when topology alrea
   assert.equal(Object.hasOwn(revoked, 'graph'), false);
 });
 
-test('duplicate task identity is rejected instead of ambiguously binding two children', () => {
+test('duplicate task and provider identities are rejected instead of ambiguously binding authority', () => {
   assert.throws(
     () => bindSubagentSpawnAuthorityV1(request({
       topologyRequest: topologyRequest({ requestedChildren: 2 }),
@@ -357,9 +400,19 @@ test('duplicate task identity is rejected instead of ambiguously binding two chi
     })),
     /childTasks contains duplicate taskId/u,
   );
+
+  assert.throws(
+    () => bindSubagentSpawnAuthorityV1(request({
+      providerCapabilities: [
+        { providerId: 'provider.main', capabilityIds: ['cap.read'] },
+        { providerId: 'provider.main', capabilityIds: ['cap.write'] },
+      ],
+    })),
+    /providerCapabilities contains duplicate providerId/u,
+  );
 });
 
-test('outer and child request boundaries reject getters, sparse arrays and symbols without reads', () => {
+test('outer, child and provider snapshot boundaries reject getters, sparse arrays and symbols without reads', () => {
   let outerReads = 0;
   const outer = request();
   Object.defineProperty(outer, 'projectId', {
@@ -394,6 +447,27 @@ test('outer and child request boundaries reject getters, sparse arrays and symbo
   );
   assert.equal(childReads, 0);
 
+  let providerReads = 0;
+  const providerEntry = {
+    providerId: 'provider.main',
+    capabilityIds: ['cap.read'],
+  };
+  Object.defineProperty(providerEntry, 'capabilityIds', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      providerReads += 1;
+      return ['cap.read'];
+    },
+  });
+  assert.throws(
+    () => bindSubagentSpawnAuthorityV1(request({
+      providerCapabilities: [providerEntry],
+    })),
+    /capabilityIds.*enumerable own data property/u,
+  );
+  assert.equal(providerReads, 0);
+
   const sparse = new Array(2);
   sparse[0] = childTask('task.one');
   assert.throws(
@@ -409,33 +483,60 @@ test('outer and child request boundaries reject getters, sparse arrays and symbo
   );
 });
 
-test('common authority arrays remain descriptor-safe through child derivation', () => {
-  let reads = 0;
-  const hostile = ['cap.read'];
-  Object.defineProperty(hostile, '0', {
+test('common authority and provider capability arrays remain descriptor-safe', () => {
+  let authorityReads = 0;
+  const hostileAuthority = ['cap.read'];
+  Object.defineProperty(hostileAuthority, '0', {
     enumerable: true,
     configurable: true,
     get() {
-      reads += 1;
+      authorityReads += 1;
       return 'cap.read';
     },
   });
 
   assert.throws(
     () => bindSubagentSpawnAuthorityV1(request({
-      parentCapabilityIds: hostile,
+      parentCapabilityIds: hostileAuthority,
     })),
     /parentCapabilityIds must be a dense data-only array/u,
   );
-  assert.equal(reads, 0);
+  assert.equal(authorityReads, 0);
+
+  let providerReads = 0;
+  const hostileProviderCaps = ['cap.read'];
+  Object.defineProperty(hostileProviderCaps, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      providerReads += 1;
+      return 'cap.read';
+    },
+  });
+
+  assert.throws(
+    () => bindSubagentSpawnAuthorityV1(request({
+      providerCapabilities: [{
+        providerId: 'provider.main',
+        capabilityIds: hostileProviderCaps,
+      }],
+    })),
+    /providerCapabilities\[0\]\.capabilityIds must be a dense data-only array/u,
+  );
+  assert.equal(providerReads, 0);
 });
 
 test('caller mutations after binding cannot widen frozen child authority', () => {
   const task = childTask('task.mutable');
   const parentCapabilities = ['cap.read', 'cap.write'];
+  const providerCaps = ['cap.read', 'cap.write'];
   const descriptors = [tool('tool.read', ['cap.read'])];
   const input = request({
     parentCapabilityIds: parentCapabilities,
+    providerCapabilities: [{
+      providerId: 'provider.main',
+      capabilityIds: providerCaps,
+    }],
     parentToolDescriptors: descriptors,
     childTasks: [task],
   });
@@ -444,6 +545,7 @@ test('caller mutations after binding cannot widen frozen child authority', () =>
   assert.equal(result.decision, 'ALLOW');
 
   parentCapabilities.push('cap.admin');
+  providerCaps.push('cap.admin');
   task.taskRequestedCapabilityIds.push('cap.write');
   task.taskSourceIds.push('source.drive');
   descriptors[0].capabilityIds.push('cap.write');
