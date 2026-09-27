@@ -2672,6 +2672,34 @@ function renderBrowserAgentList() {
   }
 }
 
+async function loadBrowserAgentExecutionPolicy() {
+  try {
+    const policy = await core('GET_BROWSER_AGENT_EXECUTION_POLICY');
+    const value = Number(policy?.maxConcurrentAgents ?? 1);
+    $('agent-max-concurrent-agents').value = String(value);
+    $('agent-execution-policy-status').textContent = `Активний глобальний ліміт: ${value} одночасних Agent.`;
+  } catch (error) {
+    $('agent-execution-policy-status').textContent = `Не вдалося завантажити ліміт Agent: ${error.message}`;
+  }
+}
+
+async function saveBrowserAgentExecutionPolicy() {
+  const value = Number($('agent-max-concurrent-agents').value);
+  if (!Number.isInteger(value) || value < 1 || value > 32) {
+    $('agent-execution-policy-status').textContent = 'Введіть ціле число від 1 до 32.';
+    $('agent-max-concurrent-agents').focus();
+    return;
+  }
+  try {
+    const policy = await core('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', { maxConcurrentAgents: value });
+    $('agent-max-concurrent-agents').value = String(policy.maxConcurrentAgents);
+    $('agent-execution-policy-status').textContent = `Збережено: максимум ${policy.maxConcurrentAgents} одночасних Agent.`;
+    announce('Глобальний ліміт одночасного виконання Agent збережено.');
+  } catch (error) {
+    $('agent-execution-policy-status').textContent = `Не вдалося зберегти ліміт Agent: ${error.message}`;
+  }
+}
+
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
@@ -4499,6 +4527,7 @@ $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
+$('agent-save-execution-policy-button').addEventListener('click', () => { void saveBrowserAgentExecutionPolicy(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -4870,3 +4899,5 @@ window.setInterval(() => {
 window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };
+
+void loadBrowserAgentExecutionPolicy();
