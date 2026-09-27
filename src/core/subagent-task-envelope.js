@@ -217,6 +217,18 @@ function normalizeBudget(value) {
 
 function normalizeOutcomeBinding(value) {
   const raw = record(value, OUTCOME_KEYS, 'SubagentTaskOutcomeBindingV1');
+  const criterionIds = idList(
+    own(raw, 'criterionIds', 'SubagentTaskOutcomeBindingV1'),
+    'outcome.criterionIds',
+    128,
+  ).sort(compareCodeUnit);
+  const deliverableIds = idList(
+    own(raw, 'deliverableIds', 'SubagentTaskOutcomeBindingV1'),
+    'outcome.deliverableIds',
+    128,
+  ).sort(compareCodeUnit);
+  if (!criterionIds.length) throw new Error('Subagent task outcome requires completion criteria');
+  if (!deliverableIds.length) throw new Error('Subagent task outcome requires deliverables');
   return {
     contractId: id(own(raw, 'contractId', 'SubagentTaskOutcomeBindingV1'), 'outcome.contractId'),
     contractRevision: integer(
@@ -228,16 +240,8 @@ function normalizeOutcomeBinding(value) {
       own(raw, 'desiredResult', 'SubagentTaskOutcomeBindingV1'),
       'outcome.desiredResult',
     ),
-    criterionIds: idList(
-      own(raw, 'criterionIds', 'SubagentTaskOutcomeBindingV1'),
-      'outcome.criterionIds',
-      128,
-    ).sort(compareCodeUnit),
-    deliverableIds: idList(
-      own(raw, 'deliverableIds', 'SubagentTaskOutcomeBindingV1'),
-      'outcome.deliverableIds',
-      128,
-    ).sort(compareCodeUnit),
+    criterionIds,
+    deliverableIds,
     verifierId: id(own(raw, 'verifierId', 'SubagentTaskOutcomeBindingV1'), 'outcome.verifierId'),
     requiredEvidenceArtifactCount: integer(
       own(raw, 'requiredEvidenceArtifactCount', 'SubagentTaskOutcomeBindingV1'),
