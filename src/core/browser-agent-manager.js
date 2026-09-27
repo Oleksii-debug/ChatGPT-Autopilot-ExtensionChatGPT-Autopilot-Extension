@@ -222,24 +222,26 @@ function trustedAutomaticDelegationDependencies(dependencies) {
   if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
     throw new Error('Trusted specialist provider readiness resolver is required');
   }
-  let cursor = resolver;
-  let resolveDescriptor = null;
-  while (cursor && cursor !== Object.prototype) {
-    const descriptor = Object.getOwnPropertyDescriptor(cursor, 'resolve');
-    if (descriptor) {
-      resolveDescriptor = descriptor;
-      break;
+  const dataMethod = name => {
+    let cursor = resolver;
+    while (cursor && cursor !== Object.prototype) {
+      const descriptor = Object.getOwnPropertyDescriptor(cursor, name);
+      if (descriptor) {
+        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+          throw new Error(`Trusted specialist provider readiness resolver.${name} must be a data method`);
+        }
+        return descriptor.value;
+      }
+      cursor = Object.getPrototypeOf(cursor);
     }
-    cursor = Object.getPrototypeOf(cursor);
-  }
-  if (!resolveDescriptor
-      || !Object.hasOwn(resolveDescriptor, 'value')
-      || typeof resolveDescriptor.value !== 'function') {
-    throw new Error('Trusted specialist provider readiness resolver.resolve must be a data method');
-  }
+    throw new Error(`Trusted specialist provider readiness resolver.${name} must be a data method`);
+  };
+  const resolveMethod = dataMethod('resolve');
+  const assertCurrentMethod = dataMethod('assertCurrent');
   return Object.freeze({
     withProjectHierarchyAuthority: raw.withProjectHierarchyAuthority,
-    resolveSpecialistReadiness: selection => resolveDescriptor.value.call(resolver, selection),
+    resolveSpecialistReadiness: selection => resolveMethod.call(resolver, selection),
+    assertSpecialistReadinessCurrent: readiness => assertCurrentMethod.call(resolver, readiness),
   });
 }
 
@@ -1867,6 +1869,7 @@ export class BrowserAgentManager {
     const {
       withProjectHierarchyAuthority,
       resolveSpecialistReadiness,
+      assertSpecialistReadinessCurrent,
     } = trustedAutomaticDelegationDependencies(dependencies);
 
     const initial = await this.get(id);
@@ -1978,7 +1981,8 @@ export class BrowserAgentManager {
     return withProjectHierarchyAuthority(projectId, async authority => {
       const at = new Date(this.now()).toISOString();
       let result = null;
-      await this.update(store => {
+      await this.update(async store => {
+        await assertSpecialistReadinessCurrent(providerReadiness);
         const job = store.byId[id];
         if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
         if ((job.config?.projectId || '') !== projectId) {
@@ -2428,7 +2432,7 @@ export class BrowserAgentManager {
     for (const jobId of candidateJobIds) {
       const admission = automaticAdmissions.get(jobId) || null;
       const claimOne = async authority => {
-        await this.update(store => {
+        await this.update(async store => {
           const job = store.byId[jobId];
           if (!job?.runtime?.plan) return store;
 
@@ -2496,11 +2500,12 @@ export class BrowserAgentManager {
                 parentCapabilityIds: job.definitionScope.capabilityIds,
                 parentToolIds: job.definitionScope.toolIds,
               });
-              assertTrustedProviderReadinessForSelection(
+              const providerReadiness = assertTrustedProviderReadinessForSelection(
                 admission.readinessByNode.get(binding.nodeId),
                 binding.selection,
                 this.now(),
               );
+              await trustedDependencies.assertSpecialistReadinessCurrent(providerReadiness);
             }
             const policy = authority.subagentPolicy;
             const requestedMaxChildren = claimRequest.maxChildrenPerAgent === undefined
