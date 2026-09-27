@@ -5,6 +5,7 @@ import {
   SpecialistProviderReadinessSource,
   inspectSpecialistProviderReadinessV1,
 } from '../src/core/specialist-provider-readiness.js';
+import { prepareAutomaticAgentSpecialistDelegationV1 } from '../src/core/agent-specialist-delegation.js';
 
 function selection(overrides = {}) {
   return {
@@ -69,6 +70,82 @@ test('provider-wide readiness satisfies every selected specialist tool without g
   });
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.checks), true);
+});
+
+test('canonical automatic-delegation proposal selection feeds the readiness binding without reconstruction', () => {
+  const at = '2026-09-27T12:00:00.000Z';
+  const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+    schemaVersion: 1,
+    plan: {
+      schemaVersion: 1,
+      planId: 'plan-readiness-integration',
+      jobId: 'job-readiness-integration',
+      objective: 'Read the local input.',
+      successCriteria: ['Input is read'],
+      createdAt: at,
+      updatedAt: at,
+      revision: 1,
+      nodes: [{
+        nodeId: 'local-read',
+        title: 'Read input',
+        objective: 'Read the bounded local input.',
+        dependsOn: [],
+        conflictKeys: ['artifact:input'],
+        ownerId: 'agent-root',
+        executionPlane: 'LOCAL',
+        acceptanceCriteria: ['Input is returned'],
+        budget: {
+          maxModelCalls: 2,
+          maxRuntimeSeconds: 300,
+          maxCostUsdMicros: 0,
+        },
+        state: 'READY',
+        evidence: '',
+        updatedAt: at,
+      }],
+    },
+    expectedPlanRevision: 1,
+    nodeId: 'local-read',
+    registry: {
+      schemaVersion: 1,
+      registryId: 'registry:readiness',
+      revision: 1,
+      definitions: [{
+        schemaVersion: 1,
+        specialistId: 'reader.local',
+        providerId: 'provider.local',
+        label: 'Local reader',
+        description: '',
+        executionPlane: 'LOCAL',
+        capabilityIds: ['data.read'],
+        toolIds: ['fs.read'],
+        resultContractId: 'result:read',
+        enabled: true,
+        definitionRevision: 1,
+      }],
+    },
+    parentCapabilityIds: ['data.read'],
+    parentToolIds: ['fs.read'],
+    requiredCapabilityIds: ['data.read'],
+    requiredToolIds: ['fs.read'],
+    policyEnvelopeId: 'policy:readiness',
+    deadlineAt: '2026-09-27T13:00:00.000Z',
+    priority: 0,
+    at,
+  });
+
+  const result = inspectSpecialistProviderReadinessV1({
+    selection: proposal.selection,
+    providerStates: [readiness({ toolId: 'fs.read' })],
+  });
+
+  assert.equal(proposal.selection.specialistId, 'reader.local');
+  assert.equal(result.specialistId, 'reader.local');
+  assert.equal(result.providerId, 'provider.local');
+  assert.deepEqual(result.requiredToolIds, ['fs.read']);
+  assert.equal(result.readiness, 'READY');
+  assert.equal(result.executable, true);
+  assert.equal(result.authority.capacityReserved, false);
 });
 
 test('tool-specific readiness overrides provider-wide fallback for the exact selected tool', () => {
