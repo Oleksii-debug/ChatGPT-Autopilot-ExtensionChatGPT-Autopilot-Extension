@@ -152,6 +152,9 @@ function mergeAiRouterSettingsOverride(rawBase, rawOverride = {}) {
   const override = snapshotAiRouterOverride(rawOverride);
   const next = structuredClone(base);
   if (Object.hasOwn(override, 'routePolicy')) {
+    if (!base.routes.length) {
+      throw new Error('Selected Agent AI route policy requires a configured Models route pool');
+    }
     next.routePolicy = structuredClone(narrowAiRoutePolicy(base, override.routePolicy));
   }
   if (AI_ROUTER_OVERRIDE_MODES.has(override.mode)) next.mode = override.mode;
