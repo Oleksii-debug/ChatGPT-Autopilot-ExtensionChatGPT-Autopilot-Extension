@@ -70,6 +70,7 @@ function request(overrides = {}) {
     parentNodeId: overrides.parentNodeId || 'root',
     requestedChildren: overrides.requestedChildren || 1,
     resourceBudget: overrides.resourceBudget || { maxChildAgents: 8 },
+    spawnId: overrides.spawnId || 'spawn-a',
     nowMs: overrides.nowMs ?? 250,
   };
 }
@@ -89,12 +90,13 @@ test('atomically appends inherited child topology while preserving durable paren
     graph: canonicalGraph,
     runtime,
     requestedChildren: 2,
+    spawnId: 'effect-17',
     nowMs: 300,
   }));
 
   assert.equal(result.decision, SubagentTopologyMutationDecision.ALLOW);
-  assert.deepEqual(result.createdNodeIds, ['subagent-1', 'subagent-2']);
-  assert.deepEqual(result.graph.nodesById.root.childIds, ['subagent-1', 'subagent-2']);
+  assert.deepEqual(result.createdNodeIds, ['subagent:effect-17:1', 'subagent:effect-17:2']);
+  assert.deepEqual(result.graph.nodesById.root.childIds, ['subagent:effect-17:1', 'subagent:effect-17:2']);
   assert.equal(result.runtime.createdAt, runtime.createdAt);
   assert.equal(result.runtime.updatedAt, 300);
   assert.deepEqual(result.runtime.nodesById.root.activationLedger, runtime.nodesById.root.activationLedger);
@@ -110,13 +112,53 @@ test('atomically appends inherited child topology while preserving durable paren
     assert.equal(result.runtime.nodesById[childId].lifecycle, OrchestrationNodeLifecycle.IDLE);
   }
 
+  assert.equal(result.reused, false);
   assert.equal(result.activationAuthority, false);
   assert.equal(result.executionAuthority, false);
   assert.doesNotThrow(() => validateOrchestrationHierarchyRuntimeV1(result.graph, result.runtime));
   assert.equal(Object.isFrozen(result), true);
 });
 
-test('preserves explicit parent barrier semantics and allocates globally unique child ids', () => {
+test('same spawn identity is exact-effect idempotent after restart', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    requestedChildren: 2,
+    spawnId: 'exact-effect-1',
+    nowMs: 300,
+  }));
+  const second = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: first.runtime,
+    requestedChildren: 2,
+    spawnId: 'exact-effect-1',
+    resourceBudget: { maxChildAgents: 2 },
+    nowMs: 999,
+  }));
+
+  assert.equal(second.decision, 'ALLOW');
+  assert.equal(second.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.equal(second.reused, true);
+  assert.deepEqual(second.createdNodeIds, first.createdNodeIds);
+  assert.deepEqual(second.graph, first.graph);
+  assert.deepEqual(second.runtime, first.runtime);
+});
+
+test('same spawn identity cannot be replayed with a different child count', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    requestedChildren: 2,
+    spawnId: 'exact-effect-2',
+  }));
+  const conflict = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: first.runtime,
+    requestedChildren: 1,
+    spawnId: 'exact-effect-2',
+  }));
+  assert.equal(conflict.decision, 'DENY');
+  assert.equal(conflict.reasonCode, 'SPAWN_IDENTITY_CONFLICT');
+  assert.deepEqual(conflict.createdNodeIds, []);
+});
+
+test('preserves explicit parent barrier semantics and unrelated node identities', () => {
   const canonicalGraph = graph([
     node('root', null, ['subagent-1'], {
       barrier: { mode: 'REQUIRED_DIRECT_CHILDREN', childIds: ['subagent-1'] },
@@ -127,11 +169,13 @@ test('preserves explicit parent barrier semantics and allocates globally unique 
   const result = mutateOrchestrationSubagentTopologyV1(request({
     graph: canonicalGraph,
     runtime: runtimeFor(canonicalGraph),
+    spawnId: 'new-effect',
   }));
 
   assert.equal(result.decision, 'ALLOW');
-  assert.deepEqual(result.createdNodeIds, ['subagent-2']);
-  assert.deepEqual(result.graph.nodesById.root.childIds, ['subagent-1', 'subagent-2']);
+  assert.deepEqual(result.createdNodeIds, ['subagent:new-effect:1']);
+  assert.equal(result.graph.nodesById.root.childIds.includes('subagent-1'), true);
+  assert.equal(result.graph.nodesById.root.childIds.includes('subagent:new-effect:1'), true);
   assert.deepEqual(result.graph.nodesById.root.barrier, {
     mode: 'REQUIRED_DIRECT_CHILDREN',
     childIds: ['subagent-1'],
@@ -268,5 +312,10 @@ test('request boundary rejects accessors, hidden authority and unknown fields wi
   assert.throws(
     () => mutateOrchestrationSubagentTopologyV1(symbolic),
     /symbol field/,
+  );
+
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(request({ spawnId: 'bad id' })),
+    /spawnId is invalid/,
   );
 });
