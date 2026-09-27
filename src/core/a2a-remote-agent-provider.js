@@ -38,6 +38,7 @@ const RESPONSE_KEYS = new Set(['status', 'contentType', 'body']);
 const JSONRPC_RESPONSE_KEYS = new Set(['jsonrpc', 'id', 'result', 'error']);
 const SEND_MESSAGE_RESULT_KEYS = new Set(['task', 'message']);
 const OBSERVATION_INPUT_KEYS = new Set(['providerResult', 'exactEffectState']);
+const PROVIDER_OPTION_KEYS = new Set(['transport', 'now']);
 const PROVIDER_RESULT_KEYS = new Set([
   'schemaVersion',
   'providerId',
@@ -106,6 +107,31 @@ function dataRecord(value, allowed, label) {
     out[key] = descriptor.value;
   }
   return out;
+}
+
+function bindTransportSendJsonRpc(transport) {
+  if (!transport || (typeof transport !== 'object' && typeof transport !== 'function') || Array.isArray(transport)) {
+    fail('A2A_TRANSPORT_UNAVAILABLE', 'A2A transport.sendJsonRpc is required');
+  }
+
+  let current = transport;
+  for (let depth = 0; current && depth < 16; depth += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, 'sendJsonRpc');
+    if (descriptor) {
+      if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')
+          || typeof descriptor.value !== 'function') {
+        fail(
+          'A2A_TRANSPORT_UNAVAILABLE',
+          'A2A transport.sendJsonRpc must be a data method',
+        );
+      }
+      return descriptor.value.bind(transport);
+    }
+    if (current === Object.prototype || current === Function.prototype) break;
+    current = Object.getPrototypeOf(current);
+  }
+
+  fail('A2A_TRANSPORT_UNAVAILABLE', 'A2A transport.sendJsonRpc is required');
 }
 
 function exactString(value, label, maxBytes, { allowWhitespaceOnly = false } = {}) {
@@ -646,14 +672,14 @@ function a2aSendResultToObservationV1(input = {}) {
 }
 
 export class A2ARemoteAgentProviderV1 {
-  constructor({ transport, now = () => Date.now() } = {}) {
-    if (!transport || typeof transport !== 'object' || typeof transport.sendJsonRpc !== 'function') {
-      fail('A2A_TRANSPORT_UNAVAILABLE', 'A2A transport.sendJsonRpc is required');
-    }
+  constructor(options = {}) {
+    const raw = dataRecord(options, PROVIDER_OPTION_KEYS, 'A2A provider options');
+    const now = Object.hasOwn(raw, 'now') ? raw.now : () => Date.now();
+    const sendJsonRpc = bindTransportSendJsonRpc(raw.transport);
     if (typeof now !== 'function') {
       fail('A2A_TIME_UNAVAILABLE', 'A2A provider requires a trusted runtime clock');
     }
-    this.transport = transport;
+    this.sendJsonRpc = sendJsonRpc;
     this.now = now;
     ISSUED_PROVIDER_RESULTS.set(this, new WeakSet());
   }
@@ -724,7 +750,7 @@ export class A2ARemoteAgentProviderV1 {
     );
     let rawResponse;
     try {
-      rawResponse = await this.transport.sendJsonRpc(freeze({
+      rawResponse = await this.sendJsonRpc(freeze({
         url: assessment.selectedInterface.url,
         protocolVersion: assessment.selectedInterface.protocolVersion,
         tenant: assessment.selectedInterface.tenant,
