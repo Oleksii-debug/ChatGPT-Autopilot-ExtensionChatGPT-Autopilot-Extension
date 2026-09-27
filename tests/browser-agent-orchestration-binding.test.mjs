@@ -1486,3 +1486,55 @@ test('scope dispatcher rejects non-lifecycle hierarchy events without mutating c
   assert.deepEqual((await controller.runtimeRepository.load()).hierarchy.state, runtimeBefore.hierarchy.state);
   assert.deepEqual(await core.load(), coreBefore);
 });
+
+
+test('bound lifecycle transition capability expires when canonical Project fence is released', async () => {
+  const { manager, orchestration, dependencies } = await fixture();
+  const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  let escaped = null;
+
+  await orchestration.withBrowserAgentBoundLifecycleAuthority(
+    bound.binding,
+    async applyBoundLifecycle => {
+      escaped = applyBoundLifecycle;
+    },
+  );
+  assert.equal(typeof escaped, 'function');
+
+  const before = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  await assert.rejects(
+    () => escaped('PAUSE', { browserControlEpoch: 1, nowMs: 2000 }),
+    /authority callback has expired/,
+  );
+  const after = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.deepEqual(after.hierarchy.state, before.hierarchy.state);
+});
+
+test('duplicate bound lifecycle retry is accepted only when durable target scope already matches', async () => {
+  const { manager, orchestration, dependencies } = await fixture();
+  const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+
+  const first = await orchestration.withBrowserAgentBoundLifecycleAuthority(
+    bound.binding,
+    applyBoundLifecycle => applyBoundLifecycle('PAUSE', {
+      browserControlEpoch: 7,
+      nowMs: 2000,
+    }),
+  );
+  assert.equal(first.targetScopeState, 'PAUSED');
+  assert.equal(first.result.reason, 'PAUSED');
+
+  const retry = await orchestration.withBrowserAgentBoundLifecycleAuthority(
+    bound.binding,
+    applyBoundLifecycle => applyBoundLifecycle('PAUSE', {
+      browserControlEpoch: 7,
+      nowMs: 2000,
+    }),
+  );
+  assert.equal(retry.result.reason, 'DUPLICATE_EVENT');
+  assert.equal(retry.targetScopeState, 'PAUSED');
+
+  const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
+});
