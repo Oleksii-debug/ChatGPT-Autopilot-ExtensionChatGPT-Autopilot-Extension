@@ -31,6 +31,12 @@ const CHILD_BUDGET_KEYS = new Set([
   'maxCostUsdMicros',
 ]);
 
+const CHILD_BUDGET_BOUNDS = Object.freeze({
+  maxModelCalls: Object.freeze({ min: 0, max: 1_000_000 }),
+  maxRuntimeSeconds: Object.freeze({ min: 0, max: 31_536_000 }),
+  maxCostUsdMicros: Object.freeze({ min: 0, max: Number.MAX_SAFE_INTEGER }),
+});
+
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function snapshot(value, allowed, label) {
@@ -144,7 +150,11 @@ function normalizeChildBudget(input) {
   const raw = snapshot(input, CHILD_BUDGET_KEYS, 'Agent specialist delegation childBudget');
   const output = {};
   for (const key of Object.keys(raw)) {
-    output[key] = exactInteger(raw[key], `childBudget.${key}`);
+    output[key] = exactInteger(
+      raw[key],
+      `childBudget.${key}`,
+      CHILD_BUDGET_BOUNDS[key],
+    );
   }
   return freeze(output);
 }
