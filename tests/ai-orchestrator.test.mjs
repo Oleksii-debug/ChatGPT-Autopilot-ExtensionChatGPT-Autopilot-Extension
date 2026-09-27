@@ -500,6 +500,88 @@ test('omitting route quality evidence preserves existing canonical Router order'
   assert.equal(result.routing.reason, 'policy-selection');
 });
 
+test('quality-ranked route failure reuses the existing canonical retryable failover path', async () => {
+  const routes = [
+    { routeId:'fallback', provider:'ollama', model:'fallback-model', roles:['planner'], priority:0 },
+    { routeId:'quality-first', provider:'ollama', model:'quality-model', roles:['planner'], priority:0 },
+  ];
+  const calls = [];
+  const gateway = {
+    async complete(req) {
+      calls.push(req.model);
+      if (req.model === 'quality-model') {
+        throw Object.assign(new Error('temporary quota'), {
+          code:'AI_PROVIDER_QUOTA_EXHAUSTED',
+          status:429,
+        });
+      }
+      return { text:'fallback result' };
+    },
+  };
+  let clock = QUALITY_NOW;
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => clock++ });
+  const result = await router.run(
+    settings({
+      routes,
+      routePolicy:{ retryBackoffSeconds:60, circuitBreakerFailures:2, circuitBreakerSeconds:300 },
+    }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'quality failover task',
+    {
+      taskRole:'planner',
+      routeQualityBenchmarkRequests:[await routeQualityBinding(routes[1], { suffix:'failover' })],
+    },
+  );
+
+  assert.deepEqual(calls, ['quality-model','fallback-model']);
+  assert.equal(result.routing.selectedRouteId, 'fallback');
+  assert.equal(result.routing.reason, 'failover');
+  assert.deepEqual(
+    result.routing.failoverChain.map(item => item.routeId + ':' + item.outcome),
+    ['quality-first:FAILED','fallback:SUCCESS'],
+  );
+  assert.ok(result.runtime.routeStates['quality-first'].backoffUntil > QUALITY_NOW);
+});
+
+test('quality evidence cannot bypass owner autoSwitch=false after a retryable provider failure', async () => {
+  const routes = [
+    { routeId:'fallback', provider:'ollama', model:'fallback-model', roles:['planner'], priority:0 },
+    { routeId:'quality-first', provider:'ollama', model:'quality-model', roles:['planner'], priority:0 },
+  ];
+  const calls = [];
+  const gateway = {
+    async complete(req) {
+      calls.push(req.model);
+      throw Object.assign(new Error('temporary quota'), {
+        code:'AI_PROVIDER_QUOTA_EXHAUSTED',
+        status:429,
+      });
+    },
+  };
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => QUALITY_NOW });
+  await assert.rejects(
+    () => router.run(
+      settings({
+        routes,
+        routePolicy:{
+          autoSwitch:false,
+          retryBackoffSeconds:60,
+          circuitBreakerFailures:2,
+          circuitBreakerSeconds:300,
+        },
+      }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'quality no-switch task',
+      {
+        taskRole:'planner',
+        routeQualityBenchmarkRequests:[await routeQualityBinding(routes[1], { suffix:'no-switch' })],
+      },
+    ),
+    /temporary quota/u,
+  );
+  assert.deepEqual(calls, ['quality-model']);
+});
+
 test('three-route pool fails over on quota and unavailability without changing request identity or budget accounting', async () => {
   const calls = [];
   const gateway = {
