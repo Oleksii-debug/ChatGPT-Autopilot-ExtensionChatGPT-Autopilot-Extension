@@ -52,6 +52,11 @@ import {
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
 import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
+import {
+  AGENT_DEFINITION_REGISTRY_VERSION,
+  normalizeAgentDefinitionRegistryV1,
+  proposeAgentDefinitionRegistryMutationV1,
+} from './agent-definition-registry.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -60,6 +65,12 @@ const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
 const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
 const MAX_BROWSER_AGENT_CONCURRENT = 32;
+const MAX_AGENT_DEFINITION_REGISTRIES = 128;
+const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
+const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -99,6 +110,43 @@ function snapshotOwnDataRequest(value, label) {
     snapshot[key] = descriptor.value;
   }
   return snapshot;
+}
+function snapshotExactOwnDataRequest(value, allowed, label) {
+  const snapshot = snapshotOwnDataRequest(value, label);
+  for (const key of Object.keys(snapshot)) {
+    if (!allowed.has(key)) throw new Error(`${label} contains an unknown field: ${key}`);
+  }
+  return snapshot;
+}
+function canonicalAgentDefinitionRegistryId(value) {
+  return normalizeAgentDefinitionRegistryV1({
+    schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+    registryId: value,
+    revision: 1,
+    definitions: [],
+  }).registryId;
+}
+function normalizePersistedAgentDefinitionRegistries(raw) {
+  if (raw === undefined) return {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) return {};
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return {};
+  const out = {};
+  for (const key of keys.sort()) {
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) continue;
+    try {
+      const registry = normalizeAgentDefinitionRegistryV1(descriptor.value);
+      if (registry.registryId === key) out[key] = registry;
+    } catch {
+      // Corrupt one persisted definition registry must not poison Agent jobs or
+      // other valid registries. The invalid entry is never exposed as canonical.
+    }
+  }
+  return out;
 }
 function nonNegativeSafeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
@@ -192,6 +240,7 @@ function freshStore() {
     order: [],
     byId: {},
     executionPolicy: normalizeBrowserAgentExecutionPolicy(),
+    definitionRegistriesById: {},
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -409,6 +458,7 @@ function normalizeStore(raw, now) {
   } catch {
     out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
   }
+  out.definitionRegistriesById = normalizePersistedAgentDefinitionRegistries(raw.definitionRegistriesById);
   return out;
 }
 
@@ -559,6 +609,80 @@ export class BrowserAgentManager {
     // failed save after the durable policy already committed.
     this.#requestExecutionSlotPump();
     return policy;
+  }
+
+  async listAgentDefinitionRegistries() {
+    const store = await this.load();
+    const registries = Object.keys(store.definitionRegistriesById || {})
+      .sort()
+      .map(registryId => clone(store.definitionRegistriesById[registryId]));
+    return { registries };
+  }
+
+  async getAgentDefinitionRegistry(registryId) {
+    const canonicalId = canonicalAgentDefinitionRegistryId(registryId);
+    const store = await this.load();
+    const registry = store.definitionRegistriesById?.[canonicalId];
+    return { registry: registry ? clone(registry) : null };
+  }
+
+  async createAgentDefinitionRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_REGISTRY_CREATE_KEYS,
+      'Browser Agent definition registry create request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent definition registry create request requires registryId');
+    }
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    let created = null;
+    await this.update(store => {
+      const registries = store.definitionRegistriesById || (store.definitionRegistriesById = {});
+      if (registries[registryId]) throw new Error('Agent definition registry already exists');
+      if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
+        throw new Error('Agent definition registry capacity is exhausted');
+      }
+      created = normalizeAgentDefinitionRegistryV1({
+        schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+        registryId,
+        revision: 1,
+        definitions: [],
+      });
+      registries[registryId] = created;
+      return store;
+    });
+    return { registry: clone(created) };
+  }
+
+  async mutateAgentDefinitionRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS,
+      'Browser Agent definition registry mutation request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent definition registry mutation request requires registryId');
+    }
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    let committed = null;
+    await this.update(store => {
+      const current = store.definitionRegistriesById?.[registryId];
+      if (!current) throw new Error('Agent definition registry not found');
+      const proposalInput = {
+        registry: current,
+        registryId,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        kind: request.kind,
+      };
+      for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
+        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
+      }
+      committed = proposeAgentDefinitionRegistryMutationV1(proposalInput);
+      store.definitionRegistriesById[registryId] = committed.nextRegistry;
+      return store;
+    });
+    return clone(committed);
   }
 
   #rejectExecutionSlotQueue(error) {
