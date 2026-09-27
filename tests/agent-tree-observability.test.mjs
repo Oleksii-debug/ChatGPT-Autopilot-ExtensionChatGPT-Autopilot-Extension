@@ -307,6 +307,46 @@ test('null-prototype request and telemetry records remain portable data inputs',
   assert.equal(result.rows[0].telemetry.modelCalls, 2);
 });
 
+
+test('observable state fails closed when hierarchy runtime carries invalid presentation values', () => {
+  const badLifecycle = request();
+  badLifecycle.runtime.nodesById.root.lifecycle = 'RUNNINGISH';
+  assert.throws(
+    () => buildAgentTreeProjectionV1(badLifecycle),
+    /Observable lifecycle is invalid/,
+  );
+
+  const badScope = request();
+  badScope.runtime.nodesById.root.scopeState = 'MAYBE';
+  assert.throws(
+    () => buildAgentTreeProjectionV1(badScope),
+    /Observable scopeState is invalid/,
+  );
+
+  const badRound = request();
+  badRound.runtime.nodesById.root.round = -0;
+  assert.throws(
+    () => buildAgentTreeProjectionV1(badRound),
+    /non-canonical number|Observable round is invalid/,
+  );
+
+  const missingActivation = request();
+  missingActivation.runtime.nodesById.root.currentActivationId = 'missing-activation';
+  assert.throws(
+    () => buildAgentTreeProjectionV1(missingActivation),
+    /Current activation is missing/,
+  );
+});
+
+test('accessible labels are single-line and strip bidi/control presentation hazards', () => {
+  const input = request();
+  input.graph.promptProfiles[0].role = 'coord\n\u202EINATOR';
+  const result = buildAgentTreeProjectionV1(input);
+  assert.equal(result.rows[0].role, 'coord INATOR');
+  assert.match(result.textLines[0], /^coord INATOR \[root\]/);
+  assert.doesNotMatch(result.textLines[0], /[\n\r\u202E]/u);
+});
+
 test('canonical hierarchy mismatch remains authoritative over the projection', () => {
   const input = request();
   input.runtime.graphId = 'other-graph';
