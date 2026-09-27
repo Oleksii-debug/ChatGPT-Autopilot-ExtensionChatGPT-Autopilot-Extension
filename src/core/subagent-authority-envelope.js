@@ -13,6 +13,8 @@ const REQUEST_KEYS = new Set([
   'childAgentId',
   'taskId',
   'providerId',
+  'parentProviderIds',
+  'ownerAllowedProviderIds',
   'parentCapabilityIds',
   'ownerAllowedCapabilityIds',
   'providerCapabilityIds',
@@ -154,6 +156,15 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
 
   if (identities.parentAgentId === identities.childAgentId) {
     return denied('CHILD_IDENTITY_NOT_ISOLATED', identities);
+  }
+
+  const parentProviderIds = idList(own(request, 'parentProviderIds'), 'parentProviderIds');
+  const ownerAllowedProviderIds = idList(own(request, 'ownerAllowedProviderIds'), 'ownerAllowedProviderIds');
+  const providerAuthorityIntersection = intersect(parentProviderIds, ownerAllowedProviderIds);
+  if (!providerAuthorityIntersection.includes(identities.providerId)) {
+    return denied('PROVIDER_SCOPE_ESCALATION', identities, {
+      deniedProviderIds: [identities.providerId],
+    });
   }
 
   const parentCapabilityIds = idList(own(request, 'parentCapabilityIds'), 'parentCapabilityIds');
