@@ -24,6 +24,24 @@ const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPha
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
 
+export const OrchestrationProjectAuthorityErrorCode = Object.freeze({
+  PROJECT_UNOWNED: 'PROJECT_UNOWNED',
+  PROJECT_NON_UNIQUE: 'PROJECT_NON_UNIQUE',
+  HIERARCHY_UNAVAILABLE: 'HIERARCHY_UNAVAILABLE',
+  HIERARCHY_INCONSISTENT: 'HIERARCHY_INCONSISTENT',
+});
+
+function orchestrationProjectAuthorityError(code, message, cause = undefined) {
+  const error = new Error(message, cause === undefined ? undefined : { cause });
+  Object.defineProperty(error, 'code', {
+    value: code,
+    enumerable: true,
+    writable: false,
+    configurable: false,
+  });
+  return error;
+}
+
 function clone(value) { return structuredClone(value); }
 function text(value) { return typeof value === 'string' ? value.trim() : ''; }
 function safeName(value, fallback = 'Оркестр') { return text(value).slice(0, 120) || fallback; }
@@ -527,22 +545,30 @@ export class OrchestrationV2Manager {
       }
     }
     if (matches.length === 0) {
-      throw new Error('No canonical orchestra owns this Project ID');
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.PROJECT_UNOWNED, 'No canonical orchestra owns this Project ID');
     }
     if (matches.length !== 1) {
-      throw new Error('Project ID is not uniquely owned by one canonical orchestra');
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.PROJECT_NON_UNIQUE, 'Project ID is not uniquely owned by one canonical orchestra');
     }
     const match = matches[0];
     const runtime = await match.controller.runtimeRepository.load();
     const graph = runtime?.hierarchy?.graph;
     const state = runtime?.hierarchy?.state;
     if (!graph || !state) {
-      throw new Error('Canonical orchestra has no durable orchestration hierarchy');
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.HIERARCHY_UNAVAILABLE, 'Canonical orchestra has no durable orchestration hierarchy');
     }
     if (state.graphId !== graph.graphId || state.controlEpoch !== graph.controlEpoch) {
-      throw new Error('Canonical orchestration hierarchy runtime provenance is inconsistent');
+      throw orchestrationProjectAuthorityError(OrchestrationProjectAuthorityErrorCode.HIERARCHY_INCONSISTENT, 'Canonical orchestration hierarchy runtime provenance is inconsistent');
     }
-    validateOrchestrationHierarchyRuntimeV1(graph, state);
+    try {
+      validateOrchestrationHierarchyRuntimeV1(graph, state);
+    } catch (error) {
+      throw orchestrationProjectAuthorityError(
+        OrchestrationProjectAuthorityErrorCode.HIERARCHY_INCONSISTENT,
+        'Canonical orchestration hierarchy runtime is invalid',
+        error,
+      );
+    }
     return createOrchestrationProjectAuthorityV1({
       orchestraId: match.orchestraId,
       projectId,
