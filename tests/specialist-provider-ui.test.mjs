@@ -44,6 +44,22 @@ test('OpenHands provider config controls are native-labeled and expose no implic
   assert.match(options, /OPENHANDS_CODING_PROVIDER_ID/u);
 });
 
+
+test('readiness button probes only the saved canonical provider config and grants no execution authority', () => {
+  assert.match(html, /id="specialist-provider-config-probe-button"[^>]*disabled/u);
+  assert.match(html, /Перевірити readiness збереженого config/u);
+  const probe = functionBody('probeSpecialistProviderConfig');
+  assert.match(probe, /PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG/u);
+  assert.match(probe, /providerId: OPENHANDS_CODING_PROVIDER_ID/u);
+  assert.match(probe, /result\?\.configRevision !== current\.revision/u);
+  assert.match(probe, /GET-only probe без claim або provider execution/u);
+  assert.match(probe, /не резервує capacity і не дає execution\/completion authority/u);
+  assert.doesNotMatch(
+    probe,
+    /CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS|RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION|COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF|VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF/u,
+  );
+});
+
 test('provider config load, save and clear reuse only canonical backend config authority', () => {
   const load = functionBody('loadSpecialistProviderConfig');
   assert.match(load, /LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS/u);

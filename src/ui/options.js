@@ -3172,6 +3172,7 @@ function fillSpecialistProviderConfig(record = null) {
       ? `У карантині provider configs: ${ui.specialistProviderQuarantineCount}.`
       : 'Provider config quarantine порожній.');
   $('specialist-provider-config-save-button').disabled = ui.specialistProviderQuarantined;
+  $('specialist-provider-config-probe-button').disabled = !record || ui.specialistProviderQuarantined;
   $('specialist-provider-config-clear-button').disabled = !record || ui.specialistProviderQuarantined;
 }
 
@@ -3231,6 +3232,35 @@ async function loadSpecialistProviderConfig() {
   }
 }
 
+async function probeSpecialistProviderConfig() {
+  const status = $('specialist-provider-config-status');
+  const current = ui.specialistProviderConfig;
+  if (!current || ui.specialistProviderQuarantined) {
+    status.textContent = 'Спочатку потрібен збережений некарантинований OpenHands owner config.';
+    return;
+  }
+  const button = $('specialist-provider-config-probe-button');
+  button.disabled = true;
+  status.textContent = `Перевіряю readiness збереженого config revision ${current.revision}. Це GET-only probe без claim або provider execution.`;
+  try {
+    const result = await core('PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+    });
+    if (result?.configRevision !== current.revision) {
+      await loadSpecialistProviderConfig();
+      status.textContent = 'Readiness probe завершився, але config revision змінилася. Актуальний owner config перезавантажено; повторіть probe.';
+      return;
+    }
+    const state = result?.providerState || {};
+    const observed = result?.observedAt ? formatTime(result.observedAt) : 'невідомо';
+    status.textContent = `Readiness: ${state.health || 'UNKNOWN'}; reason: ${state.reasonCode || 'невідомо'}; latency: ${Number(state.latencyMs || 0)} ms; observed: ${observed}. Probe не резервує capacity і не дає execution/completion authority.`;
+    announce(state.health === 'READY' ? 'OpenHands provider readiness: READY.' : `OpenHands provider readiness: ${state.health || 'UNKNOWN'}.`);
+  } catch (error) {
+    status.textContent = `Readiness probe не виконано: ${error.message}`;
+  } finally {
+    $('specialist-provider-config-probe-button').disabled = !ui.specialistProviderConfig || ui.specialistProviderQuarantined;
+  }
+}
 async function saveSpecialistProviderConfig() {
   const status = $('specialist-provider-config-status');
   try {
@@ -5683,6 +5713,7 @@ $('specialist-save-button').addEventListener('click', saveSpecialistDefinition);
 $('specialist-toggle-enabled-button').addEventListener('click', toggleSpecialistEnabled);
 $('specialist-delete-button').addEventListener('click', deleteSpecialistDefinition);
 $('specialist-provider-config-reload-button').addEventListener('click', loadSpecialistProviderConfig);
+$('specialist-provider-config-probe-button').addEventListener('click', probeSpecialistProviderConfig);
 $('specialist-provider-config-save-button').addEventListener('click', saveSpecialistProviderConfig);
 $('specialist-provider-config-clear-button').addEventListener('click', clearSpecialistProviderConfig);
 $('specialist-provider-runtime-refresh-button').addEventListener('click', loadSpecialistProviderRuntime);

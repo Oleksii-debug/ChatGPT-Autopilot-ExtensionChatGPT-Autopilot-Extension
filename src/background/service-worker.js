@@ -26,7 +26,10 @@ import {
   OpenHandsCodingSpecialistClient,
   OpenHandsCodingSpecialistError,
 } from '../core/coding-specialist-provider.js';
-import { createOpenHandsSpecialistReadinessBindingV1 } from '../core/openhands-specialist-readiness.js';
+import {
+  createOpenHandsSpecialistReadinessBindingV1,
+  probeOpenHandsSpecialistProviderConfigV1,
+} from '../core/openhands-specialist-readiness.js';
 import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
@@ -82,6 +85,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
   'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
+  'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS',
   'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
@@ -760,6 +764,35 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.listSpecialistProviderConfigs();
   } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.getSpecialistProviderConfig(message.payload?.providerId || '');
+  } else if (message.command === 'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
+    const providerId = message.payload?.providerId || '';
+    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
+      throw new Error('No read-only Specialist provider probe is installed for requested provider');
+    }
+    const beforeProbe = await browserAgent.getSpecialistProviderConfig(providerId);
+    if (beforeProbe.quarantined) {
+      throw new Error('Selected Specialist provider config is quarantined as corrupt');
+    }
+    if (!beforeProbe.config) {
+      throw new Error('Selected Specialist provider is not configured by the owner');
+    }
+    const configSnapshot = JSON.stringify(beforeProbe.config);
+    const probe = await probeOpenHandsSpecialistProviderConfigV1({
+      config: beforeProbe.config.config,
+      client: openHandsSpecialistClient,
+    });
+    const afterProbe = await browserAgent.getSpecialistProviderConfig(providerId);
+    if (afterProbe.quarantined || !afterProbe.config
+        || JSON.stringify(afterProbe.config) !== configSnapshot) {
+      throw new Error('Specialist provider config changed during readiness probe');
+    }
+    result = {
+      providerId,
+      configRevision: afterProbe.config.revision,
+      observedAt: probe.observedAt,
+      providerState: probe.providerState,
+      authority: probe.authority,
+    };
   } else if (message.command === 'SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
     result = await browserAgent.setSpecialistProviderConfig(message.payload || {});
   } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {

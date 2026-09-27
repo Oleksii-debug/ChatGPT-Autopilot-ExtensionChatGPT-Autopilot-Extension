@@ -8,6 +8,7 @@ import {
 } from '../src/core/coding-specialist-provider.js';
 import {
   createOpenHandsSpecialistReadinessBindingV1,
+  probeOpenHandsSpecialistProviderConfigV1,
 } from '../src/core/openhands-specialist-readiness.js';
 import {
   SpecialistProviderReadinessResolverV1,
@@ -83,6 +84,42 @@ function monotonicNow(values) {
   let index = 0;
   return () => values[Math.min(index++, values.length - 1)];
 }
+
+
+test('owner-config readiness probe is read-only, bounded, and grants no execution authority', async () => {
+  const calls = [];
+  const client = new OpenHandsCodingSpecialistClient({
+    fetchFn: async (url, options) => {
+      calls.push({ url, method: options.method, hasBody: Object.hasOwn(options, 'body') });
+      return jsonResponse({
+        info: {
+          title: 'OpenHands Agent Server',
+          version: OPENHANDS_AGENT_SERVER_VERSION,
+        },
+      });
+    },
+  });
+  const result = await probeOpenHandsSpecialistProviderConfigV1({
+    config: config(),
+    client,
+    now: monotonicNow([T0, T1]),
+  });
+
+  assert.deepEqual(calls, [{
+    url: 'http://127.0.0.1:3000/openapi.json',
+    method: 'GET',
+    hasBody: false,
+  }]);
+  assert.equal(result.providerId, OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(result.providerState.health, 'READY');
+  assert.equal(result.providerState.reasonCode, 'OPENHANDS_PROBE_READY');
+  assert.equal(result.providerState.latencyMs, 25);
+  assert.equal(result.authority.providerExecutionAuthorized, false);
+  assert.equal(result.authority.completionAuthorized, false);
+  assert.equal(result.authority.verificationAuthorized, false);
+  assert.equal(result.authority.capacityReserved, false);
+  assert.equal(JSON.stringify(result).includes('workspace'), false);
+});
 
 test('real OpenHands client readiness path performs only harmless GET /openapi.json and becomes executable through #454', async () => {
   const calls = [];
