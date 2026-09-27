@@ -1,3 +1,5 @@
+import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
+
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function exactText(value, label, max, { optional = false } = {}) {
@@ -174,6 +176,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   definitionRevision = 1,
   configDefaults = {},
   modelRoutePolicy = null,
+  specialistDelegationProfile = undefined,
 } = {}) {
   if (!Number.isSafeInteger(definitionRevision) || definitionRevision < 1 || Object.is(definitionRevision,-0)) {
     throw new Error('Definition revision має бути додатним цілим числом.');
@@ -191,6 +194,13 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
     modelRoutePolicy: copyModelRoutePolicy(modelRoutePolicy),
+    ...(specialistDelegationProfile === undefined
+      ? {}
+      : {
+        specialistDelegationProfile: specialistDelegationProfile === null
+          ? null
+          : normalizeAgentSpecialistDelegationProfileV1(specialistDelegationProfile),
+      }),
     enabled: input.enabled === true,
     definitionRevision,
   };
