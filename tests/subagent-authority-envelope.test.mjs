@@ -27,6 +27,8 @@ function request(overrides = {}) {
     childAgentId: 'agent.child',
     taskId: 'task.one',
     providerId: 'provider.main',
+    parentProviderIds: ['provider.main', 'provider.backup'],
+    ownerAllowedProviderIds: ['provider.main'],
     parentCapabilityIds: ['cap.read', 'cap.write', 'cap.admin'],
     ownerAllowedCapabilityIds: ['cap.read', 'cap.write'],
     providerCapabilityIds: ['cap.read', 'cap.write', 'cap.remote'],
@@ -66,6 +68,23 @@ test('derives only the exact task scope inside parent, owner and provider author
   assert.equal(result.policyAuthority, false);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.toolDescriptors[0]), true);
+});
+
+
+test('selected provider must remain inside parent and owner provider scope', () => {
+  const parentDenied = deriveSubagentAuthorityEnvelopeV1(request({
+    parentProviderIds: ['provider.backup'],
+  }));
+  assert.equal(parentDenied.decision, 'DENY');
+  assert.equal(parentDenied.reasonCode, 'PROVIDER_SCOPE_ESCALATION');
+  assert.deepEqual(parentDenied.deniedProviderIds, ['provider.main']);
+
+  const ownerDenied = deriveSubagentAuthorityEnvelopeV1(request({
+    ownerAllowedProviderIds: ['provider.backup'],
+  }));
+  assert.equal(ownerDenied.decision, 'DENY');
+  assert.equal(ownerDenied.reasonCode, 'PROVIDER_SCOPE_ESCALATION');
+  assert.deepEqual(ownerDenied.deniedProviderIds, ['provider.main']);
 });
 
 test('fails closed when task capability exceeds any authority intersection member', () => {
