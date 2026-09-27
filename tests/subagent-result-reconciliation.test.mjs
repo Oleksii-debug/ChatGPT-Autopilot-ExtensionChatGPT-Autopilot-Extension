@@ -250,6 +250,55 @@ function graph() {
   });
 }
 
+function nestedGraph() {
+  return validateOrchestrationGraphV1({
+    schemaVersion: 1,
+    graphId: 'nested-result-reconciliation-graph',
+    controlEpoch: 7,
+    loopPolicy: { mode: 'ONE_SHOT', maxRounds: 0 },
+    promptProfiles: [
+      { id: 'parent-profile', role: 'PARENT', version: 1, prompt: 'parent' },
+      { id: 'child-profile', role: 'CHILD', version: 1, prompt: 'child' },
+      { id: 'grandchild-profile', role: 'GRANDCHILD', version: 1, prompt: 'grandchild' },
+    ],
+    nodes: [
+      {
+        id: 'parent-1',
+        parentId: null,
+        childIds: ['child-1'],
+        promptProfileId: 'parent-profile',
+        chatMode: OrchestrationChatMode.PERSISTENT_CHAT,
+        maxActiveChildren: 1,
+        barrier: {
+          mode: OrchestrationBarrierMode.ALL_DIRECT_CHILDREN,
+          childIds: ['child-1'],
+        },
+      },
+      {
+        id: 'child-1',
+        parentId: 'parent-1',
+        childIds: ['grandchild-1'],
+        promptProfileId: 'child-profile',
+        chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
+        maxActiveChildren: 1,
+        barrier: {
+          mode: OrchestrationBarrierMode.ALL_DIRECT_CHILDREN,
+          childIds: ['grandchild-1'],
+        },
+      },
+      {
+        id: 'grandchild-1',
+        parentId: 'child-1',
+        childIds: [],
+        promptProfileId: 'grandchild-profile',
+        chatMode: OrchestrationChatMode.NEW_CHAT_PER_ACTIVATION,
+        maxActiveChildren: 0,
+        barrier: { mode: OrchestrationBarrierMode.NONE, childIds: [] },
+      },
+    ],
+  });
+}
+
 function runtimeFixture({ confirmEffect = true } = {}) {
   const g = graph();
   let runtime = createOrchestrationHierarchyRuntime(g, Date.parse(T0));
@@ -487,6 +536,134 @@ test('trusted result produces only an inert canonical terminal event and existin
     reduced.actions[0].purpose,
     OrchestrationActivationPurpose.RECONCILE,
   );
+});
+
+test('nested subagent reconciles upward only after its canonical RECONCILE activation is terminalized', async () => {
+  const contract = outcomeContract();
+  const task = taskEnvelope(contract);
+  const g = nestedGraph();
+  let runtime = createOrchestrationHierarchyRuntime(g, Date.parse(T0));
+
+  runtime = reduceOrchestrationHierarchyEvent(
+    g,
+    runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: 'activate-grandchild',
+      controlEpoch: 7,
+      nodeId: 'grandchild-1',
+      generation: 1,
+      activationId: 'grandchild-activation-1',
+      purpose: OrchestrationActivationPurpose.WORK,
+    },
+    EPOCH_T1,
+  ).runtime;
+  runtime = reduceOrchestrationHierarchyEvent(
+    g,
+    runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'confirm-grandchild',
+      controlEpoch: 7,
+      nodeId: 'grandchild-1',
+      generation: 1,
+      activationId: 'grandchild-activation-1',
+      effectRef: 'effect://grandchild',
+    },
+    EPOCH_T1 + 1,
+  ).runtime;
+  const grandchildTerminal = reduceOrchestrationHierarchyEvent(
+    g,
+    runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_TERMINAL,
+      eventId: 'terminal-grandchild',
+      controlEpoch: 7,
+      nodeId: 'grandchild-1',
+      generation: 1,
+      activationId: 'grandchild-activation-1',
+      status: 'COMPLETED',
+    },
+    EPOCH_T1 + 2,
+  );
+  runtime = grandchildTerminal.runtime;
+
+  assert.equal(grandchildTerminal.actions.length, 1);
+  const childReconcileAction = grandchildTerminal.actions[0];
+  assert.equal(
+    childReconcileAction.type,
+    OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT,
+  );
+  assert.equal(childReconcileAction.nodeId, 'child-1');
+  assert.equal(
+    childReconcileAction.purpose,
+    OrchestrationActivationPurpose.RECONCILE,
+  );
+
+  runtime = reduceOrchestrationHierarchyEvent(
+    g,
+    runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'confirm-child-reconcile',
+      controlEpoch: 7,
+      nodeId: 'child-1',
+      generation: 1,
+      activationId: childReconcileAction.activationId,
+      effectRef: 'effect://child-reconcile',
+    },
+    EPOCH_T1 + 3,
+  ).runtime;
+
+  const derivedBinding = deriveSubagentTaskActivationBindingV1({
+    taskEnvelope: task,
+    graph: g,
+    runtime,
+    activationAction: childReconcileAction,
+    invocationId: 'invocation-child-1',
+    boundAt: T2,
+  });
+  assert.equal(
+    derivedBinding.activationPurpose,
+    OrchestrationActivationPurpose.RECONCILE,
+  );
+
+  const result = resultEnvelope({ contract });
+  const input = {
+    resultEnvelope: result,
+    outcomeContract: contract,
+    criterionVerifications: [{
+      criterionId: 'criterion-1',
+      verificationId: 'verification-1',
+    }],
+    evaluatedAt: T6,
+    graph: g,
+    runtime,
+    taskActivationBindingId: derivedBinding.bindingId,
+  };
+  const value = await prepareSubagentResultReconciliationV1(
+    input,
+    deps({ contract, bindingValue: derivedBinding }),
+  );
+
+  assert.equal(
+    value.decision,
+    SubagentResultReconciliationDecision.ADMIT_TERMINAL,
+  );
+  assert.equal(value.terminalEvent.status, 'COMPLETED');
+
+  const reduced = reduceOrchestrationHierarchyEvent(
+    g,
+    runtime,
+    value.terminalEvent,
+    Date.parse(T6) + 1,
+  );
+  assert.equal(reduced.actions.length, 1);
+  assert.equal(
+    reduced.actions[0].type,
+    OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT,
+  );
+  assert.equal(reduced.actions[0].nodeId, 'parent-1');
 });
 
 test('exact retry produces the same event identity and canonical reducer deduplicates it', async () => {
@@ -794,6 +971,14 @@ test('already-terminal current activation produces no second terminal proposal',
 });
 
 test('trusted activation binding boundary rejects authority-bearing extras and accessors without getter execution', () => {
+  assert.throws(
+    () => normalizeTrustedSubagentTaskActivationBindingV1({
+      ...binding(),
+      bindingId: 'caller-chosen-binding-id',
+    }),
+    /bindingId is not canonical/u,
+  );
+
   assert.throws(
     () => normalizeTrustedSubagentTaskActivationBindingV1({
       ...binding(),
