@@ -706,3 +706,61 @@ test('approved effects wait for the same global and same-target execution admiss
   assert.equal(after.runtime.pendingApproval, null);
   assert.equal(after.runtime.stepCount, 1);
 });
+
+test('moving an active Agent to another tab immediately unblocks a queued old-target Agent', async () => {
+  const chrome = makeChromeStorage();
+  chrome.tabs = {
+    async get(id) {
+      if (id === 10) return { id: 10, url: 'https://one.example/', status: 'complete' };
+      if (id === 20) return { id: 20, url: 'https://two.example/', status: 'complete' };
+      throw new Error('unknown tab');
+    },
+    async query() { return []; },
+  };
+  chrome.permissions = { async contains() { return true; } };
+
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  await manager.create({ id: 'moving', goal: 'Move away from tab one' });
+  await manager.create({ id: 'waiting', goal: 'Use tab one afterwards' });
+  await manager.updateExecutionPolicy({ maxConcurrentAgents: 2 });
+  await manager.update(store => {
+    const moving = store.byId.moving;
+    const waiting = store.byId.waiting;
+    moving.runtime.runState = BrowserAgentRunState.RUNNING;
+    moving.runtime.controlEpoch = 1;
+    moving.runtime.tabId = 10;
+    moving.runtime.knownTabIds = [10, 20];
+    moving.runtime.currentUrl = 'https://one.example/';
+    waiting.runtime.runState = BrowserAgentRunState.RUNNING;
+    waiting.runtime.controlEpoch = 1;
+    waiting.runtime.tabId = 10;
+    waiting.runtime.knownTabIds = [10];
+    waiting.runtime.currentUrl = 'https://one.example/';
+    return store;
+  });
+  manager.reconcileAlarm = async () => 0;
+  manager.executionSlotActive.add('moving');
+
+  let waitingStartedResolve;
+  const waitingStarted = new Promise(resolve => { waitingStartedResolve = resolve; });
+  manager.cycleOne = async id => {
+    if (id === 'waiting') waitingStartedResolve();
+    return { kind: 'COMPLETED', id };
+  };
+
+  const queued = manager.runBurst('waiting', { maxCycles: 1 });
+  await Promise.resolve();
+
+  const moving = (await manager.get('moving')).job;
+  const switched = await manager.executeAction(
+    moving,
+    { url: 'https://one.example/' },
+    { type: BrowserAgentActionType.SWITCH_TAB, tabId: 20 },
+    moving.runtime.controlEpoch,
+  );
+  assert.equal(switched.kind, 'ACTION');
+  assert.equal((await manager.get('moving')).job.runtime.tabId, 20);
+
+  await waitingStarted;
+  await queued;
+});
