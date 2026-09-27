@@ -121,3 +121,4 @@ EMERGENCY HOTFIX — 2026-09-26 — SESSION / SCENARIO EFFORT CONTROL
 - Scenario response timeout gets a bounded recovery grace when tab state is temporarily unknown.
 - READ_ASSISTANT_REPORT navigation waits are bounded to 10s as a race backstop instead of the generic 90s wait.
 - New Scenario Work default response poll interval is 180s; UI recommends 180–300s.
+- Existing pre-hotfix scenarios still on the legacy default 15s poll are migrated once to 180s automatically; later owner-selected values are preserved.
