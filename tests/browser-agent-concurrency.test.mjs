@@ -313,11 +313,15 @@ test('queued admission fails closed instead of hanging when policy storage read 
     job: { id, runtime: { runState: 'RUNNING', nextWakeAt: 0 } },
   });
 
-  let policyReads = 0;
-  manager.getExecutionPolicy = async () => {
-    policyReads += 1;
-    if (policyReads === 3) throw new Error('simulated policy storage read failure');
-    return { maxConcurrentAgents: 1 };
+  const originalStorageGet = chrome.storage.local.get.bind(chrome.storage.local);
+  let failQueuedPumpRead = false;
+  let readsAfterArm = 0;
+  chrome.storage.local.get = async key => {
+    if (failQueuedPumpRead) {
+      readsAfterArm += 1;
+      if (readsAfterArm === 2) throw new Error('simulated policy storage read failure');
+    }
+    return originalStorageGet(key);
   };
 
   let releaseHeld;
@@ -334,14 +338,16 @@ test('queued admission fails closed instead of hanging when policy storage read 
 
   const held = manager.runBurst('held', { maxCycles: 1 });
   await heldStarted;
+  failQueuedPumpRead = true;
   await assert.rejects(
     manager.runBurst('queued', { maxCycles: 1 }),
     /simulated policy storage read failure/,
   );
+  failQueuedPumpRead = false;
+  chrome.storage.local.get = originalStorageGet;
   releaseHeld();
   await held;
 
-  manager.getExecutionPolicy = async () => ({ maxConcurrentAgents: 1 });
   const recovered = await manager.runBurst('queued', { maxCycles: 1 });
   assert.equal(recovered.kind, 'BURST');
   assert.equal(recovered.cycles, 1);
