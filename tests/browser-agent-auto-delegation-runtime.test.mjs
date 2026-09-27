@@ -160,7 +160,11 @@ function plan(overrides = {}) {
   };
 }
 
-function readyReadinessResolver({ executable = true, onResolve = null } = {}) {
+function readyReadinessResolver({
+  executable = true,
+  onResolve = null,
+  onAssertCurrent = null,
+} = {}) {
   return {
     async resolve(selection) {
       if (onResolve) await onResolve(selection);
@@ -192,6 +196,10 @@ function readyReadinessResolver({ executable = true, onResolve = null } = {}) {
           capacityReserved: false,
         },
       };
+    },
+    async assertCurrent(readiness) {
+      if (onAssertCurrent) await onAssertCurrent(readiness);
+      return true;
     },
   };
 }
@@ -378,6 +386,63 @@ test('automatic delegation refuses a non-running parent before any readiness pro
   assert.equal(listed.handoffs.length, 0);
   assert.equal(listed.executionOwnerships.length, 0);
   assert.equal(listed.delegationBindings.length, 0);
+});
+
+test('provider config provenance is revalidated inside durable auto-delegation admission', async () => {
+  let assertions = 0;
+  const resolver = readyReadinessResolver({
+    onAssertCurrent: async () => {
+      assertions += 1;
+      throw new Error('Specialist provider config changed after readiness probe');
+    },
+  });
+  const { manager, dependencies } = await fixture({
+    specialistProviderReadinessResolver: resolver,
+  });
+
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies),
+    /provider config changed after readiness probe/u,
+  );
+  assert.equal(assertions, 1);
+  const after = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(after.handoffs.length, 0);
+  assert.equal(after.executionOwnerships.length, 0);
+  assert.equal(after.delegationBindings.length, 0);
+});
+
+test('provider config provenance is revalidated again at canonical claim', async () => {
+  let assertions = 0;
+  let rejectAfterPrepare = false;
+  const resolver = readyReadinessResolver({
+    onAssertCurrent: async () => {
+      assertions += 1;
+      if (rejectAfterPrepare) {
+        throw new Error('Specialist provider config changed after readiness probe');
+      }
+    },
+  });
+  const { manager, dependencies } = await fixture({
+    specialistProviderReadinessResolver: resolver,
+  });
+  await manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies);
+  rejectAfterPrepare = true;
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffsAcrossJobs({
+      targetJobId: 'job.auto',
+      maxConcurrentHandoffs: 1,
+      maxChildrenPerAgent: 2,
+      maxDepth: 2,
+      leaseSeconds: 900,
+      at: T0,
+    }, dependencies),
+    /provider config changed after readiness probe/u,
+  );
+  assert.equal(assertions, 2);
+  const after = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(after.handoffs[0].state, 'READY');
+  assert.equal(after.executionOwnerships[0].state, ExecutionOwnershipState.AVAILABLE);
 });
 
 test('unavailable trusted provider readiness produces zero durable delegation mutation', async () => {
