@@ -227,6 +227,26 @@ test('binding fails closed on missing node and stale graph provenance fences', a
   );
 });
 
+test('Browser Agent binding rejects cross-Project authority even from the trusted resolver seam', async () => {
+  const { manager, orchestration } = await fixture();
+  const live = await orchestration.resolveProjectHierarchyAuthority('project-1');
+  const wrongProjectAuthority = createOrchestrationProjectAuthorityV1({
+    orchestraId: live.orchestraId,
+    projectId: 'project-2',
+    graph: live.graph,
+    subagentPolicy: live.subagentPolicy,
+  });
+  await assert.rejects(
+    () => manager.bindOrchestrationNode(
+      'job-1',
+      { nodeId: 'worker' },
+      { resolveProjectHierarchyAuthority: async () => wrongProjectAuthority },
+    ),
+    /does not match Browser Agent project/,
+  );
+  assert.equal((await manager.get('job-1')).job.orchestrationNodeBinding, null);
+});
+
 test('binding request and trusted resolver dependency boundaries are exact-shape and zero-getter', async () => {
   const { manager, dependencies } = await fixture();
   let requestReads = 0;
