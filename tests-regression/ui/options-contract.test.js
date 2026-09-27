@@ -291,6 +291,8 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   has(/id="agent-max-concurrent-agents" type="number" min="1" max="32" step="1"/, 'global Agent concurrency must expose bounded native numeric semantics');
   has(/id="agent-execution-policy-status" role="status"/, 'global Agent concurrency save result must be announced');
   assert.match(js, /core\('GET_BROWSER_AGENT_EXECUTION_POLICY'\)/, 'Agent UI must read the canonical execution policy through Core');
+  assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must load through the canonical startup sequence');
+  assert.doesNotMatch(js, /export \{ MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName \};\s*void loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must not create a second startup path');
   assert.match(js, /core\('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', \{ maxConcurrentAgents: value \}\)/, 'Agent UI must update the canonical execution policy through Core');
   assert.match(js, /!Number\.isInteger\(value\) \|\| value < 1 \|\| value > 32/, 'Agent UI must reject invalid concurrency before Core mutation');
   assert.match(js, /chrome\.permissions\.request\(\{ origins \}\)/, 'site access must be explicit through Chrome optional permissions');
