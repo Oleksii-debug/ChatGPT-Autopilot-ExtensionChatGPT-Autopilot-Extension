@@ -11,6 +11,7 @@ import {
   createBrowserAgentOrchestrationNodeBindingV1,
   createOrchestrationProjectAuthorityV1,
   inspectBrowserAgentOrchestrationNodeBindingV1,
+  normalizeBrowserAgentOrchestrationBindingRequestV1,
 } from '../src/core/browser-agent-orchestration-binding.js';
 
 function chromeFake() {
@@ -143,6 +144,19 @@ test('Project authority resolver returns the unique durable orchestra policy and
     maxChildrenPerAgent: 0,
   });
   assert.equal(Object.isFrozen(authority), true);
+});
+
+test('binding request normalizer is canonical and idempotent when optional epoch is absent', () => {
+  const first = normalizeBrowserAgentOrchestrationBindingRequestV1({ nodeId: 'worker' });
+  assert.deepEqual(first, {
+    nodeId: 'worker',
+    expectedGraphId: '',
+    expectedControlEpoch: null,
+  });
+  const second = normalizeBrowserAgentOrchestrationBindingRequestV1(first);
+  assert.deepEqual(second, first);
+  assert.equal(Object.isFrozen(first), true);
+  assert.equal(Object.isFrozen(second), true);
 });
 
 test('Browser Agent binding persists through the existing store and survives restart', async () => {
