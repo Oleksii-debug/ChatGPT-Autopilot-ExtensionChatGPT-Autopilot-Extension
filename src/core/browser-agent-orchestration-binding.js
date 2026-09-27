@@ -69,7 +69,9 @@ function browserAgentJobId(value) {
 }
 
 function positiveInteger(value, label, { optional = false } = {}) {
-  if (optional && value === undefined) return null;
+  // Optional canonical fields normalize to null. Accept that canonical output
+  // on a subsequent normalization pass so exported normalizers are composable.
+  if (optional && (value === undefined || value === null)) return null;
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
       || Object.is(value, -0)
