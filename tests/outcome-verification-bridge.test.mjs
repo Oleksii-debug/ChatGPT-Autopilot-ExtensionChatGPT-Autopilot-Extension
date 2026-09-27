@@ -274,6 +274,20 @@ test('all criteria require trusted ledger records with canonical verification an
   assert.equal(artifactCriterion.observationId, 'observation-artifact');
   assert.equal(artifactCriterion.trustedReasonCode, 'PASS');
   assert.deepEqual(
+    artifactCriterion.trustedEvidenceArtifactRefs.map(
+      ref => [ref.artifactId, ref.sha256, ref.createdAt],
+    ),
+    artifactCriterion.evidenceArtifactIds.map(
+      artifactId => {
+        const ref = fixture.records.get('verification-artifact').evidenceArtifacts
+          .find(item => item.artifactId === artifactId);
+        return [ref.artifactId, ref.sha256, ref.createdAt];
+      },
+    ),
+  );
+  assert.ok(Object.isFrozen(artifactCriterion.trustedEvidenceArtifactRefs));
+  assert.ok(Object.isFrozen(artifactCriterion.trustedEvidenceArtifactRefs[0]));
+  assert.deepEqual(
     contractCalls,
     [{ contractId: 'outcome-1', contractRevision: 1 }],
   );
