@@ -19,6 +19,21 @@ const INPUT_KEYS = new Set([
   'parentBinding',
 ]);
 
+const ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch',
+  'pinnedRouteId',
+  'orderedRouteIds',
+  'allowRouteIds',
+  'denyRouteIds',
+  'freeOnly',
+  'locality',
+  'maxInputPricePerMillionUsd',
+  'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds',
+  'circuitBreakerFailures',
+  'circuitBreakerSeconds',
+]);
+
 const BINDING_KEYS = new Set([
   'schemaVersion',
   'projectId',
@@ -197,6 +212,32 @@ function routePolicyProjection(policy, authorityRouteIds) {
   };
 }
 
+function inheritChildRoutePolicy(parent, authorityRouteIds, childInput) {
+  const overrides = strictRecord(
+    childInput == null ? {} : childInput,
+    ROUTE_POLICY_KEYS,
+    'Child AiRoutePolicy',
+  );
+  const authority = new Set(authorityRouteIds);
+  const parentPolicy = parent.routePolicy;
+  const inherited = {
+    autoSwitch: parentPolicy.autoSwitch,
+    pinnedRouteId: parentPolicy.pinnedRouteId,
+    orderedRouteIds: parentPolicy.orderedRouteIds.filter(routeId => authority.has(routeId)),
+    allowRouteIds: [...authorityRouteIds],
+    denyRouteIds: [],
+    freeOnly: parentPolicy.freeOnly,
+    locality: parentPolicy.locality,
+    maxInputPricePerMillionUsd: parentPolicy.maxInputPricePerMillionUsd,
+    maxOutputPricePerMillionUsd: parentPolicy.maxOutputPricePerMillionUsd,
+    retryBackoffSeconds: parentPolicy.retryBackoffSeconds,
+    circuitBreakerFailures: parentPolicy.circuitBreakerFailures,
+    circuitBreakerSeconds: parentPolicy.circuitBreakerSeconds,
+  };
+  for (const key of Object.keys(overrides)) inherited[key] = overrides[key];
+  return normalizeAiRoutePolicy(inherited);
+}
+
 function assertChildPolicyDoesNotWiden(parent, childPolicy) {
   const parentPolicy = parent.routePolicy;
 
@@ -305,6 +346,9 @@ export function normalizeAgentModelPolicyBindingV1(input) {
   const effectiveRouteIds = idList(own(raw, 'effectiveRouteIds'), 'effectiveRouteIds', { allowEmpty: false });
   assertSubset(effectiveRouteIds, authorityRouteIds, 'effectiveRouteIds');
 
+  if (!Object.hasOwn(raw, 'routePolicy')) {
+    throw new Error('Durable Agent routePolicy is required');
+  }
   const routePolicy = normalizeAiRoutePolicy(own(raw, 'routePolicy'));
   assertSubset(routePolicy.allowRouteIds, authorityRouteIds, 'routePolicy.allowRouteIds');
   assertSubset(routePolicy.denyRouteIds, authorityRouteIds, 'routePolicy.denyRouteIds');
@@ -425,7 +469,10 @@ export function createAgentModelPolicyBindingV1(input) {
     throw new Error('Agent has no routes inside owner/parent model authority');
   }
 
-  const routePolicy = normalizeAiRoutePolicy(own(raw, 'routePolicy') || {});
+  const routePolicyInput = own(raw, 'routePolicy');
+  const routePolicy = parentBinding
+    ? inheritChildRoutePolicy(parentBinding, authorityRouteIds, routePolicyInput)
+    : normalizeAiRoutePolicy(routePolicyInput ?? {});
   if (parentBinding) assertChildPolicyDoesNotWiden(parentBinding, routePolicy);
 
   const projected = routePolicyProjection(routePolicy, authorityRouteIds);
