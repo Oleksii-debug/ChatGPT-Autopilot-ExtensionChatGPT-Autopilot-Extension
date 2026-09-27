@@ -23,7 +23,6 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_DEPTH = 64;
 const MAX_SNAPSHOT_NODES = 100_000;
 const MAX_TELEMETRY_ROWS = 1_000;
-const ATTENTION_TERMINAL_STATUSES = new Set(['BLOCKED', 'FAILED', 'MANUAL_REVIEW']);
 const ACTIVE_LIFECYCLES = new Set([
   OrchestrationNodeLifecycle.PREPARING_EFFECT,
   OrchestrationNodeLifecycle.ACTIVE,
@@ -51,19 +50,24 @@ function strictRecord(value, allowed, label) {
   return out;
 }
 
-function snapshotCanonicalData(value, label, state = { depth: 0, count: 0, stack: new WeakSet() }) {
+function snapshotCanonicalData(
+  value,
+  label,
+  context = { count: 0, stack: new WeakSet() },
+  depth = 0,
+) {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
     if (!Number.isFinite(value) || Object.is(value, -0)) throw new Error(`${label} contains non-canonical number`);
     return value;
   }
   if (!value || typeof value !== 'object') throw new Error(`${label} contains non-data value`);
-  if (state.depth > MAX_DEPTH) throw new Error(`${label} exceeds maximum nesting depth`);
-  if (state.stack.has(value)) throw new Error(`${label} contains a cycle`);
-  state.count += 1;
-  if (state.count > MAX_SNAPSHOT_NODES) throw new Error(`${label} exceeds maximum data nodes`);
+  if (depth > MAX_DEPTH) throw new Error(`${label} exceeds maximum nesting depth`);
+  if (context.stack.has(value)) throw new Error(`${label} contains a cycle`);
+  context.count += 1;
+  if (context.count > MAX_SNAPSHOT_NODES) throw new Error(`${label} exceeds maximum data nodes`);
 
-  state.stack.add(value);
+  context.stack.add(value);
   try {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     if (Array.isArray(value)) {
@@ -86,7 +90,8 @@ function snapshotCanonicalData(value, label, state = { depth: 0, count: 0, stack
         out[index] = snapshotCanonicalData(
           descriptor.value,
           `${label}[${index}]`,
-          { ...state, depth: state.depth + 1 },
+          context,
+          depth + 1,
         );
       }
       return out;
@@ -104,12 +109,13 @@ function snapshotCanonicalData(value, label, state = { depth: 0, count: 0, stack
       out[key] = snapshotCanonicalData(
         descriptor.value,
         `${label}.${key}`,
-        { ...state, depth: state.depth + 1 },
+        context,
+        depth + 1,
       );
     }
     return out;
   } finally {
-    state.stack.delete(value);
+    context.stack.delete(value);
   }
 }
 
