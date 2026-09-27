@@ -37,6 +37,10 @@ const ENVELOPE_KEYS = new Set([
   'inputArtifactRefs',
   'outcome',
   'createdAt',
+  'planProvenance',
+  'outcomeProvenance',
+  'inputReferenceProvenance',
+  'trustedResolutionRequired',
   'executionAuthority',
   'schedulingAuthority',
   'policyAuthority',
@@ -298,6 +302,14 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
       throw new Error('SubagentTaskEnvelopeV1 cannot grant ' + key);
     }
   }
+  for (const key of ['planProvenance', 'outcomeProvenance', 'inputReferenceProvenance']) {
+    if (own(raw, key, 'SubagentTaskEnvelopeV1') !== 'UNVERIFIED_INPUT') {
+      throw new Error('SubagentTaskEnvelopeV1 cannot claim trusted provenance: ' + key);
+    }
+  }
+  if (own(raw, 'trustedResolutionRequired', 'SubagentTaskEnvelopeV1') !== true) {
+    throw new Error('SubagentTaskEnvelopeV1 must require trusted runtime resolution');
+  }
 
   return freezeDeep({
     schemaVersion: SUBAGENT_TASK_ENVELOPE_VERSION,
@@ -323,6 +335,10 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
     ),
     outcome: normalizeOutcomeBinding(own(raw, 'outcome', 'SubagentTaskEnvelopeV1')),
     createdAt: timestamp(own(raw, 'createdAt', 'SubagentTaskEnvelopeV1'), 'createdAt'),
+    planProvenance: 'UNVERIFIED_INPUT',
+    outcomeProvenance: 'UNVERIFIED_INPUT',
+    inputReferenceProvenance: 'UNVERIFIED_INPUT',
+    trustedResolutionRequired: true,
     executionAuthority: false,
     schedulingAuthority: false,
     policyAuthority: false,
@@ -334,10 +350,12 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
 /**
  * Bind one canonical AgentPlan node to one child Agent task.
  *
- * This is a pure, non-authorizing contract. It does not assign the child,
- * schedule work, reserve capacity, execute tools, authenticate owner policy,
- * or verify completion. Those remain responsibilities of the existing
- * canonical control plane.
+ * This is a pure, non-authorizing contract. Normalization does not prove that
+ * the supplied plan, outcome contract, or input refs came from trusted durable
+ * stores; their provenance remains UNVERIFIED_INPUT until existing runtime
+ * authorities resolve them. This function does not assign the child, schedule
+ * work, reserve capacity, execute tools, authenticate owner policy, or verify
+ * completion.
  */
 export function createSubagentTaskEnvelopeV1(input = {}) {
   const raw = record(input, INPUT_KEYS, 'SubagentTaskEnvelopeBuildV1');
@@ -422,6 +440,10 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
       requiredEvidenceArtifactCount: outcome.verifierPlan.requiredEvidenceArtifactCount,
     },
     createdAt,
+    planProvenance: 'UNVERIFIED_INPUT',
+    outcomeProvenance: 'UNVERIFIED_INPUT',
+    inputReferenceProvenance: 'UNVERIFIED_INPUT',
+    trustedResolutionRequired: true,
     executionAuthority: false,
     schedulingAuthority: false,
     policyAuthority: false,

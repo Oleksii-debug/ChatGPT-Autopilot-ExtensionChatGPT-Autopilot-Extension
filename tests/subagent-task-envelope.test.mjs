@@ -171,6 +171,10 @@ test('binds exact child task, immutable input refs, budget, conflicts and outcom
     verifierId: 'verifier-1',
     requiredEvidenceArtifactCount: 1,
   });
+  assert.equal(value.planProvenance, 'UNVERIFIED_INPUT');
+  assert.equal(value.outcomeProvenance, 'UNVERIFIED_INPUT');
+  assert.equal(value.inputReferenceProvenance, 'UNVERIFIED_INPUT');
+  assert.equal(value.trustedResolutionRequired, true);
   assert.equal(value.executionAuthority, false);
   assert.equal(value.schedulingAuthority, false);
   assert.equal(value.policyAuthority, false);
@@ -219,6 +223,22 @@ test('normalization is restart-stable and rejects any attempt to mint authority'
   assert.throws(
     () => normalizeSubagentTaskEnvelopeV1(noDeliverables),
     /outcome requires deliverables/,
+  );
+
+  for (const key of ['planProvenance', 'outcomeProvenance', 'inputReferenceProvenance']) {
+    const forgedTrust = structuredClone(value);
+    forgedTrust[key] = 'TRUSTED';
+    assert.throws(
+      () => normalizeSubagentTaskEnvelopeV1(forgedTrust),
+      /cannot claim trusted provenance/,
+    );
+  }
+
+  const bypassResolution = structuredClone(value);
+  bypassResolution.trustedResolutionRequired = false;
+  assert.throws(
+    () => normalizeSubagentTaskEnvelopeV1(bypassResolution),
+    /must require trusted runtime resolution/,
   );
 });
 
