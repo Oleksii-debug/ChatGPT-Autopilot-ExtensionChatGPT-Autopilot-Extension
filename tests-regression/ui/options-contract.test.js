@@ -303,6 +303,9 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.doesNotMatch(html, /id="agent-ai-pinned-route-id"[^>]*aria-describedby=/, 'Agent route status must use the existing concise live-status pattern instead of adding tutorial aria-describedby prose');
   assert.match(html, /id="agent-route-binding-status"[^>]*role="status"/, 'Agent route policy/readiness must be announced through a native status surface');
   assert.ok(js.includes('browserAgentRoutePolicyBlockReason'), 'Agent route choices must project global Models policy before the user starts a job');
+  assert.ok(js.includes('function aiRouteDisplayLabel(route = {})'), 'Agent and Models must share one deterministic route display label');
+  assert.ok(js.includes('return displayName ? \`${displayName} (${routeId})\` : routeId;'), 'profile display name must remain paired with stable route ID for keyboard/NVDA disambiguation');
+  assert.ok(js.includes('option.textContent = \`${aiRouteDisplayLabel(route)}: ${route.model}'), 'Agent route select must announce the profile display label');
   assert.ok(js.includes('option.disabled = Boolean(blockReason)'), 'globally blocked Agent routes must not look normally selectable');
   assert.ok(js.includes('assertBrowserAgentRouteReadyForLaunch();'), 'new Agent creation must reject a statically blocked saved route before creating a doomed job');
   assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
