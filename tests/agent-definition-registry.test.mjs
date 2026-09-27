@@ -1,0 +1,281 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  materializeAgentDefinitionV1,
+  normalizeAgentDefinitionRegistryV1,
+  normalizeAgentDefinitionV1,
+  normalizeAgentDefinitionSelectionV1,
+  selectAgentDefinitionV1,
+} from '../src/core/agent-definition-registry.js';
+
+function definition(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    agentDefinitionId: 'agent.research',
+    label: 'Research Agent',
+    description: 'Reusable source-aware research worker.',
+    instructions: 'Research the owner task using only the admitted tools. Preserve source provenance.',
+    capabilityIds: ['research.read', 'project.context'],
+    toolIds: ['browser.read', 'files.read', 'github.read'],
+    acceptanceCriteria: ['Every material claim has source evidence.', 'Return a concise final artifact.'],
+    configDefaults: {
+      maxSteps: 120,
+      maxModelCalls: 20,
+      maxRuntimeMinutes: 30,
+      aiRoutingMode: 'primary',
+      aiPrimaryProvider: 'openai-compatible',
+      aiPrimaryModel: 'mistral-small-latest',
+      maxCostUsd: 2,
+      inputPricePerMillionUsd: 1,
+      outputPricePerMillionUsd: 2,
+      visionOnDemand: false,
+    },
+    enabled: true,
+    definitionRevision: 7,
+    ...overrides,
+  };
+}
+
+function registry(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    registryId: 'agents:project-1',
+    revision: 3,
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition(),
+    ],
+    ...overrides,
+  };
+}
+
+function materialization(overrides = {}) {
+  const reg = registry();
+  return {
+    registry: reg,
+    selection: selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' }),
+    jobId: 'job-research-001',
+    projectId: 'project-1',
+    goal: 'Compare the two candidate APIs and report documented trade-offs.',
+    ownerCapabilityIds: ['project.context', 'research.read', 'research.write'],
+    ownerToolIds: ['browser.read', 'files.read', 'github.read', 'artifact.write'],
+    requestedCapabilityIds: ['research.read', 'project.context'],
+    requestedToolIds: ['github.read', 'browser.read'],
+    ...overrides,
+  };
+}
+
+test('registry canonicalizes reusable Agent definitions deterministically', () => {
+  const normalized = normalizeAgentDefinitionRegistryV1(registry());
+  assert.equal(normalized.registryId, 'agents:project-1');
+  assert.equal(normalized.revision, 3);
+  assert.deepEqual(normalized.definitions.map(item => item.agentDefinitionId), ['agent.research', 'agent.writer']);
+  assert.deepEqual(normalized.definitions[0].capabilityIds, ['project.context', 'research.read']);
+  assert.deepEqual(normalized.definitions[0].toolIds, ['browser.read', 'files.read', 'github.read']);
+  assert.equal(normalized.definitions[0].configDefaults.aiPrimaryModel, 'mistral-small-latest');
+  assert.ok(Object.isFrozen(normalized));
+  assert.ok(Object.isFrozen(normalized.definitions[0].configDefaults));
+});
+
+test('selection carries a full immutable definition snapshot so same-revision byte drift fails closed', () => {
+  const reg = registry();
+  const selected = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+  assert.equal(selected.registryRevision, 3);
+  assert.equal(selected.definitionRevision, 7);
+  assert.equal(selected.definition.instructions, definition().instructions);
+  assert.ok(Object.isFrozen(selected.definition));
+
+  const drifted = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({ instructions: 'Changed instructions without a revision bump.' }),
+    ],
+  });
+  assert.throws(() => materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: drifted,
+    selection: selected,
+  }), /drifted from current registry definition/);
+});
+
+test('materialization reuses Browser Agent config and binds model, budget, goal and acceptance defaults', () => {
+  const result = materializeAgentDefinitionV1(materialization());
+  assert.equal(result.config.id, 'job-research-001');
+  assert.equal(result.config.projectId, 'project-1');
+  assert.equal(result.config.name, 'Research Agent');
+  assert.match(result.config.goal, /^Reusable Agent definition instructions:/);
+  assert.match(result.config.goal, /Owner task:\nCompare the two candidate APIs/);
+  assert.equal(result.config.maxSteps, 120);
+  assert.equal(result.config.maxModelCalls, 20);
+  assert.equal(result.config.aiRoutingMode, 'primary');
+  assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
+  assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
+  assert.equal(result.config.maxCostUsd, 2);
+  assert.deepEqual(result.config.acceptanceCriteria, definition().acceptanceCriteria);
+});
+
+test('definition never grants owner policy, credential, scheduling, execution or verification authority', () => {
+  const result = materializeAgentDefinitionV1(materialization());
+  assert.equal(result.config.approvalMode, 'CONSEQUENTIAL');
+  assert.equal(result.config.credentialDecision, 'ASK');
+  assert.equal(result.config.trustedScriptEnabled, false);
+  assert.deepEqual(result.config.siteRules, []);
+  assert.deepEqual(result.authority, {
+    executionAuthorized: false,
+    policyAuthorized: false,
+    schedulingAuthorized: false,
+    recoveryAuthorized: false,
+    credentialAuthorized: false,
+    completionAuthorized: false,
+    verificationAuthorized: false,
+  });
+  assert.equal(JSON.stringify(result).includes('credentialRef'), false);
+  assert.equal(JSON.stringify(result).includes('apiKey'), false);
+  assert.equal(JSON.stringify(result).includes('runState'), false);
+});
+
+test('requested capability and tool scope is the explicit intersection of owner and definition', () => {
+  const result = materializeAgentDefinitionV1(materialization());
+  assert.deepEqual(result.scope.capabilityIds, ['project.context', 'research.read']);
+  assert.deepEqual(result.scope.toolIds, ['browser.read', 'github.read']);
+  assert.equal(result.scope.toolIds.includes('files.read'), false, 'definition-granted but unrequested tool must not leak into instantiated scope');
+  assert.equal(result.scope.toolIds.includes('artifact.write'), false, 'owner-granted but definition-absent tool must not leak into instantiated scope');
+
+  assert.throws(() => materializeAgentDefinitionV1(materialization({
+    requestedCapabilityIds: ['research.write'],
+  })), /exceeds allowed authority/);
+  assert.throws(() => materializeAgentDefinitionV1(materialization({
+    requestedToolIds: ['artifact.write'],
+  })), /exceeds allowed authority/);
+});
+
+test('disabled, removed and registry-revision drift require fresh selection', () => {
+  const reg = registry();
+  const selected = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+  const base = materialization({ selection: selected });
+
+  assert.throws(() => materializeAgentDefinitionV1({
+    ...base,
+    registry: registry({
+      definitions: [
+        definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+        definition({ enabled: false }),
+      ],
+    }),
+  }), /missing or disabled/);
+
+  assert.throws(() => materializeAgentDefinitionV1({
+    ...base,
+    registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
+  }), /missing or disabled/);
+
+  assert.throws(() => materializeAgentDefinitionV1({
+    ...base,
+    registry: registry({ revision: 4 }),
+  }), /registry identity or revision drifted/);
+});
+
+test('selection envelope cannot substitute a different definition identity or revision', () => {
+  const reg = registry();
+  const selected = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+  assert.throws(() => normalizeAgentDefinitionSelectionV1({
+    ...selected,
+    agentDefinitionId: 'agent.other',
+  }), /identity does not match/);
+  assert.throws(() => normalizeAgentDefinitionSelectionV1({
+    ...selected,
+    definitionRevision: 8,
+  }), /identity does not match/);
+});
+
+test('config defaults are behavior/model defaults only and reject owner-authority fields', () => {
+  for (const [field, value] of [
+    ['approvalMode', 'ALLOW_ALL'],
+    ['credentialDecision', 'ALLOW'],
+    ['siteRules', []],
+    ['trustedScriptEnabled', true],
+    ['scheduleStartAt', 12345],
+    ['scheduleEndAt', 23456],
+  ]) {
+    assert.throws(() => normalizeAgentDefinitionV1(definition({
+      configDefaults: { ...definition().configDefaults, [field]: value },
+    })), /unknown field/);
+  }
+});
+
+test('definition and registry reject secrets, numeric aliases, duplicate identities and non-canonical text', () => {
+  assert.throws(() => normalizeAgentDefinitionV1({ ...definition(), apiKey: 'never-store-this' }), /unknown field: apiKey/);
+  assert.throws(() => normalizeAgentDefinitionV1(definition({ definitionRevision: -0 })), /definitionRevision is invalid/);
+  assert.throws(() => normalizeAgentDefinitionV1(definition({ label: ' Research Agent' })), /exact bounded text/);
+  assert.throws(() => normalizeAgentDefinitionRegistryV1(registry({
+    definitions: [definition(), definition()],
+  })), /duplicate agentDefinitionId/);
+  assert.throws(() => normalizeAgentDefinitionRegistryV1(registry({ revision: -0 })), /registry revision is invalid/);
+});
+
+test('authority envelopes reject accessors, hidden/symbol fields and sparse arrays without getter reads', () => {
+  let reads = 0;
+  const hostile = definition();
+  Object.defineProperty(hostile, 'instructions', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'must not execute';
+    },
+  });
+  assert.throws(() => normalizeAgentDefinitionV1(hostile), /instructions must be an enumerable own data property/);
+  assert.equal(reads, 0);
+
+  const hidden = definition();
+  Object.defineProperty(hidden, 'enabled', { enumerable: false, value: true });
+  assert.throws(() => normalizeAgentDefinitionV1(hidden), /enabled must be an enumerable own data property/);
+
+  const symbolic = definition();
+  symbolic[Symbol('authority')] = true;
+  assert.throws(() => normalizeAgentDefinitionV1(symbolic), /unknown field/);
+
+  const sparseCapabilities = definition();
+  sparseCapabilities.capabilityIds = new Array(1);
+  assert.throws(() => normalizeAgentDefinitionV1(sparseCapabilities), /enumerable own data property/);
+
+  const hostileDefaults = definition();
+  let defaultReads = 0;
+  Object.defineProperty(hostileDefaults.configDefaults, 'maxSteps', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      defaultReads += 1;
+      return 9999;
+    },
+  });
+  assert.throws(() => normalizeAgentDefinitionV1(hostileDefaults), /maxSteps must be an enumerable own data property/);
+  assert.equal(defaultReads, 0);
+});
+
+test('null-prototype records are accepted and caller-owned data remains unchanged', () => {
+  const def = Object.assign(Object.create(null), definition());
+  def.configDefaults = Object.assign(Object.create(null), definition().configDefaults);
+  const reg = Object.assign(Object.create(null), registry({ definitions: [def] }));
+  const before = JSON.stringify(reg);
+  const selected = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+  assert.equal(selected.definition.agentDefinitionId, 'agent.research');
+  assert.equal(JSON.stringify(reg), before);
+});
+
+test('materialization rejects oversized composed goal and keeps reusable instructions bounded', () => {
+  const reg = registry({
+    definitions: [
+      definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 }),
+      definition({ instructions: 'x'.repeat(12000) }),
+    ],
+  });
+  const selection = selectAgentDefinitionV1({ registry: reg, agentDefinitionId: 'agent.research' });
+  assert.throws(() => materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: reg,
+    selection,
+    goal: 'y'.repeat(40000),
+  }), /exceeds Browser Agent limit/);
+});
