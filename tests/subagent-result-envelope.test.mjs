@@ -334,6 +334,22 @@ test('result artifacts must be hash-bound even when canonical ObservationV1 perm
   );
 });
 
+test('result artifacts are bound to the exact child invocation that produced the observation', () => {
+  for (const producerInvocationId of ['invocation-other', '']) {
+    assert.throws(
+      () => createSubagentResultEnvelopeV1(request({
+        observation: observation({
+          artifactRefs: [artifactRef('result-wrong-producer', {
+            sha256: '6'.repeat(64),
+            producerInvocationId,
+          })],
+        }),
+      })),
+      /producerInvocationId must match child invocation/,
+    );
+  }
+});
+
 test('result chronology cannot predate task, observation, verification or artifact creation', () => {
   assert.throws(
     () => createSubagentResultEnvelopeV1(request({
@@ -427,6 +443,13 @@ test('restart normalization is strict and cannot mint execution or completion au
   assert.throws(
     () => normalizeSubagentResultEnvelopeV1(bypassTrustedGate),
     /must require canonical trusted verification before completion/,
+  );
+
+  const forgedProducer = structuredClone(value);
+  forgedProducer.resultArtifactRefs[0].producerInvocationId = 'invocation-other';
+  assert.throws(
+    () => normalizeSubagentResultEnvelopeV1(forgedProducer),
+    /producerInvocationId must match child invocation/,
   );
 });
 
