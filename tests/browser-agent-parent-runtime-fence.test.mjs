@@ -182,6 +182,10 @@ test('rejects unknown fields, accessors, sparse arrays, duplicates and coercive 
     /duplicate identity/,
   );
   assert.throws(
+    () => createBrowserAgentParentRuntimeFenceV1(live({ controlEpoch: 0 })),
+    /controlEpoch is invalid/,
+  );
+  assert.throws(
     () => createBrowserAgentParentRuntimeFenceV1(live({ controlEpoch: '7' })),
     /controlEpoch is invalid/,
   );
@@ -206,6 +210,25 @@ test('normalizer rejects authority-shaped or noncanonical fence bytes', () => {
       schemaVersion: 2,
     }),
     /Unsupported/,
+  );
+  assert.throws(
+    () => normalizeBrowserAgentParentRuntimeFenceV1({
+      ...fence,
+      controlEpoch: 0,
+    }),
+    /controlEpoch is invalid/,
+  );
+  const stoppedAtInitialEpoch = inspectBrowserAgentParentRuntimeFenceV1({
+    fence,
+    live: live({
+      runState: BrowserAgentRunState.STOPPED,
+      controlEpoch: 0,
+    }),
+  });
+  assert.equal(stoppedAtInitialEpoch.current, false);
+  assert.equal(
+    stoppedAtInitialEpoch.status,
+    BrowserAgentParentRuntimeFenceStatus.NOT_RUNNING,
   );
   assert.throws(
     () => inspectBrowserAgentParentRuntimeFenceV1({
