@@ -1683,26 +1683,31 @@ export class BrowserAgentManager {
               || existing.deadlineAt !== intent.deadlineAt) {
             throw new Error('Existing specialist delegation authority differs from current request');
           }
-          if (existing.state !== 'LEASED'
-              || existingOwnership.state !== ExecutionOwnershipState.OWNED
-              || !existing.leaseId
-              || existing.leaseId !== existingOwnership.leaseId
-              || existing.leaseExpiresAt !== existingOwnership.leaseUntil
-              || existing.leaseExpiresAt <= at) {
-            throw new Error('Existing automatic specialist delegation requires reconciliation before reuse');
-          }
+
           const node = normalizeAgentPlanV1(job.runtime.plan).nodes
             .find(item => item.nodeId === intent.nodeId);
-          if (!node || node.state !== AgentPlanNodeState.RUNNING) {
-            throw new Error('Existing automatic specialist delegation lacks RUNNING AgentPlan ownership');
+          const prepared = existing.state === 'READY'
+            && existingOwnership.state === ExecutionOwnershipState.AVAILABLE
+            && existing.leaseId === ''
+            && existing.leaseExpiresAt === ''
+            && existingOwnership.leaseId === ''
+            && existingOwnership.leaseUntil === ''
+            && node?.state === AgentPlanNodeState.READY;
+          const claimed = existing.state === 'LEASED'
+            && existingOwnership.state === ExecutionOwnershipState.OWNED
+            && Boolean(existing.leaseId)
+            && existing.leaseId === existingOwnership.leaseId
+            && existing.leaseExpiresAt === existingOwnership.leaseUntil
+            && existing.leaseExpiresAt > at
+            && node?.state === AgentPlanNodeState.RUNNING;
+          if (!prepared && !claimed) {
+            throw new Error('Existing automatic specialist delegation requires reconciliation before reuse');
           }
+
           const capacity = inspectProductWideSpecialistCapacity(
             store,
             intent.maxConcurrentHandoffs,
           );
-          if (capacity.capacityObligations > capacity.maxConcurrentHandoffs) {
-            throw new Error('Product-wide specialist capacity is below existing automatic delegation obligations');
-          }
           result = {
             proposal: null,
             assignment: clone(existing),
@@ -1711,7 +1716,7 @@ export class BrowserAgentManager {
             structureAdmission: clone(structureAdmission),
             capacityReservation: {
               ...capacity,
-              reserved: true,
+              reserved: claimed,
               reused: true,
             },
             reused: true,
@@ -1743,6 +1748,14 @@ export class BrowserAgentManager {
 
         const assignment = proposal.preview.assignment;
         const executionOwnership = proposal.preview.executionOwnership;
+        if (assignment.state !== 'READY'
+            || assignment.leaseId !== ''
+            || assignment.leaseExpiresAt !== ''
+            || executionOwnership.state !== ExecutionOwnershipState.AVAILABLE
+            || executionOwnership.leaseId !== ''
+            || executionOwnership.leaseUntil !== '') {
+          throw new Error('Automatic delegation proposal unexpectedly granted execution ownership');
+        }
         if (ownerships.some(item =>
           normalizeExecutionOwnershipV1(item).effectId === executionOwnership.effectId)) {
           throw new Error('Automatic delegation found execution ownership without matching handoff');
@@ -1752,41 +1765,13 @@ export class BrowserAgentManager {
           throw new Error('Automatic delegation found provenance binding without matching handoff');
         }
 
+        // PREPARE observes current product-wide capacity but never reserves it.
+        // The existing canonical claim path is the only authority that may
+        // create a lease, OWNED execution ownership, or RUNNING plan state.
         const capacityBefore = inspectProductWideSpecialistCapacity(
           store,
           intent.maxConcurrentHandoffs,
         );
-        if (capacityBefore.remainingSlots < 1) {
-          throw new Error('Product-wide specialist capacity exhausted before automatic delegation');
-        }
-
-        const claimed = claimAgentPlanSpecialistHandoffsV1(
-          reconciledPlan,
-          [assignment],
-          {
-            executionOwnerships: [executionOwnership],
-            availableSlots: 1,
-            maxChildrenPerAgent: authority.subagentPolicy.maxChildrenPerAgent,
-            maxDepth: authority.subagentPolicy.maxDepth,
-            leaseSeconds: intent.leaseSeconds,
-            at,
-          },
-        );
-        if (claimed.claimed.length !== 1 || claimed.claimed[0] !== assignment.agentId) {
-          throw new Error('Canonical specialist capacity admission did not reserve the automatic handoff');
-        }
-        if (claimed.reconciliationRequired.length) {
-          throw new Error('Fresh automatic specialist handoff unexpectedly requires reconciliation');
-        }
-        const admittedAssignment = claimed.assignments.find(item =>
-          item.agentId === assignment.agentId);
-        const admittedOwnership = claimed.executionOwnerships.find(item =>
-          item.effectId === executionOwnership.effectId);
-        if (!admittedAssignment || !admittedOwnership
-            || admittedAssignment.state !== 'LEASED'
-            || admittedOwnership.state !== ExecutionOwnershipState.OWNED) {
-          throw new Error('Canonical specialist capacity admission did not create a durable lease/ownership pair');
-        }
 
         const delegationBinding = normalizePersistedSpecialistDelegationBinding({
           schemaVersion: 1,
@@ -1799,31 +1784,30 @@ export class BrowserAgentManager {
           handoff: proposal.binding.handoff,
           boundAt: at,
         });
-        job.runtime.plan = claimed.plan;
-        job.runtime.specialistHandoffs = [...handoffs, admittedAssignment];
-        job.runtime.specialistExecutionOwnerships = [...ownerships, admittedOwnership];
+        job.runtime.plan = reconciledPlan;
+        job.runtime.specialistHandoffs = [...handoffs, assignment];
+        job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
         job.runtime.specialistDelegationBindings = [...bindings, delegationBinding];
         job.runtime.updatedAt = this.now();
         appendHistory(job.runtime, {
           at: this.now(),
-          type: 'specialist-auto-delegation-admitted',
+          type: 'specialist-auto-delegation-prepared',
           nodeId: proposal.nodeId,
-          agentId: admittedAssignment.agentId,
+          agentId: assignment.agentId,
           specialistId: proposal.selection.specialistId,
           registryId: proposal.registryId,
           registryRevision: proposal.registryRevision,
-          message: 'Least-authority specialist selected and durably admitted within product-wide capacity; no provider effect was dispatched.',
+          message: 'Least-authority specialist selected and durably prepared; canonical claim still owns capacity, lease and execution admission. No provider effect was dispatched.',
         });
         result = {
           proposal: clone(proposal),
-          assignment: clone(admittedAssignment),
-          executionOwnership: clone(admittedOwnership),
+          assignment: clone(assignment),
+          executionOwnership: clone(executionOwnership),
           delegationBinding: clone(delegationBinding),
           structureAdmission: clone(structureAdmission),
           capacityReservation: {
             ...capacityBefore,
-            remainingSlots: capacityBefore.remainingSlots - 1,
-            reserved: true,
+            reserved: false,
             reused: false,
           },
           reused: false,
