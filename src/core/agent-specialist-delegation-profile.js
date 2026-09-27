@@ -194,7 +194,9 @@ function freeze(value) {
 }
 
 function normalizeChildBudget(input) {
-  if (input === undefined) return undefined;
+  if (input === undefined) {
+    throw new Error('Agent specialist delegation childBudget must be omitted instead of undefined');
+  }
   const raw = snapshot(input, CHILD_BUDGET_KEYS, 'Agent specialist delegation childBudget');
   const output = {};
   for (const key of Object.keys(raw)) {
