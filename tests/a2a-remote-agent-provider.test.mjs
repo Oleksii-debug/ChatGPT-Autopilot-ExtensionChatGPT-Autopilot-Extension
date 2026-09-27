@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  A2A_JSONRPC_METHOD_GET_TASK,
   A2A_JSONRPC_METHOD_SEND_MESSAGE,
   A2ARemoteAgentProviderV1,
 } from '../src/core/a2a-remote-agent-provider.js';
@@ -17,6 +18,8 @@ const T1 = '2026-09-25T00:10:00.000Z';
 const T2 = '2026-09-25T00:20:00.000Z';
 const T3 = '2026-09-25T00:30:00.000Z';
 const T4 = '2026-09-25T00:40:00.000Z';
+const T4A = '2026-09-25T00:41:00.000Z';
+const T5 = '2026-09-25T00:50:00.000Z';
 const sha = char => char.repeat(64);
 
 function requirement() {
@@ -180,6 +183,132 @@ function executingExactState(invocationOverrides = {}) {
   assert.equal(transition.accepted, true);
   assert.equal(transition.state.phase, ExactEffectPhase.EXECUTING);
   return transition.state;
+}
+
+function taskObservation(state = executingExactState(), overrides = {}) {
+  return {
+    schemaVersion: 1,
+    observationId: state.executionId,
+    invocationId: state.effectId,
+    status: 'OK',
+    summary: 'A2A SendMessage task identity observed.',
+    data: {
+      protocol: 'A2A',
+      protocolVersion: '1.0',
+      providerId: 'a2a-remote-agent',
+      remoteAgentId: 'agent.remote',
+      delegationId: 'delegation-1',
+      resultKind: 'TASK',
+      remoteTaskId: 'remote-task-1',
+      remoteMessageId: null,
+      untrustedRemoteData: true,
+      executionAuthorized: false,
+      credentialUseAuthorized: false,
+      requiresIndependentVerification: true,
+      ...overrides,
+    },
+    artifactRefs: [],
+    observedAt: T4,
+  };
+}
+
+function observedTaskExactState(observationOverrides = {}, invocationOverrides = {}) {
+  const executing = executingExactState(invocationOverrides);
+  const transition = reduceExactEffectV1(executing, {
+    schemaVersion: 1,
+    eventId: 'event-observed-task',
+    type: ExactEffectEventType.RECORD_OBSERVATION,
+    effectId: executing.effectId,
+    executionId: executing.executionId,
+    at: T4,
+    observation: taskObservation(executing, observationOverrides),
+  });
+  assert.equal(transition.accepted, true);
+  assert.equal(transition.state.phase, ExactEffectPhase.OBSERVED);
+  return transition.state;
+}
+
+function reconcilingTaskExactState() {
+  const observed = observedTaskExactState();
+  const transition = reduceExactEffectV1(observed, {
+    schemaVersion: 1,
+    eventId: 'event-task-ambiguity',
+    type: ExactEffectEventType.DECLARE_AMBIGUITY,
+    effectId: observed.effectId,
+    executionId: observed.executionId,
+    at: T4A,
+    reasonCode: 'REMOTE_TASK_PENDING',
+    summary: 'Remote A2A task remains non-terminal.',
+  });
+  assert.equal(transition.accepted, true);
+  assert.equal(transition.state.phase, ExactEffectPhase.RECONCILE);
+  return transition.state;
+}
+
+function getTaskResponse({
+  requestId = 'effect-1:attempt:1:get-task',
+  remoteTaskId = 'remote-task-1',
+  taskState = 'TASK_STATE_COMPLETED',
+  patch = {},
+} = {}) {
+  return {
+    status: 200,
+    contentType: 'application/json; charset=utf-8',
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: requestId,
+      result: {
+        id: remoteTaskId,
+        contextId: 'remote-context-1',
+        status: { state: taskState },
+        artifacts: [{ artifactId: 'remote-artifact-1', name: 'result.txt' }],
+        ...patch,
+      },
+    }),
+  };
+}
+
+function getTaskInput(overrides = {}) {
+  return {
+    card: card(),
+    admission: admission(),
+    delegation: delegation(),
+    policyDecision: policy(),
+    historyLength: 0,
+    timeoutMs: 5000,
+    ...overrides,
+  };
+}
+
+function getTaskHarness({
+  response = getTaskResponse(),
+  transportError = null,
+  trustedStates = [observedTaskExactState()],
+  resolverError = null,
+  now = Date.parse(T5),
+} = {}) {
+  const calls = [];
+  const lookups = [];
+  let resolveIndex = 0;
+  const transport = {
+    async sendJsonRpc(request) {
+      calls.push(request);
+      if (transportError) throw transportError;
+      return response;
+    },
+  };
+  const provider = new A2ARemoteAgentProviderV1({
+    transport,
+    now: () => now,
+    async resolveTrustedExactEffectState(lookup) {
+      lookups.push(lookup);
+      if (resolverError) throw resolverError;
+      const index = Math.min(resolveIndex, trustedStates.length - 1);
+      resolveIndex += 1;
+      return trustedStates[index];
+    },
+  });
+  return { provider, calls, lookups };
 }
 
 test('sends one exact JSON-RPC message/send through admitted interface without credential material', async () => {
@@ -451,6 +580,209 @@ test('ObservationV1 conversion rejects cloned/cross-provider results and exact-e
       error => error.code === 'A2A_EXACT_EFFECT_BINDING_MISMATCH',
     );
   }
+});
+
+test('GetTask derives the remote task id only from trusted exact-effect observation', async () => {
+  const { provider, calls, lookups } = getTaskHarness();
+  const result = await provider.getTask(getTaskInput());
+
+  assert.equal(calls.length, 1);
+  assert.equal(lookups.length, 2);
+  assert.deepEqual(lookups[0], {
+    schemaVersion: 1,
+    effectId: 'effect-1',
+    delegationId: 'delegation-1',
+    localAgentId: 'agent.local',
+    localTaskId: 'task-1',
+    remoteAgentId: 'agent.remote',
+    policyDecisionId: 'policy-1',
+  });
+  assert.equal(Object.isFrozen(lookups[0]), true);
+
+  const call = calls[0];
+  assert.equal(call.request.method, A2A_JSONRPC_METHOD_GET_TASK);
+  assert.equal(call.request.id, 'effect-1:attempt:1:get-task');
+  assert.equal(call.request.params.id, 'remote-task-1');
+  assert.equal(call.request.params.historyLength, 0);
+  assert.equal(Object.hasOwn(call.request.params, 'remoteTaskId'), false);
+  assert.equal(call.executionId, 'effect-1:attempt:1');
+
+  assert.equal(result.remoteTaskId, 'remote-task-1');
+  assert.equal(result.taskState, 'TASK_STATE_COMPLETED');
+  assert.equal(result.remoteTask.id, 'remote-task-1');
+  assert.equal(result.readOnly, true);
+  assert.equal(result.effectMayHaveOccurred, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.reconciliationAuthorized, false);
+  assert.equal(result.commitAuthorized, false);
+  assert.equal(result.requiresIndependentVerification, true);
+  assert.equal(result.requiresCanonicalExactEffectReconciliation, true);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.remoteTask), true);
+});
+
+test('GetTask caller cannot provide or substitute a remote task id', async () => {
+  const { provider, calls, lookups } = getTaskHarness();
+  await assert.rejects(
+    provider.getTask({
+      ...getTaskInput(),
+      remoteTaskId: 'attacker-task',
+    }),
+    error => error.code === 'A2A_PROVIDER_INPUT_INVALID'
+      && /unknown field/u.test(error.message),
+  );
+  assert.equal(lookups.length, 0);
+  assert.equal(calls.length, 0);
+});
+
+test('GetTask requires a trusted current TASK observation before network I/O', async () => {
+  const invalidStates = [
+    executingExactState(),
+    observedTaskExactState({ resultKind: 'MESSAGE', remoteTaskId: null, remoteMessageId: 'remote-message-1' }),
+    observedTaskExactState({ remoteAgentId: 'agent.other' }),
+    observedTaskExactState({ delegationId: 'delegation-other' }),
+    observedTaskExactState({}, { policyDecisionId: 'policy-other' }),
+  ];
+
+  for (const trustedState of invalidStates) {
+    const { provider, calls } = getTaskHarness({ trustedStates: [trustedState] });
+    await assert.rejects(
+      provider.getTask(getTaskInput()),
+      error => [
+        'A2A_TRUSTED_EFFECT_INVALID',
+        'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      ].includes(error.code),
+    );
+    assert.equal(calls.length, 0);
+  }
+
+  const calls = [];
+  const providerWithoutResolver = new A2ARemoteAgentProviderV1({
+    transport: {
+      async sendJsonRpc(request) {
+        calls.push(request);
+        return getTaskResponse();
+      },
+    },
+    now: () => Date.parse(T5),
+  });
+  await assert.rejects(
+    providerWithoutResolver.getTask(getTaskInput()),
+    error => error.code === 'A2A_TRUSTED_EFFECT_RESOLVER_UNAVAILABLE',
+  );
+  assert.equal(calls.length, 0);
+});
+
+test('GetTask accepts canonical RECONCILE state and preserves tenant plus bounded history', async () => {
+  const tenantInterface = {
+    url: 'https://agent.example.com/a2a',
+    protocolBinding: 'JSONRPC',
+    protocolVersion: '1.0',
+    tenant: 'tenant-a',
+  };
+  const { provider, calls } = getTaskHarness({
+    trustedStates: [reconcilingTaskExactState()],
+  });
+  const result = await provider.getTask(getTaskInput({
+    card: card({ supportedInterfaces: [tenantInterface] }),
+    admission: admission({ tenant: 'tenant-a' }),
+    historyLength: 10,
+  }));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].tenant, 'tenant-a');
+  assert.equal(calls[0].request.params.tenant, 'tenant-a');
+  assert.equal(calls[0].request.params.historyLength, 10);
+  assert.equal(result.historyLength, 10);
+});
+
+test('GetTask history aliases and out-of-bound requests fail before trusted resolution', async () => {
+  for (const historyLength of [-0, -1, 101, 1.5, '10']) {
+    const { provider, calls, lookups } = getTaskHarness();
+    await assert.rejects(
+      provider.getTask(getTaskInput({ historyLength })),
+      error => error.code === 'A2A_PROVIDER_INPUT_INVALID'
+        && /historyLength/u.test(error.message),
+    );
+    assert.equal(lookups.length, 0);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test('GetTask response must echo the trusted task id and valid A2A task state', async () => {
+  for (const response of [
+    getTaskResponse({ remoteTaskId: 'remote-task-other' }),
+    getTaskResponse({ taskState: 'completed' }),
+    getTaskResponse({ patch: { status: null } }),
+    {
+      ...getTaskResponse(),
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'wrong-request-id',
+        result: {
+          id: 'remote-task-1',
+          status: { state: 'TASK_STATE_COMPLETED' },
+        },
+      }),
+    },
+  ]) {
+    const { provider, calls } = getTaskHarness({ response });
+    await assert.rejects(
+      provider.getTask(getTaskInput()),
+      error => error.code === 'A2A_GET_TASK_RESPONSE_INVALID'
+        && error.effectMayHaveOccurred === false
+        && error.safeToRetry === false,
+    );
+    assert.equal(calls.length, 1);
+  }
+});
+
+test('GetTask transport uncertainty is retry-safe for the protocol read operation', async () => {
+  const transportError = Object.assign(new Error('connection reset after request write'), {
+    effectMayHaveOccurred: true,
+    safeToRetry: false,
+  });
+  const { provider, calls } = getTaskHarness({ transportError });
+  await assert.rejects(
+    provider.getTask(getTaskInput()),
+    error => error.code === 'A2A_GET_TASK_TRANSPORT_FAILED'
+      && error.effectMayHaveOccurred === false
+      && error.safeToRetry === true,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test('GetTask discards a response if canonical effect identity changes while request is in flight', async () => {
+  const first = observedTaskExactState();
+  const second = observedTaskExactState({ remoteTaskId: 'remote-task-other' });
+  const { provider, calls } = getTaskHarness({
+    trustedStates: [first, second],
+  });
+  await assert.rejects(
+    provider.getTask(getTaskInput()),
+    error => error.code === 'A2A_GET_TASK_CANONICAL_STATE_CHANGED'
+      || error.code === 'A2A_GET_TASK_RESPONSE_INVALID',
+  );
+  assert.equal(calls.length, 1);
+});
+
+test('GetTask provider option resolver is descriptor-safe and never executes accessors', () => {
+  let reads = 0;
+  const options = {
+    transport: { sendJsonRpc: async () => getTaskResponse() },
+    now: () => Date.parse(T5),
+  };
+  Object.defineProperty(options, 'resolveTrustedExactEffectState', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      throw new Error('resolver getter must not execute');
+    },
+  });
+  assert.throws(
+    () => new A2ARemoteAgentProviderV1(options),
+    error => error.code === 'A2A_PROVIDER_INPUT_INVALID',
+  );
+  assert.equal(reads, 0);
 });
 
 test('DENY and REQUIRE_APPROVAL never reach transport', async () => {

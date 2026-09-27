@@ -16,6 +16,7 @@ import {
 
 export const A2A_REMOTE_AGENT_PROVIDER_VERSION = 1;
 export const A2A_JSONRPC_METHOD_SEND_MESSAGE = 'SendMessage';
+export const A2A_JSONRPC_METHOD_GET_TASK = 'GetTask';
 
 const MAX_MESSAGE_BYTES = 32 * 1024;
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -23,6 +24,7 @@ const MAX_JSON_DEPTH = 32;
 const MAX_JSON_NODES = 4096;
 const MIN_TIMEOUT_MS = 100;
 const MAX_TIMEOUT_MS = 120000;
+const MAX_GET_TASK_HISTORY_LENGTH = 100;
 
 const EXECUTE_KEYS = new Set([
   'card',
@@ -34,11 +36,20 @@ const EXECUTE_KEYS = new Set([
   'timeoutMs',
 ]);
 
+const GET_TASK_KEYS = new Set([
+  'card',
+  'admission',
+  'delegation',
+  'policyDecision',
+  'historyLength',
+  'timeoutMs',
+]);
+
 const RESPONSE_KEYS = new Set(['status', 'contentType', 'body']);
 const JSONRPC_RESPONSE_KEYS = new Set(['jsonrpc', 'id', 'result', 'error']);
 const SEND_MESSAGE_RESULT_KEYS = new Set(['task', 'message']);
 const OBSERVATION_INPUT_KEYS = new Set(['providerResult', 'exactEffectState']);
-const PROVIDER_OPTION_KEYS = new Set(['transport', 'now']);
+const PROVIDER_OPTION_KEYS = new Set(['transport', 'now', 'resolveTrustedExactEffectState']);
 const PROVIDER_RESULT_KEYS = new Set([
   'schemaVersion',
   'providerId',
@@ -69,6 +80,16 @@ const PROVIDER_RESULT_KEYS = new Set([
 ]);
 const MAX_REMOTE_ID_BYTES = 1024;
 const ISSUED_PROVIDER_RESULTS = new WeakMap();
+const A2A_TASK_STATES = new Set([
+  'TASK_STATE_SUBMITTED',
+  'TASK_STATE_WORKING',
+  'TASK_STATE_COMPLETED',
+  'TASK_STATE_FAILED',
+  'TASK_STATE_CANCELED',
+  'TASK_STATE_INPUT_REQUIRED',
+  'TASK_STATE_REJECTED',
+  'TASK_STATE_AUTH_REQUIRED',
+]);
 
 function fail(code, message, {
   effectMayHaveOccurred = false,
@@ -327,6 +348,31 @@ function timeout(value) {
   return out;
 }
 
+function getTaskHistoryLength(value) {
+  const out = value == null ? 0 : value;
+  if (!Number.isSafeInteger(out)
+      || Object.is(out, -0)
+      || out < 0
+      || out > MAX_GET_TASK_HISTORY_LENGTH) {
+    fail(
+      'A2A_PROVIDER_INPUT_INVALID',
+      'historyLength must be an integer from 0 to 100 without signed-zero aliases',
+    );
+  }
+  return out;
+}
+
+function exactTrustedRemoteTaskId(value, label) {
+  if (typeof value !== 'string'
+      || !value
+      || value !== value.trim()
+      || /[\u0000-\u001f\u007f]/u.test(value)
+      || new TextEncoder().encode(value).byteLength > MAX_REMOTE_ID_BYTES) {
+    fail('A2A_TRUSTED_EFFECT_INVALID', `${label} must be an exact bounded opaque identifier`);
+  }
+  return value;
+}
+
 function trustedNow(now) {
   let value;
   try {
@@ -550,6 +596,112 @@ function bindExecutingExactEffect(stateInput, delegation, policy) {
   return state;
 }
 
+async function resolveTrustedA2ATaskBinding(
+  resolveTrustedExactEffectState,
+  delegation,
+  policy,
+  runtimeNowMs,
+) {
+  if (typeof resolveTrustedExactEffectState !== 'function') {
+    fail(
+      'A2A_TRUSTED_EFFECT_RESOLVER_UNAVAILABLE',
+      'A2A GetTask requires the canonical trusted exact-effect resolver',
+    );
+  }
+  const lookup = freeze({
+    schemaVersion: A2A_REMOTE_AGENT_PROVIDER_VERSION,
+    effectId: delegation.effectId,
+    delegationId: delegation.delegationId,
+    localAgentId: delegation.localAgentId,
+    localTaskId: delegation.localTaskId,
+    remoteAgentId: delegation.remoteAgentId,
+    policyDecisionId: policy.decisionId,
+  });
+  let rawState;
+  try {
+    rawState = await resolveTrustedExactEffectState(lookup);
+  } catch (cause) {
+    fail(
+      'A2A_TRUSTED_EFFECT_RESOLUTION_FAILED',
+      'Canonical trusted exact-effect resolution failed',
+      { cause },
+    );
+  }
+  if (rawState == null) {
+    fail(
+      'A2A_TRUSTED_EFFECT_RESOLUTION_FAILED',
+      'Canonical trusted exact-effect resolver did not resolve the A2A effect',
+    );
+  }
+
+  let state;
+  try {
+    state = normalizeExactEffectStateV1(rawState);
+  } catch (cause) {
+    fail(
+      'A2A_TRUSTED_EFFECT_INVALID',
+      'Canonical trusted exact-effect snapshot is invalid',
+      { cause },
+    );
+  }
+  if (![ExactEffectPhase.OBSERVED, ExactEffectPhase.RECONCILE].includes(state.phase)
+      || !state.executionId
+      || !state.observation) {
+    fail(
+      'A2A_TRUSTED_EFFECT_INVALID',
+      'A2A GetTask requires the current OBSERVED or RECONCILE exact-effect attempt',
+    );
+  }
+  if (state.effectId !== delegation.effectId
+      || state.invocation.providerId !== 'a2a-remote-agent'
+      || state.invocation.policyDecisionId !== policy.decisionId
+      || !sameStringSet(
+        state.invocation.requestedCapabilityIds,
+        delegation.requestedCapabilityIds,
+      )) {
+    fail(
+      'A2A_EXACT_EFFECT_BINDING_MISMATCH',
+      'A2A GetTask exact-effect attempt does not match delegation/provider/policy/capabilities',
+    );
+  }
+  if (state.observation.observationId !== state.executionId
+      || state.observation.invocationId !== state.effectId
+      || state.observation.status !== ObservationStatus.OK
+      || Date.parse(state.observation.observedAt) > runtimeNowMs) {
+    fail(
+      'A2A_TRUSTED_EFFECT_INVALID',
+      'A2A GetTask source observation is not the current causal task observation',
+    );
+  }
+
+  const data = dataObject(
+    state.observation.data,
+    'A2A trusted task observation data',
+    'A2A_TRUSTED_EFFECT_INVALID',
+  );
+  if (data.protocol !== 'A2A'
+      || data.protocolVersion !== '1.0'
+      || data.providerId !== 'a2a-remote-agent'
+      || data.remoteAgentId !== delegation.remoteAgentId
+      || data.delegationId !== delegation.delegationId
+      || data.resultKind !== 'TASK'
+      || data.remoteMessageId !== null
+      || data.untrustedRemoteData !== true
+      || data.executionAuthorized !== false
+      || data.credentialUseAuthorized !== false
+      || data.requiresIndependentVerification !== true) {
+    fail(
+      'A2A_TRUSTED_EFFECT_INVALID',
+      'A2A GetTask source observation does not preserve the canonical task identity contract',
+    );
+  }
+  const remoteTaskId = exactTrustedRemoteTaskId(
+    data.remoteTaskId,
+    'A2A trusted task observation remoteTaskId',
+  );
+  return freeze({ state, remoteTaskId, lookup });
+}
+
 function jsonRpcRequest(delegation, messageText, tenant) {
   const message = {
     messageId: delegation.delegationId,
@@ -571,6 +723,119 @@ function jsonRpcRequest(delegation, messageText, tenant) {
     method: A2A_JSONRPC_METHOD_SEND_MESSAGE,
     params,
   });
+}
+
+function jsonRpcGetTaskRequest(binding, tenant, historyLength) {
+  const requestId = `${binding.state.executionId}:get-task`;
+  const params = {
+    id: binding.remoteTaskId,
+    historyLength,
+  };
+  if (tenant) params.tenant = tenant;
+  return freeze({
+    jsonrpc: '2.0',
+    id: requestId,
+    method: A2A_JSONRPC_METHOD_GET_TASK,
+    params,
+  });
+}
+
+function parseGetTaskJsonRpcResponse(rawResponse, expectedRequestId, expectedTaskId) {
+  try {
+    const response = responseEnvelope(rawResponse);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`A2A GetTask endpoint returned HTTP ${response.status}`);
+    }
+    const mediaType = response.contentType.split(';', 1)[0].trim().toLowerCase();
+    if (mediaType !== 'application/json') {
+      throw new Error('A2A GetTask response must use application/json');
+    }
+    const parsed = JSON.parse(response.body);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('A2A GetTask JSON-RPC response must be an object');
+    }
+    for (const key of Object.keys(parsed)) {
+      if (!JSONRPC_RESPONSE_KEYS.has(key)) {
+        throw new Error(`A2A GetTask JSON-RPC response contains unknown field: ${key}`);
+      }
+    }
+    if (parsed.jsonrpc !== '2.0') {
+      throw new Error('A2A GetTask JSON-RPC version must be 2.0');
+    }
+    if (parsed.id !== expectedRequestId) {
+      throw new Error('A2A GetTask JSON-RPC response id does not match the current execution');
+    }
+    const hasResult = Object.prototype.hasOwnProperty.call(parsed, 'result');
+    const hasError = Object.prototype.hasOwnProperty.call(parsed, 'error');
+    if (hasResult === hasError) {
+      throw new Error('A2A GetTask JSON-RPC response must contain exactly one of result or error');
+    }
+    if (hasError) {
+      let remoteError;
+      try {
+        remoteError = boundedJson(parsed.error, 'A2A GetTask remote error');
+      } catch (cause) {
+        throw new Error('A2A GetTask remote error is invalid', { cause });
+      }
+      fail(
+        'A2A_GET_TASK_REMOTE_ERROR',
+        'A2A remote endpoint returned a GetTask JSON-RPC error',
+        { remoteError },
+      );
+    }
+
+    const remoteTask = boundedJson(parsed.result, 'A2A GetTask result');
+    const task = dataObject(
+      remoteTask,
+      'A2A GetTask result Task',
+      'A2A_GET_TASK_RESPONSE_INVALID',
+    );
+    const remoteTaskId = exactRemoteId(
+      task.id,
+      'A2A GetTask result Task.id',
+      false,
+    );
+    if (remoteTaskId !== expectedTaskId) {
+      throw new Error('A2A GetTask returned a different remote task id');
+    }
+    const status = dataObject(
+      task.status,
+      'A2A GetTask result Task.status',
+      'A2A_GET_TASK_RESPONSE_INVALID',
+    );
+    if (typeof status.state !== 'string' || !A2A_TASK_STATES.has(status.state)) {
+      throw new Error('A2A GetTask result Task.status.state is invalid');
+    }
+    return freeze({
+      remoteTask,
+      remoteTaskId,
+      taskState: status.state,
+    });
+  } catch (error) {
+    if (error?.code === 'A2A_GET_TASK_REMOTE_ERROR') throw error;
+    fail(
+      'A2A_GET_TASK_RESPONSE_INVALID',
+      String(error?.message || error || 'A2A GetTask response validation failed').slice(0, 4000),
+      {
+        effectMayHaveOccurred: false,
+        safeToRetry: false,
+        cause: error instanceof Error ? error : null,
+      },
+    );
+  }
+}
+
+function readOnlyGetTaskTransportFailure(error) {
+  const message = String(error?.message || error || 'A2A GetTask transport failed').slice(0, 4000);
+  fail(
+    'A2A_GET_TASK_TRANSPORT_FAILED',
+    message,
+    {
+      effectMayHaveOccurred: false,
+      safeToRetry: true,
+      cause: error instanceof Error ? error : null,
+    },
+  );
 }
 
 function a2aSendResultToObservationV1(input = {}) {
@@ -675,12 +940,23 @@ export class A2ARemoteAgentProviderV1 {
   constructor(options = {}) {
     const raw = dataRecord(options, PROVIDER_OPTION_KEYS, 'A2A provider options');
     const now = Object.hasOwn(raw, 'now') ? raw.now : () => Date.now();
+    const resolveTrustedExactEffectState = Object.hasOwn(raw, 'resolveTrustedExactEffectState')
+      ? raw.resolveTrustedExactEffectState
+      : null;
     const sendJsonRpc = bindTransportSendJsonRpc(raw.transport);
     if (typeof now !== 'function') {
       fail('A2A_TIME_UNAVAILABLE', 'A2A provider requires a trusted runtime clock');
     }
+    if (resolveTrustedExactEffectState !== null
+        && typeof resolveTrustedExactEffectState !== 'function') {
+      fail(
+        'A2A_TRUSTED_EFFECT_RESOLVER_UNAVAILABLE',
+        'resolveTrustedExactEffectState must be a function',
+      );
+    }
     this.sendJsonRpc = sendJsonRpc;
     this.now = now;
+    this.resolveTrustedExactEffectState = resolveTrustedExactEffectState;
     ISSUED_PROVIDER_RESULTS.set(this, new WeakSet());
   }
 
@@ -694,6 +970,134 @@ export class A2ARemoteAgentProviderV1 {
       );
     }
     return a2aSendResultToObservationV1(request);
+  }
+
+  async getTask(input = {}) {
+    const raw = dataRecord(input, GET_TASK_KEYS, 'A2A GetTask request');
+    const delegation = normalizeA2ADelegationRequestV1(raw.delegation);
+    const admission = normalizeA2ARemoteAdmissionRefV1(raw.admission);
+    const policy = normalizePolicyDecisionV1(raw.policyDecision);
+    const historyLength = getTaskHistoryLength(raw.historyLength);
+    const timeoutMs = timeout(raw.timeoutMs);
+    const runtimeNow = trustedNow(this.now);
+
+    const assessment = assessA2ADelegationV1({
+      card: raw.card,
+      admission: raw.admission,
+      delegation: raw.delegation,
+      assessmentAt: runtimeNow.iso,
+    });
+    if (assessment.reasons.length) {
+      fail(
+        'A2A_DELEGATION_BLOCKED',
+        `A2A GetTask delegation is blocked: ${assessment.reasons.join(',')}`,
+      );
+    }
+    if (!assessment.selectedInterface) {
+      fail('A2A_DELEGATION_BLOCKED', 'A2A GetTask has no admitted interface');
+    }
+    if (admission.expiresAt && runtimeNow.ms >= Date.parse(admission.expiresAt)) {
+      fail('A2A_ADMISSION_EXPIRED', 'A2A admission expired before GetTask');
+    }
+    assertPolicy(policy, delegation, runtimeNow.ms);
+    if (assessment.selectedInterface.protocolBinding !== 'JSONRPC') {
+      fail(
+        'A2A_TRANSPORT_NOT_IMPLEMENTED',
+        `A2A protocol binding is not implemented: ${assessment.selectedInterface.protocolBinding}`,
+      );
+    }
+    if (assessment.selectedInterface.protocolVersion !== '1.0') {
+      fail(
+        'A2A_PROTOCOL_VERSION_NOT_IMPLEMENTED',
+        `A2A protocol version is not implemented by this provider: ${assessment.selectedInterface.protocolVersion}`,
+      );
+    }
+
+    const sourceBinding = await resolveTrustedA2ATaskBinding(
+      this.resolveTrustedExactEffectState,
+      delegation,
+      policy,
+      runtimeNow.ms,
+    );
+    const request = jsonRpcGetTaskRequest(
+      sourceBinding,
+      assessment.selectedInterface.tenant,
+      historyLength,
+    );
+
+    let rawResponse;
+    try {
+      rawResponse = await this.sendJsonRpc(freeze({
+        url: assessment.selectedInterface.url,
+        protocolVersion: assessment.selectedInterface.protocolVersion,
+        tenant: assessment.selectedInterface.tenant,
+        timeoutMs,
+        effectId: delegation.effectId,
+        executionId: sourceBinding.state.executionId,
+        securityRequirement: delegation.declaredSecurityRequirement,
+        request,
+      }));
+    } catch (error) {
+      readOnlyGetTaskTransportFailure(error);
+    }
+
+    const parsed = parseGetTaskJsonRpcResponse(
+      rawResponse,
+      request.id,
+      sourceBinding.remoteTaskId,
+    );
+
+    const afterResponseNow = trustedNow(this.now);
+    const currentBinding = await resolveTrustedA2ATaskBinding(
+      this.resolveTrustedExactEffectState,
+      delegation,
+      policy,
+      afterResponseNow.ms,
+    );
+    if (currentBinding.state.executionId !== sourceBinding.state.executionId
+        || currentBinding.remoteTaskId !== sourceBinding.remoteTaskId) {
+      fail(
+        'A2A_GET_TASK_CANONICAL_STATE_CHANGED',
+        'Canonical A2A exact-effect task identity changed while GetTask was in flight',
+      );
+    }
+
+    return freeze({
+      schemaVersion: A2A_REMOTE_AGENT_PROVIDER_VERSION,
+      providerId: 'a2a-remote-agent',
+      remoteAgentId: assessment.remoteAgentId,
+      delegationId: delegation.delegationId,
+      localAgentId: delegation.localAgentId,
+      localTaskId: delegation.localTaskId,
+      effectId: delegation.effectId,
+      executionId: sourceBinding.state.executionId,
+      sourceObservationId: sourceBinding.state.observation.observationId,
+      sourceObservationObservedAt: sourceBinding.state.observation.observedAt,
+      policyDecisionId: policy.decisionId,
+      interfaceUrl: assessment.selectedInterface.url,
+      protocolBinding: assessment.selectedInterface.protocolBinding,
+      protocolVersion: assessment.selectedInterface.protocolVersion,
+      tenant: assessment.selectedInterface.tenant,
+      requestedSkillId: delegation.requestedSkillId,
+      requestedCapabilityIds: delegation.requestedCapabilityIds,
+      remoteTaskId: parsed.remoteTaskId,
+      taskState: parsed.taskState,
+      remoteTask: parsed.remoteTask,
+      observedAt: afterResponseNow.iso,
+      historyLength,
+      runtimeExpiryVerified: true,
+      readOnly: true,
+      untrustedRemoteData: true,
+      effectMayHaveOccurred: false,
+      safeToRetry: true,
+      executionAuthorized: false,
+      credentialUseAuthorized: false,
+      policyDecision: 'NONE',
+      reconciliationAuthorized: false,
+      commitAuthorized: false,
+      requiresIndependentVerification: true,
+      requiresCanonicalExactEffectReconciliation: true,
+    });
   }
 
   async sendMessage(input = {}) {
