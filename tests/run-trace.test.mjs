@@ -96,6 +96,27 @@ test('projection is deterministic and emits parents before children even from re
   assert.equal(first.cursor.nextAfterEventId, 'event-later');
 });
 
+test('projection orders canonical extended-year events by epoch, then eventId', () => {
+  const earlier = '9999-12-31T23:59:59.999Z';
+  const later = '+010000-01-01T00:00:00.000Z';
+  const same = '+010000-01-01T00:00:00.001Z';
+
+  const projection = buildRunTraceProjectionV1(request([
+    event({ eventId: 'later-a', occurredAt: later }),
+    event({ eventId: 'same-z', occurredAt: same }),
+    event({ eventId: 'earlier-z', occurredAt: earlier }),
+    event({ eventId: 'same-a', occurredAt: same }),
+  ], {
+    observedThrough: same,
+  }));
+
+  assert.deepEqual(
+    projection.events.map(item => item.eventId),
+    ['earlier-z', 'later-a', 'same-a', 'same-z'],
+  );
+  assert.equal(projection.cursor.nextAfterEventId, 'same-z');
+});
+
 test('projection rejects run/project/job/revision identity substitution', () => {
   for (const [field, value] of [
     ['runId', 'run-2'],
