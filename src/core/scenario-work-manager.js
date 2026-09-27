@@ -20,6 +20,9 @@ import {
 
 export const SCENARIO_WORK_STORAGE_KEY = 'autopilotScenarioWorkV1';
 export const SCENARIO_WORK_ALARM = 'autopilot-scenario-work-wake';
+const SCENARIO_TAB_RECOVERY_MIGRATION_KEY = 'autopilotScenarioTabRecoveryMigrationV1';
+const LEGACY_DEFAULT_POLL_SECONDS = 15;
+const SAFE_DEFAULT_POLL_SECONDS = 180;
 const STORAGE_SCHEMA_VERSION = 1;
 const MAX_PERSISTED_ARRAY_LENGTH = 10000;
 const MAX_PERSISTED_OBJECT_KEYS = 10000;
@@ -493,7 +496,26 @@ export class ScenarioWorkManager {
 
   async load() {
     const result = await this.chrome.storage.local.get(SCENARIO_WORK_STORAGE_KEY);
-    return normalizeStore(result?.[SCENARIO_WORK_STORAGE_KEY], this.now());
+    const store = normalizeStore(result?.[SCENARIO_WORK_STORAGE_KEY], this.now());
+
+    // One-time owner-safe migration for scenarios created before the tab
+    // recovery hotfix. The legacy UI default was 15 seconds, which can cause
+    // excessive read-only polling across many long-running chats. Migrate only
+    // that legacy default once per browser profile; any explicit value the
+    // owner chooses after this hotfix (including 15) remains authoritative.
+    const migration = await this.chrome.storage.local.get(SCENARIO_TAB_RECOVERY_MIGRATION_KEY);
+    if (migration?.[SCENARIO_TAB_RECOVERY_MIGRATION_KEY] !== true) {
+      let changed = false;
+      for (const item of Object.values(store.byId || {})) {
+        if (Number(item?.config?.pollSeconds) !== LEGACY_DEFAULT_POLL_SECONDS) continue;
+        item.config.pollSeconds = SAFE_DEFAULT_POLL_SECONDS;
+        changed = true;
+      }
+      const record = { [SCENARIO_TAB_RECOVERY_MIGRATION_KEY]: true };
+      if (changed) record[SCENARIO_WORK_STORAGE_KEY] = store;
+      await this.chrome.storage.local.set(record);
+    }
+    return store;
   }
 
   async save(store) {
