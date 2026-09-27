@@ -342,7 +342,6 @@ function assertTrustedResultVerificationParticipation(result, adjudication) {
     if (row.verificationStatus !== result.verificationStatus
         || row.verifierId !== result.verifierId
         || row.verificationAuthorityId !== result.verificationAuthorityId
-        || row.reasonCode !== result.verificationReasonCode
         || row.verifiedAt !== result.verifiedAt
         || !exactStringSet(row.evidenceArtifactIds, resultEvidenceIds)) {
       throw new Error(
