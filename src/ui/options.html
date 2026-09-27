@@ -266,9 +266,46 @@
           <textarea id="agent-definition-tags" rows="3" spellcheck="false"></textarea>
           <label for="agent-definition-acceptance">Критерії завершення — по одному в рядку</label>
           <textarea id="agent-definition-acceptance" rows="4" spellcheck="true"></textarea>
+
+          <fieldset class="settings-group" id="agent-definition-model-defaults-group">
+            <legend>Модель за замовчуванням для цієї definition</legend>
+            <p>Ці значення застосовуються до нових завдань, створених із definition. «Не задавати» залишає відповідне runtime-налаштування власнику або глобальному AI Router.</p>
+            <label for="agent-definition-ai-routing-mode">Маршрут моделі</label>
+            <select id="agent-definition-ai-routing-mode">
+              <option value="">Не задавати</option>
+              <option value="inherit">Успадкувати глобальний AI Router — явно</option>
+              <option value="primary">Завжди primary</option>
+              <option value="strong">Завжди strong</option>
+              <option value="hybrid-auto">Hybrid AUTO</option>
+              <option value="hybrid-rules">Hybrid за глобальними правилами</option>
+            </select>
+            <label for="agent-definition-ai-pinned-route-id">Pinned route ID із вкладки «Моделі» — необов’язково</label>
+            <input id="agent-definition-ai-pinned-route-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-ai-primary-provider">Primary provider</label>
+            <select id="agent-definition-ai-primary-provider">
+              <option value="">Не задавати</option>
+              <option value="inherit">Успадкувати</option>
+              <option value="ollama">Локальна Ollama</option>
+              <option value="openai">OpenAI API</option>
+              <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
+            </select>
+            <label for="agent-definition-ai-primary-model">Primary model — необов’язково при inherited provider</label>
+            <input id="agent-definition-ai-primary-model" type="text" maxlength="300" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-ai-strong-provider">Strong provider</label>
+            <select id="agent-definition-ai-strong-provider">
+              <option value="">Не задавати</option>
+              <option value="inherit">Успадкувати</option>
+              <option value="openai">OpenAI API</option>
+              <option value="ollama">Локальна Ollama</option>
+              <option value="openai-compatible">OpenAI-compatible / LM Studio / remote HTTPS</option>
+            </select>
+            <label for="agent-definition-ai-strong-model">Strong model — необов’язково при inherited provider</label>
+            <input id="agent-definition-ai-strong-model" type="text" maxlength="300" autocomplete="off" spellcheck="false">
+          </fieldset>
+
           <label><input id="agent-definition-enabled" type="checkbox" checked>Definition увімкнена</label>
           <p id="agent-definition-revision" tabindex="0">Реєстр не вибрано.</p>
-          <p>Збережені model/config defaults не редагуються тут: під час оновлення вони зберігаються без змін.</p>
+          <p>Інші збережені config defaults, яких немає в цій формі, під час оновлення зберігаються без змін.</p>
           <div class="agent-actions" aria-label="Дії з reusable Agent definition">
             <button id="agent-definition-save-button" type="button" disabled>Зберегти definition</button>
             <button id="agent-definition-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
