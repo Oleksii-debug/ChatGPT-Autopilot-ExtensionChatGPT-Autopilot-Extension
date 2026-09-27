@@ -124,6 +124,48 @@ test('Agent route pin stays fail-closed under global owner policy, role filterin
   assert.equal(calls.length, 0, 'durable backoff on a pinned Agent route must not silently use another route');
 });
 
+test('fresh retryable Agent route failure preserves durable retryAt and blocks legacy strong fallback', async () => {
+  const calls = [];
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: new AiOrchestrator({
+      now: () => 5000,
+      gatewayClient: { async complete(request) {
+        calls.push(request);
+        const error = new Error('provider quota exhausted');
+        error.status = 429;
+        throw error;
+      } },
+    }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{
+      routeId:'mistral-agent',
+      provider:'openai-compatible',
+      endpointId:'mistral',
+      model:'mistral-small-latest',
+      roles:['planner'],
+      costClass:'paid',
+      inputPricePerMillionUsd:1,
+      outputPricePerMillionUsd:2,
+    }],
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{ routeId:'mistral-agent' },
+  }), error => {
+    assert.equal(error?.code, 'AI_ROUTE_POOL_EXHAUSTED');
+    assert.equal(error?.retryAt, 65000);
+    assert.equal(error?.routerRuntime?.routeStates?.['mistral-agent']?.backoffUntil, 65000);
+    assert.equal(error?.routerRuntime?.routeStates?.['mistral-agent']?.lastErrorCategory, 'quota-or-rate');
+    return true;
+  });
+  assert.equal(calls.length, 1, 'pinned Agent must not issue a legacy strong fallback call after a retryable provider failure');
+});
+
 test('AI router settings persist and old states without router fields stay valid', async () => {
   const old = createEmptyState(1000);
   delete old.profile.aiRouter;
