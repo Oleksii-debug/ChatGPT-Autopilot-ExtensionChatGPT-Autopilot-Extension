@@ -326,10 +326,15 @@ export class OrchestrationV2Manager {
           : transition === 'STOP'
             ? 'STOPPED'
             : 'RUNNING';
-        if (result?.kind !== 'HIERARCHY_EVENT' || result.reason !== expectedReason) {
+        const acceptedReason = result?.reason === expectedReason || result?.reason === 'DUPLICATE_EVENT';
+        if (result?.kind !== 'HIERARCHY_EVENT' || !acceptedReason) {
           throw new Error(`Browser Agent hierarchy lifecycle transition was not accepted: ${String(result?.reason || result?.kind || 'UNKNOWN')}`);
         }
 
+        // A retry can legitimately deduplicate after the hierarchy event was
+        // durably committed but the caller did not observe success. Authorization
+        // is therefore decided by the durable target state below, not by the
+        // summary reason alone.
         // RESUME_SCOPE deliberately leaves terminal STOPPED nodes stopped. The
         // aggregate reducer reason describes the requested scope, so bind
         // authorization to the actual durable target state.
