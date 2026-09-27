@@ -521,3 +521,64 @@ test('an active Agent cannot switch onto another active Agent current tab', asyn
   assert.equal(after.runtime.tabId, 22);
   assert.equal(after.runtime.currentUrl, 'https://two.example/');
 });
+
+test('saving execution concurrency is independent of Chrome alarm reconciliation', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  manager.reconcileAlarm = async () => { throw new Error('alarm subsystem unavailable'); };
+
+  assert.deepEqual(await manager.updateExecutionPolicy({ maxConcurrentAgents: 4 }), { maxConcurrentAgents: 4 });
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  assert.deepEqual(await restarted.getExecutionPolicy(), { maxConcurrentAgents: 4 });
+});
+
+test('closing an owned tab never falls back onto another active Agent current tab', async () => {
+  const chrome = makeChromeStorage();
+  chrome.tabs = {
+    async query() { return []; },
+    async get(id) {
+      if (id === 11) return { id: 11, url: 'https://one.example/', status: 'complete' };
+      if (id === 22) return { id: 22, url: 'https://two.example/', status: 'complete' };
+      throw new Error('unknown tab');
+    },
+    async remove() {},
+  };
+
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  await manager.create({ id: 'owner-a', goal: 'Use tab one' });
+  await manager.create({ id: 'owner-b', goal: 'Use tab two' });
+  await manager.update(store => {
+    const a = store.byId['owner-a'];
+    const b = store.byId['owner-b'];
+    a.runtime.runState = BrowserAgentRunState.RUNNING;
+    a.runtime.controlEpoch = 1;
+    a.runtime.tabId = 11;
+    a.runtime.knownTabIds = [11];
+    a.runtime.currentUrl = 'https://one.example/';
+    b.runtime.runState = BrowserAgentRunState.RUNNING;
+    b.runtime.controlEpoch = 1;
+    b.runtime.tabId = 22;
+    b.runtime.knownTabIds = [22, 11];
+    b.runtime.ownedTabIds = [22];
+    b.runtime.currentUrl = 'https://two.example/';
+    return store;
+  });
+  manager.executionSlotActive.add('owner-a');
+  manager.executionSlotActive.add('owner-b');
+
+  const current = (await manager.get('owner-b')).job;
+  const result = await manager.executeAction(
+    current,
+    { url: 'https://two.example/' },
+    { type: BrowserAgentActionType.CLOSE_TAB, tabId: 22 },
+    current.runtime.controlEpoch,
+  );
+
+  assert.equal(result.kind, 'ACTION');
+  assert.equal(result.currentUrl, '');
+  const after = (await manager.get('owner-b')).job;
+  assert.equal(after.runtime.tabId, null);
+  assert.equal(after.runtime.currentUrl, '');
+  assert.deepEqual(after.runtime.ownedTabIds, []);
+  assert.deepEqual(after.runtime.knownTabIds, [11]);
+});
