@@ -181,6 +181,108 @@ test('replay only prepares activation for children still idle at generation one'
   );
 });
 
+test('pause blocks replay activation without consuming identity and resume restores exact activation', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'pause-recovery',
+    nowMs: 300,
+  }));
+
+  const paused = reduceOrchestrationHierarchyEvent(
+    first.graph,
+    first.runtime,
+    {
+      type: 'PAUSE_SCOPE',
+      eventId: 'pause-recovery:event:pause',
+      controlEpoch: 7,
+      nodeId: 'root',
+    },
+    301,
+  );
+  const replayWhilePaused = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: paused.runtime,
+    spawnId: 'pause-recovery',
+    nowMs: 302,
+  }));
+  assert.equal(replayWhilePaused.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.deepEqual(replayWhilePaused.activationRequests, []);
+
+  const resumed = reduceOrchestrationHierarchyEvent(
+    first.graph,
+    paused.runtime,
+    {
+      type: 'RESUME_SCOPE',
+      eventId: 'pause-recovery:event:resume',
+      controlEpoch: 7,
+      nodeId: 'root',
+    },
+    303,
+  );
+  const replayAfterResume = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: resumed.runtime,
+    spawnId: 'pause-recovery',
+    nowMs: 304,
+  }));
+  assert.equal(replayAfterResume.activationRequests.length, 1);
+  assert.equal(replayAfterResume.activationRequests[0].eventId, first.activationRequests[0].eventId);
+
+  const activated = reduceOrchestrationHierarchyEvent(
+    replayAfterResume.graph,
+    replayAfterResume.runtime,
+    replayAfterResume.activationRequests[0],
+    305,
+  );
+  assert.equal(activated.actions.some(action => action.type === 'ACTIVATE_NODE'), true);
+  assert.notEqual(activated.reason, 'DUPLICATE_EVENT');
+});
+
+test('replay revalidates current policy and resource authority before preparing activation', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'revoke-recovery',
+    nowMs: 300,
+  }));
+
+  const policyRevoked = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: first.runtime,
+    spawnId: 'revoke-recovery',
+    policy: { ...policy, allowAgentCreatedChildren: false },
+    nowMs: 301,
+  }));
+  assert.equal(policyRevoked.decision, 'ALLOW');
+  assert.equal(policyRevoked.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.deepEqual(policyRevoked.activationRequests, []);
+
+  const budgetRevoked = mutateOrchestrationSubagentTopologyV1(request({
+    graph: first.graph,
+    runtime: first.runtime,
+    spawnId: 'revoke-recovery',
+    resourceBudget: { maxChildAgents: 0 },
+    nowMs: 302,
+  }));
+  assert.equal(budgetRevoked.decision, 'ALLOW');
+  assert.equal(budgetRevoked.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
+  assert.deepEqual(budgetRevoked.activationRequests, []);
+});
+
+test('replay cannot bypass initiator validation', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'initiator-replay',
+    nowMs: 300,
+  }));
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(request({
+      graph: first.graph,
+      runtime: first.runtime,
+      spawnId: 'initiator-replay',
+      initiator: 'UNTRUSTED',
+      nowMs: 301,
+    })),
+    /initiator is invalid/,
+  );
+});
+
 test('same spawn identity is exact-effect idempotent after restart', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
