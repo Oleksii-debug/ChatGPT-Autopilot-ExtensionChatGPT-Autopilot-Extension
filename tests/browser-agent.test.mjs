@@ -1226,6 +1226,75 @@ test('Browser Agent requires a separate read-only verifier before completing an 
   assert.equal(live.job.runtime.modelCalls, 2);
 });
 
+test('Browser Agent persists independent verifier route failure runtime before retry', async () => {
+  const chrome = makeChrome();
+  let verifierCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    now: () => 5000,
+    routePrompt: async payload => {
+      verifierCalls += 1;
+      assert.equal(payload.taskRole, 'verifier');
+      const error = new Error('Pinned verifier route remains in durable backoff');
+      error.code = 'AI_ROUTE_POOL_EXHAUSTED';
+      error.retryAt = 10000;
+      error.modelCallsUsed = 1;
+      error.routerRuntime = {
+        routeStates: {
+          'mistral-agent': {
+            consecutiveFailures: 1,
+            successes: 0,
+            failures: 1,
+            backoffUntil: 10000,
+            circuitOpenUntil: 0,
+            lastErrorCode: 'HTTP_429',
+            lastErrorCategory: 'quota-or-rate',
+            lastErrorAt: 4000,
+            lastSuccessAt: 0,
+            lastLatencyMs: 10,
+          },
+        },
+        lastRouteId: 'mistral-agent',
+        lastFailoverChain: [],
+      };
+      throw error;
+    },
+  });
+  await manager.create({
+    id: 'job-verifier-route-failure',
+    goal: 'Verify the observed page',
+    acceptanceCriteria: ['The current page is observed'],
+  });
+  const before = await manager.get('job-verifier-route-failure');
+  const snapshot = {
+    url: 'https://example.test/',
+    frames: [{ frameId: 0, url: 'https://example.test/', text: 'Observed page', elements: [] }],
+  };
+  const action = {
+    type: 'done',
+    evidence: {
+      snapshotSignature: browserSnapshotSignature(snapshot),
+      checks: [{ criterion: 1, detail: 'Observed page' }],
+    },
+  };
+  const outcome = await manager.independentlyVerifyOutcome(
+    'job-verifier-route-failure',
+    before.job.runtime.controlEpoch,
+    before.job,
+    before.job.config,
+    snapshot,
+    action,
+  );
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.error?.code, 'AI_ROUTE_POOL_EXHAUSTED');
+  assert.equal(verifierCalls, 1);
+  const live = await manager.get('job-verifier-route-failure');
+  assert.equal(live.job.runtime.modelCalls, 1, 'failed verifier call remains monotonic when no lifecycle adapter accounted it');
+  assert.equal(live.job.runtime.aiRouterRuntime.lastRouteId, 'mistral-agent');
+  assert.equal(live.job.runtime.aiRouterRuntime.routeStates['mistral-agent'].backoffUntil, 10000);
+  assert.equal(live.job.runtime.aiRouterRuntime.routeStates['mistral-agent'].lastErrorCode, 'HTTP_429');
+});
+
 test('Browser Agent persists a planner-proposed DAG without treating planning as a browser effect', async () => {
   const chrome = makeChrome();
   const at = new Date().toISOString();
