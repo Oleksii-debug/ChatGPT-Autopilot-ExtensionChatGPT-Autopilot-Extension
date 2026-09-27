@@ -620,7 +620,7 @@ function currentActivationProjection(graph, runtime, result) {
   if (nodeRuntime.scopeState !== 'RUNNING') {
     return {
       ok: false,
-      wait: true,
+      wait: nodeRuntime.scopeState === 'PAUSED',
       reasonCode: 'RESULT_CHILD_SCOPE_' + String(nodeRuntime.scopeState || 'BLOCKED'),
     };
   }
