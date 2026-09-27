@@ -58,6 +58,16 @@ function id(value, label, { optional = false } = {}) {
   return value;
 }
 
+function browserAgentJobId(value) {
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > 128) {
+    throw new Error('binding jobId is invalid');
+  }
+  return value;
+}
+
 function positiveInteger(value, label, { optional = false } = {}) {
   if (optional && value === undefined) return null;
   if (typeof value !== 'number'
@@ -148,7 +158,7 @@ export function createBrowserAgentOrchestrationNodeBindingV1(input = {}) {
   );
   const canonicalAuthority = normalizeOrchestrationProjectAuthorityV1(raw.authority);
   const canonicalRequest = normalizeBrowserAgentOrchestrationBindingRequestV1(raw.request);
-  const canonicalJobId = id(raw.jobId, 'binding jobId');
+  const canonicalJobId = browserAgentJobId(raw.jobId);
   const canonicalProjectId = id(raw.projectId, 'binding projectId');
   if (canonicalAuthority.projectId !== canonicalProjectId) {
     throw new Error('Orchestration project authority does not match Browser Agent project');
@@ -196,7 +206,7 @@ export function normalizeBrowserAgentOrchestrationNodeBindingV1(input) {
   }
   return frozen({
     schemaVersion: BROWSER_AGENT_ORCHESTRATION_BINDING_VERSION,
-    jobId: id(raw.jobId, 'binding jobId'),
+    jobId: browserAgentJobId(raw.jobId),
     projectId: id(raw.projectId, 'binding projectId'),
     orchestraId: id(raw.orchestraId, 'binding orchestraId'),
     graphId: id(raw.graphId, 'binding graphId'),
