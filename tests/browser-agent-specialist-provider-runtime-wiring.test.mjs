@@ -43,6 +43,8 @@ test('service worker composes one trusted durable Specialist readiness path', as
   );
   assert.match(source, /openHandsSpecialistClient\.execute\(/);
   assert.match(source, /browserAgent\.recordSpecialistProviderExecutionOutcome\(/);
+  assert.match(source, /providerUpdatedAt:\s*providerResult\.providerUpdatedAt \|\| ''/);
+  assert.match(source, /providerObservedAt:\s*providerResult\.providerObservedAt \|\| ''/);
   assert.match(source, /completionAuthorized:\s*false/);
   const runProviderCommand = source.match(
     /} else if \(message\.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION'\) \{([\s\S]*?)\n  } else if \(message\.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY'\) \{/,

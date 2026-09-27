@@ -874,6 +874,8 @@ export async function dispatchUiMessage(message) {
           reconciliationRequired: providerResult.reconciliationRequired === true,
           safeToRetry: providerResult.safeToRetry === true,
           effectEvidence: providerResult.effectEvidence || '',
+          providerUpdatedAt: providerResult.providerUpdatedAt || '',
+          providerObservedAt: providerResult.providerObservedAt || '',
           errorCode: '',
         };
       } catch (error) {
