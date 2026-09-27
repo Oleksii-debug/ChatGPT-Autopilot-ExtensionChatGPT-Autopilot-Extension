@@ -391,6 +391,37 @@
           </div>
         </fieldset>
         <p id="specialist-status" role="status">Specialist реєстри ще не завантажено.</p>
+
+        <fieldset class="settings-group" id="openhands-provider-config-group">
+          <legend>OpenHands Agent Server для Specialist</legend>
+          <p>Це єдина owner-facing проєкція канонічної BrowserAgent provider-config authority. Вона лише зберігає локальну кваліфікацію provider і не запускає Specialist.</p>
+          <p id="openhands-provider-fixed-contract" tabindex="0">Provider: openhands-agent-server. Agent Server version: 1.49.5. Auth: LOCAL_UNAUTHENTICATED. Secrets і віддалені сервери не підтримуються.</p>
+          <label for="openhands-provider-server-url">Локальний Agent Server URL з явним портом</label>
+          <input id="openhands-provider-server-url" type="url" maxlength="300" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:3000">
+          <label for="openhands-provider-profile-id">Agent profile UUID</label>
+          <input id="openhands-provider-profile-id" type="text" maxlength="36" autocomplete="off" spellcheck="false">
+          <label for="openhands-provider-profile-revision">Agent profile revision</label>
+          <input id="openhands-provider-profile-revision" type="number" min="1" step="1" value="1">
+          <label for="openhands-provider-workspace-path">Абсолютний workspace path</label>
+          <input id="openhands-provider-workspace-path" type="text" maxlength="4096" autocomplete="off" spellcheck="false">
+          <label for="openhands-provider-capabilities">Qualified capability IDs — щонайменше один, по одному в рядку</label>
+          <textarea id="openhands-provider-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="openhands-provider-request-timeout">Request timeout, секунд</label>
+          <input id="openhands-provider-request-timeout" type="number" min="1" max="120" step="1" value="30">
+          <label for="openhands-provider-max-execution">Max execution, секунд</label>
+          <input id="openhands-provider-max-execution" type="number" min="1" max="21600" step="1" value="1800">
+          <label for="openhands-provider-poll-interval">Poll interval, мс</label>
+          <input id="openhands-provider-poll-interval" type="number" min="100" max="30000" step="1" value="1000">
+          <label for="openhands-provider-max-iterations">Max iterations</label>
+          <input id="openhands-provider-max-iterations" type="number" min="1" max="500" step="1" value="100">
+          <label for="openhands-provider-max-response-bytes">Max response bytes</label>
+          <input id="openhands-provider-max-response-bytes" type="number" min="1024" max="2000000" step="1" value="1000000">
+          <div class="agent-actions" aria-label="Дії OpenHands provider configuration">
+            <button id="openhands-provider-save-button" type="button">Зберегти OpenHands provider config</button>
+            <button id="openhands-provider-clear-button" type="button" disabled>Очистити OpenHands provider config</button>
+          </div>
+          <p id="openhands-provider-status" role="status">OpenHands provider config ще не завантажено.</p>
+        </fieldset>
       </details>
 
       <label for="agent-prompt">Що потрібно зробити?</label>

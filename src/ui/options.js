@@ -7,6 +7,7 @@ import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from '.
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
 import { buildSpecialistDefinitionFromFormV1 } from './specialist-definition-form.js';
+import { buildOpenHandsSpecialistProviderConfigRequestV1 } from './specialist-provider-config-form.js';
 import {
   agentDefinitionLaunchScopeTextV1,
   buildAgentDefinitionLaunchRequestV1,
@@ -58,6 +59,8 @@ const ui = {
   selectedSpecialist: null,
   specialistMode: 'none',
   specialistQuarantineCount: 0,
+  openHandsProviderConfig: null,
+  openHandsProviderConfigQuarantined: false,
   agentDraftActive: false,
   agentPolicyDirty: false,
   agentPolicyEditEpoch: 0,
@@ -3122,6 +3125,124 @@ async function deleteSpecialistDefinition() {
   }
 }
 
+function openHandsProviderConfigFormValue() {
+  return {
+    serverUrl: $('openhands-provider-server-url').value,
+    agentProfileId: $('openhands-provider-profile-id').value,
+    agentProfileRevision: $('openhands-provider-profile-revision').value,
+    workspacePath: $('openhands-provider-workspace-path').value,
+    qualifiedCapabilityIdsText: $('openhands-provider-capabilities').value,
+    requestTimeoutSeconds: $('openhands-provider-request-timeout').value,
+    maxExecutionSeconds: $('openhands-provider-max-execution').value,
+    pollIntervalMs: $('openhands-provider-poll-interval').value,
+    maxIterations: $('openhands-provider-max-iterations').value,
+    maxResponseBytes: $('openhands-provider-max-response-bytes').value,
+  };
+}
+
+function fillOpenHandsProviderConfigForm(current = null, { quarantined = false } = {}) {
+  const config = current?.config || null;
+  $('openhands-provider-server-url').value = config?.serverUrl || '';
+  $('openhands-provider-profile-id').value = config?.agentProfileId || '';
+  $('openhands-provider-profile-revision').value = String(config?.agentProfileRevision ?? 1);
+  $('openhands-provider-workspace-path').value = config?.workspacePath || '';
+  $('openhands-provider-capabilities').value = Array.isArray(config?.qualifiedCapabilityIds)
+    ? config.qualifiedCapabilityIds.join('\n')
+    : '';
+  $('openhands-provider-request-timeout').value = String(config?.requestTimeoutSeconds ?? 30);
+  $('openhands-provider-max-execution').value = String(config?.maxExecutionSeconds ?? 1800);
+  $('openhands-provider-poll-interval').value = String(config?.pollIntervalMs ?? 1000);
+  $('openhands-provider-max-iterations').value = String(config?.maxIterations ?? 100);
+  $('openhands-provider-max-response-bytes').value = String(config?.maxResponseBytes ?? 1000000);
+
+  const saveButton = $('openhands-provider-save-button');
+  const clearButton = $('openhands-provider-clear-button');
+  saveButton.disabled = quarantined;
+  clearButton.disabled = quarantined || !current;
+  if (quarantined) {
+    $('openhands-provider-status').textContent = 'OpenHands provider config перебуває в карантині як пошкоджений. UI не буде його перезаписувати; потрібне явне відновлення durable storage.';
+  } else if (current) {
+    $('openhands-provider-status').textContent = `OpenHands provider config revision ${current.revision}; оновлено ${formatTime(current.updatedAt)}.`;
+  } else {
+    $('openhands-provider-status').textContent = 'OpenHands provider config не налаштовано. Заповніть локальну owner-qualified конфігурацію.';
+  }
+}
+
+async function loadOpenHandsProviderConfig() {
+  try {
+    const data = await core('LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS');
+    const configs = Array.isArray(data?.configs) ? data.configs : [];
+    const quarantinedProviderIds = Array.isArray(data?.quarantinedProviderIds)
+      ? data.quarantinedProviderIds
+      : [];
+    const current = configs.find(item => item?.providerId === 'openhands-agent-server') || null;
+    const quarantined = quarantinedProviderIds.includes('openhands-agent-server');
+    ui.openHandsProviderConfig = current;
+    ui.openHandsProviderConfigQuarantined = quarantined;
+    fillOpenHandsProviderConfigForm(current, { quarantined });
+  } catch (error) {
+    ui.openHandsProviderConfig = null;
+    ui.openHandsProviderConfigQuarantined = false;
+    $('openhands-provider-save-button').disabled = true;
+    $('openhands-provider-clear-button').disabled = true;
+    $('openhands-provider-status').textContent = `OpenHands provider config не завантажено: ${error.message}`;
+  }
+}
+
+async function saveOpenHandsProviderConfig() {
+  const current = ui.openHandsProviderConfig;
+  if (ui.openHandsProviderConfigQuarantined) {
+    $('openhands-provider-status').textContent = 'Пошкоджений quarantined provider config не можна перезаписати з UI.';
+    return;
+  }
+  try {
+    const request = buildOpenHandsSpecialistProviderConfigRequestV1(
+      openHandsProviderConfigFormValue(),
+      { expectedRevision: current?.revision || 0 },
+    );
+    await core('SET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', request);
+    await loadOpenHandsProviderConfig();
+    $('openhands-provider-status').textContent = current
+      ? 'OpenHands provider config оновлено з exact revision CAS.'
+      : 'OpenHands provider config створено.';
+    announce(current ? 'OpenHands provider config оновлено.' : 'OpenHands provider config створено.');
+  } catch (error) {
+    if (/revision drifted/iu.test(String(error?.message || ''))) {
+      await loadOpenHandsProviderConfig();
+      $('openhands-provider-status').textContent = 'Provider config змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
+      announce('OpenHands provider config змінився. Актуальні дані перезавантажено.');
+      return;
+    }
+    $('openhands-provider-status').textContent = `OpenHands provider config не збережено: ${error.message}`;
+  }
+}
+
+async function clearOpenHandsProviderConfig() {
+  const current = ui.openHandsProviderConfig;
+  if (!current || ui.openHandsProviderConfigQuarantined) return;
+  if (typeof globalThis.confirm === 'function'
+      && !globalThis.confirm('Очистити owner-qualified OpenHands provider config? Новий Specialist execution не зможе пройти readiness, доки config не буде створено знову.')) {
+    return;
+  }
+  try {
+    await core('CLEAR_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
+      providerId: 'openhands-agent-server',
+      expectedRevision: current.revision,
+    });
+    await loadOpenHandsProviderConfig();
+    $('openhands-provider-status').textContent = 'OpenHands provider config очищено. Provider readiness тепер fail-closed.';
+    announce('OpenHands provider config очищено.');
+  } catch (error) {
+    if (/revision drifted/iu.test(String(error?.message || ''))) {
+      await loadOpenHandsProviderConfig();
+      $('openhands-provider-status').textContent = 'Provider config змінився в іншій операції. Актуальні дані перезавантажено.';
+      announce('OpenHands provider config змінився. Актуальні дані перезавантажено.');
+      return;
+    }
+    $('openhands-provider-status').textContent = `OpenHands provider config не очищено: ${error.message}`;
+  }
+}
+
 function browserAgentNameFromGoal(goal) {
   const text = String(goal || '').replace(/\s+/g, ' ').trim();
   return text ? text.slice(0, 90) : 'Нове завдання агента';
@@ -5378,6 +5499,8 @@ $('specialist-new-button').addEventListener('click', newSpecialistDefinition);
 $('specialist-save-button').addEventListener('click', saveSpecialistDefinition);
 $('specialist-toggle-enabled-button').addEventListener('click', toggleSpecialistEnabled);
 $('specialist-delete-button').addEventListener('click', deleteSpecialistDefinition);
+$('openhands-provider-save-button').addEventListener('click', saveOpenHandsProviderConfig);
+$('openhands-provider-clear-button').addEventListener('click', clearOpenHandsProviderConfig);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
@@ -5591,6 +5714,7 @@ async function initialLoad() {
   await loadBrowserAgentExecutionPolicy();
   await loadAgentDefinitionRegistries();
   await loadSpecialistRegistries();
+  await loadOpenHandsProviderConfig();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
