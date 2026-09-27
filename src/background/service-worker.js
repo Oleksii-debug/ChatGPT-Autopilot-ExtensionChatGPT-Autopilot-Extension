@@ -21,7 +21,7 @@ import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
-import { sameChatConversationUrl } from '../core/tabs.js';
+import { probeAssistantConversation as probeAssistantConversationCore } from '../core/assistant-report-probe.js';
 import {
   DRIVE_SCALAR_PROVIDER_V1,
   DriveScalarProviderV1,
@@ -183,35 +183,7 @@ async function syncSessionDrivePrompts({ nowMs = Date.now() } = {}) {
 }
 
 async function probeAssistantConversation(job) {
-  const conversationUrl = String(job?.conversationUrl || '').trim();
-  if (!conversationUrl) throw new Error('Assistant report probe requires conversationUrl');
-  let tabId = null;
-  let temporaryTab = false;
-  try {
-    const tabs = await chrome.tabs.query({ url: 'https://chatgpt.com/*' });
-    const existing = (tabs || []).find(tab => tab?.id != null && sameChatConversationUrl(tab.url, conversationUrl));
-    if (existing?.id != null) {
-      tabId = existing.id;
-    } else {
-      const tab = await chrome.tabs.create({ url: conversationUrl, active: false });
-      tabId = tab?.id ?? null;
-      temporaryTab = true;
-    }
-    if (tabId == null) throw new Error('Assistant report probe could not resolve a ChatGPT tab');
-    return await transport.execute(tabId, {
-      requestId: `assistant-report:${job.id || job.workerId || job.taskId || 'probe'}:${Date.now()}`,
-      taskId: job.taskId || job.workerId || 'assistant-report',
-      mode: 'READ_ASSISTANT_REPORT',
-      expectedUrl: conversationUrl,
-      promptText: '',
-      assistantBaselineCount: Number(job.assistantBaselineCount || 0),
-      assistantBaselineKnown: job.assistantBaselineKnown === true,
-    });
-  } finally {
-    if (temporaryTab && tabId != null) {
-      try { await chrome.tabs.remove(tabId); } catch (_) {}
-    }
-  }
+  return probeAssistantConversationCore(chrome, transport, job);
 }
 
 async function collectWebReportFromConversation(job) {
