@@ -416,7 +416,7 @@ export class AiOrchestrator {
           if (!settings.routePolicy.autoSwitch) {
             const failedState = routeStates[route.routeId];
             const retryAt = Math.max(failedState?.backoffUntil || 0, failedState?.circuitOpenUntil || 0);
-            if (error && typeof error === 'object' && retryAt > now) error.retryAt = retryAt;
+            if (error && typeof error === 'object' && retryAt > this.now()) error.retryAt = retryAt;
             throw attachFailureRuntime(error);
           }
         }
@@ -427,8 +427,8 @@ export class AiOrchestrator {
         routeStates,
         role: requestedRole,
         capabilityIds,
-        requiresVision: Boolean(clean(imageDataUrl)),
-        now,
+        requiresVision,
+        now:this.now(),
       });
       throw attachFailureRuntime(createAiRoutePoolExhaustedError({
         attempts: routeAttempts,
