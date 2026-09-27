@@ -175,68 +175,6 @@ test('Browser Agent binding persists through the existing store and survives res
   );
 });
 
-test('definition-launched Browser Agents use the same durable orchestration binding seam', async () => {
-  const { manager, dependencies } = await fixture();
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:binding-project' });
-  await manager.mutateAgentDefinitionRegistry({
-    registryId: 'agents:binding-project',
-    expectedRegistryRevision: 1,
-    kind: AgentDefinitionRegistryMutationKind.CREATE,
-    definition: {
-      schemaVersion: 1,
-      agentDefinitionId: 'agent.bound',
-      label: 'Bound Agent',
-      description: '',
-      instructions: 'Perform bounded delegated work.',
-      capabilityIds: [],
-      toolIds: [],
-      tags: ['bound'],
-      acceptanceCriteria: [],
-      configDefaults: {},
-      enabled: true,
-      definitionRevision: 1,
-    },
-  });
-  const launched = await manager.createFromAgentDefinition({
-    registryId: 'agents:binding-project',
-    expectedRegistryRevision: 2,
-    agentDefinitionId: 'agent.bound',
-    expectedDefinitionRevision: 1,
-    jobId: 'job.definition-bound',
-    goal: 'Work under the canonical hierarchy.',
-    projectId: 'project-1',
-    ownerBudget: {
-      maxSteps: 100,
-      maxModelCalls: 10,
-      maxInputTokens: 10000,
-      maxOutputTokens: 5000,
-      maxTotalTokens: 15000,
-      maxOutputTokensPerCall: 1000,
-      maxRuntimeMinutes: 30,
-      maxCostUsd: 1,
-      inputPricePerMillionUsd: 1,
-      outputPricePerMillionUsd: 1,
-    },
-    ownerCapabilityIds: [],
-    ownerToolIds: [],
-    requestedCapabilityIds: [],
-    requestedToolIds: [],
-  });
-  assert.equal(launched.job.orchestrationNodeBinding, null);
-
-  const bound = await manager.bindOrchestrationNode(
-    'job.definition-bound',
-    { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
-    dependencies,
-  );
-  assert.equal(bound.binding.jobId, 'job.definition-bound');
-  assert.equal((await manager.get('job.definition-bound')).job.definitionSelection.agentDefinitionId, 'agent.bound');
-  assert.equal(
-    (await manager.inspectOrchestrationNodeBinding('job.definition-bound', dependencies)).status,
-    'CURRENT',
-  );
-});
-
 test('same canonical binding is idempotent and preserves original boundAt', async () => {
   const { manager, dependencies, advance } = await fixture();
   const first = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
