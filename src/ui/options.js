@@ -1115,6 +1115,13 @@ function aiRouterSettingsFromForm() {
     if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: введіть ціле число ${min}-${max}.`);
     return value;
   };
+  const optionalPriceCap = (id, label) => {
+    const text = $(id).value.trim();
+    if (!text) return null;
+    const value = Number(text);
+    if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error(`${label}: введіть число від 0 до 1000000 або залиште поле порожнім.`);
+    return value;
+  };
   const routes = aiRouterRoutesFromForm();
   const allowRouteIds = selectedValues('ai-router-allow-routes');
   const denyRouteIds = selectedValues('ai-router-deny-routes');
@@ -1149,8 +1156,8 @@ function aiRouterSettingsFromForm() {
       denyRouteIds,
       freeOnly:$('ai-router-free-only').checked,
       locality:$('ai-router-locality').value,
-      maxInputPricePerMillionUsd:Number($('ai-router-max-input-price').value),
-      maxOutputPricePerMillionUsd:Number($('ai-router-max-output-price').value),
+      maxInputPricePerMillionUsd:optionalPriceCap('ai-router-max-input-price', 'Максимальна input-ціна'),
+      maxOutputPricePerMillionUsd:optionalPriceCap('ai-router-max-output-price', 'Максимальна output-ціна'),
       retryBackoffSeconds:integer('ai-router-backoff-seconds', 1, 86400, 'Backoff'),
       circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'Поріг circuit breaker'),
       circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Тривалість circuit breaker'),
@@ -1359,8 +1366,8 @@ async function loadAiRouterSettings() {
     $('ai-router-auto-switch').checked = policy.autoSwitch !== false;
     $('ai-router-free-only').checked = policy.freeOnly === true;
     $('ai-router-locality').value = policy.locality || 'any';
-    $('ai-router-max-input-price').value = String(policy.maxInputPricePerMillionUsd ?? 0);
-    $('ai-router-max-output-price').value = String(policy.maxOutputPricePerMillionUsd ?? 0);
+    $('ai-router-max-input-price').value = policy.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
+    $('ai-router-max-output-price').value = policy.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
     $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
     $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
     $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
