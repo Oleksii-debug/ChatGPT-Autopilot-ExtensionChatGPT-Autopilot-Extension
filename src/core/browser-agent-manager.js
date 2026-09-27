@@ -558,20 +558,29 @@ export class BrowserAgentManager {
     return policy;
   }
 
+  #rejectExecutionSlotQueue(error) {
+    const pending = this.executionSlotQueue.splice(0);
+    for (const next of pending) next.reject(error);
+  }
+
   async #pumpExecutionSlots() {
     if (this.executionSlotPump) return this.executionSlotPump;
     const operation = (async () => {
-      while (this.executionSlotQueue.length) {
-        const policy = await this.getExecutionPolicy();
-        if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
-        const next = this.executionSlotQueue.shift();
-        if (!next) return;
-        if (this.executionSlotActive.has(next.id)) {
+      try {
+        while (this.executionSlotQueue.length) {
+          const policy = await this.getExecutionPolicy();
+          if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
+          const next = this.executionSlotQueue.shift();
+          if (!next) return;
+          if (this.executionSlotActive.has(next.id)) {
+            next.resolve();
+            continue;
+          }
+          this.executionSlotActive.add(next.id);
           next.resolve();
-          continue;
         }
-        this.executionSlotActive.add(next.id);
-        next.resolve();
+      } catch (error) {
+        this.#rejectExecutionSlotQueue(error);
       }
     })();
     this.executionSlotPump = operation;
@@ -580,9 +589,13 @@ export class BrowserAgentManager {
     } finally {
       if (this.executionSlotPump === operation) this.executionSlotPump = null;
       if (this.executionSlotQueue.length) {
-        const policy = await this.getExecutionPolicy();
-        if (this.executionSlotActive.size < policy.maxConcurrentAgents) {
-          void this.#pumpExecutionSlots();
+        try {
+          const policy = await this.getExecutionPolicy();
+          if (this.executionSlotActive.size < policy.maxConcurrentAgents) {
+            void this.#pumpExecutionSlots();
+          }
+        } catch (error) {
+          this.#rejectExecutionSlotQueue(error);
         }
       }
     }
@@ -599,8 +612,8 @@ export class BrowserAgentManager {
       this.executionSlotActive.add(id);
       return true;
     }
-    await new Promise(resolve => {
-      this.executionSlotQueue.push({ id, resolve });
+    await new Promise((resolve, reject) => {
+      this.executionSlotQueue.push({ id, resolve, reject });
       void this.#pumpExecutionSlots();
     });
     return true;
