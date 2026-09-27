@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
+import { BrowserAgentActionType, BrowserAgentRunState } from '../src/core/browser-agent.js';
 
 function makeChromeStorage() {
   const data = Object.create(null);
@@ -469,4 +470,54 @@ test('concurrent active-tab adoption gives the owner tab to only one Agent and i
   assert.deepEqual(isolated.runtime.ownedTabIds, [8]);
   assert.ok(adopted.runtime.knownTabIds.includes(7));
   assert.ok(isolated.runtime.knownTabIds.includes(8));
+});
+
+test('an active Agent cannot switch onto another active Agent current tab', async () => {
+  const chrome = makeChromeStorage();
+  chrome.tabs = {
+    async get(id) {
+      if (id === 11) return { id: 11, url: 'https://one.example/', status: 'complete' };
+      if (id === 22) return { id: 22, url: 'https://two.example/', status: 'complete' };
+      throw new Error('unknown tab');
+    },
+    async query() { return []; },
+  };
+  chrome.permissions = {
+    async contains() { return true; },
+  };
+
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  await manager.create({ id: 'owner-a', goal: 'Use tab one' });
+  await manager.create({ id: 'owner-b', goal: 'Use tab two' });
+  await manager.update(store => {
+    const a = store.byId['owner-a'];
+    const b = store.byId['owner-b'];
+    a.runtime.runState = BrowserAgentRunState.RUNNING;
+    a.runtime.controlEpoch = 1;
+    a.runtime.tabId = 11;
+    a.runtime.knownTabIds = [11];
+    a.runtime.currentUrl = 'https://one.example/';
+    b.runtime.runState = BrowserAgentRunState.RUNNING;
+    b.runtime.controlEpoch = 1;
+    b.runtime.tabId = 22;
+    b.runtime.knownTabIds = [22, 11];
+    b.runtime.currentUrl = 'https://two.example/';
+    return store;
+  });
+  manager.executionSlotActive.add('owner-a');
+  manager.executionSlotActive.add('owner-b');
+
+  const current = (await manager.get('owner-b')).job;
+  await assert.rejects(
+    manager.executeAction(
+      current,
+      { url: 'https://two.example/' },
+      { type: BrowserAgentActionType.SWITCH_TAB, tabId: 11 },
+      current.runtime.controlEpoch,
+    ),
+    /already in use by another active Agent/,
+  );
+  const after = (await manager.get('owner-b')).job;
+  assert.equal(after.runtime.tabId, 22);
+  assert.equal(after.runtime.currentUrl, 'https://two.example/');
 });
