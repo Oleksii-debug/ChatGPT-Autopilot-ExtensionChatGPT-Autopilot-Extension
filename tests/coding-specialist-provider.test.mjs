@@ -268,7 +268,14 @@ test('workspace, profile revision and server version drift fail closed before re
     if (url.endsWith('/openapi.json')) return openapi();
     return json(info('running', { workspace: { working_dir: 'C:\\other' } }));
   });
-  await assert.rejects(() => wrongWorkspace.execute(input()), /workspace does not match/);
+  await assert.rejects(
+    () => wrongWorkspace.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
 
   const wrongProfile = clientFor(async url => {
     if (url.endsWith('/openapi.json')) return openapi();
@@ -276,7 +283,40 @@ test('workspace, profile revision and server version drift fail closed before re
       launched_agent_profile: { agent_profile_id: PROFILE_ID, revision: 8 },
     }));
   });
-  await assert.rejects(() => wrongProfile.execute(input()), /profile provenance/);
+  await assert.rejects(
+    () => wrongProfile.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
+});
+
+test('created conversation provenance mismatch is reconciliation-required after POST effect', async () => {
+  let phase = 0;
+  const client = clientFor(async (url, init) => {
+    if (url.endsWith('/openapi.json')) return openapi();
+    if (url.endsWith(`/api/conversations/${CONVERSATION_ID}`) && phase === 0) {
+      phase = 1;
+      return json({}, 404);
+    }
+    if (url.endsWith('/api/conversations') && init.method === 'POST') {
+      return json(info('running', {
+        launched_agent_profile: { agent_profile_id: PROFILE_ID, revision: 99 },
+      }));
+    }
+    throw new Error('unexpected request');
+  });
+
+  await assert.rejects(
+    () => client.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
 });
 
 test('transport loss after POST dispatch is ambiguous and cannot be blindly retried', async () => {
