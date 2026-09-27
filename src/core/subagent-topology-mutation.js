@@ -169,10 +169,13 @@ function replayActivationAdmitted({
   });
   if (resource.decision !== ResourceBudgetDecisionKind.ALLOW) return false;
 
+  const parentNode = graph.nodesById[parentNodeId];
   const parentRuntime = runtime.nodesById[parentNodeId];
-  if (!parentRuntime
-      || ![OrchestrationNodeLifecycle.ACTIVE, OrchestrationNodeLifecycle.IDLE].includes(parentRuntime.lifecycle)
-      || !scopeChainIsRunning(graph, runtime, parentNodeId)) {
+  if (!parentNode || !parentRuntime || lifecycleAdmission(
+    normalizedSpawnInitiator,
+    parentNode,
+    parentRuntime,
+  ) || !scopeChainIsRunning(graph, runtime, parentNodeId)) {
     return false;
   }
   return true;
