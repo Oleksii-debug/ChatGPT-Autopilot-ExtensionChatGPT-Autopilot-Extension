@@ -117,22 +117,33 @@ function childIdsForSpawn(spawnId, requestedChildren) {
   );
 }
 
-function activationRequestsForSpawn(graph, spawnId, childNodeIds) {
-  return childNodeIds.map((nodeId, index) => ({
-    type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
-    eventId: compactOrchestrationEventId(
-      'subagent-spawn',
-      graph.graphId,
-      spawnId,
+function activationRequestsForSpawn(graph, runtime, spawnId, childNodeIds) {
+  const requests = [];
+  childNodeIds.forEach((nodeId, index) => {
+    const nodeRuntime = runtime.nodesById[nodeId];
+    if (!nodeRuntime
+        || nodeRuntime.generation !== 1
+        || nodeRuntime.lifecycle !== OrchestrationNodeLifecycle.IDLE
+        || nodeRuntime.currentActivationId) {
+      return;
+    }
+    requests.push({
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: compactOrchestrationEventId(
+        'subagent-spawn',
+        graph.graphId,
+        spawnId,
+        nodeId,
+        1,
+      ),
+      controlEpoch: graph.controlEpoch,
       nodeId,
-      1,
-    ),
-    controlEpoch: graph.controlEpoch,
-    nodeId,
-    generation: 1,
-    activationId: 'spawn:' + spawnId + ':child:' + (index + 1),
-    purpose: OrchestrationActivationPurpose.WORK,
-  }));
+      generation: 1,
+      activationId: 'spawn:' + spawnId + ':child:' + (index + 1),
+      purpose: OrchestrationActivationPurpose.WORK,
+    });
+  });
+  return requests;
 }
 
 function denial(reasonCode, details = {}) {
@@ -186,7 +197,7 @@ function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
     parentNodeId,
     spawnId,
     createdNodeIds: expectedChildIds,
-    activationRequests: activationRequestsForSpawn(graph, spawnId, expectedChildIds),
+    activationRequests: activationRequestsForSpawn(graph, runtime, spawnId, expectedChildIds),
     reused: true,
     graph,
     runtime,
@@ -320,7 +331,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     parentNodeId,
     spawnId,
     createdNodeIds: expectedChildIds,
-    activationRequests: activationRequestsForSpawn(nextGraph, spawnId, expectedChildIds),
+    activationRequests: activationRequestsForSpawn(nextGraph, validatedRuntime, spawnId, expectedChildIds),
     reused: false,
     structure,
     resource,
