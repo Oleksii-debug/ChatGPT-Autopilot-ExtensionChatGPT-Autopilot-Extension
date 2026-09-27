@@ -1662,21 +1662,142 @@ export class BrowserAgentManager {
     const registryId = intent.registryId;
     const expectedRegistryRevision = intent.expectedRegistryRevision;
     const expectedPlanRevision = intent.expectedPlanRevision;
-    const withProjectHierarchyAuthority = trustedOrchestrationAuthorityFence(dependencies);
-    const at = new Date(this.now()).toISOString();
+    const {
+      withProjectHierarchyAuthority,
+      resolveSpecialistReadiness,
+    } = trustedAutomaticDelegationDependencies(dependencies);
 
     const initial = await this.get(id);
     if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
     const projectId = initial.job.config?.projectId || '';
     if (!projectId) throw new Error('Automatic delegation requires a durable Project binding');
+    const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
+    const preflightAt = new Date(this.now()).toISOString();
+
+    const preflightSelection = await withProjectHierarchyAuthority(projectId, async authority => {
+      const store = await this.load();
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
+      if ((job.config?.projectId || '') !== projectId) {
+        throw new Error('Browser Agent Project changed before automatic delegation readiness probe');
+      }
+      const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({ fence: parentRuntimeFence, job });
+      if (!parentFenceStatus.current) {
+        throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+      }
+      if (job.runtime.plan.revision !== expectedPlanRevision) {
+        throw new Error('AgentPlan revision drifted before automatic delegation');
+      }
+      if (!job.definitionScope) {
+        throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
+      }
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) throw new Error('Specialist registry is quarantined as corrupt');
+      const registry = store.specialistRegistriesById?.[registryId];
+      if (!registry) throw new Error('Specialist registry not found');
+      if (registry.revision !== expectedRegistryRevision) {
+        throw new Error('Specialist registry revision drifted before automatic delegation');
+      }
+      if (!job.orchestrationNodeBinding) {
+        throw new Error('Automatic delegation requires a durable orchestration node binding');
+      }
+      const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: job.orchestrationNodeBinding,
+        authority,
+      });
+      if (!bindingStatus.current) {
+        throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+      }
+      const structureAdmission = evaluateSubagentStructureAdmissionV1({
+        policy: authority.subagentPolicy,
+        initiator: SubagentSpawnInitiator.AGENT,
+        graph: authority.graph,
+        parentNodeId: job.orchestrationNodeBinding.nodeId,
+        requestedChildren: 1,
+      });
+      if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+        throw new Error(`Automatic delegation denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+      }
+
+      const planId = normalizeAgentPlanV1(job.runtime.plan).planId;
+      const expectedAgentId = specialistAssignmentIdForPlanNodeV1(planId, intent.nodeId);
+      const existing = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === expectedAgentId);
+      if (existing) {
+        const existingBinding = (job.runtime.specialistDelegationBindings || [])
+          .find(item => item?.planId === planId && item?.nodeId === intent.nodeId);
+        if (!existingBinding) {
+          throw new Error('Existing specialist handoff lacks canonical automatic-delegation provenance');
+        }
+        bindSpecialistHandoffToRegistryV1({
+          registry,
+          selection: existingBinding.selection,
+          handoff: existingBinding.handoff,
+          parentCapabilityIds: job.definitionScope.capabilityIds,
+          parentToolIds: job.definitionScope.toolIds,
+        });
+        if (existingBinding.registryRevision !== registry.revision) {
+          throw new Error('Existing specialist delegation provenance drifted from current registry');
+        }
+        if (!sameCanonicalIdentityList(existingBinding.selection.requestedCapabilityIds, intent.requiredCapabilityIds)
+            || !sameCanonicalIdentityList(existingBinding.selection.grantedToolIds, intent.requiredToolIds)) {
+          throw new Error('Existing specialist delegation scope differs from current request');
+        }
+        return normalizeSpecialistSelectionV1(existingBinding.selection);
+      }
+
+      const reconciledPlan = reconcileAgentPlanV1(job.runtime.plan, { at: preflightAt });
+      const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+        plan: reconciledPlan,
+        expectedPlanRevision: reconciledPlan.revision,
+        nodeId: intent.nodeId,
+        registry,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        requiredCapabilityIds: intent.requiredCapabilityIds,
+        requiredToolIds: intent.requiredToolIds,
+        policyEnvelopeId: intent.policyEnvelopeId,
+        deadlineAt: intent.deadlineAt,
+        priority: intent.priority,
+        childBudget: intent.childBudget,
+        artifactRefs: intent.artifactRefs,
+        credentialRefs: intent.credentialRefs,
+        parentInvocationId: intent.parentInvocationId,
+        at: preflightAt,
+      });
+      return normalizeSpecialistSelectionV1(proposal.selection);
+    });
+
+    const providerReadiness = await resolveSpecialistReadiness(preflightSelection);
+    if (ownDataPropertyValue(providerReadiness, 'trustedResolverInvoked') !== true
+        || ownDataPropertyValue(providerReadiness, 'callerReadinessAccepted') !== false) {
+      throw new Error('Trusted specialist provider readiness resolver returned non-canonical provenance');
+    }
+    if (ownDataPropertyValue(providerReadiness, 'registryId') !== preflightSelection.registryId
+        || ownDataPropertyValue(providerReadiness, 'registryRevision') !== preflightSelection.registryRevision
+        || ownDataPropertyValue(providerReadiness, 'specialistId') !== preflightSelection.specialistId
+        || ownDataPropertyValue(providerReadiness, 'providerId') !== preflightSelection.providerId
+        || ownDataPropertyValue(providerReadiness, 'definitionRevision') !== preflightSelection.definitionRevision) {
+      throw new Error('Trusted specialist provider readiness provenance does not match selected specialist');
+    }
+    if (ownDataPropertyValue(providerReadiness, 'executable') !== true) {
+      throw new Error('Selected specialist provider is not currently executable');
+    }
 
     return withProjectHierarchyAuthority(projectId, async authority => {
+      const at = new Date(this.now()).toISOString();
       let result = null;
       await this.update(store => {
         const job = store.byId[id];
         if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
         if ((job.config?.projectId || '') !== projectId) {
           throw new Error('Browser Agent Project changed during automatic delegation');
+        }
+        const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+          fence: parentRuntimeFence,
+          job,
+        });
+        if (!parentFenceStatus.current) {
+          throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
         }
         if (job.runtime.plan.revision !== expectedPlanRevision) {
           throw new Error('AgentPlan revision drifted before automatic delegation');
@@ -1748,6 +1869,9 @@ export class BrowserAgentManager {
           });
           if (existingBinding.registryRevision !== registry.revision) {
             throw new Error('Existing specialist delegation provenance drifted from current registry');
+          }
+          if (!sameSpecialistSelection(existingBinding.selection, preflightSelection)) {
+            throw new Error('Selected specialist changed after provider readiness probe');
           }
           if (!sameCanonicalIdentityList(
             existingBinding.selection.requestedCapabilityIds,
@@ -1826,6 +1950,9 @@ export class BrowserAgentManager {
           at,
         });
 
+        if (!sameSpecialistSelection(proposal.selection, preflightSelection)) {
+          throw new Error('Selected specialist changed after provider readiness probe');
+        }
         const assignment = proposal.preview.assignment;
         const executionOwnership = proposal.preview.executionOwnership;
         if (assignment.state !== 'READY'
