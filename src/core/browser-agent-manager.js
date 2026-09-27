@@ -579,6 +579,12 @@ export class BrowserAgentManager {
       await operation;
     } finally {
       if (this.executionSlotPump === operation) this.executionSlotPump = null;
+      if (this.executionSlotQueue.length) {
+        const policy = await this.getExecutionPolicy();
+        if (this.executionSlotActive.size < policy.maxConcurrentAgents) {
+          void this.#pumpExecutionSlots();
+        }
+      }
     }
   }
 
