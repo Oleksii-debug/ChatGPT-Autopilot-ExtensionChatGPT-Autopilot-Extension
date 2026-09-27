@@ -58,16 +58,6 @@ function id(value, label, { optional = false } = {}) {
   return value;
 }
 
-function browserAgentJobId(value, label) {
-  if (typeof value !== 'string'
-      || value !== value.trim()
-      || !value
-      || value.length > 128) {
-    throw new Error(`${label} is invalid`);
-  }
-  return value;
-}
-
 function browserAgentJobId(value) {
   if (typeof value !== 'string'
       || value !== value.trim()
