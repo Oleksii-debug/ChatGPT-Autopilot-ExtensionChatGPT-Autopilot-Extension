@@ -28,8 +28,7 @@ const CONFIG_DEFAULT_KEYS = new Set([
   'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxCostUsd',
   'inputPricePerMillionUsd', 'outputPricePerMillionUsd',
   'aiRoutingMode', 'aiPrimaryProvider', 'aiPrimaryModel',
-  'aiStrongProvider', 'aiStrongModel', 'repeatMode', 'intervalSeconds',
-  'activeWindowStart', 'activeWindowEnd',
+  'aiStrongProvider', 'aiStrongModel',
 ]);
 
 function record(value, allowed, label) {
