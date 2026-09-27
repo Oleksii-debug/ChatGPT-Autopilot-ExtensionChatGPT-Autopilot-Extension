@@ -1291,15 +1291,17 @@ function syncBrowserAgentRouteBindingStatus() {
   const select = $('agent-ai-pinned-route-id');
   const status = $('agent-route-binding-status');
   const routeId = select.value;
+  let nextText;
   if (!routeId) {
-    status.textContent = 'Agent успадковує глобальну політику маршрутів і може використовувати її дозволений fallback.';
-    return;
+    nextText = 'Agent успадковує глобальну політику маршрутів і може використовувати її дозволений fallback.';
+  } else {
+    const option = [...select.options].find(item => item.value === routeId);
+    const blockReason = option?.dataset?.blockReason || '';
+    nextText = blockReason
+      ? `Маршрут ${routeId} збережений для цього Agent, але зараз недоступний: ${blockReason}. Виклик завершиться до provider I/O; прихованого fallback не буде.`
+      : `Маршрут ${routeId} закріплений лише за цим Agent. Глобальні role/capability/budget/backoff правила залишаються чинними; прихованого fallback немає.`;
   }
-  const option = [...select.options].find(item => item.value === routeId);
-  const blockReason = option?.dataset?.blockReason || '';
-  status.textContent = blockReason
-    ? `Маршрут ${routeId} збережений для цього Agent, але зараз недоступний: ${blockReason}. Виклик завершиться до provider I/O; прихованого fallback не буде.`
-    : `Маршрут ${routeId} закріплений лише за цим Agent. Глобальні role/capability/budget/backoff правила залишаються чинними; прихованого fallback немає.`;
+  if (status.textContent !== nextText) status.textContent = nextText;
 }
 
 function assertBrowserAgentRouteReadyForLaunch() {
