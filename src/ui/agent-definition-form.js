@@ -56,6 +56,75 @@ function copyDataRecord(value, label) {
   return out;
 }
 
+const AGENT_MODEL_ROUTING_MODES = new Set(['inherit', 'primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
+const AGENT_MODEL_PROVIDERS = new Set(['inherit', 'ollama', 'openai', 'openai-compatible']);
+
+function optionalOwnFormText(input, key, label, max) {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor) return { present: false, value: '' };
+  if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + ' має бути enumerable data property.');
+  }
+  const value = descriptor.value;
+  if (typeof value !== 'string') throw new Error(label + ' має бути текстом.');
+  if (value !== value.trim() || value.length > max || value.includes('\0')) {
+    throw new Error(label + ' має бути канонічним текстом без пробілів на початку/в кінці.');
+  }
+  return { present: true, value };
+}
+
+export function mergeAgentDefinitionModelDefaultsV1(input = {}, configDefaults = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма model defaults недоступна.');
+  }
+  const out = copyDataRecord(configDefaults, 'configDefaults');
+
+  const routingMode = optionalOwnFormText(input, 'aiRoutingMode', 'AI routing mode', 40);
+  if (routingMode.present) {
+    if (!routingMode.value) delete out.aiRoutingMode;
+    else if (!AGENT_MODEL_ROUTING_MODES.has(routingMode.value)) throw new Error('AI routing mode не підтримується.');
+    else out.aiRoutingMode = routingMode.value;
+  }
+
+  const pinnedRouteId = optionalOwnFormText(input, 'aiPinnedRouteId', 'Pinned route ID', 180);
+  if (pinnedRouteId.present) {
+    if (!pinnedRouteId.value) delete out.aiPinnedRouteId;
+    else out.aiPinnedRouteId = parseCanonicalAgentIdentity(pinnedRouteId.value, 'Pinned route ID');
+  }
+
+  const primaryProvider = optionalOwnFormText(input, 'aiPrimaryProvider', 'Primary provider', 40);
+  if (primaryProvider.present) {
+    if (!primaryProvider.value) delete out.aiPrimaryProvider;
+    else if (!AGENT_MODEL_PROVIDERS.has(primaryProvider.value)) throw new Error('Primary provider не підтримується.');
+    else out.aiPrimaryProvider = primaryProvider.value;
+  }
+  const primaryModel = optionalOwnFormText(input, 'aiPrimaryModel', 'Primary model', 300);
+  if (primaryModel.present) {
+    if (!primaryModel.value) delete out.aiPrimaryModel;
+    else out.aiPrimaryModel = primaryModel.value;
+  }
+
+  const strongProvider = optionalOwnFormText(input, 'aiStrongProvider', 'Strong provider', 40);
+  if (strongProvider.present) {
+    if (!strongProvider.value) delete out.aiStrongProvider;
+    else if (!AGENT_MODEL_PROVIDERS.has(strongProvider.value)) throw new Error('Strong provider не підтримується.');
+    else out.aiStrongProvider = strongProvider.value;
+  }
+  const strongModel = optionalOwnFormText(input, 'aiStrongModel', 'Strong model', 300);
+  if (strongModel.present) {
+    if (!strongModel.value) delete out.aiStrongModel;
+    else out.aiStrongModel = strongModel.value;
+  }
+
+  if (out.aiPrimaryProvider && out.aiPrimaryProvider !== 'inherit' && !out.aiPrimaryModel) {
+    throw new Error('Primary provider override потребує explicit Primary model.');
+  }
+  if (out.aiStrongProvider && out.aiStrongProvider !== 'inherit' && !out.aiStrongModel) {
+    throw new Error('Strong provider override потребує explicit Strong model.');
+  }
+  return out;
+}
+
 export function buildAgentDefinitionFromFormV1(input = {}, {
   definitionRevision = 1,
   configDefaults = {},
@@ -74,7 +143,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     toolIds: listFromLines(input.toolIdsText ?? '', 'Tool ID', { maxItems:128, itemMax:180, identity:true }),
     tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
-    configDefaults: copyDataRecord(configDefaults, 'configDefaults'),
+    configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
     enabled: input.enabled === true,
     definitionRevision,
   };
