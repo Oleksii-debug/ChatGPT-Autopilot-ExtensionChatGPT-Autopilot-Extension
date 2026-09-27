@@ -2786,7 +2786,7 @@ export class BrowserAgentManager {
         type: 'model',
         error,
         retryMs: 1500,
-        retryAt: error?.code === 'AI_ROUTE_POOL_EXHAUSTED' ? error?.retryAt : 0,
+        retryAt: error?.retryAt,
         maxConsecutive: 5,
       });
     }
@@ -2917,7 +2917,7 @@ export class BrowserAgentManager {
         action,
         countStep: false,
         retryMs: 500,
-        retryAt: outcome.error?.code === 'AI_ROUTE_POOL_EXHAUSTED' ? outcome.error?.retryAt : 0,
+        retryAt: outcome.error?.retryAt,
         maxConsecutive: 4,
       });
       let nextPlan;
@@ -2977,7 +2977,7 @@ export class BrowserAgentManager {
         action,
         countStep: false,
         retryMs: 500,
-        retryAt: outcome.error?.code === 'AI_ROUTE_POOL_EXHAUSTED' ? outcome.error?.retryAt : 0,
+        retryAt: outcome.error?.retryAt,
         maxConsecutive: 4,
       });
       const verification = outcome.verification;
