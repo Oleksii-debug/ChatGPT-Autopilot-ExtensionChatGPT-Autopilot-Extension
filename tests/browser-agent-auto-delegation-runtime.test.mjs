@@ -355,6 +355,89 @@ test('runtime auto-delegation prepares least authority without claiming executio
   );
 });
 
+test('automatic delegation refuses a non-running parent before any readiness probe', async () => {
+  let readinessCalls = 0;
+  const resolver = readyReadinessResolver({
+    onResolve: async () => { readinessCalls += 1; },
+  });
+  const { manager, dependencies } = await fixture({
+    specialistProviderReadinessResolver: resolver,
+  });
+  await manager.update(store => {
+    store.byId['job.auto'].runtime.runState = 'PAUSED';
+    store.byId['job.auto'].runtime.controlEpoch = 2;
+    return store;
+  });
+
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies),
+    /parent must be RUNNING/u,
+  );
+  assert.equal(readinessCalls, 0, 'revoked parent runtime must fail before provider probing');
+  const listed = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(listed.handoffs.length, 0);
+  assert.equal(listed.executionOwnerships.length, 0);
+  assert.equal(listed.delegationBindings.length, 0);
+});
+
+test('unavailable trusted provider readiness produces zero durable delegation mutation', async () => {
+  let readinessCalls = 0;
+  const resolver = readyReadinessResolver({
+    executable: false,
+    onResolve: async () => { readinessCalls += 1; },
+  });
+  const { manager, dependencies } = await fixture({
+    specialistProviderReadinessResolver: resolver,
+  });
+  const before = await manager.get('job.auto');
+
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies),
+    /not currently executable/u,
+  );
+
+  assert.equal(readinessCalls, 1);
+  const after = await manager.get('job.auto');
+  assert.deepEqual(after.job.runtime.plan, before.job.runtime.plan);
+  assert.deepEqual(after.job.runtime.specialistHandoffs, []);
+  assert.deepEqual(after.job.runtime.specialistExecutionOwnerships, []);
+  assert.deepEqual(after.job.runtime.specialistDelegationBindings, []);
+});
+
+test('parent pause during async readiness probe invalidates the runtime fence before persistence', async () => {
+  let probeReachedResolve;
+  const probeReached = new Promise(resolve => { probeReachedResolve = resolve; });
+  let releaseProbeResolve;
+  const releaseProbe = new Promise(resolve => { releaseProbeResolve = resolve; });
+  const resolver = readyReadinessResolver({
+    onResolve: async () => {
+      probeReachedResolve();
+      await releaseProbe;
+    },
+  });
+  const { manager, dependencies } = await fixture({
+    specialistProviderReadinessResolver: resolver,
+  });
+
+  const pending = manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies);
+  await probeReached;
+  await manager.update(store => {
+    store.byId['job.auto'].runtime.runState = 'PAUSED';
+    store.byId['job.auto'].runtime.controlEpoch = 2;
+    return store;
+  });
+  releaseProbeResolve();
+
+  await assert.rejects(
+    pending,
+    /parent runtime fence is stale: NOT_RUNNING/u,
+  );
+  const listed = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(listed.handoffs.length, 0);
+  assert.equal(listed.executionOwnerships.length, 0);
+  assert.equal(listed.delegationBindings.length, 0);
+});
+
 test('durable delegation binding and isolated child references survive restart', async () => {
   const { chrome, manager, dependencies } = await fixture();
   const artifact = {
