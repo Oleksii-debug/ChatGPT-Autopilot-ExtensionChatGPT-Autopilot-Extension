@@ -1,8 +1,11 @@
 import { focusAfterLifecycleSuccess } from './focus-policy.js';
+import { makeScenarioWorkProfile, makeScenarioWorkTemplate, parseScenarioWorkProfileDocument } from './scenario-work-profile.js';
 import { translateText } from './uk-localization.js';
 import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBoundedInteger } from './config-tools.js';
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
+import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
+import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -28,11 +31,23 @@ const ui = {
   orchestrationV2Orchestras: [],
   selectedOrchestraId: '',
   scenarioWorkScenarios: [],
+  scenarioWorkPools: [],
   selectedScenarioWorkId: '',
+  selectedScenarioPoolId: '',
   selectedScenarioWork: null,
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
+  agentDefinitionRegistries: [],
+  selectedAgentDefinitionRegistryId: '',
+  selectedAgentDefinitionRegistry: null,
+  selectedAgentDefinitionId: '',
+  selectedAgentDefinition: null,
+  agentDefinitionMode: 'none',
+  agentDefinitionQuarantineCount: 0,
+  agentDraftActive: false,
+  agentPolicyDirty: false,
+  agentPolicyEditEpoch: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -98,10 +113,17 @@ async function loadProfileSettings() {
   try {
     const data = await core('GET_PROFILE_SETTINGS');
     const minutes = Number(data?.rateLimitCooldownMinutes ?? 0);
+    const concurrency = Number(data?.maxConcurrentSessionOperations ?? 10);
     $('rate-limit-cooldown-minutes').value = String(minutes);
-    $('rate-limit-setting-status').textContent = `Current fallback rate-limit pause: ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+    if ($('simplified-rate-limit-cooldown-minutes')) $('simplified-rate-limit-cooldown-minutes').value = String(minutes);
+    if ($('simplified-max-concurrent-session-operations')) $('simplified-max-concurrent-session-operations').value = String(concurrency);
+    $('rate-limit-setting-status').textContent = `Активна пауза: ${minutes} хв.`;
+    if ($('simplified-profile-setting-status')) {
+      $('simplified-profile-setting-status').textContent = `Активна пауза: ${minutes} хв. Паралельність: ${concurrency} одночасних операцій.`;
+    }
   } catch (error) {
-    $('rate-limit-setting-status').textContent = `Could not load fallback rate-limit pause: ${error.message}`;
+    $('rate-limit-setting-status').textContent = `Не вдалося завантажити налаштування: ${error.message}`;
+    if ($('simplified-profile-setting-status')) $('simplified-profile-setting-status').textContent = `Не вдалося завантажити налаштування: ${error.message}`;
   }
 }
 
@@ -113,13 +135,36 @@ async function saveProfileSettings() {
     return;
   }
   try {
-    const data = await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
-    $('rate-limit-setting-status').textContent = data.rateLimitCooldownMinutes === 0
-      ? 'Збережено: додаткову спільну паузу після rate-limit вимкнено. Серверне обмеження та технічний retry залишаються чинними.'
-      : `Збережено резервну паузу: ${data.rateLimitCooldownMinutes} хв.`;
-    announce('Rate-limit pause saved.');
+    await core('UPDATE_PROFILE_SETTINGS', { rateLimitCooldownMinutes: minutes });
+    await loadProfileSettings();
+    announce('Налаштування паузи збережено.');
   } catch (error) {
-    $('rate-limit-setting-status').textContent = `Could not save fallback rate-limit pause: ${error.message}`;
+    $('rate-limit-setting-status').textContent = `Не вдалося зберегти налаштування: ${error.message}`;
+  }
+}
+
+async function saveSimplifiedProfileSettings() {
+  const minutes = Number($('simplified-rate-limit-cooldown-minutes').value);
+  const concurrency = Number($('simplified-max-concurrent-session-operations').value);
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 120) {
+    $('simplified-profile-setting-status').textContent = 'Пауза: введіть ціле число від 0 до 120.';
+    $('simplified-rate-limit-cooldown-minutes').focus();
+    return;
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32) {
+    $('simplified-profile-setting-status').textContent = 'Паралельність: введіть ціле число від 1 до 32.';
+    $('simplified-max-concurrent-session-operations').focus();
+    return;
+  }
+  try {
+    await core('UPDATE_PROFILE_SETTINGS', {
+      rateLimitCooldownMinutes: minutes,
+      maxConcurrentSessionOperations: concurrency,
+    });
+    await loadProfileSettings();
+    announce('Налаштування виконання збережено.');
+  } catch (error) {
+    $('simplified-profile-setting-status').textContent = `Не вдалося зберегти налаштування: ${error.message}`;
   }
 }
 
@@ -966,12 +1011,18 @@ function manualWorkerCountsFromCards() {
   ]).filter(([id]) => id));
 }
 
+function aiRouteDisplayLabel(route = {}) {
+  const routeId = String(route.routeId || '').trim() || 'без ID';
+  const displayName = String(route.displayName || '').trim();
+  return displayName ? `${displayName} (${routeId})` : routeId;
+}
+
 function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, workerPolicy = {}) {
   const list = $('ai-router-route-list');
   list.replaceChildren();
   for (const [index, route] of routes.entries()) {
     const card = $('ai-router-route-template').content.firstElementChild.cloneNode(true);
-    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${route.routeId || 'без ID'}`;
+    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${aiRouteDisplayLabel(route)}`;
     for (const label of card.querySelectorAll('[data-label-for]')) {
       const field = label.dataset.labelFor;
       const control = card.querySelector(`[data-route-field="${field}"]`);
@@ -1072,6 +1123,13 @@ function aiRouterSettingsFromForm() {
     if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: введіть ціле число ${min}-${max}.`);
     return value;
   };
+  const optionalPriceCap = (id, label) => {
+    const text = $(id).value.trim();
+    if (!text) return null;
+    const value = Number(text);
+    if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error(`${label}: введіть число від 0 до 1000000 або залиште поле порожнім.`);
+    return value;
+  };
   const routes = aiRouterRoutesFromForm();
   const allowRouteIds = selectedValues('ai-router-allow-routes');
   const denyRouteIds = selectedValues('ai-router-deny-routes');
@@ -1106,8 +1164,8 @@ function aiRouterSettingsFromForm() {
       denyRouteIds,
       freeOnly:$('ai-router-free-only').checked,
       locality:$('ai-router-locality').value,
-      maxInputPricePerMillionUsd:Number($('ai-router-max-input-price').value),
-      maxOutputPricePerMillionUsd:Number($('ai-router-max-output-price').value),
+      maxInputPricePerMillionUsd:optionalPriceCap('ai-router-max-input-price', 'Максимальна input-ціна'),
+      maxOutputPricePerMillionUsd:optionalPriceCap('ai-router-max-output-price', 'Максимальна output-ціна'),
       retryBackoffSeconds:integer('ai-router-backoff-seconds', 1, 86400, 'Backoff'),
       circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'Поріг circuit breaker'),
       circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Тривалість circuit breaker'),
@@ -1211,6 +1269,97 @@ function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
   fillModelSelect(modelId, $(providerId).value, [], selected);
 }
 
+function browserAgentRoutePolicyBlockReason(route, policy = {}) {
+  if (route?.enabled === false) return 'маршрут вимкнено у вкладці «Моделі»';
+  const roles = Array.isArray(route?.roles) ? route.roles : [];
+  if (roles.length && !roles.includes('planner')) return 'маршрут не дозволяє роль planner, потрібну для запуску Agent';
+  const routeId = String(route?.routeId || '');
+  const allow = new Set(Array.isArray(policy?.allowRouteIds) ? policy.allowRouteIds : []);
+  const deny = new Set(Array.isArray(policy?.denyRouteIds) ? policy.denyRouteIds : []);
+  if (policy?.pinnedRouteId && policy.pinnedRouteId !== routeId) return `глобально закріплено маршрут ${policy.pinnedRouteId}`;
+  if (allow.size && !allow.has(routeId)) return 'маршрут не входить до глобального allow-списку';
+  if (deny.has(routeId)) return 'маршрут заборонено глобальним deny-списком';
+  if (policy?.freeOnly === true && route?.costClass !== 'free') return 'глобальна політика дозволяє лише безкоштовні маршрути';
+  if (route?.costClass !== 'free' && route?.costClass !== 'paid') return 'клас вартості маршруту не підтверджено';
+  if (route?.costClass === 'paid' && (route?.inputPriceKnown !== true || route?.outputPriceKnown !== true)) {
+    return 'для платного маршруту не підтверджено input/output ціни';
+  }
+  const locality = typeof policy?.locality === 'string' && policy.locality ? policy.locality : 'any';
+  if (locality !== 'any' && route?.locality !== locality) return `глобальна політика дозволяє лише ${locality}`;
+  if (policy?.maxInputPricePerMillionUsd != null
+      && Number(route?.inputPricePerMillionUsd) > Number(policy.maxInputPricePerMillionUsd)) {
+    return 'input-ціна перевищує глобальний ліміт';
+  }
+  if (policy?.maxOutputPricePerMillionUsd != null
+      && Number(route?.outputPricePerMillionUsd) > Number(policy.maxOutputPricePerMillionUsd)) {
+    return 'output-ціна перевищує глобальний ліміт';
+  }
+  return '';
+}
+
+function syncBrowserAgentRouteBindingStatus() {
+  const select = $('agent-ai-pinned-route-id');
+  const status = $('agent-route-binding-status');
+  const routeId = select.value;
+  let nextText;
+  if (!routeId) {
+    nextText = 'Agent успадковує глобальну політику маршрутів і може використовувати її дозволений fallback.';
+  } else {
+    const option = [...select.options].find(item => item.value === routeId);
+    const blockReason = option?.dataset?.blockReason || '';
+    nextText = blockReason
+      ? `Маршрут ${routeId} збережений для цього Agent, але зараз недоступний: ${blockReason}. Виклик завершиться до provider I/O; прихованого fallback не буде.`
+      : `Маршрут ${routeId} закріплений лише за цим Agent. Глобальні role/capability/budget/backoff правила залишаються чинними; прихованого fallback немає.`;
+  }
+  if (status.textContent !== nextText) status.textContent = nextText;
+}
+
+function assertBrowserAgentRouteReadyForLaunch() {
+  const select = $('agent-ai-pinned-route-id');
+  const routeId = select.value;
+  if (!routeId) return;
+  const option = [...select.options].find(item => item.value === routeId);
+  const blockReason = option?.dataset?.blockReason || '';
+  if (blockReason) {
+    throw new Error(`Маршрут ${routeId} зараз недоступний: ${blockReason}. Оберіть доступний маршрут або успадкуйте глобальну політику.`);
+  }
+  const acceptanceCriteria = browserAgentAcceptanceCriteriaFromText($('agent-acceptance-criteria').value);
+  if (acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false') {
+    throw new Error(`Маршрут ${routeId} не дозволяє роль verifier, потрібну для перевірки заданих критеріїв прийняття. Оберіть інший маршрут або успадкуйте глобальну політику.`);
+  }
+}
+
+function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
+  const select = $('agent-ai-pinned-route-id');
+  const selected = select.value;
+  select.replaceChildren();
+  const inherited = document.createElement('option');
+  inherited.value = '';
+  inherited.textContent = 'Успадкувати глобальну політику маршрутів';
+  select.append(inherited);
+  for (const route of routes) {
+    const option = document.createElement('option');
+    option.value = route.routeId;
+    const blockReason = browserAgentRoutePolicyBlockReason(route, policy);
+    const roles = Array.isArray(route?.roles) ? route.roles : [];
+    option.dataset.blockReason = blockReason;
+    option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'));
+    option.disabled = Boolean(blockReason);
+    option.textContent = `${aiRouteDisplayLabel(route)}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` — недоступний: ${blockReason}` : ''}`;
+    select.append(option);
+  }
+  if (selected && ![...select.options].some(option => option.value === selected)) {
+    const unavailable = document.createElement('option');
+    unavailable.value = selected;
+    unavailable.dataset.blockReason = 'маршрут відсутній у збереженому пулі';
+    unavailable.disabled = true;
+    unavailable.textContent = `${selected} — недоступний: маршрут відсутній у збереженому пулі`;
+    select.append(unavailable);
+  }
+  select.value = selected;
+  syncBrowserAgentRouteBindingStatus();
+}
+
 async function loadAiRouterSettings() {
   try {
     const data = await core('GET_AI_ROUTER_SETTINGS');
@@ -1235,8 +1384,8 @@ async function loadAiRouterSettings() {
     $('ai-router-auto-switch').checked = policy.autoSwitch !== false;
     $('ai-router-free-only').checked = policy.freeOnly === true;
     $('ai-router-locality').value = policy.locality || 'any';
-    $('ai-router-max-input-price').value = String(policy.maxInputPricePerMillionUsd ?? 0);
-    $('ai-router-max-output-price').value = String(policy.maxOutputPricePerMillionUsd ?? 0);
+    $('ai-router-max-input-price').value = policy.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
+    $('ai-router-max-output-price').value = policy.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
     $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
     $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
     $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
@@ -1246,6 +1395,7 @@ async function loadAiRouterSettings() {
     $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
     $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
     renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
+    renderBrowserAgentRouteChoices(settings.routes || [], policy);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -1261,6 +1411,7 @@ async function saveAiRouterSettings() {
     setAiRouterBusy(true);
     const settings = aiRouterSettingsFromForm();
     const data = await core('UPDATE_AI_ROUTER_SETTINGS', { settings });
+    renderBrowserAgentRouteChoices(data.settings?.routes || [], data.settings?.routePolicy || {});
     $('ai-router-status').textContent = `AI-координатор збережено: режим ${data.settings.mode}.`;
     announce('Налаштування AI-координатора збережено.');
   } catch (error) {
@@ -1279,8 +1430,17 @@ async function testAiGateway() {
     const result = data.result || {};
     const providerStatus = Array.isArray(result.providerStatus) ? result.providerStatus : [];
     const providerText = providerStatus.length
-      ? providerStatus.map(item => `${item.provider}: ${item.ok ? `готовий (${item.models || 0} моделей)` : (item.configured === false ? 'не налаштований' : 'недоступний')}`).join('; ')
+      ? providerStatus.map(item => `${item.endpointId || item.provider}: ${item.ok ? `готовий (${item.models || 0} моделей)` : (item.configured === false ? 'не налаштований' : 'недоступний')}`).join('; ')
       : ((result.providers || []).join(', ') || 'не вказано');
+    const endpointStatus = Array.isArray(result.compatibleEndpoints)
+      ? result.compatibleEndpoints.map(item => {
+        const name = item.endpointId === 'mistral' ? 'Містраль' : (item.endpointId || 'endpoint');
+        return `${name}: ${item.apiKeyConfigured ? 'ключ завантажений у локальний Gateway' : 'ключ не завантажений у локальний Gateway'}`;
+      }).join('; ')
+      : '';
+    $('ai-router-provider-key-status').textContent = endpointStatus
+      ? `Ключі постачальників: ${endpointStatus}.`
+      : 'Ключі постачальників: Gateway не повідомив про окремі endpoint-и.';
     const compatibleCredential = result.compatibleApiKeyConfigured
       ? 'compatible key завантажений у Gateway'
       : 'compatible key не збережений (для локального сервера без авторизації це нормально)';
@@ -1291,6 +1451,7 @@ async function testAiGateway() {
     announce('AI Gateway відповідає.');
   } catch (error) {
     $('ai-router-openai-key-status').textContent = 'OpenAI API key: не вдалося перевірити, бо Gateway недоступний.';
+    $('ai-router-provider-key-status').textContent = 'Ключі Містраль та інших постачальників: Gateway недоступний, статус невідомий.';
     $('ai-router-status').textContent = `AI Gateway недоступний: ${error.message}`;
   } finally {
     setAiRouterBusy(false);
@@ -1517,12 +1678,43 @@ function scenarioWorkInt(id, min, max, label) {
   return parseStrictBoundedInteger($(id).value, { min, max, label });
 }
 
+function syncScenarioInitialStaggerBounds() {
+  const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
+  $('scenario-cycle-initial-stagger').max = unit === 'minutes' ? '10080' : '604800';
+}
+
+function scenarioInitialStaggerSecondsFromForm() {
+  const unit = $('scenario-cycle-initial-stagger-unit').value === 'minutes' ? 'minutes' : 'seconds';
+  const value = scenarioWorkInt(
+    'scenario-cycle-initial-stagger',
+    0,
+    unit === 'minutes' ? 10080 : 604800,
+    'Пауза між першими промптами',
+  );
+  return value * (unit === 'minutes' ? 60 : 1);
+}
+
+function setScenarioInitialStaggerForm(rawSeconds) {
+  const seconds = Math.max(0, Math.min(604800, Math.floor(Number(rawSeconds) || 0)));
+  const useMinutes = seconds >= 60 && seconds % 60 === 0;
+  $('scenario-cycle-initial-stagger-unit').value = useMinutes ? 'minutes' : 'seconds';
+  syncScenarioInitialStaggerBounds();
+  $('scenario-cycle-initial-stagger').value = String(useMinutes ? seconds / 60 : seconds);
+}
+
+function formatScenarioInitialStagger(seconds) {
+  const value = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (value > 0 && value % 60 === 0) return `${value / 60} хв`;
+  return `${value} с`;
+}
+
 function setScenarioWorkBusy(busy) {
   for (const id of [
     'new-scenario-cycle-button', 'new-scenario-pairs-button', 'new-scenario-group-button', 'new-scenario-pipeline-button',
     'save-scenario-work-button', 'start-scenario-work-button', 'pause-scenario-work-button',
     'resume-scenario-work-button', 'stop-scenario-work-button', 'delete-scenario-work-button',
     'scenario-work-run-now', 'scenario-cycle-start-parallel',
+    'scenario-work-template-button', 'scenario-work-import-button', 'scenario-work-export-button',
   ]) {
     const element = $(id);
     if (element) element.disabled = busy;
@@ -1530,24 +1722,65 @@ function setScenarioWorkBusy(busy) {
   if (!busy) syncScenarioWorkButtons();
 }
 
+function setScenarioPoolStructuralControlsDisabled(disabled) {
+  for (const id of ['scenario-cycle-url', 'scenario-cycle-parallel-count', 'scenario-cycle-add-step']) {
+    const element = $(id);
+    if (element) element.disabled = disabled;
+  }
+  $('scenario-cycle-steps').querySelectorAll('[data-scenario-step-repeat], [data-scenario-step-prompt], button').forEach(element => {
+    element.disabled = disabled;
+  });
+}
+
 function syncScenarioWorkButtons() {
   const item = ui.selectedScenarioWork;
-  const state = item?.runtime?.runState || '';
+  const pool = ui.selectedScenarioPoolId
+    ? (ui.scenarioWorkPools || []).find(value => value.id === ui.selectedScenarioPoolId)
+    : null;
+  const state = pool?.runState || item?.runtime?.runState || '';
   const has = Boolean(item);
+  const isPool = Boolean(pool);
   const running = state === 'RUNNING';
   const paused = state === 'PAUSED';
-  $('save-scenario-work-button').disabled = !has || running || paused;
-  $('start-scenario-work-button').disabled = !has || running || paused;
+  const stopped = state === 'STOPPED';
+  const completed = state === 'COMPLETED';
+  const error = state === 'ERROR';
+
+  $('save-scenario-work-button').textContent = isPool ? 'Зберегти параметри всього сценарію' : 'Зберегти';
+  $('start-scenario-work-button').textContent = isPool ? 'Запустити весь сценарій' : 'Запустити';
+  $('pause-scenario-work-button').textContent = isPool ? 'Призупинити весь сценарій' : 'Призупинити';
+  $('resume-scenario-work-button').textContent = isPool ? 'Продовжити весь сценарій' : 'Продовжити';
+  $('stop-scenario-work-button').textContent = isPool ? 'Зупинити весь сценарій' : 'Зупинити';
+  $('delete-scenario-work-button').textContent = isPool ? 'Видалити весь сценарій' : 'Видалити';
+
+  $('save-scenario-work-button').disabled = !has || running || error || completed || (!isPool && paused);
+  $('start-scenario-work-button').disabled = !has || running || paused || completed || error;
   $('pause-scenario-work-button').disabled = !has || !running;
   $('resume-scenario-work-button').disabled = !has || !paused;
   $('stop-scenario-work-button').disabled = !has || (!running && !paused);
-  $('delete-scenario-work-button').disabled = !has || running;
+  $('delete-scenario-work-button').disabled = !has || running || paused;
   $('scenario-work-run-now').disabled = !has || !running;
-  $('scenario-cycle-start-parallel').disabled = !has || item?.config?.mode !== 'CHAT_CYCLE';
+  $('scenario-cycle-start-parallel').disabled = !has || isPool || item?.config?.mode !== 'CHAT_CYCLE';
+  setScenarioPoolStructuralControlsDisabled(isPool);
+
+  if ($('scenario-work-control-help')) {
+    $('scenario-work-control-help').textContent = !has
+      ? 'Виберіть сценарій зі списку.'
+      : isPool
+        ? running
+          ? 'Керується весь пул. Щоб змінити таймаути та інші runtime-параметри, спочатку призупиніть весь сценарій.'
+          : paused
+            ? 'Весь пул призупинено. Можна змінити таймаути, інтервали перевірки, retry, політику timeout, додаткові чати та стартову паузу; структура промптів не змінюється.'
+            : stopped
+              ? 'Пул зупинено. Runtime-параметри можна змінити і зберегти без скидання прогресу.'
+              : 'Керування застосовується до всіх фізичних чатів цього сценарію.'
+        : 'Керування застосовується до вибраного сценарію.';
+  }
 }
 
 function clearScenarioWorkState() {
   ui.selectedScenarioWorkId = '';
+  ui.selectedScenarioPoolId = '';
   ui.selectedScenarioWork = null;
   $('scenario-work-name').value = '';
   $('scenario-work-mode-label').textContent = 'Формат не вибрано.';
@@ -1586,20 +1819,62 @@ function renderScenarioWorkState(item) {
     return;
   }
   const runtime = item.runtime || {};
-  addScenarioStateLine('Стан', runtime.runState || 'STOPPED');
+  const selectedPool = item.poolController === true
+    ? (item.poolSummary || (ui.scenarioWorkPools || []).find(value => value.id === item.pool?.id))
+    : null;
+  addScenarioStateLine('Стан', selectedPool?.runState || runtime.runState || 'STOPPED');
   addScenarioStateLine('Формат', SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || '—');
-  addScenarioStateLine('Покоління', runtime.generation ?? 1);
-  addScenarioStateLine('Фаза', runtime.phase || '—');
+  if (item.pool) {
+    const pool = selectedPool || (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id);
+    addScenarioStateLine('Пул: фізичних чатів', pool?.slots ?? '—');
+    addScenarioStateLine('Пул: план повідомлень на один чат', pool?.messagesPerChat ?? '—');
+    addScenarioStateLine('Пул: план усіх Send', pool?.plannedSends ?? '—');
+    addScenarioStateLine('Пул: перший Send підтверджено', pool ? `${pool.firstPromptSent ?? 0}/${pool.slots}` : '—');
+    addScenarioStateLine('Пул: ще не отримали перший Send', pool?.firstPromptPending ?? '—');
+    addScenarioStateLine('Пул: чекають завершення відповіді', pool?.waitingResponse ?? '—');
+    addScenarioStateLine('Пул: підтверджено завершених відповідей', pool?.completedResponses ?? '—');
+    addScenarioStateLine('Пул: логічних Send у послідовностях', pool?.sequenceVerifiedSends != null ? `${pool.sequenceVerifiedSends}/${pool.plannedSends ?? '—'}` : '—');
+    addScenarioStateLine('Пул: фізично підтверджених Send-спроб', pool?.transportVerifiedSends ?? pool?.verifiedSends ?? '—');
+    addScenarioStateLine('Пул: повторних/замінних Send-спроб', pool?.retryVerifiedSends ?? '—');
+    addScenarioStateLine('Пул: завершених чатів', pool?.completed ?? '—');
+    addScenarioStateLine('Пул: призупинено', pool?.paused ?? '—');
+    addScenarioStateLine('Пул: помилок', pool?.error ?? '—');
+    addScenarioStateLine('Пул: використано ліміт нових чатів', `${pool?.replacementsUsed ?? '—'}/${pool?.replacementBudget ?? item.pool.replacementBudget}`);
+    addScenarioStateLine('Фактична пауза лише між першими промптами', formatScenarioInitialStagger(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0));
+    if (item.poolController === true) {
+      addScenarioStateLine('Керування', 'Дії на цій вкладці застосовуються до всіх фізичних чатів сценарію. Деталі кожного чату дивіться у «Сеансах» та діагностиці.');
+      return;
+    }
+    addScenarioStateLine('Цей слот: нових чатів після початкового', runtime.poolReplacementsUsed || 0);
+  }
   if (runtime.mode === 'CHAT_CYCLE') {
-    addScenarioStateLine('Коло', `${runtime.round ?? 0}/${item.config?.roundsPerGeneration ?? 0}`);
-    addScenarioStateLine('Крок промпта', `${(runtime.stepIndex ?? 0) + 1}`);
-    addScenarioStateLine('Повтор кроку', `${(runtime.repeatIndex ?? 0) + 1}`);
+    const steps = Array.isArray(item.config?.steps) ? item.config.steps : [];
+    const totalMessages = steps.reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
+    const stepIndex = Math.max(0, Math.min(steps.length - 1, Number(runtime.stepIndex || 0)));
+    const repeatIndex = Math.max(0, Number(runtime.repeatIndex || 0));
+    const beforeCurrent = steps.slice(0, stepIndex).reduce((sum, step) => sum + Math.max(0, Number(step?.repeat || 0)), 0);
+    const currentMessage = totalMessages ? Math.min(totalMessages, beforeCurrent + repeatIndex + 1) : 0;
+    const currentRepeatTotal = Math.max(0, Number(steps[stepIndex]?.repeat || 0));
+    addScenarioStateLine(item.pool ? 'Фізичний чат у цьому слоті' : 'Фізичний чат', `№${runtime.generation ?? 1}`);
+    const confirmed = Number.isInteger(item.verifiedSends?.confirmedInThisChat)
+      ? item.verifiedSends.confirmedInThisChat : null;
+    addScenarioStateLine('Підтверджено повідомлень у цьому чаті', `${confirmed ?? '—'}/${totalMessages}`);
+    addScenarioStateLine('Наступне повідомлення', `${currentMessage}/${totalMessages}`);
+    addScenarioStateLine('Підтверджено за весь сценарій', item.verifiedSends?.confirmedOverall ?? '—');
+    addScenarioStateLine('Промпт у послідовності', `${steps.length ? stepIndex + 1 : 0}/${steps.length}`);
+    addScenarioStateLine('Повтор цього промпта', `${currentRepeatTotal ? Math.min(currentRepeatTotal, repeatIndex + 1) : 0}/${currentRepeatTotal}`);
   } else if (runtime.mode === 'AUDITOR_GROUP') {
+    addScenarioStateLine('Покоління', runtime.generation ?? 1);
+    addScenarioStateLine('Фаза', runtime.phase || '—');
     addScenarioStateLine('Коло групи', `${runtime.group?.round ?? 0}/${item.config?.roundsPerGeneration ?? 0}`);
   } else if (runtime.mode === 'PAIRS') {
+    addScenarioStateLine('Покоління', runtime.generation ?? 1);
+    addScenarioStateLine('Фаза', runtime.phase || '—');
     const rounds = Object.values(runtime.pairs || {}).map(pair => `№${pair.index}: ${pair.round ?? 0}`).join('; ');
     addScenarioStateLine('Кола двійок', rounds || '—');
   } else if (runtime.mode === 'AUDITOR_PIPELINE') {
+    addScenarioStateLine('Покоління', runtime.generation ?? 1);
+    addScenarioStateLine('Фаза', runtime.phase || '—');
     const first = Object.values(runtime.firstSlots || {});
     const second = Object.values(runtime.secondSlots || {});
     const firstVerified = first.filter(slot => slot.state === 'COMPLETE').length;
@@ -1674,6 +1949,7 @@ function createScenarioCycleStep(step = {}, index = 0) {
       || $('scenario-cycle-add-step');
     fieldset.remove();
     renumberScenarioCycleSteps();
+    updateScenarioCycleMessageCount();
     nextFocus?.focus();
     announce('Промпт видалено.');
   });
@@ -1688,12 +1964,24 @@ function renumberScenarioCycleSteps() {
   });
 }
 
+function updateScenarioCycleMessageCount() {
+  const rows = [...$('scenario-cycle-steps').querySelectorAll('[data-scenario-step]')];
+  const total = rows.reduce((sum, row) => {
+    const value = Number(row.querySelector('[data-scenario-step-repeat]')?.value);
+    return sum + (Number.isSafeInteger(value) && value > 0 ? value : 0);
+  }, 0);
+  $('scenario-cycle-message-count').textContent = total
+    ? `Повідомлень у кожному чаті: ${total}.`
+    : 'Повідомлень у кожному чаті: перевірте кількість повторів.';
+}
+
 function renderScenarioCycleSteps(steps = []) {
   const container = $('scenario-cycle-steps');
   container.replaceChildren();
   const actual = steps.length ? steps : [{ prompt: 'Продовжуй.', repeat: 1 }];
   actual.forEach((step, index) => container.append(createScenarioCycleStep(step, index)));
   renumberScenarioCycleSteps();
+  updateScenarioCycleMessageCount();
 }
 
 function readScenarioCycleSteps() {
@@ -1720,8 +2008,8 @@ function scenarioWorkConfigFromForm() {
     id: current.id,
     name: $('scenario-work-name').value.trim() || current.name || 'Сценарна робота',
     mode,
-    roundsPerGeneration: scenarioWorkInt('scenario-work-rounds', 1, 10000, 'Кіл у поколінні'),
-    maxGenerations: scenarioWorkInt('scenario-work-generations', 0, 10000, 'Кількість поколінь'),
+    roundsPerGeneration: mode === 'CHAT_CYCLE' ? 1 : scenarioWorkInt('scenario-work-rounds', 1, 10000, 'Кіл у поколінні'),
+    maxGenerations: mode === 'CHAT_CYCLE' ? 1 : scenarioWorkInt('scenario-work-generations', 0, 10000, 'Кількість поколінь'),
     responseTimeoutMinutes: scenarioWorkInt('scenario-work-timeout', 1, 1440, 'Час очікування відповіді'),
     pollSeconds: scenarioWorkInt('scenario-work-poll', 5, 600, 'Інтервал перевірки'),
     minimumLaunchGapSeconds: scenarioWorkInt('scenario-work-launch-gap', 0, 3600, 'Пауза після завершення відповіді'),
@@ -1773,12 +2061,18 @@ function scenarioWorkConfigFromForm() {
 function fillScenarioWorkForm(item) {
   if (!item) { clearScenarioWorkState(); return; }
   ui.selectedScenarioWorkId = item.id;
+  ui.selectedScenarioPoolId = item.poolController === true ? (item.poolSummary?.id || item.pool?.id || '') : '';
   ui.selectedScenarioWork = clone(item);
   const config = item.config || {};
-  $('scenario-work-name').value = item.name || config.name || '';
+  const runtime = item.runtime || {};
+  const selectedPool = ui.selectedScenarioPoolId
+    ? (item.poolSummary || (ui.scenarioWorkPools || []).find(value => value.id === ui.selectedScenarioPoolId))
+    : null;
+  $('scenario-work-name').value = selectedPool?.name || item.name || config.name || '';
   $('scenario-work-mode-label').textContent = `Формат: ${SCENARIO_WORK_MODE_LABELS[config.mode] || config.mode || 'невідомий'}.`;
-  $('scenario-work-rounds').value = String(config.roundsPerGeneration ?? 10);
-  $('scenario-work-generations').value = String(config.maxGenerations ?? 0);
+  $('scenario-work-round-generation-settings').hidden = config.mode === 'CHAT_CYCLE';
+  $('scenario-work-rounds').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.roundsPerGeneration ?? 10));
+  $('scenario-work-generations').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.maxGenerations ?? 0));
   $('scenario-work-timeout').value = String(config.responseTimeoutMinutes ?? 40);
   $('scenario-work-poll').value = String(config.pollSeconds ?? 15);
   $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
@@ -1791,6 +2085,16 @@ function fillScenarioWorkForm(item) {
     $('scenario-cycle-url').value = config.launchUrl || 'https://chatgpt.com/';
     $('scenario-cycle-restart-round-timeout').checked = config.restartCurrentRoundOnTimeout !== false;
     renderScenarioCycleSteps(config.steps || []);
+    const pool = selectedPool || (item.pool ? (ui.scenarioWorkPools || []).find(value => value.id === item.pool.id) : null);
+    if (item.pool) {
+      $('scenario-cycle-parallel-count').value = String(pool?.slots ?? 1);
+      $('scenario-cycle-replacement-budget').value = String(pool?.replacementBudget ?? item.pool.replacementBudget ?? 0);
+      setScenarioInitialStaggerForm(pool?.initialStaggerSeconds ?? runtime.initialStaggerSeconds ?? 0);
+    } else {
+      $('scenario-cycle-parallel-count').value = '1';
+      $('scenario-cycle-replacement-budget').value = '0';
+      setScenarioInitialStaggerForm(0);
+    }
   } else {
     const prefix = config.mode === 'PAIRS' ? 'scenario-pair' : 'scenario-group';
     if (config.mode === 'PAIRS') $('scenario-pair-count').value = String(config.pairCount ?? 1);
@@ -1818,24 +2122,50 @@ function fillScenarioWorkForm(item) {
   renderScenarioWorkState(item);
   const panel = SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle';
   if (storageGet(SCENARIO_WORK_PANEL_KEY) !== 'state') setScenarioWorkPanel(panel);
-  $('scenario-work-summary').textContent = `${item.name}. Стан: ${item.runtime?.runState || 'STOPPED'}.`;
+  $('scenario-work-summary').textContent = selectedPool
+    ? `${selectedPool.name}. Весь сценарій: ${selectedPool.slots} фізичних чатів. Стан: ${selectedPool.runState || 'STOPPED'}.`
+    : `${item.name}. Стан: ${item.runtime?.runState || 'STOPPED'}.`;
   syncScenarioWorkButtons();
 }
 
+function scenarioPoolListValue(id) { return `pool:${id}`; }
+function scenarioSingleListValue(id) { return `scenario:${id}`; }
+
 function renderScenarioWorkList(data = {}) {
   const scenarios = Array.isArray(data.scenarios) ? data.scenarios : [];
+  const pools = Array.isArray(data.pools) ? data.pools : [];
+  ui.scenarioWorkPools = pools.map(item => clone(item));
   ui.scenarioWorkScenarios = scenarios.map(item => clone(item));
+  const pooledScenarioIds = new Set(scenarios.filter(item => item.pool?.id).map(item => item.id));
+  const unpooled = scenarios.filter(item => !pooledScenarioIds.has(item.id));
   const list = $('scenario-work-list');
   list.replaceChildren();
-  for (const item of scenarios) {
+
+  for (const pool of pools) {
     const option = document.createElement('option');
-    option.value = item.id;
+    option.value = scenarioPoolListValue(pool.id);
+    option.textContent = `${pool.name} — весь сценарій: ${pool.slots} чатів — ${pool.runState || 'STOPPED'}`;
+    list.append(option);
+  }
+  for (const item of unpooled) {
+    const option = document.createElement('option');
+    option.value = scenarioSingleListValue(item.id);
     option.textContent = `${item.name} — ${SCENARIO_WORK_MODE_LABELS[item.config?.mode] || item.config?.mode || 'формат'}`;
     list.append(option);
   }
-  const selected = data.selectedId && scenarios.some(item => item.id === data.selectedId)
-    ? data.selectedId
-    : (scenarios[0]?.id || '');
+
+  let selected = '';
+  if (ui.selectedScenarioPoolId && pools.some(item => item.id === ui.selectedScenarioPoolId)) {
+    selected = scenarioPoolListValue(ui.selectedScenarioPoolId);
+  } else if (ui.selectedScenarioWorkId && unpooled.some(item => item.id === ui.selectedScenarioWorkId)) {
+    selected = scenarioSingleListValue(ui.selectedScenarioWorkId);
+  } else if (data.selectedId) {
+    const selectedScenario = scenarios.find(item => item.id === data.selectedId);
+    selected = selectedScenario?.pool?.id
+      ? scenarioPoolListValue(selectedScenario.pool.id)
+      : selectedScenario ? scenarioSingleListValue(selectedScenario.id) : '';
+  }
+  if (!selected) selected = list.options[0]?.value || '';
   list.value = selected;
   if (!selected) clearScenarioWorkState();
   return selected;
@@ -1846,29 +2176,53 @@ async function loadScenarioWork({ preservePanel = true } = {}) {
     const listData = await core('LIST_SCENARIO_WORK');
     const selected = renderScenarioWorkList(listData);
     if (!selected) return;
-    const data = await core('GET_SCENARIO_WORK', { id: selected });
-    fillScenarioWorkForm(data.scenario);
-    if (!preservePanel) setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[data.scenario?.config?.mode] || 'cycle');
+    await openScenarioWorkTarget(selected, { selectSingle: false });
+    if (!preservePanel && ui.selectedScenarioWork) {
+      setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[ui.selectedScenarioWork.config?.mode] || 'cycle');
+    }
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося завантажити сценарну роботу: ${error.message}`;
   }
 }
 
-async function openScenarioWork(id) {
-  if (!id) { clearScenarioWorkState(); return; }
+async function openScenarioWorkTarget(value, { selectSingle = true } = {}) {
+  if (!value) { clearScenarioWorkState(); return; }
   try {
-    const data = await core('SELECT_SCENARIO_WORK', { id });
+    if (value.startsWith('pool:')) {
+      const poolId = value.slice(5);
+      const data = await core('GET_SCENARIO_CHAT_POOL', { id: poolId });
+      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === poolId);
+      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
+      else ui.scenarioWorkPools.push(clone(data.pool));
+      const item = { ...data.scenario, poolController: true, poolSummary: data.pool };
+      ui.selectedScenarioPoolId = poolId;
+      fillScenarioWorkForm(item);
+      $('scenario-work-list').value = scenarioPoolListValue(poolId);
+      return;
+    }
+    const id = value.startsWith('scenario:') ? value.slice(9) : value;
+    const data = selectSingle
+      ? await core('SELECT_SCENARIO_WORK', { id })
+      : await core('GET_SCENARIO_WORK', { id });
+    ui.selectedScenarioPoolId = '';
     fillScenarioWorkForm(data.scenario);
+    $('scenario-work-list').value = scenarioSingleListValue(id);
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося відкрити сценарій: ${error.message}`;
   }
+}
+
+async function openScenarioWork(id) {
+  if (!id) { clearScenarioWorkState(); return; }
+  return openScenarioWorkTarget(scenarioSingleListValue(id));
 }
 
 async function createScenarioWork(mode) {
   const label = SCENARIO_WORK_MODE_LABELS[mode] || 'Сценарна робота';
   try {
     setScenarioWorkBusy(true);
-    const data = await core('CREATE_SCENARIO_WORK', { name: `Новий: ${label}`, mode });
+    const config = mode === 'CHAT_CYCLE' ? { roundsPerGeneration: 1, maxGenerations: 1 } : {};
+    const data = await core('CREATE_SCENARIO_WORK', { name: `Новий: ${label}`, mode, config });
     await loadScenarioWork({ preservePanel: false });
     if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
     setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[mode] || 'cycle');
@@ -1879,37 +2233,114 @@ async function createScenarioWork(mode) {
   } finally { setScenarioWorkBusy(false); }
 }
 
+async function importScenarioWorkProfile() {
+  const status = $('scenario-work-profile-status');
+  const file = $('scenario-work-profile-file').files?.[0];
+  if (!file) {
+    status.textContent = 'Виберіть JSON-файл сценарію.';
+    $('scenario-work-profile-file').focus();
+    return;
+  }
+  try {
+    if (file.size > 10_000_000) throw new Error('Файл сценарію перевищує 10 МБ.');
+    setScenarioWorkBusy(true);
+    const { config, pool } = parseScenarioWorkProfileDocument(await file.text());
+    const data = await core('CREATE_SCENARIO_WORK', { name: config.name, mode: config.mode, config });
+    await loadScenarioWork({ preservePanel: false });
+    if (data?.scenario?.id) await openScenarioWork(data.scenario.id);
+    if (pool && config.mode === 'CHAT_CYCLE') {
+      $('scenario-cycle-parallel-count').value = String(pool.count);
+      $('scenario-cycle-replacement-budget').value = String(pool.replacementBudget);
+      setScenarioInitialStaggerForm(pool.staggerSeconds);
+    }
+    setScenarioWorkPanel(SCENARIO_WORK_MODE_PANELS[config.mode] || 'cycle');
+    const messageCount = config.mode === 'CHAT_CYCLE'
+      ? config.steps.reduce((sum, step) => sum + step.repeat, 0)
+      : 0;
+    status.textContent = config.mode === 'CHAT_CYCLE'
+      ? `Імпортовано новий зупинений сценарій: ${config.name}. Повідомлень у кожному чаті: ${messageCount}.${pool ? ` Паралельних чатів: ${pool.count}; додаткових чатів: ${pool.replacementBudget}; пауза лише між першими промптами: ${formatScenarioInitialStagger(pool.staggerSeconds)}.` : ''}`
+      : `Імпортовано новий зупинений сценарій: ${config.name}.`;
+    $('scenario-work-list').focus();
+  } catch (error) {
+    status.textContent = `Не вдалося імпортувати: ${error.message}`;
+  } finally {
+    setScenarioWorkBusy(false);
+  }
+}
+
+function exportScenarioWorkProfile() {
+  const status = $('scenario-work-profile-status');
+  if (!ui.selectedScenarioWork?.config) {
+    status.textContent = 'Спочатку виберіть сценарій.';
+    return;
+  }
+  try {
+    const pool = ui.selectedScenarioWork.config.mode === 'CHAT_CYCLE' ? {
+      count: scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів'),
+      replacementBudget: scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати'),
+      staggerSeconds: scenarioInitialStaggerSecondsFromForm(),
+    } : null;
+    const profile = makeScenarioWorkProfile(ui.selectedScenarioWork.config, { pool });
+    downloadJson(profile, `${safeFileName(profile.config.name)}-сценарій.json`);
+    status.textContent = 'Конфігурацію вибраного сценарію експортовано.';
+  } catch (error) {
+    status.textContent = `Не вдалося експортувати: ${error.message}`;
+  }
+}
+
+function downloadScenarioWorkTemplate() {
+  const status = $('scenario-work-profile-status');
+  try {
+    const profile = makeScenarioWorkTemplate();
+    downloadJson(profile, 'Шаблон-сценарної-роботи-12-повідомлень.json');
+    status.textContent = 'Шаблон JSON завантажено: 12 повідомлень у кожному фізичному чаті.';
+  } catch (error) {
+    status.textContent = `Не вдалося створити шаблон: ${error.message}`;
+  }
+}
+
 async function startParallelScenarioChats() {
   if (ui.selectedScenarioWork?.config?.mode !== 'CHAT_CYCLE') return;
-  let created = 0;
-  let started = 0;
-  let firstId = '';
   try {
-    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість незалежних чатів');
+    const count = scenarioWorkInt('scenario-cycle-parallel-count', 1, 20, 'Кількість одночасних чатів');
+    const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати');
+    const staggerSeconds = scenarioInitialStaggerSecondsFromForm();
     const config = scenarioWorkConfigFromForm();
     const baseName = String(config.name || 'Цикл у чаті').slice(0, 105);
     setScenarioWorkBusy(true);
-    for (let index = 1; index <= count; index += 1) {
-      const result = await core('CREATE_SCENARIO_WORK', {
-        name: `${baseName} — чат ${index}`, mode: 'CHAT_CYCLE', config,
-      });
-      const id = result?.scenario?.id;
-      if (!id) throw new Error('Створений цикл не повернув ідентифікатор.');
-      created++;
-      firstId ||= id;
-      await core('START_SCENARIO_WORK', { id });
-      started++;
+    const sourceScenarioId = ui.selectedScenarioWorkId;
+    const sourceIsDormantTemplate = Boolean(
+      sourceScenarioId
+      && !ui.selectedScenarioWork?.pool?.id
+      && ui.selectedScenarioWork?.runtime?.runState === 'STOPPED'
+      && Number(ui.selectedScenarioWork?.runtime?.totalLaunches || 0) === 0
+      && Number(ui.selectedScenarioWork?.runtime?.totalCompletedTurns || 0) === 0
+    );
+    const result = await core('CREATE_SCENARIO_CHAT_POOL', {
+      name: baseName, count, replacementBudget, staggerSeconds, autoStart: true, config,
+    });
+    const ids = result?.ids || [];
+    if (ids.length !== count) throw new Error('Пул створено не повністю. Перевірте стан перед повторною спробою.');
+    if (Number(result?.pool?.slots) !== count) throw new Error('Core повернув іншу кількість фізичних чатів, ніж було задано.');
+    if (Number(result?.pool?.initialStaggerSeconds) !== staggerSeconds) throw new Error('Core повернув іншу паузу між першими промптами, ніж було задано. Запуск зупинено як непідтверджений.');
+    // The imported/configuration-only CHAT_CYCLE source is consumed by the
+    // physical pool. Keeping it as an eleventh "scenario" made a 10-chat launch
+    // look like 11. Delete only a never-started unpooled source; never touch a
+    // real/previously-run scenario.
+    if (sourceIsDormantTemplate && !ids.includes(sourceScenarioId)) {
+      try { await core('DELETE_SCENARIO_WORK', { id: sourceScenarioId }); }
+      catch (_) { /* Global projection still excludes this dormant template. */ }
     }
     await loadScenarioWork();
-    if (firstId) {
-      $('scenario-work-list').value = firstId;
-      await openScenarioWork(firstId);
+    if (result?.pool?.id) {
+      $('scenario-work-list').value = scenarioPoolListValue(result.pool.id);
+      await openScenarioWorkTarget(scenarioPoolListValue(result.pool.id), { selectSingle: false });
     }
     setScenarioWorkPanel('state');
-    announce(`Запущено ${started} незалежних чатів. Кожен чекає своєї відповіді.`);
+    announce(`Пул підтверджено Core: ${ids.length} фізичних чатів; ${result?.pool?.messagesPerChat || config.steps.reduce((sum, step) => sum + step.repeat, 0)} повідомлень на чат; фактична пауза між першими промптами ${formatScenarioInitialStagger(result?.pool?.initialStaggerSeconds ?? staggerSeconds)}; додаткових чатів ${replacementBudget}.`);
   } catch (error) {
     await loadScenarioWork();
-    const message = `Створено ${created}, запущено ${started} чатів. Помилка: ${error.message}`;
+    const message = `Не вдалося підтвердити запуск пулу. Перевірте список сценаріїв: ${error.message}`;
     $('scenario-work-summary').textContent = message;
     announce(message);
   } finally { setScenarioWorkBusy(false); }
@@ -1921,10 +2352,26 @@ async function saveScenarioWork() {
   try {
     setScenarioWorkBusy(true);
     const config = scenarioWorkConfigFromForm();
-    const data = await core('UPDATE_SCENARIO_WORK', { id, config });
-    fillScenarioWorkForm(data.scenario);
-    await loadScenarioWork();
-    announce('Сценарій збережено.');
+    if (ui.selectedScenarioPoolId) {
+      const replacementBudget = scenarioWorkInt('scenario-cycle-replacement-budget', 0, 100000, 'Додаткові чати');
+      const staggerSeconds = scenarioInitialStaggerSecondsFromForm();
+      const data = await core('UPDATE_SCENARIO_CHAT_POOL', {
+        id: ui.selectedScenarioPoolId,
+        config,
+        replacementBudget,
+        staggerSeconds,
+      });
+      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
+      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
+      fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
+      await loadScenarioWork();
+      announce('Параметри всього сценарію збережено без скидання прогресу фізичних чатів.');
+    } else {
+      const data = await core('UPDATE_SCENARIO_WORK', { id, config });
+      fillScenarioWorkForm(data.scenario);
+      await loadScenarioWork();
+      announce('Сценарій збережено.');
+    }
   } catch (error) {
     $('scenario-work-summary').textContent = `Не вдалося зберегти сценарій: ${error.message}`;
     announce('Помилка збереження сценарію.');
@@ -1936,9 +2383,24 @@ async function scenarioWorkLifecycle(command, successText) {
   if (!id) return;
   try {
     setScenarioWorkBusy(true);
-    const data = await core(command, { id });
-    fillScenarioWorkForm(data.scenario);
-    await loadScenarioWork();
+    if (ui.selectedScenarioPoolId) {
+      const poolCommand = {
+        START_SCENARIO_WORK: 'START_SCENARIO_CHAT_POOL',
+        PAUSE_SCENARIO_WORK: 'PAUSE_SCENARIO_CHAT_POOL',
+        RESUME_SCENARIO_WORK: 'RESUME_SCENARIO_CHAT_POOL',
+        STOP_SCENARIO_WORK: 'STOP_SCENARIO_CHAT_POOL',
+      }[command];
+      if (!poolCommand) throw new Error('Непідтримувана дія для пулу.');
+      const data = await core(poolCommand, { id: ui.selectedScenarioPoolId });
+      const index = (ui.scenarioWorkPools || []).findIndex(item => item.id === ui.selectedScenarioPoolId);
+      if (index >= 0) ui.scenarioWorkPools[index] = clone(data.pool);
+      fillScenarioWorkForm({ ...data.scenario, poolController: true, poolSummary: data.pool });
+      await loadScenarioWork();
+    } else {
+      const data = await core(command, { id });
+      fillScenarioWorkForm(data.scenario);
+      await loadScenarioWork();
+    }
     if (command === 'START_SCENARIO_WORK' || command === 'RESUME_SCENARIO_WORK') setScenarioWorkPanel('state');
     announce(successText);
   } catch (error) {
@@ -1951,7 +2413,10 @@ async function deleteScenarioWork() {
   if (!id) return;
   try {
     setScenarioWorkBusy(true);
-    await core('DELETE_SCENARIO_WORK', { id });
+    if (ui.selectedScenarioPoolId) {
+      await core('DELETE_SCENARIO_CHAT_POOL', { id: ui.selectedScenarioPoolId });
+      ui.selectedScenarioPoolId = '';
+    } else await core('DELETE_SCENARIO_WORK', { id });
     await loadScenarioWork({ preservePanel: false });
     $('scenario-work-list').focus();
     announce('Сценарій видалено.');
@@ -1972,6 +2437,273 @@ async function runScenarioWorkNow() {
   } finally { setScenarioWorkBusy(false); }
 }
 
+
+function agentDefinitionLines(values = []) {
+  return Array.isArray(values) ? values.join('\n') : '';
+}
+
+function setAgentDefinitionFormEnabled(enabled) {
+  const group = $('agent-definition-form-group');
+  if (group) group.disabled = !enabled;
+  $('agent-definition-new-button').disabled = !ui.selectedAgentDefinitionRegistry;
+}
+
+function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
+  const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
+  setAgentDefinitionFormEnabled(hasRegistry);
+  const idField = $('agent-definition-id');
+  idField.readOnly = Boolean(definition) && !create;
+  idField.value = definition?.agentDefinitionId || '';
+  $('agent-definition-label').value = definition?.label || '';
+  $('agent-definition-description').value = definition?.description || '';
+  $('agent-definition-instructions').value = definition?.instructions || '';
+  $('agent-definition-capabilities').value = agentDefinitionLines(definition?.capabilityIds);
+  $('agent-definition-tools').value = agentDefinitionLines(definition?.toolIds);
+  $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
+  $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
+  $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
+  $('agent-definition-revision').textContent = definition
+    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}.`
+    : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
+  $('agent-definition-save-button').disabled = !hasRegistry;
+  $('agent-definition-toggle-enabled-button').disabled = !definition;
+  $('agent-definition-delete-button').disabled = !definition;
+}
+
+function renderAgentDefinitionRegistryList() {
+  const select = $('agent-definition-registry-list');
+  select.replaceChildren();
+  for (const registry of ui.agentDefinitionRegistries) {
+    const option = document.createElement('option');
+    option.value = registry.registryId;
+    option.textContent = `${registry.registryId} — revision ${registry.revision}`;
+    option.selected = registry.registryId === ui.selectedAgentDefinitionRegistryId;
+    select.append(option);
+  }
+  $('agent-definition-quarantine-status').textContent = ui.agentDefinitionQuarantineCount
+    ? `У карантині пошкоджених reusable-Agent реєстрів: ${ui.agentDefinitionQuarantineCount}. Їхній вміст не показується і не перезаписується.`
+    : 'Пошкоджених reusable-Agent реєстрів у карантині немає.';
+}
+
+function renderAgentDefinitionList() {
+  const select = $('agent-definition-list');
+  select.replaceChildren();
+  const definitions = ui.selectedAgentDefinitionRegistry?.definitions || [];
+  for (const definition of definitions) {
+    const option = document.createElement('option');
+    option.value = definition.agentDefinitionId;
+    option.textContent = `${definition.label} — ${definition.agentDefinitionId} — rev ${definition.definitionRevision}${definition.enabled ? '' : ' — вимкнено'}`;
+    option.selected = definition.agentDefinitionId === ui.selectedAgentDefinitionId;
+    select.append(option);
+  }
+}
+
+async function loadAgentDefinitionRegistries({ selectRegistryId = '', selectDefinitionId = '' } = {}) {
+  ui.selectedAgentDefinitionRegistry = null;
+  ui.selectedAgentDefinition = null;
+  ui.agentDefinitionMode = 'none';
+  setAgentDefinitionFormEnabled(false);
+  try {
+    const data = await core('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES');
+    ui.agentDefinitionRegistries = Array.isArray(data?.registries) ? data.registries : [];
+    ui.agentDefinitionQuarantineCount = Array.isArray(data?.quarantinedRegistryIds) ? data.quarantinedRegistryIds.length : 0;
+    const requestedRegistryId = selectRegistryId || ui.selectedAgentDefinitionRegistryId;
+    ui.selectedAgentDefinitionRegistryId = ui.agentDefinitionRegistries.some(item => item.registryId === requestedRegistryId)
+      ? requestedRegistryId
+      : (ui.agentDefinitionRegistries[0]?.registryId || '');
+    renderAgentDefinitionRegistryList();
+
+    if (!ui.selectedAgentDefinitionRegistryId) {
+      ui.selectedAgentDefinitionRegistry = null;
+      ui.selectedAgentDefinitionId = '';
+      ui.selectedAgentDefinition = null;
+      ui.agentDefinitionMode = 'none';
+      renderAgentDefinitionList();
+      fillAgentDefinitionForm(null);
+      $('agent-definition-status').textContent = 'Reusable Agent реєстрів ще немає. Створіть реєстр, щоб додати definition.';
+      return;
+    }
+
+    const detail = await core('GET_BROWSER_AGENT_DEFINITION_REGISTRY', {
+      registryId: ui.selectedAgentDefinitionRegistryId,
+    });
+    if (!detail?.registry) {
+      throw new Error(detail?.quarantined ? 'Вибраний реєстр переміщено в карантин.' : 'Вибраний реєстр більше не існує.');
+    }
+    ui.selectedAgentDefinitionRegistry = detail.registry;
+    const requestedDefinitionId = selectDefinitionId || ui.selectedAgentDefinitionId;
+    ui.selectedAgentDefinitionId = ui.selectedAgentDefinitionRegistry.definitions.some(item => item.agentDefinitionId === requestedDefinitionId)
+      ? requestedDefinitionId
+      : (ui.selectedAgentDefinitionRegistry.definitions[0]?.agentDefinitionId || '');
+    ui.selectedAgentDefinition = ui.selectedAgentDefinitionRegistry.definitions.find(item => item.agentDefinitionId === ui.selectedAgentDefinitionId) || null;
+    ui.agentDefinitionMode = ui.selectedAgentDefinition ? 'edit' : 'none';
+    renderAgentDefinitionList();
+    fillAgentDefinitionForm(ui.selectedAgentDefinition);
+    $('agent-definition-status').textContent = `Реєстр ${ui.selectedAgentDefinitionRegistry.registryId}, revision ${ui.selectedAgentDefinitionRegistry.revision}. Definitions: ${ui.selectedAgentDefinitionRegistry.definitions.length}.`;
+  } catch (error) {
+    ui.selectedAgentDefinitionRegistry = null;
+    ui.selectedAgentDefinitionId = '';
+    ui.selectedAgentDefinition = null;
+    ui.agentDefinitionMode = 'none';
+    renderAgentDefinitionList();
+    fillAgentDefinitionForm(null);
+    $('agent-definition-status').textContent = `Reusable Agent definitions не завантажено: ${error.message}`;
+  }
+}
+
+async function selectAgentDefinitionRegistry() {
+  const registryId = $('agent-definition-registry-list').value;
+  ui.selectedAgentDefinitionId = '';
+  await loadAgentDefinitionRegistries({ selectRegistryId: registryId });
+}
+
+function selectAgentDefinition() {
+  const definitionId = $('agent-definition-list').value;
+  ui.selectedAgentDefinitionId = definitionId;
+  ui.selectedAgentDefinition = ui.selectedAgentDefinitionRegistry?.definitions?.find(item => item.agentDefinitionId === definitionId) || null;
+  ui.agentDefinitionMode = ui.selectedAgentDefinition ? 'edit' : 'none';
+  fillAgentDefinitionForm(ui.selectedAgentDefinition);
+}
+
+async function createAgentDefinitionRegistry() {
+  const status = $('agent-definition-status');
+  try {
+    const registryId = parseCanonicalAgentIdentity($('agent-definition-create-registry-id').value, 'Registry ID');
+    await core('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY', { registryId });
+    $('agent-definition-create-registry-id').value = '';
+    await loadAgentDefinitionRegistries({ selectRegistryId: registryId });
+    $('agent-definition-new-button').focus();
+    status.textContent = `Реєстр ${registryId} створено. Додайте першу reusable Agent definition.`;
+    announce('Reusable Agent реєстр створено.');
+  } catch (error) {
+    status.textContent = `Реєстр не створено: ${error.message}`;
+  }
+}
+
+function newAgentDefinition() {
+  if (!ui.selectedAgentDefinitionRegistry) return;
+  ui.selectedAgentDefinitionId = '';
+  ui.selectedAgentDefinition = null;
+  ui.agentDefinitionMode = 'create';
+  renderAgentDefinitionList();
+  fillAgentDefinitionForm(null, { create: true });
+  $('agent-definition-id').focus();
+  $('agent-definition-status').textContent = 'Нова reusable Agent definition. Заповніть обов’язкові поля та збережіть.';
+}
+
+function agentDefinitionFormValue() {
+  return {
+    agentDefinitionId: $('agent-definition-id').value,
+    label: $('agent-definition-label').value,
+    description: $('agent-definition-description').value,
+    instructions: $('agent-definition-instructions').value,
+    capabilityIdsText: $('agent-definition-capabilities').value,
+    toolIdsText: $('agent-definition-tools').value,
+    tagsText: $('agent-definition-tags').value,
+    acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    enabled: $('agent-definition-enabled').checked,
+  };
+}
+
+async function reloadAfterAgentDefinitionDrift(error, { definitionId = '' } = {}) {
+  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
+  const registryId = ui.selectedAgentDefinitionRegistryId;
+  await loadAgentDefinitionRegistries({ selectRegistryId: registryId, selectDefinitionId: definitionId });
+  $('agent-definition-status').textContent = 'Реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
+  announce('Reusable Agent definition змінилася. Актуальні дані перезавантажено.');
+  return true;
+}
+
+async function saveAgentDefinition() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  if (!registry) return;
+  const current = ui.agentDefinitionMode === 'edit' ? ui.selectedAgentDefinition : null;
+  try {
+    const definitionRevision = current ? current.definitionRevision + 1 : 1;
+    const definition = buildAgentDefinitionFromFormV1(agentDefinitionFormValue(), {
+      definitionRevision,
+      configDefaults: current?.configDefaults || {},
+    });
+    const payload = current
+      ? {
+          registryId: registry.registryId,
+          expectedRegistryRevision: registry.revision,
+          kind: 'UPDATE',
+          agentDefinitionId: current.agentDefinitionId,
+          expectedDefinitionRevision: current.definitionRevision,
+          definition,
+        }
+      : {
+          registryId: registry.registryId,
+          expectedRegistryRevision: registry.revision,
+          kind: 'CREATE',
+          definition,
+        };
+    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', payload);
+    await loadAgentDefinitionRegistries({
+      selectRegistryId: registry.registryId,
+      selectDefinitionId: definition.agentDefinitionId,
+    });
+    $('agent-definition-status').textContent = current ? 'Reusable Agent definition оновлено.' : 'Reusable Agent definition створено.';
+    announce(current ? 'Reusable Agent definition оновлено.' : 'Reusable Agent definition створено.');
+  } catch (error) {
+    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current?.agentDefinitionId || '' })) return;
+    $('agent-definition-status').textContent = `Definition не збережено: ${error.message}`;
+  }
+}
+
+async function toggleAgentDefinitionEnabled() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  const current = ui.selectedAgentDefinition;
+  if (!registry || !current) return;
+  try {
+    const definition = {
+      ...current,
+      enabled: !current.enabled,
+      definitionRevision: current.definitionRevision + 1,
+    };
+    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
+      registryId: registry.registryId,
+      expectedRegistryRevision: registry.revision,
+      kind: 'UPDATE',
+      agentDefinitionId: current.agentDefinitionId,
+      expectedDefinitionRevision: current.definitionRevision,
+      definition,
+    });
+    await loadAgentDefinitionRegistries({
+      selectRegistryId: registry.registryId,
+      selectDefinitionId: current.agentDefinitionId,
+    });
+    $('agent-definition-status').textContent = definition.enabled ? 'Reusable Agent definition увімкнено.' : 'Reusable Agent definition вимкнено.';
+    announce(definition.enabled ? 'Reusable Agent definition увімкнено.' : 'Reusable Agent definition вимкнено.');
+  } catch (error) {
+    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current.agentDefinitionId })) return;
+    $('agent-definition-status').textContent = `Стан definition не змінено: ${error.message}`;
+  }
+}
+
+async function deleteAgentDefinition() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  const current = ui.selectedAgentDefinition;
+  if (!registry || !current) return;
+  if (typeof globalThis.confirm === 'function' && !globalThis.confirm(`Видалити reusable Agent definition “${current.label}”?`)) return;
+  try {
+    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
+      registryId: registry.registryId,
+      expectedRegistryRevision: registry.revision,
+      kind: 'DELETE',
+      agentDefinitionId: current.agentDefinitionId,
+      expectedDefinitionRevision: current.definitionRevision,
+    });
+    ui.selectedAgentDefinitionId = '';
+    await loadAgentDefinitionRegistries({ selectRegistryId: registry.registryId });
+    $('agent-definition-status').textContent = 'Reusable Agent definition видалено.';
+    announce('Reusable Agent definition видалено.');
+  } catch (error) {
+    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current.agentDefinitionId })) return;
+    $('agent-definition-status').textContent = `Definition не видалено: ${error.message}`;
+  }
+}
 
 function browserAgentNameFromGoal(goal) {
   const text = String(goal || '').replace(/\s+/g, ' ').trim();
@@ -2079,6 +2811,7 @@ function browserAgentPolicyFromForm() {
     activeWindowStart,
     activeWindowEnd,
     aiRoutingMode: $('agent-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-ai-pinned-route-id').value,
     aiPrimaryProvider: $('agent-ai-primary-provider').value,
     aiPrimaryModel: $('agent-ai-primary-model').value.trim(),
     aiStrongProvider: $('agent-ai-strong-provider').value,
@@ -2114,6 +2847,17 @@ function fillBrowserAgentPolicy(config = {}) {
   $('agent-active-window-start').value = config.activeWindowStart || '';
   $('agent-active-window-end').value = config.activeWindowEnd || '';
   $('agent-ai-routing-mode').value = ['inherit','primary','strong','hybrid-auto','hybrid-rules'].includes(config.aiRoutingMode) ? config.aiRoutingMode : 'inherit';
+  $('agent-ai-pinned-route-id').value = config.aiPinnedRouteId || '';
+  if ($('agent-ai-pinned-route-id').value !== (config.aiPinnedRouteId || '')) {
+    const option = document.createElement('option');
+    option.value = config.aiPinnedRouteId;
+    option.dataset.blockReason = 'маршрут відсутній у збереженому пулі';
+    option.disabled = true;
+    option.textContent = `${config.aiPinnedRouteId} — недоступний: маршрут відсутній у збереженому пулі`;
+    $('agent-ai-pinned-route-id').append(option);
+    $('agent-ai-pinned-route-id').value = option.value;
+  }
+  syncBrowserAgentRouteBindingStatus();
   $('agent-ai-primary-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiPrimaryProvider) ? config.aiPrimaryProvider : 'inherit';
   $('agent-ai-primary-model').value = config.aiPrimaryModel || '';
   $('agent-ai-strong-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiStrongProvider) ? config.aiStrongProvider : 'inherit';
@@ -2176,12 +2920,18 @@ ${pendingScript}` : '';
   const nextWake = Number(runtime.nextWakeAt || 0) > Date.now() ? ` Наступний запуск: ${new Date(runtime.nextWakeAt).toLocaleString()}.` : '';
   const capability = runtime.capabilityPermission ? ` Потрібна capability: ${runtime.capabilityPermission}.` : '';
   $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${planStatus}${result}${verified}${error}`;
-  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.`;
+  const routerRuntime = runtime.aiRouterRuntime || {};
+  const actualRouteId = String(routerRuntime.lastRouteId || '').trim();
+  const failoverChain = Array.isArray(routerRuntime.lastFailoverChain) ? routerRuntime.lastFailoverChain.slice(-4) : [];
+  const routeEvidence = actualRouteId
+    ? ` Останній фактичний AI-маршрут: ${actualRouteId}.${failoverChain.length ? ` Остання route-chain: ${failoverChain.map(item => `${item.routeId || '?'}:${item.outcome || '?'}`).join(' -> ')}.` : ''}`
+    : ' Фактичний AI-маршрут ще не використовувався.';
+  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.${routeEvidence}`;
   const history = Array.isArray(runtime.history) ? runtime.history : [];
   $('agent-history').textContent = history.length
     ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
     : 'Історії ще немає.';
-  fillBrowserAgentPolicy(config);
+  if (!ui.agentDraftActive && !ui.agentPolicyDirty) fillBrowserAgentPolicy(config);
 }
 
 function renderBrowserAgentList() {
@@ -2197,12 +2947,46 @@ function renderBrowserAgentList() {
   }
 }
 
+async function loadBrowserAgentExecutionPolicy() {
+  try {
+    const policy = await core('GET_BROWSER_AGENT_EXECUTION_POLICY');
+    const value = Number(policy?.maxConcurrentAgents ?? 1);
+    $('agent-max-concurrent-agents').value = String(value);
+    $('agent-execution-policy-status').textContent = `Активний глобальний ліміт: ${value} одночасних Agent.`;
+  } catch (error) {
+    $('agent-execution-policy-status').textContent = `Не вдалося завантажити ліміт Agent: ${error.message}`;
+  }
+}
+
+async function saveBrowserAgentExecutionPolicy() {
+  const value = Number($('agent-max-concurrent-agents').value);
+  if (!Number.isInteger(value) || value < 1 || value > 32) {
+    $('agent-execution-policy-status').textContent = 'Введіть ціле число від 1 до 32.';
+    $('agent-max-concurrent-agents').focus();
+    return;
+  }
+  try {
+    const policy = await core('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', { maxConcurrentAgents: value });
+    $('agent-max-concurrent-agents').value = String(policy.maxConcurrentAgents);
+    $('agent-execution-policy-status').textContent = `Збережено: максимум ${policy.maxConcurrentAgents} одночасних Agent.`;
+    announce('Глобальний ліміт одночасного виконання Agent збережено.');
+  } catch (error) {
+    $('agent-execution-policy-status').textContent = `Не вдалося зберегти ліміт Agent: ${error.message}`;
+  }
+}
+
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
+    const previousId = ui.selectedBrowserAgentId;
     ui.browserAgentJobs = Array.isArray(data?.jobs) ? data.jobs : [];
-    ui.selectedBrowserAgentId = selectId || data?.selectedId || ui.selectedBrowserAgentId || ui.browserAgentJobs[0]?.id || '';
+    ui.selectedBrowserAgentId = selectId || ui.selectedBrowserAgentId || data?.selectedId || ui.browserAgentJobs[0]?.id || '';
     if (ui.selectedBrowserAgentId && !ui.browserAgentJobs.some(job => job.id === ui.selectedBrowserAgentId)) ui.selectedBrowserAgentId = ui.browserAgentJobs[0]?.id || '';
+    if (previousId && previousId !== ui.selectedBrowserAgentId) {
+      ui.agentPolicyDirty = false;
+      ui.agentPolicyEditEpoch += 1;
+      $('agent-policy-edit-status').textContent = 'Вибране завдання змінилося; показано його збережену політику.';
+    }
     renderBrowserAgentList();
     const job = ui.browserAgentJobs.find(item => item.id === ui.selectedBrowserAgentId) || null;
     renderBrowserAgentJob(job);
@@ -2212,6 +2996,10 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
 }
 
 async function selectBrowserAgentJob() {
+  ui.agentDraftActive = false;
+  ui.agentPolicyDirty = false;
+  ui.agentPolicyEditEpoch += 1;
+  $('agent-policy-edit-status').textContent = 'Змін політики немає.';
   const id = $('agent-job-list').value;
   if (!id) { ui.selectedBrowserAgentId = ''; renderBrowserAgentJob(null); return; }
   try {
@@ -2226,6 +3014,7 @@ async function runBrowserAgentPrompt() {
   const goal = $('agent-prompt').value.trim();
   if (!goal) { $('agent-status').textContent = 'Опишіть, що Agent має зробити.'; $('agent-prompt').focus(); return; }
   try {
+    assertBrowserAgentRouteReadyForLaunch();
     $('agent-run-prompt-button').disabled = true;
     $('agent-status').textContent = 'Створюю завдання й запускаю Agent…';
     const created = await core('CREATE_BROWSER_AGENT_JOB', {
@@ -2236,6 +3025,9 @@ async function runBrowserAgentPrompt() {
     const id = created?.job?.id || created?.selectedId;
     if (!id) throw new Error('Core не повернув id завдання Agent.');
     ui.selectedBrowserAgentId = id;
+    ui.agentDraftActive = false;
+    ui.agentPolicyDirty = false;
+    $('agent-policy-edit-status').textContent = 'Політику нового завдання збережено.';
     await core('START_BROWSER_AGENT_JOB', { id });
     await loadBrowserAgentJobs({ selectId: id });
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
@@ -2251,6 +3043,30 @@ async function runBrowserAgentPrompt() {
   } catch (error) {
     $('agent-status').textContent = `Agent не запущено: ${error.message}`;
   } finally { $('agent-run-prompt-button').disabled = false; }
+}
+
+async function importBrowserAgentDraft() {
+  const file = $('agent-import-file').files?.[0];
+  if (!file) { $('agent-import-status').textContent = 'Оберіть JSON-файл чернетки.'; return; }
+  try {
+    if (file.size > 1024 * 1024) throw new Error('Файл чернетки має бути не більший за 1 МБ.');
+    const draft = parseAgentDraftProfile(parsePortableJson(await file.text()));
+    fillBrowserAgentPolicy(draft.policy);
+    $('agent-prompt').value = draft.goal;
+    ui.agentDraftActive = true;
+    ui.agentPolicyDirty = false;
+    $('agent-policy-edit-status').textContent = 'Чернетка завантажена; Agent не запущено.';
+    $('agent-import-status').textContent = 'Чернетку завантажено у форму. Перевірте її та окремо натисніть «Запустити агента».';
+    $('agent-prompt').focus();
+  } catch (error) { $('agent-import-status').textContent = `Імпорт не вдався: ${error.message}`; }
+}
+
+function exportBrowserAgentDraft() {
+  try {
+    const draft = makeAgentDraftProfile($('agent-prompt').value, browserAgentPolicyFromForm());
+    downloadJson(draft, 'ChatGPT-Autopilot-Agent-draft.json');
+    $('agent-import-status').textContent = 'Чернетку експортовано без ключів API та стану виконання.';
+  } catch (error) { $('agent-import-status').textContent = `Експорт не вдався: ${error.message}`; }
 }
 
 async function browserAgentLifecycle(command) {
@@ -2280,7 +3096,17 @@ async function saveBrowserAgentPolicy() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
   try {
+    assertBrowserAgentRouteReadyForLaunch();
+    const editEpoch = ui.agentPolicyEditEpoch;
     await core('UPDATE_BROWSER_AGENT_JOB', { id, config: browserAgentPolicyFromForm() });
+    if (ui.selectedBrowserAgentId !== id) return;
+    if (editEpoch === ui.agentPolicyEditEpoch) {
+      ui.agentPolicyDirty = false;
+      ui.agentDraftActive = false;
+      $('agent-policy-edit-status').textContent = 'Політику Agent збережено.';
+    } else {
+      $('agent-policy-edit-status').textContent = 'Попередні зміни збережено; нові зміни ще не збережені.';
+    }
     await loadBrowserAgentJobs({ selectId: id });
     announce('Політику Agent збережено.');
   } catch (error) { $('agent-status').textContent = `Політику не збережено: ${error.message}`; }
@@ -2459,7 +3285,8 @@ function simplifiedFields() {
     runMode: field('simplified-run-mode'), cycles: field('simplified-cycles'),
     interval: field('simplified-interval'), intervalUnit: field('simplified-interval-unit'),
     delay: field('simplified-delay'), busy: field('simplified-busy'), retry: field('simplified-retry'),
-    retryPolicy: field('simplified-retry-policy'), tabs: field('simplified-tabs'),
+    retryUnit: field('simplified-retry-unit'), retryPolicy: field('simplified-retry-policy'),
+    busyBehavior: field('simplified-busy-behavior'), tabs: field('simplified-tabs'),
   };
 }
 
@@ -2470,6 +3297,41 @@ function updateSimplifiedMode() {
   $('simplified-urls-group').hidden = !mode.startsWith('unique-');
   $('simplified-prompts-group').hidden = !mode.endsWith('-unique');
   $('simplified-cycles').disabled = mode !== 'shared-shared';
+}
+
+function renderSimplifiedLog(session) {
+  const entries = Array.isArray(session?.log) ? session.log : [];
+  const visible = entries.slice(-VISIBLE_LOG_LIMIT);
+  $('simplified-log-count').textContent = `Показано ${visible.length} із ${entries.length} записів журналу.`;
+  $('simplified-log-region').textContent = visible
+    .map(entry => typeof entry === 'string'
+      ? translateText(entry)
+      : `${formatTime(entry.at)} — ${translateText(entry.message)}`)
+    .join('\n');
+}
+
+function renderSimplifiedActions(session = ui.simplifiedSelected, { busy = false } = {}) {
+  const controls = {
+    start: $('simplified-start'),
+    pause: $('simplified-pause'),
+    resume: $('simplified-resume'),
+    stop: $('simplified-stop'),
+  };
+  if (busy) {
+    Object.values(controls).forEach((button) => { button.disabled = true; });
+    return;
+  }
+  if (!session?.id) {
+    Object.values(controls).forEach((button) => { button.disabled = true; });
+    return;
+  }
+  const state = session.runState || 'STOPPED';
+  const a = session.actionAvailability || {};
+  const active = state === 'RUNNING' || state === 'RECOVERING';
+  controls.start.disabled = active || state === 'PAUSED' || a.start === false;
+  controls.pause.disabled = !active || a.pause === false;
+  controls.resume.disabled = state !== 'PAUSED' || a.resume === false;
+  controls.stop.disabled = state === 'STOPPED' || a.stop === false;
 }
 
 function showSimplifiedSession(session) {
@@ -2488,16 +3350,23 @@ function showSimplifiedSession(session) {
   $('simplified-interval').value = String(session?.minimumSendIntervalValue || 2);
   $('simplified-delay').value = String(session?.preSendDelaySeconds || 20);
   $('simplified-busy').value = String(session?.busyCheckDelaySeconds || 2);
-  $('simplified-retry').value = String(session?.retryBackoffSeconds || 30);
+  const retryUnit = session?.retryBackoffUnit === 'minutes' ? 'minutes' : 'seconds';
+  $('simplified-retry-unit').value = retryUnit;
+  $('simplified-retry').value = String(retryUnit === 'minutes'
+    ? Math.max(1, Math.round(Number(session?.retryBackoffSeconds || 30) / 60))
+    : Number(session?.retryBackoffSeconds || 30));
   $('simplified-retry-policy').value = session?.retryPolicy || 'safe';
+  $('simplified-busy-behavior').value = session?.busyChatBehavior || 'skip-next';
   $('simplified-tabs').value = session?.tabStrategy || 'keep-open';
   updateSimplifiedMode();
   $('simplified-list').value = session?.id || '';
   $('simplified-state').textContent = session
     ? `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`
-    : 'Новий сеанс ще не збережено.';
+    : 'Сеанс не вибрано.';
+  $('simplified-draft-status').textContent = 'Незбережених змін немає.';
+  renderSimplifiedActions(session);
+  renderSimplifiedLog(session);
 }
-
 function renderSimplifiedList() {
   const rows = ui.sessions.filter(item => item.simplifiedSession);
   const signature = JSON.stringify(rows.map(row => [row.id, row.name, row.displayRunState, row.successfulSendCount]));
@@ -2530,7 +3399,10 @@ async function refreshSimplifiedSessionStatus() {
   try {
     const data = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
     const session = data.session;
+    ui.simplifiedSelected = clone(session);
     $('simplified-state').textContent = `Стан: ${session.status?.displayRunState || session.runState}. Підтверджених Send: ${session.successfulSendCount || 0}. Виконано циклів: ${session.status?.completedTaskCount || 0}. Етап: ${session.status?.operationPhase || 'NONE'}.`;
+    renderSimplifiedActions(session);
+    renderSimplifiedLog(session);
   } catch { /* Next visible read can retry without interrupting keyboard editing. */ }
 }
 
@@ -2543,6 +3415,7 @@ async function saveSimplifiedSession() {
     ui.simplifiedSelectedId = data.session.id;
     await loadSessions();
     showSimplifiedSession(data.session);
+    $('simplified-draft-status').textContent = 'Незбережених змін немає.';
     $('simplified-command-result').textContent = 'Сеанс збережено.';
   } catch (error) { $('simplified-command-result').textContent = `Не вдалося зберегти: ${error.message}`; }
 }
@@ -2550,14 +3423,26 @@ async function saveSimplifiedSession() {
 async function simplifiedAction(command) {
   if (!ui.simplifiedSelectedId) {
     $('simplified-command-result').textContent = 'Спочатку збережіть сеанс.';
+    renderSimplifiedActions(null);
     return;
   }
+  renderSimplifiedActions(ui.simplifiedSelected, { busy: true });
+  $('simplified-command-result').textContent = 'Команду передано Core…';
   try {
     const data = await core(command, { sessionId: ui.simplifiedSelectedId });
     await loadSessions();
-    showSimplifiedSession(data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session);
-    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${ui.simplifiedSelected.runState}.`;
-  } catch (error) { $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`; }
+    const session = data.session || (await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId })).session;
+    showSimplifiedSession(session);
+    $('simplified-command-result').textContent = `Core підтвердив дію. Стан: ${session.runState}.`;
+  } catch (error) {
+    $('simplified-command-result').textContent = `Дію не виконано: ${error.message}`;
+    try {
+      const current = await core('GET_SESSION', { sessionId: ui.simplifiedSelectedId });
+      showSimplifiedSession(current.session);
+    } catch {
+      renderSimplifiedActions(ui.simplifiedSelected);
+    }
+  }
 }
 
 async function importSimplifiedProfile(start) {
@@ -2580,12 +3465,31 @@ async function importSimplifiedProfile(start) {
 }
 
 
+function globalStateLabel(value) {
+  return ({
+    RUNNING: 'ПРАЦЮЄ',
+    WAITING_NEXT_SEND: 'ЧЕКАЄ НАСТУПНОГО SEND',
+    WAITING_RESPONSE: 'ЧЕКАЄ ЗАВЕРШЕННЯ ВІДПОВІДІ',
+    READY: 'ГОТОВО',
+    PAUSED: 'ПРИЗУПИНЕНО',
+    RECOVERING: 'ВІДНОВЛЮЄТЬСЯ',
+    ERROR: 'ПОМИЛКА',
+    AMBIGUOUS_EFFECT: 'ПОТРІБНО УЗГОДИТИ НАДСИЛАННЯ',
+    STOPPED: 'ЗУПИНЕНО',
+    COMPLETED: 'ЗАВЕРШЕНО',
+  })[value] || String(value || 'НЕВІДОМО');
+}
+
 function renderGlobalStatus(data) {
   const summary = data.summary || {};
-  $('global-runtime-summary').textContent = `Робочих одиниць: ${summary.total || 0}. Працює: ${summary.RUNNING || 0}. Очікує відповіді: ${summary.WAITING_RESPONSE || 0}. Готово: ${summary.READY || 0}. Призупинено: ${summary.PAUSED || 0}. Відновлюється: ${summary.RECOVERING || 0}. Помилки: ${summary.ERROR || 0}. Неоднозначний ефект: ${summary.AMBIGUOUS_EFFECT || 0}. Підтверджених надсилань${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Завершених відповідей: ${summary.completedResponses || 0}.`;
+  $('global-runtime-summary').textContent = `Робочих одиниць у всьому Autopilot: ${summary.total || 0}. Звичайних сеансів: ${(data.sessions || []).length}. Спрощених сесій: ${(data.simplifiedSessions || []).length}. Сценарних фізичних чатів: ${(data.scenarioSlots || []).length}. Оркестраційних одиниць: ${(data.orchestration || []).length}. Агентів: ${(data.agents || []).length}. Помилок: ${summary.ERROR || 0}. Потрібно узгодити надсилання: ${summary.AMBIGUOUS_EFFECT || 0}. Усього підтверджених Send${summary.verifiedSendHistoryComplete === false ? ' щонайменше' : ''}: ${summary.verifiedSends || 0}. Детальний прогрес кожного типу роботи наведено нижче один раз у його власному розділі.`;
+  const scenarioPools = data.scenarioPools || [];
+  $('global-scenario-summary').textContent = scenarioPools.length
+    ? scenarioPools.map(pool => `${pool.name}. План: ${pool.slots} фізичних чатів × ${pool.messagesPerChat || 0} повідомлень на чат = ${pool.plannedSends || 0} логічних Send. Фактична пауза між першими промптами: ${formatScenarioInitialStagger(pool.initialStaggerSeconds || 0)}. Перший логічний Send підтверджено у ${pool.firstPromptSent || 0}/${pool.slots} чатів. Ще не отримали перший Send: ${pool.firstPromptPending || 0}. Чекають завершення відповіді: ${pool.waitingResponse || 0}. Підтверджено завершених відповідей: ${pool.completedResponses || 0}. Логічних Send у послідовностях: ${pool.sequenceVerifiedSends ?? pool.verifiedSends ?? 0}/${pool.plannedSends || 0}. Фізично підтверджених Send-спроб: ${pool.transportVerifiedSends ?? pool.verifiedSends ?? 0}. Повторних або replacement-спроб: ${pool.retryVerifiedSends || 0}. Завершених чатів: ${pool.completed || 0}. Призупинено: ${pool.paused || 0}. Помилок: ${pool.error || 0}.`).join(' | ')
+    : `Запущених сценарних фізичних чатів: ${(data.scenarioSlots || []).length}.`;
   const lists = [
-    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${row.category}; підтверджених Send ${row.verifiedSends}; циклів ${row.completedCycles}`],
-    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}, ${row.role}: покоління ${row.generation}; повідомлення ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; підтверджених надсилань ${row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; стан ${row.category}`],
+    ['global-simplified-sessions', data.simplifiedSessions, row => `${row.name}: ${globalStateLabel(row.category)}; підтверджених Send ${row.verifiedSends}; завершених циклів надсилання ${row.completedCycles}; наступний Send не раніше ${row.nextAllowedSendAt ? new Date(row.nextAllowedSendAt).toLocaleString() : 'зараз'}`],
+    ['global-scenario-slots', data.scenarioSlots, row => `${row.scenario}${row.slotIndex ? `, чат ${row.slotIndex}` : ''}: поточний логічний крок ${row.message ?? '—'}/${row.messagesPerGeneration ?? '—'}; логічних Send у послідовності ${row.sequenceVerifiedSends ?? row.verifiedSends}/${row.messagesPerGeneration ?? '—'}; підтверджено завершених відповідей ${row.completedResponses}/${row.messagesPerGeneration ?? '—'}; фізично підтверджених Send-спроб ${row.transportVerifiedSends ?? row.verifiedSends}; повторних або replacement-спроб ${row.retryVerifiedSends || 0}; стан ${globalStateLabel(row.category)}`],
     ['global-orchestration', data.orchestration, row => `${row.name}: раунд ${row.round}; Director ${row.director} (готово ${row.roleEffectCounts?.director?.READY ?? row.roleCounts?.director?.TERMINAL ?? 0}); Managers ${row.managers} (готово ${row.roleEffectCounts?.manager?.READY ?? row.roleCounts?.manager?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.manager?.WAITING_RESPONSE ?? row.roleCounts?.manager?.ACTIVE ?? 0}); Workers ${row.workers} (готово ${row.roleEffectCounts?.worker?.READY ?? row.roleCounts?.worker?.TERMINAL ?? 0}, чекають ${row.roleEffectCounts?.worker?.WAITING_RESPONSE ?? row.roleCounts?.worker?.ACTIVE ?? 0}); стан ${row.phase}`],
     ['global-agents', data.agents, row => `${row.name}: ${row.category}`],
     ['global-models', data.models, row => `${row.provider}/${row.model}: ${row.category}`],
@@ -2793,7 +3697,7 @@ function renderSessionList() {
   const paused = ordinarySessions.filter(s => s.runState === 'PAUSED').length;
   const errors = ordinarySessions.filter(s => s.runState === 'ERROR').length;
   const sent = ordinarySessions.reduce((sum, s) => sum + Number(s.successfulSendCount || 0), 0);
-  if ($('session-overview')) $('session-overview').textContent = `Sessions: ${total}. Running: ${running}. Completed: ${completed}. Paused: ${paused}. Errors: ${errors}. Successfully sent total: ${sent}.`;
+  if ($('session-overview')) $('session-overview').textContent = `Звичайних ручних сеансів у цьому списку: ${total}. Працює: ${running}. Завершено: ${completed}. Призупинено: ${paused}. Помилок: ${errors}. Успішно надіслано цими звичайними сеансами: ${sent}. Спрощені й сценарні чати рахуються у зведенні «Весь Autopilot зараз» вище.`;
   syncCurrentSessionMarker();
 }
 
@@ -3434,6 +4338,7 @@ async function createSession() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadBrowserAgentExecutionPolicy();
   await loadRemoteDispatchStatus();
     await openSession(data.session.id);
     $('session-name').focus();
@@ -3836,6 +4741,18 @@ async function downloadDiagnosticReport() {
   }
 }
 
+async function downloadSimplifiedDiagnosticReport() {
+  try {
+    const extensionVersion = globalThis.chrome?.runtime?.getManifest?.().version || 'невідомо';
+    const data = await core('GET_DIAGNOSTIC_REPORT', { extensionVersion });
+    downloadText(data.report, diagnosticFileName());
+    $('simplified-diagnostic-report-status').textContent = 'Діагностичний звіт завантажено.';
+    $('simplified-command-result').textContent = 'Діагностичний звіт завантажено.';
+  } catch (error) {
+    $('simplified-diagnostic-report-status').textContent = `Не вдалося завантажити діагностичний звіт: ${error.message}`;
+  }
+}
+
 let diagnosticSnapshotInFlight = false;
 async function recordDashboardDiagnosticSnapshot() {
   if (diagnosticSnapshotInFlight || !ui.selectedSessionId || !ui.selected) return;
@@ -3886,6 +4803,7 @@ $('mode-orchestration').addEventListener('click', () => setUiMode('orchestration
 $('mode-scenario-work').addEventListener('click', () => setUiMode('scenario-work', { focus: true }));
 $('mode-agent').addEventListener('click', () => setUiMode('agent', { focus: true }));
 $('agent-worker-policy-link').addEventListener('click', () => { setUiMode('ai'); $('ai-worker-count-auto').focus(); });
+$('agent-save-execution-policy-button').addEventListener('click', () => { void saveBrowserAgentExecutionPolicy(); });
 $('mode-ai').addEventListener('click', () => setUiMode('ai', { focus: true }));
 $('mode-tabs').addEventListener('keydown', (event) => {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -3900,6 +4818,7 @@ $('mode-tabs').addEventListener('keydown', (event) => {
 });
 
 $('simplified-config-mode').addEventListener('change', updateSimplifiedMode);
+$('simplified-profile-apply').addEventListener('click', () => { void saveSimplifiedProfileSettings(); });
 $('simplified-new').addEventListener('click', () => { showSimplifiedSession(null); $('simplified-name').focus(); });
 $('simplified-list').addEventListener('change', () => { void selectSimplifiedSession($('simplified-list').value); });
 $('simplified-save').addEventListener('click', () => { void saveSimplifiedSession(); });
@@ -3918,6 +4837,23 @@ $('simplified-duplicate').addEventListener('click', async () => {
 $('simplified-delete').addEventListener('click', event => {
   if (ui.simplifiedSelectedId) openDeleteDialog(ui.simplifiedSelectedId, event.currentTarget);
 });
+$('simplified-clear-log').addEventListener('click', async () => {
+  if (!ui.simplifiedSelectedId) {
+    $('simplified-command-result').textContent = 'Сеанс не вибрано.';
+    return;
+  }
+  try {
+    const data = await core('CLEAR_LOG', { sessionId: ui.simplifiedSelectedId });
+    renderSimplifiedLog(data.session);
+    $('simplified-command-result').textContent = 'Журнал очищено.';
+  } catch (error) {
+    $('simplified-command-result').textContent = `Не вдалося очистити журнал: ${error.message}`;
+  }
+});
+$('simplified-import-file').addEventListener('change', () => {
+  const file = $('simplified-import-file').files?.[0];
+  $('simplified-import-status').textContent = file ? `Імпорт JSON: ${file.name}` : 'Імпорт JSON: Файл не вибрано.';
+});
 $('simplified-import').addEventListener('click', () => { void importSimplifiedProfile(false); });
 $('simplified-import-start').addEventListener('click', () => { void importSimplifiedProfile(true); });
 $('simplified-export').addEventListener('click', async () => {
@@ -3929,11 +4865,25 @@ $('simplified-export').addEventListener('click', async () => {
   } catch (error) { $('simplified-command-result').textContent = error.message; }
 });
 $('simplified-template').addEventListener('click', () => {
-  const config = buildSimplifiedSessionConfig({ name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/', prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1', interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2', retry: '30', retryPolicy: 'safe', tabs: 'keep-open' });
+  const config = buildSimplifiedSessionConfig({
+    name: 'Новий сеанс', mode: 'shared-shared', url: 'https://chatgpt.com/',
+    prompt: 'Продовжуй розробку.', runMode: 'continuous', cycles: '1',
+    interval: '2', intervalUnit: 'minutes', delay: '20', busy: '2',
+    retry: '30', retryUnit: 'seconds', retryPolicy: 'safe',
+    busyBehavior: 'skip-next', tabs: 'keep-open',
+  });
   downloadJson({ format: 'chatgpt-autopilot-profile', version: 1, profileName: 'Спрощений сеанс', autoStart: false, sessions: [{ ...config, autoStart: false }] }, 'Спрощений-сеанс-шаблон.json');
   $('simplified-command-result').textContent = 'Шаблон JSON експортовано.';
 });
-$('simplified-diagnostics').addEventListener('click', () => { void downloadDiagnosticReport(); });
+$('simplified-diagnostics').addEventListener('click', () => { void downloadSimplifiedDiagnosticReport(); });
+$('simplified-editor').addEventListener('input', event => {
+  if (event.target.closest('button')) return;
+  $('simplified-draft-status').textContent = 'Є незбережені зміни.';
+});
+$('simplified-editor').addEventListener('change', event => {
+  if (event.target.closest('button')) return;
+  $('simplified-draft-status').textContent = 'Є незбережені зміни.';
+});
 
 for (const panel of SCENARIO_WORK_PANELS) $('scenario-work-tab-' + panel).addEventListener('click', () => setScenarioWorkPanel(panel, { focus: true }));
 $('scenario-work-tabs').addEventListener('keydown', (event) => {
@@ -3946,8 +4896,12 @@ $('scenario-work-tabs').addEventListener('keydown', (event) => {
   event.preventDefault();
   setScenarioWorkPanel(SCENARIO_WORK_PANELS[index], { focus: true });
 });
-$('scenario-work-list').addEventListener('change', () => openScenarioWork($('scenario-work-list').value));
+$('scenario-work-list').addEventListener('change', () => openScenarioWorkTarget($('scenario-work-list').value));
 $('new-scenario-cycle-button').addEventListener('click', () => createScenarioWork('CHAT_CYCLE'));
+$('scenario-work-template-button').addEventListener('click', downloadScenarioWorkTemplate);
+$('scenario-work-import-button').addEventListener('click', importScenarioWorkProfile);
+$('scenario-work-export-button').addEventListener('click', exportScenarioWorkProfile);
+$('scenario-cycle-initial-stagger-unit').addEventListener('change', syncScenarioInitialStaggerBounds);
 $('scenario-cycle-start-parallel').addEventListener('click', startParallelScenarioChats);
 $('new-scenario-pairs-button').addEventListener('click', () => createScenarioWork('PAIRS'));
 $('new-scenario-group-button').addEventListener('click', () => createScenarioWork('AUDITOR_GROUP'));
@@ -3964,9 +4918,11 @@ $('scenario-cycle-add-step').addEventListener('click', () => {
   const row = createScenarioCycleStep({ prompt: '', repeat: 1 }, container.querySelectorAll('[data-scenario-step]').length);
   container.append(row);
   renumberScenarioCycleSteps();
+  updateScenarioCycleMessageCount();
   row.querySelector('textarea')?.focus();
   announce('Додано новий промпт.');
 });
+$('scenario-cycle-steps').addEventListener('input', updateScenarioCycleMessageCount);
 
 for (const panel of ORCHESTRATION_PANELS) $('orchestration-v2-tab-' + panel).addEventListener('click', () => setOrchestrationPanel(panel, { focus: true }));
 $('orchestration-v2-tabs').addEventListener('keydown', (event) => {
@@ -3990,7 +4946,16 @@ $('import-orchestration-v2-profile-button').addEventListener('click', importOrch
 $('export-orchestration-v2-profile-button').addEventListener('click', exportOrchestrationProfile);
 $('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
 $('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
+$('agent-definition-registry-list').addEventListener('change', selectAgentDefinitionRegistry);
+$('agent-definition-create-registry-button').addEventListener('click', createAgentDefinitionRegistry);
+$('agent-definition-list').addEventListener('change', selectAgentDefinition);
+$('agent-definition-new-button').addEventListener('click', newAgentDefinition);
+$('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
+$('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
+$('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
+$('agent-import-button').addEventListener('click', importBrowserAgentDraft);
+$('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
 $('agent-pause-button').addEventListener('click', () => browserAgentLifecycle('PAUSE_BROWSER_AGENT_JOB'));
 $('agent-resume-button').addEventListener('click', () => browserAgentLifecycle('RESUME_BROWSER_AGENT_JOB'));
@@ -4002,6 +4967,17 @@ $('agent-send-follow-up-button').addEventListener('click', sendBrowserAgentFollo
 $('agent-approve-action-button').addEventListener('click', approveBrowserAgentAction);
 $('agent-reject-action-button').addEventListener('click', rejectBrowserAgentAction);
 $('agent-save-policy-button').addEventListener('click', saveBrowserAgentPolicy);
+$('agent-ai-pinned-route-id').addEventListener('change', syncBrowserAgentRouteBindingStatus);
+$('agent-policy-details').addEventListener('input', () => {
+  ui.agentPolicyEditEpoch += 1;
+  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
+  ui.agentPolicyDirty = true;
+});
+$('agent-policy-details').addEventListener('change', () => {
+  ui.agentPolicyEditEpoch += 1;
+  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
+  ui.agentPolicyDirty = true;
+});
 $('agent-native-companion-check-button').addEventListener('click', checkNativeCompanion);
 $('agent-allow-current-site-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: false }));
 $('agent-allow-all-sites-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: true }));
@@ -4169,6 +5145,7 @@ if (globalThis.chrome?.runtime?.onMessage) chrome.runtime.onMessage.addListener(
 });
 
 async function initialLoad() {
+  syncScenarioInitialStaggerBounds();
   setUiMode(storageGet(UI_MODE_KEY) || 'sessions');
   setOrchestrationPanel(storageGet(ORCHESTRATION_PANEL_KEY) || 'orchestras');
   setScenarioWorkPanel(storageGet(SCENARIO_WORK_PANEL_KEY) || 'cycle');
@@ -4186,6 +5163,8 @@ async function initialLoad() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadBrowserAgentExecutionPolicy();
+  await loadAgentDefinitionRegistries();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
@@ -4205,3 +5184,4 @@ window.setInterval(() => {
 window.setInterval(() => { if (document.visibilityState === 'visible' && storageGet(UI_MODE_KEY) === 'simplified') void refreshSimplifiedSessionStatus(); }, 5000);
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };
+

@@ -51,12 +51,47 @@ import {
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
+import {
+  AGENT_DEFINITION_REGISTRY_VERSION,
+  normalizeAgentDefinitionRegistryV1,
+  normalizeAgentDefinitionSelectionV1,
+  selectAgentDefinitionV1,
+  materializeAgentDefinitionV1,
+  proposeAgentDefinitionRegistryMutationV1,
+} from './agent-definition-registry.js';
+import {
+  SPECIALIST_REGISTRY_VERSION,
+  normalizeSpecialistDefinitionV1,
+  normalizeSpecialistRegistryV1,
+  proposeSpecialistRegistryMutationV1,
+} from './specialist-registry.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
+const MAX_BROWSER_AGENT_CONCURRENT = 32;
+const MAX_AGENT_DEFINITION_REGISTRIES = 128;
+const MAX_SPECIALIST_REGISTRIES = 128;
+const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
+const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
+]);
+const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'jobId', 'goal', 'projectId', 'ownerBudget',
+  'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
+]);
+const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
+const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
+const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'specialistId', 'expectedDefinitionRevision',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -96,6 +131,191 @@ function snapshotOwnDataRequest(value, label) {
     snapshot[key] = descriptor.value;
   }
   return snapshot;
+}
+function snapshotExactOwnDataRequest(value, allowed, label) {
+  const snapshot = snapshotOwnDataRequest(value, label);
+  for (const key of Object.keys(snapshot)) {
+    if (!allowed.has(key)) throw new Error(`${label} contains an unknown field: ${key}`);
+  }
+  return snapshot;
+}
+function canonicalAgentDefinitionRegistryId(value) {
+  return normalizeAgentDefinitionRegistryV1({
+    schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+    registryId: value,
+    revision: 1,
+    definitions: [],
+  }).registryId;
+}
+function canonicalSpecialistRegistryId(value) {
+  return normalizeSpecialistRegistryV1({
+    schemaVersion: SPECIALIST_REGISTRY_VERSION,
+    registryId: value,
+    revision: 1,
+    definitions: [],
+  }).registryId;
+}
+function storedDefinitionMapDescriptors(raw) {
+  if (raw === undefined) return [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) return [];
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return [];
+  return keys.sort().flatMap(key => {
+    const descriptor = descriptors[key];
+    return descriptor && descriptor.enumerable === true && Object.hasOwn(descriptor, 'value')
+      ? [[key, descriptor.value]]
+      : [];
+  });
+}
+function snapshotAgentDefinitionLaunchRecord(value, label, maxFields = 32) {
+  const snapshot = snapshotOwnDataRequest(value, label);
+  if (Object.keys(snapshot).length > maxFields) throw new Error(`${label} contains too many fields`);
+  for (const [key, item] of Object.entries(snapshot)) {
+    if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+      throw new Error(`${label}.${key} must be scalar data`);
+    }
+  }
+  return snapshot;
+}
+function snapshotAgentDefinitionLaunchArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a canonical array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > max) throw new Error(`${label} has invalid length`);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) throw new Error(`${label} contains non-canonical fields`);
+  }
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+    const item = descriptor.value;
+    if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+      throw new Error(`${label}[${index}] must be scalar data`);
+    }
+    snapshot[index] = item;
+  }
+  return snapshot;
+}
+function snapshotAgentDefinitionLaunchNestedInputs(request) {
+  request.ownerBudget = snapshotAgentDefinitionLaunchRecord(
+    request.ownerBudget,
+    'Browser Agent definition launch ownerBudget',
+  );
+  for (const [key, max] of [
+    ['ownerCapabilityIds', 64],
+    ['ownerToolIds', 128],
+    ['requestedCapabilityIds', 64],
+    ['requestedToolIds', 128],
+  ]) {
+    request[key] = snapshotAgentDefinitionLaunchArray(
+      request[key],
+      `Browser Agent definition launch ${key}`,
+      max,
+    );
+  }
+  return request;
+}
+
+function normalizePersistedAgentDefinitionScope(raw, selection) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition scope requires persisted selection provenance');
+  }
+  const record = snapshotExactOwnDataRequest(raw, AGENT_DEFINITION_SCOPE_KEYS, 'Browser Agent definition scope');
+  for (const key of AGENT_DEFINITION_SCOPE_KEYS) {
+    if (!Object.hasOwn(record, key)) throw new Error(`Browser Agent definition scope requires ${key}`);
+  }
+
+  const normalizeIds = (value, label, max, allowed) => {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+      throw new Error(`${label} must be a canonical array`);
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const length = descriptors.length?.value;
+    if (!Number.isSafeInteger(length) || length < 0 || length > max) {
+      throw new Error(`${label} has invalid length`);
+    }
+    const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || !expected.has(key)) throw new Error(`${label} contains non-canonical fields`);
+    }
+    const out = [];
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = descriptors[String(index)];
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(`${label}[${index}] must be an enumerable data property`);
+      }
+      const item = descriptor.value;
+      if (typeof item !== 'string' || !allowed.includes(item)) {
+        throw new Error(`${label} exceeds selected Agent definition authority`);
+      }
+      if (index > 0 && out[index - 1] >= item) throw new Error(`${label} must be sorted and duplicate-free`);
+      out.push(item);
+    }
+    return out;
+  };
+
+  return {
+    capabilityIds: normalizeIds(record.capabilityIds, 'Browser Agent definition scope capabilityIds', 64, selection.definition.capabilityIds),
+    toolIds: normalizeIds(record.toolIds, 'Browser Agent definition scope toolIds', 128, selection.definition.toolIds),
+  };
+}
+
+function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine) {
+  const registries = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Chrome storage values are structured-cloneable. Ignore impossible
+      // in-memory exotic values without invoking caller behavior.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+    try {
+      const registry = normalizeSpecialistRegistryV1(value);
+      if (registry.registryId !== key) throw new Error('Stored Specialist registry identity drift');
+      registries[key] = registry;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { registries, quarantine };
+}
+
+function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
+  const registries = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Chrome storage values are structured-cloneable. Ignore an impossible
+      // in-memory exotic value rather than executing caller behavior.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries)) {
+    try {
+      const registry = normalizeAgentDefinitionRegistryV1(value);
+      if (registry.registryId !== key) throw new Error('Stored Agent definition registry identity drift');
+      registries[key] = registry;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { registries, quarantine };
 }
 function nonNegativeSafeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
@@ -158,7 +378,43 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   return new Date(millis).toISOString();
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
-function freshStore() { return { schemaVersion: BROWSER_AGENT_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
+function normalizeBrowserAgentExecutionPolicy(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Browser Agent execution policy must be a plain object');
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error('Browser Agent execution policy must be a plain object');
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== 'string' || !['maxConcurrentAgents'].includes(key))) {
+    throw new Error('Browser Agent execution policy contains an unknown field');
+  }
+  for (const key of keys) {
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Browser Agent execution policy fields must be enumerable data properties');
+    }
+  }
+  const value = Object.hasOwn(descriptors, 'maxConcurrentAgents')
+    ? descriptors.maxConcurrentAgents.value
+    : DEFAULT_BROWSER_AGENT_MAX_CONCURRENT;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
+      || value < 1 || value > MAX_BROWSER_AGENT_CONCURRENT) {
+    throw new Error(`Browser Agent maxConcurrentAgents must be an integer from 1 to ${MAX_BROWSER_AGENT_CONCURRENT}`);
+  }
+  return Object.freeze({ maxConcurrentAgents: value });
+}
+function freshStore() {
+  return {
+    schemaVersion: BROWSER_AGENT_SCHEMA_VERSION,
+    selectedId: '',
+    order: [],
+    byId: {},
+    executionPolicy: normalizeBrowserAgentExecutionPolicy(),
+    definitionRegistriesById: Object.create(null),
+    definitionRegistryQuarantineById: Object.create(null),
+    specialistRegistriesById: Object.create(null),
+    specialistRegistryQuarantineById: Object.create(null),
+  };
+}
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
   const url = new URL(value);
@@ -169,6 +425,7 @@ function originPattern(value) {
 function browserAgentRouterOverride(config = {}) {
   const out = {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
+  if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
   if (config.aiPrimaryProvider && config.aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT) primary.provider = config.aiPrimaryProvider;
   if (clean(config.aiPrimaryModel, 300)) primary.model = clean(config.aiPrimaryModel, 300);
@@ -355,10 +612,16 @@ function normalizeStore(raw, now) {
     if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
     try {
       const config = normalizeBrowserAgentConfig({ ...raw.byId[id].config, id }, { id });
+      const definitionSelection = raw.byId[id].definitionSelection == null
+        ? null
+        : normalizeAgentDefinitionSelectionV1(raw.byId[id].definitionSelection);
+      const definitionScope = normalizePersistedAgentDefinitionScope(raw.byId[id].definitionScope, definitionSelection);
       out.byId[id] = {
         id,
         config,
         runtime: normalizeRuntime(raw.byId[id].runtime, now),
+        definitionSelection,
+        definitionScope,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -368,6 +631,23 @@ function normalizeStore(raw, now) {
     }
   }
   out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  try {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy(raw.executionPolicy || {});
+  } catch {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
+  }
+  const definitionState = normalizePersistedAgentDefinitionState(
+    raw.definitionRegistriesById,
+    raw.definitionRegistryQuarantineById,
+  );
+  out.definitionRegistriesById = definitionState.registries;
+  out.definitionRegistryQuarantineById = definitionState.quarantine;
+  const specialistState = normalizePersistedSpecialistRegistryState(
+    raw.specialistRegistriesById,
+    raw.specialistRegistryQuarantineById,
+  );
+  out.specialistRegistriesById = specialistState.registries;
+  out.specialistRegistryQuarantineById = specialistState.quarantine;
   return out;
 }
 
@@ -389,6 +669,12 @@ export class BrowserAgentManager {
       : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
+    this.runBurstInFlight = new Map();
+    this.cycleAllInFlight = null;
+    this.executionSlotActive = new Set();
+    this.executionSlotQueue = [];
+    this.executionSlotPump = null;
+    this.executionSlotPumpRequested = false;
   }
 
   async load() {
@@ -441,6 +727,28 @@ export class BrowserAgentManager {
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
       if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
+      const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
+      const afterFailure = await this.get(id);
+      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
+      if (failedCalls && !lifecycleAccounted) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.modelCalls += failedCalls;
+          if (error?.routerRuntime) live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      } else if (error?.routerRuntime) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      }
       return { ok: false, error };
     }
     const verifier = verifierReply?.result || verifierReply;
@@ -472,6 +780,302 @@ export class BrowserAgentManager {
     if (!independent.verified) return { ok: false, error: new Error('Independent Browser Agent verifier could not prove the outcome') };
     verification = { ...verification, checks: independent.checks, independentlyVerified: true };
     return { ok: true, verification };
+  }
+
+  async getExecutionPolicy() {
+    const store = await this.load();
+    return normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+  }
+
+  async updateExecutionPolicy(input = {}) {
+    const policy = normalizeBrowserAgentExecutionPolicy(input);
+    await this.update(store => {
+      store.executionPolicy = policy;
+      return store;
+    });
+    // Concurrency policy changes neither due times nor alarm ownership. Waking
+    // the in-memory admission queue is sufficient and avoids reporting a
+    // failed save after the durable policy already committed.
+    this.#requestExecutionSlotPump();
+    return policy;
+  }
+
+  async listAgentDefinitionRegistries() {
+    const store = await this.load();
+    const registries = Object.keys(store.definitionRegistriesById || {})
+      .sort()
+      .map(registryId => clone(store.definitionRegistriesById[registryId]));
+    const quarantinedRegistryIds = Object.keys(store.definitionRegistryQuarantineById || {}).sort();
+    return { registries, quarantinedRegistryIds };
+  }
+
+  async getAgentDefinitionRegistry(registryId) {
+    const canonicalId = canonicalAgentDefinitionRegistryId(registryId);
+    const store = await this.load();
+    const registries = store.definitionRegistriesById || Object.create(null);
+    const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
+    return {
+      registry: registry ? clone(registry) : null,
+      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async createAgentDefinitionRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_REGISTRY_CREATE_KEYS,
+      'Browser Agent definition registry create request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent definition registry create request requires registryId');
+    }
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    let created = null;
+    await this.update(store => {
+      const registries = store.definitionRegistriesById
+        || (store.definitionRegistriesById = Object.create(null));
+      const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(registries, registryId)) throw new Error('Agent definition registry already exists');
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Agent definition registry is quarantined as corrupt and cannot be overwritten');
+      }
+      if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
+        throw new Error('Agent definition registry capacity is exhausted');
+      }
+      created = normalizeAgentDefinitionRegistryV1({
+        schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+        registryId,
+        revision: 1,
+        definitions: [],
+      });
+      registries[registryId] = created;
+      return store;
+    });
+    return { registry: clone(created) };
+  }
+
+  async mutateAgentDefinitionRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS,
+      'Browser Agent definition registry mutation request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent definition registry mutation request requires registryId');
+    }
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    let committed = null;
+    await this.update(store => {
+      const registries = store.definitionRegistriesById || Object.create(null);
+      const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Agent definition registry is quarantined as corrupt and cannot be mutated');
+      }
+      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!current) throw new Error('Agent definition registry not found');
+      const proposalInput = {
+        registry: current,
+        registryId,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        kind: request.kind,
+      };
+      for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
+        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
+      }
+      committed = proposeAgentDefinitionRegistryMutationV1(proposalInput);
+      store.definitionRegistriesById[registryId] = committed.nextRegistry;
+      return store;
+    });
+    return clone(committed);
+  }
+
+  async listSpecialistRegistries() {
+    const store = await this.load();
+    const registries = Object.keys(store.specialistRegistriesById || {})
+      .sort()
+      .map(registryId => clone(store.specialistRegistriesById[registryId]));
+    const quarantinedRegistryIds = Object.keys(store.specialistRegistryQuarantineById || {}).sort();
+    return { registries, quarantinedRegistryIds };
+  }
+
+  async getSpecialistRegistry(registryId) {
+    const canonicalId = canonicalSpecialistRegistryId(registryId);
+    const store = await this.load();
+    const registries = store.specialistRegistriesById || Object.create(null);
+    const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
+    return {
+      registry: registry ? clone(registry) : null,
+      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async createSpecialistRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_REGISTRY_CREATE_KEYS,
+      'Browser Agent Specialist registry create request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent Specialist registry create request requires registryId');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    let created = null;
+    await this.update(store => {
+      const registries = store.specialistRegistriesById
+        || (store.specialistRegistriesById = Object.create(null));
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(registries, registryId)) throw new Error('Specialist registry already exists');
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot be overwritten');
+      }
+      if (Object.keys(registries).length >= MAX_SPECIALIST_REGISTRIES) {
+        throw new Error('Specialist registry capacity is exhausted');
+      }
+      created = normalizeSpecialistRegistryV1({
+        schemaVersion: SPECIALIST_REGISTRY_VERSION,
+        registryId,
+        revision: 1,
+        definitions: [],
+      });
+      registries[registryId] = created;
+      return store;
+    });
+    return { registry: clone(created) };
+  }
+
+  async mutateSpecialistRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS,
+      'Browser Agent Specialist registry mutation request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent Specialist registry mutation request requires registryId');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    if (Object.hasOwn(request, 'definition')) {
+      request.definition = normalizeSpecialistDefinitionV1(request.definition);
+    }
+    let committed = null;
+    await this.update(store => {
+      const registries = store.specialistRegistriesById || Object.create(null);
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot be mutated');
+      }
+      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!current) throw new Error('Specialist registry not found');
+      const proposalInput = {
+        registry: current,
+        registryId,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        kind: request.kind,
+      };
+      for (const key of ['definition', 'specialistId', 'expectedDefinitionRevision']) {
+        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
+      }
+      committed = proposeSpecialistRegistryMutationV1(proposalInput);
+      store.specialistRegistriesById[registryId] = committed.nextRegistry;
+      return store;
+    });
+    return clone(committed);
+  }
+
+  #rejectExecutionSlotQueue(error) {
+    const pending = this.executionSlotQueue.splice(0);
+    for (const next of pending) next.reject(error);
+  }
+
+  #hasExecutionTargetConflict(store, id) {
+    const requestedTabId = store.byId[id]?.runtime?.tabId;
+    if (!Number.isInteger(requestedTabId)) return false;
+    for (const activeId of this.executionSlotActive) {
+      if (activeId === id) continue;
+      if (store.byId[activeId]?.runtime?.tabId === requestedTabId) return true;
+    }
+    return false;
+  }
+
+  #requestExecutionSlotPump() {
+    if (this.executionSlotPump) {
+      this.executionSlotPumpRequested = true;
+      return;
+    }
+    void this.#pumpExecutionSlots();
+  }
+
+  async #pumpExecutionSlots() {
+    if (this.executionSlotPump) return this.executionSlotPump;
+    this.executionSlotPumpRequested = false;
+    const operation = (async () => {
+      try {
+        while (this.executionSlotQueue.length) {
+          const store = await this.load();
+          const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+          if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
+
+          let eligibleIndex = -1;
+          for (let index = 0; index < this.executionSlotQueue.length; index += 1) {
+            const candidate = this.executionSlotQueue[index];
+            if (!this.executionSlotActive.has(candidate.id) && !this.#hasExecutionTargetConflict(store, candidate.id)) {
+              eligibleIndex = index;
+              break;
+            }
+          }
+          if (eligibleIndex < 0) return;
+
+          const [next] = this.executionSlotQueue.splice(eligibleIndex, 1);
+          if (!next) return;
+          if (this.executionSlotActive.has(next.id)) {
+            next.resolve();
+            continue;
+          }
+          this.executionSlotActive.add(next.id);
+          next.resolve();
+        }
+      } catch (error) {
+        this.#rejectExecutionSlotQueue(error);
+      }
+    })();
+    this.executionSlotPump = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.executionSlotPump === operation) this.executionSlotPump = null;
+      if (this.executionSlotPumpRequested) {
+        this.executionSlotPumpRequested = false;
+        this.#requestExecutionSlotPump();
+      }
+    }
+  }
+
+  async #acquireExecutionSlot(id) {
+    const store = await this.load();
+    const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+    const admission = evaluateResourceBudgetV1({
+      budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
+      usage: { concurrentAgents: this.executionSlotActive.size },
+      request: { concurrentAgents: 1 },
+    });
+    if (admission.decision === ResourceBudgetDecisionKind.ALLOW
+        && this.executionSlotQueue.length === 0
+        && !this.executionSlotActive.has(id)
+        && !this.#hasExecutionTargetConflict(store, id)) {
+      this.executionSlotActive.add(id);
+      return true;
+    }
+    await new Promise((resolve, reject) => {
+      this.executionSlotQueue.push({ id, resolve, reject });
+      this.#requestExecutionSlotPump();
+    });
+    return true;
+  }
+
+  #releaseExecutionSlot(id) {
+    if (!this.executionSlotActive.delete(id)) return;
+    this.#requestExecutionSlotPump();
   }
 
   async list() {
@@ -731,6 +1335,85 @@ export class BrowserAgentManager {
     return result;
   }
 
+  async createFromAgentDefinition(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_LAUNCH_KEYS,
+      'Browser Agent definition launch request',
+    );
+    for (const key of [
+      'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+      'goal', 'ownerBudget', 'ownerCapabilityIds', 'ownerToolIds',
+      'requestedCapabilityIds', 'requestedToolIds',
+    ]) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent definition launch request requires ${key}`);
+      }
+    }
+    snapshotAgentDefinitionLaunchNestedInputs(request);
+    for (const key of ['expectedRegistryRevision', 'expectedDefinitionRevision']) {
+      const value = request[key];
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+        throw new Error(`Browser Agent definition launch request ${key} must be a positive safe integer`);
+      }
+    }
+
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    const jobId = Object.hasOwn(request, 'jobId') ? request.jobId : this.createId();
+    if (typeof jobId !== 'string' || jobId.length < 1 || jobId.length > 128) {
+      throw new Error('Browser Agent definition launch jobId must be exact bounded text');
+    }
+
+    await this.update(store => {
+      const now = this.now();
+      if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
+      const registries = store.definitionRegistriesById || Object.create(null);
+      const registry = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!registry) throw new Error('Agent definition registry not found');
+      if (registry.revision !== request.expectedRegistryRevision) {
+        throw new Error('Agent definition registry revision drifted before launch');
+      }
+
+      const selection = selectAgentDefinitionV1({
+        registry,
+        agentDefinitionId: request.agentDefinitionId,
+      });
+      if (selection.definitionRevision !== request.expectedDefinitionRevision) {
+        throw new Error('Agent definition revision drifted before launch');
+      }
+
+      const materialized = materializeAgentDefinitionV1({
+        registry,
+        selection,
+        jobId,
+        goal: request.goal,
+        projectId: Object.hasOwn(request, 'projectId') ? request.projectId : '',
+        ownerBudget: request.ownerBudget,
+        ownerCapabilityIds: request.ownerCapabilityIds,
+        ownerToolIds: request.ownerToolIds,
+        requestedCapabilityIds: request.requestedCapabilityIds,
+        requestedToolIds: request.requestedToolIds,
+      });
+      if (materialized.config.id !== jobId) {
+        throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
+      }
+
+      store.byId[jobId] = {
+        id: jobId,
+        config: clone(materialized.config),
+        runtime: createBrowserAgentRuntime(now),
+        definitionSelection: clone(selection),
+        definitionScope: clone(materialized.scope),
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.order.push(jobId);
+      store.selectedId = jobId;
+      return store;
+    });
+    return this.get(jobId);
+  }
+
   async create(raw = {}) {
     const id = clean(raw.id, 128) || this.createId();
     const now = this.now();
@@ -761,6 +1444,7 @@ export class BrowserAgentManager {
       inputPricePerMillionUsd: raw.inputPricePerMillionUsd ?? 0,
       outputPricePerMillionUsd: raw.outputPricePerMillionUsd ?? 0,
       aiRoutingMode: raw.aiRoutingMode || BrowserAgentAiRoutingMode.INHERIT,
+      aiPinnedRouteId: raw.aiPinnedRouteId || '',
       aiPrimaryProvider: raw.aiPrimaryProvider || BrowserAgentAiProvider.INHERIT,
       aiPrimaryModel: raw.aiPrimaryModel || '',
       aiStrongProvider: raw.aiStrongProvider || BrowserAgentAiProvider.INHERIT,
@@ -774,7 +1458,15 @@ export class BrowserAgentManager {
     }, { id });
     await this.update(store => {
       if (store.byId[id]) throw new Error('Browser Agent job already exists');
-      store.byId[id] = { id, config, runtime: createBrowserAgentRuntime(now), createdAt: now, updatedAt: now };
+      store.byId[id] = {
+        id,
+        config,
+        runtime: createBrowserAgentRuntime(now),
+        definitionSelection: null,
+        definitionScope: null,
+        createdAt: now,
+        updatedAt: now,
+      };
       store.order.push(id);
       store.selectedId = id;
       return store;
@@ -1078,9 +1770,10 @@ export class BrowserAgentManager {
     return { kind: 'BUDGET_PAUSED', reason };
   }
 
-  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, maxConsecutive = 5 } = {}) {
+  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, retryAt = 0, maxConsecutive = 5 } = {}) {
     const now = this.now();
     const message = clean(error?.message || error || 'Unknown Browser Agent failure', 1200);
+    const absoluteRetryAt = typeof retryAt === 'number' && Number.isSafeInteger(retryAt) && retryAt > now ? retryAt : 0;
     let terminal = false;
     let consecutive = 0;
     await this.update(store => {
@@ -1101,6 +1794,10 @@ export class BrowserAgentManager {
         job.runtime.runState = BrowserAgentRunState.ERROR;
         job.runtime.nextWakeAt = 0;
         appendHistory(job.runtime, { at: now, type: 'error', message: `Agent stopped after ${consecutive} consecutive ${type || 'runtime'} failures: ${message}` });
+      } else if (absoluteRetryAt) {
+        // Canonical router backoff/circuit state is already durable. Do not wake
+        // the Agent early and convert one provider cooldown into repeated model errors.
+        job.runtime.nextWakeAt = Math.max(now + MIN_WAKE_MS, absoluteRetryAt);
       } else {
         // Bounded exponential backoff: transient browser/provider failures recover,
         // but a broken loop does not spin at full CPU/network speed.
@@ -1377,18 +2074,29 @@ export class BrowserAgentManager {
     }
     const context = await this.resolveStartContext(job);
     if (context.tab?.id != null && context.adopt) {
+      let adopted = false;
       await this.update(store => {
         const live = store.byId[job.id];
         if (!live) return store;
+        const claimedByOtherAgent = store.order.some(otherId =>
+          otherId !== job.id && store.byId[otherId]?.runtime?.tabId === context.tab.id);
+        if (claimedByOtherAgent) return store;
         live.runtime.tabId = context.tab.id;
         if (!live.runtime.knownTabIds.includes(context.tab.id)) live.runtime.knownTabIds.push(context.tab.id);
         // Adopted owner tabs are intentionally NOT placed in ownedTabIds.
         live.runtime.currentUrl = context.tab.url || context.url;
         live.runtime.updatedAt = this.now();
         appendHistory(live.runtime, { at: this.now(), type: 'tab', message: 'Adopted existing browser tab without taking ownership' });
+        adopted = true;
         return store;
       });
-      return context.tab;
+      if (adopted) {
+        this.#requestExecutionSlotPump();
+        return context.tab;
+      }
+      // Another durable Browser Agent already binds this owner tab. Do not
+      // create a competing target-ownership authority; isolate this job onto a
+      // fresh owned tab at the same URL instead.
     }
     const tab = await this.chrome.tabs.create({ url: context.url || DEFAULT_AGENT_START_URL, active: false });
     if (!Number.isInteger(tab?.id)) throw new Error('Browser Agent could not create a browser tab');
@@ -1402,6 +2110,7 @@ export class BrowserAgentManager {
       live.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return tab;
   }
 
@@ -1789,6 +2498,7 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return child;
   }
 
@@ -1866,7 +2576,12 @@ export class BrowserAgentManager {
       await this.reconcileAlarm();
       return this.get(id);
     };
-    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      // Acquire before re-proving the approved target. If this approval waited
+      // behind another Agent on the same tab, all stale-target checks must run
+      // only after exclusive Browser-Agent execution admission is obtained.
+      const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
     const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
@@ -1984,7 +2699,10 @@ export class BrowserAgentManager {
         return store;
       });
     }
-    await this.reconcileAlarm();
+      await this.reconcileAlarm();
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
     if (runInitial) await this.runBurst(id, { maxCycles: 25, maxWallMs: 25_000 });
     await this.reconcileAlarm();
     return this.get(id);
@@ -2188,6 +2906,7 @@ export class BrowserAgentManager {
         live.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: created.url || action.url };
     }
     if (action.type === BrowserAgentActionType.SWITCH_TAB) {
@@ -2214,11 +2933,19 @@ export class BrowserAgentManager {
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+        const activeTargetOwner = [...this.executionSlotActive].find(activeId =>
+          activeId !== job.id && store.byId[activeId]?.runtime?.tabId === action.tabId);
+        if (activeTargetOwner) {
+          const error = new Error('Browser Agent target tab is already in use by another active Agent');
+          error.code = 'AGENT_TAB_TARGET_IN_USE';
+          throw error;
+        }
         current.runtime.tabId = action.tabId;
         current.runtime.currentUrl = targetUrl;
         current.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: targetUrl };
     }
     if (action.type === BrowserAgentActionType.CLOSE_TAB) {
@@ -2249,6 +2976,7 @@ export class BrowserAgentManager {
           if (candidate && isHttpUrl(candidate.pendingUrl || candidate.url)) { fallback = candidate; break; }
         } catch { /* skip stale tab */ }
       }
+      let appliedFallback = fallback;
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -2256,13 +2984,18 @@ export class BrowserAgentManager {
         current.runtime.retirePendingTabIds = current.runtime.retirePendingTabIds.filter(id => id !== action.tabId);
         current.runtime.knownTabIds = current.runtime.knownTabIds.filter(id => id !== action.tabId);
         if (current.runtime.tabId === action.tabId) {
-          current.runtime.tabId = fallback?.id ?? null;
-          current.runtime.currentUrl = fallback?.pendingUrl || fallback?.url || '';
+          const fallbackClaimedByActiveAgent = Number.isInteger(fallback?.id)
+            && [...this.executionSlotActive].some(activeId =>
+              activeId !== job.id && store.byId[activeId]?.runtime?.tabId === fallback.id);
+          if (fallbackClaimedByActiveAgent) appliedFallback = null;
+          current.runtime.tabId = appliedFallback?.id ?? null;
+          current.runtime.currentUrl = appliedFallback?.pendingUrl || appliedFallback?.url || '';
         }
         current.runtime.updatedAt = this.now();
         return store;
       });
-      return { kind: 'ACTION', action, currentUrl: fallback?.pendingUrl || fallback?.url || '' };
+      this.#requestExecutionSlotPump();
+      return { kind: 'ACTION', action, currentUrl: appliedFallback?.pendingUrl || appliedFallback?.url || '' };
     }
     if (action.type === BrowserAgentActionType.DOWNLOAD) {
       if (!(await this.hasChromePermission('downloads'))) {
@@ -2753,7 +3486,13 @@ export class BrowserAgentManager {
           return store;
         });
       }
-      return this.recordRecoverableFailure(id, epoch, { type: 'model', error, retryMs: 1500, maxConsecutive: 5 });
+      return this.recordRecoverableFailure(id, epoch, {
+        type: 'model',
+        error,
+        retryMs: 1500,
+        retryAt: error?.retryAt,
+        maxConsecutive: 5,
+      });
     }
     const planner = routed?.result || routed;
     const reportedUsage = planner?.usage || routed?.usage || {};
@@ -2876,7 +3615,15 @@ export class BrowserAgentManager {
       const nodeConfig = { ...current.job.config, acceptanceCriteria: node.acceptanceCriteria };
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, nodeConfig, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
+        type: 'verification',
+        error: outcome.error,
+        action,
+        countStep: false,
+        retryMs: 500,
+        retryAt: outcome.error?.retryAt,
+        maxConsecutive: 4,
+      });
       let nextPlan;
       try {
         const running = node.state === AgentPlanNodeState.READY
@@ -2928,7 +3675,15 @@ export class BrowserAgentManager {
       }
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, current.job.config, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
+        type: 'verification',
+        error: outcome.error,
+        action,
+        countStep: false,
+        retryMs: 500,
+        retryAt: outcome.error?.retryAt,
+        maxConsecutive: 4,
+      });
       const verification = outcome.verification;
       const repeating = current.job.config.repeatMode !== BrowserAgentRepeatMode.ONCE;
       await this.update(store => {
@@ -3067,20 +3822,29 @@ export class BrowserAgentManager {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (current.job.runtime.runState === BrowserAgentRunState.WAITING_APPROVAL) throw new Error('Approve or reject the pending Browser Agent action before manual Step');
-    if (current.job.runtime.runState === BrowserAgentRunState.RUNNING) return this.cycleOne(id);
-    if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
-    const now = this.now();
-    await this.update(store => {
-      const job = store.byId[id];
-      if (!job) return store;
-      job.runtime.controlEpoch += 1;
-      job.runtime.runState = BrowserAgentRunState.RUNNING;
-      job.runtime.lastError = '';
-      job.runtime.nextWakeAt = now;
-      job.runtime.updatedAt = now;
-      return store;
-    });
-    return this.cycleOne(id, { pauseAfter: true });
+    let pauseAfter = false;
+    if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+      if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
+      const now = this.now();
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job) return store;
+        job.runtime.controlEpoch += 1;
+        job.runtime.runState = BrowserAgentRunState.RUNNING;
+        job.runtime.lastError = '';
+        job.runtime.nextWakeAt = now;
+        job.runtime.updatedAt = now;
+        return store;
+      });
+      pauseAfter = true;
+    }
+
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      return await this.cycleOne(id, { pauseAfter });
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
   }
 
   async addInstruction(id, text) {
@@ -3121,40 +3885,58 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
-    const startedWall = Date.now();
-    const results = [];
-    for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
-      if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
-      const before = await this.get(id);
-      if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
-      const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
-      if (waitMs > 0) {
-        if (waitMs > maxInlineWaitMs) break;
-        await sleep(waitMs);
+  runBurst(id, options = {}) {
+    if (this.runBurstInFlight.has(id)) return this.runBurstInFlight.get(id);
+    const operation = this.#runBurst(id, options).finally(() => {
+      if (this.runBurstInFlight.get(id) === operation) this.runBurstInFlight.delete(id);
+    });
+    this.runBurstInFlight.set(id, operation);
+    return operation;
+  }
+
+  async #runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      const startedWall = Date.now();
+      const results = [];
+      for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
+        if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
+        const before = await this.get(id);
+        if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
+        const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
+        if (waitMs > 0) {
+          if (waitMs > maxInlineWaitMs) break;
+          await sleep(waitMs);
+        }
+        const result = await this.cycleOne(id);
+        results.push(result);
+        if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
+        if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
+          const live = await this.get(id);
+          const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
+          if (delay > maxInlineWaitMs) break;
+        }
       }
-      const result = await this.cycleOne(id);
-      results.push(result);
-      if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
-      if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
-        const live = await this.get(id);
-        const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
-        if (delay > maxInlineWaitMs) break;
-      }
+      await this.reconcileAlarm();
+      return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
     }
-    await this.reconcileAlarm();
-    return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
   }
 
   cycleAll() {
+    if (this.cycleAllInFlight) return this.cycleAllInFlight;
     const operation = (async () => {
       const store = await this.load();
       const now = this.now();
-      const results = [];
+      const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+      const preflightResults = [];
+      const due = [];
+
       for (const id of store.order) {
         let job = store.byId[id];
         if ((job?.runtime?.retirePendingTabIds || []).length) {
-          results.push({ id, result: await this.retryPendingRetirement(id) });
+          preflightResults.push({ id, result: await this.retryPendingRetirement(id) });
           const live = await this.get(id);
           job = live.job;
           if (!job) continue;
@@ -3162,17 +3944,44 @@ export class BrowserAgentManager {
         if (job?.runtime?.runState === BrowserAgentRunState.WAITING_SCHEDULE) {
           if (Number(job.runtime.nextWakeAt || 0) > now) continue;
           const activation = await this.activateScheduledJob(id);
-          results.push({ id, result: activation });
+          preflightResults.push({ id, result: activation });
           const live = await this.get(id);
           job = live.job;
         }
         if (job?.runtime?.runState !== BrowserAgentRunState.RUNNING) continue;
         if (Number(job.runtime.nextWakeAt || 0) > now) continue;
-        results.push({ id, result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }) });
+        due.push(id);
       }
+
+      const runResults = new Array(due.length);
+      let cursor = 0;
+      const workerCount = Math.min(policy.maxConcurrentAgents, due.length);
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (true) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= due.length) return;
+          const id = due[index];
+          runResults[index] = {
+            id,
+            result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }),
+          };
+        }
+      });
+      await Promise.all(workers);
+
       await this.reconcileAlarm();
-      return { kind: results.length ? 'CYCLED' : 'IDLE', results };
+      const results = [...preflightResults, ...runResults.filter(Boolean)];
+      return {
+        kind: results.length ? 'CYCLED' : 'IDLE',
+        results,
+        maxConcurrentAgents: policy.maxConcurrentAgents,
+      };
     })();
+    this.cycleAllInFlight = operation;
+    operation.finally(() => {
+      if (this.cycleAllInFlight === operation) this.cycleAllInFlight = null;
+    }).catch(() => undefined);
     return operation;
   }
 

@@ -31,6 +31,7 @@
 
   const MODES = new Set([
     'CHECK_ONLY',
+    'ENSURE_HIGH_EFFORT',
     'INSERT_ONLY',
     'PREPARE_SEND',
     'SUBMIT_EXISTING',
@@ -253,6 +254,439 @@
       .find(predicate) || null;
   }
 
+  const HIGH_EFFORT_LEVELS = new Set(['high', 'extra-high']);
+
+  function normalizeEffortText(value) {
+    let text = String(value || '').trim().toLowerCase();
+    try { text = text.normalize('NFKC'); } catch (_) {}
+    return text.replace(/[–—_]+/gu, '-').replace(/\s+/gu, ' ');
+  }
+
+  function classifyEffortLabel(value) {
+    const text = normalizeEffortText(value);
+    if (!text) return null;
+    if (/\b(?:extra[ -]?high|xhigh|very high)\b/u.test(text)
+        || /дуже висок|очень высок/u.test(text)) return 'extra-high';
+    if (/\bhigh\b/u.test(text)
+        || /(?:^|\s)(?:високий|высокий|vysoky|wysoki|hoch|eleve|alto)(?:\s|$)/u.test(text)) return 'high';
+    if (/\bmedium\b/u.test(text)
+        || /(?:^|\s)(?:середній|средний|stredny|stredni|sredni|mittel|moyen|medio)(?:\s|$)/u.test(text)) return 'medium';
+    if (/\blow\b/u.test(text)
+        || /(?:^|\s)(?:низький|низкий|nizky|niski|niedrig|faible|bajo)(?:\s|$)/u.test(text)) return 'low';
+    if (/\binstant\b/u.test(text)
+        || /миттєв|мгновенн/u.test(text)) return 'instant';
+    return null;
+  }
+
+  function declaredEffortLevel(el) {
+    const raw = normalizeEffortText(el?.getAttribute?.('data-selected-reasoning-effort'));
+    return classifyEffortLabel(raw);
+  }
+
+  function effortSemanticText(el) {
+    return normalizeEffortText([
+      el?.getAttribute?.('data-selected-reasoning-effort'),
+      el?.getAttribute?.('aria-label'),
+      el?.getAttribute?.('aria-valuetext'),
+      el?.getAttribute?.('data-testid'),
+      el?.getAttribute?.('name'),
+      el?.title,
+      textOf(el),
+    ].filter(Boolean).join(' '));
+  }
+
+  function effortSemanticHint(text) {
+    return /thinking|reasoning|effort|think level|thinking level|reasoning level|зусил|мислен|міркуван|размыш|усили/u.test(text);
+  }
+
+  function isInsideEffortChoiceSurface(el) {
+    const parent = el?.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"]');
+    return Boolean(parent);
+  }
+
+  function findEffortControl(doc) {
+    const declared = Array.from(doc.querySelectorAll(
+      '[data-selected-reasoning-effort][data-codex-intelligence-trigger="true"], '
+      + '[data-selected-reasoning-effort][data-composer-navigation-target="reasoning"]'
+    ) || []).filter(isVisible).filter((el) => !isInsideEffortChoiceSurface(el))
+      .map((element) => ({ element, level: declaredEffortLevel(element) }))
+      .filter((entry) => entry.level);
+    const uniqueDeclared = Array.from(new Set(declared.map((entry) => entry.element)))
+      .map((element) => declared.find((entry) => entry.element === element));
+    if (uniqueDeclared.length === 1) {
+      return { ...uniqueDeclared[0], score: 1000, ambiguous: false };
+    }
+    if (uniqueDeclared.length > 1) {
+      return { element: null, level: null, ambiguous: true };
+    }
+
+    const candidates = Array.from(doc.querySelectorAll(
+      'button, [role="button"], [role="combobox"], [role="slider"], input[type="range"]'
+    ) || []).filter(isVisible).map((el) => {
+      if (isInsideEffortChoiceSurface(el)) return null;
+      const identity = effortSemanticText(el);
+      const ariaValue = normalizeEffortText(el.getAttribute?.('aria-valuetext'));
+      const declaredLevel = declaredEffortLevel(el);
+      const level = declaredLevel || classifyEffortLabel(ariaValue) || classifyEffortLabel(identity);
+      const role = normalizeEffortText(el.getAttribute?.('role'));
+      const popup = normalizeEffortText(el.getAttribute?.('aria-haspopup'));
+      const testId = normalizeEffortText(el.getAttribute?.('data-testid'));
+      const semantic = effortSemanticHint(identity);
+      const hasPopup = popup === 'menu' || popup === 'listbox' || popup === 'dialog' || popup === 'true';
+      const modelPicker = hasPopup && (/\bmodel\b|модель|модел|gpt[- ]?\d/u.test(identity)
+        || /(model[-_](?:picker|selector|switcher)|model-switcher)/u.test(testId));
+      let score = 0;
+      if (declaredLevel) score += 500;
+      if (semantic) score += 100;
+      if (classifyEffortLabel(ariaValue)) score += 100;
+      if (/(thinking|reasoning|effort)/u.test(testId)) score += 80;
+      if (role === 'slider') score += 70;
+      if (level && hasPopup) score += 60;
+      if (level && semantic) score += 30;
+      if (modelPicker) score += 45;
+      if (!score) return null;
+      return { element: el, level, score };
+    }).filter(Boolean).sort((a, b) => b.score - a.score);
+
+    if (!candidates.length) return { element: null, level: null, ambiguous: false };
+    if (candidates.length > 1 && candidates[0].score === candidates[1].score) {
+      return { element: null, level: null, ambiguous: true };
+    }
+    return { ...candidates[0], ambiguous: false };
+  }
+
+  function effortOptionSelected(el) {
+    const ariaChecked = normalizeEffortText(el?.getAttribute?.('aria-checked'));
+    const ariaSelected = normalizeEffortText(el?.getAttribute?.('aria-selected'));
+    const dataState = normalizeEffortText(el?.getAttribute?.('data-state'));
+    const dataSelected = normalizeEffortText(el?.getAttribute?.('data-selected'));
+    return ariaChecked === 'true'
+      || ariaSelected === 'true'
+      || dataSelected === 'true'
+      || dataState === 'checked'
+      || dataState === 'on'
+      || dataState === 'selected';
+  }
+
+  function findSelectedEffortOption(doc) {
+    const options = Array.from(doc.querySelectorAll(
+      '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"]'
+    ) || []).filter(isVisible).filter(effortOptionSelected)
+      .map((element) => ({ element, level: classifyEffortLabel(effortSemanticText(element)) }))
+      .filter((entry) => entry.level);
+    if (!options.length) return { element: null, level: null, ambiguous: false };
+    if (options.length > 1) return { element: null, level: null, ambiguous: true };
+    return { ...options[0], ambiguous: false };
+  }
+
+  function effortOptionScore(el) {
+    const identity = effortSemanticText(el);
+    if (classifyEffortLabel(identity) !== 'high') return 0;
+    const role = normalizeEffortText(el.getAttribute?.('role'));
+    const choiceRole = ['menuitemradio', 'option', 'radio', 'menuitem'].includes(role);
+    const choiceSurface = el.closest?.('[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]');
+    if (!choiceRole && !choiceSurface && !effortSemanticHint(identity)) return 0;
+    let score = 10;
+    if (choiceRole) score += 100;
+    if (effortOptionSelected(el)) score += 20;
+    if (choiceSurface) score += 30;
+    return score;
+  }
+
+  function findHighEffortOption(doc) {
+    const ranked = Array.from(doc.querySelectorAll(
+      '[role="menuitemradio"], [role="menuitem"], [role="option"], [role="radio"], button, [role="button"]'
+    ) || []).filter(isVisible)
+      .map((element) => ({ element, score: effortOptionScore(element) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score);
+    if (!ranked.length) return { element: null, ambiguous: false };
+    if (ranked.length > 1 && ranked[0].score === ranked[1].score) return { element: null, ambiguous: true };
+    return { element: ranked[0].element, ambiguous: false };
+  }
+
+  function effortChoiceSurfaceOpen(doc) {
+    if (findReasoningPowerSlider(doc).element) return true;
+    return Array.from(doc.querySelectorAll(
+      '[role="menu"], [role="listbox"], [role="radiogroup"], [role="dialog"]'
+    ) || []).filter(isVisible).some(isEffortPickerSurface);
+  }
+
+  function closeEffortPickerIfOpen(doc, control) {
+    if (!control || !effortChoiceSurfaceOpen(doc)) return;
+    try { control.click?.(); } catch (_) {}
+  }
+
+  function isEffortPickerSurface(surface) {
+    const text = effortSemanticText(surface);
+    if (!text) return false;
+    const levels = ['instant', 'low', 'medium', 'high', 'extra-high']
+      .filter((level) => {
+        if (level === 'extra-high') return /extra[ -]?high|xhigh|very high|дуже висок|очень высок/u.test(text);
+        if (level === 'high') return /\bhigh\b|високий|высокий/u.test(text);
+        if (level === 'medium') return /\bmedium\b|середній|средний/u.test(text);
+        if (level === 'low') return /\blow\b|низький|низкий/u.test(text);
+        return /\binstant\b|миттєв|мгновенн/u.test(text);
+      });
+    return levels.length >= 2 && (effortSemanticHint(text) || /instant|medium|high/u.test(text));
+  }
+
+  // ChatGPT reasoning effort is keyboard-adjustable, but the number of
+  // positions is not a stable contract. Verify the result from the explicit
+  // data-selected-reasoning-effort state on the model/intelligence trigger.
+  function findReasoningPowerSlider(doc) {
+    const raw = Array.from(doc.querySelectorAll('[data-reasoning-slider="true"]') || [])
+      .filter(isVisible);
+    const rows = Array.from(new Set(raw.map((node) => {
+      if (normalizeEffortText(node.getAttribute?.('role')) === 'menuitem') return node;
+      return node.closest?.('[role="menuitem"]') || node;
+    }).filter(Boolean))).filter(isVisible).filter((row) => {
+      const surface = row.closest?.('[role="menu"], [role="listbox"], [role="dialog"]');
+      return !surface || isVisible(surface);
+    });
+    if (rows.length > 1) return { element: null, ambiguous: true };
+    if (!rows.length) return { element: null, ambiguous: false };
+    const row = rows[0];
+    const thumb = normalizeEffortText(row.getAttribute?.('role')) === 'slider'
+      ? row : row.querySelector?.('[role="slider"]');
+    const valueRaw = thumb?.getAttribute?.('aria-valuenow');
+    const minRaw = thumb?.getAttribute?.('aria-valuemin');
+    const maxRaw = thumb?.getAttribute?.('aria-valuemax');
+    const value = valueRaw == null || valueRaw === '' ? null : Number(valueRaw);
+    const min = minRaw == null || minRaw === '' ? null : Number(minRaw);
+    const max = maxRaw == null || maxRaw === '' ? null : Number(maxRaw);
+    const ids = String(row.getAttribute?.('aria-describedby') || '').split(/\s+/u).filter(Boolean);
+    const described = ids.map((id) => doc.getElementById?.(id)).filter(Boolean);
+    // Legacy ChatGPT exposed the slider's announced value through an
+    // accessibility-only role=status node. It may be visually hidden and is
+    // still authoritative because aria-describedby binds it to this control.
+    const status = described.find((node) => normalizeEffortText(node.getAttribute?.('role')) === 'status')
+      || described.find((node) => isVisible(node)) || null;
+    const statusText = textOf(status);
+    const legacyOrdinal = normalizeEffortText(statusText)
+      .match(/\b(\d+)\s*(?:of|из|із|з)\s*(\d+)\b/u);
+    const legacyShapeCompatible = !legacyOrdinal || Number(legacyOrdinal[2]) === 3;
+    const label = [
+      thumb?.getAttribute?.('aria-valuetext'),
+      row.getAttribute?.('aria-valuetext'),
+      legacyShapeCompatible ? statusText.replace(/[,.;:!?]+/gu, ' ') : '',
+    ].filter(Boolean).join(' ');
+    return {
+      element: row,
+      thumb,
+      value: Number.isFinite(value) ? value : null,
+      min: Number.isFinite(min) ? min : null,
+      max: Number.isFinite(max) ? max : null,
+      level: classifyEffortLabel(label),
+      ambiguous: false,
+    };
+  }
+
+  async function selectHighPowerSlider(doc, request, start, deps, control) {
+    const waitFn = deps?.wait || wait;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const declared = findEffortControl(doc);
+      if (!declared.ambiguous && HIGH_EFFORT_LEVELS.has(declared.level)) {
+        closeEffortPickerIfOpen(doc, control || declared.element);
+        return resultBase(request, start, {
+          status: STATUS.READY, effortLevel: declared.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_DECLARED_STATE_CONFIRMED'
+        });
+      }
+      const slider = findReasoningPowerSlider(doc);
+      if (slider.ambiguous || !slider.element) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SLIDER_UNRECOGNIZED'
+        });
+      }
+      if (HIGH_EFFORT_LEVELS.has(slider.level)) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.READY, effortLevel: slider.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_SLIDER_CONFIRMED'
+        });
+      }
+      const beforeValue = slider.value;
+      const beforeDeclaredLevel = declared.level;
+      try {
+        slider.element.focus?.();
+        slider.element.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowRight', code: 'ArrowRight', bubbles: true, cancelable: true
+        }));
+      } catch (_) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_KEY_FAILED'
+        });
+      }
+      await waitFn(180);
+      const afterDeclared = findEffortControl(doc);
+      if (!afterDeclared.ambiguous && HIGH_EFFORT_LEVELS.has(afterDeclared.level)) {
+        closeEffortPickerIfOpen(doc, control || afterDeclared.element);
+        return resultBase(request, start, {
+          status: STATUS.READY, effortLevel: afterDeclared.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED'
+        });
+      }
+      const changed = findReasoningPowerSlider(doc);
+      if (changed.ambiguous || !changed.element) {
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
+        });
+      }
+      const numericProgress = beforeValue != null && changed.value != null && changed.value > beforeValue;
+      const semanticProgress = beforeDeclaredLevel && afterDeclared.level
+        && beforeDeclaredLevel !== afterDeclared.level;
+      const internalSemanticProgress = slider.level && changed.level && slider.level !== changed.level;
+      if (!numericProgress && !semanticProgress && !internalSemanticProgress) {
+        const atMaximum = changed.value != null && changed.max != null && changed.value >= changed.max;
+        closeEffortPickerIfOpen(doc, control);
+        return resultBase(request, start, {
+          status: atMaximum ? STATUS.UNKNOWN_UI : STATUS.TEMPORARY_ERROR,
+          safeDiagnosticCode: atMaximum ? 'EFFORT_HIGH_STATE_NOT_RECOGNIZED' : 'EFFORT_SLIDER_SELECTION_NOT_PROVEN'
+        });
+      }
+    }
+    closeEffortPickerIfOpen(doc, control);
+    return resultBase(request, start, {
+      status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_SLIDER_HIGH_NOT_PROVEN'
+    });
+  }
+
+  async function ensureHighEffort(doc, request, start, deps) {
+    if (!sameExpectedChat(globalThis.location?.href || '', request.expectedUrl)) {
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'URL_MISMATCH_BEFORE_EFFORT' });
+    }
+    const blocking = detectBlockingState(doc);
+    if (blocking) return resultBase(request, start, { status: blocking.status, safeDiagnosticCode: blocking.code + '_BEFORE_EFFORT' });
+
+    const current = findEffortControl(doc);
+    if (current.ambiguous) {
+      return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_CONTROL_AMBIGUOUS' });
+    }
+    if (HIGH_EFFORT_LEVELS.has(current.level)) {
+      return resultBase(request, start, {
+        status: STATUS.READY,
+        effortLevel: current.level,
+        safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
+      });
+    }
+
+    const openSlider = findReasoningPowerSlider(doc);
+    if (openSlider.element || openSlider.ambiguous) {
+      return selectHighPowerSlider(doc, request, start, deps, current.element);
+    }
+
+    let highOption = findHighEffortOption(doc);
+    if (highOption.ambiguous) {
+      return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
+    }
+
+    if (!highOption.element) {
+      if (!current.element) {
+        return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_NOT_READY' });
+      }
+      try { current.element.focus?.(); current.element.click?.(); } catch (_) {
+        return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_CONTROL_OPEN_FAILED' });
+      }
+
+      const deadline = nowMs() + 1500;
+      do {
+        await (deps?.wait || wait)(100);
+        const alreadySelected = findSelectedEffortOption(doc);
+        if (alreadySelected.ambiguous) {
+          closeEffortPickerIfOpen(doc, current.element);
+          return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_SELECTED_OPTION_AMBIGUOUS' });
+        }
+        if (HIGH_EFFORT_LEVELS.has(alreadySelected.level)) {
+          try { current.element.click?.(); } catch (_) {}
+          return resultBase(request, start, {
+            status: STATUS.READY,
+            effortLevel: alreadySelected.level,
+            safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED_IN_PICKER',
+          });
+        }
+        const slider = findReasoningPowerSlider(doc);
+        if (slider.element || slider.ambiguous) {
+          return selectHighPowerSlider(doc, request, start, deps, current.element);
+        }
+        highOption = findHighEffortOption(doc);
+        if (highOption.ambiguous) {
+          closeEffortPickerIfOpen(doc, current.element);
+          return resultBase(request, start, { status: STATUS.UNKNOWN_UI, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_AMBIGUOUS' });
+        }
+        if (highOption.element) break;
+      } while (nowMs() < deadline);
+    }
+
+    if (!highOption.element) {
+      const refreshed = findEffortControl(doc);
+      if (!refreshed.ambiguous && HIGH_EFFORT_LEVELS.has(refreshed.level)) {
+        return resultBase(request, start, {
+          status: STATUS.READY,
+          effortLevel: refreshed.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED',
+        });
+      }
+      closeEffortPickerIfOpen(doc, current.element);
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_OPTION_NOT_READY' });
+    }
+
+    try { highOption.element.focus?.(); highOption.element.click?.(); } catch (_) {
+      closeEffortPickerIfOpen(doc, current.element);
+      return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_CLICK_FAILED' });
+    }
+
+    const verifyDeadline = nowMs() + 1800;
+    let reopenedForProof = false;
+    do {
+      await (deps?.wait || wait)(100);
+      const verified = findEffortControl(doc);
+      if (!verified.ambiguous && HIGH_EFFORT_LEVELS.has(verified.level)) {
+        return resultBase(request, start, {
+          status: STATUS.READY,
+          effortLevel: verified.level,
+          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
+        });
+      }
+      let selected = findHighEffortOption(doc);
+      if (!selected.ambiguous && selected.element
+          && effortOptionSelected(selected.element)) {
+        return resultBase(request, start, {
+          status: STATUS.READY,
+          effortLevel: 'high',
+          safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
+        });
+      }
+
+      // Some ChatGPT layouts keep the top-level model picker labelled only with
+      // the model name (for example GPT-5.6) and hide the selected effort once
+      // the menu closes. Reopen that same semantic picker once and verify the
+      // High option's checked/selected state; then close the picker again.
+      if (!reopenedForProof && !verified.ambiguous && verified.element && !selected.element) {
+        reopenedForProof = true;
+        try { verified.element.click?.(); } catch (_) {}
+        await (deps?.wait || wait)(100);
+        selected = findHighEffortOption(doc);
+        if (!selected.ambiguous && selected.element
+            && effortOptionSelected(selected.element)) {
+          try { verified.element.click?.(); } catch (_) {}
+          return resultBase(request, start, {
+            status: STATUS.READY,
+            effortLevel: 'high',
+            safeDiagnosticCode: 'EFFORT_HIGH_SELECTED_AND_VERIFIED',
+          });
+        }
+        try { verified.element.click?.(); } catch (_) {}
+      }
+    } while (nowMs() < verifyDeadline);
+
+    closeEffortPickerIfOpen(doc, current.element);
+    return resultBase(request, start, { status: STATUS.TEMPORARY_ERROR, safeDiagnosticCode: 'EFFORT_HIGH_SELECTION_NOT_PROVEN' });
+  }
+
   function visibleStatusText(doc) {
     return Array.from(doc.querySelectorAll('[role="alert"], [role="status"], [aria-live="assertive"]'))
       .filter(isVisible)
@@ -274,7 +708,7 @@
     // Any visible semantic modal outranks page-underlay evidence. We do not auto-click
     // dialogs here: CAPTCHA/security/account/payment/confirmation and localized/unknown
     // modal surfaces all require manual review unless a future control is explicitly whitelisted.
-    const dialogs = visibleModalSurfaces(doc);
+    const dialogs = visibleModalSurfaces(doc).filter((dialog) => !isEffortPickerSurface(dialog));
     if (dialogs.length) {
       const dialogText = dialogs.map((dialog) => (accessibleName(dialog) + ' ' + textOf(dialog)).toLowerCase()).join('\n');
       if (/captcha|verify|verification|security|confirm|account|payment|billing|purchase|subscribe/.test(dialogText)) {
@@ -365,7 +799,14 @@
   function promptTextMatches(observed, expected) {
     const a = normalizePromptText(observed);
     const b = normalizePromptText(expected);
-    return a === b;
+    if (a === b) return true;
+    if (!a || !b) return false;
+    // ChatGPT/ProseMirror can preserve every non-whitespace character while
+    // reflowing paragraph/newline boundaries in contenteditable. That is a
+    // presentation change, not a prompt change. Accept only when the complete
+    // compacted text is identical; any changed/missing/extra non-whitespace
+    // character still fails closed.
+    return compactPromptText(a) === compactPromptText(b);
   }
 
   function repeatedUnit(value, unit, separator = '') {
@@ -414,7 +855,10 @@
       `observedLength=${String(observed ?? '').length}`,
       `expectedNormalizedLength=${normalizePromptText(expected).length}`,
       `observedNormalizedLength=${normalizePromptText(observed).length}`,
-      `normalizedMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`
+      `exactNormalizedMatch=${normalizePromptText(observed) === normalizePromptText(expected) ? 'yes' : 'no'}`,
+      `promptMatch=${promptTextMatches(observed, expected) ? 'yes' : 'no'}`,
+      `compactMatch=${compactPromptText(observed) === compactPromptText(expected) ? 'yes' : 'no'}`,
+      `nonWhitespaceMatch=${normalizePromptText(observed).replace(/\s+/gu, '') === normalizePromptText(expected).replace(/\s+/gu, '') ? 'yes' : 'no'}`
     ].join('; ');
   }
 
@@ -584,6 +1028,13 @@
   }
 
   function semanticUserMessages(doc) {
+    // Work renders a user turn as a keyed bubble without the legacy author
+    // attributes. When these bubbles exist, article headings and assistant
+    // quotations must not be mistaken for additional user messages: the
+    // pre-send history and post-send history have to use the same units.
+    const workBubbles = Array.from(doc.querySelectorAll('[data-user-message-bubble="true"]'))
+      .filter(el => typeof el.closest !== 'function' || Boolean(el.closest('main, [role="main"]')));
+    if (workBubbles.length) return workBubbles.filter(el => !workBubbles.some(other => other !== el && el.contains?.(other)));
     const candidates = [...new Set([
       ...doc.querySelectorAll('[data-message-author-role="user"], [data-author="user"], article'),
       ...doc.querySelectorAll('[data-testid="user-message"]'),
@@ -599,7 +1050,14 @@
 
   function userMessageText(el) {
     // Read the message body without the turn heading, copy/edit buttons or footer.
-    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []);
+    if (el.getAttribute?.('data-user-message-bubble') === 'true') {
+      const body = el.querySelector?.('.whitespace-pre-wrap, [data-message-content]');
+      return textOf(body || el).trim();
+    }
+    const bodies = [...new Set([
+      ...Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content]') || []),
+      ...Array.from(el.querySelectorAll?.('[data-user-message-bubble="true"]') || []),
+    ])];
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
     return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
@@ -609,16 +1067,26 @@
   }
 
   function semanticAssistantMessages(doc) {
-    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article'))
+    const candidates = Array.from(doc.querySelectorAll('[data-message-author-role="assistant"], [data-author="assistant"], article, [data-turn-key] [data-chatgpt-search-unit-key]'))
       .filter((el) => {
         const role = String(el.getAttribute?.('data-message-author-role') || el.getAttribute?.('data-author') || '').toLowerCase();
-        return role === 'assistant' || /chatgpt said|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el));
+        // Work exposes separate keyed units for the user and assistant within
+        // one turn. The assistant unit has a role marker even when its heading
+        // is localized; an arbitrary non-user search unit is not a reply.
+        const workKey = String(el.getAttribute?.('data-chatgpt-search-unit-key') || '');
+        const workUnit = el.hasAttribute?.('data-chatgpt-search-unit-key')
+          && (typeof el.closest !== 'function' || Boolean(el.closest('main, [role="main"]')))
+          && (el.querySelector?.('[data-conversation-role="assistant"]')
+            || /:assistant$/.test(workKey))
+          && el.querySelector?.('[data-markdown-text-style="assistant-message"]');
+        return role === 'assistant' || /chatgpt said|chatgpt сказал|assistant|chatgpt сказав|chatgpt відповів|помічник/.test(accessibleName(el))
+          || workUnit;
       });
     return candidates.filter(el => !candidates.some(other => other !== el && el.contains?.(other)));
   }
 
   function assistantMessageText(el) {
-    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"]') || []);
+    const bodies = Array.from(el.querySelectorAll?.('.whitespace-pre-wrap, [data-message-content], [class*="markdown"], [data-markdown-text-style="assistant-message"]') || []);
     const roots = bodies.filter(node => !bodies.some(other => other !== node && other.contains?.(node)));
     return (roots.length ? roots.map(textOf).join('\n') : textOf(el)).trim();
   }
@@ -639,6 +1107,9 @@
   function unlabeledPromptCount(doc, promptText) {
     const main = doc.querySelector?.('main, [role="main"]');
     if (!main || !promptText || typeof main.querySelectorAll !== 'function') return 0;
+    // Once this page exposes canonical user bubbles, the unlabeled fallback
+    // must not count an assistant quote or a sidebar copy of the same prompt.
+    if (main.querySelector?.('[data-user-message-bubble="true"]')) return 0;
     let count = 0;
     for (const node of main.querySelectorAll('p, div, span, pre, li, blockquote')) {
       if (!isVisible(node) || node.closest?.('form, [contenteditable="true"], nav, aside, [data-message-author-role="assistant"], [data-author="assistant"], [data-testid="assistant-message"]')) continue;
@@ -857,6 +1328,44 @@
     } while (nowMs() < insertionDeadline);
 
     const finalElement = lastFound?.element || found?.element;
+    // On some background ProseMirror editors execCommand reports success yet
+    // the rendered long prompt differs from the requested text. Never Send
+    // that draft. Replace it once through the alternate paragraph/input path
+    // and accept only a fresh, exact, stable editor observation.
+    if (finalElement?.getAttribute?.('contenteditable') === 'true'
+        && !attachmentNodes(finalElement).length) {
+      const repairDoc = finalElement.ownerDocument;
+      const allowed = dispatchEditorEvent(finalElement, 'beforeinput', {
+        bubbles: true, composed: true, cancelable: true,
+        inputType: 'insertReplacementText', data: request.promptText
+      });
+      if (allowed !== false && replaceContentEditableText(finalElement, request.promptText, repairDoc)) {
+        dispatchEditorEvent(finalElement, 'input', {
+          bubbles: true, composed: true, inputType: 'insertReplacementText',
+          data: request.promptText
+        });
+        const repairDeadline = nowMs() + 1200;
+        let consecutiveMatches = 0;
+        do {
+          await (deps.wait || wait)(100);
+          const repaired = findVisibleComposer(doc);
+          if (repaired.ambiguous || repaired.element !== finalElement
+              || attachmentNodes(finalElement).length) break;
+          if (promptTextMatches(editorText(finalElement), request.promptText)) {
+            consecutiveMatches += 1;
+            if (consecutiveMatches >= 2) {
+              acceptedRepresentationEvidence.delete(evidenceKey(request));
+              return resultBase(request, start, {
+                status: STATUS.INSERTED_NOT_SENT,
+                composerState: 'VISIBLE_NONEMPTY',
+                safeDiagnosticCode: 'INSERTION_TEXT_PROVEN',
+                safeDiagnosticMessage: 'repair=alternate; ' + safeTextProofMessage(editorText(finalElement), request.promptText, finalElement)
+              });
+            }
+          } else consecutiveMatches = 0;
+        } while (nowMs() < repairDeadline);
+      }
+    }
     const finalText = finalElement ? editorText(finalElement) : '';
     return resultBase(request, start, {
       status: STATUS.INSERTED_NOT_SENT,
@@ -1353,6 +1862,7 @@
 
     if (request.mode === 'READ_ASSISTANT_REPORT') return readAssistantReport(doc, request, start);
     if (request.mode === 'CHECK_ONLY') return inspect(doc, request, start);
+    if (request.mode === 'ENSURE_HIGH_EFFORT') return ensureHighEffort(doc, request, start, deps || {});
     if (request.mode === 'INSERT_ONLY') return insertOnly(doc, request, start, deps || {});
     if (request.mode === 'PREPARE_SEND') return prepareSend(doc, request, start);
     if (request.mode === 'SUBMIT_EXISTING') return submitExisting(doc, request, start, deps || {});
@@ -1368,6 +1878,8 @@
     normalizePromptText,
     promptTextMatches,
     findVisibleComposer,
+    classifyEffortLabel,
+    findEffortControl,
     detectBlockingState,
     execute
   };

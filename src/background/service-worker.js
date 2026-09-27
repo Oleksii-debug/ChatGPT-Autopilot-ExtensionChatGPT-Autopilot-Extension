@@ -66,8 +66,12 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_ACTION_CENTER',
   'GET_PROJECT_WORKSPACE_SUMMARY',
   'GET_SCENARIO_WORK',
+  'GET_SCENARIO_CHAT_POOL',
   'LIST_BROWSER_AGENT_JOBS',
+  'GET_BROWSER_AGENT_EXECUTION_POLICY',
   'GET_BROWSER_AGENT_JOB',
+  'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES',
+  'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
@@ -121,6 +125,25 @@ const scenarioWork = new ScenarioWorkManager({
 });
 const AI_REPORT_ALARM = 'autopilot-ai-report-wake';
 const AI_MANAGER_ALARM = 'autopilot-ai-manager-wake';
+const CORE_WATCHDOG_ALARM = 'autopilot-core-watchdog';
+const CORE_WATCHDOG_PERIOD_MINUTES = 0.5;
+
+function coreNeedsWatchdog(state) {
+  return Object.values(state?.sessionsById || {}).some(session =>
+    session?.runState === 'RUNNING' || session?.runState === 'RECOVERING');
+}
+
+async function reconcileCoreWatchdog(state) {
+  if (!coreNeedsWatchdog(state)) {
+    try { await chrome.alarms.clear(CORE_WATCHDOG_ALARM); } catch (_) {}
+    return false;
+  }
+  await chrome.alarms.create(CORE_WATCHDOG_ALARM, {
+    delayInMinutes: CORE_WATCHDOG_PERIOD_MINUTES,
+    periodInMinutes: CORE_WATCHDOG_PERIOD_MINUTES,
+  });
+  return true;
+}
 
 async function resolveOrchestrationHierarchyProvider({ binding } = {}) {
   if (!binding?.sourceId) return null;
@@ -254,12 +277,13 @@ function beginColdStartReconciliation() {
 
   coldStartBarrier = (async () => {
     await ensureBundledBootstrapApplied();
-    await reconcileRuntimeColdStart({
+    const coreRecovery = await reconcileRuntimeColdStart({
       repository: repo,
       chromeApi: chrome,
       executionAvailable: EXECUTION_AVAILABLE,
       syncDrivePrompts: syncSessionDrivePrompts,
     });
+    await reconcileCoreWatchdog(coreRecovery.state);
     await restorePendingSendTabs(chrome, repo);
     await remoteDispatch.reconcileAlarm();
     // Reconstruct only deterministic alarms here. Ordinary MV3 service-worker
@@ -400,6 +424,7 @@ export function runExecutionCycle() {
     // scheduler-relevant state. A pure handoff/summary must not duplicate the
     // canonical core alarm on every wake.
     const state = await stateAfterManager(manager);
+    await reconcileCoreWatchdog(state);
     await notifyStatusChanged(state);
     return { ...result, state, manager, remoteSync, orchestrationSync, scenarioSync };
   })();
@@ -477,6 +502,7 @@ export async function reconcileRuntime() {
     executionAvailable: false,
     syncDrivePrompts: syncSessionDrivePrompts,
   });
+  await reconcileCoreWatchdog(cycle.state);
   await notifyStatusChanged(cycle.state);
   return cycle.state;
 }
@@ -597,6 +623,25 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.get(message.payload?.id || '');
   } else if (message.command === 'CREATE_SCENARIO_WORK') {
     result = await scenarioWork.create(message.payload || {});
+  } else if (message.command === 'CREATE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.createChatPool(message.payload || {});
+  } else if (message.command === 'GET_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.getChatPool(message.payload?.id || '');
+  } else if (message.command === 'UPDATE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.updateChatPool(message.payload?.id || '', message.payload?.config || {}, {
+      replacementBudget: message.payload?.replacementBudget,
+      staggerSeconds: message.payload?.staggerSeconds,
+    });
+  } else if (message.command === 'START_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.startChatPool(message.payload?.id || '');
+  } else if (message.command === 'PAUSE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.pauseChatPool(message.payload?.id || '');
+  } else if (message.command === 'RESUME_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.resumeChatPool(message.payload?.id || '');
+  } else if (message.command === 'STOP_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.stopChatPool(message.payload?.id || '');
+  } else if (message.command === 'DELETE_SCENARIO_CHAT_POOL') {
+    result = await scenarioWork.deleteChatPool(message.payload?.id || '');
   } else if (message.command === 'SELECT_SCENARIO_WORK') {
     result = await scenarioWork.select(message.payload?.id || '');
   } else if (message.command === 'UPDATE_SCENARIO_WORK') {
@@ -615,8 +660,30 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.cycleAll();
   } else if (message.command === 'LIST_BROWSER_AGENT_JOBS') {
     result = await browserAgent.list();
+  } else if (message.command === 'GET_BROWSER_AGENT_EXECUTION_POLICY') {
+    result = await browserAgent.getExecutionPolicy();
+  } else if (message.command === 'UPDATE_BROWSER_AGENT_EXECUTION_POLICY') {
+    result = await browserAgent.updateExecutionPolicy(message.payload || {});
   } else if (message.command === 'GET_BROWSER_AGENT_JOB') {
     result = await browserAgent.get(message.payload?.id || '');
+  } else if (message.command === 'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES') {
+    result = await browserAgent.listAgentDefinitionRegistries();
+  } else if (message.command === 'GET_BROWSER_AGENT_DEFINITION_REGISTRY') {
+    result = await browserAgent.getAgentDefinitionRegistry(message.payload?.registryId || '');
+  } else if (message.command === 'CREATE_BROWSER_AGENT_DEFINITION_REGISTRY') {
+    result = await browserAgent.createAgentDefinitionRegistry(message.payload || {});
+  } else if (message.command === 'MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY') {
+    result = await browserAgent.mutateAgentDefinitionRegistry(message.payload || {});
+  } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
+    result = await browserAgent.createFromAgentDefinition(message.payload || {});
+  } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES') {
+    result = await browserAgent.listSpecialistRegistries();
+  } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_REGISTRY') {
+    result = await browserAgent.getSpecialistRegistry(message.payload?.registryId || '');
+  } else if (message.command === 'CREATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
+    result = await browserAgent.createSpecialistRegistry(message.payload || {});
+  } else if (message.command === 'MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY') {
+    result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
@@ -694,6 +761,7 @@ chrome.runtime.onInstalled.addListener(() => { runSafely(runStartupCycle()); });
 chrome.runtime.onStartup.addListener(() => { runSafely(runStartupCycle()); });
 chrome.alarms.onAlarm.addListener(alarm => {
   if (alarm.name === 'autopilot-core-wake') runSafely(runExecutionCycle());
+  if (alarm.name === CORE_WATCHDOG_ALARM) runSafely(runExecutionCycle());
   if (alarm.name === AI_REPORT_ALARM) runSafely(runAiReportCycle());
   if (alarm.name === AI_MANAGER_ALARM) runSafely(runAiManagerCycle());
   if (alarm.name === BROWSER_AGENT_ALARM) runSafely(browserAgent.cycleAll());

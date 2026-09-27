@@ -48,8 +48,7 @@ test('OpenAI API UI exposes real model selection and keeps the secret out of ext
   assert.match(optionsJs, /gpt-5\.6-sol/);
   assert.match(optionsJs, /gpt-5\.6-terra/);
   assert.match(optionsJs, /gpt-5\.6-luna/);
-  assert.match(html, /Windows DPAPI/);
-  assert.match(html, /НАЛАШТУВАТИ OPENAI API КЛЮЧ\.ps1/);
+  assert.doesNotMatch(html, /Windows DPAPI|НАЛАШТУВАТИ OPENAI API КЛЮЧ\.ps1/);
   assert.doesNotMatch(html, /type="password"[^>]*openai/i);
   assert.doesNotMatch(optionsJs, /OPENAI_API_KEY/);
 });
@@ -65,7 +64,6 @@ test('route-pool owner controls are native, keyboard accessible and persist ever
   assert.match(optionsJs, /routeStates/);
   assert.doesNotMatch(html, /textarea[^>]+route-pool/i);
 });
-
 
 test('route model profiles expose bounded native controls and round-trip form wiring', () => {
   for (const field of ['displayName', 'systemPrompt', 'workerPrompt']) {
@@ -83,6 +81,17 @@ test('route model profiles expose bounded native controls and round-trip form wi
   assert.match(optionsJs, /workerPrompt:route\.workerPrompt \|\| ''/);
 });
 
+test('Models price caps preserve null as unbounded and explicit zero as a real cap', () => {
+  assert.match(optionsJs, /const optionalPriceCap = \(id, label\) =>/);
+  assert.match(optionsJs, /if \(!text\) return null;/);
+  assert.match(optionsJs, /maxInputPricePerMillionUsd:optionalPriceCap\('ai-router-max-input-price'/);
+  assert.match(optionsJs, /maxOutputPricePerMillionUsd:optionalPriceCap\('ai-router-max-output-price'/);
+  assert.match(optionsJs, /policy\.maxInputPricePerMillionUsd == null \? '' : String\(policy\.maxInputPricePerMillionUsd\)/);
+  assert.match(optionsJs, /policy\.maxOutputPricePerMillionUsd == null \? '' : String\(policy\.maxOutputPricePerMillionUsd\)/);
+  assert.doesNotMatch(optionsJs, /maxInputPricePerMillionUsd:Number\(\$\('ai-router-max-input-price'\)\.value\)/);
+  assert.match(html, /Макс\. ціна input[^<]*порожнє поле — без ліміту, 0 — лише нульова ціна/);
+  assert.match(html, /Макс\. ціна output[^<]*порожнє поле — без ліміту, 0 — лише нульова ціна/);
+});
 
 test('route prompt fields preserve owner-authored whitespace instead of trimming it in the UI', () => {
   assert.match(optionsJs, /const exactText = field => card\.querySelector/);

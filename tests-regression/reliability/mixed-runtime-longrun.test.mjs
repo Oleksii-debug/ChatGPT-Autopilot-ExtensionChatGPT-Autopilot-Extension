@@ -196,11 +196,15 @@ test('mixed long-run keeps Ordinary, Browser Agent, Scenario Work and Orchestrat
   const transport = {
     execute: async (tabId, request) => {
       if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY, safeDiagnosticCode: 'READY', normalizedObservedUrl: request.expectedUrl };
+      if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, effortLevel: 'high', safeDiagnosticCode: 'EFFORT_HIGH_CONFIRMED', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'INSERT_ONLY') return { status: InteractionResult.INSERTED_NOT_SENT, safeDiagnosticCode: 'INSERTION_TEXT_PROVEN', composerState: 'VISIBLE_NONEMPTY', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'PREPARE_SEND') return { status: InteractionResult.READY, safeDiagnosticCode: 'PENDING_PROMPT_READY_TO_SUBMIT', normalizedObservedUrl: request.expectedUrl };
       if (request.mode === 'SUBMIT_EXISTING') {
         generatedConversation += 1;
-        const url = `https://chatgpt.com/c/mixed-${generatedConversation}`;
+        // The first Send creates a conversation. Subsequent Scenario turns
+        // stay at their existing /c/ URL, as the real persistent chat does.
+        const url = /\/c\//.test(request.expectedUrl)
+          ? request.expectedUrl : `https://chatgpt.com/c/mixed-${generatedConversation}`;
         const tab = chrome.tabsMap.get(tabId);
         if (tab) tab.url = url;
         const ordinary = String(request.taskId || '').startsWith('ordinary-mixed-');
@@ -243,7 +247,10 @@ test('mixed long-run keeps Ordinary, Browser Agent, Scenario Work and Orchestrat
     createId: () => 'mixed-scenario',
     collectAssistantReport: async () => ({ status: 'READY', assistantComplete: true, assistantText: 'Scenario turn complete' }),
   });
-  await scenario.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: { roundsPerGeneration: 50, steps: [{ prompt: 'SCENARIO MIXED' }], minimumLaunchGapSeconds: 0 } });
+  await scenario.create({ mode: ScenarioWorkMode.CHAT_CYCLE, config: {
+    steps: Array.from({ length: 8 }, (_, index) => ({ prompt: `SCENARIO MIXED ${index + 1}` })),
+    minimumLaunchGapSeconds: 0
+  } });
   await scenario.start('mixed-scenario');
 
   let controlRevision = 0;

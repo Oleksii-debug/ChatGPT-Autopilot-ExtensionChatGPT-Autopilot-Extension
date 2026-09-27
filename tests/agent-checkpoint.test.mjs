@@ -265,6 +265,27 @@ test('current checkpoint head is strict and bounded', () => {
   );
 });
 
+test('checkpoint ledger revision preserves canonical zero and rejects signed zero', async () => {
+  const checkpoint = await createAgentCheckpointV1(checkpointInput({
+    exactEffectLedgerRevision: 0,
+  }));
+  assert.equal(checkpoint.exactEffectLedgerRevision, 0);
+  assert.equal(Object.is(checkpoint.exactEffectLedgerRevision, -0), false);
+
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput({ exactEffectLedgerRevision: -0 })),
+    /non-negative integer/u,
+  );
+
+  const current = normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: 0 }));
+  assert.equal(current.exactEffectLedgerRevision, 0);
+  assert.equal(Object.is(current.exactEffectLedgerRevision, -0), false);
+  assert.throws(
+    () => normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: -0 })),
+    /non-negative integer/u,
+  );
+});
+
 test('checkpoint timestamp boundaries require exact canonical UTC representation', async () => {
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput({
@@ -413,22 +434,3 @@ test('checkpoint crypto options are exact and preserve null-prototype compatibil
   assert.equal(result.status, AgentCheckpointRewindStatus.READY_FOR_RECONCILIATION);
 });
 
-test('checkpoint exact-effect ledger revision rejects signed zero while preserving canonical zero', async () => {
-  const checkpoint = await createAgentCheckpointV1(checkpointInput({ exactEffectLedgerRevision: 0 }));
-  assert.equal(Object.is(checkpoint.exactEffectLedgerRevision, 0), true);
-  assert.equal(Object.is(checkpoint.exactEffectLedgerRevision, -0), false);
-
-  await assert.rejects(
-    () => createAgentCheckpointV1(checkpointInput({ exactEffectLedgerRevision: -0 })),
-    /exactEffectLedgerRevision must be a non-negative integer/,
-  );
-
-  const normalizedHead = normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: 0 }));
-  assert.equal(Object.is(normalizedHead.exactEffectLedgerRevision, 0), true);
-  assert.equal(Object.is(normalizedHead.exactEffectLedgerRevision, -0), false);
-
-  assert.throws(
-    () => normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: -0 })),
-    /exactEffectLedgerRevision must be a non-negative integer/,
-  );
-});

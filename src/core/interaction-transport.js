@@ -1,11 +1,12 @@
 import { InteractionResult } from '../shared/protocol.js';
 import { waitForTaskTabReady } from './tabs.js';
 import { SiteAdapterId, getSiteAdapter, requireSiteAdapterUrl } from './site-adapter-registry.js';
-// These phases only inspect state. They neither change the composer nor click
-// Send, so one receiver restoration and one retry are safe after an extension
-// update or a ChatGPT navigation. Effectful phases remain non-replayable.
+// These phases are replay-safe. ENSURE_HIGH_EFFORT is idempotent: a lost
+// response is retried only to prove/select the same High setting before any
+// prompt insertion. Send and prompt-mutation phases remain non-replayable.
 const SAFE_RECEIVER_RECOVERY_MODES = new Set([
   'CHECK_ONLY',
+  'ENSURE_HIGH_EFFORT',
   'PREPARE_SEND',
   'VERIFY_AFTER_UNCERTAIN_SUBMIT',
   'READ_ASSISTANT_REPORT',

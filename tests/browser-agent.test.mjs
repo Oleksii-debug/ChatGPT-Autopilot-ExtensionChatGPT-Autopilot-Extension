@@ -448,7 +448,11 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
         result: {
           text: JSON.stringify({ type: 'done', summary: 'routed' }),
           usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5, modelCalls: 1 },
-          runtime: { requestCount: 1, primaryCount: 0, strongCount: 1, lastRoute: 'strong', lastStrongAt: 1234, strongHistoryAt: [1234] },
+          runtime: {
+            requestCount: 1, primaryCount: 0, strongCount: 1, lastRoute: 'strong', lastStrongAt: 1234, strongHistoryAt: [1234],
+            lastRouteId: 'mistral-agent',
+            lastFailoverChain: [{ routeId:'mistral-agent', outcome:'SUCCESS', code:'', category:'' }],
+          },
         },
       };
     },
@@ -456,7 +460,7 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
   });
   await manager.create({
     id: 'job-1', goal: 'Use the strong API model for this job',
-    aiRoutingMode: 'strong', aiStrongProvider: 'openai', aiStrongModel: 'gpt-strong', stepDelayMs: 0,
+    aiRoutingMode: 'strong', aiPinnedRouteId: 'mistral-agent', aiStrongProvider: 'openai', aiStrongModel: 'gpt-strong', stepDelayMs: 0,
   });
   await manager.start('job-1', { runInitial: false });
   const result = await manager.cycleOne('job-1');
@@ -464,12 +468,16 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
   assert.equal(payloads.length, 1);
   assert.equal(payloads[0].isolatedRuntime, true);
   assert.equal(payloads[0].routerOverride.mode, 'strong');
+  assert.equal(payloads[0].routerOverride.routeId, 'mistral-agent');
   assert.equal(payloads[0].routerOverride.strong.provider, 'openai');
   assert.equal(payloads[0].routerOverride.strong.model, 'gpt-strong');
   const live = await manager.get('job-1');
+  assert.equal(live.job.config.aiPinnedRouteId, 'mistral-agent');
   assert.equal(live.job.runtime.aiRouterRuntime.requestCount, 1);
   assert.equal(live.job.runtime.aiRouterRuntime.strongCount, 1);
   assert.equal(live.job.runtime.aiRouterRuntime.lastRoute, 'strong');
+  assert.equal(live.job.runtime.aiRouterRuntime.lastRouteId, 'mistral-agent');
+  assert.deepEqual(live.job.runtime.aiRouterRuntime.lastFailoverChain.map(item => [item.routeId, item.outcome]), [['mistral-agent','SUCCESS']]);
 });
 
 test('consequential approval is default policy and classifies multilingual final actions', () => {
@@ -1216,6 +1224,162 @@ test('Browser Agent requires a separate read-only verifier before completing an 
   assert.equal(verifierCalls, 1);
   assert.equal(live.job.runtime.verifiedOutcome.checks[0].detail, 'Current semantic page shows page version 0.');
   assert.equal(live.job.runtime.modelCalls, 2);
+});
+
+test('Browser Agent persists independent verifier route failure runtime before retry', async () => {
+  const chrome = makeChrome();
+  let verifierCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    now: () => 5000,
+    routePrompt: async payload => {
+      verifierCalls += 1;
+      assert.equal(payload.taskRole, 'verifier');
+      const error = new Error('Pinned verifier route remains in durable backoff');
+      error.code = 'AI_ROUTE_POOL_EXHAUSTED';
+      error.retryAt = 10000;
+      error.modelCallsUsed = 1;
+      error.routerRuntime = {
+        routeStates: {
+          'mistral-agent': {
+            consecutiveFailures: 1,
+            successes: 0,
+            failures: 1,
+            backoffUntil: 10000,
+            circuitOpenUntil: 0,
+            lastErrorCode: 'HTTP_429',
+            lastErrorCategory: 'quota-or-rate',
+            lastErrorAt: 4000,
+            lastSuccessAt: 0,
+            lastLatencyMs: 10,
+          },
+        },
+        lastRouteId: 'mistral-agent',
+        lastFailoverChain: [],
+      };
+      throw error;
+    },
+  });
+  await manager.create({
+    id: 'job-verifier-route-failure',
+    goal: 'Verify the observed page',
+    acceptanceCriteria: ['The current page is observed'],
+  });
+  const before = await manager.get('job-verifier-route-failure');
+  const snapshot = {
+    url: 'https://example.test/',
+    frames: [{ frameId: 0, url: 'https://example.test/', text: 'Observed page', elements: [] }],
+  };
+  const action = {
+    type: 'done',
+    evidence: {
+      snapshotSignature: browserSnapshotSignature(snapshot),
+      checks: [{ criterion: 1, detail: 'Observed page' }],
+    },
+  };
+  const outcome = await manager.independentlyVerifyOutcome(
+    'job-verifier-route-failure',
+    before.job.runtime.controlEpoch,
+    before.job,
+    before.job.config,
+    snapshot,
+    action,
+  );
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.error?.code, 'AI_ROUTE_POOL_EXHAUSTED');
+  assert.equal(verifierCalls, 1);
+  const live = await manager.get('job-verifier-route-failure');
+  assert.equal(live.job.runtime.modelCalls, 1, 'failed verifier call remains monotonic when no lifecycle adapter accounted it');
+  assert.equal(live.job.runtime.aiRouterRuntime.lastRouteId, 'mistral-agent');
+  assert.equal(live.job.runtime.aiRouterRuntime.routeStates['mistral-agent'].backoffUntil, 10000);
+  assert.equal(live.job.runtime.aiRouterRuntime.routeStates['mistral-agent'].lastErrorCode, 'HTTP_429');
+});
+
+test('Browser Agent honors provider retryAt even when no pool-exhausted wrapper is used', async () => {
+  const chrome = makeChrome();
+  let routeCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    now: () => 5000,
+    routePrompt: async () => {
+      routeCalls += 1;
+      const error = new Error('AI route pool is cooling down');
+      error.code = 'PROVIDER_RATE_LIMITED';
+      error.retryAt = 65000;
+      throw error;
+    },
+  });
+  await manager.create({ id: 'job-route-retry-at', goal: 'Continue after provider cooldown' });
+  await manager.start('job-route-retry-at', { runInitial: false });
+  const result = await manager.cycleOne('job-route-retry-at');
+  const live = await manager.get('job-route-retry-at');
+  assert.equal(result.kind, 'MODEL_RETRY');
+  assert.equal(routeCalls, 1);
+  assert.equal(live.job.runtime.consecutiveModelErrors, 1);
+  assert.equal(live.job.runtime.nextWakeAt, 65000, 'router retryAt must outrank the generic 30-second recovery cap');
+});
+
+test('Browser Agent waits until verifier route retryAt and retains failed verifier accounting', async () => {
+  const chrome = makeChrome();
+  let verifierCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    now: () => 5000,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        verifierCalls += 1;
+        const error = new Error('Verifier route is cooling down');
+        error.code = 'PROVIDER_RATE_LIMITED';
+        error.retryAt = 70000;
+        error.modelCallsUsed = 1;
+        error.routerRuntime = {
+          routeStates: {
+            'verifier-route': {
+              consecutiveFailures: 1,
+              successes: 0,
+              failures: 1,
+              backoffUntil: 70000,
+              circuitOpenUntil: 0,
+              lastErrorCode: 'HTTP_429',
+              lastErrorCategory: 'quota-or-rate',
+              lastErrorAt: 5000,
+              lastSuccessAt: 0,
+              lastLatencyMs: 1,
+            },
+          },
+          lastRouteId: 'verifier-route',
+          lastFailoverChain: [],
+        };
+        throw error;
+      }
+      const snapshotMarker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(snapshotMarker) + snapshotMarker.length));
+      return {
+        text: JSON.stringify({
+          type: 'done',
+          summary: 'Planner supplied current evidence',
+          evidence: {
+            snapshotSignature: browserSnapshotSignature(snapshot),
+            checks: [{ criterion: 1, detail: 'Current page was observed.' }],
+          },
+        }),
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+      };
+    },
+  });
+  await manager.create({
+    id: 'job-verifier-retry-at',
+    goal: 'Verify current page',
+    acceptanceCriteria: ['The current page is observed'],
+  });
+  await manager.start('job-verifier-retry-at', { runInitial: false });
+  const result = await manager.cycleOne('job-verifier-retry-at');
+  const live = await manager.get('job-verifier-retry-at');
+  assert.equal(result.kind, 'VERIFICATION_RETRY');
+  assert.equal(verifierCalls, 1);
+  assert.equal(live.job.runtime.modelCalls, 2, 'planner success plus failed verifier call must remain monotonic');
+  assert.equal(live.job.runtime.nextWakeAt, 70000);
+  assert.equal(live.job.runtime.aiRouterRuntime.routeStates['verifier-route'].backoffUntil, 70000);
 });
 
 test('Browser Agent persists a planner-proposed DAG without treating planning as a browser effect', async () => {

@@ -261,8 +261,9 @@ test('Multi-Agent Orchestration V2 exposes concise owner limits, profile files a
     assert.ok(html.includes(`<fieldset class="settings-group" id="${id}">`), `missing semantic group ${id}`);
     assert.ok(html.includes(`<legend>${legend}</legend>`), `missing semantic group legend ${legend}`);
   }
-  has(/id="orchestration-v2-control-comment"[^>]*aria-describedby="orchestration-v2-control-comment-help"/, 'control comment auto-discovery help must be programmatically associated');
-  has(/id="orchestration-v2-max-launches-window"[^>]*aria-describedby="orchestration-v2-launch-limit-help"/, 'launch window zero semantics must be programmatically associated');
+  has(/id="orchestration-v2-control-comment"[^>]*type="number"/, 'control comment field must remain a native numeric control');
+  has(/id="orchestration-v2-max-launches-window"[^>]*type="number"/, 'launch window field must remain a native numeric control');
+  assert.doesNotMatch(html, /orchestration-v2-control-comment-help|orchestration-v2-launch-limit-help/, 'removed tutorial help must not return');
   assert.match(js, /launch \${launch}, gap \${preview\.minimumLaunchIntervalSeconds \?\? 0}s; \${preview\.coordinatorProviderId \|\| '\?'} → \${preview\.workerProviderId \|\| '\?'}; Issue \${preview\.controlIssueNumber \|\| 0}, \${comment}/, 'profile preview must expose launch policy, providers and control comment before import');
   assert.match(js, /orchestration-v2-control-comment'\)\.value = config\.controlCommentId \? String\(config\.controlCommentId\) : ''/, 'auto-discovered provider comment must not silently pin the editable config field');
   assert.match(js, /Control \${controlCommentText}/, 'runtime summary must show discovered-vs-pinned control comment state');
@@ -273,9 +274,15 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'mode-agent','agent-prompt','agent-run-prompt-button','agent-pause-button','agent-resume-button','agent-stop-button',
     'agent-follow-up','agent-send-follow-up-button','agent-job-list','agent-history','agent-allow-current-site-button','agent-allow-all-sites-button',
     'agent-repeat-mode','agent-interval-seconds','agent-schedule-start','agent-schedule-end','agent-active-window-start','agent-active-window-end',
-    'agent-ai-routing-mode','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
-    'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd',
+    'agent-ai-routing-mode','agent-ai-pinned-route-id','agent-ai-primary-provider','agent-ai-primary-model','agent-ai-strong-provider','agent-ai-strong-model',
+    'agent-max-model-calls','agent-max-input-tokens','agent-max-output-tokens','agent-max-total-tokens','agent-max-runtime-minutes','agent-max-cost-usd','agent-policy-edit-status',
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
+    'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
+    'agent-max-concurrent-agents','agent-save-execution-policy-button','agent-execution-policy-status',
+    'agent-definition-details','agent-definition-registry-list','agent-definition-create-registry-id','agent-definition-create-registry-button','agent-definition-quarantine-status',
+    'agent-definition-list','agent-definition-new-button','agent-definition-form-group','agent-definition-id','agent-definition-label','agent-definition-description','agent-definition-instructions',
+    'agent-definition-capabilities','agent-definition-tools','agent-definition-tags','agent-definition-acceptance','agent-definition-enabled','agent-definition-revision',
+    'agent-definition-save-button','agent-definition-toggle-enabled-button','agent-definition-delete-button','agent-definition-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
   has(/id="agent-status" role="status"/, 'Agent status must be announced');
@@ -284,6 +291,29 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.match(js, /core\('START_BROWSER_AGENT_JOB'/);
   assert.match(js, /core\('ADD_BROWSER_AGENT_INSTRUCTION'/);
   assert.match(js, /core\('RUN_BROWSER_AGENT_BURST'/);
+  has(/<label for="agent-max-concurrent-agents">Максимум одночасно активних верхньорівневих Agent<\/label>/, 'global Agent concurrency must have a persistent native label');
+  has(/id="agent-max-concurrent-agents" type="number" min="1" max="32" step="1"/, 'global Agent concurrency must expose bounded native numeric semantics');
+  has(/id="agent-execution-policy-status" role="status"/, 'global Agent concurrency save result must be announced');
+  assert.match(js, /core\('GET_BROWSER_AGENT_EXECUTION_POLICY'\)/, 'Agent UI must read the canonical execution policy through Core');
+  assert.match(js, /core\('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES'\)/, 'reusable Agent UI must list registries through canonical Core');
+  assert.match(js, /core\('GET_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must refresh the exact selected registry through canonical Core');
+  assert.match(js, /core\('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must create registries through canonical Core');
+  assert.match(js, /core\('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must commit definition CRUD through canonical Core');
+  assert.match(js, /expectedRegistryRevision: registry\.revision/, 'definition mutations must carry exact registry CAS');
+  assert.match(js, /expectedDefinitionRevision: current\.definitionRevision/, 'definition update/delete must carry exact definition CAS');
+  assert.match(js, /configDefaults: current\?\.configDefaults \|\| \{\}/, 'definition edits must preserve canonical persisted model/config defaults');
+  assert.match(js, /ui\.agentDefinitionMode === 'edit'/, 'definition create and edit paths must remain explicit');
+  assert.match(js, /revision drifted/, 'stale definition writes must force a current-state reload');
+  assert.match(js, /agentDefinitionQuarantineCount/, 'quarantined registries must be visible as aggregate owner-attention state');
+  assert.doesNotMatch(js, /quarantinedRegistryIds\[[^\]]+\]/, 'UI must not render raw quarantined registry identities');
+  assert.match(html, /<label for="agent-definition-registry-list">/, 'definition registry selector needs a persistent native label');
+  assert.match(html, /<label for="agent-definition-list">/, 'definition selector needs a persistent native label');
+  assert.match(html, /id="agent-definition-status" role="status"/, 'definition CRUD outcomes must be announced');
+  assert.match(html, /id="agent-definition-quarantine-status" tabindex="0"/, 'definition quarantine summary must be keyboard readable without a noisy live region');
+  assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadBrowserAgentExecutionPolicy\(\);[\s\S]*await loadAgentDefinitionRegistries\(\);/, 'Agent runtime and reusable-definition state must load through the canonical startup sequence');
+  assert.doesNotMatch(js, /export \{ MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName \};\s*void loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must not create a second startup path');
+  assert.match(js, /core\('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', \{ maxConcurrentAgents: value \}\)/, 'Agent UI must update the canonical execution policy through Core');
+  assert.match(js, /!Number\.isInteger\(value\) \|\| value < 1 \|\| value > 32/, 'Agent UI must reject invalid concurrency before Core mutation');
   assert.match(js, /chrome\.permissions\.request\(\{ origins \}\)/, 'site access must be explicit through Chrome optional permissions');
   assert.ok(js.includes("repeatMode: $('agent-repeat-mode').value"), 'schedule/repeat policy must be persisted through Core');
   assert.match(js, /WAITING_SCHEDULE: 'очікує розкладу'/, 'scheduled wait must be exposed in readable status');
@@ -297,6 +327,29 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiRoutingMode: $('agent-ai-routing-mode').value"), 'per-Agent AI routing mode must persist through Core');
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
+  assert.ok(js.includes("aiPinnedRouteId: $('agent-ai-pinned-route-id').value"), 'Agent route choice must persist through Core');
+  assert.doesNotMatch(html, /id="agent-ai-pinned-route-id"[^>]*aria-describedby=/, 'Agent route status must use the existing concise live-status pattern instead of adding tutorial aria-describedby prose');
+  assert.match(html, /id="agent-route-binding-status"[^>]*role="status"/, 'Agent route policy/readiness must be announced through a native status surface');
+  assert.ok(js.includes('browserAgentRoutePolicyBlockReason'), 'Agent route choices must project global Models policy before the user starts a job');
+  assert.ok(js.includes('function aiRouteDisplayLabel(route = {})'), 'Agent and Models must share one deterministic route display label');
+  assert.ok(js.includes('return displayName ? \`${displayName} (${routeId})\` : routeId;'), 'profile display name must remain paired with stable route ID for keyboard/NVDA disambiguation');
+  assert.ok(js.includes('option.textContent = \`${aiRouteDisplayLabel(route)}: ${route.model}'), 'Agent route select must announce the profile display label');
+  assert.ok(js.includes('if (status.textContent !== nextText) status.textContent = nextText;'), '2-second Agent refresh must not rewrite an unchanged route-binding live region');
+  assert.ok(js.includes('option.disabled = Boolean(blockReason)'), 'globally blocked Agent routes must not look normally selectable');
+  assert.ok(js.includes("roles.length && !roles.includes('planner')"), 'Agent route readiness must reject an explicit role profile that cannot perform the first planner call');
+  assert.ok(js.includes("option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'))"), 'Agent route choices must retain verifier eligibility for acceptance preflight');
+  assert.ok(js.includes("acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false'"), 'owner acceptance criteria must reject a pinned route that cannot perform verifier calls');
+  assert.ok(js.includes('assertBrowserAgentRouteReadyForLaunch();'), 'new Agent creation must reject a statically blocked saved route before creating a doomed job');
+  const saveAgentPolicy = js.match(/async function saveBrowserAgentPolicy\(\)[\s\S]*?\n}\n/)?.[0] || '';
+  assert.match(saveAgentPolicy, /assertBrowserAgentRouteReadyForLaunch\(\);/, 'existing Agent policy saves must enforce the same pinned-route readiness gate');
+  assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
+  assert.ok(js.includes("item.routeId || '?'"), 'Agent usage must expose bounded route-chain evidence without provider payloads');
+  assert.match(js, /!ui\.agentDraftActive && !ui\.agentPolicyDirty\) fillBrowserAgentPolicy\(config\)/, 'status refresh must preserve unsaved Agent policy fields');
+  assert.match(js, /if \(editEpoch === ui\.agentPolicyEditEpoch\)/, 'late save must not erase edits typed while Core was updating');
+  assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');
+  assert.match(js, /parseAgentDraftProfile\(parsePortableJson\(await file\.text\(\)\)\)/, 'Agent JSON must be validated before form insertion');
+  assert.match(js, /ui\.agentDraftActive = true/, 'periodic status refresh must preserve the imported draft');
+  assert.doesNotMatch(js.match(/async function importBrowserAgentDraft\(\)[\s\S]*?\n}\n/)?.[0] || '', /CREATE_BROWSER_AGENT_JOB|START_BROWSER_AGENT_JOB/, 'Agent import must never create or start a job');
 });
 
 test('Remote Dispatch exposes keyboard/NVDA-readable GitHub feed configuration and status', () => {
@@ -319,10 +372,10 @@ test('Remote Dispatch exposes keyboard/NVDA-readable GitHub feed configuration a
 test('orchestration controls explain per-orchestra pause/resume/stop and expose no inert fallback toggle', () => {
   assert.match(html, /Призупинити оркестр/);
   assert.match(html, /Продовжити оркестр/);
-  assert.match(html, /Пауза стосується лише вибраного оркестру/);
-  assert.match(html, /інші оркестри продовжують працювати/);
-  assert.match(html, /Аварійно зупинити вибраний оркестр/);
-  assert.match(html, /Інші оркестри не зупиняються/);
+  assert.match(html, /id="pause-orchestration-v2-orchestra-button"[^>]*>Призупинити оркестр</);
+  assert.match(html, /id="resume-orchestration-v2-orchestra-button"[^>]*>Продовжити оркестр</);
+  assert.match(html, /id="stop-orchestration-v2-button"[^>]*>Аварійно зупинити вибраний оркестр</);
+  assert.doesNotMatch(html, /Пауза стосується лише вибраного оркестру|Інші оркестри не зупиняються/);
   assert.doesNotMatch(html, /orchestration-v2-fallback-prompt/);
 });
 
@@ -380,9 +433,10 @@ test('Orchestration Drive scalar controls are keyboard-native, explicit, and do 
     'orchestration-v2-drive-auth-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Drive scalar control ${id}`);
 
-  has(/<label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers, необов’язково<\/label>/);
-  has(/id="orchestration-v2-hierarchy-drive-sources"[^>]*aria-describedby="orchestration-v2-hierarchy-drive-help"/s);
-  has(/id="orchestration-v2-hierarchy-drive-poll"[^>]*min="1"[^>]*max="1440"[^>]*aria-describedby="orchestration-v2-hierarchy-drive-help"/s);
+  has(/<label for="orchestration-v2-hierarchy-drive-sources">Drive-керування кількістю Workers<\/label>/);
+  has(/id="orchestration-v2-hierarchy-drive-sources"/s);
+  has(/id="orchestration-v2-hierarchy-drive-poll"[^>]*min="1"[^>]*max="1440"/s);
+  assert.doesNotMatch(html, /orchestration-v2-hierarchy-drive-help/);
   has(/id="orchestration-v2-drive-auth-status" role="status"/);
   assert.match(js, /function orchestrationDriveScalarSourcesFromForm\(domains\)/);
   assert.match(js, /driveScalarSources,/);

@@ -32,6 +32,16 @@ function mergeAiRouterSettingsOverride(rawBase, rawOverride = {}) {
   const override = rawOverride && typeof rawOverride === 'object' ? rawOverride : {};
   const next = structuredClone(base);
   if (AI_ROUTER_OVERRIDE_MODES.has(override.mode)) next.mode = override.mode;
+  if (override.routeId !== undefined && override.routeId !== '') {
+    const routeId = override.routeId;
+    if (typeof routeId !== 'string' || !next.routes.some(route => route.routeId === routeId && route.enabled)) {
+      throw new Error('Selected Agent AI route is missing or disabled in Models');
+    }
+    if (next.routePolicy.pinnedRouteId && next.routePolicy.pinnedRouteId !== routeId) {
+      throw new Error('Selected Agent AI route conflicts with the global pinned route');
+    }
+    next.routePolicy.pinnedRouteId = routeId;
+  }
   for (const slotName of ['primary', 'strong']) {
     const slot = override[slotName];
     if (!slot || typeof slot !== 'object') continue;
@@ -514,21 +524,39 @@ export class CoreCommandDispatcher {
     if (command === CoreCommand.GET_PROFILE_SETTINGS) {
       const state = await this.repo.load();
       const ms = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
-      return { rateLimitCooldownMinutes: Math.round(ms / 60000) };
+      const concurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
+      return {
+        rateLimitCooldownMinutes: Math.round(ms / 60000),
+        maxConcurrentSessionOperations: Number.isInteger(concurrency) ? Math.max(1, Math.min(32, concurrency)) : 10,
+      };
     }
     if (command === CoreCommand.UPDATE_PROFILE_SETTINGS) {
-      const minutes = Number(payload.rateLimitCooldownMinutes);
-      const ms = minutes * 60000;
-      if (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS) {
+      const hasCooldown = payload.rateLimitCooldownMinutes !== undefined;
+      const hasConcurrency = payload.maxConcurrentSessionOperations !== undefined;
+      const minutes = hasCooldown ? Number(payload.rateLimitCooldownMinutes) : null;
+      const ms = hasCooldown ? minutes * 60000 : null;
+      const concurrency = hasConcurrency ? Number(payload.maxConcurrentSessionOperations) : null;
+      if (hasCooldown && (!Number.isInteger(minutes) || ms < MIN_RATE_LIMIT_COOLDOWN_MS || ms > MAX_RATE_LIMIT_COOLDOWN_MS)) {
         throw new Error('Rate-limit pause must be a whole number from 0 to 120 minutes');
       }
-      await this.repo.update(draft => {
-        draft.profile.rateLimitCooldownMs = ms;
-        draft.profile.rateLimitReservePolicyVersion = 1;
-        if (ms === 0) draft.profile.rateLimitUntil = 0;
+      if (hasConcurrency && (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 32)) {
+        throw new Error('Maximum concurrent Session operations must be a whole number from 1 to 32');
+      }
+      const state = await this.repo.update(draft => {
+        if (hasCooldown) {
+          draft.profile.rateLimitCooldownMs = ms;
+          draft.profile.rateLimitReservePolicyVersion = 1;
+          if (ms === 0) draft.profile.rateLimitUntil = 0;
+        }
+        if (hasConcurrency) draft.profile.maxConcurrentSessionOperations = concurrency;
         return draft;
       });
-      return { rateLimitCooldownMinutes: minutes };
+      const storedMs = Number(state.profile?.rateLimitCooldownMs ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS);
+      const storedConcurrency = Number(state.profile?.maxConcurrentSessionOperations ?? 10);
+      return {
+        rateLimitCooldownMinutes: Math.round(storedMs / 60000),
+        maxConcurrentSessionOperations: Number.isInteger(storedConcurrency) ? Math.max(1, Math.min(32, storedConcurrency)) : 10,
+      };
     }
     if (command === CoreCommand.GET_LOCAL_AI_SETTINGS) {
       const state = await this.repo.load();

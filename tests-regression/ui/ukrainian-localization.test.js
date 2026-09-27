@@ -44,6 +44,7 @@ test('Ukrainian UI localization translates command and Core status output', () =
   assert.equal(translateText('Session started; global pause cleared by explicit Start'), 'Сеанс запущено; загальну паузу скасовано явною командою запуску');
   assert.equal(translateText('Pause or stop the session and resolve uncertain work before deleting'), 'Перед видаленням призупиніть або зупиніть активний сеанс і розв’яжіть невизначене надсилання');
   assert.equal(translateText('SUBMISSION_UNCERTAIN'), 'РЕЗУЛЬТАТ ВІДПРАВЛЕННЯ НЕВИЗНАЧЕНИЙ');
+  assert.equal(translateText('FAILED_SAFE'), 'ТИМЧАСОВА ПОМИЛКА — ПОВТОР ЗАПЛАНОВАНО');
   assert.equal(
     translateText('Automatic execution temporarily unavailable; retry scheduled. Diagnostic: TAB_NAVIGATION_TIMEOUT.'),
     'Автоматичне виконання тимчасово недоступне; повторну спробу заплановано. Діагностика: TAB_NAVIGATION_TIMEOUT.',

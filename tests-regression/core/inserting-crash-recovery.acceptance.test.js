@@ -57,6 +57,7 @@ function executorFor(repo, chromeApi, clock, modes) {
     async execute(_tabId, request) {
       modes.push(request.mode);
       if (request.mode === 'CHECK_ONLY') return { status: InteractionResult.READY };
+      if (request.mode === 'ENSURE_HIGH_EFFORT') return { status: InteractionResult.READY, safeDiagnosticCode: 'EFFORT_HIGH_VERIFIED' };
       if (request.mode === 'INSERT_ONLY') throw new Error('network disconnected during INSERT_ONLY');
       throw new Error(`unexpected Interaction mode after insertion transport loss: ${request.mode}`);
     },
