@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import { normalizeAgentDefinitionV1 } from '../src/core/agent-definition-registry.js';
 import {
@@ -304,4 +305,16 @@ test('form-produced model defaults are already canonical at the durable AgentDef
   const canonical = normalizeAgentDefinitionV1(raw);
   assert.deepEqual(canonical.configDefaults, raw.configDefaults);
   assert.equal(canonical.definitionRevision, 9);
+});
+
+test('Agent definition options save preserves an existing specialist delegation profile', async () => {
+  const source = await readFile(new URL('../src/ui/options.js', import.meta.url), 'utf8');
+  const save = source.match(
+    /async function saveAgentDefinition\(\) \{([\s\S]*?)\n\}\n\nasync function toggleAgentDefinitionEnabled/u,
+  );
+  assert.ok(save, 'saveAgentDefinition must remain structurally identifiable');
+  assert.match(
+    save[1],
+    /specialistDelegationProfile:\s*current && Object\.hasOwn\(current, 'specialistDelegationProfile'\)[\s\S]*?\? current\.specialistDelegationProfile[\s\S]*?: undefined/u,
+  );
 });
