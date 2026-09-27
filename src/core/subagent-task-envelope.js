@@ -349,8 +349,8 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
   if (![AgentPlanNodeState.READY, AgentPlanNodeState.RUNNING].includes(node.state)) {
     throw new Error('Subagent task AgentPlan node must be READY or RUNNING');
   }
-  if (node.ownerId && node.ownerId !== childAgentId) {
-    throw new Error('Subagent task child identity does not match AgentPlan node owner');
+  if (node.ownerId !== childAgentId) {
+    throw new Error('Subagent task requires exact AgentPlan node owner binding');
   }
 
   const outcome = normalizeOutcomeContractV1(
@@ -381,6 +381,9 @@ export function createSubagentTaskEnvelopeV1(input = {}) {
   );
   if (Date.parse(createdAt) < Date.parse(plan.updatedAt)) {
     throw new Error('Subagent task envelope cannot predate AgentPlan revision');
+  }
+  if (Date.parse(createdAt) < Date.parse(node.updatedAt)) {
+    throw new Error('Subagent task envelope cannot predate AgentPlan node state');
   }
   if (Date.parse(createdAt) < Date.parse(outcome.createdAt)) {
     throw new Error('Subagent task envelope cannot predate OutcomeContract');
