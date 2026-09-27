@@ -4,10 +4,36 @@ import assert from 'node:assert/strict';
 import { BrowserAgentRunState } from '../src/core/browser-agent.js';
 import {
   BrowserAgentParentRuntimeFenceStatus,
+  createBrowserAgentParentRuntimeFenceFromJobV1,
   createBrowserAgentParentRuntimeFenceV1,
+  inspectBrowserAgentParentRuntimeFenceFromJobV1,
   inspectBrowserAgentParentRuntimeFenceV1,
   normalizeBrowserAgentParentRuntimeFenceV1,
 } from '../src/core/browser-agent-parent-runtime-fence.js';
+
+function canonicalJob({
+  runState = BrowserAgentRunState.RUNNING,
+  controlEpoch = 7,
+  capabilityIds = ['data.read', 'data.analyze'],
+  toolIds = ['artifact.write', 'data.query'],
+  id = 'job parent',
+} = {}) {
+  return {
+    id,
+    config: { id, projectId: 'project-1' },
+    runtime: {
+      runState,
+      controlEpoch,
+      stepCount: 3,
+      updatedAt: 123,
+    },
+    definitionSelection: { agentDefinitionId: 'agent.analysis' },
+    definitionScope: { capabilityIds, toolIds },
+    orchestrationNodeBinding: null,
+    createdAt: 1,
+    updatedAt: 123,
+  };
+}
 
 function live(overrides = {}) {
   return {
@@ -54,6 +80,68 @@ test('creates an immutable canonical fence only from a RUNNING parent', () => {
       state,
     );
   }
+});
+
+test('canonical durable job adapter derives runtime and definition scope without caller-shaped facts', () => {
+  const job = canonicalJob();
+  const fence = createBrowserAgentParentRuntimeFenceFromJobV1(job);
+  assert.deepEqual(fence, createBrowserAgentParentRuntimeFenceV1(live()));
+
+  const current = inspectBrowserAgentParentRuntimeFenceFromJobV1({ fence, job });
+  assert.equal(current.current, true);
+  assert.equal(current.status, BrowserAgentParentRuntimeFenceStatus.CURRENT);
+
+  const paused = canonicalJob({
+    runState: BrowserAgentRunState.PAUSED,
+    controlEpoch: 8,
+  });
+  const revoked = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+    fence,
+    job: paused,
+  });
+  assert.equal(revoked.current, false);
+  assert.equal(revoked.status, BrowserAgentParentRuntimeFenceStatus.NOT_RUNNING);
+
+  assert.throws(
+    () => createBrowserAgentParentRuntimeFenceFromJobV1({
+      ...canonicalJob(),
+      definitionScope: null,
+    }),
+    /requires durable definitionScope/,
+  );
+});
+
+test('canonical durable job adapter does not execute runtime or scope accessors', () => {
+  let reads = 0;
+  const job = canonicalJob();
+  Object.defineProperty(job.runtime, 'runState', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return BrowserAgentRunState.RUNNING;
+    },
+  });
+  assert.throws(
+    () => createBrowserAgentParentRuntimeFenceFromJobV1(job),
+    /runState must be an enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  const scopeJob = canonicalJob();
+  Object.defineProperty(scopeJob.definitionScope, 'capabilityIds', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ['data.read'];
+    },
+  });
+  assert.throws(
+    () => createBrowserAgentParentRuntimeFenceFromJobV1(scopeJob),
+    /capabilityIds must be an enumerable own data property/,
+  );
+  assert.equal(reads, 0);
 });
 
 test('CURRENT requires exact live job, epoch and narrowed scope', () => {
