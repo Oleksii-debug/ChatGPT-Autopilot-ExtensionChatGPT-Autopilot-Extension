@@ -109,3 +109,11 @@ test('rejects exotic form prototypes and preserves explicit disabled state', () 
   const definition = buildSpecialistDefinitionFromFormV1(form({ enabled: false }));
   assert.equal(definition.enabled, false);
 });
+
+
+test('rejects non-boolean enabled aliases instead of coercing them to disabled', () => {
+  assert.throws(
+    () => buildSpecialistDefinitionFromFormV1(form({ enabled: 'false' })),
+    /Enabled має бути boolean/,
+  );
+});
