@@ -39,7 +39,7 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
+import { normalizeArtifactRefV1, normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
@@ -304,6 +304,101 @@ function normalizePersistedAgentDefinitionScope(raw, selection) {
     capabilityIds: normalizeIds(record.capabilityIds, 'Browser Agent definition scope capabilityIds', 64, selection.definition.capabilityIds),
     toolIds: normalizeIds(record.toolIds, 'Browser Agent definition scope toolIds', 128, selection.definition.toolIds),
   };
+}
+
+function canonicalDenseArray(value, label, max, min = 0) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a canonical array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < min || length > max) {
+    throw new Error(`${label} has invalid length`);
+  }
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(`${label} contains non-canonical fields`);
+    }
+  }
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable own data property`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
+}
+
+function canonicalDelegationIds(value, label, max, min = 0) {
+  const out = canonicalDenseArray(value, label, max, min)
+    .map((item, index) => exactIdentity(item, `${label}[${index}]`));
+  if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicate identity`);
+  return Object.freeze([...out].sort());
+}
+
+function normalizeAutomaticDelegationIntent(request) {
+  const childBudget = Object.hasOwn(request, 'childBudget')
+    ? (() => {
+      const raw = snapshotExactOwnDataRequest(
+        request.childBudget,
+        new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']),
+        'Browser Agent automatic specialist childBudget',
+      );
+      const out = Object.create(null);
+      for (const [key, value] of Object.entries(raw)) {
+        if (typeof value !== 'number'
+            || !Number.isSafeInteger(value)
+            || Object.is(value, -0)
+            || value < 0) {
+          throw new Error(`Browser Agent automatic specialist childBudget.${key} is invalid`);
+        }
+        out[key] = value;
+      }
+      return Object.freeze(out);
+    })()
+    : undefined;
+  const artifactRefs = Object.hasOwn(request, 'artifactRefs')
+    ? canonicalDenseArray(request.artifactRefs, 'Browser Agent automatic specialist artifactRefs', 128)
+      .map(normalizeArtifactRefV1)
+    : [];
+  const credentialRefs = Object.hasOwn(request, 'credentialRefs')
+    ? canonicalDenseArray(request.credentialRefs, 'Browser Agent automatic specialist credentialRefs', 64)
+      .map(normalizeCredentialRefV1)
+    : [];
+  const priority = Object.hasOwn(request, 'priority') ? request.priority : 0;
+  if (typeof priority !== 'number'
+      || !Number.isSafeInteger(priority)
+      || Object.is(priority, -0)
+      || priority < 0
+      || priority > 1_000_000) {
+    throw new Error('Browser Agent automatic specialist priority is invalid');
+  }
+  const parentInvocationId = Object.hasOwn(request, 'parentInvocationId') && request.parentInvocationId !== ''
+    ? exactIdentity(request.parentInvocationId, 'parentInvocationId')
+    : '';
+  return Object.freeze({
+    registryId: canonicalSpecialistRegistryId(request.registryId),
+    expectedRegistryRevision: positiveExactInteger(request.expectedRegistryRevision, 'expectedRegistryRevision'),
+    expectedPlanRevision: positiveExactInteger(request.expectedPlanRevision, 'expectedPlanRevision'),
+    nodeId: exactIdentity(request.nodeId, 'nodeId'),
+    requiredCapabilityIds: canonicalDelegationIds(
+      request.requiredCapabilityIds,
+      'requiredCapabilityIds',
+      64,
+      1,
+    ),
+    requiredToolIds: canonicalDelegationIds(request.requiredToolIds, 'requiredToolIds', 128),
+    policyEnvelopeId: exactIdentity(request.policyEnvelopeId, 'policyEnvelopeId'),
+    deadlineAt: specialistRequestTimestamp(request.deadlineAt, undefined, 'deadlineAt'),
+    priority,
+    childBudget,
+    artifactRefs: Object.freeze(artifactRefs),
+    credentialRefs: Object.freeze(credentialRefs),
+    parentInvocationId,
+  });
 }
 
 function positiveExactInteger(value, label) {
@@ -1351,15 +1446,10 @@ export class BrowserAgentManager {
         throw new Error(`Browser Agent automatic specialist delegation request requires ${key}`);
       }
     }
-    const registryId = canonicalSpecialistRegistryId(request.registryId);
-    const expectedRegistryRevision = positiveExactInteger(
-      request.expectedRegistryRevision,
-      'expectedRegistryRevision',
-    );
-    const expectedPlanRevision = positiveExactInteger(
-      request.expectedPlanRevision,
-      'expectedPlanRevision',
-    );
+    const intent = normalizeAutomaticDelegationIntent(request);
+    const registryId = intent.registryId;
+    const expectedRegistryRevision = intent.expectedRegistryRevision;
+    const expectedPlanRevision = intent.expectedPlanRevision;
     const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
     const at = new Date(this.now()).toISOString();
     let result = null;
@@ -1413,19 +1503,19 @@ export class BrowserAgentManager {
       const proposal = prepareAutomaticAgentSpecialistDelegationV1({
         plan: reconciledPlan,
         expectedPlanRevision: reconciledPlan.revision,
-        nodeId: request.nodeId,
+        nodeId: intent.nodeId,
         registry,
         parentCapabilityIds: job.definitionScope.capabilityIds,
         parentToolIds: job.definitionScope.toolIds,
-        requiredCapabilityIds: request.requiredCapabilityIds,
-        requiredToolIds: request.requiredToolIds,
-        policyEnvelopeId: request.policyEnvelopeId,
-        deadlineAt: request.deadlineAt,
-        priority: Object.hasOwn(request, 'priority') ? request.priority : 0,
-        childBudget: Object.hasOwn(request, 'childBudget') ? request.childBudget : undefined,
-        artifactRefs: Object.hasOwn(request, 'artifactRefs') ? request.artifactRefs : [],
-        credentialRefs: Object.hasOwn(request, 'credentialRefs') ? request.credentialRefs : [],
-        parentInvocationId: Object.hasOwn(request, 'parentInvocationId') ? request.parentInvocationId : '',
+        requiredCapabilityIds: intent.requiredCapabilityIds,
+        requiredToolIds: intent.requiredToolIds,
+        policyEnvelopeId: intent.policyEnvelopeId,
+        deadlineAt: intent.deadlineAt,
+        priority: intent.priority,
+        childBudget: intent.childBudget,
+        artifactRefs: intent.artifactRefs,
+        credentialRefs: intent.credentialRefs,
+        parentInvocationId: intent.parentInvocationId,
         at,
       });
 
