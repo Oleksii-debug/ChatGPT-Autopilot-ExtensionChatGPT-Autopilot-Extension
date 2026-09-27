@@ -1362,3 +1362,47 @@ test('bound Browser Agent cannot resume over a hierarchy node made terminal by S
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'STOPPED');
   assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'STOPPED');
 });
+
+
+test('bound lifecycle waits for canonical Project authority before mutating Browser Agent state', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+
+  let projectFenceReachedResolve;
+  const projectFenceReached = new Promise(resolve => { projectFenceReachedResolve = resolve; });
+  let releaseProjectFenceResolve;
+  const releaseProjectFence = new Promise(resolve => { releaseProjectFenceResolve = resolve; });
+  const holdingProjectAuthority = orchestration.withProjectHierarchyAuthority(
+    'project-1',
+    async authority => {
+      projectFenceReachedResolve();
+      await releaseProjectFence;
+      return authority;
+    },
+  );
+  await projectFenceReached;
+
+  let pauseSettled = false;
+  const pausing = manager.pause('job-1', lifecycleDependencies).then(result => {
+    pauseSettled = true;
+    return result;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(pauseSettled, false, 'PAUSE must wait behind canonical Project authority');
+  const during = await manager.get('job-1');
+  assert.equal(during.job.runtime.runState, 'RUNNING');
+  assert.equal(during.job.runtime.controlEpoch, 1);
+
+  releaseProjectFenceResolve();
+  await holdingProjectAuthority;
+  await pausing;
+
+  const after = await manager.get('job-1');
+  assert.equal(after.job.runtime.runState, 'PAUSED');
+  assert.equal(after.job.runtime.controlEpoch, 2);
+  const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
+});
