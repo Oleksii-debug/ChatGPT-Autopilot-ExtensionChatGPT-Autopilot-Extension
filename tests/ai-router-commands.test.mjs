@@ -552,10 +552,13 @@ test('Agent route policy can narrow global Models policy without mutating it', a
   assert.deepEqual(after, before, 'per-Agent policy must never mutate global Models settings');
 });
 
-test('Agent route policy fails closed when Models has no route pool instead of silently using legacy slots', async () => {
-  let calls = 0;
+test('Agent route policy fails closed before real provider I/O when Models has no route pool', async () => {
+  const calls = [];
   const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
-    aiOrchestrator: { async run() { calls += 1; throw new Error('provider must not run'); } },
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'must-not-run', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
   });
   await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
     enabled:true,
@@ -565,15 +568,20 @@ test('Agent route policy fails closed when Models has no route pool instead of s
     routes:[],
   } });
 
-  await assert.rejects(
-    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
-      prompt:'agent task',
-      isolatedRuntime:true,
-      routerOverride:{ routePolicy:{ freeOnly:true, locality:'local' } },
-    }),
-    /requires a configured Models route pool/u,
-  );
-  assert.equal(calls, 0, 'legacy primary/strong slots must not bypass per-Agent route policy');
+  for (const routePolicy of [
+    { freeOnly:true, locality:'local', maxInputPricePerMillionUsd:0, maxOutputPricePerMillionUsd:0 },
+    { autoSwitch:false },
+  ]) {
+    await assert.rejects(
+      () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+        prompt:'agent task',
+        isolatedRuntime:true,
+        routerOverride:{ routePolicy },
+      }),
+      /requires a configured Models route pool/u,
+    );
+  }
+  assert.equal(calls.length, 0, 'legacy primary/strong slots must not bypass per-Agent route policy or no-switch semantics');
 });
 
 test('Agent route policy fails closed when it widens global allow-list, locality or pin authority', async () => {
