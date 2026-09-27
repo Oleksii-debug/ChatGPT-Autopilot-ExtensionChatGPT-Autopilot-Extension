@@ -4,6 +4,13 @@ import { normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 export const SPECIALIST_REGISTRY_VERSION = 1;
 export const SPECIALIST_DEFINITION_VERSION = 1;
 export const SPECIALIST_SELECTION_VERSION = 1;
+export const SPECIALIST_REGISTRY_MUTATION_VERSION = 1;
+
+export const SpecialistRegistryMutationKind = Object.freeze({
+  CREATE: 'CREATE',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+});
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const PLANES = new Set(Object.values(AgentExecutionPlane));
@@ -12,6 +19,11 @@ const REG_KEYS = new Set(['schemaVersion','registryId','revision','definitions']
 const DISC_KEYS = new Set(['registry','requiredCapabilityIds','requiredToolIds','parentCapabilityIds','parentToolIds','executionPlanes']);
 const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
 const BIND_KEYS = new Set(['registry','selection','handoff','parentCapabilityIds','parentToolIds']);
+const MUTATION_KEYS = new Set([
+  'registry', 'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'specialistId', 'expectedDefinitionRevision',
+]);
+const MUTATION_KINDS = new Set(Object.values(SpecialistRegistryMutationKind));
 
 function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' must be a plain data object');
@@ -66,6 +78,10 @@ function integer(value, label) {
 function bool(value, label) {
   if (typeof value !== 'boolean') throw new Error(label + ' must be boolean');
   return value;
+}
+function nextRevision(value, label) {
+  if (value >= Number.MAX_SAFE_INTEGER) throw new Error(label + ' cannot advance beyond MAX_SAFE_INTEGER');
+  return value + 1;
 }
 function plane(value, label) {
   if (typeof value !== 'string' || !PLANES.has(value)) throw new Error(label + ' is invalid');
@@ -191,5 +207,110 @@ export function bindSpecialistHandoffToRegistryV1(input = {}) {
     childContext:{goal:handoff.goal, artifactRefs:handoff.artifactRefs, credentialRefs:handoff.credentialRefs, parentInvocationId:handoff.parentInvocationId},
     childScope:{capabilityIds:selected.requestedCapabilityIds, toolIds:selected.grantedToolIds},
     authority:{executionAuthorized:false,policyAuthorized:false,schedulingAuthorized:false,recoveryAuthorized:false,credentialAuthorized:false,completionAuthorized:false,verificationAuthorized:false},
+  });
+}
+
+
+/**
+ * Builds the next canonical SpecialistRegistry snapshot under exact
+ * compare-and-swap guards. Persistence remains owned by the caller's existing
+ * durable store/update authority.
+ */
+export function proposeSpecialistRegistryMutationV1(input = {}) {
+  const raw = record(input, MUTATION_KEYS, 'Specialist registry mutation request');
+  const registry = normalizeSpecialistRegistryV1(raw.registry);
+  const registryId = id(raw.registryId, 'registryId');
+  if (registryId !== registry.registryId) throw new Error('Specialist registry identity does not match mutation target');
+  const expectedRegistryRevision = integer(raw.expectedRegistryRevision, 'expectedRegistryRevision');
+  if (expectedRegistryRevision !== registry.revision) throw new Error('Specialist registry revision drifted before mutation');
+  if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
+    throw new Error('Specialist registry mutation kind is invalid');
+  }
+
+  const nextRegistryRevision = nextRevision(registry.revision, 'Specialist registry revision');
+  let nextDefinitions;
+  let specialistId;
+  let previousDefinitionRevision = 0;
+  let nextDefinitionRevision = 0;
+
+  if (raw.kind === SpecialistRegistryMutationKind.CREATE) {
+    if (!Object.hasOwn(raw, 'definition')) throw new Error('CREATE mutation requires definition');
+    if (Object.hasOwn(raw, 'specialistId') || Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('CREATE mutation must not supply existing-definition identity');
+    }
+    const definition = normalizeSpecialistDefinitionV1(raw.definition);
+    specialistId = definition.specialistId;
+    if (definition.definitionRevision !== 1) throw new Error('CREATE mutation requires definitionRevision 1');
+    if (registry.definitions.some(item => item.specialistId === specialistId)) {
+      throw new Error('CREATE mutation target already exists');
+    }
+    nextDefinitionRevision = 1;
+    nextDefinitions = [...registry.definitions, definition];
+  } else if (raw.kind === SpecialistRegistryMutationKind.UPDATE) {
+    if (!Object.hasOwn(raw, 'definition')
+        || !Object.hasOwn(raw, 'specialistId')
+        || !Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('UPDATE mutation requires specialistId, definition and expectedDefinitionRevision');
+    }
+    specialistId = id(raw.specialistId, 'specialistId');
+    const definition = normalizeSpecialistDefinitionV1(raw.definition);
+    if (definition.specialistId !== specialistId) {
+      throw new Error('UPDATE mutation definition identity does not match target');
+    }
+    const current = registry.definitions.find(item => item.specialistId === specialistId);
+    if (!current) throw new Error('UPDATE mutation target does not exist');
+    const expectedDefinitionRevision = integer(raw.expectedDefinitionRevision, 'expectedDefinitionRevision');
+    if (expectedDefinitionRevision !== current.definitionRevision) {
+      throw new Error('Specialist definition revision drifted before update');
+    }
+    previousDefinitionRevision = current.definitionRevision;
+    nextDefinitionRevision = nextRevision(current.definitionRevision, 'Specialist definition revision');
+    if (definition.definitionRevision !== nextDefinitionRevision) {
+      throw new Error('UPDATE mutation must increment definitionRevision exactly once');
+    }
+    nextDefinitions = registry.definitions.map(item => item.specialistId === specialistId ? definition : item);
+  } else {
+    if (!Object.hasOwn(raw, 'specialistId') || !Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('DELETE mutation requires specialistId and expectedDefinitionRevision');
+    }
+    if (Object.hasOwn(raw, 'definition')) throw new Error('DELETE mutation must not supply definition');
+    specialistId = id(raw.specialistId, 'specialistId');
+    const current = registry.definitions.find(item => item.specialistId === specialistId);
+    if (!current) throw new Error('DELETE mutation target does not exist');
+    const expectedDefinitionRevision = integer(raw.expectedDefinitionRevision, 'expectedDefinitionRevision');
+    if (expectedDefinitionRevision !== current.definitionRevision) {
+      throw new Error('Specialist definition revision drifted before delete');
+    }
+    previousDefinitionRevision = current.definitionRevision;
+    nextDefinitions = registry.definitions.filter(item => item.specialistId !== specialistId);
+  }
+
+  const nextRegistry = normalizeSpecialistRegistryV1({
+    schemaVersion: SPECIALIST_REGISTRY_VERSION,
+    registryId: registry.registryId,
+    revision: nextRegistryRevision,
+    definitions: nextDefinitions,
+  });
+
+  return freeze({
+    schemaVersion: SPECIALIST_REGISTRY_MUTATION_VERSION,
+    kind: raw.kind,
+    registryId: registry.registryId,
+    previousRegistryRevision: registry.revision,
+    nextRegistryRevision,
+    specialistId,
+    previousDefinitionRevision,
+    nextDefinitionRevision,
+    nextRegistry,
+    authority: {
+      persistenceAuthorized: false,
+      executionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
+      credentialAuthorized: false,
+      completionAuthorized: false,
+      verificationAuthorized: false,
+    },
   });
 }
