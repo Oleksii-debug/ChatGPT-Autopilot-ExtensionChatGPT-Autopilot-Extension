@@ -109,6 +109,9 @@ export function normalizeTrustedExecutionVerificationRecordV1(input) {
   }
   const evidenceArtifacts = dataArray(raw.evidenceArtifacts, 'Trusted execution evidenceArtifacts')
     .map(normalizeArtifactRefV1);
+  if (!evidenceArtifacts.length || !verification.evidenceArtifactIds.length) {
+    throw new Error('Trusted execution verification requires hashed evidence artifacts');
+  }
   if (new Set(evidenceArtifacts.map(item => item.artifactId)).size !== evidenceArtifacts.length) {
     throw new Error('Trusted execution verification contains duplicate evidence artifactId');
   }
