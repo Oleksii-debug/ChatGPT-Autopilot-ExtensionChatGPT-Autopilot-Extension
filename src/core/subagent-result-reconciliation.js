@@ -796,6 +796,7 @@ export async function prepareSubagentResultReconciliationV1(
       binding.bindingId,
       binding.activationId,
       result.verificationId,
+      terminalStatus,
     ),
     controlEpoch: runtime.controlEpoch,
     nodeId: result.childAgentId,
