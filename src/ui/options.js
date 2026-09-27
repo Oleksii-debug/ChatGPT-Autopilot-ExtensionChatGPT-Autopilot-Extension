@@ -1003,12 +1003,18 @@ function manualWorkerCountsFromCards() {
   ]).filter(([id]) => id));
 }
 
+function aiRouteDisplayLabel(route = {}) {
+  const routeId = String(route.routeId || '').trim() || 'без ID';
+  const displayName = String(route.displayName || '').trim();
+  return displayName ? `${displayName} (${routeId})` : routeId;
+}
+
 function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, workerPolicy = {}) {
   const list = $('ai-router-route-list');
   list.replaceChildren();
   for (const [index, route] of routes.entries()) {
     const card = $('ai-router-route-template').content.firstElementChild.cloneNode(true);
-    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${route.routeId || 'без ID'}`;
+    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${aiRouteDisplayLabel(route)}`;
     for (const label of card.querySelectorAll('[data-label-for]')) {
       const field = label.dataset.labelFor;
       const control = card.querySelector(`[data-route-field="${field}"]`);
@@ -1314,7 +1320,7 @@ function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
     const blockReason = browserAgentRoutePolicyBlockReason(route, policy);
     option.dataset.blockReason = blockReason;
     option.disabled = Boolean(blockReason);
-    option.textContent = `${route.routeId}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` — недоступний: ${blockReason}` : ''}`;
+    option.textContent = `${aiRouteDisplayLabel(route)}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` — недоступний: ${blockReason}` : ''}`;
     select.append(option);
   }
   if (selected && ![...select.options].some(option => option.value === selected)) {
