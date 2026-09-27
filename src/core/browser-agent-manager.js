@@ -150,6 +150,61 @@ function storedDefinitionMapDescriptors(raw) {
       : [];
   });
 }
+function snapshotAgentDefinitionLaunchRecord(value, label, maxFields = 32) {
+  const snapshot = snapshotOwnDataRequest(value, label);
+  if (Object.keys(snapshot).length > maxFields) throw new Error(`${label} contains too many fields`);
+  for (const [key, item] of Object.entries(snapshot)) {
+    if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+      throw new Error(`${label}.${key} must be scalar data`);
+    }
+  }
+  return snapshot;
+}
+function snapshotAgentDefinitionLaunchArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a canonical array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > max) throw new Error(`${label} has invalid length`);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) throw new Error(`${label} contains non-canonical fields`);
+  }
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+    const item = descriptor.value;
+    if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+      throw new Error(`${label}[${index}] must be scalar data`);
+    }
+    snapshot[index] = item;
+  }
+  return snapshot;
+}
+function snapshotAgentDefinitionLaunchNestedInputs(request) {
+  request.ownerBudget = snapshotAgentDefinitionLaunchRecord(
+    request.ownerBudget,
+    'Browser Agent definition launch ownerBudget',
+  );
+  for (const [key, max] of [
+    ['ownerCapabilityIds', 64],
+    ['ownerToolIds', 128],
+    ['requestedCapabilityIds', 64],
+    ['requestedToolIds', 128],
+  ]) {
+    request[key] = snapshotAgentDefinitionLaunchArray(
+      request[key],
+      `Browser Agent definition launch ${key}`,
+      max,
+    );
+  }
+  return request;
+}
+
 function normalizePersistedAgentDefinitionScope(raw, selection) {
   if (selection == null) {
     if (raw == null) return null;
@@ -1150,6 +1205,7 @@ export class BrowserAgentManager {
         throw new Error(`Browser Agent definition launch request requires ${key}`);
       }
     }
+    snapshotAgentDefinitionLaunchNestedInputs(request);
     for (const key of ['expectedRegistryRevision', 'expectedDefinitionRevision']) {
       const value = request[key];
       if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
@@ -1163,8 +1219,8 @@ export class BrowserAgentManager {
       throw new Error('Browser Agent definition launch jobId must be exact bounded text');
     }
 
-    const now = this.now();
     await this.update(store => {
+      const now = this.now();
       if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
       const registries = store.definitionRegistriesById || Object.create(null);
       const registry = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
