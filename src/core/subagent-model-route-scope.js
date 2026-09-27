@@ -173,8 +173,8 @@ function routeBinding(route) {
     provider: route.provider,
     model: route.model,
     endpointId: route.endpointId,
-    roles: [...route.roles],
-    capabilityIds: [...route.capabilityIds],
+    roles: [...route.roles].sort(),
+    capabilityIds: [...route.capabilityIds].sort(),
     locality: route.locality,
     costClass: route.costClass,
     inputPricePerMillionUsd: route.inputPricePerMillionUsd,
@@ -262,21 +262,21 @@ export function deriveSubagentModelRouteScopeV1(input = {}) {
   const ownerRoutePolicy = normalizeAiRoutePolicy(
     requiredOwn(request, 'ownerRoutePolicy', 'ownerRoutePolicy'),
   );
-  const childCapabilityIds = idList(
+  const childCapabilityIds = sortedUnique(idList(
     requiredOwn(request, 'childCapabilityIds', 'childCapabilityIds'),
     'childCapabilityIds',
     MAX_CAPABILITY_IDS,
-  );
-  const modelCapabilityIds = idList(
+  ));
+  const modelCapabilityIds = sortedUnique(idList(
     requiredOwn(request, 'taskModelCapabilityIds', 'taskModelCapabilityIds'),
     'taskModelCapabilityIds',
     MAX_CAPABILITY_IDS,
-  );
-  const taskRequestedRouteIds = idList(
+  ));
+  const taskRequestedRouteIds = sortedUnique(idList(
     requiredOwn(request, 'taskRequestedRouteIds', 'taskRequestedRouteIds'),
     'taskRequestedRouteIds',
     MAX_ROUTE_IDS,
-  );
+  ));
   const role = requiredOwn(request, 'role', 'role');
   if (typeof role !== 'string' || role !== role.trim() || !ROLES.has(role)) {
     throw new Error('role must be a canonical AI route role');
