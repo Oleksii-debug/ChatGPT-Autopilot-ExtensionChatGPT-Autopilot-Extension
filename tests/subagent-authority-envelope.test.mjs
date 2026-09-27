@@ -35,6 +35,8 @@ function request(overrides = {}) {
     taskSourceIds: ['source.repo'],
     parentArtifactIds: ['artifact.input', 'artifact.private'],
     taskArtifactIds: ['artifact.input'],
+    parentToolIds: ['tool.read', 'tool.write'],
+    ownerAllowedToolIds: ['tool.read', 'tool.write'],
     requestedToolIds: ['tool.read'],
     toolDescriptors: [tool('tool.read')],
     ...overrides,
@@ -98,6 +100,22 @@ test('child context cannot escape parent source or artifact visibility', () => {
   assert.deepEqual(artifact.artifactIds, []);
 });
 
+test('tool identity is independently narrowed by parent and owner scope', () => {
+  const parentDenied = deriveSubagentAuthorityEnvelopeV1(request({
+    parentToolIds: ['tool.write'],
+    requestedToolIds: ['tool.read'],
+  }));
+  assert.equal(parentDenied.reasonCode, 'TOOL_SCOPE_ESCALATION');
+  assert.deepEqual(parentDenied.deniedToolIds, ['tool.read']);
+
+  const ownerDenied = deriveSubagentAuthorityEnvelopeV1(request({
+    ownerAllowedToolIds: ['tool.write'],
+    requestedToolIds: ['tool.read'],
+  }));
+  assert.equal(ownerDenied.reasonCode, 'TOOL_SCOPE_ESCALATION');
+  assert.deepEqual(ownerDenied.deniedToolIds, ['tool.read']);
+});
+
 test('tool descriptors cannot smuggle provider or capability authority', () => {
   const capability = deriveSubagentAuthorityEnvelopeV1(request({
     toolDescriptors: [tool('tool.read', ['cap.read', 'cap.write'])],
@@ -113,6 +131,8 @@ test('tool descriptors cannot smuggle provider or capability authority', () => {
   assert.deepEqual(provider.deniedToolIds, ['tool.read']);
 
   const missing = deriveSubagentAuthorityEnvelopeV1(request({
+    parentToolIds: ['tool.read', 'tool.unknown'],
+    ownerAllowedToolIds: ['tool.read', 'tool.unknown'],
     requestedToolIds: ['tool.unknown'],
   }));
   assert.equal(missing.reasonCode, 'TOOL_DESCRIPTOR_MISSING');
