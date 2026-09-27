@@ -116,3 +116,55 @@ test('overlapping cycleAll wake calls coalesce and cannot multiply the global ce
   assert.equal(maxActive, 2);
   assert.deepEqual(Object.fromEntries(calls), { a: 1, b: 1, c: 1 });
 });
+
+test('direct runBurst callers share the same product-wide execution ceiling', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const ids = ['manual-a', 'manual-b', 'manual-c'];
+  manager.load = async () => dueStore(2, ids);
+  manager.getExecutionPolicy = async () => ({ maxConcurrentAgents: 2 });
+  manager.reconcileAlarm = async () => 0;
+
+  let active = 0;
+  let maxActive = 0;
+  manager.cycleOne = async id => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    active -= 1;
+    return { kind: 'COMPLETED', id };
+  };
+
+  await Promise.all(ids.map(id => manager.runBurst(id, { maxCycles: 1 })));
+  assert.equal(maxActive, 2);
+});
+
+test('a queued direct burst observes a lowered owner concurrency limit before admission', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const ids = ['a', 'b', 'c'];
+  manager.load = async () => dueStore(2, ids);
+  let limit = 2;
+  manager.getExecutionPolicy = async () => ({ maxConcurrentAgents: limit });
+  manager.reconcileAlarm = async () => 0;
+
+  let releaseFirst;
+  const firstBarrier = new Promise(resolve => { releaseFirst = resolve; });
+  const starts = [];
+  manager.cycleOne = async id => {
+    starts.push(id);
+    if (id === 'a') await firstBarrier;
+    else await new Promise(resolve => setTimeout(resolve, 10));
+    return { kind: 'COMPLETED', id };
+  };
+
+  const a = manager.runBurst('a', { maxCycles: 1 });
+  const b = manager.runBurst('b', { maxCycles: 1 });
+  const c = manager.runBurst('c', { maxCycles: 1 });
+  await new Promise(resolve => setTimeout(resolve, 5));
+  limit = 1;
+  releaseFirst();
+  await Promise.all([a, b, c]);
+  assert.deepEqual(starts.slice(0, 2), ['a', 'b']);
+  assert.equal(starts.at(-1), 'c');
+});
