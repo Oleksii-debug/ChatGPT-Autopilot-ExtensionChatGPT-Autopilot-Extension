@@ -4063,6 +4063,7 @@ async function createSession() {
   await loadOrchestrationV2Status();
   await loadScenarioWork();
   await loadBrowserAgentJobs();
+  await loadBrowserAgentExecutionPolicy();
   await loadRemoteDispatchStatus();
     await openSession(data.session.id);
     $('session-name').focus();
@@ -4900,4 +4901,3 @@ window.setInterval(() => { if (document.visibilityState === 'visible' && storage
 
 export { MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName };
 
-void loadBrowserAgentExecutionPolicy();
