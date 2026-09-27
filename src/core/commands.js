@@ -14,6 +14,7 @@ import { buildRunTimelineV1 } from './run-timeline.js';
 import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
+import { normalizeAiRoutePolicy } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
@@ -27,10 +28,84 @@ const URL_OWNERSHIP_ERROR = 'Another active or unresolved session already owns o
 
 const AI_ROUTER_OVERRIDE_MODES = new Set(['primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
 const AI_ROUTER_OVERRIDE_PROVIDERS = new Set(['ollama', 'openai', 'openai-compatible']);
+const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
+  'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
+]);
+function minimumNullable(left, right) {
+  if (left == null) return right;
+  if (right == null) return left;
+  return Math.min(left, right);
+}
+function narrowAiRoutePolicy(baseSettings, rawRequested) {
+  if (!rawRequested || typeof rawRequested !== 'object' || Array.isArray(rawRequested)) {
+    throw new Error('Selected Agent AI route policy must be a plain object');
+  }
+  const proto = Object.getPrototypeOf(rawRequested);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error('Selected Agent AI route policy must be a plain object');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawRequested);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('Selected Agent AI route policy contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error('Selected Agent AI route policy must contain data-only fields');
+    }
+  }
+  const requested = normalizeAiRoutePolicy(rawRequested);
+  const base = baseSettings.routePolicy;
+  const knownRoutes = new Set(baseSettings.routes.map(route => route.routeId));
+  const globalAllow = new Set(base.allowRouteIds);
+  const requestedAllow = requested.allowRouteIds;
+  if (globalAllow.size && requestedAllow.some(routeId => !globalAllow.has(routeId))) {
+    throw new Error('Selected Agent AI route policy exceeds the global allow-list');
+  }
+  for (const routeId of [...requestedAllow, ...requested.denyRouteIds, ...requested.orderedRouteIds]) {
+    if (!knownRoutes.has(routeId)) throw new Error('Selected Agent AI route policy references an unknown route');
+  }
+  if (base.pinnedRouteId && requested.pinnedRouteId && base.pinnedRouteId !== requested.pinnedRouteId) {
+    throw new Error('Selected Agent AI route policy conflicts with the global pinned route');
+  }
+  if (requested.pinnedRouteId && !knownRoutes.has(requested.pinnedRouteId)) {
+    throw new Error('Selected Agent AI route policy pins an unknown route');
+  }
+  if (base.locality !== 'any' && requested.locality !== 'any' && base.locality !== requested.locality) {
+    throw new Error('Selected Agent AI route policy exceeds the global locality policy');
+  }
+  const deny = [...new Set([...base.denyRouteIds, ...requested.denyRouteIds])];
+  const allow = requestedAllow.length ? [...requestedAllow] : [...base.allowRouteIds];
+  const policy = {
+    ...base,
+    autoSwitch: base.autoSwitch && requested.autoSwitch,
+    pinnedRouteId: base.pinnedRouteId || requested.pinnedRouteId,
+    orderedRouteIds: requested.orderedRouteIds.length ? [...requested.orderedRouteIds] : [...base.orderedRouteIds],
+    allowRouteIds: allow,
+    denyRouteIds: deny,
+    freeOnly: base.freeOnly || requested.freeOnly,
+    locality: base.locality === 'any' ? requested.locality : base.locality,
+    maxInputPricePerMillionUsd: minimumNullable(base.maxInputPricePerMillionUsd, requested.maxInputPricePerMillionUsd),
+    maxOutputPricePerMillionUsd: minimumNullable(base.maxOutputPricePerMillionUsd, requested.maxOutputPricePerMillionUsd),
+  };
+  if (policy.pinnedRouteId) {
+    if (policy.allowRouteIds.length && !policy.allowRouteIds.includes(policy.pinnedRouteId)) {
+      throw new Error('Selected Agent AI route pin falls outside the effective allow-list');
+    }
+    if (policy.denyRouteIds.includes(policy.pinnedRouteId)) {
+      throw new Error('Selected Agent AI route pin is denied by effective policy');
+    }
+  }
+  return normalizeAiRoutePolicy(policy);
+}
 function mergeAiRouterSettingsOverride(rawBase, rawOverride = {}) {
   const base = normalizeAiRouterSettings(rawBase || DEFAULT_AI_ROUTER_SETTINGS);
   const override = rawOverride && typeof rawOverride === 'object' ? rawOverride : {};
   const next = structuredClone(base);
+  if (Object.hasOwn(override, 'routePolicy')) {
+    next.routePolicy = narrowAiRoutePolicy(base, override.routePolicy);
+  }
   if (AI_ROUTER_OVERRIDE_MODES.has(override.mode)) next.mode = override.mode;
   if (override.routeId !== undefined && override.routeId !== '') {
     const routeId = override.routeId;
