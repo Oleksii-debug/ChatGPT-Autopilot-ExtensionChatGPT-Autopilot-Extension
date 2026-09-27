@@ -761,3 +761,63 @@ test('registry mutation fails closed at revision overflow and supports null-prot
   assert.ok(Object.isFrozen(result));
   assert.ok(Object.isFrozen(result.nextRegistry));
 });
+
+
+test('reusable Agent model route policy is canonical, immutable and materializes as a non-authorizing router override', () => {
+  const def = definition({
+    modelRoutePolicy: {
+      autoSwitch: false,
+      allowRouteIds: ['mistral-agent', 'local-safe'],
+      denyRouteIds: ['blocked-paid'],
+      freeOnly: true,
+      locality: 'local',
+      maxInputPricePerMillionUsd: 0,
+      maxOutputPricePerMillionUsd: 0,
+    },
+  });
+  const reg = registry({ definitions: [def] });
+  const normalized = normalizeAgentDefinitionRegistryV1(reg);
+  const policy = normalized.definitions[0].modelRoutePolicy;
+  assert.equal(policy.autoSwitch, false);
+  assert.deepEqual(policy.allowRouteIds, ['mistral-agent', 'local-safe']);
+  assert.deepEqual(policy.denyRouteIds, ['blocked-paid']);
+  assert.equal(policy.freeOnly, true);
+  assert.equal(policy.locality, 'local');
+  assert.ok(Object.isFrozen(policy));
+  assert.ok(Object.isFrozen(policy.allowRouteIds));
+
+  const selected = selectAgentDefinitionV1({ registry: normalized, agentDefinitionId: 'agent.research' });
+  const result = materializeAgentDefinitionV1({
+    ...materialization(),
+    registry: normalized,
+    selection: selected,
+  });
+  assert.deepEqual(result.routerOverride, { routePolicy: policy });
+  assert.deepEqual(result.authority, {
+    executionAuthorized: false,
+    policyAuthorized: false,
+    schedulingAuthorized: false,
+    recoveryAuthorized: false,
+    credentialAuthorized: false,
+    completionAuthorized: false,
+    verificationAuthorized: false,
+  });
+});
+
+test('reusable Agent model route policy rejects hidden authority and hostile descriptors', () => {
+  assert.throws(() => normalizeAgentDefinitionV1(definition({
+    modelRoutePolicy: { retryBackoffSeconds: 1 },
+  })), /unknown field: retryBackoffSeconds/);
+
+  let reads = 0;
+  const policy = {};
+  Object.defineProperty(policy, 'freeOnly', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return true;
+    },
+  });
+  assert.throws(() => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })), /freeOnly must be an enumerable own data property/);
+  assert.equal(reads, 0);
+});
