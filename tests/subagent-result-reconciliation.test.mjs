@@ -14,6 +14,7 @@ import {
   OrchestrationChatMode,
   OrchestrationHierarchyActionType,
   OrchestrationHierarchyEventType,
+  compactOrchestrationEventId,
   createOrchestrationHierarchyRuntime,
   reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
@@ -289,10 +290,21 @@ function runtimeFixture({ confirmEffect = true } = {}) {
   return { g, runtime };
 }
 
+function canonicalBindingId() {
+  return compactOrchestrationEventId(
+    'subagent-task-activation-binding',
+    'project-1',
+    'envelope-1',
+    'child-activation-1',
+    '1',
+    'invocation-child-1',
+  );
+}
+
 function binding(overrides = {}) {
   return {
     schemaVersion: SUBAGENT_TASK_ACTIVATION_BINDING_VERSION,
-    bindingId: 'binding-1',
+    bindingId: canonicalBindingId(),
     projectId: 'project-1',
     parentAgentId: 'parent-1',
     childAgentId: 'child-1',
@@ -406,7 +418,7 @@ function request({
       evaluatedAt: T6,
       graph: runtimeState.g,
       runtime: runtimeState.runtime,
-      taskActivationBindingId: 'binding-1',
+      taskActivationBindingId: canonicalBindingId(),
     },
   };
 }
@@ -857,7 +869,6 @@ test('derives task activation binding only from canonical task, reducer action a
   runtime = prepared.runtime;
 
   const value = deriveSubagentTaskActivationBindingV1({
-    bindingId: 'binding-1',
     taskEnvelope: task,
     graph: g,
     runtime,
@@ -890,7 +901,6 @@ test('binding derivation rejects forged or stale activation actions and never ac
     EPOCH_T1,
   );
   const baseInput = {
-    bindingId: 'binding-1',
     taskEnvelope: task,
     graph: g,
     runtime: prepared.runtime,
@@ -953,7 +963,6 @@ test('binding derivation rejects ambiguous/terminal activation state and pre-act
     EPOCH_T1,
   );
   const baseInput = {
-    bindingId: 'binding-1',
     taskEnvelope: task,
     graph: g,
     activationAction: prepared.actions[0],
