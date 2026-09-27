@@ -86,6 +86,22 @@ test('successful terminal provider evidence is not promoted to product completio
   assert.equal(value.reconciliationRequired, false);
 });
 
+test('negative terminal OpenHands evidence remains provider failure plus manual review', () => {
+  const failed = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
+    providerStatus: 'error',
+    providerSucceeded: false,
+    manualReviewRequired: true,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+    errorCode: '',
+    at: T1,
+  });
+  assert.equal(failed.status, SpecialistProviderExecutionStatus.PROVIDER_FAILED);
+  assert.equal(failed.providerSucceeded, false);
+  assert.equal(failed.manualReviewRequired, true);
+});
+
 test('manual and ambiguous outcomes remain explicit and fail closed', () => {
   const manual = recordSpecialistProviderExecutionOutcomeV1(prepared(), {
     providerStatus: 'waiting_for_confirmation',
