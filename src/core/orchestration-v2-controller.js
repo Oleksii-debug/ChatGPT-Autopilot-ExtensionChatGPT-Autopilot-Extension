@@ -166,12 +166,14 @@ export class OrchestrationV2Controller {
 
     let summary = { kind: 'NO_HIERARCHY', actions: [], scopeTransitions: [] };
     let coreProjectionCommitted = false;
+    let rollbackGraphId = '';
     let rollbackSnapshots = [];
     try {
       await this.runtimeRepository.update(async runtime => {
         const hierarchy = hierarchyContainer(runtime);
         if (!hierarchy) return runtime;
         const reduced = reduceOrchestrationHierarchyEvent(hierarchy.graph, hierarchy.state, eventRaw, nowMs);
+        rollbackGraphId = hierarchy.graph.graphId;
         let scopeSync = { transitions: [] };
 
         await this.coreRepository.update(coreState => {
@@ -234,7 +236,7 @@ export class OrchestrationV2Controller {
           for (const snapshot of rollbackSnapshots) {
             const session = coreState.sessionsById?.[snapshot.sessionId];
             const binding = session?.orchestrationHierarchy;
-            if (!session || !binding || binding.graphId == null) {
+            if (!session || !binding || binding.graphId !== rollbackGraphId) {
               rollbackConflict = true;
               continue;
             }
