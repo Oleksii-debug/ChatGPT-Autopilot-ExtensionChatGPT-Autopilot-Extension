@@ -562,6 +562,122 @@ test('post-policy-persist profile failure restores config hierarchy and policy b
   }
 });
 
+test('failed profile import cannot clobber a concurrent owner Pause after rollback', async () => {
+  const { orchestration } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+  const before = await orchestration.getStatus('orch-1');
+  const originalConfigureHierarchy = controller.configureHierarchy.bind(controller);
+
+  let configureReachedResolve;
+  const configureReached = new Promise(resolve => { configureReachedResolve = resolve; });
+  let releaseConfigureResolve;
+  const releaseConfigure = new Promise(resolve => { releaseConfigureResolve = resolve; });
+  controller.configureHierarchy = async () => {
+    configureReachedResolve();
+    await releaseConfigure;
+    throw new Error('forced import failure before queued Pause');
+  };
+
+  const profile = exportOrchestrationProfile(
+    { ...before.config, enabled: false, absoluteMaxWorkers: 3 },
+    {
+      name: 'Pause rollback serialization',
+      hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+      subagentPolicy: before.orchestra.subagentPolicy,
+    },
+  );
+
+  try {
+    const importing = orchestration.importProfile(profile);
+    await configureReached;
+
+    let pauseSettled = false;
+    const pausing = orchestration.pause('orch-1').then(result => {
+      pauseSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+      pauseSettled,
+      false,
+      'owner Pause must queue behind the same Project-authority fence while import can still roll back runtime/meta',
+    );
+
+    releaseConfigureResolve();
+    await assert.rejects(importing, /forced import failure before queued Pause/u);
+    const paused = await pausing;
+
+    assert.equal(paused.ownerPaused, true, 'queued owner Pause must apply after rollback and remain durable');
+    assert.deepEqual(paused.config, before.config, 'failed import config must roll back before Pause applies');
+    assert.equal(paused.runtime.hierarchy.graphId, before.runtime.hierarchy.graphId);
+    const durable = await orchestration.getStatus('orch-1');
+    assert.equal(durable.ownerPaused, true);
+    assert.deepEqual(durable.config, before.config);
+    assert.equal(durable.runtime.hierarchy.graphId, before.runtime.hierarchy.graphId);
+  } finally {
+    releaseConfigureResolve?.();
+    controller.configureHierarchy = originalConfigureHierarchy;
+  }
+});
+
+test('failed profile import cannot erase a concurrent rename of the snapshotted orchestra record', async () => {
+  const { orchestration } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+  const before = await orchestration.getStatus('orch-1');
+  const originalConfigureHierarchy = controller.configureHierarchy.bind(controller);
+
+  let configureReachedResolve;
+  const configureReached = new Promise(resolve => { configureReachedResolve = resolve; });
+  let releaseConfigureResolve;
+  const releaseConfigure = new Promise(resolve => { releaseConfigureResolve = resolve; });
+  controller.configureHierarchy = async () => {
+    configureReachedResolve();
+    await releaseConfigure;
+    throw new Error('forced import failure before queued rename');
+  };
+
+  const profile = exportOrchestrationProfile(
+    { ...before.config, enabled: false, absoluteMaxWorkers: 3 },
+    {
+      name: 'Rename rollback serialization',
+      hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+      subagentPolicy: before.orchestra.subagentPolicy,
+    },
+  );
+
+  try {
+    const importing = orchestration.importProfile(profile);
+    await configureReached;
+
+    let renameSettled = false;
+    const renaming = orchestration.rename('orch-1', 'Owner rename after rollback').then(result => {
+      renameSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+      renameSettled,
+      false,
+      'rename of the snapshotted meta record must not settle inside a rollback-capable import',
+    );
+
+    releaseConfigureResolve();
+    await assert.rejects(importing, /forced import failure before queued rename/u);
+    const renamed = await renaming;
+
+    assert.equal(renamed.orchestra.name, 'Owner rename after rollback');
+    assert.deepEqual(renamed.config, before.config);
+    assert.equal(renamed.runtime.hierarchy.graphId, before.runtime.hierarchy.graphId);
+    const durable = await orchestration.getStatus('orch-1');
+    assert.equal(durable.orchestra.name, 'Owner rename after rollback');
+  } finally {
+    releaseConfigureResolve?.();
+    controller.configureHierarchy = originalConfigureHierarchy;
+  }
+});
+
 test('failed owner-paused project rebind defers managed-session purge until authority rollback completes', async () => {
   const { chrome, manager, orchestration, dependencies } = await fixture();
   await orchestration.updateMeta(meta => {

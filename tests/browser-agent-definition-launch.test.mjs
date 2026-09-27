@@ -55,6 +55,12 @@ function definition(overrides = {}) {
       maxRuntimeMinutes: 20,
       aiPinnedRouteId: 'route.research',
     },
+    modelRoutePolicy: {
+      autoSwitch: false,
+      allowRouteIds: ['route.research'],
+      freeOnly: true,
+      locality: 'local',
+    },
     enabled: true,
     definitionRevision: 1,
     ...overrides,
@@ -128,6 +134,9 @@ test('persisted Agent definition launches atomically into the canonical Browser 
     capabilityIds: ['research'],
     toolIds: ['browser.read'],
   });
+  assert.deepEqual(created.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.autoSwitch, false);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.freeOnly, true);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
 
@@ -143,7 +152,23 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.equal(loaded.job.definitionSelection.definitionRevision, 1);
   assert.deepEqual(loaded.job.definitionScope.capabilityIds, ['research']);
   assert.deepEqual(loaded.job.definitionScope.toolIds, ['browser.read']);
+  assert.deepEqual(loaded.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
+  assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
   assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
+});
+
+test('restart rejects a selected definition when its persisted model route policy binding is missing', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest());
+
+  const [storageKey] = Object.keys(data);
+  delete data[storageKey].byId['job.research-1'].definitionRouterOverride;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.research-1');
+  assert.equal(loaded.job, null, 'a durable Agent must not reload after its exact route-policy binding disappears');
 });
 
 test('launch requires exact live registry and definition revisions at the serialized write boundary', async () => {
