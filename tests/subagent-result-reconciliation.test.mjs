@@ -816,6 +816,30 @@ test('paused scope and unconfirmed effect produce no terminal event', async () =
   assert.equal(paused.terminalEvent, null);
 });
 
+test('stopped scope permanently denies late result admission instead of waiting for resume', async () => {
+  const fixture = request();
+  const stoppedRuntime = reduceOrchestrationHierarchyEvent(
+    fixture.runtimeState.g,
+    fixture.runtimeState.runtime,
+    {
+      type: OrchestrationHierarchyEventType.STOP_SCOPE,
+      eventId: 'stop-parent',
+      controlEpoch: 7,
+      nodeId: 'parent-1',
+    },
+    Date.parse(T5) + 1,
+  ).runtime;
+
+  const stopped = await prepareSubagentResultReconciliationV1(
+    { ...fixture.input, runtime: stoppedRuntime },
+    deps({ contract: fixture.contract }),
+  );
+  assert.equal(stopped.decision, SubagentResultReconciliationDecision.DENY);
+  assert.equal(stopped.reasonCode, 'RESULT_CHILD_SCOPE_STOPPED');
+  assert.equal(stopped.terminalEvent, null);
+  assert.equal(stopped.requiresCanonicalOrchestrationReducer, false);
+});
+
 test('raw negative observation cannot override canonical trusted outcome completion', async () => {
   const contract = outcomeContract();
   const result = resultEnvelope({
