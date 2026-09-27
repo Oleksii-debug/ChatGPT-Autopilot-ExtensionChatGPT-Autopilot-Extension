@@ -99,9 +99,57 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
   }
   return normalizeAiRoutePolicy(policy);
 }
+function snapshotAiRouterOverride(rawOverride) {
+  if (rawOverride == null) return Object.freeze({});
+  if (typeof rawOverride !== 'object' || Array.isArray(rawOverride)) {
+    throw new Error('Selected Agent AI router override must be a plain object');
+  }
+  const proto = Object.getPrototypeOf(rawOverride);
+  if (proto !== Object.prototype && proto !== null) {
+    throw new Error('Selected Agent AI router override must be a plain object');
+  }
+  const allowed = new Set(['mode', 'routeId', 'primary', 'strong', 'routePolicy']);
+  const descriptors = Object.getOwnPropertyDescriptors(rawOverride);
+  const out = {};
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !allowed.has(key)) {
+      throw new Error('Selected Agent AI router override contains unsupported field');
+    }
+    const descriptor = descriptors[key];
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error('Selected Agent AI router override must contain data-only fields');
+    }
+    out[key] = descriptor.value;
+  }
+  for (const slotName of ['primary', 'strong']) {
+    if (!Object.hasOwn(out, slotName) || out[slotName] == null) continue;
+    const slot = out[slotName];
+    if (typeof slot !== 'object' || Array.isArray(slot)) {
+      throw new Error('Selected Agent AI router ' + slotName + ' override must be a plain object');
+    }
+    const slotProto = Object.getPrototypeOf(slot);
+    if (slotProto !== Object.prototype && slotProto !== null) {
+      throw new Error('Selected Agent AI router ' + slotName + ' override must be a plain object');
+    }
+    const slotDescriptors = Object.getOwnPropertyDescriptors(slot);
+    const safeSlot = {};
+    for (const key of Reflect.ownKeys(slotDescriptors)) {
+      if (typeof key !== 'string' || !new Set(['provider', 'model']).has(key)) {
+        throw new Error('Selected Agent AI router ' + slotName + ' override contains unsupported field');
+      }
+      const descriptor = slotDescriptors[key];
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+        throw new Error('Selected Agent AI router ' + slotName + ' override must contain data-only fields');
+      }
+      safeSlot[key] = descriptor.value;
+    }
+    out[slotName] = safeSlot;
+  }
+  return Object.freeze(out);
+}
 function mergeAiRouterSettingsOverride(rawBase, rawOverride = {}) {
   const base = normalizeAiRouterSettings(rawBase || DEFAULT_AI_ROUTER_SETTINGS);
-  const override = rawOverride && typeof rawOverride === 'object' ? rawOverride : {};
+  const override = snapshotAiRouterOverride(rawOverride);
   const next = structuredClone(base);
   if (Object.hasOwn(override, 'routePolicy')) {
     next.routePolicy = structuredClone(narrowAiRoutePolicy(base, override.routePolicy));
