@@ -156,6 +156,127 @@ export class OrchestrationV2Controller {
     return { kind: 'HIERARCHY_CLEARED' };
   }
 
+  async dispatchHierarchyScopeEvent(eventRaw, { nowMs = this.now() } = {}) {
+    const requestedType = typeof eventRaw?.type === 'string' ? eventRaw.type.trim().toUpperCase() : '';
+    if (![OrchestrationHierarchyEventType.PAUSE_SCOPE,
+      OrchestrationHierarchyEventType.RESUME_SCOPE,
+      OrchestrationHierarchyEventType.STOP_SCOPE].includes(requestedType)) {
+      throw new Error('Hierarchy scope dispatcher accepts only PAUSE_SCOPE, RESUME_SCOPE or STOP_SCOPE');
+    }
+
+    let summary = { kind: 'NO_HIERARCHY', actions: [], scopeTransitions: [] };
+    let coreProjectionCommitted = false;
+    let rollbackSnapshots = [];
+    try {
+      await this.runtimeRepository.update(async runtime => {
+        const hierarchy = hierarchyContainer(runtime);
+        if (!hierarchy) return runtime;
+        const reduced = reduceOrchestrationHierarchyEvent(hierarchy.graph, hierarchy.state, eventRaw, nowMs);
+        let scopeSync = { transitions: [] };
+
+        await this.coreRepository.update(coreState => {
+          rollbackSnapshots = [];
+          for (const [sessionId, session] of Object.entries(coreState.sessionsById || {})) {
+            const binding = session?.orchestrationHierarchy;
+            if (!binding?.managed || binding.graphId !== hierarchy.graph.graphId) continue;
+            rollbackSnapshots.push({
+              sessionId,
+              before: {
+                enabled: session.enabled,
+                runState: session.runState,
+                scopeState: binding.scopeState || 'RUNNING',
+              },
+            });
+          }
+
+          scopeSync = syncHierarchyScopeStatesIntoCore(
+            coreState,
+            hierarchy.graph,
+            reduced.runtime,
+          );
+          for (const snapshot of rollbackSnapshots) {
+            const session = scopeSync.state.sessionsById?.[snapshot.sessionId];
+            const binding = session?.orchestrationHierarchy;
+            snapshot.after = session && binding
+              ? {
+                  enabled: session.enabled,
+                  runState: session.runState,
+                  scopeState: binding.scopeState || 'RUNNING',
+                }
+              : null;
+          }
+          return scopeSync.state;
+        });
+        coreProjectionCommitted = true;
+
+        runtime.hierarchy = {
+          ...runtime.hierarchy,
+          schemaVersion: 1,
+          graph: hierarchy.graph,
+          state: reduced.runtime,
+        };
+        summary = {
+          kind: 'HIERARCHY_EVENT',
+          reason: reduced.reason,
+          deduplicated: reduced.deduplicated === true,
+          actions: [],
+          scopeTransitions: scopeSync.transitions || [],
+        };
+        return runtime;
+      });
+      return summary;
+    } catch (error) {
+      if (!coreProjectionCommitted || !rollbackSnapshots.length) throw error;
+
+      let rollbackConflict = false;
+      try {
+        await this.coreRepository.update(coreState => {
+          for (const snapshot of rollbackSnapshots) {
+            const session = coreState.sessionsById?.[snapshot.sessionId];
+            const binding = session?.orchestrationHierarchy;
+            if (!session || !binding || binding.graphId == null) {
+              rollbackConflict = true;
+              continue;
+            }
+            const current = {
+              enabled: session.enabled,
+              runState: session.runState,
+              scopeState: binding.scopeState || 'RUNNING',
+            };
+            const matchesAfter = snapshot.after
+              && current.enabled === snapshot.after.enabled
+              && current.runState === snapshot.after.runState
+              && current.scopeState === snapshot.after.scopeState;
+            const alreadyBefore = current.enabled === snapshot.before.enabled
+              && current.runState === snapshot.before.runState
+              && current.scopeState === snapshot.before.scopeState;
+            if (!matchesAfter && !alreadyBefore) {
+              rollbackConflict = true;
+              continue;
+            }
+            if (alreadyBefore) continue;
+            session.enabled = snapshot.before.enabled;
+            session.runState = snapshot.before.runState;
+            binding.scopeState = snapshot.before.scopeState;
+          }
+          return coreState;
+        });
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Hierarchy scope persistence failed and Core scope projection rollback also failed.',
+        );
+      }
+      if (rollbackConflict) {
+        throw new AggregateError(
+          [error, new Error('Core scope projection changed concurrently during rollback')],
+          'Hierarchy scope persistence failed and Core scope projection could not be restored exactly.',
+        );
+      }
+      throw error;
+    }
+  }
+
   async dispatchHierarchyEvent(eventRaw, { nowMs = this.now() } = {}) {
     let summary = { kind: 'NO_HIERARCHY', actions: [], materialized: [], reused: [], blocked: [] };
     await this.runtimeRepository.update(async runtime => {
