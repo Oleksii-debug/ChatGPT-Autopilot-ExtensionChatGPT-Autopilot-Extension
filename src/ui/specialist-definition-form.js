@@ -58,6 +58,9 @@ export function buildSpecialistDefinitionFromFormV1(input = {}, { definitionRevi
     throw new Error('Execution plane не підтримується.');
   }
 
+  const enabled = ownData(input, 'enabled', 'Enabled');
+  if (typeof enabled !== 'boolean') throw new Error('Enabled має бути boolean.');
+
   return {
     schemaVersion: 1,
     specialistId: canonicalIdentity(ownData(input, 'specialistId', 'Specialist ID'), 'Specialist ID'),
@@ -68,7 +71,7 @@ export function buildSpecialistDefinitionFromFormV1(input = {}, { definitionRevi
     capabilityIds: identityLines(ownData(input, 'capabilityIdsText', 'Capability IDs'), 'Capability ID', { minItems: 1, maxItems: 64 }),
     toolIds: identityLines(ownData(input, 'toolIdsText', 'Tool IDs'), 'Tool ID', { maxItems: 128 }),
     resultContractId: canonicalIdentity(ownData(input, 'resultContractId', 'Result contract ID'), 'Result contract ID'),
-    enabled: ownData(input, 'enabled', 'Enabled') === true,
+    enabled,
     definitionRevision,
   };
 }
