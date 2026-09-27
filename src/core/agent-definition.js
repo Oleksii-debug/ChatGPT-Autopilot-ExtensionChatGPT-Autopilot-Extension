@@ -134,7 +134,8 @@ function normalizeTags(raw) {
 function normalizePortablePolicy(rawPolicy) {
   const raw = record(rawPolicy, POLICY_KEYS, 'AgentDefinitionV1.policy');
   const safe = Object.create(null);
-  for (const key of Object.keys(raw)) safe[key] = snapshotData(raw[key], 'AgentDefinitionV1.policy.' + key);
+  const inputState = { nodes: 0 };
+  for (const key of Object.keys(raw)) safe[key] = snapshotData(raw[key], 'AgentDefinitionV1.policy.' + key, inputState);
   const config = normalizeBrowserAgentConfig({
     ...safe,
     id: 'agent-definition-policy',
@@ -143,8 +144,9 @@ function normalizePortablePolicy(rawPolicy) {
     goal: '',
   }, { id: 'agent-definition-policy' });
   const policy = Object.create(null);
+  const outputState = { nodes: 0 };
   for (const key of POLICY_KEYS) {
-    if (Object.hasOwn(config, key)) policy[key] = snapshotData(config[key], 'Canonical Agent policy.' + key);
+    if (Object.hasOwn(config, key)) policy[key] = snapshotData(config[key], 'Canonical Agent policy.' + key, outputState);
   }
   return freeze(policy);
 }
