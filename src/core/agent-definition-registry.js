@@ -1,5 +1,6 @@
 import { normalizeBrowserAgentConfig } from './browser-agent.js';
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
+import { normalizeAgentSpecialistDelegationProfileV1 } from './agent-specialist-delegation-profile.js';
 
 export const AGENT_DEFINITION_VERSION = 1;
 export const AGENT_DEFINITION_REGISTRY_VERSION = 1;
@@ -15,7 +16,8 @@ export const AgentDefinitionRegistryMutationKind = Object.freeze({
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const DEF_KEYS = new Set([
   'schemaVersion', 'agentDefinitionId', 'label', 'description', 'instructions',
-  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy', 'enabled',
+  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy',
+  'specialistDelegationProfile', 'enabled',
   'definitionRevision',
 ]);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
@@ -296,18 +298,39 @@ export function normalizeAgentDefinitionV1(input) {
   if (raw.schemaVersion !== AGENT_DEFINITION_VERSION) {
     throw new Error('AgentDefinitionV1.schemaVersion must be numeric 1');
   }
+  const capabilityIds = ids(raw.capabilityIds, 'capabilityIds', 64);
+  const toolIds = ids(raw.toolIds, 'toolIds', 128);
+  let specialistDelegationProfile;
+  if (Object.hasOwn(raw, 'specialistDelegationProfile')) {
+    specialistDelegationProfile = raw.specialistDelegationProfile === null
+      ? null
+      : normalizeAgentSpecialistDelegationProfileV1(raw.specialistDelegationProfile);
+    if (specialistDelegationProfile) {
+      subset(
+        specialistDelegationProfile.requiredCapabilityIds,
+        capabilityIds,
+        'Agent specialist delegation capabilities',
+      );
+      subset(
+        specialistDelegationProfile.requiredToolIds,
+        toolIds,
+        'Agent specialist delegation tools',
+      );
+    }
+  }
   return freeze({
     schemaVersion: AGENT_DEFINITION_VERSION,
     agentDefinitionId: id(raw.agentDefinitionId, 'agentDefinitionId'),
     label: textValue(raw.label, 'label', 160),
     description: textValue(raw.description, 'description', 4000, { optional: true }),
     instructions: textValue(raw.instructions, 'instructions', 12000),
-    capabilityIds: ids(raw.capabilityIds, 'capabilityIds', 64),
-    toolIds: ids(raw.toolIds, 'toolIds', 128),
+    capabilityIds,
+    toolIds,
     tags: ids(raw.tags, 'tags', 32),
     acceptanceCriteria: normalizeAcceptanceCriteria(raw.acceptanceCriteria),
     configDefaults: normalizeConfigDefaults(raw.configDefaults),
     modelRoutePolicy: normalizeAgentModelRoutePolicyV1(raw.modelRoutePolicy),
+    ...(Object.hasOwn(raw, 'specialistDelegationProfile') ? { specialistDelegationProfile } : {}),
     enabled: bool(raw.enabled, 'enabled'),
     definitionRevision: positiveInteger(raw.definitionRevision, 'definitionRevision'),
   });
