@@ -499,6 +499,46 @@ test('automatic runtime boundary rejects unknown fields and accessors without in
   assert.equal(reads, 0);
 });
 
+test('nested automatic-delegation intent is snapshotted before serialized enqueue', async () => {
+  const { manager, dependencies } = await fixture();
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const blocker = manager.update(async store => {
+    await gate;
+    return store;
+  });
+
+  const mutable = request();
+  mutable.requiredCapabilityIds = ['data.read', 'data.analyze'];
+  mutable.requiredToolIds = ['data.query', 'artifact.write'];
+  const pending = manager.autoPrepareSpecialistHandoff('job.auto', mutable, dependencies);
+
+  mutable.requiredCapabilityIds[0] = 'filesystem.write';
+  mutable.requiredToolIds[0] = 'shell.run';
+  mutable.priority = 999;
+  release();
+  await blocker;
+  const result = await pending;
+
+  assert.equal(result.proposal.selection.specialistId, 'narrow-a');
+  assert.deepEqual(result.proposal.selection.requestedCapabilityIds, ['data.analyze', 'data.read']);
+  assert.deepEqual(result.proposal.selection.grantedToolIds, ['artifact.write', 'data.query']);
+  assert.equal(result.assignment.priority, 5);
+});
+
+test('automatic delegation rejects non-canonical timestamps before durable admission', async () => {
+  const { manager, dependencies } = await fixture();
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff(
+      'job.auto',
+      request({ deadlineAt: '2026-09-27T11:00:00Z' }),
+      dependencies,
+    ),
+    /canonical ISO-8601 UTC/,
+  );
+  assert.equal((await manager.listSpecialistHandoffs('job.auto')).handoffs.length, 0);
+});
+
 test('serialized registry mutation wins before queued auto-delegation and stale CAS cannot bypass it', async () => {
   const { manager, dependencies } = await fixture();
   const mutation = manager.mutateSpecialistRegistry({
