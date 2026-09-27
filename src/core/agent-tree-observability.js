@@ -1,5 +1,7 @@
 import {
+  OrchestrationActivationPhase,
   OrchestrationNodeLifecycle,
+  OrchestrationTerminalStatus,
   validateOrchestrationGraphV1,
   validateOrchestrationHierarchyRuntimeV1,
 } from './orchestration-hierarchy.js';
@@ -23,10 +25,15 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_DEPTH = 64;
 const MAX_SNAPSHOT_NODES = 100_000;
 const MAX_TELEMETRY_ROWS = 1_000;
+const LIFECYCLES = new Set(Object.values(OrchestrationNodeLifecycle));
+const TERMINAL_STATUSES = new Set(Object.values(OrchestrationTerminalStatus));
+const ACTIVATION_PHASES = new Set(Object.values(OrchestrationActivationPhase));
+const SCOPE_STATES = new Set(['RUNNING', 'PAUSED', 'STOPPED']);
 const ACTIVE_LIFECYCLES = new Set([
   OrchestrationNodeLifecycle.PREPARING_EFFECT,
   OrchestrationNodeLifecycle.ACTIVE,
 ]);
+const UNSAFE_DISPLAY_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
 
 function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -174,6 +181,49 @@ function freezeDeep(value) {
   return Object.freeze(value);
 }
 
+function compareId(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function safeDisplayText(value, fallback, max = 300) {
+  const source = typeof value === 'string' ? value : '';
+  const normalized = source
+    .replace(UNSAFE_DISPLAY_CONTROLS, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim()
+    .slice(0, max);
+  return normalized || fallback;
+}
+
+function validateObservableNodeRuntime(nodeRuntime, nodeId) {
+  if (!LIFECYCLES.has(nodeRuntime.lifecycle)) {
+    throw new Error(`Observable lifecycle is invalid for nodeId: ${nodeId}`);
+  }
+  if (!SCOPE_STATES.has(nodeRuntime.scopeState)) {
+    throw new Error(`Observable scopeState is invalid for nodeId: ${nodeId}`);
+  }
+  if (typeof nodeRuntime.round !== 'number'
+      || !Number.isSafeInteger(nodeRuntime.round)
+      || Object.is(nodeRuntime.round, -0)
+      || nodeRuntime.round < 1) {
+    throw new Error(`Observable round is invalid for nodeId: ${nodeId}`);
+  }
+  if (nodeRuntime.lastTerminalStatus
+      && !TERMINAL_STATUSES.has(nodeRuntime.lastTerminalStatus)) {
+    throw new Error(`Observable terminal status is invalid for nodeId: ${nodeId}`);
+  }
+  if (nodeRuntime.currentActivationId) {
+    id(nodeRuntime.currentActivationId, `currentActivationId for ${nodeId}`);
+    const current = nodeRuntime.activationLedger?.[nodeRuntime.currentActivationId];
+    if (!current || typeof current !== 'object' || Array.isArray(current)) {
+      throw new Error(`Current activation is missing for nodeId: ${nodeId}`);
+    }
+    if (!ACTIVATION_PHASES.has(current.phase)) {
+      throw new Error(`Current activation phase is invalid for nodeId: ${nodeId}`);
+    }
+  }
+}
+
 function safeAdd(left, right, label) {
   const next = left + right;
   if (!Number.isSafeInteger(next)) throw new Error(`${label} exceeds safe integer range`);
@@ -236,7 +286,7 @@ export function buildAgentTreeProjectionV1(input = {}) {
 
   const telemetry = denseArray(request.telemetry, 'telemetry', MAX_TELEMETRY_ROWS)
     .map(normalizeAgentTreeTelemetryV1)
-    .sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+    .sort((left, right) => compareId(left.nodeId, right.nodeId));
   if (new Set(telemetry.map(item => item.nodeId)).size !== telemetry.length) {
     throw new Error('telemetry contains duplicate nodeId');
   }
@@ -267,6 +317,7 @@ export function buildAgentTreeProjectionV1(input = {}) {
   function visit(nodeId, depth) {
     const node = graph.nodesById[nodeId];
     const nodeRuntime = runtime.nodesById[nodeId];
+    validateObservableNodeRuntime(nodeRuntime, nodeId);
     const profile = profilesById.get(node.promptProfileId);
     const nodeTelemetry = telemetryByNodeId.get(nodeId) || null;
     const reason = attentionReason(nodeRuntime);
@@ -284,7 +335,7 @@ export function buildAgentTreeProjectionV1(input = {}) {
       }
     }
 
-    const label = profile?.role || nodeId;
+    const label = safeDisplayText(profile?.role, nodeId);
     const state = stateLabel(nodeRuntime);
     const indent = '  '.repeat(Math.min(depth, 20));
     const attention = reason ? `; attention ${reason}` : '';
@@ -295,7 +346,7 @@ export function buildAgentTreeProjectionV1(input = {}) {
       parentId: node.parentId,
       childIds: [...node.childIds],
       depth,
-      role: profile?.role || '',
+      role: safeDisplayText(profile?.role, ''),
       promptProfileId: node.promptProfileId,
       lifecycle: nodeRuntime.lifecycle,
       scopeState: nodeRuntime.scopeState,
