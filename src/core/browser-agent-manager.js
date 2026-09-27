@@ -58,6 +58,7 @@ import {
   normalizeAgentDefinitionSelectionV1,
   selectAgentDefinitionV1,
   materializeAgentDefinitionV1,
+  normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
 import {
@@ -66,6 +67,13 @@ import {
   normalizeSpecialistRegistryV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
+import {
+  BrowserAgentOrchestrationBindingStatus,
+  createBrowserAgentOrchestrationNodeBindingV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+  normalizeBrowserAgentOrchestrationBindingRequestV1,
+  normalizeBrowserAgentOrchestrationNodeBindingV1,
+} from './browser-agent-orchestration-binding.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -91,6 +99,10 @@ const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
+]);
+const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
+  'resolveProjectHierarchyAuthority',
+  'withProjectHierarchyAuthority',
 ]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
@@ -139,6 +151,59 @@ function snapshotExactOwnDataRequest(value, allowed, label) {
   }
   return snapshot;
 }
+function trustedOrchestrationAuthorityResolver(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
+    'Browser Agent orchestration binding dependencies',
+  );
+  if (typeof raw.resolveProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority resolver is required');
+  }
+  return raw.resolveProjectHierarchyAuthority;
+}
+
+function trustedOrchestrationAuthorityFence(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
+    'Browser Agent orchestration binding dependencies',
+  );
+  if (typeof raw.withProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority fence is required');
+  }
+  return raw.withProjectHierarchyAuthority;
+}
+
+const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
+  'PROJECT_UNOWNED',
+  'PROJECT_NON_UNIQUE',
+  'HIERARCHY_UNAVAILABLE',
+  'HIERARCHY_INCONSISTENT',
+]);
+
+function ownDataPropertyValue(value, key) {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+}
+
+function inspectUnavailableOrchestrationAuthority(binding, error) {
+  const code = ownDataPropertyValue(error, 'code');
+  if (typeof code !== 'string' || !ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES.has(code)) return null;
+  const canonicalBinding = normalizeBrowserAgentOrchestrationNodeBindingV1(binding);
+  const projectDrift = code === 'PROJECT_UNOWNED' || code === 'PROJECT_NON_UNIQUE';
+  return Object.freeze({
+    binding: canonicalBinding,
+    status: projectDrift
+      ? BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED
+      : BrowserAgentOrchestrationBindingStatus.GRAPH_DRIFTED,
+    current: false,
+    currentAuthority: null,
+    authorityErrorCode: code,
+  });
+}
+
 function canonicalAgentDefinitionRegistryId(value) {
   return normalizeAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
@@ -422,8 +487,27 @@ function originPattern(value) {
   return `${url.origin}/*`;
 }
 
-function browserAgentRouterOverride(config = {}) {
-  const out = {};
+function normalizePersistedDefinitionRouterOverride(raw, selection) {
+  if (raw == null) {
+    if (selection?.definition?.modelRoutePolicy) {
+      throw new Error('Browser Agent selected definition route policy requires persisted router override');
+    }
+    return null;
+  }
+  if (!selection) throw new Error('Browser Agent definition router override requires persisted selection provenance');
+  const record = snapshotExactOwnDataRequest(raw, new Set(['routePolicy']), 'Browser Agent definition router override');
+  if (!Object.hasOwn(record, 'routePolicy')) throw new Error('Browser Agent definition router override requires routePolicy');
+  const routePolicy = normalizeAgentModelRoutePolicyV1(record.routePolicy);
+  if (!routePolicy) throw new Error('Browser Agent definition router override routePolicy is required');
+  if (JSON.stringify(routePolicy) !== JSON.stringify(selection.definition.modelRoutePolicy)) {
+    throw new Error('Browser Agent definition router override drifted from selected definition');
+  }
+  return Object.freeze({ routePolicy });
+}
+function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
+  const out = definitionRouterOverride?.routePolicy
+    ? { routePolicy: definitionRouterOverride.routePolicy }
+    : {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
   if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
@@ -616,12 +700,28 @@ function normalizeStore(raw, now) {
         ? null
         : normalizeAgentDefinitionSelectionV1(raw.byId[id].definitionSelection);
       const definitionScope = normalizePersistedAgentDefinitionScope(raw.byId[id].definitionScope, definitionSelection);
+      const definitionRouterOverride = normalizePersistedDefinitionRouterOverride(
+        raw.byId[id].definitionRouterOverride,
+        definitionSelection,
+      );
+      const orchestrationNodeBinding = raw.byId[id].orchestrationNodeBinding == null
+        ? null
+        : normalizeBrowserAgentOrchestrationNodeBindingV1(raw.byId[id].orchestrationNodeBinding);
+      if (orchestrationNodeBinding && orchestrationNodeBinding.jobId !== id) {
+        throw new Error('Browser Agent orchestration binding jobId mismatch');
+      }
+      if (orchestrationNodeBinding && orchestrationNodeBinding.projectId !== config.projectId) {
+        // Preserve a stale Project binding as drift evidence only when the job
+        // itself is otherwise canonical. It can never be consumed as CURRENT.
+      }
       out.byId[id] = {
         id,
         config,
         runtime: normalizeRuntime(raw.byId[id].runtime, now),
         definitionSelection,
         definitionScope,
+        definitionRouterOverride,
+        orchestrationNodeBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -721,7 +821,7 @@ export class BrowserAgentManager {
         maxOutputTokens: verifierMaxOutputTokens,
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
-        routerOverride: browserAgentRouterOverride(job.config),
+        routerOverride: browserAgentRouterOverride(job.config, job.definitionRouterOverride),
         taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
@@ -1120,6 +1220,92 @@ export class BrowserAgentManager {
     });
   }
 
+  /**
+   * Persist one exact Browser Agent -> canonical OrchestrationHierarchy node
+   * binding through the existing Browser Agent serialized storage authority.
+   * Canonical OrchestrationV2 authority remains fenced until this manager's
+   * durable Browser Agent update has committed; no caller snapshot can mint
+   * structural authority outside that shared serialization boundary.
+   */
+  async bindOrchestrationNode(id, rawRequest = {}, dependencies = {}) {
+    const request = normalizeBrowserAgentOrchestrationBindingRequestV1(rawRequest);
+    const withProjectHierarchyAuthority = trustedOrchestrationAuthorityFence(dependencies);
+
+    const initial = await this.get(id);
+    if (!initial.job) throw new Error('Browser Agent job not found');
+    const projectId = initial.job.config?.projectId || '';
+    if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+
+    return withProjectHierarchyAuthority(projectId, async authority => {
+      let binding = null;
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job) throw new Error('Browser Agent job not found');
+        const liveProjectId = job.config?.projectId || '';
+        if (liveProjectId !== projectId) {
+          throw new Error('Browser Agent Project changed during orchestration binding');
+        }
+
+        const currentBinding = job.orchestrationNodeBinding;
+        binding = createBrowserAgentOrchestrationNodeBindingV1({
+          jobId: job.id,
+          projectId,
+          request,
+          authority,
+          currentBinding,
+          boundAt: this.now(),
+        });
+        if (currentBinding) return store;
+
+        job.orchestrationNodeBinding = clone(binding);
+        job.updatedAt = this.now();
+        return store;
+      });
+      return Object.freeze({ binding });
+    });
+  }
+
+  /**
+   * Read the durable node binding and compare it with current canonical
+   * OrchestrationV2 authority. Drift is surfaced; it is never silently healed.
+   */
+  async inspectOrchestrationNodeBinding(id = '', dependencies = {}) {
+    const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
+    const current = await this.get(id);
+    if (!current.job) throw new Error('Browser Agent job not found');
+    if (!current.job.orchestrationNodeBinding) {
+      return Object.freeze({
+        binding: null,
+        status: 'UNBOUND',
+        current: false,
+        currentAuthority: null,
+      });
+    }
+    const projectId = current.job.config?.projectId || '';
+    if (!projectId) {
+      return Object.freeze({
+        binding: current.job.orchestrationNodeBinding,
+        status: BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED,
+        current: false,
+        currentAuthority: null,
+      });
+    }
+    try {
+      const authority = await resolveProjectHierarchyAuthority(projectId);
+      return inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: current.job.orchestrationNodeBinding,
+        authority,
+      });
+    } catch (error) {
+      const unavailable = inspectUnavailableOrchestrationAuthority(
+        current.job.orchestrationNodeBinding,
+        error,
+      );
+      if (unavailable) return unavailable;
+      throw error;
+    }
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -1404,6 +1590,8 @@ export class BrowserAgentManager {
         runtime: createBrowserAgentRuntime(now),
         definitionSelection: clone(selection),
         definitionScope: clone(materialized.scope),
+        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
+        orchestrationNodeBinding: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -1464,6 +1652,8 @@ export class BrowserAgentManager {
         runtime: createBrowserAgentRuntime(now),
         definitionSelection: null,
         definitionScope: null,
+        definitionRouterOverride: null,
+        orchestrationNodeBinding: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -3457,7 +3647,7 @@ export class BrowserAgentManager {
         maxOutputTokens,
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(current.job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
-        routerOverride: browserAgentRouterOverride(current.job.config),
+        routerOverride: browserAgentRouterOverride(current.job.config, current.job.definitionRouterOverride),
         taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
