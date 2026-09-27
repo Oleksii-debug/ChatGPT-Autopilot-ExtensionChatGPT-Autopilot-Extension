@@ -127,12 +127,17 @@ async function fixture() {
     withProjectHierarchyAuthority: (projectId, operation) =>
       orchestration.withProjectHierarchyAuthority(projectId, operation),
   };
+  const lifecycleDependencies = {
+    applyBrowserAgentBoundLifecycle: (binding, transition, options) =>
+      orchestration.applyBrowserAgentBoundLifecycle(binding, transition, options),
+  };
   return {
     chrome,
     core,
     orchestration,
     manager,
     dependencies,
+    lifecycleDependencies,
     advance(ms = 1) { now += ms; },
   };
 }
@@ -1115,4 +1120,148 @@ test('service worker exposes one explicit read path and one explicit bind path t
   assert.match(source, /browserAgent\.bindOrchestrationNode\(/u);
   assert.match(source, /orchestrationV2\.withProjectHierarchyAuthority\(projectId, operation\)/u);
   assert.match(source, /orchestrationV2\.resolveProjectHierarchyAuthority\(projectId\)/u);
+});
+
+
+test('bound Browser Agent owner lifecycle propagates through the canonical hierarchy subtree', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode(
+    'job-1',
+    { nodeId: 'root', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
+    dependencies,
+  );
+  await manager.start('job-1', { runInitial: false });
+
+  await manager.pause('job-1', lifecycleDependencies);
+  let runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.root.lifecycle, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.lifecycle, 'PAUSED');
+  assert.equal((await manager.get('job-1')).job.runtime.runState, 'PAUSED');
+
+  await manager.resume('job-1', { runInitial: false }, lifecycleDependencies);
+  runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'RUNNING');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'RUNNING');
+  assert.equal((await manager.get('job-1')).job.runtime.runState, 'RUNNING');
+
+  await manager.stop('job-1', lifecycleDependencies);
+  runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.root.lifecycle, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.lifecycle, 'STOPPED');
+  assert.equal((await manager.get('job-1')).job.runtime.runState, 'STOPPED');
+});
+
+test('bound resume never resurrects a descendant already stopped by canonical hierarchy authority', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  await manager.pause('job-1', lifecycleDependencies);
+
+  const controller = orchestration.controllerFor('orch-1');
+  await controller.dispatchHierarchyEvent({
+    type: 'STOP_SCOPE',
+    eventId: 'test-stop-worker-before-parent-resume',
+    controlEpoch: 1,
+    nodeId: 'worker',
+  }, { nowMs: 2100 });
+
+  await manager.resume('job-1', { runInitial: false }, lifecycleDependencies);
+  const runtime = await controller.runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'RUNNING');
+  assert.notEqual(runtime.hierarchy.state.nodesById.root.lifecycle, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.lifecycle, 'STOPPED');
+});
+
+test('stale bound hierarchy provenance fails closed and rolls Browser Agent lifecycle back', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  const before = await manager.get('job-1');
+
+  await orchestration.controllerFor('orch-1').configureHierarchy(
+    hierarchy({ controlEpoch: 2 }),
+    { nowMs: 2500 },
+  );
+
+  await assert.rejects(
+    () => manager.pause('job-1', lifecycleDependencies),
+    /binding is stale: CONTROL_EPOCH_DRIFTED/,
+  );
+  const after = await manager.get('job-1');
+  assert.equal(after.job.runtime.runState, before.job.runtime.runState);
+  assert.equal(after.job.runtime.controlEpoch, before.job.runtime.controlEpoch);
+  assert.deepEqual(after.job.runtime.history, before.job.runtime.history);
+
+  const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.controlEpoch, 2);
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'RUNNING');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'RUNNING');
+});
+
+test('hierarchy transition failure restores exact Browser Agent lifecycle state before releasing its update chain', async () => {
+  const { manager, dependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  const before = await manager.get('job-1');
+
+  await assert.rejects(
+    () => manager.pause('job-1', {
+      applyBrowserAgentBoundLifecycle: async () => {
+        throw new Error('injected hierarchy persistence failure');
+      },
+    }),
+    /injected hierarchy persistence failure/,
+  );
+
+  const after = await manager.get('job-1');
+  assert.equal(after.job.runtime.runState, 'RUNNING');
+  assert.equal(after.job.runtime.controlEpoch, before.job.runtime.controlEpoch);
+  assert.deepEqual(after.job.runtime.history, before.job.runtime.history);
+  assert.equal(after.job.runtime.updatedAt, before.job.runtime.updatedAt);
+});
+
+test('bound lifecycle dependency is descriptor-safe and cannot run a getter or add authority aliases', async () => {
+  const { manager, dependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+  const before = await manager.get('job-1');
+
+  let reads = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'applyBrowserAgentBoundLifecycle', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return async () => {};
+    },
+  });
+  await assert.rejects(
+    () => manager.pause('job-1', hostile),
+    /enumerable data property/,
+  );
+  assert.equal(reads, 0);
+  assert.equal((await manager.get('job-1')).job.runtime.controlEpoch, before.job.runtime.controlEpoch);
+
+  await assert.rejects(
+    () => manager.pause('job-1', {
+      applyBrowserAgentBoundLifecycle: async () => {},
+      executionAuthorized: true,
+    }),
+    /unknown field/,
+  );
+  assert.equal((await manager.get('job-1')).job.runtime.controlEpoch, before.job.runtime.controlEpoch);
+});
+
+test('service worker routes Browser Agent owner lifecycle commands through the canonical hierarchy adapter', async () => {
+  const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
+  assert.match(source, /const browserAgentOrchestrationLifecycleDependencies = Object\.freeze\(/);
+  assert.match(source, /orchestrationV2\.applyBrowserAgentBoundLifecycle\(binding, transition, options\)/);
+  assert.match(source, /browserAgent\.pause\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
+  assert.match(source, /browserAgent\.resume\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
+  assert.match(source, /browserAgent\.stop\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
 });
