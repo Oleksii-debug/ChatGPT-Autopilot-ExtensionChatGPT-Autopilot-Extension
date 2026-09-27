@@ -157,7 +157,21 @@ export class OrchestrationV2Controller {
   }
 
   async dispatchHierarchyScopeEvent(eventRaw, { nowMs = this.now() } = {}) {
-    const requestedType = typeof eventRaw?.type === 'string' ? eventRaw.type.trim().toUpperCase() : '';
+    if (!eventRaw || typeof eventRaw !== 'object' || Array.isArray(eventRaw)) {
+      throw new Error('Hierarchy scope event must be a plain object');
+    }
+    const prototype = Object.getPrototypeOf(eventRaw);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new Error('Hierarchy scope event must be a plain object');
+    }
+    const typeDescriptor = Object.getOwnPropertyDescriptor(eventRaw, 'type');
+    if (!typeDescriptor
+        || typeDescriptor.enumerable !== true
+        || !Object.hasOwn(typeDescriptor, 'value')
+        || typeof typeDescriptor.value !== 'string') {
+      throw new Error('Hierarchy scope event type must be an enumerable own data property');
+    }
+    const requestedType = typeDescriptor.value;
     if (![OrchestrationHierarchyEventType.PAUSE_SCOPE,
       OrchestrationHierarchyEventType.RESUME_SCOPE,
       OrchestrationHierarchyEventType.STOP_SCOPE].includes(requestedType)) {
