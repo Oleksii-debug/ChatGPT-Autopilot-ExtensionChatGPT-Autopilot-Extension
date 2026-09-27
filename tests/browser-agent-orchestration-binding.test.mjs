@@ -317,6 +317,80 @@ test('current binding exposes control-epoch, graph and node drift without silent
   assert.equal(inspected.status, 'NODE_MISSING');
 });
 
+test('binding rejects Project ownership drift between canonical authority reads before persistence', async () => {
+  const { manager, orchestration } = await fixture();
+  let authorityReads = 0;
+  const dependencies = {
+    resolveProjectHierarchyAuthority: async projectId => {
+      authorityReads += 1;
+      if (authorityReads === 2) {
+        const status = await orchestration.getStatus('orch-1');
+        await orchestration.updateConfig({ ...status.config, projectId: 'project-2' }, 'orch-1');
+      }
+      return orchestration.resolveProjectHierarchyAuthority(projectId);
+    },
+  };
+
+  await assert.rejects(
+    () => manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies),
+    /No canonical orchestra owns this Project ID/,
+  );
+  assert.equal(authorityReads, 2);
+  assert.equal((await manager.get('job-1')).job.orchestrationNodeBinding, null);
+});
+
+test('binding compensates a Project authority change in the final storage commit window', async () => {
+  const { manager, orchestration } = await fixture();
+  const before = await manager.get('job-1');
+  let authorityReads = 0;
+  const dependencies = {
+    resolveProjectHierarchyAuthority: async projectId => {
+      authorityReads += 1;
+      if (authorityReads === 3) {
+        const status = await orchestration.getStatus('orch-1');
+        await orchestration.updateConfig({ ...status.config, projectId: 'project-2' }, 'orch-1');
+      }
+      return orchestration.resolveProjectHierarchyAuthority(projectId);
+    },
+  };
+
+  await assert.rejects(
+    () => manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies),
+    /Canonical orchestration authority changed during Browser Agent binding/,
+  );
+  assert.equal(authorityReads, 3);
+  const after = await manager.get('job-1');
+  assert.equal(after.job.orchestrationNodeBinding, null);
+  assert.equal(after.job.updatedAt, before.job.updatedAt, 'compensating rollback restores the pre-bind timestamp when untouched');
+});
+
+test('binding inspection returns structured Project drift after durable owner reassignment', async () => {
+  const { manager, orchestration, dependencies } = await fixture();
+  const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
+  const status = await orchestration.getStatus('orch-1');
+  await orchestration.updateConfig({ ...status.config, projectId: 'project-2' }, 'orch-1');
+
+  const inspected = await manager.inspectOrchestrationNodeBinding('job-1', dependencies);
+  assert.equal(inspected.status, 'PROJECT_AUTHORITY_DRIFTED');
+  assert.equal(inspected.current, false);
+  assert.equal(inspected.currentAuthority, null);
+  assert.equal(inspected.authorityErrorCode, 'PROJECT_UNOWNED');
+  assert.deepEqual(inspected.binding, bound.binding);
+});
+
+test('binding inspection returns structured graph drift when the durable hierarchy disappears', async () => {
+  const { manager, orchestration, dependencies } = await fixture();
+  const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
+  await orchestration.controllerFor('orch-1').clearHierarchy({ nowMs: 3000 });
+
+  const inspected = await manager.inspectOrchestrationNodeBinding('job-1', dependencies);
+  assert.equal(inspected.status, 'GRAPH_DRIFTED');
+  assert.equal(inspected.current, false);
+  assert.equal(inspected.currentAuthority, null);
+  assert.equal(inspected.authorityErrorCode, 'HIERARCHY_UNAVAILABLE');
+  assert.deepEqual(inspected.binding, bound.binding);
+});
+
 test('Project authority resolver fails closed on missing hierarchy and duplicate durable project ownership', async () => {
   const { chrome, orchestration } = await fixture();
   await orchestration.controllerFor('orch-1').clearHierarchy({ nowMs: 2000 });
@@ -507,7 +581,7 @@ test('Project authority resolver rejects structurally corrupt durable hierarchy 
   chrome.data[key].hierarchy.state.nodeOrder = ['root'];
   await assert.rejects(
     () => orchestration.resolveProjectHierarchyAuthority('project-1'),
-    /Runtime node order mismatch/,
+    /Canonical orchestration hierarchy runtime is invalid/,
   );
 });
 
