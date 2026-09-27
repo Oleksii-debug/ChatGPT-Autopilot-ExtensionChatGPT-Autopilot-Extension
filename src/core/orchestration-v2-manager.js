@@ -239,14 +239,13 @@ export class OrchestrationV2Manager {
   }
 
   /**
-   * Apply one Browser Agent owner lifecycle transition to the exact bound
-   * OrchestrationHierarchy node. This is deliberately a thin adapter over the
-   * existing hierarchy reducer/runtime; it creates no lifecycle authority.
+   * Hold canonical Project/hierarchy authority while BrowserAgentManager runs
+   * its serialized owner-lifecycle mutation and the exact bound subtree event.
+   * The shared lock order is Project -> Browser, matching durable BIND, so
+   * lifecycle and binding cannot create a cross-authority lock inversion.
    *
-   * The Project authority fence is held from provenance revalidation through
-   * durable hierarchy dispatch. BrowserAgentManager keeps its own serialized
-   * store operation open while calling this method and restores its previous
-   * durable state if this call fails.
+   * This remains a thin adapter over the existing hierarchy reducer/runtime;
+   * it creates no lifecycle authority.
    */
   withBrowserAgentBoundLifecycleAuthority(bindingRaw, operation) {
     const binding = normalizeBrowserAgentOrchestrationNodeBindingV1(bindingRaw);
