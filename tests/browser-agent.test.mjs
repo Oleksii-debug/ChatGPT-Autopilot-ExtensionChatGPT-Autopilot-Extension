@@ -1178,6 +1178,20 @@ test('owner outcome contract is normalized and completion evidence must bind eve
   const config = normalizeBrowserAgentConfig({ id: 'job-contract', goal: 'Verify selected course', acceptanceCriteria: ['The selected course is visible', 'The timetable has no conflict'] });
   assert.deepEqual(config.acceptanceCriteria, ['The selected course is visible', 'The timetable has no conflict']);
   assert.throws(() => normalizeBrowserAgentConfig({ id: 'job-contract', goal: 'x', acceptanceCriteria: ['same', 'Same'] }), /Duplicate Browser Agent acceptance criterion/);
+  const originalLocaleLowerCase = String.prototype.toLocaleLowerCase;
+  String.prototype.toLocaleLowerCase = function forbiddenLocaleFold() {
+    throw new Error('acceptance criteria must not depend on host locale');
+  };
+  try {
+    const portable = normalizeBrowserAgentConfig({
+      id: 'job-contract-portable',
+      goal: 'x',
+      acceptanceCriteria: ['I', 'ı'],
+    });
+    assert.deepEqual(portable.acceptanceCriteria, ['I', 'ı']);
+  } finally {
+    String.prototype.toLocaleLowerCase = originalLocaleLowerCase;
+  }
   const snapshot = { url: 'https://ais.example.edu/app', frames: [{ frameId: 0, url: 'https://ais.example.edu/app', text: 'Course A selected; no conflicts', elements: [] }] };
   const signature = browserSnapshotSignature(snapshot);
   const complete = { type: 'done', evidence: { snapshotSignature: signature, checks: [{ criterion: 1, detail: 'Course A is selected.' }, { criterion: 2, detail: 'No conflict marker is present.' }] } };
