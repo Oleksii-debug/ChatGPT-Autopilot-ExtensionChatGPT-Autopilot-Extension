@@ -178,9 +178,33 @@ function replayActivationAdmitted({
   return true;
 }
 
-function activationRequestsForSpawn(graph, runtime, spawnId, childNodeIds) {
+function activationInFlight(nodeRuntime) {
+  if (!nodeRuntime?.currentActivationId) return false;
+  const current = nodeRuntime.activationLedger?.[nodeRuntime.currentActivationId];
+  return Boolean(
+    current
+    && !['TERMINAL', 'SUPERSEDED'].includes(current.phase),
+  );
+}
+
+function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, childNodeIds) {
+  const parent = graph.nodesById[parentNodeId];
+  if (!parent) return [];
+
+  // OrchestrationHierarchy treats zero as the legacy "all direct children"
+  // sentinel. Preserve that behavior, but a positive cap is a hard concurrent
+  // child-activation limit and must include already in-flight siblings.
+  const effectiveLimit = parent.maxActiveChildren || parent.childIds.length;
+  const occupiedSlots = parent.childIds.reduce((count, childId) => (
+    childNodeIds.includes(childId)
+      ? count
+      : count + (activationInFlight(runtime.nodesById[childId]) ? 1 : 0)
+  ), 0);
+  let remainingSlots = Math.max(0, effectiveLimit - occupiedSlots);
+
   const requests = [];
   childNodeIds.forEach((nodeId, index) => {
+    if (remainingSlots <= 0) return;
     const nodeRuntime = runtime.nodesById[nodeId];
     if (!nodeRuntime
         || nodeRuntime.generation !== 1
@@ -204,6 +228,7 @@ function activationRequestsForSpawn(graph, runtime, spawnId, childNodeIds) {
       activationId: 'spawn:' + spawnId + ':child:' + (index + 1),
       purpose: OrchestrationActivationPurpose.WORK,
     });
+    remainingSlots -= 1;
   });
   return requests;
 }
@@ -275,7 +300,7 @@ function replayResult(
     spawnId,
     createdNodeIds: expectedChildIds,
     activationRequests: activationAdmitted
-      ? activationRequestsForSpawn(graph, runtime, spawnId, expectedChildIds)
+      ? activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, expectedChildIds)
       : [],
     reused: true,
     graph,
@@ -420,7 +445,13 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     parentNodeId,
     spawnId,
     createdNodeIds: expectedChildIds,
-    activationRequests: activationRequestsForSpawn(nextGraph, validatedRuntime, spawnId, expectedChildIds),
+    activationRequests: activationRequestsForSpawn(
+      nextGraph,
+      validatedRuntime,
+      parentNodeId,
+      spawnId,
+      expectedChildIds,
+    ),
     reused: false,
     structure,
     resource,
