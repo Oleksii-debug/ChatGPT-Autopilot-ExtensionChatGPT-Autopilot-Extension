@@ -481,21 +481,25 @@ test('owner route scope rejects sparse, accessor-backed and duplicate arrays wit
   );
 });
 
-test('routePolicy input is fail-closed rather than truthy/falsy-coerced', () => {
-  assert.throws(
-    () => createAgentModelPolicyBindingV1(request({ routePolicy: false })),
-    /AI route policy must be an object/,
-  );
+test('routePolicy input is fail-closed rather than truthy/falsy/null-coerced', () => {
+  for (const routePolicy of [false, null]) {
+    assert.throws(
+      () => createAgentModelPolicyBindingV1(request({ routePolicy })),
+      /AI route policy must be an object/,
+    );
+  }
 
   const parent = createAgentModelPolicyBindingV1(request({ agentId: 'agent.parent' }));
-  assert.throws(
-    () => createAgentModelPolicyBindingV1(request({
-      agentId: 'agent.child',
-      parentBinding: parent,
-      routePolicy: false,
-    })),
-    /Child AiRoutePolicy must be a plain object/,
-  );
+  for (const routePolicy of [false, null]) {
+    assert.throws(
+      () => createAgentModelPolicyBindingV1(request({
+        agentId: 'agent.child',
+        parentBinding: parent,
+        routePolicy,
+      })),
+      /Child AiRoutePolicy must be a plain object/,
+    );
+  }
 });
 
 test('canonical route-pool normalizer remains the only route metadata authority', () => {
