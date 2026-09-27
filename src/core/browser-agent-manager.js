@@ -51,12 +51,15 @@ import {
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
+const MAX_BROWSER_AGENT_CONCURRENT = 32;
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -158,7 +161,39 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   return new Date(millis).toISOString();
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
-function freshStore() { return { schemaVersion: BROWSER_AGENT_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
+function normalizeBrowserAgentExecutionPolicy(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Browser Agent execution policy must be a plain object');
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error('Browser Agent execution policy must be a plain object');
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== 'string' || !['maxConcurrentAgents'].includes(key))) {
+    throw new Error('Browser Agent execution policy contains an unknown field');
+  }
+  for (const key of keys) {
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Browser Agent execution policy fields must be enumerable data properties');
+    }
+  }
+  const value = Object.hasOwn(descriptors, 'maxConcurrentAgents')
+    ? descriptors.maxConcurrentAgents.value
+    : DEFAULT_BROWSER_AGENT_MAX_CONCURRENT;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
+      || value < 1 || value > MAX_BROWSER_AGENT_CONCURRENT) {
+    throw new Error(`Browser Agent maxConcurrentAgents must be an integer from 1 to ${MAX_BROWSER_AGENT_CONCURRENT}`);
+  }
+  return Object.freeze({ maxConcurrentAgents: value });
+}
+function freshStore() {
+  return {
+    schemaVersion: BROWSER_AGENT_SCHEMA_VERSION,
+    selectedId: '',
+    order: [],
+    byId: {},
+    executionPolicy: normalizeBrowserAgentExecutionPolicy(),
+  };
+}
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
   const url = new URL(value);
@@ -369,6 +404,11 @@ function normalizeStore(raw, now) {
     }
   }
   out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  try {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy(raw.executionPolicy || {});
+  } catch {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
+  }
   return out;
 }
 
@@ -390,6 +430,7 @@ export class BrowserAgentManager {
       : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
+    this.cycleAllInFlight = null;
   }
 
   async load() {
@@ -495,6 +536,21 @@ export class BrowserAgentManager {
     if (!independent.verified) return { ok: false, error: new Error('Independent Browser Agent verifier could not prove the outcome') };
     verification = { ...verification, checks: independent.checks, independentlyVerified: true };
     return { ok: true, verification };
+  }
+
+  async getExecutionPolicy() {
+    const store = await this.load();
+    return normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+  }
+
+  async updateExecutionPolicy(input = {}) {
+    const policy = normalizeBrowserAgentExecutionPolicy(input);
+    await this.update(store => {
+      store.executionPolicy = policy;
+      return store;
+    });
+    await this.reconcileAlarm();
+    return policy;
   }
 
   async list() {
@@ -3198,14 +3254,18 @@ export class BrowserAgentManager {
   }
 
   cycleAll() {
+    if (this.cycleAllInFlight) return this.cycleAllInFlight;
     const operation = (async () => {
       const store = await this.load();
       const now = this.now();
-      const results = [];
+      const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+      const preflightResults = [];
+      const due = [];
+
       for (const id of store.order) {
         let job = store.byId[id];
         if ((job?.runtime?.retirePendingTabIds || []).length) {
-          results.push({ id, result: await this.retryPendingRetirement(id) });
+          preflightResults.push({ id, result: await this.retryPendingRetirement(id) });
           const live = await this.get(id);
           job = live.job;
           if (!job) continue;
@@ -3213,17 +3273,54 @@ export class BrowserAgentManager {
         if (job?.runtime?.runState === BrowserAgentRunState.WAITING_SCHEDULE) {
           if (Number(job.runtime.nextWakeAt || 0) > now) continue;
           const activation = await this.activateScheduledJob(id);
-          results.push({ id, result: activation });
+          preflightResults.push({ id, result: activation });
           const live = await this.get(id);
           job = live.job;
         }
         if (job?.runtime?.runState !== BrowserAgentRunState.RUNNING) continue;
         if (Number(job.runtime.nextWakeAt || 0) > now) continue;
-        results.push({ id, result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }) });
+        due.push(id);
       }
+
+      const workerCount = [];
+      for (let index = 0; index < due.length; index += 1) {
+        const admission = evaluateResourceBudgetV1({
+          budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
+          usage: { concurrentAgents: workerCount.length },
+          request: { concurrentAgents: 1 },
+        });
+        if (admission.decision !== ResourceBudgetDecisionKind.ALLOW) break;
+        workerCount.push(index);
+      }
+
+      const runResults = new Array(due.length);
+      let cursor = 0;
+      const workers = workerCount.map(async () => {
+        while (true) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= due.length) return;
+          const id = due[index];
+          runResults[index] = {
+            id,
+            result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }),
+          };
+        }
+      });
+      await Promise.all(workers);
+
       await this.reconcileAlarm();
-      return { kind: results.length ? 'CYCLED' : 'IDLE', results };
+      const results = [...preflightResults, ...runResults.filter(Boolean)];
+      return {
+        kind: results.length ? 'CYCLED' : 'IDLE',
+        results,
+        maxConcurrentAgents: policy.maxConcurrentAgents,
+      };
     })();
+    this.cycleAllInFlight = operation;
+    operation.finally(() => {
+      if (this.cycleAllInFlight === operation) this.cycleAllInFlight = null;
+    }).catch(() => undefined);
     return operation;
   }
 
