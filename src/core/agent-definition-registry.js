@@ -204,6 +204,30 @@ export function normalizeAgentModelRoutePolicyV1(input) {
   if (input === undefined || input === null) return null;
   const raw = record(input, MODEL_ROUTE_POLICY_KEYS, 'AgentDefinitionV1.modelRoutePolicy');
   const normalized = normalizeAiRoutePolicy(raw);
+  for (const key of ['autoSwitch', 'freeOnly']) {
+    if (Object.hasOwn(raw, key) && raw[key] !== normalized[key]) {
+      throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
+    }
+  }
+  for (const key of ['pinnedRouteId', 'locality']) {
+    if (Object.hasOwn(raw, key) && raw[key] !== normalized[key]) {
+      throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
+    }
+  }
+  for (const key of ['maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
+    if (Object.hasOwn(raw, key) && !Object.is(raw[key], normalized[key])) {
+      throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
+    }
+  }
+  for (const key of ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds']) {
+    if (!Object.hasOwn(raw, key)) continue;
+    const value = raw[key];
+    if (!Array.isArray(value)
+        || value.length !== normalized[key].length
+        || value.some((item, index) => item !== normalized[key][index])) {
+      throw new Error('AgentDefinitionV1.modelRoutePolicy.' + key + ' must already be canonical');
+    }
+  }
   return freeze({
     autoSwitch: normalized.autoSwitch,
     pinnedRouteId: normalized.pinnedRouteId,
