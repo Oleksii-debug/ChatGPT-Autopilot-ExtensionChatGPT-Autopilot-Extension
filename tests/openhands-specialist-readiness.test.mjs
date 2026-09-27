@@ -293,6 +293,26 @@ test('binding rejects another provider identity and caller authority fields befo
   assert.equal(probes, 0);
 
   await assert.rejects(
+    binding.resolveReadiness({
+      ...request,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      specialistId: 'other-specialist',
+    }),
+    /targets another specialist/u,
+  );
+  assert.equal(probes, 0);
+
+  await assert.rejects(
+    binding.resolveReadiness({
+      ...request,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      executionPlane: 'REMOTE',
+    }),
+    /requires LOCAL execution plane/u,
+  );
+  assert.equal(probes, 0);
+
+  await assert.rejects(
     binding.resolveReadiness({ ...request, providerId: OPENHANDS_CODING_PROVIDER_ID, executionAuthorized: true }),
     /unknown field/u,
   );
