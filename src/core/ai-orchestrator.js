@@ -175,8 +175,11 @@ function automaticStrongGuard(settings, runtime, now) {
   return { allowed: true, reason: '', retryAt: 0 };
 }
 
-function pinnedRouteSelectionBlocksFallback(settings) {
-  return Boolean(clean(settings?.routePolicy?.pinnedRouteId));
+function routePolicyBlocksAutomaticFallback(settings) {
+  return Boolean(settings?.routes?.length) && (
+    Boolean(clean(settings?.routePolicy?.pinnedRouteId))
+    || settings?.routePolicy?.autoSwitch === false
+  );
 }
 
 function shouldScheduledStrong(settings, runtime, now) {
@@ -407,7 +410,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, `${clean(systemPrompt)}${previousStrongContext(settings, runtime)}`.trim(), outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (pinnedRouteSelectionBlocksFallback(settings, error)) throw error;
+        if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(
@@ -425,7 +428,7 @@ export class AiOrchestrator {
         primaryResult = await call(settings.primary, userPrompt, primarySystem, outputCeiling);
       } catch (error) {
         primaryError = clean(error?.message || error);
-        if (pinnedRouteSelectionBlocksFallback(settings, error)) throw error;
+        if (routePolicyBlocksAutomaticFallback(settings)) throw error;
         if (error?.routeFailureClassification?.retryable === false) throw error;
         if (!settings.fallbackToStrongOnPrimaryError || (!settings.routes.length && !settings.strong.model)) throw error;
         strongResult = await tryStrong(

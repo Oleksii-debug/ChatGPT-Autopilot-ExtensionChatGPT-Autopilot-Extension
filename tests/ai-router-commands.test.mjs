@@ -221,6 +221,61 @@ test('autoSwitch=false preserves provider retryAt without issuing a second route
   assert.equal(calls.length, 1, 'pinned Agent failure must not call the eligible verifier route through legacy strong fallback');
 });
 
+test('autoSwitch=false blocks outer route fallback without requiring an Agent pin', async () => {
+  const calls = [];
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: new AiOrchestrator({
+      now: () => 5000,
+      gatewayClient: { async complete(request) {
+        calls.push(structuredClone(request));
+        if (request.model === 'planner-model') {
+          const error = new Error('planner provider quota exhausted');
+          error.status = 429;
+          throw error;
+        }
+        return { text:'verifier fallback must not run' };
+      } },
+    }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{
+      routeId:'planner-route',
+      provider:'openai-compatible',
+      endpointId:'mistral',
+      model:'planner-model',
+      roles:['planner'],
+      costClass:'paid',
+      inputPricePerMillionUsd:1,
+      outputPricePerMillionUsd:2,
+    }, {
+      routeId:'verifier-route',
+      provider:'openai-compatible',
+      endpointId:'mistral',
+      model:'verifier-model',
+      roles:['verifier'],
+      costClass:'paid',
+      inputPricePerMillionUsd:1,
+      outputPricePerMillionUsd:2,
+    }],
+    routePolicy:{ autoSwitch:false, retryBackoffSeconds:60 },
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+  }), error => {
+    assert.notEqual(error?.code, 'AI_ROUTE_POOL_EXHAUSTED', 'no-switch keeps the original provider failure identity');
+    assert.equal(error?.retryAt, 65000);
+    assert.equal(error?.routerRuntime?.routeStates?.['planner-route']?.backoffUntil, 65000);
+    assert.equal(error?.routerRuntime?.routeStates?.['planner-route']?.lastErrorCategory, 'quota-or-rate');
+    return true;
+  });
+  assert.equal(calls.length, 1, 'autoSwitch=false must not enter an outer verifier fallback');
+  assert.equal(calls[0].model, 'planner-model');
+});
+
 test('AI router settings persist and old states without router fields stay valid', async () => {
   const old = createEmptyState(1000);
   delete old.profile.aiRouter;
