@@ -191,6 +191,30 @@ function workKindForState(state) {
   throw new Error('Agent self-repair cycle state is unsupported');
 }
 
+function assertNoDuplicateActiveWork(currentPlan, cycle, kind) {
+  if (kind === AgentSelfRepairWorkKind.REPAIR) {
+    const recordedRepairIds = new Set(cycle.attempts
+      .map((attempt) => attempt.repair?.repairId)
+      .filter(Boolean));
+    const duplicate = currentPlan.nodes.find((node) => node.ownerId === cycle.actorId
+      && node.conflictKeys.includes(cycle.cycleId)
+      && !recordedRepairIds.has(node.nodeId));
+    if (duplicate) {
+      throw new Error('Agent self-repair active REPAIR work already exists in currentPlan');
+    }
+    return;
+  }
+  if (kind === AgentSelfRepairWorkKind.RETEST) {
+    const repairId = cycle.attempts.at(-1)?.repair?.repairId;
+    const duplicate = currentPlan.nodes.find((node) => node.ownerId === cycle.verifierId
+      && node.conflictKeys.includes(cycle.cycleId)
+      && node.dependsOn.includes(repairId));
+    if (duplicate) {
+      throw new Error('Agent self-repair active RETEST work already exists in currentPlan');
+    }
+  }
+}
+
 function authorityFence() {
   return {
     advisoryOnly: true,
@@ -262,6 +286,8 @@ export function proposeAgentSelfRepairWorkV1(input) {
     });
   }
 
+  assertNoDuplicateActiveWork(currentPlan, cycle, kind);
+
   if (raw.workNode == null) throw new Error('Agent self-repair active state requires workNode');
   if (raw.resourceEnvelope == null) throw new Error('Agent self-repair active state requires resourceEnvelope');
   const template = normalizeWorkNodeTemplate(raw.workNode);
@@ -300,10 +326,8 @@ export function proposeAgentSelfRepairWorkV1(input) {
   }
 
   const conflictKeys = [];
-  if (kind === AgentSelfRepairWorkKind.REPAIR) {
-    for (const conflictKey of failedNode.conflictKeys) {
-      if (!conflictKeys.includes(conflictKey)) conflictKeys.push(conflictKey);
-    }
+  for (const conflictKey of failedNode.conflictKeys) {
+    if (!conflictKeys.includes(conflictKey)) conflictKeys.push(conflictKey);
   }
   for (const conflictKey of template.conflictKeys) {
     if (!conflictKeys.includes(conflictKey)) conflictKeys.push(conflictKey);
