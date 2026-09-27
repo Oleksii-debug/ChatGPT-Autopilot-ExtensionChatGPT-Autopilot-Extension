@@ -19,6 +19,7 @@ const REQUEST_KEYS = new Set([
   'projectId',
   'parentProviderIds',
   'ownerAllowedProviderIds',
+  'providerCapabilities',
   'parentCapabilityIds',
   'ownerAllowedCapabilityIds',
   'parentSourceIds',
@@ -34,15 +35,20 @@ const REQUEST_KEYS = new Set([
 const TASK_KEYS = new Set([
   'taskId',
   'providerId',
-  'providerCapabilityIds',
   'taskRequestedCapabilityIds',
   'taskSourceIds',
   'taskArtifactIds',
   'requestedToolIds',
 ]);
 
+const PROVIDER_CAPABILITY_KEYS = new Set([
+  'providerId',
+  'capabilityIds',
+]);
+
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_CHILD_TASKS = 200;
+const MAX_LIST = 256;
 
 function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -78,7 +84,7 @@ function requiredId(value, label) {
   return value;
 }
 
-function dataArray(value, label, max = MAX_CHILD_TASKS) {
+function dataArray(value, label, max = MAX_LIST) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a plain array`);
   }
@@ -107,6 +113,16 @@ function dataArray(value, label, max = MAX_CHILD_TASKS) {
   return out;
 }
 
+function idList(value, label) {
+  const ids = dataArray(value, label).map(
+    (item, index) => requiredId(item, `${label}[${index}]`),
+  );
+  if (new Set(ids).size !== ids.length) {
+    throw new Error(`${label} contains duplicates`);
+  }
+  return ids;
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -132,7 +148,7 @@ function denied(reasonCode, details = {}) {
 }
 
 function normalizeChildTasks(value) {
-  const tasks = dataArray(value, 'childTasks').map((item, index) => {
+  const tasks = dataArray(value, 'childTasks', MAX_CHILD_TASKS).map((item, index) => {
     const task = strictRecord(item, TASK_KEYS, `childTasks[${index}]`);
     return {
       task,
@@ -148,14 +164,47 @@ function normalizeChildTasks(value) {
   return tasks;
 }
 
+function normalizeProviderCapabilities(value) {
+  const entries = dataArray(value, 'providerCapabilities').map((item, index) => {
+    const entry = strictRecord(
+      item,
+      PROVIDER_CAPABILITY_KEYS,
+      `providerCapabilities[${index}]`,
+    );
+    return {
+      providerId: requiredId(
+        own(entry, 'providerId'),
+        `providerCapabilities[${index}].providerId`,
+      ),
+      capabilityIds: idList(
+        own(entry, 'capabilityIds'),
+        `providerCapabilities[${index}].capabilityIds`,
+      ),
+    };
+  });
+
+  const byProviderId = new Map();
+  for (const entry of entries) {
+    if (byProviderId.has(entry.providerId)) {
+      throw new Error('providerCapabilities contains duplicate providerId');
+    }
+    byProviderId.set(entry.providerId, entry);
+  }
+  return byProviderId;
+}
+
 /**
  * Atomically compose deterministic child topology with least-authority child
  * envelopes.
  *
  * Parent/child Agent identities are never accepted from child task input. They
- * are derived only from the canonical topology transform result. This function
- * is pure and non-authorizing: callers must persist and activate through the
- * existing canonical Orchestration V2 authority.
+ * are derived only from the canonical topology transform result. Provider
+ * capability truth is also separate from child task/model scope: the child may
+ * select a provider ID, but its capability set comes from the canonical
+ * provider snapshot supplied by the existing owner/runtime authority.
+ *
+ * This function is pure and non-authorizing. Callers must persist and activate
+ * through the existing canonical Orchestration V2 authority.
  */
 export function bindSubagentSpawnAuthorityV1(input = {}) {
   const request = strictRecord(
@@ -165,6 +214,9 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
   );
   const projectId = requiredId(own(request, 'projectId'), 'projectId');
   const childTasks = normalizeChildTasks(own(request, 'childTasks'));
+  const providerCapabilities = normalizeProviderCapabilities(
+    own(request, 'providerCapabilities'),
+  );
 
   const topology = mutateOrchestrationSubagentTopologyV1(
     own(request, 'topologyRequest'),
@@ -190,6 +242,18 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
   for (let index = 0; index < childTasks.length; index += 1) {
     const { task, taskId, providerId } = childTasks[index];
     const childNodeId = topology.createdNodeIds[index];
+    const providerCapability = providerCapabilities.get(providerId);
+
+    if (!providerCapability) {
+      return denied('PROVIDER_CAPABILITY_SNAPSHOT_MISSING', {
+        projectId,
+        parentNodeId: topology.parentNodeId,
+        spawnId: topology.spawnId,
+        deniedChildNodeId: childNodeId,
+        deniedTaskId: taskId,
+        deniedProviderId: providerId,
+      });
+    }
 
     const authorityEnvelope = deriveSubagentAuthorityEnvelopeV1({
       projectId,
@@ -201,7 +265,7 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
       ownerAllowedProviderIds: own(request, 'ownerAllowedProviderIds'),
       parentCapabilityIds: own(request, 'parentCapabilityIds'),
       ownerAllowedCapabilityIds: own(request, 'ownerAllowedCapabilityIds'),
-      providerCapabilityIds: own(task, 'providerCapabilityIds'),
+      providerCapabilityIds: providerCapability.capabilityIds,
       taskRequestedCapabilityIds: own(task, 'taskRequestedCapabilityIds'),
       parentSourceIds: own(request, 'parentSourceIds'),
       ownerAllowedSourceIds: own(request, 'ownerAllowedSourceIds'),
