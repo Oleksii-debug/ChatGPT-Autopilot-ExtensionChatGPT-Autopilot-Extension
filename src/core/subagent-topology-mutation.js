@@ -1,6 +1,9 @@
 import {
+  OrchestrationActivationPurpose,
   OrchestrationBarrierMode,
+  OrchestrationHierarchyEventType,
   OrchestrationNodeLifecycle,
+  compactOrchestrationEventId,
   createOrchestrationHierarchyRuntime,
   validateOrchestrationGraphV1,
   validateOrchestrationHierarchyRuntimeV1,
@@ -114,12 +117,31 @@ function childIdsForSpawn(spawnId, requestedChildren) {
   );
 }
 
+function activationRequestsForSpawn(graph, spawnId, childNodeIds) {
+  return childNodeIds.map((nodeId, index) => ({
+    type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+    eventId: compactOrchestrationEventId(
+      'subagent-spawn',
+      graph.graphId,
+      spawnId,
+      nodeId,
+      1,
+    ),
+    controlEpoch: graph.controlEpoch,
+    nodeId,
+    generation: 1,
+    activationId: 'spawn:' + spawnId + ':child:' + (index + 1),
+    purpose: OrchestrationActivationPurpose.WORK,
+  }));
+}
+
 function denial(reasonCode, details = {}) {
   return freezeDeep({
     schemaVersion: SUBAGENT_TOPOLOGY_MUTATION_VERSION,
     decision: SubagentTopologyMutationDecision.DENY,
     reasonCode,
     createdNodeIds: [],
+    activationRequests: [],
     reused: false,
     activationAuthority: false,
     executionAuthority: false,
@@ -164,6 +186,7 @@ function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
     parentNodeId,
     spawnId,
     createdNodeIds: expectedChildIds,
+    activationRequests: activationRequestsForSpawn(graph, spawnId, expectedChildIds),
     reused: true,
     graph,
     runtime,
@@ -297,6 +320,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     parentNodeId,
     spawnId,
     createdNodeIds: expectedChildIds,
+    activationRequests: activationRequestsForSpawn(nextGraph, spawnId, expectedChildIds),
     reused: false,
     structure,
     resource,
