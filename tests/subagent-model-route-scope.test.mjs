@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { AiRouteRole } from '../src/core/ai-route-pool.js';
+import { deriveSubagentAuthorityEnvelopeV1 } from '../src/core/subagent-authority-envelope.js';
 import {
   SubagentModelRouteScopeDecision,
   deriveSubagentModelRouteScopeV1,
@@ -63,16 +64,39 @@ function routes() {
   ];
 }
 
-function request(overrides = {}) {
-  return {
+function childAuthority(capabilityIds = ['model.code', 'model.vision'], overrides = {}) {
+  return deriveSubagentAuthorityEnvelopeV1({
     projectId: 'project.alpha',
     parentAgentId: 'agent.parent',
     childAgentId: 'agent.child',
     taskId: 'task.one',
+    providerId: 'provider.model-worker',
+    parentProviderIds: ['provider.model-worker'],
+    ownerAllowedProviderIds: ['provider.model-worker'],
+    parentCapabilityIds: capabilityIds,
+    ownerAllowedCapabilityIds: capabilityIds,
+    providerCapabilityIds: capabilityIds,
+    taskRequestedCapabilityIds: capabilityIds,
+    parentSourceIds: [],
+    ownerAllowedSourceIds: [],
+    taskSourceIds: [],
+    parentArtifactIds: [],
+    ownerAllowedArtifactIds: [],
+    taskArtifactIds: [],
+    parentToolIds: [],
+    ownerAllowedToolIds: [],
+    requestedToolIds: [],
+    parentToolDescriptors: [],
+    ...overrides,
+  });
+}
+
+function request(overrides = {}) {
+  return {
+    childAuthorityEnvelope: childAuthority(),
     routes: routes(),
     parentRoutePolicy: {},
     ownerRoutePolicy: {},
-    childCapabilityIds: ['model.code', 'model.vision'],
     taskModelCapabilityIds: ['model.code'],
     taskRequestedRouteIds: [],
     role: AiRouteRole.FAST_WORKER,
@@ -86,6 +110,7 @@ test('derives only the common parent-owner model route scope and grants zero exe
 
   assert.equal(value.decision, SubagentModelRouteScopeDecision.ALLOW);
   assert.equal(value.reasonCode, 'MODEL_ROUTE_SCOPE_ADMITTED');
+  assert.equal(value.childAuthorityProviderId, 'provider.model-worker');
   assert.deepEqual(value.admittedRouteIds, [
     'route.local',
     'route.remote.cheap',
@@ -225,7 +250,7 @@ test('unknown task route ID is denied even when all canonical policies are other
 
 test('task model capabilities cannot exceed the already-admitted child capability envelope', () => {
   const value = deriveSubagentModelRouteScopeV1(request({
-    childCapabilityIds: ['model.code'],
+    childAuthorityEnvelope: childAuthority(['model.code']),
     taskModelCapabilityIds: ['model.code', 'model.admin'],
   }));
   assert.equal(value.decision, 'DENY');
@@ -263,13 +288,13 @@ test('role mismatch yields no common route instead of silently changing child ro
 
 test('set-valued scope inputs are canonical across semantically equivalent ordering', () => {
   const forward = deriveSubagentModelRouteScopeV1(request({
-    childCapabilityIds: ['model.code', 'model.vision'],
+    childAuthorityEnvelope: childAuthority(['model.code', 'model.vision']),
     taskModelCapabilityIds: ['model.code', 'model.vision'],
     taskRequestedRouteIds: ['route.vision'],
   }));
   const reordered = deriveSubagentModelRouteScopeV1(request({
     routes: [...routes()].reverse(),
-    childCapabilityIds: ['model.vision', 'model.code'],
+    childAuthorityEnvelope: childAuthority(['model.vision', 'model.code']),
     taskModelCapabilityIds: ['model.vision', 'model.code'],
     taskRequestedRouteIds: ['route.vision'],
   }));
@@ -283,7 +308,7 @@ test('set-valued scope inputs are canonical across semantically equivalent order
 test('request boundary rejects accessors without executing them', () => {
   let getterCalls = 0;
   const hostile = request();
-  Object.defineProperty(hostile, 'taskId', {
+  Object.defineProperty(hostile, 'role', {
     enumerable: true,
     configurable: true,
     get() {
@@ -294,6 +319,27 @@ test('request boundary rejects accessors without executing them', () => {
 
   assert.throws(
     () => deriveSubagentModelRouteScopeV1(hostile),
+    /enumerable own data property/u,
+  );
+  assert.equal(getterCalls, 0);
+});
+
+test('child authority envelope boundary rejects accessors without executing them', () => {
+  let getterCalls = 0;
+  const hostileAuthority = { ...childAuthority() };
+  Object.defineProperty(hostileAuthority, 'capabilityIds', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('must not execute child authority getter');
+    },
+  });
+
+  assert.throws(
+    () => deriveSubagentModelRouteScopeV1(request({
+      childAuthorityEnvelope: hostileAuthority,
+    })),
     /enumerable own data property/u,
   );
   assert.equal(getterCalls, 0);
@@ -371,18 +417,39 @@ test('sparse, duplicate, symbol and unknown authority representations fail close
   );
 });
 
-test('exact identities and required booleans fail closed instead of coercing', () => {
+test('child identity and capability provenance come only from the admitted #469 authority envelope', () => {
   assert.throws(
-    () => deriveSubagentModelRouteScopeV1(request({ childAgentId: ' agent.child ' })),
-    /exact canonical identity/u,
+    () => deriveSubagentModelRouteScopeV1({
+      ...request(),
+      childAgentId: 'agent.alias',
+    }),
+    /unknown field: childAgentId/u,
   );
+
   assert.throws(
     () => deriveSubagentModelRouteScopeV1(request({ requiresVision: 0 })),
     /must be boolean/u,
   );
+
+  const deniedAuthority = childAuthority(['model.code'], {
+    childAgentId: 'agent.parent',
+  });
+  assert.equal(deniedAuthority.decision, 'DENY');
   assert.throws(
-    () => deriveSubagentModelRouteScopeV1(request({ childAgentId: 'agent.parent' })),
-    /isolated/u,
+    () => deriveSubagentModelRouteScopeV1(request({
+      childAuthorityEnvelope: deniedAuthority,
+    })),
+    /admitted least-authority envelope/u,
+  );
+
+  assert.throws(
+    () => deriveSubagentModelRouteScopeV1(request({
+      childAuthorityEnvelope: {
+        ...childAuthority(),
+        executionAuthority: true,
+      },
+    })),
+    /executionAuthority must remain false/u,
   );
 });
 
@@ -397,7 +464,7 @@ test('route binding carries model identity and policy-relevant metadata but no p
     provider: 'openai',
     model: 'model-route.remote.cheap',
     endpointId: 'openai',
-    roles: [AiRouteRole.FAST_WORKER, AiRouteRole.CODER],
+    roles: [AiRouteRole.CODER, AiRouteRole.FAST_WORKER],
     capabilityIds: ['model.code'],
     locality: 'remote',
     costClass: 'paid',
