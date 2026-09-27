@@ -147,6 +147,8 @@ test('tool descriptors cannot smuggle provider or capability authority', () => {
 
 test('unused descriptors grant no authority and requested tool order remains deterministic', () => {
   const result = deriveSubagentAuthorityEnvelopeV1(request({
+    parentToolIds: ['tool.read', 'tool.write', 'tool.second'],
+    ownerAllowedToolIds: ['tool.read', 'tool.write', 'tool.second'],
     requestedToolIds: ['tool.second', 'tool.read'],
     toolDescriptors: [
       tool('tool.unused', ['cap.admin']),
