@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  AGENT_SPECIALIST_DELEGATION_BINDING_VERSION,
   AGENT_SPECIALIST_DELEGATION_PROFILE_VERSION,
   materializeAgentSpecialistDelegationIntentV1,
+  materializeBoundAgentSpecialistDelegationIntentV1,
+  normalizeAgentSpecialistDelegationBindingV1,
   normalizeAgentSpecialistDelegationProfileV1,
 } from '../src/core/agent-specialist-delegation-profile.js';
 
@@ -43,6 +46,128 @@ function request(overrides = {}) {
     ...overrides,
   };
 }
+
+function binding(overrides = {}) {
+  return {
+    schemaVersion: AGENT_SPECIALIST_DELEGATION_BINDING_VERSION,
+    jobId: 'job:agent-1',
+    projectId: 'project:1',
+    registryId: 'agents:project-1',
+    registryRevision: 3,
+    agentDefinitionId: 'agent:research',
+    definitionRevision: 7,
+    profile: profile(),
+    authority: {
+      proposalOnly: true,
+      executionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
+      credentialAuthorized: false,
+      completionAuthorized: false,
+      verificationAuthorized: false,
+      capacityReserved: false,
+    },
+    ...overrides,
+  };
+}
+
+function boundRequest(overrides = {}) {
+  return {
+    binding: binding(),
+    jobId: 'job:agent-1',
+    projectId: 'project:1',
+    agentDefinitionRegistryId: 'agents:project-1',
+    agentDefinitionRegistryRevision: 3,
+    agentDefinitionId: 'agent:research',
+    definitionRevision: 7,
+    parentCapabilityIds: ['filesystem.write', 'data.read', 'data.analyze'],
+    parentToolIds: ['shell.run', 'artifact.write', 'data.query'],
+    expectedRegistryRevision: 5,
+    expectedPlanRevision: 11,
+    nodeId: 'node:local-analysis',
+    at: T0,
+    parentInvocationId: 'invocation:parent-1',
+    ...overrides,
+  };
+}
+
+test('normalizes launch binding and rejects any caller-shaped authority grant', () => {
+  const normalized = normalizeAgentSpecialistDelegationBindingV1(binding());
+  assert.equal(normalized.jobId, 'job:agent-1');
+  assert.equal(normalized.projectId, 'project:1');
+  assert.equal(normalized.registryId, 'agents:project-1');
+  assert.equal(normalized.registryRevision, 3);
+  assert.equal(normalized.agentDefinitionId, 'agent:research');
+  assert.equal(normalized.definitionRevision, 7);
+  assert.equal(normalized.profile.registryId, 'specialists:project-1');
+  assert.equal(normalized.authority.proposalOnly, true);
+  assert.equal(normalized.authority.executionAuthorized, false);
+  assert.equal(Object.isFrozen(normalized), true);
+  assert.equal(Object.isFrozen(normalized.profile), true);
+  assert.equal(Object.isFrozen(normalized.authority), true);
+
+  const escalated = binding();
+  escalated.authority = { ...escalated.authority, executionAuthorized: true };
+  assert.throws(
+    () => normalizeAgentSpecialistDelegationBindingV1(escalated),
+    /executionAuthorized must be false/u,
+  );
+
+  const hidden = binding();
+  hidden.authority = { ...hidden.authority, hiddenGrant: true };
+  assert.throws(
+    () => normalizeAgentSpecialistDelegationBindingV1(hidden),
+    /unknown field/u,
+  );
+});
+
+test('bound materialization derives PREPARE intent only from exact launch provenance', () => {
+  const intent = materializeBoundAgentSpecialistDelegationIntentV1(boundRequest());
+  assert.equal(intent.request.registryId, 'specialists:project-1');
+  assert.equal(intent.request.expectedRegistryRevision, 5);
+  assert.equal(intent.request.expectedPlanRevision, 11);
+  assert.equal(intent.request.nodeId, 'node:local-analysis');
+  assert.deepEqual(intent.request.requiredCapabilityIds, ['data.analyze', 'data.read']);
+  assert.deepEqual(intent.request.requiredToolIds, ['artifact.write', 'data.query']);
+  assert.equal(intent.request.deadlineAt, '2026-09-27T18:15:00.000Z');
+  assert.deepEqual(intent.provenance, {
+    jobId: 'job:agent-1',
+    projectId: 'project:1',
+    agentDefinitionRegistryId: 'agents:project-1',
+    agentDefinitionRegistryRevision: 3,
+    agentDefinitionId: 'agent:research',
+    definitionRevision: 7,
+    ownerBound: true,
+  });
+  assert.equal(intent.authority.executionAuthorized, false);
+  assert.equal(intent.authority.capacityReserved, false);
+  assert.equal(Object.isFrozen(intent.provenance), true);
+});
+
+test('bound materialization fails closed on job, Project or definition provenance drift', () => {
+  for (const [field, value] of [
+    ['jobId', 'job:other'],
+    ['projectId', 'project:other'],
+    ['agentDefinitionRegistryId', 'agents:other'],
+    ['agentDefinitionRegistryRevision', 4],
+    ['agentDefinitionId', 'agent:other'],
+    ['definitionRevision', 8],
+  ]) {
+    assert.throws(
+      () => materializeBoundAgentSpecialistDelegationIntentV1(boundRequest({ [field]: value })),
+      /binding provenance drifted/u,
+      field,
+    );
+  }
+
+  assert.throws(
+    () => materializeBoundAgentSpecialistDelegationIntentV1(boundRequest({
+      binding: binding({ projectId: '' }),
+    })),
+    /binding provenance drifted/u,
+  );
+});
 
 test('normalizes owner delegation profile deterministically and freezes it', () => {
   const normalized = normalizeAgentSpecialistDelegationProfileV1(profile());
