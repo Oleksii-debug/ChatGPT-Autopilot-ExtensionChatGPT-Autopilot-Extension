@@ -5,6 +5,7 @@ import {
 } from './capability-discovery.js';
 import {
   OPENHANDS_CODING_PROVIDER_ID,
+  OPENHANDS_CODING_SPECIALIST_ID,
   normalizeOpenHandsCodingSpecialistConfigV1,
 } from './coding-specialist-provider.js';
 
@@ -191,12 +192,16 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
     }
     id(request.registryId, 'registryId');
     integer(request.registryRevision, 'registryRevision', 1, Number.MAX_SAFE_INTEGER);
-    id(request.specialistId, 'specialistId');
+    if (id(request.specialistId, 'specialistId') !== OPENHANDS_CODING_SPECIALIST_ID) {
+      throw new Error('OpenHands readiness request targets another specialist');
+    }
     if (id(request.providerId, 'providerId') !== OPENHANDS_CODING_PROVIDER_ID) {
       throw new Error('OpenHands readiness request targets another provider');
     }
     integer(request.definitionRevision, 'definitionRevision', 1, Number.MAX_SAFE_INTEGER);
-    id(request.executionPlane, 'executionPlane');
+    if (id(request.executionPlane, 'executionPlane') !== 'LOCAL') {
+      throw new Error('OpenHands coding readiness requires LOCAL execution plane');
+    }
     toolIds(request.requestedToolIds);
     timestamp(request.asOf, 'asOf');
 
