@@ -243,6 +243,9 @@ function bindingKey({
   parentAgentId,
   policyRevision,
   routePoolRevision,
+  authorityRouteIds,
+  effectiveRouteIds,
+  routePolicy,
 }) {
   return JSON.stringify([
     AGENT_MODEL_POLICY_BINDING_VERSION,
@@ -251,6 +254,22 @@ function bindingKey({
     parentAgentId,
     policyRevision,
     routePoolRevision,
+    authorityRouteIds,
+    effectiveRouteIds,
+    [
+      routePolicy.autoSwitch,
+      routePolicy.pinnedRouteId,
+      routePolicy.orderedRouteIds,
+      routePolicy.allowRouteIds,
+      routePolicy.denyRouteIds,
+      routePolicy.freeOnly,
+      routePolicy.locality,
+      routePolicy.maxInputPricePerMillionUsd,
+      routePolicy.maxOutputPricePerMillionUsd,
+      routePolicy.retryBackoffSeconds,
+      routePolicy.circuitBreakerFailures,
+      routePolicy.circuitBreakerSeconds,
+    ],
   ]);
 }
 
@@ -294,7 +313,14 @@ export function normalizeAgentModelPolicyBindingV1(input) {
     assertSubset([routePolicy.pinnedRouteId], authorityRouteIds, 'routePolicy.pinnedRouteId');
   }
 
-  const allow = routePolicy.allowRouteIds.length ? routePolicy.allowRouteIds : authorityRouteIds;
+  if (!routePolicy.allowRouteIds.length) {
+    throw new Error('Durable Agent routePolicy.allowRouteIds must be explicit');
+  }
+  const allow = routePolicy.allowRouteIds;
+  const canonicalAllow = authorityRouteIds.filter(routeId => new Set(allow).has(routeId));
+  assertExactList(routePolicy.allowRouteIds, canonicalAllow, 'routePolicy.allowRouteIds');
+  const canonicalDeny = authorityRouteIds.filter(routeId => new Set(routePolicy.denyRouteIds).has(routeId));
+  assertExactList(routePolicy.denyRouteIds, canonicalDeny, 'routePolicy.denyRouteIds');
   assertInsideAgentAllow(routePolicy.denyRouteIds, allow, 'routePolicy.denyRouteIds');
   assertInsideAgentAllow(routePolicy.orderedRouteIds, allow, 'routePolicy.orderedRouteIds');
   if (routePolicy.pinnedRouteId) {
@@ -313,6 +339,9 @@ export function normalizeAgentModelPolicyBindingV1(input) {
     parentAgentId,
     policyRevision,
     routePoolRevision,
+    authorityRouteIds,
+    effectiveRouteIds,
+    routePolicy,
   });
   if (own(raw, 'bindingKey') !== expectedKey) {
     throw new Error('Agent model policy bindingKey is inconsistent');
@@ -407,6 +436,9 @@ export function createAgentModelPolicyBindingV1(input) {
     parentAgentId,
     policyRevision,
     routePoolRevision,
+    authorityRouteIds,
+    effectiveRouteIds: projected.effectiveRouteIds,
+    routePolicy: projected.routePolicy,
   });
 
   return normalizeAgentModelPolicyBindingV1({
