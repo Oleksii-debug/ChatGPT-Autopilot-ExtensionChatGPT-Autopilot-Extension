@@ -286,6 +286,7 @@ test('binding rejects another provider identity and caller authority fields befo
     providerId: 'provider.other',
     definitionRevision: 1,
     executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
     requestedToolIds: [],
     asOf: '2026-09-27T13:00:00.025Z',
   };
@@ -319,6 +320,25 @@ test('binding rejects another provider identity and caller authority fields befo
   assert.equal(probes, 0);
 });
 
+test('readiness capability scope must exactly match the owner-qualified OpenHands profile before probing', async () => {
+  let probes = 0;
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client: { async probe() { probes += 1; } },
+    now: monotonicNow([T0, T1]),
+  });
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding],
+    now: () => T1,
+  });
+
+  await assert.rejects(
+    resolver.resolve(selection({ requestedCapabilityIds: ['code.review'] })),
+    /capability scope does not match qualified profile/u,
+  );
+  assert.equal(probes, 0);
+});
+
 test('clock regression and invalid owner dependencies fail closed', async () => {
   const backward = createOpenHandsSpecialistReadinessBindingV1({
     config: config(),
@@ -333,6 +353,7 @@ test('clock regression and invalid owner dependencies fail closed', async () => 
     providerId: OPENHANDS_CODING_PROVIDER_ID,
     definitionRevision: 1,
     executionPlane: 'LOCAL',
+    requestedCapabilityIds: ['code.write'],
     requestedToolIds: [],
     asOf: '2026-09-27T13:00:00.025Z',
   };
