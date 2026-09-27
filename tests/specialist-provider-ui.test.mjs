@@ -112,6 +112,7 @@ test('claim keeps product-wide capacity explicit and delegates lease policy to c
 test('provider run requires a current LEASED handoff and never grants completion or verification in UI', () => {
   const run = functionBody('runSelectedSpecialistProviderExecution');
   assert.match(run, /handoff\.state !== 'LEASED'/u);
+  assert.match(options, /blockedStatuses = new Set\(\['BLOCKED_FAILURE', 'PROVIDER_SUCCEEDED', 'PROVIDER_FAILED', 'MANUAL_REVIEW', 'RECONCILE'\]\)/u);
   assert.match(run, /RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION/u);
   assert.match(run, /completionAuthorized=ні/u);
   assert.match(run, /ui\.selectedBrowserAgentId !== jobId[\s\S]*?return;[\s\S]*?loadBrowserAgentJobs/u);
