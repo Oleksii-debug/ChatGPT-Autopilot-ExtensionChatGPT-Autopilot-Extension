@@ -122,9 +122,10 @@ function idList(value, label, { allowEmpty = true } = {}) {
 }
 
 function deepFreeze(value) {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  if (!value || typeof value !== 'object') return value;
   for (const child of Object.values(value)) deepFreeze(child);
-  return Object.freeze(value);
+  if (!Object.isFrozen(value)) Object.freeze(value);
+  return value;
 }
 
 function exactFalse(value, label) {
@@ -143,6 +144,12 @@ function assertSubset(routeIds, allowed, label) {
   if (extra.length) throw new Error(`${label} exceeds route authority: ${extra[0]}`);
 }
 
+function assertInsideAgentAllow(routeIds, allowed, label) {
+  const allowedSet = new Set(allowed);
+  const extra = routeIds.filter(routeId => !allowedSet.has(routeId));
+  if (extra.length) throw new Error(`${label} is outside Agent allow scope: ${extra[0]}`);
+}
+
 function canonicalOrder(pool, routeIds) {
   const selected = new Set(routeIds);
   return pool.map(route => route.routeId).filter(routeId => selected.has(routeId));
@@ -157,6 +164,11 @@ function routePolicyProjection(policy, authorityRouteIds) {
   assertSubset(policy.orderedRouteIds, authorityRouteIds, 'Agent routePolicy.orderedRouteIds');
   if (policy.pinnedRouteId) {
     assertSubset([policy.pinnedRouteId], authorityRouteIds, 'Agent routePolicy.pinnedRouteId');
+  }
+  assertInsideAgentAllow(policy.denyRouteIds, requestedAllow, 'Agent routePolicy.denyRouteIds');
+  assertInsideAgentAllow(policy.orderedRouteIds, requestedAllow, 'Agent routePolicy.orderedRouteIds');
+  if (policy.pinnedRouteId) {
+    assertInsideAgentAllow([policy.pinnedRouteId], requestedAllow, 'Agent routePolicy.pinnedRouteId');
   }
 
   const allowSet = new Set(requestedAllow);
@@ -283,6 +295,11 @@ export function normalizeAgentModelPolicyBindingV1(input) {
   }
 
   const allow = routePolicy.allowRouteIds.length ? routePolicy.allowRouteIds : authorityRouteIds;
+  assertInsideAgentAllow(routePolicy.denyRouteIds, allow, 'routePolicy.denyRouteIds');
+  assertInsideAgentAllow(routePolicy.orderedRouteIds, allow, 'routePolicy.orderedRouteIds');
+  if (routePolicy.pinnedRouteId) {
+    assertInsideAgentAllow([routePolicy.pinnedRouteId], allow, 'routePolicy.pinnedRouteId');
+  }
   const deny = new Set(routePolicy.denyRouteIds);
   const expectedEffective = allow.filter(routeId => !deny.has(routeId));
   assertExactList(effectiveRouteIds, expectedEffective, 'effectiveRouteIds');
