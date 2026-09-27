@@ -300,6 +300,12 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
   assert.ok(js.includes("aiPinnedRouteId: $('agent-ai-pinned-route-id').value"), 'Agent route choice must persist through Core');
+  assert.match(html, /id="agent-ai-pinned-route-id"[^>]*aria-describedby="agent-route-binding-status agent-route-pool-note"/, 'Agent route choice must expose its policy/readiness explanation to keyboard and screen-reader users');
+  assert.match(html, /id="agent-route-binding-status"[^>]*role="status"/, 'Agent route policy/readiness must be announced through a native status surface');
+  assert.ok(js.includes('browserAgentRoutePolicyBlockReason'), 'Agent route choices must project global Models policy before the user starts a job');
+  assert.ok(js.includes('option.disabled = Boolean(blockReason)'), 'globally blocked Agent routes must not look normally selectable');
+  assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
+  assert.ok(js.includes("item.routeId || '?'"), 'Agent usage must expose bounded route-chain evidence without provider payloads');
   assert.match(js, /!ui\.agentDraftActive && !ui\.agentPolicyDirty\) fillBrowserAgentPolicy\(config\)/, 'status refresh must preserve unsaved Agent policy fields');
   assert.match(js, /if \(editEpoch === ui\.agentPolicyEditEpoch\)/, 'late save must not erase edits typed while Core was updating');
   assert.match(html, /id="agent-route-pool-note"[^>]*>Якщо у вкладці «Моделі» додано маршрути/, 'Agent UI must explain that configured global route pool takes precedence over the legacy provider/model overrides');

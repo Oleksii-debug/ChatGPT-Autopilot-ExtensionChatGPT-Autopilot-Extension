@@ -72,6 +72,58 @@ test('Agent route binding respects a conflicting global pin', async () => {
   }), /conflicts with the global pinned route/);
 });
 
+test('Agent route pin stays fail-closed under global owner policy, role filtering and durable backoff', async () => {
+  const calls = [];
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: new AiOrchestrator({
+      now: () => 5000,
+      gatewayClient: { async complete(request) {
+        calls.push(request);
+        return { text:'unexpected', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+      } },
+    }),
+  });
+  const routes = [
+    { routeId:'local', provider:'ollama', model:'local-model', priority:100, roles:['planner','verifier'] },
+    { routeId:'mistral-agent', provider:'openai-compatible', endpointId:'mistral', model:'mistral-small-latest',
+      priority:1, roles:['planner'], costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+  ];
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true, mode:'primary', routes, routePolicy:{ denyRouteIds:['mistral-agent'] },
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task', isolatedRuntime:true, routerOverride:{ routeId:'mistral-agent' },
+  }), /No AI route satisfies/u);
+  assert.equal(calls.length, 0, 'global deny policy must block the Agent pin before provider I/O');
+
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true, mode:'primary', routes, routePolicy:{},
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'verify agent outcome', isolatedRuntime:true, taskRole:'verifier',
+    routerOverride:{ routeId:'mistral-agent' },
+  }), /No AI route satisfies/u);
+  assert.equal(calls.length, 0, 'role-incompatible pinned route must not fall back to another model');
+
+  const backoffState = {
+    consecutiveFailures:1, successes:0, failures:1,
+    backoffUntil:10000, circuitOpenUntil:0,
+    lastErrorCode:'HTTP_429', lastErrorCategory:'quota-or-rate',
+    lastErrorAt:4000, lastSuccessAt:0, lastLatencyMs:10,
+  };
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task', isolatedRuntime:true,
+    routerOverride:{ routeId:'mistral-agent' },
+    routerRuntime:{ routeStates:{ 'mistral-agent':backoffState } },
+  }), error => {
+    assert.equal(error?.code, 'AI_ROUTE_POOL_EXHAUSTED');
+    assert.equal(error?.retryAt, 10000);
+    return true;
+  });
+  assert.equal(calls.length, 0, 'durable backoff on a pinned Agent route must not silently use another route');
+});
+
 test('AI router settings persist and old states without router fields stay valid', async () => {
   const old = createEmptyState(1000);
   delete old.profile.aiRouter;

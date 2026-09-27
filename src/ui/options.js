@@ -1243,7 +1243,48 @@ function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
   fillModelSelect(modelId, $(providerId).value, [], selected);
 }
 
-function renderBrowserAgentRouteChoices(routes = []) {
+function browserAgentRoutePolicyBlockReason(route, policy = {}) {
+  if (route?.enabled === false) return 'маршрут вимкнено у вкладці «Моделі»';
+  const routeId = String(route?.routeId || '');
+  const allow = new Set(Array.isArray(policy?.allowRouteIds) ? policy.allowRouteIds : []);
+  const deny = new Set(Array.isArray(policy?.denyRouteIds) ? policy.denyRouteIds : []);
+  if (policy?.pinnedRouteId && policy.pinnedRouteId !== routeId) return `глобально закріплено маршрут ${policy.pinnedRouteId}`;
+  if (allow.size && !allow.has(routeId)) return 'маршрут не входить до глобального allow-списку';
+  if (deny.has(routeId)) return 'маршрут заборонено глобальним deny-списком';
+  if (policy?.freeOnly === true && route?.costClass !== 'free') return 'глобальна політика дозволяє лише безкоштовні маршрути';
+  if (route?.costClass !== 'free' && route?.costClass !== 'paid') return 'клас вартості маршруту не підтверджено';
+  if (route?.costClass === 'paid' && (route?.inputPriceKnown !== true || route?.outputPriceKnown !== true)) {
+    return 'для платного маршруту не підтверджено input/output ціни';
+  }
+  const locality = typeof policy?.locality === 'string' && policy.locality ? policy.locality : 'any';
+  if (locality !== 'any' && route?.locality !== locality) return `глобальна політика дозволяє лише ${locality}`;
+  if (policy?.maxInputPricePerMillionUsd != null
+      && Number(route?.inputPricePerMillionUsd) > Number(policy.maxInputPricePerMillionUsd)) {
+    return 'input-ціна перевищує глобальний ліміт';
+  }
+  if (policy?.maxOutputPricePerMillionUsd != null
+      && Number(route?.outputPricePerMillionUsd) > Number(policy.maxOutputPricePerMillionUsd)) {
+    return 'output-ціна перевищує глобальний ліміт';
+  }
+  return '';
+}
+
+function syncBrowserAgentRouteBindingStatus() {
+  const select = $('agent-ai-pinned-route-id');
+  const status = $('agent-route-binding-status');
+  const routeId = select.value;
+  if (!routeId) {
+    status.textContent = 'Agent успадковує глобальну політику маршрутів і може використовувати її дозволений fallback.';
+    return;
+  }
+  const option = [...select.options].find(item => item.value === routeId);
+  const blockReason = option?.dataset?.blockReason || '';
+  status.textContent = blockReason
+    ? `Маршрут ${routeId} збережений для цього Agent, але зараз недоступний: ${blockReason}. Виклик завершиться до provider I/O; прихованого fallback не буде.`
+    : `Маршрут ${routeId} закріплений лише за цим Agent. Глобальні role/capability/budget/backoff правила залишаються чинними; прихованого fallback немає.`;
+}
+
+function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
   const select = $('agent-ai-pinned-route-id');
   const selected = select.value;
   select.replaceChildren();
@@ -1252,19 +1293,24 @@ function renderBrowserAgentRouteChoices(routes = []) {
   inherited.textContent = 'Успадкувати глобальну політику маршрутів';
   select.append(inherited);
   for (const route of routes) {
-    if (route.enabled === false) continue;
     const option = document.createElement('option');
     option.value = route.routeId;
-    option.textContent = `${route.routeId}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}`;
+    const blockReason = browserAgentRoutePolicyBlockReason(route, policy);
+    option.dataset.blockReason = blockReason;
+    option.disabled = Boolean(blockReason);
+    option.textContent = `${route.routeId}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` — недоступний: ${blockReason}` : ''}`;
     select.append(option);
   }
   if (selected && ![...select.options].some(option => option.value === selected)) {
     const unavailable = document.createElement('option');
     unavailable.value = selected;
-    unavailable.textContent = `${selected} — маршрут відсутній у збереженому пулі`;
+    unavailable.dataset.blockReason = 'маршрут відсутній у збереженому пулі';
+    unavailable.disabled = true;
+    unavailable.textContent = `${selected} — недоступний: маршрут відсутній у збереженому пулі`;
     select.append(unavailable);
   }
   select.value = selected;
+  syncBrowserAgentRouteBindingStatus();
 }
 
 async function loadAiRouterSettings() {
@@ -1302,7 +1348,7 @@ async function loadAiRouterSettings() {
     $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
     $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
     renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
-    renderBrowserAgentRouteChoices(settings.routes || []);
+    renderBrowserAgentRouteChoices(settings.routes || [], policy);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -1318,7 +1364,7 @@ async function saveAiRouterSettings() {
     setAiRouterBusy(true);
     const settings = aiRouterSettingsFromForm();
     const data = await core('UPDATE_AI_ROUTER_SETTINGS', { settings });
-    renderBrowserAgentRouteChoices(data.settings?.routes || []);
+    renderBrowserAgentRouteChoices(data.settings?.routes || [], data.settings?.routePolicy || {});
     $('ai-router-status').textContent = `AI-координатор збережено: режим ${data.settings.mode}.`;
     announce('Налаштування AI-координатора збережено.');
   } catch (error) {
@@ -2491,10 +2537,13 @@ function fillBrowserAgentPolicy(config = {}) {
   if ($('agent-ai-pinned-route-id').value !== (config.aiPinnedRouteId || '')) {
     const option = document.createElement('option');
     option.value = config.aiPinnedRouteId;
-    option.textContent = `${config.aiPinnedRouteId} — маршрут відсутній у збереженому пулі`;
+    option.dataset.blockReason = 'маршрут відсутній у збереженому пулі';
+    option.disabled = true;
+    option.textContent = `${config.aiPinnedRouteId} — недоступний: маршрут відсутній у збереженому пулі`;
     $('agent-ai-pinned-route-id').append(option);
     $('agent-ai-pinned-route-id').value = option.value;
   }
+  syncBrowserAgentRouteBindingStatus();
   $('agent-ai-primary-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiPrimaryProvider) ? config.aiPrimaryProvider : 'inherit';
   $('agent-ai-primary-model').value = config.aiPrimaryModel || '';
   $('agent-ai-strong-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiStrongProvider) ? config.aiStrongProvider : 'inherit';
@@ -2557,7 +2606,13 @@ ${pendingScript}` : '';
   const nextWake = Number(runtime.nextWakeAt || 0) > Date.now() ? ` Наступний запуск: ${new Date(runtime.nextWakeAt).toLocaleString()}.` : '';
   const capability = runtime.capabilityPermission ? ` Потрібна capability: ${runtime.capabilityPermission}.` : '';
   $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${planStatus}${result}${verified}${error}`;
-  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.`;
+  const routerRuntime = runtime.aiRouterRuntime || {};
+  const actualRouteId = String(routerRuntime.lastRouteId || '').trim();
+  const failoverChain = Array.isArray(routerRuntime.lastFailoverChain) ? routerRuntime.lastFailoverChain.slice(-4) : [];
+  const routeEvidence = actualRouteId
+    ? ` Останній фактичний AI-маршрут: ${actualRouteId}.${failoverChain.length ? ` Остання route-chain: ${failoverChain.map(item => `${item.routeId || '?'}:${item.outcome || '?'}`).join(' -> ')}.` : ''}`
+    : ' Фактичний AI-маршрут ще не використовувався.';
+  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.${routeEvidence}`;
   const history = Array.isArray(runtime.history) ? runtime.history : [];
   $('agent-history').textContent = history.length
     ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
@@ -4559,6 +4614,7 @@ $('agent-send-follow-up-button').addEventListener('click', sendBrowserAgentFollo
 $('agent-approve-action-button').addEventListener('click', approveBrowserAgentAction);
 $('agent-reject-action-button').addEventListener('click', rejectBrowserAgentAction);
 $('agent-save-policy-button').addEventListener('click', saveBrowserAgentPolicy);
+$('agent-ai-pinned-route-id').addEventListener('change', syncBrowserAgentRouteBindingStatus);
 $('agent-policy-details').addEventListener('input', () => {
   ui.agentPolicyEditEpoch += 1;
   if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
