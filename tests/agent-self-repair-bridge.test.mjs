@@ -262,7 +262,7 @@ test('READY_FOR_RETEST requires the verified repair node from the same cycle and
   assert.equal(result.workKind, AgentSelfRepairWorkKind.RETEST);
   assert.equal(result.extensionNode.ownerId, 'verifier-1');
   assert.deepEqual(result.extensionNode.dependsOn, ['repair-work-1']);
-  assert.deepEqual(result.extensionNode.conflictKeys, ['self-repair-cycle-1']);
+  assert.deepEqual(result.extensionNode.conflictKeys, ['artifact-target', 'self-repair-cycle-1']);
   assert.equal(result.extensionNode.state, 'READY');
 });
 
@@ -350,6 +350,95 @@ test('RETEST rejects stale or unrelated predecessor evidence', () => {
     resourceEnvelope: budget(),
     at: '2026-09-27T01:01:00.000Z',
   }), /not bound to this cycle/u);
+});
+
+test('active REPAIR proposal fails closed when currentPlan already contains unrecorded cycle work', () => {
+  const origin = originPlan();
+  const current = originPlan({
+    revision: 8,
+    updatedAt: '2026-09-27T01:00:30.000Z',
+    nodes: [
+      ...origin.nodes,
+      {
+        nodeId: 'repair-orphan-1',
+        title: 'Already proposed repair',
+        objective: 'Repair the same failed subject',
+        dependsOn: ['setup'],
+        conflictKeys: ['artifact-target', 'self-repair-cycle-1'],
+        ownerId: 'actor-1',
+        executionPlane: 'LOCAL',
+        acceptanceCriteria: [],
+        budget: budget(),
+        state: 'READY',
+        evidence: '',
+        updatedAt: '2026-09-27T01:00:30.000Z',
+      },
+    ],
+  });
+  assert.throws(() => proposeAgentSelfRepairWorkV1(request({
+    originPlan: origin,
+    currentPlan: current,
+    at: '2026-09-27T01:01:00.000Z',
+  })), /active REPAIR work already exists/u);
+});
+
+test('active RETEST proposal fails closed when verifier work for the same repair already exists', () => {
+  const origin = originPlan();
+  const current = originPlan({
+    revision: 10,
+    updatedAt: '2026-09-27T01:00:35.000Z',
+    nodes: [
+      ...origin.nodes,
+      {
+        nodeId: 'repair-work-1',
+        title: 'Repair failed output',
+        objective: 'Apply the bounded repair',
+        dependsOn: ['setup'],
+        conflictKeys: ['artifact-target', 'self-repair-cycle-1'],
+        ownerId: 'actor-1',
+        executionPlane: 'LOCAL',
+        acceptanceCriteria: [],
+        budget: budget(),
+        state: 'VERIFIED',
+        evidence: 'repair applied',
+        updatedAt: '2026-09-27T01:00:25.000Z',
+      },
+      {
+        nodeId: 'retest-orphan-1',
+        title: 'Already proposed retest',
+        objective: 'Verify repaired output',
+        dependsOn: ['repair-work-1'],
+        conflictKeys: ['artifact-target', 'self-repair-cycle-1'],
+        ownerId: 'verifier-1',
+        executionPlane: 'LOCAL',
+        acceptanceCriteria: [],
+        budget: budget(),
+        state: 'READY',
+        evidence: '',
+        updatedAt: '2026-09-27T01:00:35.000Z',
+      },
+    ],
+  });
+  const repairingCycle = cycle({
+    updatedAt: '2026-09-27T01:00:20.000Z',
+    attempts: [{
+      attemptNumber: 1,
+      failure: failure(),
+      diagnosis: diagnosis(),
+      repair: repair(),
+      retest: null,
+    }],
+  });
+  assert.throws(() => proposeAgentSelfRepairWorkV1({
+    originPlan: origin,
+    currentPlan: current,
+    failedNodeId: 'target',
+    cycle: repairingCycle,
+    workNode: workNode({ nodeId: 'retest-work-2', conflictKeys: [] }),
+    predecessorNodeId: 'repair-work-1',
+    resourceEnvelope: budget(),
+    at: '2026-09-27T01:01:00.000Z',
+  }), /active RETEST work already exists/u);
 });
 
 test('terminal cycle states never append work or authorize completion', () => {
