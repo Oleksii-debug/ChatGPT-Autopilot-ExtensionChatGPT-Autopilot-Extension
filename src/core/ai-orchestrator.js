@@ -148,6 +148,16 @@ export function normalizeAiRouterRuntime(raw = {}) {
   };
 }
 
+function isCanonicalEmptyArray(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length !== 0) {
+    return false;
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  return Reflect.ownKeys(descriptors).length === 1
+    && Object.hasOwn(descriptors, 'length')
+    && descriptors.length?.value === 0;
+}
+
 function requireConfigured(slot, label) {
   if (!slot?.model) throw new Error(`${label} AI model is not selected`);
 }
@@ -341,7 +351,8 @@ export class AiOrchestrator {
 
       let dispatchCandidates = selected.candidates;
       let qualityEvidenceApplied = false;
-      if (routeQualityBenchmarkRequests !== null) {
+      if (routeQualityBenchmarkRequests !== null
+          && !isCanonicalEmptyArray(routeQualityBenchmarkRequests)) {
         const advisory = await rankAiRouteCandidatesByEvidenceV1({
           ...selectionInput,
           benchmarkRequests: routeQualityBenchmarkRequests,
