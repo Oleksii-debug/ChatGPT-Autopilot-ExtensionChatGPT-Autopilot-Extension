@@ -249,6 +249,38 @@ test('immediate spawned-child activation consumes only free positive-cap slots',
   );
 });
 
+test('replay counts an already activated spawned sibling against parent concurrency', () => {
+  const canonicalGraph = graph([node('root', null, [], { maxActiveChildren: 0 })]);
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    graph: canonicalGraph,
+    runtime: runtimeFor(canonicalGraph),
+    requestedChildren: 2,
+    spawnId: 'replay-cap',
+    nowMs: 300,
+  }));
+
+  const cappedGraph = structuredClone(first.graph);
+  cappedGraph.nodesById.root.maxActiveChildren = 1;
+  const normalizedCappedGraph = validateOrchestrationGraphV1(cappedGraph);
+  const activated = reduceOrchestrationHierarchyEvent(
+    normalizedCappedGraph,
+    first.runtime,
+    first.activationRequests[0],
+    301,
+  );
+
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: normalizedCappedGraph,
+    runtime: activated.runtime,
+    requestedChildren: 2,
+    spawnId: 'replay-cap',
+    nowMs: 400,
+  }));
+
+  assert.equal(replay.decision, 'ALLOW');
+  assert.deepEqual(replay.activationRequests, []);
+});
+
 test('replay only prepares activation for children still idle at generation one', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
