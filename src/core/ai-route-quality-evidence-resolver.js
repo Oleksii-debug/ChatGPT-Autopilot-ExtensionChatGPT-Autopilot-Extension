@@ -122,6 +122,13 @@ function snapshotScopedBenchmarkRequests(value, requestedRouteIds) {
       BINDING_KEYS,
       'AI route quality benchmark reader result[' + index + ']',
     );
+    for (const requiredKey of BINDING_KEYS) {
+      if (!Object.hasOwn(raw, requiredKey)) {
+        throw new Error(
+          'AI route quality benchmark reader result[' + index + '] is missing field: ' + requiredKey,
+        );
+      }
+    }
     const routeId = canonicalId(
       raw.routeId,
       'AI route quality benchmark reader result[' + index + '].routeId',
