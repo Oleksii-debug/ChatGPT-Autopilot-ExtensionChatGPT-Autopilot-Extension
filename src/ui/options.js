@@ -5,6 +5,11 @@ import { extractChatGptUrls, mergeBulkUrls, parsePortableJson, parseStrictBounde
 import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
+import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
+import {
+  agentDefinitionLaunchScopeTextV1,
+  buildAgentDefinitionLaunchRequestV1,
+} from './agent-definition-launch-form.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -37,6 +42,14 @@ const ui = {
   browserAgentJobs: [],
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
+  agentDefinitionRegistries: [],
+  selectedAgentDefinitionRegistryId: '',
+  selectedAgentDefinitionRegistry: null,
+  selectedAgentDefinitionId: '',
+  selectedAgentDefinition: null,
+  agentDefinitionMode: 'none',
+  agentDefinitionQuarantineCount: 0,
+  agentDefinitionLaunchDefinitionId: '',
   agentDraftActive: false,
   agentPolicyDirty: false,
   agentPolicyEditEpoch: 0,
@@ -2430,6 +2443,416 @@ async function runScenarioWorkNow() {
 }
 
 
+function agentDefinitionLines(values = []) {
+  return Array.isArray(values) ? values.join('\n') : '';
+}
+
+function setAgentDefinitionFormEnabled(enabled) {
+  const group = $('agent-definition-form-group');
+  if (group) group.disabled = !enabled;
+  $('agent-definition-new-button').disabled = !ui.selectedAgentDefinitionRegistry;
+}
+
+function agentDefinitionModelPolicySummary(definition) {
+  const policy = definition?.modelRoutePolicy;
+  if (!policy) return 'Model policy: global Models settings.';
+  const parts = [];
+  if (policy.pinnedRouteId) parts.push('route ' + policy.pinnedRouteId);
+  if (Array.isArray(policy.allowRouteIds) && policy.allowRouteIds.length) {
+    parts.push('allowed routes ' + policy.allowRouteIds.join(', '));
+  }
+  if (policy.freeOnly) parts.push('free only');
+  if (policy.locality && policy.locality !== 'any') parts.push(policy.locality + ' only');
+  if (policy.autoSwitch === false) parts.push('automatic failover off');
+  if (policy.maxInputPricePerMillionUsd != null) parts.push('input price cap ' + policy.maxInputPricePerMillionUsd);
+  if (policy.maxOutputPricePerMillionUsd != null) parts.push('output price cap ' + policy.maxOutputPricePerMillionUsd);
+  return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
+}
+
+function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
+  const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
+  setAgentDefinitionFormEnabled(hasRegistry);
+  const idField = $('agent-definition-id');
+  idField.readOnly = Boolean(definition) && !create;
+  idField.value = definition?.agentDefinitionId || '';
+  $('agent-definition-label').value = definition?.label || '';
+  $('agent-definition-description').value = definition?.description || '';
+  $('agent-definition-instructions').value = definition?.instructions || '';
+  $('agent-definition-capabilities').value = agentDefinitionLines(definition?.capabilityIds);
+  $('agent-definition-tools').value = agentDefinitionLines(definition?.toolIds);
+  $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
+  $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
+  const configDefaults = definition?.configDefaults || {};
+  $('agent-definition-ai-routing-mode').value = Object.hasOwn(configDefaults, 'aiRoutingMode') ? configDefaults.aiRoutingMode : '';
+  $('agent-definition-ai-pinned-route-id').value = Object.hasOwn(configDefaults, 'aiPinnedRouteId') ? configDefaults.aiPinnedRouteId : '';
+  $('agent-definition-ai-primary-provider').value = Object.hasOwn(configDefaults, 'aiPrimaryProvider') ? configDefaults.aiPrimaryProvider : '';
+  $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
+  $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
+  $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
+  $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
+  $('agent-definition-revision').textContent = definition
+    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
+    : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
+  $('agent-definition-save-button').disabled = !hasRegistry;
+  $('agent-definition-toggle-enabled-button').disabled = !definition;
+  $('agent-definition-delete-button').disabled = !definition;
+  fillAgentDefinitionLaunchForm(definition);
+}
+
+function fillAgentDefinitionLaunchForm(definition = null) {
+  const group = $('agent-definition-launch-group');
+  const button = $('agent-definition-launch-button');
+  const status = $('agent-definition-launch-status');
+  const launchable = Boolean(definition?.enabled === true && ui.selectedAgentDefinitionRegistry);
+  group.disabled = !launchable;
+  button.disabled = !launchable;
+
+  if (!definition) {
+    ui.agentDefinitionLaunchDefinitionId = '';
+    $('agent-definition-launch-owner-capabilities').value = '';
+    $('agent-definition-launch-owner-tools').value = '';
+    $('agent-definition-launch-requested-capabilities').value = '';
+    $('agent-definition-launch-requested-tools').value = '';
+    status.textContent = 'Оберіть увімкнену Agent definition. Створення не запускає виконання.';
+    return;
+  }
+
+  const definitionLaunchKey = `${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
+    const scope = agentDefinitionLaunchScopeTextV1(definition);
+    $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
+    $('agent-definition-launch-owner-tools').value = scope.ownerToolIdsText;
+    $('agent-definition-launch-requested-capabilities').value = scope.requestedCapabilityIdsText;
+    $('agent-definition-launch-requested-tools').value = scope.requestedToolIdsText;
+    ui.agentDefinitionLaunchDefinitionId = definitionLaunchKey;
+  }
+
+  status.textContent = definition.enabled === true
+    ? 'Готово до створення STOPPED-завдання. Перевірте owner grants, narrowing і поточний бюджет Agent.'
+    : 'Ця Agent definition вимкнена. Увімкніть її перед створенням завдання.';
+}
+
+function browserAgentOwnerBudgetPolicyFromForm() {
+  return {
+    maxSteps: browserAgentInteger('agent-max-steps', 1, 10000, 'Safety ceiling дій'),
+    maxModelCalls: browserAgentInteger('agent-max-model-calls', 0, 1000000, 'Model calls'),
+    maxInputTokens: browserAgentInteger('agent-max-input-tokens', 0, 2000000000, 'Вхідні токени'),
+    maxOutputTokens: browserAgentInteger('agent-max-output-tokens', 0, 2000000000, 'Вихідні токени'),
+    maxTotalTokens: browserAgentInteger('agent-max-total-tokens', 0, 2000000000, 'Усі токени'),
+    maxOutputTokensPerCall: browserAgentInteger('agent-max-output-per-call', 128, 200000, 'Output tokens на model call'),
+    maxRuntimeMinutes: browserAgentInteger('agent-max-runtime-minutes', 0, 525600, 'Час роботи'),
+    maxCostUsd: browserAgentNumber('agent-max-cost-usd', 0, 1000000, 'Бюджет USD'),
+    inputPricePerMillionUsd: browserAgentNumber('agent-input-price', 0, 1000000, 'Ціна input'),
+    outputPricePerMillionUsd: browserAgentNumber('agent-output-price', 0, 1000000, 'Ціна output'),
+  };
+}
+
+function agentDefinitionLaunchFormValue() {
+  return {
+    goal: $('agent-definition-launch-goal').value,
+    projectId: $('agent-definition-launch-project-id').value,
+    jobId: $('agent-definition-launch-job-id').value,
+    ownerCapabilityIdsText: $('agent-definition-launch-owner-capabilities').value,
+    ownerToolIdsText: $('agent-definition-launch-owner-tools').value,
+    requestedCapabilityIdsText: $('agent-definition-launch-requested-capabilities').value,
+    requestedToolIdsText: $('agent-definition-launch-requested-tools').value,
+  };
+}
+
+async function createBrowserAgentFromDefinition() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  const definition = ui.selectedAgentDefinition;
+  const button = $('agent-definition-launch-button');
+  const status = $('agent-definition-launch-status');
+  if (!registry || !definition) {
+    status.textContent = 'Спочатку оберіть reusable Agent definition.';
+    return;
+  }
+
+  try {
+    const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
+      registry,
+      definition,
+      ownerPolicy: browserAgentOwnerBudgetPolicyFromForm(),
+    });
+    button.disabled = true;
+    status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
+
+    const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
+    const id = created?.job?.id || created?.selectedId;
+    if (!id) throw new Error('Core не повернув id створеного Agent job.');
+
+    ui.selectedBrowserAgentId = id;
+    ui.agentDraftActive = false;
+    ui.agentPolicyDirty = false;
+    await loadBrowserAgentJobs({ selectId: id });
+
+    const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
+    if (runState !== 'STOPPED') {
+      throw new Error(`Створене завдання має неочікуваний стан ${runState || 'UNKNOWN'}; автоматичний запуск не виконувався`);
+    }
+
+    status.textContent = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
+    announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
+    $('agent-job-list').focus();
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadAgentDefinitionRegistries({
+        selectRegistryId: registry.registryId,
+        selectDefinitionId: definition.agentDefinitionId,
+      });
+      status.textContent = 'Definition змінилася до створення. Актуальні дані перезавантажено; перевірте grants і повторіть створення.';
+      announce('Agent definition змінилася. Актуальні дані перезавантажено.');
+    } else {
+      status.textContent = `Завдання з definition не створено: ${error.message}`;
+    }
+  } finally {
+    button.disabled = !(ui.selectedAgentDefinition?.enabled === true && ui.selectedAgentDefinitionRegistry);
+  }
+}
+
+function renderAgentDefinitionRegistryList() {
+  const select = $('agent-definition-registry-list');
+  select.replaceChildren();
+  for (const registry of ui.agentDefinitionRegistries) {
+    const option = document.createElement('option');
+    option.value = registry.registryId;
+    option.textContent = `${registry.registryId} — revision ${registry.revision}`;
+    option.selected = registry.registryId === ui.selectedAgentDefinitionRegistryId;
+    select.append(option);
+  }
+  $('agent-definition-quarantine-status').textContent = ui.agentDefinitionQuarantineCount
+    ? `У карантині пошкоджених reusable-Agent реєстрів: ${ui.agentDefinitionQuarantineCount}. Їхній вміст не показується і не перезаписується.`
+    : 'Пошкоджених reusable-Agent реєстрів у карантині немає.';
+}
+
+function renderAgentDefinitionList() {
+  const select = $('agent-definition-list');
+  select.replaceChildren();
+  const definitions = ui.selectedAgentDefinitionRegistry?.definitions || [];
+  for (const definition of definitions) {
+    const option = document.createElement('option');
+    option.value = definition.agentDefinitionId;
+    option.textContent = `${definition.label} — ${definition.agentDefinitionId} — rev ${definition.definitionRevision}${definition.enabled ? '' : ' — вимкнено'}`;
+    option.selected = definition.agentDefinitionId === ui.selectedAgentDefinitionId;
+    select.append(option);
+  }
+}
+
+async function loadAgentDefinitionRegistries({ selectRegistryId = '', selectDefinitionId = '' } = {}) {
+  ui.selectedAgentDefinitionRegistry = null;
+  ui.selectedAgentDefinition = null;
+  ui.agentDefinitionMode = 'none';
+  setAgentDefinitionFormEnabled(false);
+  try {
+    const data = await core('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES');
+    ui.agentDefinitionRegistries = Array.isArray(data?.registries) ? data.registries : [];
+    ui.agentDefinitionQuarantineCount = Array.isArray(data?.quarantinedRegistryIds) ? data.quarantinedRegistryIds.length : 0;
+    const requestedRegistryId = selectRegistryId || ui.selectedAgentDefinitionRegistryId;
+    ui.selectedAgentDefinitionRegistryId = ui.agentDefinitionRegistries.some(item => item.registryId === requestedRegistryId)
+      ? requestedRegistryId
+      : (ui.agentDefinitionRegistries[0]?.registryId || '');
+    renderAgentDefinitionRegistryList();
+
+    if (!ui.selectedAgentDefinitionRegistryId) {
+      ui.selectedAgentDefinitionRegistry = null;
+      ui.selectedAgentDefinitionId = '';
+      ui.selectedAgentDefinition = null;
+      ui.agentDefinitionMode = 'none';
+      renderAgentDefinitionList();
+      fillAgentDefinitionForm(null);
+      $('agent-definition-status').textContent = 'Reusable Agent реєстрів ще немає. Створіть реєстр, щоб додати definition.';
+      return;
+    }
+
+    const detail = await core('GET_BROWSER_AGENT_DEFINITION_REGISTRY', {
+      registryId: ui.selectedAgentDefinitionRegistryId,
+    });
+    if (!detail?.registry) {
+      throw new Error(detail?.quarantined ? 'Вибраний реєстр переміщено в карантин.' : 'Вибраний реєстр більше не існує.');
+    }
+    ui.selectedAgentDefinitionRegistry = detail.registry;
+    const requestedDefinitionId = selectDefinitionId || ui.selectedAgentDefinitionId;
+    ui.selectedAgentDefinitionId = ui.selectedAgentDefinitionRegistry.definitions.some(item => item.agentDefinitionId === requestedDefinitionId)
+      ? requestedDefinitionId
+      : (ui.selectedAgentDefinitionRegistry.definitions[0]?.agentDefinitionId || '');
+    ui.selectedAgentDefinition = ui.selectedAgentDefinitionRegistry.definitions.find(item => item.agentDefinitionId === ui.selectedAgentDefinitionId) || null;
+    ui.agentDefinitionMode = ui.selectedAgentDefinition ? 'edit' : 'none';
+    renderAgentDefinitionList();
+    fillAgentDefinitionForm(ui.selectedAgentDefinition);
+    $('agent-definition-status').textContent = `Реєстр ${ui.selectedAgentDefinitionRegistry.registryId}, revision ${ui.selectedAgentDefinitionRegistry.revision}. Definitions: ${ui.selectedAgentDefinitionRegistry.definitions.length}.`;
+  } catch (error) {
+    ui.selectedAgentDefinitionRegistry = null;
+    ui.selectedAgentDefinitionId = '';
+    ui.selectedAgentDefinition = null;
+    ui.agentDefinitionMode = 'none';
+    renderAgentDefinitionList();
+    fillAgentDefinitionForm(null);
+    $('agent-definition-status').textContent = `Reusable Agent definitions не завантажено: ${error.message}`;
+  }
+}
+
+async function selectAgentDefinitionRegistry() {
+  const registryId = $('agent-definition-registry-list').value;
+  ui.selectedAgentDefinitionId = '';
+  await loadAgentDefinitionRegistries({ selectRegistryId: registryId });
+}
+
+function selectAgentDefinition() {
+  const definitionId = $('agent-definition-list').value;
+  ui.selectedAgentDefinitionId = definitionId;
+  ui.selectedAgentDefinition = ui.selectedAgentDefinitionRegistry?.definitions?.find(item => item.agentDefinitionId === definitionId) || null;
+  ui.agentDefinitionMode = ui.selectedAgentDefinition ? 'edit' : 'none';
+  fillAgentDefinitionForm(ui.selectedAgentDefinition);
+}
+
+async function createAgentDefinitionRegistry() {
+  const status = $('agent-definition-status');
+  try {
+    const registryId = parseCanonicalAgentIdentity($('agent-definition-create-registry-id').value, 'Registry ID');
+    await core('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY', { registryId });
+    $('agent-definition-create-registry-id').value = '';
+    await loadAgentDefinitionRegistries({ selectRegistryId: registryId });
+    $('agent-definition-new-button').focus();
+    status.textContent = `Реєстр ${registryId} створено. Додайте першу reusable Agent definition.`;
+    announce('Reusable Agent реєстр створено.');
+  } catch (error) {
+    status.textContent = `Реєстр не створено: ${error.message}`;
+  }
+}
+
+function newAgentDefinition() {
+  if (!ui.selectedAgentDefinitionRegistry) return;
+  ui.selectedAgentDefinitionId = '';
+  ui.selectedAgentDefinition = null;
+  ui.agentDefinitionMode = 'create';
+  renderAgentDefinitionList();
+  fillAgentDefinitionForm(null, { create: true });
+  $('agent-definition-id').focus();
+  $('agent-definition-status').textContent = 'Нова reusable Agent definition. Заповніть обов’язкові поля та збережіть.';
+}
+
+function agentDefinitionFormValue() {
+  return {
+    agentDefinitionId: $('agent-definition-id').value,
+    label: $('agent-definition-label').value,
+    description: $('agent-definition-description').value,
+    instructions: $('agent-definition-instructions').value,
+    capabilityIdsText: $('agent-definition-capabilities').value,
+    toolIdsText: $('agent-definition-tools').value,
+    tagsText: $('agent-definition-tags').value,
+    acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    aiRoutingMode: $('agent-definition-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-definition-ai-pinned-route-id').value,
+    aiPrimaryProvider: $('agent-definition-ai-primary-provider').value,
+    aiPrimaryModel: $('agent-definition-ai-primary-model').value,
+    aiStrongProvider: $('agent-definition-ai-strong-provider').value,
+    aiStrongModel: $('agent-definition-ai-strong-model').value,
+    enabled: $('agent-definition-enabled').checked,
+  };
+}
+
+async function reloadAfterAgentDefinitionDrift(error, { definitionId = '' } = {}) {
+  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
+  const registryId = ui.selectedAgentDefinitionRegistryId;
+  await loadAgentDefinitionRegistries({ selectRegistryId: registryId, selectDefinitionId: definitionId });
+  $('agent-definition-status').textContent = 'Реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
+  announce('Reusable Agent definition змінилася. Актуальні дані перезавантажено.');
+  return true;
+}
+
+async function saveAgentDefinition() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  if (!registry) return;
+  const current = ui.agentDefinitionMode === 'edit' ? ui.selectedAgentDefinition : null;
+  try {
+    const definitionRevision = current ? current.definitionRevision + 1 : 1;
+    const definition = buildAgentDefinitionFromFormV1(agentDefinitionFormValue(), {
+      definitionRevision,
+      configDefaults: current?.configDefaults || {},
+      modelRoutePolicy: current?.modelRoutePolicy ?? null,
+    });
+    const payload = current
+      ? {
+          registryId: registry.registryId,
+          expectedRegistryRevision: registry.revision,
+          kind: 'UPDATE',
+          agentDefinitionId: current.agentDefinitionId,
+          expectedDefinitionRevision: current.definitionRevision,
+          definition,
+        }
+      : {
+          registryId: registry.registryId,
+          expectedRegistryRevision: registry.revision,
+          kind: 'CREATE',
+          definition,
+        };
+    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', payload);
+    await loadAgentDefinitionRegistries({
+      selectRegistryId: registry.registryId,
+      selectDefinitionId: definition.agentDefinitionId,
+    });
+    $('agent-definition-status').textContent = current ? 'Reusable Agent definition оновлено.' : 'Reusable Agent definition створено.';
+    announce(current ? 'Reusable Agent definition оновлено.' : 'Reusable Agent definition створено.');
+  } catch (error) {
+    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current?.agentDefinitionId || '' })) return;
+    $('agent-definition-status').textContent = `Definition не збережено: ${error.message}`;
+  }
+}
+
+async function toggleAgentDefinitionEnabled() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  const current = ui.selectedAgentDefinition;
+  if (!registry || !current) return;
+  try {
+    const definition = {
+      ...current,
+      enabled: !current.enabled,
+      definitionRevision: current.definitionRevision + 1,
+    };
+    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
+      registryId: registry.registryId,
+      expectedRegistryRevision: registry.revision,
+      kind: 'UPDATE',
+      agentDefinitionId: current.agentDefinitionId,
+      expectedDefinitionRevision: current.definitionRevision,
+      definition,
+    });
+    await loadAgentDefinitionRegistries({
+      selectRegistryId: registry.registryId,
+      selectDefinitionId: current.agentDefinitionId,
+    });
+    $('agent-definition-status').textContent = definition.enabled ? 'Reusable Agent definition увімкнено.' : 'Reusable Agent definition вимкнено.';
+    announce(definition.enabled ? 'Reusable Agent definition увімкнено.' : 'Reusable Agent definition вимкнено.');
+  } catch (error) {
+    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current.agentDefinitionId })) return;
+    $('agent-definition-status').textContent = `Стан definition не змінено: ${error.message}`;
+  }
+}
+
+async function deleteAgentDefinition() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  const current = ui.selectedAgentDefinition;
+  if (!registry || !current) return;
+  if (typeof globalThis.confirm === 'function' && !globalThis.confirm(`Видалити reusable Agent definition “${current.label}”?`)) return;
+  try {
+    await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
+      registryId: registry.registryId,
+      expectedRegistryRevision: registry.revision,
+      kind: 'DELETE',
+      agentDefinitionId: current.agentDefinitionId,
+      expectedDefinitionRevision: current.definitionRevision,
+    });
+    ui.selectedAgentDefinitionId = '';
+    await loadAgentDefinitionRegistries({ selectRegistryId: registry.registryId });
+    $('agent-definition-status').textContent = 'Reusable Agent definition видалено.';
+    announce('Reusable Agent definition видалено.');
+  } catch (error) {
+    if (await reloadAfterAgentDefinitionDrift(error, { definitionId: current.agentDefinitionId })) return;
+    $('agent-definition-status').textContent = `Definition не видалено: ${error.message}`;
+  }
+}
+
 function browserAgentNameFromGoal(goal) {
   const text = String(goal || '').replace(/\s+/g, ' ').trim();
   return text ? text.slice(0, 90) : 'Нове завдання агента';
@@ -4671,6 +5094,14 @@ $('import-orchestration-v2-profile-button').addEventListener('click', importOrch
 $('export-orchestration-v2-profile-button').addEventListener('click', exportOrchestrationProfile);
 $('configure-orchestration-v2-hierarchy-button').addEventListener('click', configureOrchestrationHierarchyTemplate);
 $('authorize-orchestration-v2-drive-button').addEventListener('click', authorizeOrchestrationDrive);
+$('agent-definition-registry-list').addEventListener('change', selectAgentDefinitionRegistry);
+$('agent-definition-create-registry-button').addEventListener('click', createAgentDefinitionRegistry);
+$('agent-definition-list').addEventListener('change', selectAgentDefinition);
+$('agent-definition-new-button').addEventListener('click', newAgentDefinition);
+$('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
+$('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
+$('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
+$('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
@@ -4882,6 +5313,7 @@ async function initialLoad() {
   await loadScenarioWork();
   await loadBrowserAgentJobs();
   await loadBrowserAgentExecutionPolicy();
+  await loadAgentDefinitionRegistries();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
