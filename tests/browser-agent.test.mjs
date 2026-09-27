@@ -1295,6 +1295,93 @@ test('Browser Agent persists independent verifier route failure runtime before r
   assert.equal(live.job.runtime.aiRouterRuntime.routeStates['mistral-agent'].lastErrorCode, 'HTTP_429');
 });
 
+test('Browser Agent waits until canonical planner route retryAt instead of early exponential retries', async () => {
+  const chrome = makeChrome();
+  let routeCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    now: () => 5000,
+    routePrompt: async () => {
+      routeCalls += 1;
+      const error = new Error('AI route pool is cooling down');
+      error.code = 'AI_ROUTE_POOL_EXHAUSTED';
+      error.retryAt = 65000;
+      throw error;
+    },
+  });
+  await manager.create({ id: 'job-route-retry-at', goal: 'Continue after provider cooldown' });
+  await manager.start('job-route-retry-at', { runInitial: false });
+  const result = await manager.cycleOne('job-route-retry-at');
+  const live = await manager.get('job-route-retry-at');
+  assert.equal(result.kind, 'MODEL_RETRY');
+  assert.equal(routeCalls, 1);
+  assert.equal(live.job.runtime.consecutiveModelErrors, 1);
+  assert.equal(live.job.runtime.nextWakeAt, 65000, 'router retryAt must outrank the generic 30-second recovery cap');
+});
+
+test('Browser Agent waits until verifier route retryAt and retains failed verifier accounting', async () => {
+  const chrome = makeChrome();
+  let verifierCalls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    now: () => 5000,
+    routePrompt: async payload => {
+      if (payload.systemPrompt.startsWith('Return only a read-only Browser Agent outcome-verification')) {
+        verifierCalls += 1;
+        const error = new Error('Verifier route is cooling down');
+        error.code = 'AI_ROUTE_POOL_EXHAUSTED';
+        error.retryAt = 70000;
+        error.modelCallsUsed = 1;
+        error.routerRuntime = {
+          routeStates: {
+            'verifier-route': {
+              consecutiveFailures: 1,
+              successes: 0,
+              failures: 1,
+              backoffUntil: 70000,
+              circuitOpenUntil: 0,
+              lastErrorCode: 'HTTP_429',
+              lastErrorCategory: 'quota-or-rate',
+              lastErrorAt: 5000,
+              lastSuccessAt: 0,
+              lastLatencyMs: 1,
+            },
+          },
+          lastRouteId: 'verifier-route',
+          lastFailoverChain: [],
+        };
+        throw error;
+      }
+      const snapshotMarker = 'CURRENT SNAPSHOT:\n';
+      const snapshot = JSON.parse(payload.prompt.slice(payload.prompt.lastIndexOf(snapshotMarker) + snapshotMarker.length));
+      return {
+        text: JSON.stringify({
+          type: 'done',
+          summary: 'Planner supplied current evidence',
+          evidence: {
+            snapshotSignature: browserSnapshotSignature(snapshot),
+            checks: [{ criterion: 1, detail: 'Current page was observed.' }],
+          },
+        }),
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2, modelCalls: 1 },
+      };
+    },
+  });
+  await manager.create({
+    id: 'job-verifier-retry-at',
+    goal: 'Verify current page',
+    acceptanceCriteria: ['The current page is observed'],
+  });
+  await manager.start('job-verifier-retry-at', { runInitial: false });
+  const result = await manager.cycleOne('job-verifier-retry-at');
+  const live = await manager.get('job-verifier-retry-at');
+  assert.equal(result.kind, 'VERIFICATION_RETRY');
+  assert.equal(verifierCalls, 1);
+  assert.equal(live.job.runtime.modelCalls, 2, 'planner success plus failed verifier call must remain monotonic');
+  assert.equal(live.job.runtime.nextWakeAt, 70000);
+  assert.equal(live.job.runtime.aiRouterRuntime.routeStates['verifier-route'].backoffUntil, 70000);
+});
+
 test('Browser Agent persists a planner-proposed DAG without treating planning as a browser effect', async () => {
   const chrome = makeChrome();
   const at = new Date().toISOString();
