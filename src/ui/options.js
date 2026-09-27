@@ -2499,6 +2499,10 @@ function renderAgentDefinitionList() {
 }
 
 async function loadAgentDefinitionRegistries({ selectRegistryId = '', selectDefinitionId = '' } = {}) {
+  ui.selectedAgentDefinitionRegistry = null;
+  ui.selectedAgentDefinition = null;
+  ui.agentDefinitionMode = 'none';
+  setAgentDefinitionFormEnabled(false);
   try {
     const data = await core('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES');
     ui.agentDefinitionRegistries = Array.isArray(data?.registries) ? data.registries : [];
@@ -2537,6 +2541,12 @@ async function loadAgentDefinitionRegistries({ selectRegistryId = '', selectDefi
     fillAgentDefinitionForm(ui.selectedAgentDefinition);
     $('agent-definition-status').textContent = `Реєстр ${ui.selectedAgentDefinitionRegistry.registryId}, revision ${ui.selectedAgentDefinitionRegistry.revision}. Definitions: ${ui.selectedAgentDefinitionRegistry.definitions.length}.`;
   } catch (error) {
+    ui.selectedAgentDefinitionRegistry = null;
+    ui.selectedAgentDefinitionId = '';
+    ui.selectedAgentDefinition = null;
+    ui.agentDefinitionMode = 'none';
+    renderAgentDefinitionList();
+    fillAgentDefinitionForm(null);
     $('agent-definition-status').textContent = `Reusable Agent definitions не завантажено: ${error.message}`;
   }
 }
