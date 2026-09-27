@@ -33,7 +33,7 @@ const ACTIVE_LIFECYCLES = new Set([
   OrchestrationNodeLifecycle.PREPARING_EFFECT,
   OrchestrationNodeLifecycle.ACTIVE,
 ]);
-const UNSAFE_DISPLAY_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu;
+const UNSAFE_DISPLAY_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu;
 
 function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
