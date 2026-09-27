@@ -1462,8 +1462,9 @@ export class BrowserAgentManager {
   /**
    * Persist one exact Browser Agent -> canonical OrchestrationHierarchy node
    * binding through the existing Browser Agent serialized storage authority.
-   * The resolver is re-read inside the mutation boundary to prevent a caller
-   * supplied graph/policy snapshot from minting durable structural authority.
+   * Canonical OrchestrationV2 authority remains fenced until this manager's
+   * durable Browser Agent update has committed; no caller snapshot can mint
+   * structural authority outside that shared serialization boundary.
    */
   async bindOrchestrationNode(id, rawRequest = {}, dependencies = {}) {
     const request = normalizeBrowserAgentOrchestrationBindingRequestV1(rawRequest);
