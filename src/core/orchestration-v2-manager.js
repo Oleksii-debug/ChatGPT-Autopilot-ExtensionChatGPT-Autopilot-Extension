@@ -11,6 +11,7 @@ import { OrchestrationHierarchyEventType, compactOrchestrationEventId } from './
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
+import { createOrchestrationProjectAuthorityV1 } from './browser-agent-orchestration-binding.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -496,6 +497,53 @@ export class OrchestrationV2Manager {
       return draft;
     });
     return this.getStatus();
+  }
+
+  /**
+   * Read-only canonical Project -> Orchestration hierarchy authority resolver.
+   * Project identity comes from durable orchestra config; topology and owner
+   * subagent policy come from the same orchestra's durable state. No spawn,
+   * scheduling or execution authority is granted here.
+   */
+  async resolveProjectHierarchyAuthority(projectId) {
+    if (typeof projectId !== 'string'
+        || projectId !== projectId.trim()
+        || !projectId
+        || projectId.length > 180
+        || !/^[A-Za-z0-9._:@/+~-]+$/u.test(projectId)) {
+      throw new Error('Project ID for orchestration authority is invalid');
+    }
+    const meta = await this.loadMeta();
+    const matches = [];
+    for (const orchestraId of meta.order) {
+      const controller = this.controllerFor(orchestraId);
+      const config = await controller.configRepository.load();
+      if (config.projectId === projectId) {
+        matches.push({ orchestraId, item: meta.byId[orchestraId], controller });
+      }
+    }
+    if (matches.length === 0) {
+      throw new Error('No canonical orchestra owns this Project ID');
+    }
+    if (matches.length !== 1) {
+      throw new Error('Project ID is not uniquely owned by one canonical orchestra');
+    }
+    const match = matches[0];
+    const runtime = await match.controller.runtimeRepository.load();
+    const graph = runtime?.hierarchy?.graph;
+    const state = runtime?.hierarchy?.state;
+    if (!graph || !state) {
+      throw new Error('Canonical orchestra has no durable orchestration hierarchy');
+    }
+    if (state.graphId !== graph.graphId || state.controlEpoch !== graph.controlEpoch) {
+      throw new Error('Canonical orchestration hierarchy runtime provenance is inconsistent');
+    }
+    return createOrchestrationProjectAuthorityV1({
+      orchestraId: match.orchestraId,
+      projectId,
+      graph,
+      subagentPolicy: match.item.subagentPolicy,
+    });
   }
 
   async selectedController() {
