@@ -481,7 +481,16 @@ test('cycle must bind exact failed node identity and failed-node revision', () =
   );
   assert.throws(
     () => proposeAgentSelfRepairWorkV1(request({
-      cycle: cycle({ baselineRevisionId: '2026-09-27T00:59:59.000Z' }),
+      cycle: cycle({
+        baselineRevisionId: '2026-09-27T00:59:59.000Z',
+        attempts: [{
+          attemptNumber: 1,
+          failure: failure({ revision: '2026-09-27T00:59:59.000Z' }),
+          diagnosis: diagnosis(),
+          repair: null,
+          retest: null,
+        }],
+      }),
     })),
     /baselineRevisionId must match failed node updatedAt/u,
   );
