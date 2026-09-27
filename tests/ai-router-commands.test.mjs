@@ -195,6 +195,15 @@ test('autoSwitch=false preserves provider retryAt without issuing a second route
       costClass:'paid',
       inputPricePerMillionUsd:1,
       outputPricePerMillionUsd:2,
+    }, {
+      routeId:'verifier-fallback',
+      provider:'openai-compatible',
+      endpointId:'mistral',
+      model:'mistral-small-latest',
+      roles:['verifier'],
+      costClass:'paid',
+      inputPricePerMillionUsd:1,
+      outputPricePerMillionUsd:2,
     }],
     routePolicy:{ autoSwitch:false, retryBackoffSeconds:60 },
   } });
@@ -209,7 +218,7 @@ test('autoSwitch=false preserves provider retryAt without issuing a second route
     assert.equal(error?.routerRuntime?.routeStates?.['mistral-agent']?.lastErrorCategory, 'quota-or-rate');
     return true;
   });
-  assert.equal(calls.length, 1, 'autoSwitch=false must not call another route or legacy strong fallback');
+  assert.equal(calls.length, 1, 'pinned Agent failure must not call the eligible verifier route through legacy strong fallback');
 });
 
 test('AI router settings persist and old states without router fields stay valid', async () => {
