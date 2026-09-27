@@ -471,7 +471,20 @@ export class OrchestrationV2Manager {
     return this.runProjectAuthorityExclusive(() => this._updateConfigUnfenced(raw, id));
   }
 
-  async _updateConfigUnfenced(raw, id = '') {
+  async purgeManagedProjectSessionState(projectId, graphId = '') {
+    await this.coreRepository.update(state => {
+      for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
+        if (!isManagedSession(session, projectId, graphId)) continue;
+        if (isUnresolvedOperation(session)) {
+          throw new Error('Unresolved Send prevents project identity change.');
+        }
+        purgeManagedSessionState(state, sessionId);
+      }
+      return state;
+    });
+  }
+
+  async _updateConfigUnfenced(raw, id = '', { deferManagedSessionPurge = false } = {}) {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -489,14 +502,9 @@ export class OrchestrationV2Manager {
       if (current.projectId && current.projectId !== next.projectId) {
         const currentRuntime = await controller.runtimeRepository.load();
         const currentGraphId = hierarchyGraphId(currentRuntime);
-        await this.coreRepository.update(state => {
-          for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
-            if (!isManagedSession(session, current.projectId, currentGraphId)) continue;
-            if (isUnresolvedOperation(session)) throw new Error('Unresolved Send prevents project identity change.');
-            purgeManagedSessionState(state, sessionId);
-          }
-          return state;
-        });
+        if (!deferManagedSessionPurge) {
+          await this.purgeManagedProjectSessionState(current.projectId, currentGraphId);
+        }
       }
       await controller.configRepository.save(next);
       await controller.runtimeRepository.reset();
@@ -834,12 +842,22 @@ export class OrchestrationV2Manager {
       }
 
       const authoritySnapshot = await this.snapshotImportAuthorityState(selected.id, liveItem);
+      const oldRuntime = await liveController.runtimeRepository.load();
+      const deferredManagedSessionPurge = liveItem.ownerPaused === true
+        && Boolean(liveCurrent.projectId)
+        && liveCurrent.projectId !== imported.projectId
+        ? {
+            projectId: liveCurrent.projectId,
+            graphId: hierarchyGraphId(oldRuntime),
+          }
+        : null;
       let mutationStarted = false;
       try {
         mutationStarted = true;
         const nextStatus = await this._updateConfigUnfenced(
           { ...imported, enabled: false },
           selected.id,
+          { deferManagedSessionPurge: Boolean(deferredManagedSessionPurge) },
         );
         if (importedDocument.hierarchy) {
           const currentRuntime = await liveController.runtimeRepository.load();
@@ -857,6 +875,12 @@ export class OrchestrationV2Manager {
           record.updatedAt = this.now();
           return meta;
         });
+        if (deferredManagedSessionPurge) {
+          await this.purgeManagedProjectSessionState(
+            deferredManagedSessionPurge.projectId,
+            deferredManagedSessionPurge.graphId,
+          );
+        }
         return nextStatus;
       } catch (error) {
         if (mutationStarted) {
