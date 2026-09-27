@@ -300,7 +300,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("aiPrimaryProvider: $('agent-ai-primary-provider').value"), 'per-Agent primary provider override must persist through Core');
   assert.ok(js.includes("aiStrongProvider: $('agent-ai-strong-provider').value"), 'per-Agent strong provider override must persist through Core');
   assert.ok(js.includes("aiPinnedRouteId: $('agent-ai-pinned-route-id').value"), 'Agent route choice must persist through Core');
-  assert.match(html, /id="agent-ai-pinned-route-id"[^>]*aria-describedby="agent-route-binding-status agent-route-pool-note"/, 'Agent route choice must expose its policy/readiness explanation to keyboard and screen-reader users');
+  assert.doesNotMatch(html, /id="agent-ai-pinned-route-id"[^>]*aria-describedby=/, 'Agent route status must use the existing concise live-status pattern instead of adding tutorial aria-describedby prose');
   assert.match(html, /id="agent-route-binding-status"[^>]*role="status"/, 'Agent route policy/readiness must be announced through a native status surface');
   assert.ok(js.includes('browserAgentRoutePolicyBlockReason'), 'Agent route choices must project global Models policy before the user starts a job');
   assert.ok(js.includes('option.disabled = Boolean(blockReason)'), 'globally blocked Agent routes must not look normally selectable');
