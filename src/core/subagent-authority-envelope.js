@@ -21,6 +21,8 @@ const REQUEST_KEYS = new Set([
   'taskSourceIds',
   'parentArtifactIds',
   'taskArtifactIds',
+  'parentToolIds',
+  'ownerAllowedToolIds',
   'requestedToolIds',
   'toolDescriptors',
 ]);
@@ -158,6 +160,8 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
   const taskSourceIds = idList(own(request, 'taskSourceIds'), 'taskSourceIds');
   const parentArtifactIds = idList(own(request, 'parentArtifactIds'), 'parentArtifactIds');
   const taskArtifactIds = idList(own(request, 'taskArtifactIds'), 'taskArtifactIds');
+  const parentToolIds = idList(own(request, 'parentToolIds'), 'parentToolIds');
+  const ownerAllowedToolIds = idList(own(request, 'ownerAllowedToolIds'), 'ownerAllowedToolIds');
   const requestedToolIds = idList(own(request, 'requestedToolIds'), 'requestedToolIds');
   const descriptorInputs = dataArray(own(request, 'toolDescriptors'), 'toolDescriptors');
 
@@ -184,6 +188,14 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
   if (artifactEscape.length) {
     return denied('CONTEXT_ARTIFACT_ESCALATION', identities, {
       deniedArtifactIds: artifactEscape,
+    });
+  }
+
+  const toolAuthorityIntersection = intersect(parentToolIds, ownerAllowedToolIds);
+  const toolScopeEscalation = missing(requestedToolIds, toolAuthorityIntersection);
+  if (toolScopeEscalation.length) {
+    return denied('TOOL_SCOPE_ESCALATION', identities, {
+      deniedToolIds: toolScopeEscalation,
     });
   }
 
