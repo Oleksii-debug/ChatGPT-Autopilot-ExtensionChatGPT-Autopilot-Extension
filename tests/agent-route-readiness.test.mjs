@@ -216,3 +216,44 @@ test('nested route, policy, state and capability arrays preserve canonical fail-
   );
   assert.equal(reads, 0);
 });
+
+
+test('one required role in backoff keeps readiness waiting until that role recovers', () => {
+  const result = inspectAgentRouteReadinessV1({
+    routes:routes(),
+    policy:{},
+    routeStates:{ 'verifier-remote':{ backoffUntil:6000 } },
+    plannerCapabilityIds:['browser'],
+    verifierCapabilityIds:['verify'],
+    now:1000,
+  });
+  assert.equal(result.state, AgentRouteReadinessState.WAITING_RETRY);
+  assert.deepEqual(result.planner.availableRouteIds, ['planner-local','vision-planner']);
+  assert.deepEqual(result.verifier.availableRouteIds, []);
+  assert.equal(result.retryAt, 6000);
+});
+
+test('boolean authority fields require exact booleans and null-prototype requests remain portable', () => {
+  for (const [field, value] of [['requiresVerifier', 1], ['requiresVision', 'false']]) {
+    assert.throws(
+      () => inspectAgentRouteReadinessV1({
+        routes:routes(),
+        policy:{},
+        [field]:value,
+        now:1000,
+      }),
+      /must be boolean/u,
+      field,
+    );
+  }
+
+  const request = Object.create(null);
+  request.routes = routes();
+  request.policy = {};
+  request.plannerCapabilityIds = ['browser'];
+  request.requiresVerifier = false;
+  request.now = 1000;
+  const result = inspectAgentRouteReadinessV1(request);
+  assert.equal(result.state, AgentRouteReadinessState.READY);
+  assert.equal(result.ready, true);
+});
