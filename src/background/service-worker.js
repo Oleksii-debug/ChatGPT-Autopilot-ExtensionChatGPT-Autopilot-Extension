@@ -68,6 +68,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_SCENARIO_WORK',
   'GET_SCENARIO_CHAT_POOL',
   'LIST_BROWSER_AGENT_JOBS',
+  'GET_BROWSER_AGENT_EXECUTION_POLICY',
   'GET_BROWSER_AGENT_JOB',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
@@ -657,6 +658,10 @@ export async function dispatchUiMessage(message) {
     result = await scenarioWork.cycleAll();
   } else if (message.command === 'LIST_BROWSER_AGENT_JOBS') {
     result = await browserAgent.list();
+  } else if (message.command === 'GET_BROWSER_AGENT_EXECUTION_POLICY') {
+    result = await browserAgent.getExecutionPolicy();
+  } else if (message.command === 'UPDATE_BROWSER_AGENT_EXECUTION_POLICY') {
+    result = await browserAgent.updateExecutionPolicy(message.payload || {});
   } else if (message.command === 'GET_BROWSER_AGENT_JOB') {
     result = await browserAgent.get(message.payload?.id || '');
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
