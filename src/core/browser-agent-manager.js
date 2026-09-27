@@ -597,7 +597,7 @@ export class BrowserAgentManager {
           let eligibleIndex = -1;
           for (let index = 0; index < this.executionSlotQueue.length; index += 1) {
             const candidate = this.executionSlotQueue[index];
-            if (this.executionSlotActive.has(candidate.id) || !this.#hasExecutionTargetConflict(store, candidate.id)) {
+            if (!this.executionSlotActive.has(candidate.id) && !this.#hasExecutionTargetConflict(store, candidate.id)) {
               eligibleIndex = index;
               break;
             }
@@ -639,6 +639,7 @@ export class BrowserAgentManager {
     });
     if (admission.decision === ResourceBudgetDecisionKind.ALLOW
         && this.executionSlotQueue.length === 0
+        && !this.executionSlotActive.has(id)
         && !this.#hasExecutionTargetConflict(store, id)) {
       this.executionSlotActive.add(id);
       return true;
@@ -3296,20 +3297,29 @@ export class BrowserAgentManager {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (current.job.runtime.runState === BrowserAgentRunState.WAITING_APPROVAL) throw new Error('Approve or reject the pending Browser Agent action before manual Step');
-    if (current.job.runtime.runState === BrowserAgentRunState.RUNNING) return this.cycleOne(id);
-    if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
-    const now = this.now();
-    await this.update(store => {
-      const job = store.byId[id];
-      if (!job) return store;
-      job.runtime.controlEpoch += 1;
-      job.runtime.runState = BrowserAgentRunState.RUNNING;
-      job.runtime.lastError = '';
-      job.runtime.nextWakeAt = now;
-      job.runtime.updatedAt = now;
-      return store;
-    });
-    return this.cycleOne(id, { pauseAfter: true });
+    let pauseAfter = false;
+    if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+      if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
+      const now = this.now();
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job) return store;
+        job.runtime.controlEpoch += 1;
+        job.runtime.runState = BrowserAgentRunState.RUNNING;
+        job.runtime.lastError = '';
+        job.runtime.nextWakeAt = now;
+        job.runtime.updatedAt = now;
+        return store;
+      });
+      pauseAfter = true;
+    }
+
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      return await this.cycleOne(id, { pauseAfter });
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
   }
 
   async addInstruction(id, text) {
