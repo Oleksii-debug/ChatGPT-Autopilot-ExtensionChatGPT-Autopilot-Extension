@@ -1166,14 +1166,16 @@ export class BrowserAgentManager {
       const projectId = job.config?.projectId || '';
       if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
       const authority = await resolveProjectHierarchyAuthority(projectId);
+      const currentBinding = job.orchestrationNodeBinding;
       binding = createBrowserAgentOrchestrationNodeBindingV1({
         jobId: job.id,
         projectId,
         request,
         authority,
-        currentBinding: job.orchestrationNodeBinding,
+        currentBinding,
         boundAt: this.now(),
       });
+      if (currentBinding) return store;
       job.orchestrationNodeBinding = clone(binding);
       job.updatedAt = this.now();
       return store;
