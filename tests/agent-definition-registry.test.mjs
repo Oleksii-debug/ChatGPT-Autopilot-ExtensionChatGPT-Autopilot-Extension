@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  AgentDefinitionRegistryMutationKind,
   discoverAgentDefinitionsV1,
   materializeAgentDefinitionV1,
   normalizeAgentDefinitionRegistryV1,
   normalizeAgentDefinitionV1,
   normalizeAgentDefinitionSelectionV1,
+  proposeAgentDefinitionRegistryMutationV1,
   selectAgentDefinitionV1,
 } from '../src/core/agent-definition-registry.js';
 
@@ -485,4 +487,277 @@ test('materialization rejects oversized composed goal and keeps reusable instruc
     selection,
     goal: 'y'.repeat(40000),
   }), /exceeds Browser Agent limit/);
+});
+
+
+test('registry CREATE is revision-CAS guarded, deterministic and persistence-non-authorizing', () => {
+  const current = registry();
+  const created = definition({
+    agentDefinitionId: 'agent.analysis',
+    label: 'Analysis Agent',
+    definitionRevision: 1,
+    tags: ['analysis'],
+  });
+  const result = proposeAgentDefinitionRegistryMutationV1({
+    registry: current,
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 3,
+    kind: AgentDefinitionRegistryMutationKind.CREATE,
+    definition: created,
+  });
+  assert.equal(result.previousRegistryRevision, 3);
+  assert.equal(result.nextRegistryRevision, 4);
+  assert.equal(result.agentDefinitionId, 'agent.analysis');
+  assert.equal(result.previousDefinitionRevision, 0);
+  assert.equal(result.nextDefinitionRevision, 1);
+  assert.deepEqual(
+    result.nextRegistry.definitions.map(item => item.agentDefinitionId),
+    ['agent.analysis', 'agent.research', 'agent.writer'],
+  );
+  assert.equal(current.revision, 3, 'proposal must not mutate caller registry');
+  assert.equal(current.definitions.length, 2);
+  assert.deepEqual(result.authority, {
+    persistenceAuthorized: false,
+    executionAuthorized: false,
+    policyAuthorized: false,
+    schedulingAuthorized: false,
+    recoveryAuthorized: false,
+  });
+});
+
+test('registry CREATE rejects duplicate identity and non-initial definition revision', () => {
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: registry(),
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.CREATE,
+      definition: definition({ definitionRevision: 1 }),
+    }),
+    /target already exists/,
+  );
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: registry(),
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.CREATE,
+      definition: definition({
+        agentDefinitionId: 'agent.analysis',
+        label: 'Analysis Agent',
+        definitionRevision: 2,
+      }),
+    }),
+    /definitionRevision 1/,
+  );
+});
+
+test('registry UPDATE requires exact registry and definition revisions and one-step revision advance', () => {
+  const current = registry();
+  const updated = definition({
+    description: 'Updated source-aware research worker.',
+    definitionRevision: 8,
+  });
+  const result = proposeAgentDefinitionRegistryMutationV1({
+    registry: current,
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 3,
+    kind: AgentDefinitionRegistryMutationKind.UPDATE,
+    agentDefinitionId: 'agent.research',
+    definition: updated,
+    expectedDefinitionRevision: 7,
+  });
+  assert.equal(result.nextRegistry.revision, 4);
+  assert.equal(result.previousDefinitionRevision, 7);
+  assert.equal(result.nextDefinitionRevision, 8);
+  assert.equal(
+    result.nextRegistry.definitions.find(item => item.agentDefinitionId === 'agent.research').description,
+    'Updated source-aware research worker.',
+  );
+
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+      registryId: 'agents:wrong-project',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
+      definition: updated,
+      expectedDefinitionRevision: 7,
+    }),
+    /registry identity does not match mutation target/,
+  );
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.writer',
+      definition: updated,
+      expectedDefinitionRevision: 2,
+    }),
+    /definition identity does not match target/,
+  );
+
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+    registryId: 'agents:project-1',
+      expectedRegistryRevision: 2,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
+      definition: updated,
+      expectedDefinitionRevision: 7,
+    }),
+    /registry revision drifted/,
+  );
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+    registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
+      definition: updated,
+      expectedDefinitionRevision: 6,
+    }),
+    /definition revision drifted/,
+  );
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+    registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
+      definition: definition({ definitionRevision: 9 }),
+      expectedDefinitionRevision: 7,
+    }),
+    /increment definitionRevision exactly once/,
+  );
+});
+
+test('registry DELETE requires exact target revision and returns a canonical next snapshot', () => {
+  const result = proposeAgentDefinitionRegistryMutationV1({
+    registry: registry(),
+      registryId: 'agents:project-1',
+    expectedRegistryRevision: 3,
+    kind: AgentDefinitionRegistryMutationKind.DELETE,
+    agentDefinitionId: 'agent.research',
+    expectedDefinitionRevision: 7,
+  });
+  assert.equal(result.nextRegistry.revision, 4);
+  assert.equal(result.previousDefinitionRevision, 7);
+  assert.equal(result.nextDefinitionRevision, 0);
+  assert.deepEqual(result.nextRegistry.definitions.map(item => item.agentDefinitionId), ['agent.writer']);
+
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: registry(),
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.DELETE,
+      agentDefinitionId: 'agent.missing',
+      expectedDefinitionRevision: 1,
+    }),
+    /target does not exist/,
+  );
+});
+
+test('registry mutation request is exact, descriptor-safe and rejects shape aliases without reads', () => {
+  let reads = 0;
+  const hostile = {
+    registry: registry(),
+      registryId: 'agents:project-1',
+    expectedRegistryRevision: 3,
+    kind: AgentDefinitionRegistryMutationKind.DELETE,
+    agentDefinitionId: 'agent.research',
+    expectedDefinitionRevision: 7,
+  };
+  Object.defineProperty(hostile, 'expectedRegistryRevision', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 3;
+    },
+  });
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1(hostile),
+    /expectedRegistryRevision must be an enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+
+  for (const request of [
+    {
+      registry: registry(),
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: -0,
+      kind: AgentDefinitionRegistryMutationKind.DELETE,
+      agentDefinitionId: 'agent.research',
+      expectedDefinitionRevision: 7,
+    },
+    {
+      registry: registry(),
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: 'delete',
+      agentDefinitionId: 'agent.research',
+      expectedDefinitionRevision: 7,
+    },
+    {
+      registry: registry(),
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.CREATE,
+      definition: definition({
+        agentDefinitionId: 'agent.analysis',
+        label: 'Analysis Agent',
+        definitionRevision: 1,
+      }),
+      expectedDefinitionRevision: undefined,
+    },
+  ]) {
+    assert.throws(() => proposeAgentDefinitionRegistryMutationV1(request));
+  }
+
+  const decorated = {
+    registry: registry(),
+      registryId: 'agents:project-1',
+    expectedRegistryRevision: 3,
+    kind: AgentDefinitionRegistryMutationKind.DELETE,
+    agentDefinitionId: 'agent.research',
+    expectedDefinitionRevision: 7,
+    persistenceAuthorized: true,
+  };
+  assert.throws(() => proposeAgentDefinitionRegistryMutationV1(decorated), /unknown field/);
+});
+
+test('registry mutation fails closed at revision overflow and supports null-prototype request records', () => {
+  const nearOverflow = registry({ revision: Number.MAX_SAFE_INTEGER });
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: nearOverflow,
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: Number.MAX_SAFE_INTEGER,
+      kind: AgentDefinitionRegistryMutationKind.DELETE,
+      agentDefinitionId: 'agent.research',
+      expectedDefinitionRevision: 7,
+    }),
+    /cannot advance beyond MAX_SAFE_INTEGER/,
+  );
+
+  const request = Object.assign(Object.create(null), {
+    registry: registry(),
+      registryId: 'agents:project-1',
+    expectedRegistryRevision: 3,
+    kind: AgentDefinitionRegistryMutationKind.DELETE,
+    agentDefinitionId: 'agent.research',
+    expectedDefinitionRevision: 7,
+  });
+  const result = proposeAgentDefinitionRegistryMutationV1(request);
+  assert.equal(result.nextRegistry.revision, 4);
+  assert.ok(Object.isFrozen(result));
+  assert.ok(Object.isFrozen(result.nextRegistry));
 });
