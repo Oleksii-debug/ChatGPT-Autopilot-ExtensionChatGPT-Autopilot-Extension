@@ -29,6 +29,7 @@ const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPh
 const MAX_INITIAL_STAGGER_SECONDS = 604800; // 7 days; UI may express this in seconds or minutes.
 const ASSISTANT_OBSERVATION_HEARTBEAT_MS = 5 * 60 * 1000;
 const ASSISTANT_TAB_RECOVERY_GRACE_MS = 5 * 60 * 1000;
+const ASSISTANT_TAB_RECOVERY_MAX_GRACES = 3;
 const ASSISTANT_TAB_RECOVERY_CODES = new Set([
   'ASSISTANT_RESPONSE_TAB_RELOAD_STARTED',
   'ASSISTANT_RESPONSE_TAB_DISCARDED',
@@ -1337,6 +1338,11 @@ export class ScenarioWorkManager {
       const refreshed = ensureManagerRuntimeFields(runtime);
       const liveParticipant = scenarioWorkParticipants(refreshed).find(item => item.key === participant.key);
       if (liveParticipant?.state !== ScenarioParticipantState.WAITING) return { ownerChanged: false };
+      const graceCount = Math.max(0, Number(liveParticipant.tabRecoveryGraceCount || 0));
+      if (graceCount >= ASSISTANT_TAB_RECOVERY_MAX_GRACES) {
+        return { ownerChanged: false, exhausted: true };
+      }
+      liveParticipant.tabRecoveryGraceCount = graceCount + 1;
       liveParticipant.deadlineAt = Math.max(
         Number(liveParticipant.deadlineAt || 0),
         now + ASSISTANT_TAB_RECOVERY_GRACE_MS,
@@ -1352,7 +1358,7 @@ export class ScenarioWorkManager {
         event: 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ВІДНОВЛЕННЯ_ВКЛАДКИ',
         status: 'RECOVERING',
         code: code || 'ASSISTANT_RESPONSE_TAB_RECOVERY',
-        message: `Стан відповіді невідомий через відновлення вкладки; timeout відкладено на ${Math.floor(ASSISTANT_TAB_RECOVERY_GRACE_MS / 1000)} с без replacement.`,
+        message: `Стан відповіді невідомий через відновлення вкладки; recovery grace ${liveParticipant.tabRecoveryGraceCount}/${ASSISTANT_TAB_RECOVERY_MAX_GRACES}, timeout відкладено на ${Math.floor(ASSISTANT_TAB_RECOVERY_GRACE_MS / 1000)} с без replacement.`,
         now,
       });
       return { ownerChanged: false };
@@ -1387,7 +1393,7 @@ export class ScenarioWorkManager {
       if (report?.tabRecoveryPending === true || ASSISTANT_TAB_RECOVERY_CODES.has(reportCode)) {
         const recovery = await extendForTabRecovery(participant, task, reportCode);
         if (recovery.ownerChanged) return { runtime: recovery.runtime || runtime, ownerChanged: true };
-        continue;
+        if (!recovery.exhausted) continue;
       }
       // responseTimeoutMinutes means absence of a completed/ongoing assistant response,
       // not a hard wall-clock cap on a response that is still streaming. If the
