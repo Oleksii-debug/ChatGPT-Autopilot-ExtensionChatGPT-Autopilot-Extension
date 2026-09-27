@@ -124,7 +124,11 @@ test('legacy default 15s polling migrates once to 180s without overriding later 
   delete chromeApi._storage.autopilotScenarioTabRecoveryMigrationV1;
   const migrated = await manager.get(scenarioId);
   assert.equal(migrated.scenario.config.pollSeconds, 180);
+  assert.equal(chromeApi._storage.autopilotScenarioTabRecoveryMigrationV1, undefined);
+
+  await manager.update(store => store);
   assert.equal(chromeApi._storage.autopilotScenarioTabRecoveryMigrationV1, true);
+  assert.equal((await manager.get(scenarioId)).scenario.config.pollSeconds, 180);
 
   await manager.update(store => {
     store.byId[scenarioId].config.pollSeconds = 15;
