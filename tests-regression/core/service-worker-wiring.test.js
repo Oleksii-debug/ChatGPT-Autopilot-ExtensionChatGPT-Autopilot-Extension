@@ -132,6 +132,9 @@ test('Browser Agent uses a dedicated durable manager with fast-burst and owner-i
   assert.match(source, /browserAgent\.getExecutionPolicy\(\)/);
   assert.match(source, /message\.command === 'UPDATE_BROWSER_AGENT_EXECUTION_POLICY'/);
   assert.match(source, /browserAgent\.updateExecutionPolicy\(message\.payload \|\| \{\}\)/);
+  const readOnlyCommands = source.match(/const READ_ONLY_UI_COMMANDS = new Set\(\[([\s\S]*?)\]\);/)?.[1] || '';
+  assert.match(readOnlyCommands, /'GET_BROWSER_AGENT_EXECUTION_POLICY'/, 'Agent policy reads must stay read-only');
+  assert.doesNotMatch(readOnlyCommands, /'UPDATE_BROWSER_AGENT_EXECUTION_POLICY'/, 'Agent policy writes must run mutation reconciliation');
   assert.match(source, /message\.command === 'APPROVE_BROWSER_AGENT_ACTION'/);
   assert.match(source, /browserAgent\.approvePendingAction\(/);
   assert.match(source, /message\.command === 'REJECT_BROWSER_AGENT_ACTION'/);
