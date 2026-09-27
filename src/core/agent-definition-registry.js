@@ -29,7 +29,7 @@ const MATERIALIZE_KEYS = new Set([
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const MUTATION_KEYS = new Set([
-  'registry', 'expectedRegistryRevision', 'kind',
+  'registry', 'registryId', 'expectedRegistryRevision', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const MUTATION_KINDS = new Set(Object.values(AgentDefinitionRegistryMutationKind));
@@ -454,6 +454,10 @@ export function materializeAgentDefinitionV1(input = {}) {
 export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
   const raw = record(input, MUTATION_KEYS, 'Agent definition registry mutation request');
   const registry = normalizeAgentDefinitionRegistryV1(raw.registry);
+  const registryId = id(raw.registryId, 'registryId');
+  if (registryId !== registry.registryId) {
+    throw new Error('Agent definition registry identity does not match mutation target');
+  }
   const expectedRegistryRevision = positiveInteger(
     raw.expectedRegistryRevision,
     'expectedRegistryRevision',
@@ -489,14 +493,16 @@ export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
     nextDefinitionRevision = 1;
     nextDefinitions = [...registry.definitions, definition];
   } else if (raw.kind === AgentDefinitionRegistryMutationKind.UPDATE) {
-    if (!Object.hasOwn(raw, 'definition') || !Object.hasOwn(raw, 'expectedDefinitionRevision')) {
-      throw new Error('UPDATE mutation requires definition and expectedDefinitionRevision');
+    if (!Object.hasOwn(raw, 'definition')
+      || !Object.hasOwn(raw, 'agentDefinitionId')
+      || !Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('UPDATE mutation requires agentDefinitionId, definition and expectedDefinitionRevision');
     }
-    if (Object.hasOwn(raw, 'agentDefinitionId')) {
-      throw new Error('UPDATE mutation derives identity from definition');
-    }
+    agentDefinitionId = id(raw.agentDefinitionId, 'agentDefinitionId');
     const definition = normalizeAgentDefinitionV1(raw.definition);
-    agentDefinitionId = definition.agentDefinitionId;
+    if (definition.agentDefinitionId !== agentDefinitionId) {
+      throw new Error('UPDATE mutation definition identity does not match target');
+    }
     const current = registry.definitions.find(item => item.agentDefinitionId === agentDefinitionId);
     if (!current) throw new Error('UPDATE mutation target does not exist');
     const expectedDefinitionRevision = positiveInteger(
