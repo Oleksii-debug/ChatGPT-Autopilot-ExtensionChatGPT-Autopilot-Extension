@@ -222,6 +222,13 @@ test('materialization rejects stale-shaped identities, timestamps, revisions and
   );
   assert.throws(
     () => materializeAgentSpecialistDelegationIntentV1(request({
+      at: '+275760-09-13T00:00:00.000Z',
+      profile: profile({ deadlineSeconds: 1 }),
+    })),
+    /deadline exceeds exact timestamp range/u,
+  );
+  assert.throws(
+    () => materializeAgentSpecialistDelegationIntentV1(request({
       childBudget: { maxModelCalls: -0 },
     })),
     /childBudget\.maxModelCalls is invalid/u,
