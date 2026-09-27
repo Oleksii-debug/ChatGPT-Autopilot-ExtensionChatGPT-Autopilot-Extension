@@ -113,3 +113,11 @@ EMERGENCY HOTFIX — 2026-09-26 — SESSION / SCENARIO EFFORT CONTROL
 - The legacy announced three-step slider remains supported only as a bounded compatibility fallback.
 - Pre-send TEMPORARY_ERROR/UNKNOWN_UI effort retries keep the extension-owned tab alive instead of causing a close/reopen storm.
 - Regression coverage added for explicit High and Medium-to-High current-production states.
+
+2026-09-27 — Scenario tab residency/recovery hotfix
+- Active Scenario Work tabs are now marked autoDiscardable=false when Chrome allows it.
+- Assistant response polling no longer repeatedly opens/closes a missing live conversation; it reopens once and keeps the exact /c/<id> resident.
+- discarded/frozen/loading managed tabs enter explicit recovery states instead of being misclassified as response timeout/replacement.
+- Scenario response timeout gets a bounded recovery grace when tab state is temporarily unknown.
+- READ_ASSISTANT_REPORT navigation waits are bounded to 10s as a race backstop instead of the generic 90s wait.
+- New Scenario Work default response poll interval is 180s; UI recommends 180–300s.
