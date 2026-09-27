@@ -428,6 +428,61 @@ test('route quality evidence cannot re-admit a route blocked by canonical owner 
   assert.equal(result.routing.selectedRouteId, 'allowed');
 });
 
+test('an explicit empty quality-evidence list is a no-op rather than cost or latency routing', async () => {
+  const routes = [
+    {
+      routeId:'priority-paid',
+      provider:'openai',
+      model:'paid-model',
+      roles:['planner'],
+      priority:0,
+      costClass:'paid',
+      inputPricePerMillionUsd:5,
+      outputPricePerMillionUsd:5,
+    },
+    { routeId:'later-free', provider:'ollama', model:'free-model', roles:['planner'], priority:0 },
+  ];
+  const gateway = new FakeGateway(['baseline']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => QUALITY_NOW });
+  const result = await router.run(
+    settings({
+      routes,
+      routePolicy:{ orderedRouteIds:['priority-paid','later-free'] },
+    }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'empty evidence task',
+    {
+      taskRole:'planner',
+      routeQualityBenchmarkRequests:[],
+    },
+  );
+
+  assert.equal(gateway.calls[0].model, 'paid-model');
+  assert.equal(result.routing.reason, 'policy-selection');
+});
+
+test('malformed empty quality evidence cannot hide non-canonical authority fields', async () => {
+  const routes = [
+    { routeId:'route-a', provider:'ollama', model:'model-a', roles:['planner'], priority:0 },
+  ];
+  const malformed = [];
+  malformed.extraAuthority = true;
+  const router = new AiOrchestrator({
+    gatewayClient:new FakeGateway(['must not run']),
+    now:() => QUALITY_NOW,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings({ routes }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'malformed evidence task',
+      { taskRole:'planner', routeQualityBenchmarkRequests:malformed },
+    ),
+    /dense and data-only|non-canonical array fields/u,
+  );
+});
+
 test('omitting route quality evidence preserves existing canonical Router order', async () => {
   const routes = [
     { routeId:'priority-a', provider:'ollama', model:'model-a', roles:['planner'], priority:20 },
