@@ -332,6 +332,10 @@ export class OrchestrationV2Manager {
   }
 
   async rename(id, name) {
+    return this.runProjectAuthorityExclusive(() => this._renameUnfenced(id, name));
+  }
+
+  async _renameUnfenced(id, name) {
     await this.updateMeta(meta => {
       if (!meta.byId[id]) throw new Error('Orchestra not found');
       meta.byId[id].name = safeName(name);
@@ -352,6 +356,10 @@ export class OrchestrationV2Manager {
   }
 
   async pause(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._pauseUnfenced(id));
+  }
+
+  async _pauseUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
@@ -397,6 +405,10 @@ export class OrchestrationV2Manager {
   }
 
   async resume(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._resumeUnfenced(id));
+  }
+
+  async _resumeUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -565,6 +577,10 @@ export class OrchestrationV2Manager {
   }
 
   async start(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._startUnfenced(id));
+  }
+
+  async _startUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -953,6 +969,10 @@ export class OrchestrationV2Manager {
   }
 
   async emergencyStop(id = '') {
+    return this.runProjectAuthorityExclusive(() => this._emergencyStopUnfenced(id));
+  }
+
+  async _emergencyStopUnfenced(id = '') {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     if (!orchestraId || !meta.byId[orchestraId]) throw new Error('Orchestra not found');
