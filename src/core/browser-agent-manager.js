@@ -1522,6 +1522,16 @@ export class BrowserAgentManager {
       request.expectedRevision,
       'Specialist provider config expectedRevision',
     );
+    // Normalize and snapshot nested provider config before entering the
+    // serialized write queue. Caller mutation after this method is invoked
+    // cannot change the authority that will be committed.
+    const prepared = createSpecialistProviderConfigV1({
+      providerId,
+      kind: request.kind,
+      config: request.config,
+      revision: 1,
+      updatedAt: new Date(this.now()).toISOString(),
+    });
     let committed = null;
     await this.update(store => {
       const configs = store.specialistProviderConfigsById
@@ -1543,8 +1553,8 @@ export class BrowserAgentManager {
       }
       committed = createSpecialistProviderConfigV1({
         providerId,
-        kind: request.kind,
-        config: request.config,
+        kind: prepared.kind,
+        config: prepared.config,
         revision: currentRevision + 1,
         updatedAt: new Date(this.now()).toISOString(),
       });
