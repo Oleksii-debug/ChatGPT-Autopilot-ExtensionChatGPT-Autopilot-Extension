@@ -592,3 +592,32 @@ test('Agent route policy rejects resilience controls and hostile fields instead 
     routerOverride:{ routePolicy:{ retryBackoffSeconds:1 } },
   }), /unsupported field/);
 });
+
+
+test('Agent route policy composes with legacy per-Agent route pin without mutating frozen policy', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[
+      { routeId:'local-a', provider:'ollama', model:'local-a', priority:1, costClass:'free', locality:'local' },
+      { routeId:'local-b', provider:'ollama', model:'local-b', priority:2, costClass:'free', locality:'local' },
+    ],
+  } });
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{
+      routePolicy:{ allowRouteIds:['local-b'], freeOnly:true, locality:'local' },
+      routeId:'local-b',
+    },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['local-b']);
+});
