@@ -157,6 +157,32 @@ test('materialization derives existing PREPARE intent without granting runtime a
   assert.equal(Object.hasOwn(intent.request, 'schemaVersion'), false);
 });
 
+test('materialized request matches canonical AUTO_PREPARE key semantics and omits absent optionals', () => {
+  const withoutBudget = request();
+  delete withoutBudget.childBudget;
+  delete withoutBudget.parentInvocationId;
+  const materialized = materializeAgentSpecialistDelegationIntentV1(withoutBudget);
+
+  assert.deepEqual(Object.keys(materialized.request).sort(), [
+    'deadlineAt',
+    'expectedPlanRevision',
+    'expectedRegistryRevision',
+    'leaseSeconds',
+    'maxConcurrentHandoffs',
+    'nodeId',
+    'parentInvocationId',
+    'policyEnvelopeId',
+    'priority',
+    'registryId',
+    'requiredCapabilityIds',
+    'requiredToolIds',
+  ].sort());
+  assert.equal(Object.hasOwn(materialized.request, 'childBudget'), false);
+  assert.equal(materialized.request.parentInvocationId, '');
+  assert.equal(Object.hasOwn(materialized.request, 'artifactRefs'), false);
+  assert.equal(Object.hasOwn(materialized.request, 'credentialRefs'), false);
+});
+
 test('materialization rejects capability or tool escalation beyond persisted parent scope', () => {
   assert.throws(
     () => materializeAgentSpecialistDelegationIntentV1(request({
