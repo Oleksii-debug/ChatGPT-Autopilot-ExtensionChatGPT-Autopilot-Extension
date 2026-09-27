@@ -39,7 +39,7 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
@@ -64,6 +64,8 @@ import {
   SPECIALIST_REGISTRY_VERSION,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
+  normalizeSpecialistSelectionV1,
+  bindSpecialistHandoffToRegistryV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
 import {
@@ -72,6 +74,12 @@ import {
   normalizeBrowserAgentOrchestrationBindingRequestV1,
   normalizeBrowserAgentOrchestrationNodeBindingV1,
 } from './browser-agent-orchestration-binding.js';
+import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
+import {
+  evaluateSubagentStructureAdmissionV1,
+  SubagentSpawnInitiator,
+  SubagentStructureDecision,
+} from './subagent-structure-policy.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -99,6 +107,15 @@ const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
 const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set(['resolveProjectHierarchyAuthority']);
+const AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
+  'requiredCapabilityIds', 'requiredToolIds', 'policyEnvelopeId', 'deadlineAt',
+  'priority', 'childBudget', 'artifactRefs', 'credentialRefs', 'parentInvocationId',
+]);
+const PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS = new Set([
+  'schemaVersion', 'planId', 'nodeId', 'planRevision', 'registryId',
+  'registryRevision', 'selection', 'handoff', 'boundAt',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -287,6 +304,88 @@ function normalizePersistedAgentDefinitionScope(raw, selection) {
     capabilityIds: normalizeIds(record.capabilityIds, 'Browser Agent definition scope capabilityIds', 64, selection.definition.capabilityIds),
     toolIds: normalizeIds(record.toolIds, 'Browser Agent definition scope toolIds', 128, selection.definition.toolIds),
   };
+}
+
+function positiveExactInteger(value, label) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 1) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+  return value;
+}
+
+function exactIdentity(value, label, max = 180) {
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > max
+      || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function normalizePersistedSpecialistDelegationBinding(raw) {
+  const record = snapshotExactOwnDataRequest(
+    raw,
+    PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS,
+    'Browser Agent specialist delegation binding',
+  );
+  for (const key of PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS) {
+    if (!Object.hasOwn(record, key)) {
+      throw new Error(`Browser Agent specialist delegation binding requires ${key}`);
+    }
+  }
+  if (record.schemaVersion !== 1) {
+    throw new Error('Unsupported Browser Agent specialist delegation binding schemaVersion');
+  }
+  const selection = normalizeSpecialistSelectionV1(record.selection);
+  const handoff = normalizeSpecialistHandoffV1(record.handoff);
+  const planId = exactIdentity(record.planId, 'specialist delegation planId');
+  const nodeId = exactIdentity(record.nodeId, 'specialist delegation nodeId');
+  const registryId = exactIdentity(record.registryId, 'specialist delegation registryId');
+  const planRevision = positiveExactInteger(record.planRevision, 'specialist delegation planRevision');
+  const registryRevision = positiveExactInteger(record.registryRevision, 'specialist delegation registryRevision');
+  const boundAt = specialistRequestTimestamp(record.boundAt, undefined, 'specialist delegation boundAt');
+  if (selection.registryId !== registryId || selection.registryRevision !== registryRevision) {
+    throw new Error('Specialist delegation selection registry provenance mismatch');
+  }
+  if (handoff.specialistId !== selection.specialistId) {
+    throw new Error('Specialist delegation handoff specialist provenance mismatch');
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    planId,
+    nodeId,
+    planRevision,
+    registryId,
+    registryRevision,
+    selection,
+    handoff,
+    boundAt,
+  });
+}
+
+function normalizePersistedSpecialistDelegationBindings(raw, plan) {
+  if (!plan || !Array.isArray(raw) || Object.getPrototypeOf(raw) !== Array.prototype) return [];
+  const out = [];
+  const seenNodes = new Set();
+  for (const item of raw.slice(0, 128)) {
+    try {
+      const binding = normalizePersistedSpecialistDelegationBinding(item);
+      if (binding.planId !== plan.planId) continue;
+      if (!plan.nodes.some(node => node.nodeId === binding.nodeId)) continue;
+      if (seenNodes.has(binding.nodeId)) continue;
+      seenNodes.add(binding.nodeId);
+      out.push(binding);
+    } catch {
+      // A corrupt delegation provenance record cannot grant authority. Drop it
+      // while preserving the assignment/ownership records for manual recovery.
+    }
+  }
+  return out;
 }
 
 function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine) {
@@ -516,11 +615,16 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const specialistDelegationBindings = normalizePersistedSpecialistDelegationBindings(
+    raw.specialistDelegationBindings,
+    plan,
+  );
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
+    specialistDelegationBindings,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -1225,6 +1329,185 @@ export class BrowserAgentManager {
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
     };
+  }
+
+  /**
+   * Automatically selects the least-authority specialist from the durable
+   * canonical registry and persists its existing handoff/ownership contracts.
+   * This prepares no provider effect and grants no execution authority.
+   */
+  async autoPrepareSpecialistHandoff(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS,
+      'Browser Agent automatic specialist delegation request',
+    );
+    for (const key of [
+      'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
+      'requiredCapabilityIds', 'requiredToolIds', 'policyEnvelopeId', 'deadlineAt',
+    ]) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent automatic specialist delegation request requires ${key}`);
+      }
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    const expectedRegistryRevision = positiveExactInteger(
+      request.expectedRegistryRevision,
+      'expectedRegistryRevision',
+    );
+    const expectedPlanRevision = positiveExactInteger(
+      request.expectedPlanRevision,
+      'expectedPlanRevision',
+    );
+    const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
+    const at = new Date(this.now()).toISOString();
+    let result = null;
+
+    await this.update(async store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
+      if (job.runtime.plan.revision !== expectedPlanRevision) {
+        throw new Error('AgentPlan revision drifted before automatic delegation');
+      }
+      if (!job.definitionScope) {
+        throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
+      }
+
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt');
+      }
+      const registry = store.specialistRegistriesById?.[registryId];
+      if (!registry) throw new Error('Specialist registry not found');
+      if (registry.revision !== expectedRegistryRevision) {
+        throw new Error('Specialist registry revision drifted before automatic delegation');
+      }
+
+      if (!job.orchestrationNodeBinding) {
+        throw new Error('Automatic delegation requires a durable orchestration node binding');
+      }
+      const projectId = job.config?.projectId || '';
+      if (!projectId) throw new Error('Automatic delegation requires a durable Project binding');
+      const authority = await resolveProjectHierarchyAuthority(projectId);
+      const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: job.orchestrationNodeBinding,
+        authority,
+      });
+      if (!bindingStatus.current) {
+        throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+      }
+
+      const structureAdmission = evaluateSubagentStructureAdmissionV1({
+        policy: authority.subagentPolicy,
+        initiator: SubagentSpawnInitiator.AGENT,
+        graph: authority.graph,
+        parentNodeId: job.orchestrationNodeBinding.nodeId,
+        requestedChildren: 1,
+      });
+      if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+        throw new Error(`Automatic delegation denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+      }
+
+      const reconciledPlan = reconcileAgentPlanV1(job.runtime.plan, { at });
+      const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+        plan: reconciledPlan,
+        expectedPlanRevision: reconciledPlan.revision,
+        nodeId: request.nodeId,
+        registry,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        requiredCapabilityIds: request.requiredCapabilityIds,
+        requiredToolIds: request.requiredToolIds,
+        policyEnvelopeId: request.policyEnvelopeId,
+        deadlineAt: request.deadlineAt,
+        priority: Object.hasOwn(request, 'priority') ? request.priority : 0,
+        childBudget: Object.hasOwn(request, 'childBudget') ? request.childBudget : undefined,
+        artifactRefs: Object.hasOwn(request, 'artifactRefs') ? request.artifactRefs : [],
+        credentialRefs: Object.hasOwn(request, 'credentialRefs') ? request.credentialRefs : [],
+        parentInvocationId: Object.hasOwn(request, 'parentInvocationId') ? request.parentInvocationId : '',
+        at,
+      });
+
+      const handoffs = Array.isArray(job.runtime.specialistHandoffs)
+        ? job.runtime.specialistHandoffs
+        : [];
+      const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships)
+        ? job.runtime.specialistExecutionOwnerships
+        : [];
+      const bindings = Array.isArray(job.runtime.specialistDelegationBindings)
+        ? job.runtime.specialistDelegationBindings
+        : [];
+      const assignment = proposal.preview.assignment;
+      const executionOwnership = proposal.preview.executionOwnership;
+      const existing = handoffs.find(item => item?.agentId === assignment.agentId);
+      if (existing) {
+        const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
+        const existingBinding = bindings.find(item =>
+          item?.planId === proposal.planId && item?.nodeId === proposal.nodeId);
+        if (!existingOwnership || !existingBinding) {
+          throw new Error('Existing specialist handoff lacks canonical automatic-delegation provenance');
+        }
+        bindSpecialistHandoffToRegistryV1({
+          registry,
+          selection: existingBinding.selection,
+          handoff: existingBinding.handoff,
+          parentCapabilityIds: job.definitionScope.capabilityIds,
+          parentToolIds: job.definitionScope.toolIds,
+        });
+        if (existingBinding.registryRevision !== registry.revision
+            || existingBinding.selection.specialistId !== proposal.selection.specialistId) {
+          throw new Error('Existing specialist delegation provenance drifted from current canonical selection');
+        }
+        result = {
+          proposal: clone(proposal),
+          assignment: clone(existing),
+          executionOwnership: clone(existingOwnership),
+          delegationBinding: clone(existingBinding),
+          structureAdmission: clone(structureAdmission),
+          reused: true,
+          executionAuthorized: false,
+        };
+        return store;
+      }
+
+      const delegationBinding = normalizePersistedSpecialistDelegationBinding({
+        schemaVersion: 1,
+        planId: proposal.planId,
+        nodeId: proposal.nodeId,
+        planRevision: proposal.planRevision,
+        registryId: proposal.registryId,
+        registryRevision: proposal.registryRevision,
+        selection: proposal.selection,
+        handoff: proposal.binding.handoff,
+        boundAt: at,
+      });
+      job.runtime.plan = reconciledPlan;
+      job.runtime.specialistHandoffs = [...handoffs, assignment];
+      job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.specialistDelegationBindings = [...bindings, delegationBinding];
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-auto-delegation-prepared',
+        nodeId: proposal.nodeId,
+        agentId: assignment.agentId,
+        specialistId: proposal.selection.specialistId,
+        registryId: proposal.registryId,
+        registryRevision: proposal.registryRevision,
+        message: 'Least-authority specialist selected and durably prepared; execution is not yet claimed.',
+      });
+      result = {
+        proposal: clone(proposal),
+        assignment: clone(assignment),
+        executionOwnership: clone(executionOwnership),
+        delegationBinding: clone(delegationBinding),
+        structureAdmission: clone(structureAdmission),
+        reused: false,
+        executionAuthorized: false,
+      };
+      return store;
+    });
+    return result;
   }
 
   async prepareSpecialistHandoff(id, payload = {}) {
