@@ -1185,7 +1185,7 @@ test('provider terminal success is durable evidence but never product completion
 });
 
 test('provider manual-review outcome enters canonical MANUAL_REVIEW and cannot auto-dispatch again', async () => {
-  const { manager, dependencies } = await fixture({
+  const { chrome, manager, dependencies } = await fixture({
     specialistDefinitions: [openHandsSpecialistDefinition()],
   });
   await configureOpenHandsProvider(manager);
@@ -1232,6 +1232,17 @@ test('provider manual-review outcome enters canonical MANUAL_REVIEW and cannot a
   assert.equal(reused.dispatchable, false);
   assert.equal(reused.execution.status, SpecialistProviderExecutionStatus.MANUAL_REVIEW);
   assert.equal(reused.execution.conversationId, prepared.execution.conversationId);
+
+  const afterLease = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T1),
+  });
+  await assert.rejects(
+    () => configureOpenHandsProvider(afterLease, 1),
+    /bound to a live provider execution lease/u,
+    'unresolved MANUAL_REVIEW must keep owner provider config immutable after the original lease time',
+  );
 });
 
 test('BrowserAgentManager advances provider result to VERIFIED only through resolver-backed trusted record', async () => {
