@@ -50,6 +50,11 @@ const PROVIDER_CAPABILITY_KEYS = new Set([
 const PRIOR_TASK_BINDING_KEYS = new Set([
   'childNodeId',
   'taskId',
+  'providerId',
+  'taskRequestedCapabilityIds',
+  'taskSourceIds',
+  'taskArtifactIds',
+  'requestedToolIds',
 ]);
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -161,6 +166,22 @@ function normalizeChildTasks(value) {
       task,
       taskId: requiredId(own(task, 'taskId'), `childTasks[${index}].taskId`),
       providerId: requiredId(own(task, 'providerId'), `childTasks[${index}].providerId`),
+      taskRequestedCapabilityIds: idList(
+        own(task, 'taskRequestedCapabilityIds'),
+        `childTasks[${index}].taskRequestedCapabilityIds`,
+      ).sort(),
+      taskSourceIds: idList(
+        own(task, 'taskSourceIds'),
+        `childTasks[${index}].taskSourceIds`,
+      ).sort(),
+      taskArtifactIds: idList(
+        own(task, 'taskArtifactIds'),
+        `childTasks[${index}].taskArtifactIds`,
+      ).sort(),
+      requestedToolIds: idList(
+        own(task, 'requestedToolIds'),
+        `childTasks[${index}].requestedToolIds`,
+      ).sort(),
     };
   });
 
@@ -194,6 +215,26 @@ function normalizePriorTaskBindings(value) {
           own(binding, 'taskId'),
           `priorTaskBindings[${index}].taskId`,
         ),
+        providerId: requiredId(
+          own(binding, 'providerId'),
+          `priorTaskBindings[${index}].providerId`,
+        ),
+        taskRequestedCapabilityIds: idList(
+          own(binding, 'taskRequestedCapabilityIds'),
+          `priorTaskBindings[${index}].taskRequestedCapabilityIds`,
+        ).sort(),
+        taskSourceIds: idList(
+          own(binding, 'taskSourceIds'),
+          `priorTaskBindings[${index}].taskSourceIds`,
+        ).sort(),
+        taskArtifactIds: idList(
+          own(binding, 'taskArtifactIds'),
+          `priorTaskBindings[${index}].taskArtifactIds`,
+        ).sort(),
+        requestedToolIds: idList(
+          own(binding, 'requestedToolIds'),
+          `priorTaskBindings[${index}].requestedToolIds`,
+        ).sort(),
       };
     },
   );
@@ -211,12 +252,18 @@ function normalizePriorTaskBindings(value) {
 
 function exactTaskBindingMatch(left, right) {
   if (left.length !== right.length) return false;
-  const rightByChild = new Map(
-    right.map(binding => [binding.childNodeId, binding.taskId]),
-  );
-  return left.every(
-    binding => rightByChild.get(binding.childNodeId) === binding.taskId,
-  );
+  const rightByChild = new Map(right.map(binding => [binding.childNodeId, binding]));
+  return left.every(binding => {
+    const prior = rightByChild.get(binding.childNodeId);
+    if (!prior) return false;
+    return binding.taskId === prior.taskId
+      && binding.providerId === prior.providerId
+      && JSON.stringify(binding.taskRequestedCapabilityIds)
+        === JSON.stringify(prior.taskRequestedCapabilityIds)
+      && JSON.stringify(binding.taskSourceIds) === JSON.stringify(prior.taskSourceIds)
+      && JSON.stringify(binding.taskArtifactIds) === JSON.stringify(prior.taskArtifactIds)
+      && JSON.stringify(binding.requestedToolIds) === JSON.stringify(prior.requestedToolIds);
+  });
 }
 
 function normalizeProviderCapabilities(value) {
@@ -296,6 +343,11 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
   const taskBindings = childTasks.map((item, index) => ({
     childNodeId: topology.createdNodeIds[index],
     taskId: item.taskId,
+    providerId: item.providerId,
+    taskRequestedCapabilityIds: [...item.taskRequestedCapabilityIds],
+    taskSourceIds: [...item.taskSourceIds],
+    taskArtifactIds: [...item.taskArtifactIds],
+    requestedToolIds: [...item.requestedToolIds],
   }));
   const hasPriorTaskBindings = Object.hasOwn(request, 'priorTaskBindings');
 
@@ -327,7 +379,14 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
 
   const bindings = [];
   for (let index = 0; index < childTasks.length; index += 1) {
-    const { task, taskId, providerId } = childTasks[index];
+    const {
+      taskId,
+      providerId,
+      taskRequestedCapabilityIds,
+      taskSourceIds,
+      taskArtifactIds,
+      requestedToolIds,
+    } = childTasks[index];
     const childNodeId = topology.createdNodeIds[index];
     const providerCapability = providerCapabilities.get(providerId);
 
@@ -353,16 +412,16 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
       parentCapabilityIds: own(request, 'parentCapabilityIds'),
       ownerAllowedCapabilityIds: own(request, 'ownerAllowedCapabilityIds'),
       providerCapabilityIds: providerCapability.capabilityIds,
-      taskRequestedCapabilityIds: own(task, 'taskRequestedCapabilityIds'),
+      taskRequestedCapabilityIds,
       parentSourceIds: own(request, 'parentSourceIds'),
       ownerAllowedSourceIds: own(request, 'ownerAllowedSourceIds'),
-      taskSourceIds: own(task, 'taskSourceIds'),
+      taskSourceIds,
       parentArtifactIds: own(request, 'parentArtifactIds'),
       ownerAllowedArtifactIds: own(request, 'ownerAllowedArtifactIds'),
-      taskArtifactIds: own(task, 'taskArtifactIds'),
+      taskArtifactIds,
       parentToolIds: own(request, 'parentToolIds'),
       ownerAllowedToolIds: own(request, 'ownerAllowedToolIds'),
-      requestedToolIds: own(task, 'requestedToolIds'),
+      requestedToolIds,
       parentToolDescriptors: own(request, 'parentToolDescriptors'),
     });
 
