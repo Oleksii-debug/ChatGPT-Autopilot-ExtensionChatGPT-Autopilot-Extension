@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   OrchestrationNodeLifecycle,
   createOrchestrationHierarchyRuntime,
+  reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
   validateOrchestrationHierarchyRuntimeV1,
 } from '../src/core/orchestration-hierarchy.js';
@@ -113,6 +114,39 @@ test('atomically appends inherited child topology while preserving durable paren
   }
 
   assert.equal(result.reused, false);
+  assert.equal(result.activationRequests.length, 2);
+  assert.deepEqual(
+    result.activationRequests.map(event => ({
+      type: event.type,
+      controlEpoch: event.controlEpoch,
+      nodeId: event.nodeId,
+      generation: event.generation,
+      purpose: event.purpose,
+    })),
+    [
+      {
+        type: 'NODE_ACTIVATION_REQUESTED',
+        controlEpoch: 7,
+        nodeId: 'subagent:effect-17:1',
+        generation: 1,
+        purpose: 'WORK',
+      },
+      {
+        type: 'NODE_ACTIVATION_REQUESTED',
+        controlEpoch: 7,
+        nodeId: 'subagent:effect-17:2',
+        generation: 1,
+        purpose: 'WORK',
+      },
+    ],
+  );
+  const reduced = reduceOrchestrationHierarchyEvent(
+    result.graph,
+    result.runtime,
+    result.activationRequests[0],
+    301,
+  );
+  assert.equal(reduced.actions.some(action => action.type === 'ACTIVATE_NODE'), true);
   assert.equal(result.activationAuthority, false);
   assert.equal(result.executionAuthority, false);
   assert.doesNotThrow(() => validateOrchestrationHierarchyRuntimeV1(result.graph, result.runtime));
@@ -138,6 +172,7 @@ test('same spawn identity is exact-effect idempotent after restart', () => {
   assert.equal(second.reasonCode, 'SUBAGENT_TOPOLOGY_REUSED');
   assert.equal(second.reused, true);
   assert.deepEqual(second.createdNodeIds, first.createdNodeIds);
+  assert.deepEqual(second.activationRequests, first.activationRequests);
   assert.deepEqual(second.graph, first.graph);
   assert.deepEqual(second.runtime, first.runtime);
 });
@@ -245,6 +280,7 @@ test('structure policy denial performs no topology mutation', () => {
   assert.equal(result.reasonCode, 'STRUCTURE_DENIED');
   assert.equal(result.structure.reasonCode, 'MAX_FANOUT_EXCEEDED');
   assert.deepEqual(result.createdNodeIds, []);
+  assert.deepEqual(result.activationRequests, []);
 });
 
 test('global child budget is consumed from canonical graph facts and fails closed', () => {
