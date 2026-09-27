@@ -322,11 +322,39 @@ test('durable normalizer rejects binding identity, effective-set and authority t
   );
 });
 
-test('binding identity is deterministic across exact replay', () => {
+test('binding identity is deterministic for exact replay and changes with policy semantics', () => {
   const first = createAgentModelPolicyBindingV1(request());
   const second = createAgentModelPolicyBindingV1(request());
   assert.equal(first.bindingKey, second.bindingKey);
   assert.deepEqual(first, second);
+
+  const changed = createAgentModelPolicyBindingV1(request({
+    routePolicy: { allowRouteIds: ['route.a', 'route.b'] },
+  }));
+  assert.notEqual(first.bindingKey, changed.bindingKey);
+});
+
+test('durable normalizer rejects non-canonical route-set ordering', () => {
+  const binding = createAgentModelPolicyBindingV1(request({
+    routePolicy: {
+      allowRouteIds: ['route.b', 'route.a'],
+      denyRouteIds: ['route.b'],
+    },
+  }));
+
+  assert.deepEqual(binding.routePolicy.allowRouteIds, ['route.a', 'route.b']);
+  assert.deepEqual(binding.routePolicy.denyRouteIds, ['route.b']);
+
+  assert.throws(
+    () => normalizeAgentModelPolicyBindingV1({
+      ...binding,
+      routePolicy: {
+        ...binding.routePolicy,
+        allowRouteIds: ['route.b', 'route.a'],
+      },
+    }),
+    /routePolicy\.allowRouteIds is inconsistent/,
+  );
 });
 
 test('revision fields reject signed zero, fractions, unsafe and string coercion', () => {
