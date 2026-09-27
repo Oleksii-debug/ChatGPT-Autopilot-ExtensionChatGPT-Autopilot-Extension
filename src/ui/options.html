@@ -390,7 +390,66 @@
             <button id="specialist-delete-button" type="button" disabled>Видалити Specialist</button>
           </div>
         </fieldset>
+
         <p id="specialist-status" role="status">Specialist реєстри ще не завантажено.</p>
+
+        <fieldset class="settings-group" id="specialist-provider-config-group">
+          <legend>OpenHands provider config</legend>
+          <p>Це owner-qualified конфігурація canonical OpenHands provider. Збереження не запускає provider і не означає readiness.</p>
+          <label for="specialist-provider-config-provider-id">Provider ID</label>
+          <input id="specialist-provider-config-provider-id" type="text" readonly spellcheck="false">
+          <label for="specialist-openhands-server-url">Agent Server URL — лише localhost HTTP</label>
+          <input id="specialist-openhands-server-url" type="text" maxlength="300" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:8000">
+          <label for="specialist-openhands-server-version">Підтримувана Agent Server version</label>
+          <input id="specialist-openhands-server-version" type="text" readonly spellcheck="false">
+          <label for="specialist-openhands-profile-id">Agent profile ID — canonical lowercase UUID</label>
+          <input id="specialist-openhands-profile-id" type="text" maxlength="36" autocomplete="off" spellcheck="false">
+          <label for="specialist-openhands-profile-revision">Agent profile revision</label>
+          <input id="specialist-openhands-profile-revision" type="number" min="1" step="1">
+          <label for="specialist-openhands-workspace-path">Абсолютний workspace path</label>
+          <input id="specialist-openhands-workspace-path" type="text" maxlength="1000" autocomplete="off" spellcheck="false">
+          <label for="specialist-openhands-capabilities">Qualified capability IDs — щонайменше один, по одному в рядку</label>
+          <textarea id="specialist-openhands-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="specialist-openhands-request-timeout">Request timeout, секунд — 1–120</label>
+          <input id="specialist-openhands-request-timeout" type="number" min="1" max="120" step="1">
+          <label for="specialist-openhands-max-execution">Max execution, секунд — 1–21600</label>
+          <input id="specialist-openhands-max-execution" type="number" min="1" max="21600" step="1">
+          <label for="specialist-openhands-poll-interval">Poll interval, мс — 100–30000</label>
+          <input id="specialist-openhands-poll-interval" type="number" min="100" max="30000" step="1">
+          <label for="specialist-openhands-max-iterations">Max iterations — 1–500</label>
+          <input id="specialist-openhands-max-iterations" type="number" min="1" max="500" step="1">
+          <label for="specialist-openhands-max-response-bytes">Max response bytes — 1024–2000000</label>
+          <input id="specialist-openhands-max-response-bytes" type="number" min="1024" max="2000000" step="1">
+          <label for="specialist-openhands-auth-mode">Auth mode</label>
+          <input id="specialist-openhands-auth-mode" type="text" readonly spellcheck="false">
+          <p id="specialist-provider-config-revision" tabindex="0">OpenHands provider config ще не збережено.</p>
+          <p id="specialist-provider-config-quarantine-status" tabindex="0">Provider config quarantine ще не перевірено.</p>
+          <div class="agent-actions" aria-label="Дії з OpenHands provider config">
+            <button id="specialist-provider-config-reload-button" type="button">Перезавантажити config</button>
+            <button id="specialist-provider-config-save-button" type="button">Зберегти owner config</button>
+            <button id="specialist-provider-config-clear-button" type="button" disabled>Очистити owner config</button>
+          </div>
+          <p id="specialist-provider-config-status" role="status">OpenHands provider config ще не завантажено.</p>
+        </fieldset>
+
+        <fieldset class="settings-group" id="specialist-provider-runtime-group">
+          <legend>Specialist provider execution</legend>
+          <p id="specialist-provider-runtime-job" tabindex="0">Browser Agent job не вибрано.</p>
+          <p>Claim використовує canonical cross-job admission. Provider success є лише evidence: completion вимагає result artifacts та незалежної verification authority.</p>
+          <label for="specialist-provider-max-concurrent-handoffs">Product-wide max concurrent Specialist handoffs — 0–256, обов’язково для claim</label>
+          <input id="specialist-provider-max-concurrent-handoffs" type="number" min="0" max="256" step="1">
+          <div class="agent-actions" aria-label="Дії з Specialist handoffs">
+            <button id="specialist-provider-runtime-refresh-button" type="button">Оновити handoffs та evidence</button>
+            <button id="specialist-provider-claim-button" type="button" disabled>Claim готових handoffs</button>
+          </div>
+          <label for="specialist-provider-handoff-list">Specialist handoffs поточного Agent</label>
+          <select id="specialist-provider-handoff-list" size="5"></select>
+          <button id="specialist-provider-run-button" type="button" disabled>Запустити provider для вибраного LEASED handoff</button>
+          <label for="specialist-provider-execution-list">Durable provider execution evidence</label>
+          <select id="specialist-provider-execution-list" size="5"></select>
+          <p id="specialist-provider-runtime-status" role="status">Оберіть Browser Agent job, щоб переглянути Specialist handoffs.</p>
+          <p id="specialist-provider-completion-fence" tabindex="0">Provider terminal status не завершує Specialist автоматично. Completion/SAFE_RETRY залишаються fail-closed до artifacts + canonical independent verifier provenance.</p>
+        </fieldset>
       </details>
 
       <label for="agent-prompt">Що потрібно зробити?</label>
