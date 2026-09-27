@@ -535,7 +535,7 @@ export class OrchestrationV2Manager {
       await this.chrome.storage.local.set(restore);
     }
     if (remove.length) {
-      await this.chrome.storage.local.remove?.(remove);
+      await this.chrome.storage.local.remove(remove);
     }
 
     await this.updateMeta(meta => {
