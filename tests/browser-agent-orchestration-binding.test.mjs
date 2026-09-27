@@ -178,9 +178,29 @@ test('Browser Agent binding persists through the existing store and survives res
 test('same canonical binding is idempotent and preserves original boundAt', async () => {
   const { manager, dependencies, advance } = await fixture();
   const first = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
+  const before = await manager.get('job-1');
   advance(500);
   const second = await manager.bindOrchestrationNode('job-1', { nodeId: 'worker' }, dependencies);
+  const after = await manager.get('job-1');
   assert.deepEqual(second.binding, first.binding);
+  assert.equal(after.job.updatedAt, before.job.updatedAt, 'idempotent bind must not mutate durable job state');
+});
+
+test('binding preserves legal manual Browser Agent job IDs with internal spaces', async () => {
+  const { manager, dependencies } = await fixture();
+  await manager.create({
+    id: 'manual job 2',
+    projectId: 'project-1',
+    name: 'Manual spaced identity',
+    goal: 'Verify compatibility with existing Browser Agent identity semantics.',
+  });
+  const bound = await manager.bindOrchestrationNode(
+    'manual job 2',
+    { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
+    dependencies,
+  );
+  assert.equal(bound.binding.jobId, 'manual job 2');
+  assert.equal((await manager.inspectOrchestrationNodeBinding('manual job 2', dependencies)).status, 'CURRENT');
 });
 
 test('binding fails closed on missing node and stale graph provenance fences', async () => {
