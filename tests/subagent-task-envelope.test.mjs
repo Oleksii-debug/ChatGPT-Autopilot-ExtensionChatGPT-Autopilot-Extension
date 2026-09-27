@@ -98,6 +98,21 @@ function outcome(overrides = {}) {
   });
 }
 
+function artifactRef(artifactId, overrides = {}) {
+  return {
+    schemaVersion: 1,
+    artifactId,
+    kind: 'document',
+    uri: 'artifact://' + artifactId,
+    mediaType: 'text/plain',
+    sha256: overrides.sha256 ?? 'a'.repeat(64),
+    sizeBytes: 12,
+    createdAt: overrides.createdAt ?? T0,
+    producerInvocationId: 'invocation-1',
+    sensitive: false,
+  };
+}
+
 function request(overrides = {}) {
   return {
     envelopeId: 'envelope-1',
@@ -107,7 +122,10 @@ function request(overrides = {}) {
     plan: plan(),
     nodeId: 'task-1',
     inputSourceIds: ['source-1'],
-    inputArtifactIds: ['artifact-input-2', 'artifact-input-1'],
+    inputArtifactRefs: [
+      artifactRef('artifact-input-2', { sha256: 'b'.repeat(64) }),
+      artifactRef('artifact-input-1'),
+    ],
     outcomeContract: outcome(),
     createdAt: T2,
     ...overrides,
@@ -132,8 +150,18 @@ test('binds exact child task, immutable input refs, budget, conflicts and outcom
     maxRuntimeSeconds: 300,
     maxCostUsdMicros: 1_000,
   });
-  assert.deepEqual(value.inputSourceIds, ['source-1']);
-  assert.deepEqual(value.inputArtifactIds, ['artifact-input-1', 'artifact-input-2']);
+  assert.deepEqual(value.inputSourceRefs, [{
+    sourceId: 'source-1',
+    location: 'project://source-1',
+    revisionId: 'rev-1',
+  }]);
+  assert.deepEqual(
+    value.inputArtifactRefs.map(ref => [ref.artifactId, ref.sha256]),
+    [
+      ['artifact-input-1', 'a'.repeat(64)],
+      ['artifact-input-2', 'b'.repeat(64)],
+    ],
+  );
   assert.deepEqual(value.outcome, {
     contractId: 'outcome-1',
     contractRevision: 1,
@@ -229,7 +257,7 @@ test('OutcomeContract must cover existing AgentPlan acceptance criteria', () => 
   );
 });
 
-test('input source refs must be declared by OutcomeContract source truth while artifact refs stay opaque', () => {
+test('input sources become revision-bound refs and artifact inputs require immutable sha256 identity', () => {
   assert.throws(
     () => createSubagentTaskEnvelopeV1(request({
       inputSourceIds: ['source-unknown'],
@@ -237,13 +265,21 @@ test('input source refs must be declared by OutcomeContract source truth while a
     /input source is not bound to OutcomeContract sourceTruth/,
   );
 
+  assert.throws(
+    () => createSubagentTaskEnvelopeV1(request({
+      inputArtifactRefs: [artifactRef('artifact-unhashed', { sha256: '' })],
+    })),
+    /must carry sha256 immutable identity/,
+  );
+
   const value = createSubagentTaskEnvelopeV1(request({
-    inputArtifactIds: ['artifact:opaque:1'],
+    inputArtifactRefs: [artifactRef('artifact:opaque:1', { sha256: 'c'.repeat(64) })],
   }));
-  assert.deepEqual(value.inputArtifactIds, ['artifact:opaque:1']);
+  assert.equal(value.inputArtifactRefs[0].artifactId, 'artifact:opaque:1');
+  assert.equal(value.inputArtifactRefs[0].sha256, 'c'.repeat(64));
 });
 
-test('envelope chronology cannot predate either exact AgentPlan revision or OutcomeContract', () => {
+test('envelope chronology cannot predate plan/outcome and cannot bind a future ArtifactRef', () => {
   assert.throws(
     () => createSubagentTaskEnvelopeV1(request({ createdAt: T0 })),
     /cannot predate AgentPlan revision/,
@@ -255,6 +291,15 @@ test('envelope chronology cannot predate either exact AgentPlan revision or Outc
       createdAt: T1,
     })),
     /cannot predate OutcomeContract/,
+  );
+
+  assert.throws(
+    () => createSubagentTaskEnvelopeV1(request({
+      inputArtifactRefs: [artifactRef('artifact-future', {
+        createdAt: '2026-09-27T10:03:00.000Z',
+      })],
+    })),
+    /ArtifactRef cannot postdate envelope/,
   );
 });
 
@@ -296,8 +341,8 @@ test('request and nested ref boundaries reject accessors, sparse arrays, symbols
   assert.equal(getterReads, 0);
 
   const sparse = request();
-  sparse.inputArtifactIds = new Array(2);
-  sparse.inputArtifactIds[0] = 'artifact-1';
+  sparse.inputArtifactRefs = new Array(2);
+  sparse.inputArtifactRefs[0] = artifactRef('artifact-1');
   assert.throws(
     () => createSubagentTaskEnvelopeV1(sparse),
     /dense data-only array/,
@@ -325,8 +370,19 @@ test('caller-owned arrays and canonical inputs cannot mutate the frozen derived 
   const raw = request();
   const value = createSubagentTaskEnvelopeV1(raw);
 
-  raw.inputArtifactIds.push('artifact-late');
+  raw.inputArtifactRefs.push(artifactRef('artifact-late'));
+  raw.inputArtifactRefs[0].sha256 = 'f'.repeat(64);
   raw.inputSourceIds[0] = 'source-late';
-  assert.deepEqual(value.inputArtifactIds, ['artifact-input-1', 'artifact-input-2']);
-  assert.deepEqual(value.inputSourceIds, ['source-1']);
+  assert.deepEqual(
+    value.inputArtifactRefs.map(ref => [ref.artifactId, ref.sha256]),
+    [
+      ['artifact-input-1', 'a'.repeat(64)],
+      ['artifact-input-2', 'b'.repeat(64)],
+    ],
+  );
+  assert.deepEqual(value.inputSourceRefs, [{
+    sourceId: 'source-1',
+    location: 'project://source-1',
+    revisionId: 'rev-1',
+  }]);
 });
