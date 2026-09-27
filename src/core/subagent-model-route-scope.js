@@ -4,6 +4,10 @@ import {
   normalizeAiRoutePolicy,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
+import {
+  SUBAGENT_AUTHORITY_ENVELOPE_VERSION,
+  SubagentAuthorityDecision,
+} from './subagent-authority-envelope.js';
 
 export const SUBAGENT_MODEL_ROUTE_SCOPE_VERSION = 1;
 
@@ -15,21 +19,36 @@ export const SubagentModelRouteScopeDecision = Object.freeze({
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const ROLES = new Set(Object.values(AiRouteRole));
 const REQUEST_KEYS = new Set([
-  'projectId',
-  'parentAgentId',
-  'childAgentId',
-  'taskId',
+  'childAuthorityEnvelope',
   'routes',
   'parentRoutePolicy',
   'ownerRoutePolicy',
-  'childCapabilityIds',
   'taskModelCapabilityIds',
   'taskRequestedRouteIds',
   'role',
   'requiresVision',
 ]);
+const CHILD_AUTHORITY_KEYS = new Set([
+  'schemaVersion',
+  'decision',
+  'reasonCode',
+  'projectId',
+  'parentAgentId',
+  'childAgentId',
+  'taskId',
+  'providerId',
+  'capabilityIds',
+  'sourceIds',
+  'artifactIds',
+  'toolIds',
+  'toolDescriptors',
+  'executionAuthority',
+  'credentialAuthority',
+  'policyAuthority',
+]);
 const MAX_ROUTE_IDS = 32;
 const MAX_CAPABILITY_IDS = 64;
+const MAX_AUTHORITY_IDS = 256;
 
 function strictRecord(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -123,6 +142,88 @@ function requiredBoolean(value, label) {
   return value;
 }
 
+function normalizeChildAuthorityEnvelope(value) {
+  const raw = strictRecord(
+    value,
+    CHILD_AUTHORITY_KEYS,
+    'SubagentAuthorityEnvelopeV1',
+  );
+  if (requiredOwn(raw, 'schemaVersion', 'childAuthorityEnvelope.schemaVersion')
+      !== SUBAGENT_AUTHORITY_ENVELOPE_VERSION) {
+    throw new Error('childAuthorityEnvelope schemaVersion is unsupported');
+  }
+  if (requiredOwn(raw, 'decision', 'childAuthorityEnvelope.decision')
+      !== SubagentAuthorityDecision.ALLOW
+      || requiredOwn(raw, 'reasonCode', 'childAuthorityEnvelope.reasonCode')
+        !== 'LEAST_AUTHORITY_DERIVED') {
+    throw new Error('childAuthorityEnvelope must be an admitted least-authority envelope');
+  }
+
+  const envelope = {
+    projectId: exactId(
+      requiredOwn(raw, 'projectId', 'childAuthorityEnvelope.projectId'),
+      'childAuthorityEnvelope.projectId',
+    ),
+    parentAgentId: exactId(
+      requiredOwn(raw, 'parentAgentId', 'childAuthorityEnvelope.parentAgentId'),
+      'childAuthorityEnvelope.parentAgentId',
+    ),
+    childAgentId: exactId(
+      requiredOwn(raw, 'childAgentId', 'childAuthorityEnvelope.childAgentId'),
+      'childAuthorityEnvelope.childAgentId',
+    ),
+    taskId: exactId(
+      requiredOwn(raw, 'taskId', 'childAuthorityEnvelope.taskId'),
+      'childAuthorityEnvelope.taskId',
+    ),
+    providerId: exactId(
+      requiredOwn(raw, 'providerId', 'childAuthorityEnvelope.providerId'),
+      'childAuthorityEnvelope.providerId',
+    ),
+    capabilityIds: sortedUnique(idList(
+      requiredOwn(raw, 'capabilityIds', 'childAuthorityEnvelope.capabilityIds'),
+      'childAuthorityEnvelope.capabilityIds',
+      MAX_AUTHORITY_IDS,
+    )),
+  };
+
+  // Validate the complete canonical ALLOW shape, even though model routing only
+  // consumes identities + capabilities. This prevents a caller from presenting
+  // a partial object that merely resembles the #469 authority result.
+  idList(
+    requiredOwn(raw, 'sourceIds', 'childAuthorityEnvelope.sourceIds'),
+    'childAuthorityEnvelope.sourceIds',
+    MAX_AUTHORITY_IDS,
+  );
+  idList(
+    requiredOwn(raw, 'artifactIds', 'childAuthorityEnvelope.artifactIds'),
+    'childAuthorityEnvelope.artifactIds',
+    MAX_AUTHORITY_IDS,
+  );
+  const toolIds = idList(
+    requiredOwn(raw, 'toolIds', 'childAuthorityEnvelope.toolIds'),
+    'childAuthorityEnvelope.toolIds',
+    MAX_AUTHORITY_IDS,
+  );
+  const toolDescriptors = denseDataArray(
+    requiredOwn(raw, 'toolDescriptors', 'childAuthorityEnvelope.toolDescriptors'),
+    'childAuthorityEnvelope.toolDescriptors',
+    MAX_AUTHORITY_IDS,
+  );
+  if (toolDescriptors.length !== toolIds.length) {
+    throw new Error('childAuthorityEnvelope tool identity cardinality is inconsistent');
+  }
+  for (const key of ['executionAuthority', 'credentialAuthority', 'policyAuthority']) {
+    if (requiredOwn(raw, key, 'childAuthorityEnvelope.' + key) !== false) {
+      throw new Error('childAuthorityEnvelope.' + key + ' must remain false');
+    }
+  }
+  if (envelope.parentAgentId === envelope.childAgentId) {
+    throw new Error('childAuthorityEnvelope child identity is not isolated');
+  }
+  return freezeDeep(envelope);
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const key of Reflect.ownKeys(value)) {
@@ -201,6 +302,7 @@ function baseResult({
     parentAgentId: identities.parentAgentId,
     childAgentId: identities.childAgentId,
     taskId: identities.taskId,
+    childAuthorityProviderId: childAuthority.providerId,
     role,
     modelCapabilityIds: [...modelCapabilityIds],
     requiresVision,
@@ -239,21 +341,25 @@ function denied(reasonCode, context, details = {}) {
  * independently by the existing canonical Router selector against the same route
  * pool and task model requirements. The child may only narrow their intersection.
  *
+ * The childAuthorityEnvelope must be the trusted current ALLOW result from the
+ * integrated #469 least-authority boundary. Caller/model identity aliases are
+ * intentionally absent from this request.
+ *
  * Any consumer must re-run the canonical Router against current settings/policy/
  * route state before provider I/O. This result grants no provider-call authority.
  */
 export function deriveSubagentModelRouteScopeV1(input = {}) {
   const request = strictRecord(input, REQUEST_KEYS, 'SubagentModelRouteScopeRequestV1');
 
+  const childAuthority = normalizeChildAuthorityEnvelope(
+    requiredOwn(request, 'childAuthorityEnvelope', 'childAuthorityEnvelope'),
+  );
   const identities = freezeDeep({
-    projectId: exactId(requiredOwn(request, 'projectId', 'projectId'), 'projectId'),
-    parentAgentId: exactId(requiredOwn(request, 'parentAgentId', 'parentAgentId'), 'parentAgentId'),
-    childAgentId: exactId(requiredOwn(request, 'childAgentId', 'childAgentId'), 'childAgentId'),
-    taskId: exactId(requiredOwn(request, 'taskId', 'taskId'), 'taskId'),
+    projectId: childAuthority.projectId,
+    parentAgentId: childAuthority.parentAgentId,
+    childAgentId: childAuthority.childAgentId,
+    taskId: childAuthority.taskId,
   });
-  if (identities.parentAgentId === identities.childAgentId) {
-    throw new Error('childAgentId must be isolated from parentAgentId');
-  }
 
   const routes = normalizeAiRoutePool(requiredOwn(request, 'routes', 'routes'));
   const parentRoutePolicy = normalizeAiRoutePolicy(
@@ -262,11 +368,7 @@ export function deriveSubagentModelRouteScopeV1(input = {}) {
   const ownerRoutePolicy = normalizeAiRoutePolicy(
     requiredOwn(request, 'ownerRoutePolicy', 'ownerRoutePolicy'),
   );
-  const childCapabilityIds = sortedUnique(idList(
-    requiredOwn(request, 'childCapabilityIds', 'childCapabilityIds'),
-    'childCapabilityIds',
-    MAX_CAPABILITY_IDS,
-  ));
+  const childCapabilityIds = childAuthority.capabilityIds;
   const modelCapabilityIds = sortedUnique(idList(
     requiredOwn(request, 'taskModelCapabilityIds', 'taskModelCapabilityIds'),
     'taskModelCapabilityIds',
