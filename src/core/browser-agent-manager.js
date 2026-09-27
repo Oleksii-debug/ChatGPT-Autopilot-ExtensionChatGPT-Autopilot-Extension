@@ -69,6 +69,7 @@ import {
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
 import {
+  BrowserAgentOrchestrationBindingStatus,
   createBrowserAgentOrchestrationNodeBindingV1,
   inspectBrowserAgentOrchestrationNodeBindingV1,
   normalizeBrowserAgentOrchestrationBindingRequestV1,
@@ -173,6 +174,47 @@ function trustedOrchestrationAuthorityResolver(dependencies) {
     throw new Error('Canonical orchestration Project authority resolver is required');
   }
   return raw.resolveProjectHierarchyAuthority;
+}
+
+const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
+  'PROJECT_UNOWNED',
+  'PROJECT_NON_UNIQUE',
+  'HIERARCHY_UNAVAILABLE',
+  'HIERARCHY_INCONSISTENT',
+]);
+
+function ownDataPropertyValue(value, key) {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+}
+
+function inspectUnavailableOrchestrationAuthority(binding, error) {
+  const code = ownDataPropertyValue(error, 'code');
+  if (typeof code !== 'string' || !ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES.has(code)) return null;
+  const canonicalBinding = normalizeBrowserAgentOrchestrationNodeBindingV1(binding);
+  const projectDrift = code === 'PROJECT_UNOWNED' || code === 'PROJECT_NON_UNIQUE';
+  return Object.freeze({
+    binding: canonicalBinding,
+    status: projectDrift
+      ? BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED
+      : BrowserAgentOrchestrationBindingStatus.GRAPH_DRIFTED,
+    current: false,
+    currentAuthority: null,
+    authorityErrorCode: code,
+  });
+}
+
+function sameOrchestrationBindingRecord(left, right) {
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  return left.schemaVersion === right.schemaVersion
+    && left.jobId === right.jobId
+    && left.projectId === right.projectId
+    && left.orchestraId === right.orchestraId
+    && left.graphId === right.graphId
+    && left.controlEpoch === right.controlEpoch
+    && left.nodeId === right.nodeId
+    && left.boundAt === right.boundAt;
 }
 
 function canonicalAgentDefinitionRegistryId(value) {
@@ -1370,14 +1412,18 @@ export class BrowserAgentManager {
     const request = normalizeBrowserAgentOrchestrationBindingRequestV1(rawRequest);
     const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
     let binding = null;
+    let created = false;
+    let previousUpdatedAt = null;
+    let boundUpdatedAt = null;
     await this.update(async store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       const projectId = job.config?.projectId || '';
       if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+
       const authority = await resolveProjectHierarchyAuthority(projectId);
       const currentBinding = job.orchestrationNodeBinding;
-      binding = createBrowserAgentOrchestrationNodeBindingV1({
+      const candidate = createBrowserAgentOrchestrationNodeBindingV1({
         jobId: job.id,
         projectId,
         request,
@@ -1385,11 +1431,62 @@ export class BrowserAgentManager {
         currentBinding,
         boundAt: this.now(),
       });
+
+      // Double-read the canonical authority before durable Browser Agent
+      // mutation. This closes deterministic Project/hierarchy changes that
+      // happen while the first authority snapshot is being resolved.
+      const commitAuthority = await resolveProjectHierarchyAuthority(projectId);
+      const commitInspection = inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: candidate,
+        authority: commitAuthority,
+      });
+      if (!commitInspection.current) {
+        throw new Error('Canonical orchestration authority changed during Browser Agent binding');
+      }
+
+      binding = candidate;
       if (currentBinding) return store;
+      created = true;
+      previousUpdatedAt = job.updatedAt;
       job.orchestrationNodeBinding = clone(binding);
       job.updatedAt = this.now();
+      boundUpdatedAt = job.updatedAt;
       return store;
     });
+
+    // Chrome storage does not offer a cross-key transaction spanning the
+    // OrchestrationV2 and Browser Agent stores. Re-read once after persistence;
+    // if authority changed in that final async-storage window, compensate by
+    // removing only the binding written by this operation and fail closed.
+    let postCommitFailure = null;
+    try {
+      const postAuthority = await resolveProjectHierarchyAuthority(binding.projectId);
+      const postInspection = inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding,
+        authority: postAuthority,
+      });
+      if (!postInspection.current) {
+        postCommitFailure = new Error('Canonical orchestration authority changed during Browser Agent binding');
+      }
+    } catch (error) {
+      postCommitFailure = error;
+    }
+
+    if (postCommitFailure) {
+      if (created) {
+        await this.update(store => {
+          const job = store.byId[id];
+          if (!job || !sameOrchestrationBindingRecord(job.orchestrationNodeBinding, binding)) return store;
+          delete job.orchestrationNodeBinding;
+          if (job.updatedAt === boundUpdatedAt) job.updatedAt = previousUpdatedAt;
+          return store;
+        });
+      }
+      throw new Error('Canonical orchestration authority changed during Browser Agent binding', {
+        cause: postCommitFailure,
+      });
+    }
+
     return Object.freeze({ binding });
   }
 
@@ -1413,16 +1510,25 @@ export class BrowserAgentManager {
     if (!projectId) {
       return Object.freeze({
         binding: current.job.orchestrationNodeBinding,
-        status: 'PROJECT_AUTHORITY_DRIFTED',
+        status: BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED,
         current: false,
         currentAuthority: null,
       });
     }
-    const authority = await resolveProjectHierarchyAuthority(projectId);
-    return inspectBrowserAgentOrchestrationNodeBindingV1({
-      binding: current.job.orchestrationNodeBinding,
-      authority,
-    });
+    try {
+      const authority = await resolveProjectHierarchyAuthority(projectId);
+      return inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: current.job.orchestrationNodeBinding,
+        authority,
+      });
+    } catch (error) {
+      const unavailable = inspectUnavailableOrchestrationAuthority(
+        current.job.orchestrationNodeBinding,
+        error,
+      );
+      if (unavailable) return unavailable;
+      throw error;
+    }
   }
 
   async listSpecialistHandoffs(id = '') {
