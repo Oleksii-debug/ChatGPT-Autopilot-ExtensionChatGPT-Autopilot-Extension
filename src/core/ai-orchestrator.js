@@ -347,7 +347,20 @@ export class AiOrchestrator {
           if (!classification.retryable || !settings.routePolicy.autoSwitch) throw error;
         }
       }
-      throw attachFailureRuntime(createAiRoutePoolExhaustedError({ attempts:routeAttempts, message:'Every eligible AI route failed with a retryable provider error' }));
+      const exhausted = selectAiRouteCandidates({
+        routes: settings.routes,
+        policy: settings.routePolicy,
+        routeStates,
+        role: requestedRole,
+        capabilityIds,
+        requiresVision: Boolean(clean(imageDataUrl)),
+        now,
+      });
+      throw attachFailureRuntime(createAiRoutePoolExhaustedError({
+        attempts: routeAttempts,
+        retryAt: exhausted.retryAt,
+        message: 'Every eligible AI route failed with a retryable provider error',
+      }));
     };
 
     let primaryResult = null;
