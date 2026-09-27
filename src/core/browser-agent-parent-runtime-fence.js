@@ -14,6 +14,7 @@ export const BrowserAgentParentRuntimeFenceStatus = Object.freeze({
 const LIVE_KEYS = new Set(['jobId', 'runState', 'controlEpoch', 'capabilityIds', 'toolIds']);
 const FENCE_KEYS = new Set(['schemaVersion', 'jobId', 'controlEpoch', 'capabilityIds', 'toolIds']);
 const INSPECT_KEYS = new Set(['fence', 'live']);
+const INSPECT_JOB_KEYS = new Set(['fence', 'job']);
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_CAPABILITY_IDS = 64;
 const MAX_TOOL_IDS = 128;
@@ -40,6 +41,21 @@ function strictRecord(value, allowed, label) {
     out[key] = descriptor.value;
   }
   return out;
+}
+
+function ownData(value, key, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(label + ' must be a plain data object');
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error(label + ' must be a plain data object');
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + '.' + key + ' must be an enumerable own data property');
+  }
+  return descriptor.value;
 }
 
 function denseArray(value, label, max) {
@@ -124,6 +140,30 @@ function sameIds(left, right) {
     && left.every((value, index) => value === right[index]);
 }
 
+function liveFromCanonicalJob(job) {
+  const id = ownData(job, 'id', 'Browser Agent parent job');
+  const runtime = ownData(job, 'runtime', 'Browser Agent parent job');
+  const definitionScope = ownData(job, 'definitionScope', 'Browser Agent parent job');
+  if (definitionScope == null) {
+    throw new Error('Browser Agent parent job requires durable definitionScope');
+  }
+  return normalizeLive({
+    jobId: id,
+    runState: ownData(runtime, 'runState', 'Browser Agent parent runtime'),
+    controlEpoch: ownData(runtime, 'controlEpoch', 'Browser Agent parent runtime'),
+    capabilityIds: ownData(
+      definitionScope,
+      'capabilityIds',
+      'Browser Agent parent definitionScope',
+    ),
+    toolIds: ownData(
+      definitionScope,
+      'toolIds',
+      'Browser Agent parent definitionScope',
+    ),
+  });
+}
+
 function normalizeLive(input) {
   const raw = strictRecord(input, LIVE_KEYS, 'BrowserAgentParentRuntimeLiveV1');
   for (const key of LIVE_KEYS) {
@@ -189,6 +229,27 @@ export function createBrowserAgentParentRuntimeFenceV1(input = {}) {
  * CURRENT means only that the anti-TOCTOU fence still matches; it is not an
  * execution or child-spawn authorization.
  */
+export function createBrowserAgentParentRuntimeFenceFromJobV1(job) {
+  return createBrowserAgentParentRuntimeFenceV1(liveFromCanonicalJob(job));
+}
+
+export function inspectBrowserAgentParentRuntimeFenceFromJobV1(input = {}) {
+  const raw = strictRecord(
+    input,
+    INSPECT_JOB_KEYS,
+    'Browser Agent parent runtime job-fence inspection',
+  );
+  for (const key of INSPECT_JOB_KEYS) {
+    if (!Object.hasOwn(raw, key)) {
+      throw new Error('Browser Agent parent runtime job-fence inspection requires ' + key);
+    }
+  }
+  return inspectBrowserAgentParentRuntimeFenceV1({
+    fence: raw.fence,
+    live: liveFromCanonicalJob(raw.job),
+  });
+}
+
 export function inspectBrowserAgentParentRuntimeFenceV1(input = {}) {
   const raw = strictRecord(input, INSPECT_KEYS, 'Browser Agent parent runtime fence inspection');
   for (const key of INSPECT_KEYS) {
