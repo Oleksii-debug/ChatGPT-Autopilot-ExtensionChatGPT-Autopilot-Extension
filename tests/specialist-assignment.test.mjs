@@ -301,12 +301,29 @@ test('null-prototype assignment and claim option records remain portable', () =>
   assert.equal(claimed.assignments[0].state, 'LEASED');
 });
 
+test('zero child capacity remains valid but numeric aliases fail closed', () => {
+  assert.throws(
+    () => claimEligibleSpecialistAssignmentsV1(
+      [assignment()],
+      { now: AT, maxChildrenPerAgent: 0 },
+    ),
+    /child limit/,
+  );
+  assert.throws(
+    () => claimEligibleSpecialistAssignmentsV1(
+      [assignment()],
+      { now: AT, maxChildrenPerAgent: '0' },
+    ),
+    /maxChildrenPerAgent is invalid/,
+  );
+});
+
 test('claim ordering has an exact locale-independent identity tie-break', () => {
   const result = claimEligibleSpecialistAssignmentsV1([
     assignment({ agentId: 'child-b', priority: 5 }),
     assignment({ agentId: 'child-A', priority: 5 }),
     assignment({ agentId: 'child-a', priority: 5 }),
-  ], { now: AT, availableSlots: 3, leaseSeconds: 60 });
+  ], { now: AT, availableSlots: 1, leaseSeconds: 60 });
 
-  assert.deepEqual(result.claimed, ['child-A', 'child-a', 'child-b']);
+  assert.deepEqual(result.claimed, ['child-A']);
 });
