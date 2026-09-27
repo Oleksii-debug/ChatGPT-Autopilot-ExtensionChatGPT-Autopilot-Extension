@@ -312,6 +312,8 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.ok(js.includes("option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'))"), 'Agent route choices must retain verifier eligibility for acceptance preflight');
   assert.ok(js.includes("acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false'"), 'owner acceptance criteria must reject a pinned route that cannot perform verifier calls');
   assert.ok(js.includes('assertBrowserAgentRouteReadyForLaunch();'), 'new Agent creation must reject a statically blocked saved route before creating a doomed job');
+  const saveAgentPolicy = js.match(/async function saveBrowserAgentPolicy\(\)[\s\S]*?\n}\n/)?.[0] || '';
+  assert.match(saveAgentPolicy, /assertBrowserAgentRouteReadyForLaunch\(\);/, 'existing Agent policy saves must enforce the same pinned-route readiness gate');
   assert.ok(js.includes('routerRuntime.lastRouteId'), 'Agent usage must expose the actual routed model identity after execution');
   assert.ok(js.includes("item.routeId || '?'"), 'Agent usage must expose bounded route-chain evidence without provider payloads');
   assert.match(js, /!ui\.agentDraftActive && !ui\.agentPolicyDirty\) fillBrowserAgentPolicy\(config\)/, 'status refresh must preserve unsaved Agent policy fields');

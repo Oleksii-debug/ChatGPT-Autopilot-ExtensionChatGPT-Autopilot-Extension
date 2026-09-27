@@ -2793,6 +2793,7 @@ async function saveBrowserAgentPolicy() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
   try {
+    assertBrowserAgentRouteReadyForLaunch();
     const editEpoch = ui.agentPolicyEditEpoch;
     await core('UPDATE_BROWSER_AGENT_JOB', { id, config: browserAgentPolicyFromForm() });
     if (ui.selectedBrowserAgentId !== id) return;
