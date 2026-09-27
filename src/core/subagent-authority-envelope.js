@@ -18,8 +18,10 @@ const REQUEST_KEYS = new Set([
   'providerCapabilityIds',
   'taskRequestedCapabilityIds',
   'parentSourceIds',
+  'ownerAllowedSourceIds',
   'taskSourceIds',
   'parentArtifactIds',
+  'ownerAllowedArtifactIds',
   'taskArtifactIds',
   'parentToolIds',
   'ownerAllowedToolIds',
@@ -159,8 +161,10 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
   const providerCapabilityIds = idList(own(request, 'providerCapabilityIds'), 'providerCapabilityIds');
   const taskRequestedCapabilityIds = idList(own(request, 'taskRequestedCapabilityIds'), 'taskRequestedCapabilityIds');
   const parentSourceIds = idList(own(request, 'parentSourceIds'), 'parentSourceIds');
+  const ownerAllowedSourceIds = idList(own(request, 'ownerAllowedSourceIds'), 'ownerAllowedSourceIds');
   const taskSourceIds = idList(own(request, 'taskSourceIds'), 'taskSourceIds');
   const parentArtifactIds = idList(own(request, 'parentArtifactIds'), 'parentArtifactIds');
+  const ownerAllowedArtifactIds = idList(own(request, 'ownerAllowedArtifactIds'), 'ownerAllowedArtifactIds');
   const taskArtifactIds = idList(own(request, 'taskArtifactIds'), 'taskArtifactIds');
   const parentToolIds = idList(own(request, 'parentToolIds'), 'parentToolIds');
   const ownerAllowedToolIds = idList(own(request, 'ownerAllowedToolIds'), 'ownerAllowedToolIds');
@@ -179,14 +183,16 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
     });
   }
 
-  const sourceEscape = missing(taskSourceIds, parentSourceIds);
+  const sourceAuthorityIntersection = intersect(parentSourceIds, ownerAllowedSourceIds);
+  const sourceEscape = missing(taskSourceIds, sourceAuthorityIntersection);
   if (sourceEscape.length) {
     return denied('CONTEXT_SOURCE_ESCALATION', identities, {
       deniedSourceIds: sourceEscape,
     });
   }
 
-  const artifactEscape = missing(taskArtifactIds, parentArtifactIds);
+  const artifactAuthorityIntersection = intersect(parentArtifactIds, ownerAllowedArtifactIds);
+  const artifactEscape = missing(taskArtifactIds, artifactAuthorityIntersection);
   if (artifactEscape.length) {
     return denied('CONTEXT_ARTIFACT_ESCALATION', identities, {
       deniedArtifactIds: artifactEscape,
