@@ -18,17 +18,24 @@ const SELECTION_KEYS = new Set([
   'definitionRevision', 'definition',
 ]);
 const MATERIALIZE_KEYS = new Set([
-  'registry', 'selection', 'jobId', 'goal', 'projectId',
+  'registry', 'selection', 'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const CONFIG_DEFAULT_KEYS = new Set([
   'startUrl', 'startFromActiveTab', 'maxSteps', 'stepDelayMs',
   'allowCrossOriginNavigation', 'closeOwnedTabsOnStop', 'visionOnDemand',
   'maxModelCalls', 'maxInputTokens', 'maxOutputTokens', 'maxTotalTokens',
-  'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxCostUsd',
-  'inputPricePerMillionUsd', 'outputPricePerMillionUsd',
+  'maxOutputTokensPerCall', 'maxRuntimeMinutes',
   'aiRoutingMode', 'aiPinnedRouteId', 'aiPrimaryProvider', 'aiPrimaryModel',
   'aiStrongProvider', 'aiStrongModel',
+]);
+const DEFINITION_CEILING_KEYS = Object.freeze([
+  'maxSteps', 'maxModelCalls', 'maxInputTokens', 'maxOutputTokens',
+  'maxTotalTokens', 'maxOutputTokensPerCall', 'maxRuntimeMinutes',
+]);
+const OWNER_BUDGET_KEYS = new Set([
+  ...DEFINITION_CEILING_KEYS,
+  'maxCostUsd', 'inputPricePerMillionUsd', 'outputPricePerMillionUsd',
 ]);
 
 function record(value, allowed, label) {
@@ -167,6 +174,41 @@ function normalizeConfigDefaults(input) {
     out[key] = preview[key];
   }
   return freeze(out);
+}
+
+function normalizeOwnerBudget(input) {
+  const raw = record(input, OWNER_BUDGET_KEYS, 'Agent definition owner budget');
+  const safe = Object.create(null);
+  for (const key of OWNER_BUDGET_KEYS) {
+    if (!Object.hasOwn(raw, key)) {
+      throw new Error('Agent definition owner budget is missing required field: ' + key);
+    }
+    safe[key] = configScalar(raw[key], 'Agent definition owner budget.' + key);
+  }
+  const preview = normalizeBrowserAgentConfig({
+    ...safe,
+    goal: 'Reusable Agent owner budget preview',
+  }, { id: 'agent-definition-owner-budget-preview' });
+  const out = {};
+  for (const key of OWNER_BUDGET_KEYS) {
+    if (!Object.is(safe[key], preview[key])) {
+      throw new Error('Agent definition owner budget.' + key + ' must already be canonical');
+    }
+    out[key] = preview[key];
+  }
+  return freeze(out);
+}
+
+function intersectDefinitionCeiling(definitionDefaults, ownerBudget, key) {
+  if (!Object.hasOwn(definitionDefaults, key)) return ownerBudget[key];
+  const requested = definitionDefaults[key];
+  const owner = ownerBudget[key];
+  if (key === 'maxSteps' || key === 'maxOutputTokensPerCall') {
+    return Math.min(requested, owner);
+  }
+  if (owner === 0) return requested;
+  if (requested === 0) return owner;
+  return Math.min(requested, owner);
 }
 
 function normalizeAcceptanceCriteria(input) {
@@ -314,6 +356,7 @@ export function materializeAgentDefinitionV1(input = {}) {
     throw new Error('Selected Agent definition drifted from current registry definition');
   }
 
+  const ownerBudget = normalizeOwnerBudget(raw.ownerBudget);
   const ownerCapabilityIds = ids(raw.ownerCapabilityIds, 'ownerCapabilityIds', 64);
   const ownerToolIds = ids(raw.ownerToolIds, 'ownerToolIds', 128);
   const requestedCapabilityIds = ids(raw.requestedCapabilityIds, 'requestedCapabilityIds', 64);
@@ -332,8 +375,17 @@ export function materializeAgentDefinitionV1(input = {}) {
     + ownerGoal;
   if (composedGoal.length > 50000) throw new Error('Materialized Agent goal exceeds Browser Agent limit');
 
+  const effectiveBudget = {};
+  for (const key of DEFINITION_CEILING_KEYS) {
+    effectiveBudget[key] = intersectDefinitionCeiling(current.configDefaults, ownerBudget, key);
+  }
+  effectiveBudget.maxCostUsd = ownerBudget.maxCostUsd;
+  effectiveBudget.inputPricePerMillionUsd = ownerBudget.inputPricePerMillionUsd;
+  effectiveBudget.outputPricePerMillionUsd = ownerBudget.outputPricePerMillionUsd;
+
   const config = normalizeBrowserAgentConfig({
     ...current.configDefaults,
+    ...effectiveBudget,
     id: jobId,
     projectId,
     name: current.label,
