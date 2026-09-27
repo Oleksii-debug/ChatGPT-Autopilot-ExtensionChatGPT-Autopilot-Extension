@@ -380,4 +380,9 @@ test('request boundary rejects accessors, hidden authority and unknown fields wi
     () => mutateOrchestrationSubagentTopologyV1(request({ spawnId: 'bad id' })),
     /spawnId is invalid/,
   );
+
+  assert.throws(
+    () => mutateOrchestrationSubagentTopologyV1(request({ nowMs: -0 })),
+    /nowMs is invalid/,
+  );
 });
