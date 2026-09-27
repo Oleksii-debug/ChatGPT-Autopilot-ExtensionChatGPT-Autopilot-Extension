@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  discoverAgentDefinitionsV1,
   materializeAgentDefinitionV1,
   normalizeAgentDefinitionRegistryV1,
   normalizeAgentDefinitionV1,
@@ -78,6 +79,44 @@ test('registry canonicalizes reusable Agent definitions deterministically', () =
   assert.equal(normalized.definitions[0].configDefaults.aiPrimaryModel, 'mistral-small-latest');
   assert.ok(Object.isFrozen(normalized));
   assert.ok(Object.isFrozen(normalized.definitions[0].configDefaults));
+});
+
+test('read-only discovery filters enabled definitions deterministically without granting permission', () => {
+  const reg = registry({
+    definitions: [
+      definition({
+        agentDefinitionId: 'agent.writer',
+        label: 'Writer Agent',
+        definitionRevision: 2,
+        tags: ['writing'],
+        capabilityIds: ['artifact.write'],
+        toolIds: ['artifact.write'],
+      }),
+      definition(),
+      definition({
+        agentDefinitionId: 'agent.disabled',
+        label: 'Disabled Agent',
+        definitionRevision: 1,
+        enabled: false,
+      }),
+    ],
+  });
+  const result = discoverAgentDefinitionsV1({
+    registry: reg,
+    requiredTags: ['research'],
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+  });
+  assert.deepEqual(result.definitions.map(item => item.agentDefinitionId), ['agent.research']);
+  assert.equal(result.definitions[0].definitionRevision, 7);
+  assert.deepEqual(result.authority, { permissionGranted: false, executionAuthorized: false });
+  assert.equal(Object.hasOwn(result.definitions[0], 'instructions'), false, 'discovery summary must not copy the full prompt payload');
+
+  const noMatch = discoverAgentDefinitionsV1({
+    registry: reg,
+    requiredCapabilityIds: ['research.write'],
+  });
+  assert.deepEqual(noMatch.definitions, []);
 });
 
 test('selection carries a full immutable definition snapshot so same-revision byte drift fails closed', () => {
