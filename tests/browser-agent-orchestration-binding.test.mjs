@@ -41,6 +41,14 @@ function chromeFake() {
   };
 }
 
+function authorityStorageSnapshot(chrome, orchestraId = 'orch-1') {
+  return structuredClone({
+    config: chrome.data[`autopilotOrchestrationV2Config:${orchestraId}`],
+    runtime: chrome.data[`autopilotOrchestrationV2Runtime:${orchestraId}`],
+    manager: chrome.data.autopilotOrchestrationV2Manager,
+  });
+}
+
 function orchestraConfig(projectId) {
   return {
     enabled: false,
@@ -404,9 +412,10 @@ test('profile import keeps config, hierarchy and owner policy behind one Project
 });
 
 test('failed profile configure restores the exact authority snapshot before concurrent BIND', async () => {
-  const { manager, orchestration, dependencies } = await fixture();
+  const { chrome, manager, orchestration, dependencies } = await fixture();
   const controller = orchestration.controllerFor('orch-1');
   const before = await orchestration.getStatus('orch-1');
+  const beforeRaw = authorityStorageSnapshot(chrome);
   const beforeAuthority = await orchestration.resolveProjectHierarchyAuthority('project-1');
   const originalConfigureHierarchy = controller.configureHierarchy.bind(controller);
 
@@ -462,6 +471,7 @@ test('failed profile configure restores the exact authority snapshot before conc
     assert.deepEqual(after.config, before.config);
     assert.deepEqual(after.runtime.hierarchy.graph, before.runtime.hierarchy.graph);
     assert.deepEqual(after.orchestra.subagentPolicy, before.orchestra.subagentPolicy);
+    assert.deepEqual(authorityStorageSnapshot(chrome), beforeRaw, 'rollback must restore exact raw config/runtime/manager authority storage');
     assert.deepEqual(afterAuthority.graph, beforeAuthority.graph);
     assert.deepEqual(afterAuthority.subagentPolicy, beforeAuthority.subagentPolicy);
     assert.equal(bound.binding.graphId, 'graph-1');
@@ -473,8 +483,9 @@ test('failed profile configure restores the exact authority snapshot before conc
 });
 
 test('post-policy-persist profile failure restores config hierarchy and policy before concurrent BIND', async () => {
-  const { manager, orchestration, dependencies } = await fixture();
+  const { chrome, manager, orchestration, dependencies } = await fixture();
   const before = await orchestration.getStatus('orch-1');
+  const beforeRaw = authorityStorageSnapshot(chrome);
   const beforeAuthority = await orchestration.resolveProjectHierarchyAuthority('project-1');
   const originalUpdateMeta = orchestration.updateMeta.bind(orchestration);
 
@@ -540,6 +551,7 @@ test('post-policy-persist profile failure restores config hierarchy and policy b
     assert.deepEqual(after.config, before.config);
     assert.deepEqual(after.runtime.hierarchy.graph, before.runtime.hierarchy.graph);
     assert.deepEqual(after.orchestra.subagentPolicy, before.orchestra.subagentPolicy);
+    assert.deepEqual(authorityStorageSnapshot(chrome), beforeRaw, 'rollback must restore exact raw config/runtime/manager authority storage');
     assert.deepEqual(afterAuthority.graph, beforeAuthority.graph);
     assert.deepEqual(afterAuthority.subagentPolicy, beforeAuthority.subagentPolicy);
     assert.equal(bound.binding.graphId, 'graph-1');
