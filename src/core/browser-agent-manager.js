@@ -2062,7 +2062,12 @@ export class BrowserAgentManager {
       await this.reconcileAlarm();
       return this.get(id);
     };
-    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      // Acquire before re-proving the approved target. If this approval waited
+      // behind another Agent on the same tab, all stale-target checks must run
+      // only after exclusive Browser-Agent execution admission is obtained.
+      const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
     const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
@@ -2180,7 +2185,10 @@ export class BrowserAgentManager {
         return store;
       });
     }
-    await this.reconcileAlarm();
+      await this.reconcileAlarm();
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
     if (runInitial) await this.runBurst(id, { maxCycles: 25, maxWallMs: 25_000 });
     await this.reconcileAlarm();
     return this.get(id);
