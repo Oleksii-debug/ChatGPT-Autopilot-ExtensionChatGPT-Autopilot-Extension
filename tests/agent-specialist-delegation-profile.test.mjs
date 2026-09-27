@@ -235,6 +235,18 @@ test('materialization rejects stale-shaped identities, timestamps, revisions and
   );
   assert.throws(
     () => materializeAgentSpecialistDelegationIntentV1(request({
+      childBudget: { maxModelCalls: 1_000_001 },
+    })),
+    /childBudget\.maxModelCalls is invalid/u,
+  );
+  assert.throws(
+    () => materializeAgentSpecialistDelegationIntentV1(request({
+      childBudget: { maxRuntimeSeconds: 31_536_001 },
+    })),
+    /childBudget\.maxRuntimeSeconds is invalid/u,
+  );
+  assert.throws(
+    () => materializeAgentSpecialistDelegationIntentV1(request({
       childBudget: { maxModelCalls: 1, hidden: 2 },
     })),
     /unknown field/u,
