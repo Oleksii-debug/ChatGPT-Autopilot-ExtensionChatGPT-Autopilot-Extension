@@ -237,8 +237,8 @@ const browserAgent = new BrowserAgentManager({
 });
 browserAgentLifecycle.current = browserAgent;
 const browserAgentOrchestrationLifecycleDependencies = Object.freeze({
-  applyBrowserAgentBoundLifecycle: (binding, transition, options) =>
-    orchestrationV2.applyBrowserAgentBoundLifecycle(binding, transition, options),
+  withBrowserAgentBoundLifecycleAuthority: (binding, operation) =>
+    orchestrationV2.withBrowserAgentBoundLifecycleAuthority(binding, operation),
 });
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
