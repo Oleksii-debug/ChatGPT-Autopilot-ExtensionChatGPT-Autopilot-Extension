@@ -540,6 +540,70 @@ function assertTrustedResultVerificationParticipation(result, adjudication) {
   }
 }
 
+function assertTrustedCompletionProvenance(result, adjudication) {
+  const rows = adjudication.criteria.filter(
+    row => row.verificationId === result.verificationId,
+  );
+  const resultEvidenceById = new Map(
+    result.evidenceArtifactRefs.map(ref => [ref.artifactId, ref]),
+  );
+
+  for (const row of rows) {
+    if (row.verificationStatus !== result.verificationStatus
+        || row.verificationAuthorityId !== result.verificationAuthorityId
+        || row.trustedReasonCode !== result.verificationReasonCode
+        || row.verifiedAt !== result.verifiedAt) {
+      throw new Error(
+        'Trusted completion verification provenance does not exactly match the raw subagent result claim',
+      );
+    }
+
+    const trustedIds = [...row.evidenceArtifactIds].sort();
+    const resultIds = [...resultEvidenceById.keys()].sort();
+    if (trustedIds.length !== resultIds.length
+        || trustedIds.some((artifactId, index) => artifactId !== resultIds[index])) {
+      throw new Error(
+        'Trusted completion evidence artifact IDs do not exactly match the subagent result handback',
+      );
+    }
+
+    const trustedRefs = row.trustedEvidenceArtifactRefs;
+    if (!Array.isArray(trustedRefs) || trustedRefs.length !== resultEvidenceById.size) {
+      throw new Error('Trusted completion evidence artifact references are incomplete');
+    }
+    for (const trustedRef of trustedRefs) {
+      const resultRef = resultEvidenceById.get(trustedRef.artifactId);
+      if (!resultRef) {
+        throw new Error(
+          'Trusted completion evidence artifact reference is missing from the subagent result handback: '
+            + trustedRef.artifactId,
+        );
+      }
+      for (const field of [
+        'schemaVersion',
+        'artifactId',
+        'kind',
+        'uri',
+        'mediaType',
+        'sha256',
+        'sizeBytes',
+        'createdAt',
+        'producerInvocationId',
+        'sensitive',
+      ]) {
+        if (resultRef[field] !== trustedRef[field]) {
+          throw new Error(
+            'Trusted completion evidence artifact reference does not exactly match the subagent result handback: '
+              + trustedRef.artifactId
+              + '.'
+              + field,
+          );
+        }
+      }
+    }
+  }
+}
+
 function currentActivationProjection(graph, runtime, result) {
   const child = graph.nodesById[result.childAgentId];
   if (!child) {
@@ -780,6 +844,9 @@ export async function prepareSubagentResultReconciliationV1(
 
   const trustedComplete = adjudication.verdict === OutcomeVerificationVerdict.VERIFIED
     && adjudication.completionEvidenceReady === true;
+  if (trustedComplete) {
+    assertTrustedCompletionProvenance(result, adjudication);
+  }
   const terminalStatus = trustedComplete
     ? OrchestrationTerminalStatus.COMPLETED
     : OrchestrationTerminalStatus.FAILED;
