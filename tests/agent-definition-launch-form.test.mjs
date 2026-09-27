@@ -86,7 +86,7 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
   const request = buildAgentDefinitionLaunchRequestV1(form({
     goal: '  Owner task  ',
     projectId: '  project-1  ',
-    jobId: '  job.research-1  ',
+    jobId: '  manual research job 1  ',
   }), {
     registry: registry(),
     definition: definition(),
@@ -95,7 +95,7 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
 
   assert.equal(request.goal, 'Owner task');
   assert.equal(request.projectId, 'project-1');
-  assert.equal(request.jobId, 'job.research-1');
+  assert.equal(request.jobId, 'manual research job 1');
 });
 
 test('scope defaults expose the selected definition authority without inventing grants', () => {
