@@ -1,9 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import { StorageRepository } from '../src/core/storage.js';
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
 import { OrchestrationV2Manager } from '../src/core/orchestration-v2-manager.js';
+import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
+import {
+  createBrowserAgentOrchestrationNodeBindingV1,
+  createOrchestrationProjectAuthorityV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+} from '../src/core/browser-agent-orchestration-binding.js';
 import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
 
 function chromeFake() {
@@ -354,4 +361,174 @@ test('Project authority resolver fails closed on missing hierarchy and duplicate
     () => second.resolveProjectHierarchyAuthority('project-1'),
     /not uniquely owned/,
   );
+});
+
+
+test('exported binding helpers reject hostile outer records before invoking accessors', () => {
+  const policy = {
+    schemaVersion: 1,
+    allowAgentCreatedChildren: false,
+    maxDepth: 0,
+    maxChildrenPerAgent: 0,
+  };
+  let authorityReads = 0;
+  const hostileAuthorityCreate = {
+    orchestraId: 'orch-1',
+    projectId: 'project-1',
+    subagentPolicy: policy,
+  };
+  Object.defineProperty(hostileAuthorityCreate, 'graph', {
+    enumerable: true,
+    get() {
+      authorityReads += 1;
+      return hierarchy();
+    },
+  });
+  assert.throws(
+    () => createOrchestrationProjectAuthorityV1(hostileAuthorityCreate),
+    /enumerable own data property/,
+  );
+  assert.equal(authorityReads, 0);
+
+  const authority = createOrchestrationProjectAuthorityV1({
+    orchestraId: 'orch-1',
+    projectId: 'project-1',
+    graph: hierarchy(),
+    subagentPolicy: policy,
+  });
+
+  let bindingReads = 0;
+  const hostileBindingCreate = {
+    jobId: 'job-1',
+    projectId: 'project-1',
+    boundAt: 1000,
+    request: { nodeId: 'worker' },
+  };
+  Object.defineProperty(hostileBindingCreate, 'authority', {
+    enumerable: true,
+    get() {
+      bindingReads += 1;
+      return authority;
+    },
+  });
+  assert.throws(
+    () => createBrowserAgentOrchestrationNodeBindingV1(hostileBindingCreate),
+    /enumerable own data property/,
+  );
+  assert.equal(bindingReads, 0);
+
+  const binding = createBrowserAgentOrchestrationNodeBindingV1({
+    jobId: 'job-1',
+    projectId: 'project-1',
+    boundAt: 1000,
+    authority,
+    request: { nodeId: 'worker' },
+  });
+  let inspectionReads = 0;
+  const hostileInspection = { authority };
+  Object.defineProperty(hostileInspection, 'binding', {
+    enumerable: true,
+    get() {
+      inspectionReads += 1;
+      return binding;
+    },
+  });
+  assert.throws(
+    () => inspectBrowserAgentOrchestrationNodeBindingV1(hostileInspection),
+    /enumerable own data property/,
+  );
+  assert.equal(inspectionReads, 0);
+
+  assert.throws(
+    () => inspectBrowserAgentOrchestrationNodeBindingV1({
+      binding,
+      authority,
+      executionAuthorized: true,
+    }),
+    /unknown field/,
+  );
+});
+
+test('definition-launched Browser Agent keeps definition provenance when bound to canonical hierarchy', async () => {
+  const { manager, dependencies } = await fixture();
+  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  await manager.mutateAgentDefinitionRegistry({
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 1,
+    kind: AgentDefinitionRegistryMutationKind.CREATE,
+    definition: {
+      schemaVersion: 1,
+      agentDefinitionId: 'agent.bound',
+      label: 'Bound reusable agent',
+      description: 'Reusable bounded project specialist',
+      instructions: 'Work only within the persisted project authority.',
+      capabilityIds: ['browser', 'research'],
+      toolIds: ['browser.read', 'files.read'],
+      tags: ['bounded'],
+      acceptanceCriteria: [],
+      configDefaults: {
+        maxSteps: 50,
+        maxModelCalls: 8,
+        maxInputTokens: 6000,
+        maxOutputTokens: 3000,
+        maxTotalTokens: 9000,
+        maxOutputTokensPerCall: 1000,
+        maxRuntimeMinutes: 20,
+        aiPinnedRouteId: 'route.research',
+      },
+      enabled: true,
+      definitionRevision: 1,
+    },
+  });
+  const launched = await manager.createFromAgentDefinition({
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 2,
+    agentDefinitionId: 'agent.bound',
+    expectedDefinitionRevision: 1,
+    jobId: 'job.definition-bound',
+    goal: 'Perform bounded project work.',
+    projectId: 'project-1',
+    ownerBudget: {
+      maxSteps: 200,
+      maxModelCalls: 20,
+      maxInputTokens: 20000,
+      maxOutputTokens: 10000,
+      maxTotalTokens: 30000,
+      maxOutputTokensPerCall: 2000,
+      maxRuntimeMinutes: 60,
+      maxCostUsd: 2,
+      inputPricePerMillionUsd: 1,
+      outputPricePerMillionUsd: 2,
+    },
+    ownerCapabilityIds: ['browser', 'research'],
+    ownerToolIds: ['browser.read', 'files.read'],
+    requestedCapabilityIds: ['research'],
+    requestedToolIds: ['browser.read'],
+  });
+  assert.equal(launched.job.definitionSelection.agentDefinitionId, 'agent.bound');
+  assert.equal(launched.job.orchestrationNodeBinding, null);
+
+  await manager.bindOrchestrationNode(
+    'job.definition-bound',
+    { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
+    dependencies,
+  );
+  const persisted = await manager.get('job.definition-bound');
+  assert.equal(persisted.job.definitionSelection.registryRevision, 2);
+  assert.equal(persisted.job.definitionSelection.definitionRevision, 1);
+  assert.deepEqual(persisted.job.definitionScope, {
+    capabilityIds: ['research'],
+    toolIds: ['browser.read'],
+  });
+  assert.equal(persisted.job.orchestrationNodeBinding.nodeId, 'worker');
+  assert.equal(persisted.job.orchestrationNodeBinding.projectId, 'project-1');
+});
+
+test('service worker exposes one explicit read path and one explicit bind path through existing managers', async () => {
+  const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
+  assert.match(source, /'GET_BROWSER_AGENT_ORCHESTRATION_BINDING'/u);
+  assert.match(source, /browserAgent\.inspectOrchestrationNodeBinding\(/u);
+  assert.match(source, /'BIND_BROWSER_AGENT_ORCHESTRATION_NODE'/u);
+  assert.match(source, /browserAgent\.bindOrchestrationNode\(/u);
+  assert.match(source, /orchestrationV2\.resolveProjectHierarchyAuthority\(projectId\)/u);
 });
