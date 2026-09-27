@@ -118,6 +118,9 @@ test('owner-config readiness probe is read-only, bounded, and grants no executio
   assert.equal(result.authority.completionAuthorized, false);
   assert.equal(result.authority.verificationAuthorized, false);
   assert.equal(result.authority.capacityReserved, false);
+  assert.equal(Object.isFrozen(result), true);
+  assert.equal(Object.isFrozen(result.authority), true);
+  assert.equal(Object.isFrozen(result.providerState), true);
   assert.equal(JSON.stringify(result).includes('workspace'), false);
 });
 
