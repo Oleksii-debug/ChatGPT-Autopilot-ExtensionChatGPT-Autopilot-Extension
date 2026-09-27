@@ -500,6 +500,7 @@ test('registry CREATE is revision-CAS guarded, deterministic and persistence-non
   });
   const result = proposeAgentDefinitionRegistryMutationV1({
     registry: current,
+    registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: created,
@@ -528,6 +529,7 @@ test('registry CREATE rejects duplicate identity and non-initial definition revi
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: registry(),
+      registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: AgentDefinitionRegistryMutationKind.CREATE,
       definition: definition({ definitionRevision: 1 }),
@@ -537,6 +539,7 @@ test('registry CREATE rejects duplicate identity and non-initial definition revi
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: registry(),
+      registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: AgentDefinitionRegistryMutationKind.CREATE,
       definition: definition({
@@ -557,8 +560,10 @@ test('registry UPDATE requires exact registry and definition revisions and one-s
   });
   const result = proposeAgentDefinitionRegistryMutationV1({
     registry: current,
+    registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
+    agentDefinitionId: 'agent.research',
     definition: updated,
     expectedDefinitionRevision: 7,
   });
@@ -573,8 +578,35 @@ test('registry UPDATE requires exact registry and definition revisions and one-s
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: current,
+      registryId: 'agents:wrong-project',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
+      definition: updated,
+      expectedDefinitionRevision: 7,
+    }),
+    /registry identity does not match mutation target/,
+  );
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+      registryId: 'agents:project-1',
+      expectedRegistryRevision: 3,
+      kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.writer',
+      definition: updated,
+      expectedDefinitionRevision: 2,
+    }),
+    /definition identity does not match target/,
+  );
+
+  assert.throws(
+    () => proposeAgentDefinitionRegistryMutationV1({
+      registry: current,
+    registryId: 'agents:project-1',
       expectedRegistryRevision: 2,
       kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
       definition: updated,
       expectedDefinitionRevision: 7,
     }),
@@ -583,8 +615,10 @@ test('registry UPDATE requires exact registry and definition revisions and one-s
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: current,
+    registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
       definition: updated,
       expectedDefinitionRevision: 6,
     }),
@@ -593,8 +627,10 @@ test('registry UPDATE requires exact registry and definition revisions and one-s
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: current,
+    registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: AgentDefinitionRegistryMutationKind.UPDATE,
+      agentDefinitionId: 'agent.research',
       definition: definition({ definitionRevision: 9 }),
       expectedDefinitionRevision: 7,
     }),
@@ -605,6 +641,7 @@ test('registry UPDATE requires exact registry and definition revisions and one-s
 test('registry DELETE requires exact target revision and returns a canonical next snapshot', () => {
   const result = proposeAgentDefinitionRegistryMutationV1({
     registry: registry(),
+      registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.DELETE,
     agentDefinitionId: 'agent.research',
@@ -618,6 +655,7 @@ test('registry DELETE requires exact target revision and returns a canonical nex
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: registry(),
+      registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: AgentDefinitionRegistryMutationKind.DELETE,
       agentDefinitionId: 'agent.missing',
@@ -631,6 +669,7 @@ test('registry mutation request is exact, descriptor-safe and rejects shape alia
   let reads = 0;
   const hostile = {
     registry: registry(),
+      registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.DELETE,
     agentDefinitionId: 'agent.research',
@@ -653,6 +692,7 @@ test('registry mutation request is exact, descriptor-safe and rejects shape alia
   for (const request of [
     {
       registry: registry(),
+      registryId: 'agents:project-1',
       expectedRegistryRevision: -0,
       kind: AgentDefinitionRegistryMutationKind.DELETE,
       agentDefinitionId: 'agent.research',
@@ -660,6 +700,7 @@ test('registry mutation request is exact, descriptor-safe and rejects shape alia
     },
     {
       registry: registry(),
+      registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: 'delete',
       agentDefinitionId: 'agent.research',
@@ -667,6 +708,7 @@ test('registry mutation request is exact, descriptor-safe and rejects shape alia
     },
     {
       registry: registry(),
+      registryId: 'agents:project-1',
       expectedRegistryRevision: 3,
       kind: AgentDefinitionRegistryMutationKind.CREATE,
       definition: definition({
@@ -682,6 +724,7 @@ test('registry mutation request is exact, descriptor-safe and rejects shape alia
 
   const decorated = {
     registry: registry(),
+      registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.DELETE,
     agentDefinitionId: 'agent.research',
@@ -696,6 +739,7 @@ test('registry mutation fails closed at revision overflow and supports null-prot
   assert.throws(
     () => proposeAgentDefinitionRegistryMutationV1({
       registry: nearOverflow,
+      registryId: 'agents:project-1',
       expectedRegistryRevision: Number.MAX_SAFE_INTEGER,
       kind: AgentDefinitionRegistryMutationKind.DELETE,
       agentDefinitionId: 'agent.research',
@@ -706,6 +750,7 @@ test('registry mutation fails closed at revision overflow and supports null-prot
 
   const request = Object.assign(Object.create(null), {
     registry: registry(),
+      registryId: 'agents:project-1',
     expectedRegistryRevision: 3,
     kind: AgentDefinitionRegistryMutationKind.DELETE,
     agentDefinitionId: 'agent.research',
