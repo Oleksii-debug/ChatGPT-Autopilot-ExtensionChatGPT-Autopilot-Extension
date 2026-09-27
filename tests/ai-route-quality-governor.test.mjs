@@ -265,6 +265,48 @@ test('cost is deterministic after equal owner and quality evidence, then latency
   assert.deepEqual(report.candidates[2].latency, { observed: false, lastLatencyMs: 0 });
 });
 
+test('unknown cost or price dimensions never masquerade as zero-cost evidence', async () => {
+  const routes = [
+    paid('paid-known', 1, 2),
+    route('paid-unknown', {
+      provider: 'openai',
+      locality: 'remote',
+      costClass: 'paid',
+    }),
+    route('unknown-explicit', {
+      provider: 'openai',
+      locality: 'remote',
+      costClass: 'unknown',
+      inputPricePerMillionUsd: 0,
+      outputPricePerMillionUsd: 0,
+      inputPriceKnown: true,
+      outputPriceKnown: true,
+    }),
+  ];
+  const benchmarkRequests = await Promise.all(routes.map((item, index) => benchmarkBinding(
+    item,
+    { pass: true, suffix: 'cost-known-' + String(index + 1) },
+  )));
+
+  const report = await rank({ routes, benchmarkRequests });
+  assert.deepEqual(report.rankedRouteIds, [
+    'paid-known',
+    'paid-unknown',
+    'unknown-explicit',
+  ]);
+  assert.deepEqual(report.candidates[0].cost, {
+    costClass: 'paid',
+    inputPricePerMillionUsd: 1,
+    outputPricePerMillionUsd: 2,
+    inputPriceKnown: true,
+    outputPriceKnown: true,
+  });
+  assert.equal(report.candidates[1].cost.inputPricePerMillionUsd, 0);
+  assert.equal(report.candidates[1].cost.outputPricePerMillionUsd, 0);
+  assert.equal(report.candidates[1].cost.inputPriceKnown, false);
+  assert.equal(report.candidates[1].cost.outputPriceKnown, false);
+});
+
 test('durable backoff and autoSwitch=false remain canonical Router authority', async () => {
   const report = await rank({
     routes: [route('route-a'), route('route-b')],

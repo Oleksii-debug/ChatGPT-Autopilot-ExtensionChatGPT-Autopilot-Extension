@@ -27,6 +27,12 @@ const QUALITY_CLASS_ORDER = new Map([
   [AiRouteQualityClass.FAIL, 2],
 ]);
 
+const COST_CLASS_ORDER = new Map([
+  [AiRouteCostClass.FREE, 0],
+  [AiRouteCostClass.PAID, 1],
+  [AiRouteCostClass.UNKNOWN, 2],
+]);
+
 const REQUEST_KEYS = new Set([
   'routes',
   'policy',
@@ -214,13 +220,23 @@ function compareQuality(left, right) {
 }
 
 function compareCost(left, right) {
-  const leftClass = left.route.costClass === AiRouteCostClass.FREE ? 0 : 1;
-  const rightClass = right.route.costClass === AiRouteCostClass.FREE ? 0 : 1;
-  if (leftClass !== rightClass) return leftClass - rightClass;
-  if (left.route.inputPricePerMillionUsd !== right.route.inputPricePerMillionUsd) {
+  const classDelta = COST_CLASS_ORDER.get(left.route.costClass)
+    - COST_CLASS_ORDER.get(right.route.costClass);
+  if (classDelta) return classDelta;
+
+  if (left.route.inputPriceKnown !== right.route.inputPriceKnown) {
+    return left.route.inputPriceKnown ? -1 : 1;
+  }
+  if (left.route.inputPriceKnown
+      && left.route.inputPricePerMillionUsd !== right.route.inputPricePerMillionUsd) {
     return left.route.inputPricePerMillionUsd - right.route.inputPricePerMillionUsd;
   }
-  if (left.route.outputPricePerMillionUsd !== right.route.outputPricePerMillionUsd) {
+
+  if (left.route.outputPriceKnown !== right.route.outputPriceKnown) {
+    return left.route.outputPriceKnown ? -1 : 1;
+  }
+  if (left.route.outputPriceKnown
+      && left.route.outputPricePerMillionUsd !== right.route.outputPricePerMillionUsd) {
     return left.route.outputPricePerMillionUsd - right.route.outputPricePerMillionUsd;
   }
   return 0;
@@ -383,6 +399,8 @@ export async function rankAiRouteCandidatesByEvidenceV1(input = {}) {
       costClass: row.route.costClass,
       inputPricePerMillionUsd: row.route.inputPricePerMillionUsd,
       outputPricePerMillionUsd: row.route.outputPricePerMillionUsd,
+      inputPriceKnown: row.route.inputPriceKnown,
+      outputPriceKnown: row.route.outputPriceKnown,
     }),
     latency: freeze({
       observed: row.latencyObserved,
