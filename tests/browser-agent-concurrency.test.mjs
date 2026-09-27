@@ -275,3 +275,41 @@ test('raising the owner limit wakes queued direct bursts without waiting for an 
   releaseHeld();
   await Promise.all([held, queued]);
 });
+
+test('queued admission fails closed instead of hanging when policy storage read fails', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  manager.reconcileAlarm = async () => 0;
+  manager.get = async id => ({
+    selectedId: id,
+    job: { id, runtime: { runState: 'RUNNING', nextWakeAt: 0 } },
+  });
+
+  let policyReads = 0;
+  manager.getExecutionPolicy = async () => {
+    policyReads += 1;
+    if (policyReads === 3) throw new Error('simulated policy storage read failure');
+    return { maxConcurrentAgents: 1 };
+  };
+
+  let releaseHeld;
+  let heldStartedResolve;
+  const heldStarted = new Promise(resolve => { heldStartedResolve = resolve; });
+  const heldBarrier = new Promise(resolve => { releaseHeld = resolve; });
+  manager.cycleOne = async id => {
+    if (id === 'held') {
+      heldStartedResolve();
+      await heldBarrier;
+    }
+    return { kind: 'COMPLETED', id };
+  };
+
+  const held = manager.runBurst('held', { maxCycles: 1 });
+  await heldStarted;
+  await assert.rejects(
+    manager.runBurst('queued', { maxCycles: 1 }),
+    /simulated policy storage read failure/,
+  );
+  releaseHeld();
+  await held;
+});
