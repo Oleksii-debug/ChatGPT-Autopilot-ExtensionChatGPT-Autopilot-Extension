@@ -1265,3 +1265,71 @@ test('service worker routes Browser Agent owner lifecycle commands through the c
   assert.match(source, /browserAgent\.resume\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
   assert.match(source, /browserAgent\.stop\([\s\S]*browserAgentOrchestrationLifecycleDependencies/);
 });
+
+
+test('lifecycle adapter options are exact descriptor-safe data and private Browser Agent mutator is not exposed', async () => {
+  const { manager, orchestration, dependencies } = await fixture();
+  const bound = await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  assert.equal(manager.updateOwnerLifecycleState, undefined);
+
+  let reads = 0;
+  const hostileOptions = {};
+  Object.defineProperty(hostileOptions, 'browserControlEpoch', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 1;
+    },
+  });
+  await assert.rejects(
+    () => orchestration.applyBrowserAgentBoundLifecycle(bound.binding, 'PAUSE', hostileOptions),
+    /enumerable own data properties/,
+  );
+  assert.equal(reads, 0);
+
+  await assert.rejects(
+    () => orchestration.applyBrowserAgentBoundLifecycle(bound.binding, 'PAUSE', {
+      browserControlEpoch: 1,
+      nowMs: 2000,
+      executionAuthorized: true,
+    }),
+    /unknown field/,
+  );
+});
+
+test('failed bound lifecycle keeps the Browser Agent update chain serialized through rollback', async () => {
+  const { manager, orchestration, dependencies, lifecycleDependencies } = await fixture();
+  await manager.bindOrchestrationNode('job-1', { nodeId: 'root' }, dependencies);
+  await manager.start('job-1', { runInitial: false });
+
+  let reachedResolve;
+  const reached = new Promise(resolve => { reachedResolve = resolve; });
+  let releaseResolve;
+  const release = new Promise(resolve => { releaseResolve = resolve; });
+  const failing = manager.pause('job-1', {
+    applyBrowserAgentBoundLifecycle: async () => {
+      reachedResolve();
+      await release;
+      throw new Error('blocked lifecycle failure');
+    },
+  });
+  await reached;
+
+  let stopSettled = false;
+  const stopping = manager.stop('job-1', lifecycleDependencies).then(result => {
+    stopSettled = true;
+    return result;
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(stopSettled, false, 'STOP must remain queued behind the in-flight PAUSE+rollback transaction');
+
+  releaseResolve();
+  await assert.rejects(() => failing, /blocked lifecycle failure/);
+  await stopping;
+
+  const job = (await manager.get('job-1')).job;
+  assert.equal(job.runtime.runState, 'STOPPED');
+  const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+  assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'STOPPED');
+  assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'STOPPED');
+});
