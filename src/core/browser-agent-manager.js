@@ -1669,6 +1669,332 @@ export class BrowserAgentManager {
     return { providerId, cleared };
   }
 
+  async listSpecialistProviderExecutions(id = '') {
+    const current = await this.get(id);
+    if (!current.job) {
+      return {
+        selectedId: current.selectedId,
+        jobId: '',
+        executions: [],
+        quarantinedCount: 0,
+      };
+    }
+    return {
+      selectedId: current.selectedId,
+      jobId: current.job.id,
+      executions: clone(current.job.runtime.specialistProviderExecutions || []),
+      quarantinedCount: (current.job.runtime.specialistProviderExecutionQuarantine || []).length,
+    };
+  }
+
+  async prepareClaimedSpecialistProviderExecution(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS,
+      'Browser Agent Specialist provider execution prepare request',
+    );
+    for (const key of SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider execution prepare request requires ${key}`);
+      }
+    }
+    const agentId = exactIdentity(request.agentId, 'agentId', 180);
+    const conversationId = request.conversationId;
+    const {
+      withProjectHierarchyAuthority,
+      resolveSpecialistReadiness,
+      assertSpecialistReadinessCurrent,
+    } = trustedAutomaticDelegationDependencies(dependencies);
+
+    const initial = await this.get(id);
+    if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider execution');
+    const projectId = initial.job.config?.projectId || '';
+    if (!projectId) throw new Error('Specialist provider execution requires a durable Project binding');
+    const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
+    const initialPlan = normalizeAgentPlanV1(initial.job.runtime.plan);
+    const initialBinding = (initial.job.runtime.specialistDelegationBindings || []).find(binding =>
+      specialistAssignmentIdForPlanNodeV1(initialPlan.planId, binding.nodeId) === agentId);
+    if (!initialBinding) {
+      throw new Error('Claimed Specialist provider execution requires automatic delegation provenance');
+    }
+    const selection = normalizeSpecialistSelectionV1(initialBinding.selection);
+    const providerReadiness = assertTrustedProviderReadinessForSelection(
+      await resolveSpecialistReadiness(selection),
+      selection,
+      this.now(),
+    );
+
+    return withProjectHierarchyAuthority(projectId, async authority => {
+      let result = null;
+      await this.update(async store => {
+        await assertSpecialistReadinessCurrent(providerReadiness);
+        const job = store.byId[id];
+        if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider execution');
+        if ((job.config?.projectId || '') !== projectId) {
+          throw new Error('Browser Agent Project changed before Specialist provider execution');
+        }
+        const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+          fence: parentRuntimeFence,
+          job,
+        });
+        if (!parentFenceStatus.current) {
+          throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+        }
+        if (!job.definitionScope) {
+          throw new Error('Specialist provider execution requires durable Agent definition scope');
+        }
+        if (!job.orchestrationNodeBinding) {
+          throw new Error('Specialist provider execution requires a durable orchestration node binding');
+        }
+        const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+          binding: job.orchestrationNodeBinding,
+          authority,
+        });
+        if (!bindingStatus.current) {
+          throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+        }
+        const structureAdmission = evaluateSubagentStructureAdmissionV1({
+          policy: authority.subagentPolicy,
+          initiator: SubagentSpawnInitiator.AGENT,
+          graph: authority.graph,
+          parentNodeId: job.orchestrationNodeBinding.nodeId,
+          requestedChildren: 1,
+        });
+        if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+          throw new Error(`Specialist provider execution denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+        }
+
+        const plan = normalizeAgentPlanV1(job.runtime.plan);
+        const binding = (job.runtime.specialistDelegationBindings || []).find(candidate =>
+          specialistAssignmentIdForPlanNodeV1(plan.planId, candidate.nodeId) === agentId);
+        if (!binding || !sameSpecialistSelection(binding.selection, selection)) {
+          throw new Error('Specialist provider execution delegation provenance drifted');
+        }
+        const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === agentId);
+        const at = new Date(this.now()).toISOString();
+        if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId) {
+          throw new Error('Specialist provider execution requires the current claimed lease');
+        }
+        if (assignment.leaseExpiresAt <= at) {
+          throw new Error('Specialist provider execution lease expired before dispatch');
+        }
+        const ownership = (job.runtime.specialistExecutionOwnerships || [])
+          .map(normalizeExecutionOwnershipV1)
+          .find(item => item.planId === plan.planId && item.nodeId === binding.nodeId);
+        if (!ownership
+            || ownership.state !== ExecutionOwnershipState.OWNED
+            || ownership.ownerId !== agentId
+            || ownership.leaseId !== assignment.leaseId
+            || ownership.leaseUntil !== assignment.leaseExpiresAt) {
+          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
+        }
+
+        const configQuarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+        if (Object.hasOwn(configQuarantine, selection.providerId)) {
+          throw new Error('Selected Specialist provider config is quarantined as corrupt');
+        }
+        const providerConfig = store.specialistProviderConfigsById?.[selection.providerId];
+        if (!providerConfig) throw new Error('Selected Specialist provider is not configured by the owner');
+        const canonicalConfig = normalizeSpecialistProviderConfigV1(providerConfig);
+        if (canonicalConfig.providerId !== selection.providerId) {
+          throw new Error('Selected Specialist provider config identity drifted');
+        }
+
+        if ((job.runtime.specialistProviderExecutionQuarantine || []).length) {
+          throw new Error('Specialist provider execution provenance is quarantined as corrupt');
+        }
+        const executions = Array.isArray(job.runtime.specialistProviderExecutions)
+          ? job.runtime.specialistProviderExecutions
+          : [];
+        let execution = executions.find(item => item?.leaseId === assignment.leaseId) || null;
+        if (execution) {
+          execution = normalizeSpecialistProviderExecutionV1(execution);
+          if (execution.agentId !== agentId
+              || execution.nodeId !== binding.nodeId
+              || execution.handoffId !== binding.handoff.handoffId
+              || execution.providerId !== selection.providerId
+              || execution.leaseUntil !== assignment.leaseExpiresAt) {
+            throw new Error('Specialist provider execution identity drifted from current lease');
+          }
+          const dispatchable = [
+            SpecialistProviderExecutionStatus.PREPARED,
+            SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
+            SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+          ].includes(execution.status);
+          if (dispatchable
+              && JSON.stringify(execution.providerConfig) !== JSON.stringify(canonicalConfig)) {
+            throw new Error('Specialist provider config changed after execution preparation');
+          }
+          result = {
+            execution: clone(execution),
+            handoff: clone(binding.handoff),
+            grantedCapabilityIds: clone(selection.requestedCapabilityIds),
+            dispatchable,
+            reused: true,
+          };
+          return store;
+        }
+
+        if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
+          throw new Error('Specialist provider execution provenance capacity is exhausted');
+        }
+        execution = createSpecialistProviderExecutionV1({
+          planId: plan.planId,
+          nodeId: binding.nodeId,
+          agentId,
+          handoffId: binding.handoff.handoffId,
+          providerId: selection.providerId,
+          leaseId: assignment.leaseId,
+          leaseUntil: assignment.leaseExpiresAt,
+          conversationId,
+          providerConfig: canonicalConfig,
+          at,
+        });
+        job.runtime.specialistProviderExecutions = [...executions, execution];
+        job.runtime.updatedAt = this.now();
+        appendHistory(job.runtime, {
+          at: this.now(),
+          type: 'specialist-provider-execution-prepared',
+          agentId,
+          leaseId: assignment.leaseId,
+          providerId: selection.providerId,
+          conversationId: execution.conversationId,
+          message: 'Stable provider execution identity persisted before any external provider effect.',
+        });
+        result = {
+          execution: clone(execution),
+          handoff: clone(binding.handoff),
+          grantedCapabilityIds: clone(selection.requestedCapabilityIds),
+          dispatchable: true,
+          reused: false,
+        };
+        return store;
+      });
+      return Object.freeze(result);
+    });
+  }
+
+  async recordSpecialistProviderExecutionOutcome(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS,
+      'Browser Agent Specialist provider execution outcome request',
+    );
+    for (const key of SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider execution outcome request requires ${key}`);
+      }
+    }
+    const agentId = exactIdentity(request.agentId, 'agentId', 180);
+    const leaseId = exactIdentity(request.leaseId, 'leaseId', 180);
+    const conversationId = request.conversationId;
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider outcome');
+      if ((job.runtime.specialistProviderExecutionQuarantine || []).length) {
+        throw new Error('Specialist provider execution provenance is quarantined as corrupt');
+      }
+      const executions = Array.isArray(job.runtime.specialistProviderExecutions)
+        ? job.runtime.specialistProviderExecutions
+        : [];
+      const index = executions.findIndex(item =>
+        item?.agentId === agentId
+        && item?.leaseId === leaseId
+        && item?.conversationId === conversationId);
+      if (index < 0) throw new Error('Specialist provider execution provenance not found');
+      const current = normalizeSpecialistProviderExecutionV1(executions[index]);
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === agentId);
+      if (!assignment || assignment.leaseId !== leaseId) {
+        throw new Error('Specialist provider outcome does not match current durable handoff lease');
+      }
+      const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+      const ownershipIndex = ownerships.findIndex(item =>
+        item.planId === plan.planId && item.nodeId === current.nodeId);
+      if (ownershipIndex < 0) throw new Error('Specialist provider outcome lacks canonical execution ownership');
+      let ownership = ownerships[ownershipIndex];
+      const at = new Date(this.now()).toISOString();
+      let outcome = {
+        providerStatus: request.providerStatus,
+        providerSucceeded: request.providerSucceeded,
+        manualReviewRequired: request.manualReviewRequired,
+        reconciliationRequired: request.reconciliationRequired,
+        safeToRetry: request.safeToRetry,
+        effectEvidence: request.effectEvidence,
+        errorCode: request.errorCode,
+        at,
+      };
+
+      if (Date.parse(at) > Date.parse(current.leaseUntil)
+          && [ExecutionOwnershipState.OWNED, ExecutionOwnershipState.HANDOFF_PENDING].includes(ownership.state)) {
+        ownership = recoverExpiredExecutionOwnershipV1(ownership, {
+          at,
+          reason: 'provider result arrived after execution lease expiry',
+        });
+        outcome = {
+          ...outcome,
+          providerSucceeded: false,
+          manualReviewRequired: false,
+          reconciliationRequired: true,
+          safeToRetry: false,
+          errorCode: 'SPECIALIST_PROVIDER_RESULT_AFTER_LEASE',
+        };
+      } else if (request.reconciliationRequired === true) {
+        ownership = requireExecutionReconciliationV1(ownership, {
+          leaseId,
+          reason: request.errorCode || 'provider effect may have occurred without verified completion',
+          at,
+        });
+      } else if (ownership.state === ExecutionOwnershipState.RECONCILE) {
+        outcome = {
+          ...outcome,
+          providerSucceeded: false,
+          manualReviewRequired: false,
+          reconciliationRequired: true,
+          safeToRetry: false,
+          errorCode: request.errorCode || 'SPECIALIST_PROVIDER_RECONCILIATION_REQUIRED',
+        };
+      } else if (ownership.state !== ExecutionOwnershipState.OWNED
+          || ownership.ownerId !== agentId
+          || ownership.leaseId !== leaseId) {
+        throw new Error('Specialist provider outcome requires matching canonical execution owner lease');
+      }
+
+      const recorded = recordSpecialistProviderExecutionOutcomeV1(current, outcome);
+      const nextExecutions = [...executions];
+      nextExecutions[index] = recorded;
+      ownerships[ownershipIndex] = ownership;
+      job.runtime.specialistProviderExecutions = nextExecutions;
+      job.runtime.specialistExecutionOwnerships = ownerships;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-provider-execution-observed',
+        agentId,
+        leaseId,
+        providerId: recorded.providerId,
+        conversationId: recorded.conversationId,
+        providerStatus: recorded.providerStatus,
+        providerSucceeded: recorded.providerSucceeded,
+        reconciliationRequired: recorded.reconciliationRequired,
+        manualReviewRequired: recorded.manualReviewRequired,
+        errorCode: recorded.errorCode,
+        message: recorded.providerSucceeded
+          ? 'Provider terminal success observed; product completion remains blocked on result artifacts and independent verification.'
+          : 'Provider execution evidence recorded without granting completion authority.',
+      });
+      result = {
+        execution: clone(recorded),
+        executionOwnership: clone(ownership),
+        completionAuthorized: false,
+        verificationRequired: recorded.providerSucceeded,
+      };
+      return store;
+    });
+    return Object.freeze(result);
+  }
+
   #rejectExecutionSlotQueue(error) {
     const pending = this.executionSlotQueue.splice(0);
     for (const next of pending) next.reject(error);
