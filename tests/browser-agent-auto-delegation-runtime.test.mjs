@@ -8,6 +8,13 @@ import { OrchestrationV2Manager } from '../src/core/orchestration-v2-manager.js'
 import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
 import { SpecialistRegistryMutationKind } from '../src/core/specialist-registry.js';
 import { ExecutionOwnershipState } from '../src/core/execution-plane-ownership.js';
+import {
+  OPENHANDS_AGENT_SERVER_VERSION,
+  OPENHANDS_CODING_PROVIDER_ID,
+  OPENHANDS_CODING_SPECIALIST_ID,
+} from '../src/core/coding-specialist-provider.js';
+import { SpecialistProviderConfigKind } from '../src/core/specialist-provider-config.js';
+import { SpecialistProviderExecutionStatus } from '../src/core/specialist-provider-execution.js';
 
 const T0 = '2026-09-27T10:00:00.000Z';
 const T1 = '2026-09-27T11:00:00.000Z';
@@ -225,6 +232,7 @@ async function fixture({
   maxDepth = 2,
   maxChildrenPerAgent = 2,
   specialistProviderReadinessResolver = null,
+  specialistDefinitions = null,
 } = {}) {
   const chrome = chromeFake();
   const core = new StorageRepository(chrome);
@@ -271,7 +279,7 @@ async function fixture({
   });
 
   await manager.createSpecialistRegistry({ registryId: 'specialists:project-1' });
-  const definitions = [
+  const definitions = specialistDefinitions || [
     specialist(
       'broad',
       ['data.read', 'data.analyze', 'filesystem.write'],
@@ -324,6 +332,67 @@ async function fixture({
   };
 
   return { chrome, core, orchestration, manager, dependencies, bindingDependencies };
+}
+
+function openHandsSpecialistDefinition() {
+  return specialist(
+    OPENHANDS_CODING_SPECIALIST_ID,
+    ['data.read', 'data.analyze'],
+    ['data.query', 'artifact.write'],
+    { providerId: OPENHANDS_CODING_PROVIDER_ID },
+  );
+}
+
+async function configureOpenHandsProvider(manager, expectedRevision = 0) {
+  return manager.setSpecialistProviderConfig({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    expectedRevision,
+    kind: SpecialistProviderConfigKind.OPENHANDS_AGENT_SERVER,
+    config: {
+      schemaVersion: 1,
+      serverUrl: 'http://127.0.0.1:3000',
+      agentServerVersion: OPENHANDS_AGENT_SERVER_VERSION,
+      agentProfileId: '11111111-1111-4111-8111-111111111111',
+      agentProfileRevision: expectedRevision + 1,
+      workspacePath: 'C:\\Autopilot\\workspace',
+      qualifiedCapabilityIds: ['data.read', 'data.analyze'],
+      requestTimeoutSeconds: 10,
+      maxExecutionSeconds: 600,
+      pollIntervalMs: 500,
+      maxIterations: 30,
+      maxResponseBytes: 65536,
+      authMode: 'LOCAL_UNAUTHENTICATED',
+    },
+  });
+}
+
+function openHandsDelegationRequest() {
+  return request({
+    expectedRegistryRevision: 2,
+    childBudget: {
+      maxModelCalls: 0,
+      maxRuntimeSeconds: 600,
+      maxCostUsdMicros: 0,
+    },
+  });
+}
+
+async function claimPreparedOpenHands(manager, dependencies) {
+  const prepared = await manager.autoPrepareSpecialistHandoff(
+    'job.auto',
+    openHandsDelegationRequest(),
+    dependencies,
+  );
+  const claimed = await manager.claimSpecialistHandoffsAcrossJobs({
+    targetJobId: 'job.auto',
+    maxConcurrentHandoffs: 1,
+    maxChildrenPerAgent: 2,
+    maxDepth: 2,
+    leaseSeconds: 900,
+    at: T0,
+  }, dependencies);
+  assert.deepEqual(claimed.claimed, [{ jobId: 'job.auto', agentId: prepared.assignment.agentId }]);
+  return prepared;
 }
 
 test('runtime auto-delegation prepares least authority without claiming execution ownership', async () => {
@@ -950,5 +1019,197 @@ test('service worker routes automatic preparation through BrowserAgentManager an
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
     0,
     'service worker must not own a second Browser Agent persistence implementation',
+  );
+});
+
+
+test('claimed OpenHands execution persists one stable conversation and exact config snapshot across restart', async () => {
+  const { chrome, manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+
+  const first = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '22222222-2222-4222-8222-222222222222',
+    },
+    dependencies,
+  );
+  assert.equal(first.reused, false);
+  assert.equal(first.dispatchable, true);
+  assert.equal(first.execution.status, SpecialistProviderExecutionStatus.PREPARED);
+  assert.equal(first.execution.providerConfig.revision, 1);
+  assert.equal(first.execution.conversationId, '22222222-2222-4222-8222-222222222222');
+  assert.equal(first.execution.leaseId, delegated.assignment.leaseId || first.execution.leaseId);
+
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+  });
+  const second = await restarted.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '33333333-3333-4333-8333-333333333333',
+    },
+    dependencies,
+  );
+  assert.equal(second.reused, true);
+  assert.equal(second.execution.conversationId, first.execution.conversationId);
+  assert.equal(second.execution.leaseId, first.execution.leaseId);
+
+  const listed = await restarted.listSpecialistProviderExecutions('job.auto');
+  assert.equal(listed.executions.length, 1);
+  assert.equal(listed.quarantinedCount, 0);
+});
+
+test('live provider execution lease fences owner provider-config mutation', async () => {
+  const { manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '22222222-2222-4222-8222-222222222222',
+    },
+    dependencies,
+  );
+
+  await assert.rejects(
+    () => configureOpenHandsProvider(manager, 1),
+    /bound to a live provider execution lease/u,
+  );
+  await assert.rejects(
+    () => manager.clearSpecialistProviderConfig({
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: 1,
+    }),
+    /bound to a live provider execution lease/u,
+  );
+});
+
+test('provider terminal success is durable evidence but never product completion authority', async () => {
+  const { manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  const prepared = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '22222222-2222-4222-8222-222222222222',
+    },
+    dependencies,
+  );
+
+  const recorded = await manager.recordSpecialistProviderExecutionOutcome('job.auto', {
+    agentId: prepared.execution.agentId,
+    leaseId: prepared.execution.leaseId,
+    conversationId: prepared.execution.conversationId,
+    providerStatus: 'finished',
+    providerSucceeded: true,
+    manualReviewRequired: false,
+    reconciliationRequired: false,
+    safeToRetry: false,
+    effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+    errorCode: '',
+  });
+  assert.equal(recorded.execution.status, SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED);
+  assert.equal(recorded.executionOwnership.state, ExecutionOwnershipState.OWNED);
+  assert.equal(recorded.completionAuthorized, false);
+  assert.equal(recorded.verificationRequired, true);
+
+  const live = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(live.handoffs[0].state, 'LEASED');
+  assert.equal(live.handoffs[0].resultArtifactIds.length, 0);
+});
+
+test('ambiguous OpenHands effect immediately fences canonical ownership in RECONCILE', async () => {
+  const { manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  const prepared = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '22222222-2222-4222-8222-222222222222',
+    },
+    dependencies,
+  );
+
+  const recorded = await manager.recordSpecialistProviderExecutionOutcome('job.auto', {
+    agentId: prepared.execution.agentId,
+    leaseId: prepared.execution.leaseId,
+    conversationId: prepared.execution.conversationId,
+    providerStatus: '',
+    providerSucceeded: false,
+    manualReviewRequired: false,
+    reconciliationRequired: true,
+    safeToRetry: false,
+    effectEvidence: '',
+    errorCode: 'OPENHANDS_REQUEST_TIMEOUT',
+  });
+  assert.equal(recorded.execution.status, SpecialistProviderExecutionStatus.RECONCILE);
+  assert.equal(recorded.executionOwnership.state, ExecutionOwnershipState.RECONCILE);
+  assert.equal(recorded.executionOwnership.leaseId, prepared.execution.leaseId);
+
+  const second = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: prepared.execution.agentId,
+      conversationId: '33333333-3333-4333-8333-333333333333',
+    },
+    dependencies,
+  );
+  assert.equal(second.dispatchable, false);
+  assert.equal(second.execution.conversationId, prepared.execution.conversationId);
+});
+
+test('corrupt provider execution provenance is quarantined across restart and blocks new provider effects', async () => {
+  const { chrome, manager, dependencies } = await fixture({
+    specialistDefinitions: [openHandsSpecialistDefinition()],
+  });
+  await configureOpenHandsProvider(manager);
+  const delegated = await claimPreparedOpenHands(manager, dependencies);
+  const prepared = await manager.prepareClaimedSpecialistProviderExecution(
+    'job.auto',
+    {
+      agentId: delegated.assignment.agentId,
+      conversationId: '22222222-2222-4222-8222-222222222222',
+    },
+    dependencies,
+  );
+  assert.equal(prepared.execution.status, SpecialistProviderExecutionStatus.PREPARED);
+
+  chrome.data.autopilotBrowserAgentV1.byId['job.auto'].runtime.specialistProviderExecutions[0].conversationId = 'corrupt';
+  const restarted = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+  });
+  const listed = await restarted.listSpecialistProviderExecutions('job.auto');
+  assert.equal(listed.executions.length, 0);
+  assert.equal(listed.quarantinedCount, 1);
+
+  await assert.rejects(
+    () => restarted.prepareClaimedSpecialistProviderExecution(
+      'job.auto',
+      {
+        agentId: delegated.assignment.agentId,
+        conversationId: '33333333-3333-4333-8333-333333333333',
+      },
+      dependencies,
+    ),
+    /provenance is quarantined as corrupt/u,
   );
 });
