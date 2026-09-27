@@ -274,8 +274,15 @@ function asciiCompare(a, b) {
 }
 
 function compareCandidate(a, b) {
-  return readinessRank(a.readiness) - readinessRank(b.readiness)
-    || pathRank(a.pathKind) - pathRank(b.pathKind)
+  const aExecutable = EXECUTABLE.has(a.readiness);
+  const bExecutable = EXECUTABLE.has(b.readiness);
+  if (aExecutable !== bExecutable) return aExecutable ? -1 : 1;
+  const priority = aExecutable
+    ? pathRank(a.pathKind) - pathRank(b.pathKind)
+      || readinessRank(a.readiness) - readinessRank(b.readiness)
+    : readinessRank(a.readiness) - readinessRank(b.readiness)
+      || pathRank(a.pathKind) - pathRank(b.pathKind);
+  return priority
     || b.matchingCapabilityIds.length - a.matchingCapabilityIds.length
     || latencyRank(a.latencyMs) - latencyRank(b.latencyMs)
     || asciiCompare(a.providerId, b.providerId)
@@ -283,8 +290,8 @@ function compareCandidate(a, b) {
 }
 
 function comparePlanCandidate(a, b) {
-  return readinessRank(a.candidate.readiness) - readinessRank(b.candidate.readiness)
-    || pathRank(a.candidate.pathKind) - pathRank(b.candidate.pathKind)
+  return pathRank(a.candidate.pathKind) - pathRank(b.candidate.pathKind)
+    || readinessRank(a.candidate.readiness) - readinessRank(b.candidate.readiness)
     || b.uncoveredIds.length - a.uncoveredIds.length
     || latencyRank(a.candidate.latencyMs) - latencyRank(b.candidate.latencyMs)
     || asciiCompare(a.candidate.providerId, b.candidate.providerId)

@@ -590,3 +590,78 @@ test('capability discovery rejects canonical-looking identity and enum aliases i
     requestedCapabilityIds:['filesystem.read'],
   }), /exact canonical identity/);
 });
+
+
+test('executable deterministic path outranks ready visual or OCR fallback even when degraded', () => {
+  const result = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+      tool('visual.ready', 'visual/provider', ['filesystem.read']),
+      tool('api.degraded', 'api/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('ocr/provider', { pathKind:'OCR', health:'READY', latencyMs:1 }),
+      state('visual/provider', { pathKind:'VISUAL', health:'READY', latencyMs:2 }),
+      state('api/provider', { pathKind:'API', health:'DEGRADED', latencyMs:500 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => [item.toolId, item.readiness, item.pathKind]), [
+    ['api.degraded', 'DEGRADED', 'API'],
+    ['visual.ready', 'READY', 'VISUAL'],
+    ['ocr.ready', 'READY', 'OCR'],
+  ]);
+  assert.equal(result.plan[0].toolId, 'api.degraded');
+  assert.equal(result.plan[0].pathKind, 'API');
+  assert.equal(result.plan[0].permissionGranted, false);
+});
+
+test('degraded UIA remains preferred to ready OCR while non-executable API cannot displace executable fallback', () => {
+  const result = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.auth', 'api/provider', ['filesystem.read']),
+      tool('uia.degraded', 'uia/provider', ['filesystem.read']),
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('api/provider', {
+        pathKind:'API',
+        authenticationRequired:true,
+        authenticated:false,
+        latencyMs:1,
+      }),
+      state('uia/provider', { pathKind:'UIA', health:'DEGRADED', latencyMs:200 }),
+      state('ocr/provider', { pathKind:'OCR', health:'READY', latencyMs:1 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => [item.toolId, item.readiness, item.pathKind]), [
+    ['uia.degraded', 'DEGRADED', 'UIA'],
+    ['ocr.ready', 'READY', 'OCR'],
+    ['api.auth', 'NEEDS_AUTH', 'API'],
+  ]);
+  assert.equal(result.plan.length, 1);
+  assert.equal(result.plan[0].toolId, 'uia.degraded');
+});
+
+test('readiness remains the tie-breaker for equal executable path classes', () => {
+  const result = discoverCapabilityPathsV1({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.degraded', 'z/provider', ['filesystem.read']),
+      tool('api.ready', 'a/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('z/provider', { pathKind:'API', health:'DEGRADED', latencyMs:1 }),
+      state('a/provider', { pathKind:'API', health:'READY', latencyMs:500 }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(result.candidates.map(item => item.toolId), ['api.ready', 'api.degraded']);
+  assert.equal(result.plan[0].toolId, 'api.ready');
+});
