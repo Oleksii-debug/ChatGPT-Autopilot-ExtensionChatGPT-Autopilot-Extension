@@ -1581,7 +1581,10 @@ export class BrowserAgentManager {
         adopted = true;
         return store;
       });
-      if (adopted) return context.tab;
+      if (adopted) {
+        this.#requestExecutionSlotPump();
+        return context.tab;
+      }
       // Another durable Browser Agent already binds this owner tab. Do not
       // create a competing target-ownership authority; isolate this job onto a
       // fresh owned tab at the same URL instead.
@@ -1598,6 +1601,7 @@ export class BrowserAgentManager {
       live.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return tab;
   }
 
@@ -1985,6 +1989,7 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return child;
   }
 
@@ -2392,6 +2397,7 @@ export class BrowserAgentManager {
         live.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: created.url || action.url };
     }
     if (action.type === BrowserAgentActionType.SWITCH_TAB) {
@@ -2430,6 +2436,7 @@ export class BrowserAgentManager {
         current.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: targetUrl };
     }
     if (action.type === BrowserAgentActionType.CLOSE_TAB) {
@@ -2478,6 +2485,7 @@ export class BrowserAgentManager {
         current.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: appliedFallback?.pendingUrl || appliedFallback?.url || '' };
     }
     if (action.type === BrowserAgentActionType.DOWNLOAD) {
