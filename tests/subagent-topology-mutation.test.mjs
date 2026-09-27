@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  OrchestrationHierarchyActionType,
+  OrchestrationHierarchyEventType,
   OrchestrationNodeLifecycle,
   createOrchestrationHierarchyRuntime,
   reduceOrchestrationHierarchyEvent,
@@ -504,7 +506,7 @@ test('same spawn identity cannot be replayed with a different child count', () =
   assert.deepEqual(conflict.createdNodeIds, []);
 });
 
-test('preserves explicit parent barrier semantics and unrelated node identities', () => {
+test('extends explicit parent barrier with spawned children while preserving unrelated node identities', () => {
   const canonicalGraph = graph([
     node('root', null, ['subagent-1'], {
       barrier: { mode: 'REQUIRED_DIRECT_CHILDREN', childIds: ['subagent-1'] },
@@ -524,9 +526,66 @@ test('preserves explicit parent barrier semantics and unrelated node identities'
   assert.equal(result.graph.nodesById.root.childIds.includes('subagent:new-effect:1'), true);
   assert.deepEqual(result.graph.nodesById.root.barrier, {
     mode: 'REQUIRED_DIRECT_CHILDREN',
-    childIds: ['subagent-1'],
+    childIds: ['subagent-1', 'subagent:new-effect:1'],
   });
   assert.equal(result.graph.nodesById.root.maxActiveChildren, 1);
+});
+
+test('terminal dynamically spawned child drives canonical parent reconciliation barrier', () => {
+  const result = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'terminal-reconcile',
+    nowMs: 300,
+  }));
+  const childId = result.createdNodeIds[0];
+  const activationRequest = result.activationRequests[0];
+
+  assert.deepEqual(result.graph.nodesById.root.barrier, {
+    mode: 'REQUIRED_DIRECT_CHILDREN',
+    childIds: [childId],
+  });
+
+  const prepared = reduceOrchestrationHierarchyEvent(
+    result.graph,
+    result.runtime,
+    activationRequest,
+    301,
+  );
+  const confirmed = reduceOrchestrationHierarchyEvent(
+    result.graph,
+    prepared.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'terminal-reconcile:effect-confirmed',
+      controlEpoch: 7,
+      nodeId: childId,
+      generation: 1,
+      activationId: activationRequest.activationId,
+      effectRef: 'effect://terminal-reconcile',
+    },
+    302,
+  );
+  const terminal = reduceOrchestrationHierarchyEvent(
+    result.graph,
+    confirmed.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_TERMINAL,
+      eventId: 'terminal-reconcile:terminal',
+      controlEpoch: 7,
+      nodeId: childId,
+      generation: 1,
+      activationId: activationRequest.activationId,
+      status: 'COMPLETED',
+    },
+    303,
+  );
+
+  assert.equal(
+    terminal.actions.some(action => (
+      action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT
+      && action.nodeId === 'root'
+    )),
+    true,
+  );
 });
 
 test('structure policy denial performs no topology mutation', () => {
