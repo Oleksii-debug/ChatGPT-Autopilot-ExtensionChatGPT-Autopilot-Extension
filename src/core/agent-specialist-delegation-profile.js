@@ -1,4 +1,5 @@
 export const AGENT_SPECIALIST_DELEGATION_PROFILE_VERSION = 1;
+export const AGENT_SPECIALIST_DELEGATION_BINDING_VERSION = 1;
 
 const PROFILE_KEYS = new Set([
   'schemaVersion',
@@ -15,6 +16,48 @@ const PROFILE_KEYS = new Set([
 
 const MATERIALIZE_KEYS = new Set([
   'profile',
+  'parentCapabilityIds',
+  'parentToolIds',
+  'expectedRegistryRevision',
+  'expectedPlanRevision',
+  'nodeId',
+  'at',
+  'childBudget',
+  'parentInvocationId',
+]);
+
+const BINDING_KEYS = new Set([
+  'schemaVersion',
+  'jobId',
+  'projectId',
+  'registryId',
+  'registryRevision',
+  'agentDefinitionId',
+  'definitionRevision',
+  'profile',
+  'authority',
+]);
+
+const BINDING_AUTHORITY_KEYS = new Set([
+  'proposalOnly',
+  'executionAuthorized',
+  'policyAuthorized',
+  'schedulingAuthorized',
+  'recoveryAuthorized',
+  'credentialAuthorized',
+  'completionAuthorized',
+  'verificationAuthorized',
+  'capacityReserved',
+]);
+
+const BOUND_MATERIALIZE_KEYS = new Set([
+  'binding',
+  'jobId',
+  'projectId',
+  'agentDefinitionRegistryId',
+  'agentDefinitionRegistryRevision',
+  'agentDefinitionId',
+  'definitionRevision',
   'parentCapabilityIds',
   'parentToolIds',
   'expectedRegistryRevision',
@@ -93,6 +136,11 @@ function identity(value, label) {
     throw new Error(`${label} is invalid`);
   }
   return value;
+}
+
+function optionalIdentity(value, label) {
+  if (value === '') return '';
+  return identity(value, label);
 }
 
 function identities(value, label, max, min = 0) {
@@ -204,6 +252,60 @@ export function normalizeAgentSpecialistDelegationProfileV1(input) {
   return freeze(profile);
 }
 
+export function normalizeAgentSpecialistDelegationBindingV1(input) {
+  const raw = snapshot(input, BINDING_KEYS, 'AgentSpecialistDelegationBindingV1');
+  for (const key of BINDING_KEYS) {
+    if (!Object.hasOwn(raw, key)) {
+      throw new Error(`AgentSpecialistDelegationBindingV1 requires ${key}`);
+    }
+  }
+  if (raw.schemaVersion !== AGENT_SPECIALIST_DELEGATION_BINDING_VERSION) {
+    throw new Error('Unsupported AgentSpecialistDelegationBindingV1 schemaVersion');
+  }
+
+  const authority = snapshot(
+    raw.authority,
+    BINDING_AUTHORITY_KEYS,
+    'AgentSpecialistDelegationBindingV1.authority',
+  );
+  for (const key of BINDING_AUTHORITY_KEYS) {
+    if (!Object.hasOwn(authority, key)) {
+      throw new Error(`AgentSpecialistDelegationBindingV1.authority requires ${key}`);
+    }
+  }
+  if (authority.proposalOnly !== true) {
+    throw new Error('AgentSpecialistDelegationBindingV1.authority.proposalOnly must be true');
+  }
+  for (const key of BINDING_AUTHORITY_KEYS) {
+    if (key === 'proposalOnly') continue;
+    if (authority[key] !== false) {
+      throw new Error(`AgentSpecialistDelegationBindingV1.authority.${key} must be false`);
+    }
+  }
+
+  return freeze({
+    schemaVersion: AGENT_SPECIALIST_DELEGATION_BINDING_VERSION,
+    jobId: identity(raw.jobId, 'binding.jobId'),
+    projectId: optionalIdentity(raw.projectId, 'binding.projectId'),
+    registryId: identity(raw.registryId, 'binding.registryId'),
+    registryRevision: exactInteger(raw.registryRevision, 'binding.registryRevision', { min: 1 }),
+    agentDefinitionId: identity(raw.agentDefinitionId, 'binding.agentDefinitionId'),
+    definitionRevision: exactInteger(raw.definitionRevision, 'binding.definitionRevision', { min: 1 }),
+    profile: normalizeAgentSpecialistDelegationProfileV1(raw.profile),
+    authority: {
+      proposalOnly: true,
+      executionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
+      credentialAuthorized: false,
+      completionAuthorized: false,
+      verificationAuthorized: false,
+      capacityReserved: false,
+    },
+  });
+}
+
 /**
  * Converts owner-qualified profile data into a separate envelope containing the
  * exact existing automatic-delegation request shape plus non-authorizing metadata.
@@ -289,6 +391,89 @@ export function materializeAgentSpecialistDelegationIntentV1(input = {}) {
       completionAuthorized: false,
       verificationAuthorized: false,
       capacityReserved: false,
+    },
+  });
+}
+
+
+export function materializeBoundAgentSpecialistDelegationIntentV1(input = {}) {
+  const raw = snapshot(
+    input,
+    BOUND_MATERIALIZE_KEYS,
+    'Bound Agent specialist delegation materialization request',
+  );
+  for (const key of [
+    'binding',
+    'jobId',
+    'projectId',
+    'agentDefinitionRegistryId',
+    'agentDefinitionRegistryRevision',
+    'agentDefinitionId',
+    'definitionRevision',
+    'parentCapabilityIds',
+    'parentToolIds',
+    'expectedRegistryRevision',
+    'expectedPlanRevision',
+    'nodeId',
+    'at',
+  ]) {
+    if (!Object.hasOwn(raw, key)) {
+      throw new Error(`Bound Agent specialist delegation materialization request requires ${key}`);
+    }
+  }
+
+  const binding = normalizeAgentSpecialistDelegationBindingV1(raw.binding);
+  const jobId = identity(raw.jobId, 'jobId');
+  const projectId = identity(raw.projectId, 'projectId');
+  const agentDefinitionRegistryId = identity(
+    raw.agentDefinitionRegistryId,
+    'agentDefinitionRegistryId',
+  );
+  const agentDefinitionRegistryRevision = exactInteger(
+    raw.agentDefinitionRegistryRevision,
+    'agentDefinitionRegistryRevision',
+    { min: 1 },
+  );
+  const agentDefinitionId = identity(raw.agentDefinitionId, 'agentDefinitionId');
+  const definitionRevision = exactInteger(
+    raw.definitionRevision,
+    'definitionRevision',
+    { min: 1 },
+  );
+
+  if (binding.jobId !== jobId
+      || binding.projectId !== projectId
+      || binding.registryId !== agentDefinitionRegistryId
+      || binding.registryRevision !== agentDefinitionRegistryRevision
+      || binding.agentDefinitionId !== agentDefinitionId
+      || binding.definitionRevision !== definitionRevision) {
+    throw new Error('Agent specialist delegation binding provenance drifted');
+  }
+
+  const intent = materializeAgentSpecialistDelegationIntentV1({
+    profile: binding.profile,
+    parentCapabilityIds: raw.parentCapabilityIds,
+    parentToolIds: raw.parentToolIds,
+    expectedRegistryRevision: raw.expectedRegistryRevision,
+    expectedPlanRevision: raw.expectedPlanRevision,
+    nodeId: raw.nodeId,
+    at: raw.at,
+    ...(Object.hasOwn(raw, 'childBudget') ? { childBudget: raw.childBudget } : {}),
+    ...(Object.hasOwn(raw, 'parentInvocationId')
+      ? { parentInvocationId: raw.parentInvocationId }
+      : {}),
+  });
+
+  return freeze({
+    ...intent,
+    provenance: {
+      jobId,
+      projectId,
+      agentDefinitionRegistryId,
+      agentDefinitionRegistryRevision,
+      agentDefinitionId,
+      definitionRevision,
+      ownerBound: true,
     },
   });
 }
