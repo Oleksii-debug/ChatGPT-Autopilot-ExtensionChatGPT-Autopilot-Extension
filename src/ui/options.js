@@ -6,6 +6,7 @@ import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
+import { buildSpecialistDefinitionFromFormV1 } from './specialist-definition-form.js';
 import {
   agentDefinitionLaunchScopeTextV1,
   buildAgentDefinitionLaunchRequestV1,
@@ -50,6 +51,13 @@ const ui = {
   agentDefinitionMode: 'none',
   agentDefinitionQuarantineCount: 0,
   agentDefinitionLaunchDefinitionId: '',
+  specialistRegistries: [],
+  selectedSpecialistRegistryId: '',
+  selectedSpecialistRegistry: null,
+  selectedSpecialistId: '',
+  selectedSpecialist: null,
+  specialistMode: 'none',
+  specialistQuarantineCount: 0,
   agentDraftActive: false,
   agentPolicyDirty: false,
   agentPolicyEditEpoch: 0,
@@ -2836,6 +2844,268 @@ async function deleteAgentDefinition() {
   }
 }
 
+
+function specialistLines(values = []) {
+  return Array.isArray(values) ? values.join('\n') : '';
+}
+
+function setSpecialistFormEnabled(enabled) {
+  const group = $('specialist-form-group');
+  if (group) group.disabled = !enabled;
+  $('specialist-new-button').disabled = !ui.selectedSpecialistRegistry;
+}
+
+function fillSpecialistForm(definition = null, { create = false } = {}) {
+  const hasRegistry = Boolean(ui.selectedSpecialistRegistry);
+  setSpecialistFormEnabled(hasRegistry);
+  const idField = $('specialist-id');
+  idField.readOnly = Boolean(definition) && !create;
+  idField.value = definition?.specialistId || '';
+  $('specialist-provider-id').value = definition?.providerId || '';
+  $('specialist-label').value = definition?.label || '';
+  $('specialist-description').value = definition?.description || '';
+  $('specialist-execution-plane').value = definition?.executionPlane || 'LOCAL';
+  $('specialist-capabilities').value = specialistLines(definition?.capabilityIds);
+  $('specialist-tools').value = specialistLines(definition?.toolIds);
+  $('specialist-result-contract-id').value = definition?.resultContractId || '';
+  $('specialist-enabled').checked = definition ? definition.enabled === true : true;
+  $('specialist-revision').textContent = definition
+    ? `Specialist revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedSpecialistRegistry?.revision || '?'}.`
+    : (hasRegistry ? `Новий Specialist. Registry revision: ${ui.selectedSpecialistRegistry.revision}.` : 'Specialist реєстр не вибрано.');
+  $('specialist-save-button').disabled = !hasRegistry;
+  $('specialist-toggle-enabled-button').disabled = !definition;
+  $('specialist-delete-button').disabled = !definition;
+}
+
+function renderSpecialistRegistryList() {
+  const select = $('specialist-registry-list');
+  select.replaceChildren();
+  for (const registry of ui.specialistRegistries) {
+    const option = document.createElement('option');
+    option.value = registry.registryId;
+    option.textContent = `${registry.registryId} — revision ${registry.revision}`;
+    option.selected = registry.registryId === ui.selectedSpecialistRegistryId;
+    select.append(option);
+  }
+  $('specialist-quarantine-status').textContent = ui.specialistQuarantineCount
+    ? `У карантині пошкоджених Specialist реєстрів: ${ui.specialistQuarantineCount}. Їхній вміст не показується і не перезаписується.`
+    : 'Пошкоджених Specialist реєстрів у карантині немає.';
+}
+
+function renderSpecialistList() {
+  const select = $('specialist-list');
+  select.replaceChildren();
+  const definitions = ui.selectedSpecialistRegistry?.definitions || [];
+  for (const definition of definitions) {
+    const option = document.createElement('option');
+    option.value = definition.specialistId;
+    option.textContent = `${definition.label} — ${definition.specialistId} — ${definition.providerId} / ${definition.executionPlane} — rev ${definition.definitionRevision}${definition.enabled ? '' : ' — вимкнено'}`;
+    option.selected = definition.specialistId === ui.selectedSpecialistId;
+    select.append(option);
+  }
+}
+
+async function loadSpecialistRegistries({ selectRegistryId = '', selectSpecialistId = '' } = {}) {
+  ui.selectedSpecialistRegistry = null;
+  ui.selectedSpecialist = null;
+  ui.specialistMode = 'none';
+  setSpecialistFormEnabled(false);
+  try {
+    const data = await core('LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES');
+    ui.specialistRegistries = Array.isArray(data?.registries) ? data.registries : [];
+    ui.specialistQuarantineCount = Array.isArray(data?.quarantinedRegistryIds) ? data.quarantinedRegistryIds.length : 0;
+    const requestedRegistryId = selectRegistryId || ui.selectedSpecialistRegistryId;
+    ui.selectedSpecialistRegistryId = ui.specialistRegistries.some(item => item.registryId === requestedRegistryId)
+      ? requestedRegistryId
+      : (ui.specialistRegistries[0]?.registryId || '');
+    renderSpecialistRegistryList();
+
+    if (!ui.selectedSpecialistRegistryId) {
+      ui.selectedSpecialistId = '';
+      renderSpecialistList();
+      fillSpecialistForm(null);
+      $('specialist-status').textContent = 'Specialist реєстрів ще немає. Створіть реєстр, щоб додати Specialist definition.';
+      return;
+    }
+
+    const detail = await core('GET_BROWSER_AGENT_SPECIALIST_REGISTRY', {
+      registryId: ui.selectedSpecialistRegistryId,
+    });
+    if (!detail?.registry) {
+      throw new Error(detail?.quarantined ? 'Вибраний Specialist реєстр переміщено в карантин.' : 'Вибраний Specialist реєстр більше не існує.');
+    }
+    ui.selectedSpecialistRegistry = detail.registry;
+    const requestedSpecialistId = selectSpecialistId || ui.selectedSpecialistId;
+    ui.selectedSpecialistId = ui.selectedSpecialistRegistry.definitions.some(item => item.specialistId === requestedSpecialistId)
+      ? requestedSpecialistId
+      : (ui.selectedSpecialistRegistry.definitions[0]?.specialistId || '');
+    ui.selectedSpecialist = ui.selectedSpecialistRegistry.definitions.find(item => item.specialistId === ui.selectedSpecialistId) || null;
+    ui.specialistMode = ui.selectedSpecialist ? 'edit' : 'none';
+    renderSpecialistList();
+    fillSpecialistForm(ui.selectedSpecialist);
+    $('specialist-status').textContent = `Specialist реєстр ${ui.selectedSpecialistRegistry.registryId}, revision ${ui.selectedSpecialistRegistry.revision}. Definitions: ${ui.selectedSpecialistRegistry.definitions.length}.`;
+  } catch (error) {
+    ui.selectedSpecialistRegistry = null;
+    ui.selectedSpecialistId = '';
+    ui.selectedSpecialist = null;
+    ui.specialistMode = 'none';
+    renderSpecialistList();
+    fillSpecialistForm(null);
+    $('specialist-status').textContent = `Specialist definitions не завантажено: ${error.message}`;
+  }
+}
+
+async function selectSpecialistRegistry() {
+  ui.selectedSpecialistId = '';
+  await loadSpecialistRegistries({ selectRegistryId: $('specialist-registry-list').value });
+}
+
+function selectSpecialistDefinition() {
+  const specialistId = $('specialist-list').value;
+  ui.selectedSpecialistId = specialistId;
+  ui.selectedSpecialist = ui.selectedSpecialistRegistry?.definitions?.find(item => item.specialistId === specialistId) || null;
+  ui.specialistMode = ui.selectedSpecialist ? 'edit' : 'none';
+  fillSpecialistForm(ui.selectedSpecialist);
+}
+
+async function createSpecialistRegistry() {
+  const status = $('specialist-status');
+  try {
+    const registryId = parseCanonicalAgentIdentity($('specialist-create-registry-id').value, 'Specialist registry ID');
+    await core('CREATE_BROWSER_AGENT_SPECIALIST_REGISTRY', { registryId });
+    $('specialist-create-registry-id').value = '';
+    await loadSpecialistRegistries({ selectRegistryId: registryId });
+    $('specialist-new-button').focus();
+    status.textContent = `Specialist реєстр ${registryId} створено. Додайте першу definition.`;
+    announce('Specialist реєстр створено.');
+  } catch (error) {
+    status.textContent = `Specialist реєстр не створено: ${error.message}`;
+  }
+}
+
+function newSpecialistDefinition() {
+  if (!ui.selectedSpecialistRegistry) return;
+  ui.selectedSpecialistId = '';
+  ui.selectedSpecialist = null;
+  ui.specialistMode = 'create';
+  renderSpecialistList();
+  fillSpecialistForm(null, { create: true });
+  $('specialist-id').focus();
+  $('specialist-status').textContent = 'Нова Specialist definition. Заповніть обов’язкові поля та збережіть.';
+}
+
+function specialistDefinitionFormValue() {
+  return {
+    specialistId: $('specialist-id').value,
+    providerId: $('specialist-provider-id').value,
+    label: $('specialist-label').value,
+    description: $('specialist-description').value,
+    executionPlane: $('specialist-execution-plane').value,
+    capabilityIdsText: $('specialist-capabilities').value,
+    toolIdsText: $('specialist-tools').value,
+    resultContractId: $('specialist-result-contract-id').value,
+    enabled: $('specialist-enabled').checked,
+  };
+}
+
+async function reloadAfterSpecialistDrift(error, { specialistId = '' } = {}) {
+  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
+  const registryId = ui.selectedSpecialistRegistryId;
+  await loadSpecialistRegistries({ selectRegistryId: registryId, selectSpecialistId: specialistId });
+  $('specialist-status').textContent = 'Specialist реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
+  announce('Specialist definition змінилася. Актуальні дані перезавантажено.');
+  return true;
+}
+
+async function saveSpecialistDefinition() {
+  const registry = ui.selectedSpecialistRegistry;
+  if (!registry) return;
+  const current = ui.specialistMode === 'edit' ? ui.selectedSpecialist : null;
+  try {
+    const definition = buildSpecialistDefinitionFromFormV1(specialistDefinitionFormValue(), {
+      definitionRevision: current ? current.definitionRevision + 1 : 1,
+    });
+    const payload = current
+      ? {
+          registryId: registry.registryId,
+          expectedRegistryRevision: registry.revision,
+          kind: 'UPDATE',
+          specialistId: current.specialistId,
+          expectedDefinitionRevision: current.definitionRevision,
+          definition,
+        }
+      : {
+          registryId: registry.registryId,
+          expectedRegistryRevision: registry.revision,
+          kind: 'CREATE',
+          definition,
+        };
+    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', payload);
+    await loadSpecialistRegistries({
+      selectRegistryId: registry.registryId,
+      selectSpecialistId: definition.specialistId,
+    });
+    $('specialist-status').textContent = current ? 'Specialist definition оновлено.' : 'Specialist definition створено.';
+    announce(current ? 'Specialist definition оновлено.' : 'Specialist definition створено.');
+  } catch (error) {
+    if (await reloadAfterSpecialistDrift(error, { specialistId: current?.specialistId || '' })) return;
+    $('specialist-status').textContent = `Specialist не збережено: ${error.message}`;
+  }
+}
+
+async function toggleSpecialistEnabled() {
+  const registry = ui.selectedSpecialistRegistry;
+  const current = ui.selectedSpecialist;
+  if (!registry || !current) return;
+  try {
+    const definition = {
+      ...current,
+      enabled: !current.enabled,
+      definitionRevision: current.definitionRevision + 1,
+    };
+    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', {
+      registryId: registry.registryId,
+      expectedRegistryRevision: registry.revision,
+      kind: 'UPDATE',
+      specialistId: current.specialistId,
+      expectedDefinitionRevision: current.definitionRevision,
+      definition,
+    });
+    await loadSpecialistRegistries({
+      selectRegistryId: registry.registryId,
+      selectSpecialistId: current.specialistId,
+    });
+    $('specialist-status').textContent = definition.enabled ? 'Specialist увімкнено.' : 'Specialist вимкнено.';
+    announce(definition.enabled ? 'Specialist увімкнено.' : 'Specialist вимкнено.');
+  } catch (error) {
+    if (await reloadAfterSpecialistDrift(error, { specialistId: current.specialistId })) return;
+    $('specialist-status').textContent = `Стан Specialist не змінено: ${error.message}`;
+  }
+}
+
+async function deleteSpecialistDefinition() {
+  const registry = ui.selectedSpecialistRegistry;
+  const current = ui.selectedSpecialist;
+  if (!registry || !current) return;
+  if (typeof globalThis.confirm === 'function' && !globalThis.confirm(`Видалити Specialist definition “${current.label}”?`)) return;
+  try {
+    await core('MUTATE_BROWSER_AGENT_SPECIALIST_REGISTRY', {
+      registryId: registry.registryId,
+      expectedRegistryRevision: registry.revision,
+      kind: 'DELETE',
+      specialistId: current.specialistId,
+      expectedDefinitionRevision: current.definitionRevision,
+    });
+    ui.selectedSpecialistId = '';
+    await loadSpecialistRegistries({ selectRegistryId: registry.registryId });
+    $('specialist-status').textContent = 'Specialist definition видалено.';
+    announce('Specialist definition видалено.');
+  } catch (error) {
+    if (await reloadAfterSpecialistDrift(error, { specialistId: current.specialistId })) return;
+    $('specialist-status').textContent = `Specialist не видалено: ${error.message}`;
+  }
+}
+
 function browserAgentNameFromGoal(goal) {
   const text = String(goal || '').replace(/\s+/g, ' ').trim();
   return text ? text.slice(0, 90) : 'Нове завдання агента';
@@ -5085,6 +5355,13 @@ $('agent-definition-save-button').addEventListener('click', saveAgentDefinition)
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
+$('specialist-registry-list').addEventListener('change', selectSpecialistRegistry);
+$('specialist-create-registry-button').addEventListener('click', createSpecialistRegistry);
+$('specialist-list').addEventListener('change', selectSpecialistDefinition);
+$('specialist-new-button').addEventListener('click', newSpecialistDefinition);
+$('specialist-save-button').addEventListener('click', saveSpecialistDefinition);
+$('specialist-toggle-enabled-button').addEventListener('click', toggleSpecialistEnabled);
+$('specialist-delete-button').addEventListener('click', deleteSpecialistDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
@@ -5297,6 +5574,7 @@ async function initialLoad() {
   await loadBrowserAgentJobs();
   await loadBrowserAgentExecutionPolicy();
   await loadAgentDefinitionRegistries();
+  await loadSpecialistRegistries();
   await loadRemoteDispatchStatus();
   const lastSessionId = storageGet(LAST_SESSION_KEY);
   if (lastSessionId && ui.sessions.some(session => session.id === lastSessionId)) await openSession(lastSessionId);
