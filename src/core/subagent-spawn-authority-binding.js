@@ -30,6 +30,7 @@ const REQUEST_KEYS = new Set([
   'ownerAllowedToolIds',
   'parentToolDescriptors',
   'childTasks',
+  'priorTaskBindings',
 ]);
 
 const TASK_KEYS = new Set([
@@ -44,6 +45,11 @@ const TASK_KEYS = new Set([
 const PROVIDER_CAPABILITY_KEYS = new Set([
   'providerId',
   'capabilityIds',
+]);
+
+const PRIOR_TASK_BINDING_KEYS = new Set([
+  'childNodeId',
+  'taskId',
 ]);
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -136,6 +142,7 @@ function denied(reasonCode, details = {}) {
     reasonCode,
     createdNodeIds: [],
     authorityBindings: [],
+    taskBindings: [],
     activationRequests: [],
     activationAuthority: false,
     executionAuthority: false,
@@ -168,6 +175,48 @@ function normalizeChildTasks(value) {
     left.taskId < right.taskId ? -1 : left.taskId > right.taskId ? 1 : 0
   ));
   return tasks;
+}
+
+function normalizePriorTaskBindings(value) {
+  const bindings = dataArray(value, 'priorTaskBindings', MAX_CHILD_TASKS).map(
+    (item, index) => {
+      const binding = strictRecord(
+        item,
+        PRIOR_TASK_BINDING_KEYS,
+        `priorTaskBindings[${index}]`,
+      );
+      return {
+        childNodeId: requiredId(
+          own(binding, 'childNodeId'),
+          `priorTaskBindings[${index}].childNodeId`,
+        ),
+        taskId: requiredId(
+          own(binding, 'taskId'),
+          `priorTaskBindings[${index}].taskId`,
+        ),
+      };
+    },
+  );
+
+  const childNodeIds = bindings.map(binding => binding.childNodeId);
+  const taskIds = bindings.map(binding => binding.taskId);
+  if (new Set(childNodeIds).size !== childNodeIds.length) {
+    throw new Error('priorTaskBindings contains duplicate childNodeId');
+  }
+  if (new Set(taskIds).size !== taskIds.length) {
+    throw new Error('priorTaskBindings contains duplicate taskId');
+  }
+  return bindings;
+}
+
+function exactTaskBindingMatch(left, right) {
+  if (left.length !== right.length) return false;
+  const rightByChild = new Map(
+    right.map(binding => [binding.childNodeId, binding.taskId]),
+  );
+  return left.every(
+    binding => rightByChild.get(binding.childNodeId) === binding.taskId,
+  );
 }
 
 function normalizeProviderCapabilities(value) {
@@ -244,6 +293,38 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
     });
   }
 
+  const taskBindings = childTasks.map((item, index) => ({
+    childNodeId: topology.createdNodeIds[index],
+    taskId: item.taskId,
+  }));
+  const hasPriorTaskBindings = Object.hasOwn(request, 'priorTaskBindings');
+
+  if (topology.reused) {
+    if (!hasPriorTaskBindings) {
+      return denied('REPLAY_TASK_BINDING_EVIDENCE_REQUIRED', {
+        projectId,
+        parentNodeId: topology.parentNodeId,
+        spawnId: topology.spawnId,
+      });
+    }
+    const priorTaskBindings = normalizePriorTaskBindings(
+      own(request, 'priorTaskBindings'),
+    );
+    if (!exactTaskBindingMatch(taskBindings, priorTaskBindings)) {
+      return denied('REPLAY_TASK_BINDING_MISMATCH', {
+        projectId,
+        parentNodeId: topology.parentNodeId,
+        spawnId: topology.spawnId,
+      });
+    }
+  } else if (hasPriorTaskBindings) {
+    return denied('UNEXPECTED_PRIOR_TASK_BINDING_EVIDENCE', {
+      projectId,
+      parentNodeId: topology.parentNodeId,
+      spawnId: topology.spawnId,
+    });
+  }
+
   const bindings = [];
   for (let index = 0; index < childTasks.length; index += 1) {
     const { task, taskId, providerId } = childTasks[index];
@@ -314,6 +395,7 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
     reused: topology.reused,
     createdNodeIds: [...topology.createdNodeIds],
     authorityBindings: bindings,
+    taskBindings,
     graph: topology.graph,
     runtime: topology.runtime,
     activationRequests: [...topology.activationRequests],
