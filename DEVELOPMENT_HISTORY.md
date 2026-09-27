@@ -294,3 +294,43 @@ Owner-test archive:
 - This exact CI-qualified package supersedes earlier local PR #439 package checkpoints/hashes.
 - `OWNER_WINDOWS_CHROME_VERIFIED=false` until the owner physically installs/tests this exact archive with long-running Scenario Work.
 - Do not merge PR #439 to main as part of this owner-test checkpoint.
+
+
+## 2026-09-27 11:58 Europe/Bratislava — post-hotfix topology reconciliation
+
+The owner requested a second persistence pass after the Scenario stream/tab recovery hotfix was already documented and packaged. This checkpoint records material repository topology changes that occurred afterwards.
+
+### Documentation-head qualification
+- Current hotfix/docs head before this reconciliation: `6ac96f9912002c98519ad9bceb27f05c8f852ed3`.
+- That head is documentation-only beyond the previously qualified runtime/package head `c831e77046652de51687716602c30b04113ddbb2`.
+- GitHub Actions on `6ac96f9`: Core deterministic SUCCESS; UI accessibility SUCCESS; Release package candidate SUCCESS.
+- The earlier intermediate docs commit `f1cef1181535d55d97932fd29f3aabe977befa8d` had its redundant runs cancelled by concurrency; the later docs head is the authoritative documentation-head result.
+
+### Release-candidate divergence
+Live branch comparison at this checkpoint:
+- merge base: `379d5d1c9f215249defe2883cfa634a96cebdb11`;
+- hotfix branch: 23 commits ahead of merge base;
+- hotfix branch: 115 commits behind current `release/0.10.0-candidate`;
+- status: DIVERGED.
+
+This means PR #439 must not be directly merged into the now much newer release-candidate without fresh semantic reconvergence and exact-head qualification.
+
+### Direct source check: hotfix is NOT already absorbed
+A live read of the current release-candidate confirmed:
+- `src/background/service-worker.js` still contains the old inline missing-conversation fallback: query tabs -> create inactive temporary tab -> `READ_ASSISTANT_REPORT` -> close that temporary tab in `finally`;
+- PR #439 instead delegates that path to `probeAssistantConversationCore()`;
+- current release does not contain `src/core/assistant-report-probe.js` at the PR #439 path;
+- current release `src/core/tabs.js` does not contain the hotfix `autoDiscardable=false` protection;
+- current release `src/core/scenario-work-manager.js` does not contain the PR #439 `ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING` / tab-recovery markers.
+
+Therefore “release-candidate advanced” must NOT be interpreted as “PR #439 was integrated elsewhere”.
+
+### Required integration procedure
+1. Refresh the exact current release-candidate head.
+2. Reconverge the PR #439 semantic behavior onto that head without reverting newer unrelated work.
+3. Preserve the managed-chat invariants recorded in Drive `00_PROJECT_MASTER`.
+4. Re-run focused Scenario tab-recovery tests plus exact-head Core/UI/Release/Windows packaging gates.
+5. Build a new deterministic owner-test package from the reconverged release lineage and record its exact SHA/hash/Drive ID.
+6. Keep `OWNER_WINDOWS_CHROME_VERIFIED=false` until physical testing of that new reconverged package.
+
+The previously qualified `10 Пілот 0502 2709.zip`, SHA-256 `4492fdef89b7a8d2ee91df95c7e3c3076e2df5b2433ce481cd55470b5cc62b1c`, remains valid evidence for the original PR #439 runtime head but is not a claim about the newer release-candidate.
