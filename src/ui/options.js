@@ -3246,7 +3246,8 @@ async function probeSpecialistProviderConfig() {
     const result = await core('PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', {
       providerId: OPENHANDS_CODING_PROVIDER_ID,
     });
-    if (result?.configRevision !== current.revision) {
+    if (result?.configRevision !== current.revision
+        || ui.specialistProviderConfig?.revision !== current.revision) {
       await loadSpecialistProviderConfig();
       status.textContent = 'Readiness probe завершився, але config revision змінилася. Актуальний owner config перезавантажено; повторіть probe.';
       return;
@@ -3404,6 +3405,8 @@ async function claimSpecialistProviderHandoffs() {
   const jobId = ui.selectedBrowserAgentId || '';
   if (!jobId) return;
   const status = $('specialist-provider-runtime-status');
+  const button = $('specialist-provider-claim-button');
+  button.disabled = true;
   try {
     const maxConcurrentHandoffs = parseStrictBoundedInteger(
       $('specialist-provider-max-concurrent-handoffs').value,
@@ -3413,14 +3416,24 @@ async function claimSpecialistProviderHandoffs() {
       id: jobId,
       claim: { maxConcurrentHandoffs },
     });
-    await loadBrowserAgentJobs({ selectId: jobId });
-    await loadSpecialistProviderRuntime();
     const claimed = Array.isArray(result?.claimed) ? result.claimed.length : 0;
     const reconcile = Array.isArray(result?.reconciliationRequired) ? result.reconciliationRequired.length : 0;
+    if (ui.selectedBrowserAgentId !== jobId) {
+      announce(`Specialist claim для ${jobId} завершено: ${claimed} нових lease. Поточний вибір Browser Agent не змінено.`);
+      return;
+    }
+    await loadBrowserAgentJobs({ selectId: jobId });
+    await loadSpecialistProviderRuntime();
     status.textContent = `Canonical claim: ${claimed} нових lease; reconciliation required: ${reconcile}; remaining product slots: ${Number(result?.remainingSlots ?? 0)}.`;
     announce(claimed ? `Specialist leases створено: ${claimed}.` : 'Нових Specialist leases не створено.');
   } catch (error) {
-    status.textContent = `Specialist claim не виконано: ${error.message}`;
+    if (ui.selectedBrowserAgentId === jobId) {
+      status.textContent = `Specialist claim не виконано: ${error.message}`;
+    } else {
+      announce(`Specialist claim для ${jobId} не виконано: ${error.message}`);
+    }
+  } finally {
+    if (ui.selectedBrowserAgentId === jobId) renderSpecialistProviderRuntime();
   }
 }
 
@@ -3440,6 +3453,10 @@ async function runSelectedSpecialistProviderExecution() {
       id: jobId,
       agentId: handoff.agentId,
     });
+    if (ui.selectedBrowserAgentId !== jobId) {
+      announce(`Provider execution для ${handoff.agentId} завершено. Поточний вибір Browser Agent не змінено.`);
+      return;
+    }
     await loadBrowserAgentJobs({ selectId: jobId });
     await loadSpecialistProviderRuntime();
     const execution = result?.execution || null;
@@ -3448,10 +3465,14 @@ async function runSelectedSpecialistProviderExecution() {
     status.textContent = `Provider execution: ${providerState}. providerDispatched=${result?.providerDispatched === true ? 'так' : 'ні'}. completionAuthorized=ні.${evidence}`;
     announce(`Provider execution оновлено: ${providerState}.`);
   } catch (error) {
-    await loadSpecialistProviderRuntime();
-    status.textContent = `Provider execution не виконано: ${error.message}`;
+    if (ui.selectedBrowserAgentId === jobId) {
+      await loadSpecialistProviderRuntime();
+      status.textContent = `Provider execution не виконано: ${error.message}`;
+    } else {
+      announce(`Provider execution для ${handoff.agentId} не виконано: ${error.message}`);
+    }
   } finally {
-    renderSpecialistProviderRuntime();
+    if (ui.selectedBrowserAgentId === jobId) renderSpecialistProviderRuntime();
   }
 }
 
