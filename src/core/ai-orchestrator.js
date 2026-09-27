@@ -12,6 +12,7 @@ import {
   recordAiRouteOutcome,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
+import { rankAiRouteCandidatesByEvidenceV1 } from './ai-route-quality-governor.js';
 
 export const AiRouterMode = Object.freeze({
   PRIMARY: 'primary',
@@ -201,7 +202,7 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
 }
 
 export class AiOrchestrator {
-  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null } = {}) {
+  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null, routeQualityEvidenceResolver = null } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
     if (providerCallLifecycle != null && (
       typeof providerCallLifecycle !== 'object'
@@ -210,9 +211,13 @@ export class AiOrchestrator {
     )) {
       throw new Error('AI provider-call lifecycle must expose beforeProviderCall and afterProviderCall');
     }
+    if (routeQualityEvidenceResolver != null && typeof routeQualityEvidenceResolver !== 'function') {
+      throw new Error('AI route quality evidence resolver must be a function');
+    }
     this.gateway = gatewayClient;
     this.now = now;
     this.providerCallLifecycle = providerCallLifecycle;
+    this.routeQualityEvidenceResolver = routeQualityEvidenceResolver;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
@@ -320,7 +325,17 @@ export class AiOrchestrator {
         requireConfigured(slot, slot === settings.strong ? 'Strong' : 'Primary');
         return invoke({ routeId:'', provider:slot.provider, model:slot.model, endpointId:'' }, callPrompt, callSystem, bounded);
       }
-      const selected = selectAiRouteCandidates({ routes:settings.routes, policy:settings.routePolicy, routeStates, role:requestedRole, capabilityIds, requiresVision:Boolean(clean(imageDataUrl)), now });
+      const requiresVision = Boolean(clean(imageDataUrl));
+      const selectCurrentCandidates = (selectionNow) => selectAiRouteCandidates({
+        routes:settings.routes,
+        policy:settings.routePolicy,
+        routeStates,
+        role:requestedRole,
+        capabilityIds,
+        requiresVision,
+        now:selectionNow,
+      });
+      let selected = selectCurrentCandidates(this.now());
       if (!selected.candidates.length) {
         throw attachFailureRuntime(createAiRoutePoolExhaustedError({
           attempts:routeAttempts,
@@ -328,7 +343,60 @@ export class AiOrchestrator {
           message:selected.retryAt ? 'Every eligible AI route is in durable backoff' : 'No AI route satisfies the requested role, capabilities, vision and owner policy',
         }));
       }
-      for (const route of selected.candidates) {
+
+      let candidateRoutes = selected.candidates;
+      if (this.routeQualityEvidenceResolver && candidateRoutes.length > 1) {
+        let benchmarkRequests = null;
+        try {
+          benchmarkRequests = await this.routeQualityEvidenceResolver(Object.freeze({
+            routeIds:Object.freeze(candidateRoutes.map(route => route.routeId)),
+            role:requestedRole,
+            requiresVision,
+          }));
+        } catch (_) {
+          benchmarkRequests = null;
+        }
+
+        // Evidence resolution may be asynchronous. Canonical Router authority must be
+        // refreshed after that wait before an advisory ranking can influence ordering.
+        const freshNow = this.now();
+        selected = selectCurrentCandidates(freshNow);
+        if (!selected.candidates.length) {
+          throw attachFailureRuntime(createAiRoutePoolExhaustedError({
+            attempts:routeAttempts,
+            retryAt:selected.retryAt,
+            message:selected.retryAt ? 'Every eligible AI route is in durable backoff' : 'No AI route satisfies the requested role, capabilities, vision and owner policy',
+          }));
+        }
+        candidateRoutes = selected.candidates;
+
+        if (benchmarkRequests != null) {
+          try {
+            const advisory = await rankAiRouteCandidatesByEvidenceV1({
+              routes:settings.routes,
+              policy:settings.routePolicy,
+              routeStates,
+              role:requestedRole,
+              capabilityIds,
+              requiresVision,
+              now:freshNow,
+              benchmarkRequests,
+            });
+            const advisoryRank = new Map(advisory.rankedRouteIds.map((routeId, index) => [routeId, index]));
+            candidateRoutes = [...candidateRoutes].sort((left, right) => {
+              const leftRank = advisoryRank.has(left.routeId) ? advisoryRank.get(left.routeId) : Number.MAX_SAFE_INTEGER;
+              const rightRank = advisoryRank.has(right.routeId) ? advisoryRank.get(right.routeId) : Number.MAX_SAFE_INTEGER;
+              return leftRank - rightRank;
+            });
+          } catch (_) {
+            // Quality evidence is advisory. Invalid/stale/unavailable evidence must not
+            // block the canonical baseline Router selection or widen its eligibility.
+            candidateRoutes = selected.candidates;
+          }
+        }
+      }
+
+      for (const route of candidateRoutes) {
         const started = this.now();
         try {
           const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
