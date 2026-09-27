@@ -182,3 +182,26 @@ test('Core routes Agent-definition reads and mutations only through BrowserAgent
   assert.match(source, /browserAgent\.mutateAgentDefinitionRegistry\(message\.payload \|\| \{\}\)/);
   assert.equal((source.match(/autopilotBrowserAgentV1/g) || []).length, 0, 'service worker must not own a second persistence implementation');
 });
+
+
+test('Agent definition registry identity is prototype-safe for valid Object prototype names', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'constructor' });
+  assert.equal(created.registry.registryId, 'constructor');
+  assert.equal((await manager.getAgentDefinitionRegistry('constructor')).registry.registryId, 'constructor');
+
+  await assert.rejects(
+    () => manager.createAgentDefinitionRegistry({ registryId: 'constructor' }),
+    /already exists/,
+  );
+
+  const mutation = await manager.mutateAgentDefinitionRegistry({
+    registryId: 'constructor',
+    expectedRegistryRevision: 1,
+    kind: AgentDefinitionRegistryMutationKind.CREATE,
+    definition: definition({ agentDefinitionId: 'agent.prototype-safe', label: 'Prototype Safe', tags: ['safe'] }),
+  });
+  assert.equal(mutation.nextRegistry.registryId, 'constructor');
+  assert.equal(mutation.nextRegistryRevision, 2);
+});

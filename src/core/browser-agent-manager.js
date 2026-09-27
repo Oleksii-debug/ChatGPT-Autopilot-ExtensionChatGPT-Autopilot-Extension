@@ -127,14 +127,14 @@ function canonicalAgentDefinitionRegistryId(value) {
   }).registryId;
 }
 function normalizePersistedAgentDefinitionRegistries(raw) {
-  if (raw === undefined) return {};
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  if (raw === undefined) return Object.create(null);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return Object.create(null);
   const prototype = Object.getPrototypeOf(raw);
-  if (prototype !== Object.prototype && prototype !== null) return {};
+  if (prototype !== Object.prototype && prototype !== null) return Object.create(null);
   const descriptors = Object.getOwnPropertyDescriptors(raw);
   const keys = Reflect.ownKeys(descriptors);
-  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return {};
-  const out = {};
+  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return Object.create(null);
+  const out = Object.create(null);
   for (const key of keys.sort()) {
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) continue;
@@ -240,7 +240,7 @@ function freshStore() {
     order: [],
     byId: {},
     executionPolicy: normalizeBrowserAgentExecutionPolicy(),
-    definitionRegistriesById: {},
+    definitionRegistriesById: Object.create(null),
   };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
@@ -622,7 +622,8 @@ export class BrowserAgentManager {
   async getAgentDefinitionRegistry(registryId) {
     const canonicalId = canonicalAgentDefinitionRegistryId(registryId);
     const store = await this.load();
-    const registry = store.definitionRegistriesById?.[canonicalId];
+    const registries = store.definitionRegistriesById || Object.create(null);
+    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
     return { registry: registry ? clone(registry) : null };
   }
 
@@ -638,8 +639,9 @@ export class BrowserAgentManager {
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     let created = null;
     await this.update(store => {
-      const registries = store.definitionRegistriesById || (store.definitionRegistriesById = {});
-      if (registries[registryId]) throw new Error('Agent definition registry already exists');
+      const registries = store.definitionRegistriesById
+        || (store.definitionRegistriesById = Object.create(null));
+      if (Object.hasOwn(registries, registryId)) throw new Error('Agent definition registry already exists');
       if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
         throw new Error('Agent definition registry capacity is exhausted');
       }
@@ -667,7 +669,8 @@ export class BrowserAgentManager {
     const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
     let committed = null;
     await this.update(store => {
-      const current = store.definitionRegistriesById?.[registryId];
+      const registries = store.definitionRegistriesById || Object.create(null);
+      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
       if (!current) throw new Error('Agent definition registry not found');
       const proposalInput = {
         registry: current,
