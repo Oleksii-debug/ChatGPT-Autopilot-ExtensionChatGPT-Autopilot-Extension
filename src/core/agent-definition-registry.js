@@ -458,6 +458,44 @@ export function materializeAgentDefinitionV1(input = {}) {
 
   const jobId = id(raw.jobId, 'jobId');
   const projectId = optionalId(raw.projectId, 'projectId');
+
+  let specialistDelegationBinding;
+  if (current.specialistDelegationProfile) {
+    if (current.specialistDelegationProfile.enabled) {
+      subset(
+        current.specialistDelegationProfile.requiredCapabilityIds,
+        requestedCapabilityIds,
+        'Agent specialist delegation capabilities for materialized job',
+      );
+      subset(
+        current.specialistDelegationProfile.requiredToolIds,
+        requestedToolIds,
+        'Agent specialist delegation tools for materialized job',
+      );
+    }
+    specialistDelegationBinding = freeze({
+      schemaVersion: 1,
+      jobId,
+      projectId,
+      registryId: registry.registryId,
+      registryRevision: registry.revision,
+      agentDefinitionId: current.agentDefinitionId,
+      definitionRevision: current.definitionRevision,
+      profile: current.specialistDelegationProfile,
+      authority: {
+        proposalOnly: true,
+        executionAuthorized: false,
+        policyAuthorized: false,
+        schedulingAuthorized: false,
+        recoveryAuthorized: false,
+        credentialAuthorized: false,
+        completionAuthorized: false,
+        verificationAuthorized: false,
+        capacityReserved: false,
+      },
+    });
+  }
+
   const ownerGoal = textValue(raw.goal, 'goal', 50000);
   const composedGoal = 'Reusable Agent definition instructions:\n'
     + current.instructions
@@ -502,6 +540,7 @@ export function materializeAgentDefinitionV1(input = {}) {
     routerOverride: current.modelRoutePolicy
       ? freeze({ routePolicy: current.modelRoutePolicy })
       : freeze({}),
+    ...(specialistDelegationBinding ? { specialistDelegationBinding } : {}),
     scope: {
       capabilityIds: requestedCapabilityIds,
       toolIds: requestedToolIds,
