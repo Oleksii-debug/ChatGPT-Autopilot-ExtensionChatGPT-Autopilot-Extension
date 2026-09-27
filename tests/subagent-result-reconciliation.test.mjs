@@ -339,11 +339,12 @@ function runtimeFixture({ confirmEffect = true } = {}) {
   return { g, runtime };
 }
 
-function canonicalBindingId() {
+function canonicalBindingId(controlEpoch = 7) {
   return compactOrchestrationEventId(
     'subagent-task-activation-binding',
     'project-1',
     'envelope-1',
+    String(controlEpoch),
     'child-activation-1',
     '1',
     'invocation-child-1',
@@ -968,6 +969,26 @@ test('already-terminal current activation produces no second terminal proposal',
   assert.equal(replay.reasonCode, 'RESULT_CHILD_ACTIVATION_ALREADY_TERMINAL');
   assert.equal(replay.terminalEvent, null);
   assert.equal(replay.requiresCanonicalOrchestrationReducer, false);
+});
+
+test('task activation binding identity is scoped to the exact owner control epoch', () => {
+  assert.notEqual(canonicalBindingId(7), canonicalBindingId(8));
+
+  assert.throws(
+    () => normalizeTrustedSubagentTaskActivationBindingV1({
+      ...binding(),
+      controlEpoch: 8,
+    }),
+    /bindingId is not canonical/u,
+  );
+
+  const epochEight = normalizeTrustedSubagentTaskActivationBindingV1({
+    ...binding(),
+    controlEpoch: 8,
+    bindingId: canonicalBindingId(8),
+  });
+  assert.equal(epochEight.controlEpoch, 8);
+  assert.equal(epochEight.bindingId, canonicalBindingId(8));
 });
 
 test('trusted activation binding boundary rejects authority-bearing extras and accessors without getter execution', () => {
