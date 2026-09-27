@@ -265,6 +265,27 @@ test('current checkpoint head is strict and bounded', () => {
   );
 });
 
+test('checkpoint ledger revision preserves canonical zero and rejects signed zero', async () => {
+  const checkpoint = await createAgentCheckpointV1(checkpointInput({
+    exactEffectLedgerRevision: 0,
+  }));
+  assert.equal(checkpoint.exactEffectLedgerRevision, 0);
+  assert.equal(Object.is(checkpoint.exactEffectLedgerRevision, -0), false);
+
+  await assert.rejects(
+    () => createAgentCheckpointV1(checkpointInput({ exactEffectLedgerRevision: -0 })),
+    /non-negative integer/u,
+  );
+
+  const current = normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: 0 }));
+  assert.equal(current.exactEffectLedgerRevision, 0);
+  assert.equal(Object.is(current.exactEffectLedgerRevision, -0), false);
+  assert.throws(
+    () => normalizeAgentCheckpointHeadV1(head({ exactEffectLedgerRevision: -0 })),
+    /non-negative integer/u,
+  );
+});
+
 test('checkpoint timestamp boundaries require exact canonical UTC representation', async () => {
   await assert.rejects(
     () => createAgentCheckpointV1(checkpointInput({
