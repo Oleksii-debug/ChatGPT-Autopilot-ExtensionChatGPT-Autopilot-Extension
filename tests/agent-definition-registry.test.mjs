@@ -236,6 +236,10 @@ test('config defaults are behavior/model defaults only and reject owner-authorit
     ['credentialDecision', 'ALLOW'],
     ['siteRules', []],
     ['trustedScriptEnabled', true],
+    ['repeatMode', 'CONTINUOUS'],
+    ['intervalSeconds', 60],
+    ['activeWindowStart', '09:00'],
+    ['activeWindowEnd', '17:00'],
     ['scheduleStartAt', 12345],
     ['scheduleEndAt', 23456],
   ]) {
