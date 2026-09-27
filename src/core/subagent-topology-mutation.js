@@ -137,12 +137,20 @@ function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
   if (!family.length) return null;
   const exactFamily = family.length === expectedChildIds.length
     && expectedChildIds.every(nodeId => family.includes(nodeId));
-  const exactParent = exactFamily && expectedChildIds.every(nodeId => {
-    const child = graph.nodesById[nodeId];
-    return child?.parentId === parentNodeId
-      && graph.nodesById[parentNodeId]?.childIds.includes(nodeId);
-  });
-  if (!exactParent) {
+  const parent = graph.nodesById[parentNodeId];
+  const exactAuthority = exactFamily
+    && parent
+    && !parent.providerBinding
+    && expectedChildIds.every(nodeId => {
+      const child = graph.nodesById[nodeId];
+      return child?.parentId === parentNodeId
+        && parent.childIds.includes(nodeId)
+        && child.promptProfileId === parent.promptProfileId
+        && child.recoveryPromptProfileId === parent.recoveryPromptProfileId
+        && child.chatMode === parent.chatMode
+        && child.providerBinding === null;
+    });
+  if (!exactAuthority) {
     return denial('SPAWN_IDENTITY_CONFLICT', {
       parentNodeId,
       spawnId,
