@@ -298,7 +298,10 @@ export function requireExecutionReconciliationV1(raw, {
     if (current.leaseId !== expectedLeaseId) {
       throw new Error('reconciliation lease identity mismatch');
     }
-    return current;
+    // A canonical transition result is already deeply frozen. Preserve that
+    // exact durable object on duplicate admission, while still canonicalizing
+    // mutable caller-shaped records before returning them.
+    return Object.isFrozen(raw) ? raw : current;
   }
   if (current.state !== ExecutionOwnershipState.OWNED || current.leaseId !== expectedLeaseId) {
     throw new Error('only the current execution owner may require reconciliation');

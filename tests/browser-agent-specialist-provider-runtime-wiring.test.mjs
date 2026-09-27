@@ -42,9 +42,14 @@ test('service worker composes one trusted durable Specialist readiness path', as
   assert.match(source, /openHandsSpecialistClient\.execute\(/);
   assert.match(source, /browserAgent\.recordSpecialistProviderExecutionOutcome\(/);
   assert.match(source, /completionAuthorized:\s*false/);
+  const runProviderCommand = source.match(
+    /} else if \(message\.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION'\) \{([\s\S]*?)\n  } else if \(message\.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY'\) \{/,
+  );
+  assert.ok(runProviderCommand, 'RUN Specialist provider command branch must remain structurally identifiable');
   assert.doesNotMatch(
-    source,
-    /RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION[\s\S]{0,4000}completeSpecialistHandoff\(/,
+    runProviderCommand[1],
+    /completeSpecialistHandoff\(/,
+    'provider execution may record evidence but must not grant Specialist completion authority',
   );
   assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
