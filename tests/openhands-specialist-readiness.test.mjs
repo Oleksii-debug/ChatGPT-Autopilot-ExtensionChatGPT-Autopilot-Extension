@@ -217,6 +217,67 @@ test('transport failure is a fresh non-executable UNAVAILABLE observation withou
   assert.equal(JSON.stringify(result).includes('Users'), false);
 });
 
+test('real OpenHands HTTP failure becomes bounded UNAVAILABLE readiness without response-body leakage', async () => {
+  const client = new OpenHandsCodingSpecialistClient({
+    fetchFn: async () => jsonResponse({ detail: 'SECRET remote diagnostic' }, { status: 503 }),
+  });
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client,
+    now: monotonicNow([T0, T1]),
+  });
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding],
+    now: () => T1,
+  });
+
+  const result = await resolver.resolve(selection());
+  const providerState = result.inspection.checks[0].providerReadiness;
+  assert.equal(result.readiness, 'UNAVAILABLE');
+  assert.equal(result.executable, false);
+  assert.equal(providerState.reasonCode, 'OPENHANDS_HTTP_503');
+  assert.equal(providerState.installed, true);
+  assert.equal(JSON.stringify(result).includes('SECRET'), false);
+});
+
+test('real OpenHands timeout becomes bounded UNAVAILABLE readiness before any execution path', async () => {
+  const calls = [];
+  const client = new OpenHandsCodingSpecialistClient({
+    setTimeoutFn(callback) {
+      callback();
+      return 1;
+    },
+    clearTimeoutFn() {},
+    fetchFn: async (url, options) => {
+      calls.push({ url, method: options.method, aborted: options.signal.aborted });
+      throw new Error('SECRET timeout transport detail');
+    },
+  });
+  const binding = createOpenHandsSpecialistReadinessBindingV1({
+    config: config(),
+    client,
+    now: monotonicNow([T0, T1]),
+  });
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding],
+    now: () => T1,
+  });
+
+  const result = await resolver.resolve(selection());
+  const providerState = result.inspection.checks[0].providerReadiness;
+  assert.equal(result.readiness, 'UNAVAILABLE');
+  assert.equal(result.executable, false);
+  assert.equal(providerState.reasonCode, 'OPENHANDS_REQUEST_TIMEOUT');
+  assert.equal(providerState.installed, true);
+  assert.deepEqual(calls, [{
+    url: 'http://127.0.0.1:3000/openapi.json',
+    method: 'GET',
+    aborted: true,
+  }]);
+  assert.equal(JSON.stringify(result).includes('SECRET'), false);
+  assert.equal(calls.some(call => call.url.includes('/api/conversations')), false);
+});
+
 test('unexpected probe errors remain UNKNOWN rather than being promoted or mislabeled as installation failure', async () => {
   const client = {
     async probe() {
