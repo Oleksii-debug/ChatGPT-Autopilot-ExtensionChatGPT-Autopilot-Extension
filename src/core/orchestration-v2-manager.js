@@ -27,6 +27,7 @@ const MANAGER_SCHEMA_VERSION = 1;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
+const BROWSER_AGENT_LIFECYCLE_OPTION_KEYS = new Set(['browserControlEpoch', 'nowMs']);
 
 export const OrchestrationProjectAuthorityErrorCode = Object.freeze({
   PROJECT_UNOWNED: 'PROJECT_UNOWNED',
@@ -61,6 +62,28 @@ function plainIntent(value, label) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    normalized[key] = descriptor.value;
+  }
+  return normalized;
+}
+
+function plainBrowserAgentLifecycleOptions(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Browser Agent lifecycle options must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Browser Agent lifecycle options must be a plain object');
+  }
+  const normalized = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !BROWSER_AGENT_LIFECYCLE_OPTION_KEYS.has(key)) {
+      throw new Error(`Browser Agent lifecycle options contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error('Browser Agent lifecycle options fields must be enumerable own data properties');
     }
     normalized[key] = descriptor.value;
   }
@@ -225,10 +248,10 @@ export class OrchestrationV2Manager {
    * store operation open while calling this method and restores its previous
    * durable state if this call fails.
    */
-  applyBrowserAgentBoundLifecycle(bindingRaw, transitionRaw, {
-    browserControlEpoch,
-    nowMs = this.now(),
-  } = {}) {
+  applyBrowserAgentBoundLifecycle(bindingRaw, transitionRaw, options = {}) {
+    const admittedOptions = plainBrowserAgentLifecycleOptions(options);
+    const browserControlEpoch = admittedOptions.browserControlEpoch;
+    const nowMs = admittedOptions.nowMs === undefined ? this.now() : admittedOptions.nowMs;
     const binding = normalizeBrowserAgentOrchestrationNodeBindingV1(bindingRaw);
     const transition = typeof transitionRaw === 'string' ? transitionRaw.trim().toUpperCase() : '';
     const eventType = transition === 'PAUSE'
