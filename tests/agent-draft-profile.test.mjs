@@ -15,6 +15,12 @@ test('Agent draft round trips a multi-step goal and policy without runtime state
   assert.equal(JSON.stringify(restored).includes('runState'), false);
 });
 
+test('Agent draft keeps the selected route but rejects an invalid route identifier', () => {
+  const draft = makeAgentDraftProfile('Виконати завдання', { aiPinnedRouteId:'mistral-agent' });
+  assert.equal(parseAgentDraftProfile(draft).policy.aiPinnedRouteId, 'mistral-agent');
+  assert.throws(() => makeAgentDraftProfile('Виконати завдання', { aiPinnedRouteId:'bad route' }), /route ID/);
+});
+
 test('Agent draft rejects unknown and secret fields instead of importing them', () => {
   const draft = makeAgentDraftProfile('Зробити завдання', {});
   assert.throws(() => parseAgentDraftProfile({ ...draft, runtime: { runState: 'RUNNING' } }), /формат/);

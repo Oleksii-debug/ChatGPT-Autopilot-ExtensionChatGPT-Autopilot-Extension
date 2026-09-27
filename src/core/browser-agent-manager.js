@@ -169,6 +169,7 @@ function originPattern(value) {
 function browserAgentRouterOverride(config = {}) {
   const out = {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
+  if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
   if (config.aiPrimaryProvider && config.aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT) primary.provider = config.aiPrimaryProvider;
   if (clean(config.aiPrimaryModel, 300)) primary.model = clean(config.aiPrimaryModel, 300);
@@ -441,6 +442,28 @@ export class BrowserAgentManager {
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
       if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
+      const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
+      const afterFailure = await this.get(id);
+      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
+      if (failedCalls && !lifecycleAccounted) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.modelCalls += failedCalls;
+          if (error?.routerRuntime) live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      } else if (error?.routerRuntime) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      }
       return { ok: false, error };
     }
     const verifier = verifierReply?.result || verifierReply;
@@ -761,6 +784,7 @@ export class BrowserAgentManager {
       inputPricePerMillionUsd: raw.inputPricePerMillionUsd ?? 0,
       outputPricePerMillionUsd: raw.outputPricePerMillionUsd ?? 0,
       aiRoutingMode: raw.aiRoutingMode || BrowserAgentAiRoutingMode.INHERIT,
+      aiPinnedRouteId: raw.aiPinnedRouteId || '',
       aiPrimaryProvider: raw.aiPrimaryProvider || BrowserAgentAiProvider.INHERIT,
       aiPrimaryModel: raw.aiPrimaryModel || '',
       aiStrongProvider: raw.aiStrongProvider || BrowserAgentAiProvider.INHERIT,
@@ -1078,9 +1102,10 @@ export class BrowserAgentManager {
     return { kind: 'BUDGET_PAUSED', reason };
   }
 
-  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, maxConsecutive = 5 } = {}) {
+  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, retryAt = 0, maxConsecutive = 5 } = {}) {
     const now = this.now();
     const message = clean(error?.message || error || 'Unknown Browser Agent failure', 1200);
+    const absoluteRetryAt = typeof retryAt === 'number' && Number.isSafeInteger(retryAt) && retryAt > now ? retryAt : 0;
     let terminal = false;
     let consecutive = 0;
     await this.update(store => {
@@ -1101,6 +1126,10 @@ export class BrowserAgentManager {
         job.runtime.runState = BrowserAgentRunState.ERROR;
         job.runtime.nextWakeAt = 0;
         appendHistory(job.runtime, { at: now, type: 'error', message: `Agent stopped after ${consecutive} consecutive ${type || 'runtime'} failures: ${message}` });
+      } else if (absoluteRetryAt) {
+        // Canonical router backoff/circuit state is already durable. Do not wake
+        // the Agent early and convert one provider cooldown into repeated model errors.
+        job.runtime.nextWakeAt = Math.max(now + MIN_WAKE_MS, absoluteRetryAt);
       } else {
         // Bounded exponential backoff: transient browser/provider failures recover,
         // but a broken loop does not spin at full CPU/network speed.
@@ -2753,7 +2782,13 @@ export class BrowserAgentManager {
           return store;
         });
       }
-      return this.recordRecoverableFailure(id, epoch, { type: 'model', error, retryMs: 1500, maxConsecutive: 5 });
+      return this.recordRecoverableFailure(id, epoch, {
+        type: 'model',
+        error,
+        retryMs: 1500,
+        retryAt: error?.retryAt,
+        maxConsecutive: 5,
+      });
     }
     const planner = routed?.result || routed;
     const reportedUsage = planner?.usage || routed?.usage || {};
@@ -2876,7 +2911,15 @@ export class BrowserAgentManager {
       const nodeConfig = { ...current.job.config, acceptanceCriteria: node.acceptanceCriteria };
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, nodeConfig, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
+        type: 'verification',
+        error: outcome.error,
+        action,
+        countStep: false,
+        retryMs: 500,
+        retryAt: outcome.error?.retryAt,
+        maxConsecutive: 4,
+      });
       let nextPlan;
       try {
         const running = node.state === AgentPlanNodeState.READY
@@ -2928,7 +2971,15 @@ export class BrowserAgentManager {
       }
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, current.job.config, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
+        type: 'verification',
+        error: outcome.error,
+        action,
+        countStep: false,
+        retryMs: 500,
+        retryAt: outcome.error?.retryAt,
+        maxConsecutive: 4,
+      });
       const verification = outcome.verification;
       const repeating = current.job.config.repeatMode !== BrowserAgentRepeatMode.ONCE;
       await this.update(store => {

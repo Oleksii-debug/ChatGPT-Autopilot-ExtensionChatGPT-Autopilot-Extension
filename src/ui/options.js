@@ -38,6 +38,8 @@ const ui = {
   selectedBrowserAgentId: '',
   selectedBrowserAgent: null,
   agentDraftActive: false,
+  agentPolicyDirty: false,
+  agentPolicyEditEpoch: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -910,6 +912,7 @@ function selectedValues(id) {
 function aiRouterRoutesFromForm({ validate = true } = {}) {
   return [...$('ai-router-route-list').querySelectorAll('[data-ai-route]')].map((card, index) => {
     const text = field => card.querySelector(`[data-route-field="${field}"]`).value.trim();
+    const exactText = field => card.querySelector(`[data-route-field="${field}"]`).value;
     const provider = text('provider');
     const routeId = text('routeId');
     const model = text('model');
@@ -921,6 +924,9 @@ function aiRouterRoutesFromForm({ validate = true } = {}) {
       routeId,
       provider,
       model,
+      displayName:text('displayName'),
+      systemPrompt:exactText('systemPrompt'),
+      workerPrompt:exactText('workerPrompt'),
       ...(provider === 'openai-compatible' && text('endpointId') ? { endpointId:text('endpointId') } : {}),
       roles:AI_ROUTE_ROLES.filter(role => card.querySelector(`[data-route-role="${role}"]`).checked),
       capabilityIds,
@@ -972,7 +978,7 @@ function renderAiModelPriceCatalog(routes = [], routeStates = {}) {
   for (const route of routes) {
     const kind = ['free', 'paid'].includes(route.costClass) ? route.costClass : 'unknown';
     const health = routeStates[route.routeId] || {};
-    groups[kind].push(`${route.provider}, ${route.model || 'модель не вибрано'}; маршрут ${route.routeId}; ${route.enabled === false ? 'вимкнено' : 'увімкнено'}; помилок ${Number(health.failures || 0)}; обмеження до ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'немає'}`);
+    groups[kind].push(`${route.displayName ? `${route.displayName}; ` : ''}${route.provider}, ${route.model || 'модель не вибрано'}; маршрут ${route.routeId}; ${route.enabled === false ? 'вимкнено' : 'увімкнено'}; максимум workers ${Number(route.maxWorkers || 0) || 'загальна межа'}; помилок ${Number(health.failures || 0)}; обмеження до ${health.backoffUntil ? new Date(health.backoffUntil).toLocaleString() : 'немає'}`);
   }
   for (const kind of ['free', 'paid', 'unknown']) {
     const list = $(`ai-model-${kind}-list`);
@@ -997,12 +1003,18 @@ function manualWorkerCountsFromCards() {
   ]).filter(([id]) => id));
 }
 
+function aiRouteDisplayLabel(route = {}) {
+  const routeId = String(route.routeId || '').trim() || 'без ID';
+  const displayName = String(route.displayName || '').trim();
+  return displayName ? `${displayName} (${routeId})` : routeId;
+}
+
 function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, workerPolicy = {}) {
   const list = $('ai-router-route-list');
   list.replaceChildren();
   for (const [index, route] of routes.entries()) {
     const card = $('ai-router-route-template').content.firstElementChild.cloneNode(true);
-    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${route.routeId || 'без ID'}`;
+    card.querySelector('[data-route-legend]').textContent = `Маршрут ${index + 1}: ${aiRouteDisplayLabel(route)}`;
     for (const label of card.querySelectorAll('[data-label-for]')) {
       const field = label.dataset.labelFor;
       const control = card.querySelector(`[data-route-field="${field}"]`);
@@ -1011,6 +1023,7 @@ function renderAiRouterRoutes(routes = [], routeStates = {}, policy = {}, worker
     }
     const values = {
       routeId:route.routeId || '', provider:route.provider || 'ollama', endpointId:route.endpointId || '', model:route.model || '',
+      displayName:route.displayName || '', systemPrompt:route.systemPrompt || '', workerPrompt:route.workerPrompt || '',
       capabilityIds:(route.capabilityIds || []).join(', '), priority:route.priority ?? 0,
       maxWorkers:route.maxWorkers ?? 0, manualWorkers:workerPolicy.manualRouteWorkers?.[route.routeId] ?? 0,
       locality:route.locality || (route.provider === 'ollama' ? 'local' : 'remote'), costClass:route.costClass || (route.provider === 'ollama' ? 'free' : 'unknown'),
@@ -1102,6 +1115,13 @@ function aiRouterSettingsFromForm() {
     if (!Number.isInteger(value) || value < min || value > max) throw new Error(`${label}: введіть ціле число ${min}-${max}.`);
     return value;
   };
+  const optionalPriceCap = (id, label) => {
+    const text = $(id).value.trim();
+    if (!text) return null;
+    const value = Number(text);
+    if (!Number.isFinite(value) || value < 0 || value > 1_000_000) throw new Error(`${label}: введіть число від 0 до 1000000 або залиште поле порожнім.`);
+    return value;
+  };
   const routes = aiRouterRoutesFromForm();
   const allowRouteIds = selectedValues('ai-router-allow-routes');
   const denyRouteIds = selectedValues('ai-router-deny-routes');
@@ -1136,8 +1156,8 @@ function aiRouterSettingsFromForm() {
       denyRouteIds,
       freeOnly:$('ai-router-free-only').checked,
       locality:$('ai-router-locality').value,
-      maxInputPricePerMillionUsd:Number($('ai-router-max-input-price').value),
-      maxOutputPricePerMillionUsd:Number($('ai-router-max-output-price').value),
+      maxInputPricePerMillionUsd:optionalPriceCap('ai-router-max-input-price', 'Максимальна input-ціна'),
+      maxOutputPricePerMillionUsd:optionalPriceCap('ai-router-max-output-price', 'Максимальна output-ціна'),
       retryBackoffSeconds:integer('ai-router-backoff-seconds', 1, 86400, 'Backoff'),
       circuitBreakerFailures:integer('ai-router-circuit-failures', 1, 100, 'Поріг circuit breaker'),
       circuitBreakerSeconds:integer('ai-router-circuit-seconds', 1, 86400, 'Тривалість circuit breaker'),
@@ -1241,6 +1261,97 @@ function resetAiRouterModelSlot(slot, { preserve = false } = {}) {
   fillModelSelect(modelId, $(providerId).value, [], selected);
 }
 
+function browserAgentRoutePolicyBlockReason(route, policy = {}) {
+  if (route?.enabled === false) return 'маршрут вимкнено у вкладці «Моделі»';
+  const roles = Array.isArray(route?.roles) ? route.roles : [];
+  if (roles.length && !roles.includes('planner')) return 'маршрут не дозволяє роль planner, потрібну для запуску Agent';
+  const routeId = String(route?.routeId || '');
+  const allow = new Set(Array.isArray(policy?.allowRouteIds) ? policy.allowRouteIds : []);
+  const deny = new Set(Array.isArray(policy?.denyRouteIds) ? policy.denyRouteIds : []);
+  if (policy?.pinnedRouteId && policy.pinnedRouteId !== routeId) return `глобально закріплено маршрут ${policy.pinnedRouteId}`;
+  if (allow.size && !allow.has(routeId)) return 'маршрут не входить до глобального allow-списку';
+  if (deny.has(routeId)) return 'маршрут заборонено глобальним deny-списком';
+  if (policy?.freeOnly === true && route?.costClass !== 'free') return 'глобальна політика дозволяє лише безкоштовні маршрути';
+  if (route?.costClass !== 'free' && route?.costClass !== 'paid') return 'клас вартості маршруту не підтверджено';
+  if (route?.costClass === 'paid' && (route?.inputPriceKnown !== true || route?.outputPriceKnown !== true)) {
+    return 'для платного маршруту не підтверджено input/output ціни';
+  }
+  const locality = typeof policy?.locality === 'string' && policy.locality ? policy.locality : 'any';
+  if (locality !== 'any' && route?.locality !== locality) return `глобальна політика дозволяє лише ${locality}`;
+  if (policy?.maxInputPricePerMillionUsd != null
+      && Number(route?.inputPricePerMillionUsd) > Number(policy.maxInputPricePerMillionUsd)) {
+    return 'input-ціна перевищує глобальний ліміт';
+  }
+  if (policy?.maxOutputPricePerMillionUsd != null
+      && Number(route?.outputPricePerMillionUsd) > Number(policy.maxOutputPricePerMillionUsd)) {
+    return 'output-ціна перевищує глобальний ліміт';
+  }
+  return '';
+}
+
+function syncBrowserAgentRouteBindingStatus() {
+  const select = $('agent-ai-pinned-route-id');
+  const status = $('agent-route-binding-status');
+  const routeId = select.value;
+  let nextText;
+  if (!routeId) {
+    nextText = 'Agent успадковує глобальну політику маршрутів і може використовувати її дозволений fallback.';
+  } else {
+    const option = [...select.options].find(item => item.value === routeId);
+    const blockReason = option?.dataset?.blockReason || '';
+    nextText = blockReason
+      ? `Маршрут ${routeId} збережений для цього Agent, але зараз недоступний: ${blockReason}. Виклик завершиться до provider I/O; прихованого fallback не буде.`
+      : `Маршрут ${routeId} закріплений лише за цим Agent. Глобальні role/capability/budget/backoff правила залишаються чинними; прихованого fallback немає.`;
+  }
+  if (status.textContent !== nextText) status.textContent = nextText;
+}
+
+function assertBrowserAgentRouteReadyForLaunch() {
+  const select = $('agent-ai-pinned-route-id');
+  const routeId = select.value;
+  if (!routeId) return;
+  const option = [...select.options].find(item => item.value === routeId);
+  const blockReason = option?.dataset?.blockReason || '';
+  if (blockReason) {
+    throw new Error(`Маршрут ${routeId} зараз недоступний: ${blockReason}. Оберіть доступний маршрут або успадкуйте глобальну політику.`);
+  }
+  const acceptanceCriteria = browserAgentAcceptanceCriteriaFromText($('agent-acceptance-criteria').value);
+  if (acceptanceCriteria.length && option?.dataset?.supportsVerifier === 'false') {
+    throw new Error(`Маршрут ${routeId} не дозволяє роль verifier, потрібну для перевірки заданих критеріїв прийняття. Оберіть інший маршрут або успадкуйте глобальну політику.`);
+  }
+}
+
+function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
+  const select = $('agent-ai-pinned-route-id');
+  const selected = select.value;
+  select.replaceChildren();
+  const inherited = document.createElement('option');
+  inherited.value = '';
+  inherited.textContent = 'Успадкувати глобальну політику маршрутів';
+  select.append(inherited);
+  for (const route of routes) {
+    const option = document.createElement('option');
+    option.value = route.routeId;
+    const blockReason = browserAgentRoutePolicyBlockReason(route, policy);
+    const roles = Array.isArray(route?.roles) ? route.roles : [];
+    option.dataset.blockReason = blockReason;
+    option.dataset.supportsVerifier = String(!roles.length || roles.includes('verifier'));
+    option.disabled = Boolean(blockReason);
+    option.textContent = `${aiRouteDisplayLabel(route)}: ${route.model}${route.endpointId ? ` (${route.endpointId})` : ''}${blockReason ? ` — недоступний: ${blockReason}` : ''}`;
+    select.append(option);
+  }
+  if (selected && ![...select.options].some(option => option.value === selected)) {
+    const unavailable = document.createElement('option');
+    unavailable.value = selected;
+    unavailable.dataset.blockReason = 'маршрут відсутній у збереженому пулі';
+    unavailable.disabled = true;
+    unavailable.textContent = `${selected} — недоступний: маршрут відсутній у збереженому пулі`;
+    select.append(unavailable);
+  }
+  select.value = selected;
+  syncBrowserAgentRouteBindingStatus();
+}
+
 async function loadAiRouterSettings() {
   try {
     const data = await core('GET_AI_ROUTER_SETTINGS');
@@ -1265,8 +1376,8 @@ async function loadAiRouterSettings() {
     $('ai-router-auto-switch').checked = policy.autoSwitch !== false;
     $('ai-router-free-only').checked = policy.freeOnly === true;
     $('ai-router-locality').value = policy.locality || 'any';
-    $('ai-router-max-input-price').value = String(policy.maxInputPricePerMillionUsd ?? 0);
-    $('ai-router-max-output-price').value = String(policy.maxOutputPricePerMillionUsd ?? 0);
+    $('ai-router-max-input-price').value = policy.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
+    $('ai-router-max-output-price').value = policy.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
     $('ai-router-backoff-seconds').value = String(policy.retryBackoffSeconds ?? 60);
     $('ai-router-circuit-failures').value = String(policy.circuitBreakerFailures ?? 2);
     $('ai-router-circuit-seconds').value = String(policy.circuitBreakerSeconds ?? 300);
@@ -1276,6 +1387,7 @@ async function loadAiRouterSettings() {
     $('ai-worker-min').value = String(workerPolicy.minWorkers ?? 1);
     $('ai-worker-max-parallel').value = String(workerPolicy.maxParallelWorkers ?? 8);
     renderAiRouterRoutes(settings.routes || [], data.runtime?.routeStates || {}, policy, workerPolicy);
+    renderBrowserAgentRouteChoices(settings.routes || [], policy);
     renderAiModelPriceCatalog(settings.routes || [], data.runtime?.routeStates || {});
     renderAiRouterRuntime(data.runtime || {});
     $('ai-router-status').textContent = settings.enabled
@@ -1291,6 +1403,7 @@ async function saveAiRouterSettings() {
     setAiRouterBusy(true);
     const settings = aiRouterSettingsFromForm();
     const data = await core('UPDATE_AI_ROUTER_SETTINGS', { settings });
+    renderBrowserAgentRouteChoices(data.settings?.routes || [], data.settings?.routePolicy || {});
     $('ai-router-status').textContent = `AI-координатор збережено: режим ${data.settings.mode}.`;
     announce('Налаштування AI-координатора збережено.');
   } catch (error) {
@@ -2423,6 +2536,7 @@ function browserAgentPolicyFromForm() {
     activeWindowStart,
     activeWindowEnd,
     aiRoutingMode: $('agent-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-ai-pinned-route-id').value,
     aiPrimaryProvider: $('agent-ai-primary-provider').value,
     aiPrimaryModel: $('agent-ai-primary-model').value.trim(),
     aiStrongProvider: $('agent-ai-strong-provider').value,
@@ -2458,6 +2572,17 @@ function fillBrowserAgentPolicy(config = {}) {
   $('agent-active-window-start').value = config.activeWindowStart || '';
   $('agent-active-window-end').value = config.activeWindowEnd || '';
   $('agent-ai-routing-mode').value = ['inherit','primary','strong','hybrid-auto','hybrid-rules'].includes(config.aiRoutingMode) ? config.aiRoutingMode : 'inherit';
+  $('agent-ai-pinned-route-id').value = config.aiPinnedRouteId || '';
+  if ($('agent-ai-pinned-route-id').value !== (config.aiPinnedRouteId || '')) {
+    const option = document.createElement('option');
+    option.value = config.aiPinnedRouteId;
+    option.dataset.blockReason = 'маршрут відсутній у збереженому пулі';
+    option.disabled = true;
+    option.textContent = `${config.aiPinnedRouteId} — недоступний: маршрут відсутній у збереженому пулі`;
+    $('agent-ai-pinned-route-id').append(option);
+    $('agent-ai-pinned-route-id').value = option.value;
+  }
+  syncBrowserAgentRouteBindingStatus();
   $('agent-ai-primary-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiPrimaryProvider) ? config.aiPrimaryProvider : 'inherit';
   $('agent-ai-primary-model').value = config.aiPrimaryModel || '';
   $('agent-ai-strong-provider').value = ['inherit','ollama','openai','openai-compatible'].includes(config.aiStrongProvider) ? config.aiStrongProvider : 'inherit';
@@ -2520,12 +2645,18 @@ ${pendingScript}` : '';
   const nextWake = Number(runtime.nextWakeAt || 0) > Date.now() ? ` Наступний запуск: ${new Date(runtime.nextWakeAt).toLocaleString()}.` : '';
   const capability = runtime.capabilityPermission ? ` Потрібна capability: ${runtime.capabilityPermission}.` : '';
   $('agent-status').textContent = `Стан: ${browserAgentStateLabel(state)}. Кроків: ${Number(runtime.stepCount || 0)}. Завершених циклів: ${cycles}. Поточна сторінка: ${url}.${nextWake}${capability}${planStatus}${result}${verified}${error}`;
-  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.`;
+  const routerRuntime = runtime.aiRouterRuntime || {};
+  const actualRouteId = String(routerRuntime.lastRouteId || '').trim();
+  const failoverChain = Array.isArray(routerRuntime.lastFailoverChain) ? routerRuntime.lastFailoverChain.slice(-4) : [];
+  const routeEvidence = actualRouteId
+    ? ` Останній фактичний AI-маршрут: ${actualRouteId}.${failoverChain.length ? ` Остання route-chain: ${failoverChain.map(item => `${item.routeId || '?'}:${item.outcome || '?'}`).join(' -> ')}.` : ''}`
+    : ' Фактичний AI-маршрут ще не використовувався.';
+  $('agent-usage').textContent = `Model calls: ${Number(runtime.modelCalls || 0)}; input tokens: ${Number(runtime.inputTokens || 0)}; output tokens: ${Number(runtime.outputTokens || 0)}; total tokens: ${Number(runtime.totalTokens || 0)}; орієнтовна вартість: $${Number(runtime.estimatedCostUsd || 0).toFixed(4)}.${routeEvidence}`;
   const history = Array.isArray(runtime.history) ? runtime.history : [];
   $('agent-history').textContent = history.length
     ? history.slice(-80).map((entry, index) => `${index + 1}. ${entry.at ? new Date(entry.at).toLocaleString() : ''} ${entry.type || 'event'}: ${entry.message || entry.action?.type || ''}`).join('\n')
     : 'Історії ще немає.';
-  if (!ui.agentDraftActive) fillBrowserAgentPolicy(config);
+  if (!ui.agentDraftActive && !ui.agentPolicyDirty) fillBrowserAgentPolicy(config);
 }
 
 function renderBrowserAgentList() {
@@ -2544,9 +2675,15 @@ function renderBrowserAgentList() {
 async function loadBrowserAgentJobs({ selectId = '' } = {}) {
   try {
     const data = await core('LIST_BROWSER_AGENT_JOBS');
+    const previousId = ui.selectedBrowserAgentId;
     ui.browserAgentJobs = Array.isArray(data?.jobs) ? data.jobs : [];
-    ui.selectedBrowserAgentId = selectId || data?.selectedId || ui.selectedBrowserAgentId || ui.browserAgentJobs[0]?.id || '';
+    ui.selectedBrowserAgentId = selectId || ui.selectedBrowserAgentId || data?.selectedId || ui.browserAgentJobs[0]?.id || '';
     if (ui.selectedBrowserAgentId && !ui.browserAgentJobs.some(job => job.id === ui.selectedBrowserAgentId)) ui.selectedBrowserAgentId = ui.browserAgentJobs[0]?.id || '';
+    if (previousId && previousId !== ui.selectedBrowserAgentId) {
+      ui.agentPolicyDirty = false;
+      ui.agentPolicyEditEpoch += 1;
+      $('agent-policy-edit-status').textContent = 'Вибране завдання змінилося; показано його збережену політику.';
+    }
     renderBrowserAgentList();
     const job = ui.browserAgentJobs.find(item => item.id === ui.selectedBrowserAgentId) || null;
     renderBrowserAgentJob(job);
@@ -2557,6 +2694,9 @@ async function loadBrowserAgentJobs({ selectId = '' } = {}) {
 
 async function selectBrowserAgentJob() {
   ui.agentDraftActive = false;
+  ui.agentPolicyDirty = false;
+  ui.agentPolicyEditEpoch += 1;
+  $('agent-policy-edit-status').textContent = 'Змін політики немає.';
   const id = $('agent-job-list').value;
   if (!id) { ui.selectedBrowserAgentId = ''; renderBrowserAgentJob(null); return; }
   try {
@@ -2571,6 +2711,7 @@ async function runBrowserAgentPrompt() {
   const goal = $('agent-prompt').value.trim();
   if (!goal) { $('agent-status').textContent = 'Опишіть, що Agent має зробити.'; $('agent-prompt').focus(); return; }
   try {
+    assertBrowserAgentRouteReadyForLaunch();
     $('agent-run-prompt-button').disabled = true;
     $('agent-status').textContent = 'Створюю завдання й запускаю Agent…';
     const created = await core('CREATE_BROWSER_AGENT_JOB', {
@@ -2582,6 +2723,8 @@ async function runBrowserAgentPrompt() {
     if (!id) throw new Error('Core не повернув id завдання Agent.');
     ui.selectedBrowserAgentId = id;
     ui.agentDraftActive = false;
+    ui.agentPolicyDirty = false;
+    $('agent-policy-edit-status').textContent = 'Політику нового завдання збережено.';
     await core('START_BROWSER_AGENT_JOB', { id });
     await loadBrowserAgentJobs({ selectId: id });
     if (ui.selectedBrowserAgent?.runtime?.runState === 'WAITING_PERMISSION') {
@@ -2608,6 +2751,8 @@ async function importBrowserAgentDraft() {
     fillBrowserAgentPolicy(draft.policy);
     $('agent-prompt').value = draft.goal;
     ui.agentDraftActive = true;
+    ui.agentPolicyDirty = false;
+    $('agent-policy-edit-status').textContent = 'Чернетка завантажена; Agent не запущено.';
     $('agent-import-status').textContent = 'Чернетку завантажено у форму. Перевірте її та окремо натисніть «Запустити агента».';
     $('agent-prompt').focus();
   } catch (error) { $('agent-import-status').textContent = `Імпорт не вдався: ${error.message}`; }
@@ -2648,7 +2793,17 @@ async function saveBrowserAgentPolicy() {
   const id = ui.selectedBrowserAgentId;
   if (!id) return;
   try {
+    assertBrowserAgentRouteReadyForLaunch();
+    const editEpoch = ui.agentPolicyEditEpoch;
     await core('UPDATE_BROWSER_AGENT_JOB', { id, config: browserAgentPolicyFromForm() });
+    if (ui.selectedBrowserAgentId !== id) return;
+    if (editEpoch === ui.agentPolicyEditEpoch) {
+      ui.agentPolicyDirty = false;
+      ui.agentDraftActive = false;
+      $('agent-policy-edit-status').textContent = 'Політику Agent збережено.';
+    } else {
+      $('agent-policy-edit-status').textContent = 'Попередні зміни збережено; нові зміни ще не збережені.';
+    }
     await loadBrowserAgentJobs({ selectId: id });
     announce('Політику Agent збережено.');
   } catch (error) { $('agent-status').textContent = `Політику не збережено: ${error.message}`; }
@@ -4500,6 +4655,17 @@ $('agent-send-follow-up-button').addEventListener('click', sendBrowserAgentFollo
 $('agent-approve-action-button').addEventListener('click', approveBrowserAgentAction);
 $('agent-reject-action-button').addEventListener('click', rejectBrowserAgentAction);
 $('agent-save-policy-button').addEventListener('click', saveBrowserAgentPolicy);
+$('agent-ai-pinned-route-id').addEventListener('change', syncBrowserAgentRouteBindingStatus);
+$('agent-policy-details').addEventListener('input', () => {
+  ui.agentPolicyEditEpoch += 1;
+  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
+  ui.agentPolicyDirty = true;
+});
+$('agent-policy-details').addEventListener('change', () => {
+  ui.agentPolicyEditEpoch += 1;
+  if (!ui.agentPolicyDirty) $('agent-policy-edit-status').textContent = 'Є незбережені зміни політики Agent.';
+  ui.agentPolicyDirty = true;
+});
 $('agent-native-companion-check-button').addEventListener('click', checkNativeCompanion);
 $('agent-allow-current-site-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: false }));
 $('agent-allow-all-sites-button').addEventListener('click', () => requestBrowserAgentPermission({ allSites: true }));
