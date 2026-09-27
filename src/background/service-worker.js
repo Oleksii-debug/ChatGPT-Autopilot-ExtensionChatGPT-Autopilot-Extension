@@ -248,6 +248,7 @@ browserAgentLifecycle.current = browserAgent;
 const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({
   fetchFn: (...args) => fetch(...args),
 });
+const specialistReadinessConfigProvenance = new WeakMap();
 const specialistProviderReadinessResolver = Object.freeze({
   async resolve(selection) {
     const providerId = selection?.providerId || '';
@@ -269,7 +270,26 @@ const specialistProviderReadinessResolver = Object.freeze({
         }),
       ],
     });
-    return resolver.resolve(selection);
+    const readiness = await resolver.resolve(selection);
+    specialistReadinessConfigProvenance.set(readiness, Object.freeze({
+      providerId,
+      configSnapshot: JSON.stringify(persisted.config),
+    }));
+    return readiness;
+  },
+  async assertCurrent(readiness) {
+    const provenance = specialistReadinessConfigProvenance.get(readiness);
+    if (!provenance) {
+      throw new Error('Specialist provider readiness lacks durable config provenance');
+    }
+    const persisted = await browserAgent.getSpecialistProviderConfig(provenance.providerId);
+    if (persisted.quarantined || !persisted.config) {
+      throw new Error('Specialist provider config changed after readiness probe');
+    }
+    if (JSON.stringify(persisted.config) !== provenance.configSnapshot) {
+      throw new Error('Specialist provider config changed after readiness probe');
+    }
+    return true;
   },
 });
 const automaticSpecialistDelegationDependencies = Object.freeze({
