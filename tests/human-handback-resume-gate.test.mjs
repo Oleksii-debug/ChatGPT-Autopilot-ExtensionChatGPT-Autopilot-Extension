@@ -827,6 +827,82 @@ test('current world-state arrays are consumed from descriptors without ordinary 
   assert.equal(reads, 0);
 });
 
+test('dependency options are descriptor-safe and reject hidden authority without executing getters', () => {
+  let optionGetterReads = 0;
+  let resolverCalls = 0;
+  const accessorDependencies = {};
+  Object.defineProperty(accessorDependencies, 'resolveTrustedExactEffectState', {
+    enumerable: true,
+    get() {
+      optionGetterReads += 1;
+      throw new Error('dependency getter must not execute');
+    },
+  });
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(gateInput(), accessorDependencies),
+    /enumerable own data property/,
+  );
+  assert.equal(optionGetterReads, 0);
+
+  const validResolver = () => {
+    resolverCalls += 1;
+    return exactEffectState();
+  };
+  const hiddenDependencies = { resolveTrustedExactEffectState: validResolver };
+  Object.defineProperty(hiddenDependencies, 'hiddenAuthority', {
+    enumerable: false,
+    value: true,
+  });
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(gateInput(), hiddenDependencies),
+    /unknown field: hiddenAuthority/,
+  );
+  assert.equal(resolverCalls, 0);
+
+  const symbolDependencies = { resolveTrustedExactEffectState: validResolver };
+  symbolDependencies[Symbol('hidden-authority')] = true;
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(gateInput(), symbolDependencies),
+    /symbol field/,
+  );
+  assert.equal(resolverCalls, 0);
+
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(gateInput(), {
+      resolveTrustedExactEffectState: validResolver,
+      unexpectedAuthority: true,
+    }),
+    /unknown field: unexpectedAuthority/,
+  );
+  assert.equal(resolverCalls, 0);
+
+  const exoticDependencies = Object.create({
+    resolveTrustedExactEffectState: validResolver,
+  });
+  assert.throws(
+    () => authorizeHumanHandbackResumeRawV1(gateInput(), exoticDependencies),
+    /plain data object/,
+  );
+  assert.equal(resolverCalls, 0);
+});
+
+test('null-prototype dependency records preserve the trusted exact-effect resolver path', () => {
+  let resolverCalls = 0;
+  const dependencies = Object.create(null);
+  Object.defineProperty(dependencies, 'resolveTrustedExactEffectState', {
+    enumerable: true,
+    value: lookup => {
+      resolverCalls += 1;
+      assert.equal(Object.isFrozen(lookup), true);
+      return exactEffectState();
+    },
+  });
+
+  const result = authorizeHumanHandbackResumeRawV1(gateInput(), dependencies);
+  assert.equal(result.resumeAuthorized, true);
+  assert.equal(resolverCalls, 1);
+});
+
 test('null-prototype request records remain supported and timestamp aliases fail closed', () => {
   const input = Object.assign(Object.create(null), gateInput());
   assert.equal(authorize(input).resumeAuthorized, true);

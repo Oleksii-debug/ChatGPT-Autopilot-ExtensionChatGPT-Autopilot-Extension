@@ -23,10 +23,11 @@ const REQUEST_KEYS = new Set([
   'currentNodeId',
   'at',
 ]);
+const DEPENDENCY_KEYS = new Set(['resolveTrustedExactEffectState']);
 const MAX_CURRENT_OBSERVATIONS = 256;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
-function strictRecord(value, label) {
+function strictRecord(value, label, allowedKeys = REQUEST_KEYS) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(label + ' must be a plain data object');
   }
@@ -38,7 +39,7 @@ function strictRecord(value, label) {
   const out = Object.create(null);
   for (const key of Reflect.ownKeys(descriptors)) {
     if (typeof key !== 'string') throw new Error(label + ' contains a symbol field');
-    if (!REQUEST_KEYS.has(key)) throw new Error(label + ' contains unknown field: ' + key);
+    if (!allowedKeys.has(key)) throw new Error(label + ' contains unknown field: ' + key);
     const descriptor = descriptors[key];
     if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) {
       throw new Error(label + ' field ' + key + ' must be an enumerable own data property');
@@ -46,6 +47,24 @@ function strictRecord(value, label) {
     out[key] = descriptor.value;
   }
   return out;
+}
+
+function normalizeDependencies(value) {
+  const raw = strictRecord(
+    value === undefined ? {} : value,
+    'HumanHandbackResumeGateDependenciesV1',
+    DEPENDENCY_KEYS,
+  );
+  const resolveTrustedExactEffectState = Object.hasOwn(raw, 'resolveTrustedExactEffectState')
+    ? raw.resolveTrustedExactEffectState
+    : undefined;
+  if (resolveTrustedExactEffectState !== undefined
+      && typeof resolveTrustedExactEffectState !== 'function') {
+    throw new Error(
+      'HumanHandbackResumeGateDependenciesV1 resolveTrustedExactEffectState must be a function',
+    );
+  }
+  return Object.freeze({ resolveTrustedExactEffectState });
 }
 
 function ownRequired(raw, key, label) {
@@ -201,9 +220,8 @@ function assertEffectResolution(packet, assessedAt, resolveTrustedExactEffectSta
  * no new provider/policy/effect capability. resumeAuthorized means only that
  * the existing durable job may be handed back to the canonical runtime.
  */
-export function authorizeHumanHandbackResumeV1(input = {}, {
-  resolveTrustedExactEffectState,
-} = {}) {
+export function authorizeHumanHandbackResumeV1(input = {}, dependencies = undefined) {
+  const { resolveTrustedExactEffectState } = normalizeDependencies(dependencies);
   const raw = strictRecord(input, 'HumanHandbackResumeGateRequestV1');
   const handback = normalizeHumanTakeoverV1(
     ownRequired(raw, 'handback', 'HumanHandbackResumeGateRequestV1'),
