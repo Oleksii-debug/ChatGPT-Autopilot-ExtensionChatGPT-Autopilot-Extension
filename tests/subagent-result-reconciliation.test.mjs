@@ -704,20 +704,40 @@ test('raw result verification must participate in the exact trusted outcome adju
   );
 });
 
-test('trusted verification record identity must match raw result verification provenance', async () => {
+test('trusted verification must bind the exact result invocation and observation identities', async () => {
   const contract = outcomeContract();
   const fixture = request({ contract });
   const record = trustedRecord(contract);
-  record.verification.verificationAuthorityId = 'other-authority';
-  record.verificationAuthorityId = 'other-authority';
+  record.verification.invocationId = 'invocation-other';
+  record.verification.observationId = 'observation-other';
 
   await assert.rejects(
     prepareSubagentResultReconciliationV1(
       fixture.input,
       deps({ contract, record }),
     ),
-    /raw verification does not match its trusted canonical verification record/u,
+    /verification identity does not match its trusted canonical verification record/u,
   );
+});
+
+test('canonical trusted FAILED overrides a raw VERIFIED child claim and reconciles the failed attempt', async () => {
+  const contract = outcomeContract();
+  const fixture = request({ contract });
+  const record = trustedRecord(contract, {
+    status: VerificationStatus.FAILED,
+    reasonCode: 'CHECK_FAILED',
+  });
+
+  const value = await prepareSubagentResultReconciliationV1(
+    fixture.input,
+    deps({ contract, record }),
+  );
+  assert.equal(value.decision, SubagentResultReconciliationDecision.REOPEN);
+  assert.equal(value.trustedVerification.verdict, 'REOPEN');
+  assert.equal(value.trustedVerification.criteria[0].verificationStatus, 'FAILED');
+  assert.equal(value.trustedVerification.criteria[0].trustedReasonCode, 'CHECK_FAILED');
+  assert.equal(value.terminalEvent.status, 'FAILED');
+  assert.equal(value.completionAuthority, false);
 });
 
 test('result observation and completion cannot predate the trusted activation binding', async () => {
