@@ -164,6 +164,7 @@ function participant(key, role, index = 0, generation = 1) {
     completedAt: 0,
     lastError: '',
     replacementCount: 0,
+    tabRecoveryGraceCount: 0,
   };
 }
 
@@ -501,6 +502,7 @@ export function applyScenarioLaunch(runtimeRaw, action, { sessionId, taskId, now
   item.deadlineAt = Number(action.deadlineAt || 0);
   item.completedAt = 0;
   item.lastError = '';
+  item.tabRecoveryGraceCount = 0;
   if (!runtime.totalLaunches) runtime.firstLaunchAt = now;
   runtime.lastLaunchAt = now;
   runtime.lastActionAt = now;
