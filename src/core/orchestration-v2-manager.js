@@ -260,8 +260,12 @@ export class OrchestrationV2Manager {
         throw new Error(`Browser Agent orchestration binding is stale: ${inspection.status}`);
       }
       const controller = this.controllerFor(authority.orchestraId);
+      let lifecycleAuthorityOpen = true;
 
       const applyBoundLifecycle = async (transitionRaw, options = {}) => {
+        if (!lifecycleAuthorityOpen) {
+          throw new Error('Browser Agent bound lifecycle authority callback has expired');
+        }
         const admittedOptions = plainBrowserAgentLifecycleOptions(options);
         const browserControlEpoch = admittedOptions.browserControlEpoch;
         const nowMs = admittedOptions.nowMs === undefined ? this.now() : admittedOptions.nowMs;
@@ -364,7 +368,11 @@ export class OrchestrationV2Manager {
         });
       };
 
-      return operation(applyBoundLifecycle);
+      try {
+        return await operation(applyBoundLifecycle);
+      } finally {
+        lifecycleAuthorityOpen = false;
+      }
     });
   }
 
