@@ -236,6 +236,10 @@ const browserAgent = new BrowserAgentManager({
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
 });
 browserAgentLifecycle.current = browserAgent;
+const browserAgentOrchestrationLifecycleDependencies = Object.freeze({
+  applyBrowserAgentBoundLifecycle: (binding, transition, options) =>
+    orchestrationV2.applyBrowserAgentBoundLifecycle(binding, transition, options),
+});
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
@@ -723,11 +727,21 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
-    result = await browserAgent.pause(message.payload?.id || '');
+    result = await browserAgent.pause(
+      message.payload?.id || '',
+      browserAgentOrchestrationLifecycleDependencies,
+    );
   } else if (message.command === 'RESUME_BROWSER_AGENT_JOB') {
-    result = await browserAgent.resume(message.payload?.id || '');
+    result = await browserAgent.resume(
+      message.payload?.id || '',
+      {},
+      browserAgentOrchestrationLifecycleDependencies,
+    );
   } else if (message.command === 'STOP_BROWSER_AGENT_JOB') {
-    result = await browserAgent.stop(message.payload?.id || '');
+    result = await browserAgent.stop(
+      message.payload?.id || '',
+      browserAgentOrchestrationLifecycleDependencies,
+    );
   } else if (message.command === 'STEP_BROWSER_AGENT_JOB') {
     result = await browserAgent.step(message.payload?.id || '');
   } else if (message.command === 'ADD_BROWSER_AGENT_INSTRUCTION') {
