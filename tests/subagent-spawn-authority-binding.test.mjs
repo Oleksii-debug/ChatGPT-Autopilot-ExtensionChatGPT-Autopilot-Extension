@@ -557,3 +557,44 @@ test('caller mutations after binding cannot widen frozen child authority', () =>
   assert.equal(Object.isFrozen(envelope.capabilityIds), true);
   assert.equal(Object.isFrozen(envelope.toolDescriptors[0].capabilityIds), true);
 });
+
+
+test('child task input order cannot remap durable ordinal child identities', () => {
+  const canonical = bindSubagentSpawnAuthorityV1(request({
+    topologyRequest: topologyRequest({ requestedChildren: 2 }),
+    childTasks: [
+      childTask('task.alpha'),
+      childTask('task.beta', {
+        taskRequestedCapabilityIds: ['cap.write'],
+        requestedToolIds: ['tool.write'],
+      }),
+    ],
+  }));
+  assert.equal(canonical.decision, 'ALLOW');
+
+  const replay = bindSubagentSpawnAuthorityV1(request({
+    topologyRequest: topologyRequest({
+      graph: canonical.graph,
+      runtime: canonical.runtime,
+      requestedChildren: 2,
+      spawnId: 'spawn-bind',
+      nowMs: 300,
+    }),
+    childTasks: [
+      childTask('task.beta', {
+        taskRequestedCapabilityIds: ['cap.write'],
+        requestedToolIds: ['tool.write'],
+      }),
+      childTask('task.alpha'),
+    ],
+  }));
+  assert.equal(replay.decision, 'ALLOW');
+  assert.equal(replay.reused, true);
+  assert.deepEqual(
+    replay.authorityBindings.map(binding => [binding.childNodeId, binding.taskId]),
+    [
+      ['subagent:spawn-bind:1', 'task.alpha'],
+      ['subagent:spawn-bind:2', 'task.beta'],
+    ],
+  );
+});
