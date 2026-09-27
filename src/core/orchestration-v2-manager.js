@@ -309,10 +309,33 @@ export class OrchestrationV2Manager {
       if (result?.kind !== 'HIERARCHY_EVENT' || result.reason !== expectedReason) {
         throw new Error(`Browser Agent hierarchy lifecycle transition was not accepted: ${String(result?.reason || result?.kind || 'UNKNOWN')}`);
       }
+
+      // The reducer intentionally refuses to resurrect STOPPED nodes during a
+      // RESUME_SCOPE. Its aggregate reason still describes the requested scope,
+      // so authorization must bind to the durable target node state rather than
+      // trusting the summary string alone.
+      const latestRuntime = await controller.runtimeRepository.load();
+      const latestGraph = latestRuntime?.hierarchy?.graph;
+      const latestState = latestRuntime?.hierarchy?.state;
+      if (!latestGraph
+          || !latestState
+          || latestGraph.graphId !== binding.graphId
+          || latestState.graphId !== binding.graphId
+          || latestState.controlEpoch !== binding.controlEpoch) {
+        throw new Error('Browser Agent hierarchy authority changed during lifecycle transition');
+      }
+      const target = latestState.nodesById?.[binding.nodeId];
+      if (!target || target.scopeState !== expectedReason) {
+        throw new Error(
+          `Browser Agent hierarchy target did not enter requested lifecycle scope: ${String(target?.scopeState || 'MISSING')}`,
+        );
+      }
+
       return Object.freeze({
         binding,
         transition,
         eventId,
+        targetScopeState: target.scopeState,
         result: structuredClone(result),
       });
     });
