@@ -60,8 +60,9 @@ function discovery(overrides = {}) {
   return {
     registry: registry(),
     requiredCapabilityIds: ['coding.workspace'],
+    requiredToolIds: ['workspace.patch', 'filesystem.read'],
     parentCapabilityIds: ['coding.read', 'coding.workspace', 'filesystem.archive'],
-    parentToolIds: ['workspace.patch', 'filesystem.read'],
+    parentToolIds: ['workspace.patch', 'filesystem.read', 'github.read'],
     executionPlanes: [AgentExecutionPlane.LOCAL],
     ...overrides,
   };
@@ -97,19 +98,26 @@ test('portable registry normalizes deterministically and interoperates with the 
   assert.ok(Object.isFrozen(coding.capabilityIds));
 });
 
-test('discovery grants only requested parent capabilities and the intersection of parent-approved tools', () => {
+test('discovery grants only requested parent capabilities and explicitly requested tools', () => {
   const result = discoverSpecialistsV1(discovery());
   assert.equal(result.specialists.length, 1);
   const selected = result.specialists[0];
   assert.equal(selected.specialistId, OPENHANDS_CODING_SPECIALIST_ID);
   assert.deepEqual(selected.requestedCapabilityIds, ['coding.workspace']);
   assert.deepEqual(selected.grantedToolIds, ['filesystem.read', 'workspace.patch']);
+  assert.equal(selected.grantedToolIds.includes('github.read'), false, 'parent-granted but unrequested tools must not reach the child');
   assert.equal(selected.definitionRevision, 7);
   assert.equal(selected.registryRevision, 3);
 
   assert.throws(() => discoverSpecialistsV1(discovery({
     requiredCapabilityIds: ['coding.admin'],
   })), /exceeds parent or specialist authority/);
+
+  const noMatch = discoverSpecialistsV1(discovery({
+    requiredToolIds: ['browser.read'],
+    parentToolIds: ['browser.read'],
+  }));
+  assert.deepEqual(noMatch.specialists, []);
 });
 
 test('binding preserves exact selection provenance and never mints execution or completion authority', () => {
@@ -121,6 +129,12 @@ test('binding preserves exact selection provenance and never mints execution or 
     handoff: handoff(),
     parentCapabilityIds: request.parentCapabilityIds,
     parentToolIds: request.parentToolIds,
+  });
+  assert.deepEqual(bound.childContext, {
+    goal: 'Repair the bounded repository defect and return evidence artifacts.',
+    artifactRefs: [],
+    credentialRefs: [],
+    parentInvocationId: 'invoke-parent-001',
   });
   assert.deepEqual(bound.childScope.capabilityIds, ['coding.workspace']);
   assert.deepEqual(bound.childScope.toolIds, ['filesystem.read', 'workspace.patch']);
@@ -134,7 +148,9 @@ test('binding preserves exact selection provenance and never mints execution or 
     verificationAuthorized: false,
   });
   assert.equal(bound.handoff.handoffId, 'handoff-coding-001');
+  assert.ok(Object.isFrozen(bound.childContext));
   assert.ok(Object.isFrozen(bound.childScope));
+  assert.equal(Object.hasOwn(bound, 'parentContext'), false);
 });
 
 test('disabled, removed or revision-drifted specialist definitions fail closed after selection', () => {
@@ -179,7 +195,7 @@ test('parent capability or tool-scope drift requires rediscovery instead of wide
     ...base,
     parentCapabilityIds: request.parentCapabilityIds,
     parentToolIds: ['workspace.patch'],
-  }), /tool scope changed after selection/);
+  }), /Selected child tools exceeds parent or specialist authority/);
 
   assert.throws(() => bindSpecialistHandoffToRegistryV1({
     ...base,
