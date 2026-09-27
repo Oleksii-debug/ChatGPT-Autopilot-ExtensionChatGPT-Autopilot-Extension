@@ -161,6 +161,12 @@ function normalizeChildTasks(value) {
   if (new Set(taskIds).size !== taskIds.length) {
     throw new Error('childTasks contains duplicate taskId');
   }
+
+  // Topology child IDs are ordinal. Canonicalize the task set before binding so
+  // caller array order cannot remap a durable child identity on exact replay.
+  tasks.sort((left, right) => (
+    left.taskId < right.taskId ? -1 : left.taskId > right.taskId ? 1 : 0
+  ));
   return tasks;
 }
 
