@@ -158,6 +158,45 @@ test('child Agent derives identity from the trusted parent binding and can only 
   );
 });
 
+test('child inherits parent routing constraints when it only narrows route authority', () => {
+  const parent = createAgentModelPolicyBindingV1(request({
+    agentId: 'agent.parent',
+    routePolicy: {
+      allowRouteIds: ['route.a', 'route.b'],
+      orderedRouteIds: ['route.b', 'route.a'],
+      autoSwitch: false,
+      freeOnly: true,
+      locality: 'remote',
+      maxInputPricePerMillionUsd: 3,
+      maxOutputPricePerMillionUsd: 4,
+      retryBackoffSeconds: 120,
+      circuitBreakerFailures: 1,
+      circuitBreakerSeconds: 600,
+    },
+  }));
+
+  const childInput = request({
+    agentId: 'agent.child',
+    policyRevision: 2,
+    ownerAllowedRouteIds: ['route.b', 'route.c'],
+    parentBinding: parent,
+  });
+  delete childInput.routePolicy;
+
+  const child = createAgentModelPolicyBindingV1(childInput);
+  assert.deepEqual(child.authorityRouteIds, ['route.b']);
+  assert.deepEqual(child.routePolicy.allowRouteIds, ['route.b']);
+  assert.deepEqual(child.routePolicy.orderedRouteIds, ['route.b']);
+  assert.equal(child.routePolicy.autoSwitch, false);
+  assert.equal(child.routePolicy.freeOnly, true);
+  assert.equal(child.routePolicy.locality, 'remote');
+  assert.equal(child.routePolicy.maxInputPricePerMillionUsd, 3);
+  assert.equal(child.routePolicy.maxOutputPricePerMillionUsd, 4);
+  assert.equal(child.routePolicy.retryBackoffSeconds, 120);
+  assert.equal(child.routePolicy.circuitBreakerFailures, 1);
+  assert.equal(child.routePolicy.circuitBreakerSeconds, 600);
+});
+
 test('child cannot widen parent behavioral routing constraints', () => {
   const parent = createAgentModelPolicyBindingV1(request({
     agentId: 'agent.parent',
@@ -431,6 +470,23 @@ test('owner route scope rejects sparse, accessor-backed and duplicate arrays wit
       ownerAllowedRouteIds: ['route.a', 'route.a'],
     })),
     /contains duplicates/,
+  );
+});
+
+test('routePolicy input is fail-closed rather than truthy/falsy-coerced', () => {
+  assert.throws(
+    () => createAgentModelPolicyBindingV1(request({ routePolicy: false })),
+    /AI route policy must be an object/,
+  );
+
+  const parent = createAgentModelPolicyBindingV1(request({ agentId: 'agent.parent' }));
+  assert.throws(
+    () => createAgentModelPolicyBindingV1(request({
+      agentId: 'agent.child',
+      parentBinding: parent,
+      routePolicy: false,
+    })),
+    /Child AiRoutePolicy must be a plain object/,
   );
 });
 
