@@ -225,7 +225,13 @@ test('exact project, child actor and existing AgentPlan owner are binding', () =
     () => createSubagentTaskEnvelopeV1(request({
       plan: plan({ node: { ownerId: 'other-agent' } }),
     })),
-    /child identity does not match AgentPlan node owner/,
+    /requires exact AgentPlan node owner binding/,
+  );
+  assert.throws(
+    () => createSubagentTaskEnvelopeV1(request({
+      plan: plan({ node: { ownerId: '' } }),
+    })),
+    /requires exact AgentPlan node owner binding/,
   );
   assert.throws(
     () => createSubagentTaskEnvelopeV1(request({ childAgentId: 'parent-1' })),
@@ -283,6 +289,17 @@ test('envelope chronology cannot predate plan/outcome and cannot bind a future A
   assert.throws(
     () => createSubagentTaskEnvelopeV1(request({ createdAt: T0 })),
     /cannot predate AgentPlan revision/,
+  );
+
+  assert.throws(
+    () => createSubagentTaskEnvelopeV1(request({
+      plan: plan({
+        plan: { updatedAt: T1 },
+        node: { updatedAt: T2 },
+      }),
+      createdAt: T1,
+    })),
+    /cannot predate AgentPlan node state/,
   );
 
   assert.throws(
