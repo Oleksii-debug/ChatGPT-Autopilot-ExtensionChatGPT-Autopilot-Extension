@@ -112,6 +112,19 @@ function bool(value, label) {
   return value;
 }
 
+function configScalar(value, label) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || Object.is(value, -0)) throw new Error(label + ' must be an exact scalar data value');
+    return value;
+  }
+  if (typeof value === 'string') {
+    if (value !== value.trim() || value.includes('\0')) throw new Error(label + ' must be an exact scalar data value');
+    return value;
+  }
+  throw new Error(label + ' must be an exact scalar data value');
+}
+
 function compareId(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -137,8 +150,12 @@ function freeze(value) {
 function normalizeConfigDefaults(input) {
   if (input === undefined) return freeze({});
   const raw = record(input, CONFIG_DEFAULT_KEYS, 'AgentDefinitionV1.configDefaults');
+  const safe = Object.create(null);
+  for (const key of Object.keys(raw)) {
+    safe[key] = configScalar(raw[key], 'AgentDefinitionV1.configDefaults.' + key);
+  }
   const preview = normalizeBrowserAgentConfig({
-    ...raw,
+    ...safe,
     goal: 'Reusable Agent definition preview',
   }, { id: 'agent-definition-preview' });
   const out = {};
@@ -149,7 +166,8 @@ function normalizeConfigDefaults(input) {
 }
 
 function normalizeAcceptanceCriteria(input) {
-  const values = denseArray(input, 'AgentDefinitionV1.acceptanceCriteria', 20);
+  const values = denseArray(input, 'AgentDefinitionV1.acceptanceCriteria', 20)
+    .map((value, index) => textValue(value, 'acceptanceCriteria[' + index + ']', 1000));
   const preview = normalizeBrowserAgentConfig({
     goal: 'Reusable Agent definition preview',
     acceptanceCriteria: values,
