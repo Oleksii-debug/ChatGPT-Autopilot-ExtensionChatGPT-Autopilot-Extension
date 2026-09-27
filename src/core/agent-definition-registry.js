@@ -3,6 +3,13 @@ import { normalizeBrowserAgentConfig } from './browser-agent.js';
 export const AGENT_DEFINITION_VERSION = 1;
 export const AGENT_DEFINITION_REGISTRY_VERSION = 1;
 export const AGENT_DEFINITION_SELECTION_VERSION = 1;
+export const AGENT_DEFINITION_REGISTRY_MUTATION_VERSION = 1;
+
+export const AgentDefinitionRegistryMutationKind = Object.freeze({
+  CREATE: 'CREATE',
+  UPDATE: 'UPDATE',
+  DELETE: 'DELETE',
+});
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const DEF_KEYS = new Set([
@@ -21,6 +28,11 @@ const MATERIALIZE_KEYS = new Set([
   'registry', 'selection', 'jobId', 'goal', 'projectId', 'ownerBudget',
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
+const MUTATION_KEYS = new Set([
+  'registry', 'expectedRegistryRevision', 'kind',
+  'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
+]);
+const MUTATION_KINDS = new Set(Object.values(AgentDefinitionRegistryMutationKind));
 const CONFIG_DEFAULT_KEYS = new Set([
   'startUrl', 'startFromActiveTab', 'maxSteps', 'stepDelayMs',
   'allowCrossOriginNavigation', 'closeOwnedTabsOnStop', 'visionOnDemand',
@@ -117,6 +129,13 @@ function positiveInteger(value, label) {
 function bool(value, label) {
   if (typeof value !== 'boolean') throw new Error(label + ' must be boolean');
   return value;
+}
+
+function nextRevision(value, label) {
+  if (value >= Number.MAX_SAFE_INTEGER) {
+    throw new Error(label + ' cannot advance beyond MAX_SAFE_INTEGER');
+  }
+  return value + 1;
 }
 
 function configScalar(value, label) {
@@ -421,6 +440,124 @@ export function materializeAgentDefinitionV1(input = {}) {
       credentialAuthorized: false,
       completionAuthorized: false,
       verificationAuthorized: false,
+    },
+  });
+}
+
+
+/**
+ * Builds the next canonical AgentDefinitionRegistry snapshot under exact
+ * compare-and-swap revision guards. This is deliberately a pure proposal:
+ * callers must persist it through the existing durable storage/update
+ * authority after re-checking the same expected revision.
+ */
+export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
+  const raw = record(input, MUTATION_KEYS, 'Agent definition registry mutation request');
+  const registry = normalizeAgentDefinitionRegistryV1(raw.registry);
+  const expectedRegistryRevision = positiveInteger(
+    raw.expectedRegistryRevision,
+    'expectedRegistryRevision',
+  );
+  if (expectedRegistryRevision !== registry.revision) {
+    throw new Error('Agent definition registry revision drifted before mutation');
+  }
+  if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
+    throw new Error('Agent definition registry mutation kind is invalid');
+  }
+
+  const nextRegistryRevision = nextRevision(registry.revision, 'Agent definition registry revision');
+  let nextDefinitions;
+  let agentDefinitionId;
+  let previousDefinitionRevision = 0;
+  let nextDefinitionRevision = 0;
+
+  if (raw.kind === AgentDefinitionRegistryMutationKind.CREATE) {
+    if (!Object.hasOwn(raw, 'definition')) {
+      throw new Error('CREATE mutation requires definition');
+    }
+    if (Object.hasOwn(raw, 'agentDefinitionId') || Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('CREATE mutation must not supply existing-definition identity');
+    }
+    const definition = normalizeAgentDefinitionV1(raw.definition);
+    agentDefinitionId = definition.agentDefinitionId;
+    if (definition.definitionRevision !== 1) {
+      throw new Error('CREATE mutation requires definitionRevision 1');
+    }
+    if (registry.definitions.some(item => item.agentDefinitionId === agentDefinitionId)) {
+      throw new Error('CREATE mutation target already exists');
+    }
+    nextDefinitionRevision = 1;
+    nextDefinitions = [...registry.definitions, definition];
+  } else if (raw.kind === AgentDefinitionRegistryMutationKind.UPDATE) {
+    if (!Object.hasOwn(raw, 'definition') || !Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('UPDATE mutation requires definition and expectedDefinitionRevision');
+    }
+    if (Object.hasOwn(raw, 'agentDefinitionId')) {
+      throw new Error('UPDATE mutation derives identity from definition');
+    }
+    const definition = normalizeAgentDefinitionV1(raw.definition);
+    agentDefinitionId = definition.agentDefinitionId;
+    const current = registry.definitions.find(item => item.agentDefinitionId === agentDefinitionId);
+    if (!current) throw new Error('UPDATE mutation target does not exist');
+    const expectedDefinitionRevision = positiveInteger(
+      raw.expectedDefinitionRevision,
+      'expectedDefinitionRevision',
+    );
+    if (expectedDefinitionRevision !== current.definitionRevision) {
+      throw new Error('Agent definition revision drifted before update');
+    }
+    previousDefinitionRevision = current.definitionRevision;
+    nextDefinitionRevision = nextRevision(current.definitionRevision, 'Agent definition revision');
+    if (definition.definitionRevision !== nextDefinitionRevision) {
+      throw new Error('UPDATE mutation must increment definitionRevision exactly once');
+    }
+    nextDefinitions = registry.definitions.map(item => (
+      item.agentDefinitionId === agentDefinitionId ? definition : item
+    ));
+  } else {
+    if (!Object.hasOwn(raw, 'agentDefinitionId') || !Object.hasOwn(raw, 'expectedDefinitionRevision')) {
+      throw new Error('DELETE mutation requires agentDefinitionId and expectedDefinitionRevision');
+    }
+    if (Object.hasOwn(raw, 'definition')) {
+      throw new Error('DELETE mutation must not supply definition');
+    }
+    agentDefinitionId = id(raw.agentDefinitionId, 'agentDefinitionId');
+    const current = registry.definitions.find(item => item.agentDefinitionId === agentDefinitionId);
+    if (!current) throw new Error('DELETE mutation target does not exist');
+    const expectedDefinitionRevision = positiveInteger(
+      raw.expectedDefinitionRevision,
+      'expectedDefinitionRevision',
+    );
+    if (expectedDefinitionRevision !== current.definitionRevision) {
+      throw new Error('Agent definition revision drifted before delete');
+    }
+    previousDefinitionRevision = current.definitionRevision;
+    nextDefinitions = registry.definitions.filter(item => item.agentDefinitionId !== agentDefinitionId);
+  }
+
+  const nextRegistry = normalizeAgentDefinitionRegistryV1({
+    schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+    registryId: registry.registryId,
+    revision: nextRegistryRevision,
+    definitions: nextDefinitions,
+  });
+
+  return freeze({
+    schemaVersion: AGENT_DEFINITION_REGISTRY_MUTATION_VERSION,
+    kind: raw.kind,
+    registryId: registry.registryId,
+    previousRegistryRevision: registry.revision,
+    nextRegistryRevision,
+    agentDefinitionId,
+    previousDefinitionRevision,
+    nextDefinitionRevision,
+    nextRegistry,
+    authority: {
+      persistenceAuthorized: false,
+      executionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
     },
   });
 }
