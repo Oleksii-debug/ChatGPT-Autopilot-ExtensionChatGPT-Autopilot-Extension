@@ -435,6 +435,7 @@ export class BrowserAgentManager {
     this.executionSlotActive = new Set();
     this.executionSlotQueue = [];
     this.executionSlotPump = null;
+    this.executionSlotPumpRequested = false;
   }
 
   async load() {
@@ -554,7 +555,7 @@ export class BrowserAgentManager {
       return store;
     });
     await this.reconcileAlarm();
-    void this.#pumpExecutionSlots();
+    this.#requestExecutionSlotPump();
     return policy;
   }
 
@@ -563,14 +564,45 @@ export class BrowserAgentManager {
     for (const next of pending) next.reject(error);
   }
 
+  #hasExecutionTargetConflict(store, id) {
+    const requestedTabId = store.byId[id]?.runtime?.tabId;
+    if (!Number.isInteger(requestedTabId)) return false;
+    for (const activeId of this.executionSlotActive) {
+      if (activeId === id) continue;
+      if (store.byId[activeId]?.runtime?.tabId === requestedTabId) return true;
+    }
+    return false;
+  }
+
+  #requestExecutionSlotPump() {
+    if (this.executionSlotPump) {
+      this.executionSlotPumpRequested = true;
+      return;
+    }
+    void this.#pumpExecutionSlots();
+  }
+
   async #pumpExecutionSlots() {
     if (this.executionSlotPump) return this.executionSlotPump;
+    this.executionSlotPumpRequested = false;
     const operation = (async () => {
       try {
         while (this.executionSlotQueue.length) {
-          const policy = await this.getExecutionPolicy();
+          const store = await this.load();
+          const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
           if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
-          const next = this.executionSlotQueue.shift();
+
+          let eligibleIndex = -1;
+          for (let index = 0; index < this.executionSlotQueue.length; index += 1) {
+            const candidate = this.executionSlotQueue[index];
+            if (this.executionSlotActive.has(candidate.id) || !this.#hasExecutionTargetConflict(store, candidate.id)) {
+              eligibleIndex = index;
+              break;
+            }
+          }
+          if (eligibleIndex < 0) return;
+
+          const [next] = this.executionSlotQueue.splice(eligibleIndex, 1);
           if (!next) return;
           if (this.executionSlotActive.has(next.id)) {
             next.resolve();
@@ -588,40 +620,37 @@ export class BrowserAgentManager {
       await operation;
     } finally {
       if (this.executionSlotPump === operation) this.executionSlotPump = null;
-      if (this.executionSlotQueue.length) {
-        try {
-          const policy = await this.getExecutionPolicy();
-          if (this.executionSlotActive.size < policy.maxConcurrentAgents) {
-            void this.#pumpExecutionSlots();
-          }
-        } catch (error) {
-          this.#rejectExecutionSlotQueue(error);
-        }
+      if (this.executionSlotPumpRequested) {
+        this.executionSlotPumpRequested = false;
+        this.#requestExecutionSlotPump();
       }
     }
   }
 
   async #acquireExecutionSlot(id) {
-    const policy = await this.getExecutionPolicy();
+    const store = await this.load();
+    const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
     const admission = evaluateResourceBudgetV1({
       budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
       usage: { concurrentAgents: this.executionSlotActive.size },
       request: { concurrentAgents: 1 },
     });
-    if (admission.decision === ResourceBudgetDecisionKind.ALLOW && this.executionSlotQueue.length === 0) {
+    if (admission.decision === ResourceBudgetDecisionKind.ALLOW
+        && this.executionSlotQueue.length === 0
+        && !this.#hasExecutionTargetConflict(store, id)) {
       this.executionSlotActive.add(id);
       return true;
     }
     await new Promise((resolve, reject) => {
       this.executionSlotQueue.push({ id, resolve, reject });
-      void this.#pumpExecutionSlots();
+      this.#requestExecutionSlotPump();
     });
     return true;
   }
 
   #releaseExecutionSlot(id) {
     if (!this.executionSlotActive.delete(id)) return;
-    void this.#pumpExecutionSlots();
+    this.#requestExecutionSlotPump();
   }
 
   async list() {
@@ -1533,18 +1562,26 @@ export class BrowserAgentManager {
     }
     const context = await this.resolveStartContext(job);
     if (context.tab?.id != null && context.adopt) {
+      let adopted = false;
       await this.update(store => {
         const live = store.byId[job.id];
         if (!live) return store;
+        const claimedByOtherAgent = store.order.some(otherId =>
+          otherId !== job.id && store.byId[otherId]?.runtime?.tabId === context.tab.id);
+        if (claimedByOtherAgent) return store;
         live.runtime.tabId = context.tab.id;
         if (!live.runtime.knownTabIds.includes(context.tab.id)) live.runtime.knownTabIds.push(context.tab.id);
         // Adopted owner tabs are intentionally NOT placed in ownedTabIds.
         live.runtime.currentUrl = context.tab.url || context.url;
         live.runtime.updatedAt = this.now();
         appendHistory(live.runtime, { at: this.now(), type: 'tab', message: 'Adopted existing browser tab without taking ownership' });
+        adopted = true;
         return store;
       });
-      return context.tab;
+      if (adopted) return context.tab;
+      // Another durable Browser Agent already binds this owner tab. Do not
+      // create a competing target-ownership authority; isolate this job onto a
+      // fresh owned tab at the same URL instead.
     }
     const tab = await this.chrome.tabs.create({ url: context.url || DEFAULT_AGENT_START_URL, active: false });
     if (!Number.isInteger(tab?.id)) throw new Error('Browser Agent could not create a browser tab');
