@@ -303,13 +303,18 @@ export class OrchestrationV2Manager {
       try {
         await this.updateConfig({ ...config, enabled: false }, id);
       } catch (error) {
-        await this.chrome.storage.local.remove?.([configKey(id), runtimeKey(id)]);
-        this.controllers.delete(id);
-        await this.updateMeta(meta => {
-          delete meta.byId[id];
-          meta.order = meta.order.filter(value => value !== id);
-          if (meta.selectedId === id) meta.selectedId = meta.order[0] || '';
-          return meta;
+        // updateConfig is authority-fenced, but a failing repository write may
+        // have partially persisted config/runtime. Keep cleanup under the same
+        // fence so BIND cannot observe authority that is being rolled back.
+        await this.runProjectAuthorityExclusive(async () => {
+          await this.chrome.storage.local.remove?.([configKey(id), runtimeKey(id)]);
+          this.controllers.delete(id);
+          await this.updateMeta(meta => {
+            delete meta.byId[id];
+            meta.order = meta.order.filter(value => value !== id);
+            if (meta.selectedId === id) meta.selectedId = meta.order[0] || '';
+            return meta;
+          });
         });
         throw error;
       }
