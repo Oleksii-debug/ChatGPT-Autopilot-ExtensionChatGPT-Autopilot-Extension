@@ -195,11 +195,10 @@ function activationRequestsForSpawn(graph, runtime, parentNodeId, spawnId, child
   // sentinel. Preserve that behavior, but a positive cap is a hard concurrent
   // child-activation limit and must include already in-flight siblings.
   const effectiveLimit = parent.maxActiveChildren || parent.childIds.length;
-  const occupiedSlots = parent.childIds.reduce((count, childId) => (
-    childNodeIds.includes(childId)
-      ? count
-      : count + (activationInFlight(runtime.nodesById[childId]) ? 1 : 0)
-  ), 0);
+  const occupiedSlots = parent.childIds.reduce(
+    (count, childId) => count + (activationInFlight(runtime.nodesById[childId]) ? 1 : 0),
+    0,
+  );
   let remainingSlots = Math.max(0, effectiveLimit - occupiedSlots);
 
   const requests = [];
