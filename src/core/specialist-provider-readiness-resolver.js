@@ -11,6 +11,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_BINDINGS = 128;
 const MAX_PROVIDER_STATES = 129;
 const MAX_AGE_MS = 5 * 60_000;
+const MAX_DATE_MS = 8_640_000_000_000_000;
 
 function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -167,17 +168,28 @@ export class SpecialistProviderReadinessResolverV1 {
     const bound = this.#bindings.get(selection.providerId);
     if (!bound) throw new Error('No trusted readiness resolver is bound for selected provider');
 
-    const nowMs = this.#now();
-    if (typeof nowMs !== 'number' || !Number.isSafeInteger(nowMs) || Object.is(nowMs, -0) || nowMs < 0) {
+    const startedAtMs = this.#now();
+    if (typeof startedAtMs !== 'number' || !Number.isSafeInteger(startedAtMs)
+        || Object.is(startedAtMs, -0) || startedAtMs < 0 || startedAtMs > MAX_DATE_MS) {
       throw new Error('Trusted readiness resolver clock returned an invalid time');
     }
-    const asOf = new Date(nowMs).toISOString();
+    const asOf = new Date(startedAtMs).toISOString();
     const request = resolutionRequest(selection, asOf);
     const rawResult = await bound.resolveReadiness(request);
+
+    const resolvedAtMs = this.#now();
+    if (typeof resolvedAtMs !== 'number' || !Number.isSafeInteger(resolvedAtMs)
+        || Object.is(resolvedAtMs, -0) || resolvedAtMs < 0 || resolvedAtMs > MAX_DATE_MS) {
+      throw new Error('Trusted readiness resolver clock returned an invalid time');
+    }
+    if (resolvedAtMs < startedAtMs) {
+      throw new Error('Trusted readiness resolver clock moved backwards');
+    }
+
     const result = record(rawResult, RESULT_KEYS, 'Provider readiness resolver result');
     const observed = timestamp(result.observedAt, 'observedAt');
-    if (observed.ms > nowMs) throw new Error('Provider readiness observation is from the future');
-    const ageMs = nowMs - observed.ms;
+    if (observed.ms > resolvedAtMs) throw new Error('Provider readiness observation is from the future');
+    const ageMs = resolvedAtMs - observed.ms;
     if (ageMs > bound.maxAgeMs) throw new Error('Provider readiness observation is stale');
 
     const providerStates = validateResolvedStates(result.providerStates, selection);
@@ -192,7 +204,7 @@ export class SpecialistProviderReadinessResolverV1 {
       definitionRevision: selection.definitionRevision,
       executionPlane: selection.executionPlane,
       observedAt: observed.value,
-      resolvedAt: asOf,
+      resolvedAt: new Date(resolvedAtMs).toISOString(),
       ageMs,
       maxAgeMs: bound.maxAgeMs,
       readiness: inspection.readiness,
