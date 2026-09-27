@@ -15,7 +15,11 @@ import {
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
-import { createOrchestrationProjectAuthorityV1 } from './browser-agent-orchestration-binding.js';
+import {
+  createOrchestrationProjectAuthorityV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+  normalizeBrowserAgentOrchestrationNodeBindingV1,
+} from './browser-agent-orchestration-binding.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -208,6 +212,86 @@ export class OrchestrationV2Manager {
     return this.runProjectAuthorityExclusive(async () => {
       const authority = await this.resolveProjectHierarchyAuthority(projectId);
       return operation(authority);
+    });
+  }
+
+  /**
+   * Apply one Browser Agent owner lifecycle transition to the exact bound
+   * OrchestrationHierarchy node. This is deliberately a thin adapter over the
+   * existing hierarchy reducer/runtime; it creates no lifecycle authority.
+   *
+   * The Project authority fence is held from provenance revalidation through
+   * durable hierarchy dispatch. BrowserAgentManager keeps its own serialized
+   * store operation open while calling this method and restores its previous
+   * durable state if this call fails.
+   */
+  applyBrowserAgentBoundLifecycle(bindingRaw, transitionRaw, {
+    browserControlEpoch,
+    nowMs = this.now(),
+  } = {}) {
+    const binding = normalizeBrowserAgentOrchestrationNodeBindingV1(bindingRaw);
+    const transition = typeof transitionRaw === 'string' ? transitionRaw.trim().toUpperCase() : '';
+    const eventType = transition === 'PAUSE'
+      ? OrchestrationHierarchyEventType.PAUSE_SCOPE
+      : transition === 'RESUME'
+        ? OrchestrationHierarchyEventType.RESUME_SCOPE
+        : transition === 'STOP'
+          ? OrchestrationHierarchyEventType.STOP_SCOPE
+          : '';
+    if (!eventType) throw new Error('Invalid Browser Agent bound lifecycle transition');
+    if (typeof browserControlEpoch !== 'number'
+        || !Number.isSafeInteger(browserControlEpoch)
+        || Object.is(browserControlEpoch, -0)
+        || browserControlEpoch < 1) {
+      throw new Error('Invalid Browser Agent lifecycle control epoch');
+    }
+    if (typeof nowMs !== 'number'
+        || !Number.isSafeInteger(nowMs)
+        || Object.is(nowMs, -0)
+        || nowMs < 0) {
+      throw new Error('Invalid Browser Agent lifecycle timestamp');
+    }
+
+    return this.runProjectAuthorityExclusive(async () => {
+      const authority = await this.resolveProjectHierarchyAuthority(binding.projectId);
+      const inspection = inspectBrowserAgentOrchestrationNodeBindingV1({ binding, authority });
+      if (!inspection.current) {
+        throw new Error(`Browser Agent orchestration binding is stale: ${inspection.status}`);
+      }
+
+      const controller = this.controllerFor(authority.orchestraId);
+      const eventId = compactOrchestrationEventId(
+        'browser-agent-lifecycle',
+        binding.jobId,
+        binding.projectId,
+        binding.orchestraId,
+        binding.graphId,
+        binding.controlEpoch,
+        binding.nodeId,
+        transition,
+        browserControlEpoch,
+      );
+      const result = await controller.dispatchHierarchyEvent({
+        type: eventType,
+        eventId,
+        controlEpoch: binding.controlEpoch,
+        nodeId: binding.nodeId,
+      }, { nowMs });
+
+      const expectedReason = transition === 'PAUSE'
+        ? 'PAUSED'
+        : transition === 'STOP'
+          ? 'STOPPED'
+          : 'RUNNING';
+      if (result?.kind !== 'HIERARCHY_EVENT' || result.reason !== expectedReason) {
+        throw new Error(`Browser Agent hierarchy lifecycle transition was not accepted: ${String(result?.reason || result?.kind || 'UNKNOWN')}`);
+      }
+      return Object.freeze({
+        binding,
+        transition,
+        eventId,
+        result: structuredClone(result),
+      });
     });
   }
 
