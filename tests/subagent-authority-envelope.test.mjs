@@ -32,8 +32,10 @@ function request(overrides = {}) {
     providerCapabilityIds: ['cap.read', 'cap.write', 'cap.remote'],
     taskRequestedCapabilityIds: ['cap.read'],
     parentSourceIds: ['source.repo', 'source.drive'],
+    ownerAllowedSourceIds: ['source.repo', 'source.drive'],
     taskSourceIds: ['source.repo'],
     parentArtifactIds: ['artifact.input', 'artifact.private'],
+    ownerAllowedArtifactIds: ['artifact.input', 'artifact.private'],
     taskArtifactIds: ['artifact.input'],
     parentToolIds: ['tool.read', 'tool.write'],
     ownerAllowedToolIds: ['tool.read', 'tool.write'],
@@ -84,7 +86,7 @@ test('fails closed when task capability exceeds any authority intersection membe
   assert.deepEqual(providerDenied.deniedCapabilityIds, ['cap.local']);
 });
 
-test('child context cannot escape parent source or artifact visibility', () => {
+test('child context cannot escape parent or owner source/artifact visibility', () => {
   const source = deriveSubagentAuthorityEnvelopeV1(request({
     taskSourceIds: ['source.repo', 'source.secret'],
   }));
@@ -92,12 +94,26 @@ test('child context cannot escape parent source or artifact visibility', () => {
   assert.deepEqual(source.deniedSourceIds, ['source.secret']);
   assert.deepEqual(source.sourceIds, []);
 
+  const ownerSource = deriveSubagentAuthorityEnvelopeV1(request({
+    ownerAllowedSourceIds: ['source.drive'],
+    taskSourceIds: ['source.repo'],
+  }));
+  assert.equal(ownerSource.reasonCode, 'CONTEXT_SOURCE_ESCALATION');
+  assert.deepEqual(ownerSource.deniedSourceIds, ['source.repo']);
+
   const artifact = deriveSubagentAuthorityEnvelopeV1(request({
     taskArtifactIds: ['artifact.input', 'artifact.secret'],
   }));
   assert.equal(artifact.reasonCode, 'CONTEXT_ARTIFACT_ESCALATION');
   assert.deepEqual(artifact.deniedArtifactIds, ['artifact.secret']);
   assert.deepEqual(artifact.artifactIds, []);
+
+  const ownerArtifact = deriveSubagentAuthorityEnvelopeV1(request({
+    ownerAllowedArtifactIds: ['artifact.private'],
+    taskArtifactIds: ['artifact.input'],
+  }));
+  assert.equal(ownerArtifact.reasonCode, 'CONTEXT_ARTIFACT_ESCALATION');
+  assert.deepEqual(ownerArtifact.deniedArtifactIds, ['artifact.input']);
 });
 
 test('tool identity is independently narrowed by parent and owner scope', () => {
