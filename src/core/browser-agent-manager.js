@@ -78,6 +78,10 @@ import {
 } from './browser-agent-orchestration-binding.js';
 import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
 import {
+  createBrowserAgentParentRuntimeFenceFromJobV1,
+  inspectBrowserAgentParentRuntimeFenceFromJobV1,
+} from './browser-agent-parent-runtime-fence.js';
+import {
   evaluateSubagentStructureAdmissionV1,
   SubagentSpawnInitiator,
   SubagentStructureDecision,
@@ -111,6 +115,10 @@ const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
 const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
   'resolveProjectHierarchyAuthority',
   'withProjectHierarchyAuthority',
+]);
+const AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS = new Set([
+  'withProjectHierarchyAuthority',
+  'specialistProviderReadinessResolver',
 ]);
 const AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
@@ -191,6 +199,53 @@ function trustedOrchestrationAuthorityFence(dependencies) {
     throw new Error('Canonical orchestration Project authority fence is required');
   }
   return raw.withProjectHierarchyAuthority;
+}
+
+function trustedAutomaticDelegationDependencies(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS,
+    'Browser Agent automatic specialist delegation dependencies',
+  );
+  if (typeof raw.withProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority fence is required');
+  }
+  const resolver = raw.specialistProviderReadinessResolver;
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
+    throw new Error('Trusted specialist provider readiness resolver is required');
+  }
+  let cursor = resolver;
+  let resolveDescriptor = null;
+  while (cursor && cursor !== Object.prototype) {
+    const descriptor = Object.getOwnPropertyDescriptor(cursor, 'resolve');
+    if (descriptor) {
+      resolveDescriptor = descriptor;
+      break;
+    }
+    cursor = Object.getPrototypeOf(cursor);
+  }
+  if (!resolveDescriptor
+      || !Object.hasOwn(resolveDescriptor, 'value')
+      || typeof resolveDescriptor.value !== 'function') {
+    throw new Error('Trusted specialist provider readiness resolver.resolve must be a data method');
+  }
+  return Object.freeze({
+    withProjectHierarchyAuthority: raw.withProjectHierarchyAuthority,
+    resolveSpecialistReadiness: selection => resolveDescriptor.value.call(resolver, selection),
+  });
+}
+
+function sameSpecialistSelection(left, right) {
+  const a = normalizeSpecialistSelectionV1(left);
+  const b = normalizeSpecialistSelectionV1(right);
+  return a.registryId === b.registryId
+    && a.registryRevision === b.registryRevision
+    && a.specialistId === b.specialistId
+    && a.providerId === b.providerId
+    && a.definitionRevision === b.definitionRevision
+    && a.executionPlane === b.executionPlane
+    && sameCanonicalIdentityList(a.requestedCapabilityIds, b.requestedCapabilityIds)
+    && sameCanonicalIdentityList(a.grantedToolIds, b.grantedToolIds);
 }
 
 const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
