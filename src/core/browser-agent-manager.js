@@ -58,6 +58,7 @@ import {
   normalizeAgentDefinitionSelectionV1,
   selectAgentDefinitionV1,
   materializeAgentDefinitionV1,
+  normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
 import {
@@ -486,8 +487,27 @@ function originPattern(value) {
   return `${url.origin}/*`;
 }
 
-function browserAgentRouterOverride(config = {}) {
-  const out = {};
+function normalizePersistedDefinitionRouterOverride(raw, selection) {
+  if (raw == null) {
+    if (selection?.definition?.modelRoutePolicy) {
+      throw new Error('Browser Agent selected definition route policy requires persisted router override');
+    }
+    return null;
+  }
+  if (!selection) throw new Error('Browser Agent definition router override requires persisted selection provenance');
+  const record = snapshotExactOwnDataRequest(raw, new Set(['routePolicy']), 'Browser Agent definition router override');
+  if (!Object.hasOwn(record, 'routePolicy')) throw new Error('Browser Agent definition router override requires routePolicy');
+  const routePolicy = normalizeAgentModelRoutePolicyV1(record.routePolicy);
+  if (!routePolicy) throw new Error('Browser Agent definition router override routePolicy is required');
+  if (JSON.stringify(routePolicy) !== JSON.stringify(selection.definition.modelRoutePolicy)) {
+    throw new Error('Browser Agent definition router override drifted from selected definition');
+  }
+  return Object.freeze({ routePolicy });
+}
+function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
+  const out = definitionRouterOverride?.routePolicy
+    ? { routePolicy: definitionRouterOverride.routePolicy }
+    : {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
   if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
@@ -680,6 +700,10 @@ function normalizeStore(raw, now) {
         ? null
         : normalizeAgentDefinitionSelectionV1(raw.byId[id].definitionSelection);
       const definitionScope = normalizePersistedAgentDefinitionScope(raw.byId[id].definitionScope, definitionSelection);
+      const definitionRouterOverride = normalizePersistedDefinitionRouterOverride(
+        raw.byId[id].definitionRouterOverride,
+        definitionSelection,
+      );
       const orchestrationNodeBinding = raw.byId[id].orchestrationNodeBinding == null
         ? null
         : normalizeBrowserAgentOrchestrationNodeBindingV1(raw.byId[id].orchestrationNodeBinding);
@@ -696,6 +720,7 @@ function normalizeStore(raw, now) {
         runtime: normalizeRuntime(raw.byId[id].runtime, now),
         definitionSelection,
         definitionScope,
+        definitionRouterOverride,
         orchestrationNodeBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
@@ -796,7 +821,7 @@ export class BrowserAgentManager {
         maxOutputTokens: verifierMaxOutputTokens,
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
-        routerOverride: browserAgentRouterOverride(job.config),
+        routerOverride: browserAgentRouterOverride(job.config, job.definitionRouterOverride),
         taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
@@ -1565,6 +1590,7 @@ export class BrowserAgentManager {
         runtime: createBrowserAgentRuntime(now),
         definitionSelection: clone(selection),
         definitionScope: clone(materialized.scope),
+        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
         orchestrationNodeBinding: null,
         createdAt: now,
         updatedAt: now,
@@ -1626,6 +1652,7 @@ export class BrowserAgentManager {
         runtime: createBrowserAgentRuntime(now),
         definitionSelection: null,
         definitionScope: null,
+        definitionRouterOverride: null,
         orchestrationNodeBinding: null,
         createdAt: now,
         updatedAt: now,
@@ -3620,7 +3647,7 @@ export class BrowserAgentManager {
         maxOutputTokens,
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(current.job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
-        routerOverride: browserAgentRouterOverride(current.job.config),
+        routerOverride: browserAgentRouterOverride(current.job.config, current.job.definitionRouterOverride),
         taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),

@@ -2448,6 +2448,22 @@ function setAgentDefinitionFormEnabled(enabled) {
   $('agent-definition-new-button').disabled = !ui.selectedAgentDefinitionRegistry;
 }
 
+function agentDefinitionModelPolicySummary(definition) {
+  const policy = definition?.modelRoutePolicy;
+  if (!policy) return 'Model policy: global Models settings.';
+  const parts = [];
+  if (policy.pinnedRouteId) parts.push('route ' + policy.pinnedRouteId);
+  if (Array.isArray(policy.allowRouteIds) && policy.allowRouteIds.length) {
+    parts.push('allowed routes ' + policy.allowRouteIds.join(', '));
+  }
+  if (policy.freeOnly) parts.push('free only');
+  if (policy.locality && policy.locality !== 'any') parts.push(policy.locality + ' only');
+  if (policy.autoSwitch === false) parts.push('automatic failover off');
+  if (policy.maxInputPricePerMillionUsd != null) parts.push('input price cap ' + policy.maxInputPricePerMillionUsd);
+  if (policy.maxOutputPricePerMillionUsd != null) parts.push('output price cap ' + policy.maxOutputPricePerMillionUsd);
+  return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2463,7 +2479,7 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   $('agent-definition-revision').textContent = definition
-    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}.`
+    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
     : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
   $('agent-definition-save-button').disabled = !hasRegistry;
   $('agent-definition-toggle-enabled-button').disabled = !definition;
@@ -2623,6 +2639,7 @@ async function saveAgentDefinition() {
     const definition = buildAgentDefinitionFromFormV1(agentDefinitionFormValue(), {
       definitionRevision,
       configDefaults: current?.configDefaults || {},
+      modelRoutePolicy: current?.modelRoutePolicy ?? null,
     });
     const payload = current
       ? {
