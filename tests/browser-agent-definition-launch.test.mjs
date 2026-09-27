@@ -276,6 +276,49 @@ test('definition launch request boundary is exact-shape, data-only and zero-gett
   );
 });
 
+test('launch snapshots nested owner authority before queued persistence', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+
+  const request = launchRequest({ jobId: 'job.snapshot' });
+  const pending = manager.createFromAgentDefinition(request);
+  request.ownerBudget.maxSteps = 1;
+  request.requestedCapabilityIds[0] = 'browser';
+  request.requestedToolIds[0] = 'files.read';
+
+  const created = await pending;
+  assert.equal(created.job.config.maxSteps, 50, 'post-call budget mutation must not alter materialization');
+  assert.deepEqual(created.job.definitionScope.capabilityIds, ['research']);
+  assert.deepEqual(created.job.definitionScope.toolIds, ['browser.read']);
+});
+
+test('nested launch authority rejects accessors without executing them', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+
+  let reads = 0;
+  const budget = ownerBudget();
+  Object.defineProperty(budget, 'maxSteps', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 200;
+    },
+  });
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({
+      jobId: 'job.nested-getter',
+      ownerBudget: budget,
+    })),
+    /enumerable data property/,
+  );
+  assert.equal(reads, 0);
+});
+
 test('standard Browser Agent creation carries no reusable-definition provenance', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
