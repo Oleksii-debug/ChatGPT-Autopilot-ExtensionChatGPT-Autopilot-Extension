@@ -510,3 +510,85 @@ test('pinned Agent route cannot bypass requested-role filtering through strong f
   );
   assert.equal(calls.length, 0, 'pinned route role mismatch must fail before provider I/O rather than being reclassified as verifier fallback');
 });
+
+
+test('Agent route policy can narrow global Models policy without mutating it', async () => {
+  const calls = [];
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000, {
+    aiOrchestrator: new AiOrchestrator({ gatewayClient: { async complete(request) {
+      calls.push(request);
+      return { text:'done', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+    } } }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[
+      { routeId:'local-a', provider:'ollama', model:'local-a', priority:10, costClass:'free', locality:'local' },
+      { routeId:'local-b', provider:'ollama', model:'local-b', priority:20, costClass:'free', locality:'local' },
+      { routeId:'paid', provider:'openai', model:'paid', priority:1, costClass:'paid',
+        inputPricePerMillionUsd:2, outputPricePerMillionUsd:4, locality:'remote' },
+    ],
+    routePolicy:{ allowRouteIds:['local-a','local-b','paid'], maxInputPricePerMillionUsd:5 },
+  } });
+  const before = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  const result = await dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'agent task',
+    isolatedRuntime:true,
+    routerOverride:{
+      routePolicy:{
+        autoSwitch:false,
+        allowRouteIds:['local-b'],
+        freeOnly:true,
+        locality:'local',
+        maxInputPricePerMillionUsd:1,
+      },
+    },
+  });
+  assert.equal(result.result.text, 'done');
+  assert.deepEqual(calls.map(call => call.model), ['local-b']);
+  const after = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.deepEqual(after, before, 'per-Agent policy must never mutate global Models settings');
+});
+
+test('Agent route policy fails closed when it widens global allow-list, locality or pin authority', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[
+      { routeId:'local', provider:'ollama', model:'local', costClass:'free', locality:'local' },
+      { routeId:'remote', provider:'openai', model:'remote', costClass:'paid', locality:'remote',
+        inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+    ],
+    routePolicy:{ allowRouteIds:['local'], locality:'local', pinnedRouteId:'local' },
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ allowRouteIds:['remote'] } },
+  }), /exceeds the global allow-list/);
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ locality:'remote' } },
+  }), /exceeds the global locality policy/);
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ pinnedRouteId:'remote' } },
+  }), /conflicts with the global pinned route/);
+});
+
+test('Agent route policy rejects resilience controls and hostile fields instead of creating policy authority', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: { async run() { throw new Error('provider must not run'); } },
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    routes:[{ routeId:'local', provider:'ollama', model:'local' }],
+  } });
+  await assert.rejects(() => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+    prompt:'x', isolatedRuntime:true,
+    routerOverride:{ routePolicy:{ retryBackoffSeconds:1 } },
+  }), /unsupported field/);
+});
