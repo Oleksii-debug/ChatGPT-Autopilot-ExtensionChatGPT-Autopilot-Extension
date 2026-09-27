@@ -39,7 +39,6 @@ const REQUEST_KEYS = new Set([
   'taskActivationBindingId',
 ]);
 const BINDING_BUILD_KEYS = new Set([
-  'bindingId',
   'taskEnvelope',
   'graph',
   'runtime',
@@ -349,12 +348,22 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
     throw new Error('Subagent activation binding predates the task envelope');
   }
 
+  const invocationId = exactId(
+    own(request, 'invocationId', 'SubagentTaskActivationBindingBuildV1'),
+    'invocationId',
+  );
+  const bindingId = compactOrchestrationEventId(
+    'subagent-task-activation-binding',
+    task.projectId,
+    task.envelopeId,
+    action.activationId,
+    String(action.generation),
+    invocationId,
+  );
+
   return freezeDeep({
     schemaVersion: SUBAGENT_TASK_ACTIVATION_BINDING_VERSION,
-    bindingId: exactId(
-      own(request, 'bindingId', 'SubagentTaskActivationBindingBuildV1'),
-      'bindingId',
-    ),
+    bindingId,
     projectId: task.projectId,
     parentAgentId: task.parentAgentId,
     childAgentId: task.childAgentId,
@@ -364,10 +373,7 @@ export function deriveSubagentTaskActivationBindingV1(input = {}) {
     planRevision: task.planRevision,
     outcomeContractId: task.outcome.contractId,
     outcomeContractRevision: task.outcome.contractRevision,
-    invocationId: exactId(
-      own(request, 'invocationId', 'SubagentTaskActivationBindingBuildV1'),
-      'invocationId',
-    ),
+    invocationId,
     controlEpoch: runtime.controlEpoch,
     activationId: action.activationId,
     generation: action.generation,
@@ -395,7 +401,7 @@ export function normalizeTrustedSubagentTaskActivationBindingV1(input) {
     throw new Error('Trusted subagent task activation purpose cannot terminalize a result');
   }
 
-  return freezeDeep({
+  const normalized = {
     schemaVersion: SUBAGENT_TASK_ACTIVATION_BINDING_VERSION,
     bindingId: exactId(own(raw, 'bindingId', 'TrustedSubagentTaskActivationBindingV1'), 'bindingId'),
     projectId: exactId(own(raw, 'projectId', 'TrustedSubagentTaskActivationBindingV1'), 'projectId'),
@@ -440,7 +446,19 @@ export function normalizeTrustedSubagentTaskActivationBindingV1(input) {
       own(raw, 'boundAt', 'TrustedSubagentTaskActivationBindingV1'),
       'boundAt',
     ),
-  });
+  };
+  const expectedBindingId = compactOrchestrationEventId(
+    'subagent-task-activation-binding',
+    normalized.projectId,
+    normalized.taskEnvelopeId,
+    normalized.activationId,
+    String(normalized.generation),
+    normalized.invocationId,
+  );
+  if (normalized.bindingId !== expectedBindingId) {
+    throw new Error('Trusted subagent task activation bindingId is not canonical');
+  }
+  return freezeDeep(normalized);
 }
 
 function assertResultMatchesBinding(result, binding) {
