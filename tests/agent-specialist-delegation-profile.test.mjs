@@ -397,6 +397,12 @@ test('materialization rejects stale-shaped identities, timestamps, revisions and
   );
   assert.throws(
     () => materializeAgentSpecialistDelegationIntentV1(request({
+      childBudget: undefined,
+    })),
+    /childBudget must be omitted instead of undefined/u,
+  );
+  assert.throws(
+    () => materializeAgentSpecialistDelegationIntentV1(request({
       childBudget: { maxModelCalls: -0 },
     })),
     /childBudget\.maxModelCalls is invalid/u,
