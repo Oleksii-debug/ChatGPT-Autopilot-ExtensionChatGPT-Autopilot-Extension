@@ -12,6 +12,7 @@ const DEF_KEYS = new Set([
 ]);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
 const SELECT_REQUEST_KEYS = new Set(['registry', 'agentDefinitionId']);
+const DISCOVER_KEYS = new Set(['registry', 'requiredTags', 'requiredCapabilityIds', 'requiredToolIds']);
 const SELECTION_KEYS = new Set([
   'schemaVersion', 'registryId', 'registryRevision', 'agentDefinitionId',
   'definitionRevision', 'definition',
@@ -253,6 +254,46 @@ export function selectAgentDefinitionV1(input = {}) {
     agentDefinitionId: definition.agentDefinitionId,
     definitionRevision: definition.definitionRevision,
     definition,
+  });
+}
+
+export function discoverAgentDefinitionsV1(input = {}) {
+  const raw = record(input, DISCOVER_KEYS, 'Agent definition discovery request');
+  const registry = normalizeAgentDefinitionRegistryV1(raw.registry);
+  const requiredTags = ids(raw.requiredTags === undefined ? [] : raw.requiredTags, 'requiredTags', 32);
+  const requiredCapabilityIds = ids(
+    raw.requiredCapabilityIds === undefined ? [] : raw.requiredCapabilityIds,
+    'requiredCapabilityIds',
+    64,
+  );
+  const requiredToolIds = ids(raw.requiredToolIds === undefined ? [] : raw.requiredToolIds, 'requiredToolIds', 128);
+  const containsAll = (available, required) => required.every(item => available.includes(item));
+  const definitions = registry.definitions
+    .filter(item => item.enabled)
+    .filter(item => containsAll(item.tags, requiredTags))
+    .filter(item => containsAll(item.capabilityIds, requiredCapabilityIds))
+    .filter(item => containsAll(item.toolIds, requiredToolIds))
+    .map(item => freeze({
+      agentDefinitionId: item.agentDefinitionId,
+      definitionRevision: item.definitionRevision,
+      label: item.label,
+      description: item.description,
+      tags: item.tags,
+      capabilityIds: item.capabilityIds,
+      toolIds: item.toolIds,
+    }));
+  return freeze({
+    schemaVersion: 1,
+    registryId: registry.registryId,
+    registryRevision: registry.revision,
+    requiredTags,
+    requiredCapabilityIds,
+    requiredToolIds,
+    definitions,
+    authority: {
+      permissionGranted: false,
+      executionAuthorized: false,
+    },
   });
 }
 
