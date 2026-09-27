@@ -26,6 +26,7 @@ function definition(overrides = {}) {
       maxModelCalls: 20,
       maxRuntimeMinutes: 30,
       aiRoutingMode: 'primary',
+      aiPinnedRouteId: 'mistral-agent',
       aiPrimaryProvider: 'openai-compatible',
       aiPrimaryModel: 'mistral-small-latest',
       maxCostUsd: 2,
@@ -150,6 +151,7 @@ test('materialization reuses Browser Agent config and binds model, budget, goal 
   assert.equal(result.config.maxSteps, 120);
   assert.equal(result.config.maxModelCalls, 20);
   assert.equal(result.config.aiRoutingMode, 'primary');
+  assert.equal(result.config.aiPinnedRouteId, 'mistral-agent');
   assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
   assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
   assert.equal(result.config.maxCostUsd, 2);
@@ -247,6 +249,29 @@ test('config defaults are behavior/model defaults only and reject owner-authorit
       configDefaults: { ...definition().configDefaults, [field]: value },
     })), /unknown field/);
   }
+});
+
+test('config defaults reject every legacy-normalizer alias instead of silently changing definition bytes', () => {
+  for (const [field, value] of [
+    ['maxSteps', 1.5],
+    ['aiRoutingMode', 'future-mode'],
+    ['aiPrimaryModel', 'x'.repeat(301)],
+    ['startUrl', 'https://example.com'],
+  ]) {
+    assert.throws(() => normalizeAgentDefinitionV1(definition({
+      configDefaults: { ...definition().configDefaults, [field]: value },
+    })), /must already be canonical/);
+  }
+
+  const canonical = normalizeAgentDefinitionV1(definition({
+    configDefaults: {
+      ...definition().configDefaults,
+      startUrl: 'https://example.com/',
+      aiPinnedRouteId: 'mistral-agent',
+    },
+  }));
+  assert.equal(canonical.configDefaults.startUrl, 'https://example.com/');
+  assert.equal(canonical.configDefaults.aiPinnedRouteId, 'mistral-agent');
 });
 
 test('definition and registry reject secrets, numeric aliases, duplicate identities and non-canonical text', () => {
