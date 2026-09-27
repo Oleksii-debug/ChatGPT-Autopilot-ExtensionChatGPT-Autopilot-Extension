@@ -22,9 +22,9 @@ const EXECUTABLE = new Set([
 const READINESS_RANK = Object.freeze({
   [CapabilityPathReadiness.READY]: 0,
   [CapabilityPathReadiness.DEGRADED]: 1,
-  [CapabilityPathReadiness.NEEDS_HEALTH_CHECK]: 2,
-  [CapabilityPathReadiness.NEEDS_AUTH]: 3,
-  [CapabilityPathReadiness.NEEDS_INSTALL]: 4,
+  [CapabilityPathReadiness.NEEDS_AUTH]: 2,
+  [CapabilityPathReadiness.NEEDS_INSTALL]: 3,
+  [CapabilityPathReadiness.NEEDS_HEALTH_CHECK]: 4,
   [CapabilityPathReadiness.UNAVAILABLE]: 5,
 });
 
