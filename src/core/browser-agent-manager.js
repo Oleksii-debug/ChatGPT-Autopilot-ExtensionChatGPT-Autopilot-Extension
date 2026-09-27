@@ -1665,18 +1665,6 @@ export class BrowserAgentManager {
             parentCapabilityIds: job.definitionScope.capabilityIds,
             parentToolIds: job.definitionScope.toolIds,
           });
-          if (existingBinding.registryRevision !== registry.revision
-              || !sameCanonicalIdentityList(
-                existingBinding.selection.requestedCapabilityIds,
-                intent.requiredCapabilityIds,
-              )
-              || !sameCanonicalIdentityList(
-                existingBinding.selection.grantedToolIds,
-                intent.requiredToolIds,
-              )
-              || existing.policyEnvelopeId === intent.policyEnvelopeId) {
-            // policyEnvelopeId lives on execution ownership, not assignment.
-          }
           if (existingBinding.registryRevision !== registry.revision) {
             throw new Error('Existing specialist delegation provenance drifted from current registry');
           }
