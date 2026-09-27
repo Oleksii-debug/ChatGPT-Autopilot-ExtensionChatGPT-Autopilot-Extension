@@ -461,6 +461,16 @@ test('definition-launched Browser Agent keeps definition provenance when bound t
   assert.equal(persisted.job.orchestrationNodeBinding.projectId, 'project-1');
 });
 
+test('Project authority resolver rejects structurally corrupt durable hierarchy runtime', async () => {
+  const { chrome, orchestration } = await fixture();
+  const key = 'autopilotOrchestrationV2Runtime:orch-1';
+  chrome.data[key].hierarchy.state.nodeOrder = ['root'];
+  await assert.rejects(
+    () => orchestration.resolveProjectHierarchyAuthority('project-1'),
+    /Runtime node order mismatch/,
+  );
+});
+
 test('service worker exposes one explicit read path and one explicit bind path through existing managers', async () => {
   const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
   assert.match(source, /'GET_BROWSER_AGENT_ORCHESTRATION_BINDING'/u);
