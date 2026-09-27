@@ -307,6 +307,32 @@ export class OrchestrationV2Manager {
           throw new Error('Browser Agent hierarchy authority changed before lifecycle transition');
         }
 
+        if (transition === 'RESUME') {
+          const meta = await this.loadMeta();
+          const orchestra = meta.byId?.[binding.orchestraId];
+          if (!orchestra) {
+            throw new Error('Browser Agent orchestration owner authority disappeared before resume');
+          }
+          if (orchestra.ownerPaused === true) {
+            throw new Error('Browser Agent cannot resume while canonical orchestra owner pause is active');
+          }
+
+          let ancestorId = graphBefore.nodesById[binding.nodeId]?.parentId || null;
+          while (ancestorId) {
+            const ancestorNode = graphBefore.nodesById[ancestorId];
+            const ancestorRuntime = stateBefore.nodesById?.[ancestorId];
+            if (!ancestorNode || !ancestorRuntime) {
+              throw new Error('Browser Agent hierarchy ancestor authority changed before resume');
+            }
+            if (ancestorRuntime.scopeState !== 'RUNNING') {
+              throw new Error(
+                `Browser Agent cannot resume below ${ancestorRuntime.scopeState} ancestor ${ancestorId}`,
+              );
+            }
+            ancestorId = ancestorNode.parentId || null;
+          }
+        }
+
         const eventId = compactOrchestrationEventId(
           'browser-agent-lifecycle',
           binding.jobId,
