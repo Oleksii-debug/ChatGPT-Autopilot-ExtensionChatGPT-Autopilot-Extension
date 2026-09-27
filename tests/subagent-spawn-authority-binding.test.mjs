@@ -182,6 +182,11 @@ test('binds exact canonical topology identities to per-child least authority', (
     result.authorityBindings.map(binding => binding.authorityEnvelope.capabilityIds),
     [['cap.read'], ['cap.write']],
   );
+  assert.deepEqual(result.taskBindings, [
+    { childNodeId: 'subagent:spawn-bind:1', taskId: 'task.read' },
+    { childNodeId: 'subagent:spawn-bind:2', taskId: 'task.write' },
+  ]);
+  assert.equal(Object.isFrozen(result.taskBindings), true);
   assert.equal(result.activationAuthority, false);
   assert.equal(result.executionAuthority, false);
   assert.equal(result.credentialAuthority, false);
@@ -356,6 +361,7 @@ test('exact spawn replay reuses the same child identity and re-derives current a
       nowMs: 300,
     }),
     ownerAllowedCapabilityIds: ['cap.read'],
+    priorTaskBindings: first.taskBindings,
     childTasks: [childTask('task.one')],
   }));
 
@@ -380,6 +386,7 @@ test('replay under revoked child authority fails closed even when topology alrea
       nowMs: 300,
     }),
     ownerAllowedCapabilityIds: ['cap.write'],
+    priorTaskBindings: first.taskBindings,
   }));
 
   assert.equal(revoked.decision, 'DENY');
@@ -580,6 +587,7 @@ test('child task input order cannot remap durable ordinal child identities', () 
       spawnId: 'spawn-bind',
       nowMs: 300,
     }),
+    priorTaskBindings: canonical.taskBindings,
     childTasks: [
       childTask('task.beta', {
         taskRequestedCapabilityIds: ['cap.write'],
@@ -596,5 +604,111 @@ test('child task input order cannot remap durable ordinal child identities', () 
       ['subagent:spawn-bind:1', 'task.alpha'],
       ['subagent:spawn-bind:2', 'task.beta'],
     ],
+  );
+});
+
+
+test('replay requires durable canonical child-to-task binding evidence', () => {
+  const first = bindSubagentSpawnAuthorityV1(request());
+  assert.equal(first.decision, 'ALLOW');
+
+  const replay = bindSubagentSpawnAuthorityV1(request({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      spawnId: 'spawn-bind',
+      nowMs: 300,
+    }),
+  }));
+
+  assert.equal(replay.decision, 'DENY');
+  assert.equal(replay.reasonCode, 'REPLAY_TASK_BINDING_EVIDENCE_REQUIRED');
+  assert.deepEqual(replay.taskBindings, []);
+  assert.deepEqual(replay.activationRequests, []);
+  assert.equal(Object.hasOwn(replay, 'graph'), false);
+  assert.equal(Object.hasOwn(replay, 'runtime'), false);
+});
+
+test('same spawn and child count cannot silently rebind an existing child to another task', () => {
+  const first = bindSubagentSpawnAuthorityV1(request());
+  assert.equal(first.decision, 'ALLOW');
+
+  const drift = bindSubagentSpawnAuthorityV1(request({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      spawnId: 'spawn-bind',
+      nowMs: 300,
+    }),
+    priorTaskBindings: first.taskBindings,
+    childTasks: [childTask('task.replaced')],
+  }));
+
+  assert.equal(drift.decision, 'DENY');
+  assert.equal(drift.reasonCode, 'REPLAY_TASK_BINDING_MISMATCH');
+  assert.deepEqual(drift.taskBindings, []);
+  assert.deepEqual(drift.activationRequests, []);
+  assert.equal(Object.hasOwn(drift, 'graph'), false);
+});
+
+test('new topology rejects stale prior binding evidence instead of mixing generations', () => {
+  const result = bindSubagentSpawnAuthorityV1(request({
+    priorTaskBindings: [{
+      childNodeId: 'subagent:old-spawn:1',
+      taskId: 'task.one',
+    }],
+  }));
+  assert.equal(result.decision, 'DENY');
+  assert.equal(result.reasonCode, 'UNEXPECTED_PRIOR_TASK_BINDING_EVIDENCE');
+  assert.deepEqual(result.taskBindings, []);
+  assert.equal(Object.hasOwn(result, 'graph'), false);
+});
+
+test('prior replay-binding evidence is descriptor-safe and identity-unique', () => {
+  const first = bindSubagentSpawnAuthorityV1(request());
+  assert.equal(first.decision, 'ALLOW');
+
+  let reads = 0;
+  const hostile = {
+    childNodeId: first.taskBindings[0].childNodeId,
+    taskId: first.taskBindings[0].taskId,
+  };
+  Object.defineProperty(hostile, 'taskId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'task.one';
+    },
+  });
+
+  assert.throws(
+    () => bindSubagentSpawnAuthorityV1(request({
+      topologyRequest: topologyRequest({
+        graph: first.graph,
+        runtime: first.runtime,
+        spawnId: 'spawn-bind',
+        nowMs: 300,
+      }),
+      priorTaskBindings: [hostile],
+    })),
+    /priorTaskBindings\[0\]\.taskId must be an enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
+
+  assert.throws(
+    () => bindSubagentSpawnAuthorityV1(request({
+      topologyRequest: topologyRequest({
+        graph: first.graph,
+        runtime: first.runtime,
+        spawnId: 'spawn-bind',
+        nowMs: 300,
+      }),
+      priorTaskBindings: [
+        first.taskBindings[0],
+        first.taskBindings[0],
+      ],
+    })),
+    /priorTaskBindings contains duplicate childNodeId/u,
   );
 });
