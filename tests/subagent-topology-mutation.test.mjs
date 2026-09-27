@@ -725,7 +725,7 @@ test('replay preserves initiator-specific lifecycle admission before preparing a
     initiator: SubagentSpawnInitiator.AGENT,
     requestedChildren: 1,
     spawnId: 'agent-replay-lifecycle',
-    nowMs: T1_MS,
+    nowMs: 400,
   }));
   assert.equal(agentReplay.decision, SubagentTopologyMutationDecision.ALLOW);
   assert.equal(agentReplay.reused, true);
@@ -748,7 +748,7 @@ test('replay preserves initiator-specific lifecycle admission before preparing a
     ...ownerBase,
     graph: ownerCreated.graph,
     runtime: ownerReplayRuntime,
-    nowMs: T1_MS,
+    nowMs: 400,
   });
   assert.equal(ownerReplay.decision, SubagentTopologyMutationDecision.ALLOW);
   assert.equal(ownerReplay.reused, true);
