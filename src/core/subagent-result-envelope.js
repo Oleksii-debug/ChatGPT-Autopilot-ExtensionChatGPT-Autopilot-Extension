@@ -44,6 +44,8 @@ const RESULT_KEYS = new Set([
   'verificationSummary',
   'verifiedAt',
   'requiredEvidenceArtifactCount',
+  'verificationProvenance',
+  'trustedVerificationRequired',
   'resultArtifactRefs',
   'evidenceArtifactRefs',
   'completedAt',
@@ -206,6 +208,18 @@ export function normalizeSubagentResultEnvelopeV1(input) {
     }
   }
 
+  const verificationProvenance = own(
+    raw,
+    'verificationProvenance',
+    'SubagentResultEnvelopeV1',
+  );
+  if (verificationProvenance !== 'UNVERIFIED_INPUT') {
+    throw new Error('Subagent result cannot claim trusted verification provenance');
+  }
+  if (own(raw, 'trustedVerificationRequired', 'SubagentResultEnvelopeV1') !== true) {
+    throw new Error('Subagent result must require canonical trusted verification before completion');
+  }
+
   const resultArtifactRefs = artifactRefList(
     own(raw, 'resultArtifactRefs', 'SubagentResultEnvelopeV1'),
     'resultArtifactRefs',
@@ -294,6 +308,8 @@ export function normalizeSubagentResultEnvelopeV1(input) {
     ),
     verifiedAt,
     requiredEvidenceArtifactCount,
+    verificationProvenance: 'UNVERIFIED_INPUT',
+    trustedVerificationRequired: true,
     resultArtifactRefs,
     evidenceArtifactRefs,
     completedAt,
@@ -309,9 +325,10 @@ export function normalizeSubagentResultEnvelopeV1(input) {
  * Produce a bounded, immutable-reference handback from one child Agent.
  *
  * The result deliberately excludes ObservationV1.data. No transcript or
- * arbitrary child payload is copied into the parent handback. Verification
- * here proves the exact observation/evidence relation only; it does not
- * authorize task or OutcomeContract completion.
+ * arbitrary child payload is copied into the parent handback. A raw
+ * VerificationV1 is only structurally bound here and remains UNVERIFIED_INPUT.
+ * Canonical trusted verification must be resolved by the existing
+ * outcome-verification bridge before any completion decision.
  */
 export function createSubagentResultEnvelopeV1(input = {}) {
   const raw = record(input, INPUT_KEYS, 'SubagentResultEnvelopeBuildV1');
@@ -396,6 +413,8 @@ export function createSubagentResultEnvelopeV1(input = {}) {
     verificationSummary: verification.summary,
     verifiedAt: verification.verifiedAt,
     requiredEvidenceArtifactCount: task.outcome.requiredEvidenceArtifactCount,
+    verificationProvenance: 'UNVERIFIED_INPUT',
+    trustedVerificationRequired: true,
     resultArtifactRefs,
     evidenceArtifactRefs,
     completedAt,
