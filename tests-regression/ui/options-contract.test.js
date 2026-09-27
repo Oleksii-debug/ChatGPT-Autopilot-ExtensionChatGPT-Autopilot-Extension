@@ -279,6 +279,10 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
     'agent-approval-panel','agent-approval-status','agent-approval-script','agent-approve-action-button','agent-reject-action-button','agent-approval-mode','agent-vision-on-demand','agent-trusted-script-enabled',
     'agent-import-file','agent-import-button','agent-export-button','agent-import-status',
     'agent-max-concurrent-agents','agent-save-execution-policy-button','agent-execution-policy-status',
+    'agent-definition-details','agent-definition-registry-list','agent-definition-create-registry-id','agent-definition-create-registry-button','agent-definition-quarantine-status',
+    'agent-definition-list','agent-definition-new-button','agent-definition-form-group','agent-definition-id','agent-definition-label','agent-definition-description','agent-definition-instructions',
+    'agent-definition-capabilities','agent-definition-tools','agent-definition-tags','agent-definition-acceptance','agent-definition-enabled','agent-definition-revision',
+    'agent-definition-save-button','agent-definition-toggle-enabled-button','agent-definition-delete-button','agent-definition-status',
   ]) assert.ok(html.includes(`id="${id}"`), `missing Browser Agent control ${id}`);
   has(/<label for="agent-prompt">Що потрібно зробити\?<\/label>/, 'Agent must lead with a natural-language task composer');
   has(/id="agent-status" role="status"/, 'Agent status must be announced');
@@ -291,7 +295,22 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   has(/id="agent-max-concurrent-agents" type="number" min="1" max="32" step="1"/, 'global Agent concurrency must expose bounded native numeric semantics');
   has(/id="agent-execution-policy-status" role="status"/, 'global Agent concurrency save result must be announced');
   assert.match(js, /core\('GET_BROWSER_AGENT_EXECUTION_POLICY'\)/, 'Agent UI must read the canonical execution policy through Core');
-  assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must load through the canonical startup sequence');
+  assert.match(js, /core\('LIST_BROWSER_AGENT_DEFINITION_REGISTRIES'\)/, 'reusable Agent UI must list registries through canonical Core');
+  assert.match(js, /core\('GET_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must refresh the exact selected registry through canonical Core');
+  assert.match(js, /core\('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must create registries through canonical Core');
+  assert.match(js, /core\('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must commit definition CRUD through canonical Core');
+  assert.match(js, /expectedRegistryRevision: registry\.revision/, 'definition mutations must carry exact registry CAS');
+  assert.match(js, /expectedDefinitionRevision: current\.definitionRevision/, 'definition update/delete must carry exact definition CAS');
+  assert.match(js, /configDefaults: current\?\.configDefaults \|\| \{\}/, 'definition edits must preserve canonical persisted model/config defaults');
+  assert.match(js, /ui\.agentDefinitionMode === 'edit'/, 'definition create and edit paths must remain explicit');
+  assert.match(js, /revision drifted/, 'stale definition writes must force a current-state reload');
+  assert.match(js, /agentDefinitionQuarantineCount/, 'quarantined registries must be visible as aggregate owner-attention state');
+  assert.doesNotMatch(js, /quarantinedRegistryIds\[[^\]]+\]/, 'UI must not render raw quarantined registry identities');
+  assert.match(html, /<label for="agent-definition-registry-list">/, 'definition registry selector needs a persistent native label');
+  assert.match(html, /<label for="agent-definition-list">/, 'definition selector needs a persistent native label');
+  assert.match(html, /id="agent-definition-status" role="status"/, 'definition CRUD outcomes must be announced');
+  assert.match(html, /id="agent-definition-quarantine-status" tabindex="0"/, 'definition quarantine summary must be keyboard readable without a noisy live region');
+  assert.match(js, /async function initialLoad\(\)[\s\S]*await loadBrowserAgentJobs\(\);[\s\S]*await loadBrowserAgentExecutionPolicy\(\);[\s\S]*await loadAgentDefinitionRegistries\(\);/, 'Agent runtime and reusable-definition state must load through the canonical startup sequence');
   assert.doesNotMatch(js, /export \{ MAX_TASKS, blankSession, blankTask, validate, diagnosticFileName \};\s*void loadBrowserAgentExecutionPolicy\(\);/, 'Agent execution policy must not create a second startup path');
   assert.match(js, /core\('UPDATE_BROWSER_AGENT_EXECUTION_POLICY', \{ maxConcurrentAgents: value \}\)/, 'Agent UI must update the canonical execution policy through Core');
   assert.match(js, /!Number\.isInteger\(value\) \|\| value < 1 \|\| value > 32/, 'Agent UI must reject invalid concurrency before Core mutation');

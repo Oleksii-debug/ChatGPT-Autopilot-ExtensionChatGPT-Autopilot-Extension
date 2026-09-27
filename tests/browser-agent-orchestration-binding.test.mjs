@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { StorageRepository } from '../src/core/storage.js';
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
 import { OrchestrationV2Manager } from '../src/core/orchestration-v2-manager.js';
+import { exportOrchestrationProfile } from '../src/core/orchestration-v2-profile.js';
 import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
 import {
   createBrowserAgentOrchestrationNodeBindingV1,
@@ -320,6 +321,72 @@ test('current binding exposes control-epoch, graph and node drift without silent
   );
   inspected = await manager.inspectOrchestrationNodeBinding('job-1', dependencies);
   assert.equal(inspected.status, 'NODE_MISSING');
+});
+
+test('profile import keeps config, hierarchy and owner policy behind one Project authority fence', async () => {
+  const { manager, orchestration, dependencies } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+  const originalConfigureHierarchy = controller.configureHierarchy.bind(controller);
+
+  let hierarchyReachedResolve;
+  const hierarchyReached = new Promise(resolve => { hierarchyReachedResolve = resolve; });
+  let releaseHierarchyResolve;
+  const releaseHierarchy = new Promise(resolve => { releaseHierarchyResolve = resolve; });
+  controller.configureHierarchy = async (...args) => {
+    hierarchyReachedResolve();
+    await releaseHierarchy;
+    return originalConfigureHierarchy(...args);
+  };
+
+  const profile = exportOrchestrationProfile(orchestraConfig('project-1'), {
+    name: 'Atomic authority import',
+    hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+    subagentPolicy: {
+      schemaVersion: 1,
+      allowAgentCreatedChildren: true,
+      maxDepth: 3,
+      maxChildrenPerAgent: 2,
+    },
+  });
+
+  try {
+    const importing = orchestration.importProfile(profile);
+    await hierarchyReached;
+
+    let bindingSettled = false;
+    const bindingPromise = manager.bindOrchestrationNode(
+      'job-1',
+      { nodeId: 'worker' },
+      dependencies,
+    ).then(result => {
+      bindingSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+      bindingSettled,
+      false,
+      'Browser Agent bind must not observe a profile import between config, hierarchy and owner-policy commits',
+    );
+
+    releaseHierarchyResolve();
+    const imported = await importing;
+    const bound = await bindingPromise;
+
+    assert.equal(imported.status.runtime.hierarchy.graph.graphId, 'graph-2');
+    assert.deepEqual(imported.status.orchestra.subagentPolicy, {
+      schemaVersion: 1,
+      allowAgentCreatedChildren: true,
+      maxDepth: 3,
+      maxChildrenPerAgent: 2,
+    });
+    assert.equal(bound.binding.graphId, 'graph-2');
+    assert.equal(bound.binding.controlEpoch, 2);
+  } finally {
+    releaseHierarchyResolve?.();
+    controller.configureHierarchy = originalConfigureHierarchy;
+  }
 });
 
 test('binding holds the canonical Project authority fence through durable Browser Agent persistence', async () => {

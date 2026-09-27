@@ -767,25 +767,46 @@ export class OrchestrationV2Manager {
     if (current.enabled && !selected.item.ownerPaused) {
       throw new Error('Pause the orchestra before importing configuration.');
     }
-    const status = await this.updateConfig({ ...imported, enabled: false }, selected.id);
-    if (importedDocument.hierarchy) {
-      const currentRuntime = await selected.controller.runtimeRepository.load();
-      const currentGraphId = hierarchyGraphId(currentRuntime);
-      const safety = await this.managedCoreSafety(status.config.projectId, currentGraphId);
-      if (safety.managed.length) {
-        throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
-      }
-      await this.runProjectAuthorityExclusive(() =>
-        selected.controller.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() }));
-    }
+
+    // Import is one composite Project-authority mutation: config identity,
+    // hierarchy provenance and owner subagent policy must never be observable
+    // by Browser Agent binding as three independently committed snapshots.
+    // Re-check the live owner state inside the same authority fence and call
+    // the unfenced config primitive to avoid promise-chain self-deadlock.
     const importedPolicy = storedSubagentPolicy(importedDocument.subagentPolicy);
-    await this.runProjectAuthorityExclusive(() => this.updateMeta(meta => {
-      const record = meta.byId[selected.id];
-      if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
-      record.subagentPolicy = importedPolicy;
-      record.updatedAt = this.now();
-      return meta;
-    }));
+    const status = await this.runProjectAuthorityExclusive(async () => {
+      const liveMeta = await this.loadMeta();
+      const liveItem = liveMeta.byId[selected.id];
+      if (!liveItem) throw new Error('Orchestra not found while importing profile.');
+      const liveController = this.controllerFor(selected.id);
+      const liveCurrent = await liveController.configRepository.load();
+      if (liveCurrent.enabled && !liveItem.ownerPaused) {
+        throw new Error('Pause the orchestra before importing configuration.');
+      }
+
+      const nextStatus = await this._updateConfigUnfenced(
+        { ...imported, enabled: false },
+        selected.id,
+      );
+      if (importedDocument.hierarchy) {
+        const currentRuntime = await liveController.runtimeRepository.load();
+        const currentGraphId = hierarchyGraphId(currentRuntime);
+        const safety = await this.managedCoreSafety(nextStatus.config.projectId, currentGraphId);
+        if (safety.managed.length) {
+          throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
+        }
+        await liveController.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
+      }
+      await this.updateMeta(meta => {
+        const record = meta.byId[selected.id];
+        if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
+        record.subagentPolicy = importedPolicy;
+        record.updatedAt = this.now();
+        return meta;
+      });
+      return nextStatus;
+    });
+
     return {
       config: status.config,
       hierarchy: importedDocument.hierarchy,
