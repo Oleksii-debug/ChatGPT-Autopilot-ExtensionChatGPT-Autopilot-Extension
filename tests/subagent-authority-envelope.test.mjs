@@ -117,6 +117,12 @@ test('tool descriptors cannot smuggle provider or capability authority', () => {
   }));
   assert.equal(missing.reasonCode, 'TOOL_DESCRIPTOR_MISSING');
   assert.deepEqual(missing.deniedToolIds, ['tool.unknown']);
+
+  const undeclared = deriveSubagentAuthorityEnvelopeV1(request({
+    toolDescriptors: [tool('tool.read', [])],
+  }));
+  assert.equal(undeclared.reasonCode, 'TOOL_CAPABILITY_UNDECLARED');
+  assert.deepEqual(undeclared.deniedToolIds, ['tool.read']);
 });
 
 test('unused descriptors grant no authority and requested tool order remains deterministic', () => {
