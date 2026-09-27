@@ -96,13 +96,16 @@ test('owner-injected resolver is invoked at admission time and #450 readiness re
     'providerId',
     'registryId',
     'registryRevision',
+    'requestedCapabilityIds',
     'requestedToolIds',
     'schemaVersion',
     'specialistId',
   ]);
   assert.equal(seenRequest.providerId, 'provider.local');
+  assert.deepEqual(seenRequest.requestedCapabilityIds, ['code.write']);
   assert.deepEqual(seenRequest.requestedToolIds, ['fs.read', 'fs.write']);
   assert.equal(Object.isFrozen(seenRequest), true);
+  assert.equal(Object.isFrozen(seenRequest.requestedCapabilityIds), true);
   assert.equal(Object.isFrozen(seenRequest.requestedToolIds), true);
   assert.equal('providerStates' in seenRequest, false);
   assert.equal('credentialRefs' in seenRequest, false);

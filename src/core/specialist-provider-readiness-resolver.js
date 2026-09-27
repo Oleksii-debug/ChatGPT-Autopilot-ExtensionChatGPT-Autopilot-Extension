@@ -113,6 +113,7 @@ function resolutionRequest(selection, asOf) {
     providerId: selection.providerId,
     definitionRevision: selection.definitionRevision,
     executionPlane: selection.executionPlane,
+    requestedCapabilityIds: [...selection.requestedCapabilityIds],
     requestedToolIds: [...selection.grantedToolIds],
     asOf,
   });
