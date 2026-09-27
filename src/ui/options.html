@@ -226,7 +226,57 @@
         <input id="agent-max-concurrent-agents" type="number" min="1" max="32" step="1" inputmode="numeric" value="1">
         <button id="agent-save-execution-policy-button" type="button">Зберегти ліміт одночасності</button>
         <p id="agent-execution-policy-status" role="status">Завантаження ліміту одночасності…</p>
+
       </fieldset>
+
+      <details id="agent-definition-details">
+        <summary>Reusable Agent definitions</summary>
+        <fieldset class="settings-group" id="agent-definition-registry-group">
+          <legend>Реєстри reusable Agent</legend>
+          <label for="agent-definition-registry-list">Реєстр Agent definitions</label>
+          <select id="agent-definition-registry-list" size="4"></select>
+          <label for="agent-definition-create-registry-id">ID нового реєстру</label>
+          <input id="agent-definition-create-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <button id="agent-definition-create-registry-button" type="button">Створити реєстр</button>
+          <p id="agent-definition-quarantine-status" tabindex="0">Пошкоджених reusable-Agent реєстрів у карантині немає.</p>
+        </fieldset>
+
+        <fieldset class="settings-group" id="agent-definition-selection-group">
+          <legend>Збережені Agent definitions</legend>
+          <label for="agent-definition-list">Agent definition</label>
+          <select id="agent-definition-list" size="5"></select>
+          <button id="agent-definition-new-button" type="button" disabled>Нова definition</button>
+        </fieldset>
+
+        <fieldset class="settings-group" id="agent-definition-form-group" disabled>
+          <legend>Definition</legend>
+          <label for="agent-definition-id">Agent definition ID</label>
+          <input id="agent-definition-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+          <label for="agent-definition-label">Назва</label>
+          <input id="agent-definition-label" type="text" maxlength="160" autocomplete="off">
+          <label for="agent-definition-description">Опис — необов’язково</label>
+          <textarea id="agent-definition-description" rows="3" maxlength="4000" spellcheck="true"></textarea>
+          <label for="agent-definition-instructions">Постійні інструкції Agent</label>
+          <textarea id="agent-definition-instructions" rows="7" maxlength="12000" spellcheck="true"></textarea>
+          <label for="agent-definition-capabilities">Capability IDs — по одному в рядку</label>
+          <textarea id="agent-definition-capabilities" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-tools">Tool IDs — по одному в рядку</label>
+          <textarea id="agent-definition-tools" rows="4" spellcheck="false"></textarea>
+          <label for="agent-definition-tags">Теги — по одному в рядку</label>
+          <textarea id="agent-definition-tags" rows="3" spellcheck="false"></textarea>
+          <label for="agent-definition-acceptance">Критерії завершення — по одному в рядку</label>
+          <textarea id="agent-definition-acceptance" rows="4" spellcheck="true"></textarea>
+          <label><input id="agent-definition-enabled" type="checkbox" checked>Definition увімкнена</label>
+          <p id="agent-definition-revision" tabindex="0">Реєстр не вибрано.</p>
+          <p>Збережені model/config defaults не редагуються тут: під час оновлення вони зберігаються без змін.</p>
+          <div class="agent-actions" aria-label="Дії з reusable Agent definition">
+            <button id="agent-definition-save-button" type="button" disabled>Зберегти definition</button>
+            <button id="agent-definition-toggle-enabled-button" type="button" disabled>Увімкнути або вимкнути</button>
+            <button id="agent-definition-delete-button" type="button" disabled>Видалити definition</button>
+          </div>
+        </fieldset>
+        <p id="agent-definition-status" role="status">Reusable Agent definitions ще не завантажено.</p>
+      </details>
 
       <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true"></textarea>
