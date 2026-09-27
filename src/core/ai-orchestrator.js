@@ -344,7 +344,13 @@ export class AiOrchestrator {
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:false, classification, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           routeAttempts.push({ routeId:route.routeId, outcome:'FAILED', code:classification.code, category:classification.category });
           attachFailureRuntime(error);
-          if (!classification.retryable || !settings.routePolicy.autoSwitch) throw error;
+          if (!classification.retryable) throw error;
+          if (!settings.routePolicy.autoSwitch) {
+            const failedState = routeStates[route.routeId];
+            const retryAt = Math.max(failedState?.backoffUntil || 0, failedState?.circuitOpenUntil || 0);
+            if (error && typeof error === 'object' && retryAt > now) error.retryAt = retryAt;
+            throw attachFailureRuntime(error);
+          }
         }
       }
       const exhausted = selectAiRouteCandidates({
