@@ -299,7 +299,15 @@ export function proposeAgentSelfRepairWorkV1(input) {
     dependsOn = [predecessor.nodeId];
   }
 
-  const conflictKeys = [...template.conflictKeys];
+  const conflictKeys = [];
+  if (kind === AgentSelfRepairWorkKind.REPAIR) {
+    for (const conflictKey of failedNode.conflictKeys) {
+      if (!conflictKeys.includes(conflictKey)) conflictKeys.push(conflictKey);
+    }
+  }
+  for (const conflictKey of template.conflictKeys) {
+    if (!conflictKeys.includes(conflictKey)) conflictKeys.push(conflictKey);
+  }
   if (!conflictKeys.includes(cycle.cycleId)) conflictKeys.push(cycle.cycleId);
 
   const extension = {
