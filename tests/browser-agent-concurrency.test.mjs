@@ -582,3 +582,62 @@ test('closing an owned tab never falls back onto another active Agent current ta
   assert.deepEqual(after.runtime.ownedTabIds, []);
   assert.deepEqual(after.runtime.knownTabIds, [11]);
 });
+
+test('manual Step shares the global slot and never overlaps another execution of the same Agent', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const store = dueStore(2, ['same']);
+  manager.load = async () => structuredClone(store);
+  manager.reconcileAlarm = async () => 0;
+
+  let active = 0;
+  let maxActive = 0;
+  let releaseFirst;
+  let firstStartedResolve;
+  const firstBarrier = new Promise(resolve => { releaseFirst = resolve; });
+  const firstStarted = new Promise(resolve => { firstStartedResolve = resolve; });
+  let calls = 0;
+  manager.cycleOne = async id => {
+    calls += 1;
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    if (calls === 1) {
+      firstStartedResolve();
+      await firstBarrier;
+    }
+    active -= 1;
+    return { kind: 'ACTION', id };
+  };
+
+  const first = manager.step('same');
+  await firstStarted;
+  const second = manager.step('same');
+  await Promise.resolve();
+  assert.equal(calls, 1, 'second Step must wait for the active execution slot');
+
+  releaseFirst();
+  await Promise.all([first, second]);
+  assert.equal(calls, 2);
+  assert.equal(maxActive, 1);
+});
+
+test('manual Step obeys the product-wide limit across different Agents', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  const store = dueStore(1, ['a', 'b']);
+  manager.load = async () => structuredClone(store);
+  manager.reconcileAlarm = async () => 0;
+
+  let active = 0;
+  let maxActive = 0;
+  manager.cycleOne = async id => {
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await Promise.resolve();
+    active -= 1;
+    return { kind: 'ACTION', id };
+  };
+
+  await Promise.all([manager.step('a'), manager.step('b')]);
+  assert.equal(maxActive, 1);
+});
