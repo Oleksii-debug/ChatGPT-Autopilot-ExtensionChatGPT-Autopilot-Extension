@@ -706,8 +706,8 @@ export async function dispatchUiMessage(message) {
       message.payload?.id || '',
       message.payload?.binding || {},
       {
-        resolveProjectHierarchyAuthority: projectId =>
-          orchestrationV2.resolveProjectHierarchyAuthority(projectId),
+        withProjectHierarchyAuthority: (projectId, operation) =>
+          orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
       },
     );
   } else if (message.command === 'AUTO_PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
@@ -715,8 +715,8 @@ export async function dispatchUiMessage(message) {
       message.payload?.id || '',
       message.payload?.delegation || {},
       {
-        resolveProjectHierarchyAuthority: projectId =>
-          orchestrationV2.resolveProjectHierarchyAuthority(projectId),
+        withProjectHierarchyAuthority: (projectId, operation) =>
+          orchestrationV2.withProjectHierarchyAuthority(projectId, operation),
       },
     );
   } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
