@@ -310,8 +310,22 @@ export function normalizeAiRouteQualityEvidenceRegistryV1(input) {
   });
 }
 
-function canonicalSignature(value) {
-  return JSON.stringify(value);
+function evidenceIdentitySignature(value) {
+  return JSON.stringify({
+    schemaVersion:value.schemaVersion,
+    routeId:value.routeId,
+    routeRevisionId:value.routeRevisionId,
+    runId:value.runId,
+    suiteId:value.suiteId,
+    suiteRevisionId:value.suiteRevisionId,
+    completedAt:value.completedAt,
+    maxAgeMs:value.maxAgeMs,
+    status:value.status,
+    caseCount:value.caseCount,
+    passedCaseCount:value.passedCaseCount,
+    failedCaseCount:value.failedCaseCount,
+    evaluationRequest:value.evaluationRequest,
+  });
 }
 
 export async function putAiRouteQualityEvidenceRecordV1(registryInput, input) {
@@ -361,7 +375,7 @@ export async function putAiRouteQualityEvidenceRecordV1(registryInput, input) {
 
   const existing = registry.records.find(item => item.runId === nextRecord.runId);
   if (existing) {
-    if (canonicalSignature(existing) !== canonicalSignature(nextRecord)) {
+    if (evidenceIdentitySignature(existing) !== evidenceIdentitySignature(nextRecord)) {
       throw new Error('Divergent route-quality benchmark runId collision: ' + nextRecord.runId);
     }
     return registry;
