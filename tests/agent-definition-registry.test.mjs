@@ -18,6 +18,7 @@ function definition(overrides = {}) {
     instructions: 'Research the owner task using only the admitted tools. Preserve source provenance.',
     capabilityIds: ['research.read', 'project.context'],
     toolIds: ['browser.read', 'files.read', 'github.read'],
+    tags: ['verified', 'research'],
     acceptanceCriteria: ['Every material claim has source evidence.', 'Return a concise final artifact.'],
     configDefaults: {
       maxSteps: 120,
@@ -73,6 +74,7 @@ test('registry canonicalizes reusable Agent definitions deterministically', () =
   assert.deepEqual(normalized.definitions.map(item => item.agentDefinitionId), ['agent.research', 'agent.writer']);
   assert.deepEqual(normalized.definitions[0].capabilityIds, ['project.context', 'research.read']);
   assert.deepEqual(normalized.definitions[0].toolIds, ['browser.read', 'files.read', 'github.read']);
+  assert.deepEqual(normalized.definitions[0].tags, ['research', 'verified']);
   assert.equal(normalized.definitions[0].configDefaults.aiPrimaryModel, 'mistral-small-latest');
   assert.ok(Object.isFrozen(normalized));
   assert.ok(Object.isFrozen(normalized.definitions[0].configDefaults));
@@ -208,6 +210,7 @@ test('definition and registry reject secrets, numeric aliases, duplicate identit
   assert.throws(() => normalizeAgentDefinitionV1({ ...definition(), apiKey: 'never-store-this' }), /unknown field: apiKey/);
   assert.throws(() => normalizeAgentDefinitionV1(definition({ definitionRevision: -0 })), /definitionRevision is invalid/);
   assert.throws(() => normalizeAgentDefinitionV1(definition({ label: ' Research Agent' })), /exact bounded text/);
+  assert.throws(() => normalizeAgentDefinitionV1(definition({ tags: ['research', 'research'] })), /duplicate identity/);
   assert.throws(() => normalizeAgentDefinitionRegistryV1(registry({
     definitions: [definition(), definition()],
   })), /duplicate agentDefinitionId/);
