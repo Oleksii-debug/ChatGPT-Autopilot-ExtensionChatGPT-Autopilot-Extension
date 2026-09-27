@@ -142,7 +142,7 @@ function freeze(value) {
 function normalizeChildBudget(input) {
   if (input === undefined) return undefined;
   const raw = snapshot(input, CHILD_BUDGET_KEYS, 'Agent specialist delegation childBudget');
-  const output = Object.create(null);
+  const output = {};
   for (const key of Object.keys(raw)) {
     output[key] = exactInteger(raw[key], `childBudget.${key}`);
   }
