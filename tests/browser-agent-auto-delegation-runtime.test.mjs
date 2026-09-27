@@ -160,6 +160,42 @@ function plan(overrides = {}) {
   };
 }
 
+function readyReadinessResolver({ executable = true, onResolve = null } = {}) {
+  return {
+    async resolve(selection) {
+      if (onResolve) await onResolve(selection);
+      return {
+        schemaVersion: 1,
+        registryId: selection.registryId,
+        registryRevision: selection.registryRevision,
+        specialistId: selection.specialistId,
+        providerId: selection.providerId,
+        definitionRevision: selection.definitionRevision,
+        executionPlane: selection.executionPlane,
+        observedAt: T0,
+        resolvedAt: T0,
+        ageMs: 0,
+        maxAgeMs: 60_000,
+        readiness: executable ? 'READY' : 'UNAVAILABLE',
+        executable,
+        trustedResolverInvoked: true,
+        callerReadinessAccepted: false,
+        authority: {
+          providerExecutionAuthorized: false,
+          toolExecutionAuthorized: false,
+          policyAuthorized: false,
+          schedulingAuthorized: false,
+          recoveryAuthorized: false,
+          credentialAuthorized: false,
+          completionAuthorized: false,
+          verificationAuthorized: false,
+          capacityReserved: false,
+        },
+      };
+    },
+  };
+}
+
 function request(overrides = {}) {
   return {
     registryId: 'specialists:project-1',
@@ -176,7 +212,12 @@ function request(overrides = {}) {
   };
 }
 
-async function fixture({ allowAgentCreatedChildren = true, maxDepth = 2, maxChildrenPerAgent = 2 } = {}) {
+async function fixture({
+  allowAgentCreatedChildren = true,
+  maxDepth = 2,
+  maxChildrenPerAgent = 2,
+  specialistProviderReadinessResolver = null,
+} = {}) {
   const chrome = chromeFake();
   const core = new StorageRepository(chrome);
   const orchestration = new OrchestrationV2Manager({
@@ -252,10 +293,12 @@ async function fixture({ allowAgentCreatedChildren = true, maxDepth = 2, maxChil
 
   await manager.update(store => {
     store.byId['job.auto'].runtime.plan = plan();
+    store.byId['job.auto'].runtime.runState = 'RUNNING';
+    store.byId['job.auto'].runtime.controlEpoch = 1;
     return store;
   });
 
-  const dependencies = {
+  const bindingDependencies = {
     resolveProjectHierarchyAuthority: projectId =>
       orchestration.resolveProjectHierarchyAuthority(projectId),
     withProjectHierarchyAuthority: (projectId, operation) =>
@@ -264,10 +307,15 @@ async function fixture({ allowAgentCreatedChildren = true, maxDepth = 2, maxChil
   await manager.bindOrchestrationNode(
     'job.auto',
     { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
-    dependencies,
+    bindingDependencies,
   );
+  const dependencies = {
+    withProjectHierarchyAuthority: bindingDependencies.withProjectHierarchyAuthority,
+    specialistProviderReadinessResolver:
+      specialistProviderReadinessResolver || readyReadinessResolver(),
+  };
 
-  return { chrome, core, orchestration, manager, dependencies };
+  return { chrome, core, orchestration, manager, dependencies, bindingDependencies };
 }
 
 test('runtime auto-delegation prepares least authority without claiming execution ownership', async () => {
@@ -409,7 +457,7 @@ test('automatic preparation reuses an already canonically claimed handoff withou
 });
 
 test('automatic preparation does not consume product-wide capacity; canonical claim owns the slot', async () => {
-  const { manager, dependencies } = await fixture();
+  const { manager, dependencies, bindingDependencies } = await fixture();
 
   await manager.createFromAgentDefinition({
     registryId: 'agents:project-1',
@@ -430,12 +478,14 @@ test('automatic preparation does not consume product-wide capacity; canonical cl
       planId: 'plan:other',
       jobId: 'job.other',
     });
+    store.byId['job.other'].runtime.runState = 'RUNNING';
+    store.byId['job.other'].runtime.controlEpoch = 1;
     return store;
   });
   await manager.bindOrchestrationNode(
     'job.other',
     { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
-    dependencies,
+    bindingDependencies,
   );
 
   const firstPrepared = await manager.autoPrepareSpecialistHandoff(
@@ -597,7 +647,7 @@ test('child resource budget is narrowed to the exact live AgentPlan node envelop
 });
 
 test('manual jobs without durable Agent-definition authority cannot mint parent specialist scope', async () => {
-  const { manager, dependencies } = await fixture();
+  const { manager, dependencies, bindingDependencies } = await fixture();
   await manager.create({
     id: 'job.manual',
     projectId: 'project-1',
@@ -610,9 +660,11 @@ test('manual jobs without durable Agent-definition authority cannot mint parent 
       jobId: 'job.manual',
       planId: 'plan:manual',
     };
+    store.byId['job.manual'].runtime.runState = 'RUNNING';
+    store.byId['job.manual'].runtime.controlEpoch = 1;
     return store;
   });
-  await manager.bindOrchestrationNode('job.manual', { nodeId: 'worker' }, dependencies);
+  await manager.bindOrchestrationNode('job.manual', { nodeId: 'worker' }, bindingDependencies);
   await assert.rejects(
     () => manager.autoPrepareSpecialistHandoff('job.manual', {
       ...request(),
