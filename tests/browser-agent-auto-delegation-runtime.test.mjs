@@ -170,6 +170,7 @@ function request(overrides = {}) {
     requiredToolIds: ['data.query', 'artifact.write'],
     policyEnvelopeId: 'policy:job.auto',
     deadlineAt: T1,
+    maxConcurrentHandoffs: 2,
     priority: 5,
     ...overrides,
   };
@@ -257,6 +258,8 @@ async function fixture({ allowAgentCreatedChildren = true, maxDepth = 2, maxChil
   const dependencies = {
     resolveProjectHierarchyAuthority: projectId =>
       orchestration.resolveProjectHierarchyAuthority(projectId),
+    withProjectHierarchyAuthority: (projectId, operation) =>
+      orchestration.withProjectHierarchyAuthority(projectId, operation),
   };
   await manager.bindOrchestrationNode(
     'job.auto',
@@ -267,14 +270,20 @@ async function fixture({ allowAgentCreatedChildren = true, maxDepth = 2, maxChil
   return { chrome, core, orchestration, manager, dependencies };
 }
 
-test('runtime auto-delegation atomically selects least authority and persists non-executing provenance', async () => {
+test('runtime auto-delegation atomically selects least authority and reserves capacity without provider dispatch', async () => {
   const { chrome, manager, dependencies } = await fixture();
   const result = await manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies);
 
   assert.equal(result.proposal.selection.specialistId, 'narrow-a');
   assert.equal(result.assignment.specialistId, 'narrow-a');
-  assert.equal(result.executionOwnership.state, ExecutionOwnershipState.AVAILABLE);
+  assert.equal(result.assignment.state, 'LEASED');
+  assert.equal(result.executionOwnership.state, ExecutionOwnershipState.OWNED);
   assert.equal(result.executionAuthorized, false);
+  assert.equal(result.providerDispatched, false);
+  assert.equal(result.capacityReservation.reserved, true);
+  assert.equal(result.capacityReservation.reused, false);
+  assert.equal(result.capacityReservation.capacityObligations, 0);
+  assert.equal(result.capacityReservation.remainingSlots, 1);
   assert.equal(result.reused, false);
   assert.equal(result.structureAdmission.decision, 'ALLOW');
   assert.equal(result.delegationBinding.registryId, 'specialists:project-1');
@@ -283,9 +292,11 @@ test('runtime auto-delegation atomically selects least authority and persists no
   assert.deepEqual(result.delegationBinding.selection.grantedToolIds, ['artifact.write', 'data.query']);
 
   const live = await manager.get('job.auto');
-  assert.equal(live.job.runtime.plan.revision, 8);
+  assert.equal(live.job.runtime.plan.nodes[0].state, 'RUNNING');
   assert.equal(live.job.runtime.specialistHandoffs.length, 1);
+  assert.equal(live.job.runtime.specialistHandoffs[0].state, 'LEASED');
   assert.equal(live.job.runtime.specialistExecutionOwnerships.length, 1);
+  assert.equal(live.job.runtime.specialistExecutionOwnerships[0].state, ExecutionOwnershipState.OWNED);
   assert.equal(live.job.runtime.specialistDelegationBindings.length, 1);
   assert.deepEqual(
     Object.keys(chrome.data).filter(key => key.startsWith('autopilotBrowserAgent')),
@@ -337,24 +348,113 @@ test('durable delegation binding and isolated child references survive restart',
   assert.deepEqual(binding.selection.grantedToolIds, ['artifact.write', 'data.query']);
 });
 
-test('repeated current auto-delegation is idempotent and does not duplicate durable effects', async () => {
+test('repeated current auto-delegation reuses the same live capacity reservation without a second effect', async () => {
   const { manager, dependencies } = await fixture();
   const first = await manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies);
   const before = await manager.get('job.auto');
   const second = await manager.autoPrepareSpecialistHandoff(
     'job.auto',
-    request({ expectedPlanRevision: 8 }),
+    request({ expectedPlanRevision: before.job.runtime.plan.revision }),
     dependencies,
   );
   const after = await manager.get('job.auto');
 
   assert.equal(second.reused, true);
+  assert.equal(second.capacityReservation.reserved, true);
+  assert.equal(second.capacityReservation.reused, true);
+  assert.equal(second.providerDispatched, false);
   assert.equal(second.assignment.agentId, first.assignment.agentId);
-  assert.equal(after.job.runtime.plan.revision, 8);
+  assert.equal(second.assignment.leaseId, first.assignment.leaseId);
+  assert.equal(second.executionOwnership.state, ExecutionOwnershipState.OWNED);
+  assert.equal(after.job.runtime.plan.revision, before.job.runtime.plan.revision);
   assert.equal(after.job.runtime.specialistHandoffs.length, 1);
   assert.equal(after.job.runtime.specialistExecutionOwnerships.length, 1);
   assert.equal(after.job.runtime.specialistDelegationBindings.length, 1);
   assert.equal(after.job.runtime.updatedAt, before.job.runtime.updatedAt);
+});
+
+test('product-wide capacity exhaustion in another job rejects automatic delegation with zero mutation', async () => {
+  const { manager, dependencies } = await fixture();
+
+  await manager.createFromAgentDefinition({
+    registryId: 'agents:project-1',
+    expectedRegistryRevision: 2,
+    agentDefinitionId: 'agent.analysis',
+    expectedDefinitionRevision: 1,
+    jobId: 'job.other',
+    goal: 'Produce another bounded verified analysis.',
+    projectId: 'project-1',
+    ownerBudget: ownerBudget(),
+    ownerCapabilityIds: ['data.analyze', 'data.read', 'filesystem.write'],
+    ownerToolIds: ['artifact.write', 'data.query', 'shell.run'],
+    requestedCapabilityIds: ['data.analyze', 'data.read', 'filesystem.write'],
+    requestedToolIds: ['artifact.write', 'data.query', 'shell.run'],
+  });
+  await manager.update(store => {
+    store.byId['job.other'].runtime.plan = plan({
+      planId: 'plan:other',
+      jobId: 'job.other',
+    });
+    return store;
+  });
+  await manager.bindOrchestrationNode(
+    'job.other',
+    { nodeId: 'worker', expectedGraphId: 'graph-1', expectedControlEpoch: 1 },
+    dependencies,
+  );
+
+  await manager.autoPrepareSpecialistHandoff(
+    'job.auto',
+    request({ maxConcurrentHandoffs: 1 }),
+    dependencies,
+  );
+  const beforeOther = await manager.get('job.other');
+
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff(
+      'job.other',
+      request({
+        policyEnvelopeId: 'policy:job.other',
+        maxConcurrentHandoffs: 1,
+      }),
+      dependencies,
+    ),
+    /Product-wide specialist capacity exhausted/,
+  );
+
+  const afterOther = await manager.get('job.other');
+  assert.deepEqual(afterOther, beforeOther);
+  const first = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(first.handoffs.length, 1);
+  assert.equal(first.handoffs[0].state, 'LEASED');
+  assert.equal(first.executionOwnerships[0].state, ExecutionOwnershipState.OWNED);
+});
+
+test('automatic delegation requires an explicit bounded product-wide capacity limit', async () => {
+  const { manager, dependencies } = await fixture();
+  const missing = request();
+  delete missing.maxConcurrentHandoffs;
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff('job.auto', missing, dependencies),
+    /requires maxConcurrentHandoffs/,
+  );
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff(
+      'job.auto',
+      request({ maxConcurrentHandoffs: 257 }),
+      dependencies,
+    ),
+    /integer from 0 to 256/,
+  );
+  await assert.rejects(
+    () => manager.autoPrepareSpecialistHandoff(
+      'job.auto',
+      request({ maxConcurrentHandoffs: 0 }),
+      dependencies,
+    ),
+    /capacity exhausted/,
+  );
+  assert.equal((await manager.listSpecialistHandoffs('job.auto')).handoffs.length, 0);
 });
 
 test('owner structural policy denies automatic child creation before durable handoff mutation', async () => {
@@ -412,10 +512,11 @@ test('current registry mutation invalidates persisted auto-delegation provenance
     ),
   });
 
+  const liveRevision = (await manager.get('job.auto')).job.runtime.plan.revision;
   await assert.rejects(
     () => manager.autoPrepareSpecialistHandoff(
       'job.auto',
-      request({ expectedRegistryRevision: 5, expectedPlanRevision: 8 }),
+      request({ expectedRegistryRevision: 5, expectedPlanRevision: liveRevision }),
       dependencies,
     ),
     /registry identity or revision drifted/,
@@ -564,7 +665,7 @@ test('service worker routes automatic preparation through BrowserAgentManager an
   const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
   assert.match(source, /'AUTO_PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF'/);
   assert.match(source, /browserAgent\.autoPrepareSpecialistHandoff\(/);
-  assert.match(source, /orchestrationV2\.resolveProjectHierarchyAuthority\(projectId\)/);
+  assert.match(source, /orchestrationV2\.withProjectHierarchyAuthority\(projectId, operation\)/);
   assert.equal(
     (source.match(/autopilotBrowserAgentV1/g) || []).length,
     0,
