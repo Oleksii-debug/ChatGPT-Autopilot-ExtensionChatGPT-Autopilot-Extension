@@ -2407,6 +2407,13 @@ export class BrowserAgentManager {
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+        const activeTargetOwner = [...this.executionSlotActive].find(activeId =>
+          activeId !== job.id && store.byId[activeId]?.runtime?.tabId === action.tabId);
+        if (activeTargetOwner) {
+          const error = new Error('Browser Agent target tab is already in use by another active Agent');
+          error.code = 'AGENT_TAB_TARGET_IN_USE';
+          throw error;
+        }
         current.runtime.tabId = action.tabId;
         current.runtime.currentUrl = targetUrl;
         current.runtime.updatedAt = this.now();
