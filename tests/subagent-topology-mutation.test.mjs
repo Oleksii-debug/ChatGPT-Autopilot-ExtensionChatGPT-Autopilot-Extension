@@ -200,8 +200,9 @@ test('immediate spawned-child activation respects a positive parent concurrency 
 
 test('immediate spawned-child activation consumes only free positive-cap slots', () => {
   const canonicalGraph = graph([
-    node('root', null, ['existing'], { maxActiveChildren: 2 }),
+    node('root', null, ['existing', 'idle-existing'], { maxActiveChildren: 2 }),
     node('existing', 'root'),
+    node('idle-existing', 'root'),
   ]);
   const runtime = runtimeFor(canonicalGraph);
   runtime.nodesById.existing.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
@@ -348,11 +349,39 @@ test('pause blocks replay activation without consuming identity and resume resto
     },
     303,
   );
+  const parentPrepared = reduceOrchestrationHierarchyEvent(
+    first.graph,
+    resumed.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
+      eventId: 'pause-recovery:event:parent-reactivate',
+      controlEpoch: 7,
+      nodeId: 'root',
+      generation: 1,
+      activationId: 'pause-recovery:parent-work',
+      purpose: 'WORK',
+    },
+    304,
+  );
+  const parentActive = reduceOrchestrationHierarchyEvent(
+    first.graph,
+    parentPrepared.runtime,
+    {
+      type: OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED,
+      eventId: 'pause-recovery:event:parent-confirmed',
+      controlEpoch: 7,
+      nodeId: 'root',
+      generation: 1,
+      activationId: 'pause-recovery:parent-work',
+      effectRef: 'effect://pause-recovery/parent',
+    },
+    305,
+  );
   const replayAfterResume = mutateOrchestrationSubagentTopologyV1(request({
     graph: first.graph,
-    runtime: resumed.runtime,
+    runtime: parentActive.runtime,
     spawnId: 'pause-recovery',
-    nowMs: 304,
+    nowMs: 306,
   }));
   assert.equal(replayAfterResume.activationRequests.length, 1);
   assert.equal(replayAfterResume.activationRequests[0].eventId, first.activationRequests[0].eventId);
@@ -361,7 +390,7 @@ test('pause blocks replay activation without consuming identity and resume resto
     replayAfterResume.graph,
     replayAfterResume.runtime,
     replayAfterResume.activationRequests[0],
-    305,
+    307,
   );
   assert.equal(activated.actions.some(action => action.type === 'ACTIVATE_NODE'), true);
   assert.notEqual(activated.reason, 'DUPLICATE_EVENT');
