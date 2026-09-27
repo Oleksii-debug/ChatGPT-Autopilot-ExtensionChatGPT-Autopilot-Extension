@@ -2509,6 +2509,15 @@ function syncAgentDefinitionSpecialistDelegationControls() {
   }
 }
 
+function agentDefinitionSpecialistDelegationSummary(definition) {
+  if (!definition || !Object.hasOwn(definition, 'specialistDelegationProfile')) {
+    return 'Specialist delegation: не налаштовано.';
+  }
+  const profile = definition.specialistDelegationProfile;
+  if (!profile) return 'Specialist delegation: очищено.';
+  return `Specialist delegation: ${profile.enabled ? 'увімкнено' : 'вимкнено'}; registry ${profile.registryId}.`;
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2546,8 +2555,8 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   syncAgentDefinitionSpecialistDelegationControls();
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   $('agent-definition-revision').textContent = definition
-    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
-    : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
+    ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)} ${agentDefinitionSpecialistDelegationSummary(definition)}`
+    : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}. Specialist delegation: не налаштовано.` : 'Реєстр не вибрано.');
   $('agent-definition-save-button').disabled = !hasRegistry;
   $('agent-definition-toggle-enabled-button').disabled = !definition;
   $('agent-definition-delete-button').disabled = !definition;
