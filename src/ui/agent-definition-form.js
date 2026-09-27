@@ -56,6 +56,7 @@ function copyDataRecord(value, label) {
   return out;
 }
 
+
 const AGENT_MODEL_ROUTING_MODES = new Set(['inherit', 'primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
 const AGENT_MODEL_PROVIDERS = new Set(['inherit', 'ollama', 'openai', 'openai-compatible']);
 
@@ -125,9 +126,54 @@ export function mergeAgentDefinitionModelDefaultsV1(input = {}, configDefaults =
   return out;
 }
 
+function copyModelRoutePolicy(value) {
+  if (value == null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new Error('modelRoutePolicy має бути data object.');
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const out = {};
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('modelRoutePolicy.' + key + ' має бути enumerable data property.');
+    }
+    const item = descriptor.value;
+    if (Array.isArray(item)) {
+      if (Object.getPrototypeOf(item) !== Array.prototype) throw new Error('modelRoutePolicy.' + key + ' має бути canonical array.');
+      const arrayDescriptors = Object.getOwnPropertyDescriptors(item);
+      const length = arrayDescriptors.length?.value;
+      if (!Number.isSafeInteger(length) || length < 0 || length > 32) throw new Error('modelRoutePolicy.' + key + ' має некоректну довжину.');
+      const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+      if (Reflect.ownKeys(arrayDescriptors).some(arrayKey => typeof arrayKey !== 'string' || !expected.has(arrayKey))) {
+        throw new Error('modelRoutePolicy.' + key + ' має бути dense data array.');
+      }
+      out[key] = Array.from({ length }, (_, index) => {
+        const entry = arrayDescriptors[String(index)];
+        if (!entry || entry.enumerable !== true || !Object.hasOwn(entry, 'value') || typeof entry.value !== 'string') {
+          throw new Error('modelRoutePolicy.' + key + ' має містити лише text data values.');
+        }
+        return entry.value;
+      });
+      continue;
+    }
+    if (item === null || ['string','number','boolean'].includes(typeof item)) {
+      if (typeof item === 'number' && (!Number.isFinite(item) || Object.is(item,-0))) {
+        throw new Error('modelRoutePolicy.' + key + ' має бути exact data value.');
+      }
+      out[key] = item;
+      continue;
+    }
+    throw new Error('modelRoutePolicy.' + key + ' має бути scalar або array data value.');
+  }
+  return out;
+}
+
 export function buildAgentDefinitionFromFormV1(input = {}, {
   definitionRevision = 1,
   configDefaults = {},
+  modelRoutePolicy = null,
 } = {}) {
   if (!Number.isSafeInteger(definitionRevision) || definitionRevision < 1 || Object.is(definitionRevision,-0)) {
     throw new Error('Definition revision має бути додатним цілим числом.');
@@ -144,6 +190,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
+    modelRoutePolicy: copyModelRoutePolicy(modelRoutePolicy),
     enabled: input.enabled === true,
     definitionRevision,
   };

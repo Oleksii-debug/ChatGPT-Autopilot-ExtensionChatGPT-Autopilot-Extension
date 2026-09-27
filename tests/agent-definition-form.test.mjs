@@ -78,6 +78,48 @@ test('registry and definition identities share the exact canonical ID syntax', (
 });
 
 
+test('Agent definition form preserves durable model route policy without sharing caller data', () => {
+  const policy = {
+    autoSwitch: false,
+    allowRouteIds: ['route.research'],
+    denyRouteIds: [],
+    freeOnly: true,
+    locality: 'local',
+    maxInputPricePerMillionUsd: 0,
+    maxOutputPricePerMillionUsd: 0,
+  };
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    definitionRevision: 7,
+    modelRoutePolicy: policy,
+  });
+  assert.deepEqual(definition.modelRoutePolicy, policy);
+  assert.notEqual(definition.modelRoutePolicy, policy);
+  assert.notEqual(definition.modelRoutePolicy.allowRouteIds, policy.allowRouteIds);
+});
+
+test('Agent definition form policy copy rejects accessors and sparse arrays without executing them', () => {
+  let reads = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'freeOnly', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return true;
+    },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form(), { modelRoutePolicy: hostile }),
+    /enumerable data property/,
+  );
+  assert.equal(reads, 0);
+
+  const sparse = { allowRouteIds: new Array(1) };
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form(), { modelRoutePolicy: sparse }),
+    /text data values|dense data array/,
+  );
+});
+
 test('model-default form writes only canonical supported Agent model fields', () => {
   const definition = buildAgentDefinitionFromFormV1(form({
     aiRoutingMode: 'hybrid-auto',
