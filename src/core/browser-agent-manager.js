@@ -424,7 +424,12 @@ function originPattern(value) {
 }
 
 function normalizePersistedDefinitionRouterOverride(raw, selection) {
-  if (raw == null) return null;
+  if (raw == null) {
+    if (selection?.definition?.modelRoutePolicy) {
+      throw new Error('Browser Agent selected definition route policy requires persisted router override');
+    }
+    return null;
+  }
   if (!selection) throw new Error('Browser Agent definition router override requires persisted selection provenance');
   const record = snapshotExactOwnDataRequest(raw, new Set(['routePolicy']), 'Browser Agent definition router override');
   if (!Object.hasOwn(record, 'routePolicy')) throw new Error('Browser Agent definition router override requires routePolicy');
