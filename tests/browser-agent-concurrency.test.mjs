@@ -641,3 +641,68 @@ test('manual Step obeys the product-wide limit across different Agents', async (
   await Promise.all([manager.step('a'), manager.step('b')]);
   assert.equal(maxActive, 1);
 });
+
+test('approved effects wait for the same global and same-target execution admission', async () => {
+  const chrome = makeChromeStorage();
+  chrome.tabs = {
+    async get(id) {
+      if (id === 11) return { id: 11, url: 'https://one.example/', status: 'complete' };
+      throw new Error('unknown tab');
+    },
+    async query() { return []; },
+  };
+
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  await manager.create({ id: 'active', goal: 'Hold the shared tab' });
+  await manager.create({ id: 'approval', goal: 'Execute only after approval' });
+  await manager.updateExecutionPolicy({ maxConcurrentAgents: 2 });
+  await manager.update(store => {
+    const active = store.byId.active;
+    const approval = store.byId.approval;
+    active.runtime.runState = BrowserAgentRunState.RUNNING;
+    active.runtime.controlEpoch = 1;
+    active.runtime.tabId = 11;
+    active.runtime.knownTabIds = [11];
+    active.runtime.currentUrl = 'https://one.example/';
+
+    approval.runtime.runState = BrowserAgentRunState.WAITING_APPROVAL;
+    approval.runtime.controlEpoch = 4;
+    approval.runtime.tabId = 11;
+    approval.runtime.knownTabIds = [11];
+    approval.runtime.currentUrl = 'https://one.example/';
+    approval.runtime.pendingApproval = {
+      action: { type: BrowserAgentActionType.WAIT, seconds: 1 },
+      snapshotId: 'snap-approval',
+      snapshotSignature: 'sig-approval',
+      url: 'https://one.example/',
+      tabId: 11,
+      targetName: 'bounded wait',
+      targetFingerprint: null,
+      dragStartFingerprint: null,
+      dragEndFingerprint: null,
+      reason: 'owner approval required',
+      requestedAt: 1,
+    };
+    return store;
+  });
+  manager.reconcileAlarm = async () => 0;
+  manager.executionSlotActive.add('active');
+
+  let executed = false;
+  manager.executeAction = async () => {
+    executed = true;
+    return { kind: 'ACTION', currentUrl: 'https://one.example/' };
+  };
+
+  const approving = manager.approvePendingAction('approval', { runInitial: false });
+  await Promise.resolve();
+  assert.equal(executed, false, 'approved effect must wait while another active Agent owns the same target');
+
+  manager.executionSlotActive.delete('active');
+  await manager.updateExecutionPolicy({ maxConcurrentAgents: 2 });
+  await approving;
+  assert.equal(executed, true);
+  const after = (await manager.get('approval')).job;
+  assert.equal(after.runtime.pendingApproval, null);
+  assert.equal(after.runtime.stepCount, 1);
+});
