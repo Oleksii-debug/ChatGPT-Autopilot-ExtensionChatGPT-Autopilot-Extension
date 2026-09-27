@@ -220,6 +220,14 @@
       <h2 id="agent-heading">Агент</h2>
       <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
 
+      <fieldset class="settings-group" id="agent-execution-policy-group">
+        <legend>Одночасне виконання Agent</legend>
+        <label for="agent-max-concurrent-agents">Максимум одночасно активних верхньорівневих Agent</label>
+        <input id="agent-max-concurrent-agents" type="number" min="1" max="32" step="1" inputmode="numeric" value="1">
+        <button id="agent-save-execution-policy-button" type="button">Зберегти ліміт одночасності</button>
+        <p id="agent-execution-policy-status" role="status">Завантаження ліміту одночасності…</p>
+      </fieldset>
+
       <label for="agent-prompt">Що потрібно зробити?</label>
       <textarea id="agent-prompt" rows="9" spellcheck="true"></textarea>
       <label for="agent-import-file">Імпорт чернетки Agent (JSON)</label>
