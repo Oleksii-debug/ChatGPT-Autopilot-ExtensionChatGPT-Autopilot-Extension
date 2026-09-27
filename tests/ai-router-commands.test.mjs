@@ -298,3 +298,63 @@ test('failed route health persists for restart without counting a completed requ
   assert.equal(loaded.runtime.routeStates.a.backoffUntil, 62_000);
   assert.equal(loaded.runtime.lastFailoverChain[0].routeId, 'a');
 });
+
+test('route profile names and prompts persist through the canonical router settings boundary', async () => {
+  const repo = new MemoryRepo();
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2000);
+  const settings = {
+    enabled: false,
+    mode: 'primary',
+    primary: { provider: 'ollama', model: '' },
+    strong: { provider: 'openai', model: '' },
+    routes: [{
+      routeId: 'implementer',
+      provider: 'ollama',
+      model: 'qwen',
+      displayName: 'Implementer',
+      systemPrompt: '  Preserve project policy.\nKeep spacing.  ',
+      workerPrompt: '\nImplement the assigned slice.  ',
+      roles: ['coder'],
+      priority: 10,
+    }],
+  };
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings });
+  const loaded = await dispatcher.execute('GET_AI_ROUTER_SETTINGS');
+  assert.equal(loaded.settings.routes[0].displayName, 'Implementer');
+  assert.equal(loaded.settings.routes[0].systemPrompt, '  Preserve project policy.\nKeep spacing.  ');
+  assert.equal(loaded.settings.routes[0].workerPrompt, '\nImplement the assigned slice.  ');
+});
+
+test('pinned Agent route cannot bypass requested-role filtering through strong fallback', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({
+      now: () => 5000,
+      gatewayClient: { async complete(request) {
+        calls.push(request);
+        return { text:'unexpected', usage:{ inputTokens:1, outputTokens:1, totalTokens:2 } };
+      } },
+    }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{
+      routeId:'verifier-only',
+      provider:'ollama',
+      model:'qwen',
+      roles:['verifier'],
+      priority:10,
+    }],
+  } });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'plan this task',
+      isolatedRuntime:true,
+      taskRole:'planner',
+      routerOverride:{ routeId:'verifier-only' },
+    }),
+    error => error?.code === 'AI_ROUTE_POOL_EXHAUSTED' && error?.retryAt === 0,
+  );
+  assert.equal(calls.length, 0, 'pinned route role mismatch must fail before provider I/O rather than being reclassified as verifier fallback');
+});
