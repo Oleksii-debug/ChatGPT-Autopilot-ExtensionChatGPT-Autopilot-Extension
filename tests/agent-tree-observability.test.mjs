@@ -363,6 +363,45 @@ test('canonical hierarchy mismatch remains authoritative over the projection', (
   );
 });
 
+
+test('projection re-sorts roots with locale-independent canonical ID ordering', () => {
+  const canonicalGraph = {
+    schemaVersion: 1,
+    graphId: 'stable-root-order',
+    controlEpoch: 1,
+    loopPolicy: { mode: 'ONE_SHOT', maxRounds: 0 },
+    promptProfiles: [{ id: 'worker', role: 'worker', version: 1, prompt: 'PRIVATE' }],
+    nodes: [
+      node('a-root'),
+      node('A-root'),
+    ],
+  };
+  const runtime = createOrchestrationHierarchyRuntime(canonicalGraph, NOW_MS);
+  const result = buildAgentTreeProjectionV1({
+    schemaVersion: 1,
+    graph: canonicalGraph,
+    runtime,
+    telemetry: [],
+  });
+  assert.deepEqual(result.rootIds, ['A-root', 'a-root']);
+  assert.deepEqual(result.rows.map(row => row.nodeId), ['A-root', 'a-root']);
+});
+
+test('telemetry lag fails closed when subtraction would leave safe integer range', () => {
+  const canonicalGraph = graph();
+  const runtime = runtimeFor(canonicalGraph);
+  runtime.updatedAt = Number.MAX_SAFE_INTEGER;
+  assert.throws(
+    () => buildAgentTreeProjectionV1({
+      schemaVersion: 1,
+      graph: canonicalGraph,
+      runtime,
+      telemetry: [telemetry('root', { observedAt: '-271821-04-20T00:00:00.000Z' })],
+    }),
+    /telemetry lag is outside safe integer range/,
+  );
+});
+
 test('telemetry totals fail closed instead of overflowing safe integer arithmetic', () => {
   const huge = Number.MAX_SAFE_INTEGER;
   assert.throws(
