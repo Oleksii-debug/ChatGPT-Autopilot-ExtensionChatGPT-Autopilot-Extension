@@ -305,7 +305,8 @@
 
           <fieldset class="settings-group" id="agent-definition-specialist-delegation-group">
             <legend>Автоматичне делегування Specialist</legend>
-            <label><input id="agent-definition-specialist-delegation-enabled" type="checkbox">Дозволити цій Agent definition автоматично готувати Specialist handoff</label>
+            <label><input id="agent-definition-specialist-delegation-configured" type="checkbox">Зберігати Specialist delegation profile для цієї Agent definition</label>
+            <label><input id="agent-definition-specialist-delegation-enabled" type="checkbox">Profile увімкнений для майбутнього автоматичного PREPARE</label>
             <p id="agent-definition-specialist-delegation-help">Збереження profile нічого не запускає. Runtime все одно повторно перевіряє plan, registry, policy, provider readiness і product-wide capacity перед будь-якою дією.</p>
             <label for="agent-definition-specialist-registry-id">Specialist registry ID</label>
             <input id="agent-definition-specialist-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
