@@ -71,6 +71,8 @@ const ui = {
   specialistProviderExecutions: [],
   specialistProviderExecutionQuarantineCount: 0,
   selectedSpecialistHandoffAgentId: '',
+  specialistProviderConfigLoadGeneration: 0,
+  specialistProviderRuntimeLoadGeneration: 0,
   agentDraftActive: false,
   agentPolicyDirty: false,
   agentPolicyEditEpoch: 0,
@@ -3208,11 +3210,13 @@ function openHandsProviderConfigFromForm() {
 
 async function loadSpecialistProviderConfig() {
   const status = $('specialist-provider-config-status');
+  const generation = ++ui.specialistProviderConfigLoadGeneration;
   try {
     const [listed, detail] = await Promise.all([
       core('LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS'),
       core('GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG', { providerId: OPENHANDS_CODING_PROVIDER_ID }),
     ]);
+    if (ui.specialistProviderConfigLoadGeneration !== generation) return;
     const quarantinedProviderIds = Array.isArray(listed?.quarantinedProviderIds)
       ? listed.quarantinedProviderIds
       : [];
@@ -3225,6 +3229,7 @@ async function loadSpecialistProviderConfig() {
       ? 'Owner-qualified OpenHands config завантажено. Доступність сервера перевіряється canonical readiness перед claim/run.'
       : 'OpenHands provider не налаштований. Заповніть і явно збережіть owner-qualified config.';
   } catch (error) {
+    if (ui.specialistProviderConfigLoadGeneration !== generation) return;
     ui.specialistProviderConfig = null;
     ui.specialistProviderQuarantined = false;
     fillSpecialistProviderConfig(null);
@@ -3257,6 +3262,9 @@ async function probeSpecialistProviderConfig() {
     status.textContent = `Readiness: ${state.health || 'UNKNOWN'}; reason: ${state.reasonCode || 'невідомо'}; latency: ${Number(state.latencyMs || 0)} ms; observed: ${observed}. Probe не резервує capacity і не дає execution/completion authority.`;
     announce(state.health === 'READY' ? 'OpenHands provider readiness: READY.' : `OpenHands provider readiness: ${state.health || 'UNKNOWN'}.`);
   } catch (error) {
+    if (ui.specialistProviderConfig !== current
+        || ui.specialistProviderConfig?.revision !== current.revision
+        || ui.specialistProviderQuarantined) return;
     status.textContent = `Readiness probe не виконано: ${error.message}`;
   } finally {
     $('specialist-provider-config-probe-button').disabled = !ui.specialistProviderConfig || ui.specialistProviderQuarantined;
@@ -3372,6 +3380,7 @@ function renderSpecialistProviderRuntime() {
 }
 
 async function loadSpecialistProviderRuntime() {
+  const generation = ++ui.specialistProviderRuntimeLoadGeneration;
   const jobId = ui.selectedBrowserAgentId || '';
   if (!jobId) {
     ui.specialistHandoffs = [];
@@ -3386,12 +3395,15 @@ async function loadSpecialistProviderRuntime() {
       core('LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS', { id: jobId }),
       core('LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTIONS', { id: jobId }),
     ]);
-    if (ui.selectedBrowserAgentId !== jobId) return;
+    if (ui.specialistProviderRuntimeLoadGeneration !== generation
+        || ui.selectedBrowserAgentId !== jobId) return;
     ui.specialistHandoffs = Array.isArray(handoffs?.handoffs) ? handoffs.handoffs : [];
     ui.specialistProviderExecutions = Array.isArray(executions?.executions) ? executions.executions : [];
     ui.specialistProviderExecutionQuarantineCount = Number(executions?.quarantinedCount || 0);
     renderSpecialistProviderRuntime();
   } catch (error) {
+    if (ui.specialistProviderRuntimeLoadGeneration !== generation
+        || ui.selectedBrowserAgentId !== jobId) return;
     $('specialist-provider-runtime-status').textContent = `Specialist runtime evidence не завантажено: ${error.message}`;
   }
 }
