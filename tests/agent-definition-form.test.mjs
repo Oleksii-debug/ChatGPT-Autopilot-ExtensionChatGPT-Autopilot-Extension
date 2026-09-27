@@ -94,6 +94,131 @@ test('Agent definition form keeps legacy absence and explicit specialist-profile
   assert.equal(cleared.specialistDelegationProfile, null);
 });
 
+test('Agent definition form builds configured specialist delegation profile with explicit enabled state', () => {
+  const enabled = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read\nproject.context',
+    specialistToolIdsText: 'files.read\nbrowser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  }));
+  assert.equal(enabled.specialistDelegationProfile.enabled, true);
+  assert.equal(enabled.specialistDelegationProfile.registryId, 'specialists:project-1');
+  assert.deepEqual(enabled.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(enabled.specialistDelegationProfile.requiredToolIds, [
+    'browser.read',
+    'files.read',
+  ]);
+  assert.equal(enabled.specialistDelegationProfile.maxConcurrentHandoffs, 2);
+
+  const disabled = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: false,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read',
+    specialistToolIdsText: 'browser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '30',
+    specialistMaxConcurrentHandoffs: '0',
+    specialistLeaseSeconds: '10',
+    specialistPriority: '0',
+  }));
+  assert.equal(disabled.specialistDelegationProfile.enabled, false);
+});
+
+test('Agent definition form clear semantics distinguish new absence from persisted-profile removal', () => {
+  const newDefinition = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: false,
+  }));
+  assert.equal(Object.hasOwn(newDefinition, 'specialistDelegationProfile'), false);
+
+  const persistedProfile = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: false,
+  };
+  const cleared = buildAgentDefinitionFromFormV1(form({
+    specialistDelegationConfigured: false,
+  }), {
+    specialistDelegationProfile: persistedProfile,
+  });
+  assert.equal(Object.hasOwn(cleared, 'specialistDelegationProfile'), true);
+  assert.equal(cleared.specialistDelegationProfile, null);
+});
+
+test('Specialist delegation form rejects non-canonical numeric aliases and out-of-scope grants', () => {
+  const base = {
+    specialistDelegationConfigured: true,
+    specialistDelegationEnabled: true,
+    specialistRegistryId: 'specialists:project-1',
+    specialistCapabilityIdsText: 'research.read',
+    specialistToolIdsText: 'browser.read',
+    specialistPolicyEnvelopeId: 'policy:agent.research',
+    specialistDeadlineSeconds: '900',
+    specialistMaxConcurrentHandoffs: '2',
+    specialistLeaseSeconds: '600',
+    specialistPriority: '5',
+  };
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistDeadlineSeconds: '0900',
+    })),
+    /канонічному форматі/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistMaxConcurrentHandoffs: '257',
+    })),
+    /діапазоном/u,
+  );
+  assert.throws(
+    () => normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistCapabilityIdsText: 'research.write',
+    }))),
+    /exceeds allowed authority/u,
+  );
+});
+
+test('Specialist delegation controls have explicit accessible labels and owner-warning text', async () => {
+  const html = await readFile(new URL('../src/ui/options.html', import.meta.url), 'utf8');
+  for (const id of [
+    'agent-definition-specialist-delegation-configured',
+    'agent-definition-specialist-delegation-enabled',
+    'agent-definition-specialist-registry-id',
+    'agent-definition-specialist-capabilities',
+    'agent-definition-specialist-tools',
+    'agent-definition-specialist-policy-envelope',
+    'agent-definition-specialist-deadline-seconds',
+    'agent-definition-specialist-max-concurrent',
+    'agent-definition-specialist-lease-seconds',
+    'agent-definition-specialist-priority',
+  ]) {
+    assert.match(html, new RegExp(`(?:for="${id}"|<label><input id="${id}")`, 'u'));
+  }
+  assert.match(
+    html,
+    /Збереження profile нічого не запускає[\s\S]*?Runtime все одно повторно перевіряє plan, registry, policy, provider readiness і product-wide capacity/u,
+  );
+});
+
 test('required identity and text fields fail before a Core mutation can be built', () => {
   assert.throws(() => buildAgentDefinitionFromFormV1(form({ agentDefinitionId: '' })), /ID/);
   assert.throws(() => buildAgentDefinitionFromFormV1(form({ agentDefinitionId: ' agent.research' })), /канонічним ID/);
