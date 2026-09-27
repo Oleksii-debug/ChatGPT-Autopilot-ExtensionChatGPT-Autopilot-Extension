@@ -7,7 +7,7 @@ export const AGENT_DEFINITION_SELECTION_VERSION = 1;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const DEF_KEYS = new Set([
   'schemaVersion', 'agentDefinitionId', 'label', 'description', 'instructions',
-  'capabilityIds', 'toolIds', 'acceptanceCriteria', 'configDefaults', 'enabled',
+  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'enabled',
   'definitionRevision',
 ]);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
@@ -169,11 +169,12 @@ export function normalizeAgentDefinitionV1(input) {
   return freeze({
     schemaVersion: AGENT_DEFINITION_VERSION,
     agentDefinitionId: id(raw.agentDefinitionId, 'agentDefinitionId'),
-    label: textValue(raw.label, 'label', 300),
+    label: textValue(raw.label, 'label', 160),
     description: textValue(raw.description, 'description', 4000, { optional: true }),
     instructions: textValue(raw.instructions, 'instructions', 12000),
     capabilityIds: ids(raw.capabilityIds, 'capabilityIds', 64),
     toolIds: ids(raw.toolIds, 'toolIds', 128),
+    tags: ids(raw.tags, 'tags', 32),
     acceptanceCriteria: normalizeAcceptanceCriteria(raw.acceptanceCriteria),
     configDefaults: normalizeConfigDefaults(raw.configDefaults),
     enabled: bool(raw.enabled, 'enabled'),
