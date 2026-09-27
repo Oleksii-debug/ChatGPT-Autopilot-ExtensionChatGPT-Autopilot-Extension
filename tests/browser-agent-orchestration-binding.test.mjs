@@ -38,6 +38,9 @@ function chromeFake() {
       async create() {},
       async clear() { return true; },
     },
+    permissions: {
+      async contains() { return true; },
+    },
   };
 }
 
