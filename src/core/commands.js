@@ -13,6 +13,7 @@ import { appendDiagnostic, createDiagnosticReport } from './diagnostics.js';
 import { buildRunTimelineV1 } from './run-timeline.js';
 import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
+import { normalizeOpenHandsCodingSpecialistConfigV1 } from './coding-specialist-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
@@ -723,6 +724,31 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       const settings = normalizeLocalAiSettings(payload.settings || state.profile?.localAi || DEFAULT_LOCAL_AI_SETTINGS);
       return { result: await this.localAiClient.complete(settings, payload.prompt, { systemPrompt: payload.systemPrompt || '' }) };
+    }
+    if (command === CoreCommand.GET_OPENHANDS_SPECIALIST_PROFILE) {
+      const state = await this.repo.load();
+      const stored = state.profile?.openHandsCodingSpecialist;
+      const config = stored == null ? null : normalizeOpenHandsCodingSpecialistConfigV1(stored);
+      return { config: config == null ? null : structuredClone(config) };
+    }
+    if (command === CoreCommand.UPDATE_OPENHANDS_SPECIALIST_PROFILE) {
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new Error('OpenHands specialist profile payload must be an object');
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(payload, 'config');
+      if (!descriptor
+          || descriptor.enumerable !== true
+          || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        throw new Error('OpenHands specialist profile config must be an enumerable own data property');
+      }
+      const config = descriptor.value === null
+        ? null
+        : normalizeOpenHandsCodingSpecialistConfigV1(descriptor.value);
+      await this.repo.update(draft => {
+        draft.profile.openHandsCodingSpecialist = config == null ? null : structuredClone(config);
+        return draft;
+      });
+      return { config: config == null ? null : structuredClone(config) };
     }
     if (command === CoreCommand.GET_AI_ROUTER_SETTINGS) {
       const state = await this.repo.load();
