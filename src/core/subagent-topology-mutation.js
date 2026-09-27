@@ -197,7 +197,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
     { min: 1, max: 200 },
   );
   const nowMs = integer(
-    own(request, 'nowMs', Date.now()),
+    own(request, 'nowMs'),
     'nowMs',
     { min: 0 },
   );
