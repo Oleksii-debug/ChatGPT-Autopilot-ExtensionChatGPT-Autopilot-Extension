@@ -170,6 +170,27 @@ test('async live observation may occur after admission start and freshness is me
   assert.equal(result.executable, true);
 });
 
+test('observation that becomes stale while provider resolution is awaited fails closed', async () => {
+  const start = Date.parse('2026-09-27T12:40:00.000Z');
+  const end = start + 30_001;
+  const ticks = [start, end];
+  const resolver = new SpecialistProviderReadinessResolverV1({
+    bindings: [binding(async request => {
+      assert.equal(request.asOf, '2026-09-27T12:40:00.000Z');
+      return {
+        observedAt: '2026-09-27T12:40:00.000Z',
+        providerStates: [state()],
+      };
+    })],
+    now: () => ticks.shift(),
+  });
+
+  await assert.rejects(
+    resolver.resolve(selection()),
+    /observation is stale/u,
+  );
+});
+
 test('resolver output must be fresh, canonical, and not from the future', async () => {
   const stale = runtime([binding(async () => ({
     observedAt: '2026-09-27T12:39:29.999Z',
