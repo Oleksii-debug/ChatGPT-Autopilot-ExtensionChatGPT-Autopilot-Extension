@@ -45,9 +45,9 @@ import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
-  authorizeAgentPlanSpecialistSafeRetryV1,
+  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   completeAgentPlanSpecialistHandoffV1,
-  verifyAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import {
@@ -145,6 +145,12 @@ const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
 const AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS = new Set([
   'withProjectHierarchyAuthority',
   'specialistProviderReadinessResolver',
+]);
+const TRUSTED_SPECIALIST_VERIFICATION_DEPENDENCY_KEYS = new Set([
+  'resolveTrustedExecutionVerificationRecord',
+]);
+const TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS = new Set([
+  'agentId', 'leaseId', 'verificationId',
 ]);
 const AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS = new Set([
   'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
@@ -260,6 +266,20 @@ function trustedAutomaticDelegationDependencies(dependencies) {
     withProjectHierarchyAuthority: raw.withProjectHierarchyAuthority,
     resolveSpecialistReadiness: selection => resolveMethod.call(resolver, selection),
     assertSpecialistReadinessCurrent: readiness => assertCurrentMethod.call(resolver, readiness),
+  });
+}
+
+function trustedSpecialistVerificationDependencies(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    TRUSTED_SPECIALIST_VERIFICATION_DEPENDENCY_KEYS,
+    'Browser Agent trusted specialist verification dependencies',
+  );
+  if (typeof raw.resolveTrustedExecutionVerificationRecord !== 'function') {
+    throw new Error('Canonical trusted execution verification resolver is required');
+  }
+  return Object.freeze({
+    resolveTrustedExecutionVerificationRecord: raw.resolveTrustedExecutionVerificationRecord,
   });
 }
 
@@ -3027,33 +3047,49 @@ export class BrowserAgentManager {
     };
   }
 
-  async authorizeSpecialistSafeRetry(id, payload = {}) {
-    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
-    const now = new Date(this.now()).toISOString();
-    const at = specialistRequestTimestamp(request.at, now);
+  async authorizeSpecialistSafeRetry(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS,
+      'Browser Agent specialist reconciliation request',
+    );
+    for (const key of TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent specialist reconciliation request requires ${key}`);
+      }
+    }
+    const trustedDependencies = trustedSpecialistVerificationDependencies(dependencies);
+    const at = new Date(this.now()).toISOString();
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...request,
-        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at,
-      });
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        trustedDependencies,
+      );
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
       job.runtime.updatedAt = this.now();
+      const trusted = retriable.trustedVerification;
       appendHistory(job.runtime, {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryVerification.verifierId,
-        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
-        verificationId: retriable.safeRetryVerification.verificationId,
-        observationId: retriable.safeRetryVerification.observationId,
-        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
-        evidence: retriable.safeRetryVerification.summary,
+        trustedRecordId: trusted.recordId,
+        verifierId: trusted.verifierId,
+        verificationAuthorityId: trusted.verificationAuthorityId,
+        verificationId: trusted.verificationId,
+        evidenceArtifactIds: trusted.evidenceArtifactIds,
+        verificationOutcome: trusted.outcome,
+        verificationProvenance: trusted.provenance,
         message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
       });
       result = clone(retriable);
@@ -3082,20 +3118,51 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async verifySpecialistHandoff(id, payload = {}) {
-    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
-    const now = new Date(this.now()).toISOString();
-    const at = specialistRequestTimestamp(request.at, now);
+  async verifySpecialistHandoff(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS,
+      'Browser Agent specialist verification request',
+    );
+    for (const key of TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent specialist verification request requires ${key}`);
+      }
+    }
+    const trustedDependencies = trustedSpecialistVerificationDependencies(dependencies);
+    const at = new Date(this.now()).toISOString();
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        trustedDependencies,
+      );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      const trusted = verified.trustedVerification;
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-verified',
+        agentId: verified.verifiedAgentId,
+        trustedRecordId: trusted.recordId,
+        verifierId: trusted.verifierId,
+        verificationAuthorityId: trusted.verificationAuthorityId,
+        verificationId: trusted.verificationId,
+        evidenceArtifactIds: trusted.evidenceArtifactIds,
+        verificationOutcome: trusted.outcome,
+        verificationProvenance: trusted.provenance,
+        message: 'Independent canonical trusted verifier accepted specialist evidence and advanced the plan.',
+      });
       result = clone(verified);
       return store;
     });
