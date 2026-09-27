@@ -178,6 +178,23 @@ test('spawn id prefix overlap does not corrupt exact-effect replay families', ()
   assert.deepEqual(replaySecond.createdNodeIds, ['subagent:effect:child:1']);
 });
 
+test('same spawn identity rejects replay after child authority drift', () => {
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    spawnId: 'exact-effect-authority',
+  }));
+  const tamperedGraph = structuredClone(first.graph);
+  tamperedGraph.nodesById[first.createdNodeIds[0]].promptProfileId = 'recovery';
+
+  const conflict = mutateOrchestrationSubagentTopologyV1(request({
+    graph: tamperedGraph,
+    runtime: first.runtime,
+    spawnId: 'exact-effect-authority',
+  }));
+
+  assert.equal(conflict.decision, 'DENY');
+  assert.equal(conflict.reasonCode, 'SPAWN_IDENTITY_CONFLICT');
+});
+
 test('same spawn identity cannot be replayed with a different child count', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
