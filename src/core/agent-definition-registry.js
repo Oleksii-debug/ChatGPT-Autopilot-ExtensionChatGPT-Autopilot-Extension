@@ -1,4 +1,5 @@
 import { normalizeBrowserAgentConfig } from './browser-agent.js';
+import { normalizeAiRoutePolicy } from './ai-route-pool.js';
 
 export const AGENT_DEFINITION_VERSION = 1;
 export const AGENT_DEFINITION_REGISTRY_VERSION = 1;
@@ -14,7 +15,7 @@ export const AgentDefinitionRegistryMutationKind = Object.freeze({
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const DEF_KEYS = new Set([
   'schemaVersion', 'agentDefinitionId', 'label', 'description', 'instructions',
-  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'enabled',
+  'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy', 'enabled',
   'definitionRevision',
 ]);
 const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
@@ -44,6 +45,10 @@ const CONFIG_DEFAULT_KEYS = new Set([
 const DEFINITION_CEILING_KEYS = Object.freeze([
   'maxSteps', 'maxModelCalls', 'maxInputTokens', 'maxOutputTokens',
   'maxTotalTokens', 'maxOutputTokensPerCall', 'maxRuntimeMinutes',
+]);
+const MODEL_ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
+  'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
 ]);
 const OWNER_BUDGET_KEYS = new Set([
   ...DEFINITION_CEILING_KEYS,
@@ -195,6 +200,23 @@ function normalizeConfigDefaults(input) {
   return freeze(out);
 }
 
+export function normalizeAgentModelRoutePolicyV1(input) {
+  if (input === undefined || input === null) return null;
+  const raw = record(input, MODEL_ROUTE_POLICY_KEYS, 'AgentDefinitionV1.modelRoutePolicy');
+  const normalized = normalizeAiRoutePolicy(raw);
+  return freeze({
+    autoSwitch: normalized.autoSwitch,
+    pinnedRouteId: normalized.pinnedRouteId,
+    orderedRouteIds: [...normalized.orderedRouteIds],
+    allowRouteIds: [...normalized.allowRouteIds],
+    denyRouteIds: [...normalized.denyRouteIds],
+    freeOnly: normalized.freeOnly,
+    locality: normalized.locality,
+    maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
+    maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
+  });
+}
+
 function normalizeOwnerBudget(input) {
   const raw = record(input, OWNER_BUDGET_KEYS, 'Agent definition owner budget');
   const safe = Object.create(null);
@@ -260,6 +282,7 @@ export function normalizeAgentDefinitionV1(input) {
     tags: ids(raw.tags, 'tags', 32),
     acceptanceCriteria: normalizeAcceptanceCriteria(raw.acceptanceCriteria),
     configDefaults: normalizeConfigDefaults(raw.configDefaults),
+    modelRoutePolicy: normalizeAgentModelRoutePolicyV1(raw.modelRoutePolicy),
     enabled: bool(raw.enabled, 'enabled'),
     definitionRevision: positiveInteger(raw.definitionRevision, 'definitionRevision'),
   });
@@ -428,6 +451,9 @@ export function materializeAgentDefinitionV1(input = {}) {
       definitionRevision: current.definitionRevision,
     },
     config,
+    routerOverride: current.modelRoutePolicy
+      ? freeze({ routePolicy: current.modelRoutePolicy })
+      : freeze({}),
     scope: {
       capabilityIds: requestedCapabilityIds,
       toolIds: requestedToolIds,
