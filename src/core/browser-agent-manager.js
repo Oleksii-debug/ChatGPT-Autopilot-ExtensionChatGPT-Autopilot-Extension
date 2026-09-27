@@ -248,6 +248,47 @@ function sameSpecialistSelection(left, right) {
     && sameCanonicalIdentityList(a.grantedToolIds, b.grantedToolIds);
 }
 
+function assertTrustedProviderReadinessForSelection(providerReadiness, selection, nowMs) {
+  const canonical = normalizeSpecialistSelectionV1(selection);
+  if (ownDataPropertyValue(providerReadiness, 'trustedResolverInvoked') !== true
+      || ownDataPropertyValue(providerReadiness, 'callerReadinessAccepted') !== false) {
+    throw new Error('Trusted specialist provider readiness resolver returned non-canonical provenance');
+  }
+  for (const [field, expected] of [
+    ['registryId', canonical.registryId],
+    ['registryRevision', canonical.registryRevision],
+    ['specialistId', canonical.specialistId],
+    ['providerId', canonical.providerId],
+    ['definitionRevision', canonical.definitionRevision],
+    ['executionPlane', canonical.executionPlane],
+  ]) {
+    if (ownDataPropertyValue(providerReadiness, field) !== expected) {
+      throw new Error('Trusted specialist provider readiness provenance does not match selected specialist');
+    }
+  }
+  if (ownDataPropertyValue(providerReadiness, 'executable') !== true) {
+    throw new Error('Selected specialist provider is not currently executable');
+  }
+  const resolvedAt = ownDataPropertyValue(providerReadiness, 'resolvedAt');
+  const maxAgeMs = ownDataPropertyValue(providerReadiness, 'maxAgeMs');
+  const resolvedMs = Date.parse(exactAutomaticDelegationTimestamp(resolvedAt, 'provider readiness resolvedAt'));
+  if (typeof maxAgeMs !== 'number'
+      || !Number.isSafeInteger(maxAgeMs)
+      || Object.is(maxAgeMs, -0)
+      || maxAgeMs < 1
+      || maxAgeMs > 5 * 60_000) {
+    throw new Error('Trusted specialist provider readiness maxAgeMs is invalid');
+  }
+  if (typeof nowMs !== 'number'
+      || !Number.isSafeInteger(nowMs)
+      || Object.is(nowMs, -0)
+      || nowMs < resolvedMs
+      || nowMs - resolvedMs > maxAgeMs) {
+    throw new Error('Trusted specialist provider readiness expired before durable admission');
+  }
+  return providerReadiness;
+}
+
 const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
   'PROJECT_UNOWNED',
   'PROJECT_NON_UNIQUE',
@@ -1767,21 +1808,11 @@ export class BrowserAgentManager {
       return normalizeSpecialistSelectionV1(proposal.selection);
     });
 
-    const providerReadiness = await resolveSpecialistReadiness(preflightSelection);
-    if (ownDataPropertyValue(providerReadiness, 'trustedResolverInvoked') !== true
-        || ownDataPropertyValue(providerReadiness, 'callerReadinessAccepted') !== false) {
-      throw new Error('Trusted specialist provider readiness resolver returned non-canonical provenance');
-    }
-    if (ownDataPropertyValue(providerReadiness, 'registryId') !== preflightSelection.registryId
-        || ownDataPropertyValue(providerReadiness, 'registryRevision') !== preflightSelection.registryRevision
-        || ownDataPropertyValue(providerReadiness, 'specialistId') !== preflightSelection.specialistId
-        || ownDataPropertyValue(providerReadiness, 'providerId') !== preflightSelection.providerId
-        || ownDataPropertyValue(providerReadiness, 'definitionRevision') !== preflightSelection.definitionRevision) {
-      throw new Error('Trusted specialist provider readiness provenance does not match selected specialist');
-    }
-    if (ownDataPropertyValue(providerReadiness, 'executable') !== true) {
-      throw new Error('Selected specialist provider is not currently executable');
-    }
+    const providerReadiness = assertTrustedProviderReadinessForSelection(
+      await resolveSpecialistReadiness(preflightSelection),
+      preflightSelection,
+      this.now(),
+    );
 
     return withProjectHierarchyAuthority(projectId, async authority => {
       const at = new Date(this.now()).toISOString();
