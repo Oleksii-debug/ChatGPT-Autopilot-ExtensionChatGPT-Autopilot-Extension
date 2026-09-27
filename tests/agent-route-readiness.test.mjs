@@ -102,7 +102,7 @@ test('pinned route that cannot perform the required verifier role fails as confi
   assert.equal(result.retryAt, 0);
 });
 
-test('temporary backoff is WAITING_RETRY and reports earliest required-role recovery time', () => {
+test('temporary backoff is WAITING_RETRY and reports the time when all required roles can be eligible again', () => {
   const result = inspectAgentRouteReadinessV1({
     routes:routes(),
     policy:{},
@@ -119,7 +119,7 @@ test('temporary backoff is WAITING_RETRY and reports earliest required-role reco
   assert.equal(result.ready, false);
   assert.deepEqual(result.planner.availableRouteIds, []);
   assert.deepEqual(result.verifier.availableRouteIds, []);
-  assert.equal(result.retryAt, 5000);
+  assert.equal(result.retryAt, 9000);
 });
 
 test('vision and capability constraints are delegated to the canonical route selector', () => {
