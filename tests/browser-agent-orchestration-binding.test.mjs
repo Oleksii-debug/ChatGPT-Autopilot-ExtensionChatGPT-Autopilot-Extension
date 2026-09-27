@@ -1383,6 +1383,7 @@ test('bound lifecycle waits for canonical Project authority before mutating Brow
   );
   await projectFenceReached;
 
+  const beforePause = await manager.get('job-1');
   let pauseSettled = false;
   const pausing = manager.pause('job-1', lifecycleDependencies).then(result => {
     pauseSettled = true;
@@ -1393,7 +1394,7 @@ test('bound lifecycle waits for canonical Project authority before mutating Brow
   assert.equal(pauseSettled, false, 'PAUSE must wait behind canonical Project authority');
   const during = await manager.get('job-1');
   assert.equal(during.job.runtime.runState, 'RUNNING');
-  assert.equal(during.job.runtime.controlEpoch, 1);
+  assert.equal(during.job.runtime.controlEpoch, beforePause.job.runtime.controlEpoch);
 
   releaseProjectFenceResolve();
   await holdingProjectAuthority;
@@ -1401,7 +1402,7 @@ test('bound lifecycle waits for canonical Project authority before mutating Brow
 
   const after = await manager.get('job-1');
   assert.equal(after.job.runtime.runState, 'PAUSED');
-  assert.equal(after.job.runtime.controlEpoch, 2);
+  assert.equal(after.job.runtime.controlEpoch, beforePause.job.runtime.controlEpoch + 1);
   const runtime = await orchestration.controllerFor('orch-1').runtimeRepository.load();
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
   assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
