@@ -1541,3 +1541,28 @@ test('duplicate bound lifecycle retry is accepted only when durable target scope
   assert.equal(runtime.hierarchy.state.nodesById.root.scopeState, 'PAUSED');
   assert.equal(runtime.hierarchy.state.nodesById.worker.scopeState, 'PAUSED');
 });
+
+
+test('scope dispatcher rejects accessor event type without executing the getter', async () => {
+  const { orchestration } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+  let reads = 0;
+  const hostile = {
+    eventId: 'hostile-scope-event',
+    controlEpoch: 1,
+    nodeId: 'root',
+  };
+  Object.defineProperty(hostile, 'type', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 'PAUSE_SCOPE';
+    },
+  });
+
+  await assert.rejects(
+    () => controller.dispatchHierarchyScopeEvent(hostile, { nowMs: 2000 }),
+    /type must be an enumerable own data property/,
+  );
+  assert.equal(reads, 0);
+});
