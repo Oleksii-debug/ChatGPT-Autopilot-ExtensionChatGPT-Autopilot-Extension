@@ -41,6 +41,14 @@ function chromeFake() {
   };
 }
 
+function authorityStorageSnapshot(chrome, orchestraId = 'orch-1') {
+  return structuredClone({
+    config: chrome.data[`autopilotOrchestrationV2Config:${orchestraId}`],
+    runtime: chrome.data[`autopilotOrchestrationV2Runtime:${orchestraId}`],
+    manager: chrome.data.autopilotOrchestrationV2Manager,
+  });
+}
+
 function orchestraConfig(projectId) {
   return {
     enabled: false,
@@ -388,7 +396,7 @@ test('profile import keeps config, hierarchy and owner policy behind one Project
     const imported = await importing;
     const bound = await bindingPromise;
 
-    assert.equal(imported.status.runtime.hierarchy.graph.graphId, 'graph-2');
+    assert.equal(imported.status.runtime.hierarchy.graphId, 'graph-2');
     assert.deepEqual(imported.status.orchestra.subagentPolicy, {
       schemaVersion: 1,
       allowAgentCreatedChildren: true,
@@ -400,6 +408,293 @@ test('profile import keeps config, hierarchy and owner policy behind one Project
   } finally {
     releaseHierarchyResolve?.();
     controller.configureHierarchy = originalConfigureHierarchy;
+  }
+});
+
+test('failed profile configure restores the exact authority snapshot before concurrent BIND', async () => {
+  const { chrome, manager, orchestration, dependencies } = await fixture();
+  const controller = orchestration.controllerFor('orch-1');
+  const before = await orchestration.getStatus('orch-1');
+  const beforeRaw = authorityStorageSnapshot(chrome);
+  const beforeAuthority = await orchestration.resolveProjectHierarchyAuthority('project-1');
+  const originalConfigureHierarchy = controller.configureHierarchy.bind(controller);
+
+  let configureReachedResolve;
+  const configureReached = new Promise(resolve => { configureReachedResolve = resolve; });
+  let releaseConfigureResolve;
+  const releaseConfigure = new Promise(resolve => { releaseConfigureResolve = resolve; });
+  controller.configureHierarchy = async () => {
+    const during = await controller.configRepository.load();
+    assert.equal(during.absoluteMaxWorkers, 3, 'config mutation must precede the forced configure failure');
+    configureReachedResolve();
+    await releaseConfigure;
+    throw new Error('forced hierarchy configure failure');
+  };
+
+  const profile = exportOrchestrationProfile(
+    { ...before.config, enabled: false, absoluteMaxWorkers: 3 },
+    {
+      name: 'Rollback configure failure',
+      hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+      subagentPolicy: {
+        schemaVersion: 1,
+        allowAgentCreatedChildren: true,
+        maxDepth: 3,
+        maxChildrenPerAgent: 2,
+      },
+    },
+  );
+
+  try {
+    const importing = orchestration.importProfile(profile);
+    await configureReached;
+
+    let bindSettled = false;
+    const binding = manager.bindOrchestrationNode(
+      'job-1',
+      { nodeId: 'worker' },
+      dependencies,
+    ).then(result => {
+      bindSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(bindSettled, false, 'BIND must remain fenced while failed import is rolled back');
+
+    releaseConfigureResolve();
+    await assert.rejects(importing, /forced hierarchy configure failure/u);
+    const bound = await binding;
+
+    const after = await orchestration.getStatus('orch-1');
+    const afterAuthority = await orchestration.resolveProjectHierarchyAuthority('project-1');
+    assert.deepEqual(after.config, before.config);
+    assert.deepEqual(after.runtime.hierarchy.graph, before.runtime.hierarchy.graph);
+    assert.deepEqual(after.orchestra.subagentPolicy, before.orchestra.subagentPolicy);
+    assert.deepEqual(authorityStorageSnapshot(chrome), beforeRaw, 'rollback must restore exact raw config/runtime/manager authority storage');
+    assert.deepEqual(afterAuthority.graph, beforeAuthority.graph);
+    assert.deepEqual(afterAuthority.subagentPolicy, beforeAuthority.subagentPolicy);
+    assert.equal(bound.binding.graphId, 'graph-1');
+    assert.equal(bound.binding.controlEpoch, 1);
+  } finally {
+    releaseConfigureResolve?.();
+    controller.configureHierarchy = originalConfigureHierarchy;
+  }
+});
+
+test('post-policy-persist profile failure restores config hierarchy and policy before concurrent BIND', async () => {
+  const { chrome, manager, orchestration, dependencies } = await fixture();
+  const before = await orchestration.getStatus('orch-1');
+  const beforeRaw = authorityStorageSnapshot(chrome);
+  const beforeAuthority = await orchestration.resolveProjectHierarchyAuthority('project-1');
+  const originalUpdateMeta = orchestration.updateMeta.bind(orchestration);
+
+  let policyPersistedResolve;
+  const policyPersisted = new Promise(resolve => { policyPersistedResolve = resolve; });
+  let releasePolicyResolve;
+  const releasePolicy = new Promise(resolve => { releasePolicyResolve = resolve; });
+  let armed = true;
+  orchestration.updateMeta = mutator => originalUpdateMeta(mutator).then(async result => {
+    const policy = result?.byId?.['orch-1']?.subagentPolicy;
+    if (armed
+        && policy?.allowAgentCreatedChildren === true
+        && policy?.maxDepth === 3
+        && policy?.maxChildrenPerAgent === 2) {
+      armed = false;
+      policyPersistedResolve();
+      await releasePolicy;
+      throw new Error('forced owner-policy persistence failure');
+    }
+    return result;
+  });
+
+  const profile = exportOrchestrationProfile(
+    { ...before.config, enabled: false, absoluteMaxWorkers: 3 },
+    {
+      name: 'Rollback policy failure',
+      hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+      subagentPolicy: {
+        schemaVersion: 1,
+        allowAgentCreatedChildren: true,
+        maxDepth: 3,
+        maxChildrenPerAgent: 2,
+      },
+    },
+  );
+
+  try {
+    const importing = orchestration.importProfile(profile);
+    await policyPersisted;
+
+    const during = await orchestration.controllerFor('orch-1').runtimeRepository.load();
+    assert.equal(during.hierarchy.graph.graphId, 'graph-2', 'hierarchy must have persisted before forced policy failure');
+
+    let bindSettled = false;
+    const binding = manager.bindOrchestrationNode(
+      'job-1',
+      { nodeId: 'worker' },
+      dependencies,
+    ).then(result => {
+      bindSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(bindSettled, false, 'BIND must not observe imported hierarchy/policy before rollback');
+
+    releasePolicyResolve();
+    await assert.rejects(importing, /forced owner-policy persistence failure/u);
+    const bound = await binding;
+
+    const after = await orchestration.getStatus('orch-1');
+    const afterAuthority = await orchestration.resolveProjectHierarchyAuthority('project-1');
+    assert.deepEqual(after.config, before.config);
+    assert.deepEqual(after.runtime.hierarchy.graph, before.runtime.hierarchy.graph);
+    assert.deepEqual(after.orchestra.subagentPolicy, before.orchestra.subagentPolicy);
+    assert.deepEqual(authorityStorageSnapshot(chrome), beforeRaw, 'rollback must restore exact raw config/runtime/manager authority storage');
+    assert.deepEqual(afterAuthority.graph, beforeAuthority.graph);
+    assert.deepEqual(afterAuthority.subagentPolicy, beforeAuthority.subagentPolicy);
+    assert.equal(bound.binding.graphId, 'graph-1');
+    assert.equal(bound.binding.controlEpoch, 1);
+  } finally {
+    releasePolicyResolve?.();
+    orchestration.updateMeta = originalUpdateMeta;
+  }
+});
+
+test('failed owner-paused project rebind defers managed-session purge until authority rollback completes', async () => {
+  const { chrome, manager, orchestration, dependencies } = await fixture();
+  await orchestration.updateMeta(meta => {
+    meta.byId['orch-1'].ownerPaused = true;
+    return meta;
+  });
+
+  const controller = orchestration.controllerFor('orch-1');
+  const before = await orchestration.getStatus('orch-1');
+  const beforeRaw = authorityStorageSnapshot(chrome);
+  const originalConfigureHierarchy = controller.configureHierarchy.bind(controller);
+  const originalCoreUpdate = orchestration.coreRepository.update.bind(orchestration.coreRepository);
+  let coreUpdateCalls = 0;
+  orchestration.coreRepository.update = (...args) => {
+    coreUpdateCalls += 1;
+    return originalCoreUpdate(...args);
+  };
+
+  let configureReachedResolve;
+  const configureReached = new Promise(resolve => { configureReachedResolve = resolve; });
+  let releaseConfigureResolve;
+  const releaseConfigure = new Promise(resolve => { releaseConfigureResolve = resolve; });
+  controller.configureHierarchy = async () => {
+    const during = await controller.configRepository.load();
+    assert.equal(during.projectId, 'project-2', 'project identity must have changed before forced configure failure');
+    configureReachedResolve();
+    await releaseConfigure;
+    throw new Error('forced post-rebind configure failure');
+  };
+
+  const profile = exportOrchestrationProfile(
+    { ...before.config, enabled: false, projectId: 'project-2' },
+    {
+      name: 'Rollback project rebind',
+      hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+      subagentPolicy: {
+        schemaVersion: 1,
+        allowAgentCreatedChildren: true,
+        maxDepth: 3,
+        maxChildrenPerAgent: 2,
+      },
+    },
+  );
+
+  try {
+    const importing = orchestration.importProfile(profile);
+    await configureReached;
+    assert.equal(
+      coreUpdateCalls,
+      0,
+      'old-project managed Core state must not be purged before the composite authority import commits',
+    );
+
+    let bindSettled = false;
+    const binding = manager.bindOrchestrationNode(
+      'job-1',
+      { nodeId: 'worker' },
+      dependencies,
+    ).then(result => {
+      bindSettled = true;
+      return result;
+    });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(bindSettled, false, 'BIND must remain fenced while project identity is transient');
+
+    releaseConfigureResolve();
+    await assert.rejects(importing, /forced post-rebind configure failure/u);
+    const bound = await binding;
+
+    const after = await orchestration.getStatus('orch-1');
+    assert.equal(coreUpdateCalls, 0, 'failed project rebind must leave old managed Core state untouched');
+    assert.deepEqual(authorityStorageSnapshot(chrome), beforeRaw);
+    assert.deepEqual(after.config, before.config);
+    assert.deepEqual(after.runtime.hierarchy.graph, before.runtime.hierarchy.graph);
+    assert.deepEqual(after.orchestra.subagentPolicy, before.orchestra.subagentPolicy);
+    assert.equal(bound.binding.projectId, 'project-1');
+    assert.equal(bound.binding.graphId, 'graph-1');
+    assert.equal(bound.binding.controlEpoch, 1);
+  } finally {
+    releaseConfigureResolve?.();
+    controller.configureHierarchy = originalConfigureHierarchy;
+    orchestration.coreRepository.update = originalCoreUpdate;
+  }
+});
+
+test('successful owner-paused project rebind purges managed sessions only after config hierarchy and policy commit', async () => {
+  const { orchestration } = await fixture();
+  await orchestration.updateMeta(meta => {
+    meta.byId['orch-1'].ownerPaused = true;
+    return meta;
+  });
+
+  const before = await orchestration.getStatus('orch-1');
+  const originalCoreUpdate = orchestration.coreRepository.update.bind(orchestration.coreRepository);
+  let coreUpdateCalls = 0;
+  let authorityAtPurge = null;
+  orchestration.coreRepository.update = async (...args) => {
+    coreUpdateCalls += 1;
+    authorityAtPurge = await orchestration.getStatus('orch-1');
+    return originalCoreUpdate(...args);
+  };
+
+  const profile = exportOrchestrationProfile(
+    { ...before.config, enabled: false, projectId: 'project-2' },
+    {
+      name: 'Committed project rebind',
+      hierarchy: hierarchy({ graphId: 'graph-2', controlEpoch: 2 }),
+      subagentPolicy: {
+        schemaVersion: 1,
+        allowAgentCreatedChildren: true,
+        maxDepth: 3,
+        maxChildrenPerAgent: 2,
+      },
+    },
+  );
+
+  try {
+    const imported = await orchestration.importProfile(profile);
+    assert.equal(coreUpdateCalls, 1, 'successful project rebind must perform the deferred managed-session purge exactly once');
+    assert.equal(authorityAtPurge.config.projectId, 'project-2');
+    assert.equal(authorityAtPurge.runtime.hierarchy.graphId, 'graph-2');
+    assert.deepEqual(authorityAtPurge.orchestra.subagentPolicy, {
+      schemaVersion: 1,
+      allowAgentCreatedChildren: true,
+      maxDepth: 3,
+      maxChildrenPerAgent: 2,
+    });
+    assert.equal(imported.status.config.projectId, 'project-2');
+    assert.equal(imported.status.runtime.hierarchy.graphId, 'graph-2');
+    assert.deepEqual(imported.status.orchestra.subagentPolicy, authorityAtPurge.orchestra.subagentPolicy);
+  } finally {
+    orchestration.coreRepository.update = originalCoreUpdate;
   }
 });
 

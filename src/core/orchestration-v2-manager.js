@@ -471,7 +471,20 @@ export class OrchestrationV2Manager {
     return this.runProjectAuthorityExclusive(() => this._updateConfigUnfenced(raw, id));
   }
 
-  async _updateConfigUnfenced(raw, id = '') {
+  async purgeManagedProjectSessionState(projectId, graphId = '') {
+    await this.coreRepository.update(state => {
+      for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
+        if (!isManagedSession(session, projectId, graphId)) continue;
+        if (isUnresolvedOperation(session)) {
+          throw new Error('Unresolved Send prevents project identity change.');
+        }
+        purgeManagedSessionState(state, sessionId);
+      }
+      return state;
+    });
+  }
+
+  async _updateConfigUnfenced(raw, id = '', { deferManagedSessionPurge = false } = {}) {
     const meta = await this.loadMeta();
     const orchestraId = id || meta.selectedId;
     const item = meta.byId[orchestraId];
@@ -489,14 +502,9 @@ export class OrchestrationV2Manager {
       if (current.projectId && current.projectId !== next.projectId) {
         const currentRuntime = await controller.runtimeRepository.load();
         const currentGraphId = hierarchyGraphId(currentRuntime);
-        await this.coreRepository.update(state => {
-          for (const [sessionId, session] of Object.entries(state.sessionsById || {})) {
-            if (!isManagedSession(session, current.projectId, currentGraphId)) continue;
-            if (isUnresolvedOperation(session)) throw new Error('Unresolved Send prevents project identity change.');
-            purgeManagedSessionState(state, sessionId);
-          }
-          return state;
-        });
+        if (!deferManagedSessionPurge) {
+          await this.purgeManagedProjectSessionState(current.projectId, currentGraphId);
+        }
       }
       await controller.configRepository.save(next);
       await controller.runtimeRepository.reset();
@@ -505,6 +513,55 @@ export class OrchestrationV2Manager {
       await controller.updateConfig(next);
     }
     return this.getStatus(orchestraId);
+  }
+
+  async snapshotImportAuthorityState(orchestraId, metaRecord) {
+    const keys = [configKey(orchestraId), runtimeKey(orchestraId)];
+    const raw = await this.chrome.storage.local.get(keys);
+    return {
+      orchestraId,
+      configPresent: Object.hasOwn(raw || {}, keys[0]),
+      config: Object.hasOwn(raw || {}, keys[0]) ? clone(raw[keys[0]]) : undefined,
+      runtimePresent: Object.hasOwn(raw || {}, keys[1]),
+      runtime: Object.hasOwn(raw || {}, keys[1]) ? clone(raw[keys[1]]) : undefined,
+      metaRecord: clone(metaRecord),
+    };
+  }
+
+  async restoreImportAuthorityState(snapshot) {
+    const configStorageKey = configKey(snapshot.orchestraId);
+    const runtimeStorageKey = runtimeKey(snapshot.orchestraId);
+    const restore = {};
+    const remove = [];
+
+    if (snapshot.configPresent) restore[configStorageKey] = clone(snapshot.config);
+    else remove.push(configStorageKey);
+    if (snapshot.runtimePresent) restore[runtimeStorageKey] = clone(snapshot.runtime);
+    else remove.push(runtimeStorageKey);
+
+    if (Object.keys(restore).length) {
+      await this.chrome.storage.local.set(restore);
+    }
+    if (remove.length) {
+      await this.chrome.storage.local.remove(remove);
+    }
+
+    await this.updateMeta(meta => {
+      if (!meta.byId[snapshot.orchestraId]) {
+        throw new Error('Orchestra disappeared while rolling back failed profile import.');
+      }
+      meta.byId[snapshot.orchestraId] = clone(snapshot.metaRecord);
+      return meta;
+    });
+
+    // Alarm state is derived from the restored canonical config/runtime. A
+    // reconcile failure must not replace the original import error or weaken
+    // the already-restored authority snapshot.
+    try {
+      await this.controllerFor(snapshot.orchestraId).reconcileAlarm({ nowMs: this.now() });
+    } catch {
+      // Recovery/alarm reconciliation remains retryable from canonical state.
+    }
   }
 
   async start(id = '') {
@@ -784,27 +841,60 @@ export class OrchestrationV2Manager {
         throw new Error('Pause the orchestra before importing configuration.');
       }
 
-      const nextStatus = await this._updateConfigUnfenced(
-        { ...imported, enabled: false },
-        selected.id,
-      );
-      if (importedDocument.hierarchy) {
-        const currentRuntime = await liveController.runtimeRepository.load();
-        const currentGraphId = hierarchyGraphId(currentRuntime);
-        const safety = await this.managedCoreSafety(nextStatus.config.projectId, currentGraphId);
-        if (safety.managed.length) {
-          throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
+      const authoritySnapshot = await this.snapshotImportAuthorityState(selected.id, liveItem);
+      const oldRuntime = await liveController.runtimeRepository.load();
+      const deferredManagedSessionPurge = liveItem.ownerPaused === true
+        && Boolean(liveCurrent.projectId)
+        && liveCurrent.projectId !== imported.projectId
+        ? {
+            projectId: liveCurrent.projectId,
+            graphId: hierarchyGraphId(oldRuntime),
+          }
+        : null;
+      let mutationStarted = false;
+      try {
+        mutationStarted = true;
+        const nextStatus = await this._updateConfigUnfenced(
+          { ...imported, enabled: false },
+          selected.id,
+          { deferManagedSessionPurge: Boolean(deferredManagedSessionPurge) },
+        );
+        if (importedDocument.hierarchy) {
+          const currentRuntime = await liveController.runtimeRepository.load();
+          const currentGraphId = hierarchyGraphId(currentRuntime);
+          const safety = await this.managedCoreSafety(nextStatus.config.projectId, currentGraphId);
+          if (safety.managed.length) {
+            throw new Error('Hierarchy profile can only be imported before the first Start. Create a new orchestra to replace an already-materialized hierarchy.');
+          }
+          await liveController.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
         }
-        await liveController.configureHierarchy(importedDocument.hierarchy, { nowMs: this.now() });
+        await this.updateMeta(meta => {
+          const record = meta.byId[selected.id];
+          if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
+          record.subagentPolicy = importedPolicy;
+          record.updatedAt = this.now();
+          return meta;
+        });
+        if (deferredManagedSessionPurge) {
+          await this.purgeManagedProjectSessionState(
+            deferredManagedSessionPurge.projectId,
+            deferredManagedSessionPurge.graphId,
+          );
+        }
+        return nextStatus;
+      } catch (error) {
+        if (mutationStarted) {
+          try {
+            await this.restoreImportAuthorityState(authoritySnapshot);
+          } catch (rollbackError) {
+            throw new AggregateError(
+              [error, rollbackError],
+              'Profile import failed and canonical Project authority rollback also failed.',
+            );
+          }
+        }
+        throw error;
       }
-      await this.updateMeta(meta => {
-        const record = meta.byId[selected.id];
-        if (!record) throw new Error('Orchestra not found while persisting subagent policy.');
-        record.subagentPolicy = importedPolicy;
-        record.updatedAt = this.now();
-        return meta;
-      });
-      return nextStatus;
     });
 
     return {
