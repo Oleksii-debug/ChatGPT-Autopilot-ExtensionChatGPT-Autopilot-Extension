@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { normalizeAgentDefinitionV1 } from '../src/core/agent-definition-registry.js';
 import {
   buildAgentDefinitionFromFormV1,
   mergeAgentDefinitionModelDefaultsV1,
@@ -187,4 +188,26 @@ test('model-default form admission does not execute accessors', () => {
   });
   assert.throws(() => mergeAgentDefinitionModelDefaultsV1(input, {}), /data property/);
   assert.equal(reads, 0);
+});
+
+
+test('form-produced model defaults are already canonical at the durable AgentDefinitionV1 boundary', () => {
+  const raw = buildAgentDefinitionFromFormV1(form({
+    aiRoutingMode: 'hybrid-rules',
+    aiPinnedRouteId: 'route.canonical',
+    aiPrimaryProvider: 'openai-compatible',
+    aiPrimaryModel: 'local-primary',
+    aiStrongProvider: 'openai',
+    aiStrongModel: 'gpt-5.6',
+  }), {
+    definitionRevision: 9,
+    configDefaults: {
+      maxSteps: 250,
+      maxModelCalls: 50,
+      maxOutputTokensPerCall: 4096,
+    },
+  });
+  const canonical = normalizeAgentDefinitionV1(raw);
+  assert.deepEqual(canonical.configDefaults, raw.configDefaults);
+  assert.equal(canonical.definitionRevision, 9);
 });
