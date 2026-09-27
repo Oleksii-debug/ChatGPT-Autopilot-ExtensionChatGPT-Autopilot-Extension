@@ -41,6 +41,58 @@ test('create form uses revision one and empty defaults when no persisted definit
   assert.deepEqual(definition.configDefaults, {});
 });
 
+test('Agent definition form preserves persisted specialist delegation profile without sharing caller data', () => {
+  const specialistDelegationProfile = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['research.read', 'project.context'],
+    requiredToolIds: ['files.read', 'browser.read'],
+    policyEnvelopeId: 'policy:agent.research',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 5,
+    enabled: true,
+  };
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    specialistDelegationProfile,
+  });
+  assert.deepEqual(definition.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(definition.specialistDelegationProfile.requiredToolIds, [
+    'browser.read',
+    'files.read',
+  ]);
+  assert.notEqual(definition.specialistDelegationProfile, specialistDelegationProfile);
+  assert.notEqual(
+    definition.specialistDelegationProfile.requiredCapabilityIds,
+    specialistDelegationProfile.requiredCapabilityIds,
+  );
+
+  specialistDelegationProfile.requiredCapabilityIds[0] = 'mutated';
+  assert.deepEqual(definition.specialistDelegationProfile.requiredCapabilityIds, [
+    'project.context',
+    'research.read',
+  ]);
+  assert.deepEqual(
+    normalizeAgentDefinitionV1(definition).specialistDelegationProfile,
+    definition.specialistDelegationProfile,
+  );
+});
+
+test('Agent definition form keeps legacy absence and explicit specialist-profile clear distinct', () => {
+  const absent = buildAgentDefinitionFromFormV1(form());
+  assert.equal(Object.hasOwn(absent, 'specialistDelegationProfile'), false);
+
+  const cleared = buildAgentDefinitionFromFormV1(form(), {
+    specialistDelegationProfile: null,
+  });
+  assert.equal(Object.hasOwn(cleared, 'specialistDelegationProfile'), true);
+  assert.equal(cleared.specialistDelegationProfile, null);
+});
+
 test('required identity and text fields fail before a Core mutation can be built', () => {
   assert.throws(() => buildAgentDefinitionFromFormV1(form({ agentDefinitionId: '' })), /ID/);
   assert.throws(() => buildAgentDefinitionFromFormV1(form({ agentDefinitionId: ' agent.research' })), /канонічним ID/);
