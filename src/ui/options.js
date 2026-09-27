@@ -2494,13 +2494,14 @@ function fillAgentDefinitionLaunchForm(definition = null) {
     return;
   }
 
-  if (ui.agentDefinitionLaunchDefinitionId !== definition.agentDefinitionId) {
+  const definitionLaunchKey = `${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
     const scope = agentDefinitionLaunchScopeTextV1(definition);
     $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
     $('agent-definition-launch-owner-tools').value = scope.ownerToolIdsText;
     $('agent-definition-launch-requested-capabilities').value = scope.requestedCapabilityIdsText;
     $('agent-definition-launch-requested-tools').value = scope.requestedToolIdsText;
-    ui.agentDefinitionLaunchDefinitionId = definition.agentDefinitionId;
+    ui.agentDefinitionLaunchDefinitionId = definitionLaunchKey;
   }
 
   status.textContent = definition.enabled === true
