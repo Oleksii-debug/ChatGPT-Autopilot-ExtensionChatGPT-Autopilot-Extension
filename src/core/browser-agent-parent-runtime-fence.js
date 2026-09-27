@@ -94,11 +94,11 @@ function runState(value) {
   return value;
 }
 
-function controlEpoch(value) {
+function controlEpoch(value, { positive = false } = {}) {
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
       || Object.is(value, -0)
-      || value < 0) {
+      || value < (positive ? 1 : 0)) {
     throw new Error('Browser Agent parent runtime controlEpoch is invalid');
   }
   return value;
@@ -131,10 +131,13 @@ function normalizeLive(input) {
       throw new Error('BrowserAgentParentRuntimeLiveV1 requires ' + key);
     }
   }
+  const state = runState(raw.runState);
   return freeze({
     jobId: jobId(raw.jobId),
-    runState: runState(raw.runState),
-    controlEpoch: controlEpoch(raw.controlEpoch),
+    runState: state,
+    controlEpoch: controlEpoch(raw.controlEpoch, {
+      positive: state === BrowserAgentRunState.RUNNING,
+    }),
     capabilityIds: scopeIds(raw.capabilityIds, 'parent capabilityIds', MAX_CAPABILITY_IDS),
     toolIds: scopeIds(raw.toolIds, 'parent toolIds', MAX_TOOL_IDS),
   });
@@ -153,7 +156,7 @@ export function normalizeBrowserAgentParentRuntimeFenceV1(input) {
   return freeze({
     schemaVersion: BROWSER_AGENT_PARENT_RUNTIME_FENCE_VERSION,
     jobId: jobId(raw.jobId),
-    controlEpoch: controlEpoch(raw.controlEpoch),
+    controlEpoch: controlEpoch(raw.controlEpoch, { positive: true }),
     capabilityIds: scopeIds(raw.capabilityIds, 'fence capabilityIds', MAX_CAPABILITY_IDS),
     toolIds: scopeIds(raw.toolIds, 'fence toolIds', MAX_TOOL_IDS),
   });
