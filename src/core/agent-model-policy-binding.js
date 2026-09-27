@@ -220,7 +220,7 @@ function routePolicyProjection(policy, authorityRouteIds) {
 
 function inheritChildRoutePolicy(parent, authorityRouteIds, childInput) {
   const overrides = strictRecord(
-    childInput == null ? {} : childInput,
+    childInput === undefined ? {} : childInput,
     ROUTE_POLICY_KEYS,
     'Child AiRoutePolicy',
   );
@@ -479,10 +479,15 @@ export function createAgentModelPolicyBindingV1(input) {
     throw new Error('Agent has no routes inside owner/parent model authority');
   }
 
+  const routePolicyProvided = Object.hasOwn(raw, 'routePolicy');
   const routePolicyInput = own(raw, 'routePolicy');
   const routePolicy = parentBinding
-    ? inheritChildRoutePolicy(parentBinding, authorityRouteIds, routePolicyInput)
-    : normalizeAiRoutePolicy(routePolicyInput ?? {});
+    ? inheritChildRoutePolicy(
+      parentBinding,
+      authorityRouteIds,
+      routePolicyProvided ? routePolicyInput : undefined,
+    )
+    : normalizeAiRoutePolicy(routePolicyProvided ? routePolicyInput : {});
   if (parentBinding) assertChildPolicyDoesNotWiden(parentBinding, routePolicy);
 
   const projected = routePolicyProjection(routePolicy, authorityRouteIds);
