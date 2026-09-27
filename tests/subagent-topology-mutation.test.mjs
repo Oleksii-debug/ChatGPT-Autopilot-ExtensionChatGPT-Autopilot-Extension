@@ -153,6 +153,134 @@ test('atomically appends inherited child topology while preserving durable paren
   assert.equal(Object.isFrozen(result), true);
 });
 
+test('immediate spawned-child activation respects a positive parent concurrency cap', () => {
+  const canonicalGraph = graph([
+    node('root', null, ['existing'], { maxActiveChildren: 1 }),
+    node('existing', 'root'),
+  ]);
+  const runtime = runtimeFor(canonicalGraph);
+  runtime.nodesById.existing.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  runtime.nodesById.existing.currentActivationId = 'existing-active';
+  runtime.nodesById.existing.activationLedger['existing-active'] = {
+    activationId: 'existing-active',
+    nodeId: 'existing',
+    generation: 1,
+    round: 0,
+    purpose: 'WORK',
+    phase: 'EFFECT_CONFIRMED',
+    preparedAt: 100,
+    effectConfirmedAt: 101,
+    terminalAt: 0,
+    effectRef: 'effect:existing',
+    terminalStatus: '',
+    promptPayload: '',
+    promptProfileId: '',
+    providerDispatchIdentity: '',
+  };
+  const validatedRuntime = validateOrchestrationHierarchyRuntimeV1(canonicalGraph, runtime);
+
+  const result = mutateOrchestrationSubagentTopologyV1(request({
+    graph: canonicalGraph,
+    runtime: validatedRuntime,
+    requestedChildren: 2,
+    spawnId: 'bounded-activation',
+    nowMs: 300,
+  }));
+
+  assert.equal(result.decision, 'ALLOW');
+  assert.deepEqual(result.createdNodeIds, [
+    'subagent:bounded-activation:1',
+    'subagent:bounded-activation:2',
+  ]);
+  assert.deepEqual(result.activationRequests, []);
+  assert.equal(result.graph.nodesById.root.maxActiveChildren, 1);
+});
+
+test('immediate spawned-child activation consumes only free positive-cap slots', () => {
+  const canonicalGraph = graph([
+    node('root', null, ['existing'], { maxActiveChildren: 2 }),
+    node('existing', 'root'),
+  ]);
+  const runtime = runtimeFor(canonicalGraph);
+  runtime.nodesById.existing.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  runtime.nodesById.existing.currentActivationId = 'existing-active';
+  runtime.nodesById.existing.activationLedger['existing-active'] = {
+    activationId: 'existing-active',
+    nodeId: 'existing',
+    generation: 1,
+    round: 0,
+    purpose: 'WORK',
+    phase: 'PREPARED',
+    preparedAt: 100,
+    effectConfirmedAt: 0,
+    terminalAt: 0,
+    effectRef: '',
+    terminalStatus: '',
+    promptPayload: '',
+    promptProfileId: '',
+    providerDispatchIdentity: '',
+  };
+  const validatedRuntime = validateOrchestrationHierarchyRuntimeV1(canonicalGraph, runtime);
+
+  const result = mutateOrchestrationSubagentTopologyV1(request({
+    graph: canonicalGraph,
+    runtime: validatedRuntime,
+    requestedChildren: 2,
+    spawnId: 'one-free-slot',
+    nowMs: 300,
+  }));
+
+  assert.equal(result.decision, 'ALLOW');
+  assert.deepEqual(
+    result.activationRequests.map(item => item.nodeId),
+    ['subagent:one-free-slot:1'],
+  );
+
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: result.graph,
+    runtime: result.runtime,
+    requestedChildren: 2,
+    spawnId: 'one-free-slot',
+    nowMs: 400,
+  }));
+  assert.deepEqual(
+    replay.activationRequests.map(item => item.nodeId),
+    ['subagent:one-free-slot:1'],
+  );
+});
+
+test('replay counts an already activated spawned sibling against parent concurrency', () => {
+  const canonicalGraph = graph([node('root', null, [], { maxActiveChildren: 0 })]);
+  const first = mutateOrchestrationSubagentTopologyV1(request({
+    graph: canonicalGraph,
+    runtime: runtimeFor(canonicalGraph),
+    requestedChildren: 2,
+    spawnId: 'replay-cap',
+    nowMs: 300,
+  }));
+
+  const cappedGraph = structuredClone(first.graph);
+  cappedGraph.nodesById.root.maxActiveChildren = 1;
+  const normalizedCappedGraph = validateOrchestrationGraphV1(cappedGraph);
+  const activated = reduceOrchestrationHierarchyEvent(
+    normalizedCappedGraph,
+    first.runtime,
+    first.activationRequests[0],
+    301,
+  );
+
+  const replay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: normalizedCappedGraph,
+    runtime: activated.runtime,
+    requestedChildren: 2,
+    spawnId: 'replay-cap',
+    nowMs: 400,
+  }));
+
+  assert.equal(replay.decision, 'ALLOW');
+  assert.deepEqual(replay.activationRequests, []);
+});
+
 test('replay only prepares activation for children still idle at generation one', () => {
   const first = mutateOrchestrationSubagentTopologyV1(request({
     requestedChildren: 2,
@@ -581,4 +709,48 @@ test('request boundary rejects accessors, hidden authority and unknown fields wi
     () => mutateOrchestrationSubagentTopologyV1(request({ nowMs: -0 })),
     /nowMs is invalid/,
   );
+});
+
+test('replay preserves initiator-specific lifecycle admission before preparing activation', () => {
+  const agentCreated = mutateOrchestrationSubagentTopologyV1(request({
+    initiator: SubagentSpawnInitiator.AGENT,
+    requestedChildren: 1,
+    spawnId: 'agent-replay-lifecycle',
+  }));
+  const agentReplayRuntime = structuredClone(agentCreated.runtime);
+  agentReplayRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  const agentReplay = mutateOrchestrationSubagentTopologyV1(request({
+    graph: agentCreated.graph,
+    runtime: agentReplayRuntime,
+    initiator: SubagentSpawnInitiator.AGENT,
+    requestedChildren: 1,
+    spawnId: 'agent-replay-lifecycle',
+    nowMs: 400,
+  }));
+  assert.equal(agentReplay.decision, SubagentTopologyMutationDecision.ALLOW);
+  assert.equal(agentReplay.reused, true);
+  assert.deepEqual(agentReplay.activationRequests, []);
+
+  const ownerBase = request({
+    initiator: SubagentSpawnInitiator.OWNER,
+    requestedChildren: 1,
+    spawnId: 'owner-replay-lifecycle',
+  });
+  const ownerRuntime = structuredClone(ownerBase.runtime);
+  ownerRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.IDLE;
+  const ownerCreated = mutateOrchestrationSubagentTopologyV1({
+    ...ownerBase,
+    runtime: ownerRuntime,
+  });
+  const ownerReplayRuntime = structuredClone(ownerCreated.runtime);
+  ownerReplayRuntime.nodesById.root.lifecycle = OrchestrationNodeLifecycle.ACTIVE;
+  const ownerReplay = mutateOrchestrationSubagentTopologyV1({
+    ...ownerBase,
+    graph: ownerCreated.graph,
+    runtime: ownerReplayRuntime,
+    nowMs: 400,
+  });
+  assert.equal(ownerReplay.decision, SubagentTopologyMutationDecision.ALLOW);
+  assert.equal(ownerReplay.reused, true);
+  assert.deepEqual(ownerReplay.activationRequests, []);
 });
