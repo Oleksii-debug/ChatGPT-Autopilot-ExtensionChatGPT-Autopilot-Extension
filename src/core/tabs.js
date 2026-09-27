@@ -83,6 +83,27 @@ function waitMs(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Scenario Work keeps durable ChatGPT conversations open for long-running
+// assistant responses. Ask Chrome not to automatically discard those tabs
+// under Memory Saver pressure. This is best-effort: an unavailable API or a
+// browser-side refusal must never turn a safe Scenario operation into a Send
+// failure.
+export async function keepChatTabResident(chromeApi, tab) {
+  if (!tab || tab.id == null || !chromeApi?.tabs?.update) return tab;
+  if (tab.autoDiscardable === false) return tab;
+  try {
+    const updated = await chromeApi.tabs.update(tab.id, { autoDiscardable: false });
+    return updated || { ...tab, autoDiscardable: false };
+  } catch {
+    return tab;
+  }
+}
+
+async function protectManagedScenarioTab(chromeApi, session, tab) {
+  if (session?.scenarioWork?.managed !== true) return tab;
+  return keepChatTabResident(chromeApi, tab);
+}
+
 export async function waitForTaskTabReady(chromeApi, tabId, expectedUrl, {
   timeoutMs = DEFAULT_TAB_READY_TIMEOUT_MS,
   pollIntervalMs = DEFAULT_TAB_READY_POLL_MS,
@@ -360,7 +381,7 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
       normalizedUrl: preservesFreshLaunchOwnership ? hint.normalizedUrl : task.normalizedUrl,
       allowPostSendNavigation: postSendRecovery,
     });
-    if (tab) return tab;
+    if (tab) return protectManagedScenarioTab(chromeApi, session, tab);
     if (session?.tabStrategy === TabStrategy.OPEN_CLOSE_PER_TASK
         || hint?.ownedByExtension === true) {
       // OPEN_CLOSE is always extension-owned. KEEP_TASK can also be safely
@@ -396,7 +417,8 @@ export async function resolveTaskTab(chromeApi, state, sessionId, task) {
   const match = conversationId(task.normalizedUrl)
     ? await findMatchingChatTab(chromeApi, task.normalizedUrl, excluded)
     : null;
-  const tab = match || await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+  let tab = match || await chromeApi.tabs.create({ url: task.normalizedUrl, active: false });
+  tab = await protectManagedScenarioTab(chromeApi, session, tab);
   state.tabHintsByTaskId[task.id] = {
     tabId: tab.id,
     sessionId,

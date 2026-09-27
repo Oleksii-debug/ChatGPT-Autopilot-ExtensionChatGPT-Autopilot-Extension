@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.resolve(here, '../../src/background/service-worker.js'), 'utf8');
+const assistantProbeSource = fs.readFileSync(path.resolve(here, '../../src/core/assistant-report-probe.js'), 'utf8');
 
 test('service worker owns a real runtime-cycle wiring behind the release gate', () => {
   assert.match(source, /import \{ AutomaticSessionExecutor \} from '\.\.\/core\/automatic-executor\.js';/);
@@ -54,11 +55,14 @@ test('startup and canonical alarm invoke the event-driven execution cycle', () =
 });
 
 test('orchestration V2 uses read-only assistant reports and startup reconciles before Core sends', () => {
+  assert.match(source, /import \{ probeAssistantConversation as probeAssistantConversationCore \} from '\.\.\/core\/assistant-report-probe\.js';/);
   assert.match(source, /async function probeAssistantConversation\(job\)/);
+  assert.match(source, /return probeAssistantConversationCore\(chrome, transport, job\);/);
   assert.match(source, /collectAssistantReport: probeAssistantConversation/);
-  assert.match(source, /mode: 'READ_ASSISTANT_REPORT'/);
-  assert.match(source, /sameChatConversationUrl\(tab\.url, conversationUrl\)/, 'completion probe should reuse an existing conversation tab when possible');
-  assert.match(source, /if \(temporaryTab && tabId != null\)/, 'only a temporary probe tab may be auto-closed');
+  assert.match(assistantProbeSource, /mode: 'READ_ASSISTANT_REPORT'/);
+  assert.match(assistantProbeSource, /matchesConversation\(tab, conversationUrl\)/, 'completion probe should reuse an existing conversation tab when possible');
+  assert.match(assistantProbeSource, /if \(temporaryTab && tabId != null\)/, 'only a temporary non-managed probe tab may be auto-closed');
+  assert.match(assistantProbeSource, /ASSISTANT_RESPONSE_TAB_REOPENED_WAITING/, 'managed missing conversations must reopen into a persistent recovery path');
   assert.match(source, /await orchestrationV2\.reconcileAlarm\(\);/);
   assert.match(source, /await browserAgent\.reconcileAlarm\(\);/, 'cold start must restore Browser Agent wake alarms from durable jobs');
   assert.doesNotMatch(source, /await orchestrationV2\.enqueueRecoveryEvent\(\);/, 'ordinary MV3 worker restart must not manufacture a reasoning tick');

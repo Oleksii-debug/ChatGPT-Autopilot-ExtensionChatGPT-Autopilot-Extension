@@ -2066,7 +2066,7 @@ function fillScenarioWorkForm(item) {
   $('scenario-work-rounds').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.roundsPerGeneration ?? 10));
   $('scenario-work-generations').value = String(config.mode === 'CHAT_CYCLE' ? 1 : (config.maxGenerations ?? 0));
   $('scenario-work-timeout').value = String(config.responseTimeoutMinutes ?? 40);
-  $('scenario-work-poll').value = String(config.pollSeconds ?? 15);
+  $('scenario-work-poll').value = String(config.pollSeconds ?? 180);
   $('scenario-work-launch-gap').value = String(config.minimumLaunchGapSeconds ?? 0);
   $('scenario-work-pre-send').value = String(config.preSendDelaySeconds ?? 10);
   $('scenario-work-busy-check').value = String(config.busyCheckDelaySeconds ?? 3);

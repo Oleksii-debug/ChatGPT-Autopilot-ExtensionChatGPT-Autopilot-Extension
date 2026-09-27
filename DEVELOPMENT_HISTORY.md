@@ -231,3 +231,106 @@ Qualify the exact Pilot 10 candidate head in GitHub Actions; repair any release-
 - Continued from the live #422 head after the simplified-session hotfix #425 merge. Added a native keyboard-select control listing saved AI routes for the Agent. `aiPinnedRouteId` persists through Browser Agent config and the versioned draft JSON; the background request passes it to Core. Core pins only an existing enabled route for that isolated request, rejects a conflicting global pin, and leaves the global settings/runtime intact. Normal route filtering still enforces global allow/deny, price/locality/free policy, role and backoff. Inherited route selection retains automatic failover.
 - Focused route test proves Mistral `endpointId` reaches Gateway even when a higher-priority Ollama route exists; missing/conflicting route fails before provider I/O. Browser Agent persistence/config, draft parser, UI contracts and release package tests pass. No production Orchestration change. Installed owner Chrome and Windows Gateway still require physical verification; no API secret in source or archive.
 - Follow-up Agent UI defect: its two-second status poll used to refill the entire policy form, discarding unsaved edits. New dirty/epoch guard preserves edits during polling and while a save is in flight; a later save response cannot clear newer typing. Selection of another job resets the guard and loads that job's saved policy. A native status element announces unsaved/saved state without repeating on every keystroke. The PR #426 initial archive predates this follow-up fix.
+
+## 2026-09-27 — Scenario tab residency and stream-recovery hardening
+Owner diagnostics from three Chrome accounts showed repeated long-running Scenario tabs entering navigation/recovery failure while ordinary new chats remained healthy. The hotfix protects managed Scenario tabs from Chrome auto-discard where possible, adds persistent exact-conversation recovery, separates tab recovery from response timeout/replacement, bounds read-only assistant-report navigation waits, and changes the default Scenario poll interval to 180 seconds. Regression coverage locks healthy, loading, discarded and missing-conversation probe behavior. OWNER_WINDOWS_CHROME_VERIFIED=false until physical acceptance.
+
+
+## 2026-09-27 — Three-account Scenario stream/tab recovery forensic + PR #439
+
+### Owner runtime evidence
+- Three fresh installed Pilot 10 diagnostics were captured while the affected scenarios were still active:
+  - ChatGPT-Автопілот-діагностика-2026-09-27T01-20-06-384Z.txt
+  - ChatGPT-Автопілот-діагностика-2026-09-27T01-20-16-165Z.txt
+  - ChatGPT-Автопілот-діагностика-2026-09-27T01-20-22-623Z.txt
+- Owner-visible ChatGPT symptom across three accounts: `ChatGPT stream recovery polling timed out`. The literal string is not emitted by Pilot.
+- Pilot diagnostics repeatedly showed `ASSISTANT_REPORT_PROBE_ERROR` with `Selected ChatGPT tab did not finish navigation before CHECK_ONLY`.
+- Multiple affected conversations had already produced verified Send and `ASSISTANT_RESPONSE_STREAMING`, so the evidence does not support a generic Send failure or simple account/network outage.
+- Pre-hotfix failure chain observed in several chats: verified Send / streaming -> tab navigation probe unknown -> response deadline crosses -> `SCENARIO_RESPONSE_TIMEOUT` -> `REPLACE_MEMBER`. This conflated unknown browser/tab state with assistant-response failure.
+- Diagnostics also confirmed different physical Scenario slots retain different concrete `/c/<conversation-id>` identities. Tab order/position is not the Scenario identity.
+
+### Architecture review
+- CHAT_CYCLE uses durable Session/Task/scenario identity plus tab hints and `lastConversationUrl`/chat URL.
+- Scenario tabs use `KEEP_TASK_TABS_OPEN`, but browser discard/freeze/navigation recovery was not explicitly separated from response semantics.
+- Generic readiness could wait up to 90 seconds, so one loading/recovering ChatGPT tab could materially delay later response probes.
+- Shared response-probe fallback could open a missing conversation in a temporary tab, probe it, then close it. Repeating that against a long-running stream risks forcing ChatGPT stream-recovery churn.
+- Chrome Memory Saver/discard/freeze is treated as a plausible contributing browser state, not claimed as the sole origin of the ChatGPT frontend error.
+- Rejected as primary fixes: one physical chat per Chrome window; unconditional close/reopen every poll. Neither removes browser memory management, and repeated reopen of BUSY streams may worsen stream recovery.
+
+### PR #439 implementation
+Branch: `hotfix/scenario-tab-recovery-20260927`
+Base: `release/0.10.0-candidate`
+Qualified runtime head: `c831e77046652de51687716602c30b04113ddbb2`
+Base SHA: `379d5d1c9f215249defe2883cfa634a96cebdb11`
+
+- Managed Scenario tabs request `autoDiscardable=false` best-effort.
+- Probe matching preserves exact conversation identity and considers `pendingUrl` during navigation.
+- Healthy existing managed chat probes in place.
+- `discarded` / `frozen` tabs start controlled reload recovery and return explicit recoverable state.
+- `loading` managed tabs return `ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING` non-destructively instead of occupying the generic 90-second wait.
+- Missing managed chat reopens the exact saved conversation once and keeps the tab resident for subsequent polls; persistent Scenario response polling no longer uses disposable open/probe/close churn.
+- `READ_ASSISTANT_REPORT` readiness backstop is 10 seconds.
+- At response deadline, explicit tab-recovery-pending receives a bounded 5-minute grace, maximum three graces, before normal configured timeout/replacement semantics resume.
+- Exact-once/no-blind-resend remains authoritative: probe/tab uncertainty is not evidence that Send failed.
+- New Scenario response poll default is 180 seconds; UI recommends 180–300 seconds.
+- Untouched legacy 15-second Scenario polling migrates once to 180 seconds. Later explicit owner values are preserved.
+- BUSY/streaming conversations are not forcibly closed/reopened every poll.
+- Diagnostics remain content-safe: no prompt/assistant bodies added.
+
+### Qualification and owner-test artifact
+Exact runtime head `c831e77046652de51687716602c30b04113ddbb2`:
+- Core deterministic tests: SUCCESS.
+- UI accessibility contract tests: SUCCESS.
+- Release package candidate: SUCCESS.
+- Windows release package gate: SUCCESS.
+- 198/198 src JavaScript syntax PASS.
+- Linux/Windows independently built byte-identical installable inner ZIPs.
+- ZIP integrity PASS.
+- `version=10.0.0`, `version_name=10`.
+
+Owner-test archive:
+- `10 Пілот 0502 2709.zip`
+- SHA-256 `4492fdef89b7a8d2ee91df95c7e3c3076e2df5b2433ce481cd55470b5cc62b1c`
+- This exact CI-qualified package supersedes earlier local PR #439 package checkpoints/hashes.
+- `OWNER_WINDOWS_CHROME_VERIFIED=false` until the owner physically installs/tests this exact archive with long-running Scenario Work.
+- Do not merge PR #439 to main as part of this owner-test checkpoint.
+
+
+## 2026-09-27 11:58 Europe/Bratislava — post-hotfix topology reconciliation
+
+The owner requested a second persistence pass after the Scenario stream/tab recovery hotfix was already documented and packaged. This checkpoint records material repository topology changes that occurred afterwards.
+
+### Documentation-head qualification
+- Current hotfix/docs head before this reconciliation: `6ac96f9912002c98519ad9bceb27f05c8f852ed3`.
+- That head is documentation-only beyond the previously qualified runtime/package head `c831e77046652de51687716602c30b04113ddbb2`.
+- GitHub Actions on `6ac96f9`: Core deterministic SUCCESS; UI accessibility SUCCESS; Release package candidate SUCCESS.
+- The earlier intermediate docs commit `f1cef1181535d55d97932fd29f3aabe977befa8d` had its redundant runs cancelled by concurrency; the later docs head is the authoritative documentation-head result.
+
+### Release-candidate divergence
+Live branch comparison at this checkpoint:
+- merge base: `379d5d1c9f215249defe2883cfa634a96cebdb11`;
+- hotfix branch: 23 commits ahead of merge base;
+- hotfix branch: 115 commits behind current `release/0.10.0-candidate`;
+- status: DIVERGED.
+
+This means PR #439 must not be directly merged into the now much newer release-candidate without fresh semantic reconvergence and exact-head qualification.
+
+### Direct source check: hotfix is NOT already absorbed
+A live read of the current release-candidate confirmed:
+- `src/background/service-worker.js` still contains the old inline missing-conversation fallback: query tabs -> create inactive temporary tab -> `READ_ASSISTANT_REPORT` -> close that temporary tab in `finally`;
+- PR #439 instead delegates that path to `probeAssistantConversationCore()`;
+- current release does not contain `src/core/assistant-report-probe.js` at the PR #439 path;
+- current release `src/core/tabs.js` does not contain the hotfix `autoDiscardable=false` protection;
+- current release `src/core/scenario-work-manager.js` does not contain the PR #439 `ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING` / tab-recovery markers.
+
+Therefore “release-candidate advanced” must NOT be interpreted as “PR #439 was integrated elsewhere”.
+
+### Required integration procedure
+1. Refresh the exact current release-candidate head.
+2. Reconverge the PR #439 semantic behavior onto that head without reverting newer unrelated work.
+3. Preserve the managed-chat invariants recorded in Drive `00_PROJECT_MASTER`.
+4. Re-run focused Scenario tab-recovery tests plus exact-head Core/UI/Release/Windows packaging gates.
+5. Build a new deterministic owner-test package from the reconverged release lineage and record its exact SHA/hash/Drive ID.
+6. Keep `OWNER_WINDOWS_CHROME_VERIFIED=false` until physical testing of that new reconverged package.
+
+The previously qualified `10 Пілот 0502 2709.zip`, SHA-256 `4492fdef89b7a8d2ee91df95c7e3c3076e2df5b2433ce481cd55470b5cc62b1c`, remains valid evidence for the original PR #439 runtime head but is not a claim about the newer release-candidate.

@@ -99,7 +99,7 @@ export function normalizeScenarioWorkConfig(raw = {}) {
     roundsPerGeneration: int(raw.roundsPerGeneration, 10, 1, 10000),
     maxGenerations: int(raw.maxGenerations, 0, 0, 10000),
     responseTimeoutMinutes: int(raw.responseTimeoutMinutes, 40, 1, 1440),
-    pollSeconds: int(raw.pollSeconds, 15, 5, 600),
+    pollSeconds: int(raw.pollSeconds, 180, 5, 600),
     minimumLaunchGapSeconds: int(raw.minimumLaunchGapSeconds, 0, 0, 3600),
     preSendDelaySeconds: int(raw.preSendDelaySeconds, 10, 1, 30),
     busyCheckDelaySeconds: int(raw.busyCheckDelaySeconds, 3, 1, 30),
@@ -164,6 +164,7 @@ function participant(key, role, index = 0, generation = 1) {
     completedAt: 0,
     lastError: '',
     replacementCount: 0,
+    tabRecoveryGraceCount: 0,
   };
 }
 
@@ -501,6 +502,7 @@ export function applyScenarioLaunch(runtimeRaw, action, { sessionId, taskId, now
   item.deadlineAt = Number(action.deadlineAt || 0);
   item.completedAt = 0;
   item.lastError = '';
+  item.tabRecoveryGraceCount = 0;
   if (!runtime.totalLaunches) runtime.firstLaunchAt = now;
   runtime.lastLaunchAt = now;
   runtime.lastActionAt = now;

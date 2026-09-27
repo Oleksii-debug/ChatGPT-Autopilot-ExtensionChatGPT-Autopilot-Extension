@@ -20,6 +20,9 @@ import {
 
 export const SCENARIO_WORK_STORAGE_KEY = 'autopilotScenarioWorkV1';
 export const SCENARIO_WORK_ALARM = 'autopilot-scenario-work-wake';
+const SCENARIO_TAB_RECOVERY_MIGRATION_KEY = 'autopilotScenarioTabRecoveryMigrationV1';
+const LEGACY_DEFAULT_POLL_SECONDS = 15;
+const SAFE_DEFAULT_POLL_SECONDS = 180;
 const STORAGE_SCHEMA_VERSION = 1;
 const MAX_PERSISTED_ARRAY_LENGTH = 10000;
 const MAX_PERSISTED_OBJECT_KEYS = 10000;
@@ -28,6 +31,17 @@ const MAX_PERSISTED_DEPTH = 64;
 const SAFE_OPERATION_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const MAX_INITIAL_STAGGER_SECONDS = 604800; // 7 days; UI may express this in seconds or minutes.
 const ASSISTANT_OBSERVATION_HEARTBEAT_MS = 5 * 60 * 1000;
+const ASSISTANT_TAB_RECOVERY_GRACE_MS = 5 * 60 * 1000;
+const ASSISTANT_TAB_RECOVERY_MAX_GRACES = 3;
+const ASSISTANT_TAB_RECOVERY_CODES = new Set([
+  'ASSISTANT_RESPONSE_TAB_RELOAD_STARTED',
+  'ASSISTANT_RESPONSE_TAB_DISCARDED',
+  'ASSISTANT_RESPONSE_TAB_FROZEN',
+  'ASSISTANT_RESPONSE_TAB_NAVIGATION_PENDING',
+  'ASSISTANT_RESPONSE_TAB_REOPENED_WAITING',
+  'TAB_NAVIGATION_TIMEOUT',
+  'TAB_UNAVAILABLE_DURING_READINESS_CHECK',
+]);
 const POOL_RUNTIME_EDITABLE_CONFIG_KEYS = Object.freeze([
   'responseTimeoutMinutes', 'pollSeconds', 'minimumLaunchGapSeconds',
   'preSendDelaySeconds', 'busyCheckDelaySeconds', 'retryBackoffSeconds',
@@ -482,12 +496,29 @@ export class ScenarioWorkManager {
 
   async load() {
     const result = await this.chrome.storage.local.get(SCENARIO_WORK_STORAGE_KEY);
-    return normalizeStore(result?.[SCENARIO_WORK_STORAGE_KEY], this.now());
+    const store = normalizeStore(result?.[SCENARIO_WORK_STORAGE_KEY], this.now());
+
+    // One-time owner-safe migration for scenarios created before the tab
+    // recovery hotfix. The legacy UI default was 15 seconds, which can cause
+    // excessive read-only polling across many long-running chats. Migrate only
+    // that legacy default once per browser profile; any explicit value the
+    // owner chooses after this hotfix (including 15) remains authoritative.
+    const migration = await this.chrome.storage.local.get(SCENARIO_TAB_RECOVERY_MIGRATION_KEY);
+    if (migration?.[SCENARIO_TAB_RECOVERY_MIGRATION_KEY] !== true) {
+      for (const item of Object.values(store.byId || {})) {
+        if (Number(item?.config?.pollSeconds) !== LEGACY_DEFAULT_POLL_SECONDS) continue;
+        item.config.pollSeconds = SAFE_DEFAULT_POLL_SECONDS;
+      }
+    }
+    return store;
   }
 
   async save(store) {
     const normalized = normalizeStore(store, this.now());
-    await this.chrome.storage.local.set({ [SCENARIO_WORK_STORAGE_KEY]: normalized });
+    await this.chrome.storage.local.set({
+      [SCENARIO_WORK_STORAGE_KEY]: normalized,
+      [SCENARIO_TAB_RECOVERY_MIGRATION_KEY]: true,
+    });
     return normalized;
   }
 
@@ -1321,6 +1352,37 @@ export class ScenarioWorkManager {
   async observeCompletedTurns(scenario, now, expectedOwnerEpoch) {
     let runtime = ensureManagerRuntimeFields(scenario.runtime);
     const core = await this.coreRepository.load();
+
+    const extendForTabRecovery = async (participant, task, code) => {
+      if (Number(participant.deadlineAt || 0) > now) return { ownerChanged: false };
+      const refreshed = ensureManagerRuntimeFields(runtime);
+      const liveParticipant = scenarioWorkParticipants(refreshed).find(item => item.key === participant.key);
+      if (liveParticipant?.state !== ScenarioParticipantState.WAITING) return { ownerChanged: false };
+      const graceCount = Math.max(0, Number(liveParticipant.tabRecoveryGraceCount || 0));
+      if (graceCount >= ASSISTANT_TAB_RECOVERY_MAX_GRACES) {
+        return { ownerChanged: false, exhausted: true };
+      }
+      liveParticipant.tabRecoveryGraceCount = graceCount + 1;
+      liveParticipant.deadlineAt = Math.max(
+        Number(liveParticipant.deadlineAt || 0),
+        now + ASSISTANT_TAB_RECOVERY_GRACE_MS,
+      );
+      refreshed.updatedAt = now;
+      const checkpoint = await this.checkpointRuntime(scenario.id, refreshed, expectedOwnerEpoch, now);
+      if (!checkpoint.applied) return { ownerChanged: true, runtime: checkpoint.runtime || runtime };
+      runtime = checkpoint.runtime;
+      await this.appendScenarioDiagnostic({
+        scenario: { ...scenario, runtime },
+        participant: liveParticipant,
+        task,
+        event: 'СЦЕНАРІЙ_TIMEOUT_ПРОДОВЖЕНО_ВІДНОВЛЕННЯ_ВКЛАДКИ',
+        status: 'RECOVERING',
+        code: code || 'ASSISTANT_RESPONSE_TAB_RECOVERY',
+        message: `Стан відповіді невідомий через відновлення вкладки; recovery grace ${liveParticipant.tabRecoveryGraceCount}/${ASSISTANT_TAB_RECOVERY_MAX_GRACES}, timeout відкладено на ${Math.floor(ASSISTANT_TAB_RECOVERY_GRACE_MS / 1000)} с без replacement.`,
+        now,
+      });
+      return { ownerChanged: false };
+    };
     for (const participant of scenarioWorkParticipants(runtime)) {
       if (participant.state !== ScenarioParticipantState.WAITING || !participant.sessionId) continue;
       const session = core.sessionsById?.[participant.sessionId];
@@ -1335,12 +1397,24 @@ export class ScenarioWorkManager {
           conversationUrl: task.lastConversationUrl,
           assistantBaselineCount: Number(task.lastAssistantBaselineCount || 0),
           assistantBaselineKnown: task.lastAssistantBaselineKnown === true,
+          persistentManagedTab: true,
         });
       } catch (error) {
         await this.recordAssistantObservation({ scenario, participant, task, error, now });
+        const code = String(error?.safeDiagnosticCode || '');
+        if (ASSISTANT_TAB_RECOVERY_CODES.has(code)) {
+          const recovery = await extendForTabRecovery(participant, task, code);
+          if (recovery.ownerChanged) return { runtime: recovery.runtime || runtime, ownerChanged: true };
+        }
         continue;
       }
       await this.recordAssistantObservation({ scenario, participant, task, report, now });
+      const reportCode = String(report?.safeDiagnosticCode || report?.code || '');
+      if (report?.tabRecoveryPending === true || ASSISTANT_TAB_RECOVERY_CODES.has(reportCode)) {
+        const recovery = await extendForTabRecovery(participant, task, reportCode);
+        if (recovery.ownerChanged) return { runtime: recovery.runtime || runtime, ownerChanged: true };
+        if (!recovery.exhausted) continue;
+      }
       // responseTimeoutMinutes means absence of a completed/ongoing assistant response,
       // not a hard wall-clock cap on a response that is still streaming. If the
       // page proves the assistant is actively generating exactly when the
