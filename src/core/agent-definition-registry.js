@@ -1,6 +1,9 @@
 import { normalizeBrowserAgentConfig } from './browser-agent.js';
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
-import { normalizeAgentSpecialistDelegationProfileV1 } from './agent-specialist-delegation-profile.js';
+import {
+  normalizeAgentSpecialistDelegationBindingV1,
+  normalizeAgentSpecialistDelegationProfileV1,
+} from './agent-specialist-delegation-profile.js';
 
 export const AGENT_DEFINITION_VERSION = 1;
 export const AGENT_DEFINITION_REGISTRY_VERSION = 1;
@@ -473,7 +476,7 @@ export function materializeAgentDefinitionV1(input = {}) {
         'Agent specialist delegation tools for materialized job',
       );
     }
-    specialistDelegationBinding = freeze({
+    specialistDelegationBinding = normalizeAgentSpecialistDelegationBindingV1({
       schemaVersion: 1,
       jobId,
       projectId,
