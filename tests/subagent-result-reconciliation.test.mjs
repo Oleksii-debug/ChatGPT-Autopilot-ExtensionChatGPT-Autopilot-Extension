@@ -910,6 +910,53 @@ test('trusted verification must bind the exact result invocation and observation
   );
 });
 
+test('successful terminal admission requires exact trusted verification provenance', async () => {
+  const contract = outcomeContract();
+
+  for (const [name, mutate] of [
+    ['authority', result => { result.verificationAuthorityId = 'verification-authority-other'; }],
+    ['reason', result => { result.verificationReasonCode = 'RAW_ONLY_REASON'; }],
+    ['time', result => { result.verifiedAt = '2026-09-27T10:04:30.000Z'; }],
+  ]) {
+    const result = structuredClone(resultEnvelope({ contract }));
+    mutate(result);
+    const fixture = request({ contract, result });
+
+    await assert.rejects(
+      prepareSubagentResultReconciliationV1(
+        fixture.input,
+        deps({ contract }),
+      ),
+      /Trusted completion verification provenance does not exactly match/u,
+      name,
+    );
+  }
+});
+
+test('successful terminal admission requires exact trusted evidence IDs and ArtifactRef fingerprints', async () => {
+  const contract = outcomeContract();
+
+  const wrongId = structuredClone(resultEnvelope({ contract }));
+  wrongId.evidenceArtifactRefs[0].artifactId = 'evidence-other';
+  await assert.rejects(
+    prepareSubagentResultReconciliationV1(
+      request({ contract, result: wrongId }).input,
+      deps({ contract }),
+    ),
+    /Trusted completion evidence artifact IDs do not exactly match/u,
+  );
+
+  const wrongHash = structuredClone(resultEnvelope({ contract }));
+  wrongHash.evidenceArtifactRefs[0].sha256 = '4'.repeat(64);
+  await assert.rejects(
+    prepareSubagentResultReconciliationV1(
+      request({ contract, result: wrongHash }).input,
+      deps({ contract }),
+    ),
+    /Trusted completion evidence artifact reference does not exactly match/u,
+  );
+});
+
 test('canonical trusted FAILED overrides a raw VERIFIED child claim and reconciles the failed attempt', async () => {
   const contract = outcomeContract();
   const fixture = request({ contract });
