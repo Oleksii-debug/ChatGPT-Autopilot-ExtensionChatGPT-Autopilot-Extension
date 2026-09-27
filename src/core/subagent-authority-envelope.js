@@ -210,6 +210,9 @@ export function deriveSubagentAuthorityEnvelopeV1(input = {}) {
     if (descriptor.providerId !== identities.providerId) {
       return denied('TOOL_PROVIDER_ESCALATION', identities, { deniedToolIds: [toolId] });
     }
+    if (!descriptor.capabilityIds.length) {
+      return denied('TOOL_CAPABILITY_UNDECLARED', identities, { deniedToolIds: [toolId] });
+    }
     const toolEscalation = descriptor.capabilityIds.filter(id => !childCapabilitySet.has(id));
     if (toolEscalation.length) {
       return denied('TOOL_CAPABILITY_ESCALATION', identities, {
