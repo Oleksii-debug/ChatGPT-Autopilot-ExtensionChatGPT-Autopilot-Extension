@@ -27,7 +27,7 @@ const CONFIG_DEFAULT_KEYS = new Set([
   'maxModelCalls', 'maxInputTokens', 'maxOutputTokens', 'maxTotalTokens',
   'maxOutputTokensPerCall', 'maxRuntimeMinutes', 'maxCostUsd',
   'inputPricePerMillionUsd', 'outputPricePerMillionUsd',
-  'aiRoutingMode', 'aiPrimaryProvider', 'aiPrimaryModel',
+  'aiRoutingMode', 'aiPinnedRouteId', 'aiPrimaryProvider', 'aiPrimaryModel',
   'aiStrongProvider', 'aiStrongModel',
 ]);
 
@@ -160,7 +160,11 @@ function normalizeConfigDefaults(input) {
   }, { id: 'agent-definition-preview' });
   const out = {};
   for (const key of CONFIG_DEFAULT_KEYS) {
-    if (Object.hasOwn(raw, key)) out[key] = preview[key];
+    if (!Object.hasOwn(raw, key)) continue;
+    if (!Object.is(safe[key], preview[key])) {
+      throw new Error('AgentDefinitionV1.configDefaults.' + key + ' must already be canonical');
+    }
+    out[key] = preview[key];
   }
   return freeze(out);
 }
