@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   buildAgentDefinitionFromFormV1,
+  mergeAgentDefinitionModelDefaultsV1,
   parseCanonicalAgentIdentity,
 } from '../src/ui/agent-definition-form.js';
 
@@ -73,4 +74,117 @@ test('config defaults are copied through a data-only zero-getter boundary', () =
 test('registry and definition identities share the exact canonical ID syntax', () => {
   assert.equal(parseCanonicalAgentIdentity('agents:project-1','Registry ID'),'agents:project-1');
   assert.throws(() => parseCanonicalAgentIdentity('agents project','Registry ID'), /канонічним ID/);
+});
+
+
+test('model-default form writes only canonical supported Agent model fields', () => {
+  const definition = buildAgentDefinitionFromFormV1(form({
+    aiRoutingMode: 'hybrid-auto',
+    aiPinnedRouteId: 'route.research',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-5.6',
+    aiStrongProvider: 'ollama',
+    aiStrongModel: 'qwen3:32b',
+  }), {
+    configDefaults: { maxSteps: 75, visionOnDemand: false },
+  });
+  assert.deepEqual(definition.configDefaults, {
+    maxSteps: 75,
+    visionOnDemand: false,
+    aiRoutingMode: 'hybrid-auto',
+    aiPinnedRouteId: 'route.research',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-5.6',
+    aiStrongProvider: 'ollama',
+    aiStrongModel: 'qwen3:32b',
+  });
+});
+
+test('model-default edit preserves non-model defaults and empty controls remove only edited model defaults', () => {
+  const existing = {
+    maxSteps: 90,
+    maxModelCalls: 12,
+    aiRoutingMode: 'strong',
+    aiPinnedRouteId: 'route.old',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-old',
+    aiStrongProvider: 'openai',
+    aiStrongModel: 'gpt-strong',
+  };
+  const merged = mergeAgentDefinitionModelDefaultsV1({
+    aiRoutingMode: '',
+    aiPinnedRouteId: '',
+    aiPrimaryProvider: 'inherit',
+    aiPrimaryModel: '',
+    aiStrongProvider: '',
+    aiStrongModel: '',
+  }, existing);
+  assert.deepEqual(merged, {
+    maxSteps: 90,
+    maxModelCalls: 12,
+    aiPrimaryProvider: 'inherit',
+  });
+  assert.deepEqual(existing, {
+    maxSteps: 90,
+    maxModelCalls: 12,
+    aiRoutingMode: 'strong',
+    aiPinnedRouteId: 'route.old',
+    aiPrimaryProvider: 'openai',
+    aiPrimaryModel: 'gpt-old',
+    aiStrongProvider: 'openai',
+    aiStrongModel: 'gpt-strong',
+  });
+});
+
+test('absent model-default form fields preserve the persisted canonical defaults byte-for-value', () => {
+  const existing = {
+    maxSteps: 42,
+    aiRoutingMode: 'primary',
+    aiPinnedRouteId: 'route.saved',
+    aiPrimaryProvider: 'openai-compatible',
+    aiPrimaryModel: 'model.saved',
+  };
+  assert.deepEqual(mergeAgentDefinitionModelDefaultsV1({}, existing), existing);
+});
+
+test('model-default fields fail closed on aliases, invalid route identity and incomplete explicit providers', () => {
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiRoutingMode: 'AUTO' }, {}),
+    /routing mode не підтримується/,
+  );
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiPinnedRouteId: ' route.bad' }, {}),
+    /канонічним текстом/,
+  );
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiPinnedRouteId: 'route bad' }, {}),
+    /канонічним ID/,
+  );
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiPrimaryProvider: 'openai', aiPrimaryModel: '' }, {}),
+    /Primary provider override/,
+  );
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiStrongProvider: 'ollama', aiStrongModel: '' }, {}),
+    /Strong provider override/,
+  );
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiPrimaryModel: ' model' }, {}),
+    /канонічним текстом/,
+  );
+  assert.throws(
+    () => mergeAgentDefinitionModelDefaultsV1({ aiStrongModel: 'x'.repeat(301) }, {}),
+    /канонічним текстом/,
+  );
+});
+
+test('model-default form admission does not execute accessors', () => {
+  let reads = 0;
+  const input = {};
+  Object.defineProperty(input, 'aiRoutingMode', {
+    enumerable: true,
+    get() { reads += 1; return 'strong'; },
+  });
+  assert.throws(() => mergeAgentDefinitionModelDefaultsV1(input, {}), /data property/);
+  assert.equal(reads, 0);
 });
