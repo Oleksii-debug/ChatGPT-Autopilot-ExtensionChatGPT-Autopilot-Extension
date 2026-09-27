@@ -52,6 +52,7 @@ test('readiness button probes only the saved canonical provider config and grant
   assert.match(probe, /PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG/u);
   assert.match(probe, /providerId: OPENHANDS_CODING_PROVIDER_ID/u);
   assert.match(probe, /result\?\.configRevision !== current\.revision/u);
+  assert.match(probe, /ui\.specialistProviderConfig\?\.revision !== current\.revision/u);
   assert.match(probe, /GET-only probe без claim або provider execution/u);
   assert.match(probe, /не резервує capacity і не дає execution\/completion authority/u);
   assert.doesNotMatch(
@@ -98,6 +99,8 @@ test('claim keeps product-wide capacity explicit and delegates lease policy to c
   assert.match(claim, /min: 0, max: 256/u);
   assert.match(claim, /CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS/u);
   assert.match(claim, /claim: \{ maxConcurrentHandoffs \}/u);
+  assert.match(claim, /button\.disabled = true/u);
+  assert.match(claim, /ui\.selectedBrowserAgentId !== jobId[\s\S]*?return;[\s\S]*?loadBrowserAgentJobs/u);
   assert.doesNotMatch(claim, /leaseSeconds|maxChildrenPerAgent|maxDepth/u);
 });
 
@@ -106,6 +109,8 @@ test('provider run requires a current LEASED handoff and never grants completion
   assert.match(run, /handoff\.state !== 'LEASED'/u);
   assert.match(run, /RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION/u);
   assert.match(run, /completionAuthorized=ні/u);
+  assert.match(run, /ui\.selectedBrowserAgentId !== jobId[\s\S]*?return;[\s\S]*?loadBrowserAgentJobs/u);
+  assert.match(run, /if \(ui\.selectedBrowserAgentId === jobId\) renderSpecialistProviderRuntime\(\)/u);
   assert.doesNotMatch(run, /COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF|VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF|AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY/u);
   assert.match(html, /Provider terminal status не завершує Specialist автоматично/u);
   assert.match(html, /canonical independent verifier provenance/u);
