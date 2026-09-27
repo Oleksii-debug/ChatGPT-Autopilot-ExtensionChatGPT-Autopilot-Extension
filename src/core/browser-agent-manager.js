@@ -554,7 +554,9 @@ export class BrowserAgentManager {
       store.executionPolicy = policy;
       return store;
     });
-    await this.reconcileAlarm();
+    // Concurrency policy changes neither due times nor alarm ownership. Waking
+    // the in-memory admission queue is sufficient and avoids reporting a
+    // failed save after the durable policy already committed.
     this.#requestExecutionSlotPump();
     return policy;
   }
@@ -2449,6 +2451,7 @@ export class BrowserAgentManager {
           if (candidate && isHttpUrl(candidate.pendingUrl || candidate.url)) { fallback = candidate; break; }
         } catch { /* skip stale tab */ }
       }
+      let appliedFallback = fallback;
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -2456,13 +2459,17 @@ export class BrowserAgentManager {
         current.runtime.retirePendingTabIds = current.runtime.retirePendingTabIds.filter(id => id !== action.tabId);
         current.runtime.knownTabIds = current.runtime.knownTabIds.filter(id => id !== action.tabId);
         if (current.runtime.tabId === action.tabId) {
-          current.runtime.tabId = fallback?.id ?? null;
-          current.runtime.currentUrl = fallback?.pendingUrl || fallback?.url || '';
+          const fallbackClaimedByActiveAgent = Number.isInteger(fallback?.id)
+            && [...this.executionSlotActive].some(activeId =>
+              activeId !== job.id && store.byId[activeId]?.runtime?.tabId === fallback.id);
+          if (fallbackClaimedByActiveAgent) appliedFallback = null;
+          current.runtime.tabId = appliedFallback?.id ?? null;
+          current.runtime.currentUrl = appliedFallback?.pendingUrl || appliedFallback?.url || '';
         }
         current.runtime.updatedAt = this.now();
         return store;
       });
-      return { kind: 'ACTION', action, currentUrl: fallback?.pendingUrl || fallback?.url || '' };
+      return { kind: 'ACTION', action, currentUrl: appliedFallback?.pendingUrl || appliedFallback?.url || '' };
     }
     if (action.type === BrowserAgentActionType.DOWNLOAD) {
       if (!(await this.hasChromePermission('downloads'))) {
