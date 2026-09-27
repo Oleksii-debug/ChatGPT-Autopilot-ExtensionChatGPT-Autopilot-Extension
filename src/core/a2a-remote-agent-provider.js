@@ -1019,6 +1019,16 @@ export class A2ARemoteAgentProviderV1 {
       policy,
       runtimeNow.ms,
     );
+
+    // The trusted resolver may be asynchronous. Re-check time-sensitive
+    // admission/policy immediately before network I/O so a resolver delay
+    // cannot carry an expired authority across the dispatch boundary.
+    const dispatchNow = trustedNow(this.now);
+    if (admission.expiresAt && dispatchNow.ms >= Date.parse(admission.expiresAt)) {
+      fail('A2A_ADMISSION_EXPIRED', 'A2A admission expired before GetTask dispatch');
+    }
+    assertPolicy(policy, delegation, dispatchNow.ms);
+
     const request = jsonRpcGetTaskRequest(
       sourceBinding,
       assessment.selectedInterface.tenant,

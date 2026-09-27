@@ -736,6 +736,39 @@ test('GetTask response must echo the trusted task id and valid A2A task state', 
   }
 });
 
+test('GetTask rechecks admission after an asynchronous trusted resolution before network I/O', async () => {
+  let clockReads = 0;
+  let networkCalls = 0;
+  let resolverCalls = 0;
+  const provider = new A2ARemoteAgentProviderV1({
+    transport: {
+      async sendJsonRpc() {
+        networkCalls += 1;
+        return getTaskResponse();
+      },
+    },
+    now: () => {
+      clockReads += 1;
+      return clockReads === 1
+        ? Date.parse(T5)
+        : Date.parse('2026-09-25T01:00:00.000Z');
+    },
+    async resolveTrustedExactEffectState() {
+      resolverCalls += 1;
+      await Promise.resolve();
+      return observedTaskExactState();
+    },
+  });
+
+  await assert.rejects(
+    provider.getTask(getTaskInput()),
+    error => error.code === 'A2A_ADMISSION_EXPIRED',
+  );
+  assert.equal(resolverCalls, 1);
+  assert.equal(networkCalls, 0);
+  assert.equal(clockReads, 2);
+});
+
 test('GetTask transport uncertainty is retry-safe for the protocol read operation', async () => {
   const transportError = Object.assign(new Error('connection reset after request write'), {
     effectMayHaveOccurred: true,
