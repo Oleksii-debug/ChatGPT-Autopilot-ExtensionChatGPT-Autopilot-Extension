@@ -189,7 +189,7 @@ export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
       'Specialist priority',
       { min: 0, max: 1_000_000 },
     ),
-    enabled: true,
+    enabled: input.specialistDelegationEnabled === true,
   });
   return profile;
 }
