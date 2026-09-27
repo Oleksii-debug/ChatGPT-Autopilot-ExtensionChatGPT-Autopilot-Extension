@@ -6,6 +6,10 @@ import { NativeCompanionClient } from '../core/native-companion.js';
 import { assertSimplifiedPortableProfile, buildSimplifiedSessionConfig } from './simplified-session-config.js';
 import { makeAgentDraftProfile, parseAgentDraftProfile } from './agent-draft-profile.js';
 import { buildAgentDefinitionFromFormV1, parseCanonicalAgentIdentity } from './agent-definition-form.js';
+import {
+  agentDefinitionLaunchScopeTextV1,
+  buildAgentDefinitionLaunchRequestV1,
+} from './agent-definition-launch-form.js';
 
 const MAX_PHYSICAL_TASKS = 1000;
 const MAX_TASKS = 1_000_000;
@@ -45,6 +49,7 @@ const ui = {
   selectedAgentDefinition: null,
   agentDefinitionMode: 'none',
   agentDefinitionQuarantineCount: 0,
+  agentDefinitionLaunchDefinitionId: '',
   agentDraftActive: false,
   agentPolicyDirty: false,
   agentPolicyEditEpoch: 0,
@@ -2477,6 +2482,13 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-tools').value = agentDefinitionLines(definition?.toolIds);
   $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
+  const configDefaults = definition?.configDefaults || {};
+  $('agent-definition-ai-routing-mode').value = Object.hasOwn(configDefaults, 'aiRoutingMode') ? configDefaults.aiRoutingMode : '';
+  $('agent-definition-ai-pinned-route-id').value = Object.hasOwn(configDefaults, 'aiPinnedRouteId') ? configDefaults.aiPinnedRouteId : '';
+  $('agent-definition-ai-primary-provider').value = Object.hasOwn(configDefaults, 'aiPrimaryProvider') ? configDefaults.aiPrimaryProvider : '';
+  $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
+  $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
+  $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
@@ -2484,6 +2496,119 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-save-button').disabled = !hasRegistry;
   $('agent-definition-toggle-enabled-button').disabled = !definition;
   $('agent-definition-delete-button').disabled = !definition;
+  fillAgentDefinitionLaunchForm(definition);
+}
+
+function fillAgentDefinitionLaunchForm(definition = null) {
+  const group = $('agent-definition-launch-group');
+  const button = $('agent-definition-launch-button');
+  const status = $('agent-definition-launch-status');
+  const launchable = Boolean(definition?.enabled === true && ui.selectedAgentDefinitionRegistry);
+  group.disabled = !launchable;
+  button.disabled = !launchable;
+
+  if (!definition) {
+    ui.agentDefinitionLaunchDefinitionId = '';
+    $('agent-definition-launch-owner-capabilities').value = '';
+    $('agent-definition-launch-owner-tools').value = '';
+    $('agent-definition-launch-requested-capabilities').value = '';
+    $('agent-definition-launch-requested-tools').value = '';
+    status.textContent = 'Оберіть увімкнену Agent definition. Створення не запускає виконання.';
+    return;
+  }
+
+  const definitionLaunchKey = `${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
+    const scope = agentDefinitionLaunchScopeTextV1(definition);
+    $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
+    $('agent-definition-launch-owner-tools').value = scope.ownerToolIdsText;
+    $('agent-definition-launch-requested-capabilities').value = scope.requestedCapabilityIdsText;
+    $('agent-definition-launch-requested-tools').value = scope.requestedToolIdsText;
+    ui.agentDefinitionLaunchDefinitionId = definitionLaunchKey;
+  }
+
+  status.textContent = definition.enabled === true
+    ? 'Готово до створення STOPPED-завдання. Перевірте owner grants, narrowing і поточний бюджет Agent.'
+    : 'Ця Agent definition вимкнена. Увімкніть її перед створенням завдання.';
+}
+
+function browserAgentOwnerBudgetPolicyFromForm() {
+  return {
+    maxSteps: browserAgentInteger('agent-max-steps', 1, 10000, 'Safety ceiling дій'),
+    maxModelCalls: browserAgentInteger('agent-max-model-calls', 0, 1000000, 'Model calls'),
+    maxInputTokens: browserAgentInteger('agent-max-input-tokens', 0, 2000000000, 'Вхідні токени'),
+    maxOutputTokens: browserAgentInteger('agent-max-output-tokens', 0, 2000000000, 'Вихідні токени'),
+    maxTotalTokens: browserAgentInteger('agent-max-total-tokens', 0, 2000000000, 'Усі токени'),
+    maxOutputTokensPerCall: browserAgentInteger('agent-max-output-per-call', 128, 200000, 'Output tokens на model call'),
+    maxRuntimeMinutes: browserAgentInteger('agent-max-runtime-minutes', 0, 525600, 'Час роботи'),
+    maxCostUsd: browserAgentNumber('agent-max-cost-usd', 0, 1000000, 'Бюджет USD'),
+    inputPricePerMillionUsd: browserAgentNumber('agent-input-price', 0, 1000000, 'Ціна input'),
+    outputPricePerMillionUsd: browserAgentNumber('agent-output-price', 0, 1000000, 'Ціна output'),
+  };
+}
+
+function agentDefinitionLaunchFormValue() {
+  return {
+    goal: $('agent-definition-launch-goal').value,
+    projectId: $('agent-definition-launch-project-id').value,
+    jobId: $('agent-definition-launch-job-id').value,
+    ownerCapabilityIdsText: $('agent-definition-launch-owner-capabilities').value,
+    ownerToolIdsText: $('agent-definition-launch-owner-tools').value,
+    requestedCapabilityIdsText: $('agent-definition-launch-requested-capabilities').value,
+    requestedToolIdsText: $('agent-definition-launch-requested-tools').value,
+  };
+}
+
+async function createBrowserAgentFromDefinition() {
+  const registry = ui.selectedAgentDefinitionRegistry;
+  const definition = ui.selectedAgentDefinition;
+  const button = $('agent-definition-launch-button');
+  const status = $('agent-definition-launch-status');
+  if (!registry || !definition) {
+    status.textContent = 'Спочатку оберіть reusable Agent definition.';
+    return;
+  }
+
+  try {
+    const request = buildAgentDefinitionLaunchRequestV1(agentDefinitionLaunchFormValue(), {
+      registry,
+      definition,
+      ownerPolicy: browserAgentOwnerBudgetPolicyFromForm(),
+    });
+    button.disabled = true;
+    status.textContent = 'Створюю durable STOPPED-завдання. Виконання не запускається…';
+
+    const created = await core('CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION', request);
+    const id = created?.job?.id || created?.selectedId;
+    if (!id) throw new Error('Core не повернув id створеного Agent job.');
+
+    ui.selectedBrowserAgentId = id;
+    ui.agentDraftActive = false;
+    ui.agentPolicyDirty = false;
+    await loadBrowserAgentJobs({ selectId: id });
+
+    const runState = ui.selectedBrowserAgent?.runtime?.runState || '';
+    if (runState !== 'STOPPED') {
+      throw new Error(`Створене завдання має неочікуваний стан ${runState || 'UNKNOWN'}; автоматичний запуск не виконувався`);
+    }
+
+    status.textContent = `Завдання ${id} створено з ${definition.label} у стані STOPPED. Agent не запускався; перевірте його і запускайте окремо.`;
+    announce('Reusable Agent завдання створено у стані STOPPED. Виконання не запускалося.');
+    $('agent-job-list').focus();
+  } catch (error) {
+    if (/revision drifted/i.test(String(error?.message || ''))) {
+      await loadAgentDefinitionRegistries({
+        selectRegistryId: registry.registryId,
+        selectDefinitionId: definition.agentDefinitionId,
+      });
+      status.textContent = 'Definition змінилася до створення. Актуальні дані перезавантажено; перевірте grants і повторіть створення.';
+      announce('Agent definition змінилася. Актуальні дані перезавантажено.');
+    } else {
+      status.textContent = `Завдання з definition не створено: ${error.message}`;
+    }
+  } finally {
+    button.disabled = !(ui.selectedAgentDefinition?.enabled === true && ui.selectedAgentDefinitionRegistry);
+  }
 }
 
 function renderAgentDefinitionRegistryList() {
@@ -2617,6 +2742,12 @@ function agentDefinitionFormValue() {
     toolIdsText: $('agent-definition-tools').value,
     tagsText: $('agent-definition-tags').value,
     acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    aiRoutingMode: $('agent-definition-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-definition-ai-pinned-route-id').value,
+    aiPrimaryProvider: $('agent-definition-ai-primary-provider').value,
+    aiPrimaryModel: $('agent-definition-ai-primary-model').value,
+    aiStrongProvider: $('agent-definition-ai-strong-provider').value,
+    aiStrongModel: $('agent-definition-ai-strong-model').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }
@@ -4970,6 +5101,7 @@ $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
+$('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-import-button').addEventListener('click', importBrowserAgentDraft);
 $('agent-export-button').addEventListener('click', exportBrowserAgentDraft);
