@@ -47,6 +47,57 @@ test('Browser Agent global concurrency policy persists and rejects noncanonical 
   await assert.rejects(() => restarted.updateExecutionPolicy({ maxConcurrentAgents: 2, surprise: true }), /unknown field/);
 });
 
+test('execution policy boundary is zero-getter and supports canonical null-prototype data', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+
+  let getterCalls = 0;
+  const hostile = {};
+  Object.defineProperty(hostile, 'maxConcurrentAgents', {
+    enumerable: true,
+    get() { getterCalls += 1; return 2; },
+  });
+  await assert.rejects(() => manager.updateExecutionPolicy(hostile), /enumerable data properties/);
+  assert.equal(getterCalls, 0);
+
+  const portable = Object.create(null);
+  Object.defineProperty(portable, 'maxConcurrentAgents', {
+    value: 2,
+    enumerable: true,
+    writable: true,
+    configurable: true,
+  });
+  assert.deepEqual(await manager.updateExecutionPolicy(portable), { maxConcurrentAgents: 2 });
+});
+
+test('execution policy rejects hidden, symbol and exotic fields and corrupt persisted data fails safe to serial', async () => {
+  const chrome = makeChromeStorage();
+  const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+
+  const hidden = {};
+  Object.defineProperty(hidden, 'maxConcurrentAgents', { value: 2, enumerable: false });
+  await assert.rejects(() => manager.updateExecutionPolicy(hidden), /enumerable data properties/);
+
+  const symbol = { maxConcurrentAgents: 2 };
+  symbol[Symbol('extra')] = 1;
+  await assert.rejects(() => manager.updateExecutionPolicy(symbol), /unknown field/);
+
+  class Exotic { constructor() { this.maxConcurrentAgents = 2; } }
+  await assert.rejects(() => manager.updateExecutionPolicy(new Exotic()), /plain object/);
+
+  await chrome.storage.local.set({
+    browserAgentJobsV1: {
+      schemaVersion: 1,
+      selectedId: '',
+      order: [],
+      byId: {},
+      executionPolicy: { maxConcurrentAgents: 999 },
+    },
+  });
+  const restarted = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
+  assert.deepEqual(await restarted.getExecutionPolicy(), { maxConcurrentAgents: 1 });
+});
+
 test('cycleAll overlaps independent due top-level Agents only up to the durable global ceiling', async () => {
   const chrome = makeChromeStorage();
   const manager = new BrowserAgentManager({ chromeApi: chrome, routePrompt: async () => ({ text: '{}' }) });
