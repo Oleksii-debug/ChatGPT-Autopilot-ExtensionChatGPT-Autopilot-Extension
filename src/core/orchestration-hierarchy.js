@@ -1243,7 +1243,14 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       return { runtime, actions, deduplicated: false, reason: `SCOPE_${nodeRuntime.scopeState}` };
     }
 
-    if ([OrchestrationActivationPurpose.DELEGATE, OrchestrationActivationPurpose.RECOVERY].includes(ledger.purpose)
+    const selfBarrierAction = node.childIds.length
+      && ledger.purpose !== OrchestrationActivationPurpose.RECONCILE
+      ? maybePrepareParentReconciliation(graph, runtime, nodeId, nowMs)
+      : null;
+    if (selfBarrierAction) actions.push(selfBarrierAction);
+
+    if (!selfBarrierAction
+        && [OrchestrationActivationPurpose.DELEGATE, OrchestrationActivationPurpose.RECOVERY].includes(ledger.purpose)
         && node.childIds.length
         && !node.providerBinding) {
       for (const childId of node.childIds.slice(0, node.maxActiveChildren || node.childIds.length)) {
