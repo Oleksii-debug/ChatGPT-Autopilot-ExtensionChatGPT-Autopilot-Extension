@@ -246,6 +246,8 @@ export function proposeAgentSelfRepairWorkV1(input) {
     actorId: cycle.actorId,
     verifierId: cycle.verifierId,
     verifierPlanRevisionId: cycle.verifierPlanRevisionId,
+    evidenceTrust: assessment.evidenceTrust,
+    requiresCanonicalEvidenceResolution: assessment.requiresCanonicalEvidenceResolution,
     ...authorityFence(),
   };
 
