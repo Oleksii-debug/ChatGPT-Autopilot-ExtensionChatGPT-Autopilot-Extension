@@ -49,6 +49,7 @@ const PROVIDER_CAPABILITY_KEYS = new Set([
 
 const PRIOR_TASK_BINDING_KEYS = new Set([
   'childNodeId',
+  'projectId',
   'taskId',
   'providerId',
   'taskRequestedCapabilityIds',
@@ -211,6 +212,10 @@ function normalizePriorTaskBindings(value) {
           own(binding, 'childNodeId'),
           `priorTaskBindings[${index}].childNodeId`,
         ),
+        projectId: requiredId(
+          own(binding, 'projectId'),
+          `priorTaskBindings[${index}].projectId`,
+        ),
         taskId: requiredId(
           own(binding, 'taskId'),
           `priorTaskBindings[${index}].taskId`,
@@ -256,7 +261,8 @@ function exactTaskBindingMatch(left, right) {
   return left.every(binding => {
     const prior = rightByChild.get(binding.childNodeId);
     if (!prior) return false;
-    return binding.taskId === prior.taskId
+    return binding.projectId === prior.projectId
+      && binding.taskId === prior.taskId
       && binding.providerId === prior.providerId
       && JSON.stringify(binding.taskRequestedCapabilityIds)
         === JSON.stringify(prior.taskRequestedCapabilityIds)
@@ -342,6 +348,7 @@ export function bindSubagentSpawnAuthorityV1(input = {}) {
 
   const taskBindings = childTasks.map((item, index) => ({
     childNodeId: topology.createdNodeIds[index],
+    projectId,
     taskId: item.taskId,
     providerId: item.providerId,
     taskRequestedCapabilityIds: [...item.taskRequestedCapabilityIds],

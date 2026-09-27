@@ -185,6 +185,7 @@ test('binds exact canonical topology identities to per-child least authority', (
   assert.deepEqual(result.taskBindings, [
     {
       childNodeId: 'subagent:spawn-bind:1',
+      projectId: 'project.alpha',
       taskId: 'task.read',
       providerId: 'provider.main',
       taskRequestedCapabilityIds: ['cap.read'],
@@ -194,6 +195,7 @@ test('binds exact canonical topology identities to per-child least authority', (
     },
     {
       childNodeId: 'subagent:spawn-bind:2',
+      projectId: 'project.alpha',
       taskId: 'task.write',
       providerId: 'provider.main',
       taskRequestedCapabilityIds: ['cap.write'],
@@ -694,11 +696,41 @@ test('same durable taskId cannot silently drift authority-relevant task semantic
   assert.equal(Object.hasOwn(drift, 'runtime'), false);
 });
 
+test('reused child identity cannot cross project scope under the same spawn/task binding', () => {
+  const first = bindSubagentSpawnAuthorityV1(request());
+  assert.equal(first.decision, 'ALLOW');
+  assert.equal(first.taskBindings[0].projectId, 'project.alpha');
+
+  const drift = bindSubagentSpawnAuthorityV1(request({
+    topologyRequest: topologyRequest({
+      graph: first.graph,
+      runtime: first.runtime,
+      spawnId: 'spawn-bind',
+      nowMs: 300,
+    }),
+    projectId: 'project.beta',
+    priorTaskBindings: first.taskBindings,
+  }));
+
+  assert.equal(drift.decision, 'DENY');
+  assert.equal(drift.reasonCode, 'REPLAY_TASK_BINDING_MISMATCH');
+  assert.deepEqual(drift.taskBindings, []);
+  assert.deepEqual(drift.activationRequests, []);
+  assert.equal(Object.hasOwn(drift, 'graph'), false);
+  assert.equal(Object.hasOwn(drift, 'runtime'), false);
+});
+
 test('new topology rejects stale prior binding evidence instead of mixing generations', () => {
   const result = bindSubagentSpawnAuthorityV1(request({
     priorTaskBindings: [{
       childNodeId: 'subagent:old-spawn:1',
+      projectId: 'project.alpha',
       taskId: 'task.one',
+      providerId: 'provider.main',
+      taskRequestedCapabilityIds: ['cap.read'],
+      taskSourceIds: ['source.repo'],
+      taskArtifactIds: ['artifact.input'],
+      requestedToolIds: ['tool.read'],
     }],
   }));
   assert.equal(result.decision, 'DENY');
@@ -713,8 +745,7 @@ test('prior replay-binding evidence is descriptor-safe and identity-unique', () 
 
   let reads = 0;
   const hostile = {
-    childNodeId: first.taskBindings[0].childNodeId,
-    taskId: first.taskBindings[0].taskId,
+    ...first.taskBindings[0],
   };
   Object.defineProperty(hostile, 'taskId', {
     enumerable: true,
