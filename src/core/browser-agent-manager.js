@@ -430,6 +430,7 @@ export class BrowserAgentManager {
       : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
+    this.runBurstInFlight = new Map();
     this.cycleAllInFlight = null;
     this.executionSlotActive = new Set();
     this.executionSlotQueue = [];
@@ -553,6 +554,7 @@ export class BrowserAgentManager {
       return store;
     });
     await this.reconcileAlarm();
+    void this.#pumpExecutionSlots();
     return policy;
   }
 
@@ -581,7 +583,6 @@ export class BrowserAgentManager {
   }
 
   async #acquireExecutionSlot(id) {
-    if (this.executionSlotActive.has(id)) return false;
     const policy = await this.getExecutionPolicy();
     const admission = evaluateResourceBudgetV1({
       budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
@@ -3279,7 +3280,16 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
+  runBurst(id, options = {}) {
+    if (this.runBurstInFlight.has(id)) return this.runBurstInFlight.get(id);
+    const operation = this.#runBurst(id, options).finally(() => {
+      if (this.runBurstInFlight.get(id) === operation) this.runBurstInFlight.delete(id);
+    });
+    this.runBurstInFlight.set(id, operation);
+    return operation;
+  }
+
+  async #runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
     const ownsSlot = await this.#acquireExecutionSlot(id);
     try {
       const startedWall = Date.now();
