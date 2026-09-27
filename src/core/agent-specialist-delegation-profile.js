@@ -195,8 +195,9 @@ export function normalizeAgentSpecialistDelegationProfileV1(input) {
 }
 
 /**
- * Converts owner-qualified profile data into the existing automatic-delegation
- * intent shape. This is a pure, non-authorizing projection only: the canonical
+ * Converts owner-qualified profile data into a separate envelope containing the
+ * exact existing automatic-delegation request shape plus non-authorizing metadata.
+ * The canonical
  * BrowserAgentManager must still re-read plan, registry, hierarchy, policy,
  * provider readiness and product-wide capacity before persisting or executing.
  */
@@ -228,7 +229,8 @@ export function materializeAgentSpecialistDelegationIntentV1(input = {}) {
   const at = timestamp(raw.at, 'at');
   const startMs = Date.parse(at);
   const deadlineMs = startMs + profile.deadlineSeconds * 1000;
-  if (!Number.isSafeInteger(deadlineMs)) {
+  if (!Number.isSafeInteger(deadlineMs)
+      || Math.abs(deadlineMs) > 8_640_000_000_000_000) {
     throw new Error('Agent specialist delegation deadline exceeds exact timestamp range');
   }
   const deadlineAt = new Date(deadlineMs).toISOString();
