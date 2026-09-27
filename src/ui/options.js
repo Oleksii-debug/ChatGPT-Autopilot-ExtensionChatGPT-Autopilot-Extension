@@ -2482,6 +2482,13 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-tools').value = agentDefinitionLines(definition?.toolIds);
   $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
+  const configDefaults = definition?.configDefaults || {};
+  $('agent-definition-ai-routing-mode').value = Object.hasOwn(configDefaults, 'aiRoutingMode') ? configDefaults.aiRoutingMode : '';
+  $('agent-definition-ai-pinned-route-id').value = Object.hasOwn(configDefaults, 'aiPinnedRouteId') ? configDefaults.aiPinnedRouteId : '';
+  $('agent-definition-ai-primary-provider').value = Object.hasOwn(configDefaults, 'aiPrimaryProvider') ? configDefaults.aiPrimaryProvider : '';
+  $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
+  $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
+  $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}. ${agentDefinitionModelPolicySummary(definition)}`
@@ -2735,6 +2742,12 @@ function agentDefinitionFormValue() {
     toolIdsText: $('agent-definition-tools').value,
     tagsText: $('agent-definition-tags').value,
     acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    aiRoutingMode: $('agent-definition-ai-routing-mode').value,
+    aiPinnedRouteId: $('agent-definition-ai-pinned-route-id').value,
+    aiPrimaryProvider: $('agent-definition-ai-primary-provider').value,
+    aiPrimaryModel: $('agent-definition-ai-primary-model').value,
+    aiStrongProvider: $('agent-definition-ai-strong-provider').value,
+    aiStrongModel: $('agent-definition-ai-strong-model').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }
