@@ -516,7 +516,7 @@ test('automatic preparation reuses an already canonically claimed handoff withou
     maxDepth: 2,
     leaseSeconds: 900,
     at: T0,
-  });
+  }, dependencies);
   assert.equal(claim.claimed.length, 1);
   assert.equal(claim.claimed[0].jobId, 'job.auto');
   assert.equal(claim.claimed[0].agentId, prepared.assignment.agentId);
@@ -537,6 +537,36 @@ test('automatic preparation reuses an already canonically claimed handoff withou
   assert.equal(second.capacityReservation.reused, true);
   assert.equal(second.providerDispatched, false);
   assert.deepEqual(after, before);
+});
+
+test('legacy per-job claim cannot bypass automatic delegation readiness admission', async () => {
+  const { manager, dependencies } = await fixture();
+  const prepared = await manager.autoPrepareSpecialistHandoff('job.auto', request(), dependencies);
+
+  await assert.rejects(
+    () => manager.claimSpecialistHandoffs('job.auto', {
+      maxChildrenPerAgent: 2,
+      maxDepth: 2,
+      leaseSeconds: 900,
+      at: T0,
+    }),
+    /canonical cross-job claim admission/,
+  );
+
+  const stillReady = await manager.listSpecialistHandoffs('job.auto');
+  assert.equal(stillReady.handoffs[0].agentId, prepared.assignment.agentId);
+  assert.equal(stillReady.handoffs[0].state, 'READY');
+  assert.equal(stillReady.executionOwnerships[0].state, ExecutionOwnershipState.AVAILABLE);
+
+  const admitted = await manager.claimSpecialistHandoffsAcrossJobs({
+    targetJobId: 'job.auto',
+    maxConcurrentHandoffs: 1,
+    maxChildrenPerAgent: 2,
+    maxDepth: 2,
+    leaseSeconds: 900,
+    at: T0,
+  }, dependencies);
+  assert.deepEqual(admitted.claimed, [{ jobId: 'job.auto', agentId: prepared.assignment.agentId }]);
 });
 
 test('automatic preparation does not consume product-wide capacity; canonical claim owns the slot', async () => {
@@ -595,7 +625,7 @@ test('automatic preparation does not consume product-wide capacity; canonical cl
     maxDepth: 2,
     leaseSeconds: 900,
     at: T0,
-  });
+  }, dependencies);
   assert.equal(claim.claimed.length, 1);
   assert.equal(claim.remainingSlots, 0);
 
