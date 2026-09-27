@@ -129,7 +129,11 @@ function denial(reasonCode, details = {}) {
 
 function replayResult(graph, runtime, parentNodeId, spawnId, expectedChildIds) {
   const familyPrefix = 'subagent:' + spawnId + ':';
-  const family = graph.nodeOrder.filter(nodeId => nodeId.startsWith(familyPrefix));
+  const family = graph.nodeOrder.filter(nodeId => {
+    if (!nodeId.startsWith(familyPrefix)) return false;
+    const ordinal = nodeId.slice(familyPrefix.length);
+    return /^[1-9][0-9]*$/u.test(ordinal);
+  });
   if (!family.length) return null;
   const exactFamily = family.length === expectedChildIds.length
     && expectedChildIds.every(nodeId => family.includes(nodeId));
