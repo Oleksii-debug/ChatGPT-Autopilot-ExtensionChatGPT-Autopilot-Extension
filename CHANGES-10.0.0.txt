@@ -24,6 +24,7 @@ AGENT ROUTE SELECTION — AFTER THE 74EC0D2 ARCHIVE
 - Agent status refresh no longer erases policy edits typed before Save. A save that completes after newer typing keeps the newer edits visible and marked unsaved; switching jobs loads the selected job's saved policy.
 - The Agent route selector now projects the saved Models owner-policy: disabled/denied/out-of-allow/free-only/locality/price-ineligible routes are exposed as unavailable instead of looking runnable. The saved route remains visible if it later becomes unavailable, and execution still fails closed before provider I/O.
 - Agent usage now reports the last actual route ID and a bounded failover-chain summary. Regression coverage proves an Agent pin cannot bypass global deny policy, role filtering, or durable route backoff.
+- Starting a new Agent now performs a UI preflight against the already-loaded Models policy: a saved route that is disabled or statically owner-policy-blocked is preserved in the form but does not create a knowingly doomed job. Core remains the authoritative fail-closed enforcement boundary.
 
 BASELINE
 - Last frozen canonical release: 0.9.19.

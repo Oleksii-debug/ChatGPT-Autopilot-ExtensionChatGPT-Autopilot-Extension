@@ -1284,6 +1284,17 @@ function syncBrowserAgentRouteBindingStatus() {
     : `Маршрут ${routeId} закріплений лише за цим Agent. Глобальні role/capability/budget/backoff правила залишаються чинними; прихованого fallback немає.`;
 }
 
+function assertBrowserAgentRouteReadyForLaunch() {
+  const select = $('agent-ai-pinned-route-id');
+  const routeId = select.value;
+  if (!routeId) return;
+  const option = [...select.options].find(item => item.value === routeId);
+  const blockReason = option?.dataset?.blockReason || '';
+  if (blockReason) {
+    throw new Error(`Маршрут ${routeId} зараз недоступний: ${blockReason}. Оберіть доступний маршрут або успадкуйте глобальну політику.`);
+  }
+}
+
 function renderBrowserAgentRouteChoices(routes = [], policy = {}) {
   const select = $('agent-ai-pinned-route-id');
   const selected = select.value;
@@ -2672,6 +2683,7 @@ async function runBrowserAgentPrompt() {
   const goal = $('agent-prompt').value.trim();
   if (!goal) { $('agent-status').textContent = 'Опишіть, що Agent має зробити.'; $('agent-prompt').focus(); return; }
   try {
+    assertBrowserAgentRouteReadyForLaunch();
     $('agent-run-prompt-button').disabled = true;
     $('agent-status').textContent = 'Створюю завдання й запускаю Agent…';
     const created = await core('CREATE_BROWSER_AGENT_JOB', {

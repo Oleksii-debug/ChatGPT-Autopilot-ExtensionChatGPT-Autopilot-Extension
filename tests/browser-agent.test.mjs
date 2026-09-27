@@ -448,7 +448,11 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
         result: {
           text: JSON.stringify({ type: 'done', summary: 'routed' }),
           usage: { inputTokens: 3, outputTokens: 2, totalTokens: 5, modelCalls: 1 },
-          runtime: { requestCount: 1, primaryCount: 0, strongCount: 1, lastRoute: 'strong', lastStrongAt: 1234, strongHistoryAt: [1234] },
+          runtime: {
+            requestCount: 1, primaryCount: 0, strongCount: 1, lastRoute: 'strong', lastStrongAt: 1234, strongHistoryAt: [1234],
+            lastRouteId: 'mistral-agent',
+            lastFailoverChain: [{ routeId:'mistral-agent', outcome:'SUCCESS', code:'', category:'' }],
+          },
         },
       };
     },
@@ -472,6 +476,8 @@ test('Browser Agent sends per-job router overrides with isolated durable router 
   assert.equal(live.job.runtime.aiRouterRuntime.requestCount, 1);
   assert.equal(live.job.runtime.aiRouterRuntime.strongCount, 1);
   assert.equal(live.job.runtime.aiRouterRuntime.lastRoute, 'strong');
+  assert.equal(live.job.runtime.aiRouterRuntime.lastRouteId, 'mistral-agent');
+  assert.deepEqual(live.job.runtime.aiRouterRuntime.lastFailoverChain.map(item => [item.routeId, item.outcome]), [['mistral-agent','SUCCESS']]);
 });
 
 test('consequential approval is default policy and classifies multilingual final actions', () => {
