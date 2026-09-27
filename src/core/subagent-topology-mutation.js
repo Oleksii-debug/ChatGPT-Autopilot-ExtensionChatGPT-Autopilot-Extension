@@ -119,6 +119,25 @@ function childIdsForSpawn(spawnId, requestedChildren) {
   );
 }
 
+function barrierWithSpawnedChildren(parent, childIds) {
+  if (parent.barrier.mode === OrchestrationBarrierMode.NONE) {
+    return {
+      mode: OrchestrationBarrierMode.REQUIRED_DIRECT_CHILDREN,
+      childIds: [...childIds],
+    };
+  }
+  if (parent.barrier.mode === OrchestrationBarrierMode.REQUIRED_DIRECT_CHILDREN) {
+    return {
+      mode: OrchestrationBarrierMode.REQUIRED_DIRECT_CHILDREN,
+      childIds: [...new Set([...parent.barrier.childIds, ...childIds])].sort(),
+    };
+  }
+  return {
+    mode: OrchestrationBarrierMode.ALL_DIRECT_CHILDREN,
+    childIds: [],
+  };
+}
+
 function normalizedInitiator(value) {
   if (value !== SubagentSpawnInitiator.OWNER && value !== SubagentSpawnInitiator.AGENT) {
     throw new Error('Subagent spawn initiator is invalid');
@@ -267,9 +286,13 @@ function replayResult(
   const exactFamily = family.length === expectedChildIds.length
     && expectedChildIds.every(nodeId => family.includes(nodeId));
   const parent = graph.nodesById[parentNodeId];
+  const barrierCoversSpawn = parent
+    && parent.barrier.mode !== OrchestrationBarrierMode.NONE
+    && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId));
   const exactAuthority = exactFamily
     && parent
     && !parent.providerBinding
+    && barrierCoversSpawn
     && expectedChildIds.every(nodeId => {
       const child = graph.nodesById[nodeId];
       return child?.parentId === parentNodeId
@@ -415,6 +438,7 @@ export function mutateOrchestrationSubagentTopologyV1(input = {}) {
   const rawGraph = graphDocument(canonicalGraph);
   const rawParent = rawGraph.nodes.find(node => node.id === parentNodeId);
   rawParent.childIds = [...rawParent.childIds, ...expectedChildIds];
+  rawParent.barrier = barrierWithSpawnedChildren(parentNode, expectedChildIds);
 
   for (const childId of expectedChildIds) {
     rawGraph.nodes.push({
