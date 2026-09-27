@@ -433,6 +433,8 @@ function criterionResult({
     accepted,
     reasonCode,
     evidenceArtifactIds: [...verification.evidenceArtifactIds].sort(compareCodeUnit),
+    trustedEvidenceArtifactRefs: [...trustedRecord.evidenceArtifacts]
+      .sort((left, right) => compareCodeUnit(left.artifactId, right.artifactId)),
     evidenceKinds: [...evidenceKinds].sort(compareCodeUnit),
     missingEvidenceKinds: missingKinds,
     missingEvidenceArtifactCount: missingArtifactCount,
