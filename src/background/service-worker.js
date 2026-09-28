@@ -15,6 +15,8 @@ import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restoreP
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
 import { AiOrchestrator } from '../core/ai-orchestrator.js';
+import { createAiRouteQualityEvidenceResolverV1 } from '../core/ai-route-quality-evidence-resolver.js';
+import { createAiRouteQualityCoreEvidenceReaderV1 } from '../core/ai-route-quality-core-evidence-reader.js';
 import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
@@ -76,6 +78,10 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_BROWSER_AGENT_ORCHESTRATION_BINDING',
 ]);
 const repo = new StorageRepository(chrome);
+const readAiRouteQualityBenchmarkRequests = createAiRouteQualityCoreEvidenceReaderV1({ repository: repo });
+const aiRouteQualityEvidenceResolver = createAiRouteQualityEvidenceResolverV1({
+  readBenchmarkRequests: readAiRouteQualityBenchmarkRequests,
+});
 const projectWorkspaceRuntime = new ProjectWorkspaceRuntimeReader(new ProjectWorkspaceRepository(chrome));
 const chatgptProvider = getAgentProvider(AgentProviderId.CHATGPT_BROWSER);
 const chatgptTransport = new ChromeInteractionTransport(chrome, { siteAdapterId: chatgptProvider.siteAdapterId });
@@ -86,6 +92,7 @@ const aiGatewayClient = new AiGatewayClient({ fetchFn: (...args) => fetch(...arg
 const browserAgentLifecycle = { current: null };
 const aiOrchestrator = new AiOrchestrator({
   gatewayClient: aiGatewayClient,
+  routeQualityEvidenceResolver: aiRouteQualityEvidenceResolver,
   providerCallLifecycle: {
     beforeProviderCall: async ({ context, route, prompt, systemPrompt, maxOutputTokens, callNumber }) => {
       if (context?.kind !== 'browser-agent' || !browserAgentLifecycle.current) return null;
