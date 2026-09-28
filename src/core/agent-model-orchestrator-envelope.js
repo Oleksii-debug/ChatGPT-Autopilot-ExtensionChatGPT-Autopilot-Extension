@@ -160,9 +160,17 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
     throw new Error('Dispatch intent route is not currently authorized by canonical Router policy/state');
   }
 
+  const routeWorkerCount = settings.workerPolicy.manualRouteWorkers?.[route.routeId];
+  const scopedWorkerPolicy = {
+    ...settings.workerPolicy,
+    manualRouteWorkers: routeWorkerCount === undefined
+      ? {}
+      : { [route.routeId]: routeWorkerCount },
+  };
   const scopedSettings = normalizeAiRouterSettings({
     ...settings,
     routes: [route],
+    workerPolicy: scopedWorkerPolicy,
     routePolicy: {
       ...settings.routePolicy,
       autoSwitch: false,
