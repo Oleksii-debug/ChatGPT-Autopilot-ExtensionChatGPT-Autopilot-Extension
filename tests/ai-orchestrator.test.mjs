@@ -603,6 +603,57 @@ test('provider-call lifecycle durably admits before gateway I/O and settles afte
   ]);
 });
 
+test('provider budget settlement failure fails closed without route failover or health poisoning', async () => {
+  const calls = [];
+  const gateway = {
+    async complete(req) {
+      calls.push(req.model);
+      return { text:'provider completed', usage:{ inputTokens:5, outputTokens:3, totalTokens:8 } };
+    },
+  };
+  const lifecycle = {
+    async beforeProviderCall({ route }) {
+      return { reservationId:`reservation-${route.model}` };
+    },
+    async afterProviderCall() {
+      const error = new Error('budget settlement store unavailable');
+      error.code = 'AI_PROVIDER_BUDGET_SETTLEMENT_FAILED';
+      throw error;
+    },
+  };
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    providerCallLifecycle:lifecycle,
+    now:() => 80_500,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings({
+        routes:[
+          { routeId:'a', provider:'openai', model:'route-a', roles:['planner'], priority:20, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+          { routeId:'b', provider:'ollama', model:'route-b', roles:['planner'], priority:10 },
+        ],
+      }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      {
+        taskRole:'planner',
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-1', controlEpoch:2 },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_SETTLEMENT_FAILED');
+      assert.equal(error.modelCallsUsed, 1);
+      assert.deepEqual(error.routeAttempts, []);
+      assert.deepEqual(error.routerRuntime.routeStates, {});
+      return true;
+    },
+  );
+  assert.deepEqual(calls, ['route-a']);
+});
+
 test('provider-call lifecycle conservatively settles an admitted failed gateway attempt before failover logic continues', async () => {
   const events = [];
   const gateway = {
