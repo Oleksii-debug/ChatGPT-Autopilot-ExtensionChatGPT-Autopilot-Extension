@@ -531,7 +531,10 @@ export function createAgentModelPolicyBindingV1(input) {
 
   const routePolicyProvided = Object.hasOwn(raw, 'routePolicy');
   const routePolicyInput = own(raw, 'routePolicy');
-  const topLevelRoutePolicyInput = routePolicyProvided
+  // Parent-bound child policy must be validated by the child boundary first.
+  // Running it through the top-level Agent validator would collapse the
+  // authority-specific fail-closed contract before inheritance checks run.
+  const topLevelRoutePolicyInput = !parentBinding && routePolicyProvided
     ? exactRoutePolicyRecord(routePolicyInput, 'Agent AiRoutePolicy')
     : {};
   const routePolicy = parentBinding
