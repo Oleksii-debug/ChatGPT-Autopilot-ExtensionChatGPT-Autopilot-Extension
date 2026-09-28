@@ -130,17 +130,14 @@ test('legacy schema-v2 state without route-quality evidence remains valid', () =
   assert.equal(validateState(state), state);
 });
 
-test('Core state fails closed on corrupt route-quality evidence registry', () => {
+test('corrupt advisory route-quality evidence cannot make the entire Core state unloadable', () => {
   const state = createEmptyState(1);
   state.profile.aiRouteQualityEvidenceRegistry = {
     schemaVersion: 1,
     revision: 1,
     records: [],
   };
-  assert.throws(
-    () => validateState(state),
-    /revision must equal append-only record count/u,
-  );
+  assert.equal(validateState(state), state);
 });
 
 test('Core evidence reader re-loads canonical state for every lookup and never gains write authority', async () => {
