@@ -28,7 +28,7 @@ export const AGENT_MODEL_ROUTE_CANDIDATE_BINDING_AUTHORITY = Object.freeze({
   verificationAuthorized: false,
   requiresCurrentDefinitionBinding: true,
   requiresCurrentRoutePoolRevision: true,
-  requiresCurrentRouteStateObservation: true,
+  providerDispatchRevalidationRequired: true,
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
@@ -251,7 +251,7 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
   });
 
   const availableRouteIds = ranked.candidates.map(route => route.routeId);
-  const selectedRouteId = availableRouteIds[0] ?? null;
+  const preferredRouteId = availableRouteIds[0] ?? null;
 
   return freezeDeep({
     schemaVersion: AGENT_MODEL_ROUTE_CANDIDATE_BINDING_VERSION,
@@ -270,7 +270,7 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
     effectiveRouteIds: [...effectiveRouteIds],
     eligibleRouteIds: [...ranked.eligibleRouteIds],
     availableRouteIds,
-    selectedRouteId,
+    preferredRouteId,
     retryAt: ranked.retryAt,
     authority: AGENT_MODEL_ROUTE_CANDIDATE_BINDING_AUTHORITY,
   });
