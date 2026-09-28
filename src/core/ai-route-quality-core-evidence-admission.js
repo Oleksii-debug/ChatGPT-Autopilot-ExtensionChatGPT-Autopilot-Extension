@@ -100,10 +100,15 @@ function exactTrustedBinding(value, routeId, runId) {
     throw new Error('Trusted AI route-quality benchmark runId mismatch');
   }
 
+  // Snapshot immediately after canonical evaluator admission. There is no
+  // await between validation and this clone, so resolver-owned mutable data
+  // cannot be changed later while StorageRepository.update waits in its queue.
+  const evaluationRequest = deepFreeze(structuredClone(raw.evaluationRequest));
+
   return Object.freeze({
     routeId: resolvedRouteId,
     maxAgeMs: raw.maxAgeMs,
-    evaluationRequest: raw.evaluationRequest,
+    evaluationRequest,
   });
 }
 
