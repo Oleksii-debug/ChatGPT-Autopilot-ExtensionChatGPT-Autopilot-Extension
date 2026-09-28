@@ -389,7 +389,10 @@ export function deriveSubagentModelRouteScopeV1(input = {}) {
     'requiresVision',
   );
 
-  const capabilityEscalation = missing(modelCapabilityIds, childCapabilityIds);
+  const authorityCapabilityIds = requiresVision
+    ? sortedUnique([...modelCapabilityIds, 'model.vision'])
+    : modelCapabilityIds;
+  const capabilityEscalation = missing(authorityCapabilityIds, childCapabilityIds);
   const emptyContext = {
     identities,
     childAuthorityProviderId: childAuthority.providerId,

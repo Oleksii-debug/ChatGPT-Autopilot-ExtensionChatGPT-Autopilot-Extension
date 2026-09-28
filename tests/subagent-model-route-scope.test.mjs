@@ -259,6 +259,17 @@ test('task model capabilities cannot exceed the already-admitted child capabilit
   assert.deepEqual(value.routeBindings, []);
 });
 
+test('vision requirement cannot exceed the admitted child capability envelope', () => {
+  const value = deriveSubagentModelRouteScopeV1(request({
+    childAuthorityEnvelope: childAuthority(['model.code']),
+    requiresVision: true,
+  }));
+  assert.equal(value.decision, 'DENY');
+  assert.equal(value.reasonCode, 'MODEL_CAPABILITY_ESCALATION');
+  assert.deepEqual(value.deniedCapabilityIds, ['model.vision']);
+  assert.deepEqual(value.routeBindings, []);
+});
+
 test('route capability requirements are enforced by the canonical Router selector', () => {
   const value = deriveSubagentModelRouteScopeV1(request({
     taskModelCapabilityIds: ['model.vision'],

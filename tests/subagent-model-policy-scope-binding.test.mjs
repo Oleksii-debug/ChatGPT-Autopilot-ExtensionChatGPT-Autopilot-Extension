@@ -185,6 +185,24 @@ test('task route request cannot escape durable child effective route scope', () 
   assert.deepEqual(value.deniedRouteIds, ['route.local']);
 });
 
+test('composed durable policy cannot grant vision outside child capability authority', () => {
+  const value = deriveSubagentModelRouteScopeFromAgentBindingV1(request({
+    childAuthorityEnvelope: childAuthority({
+      parentCapabilityIds: ['model.code'],
+      ownerAllowedCapabilityIds: ['model.code'],
+      providerCapabilityIds: ['model.code'],
+      taskRequestedCapabilityIds: ['model.code'],
+    }),
+    requiresVision: true,
+  }));
+
+  assert.equal(value.decision, 'DENY');
+  assert.equal(value.reasonCode, 'MODEL_CAPABILITY_ESCALATION');
+  assert.deepEqual(value.deniedCapabilityIds, ['model.vision']);
+  assert.deepEqual(value.admittedRouteIds, []);
+  assert.deepEqual(value.routeBindings, []);
+});
+
 test('durable model policy binding must match exact child authority identity', () => {
   const value = deriveSubagentModelRouteScopeFromAgentBindingV1(request({
     childAuthorityEnvelope: childAuthority({
