@@ -129,6 +129,7 @@ function request(overrides = {}) {
     childAuthorityEnvelope: childAuthority(),
     childModelPolicyBinding: child,
     routes,
+    currentAgentModelPolicyRevision: child.policyRevision,
     currentRoutePoolRevision: 7,
     taskModelCapabilityIds: ['model.code'],
     taskRequestedRouteIds: [],
@@ -216,6 +217,18 @@ test('durable model policy binding must match exact child authority identity', (
   assert.deepEqual(value.routeBindings, []);
 });
 
+test('current owner Agent policy revision must exactly match durable child binding revision', () => {
+  const value = deriveSubagentModelRouteScopeFromAgentBindingV1(request({
+    currentAgentModelPolicyRevision: 3,
+  }));
+
+  assert.equal(value.decision, 'DENY');
+  assert.equal(value.reasonCode, 'MODEL_POLICY_REVISION_STALE');
+  assert.equal(value.currentAgentModelPolicyRevision, 3);
+  assert.deepEqual(value.admittedRouteIds, []);
+  assert.deepEqual(value.routeBindings, []);
+});
+
 test('current owner route-pool revision must exactly match durable child binding revision', () => {
   const value = deriveSubagentModelRouteScopeFromAgentBindingV1(request({
     currentRoutePoolRevision: 8,
@@ -299,7 +312,15 @@ test('request boundary rejects accessor authority without executing the getter',
   assert.equal(reads, 0);
 });
 
-test('route-pool revision rejects coercion and signed zero aliases', () => {
+test('current policy and route-pool revisions reject coercion and signed zero aliases', () => {
+  for (const value of ['2', 2.5, -0, 0]) {
+    assert.throws(
+      () => deriveSubagentModelRouteScopeFromAgentBindingV1(request({
+        currentAgentModelPolicyRevision: value,
+      })),
+      /currentAgentModelPolicyRevision is invalid/u,
+    );
+  }
   for (const value of ['7', 7.5, -0, 0]) {
     assert.throws(
       () => deriveSubagentModelRouteScopeFromAgentBindingV1(request({

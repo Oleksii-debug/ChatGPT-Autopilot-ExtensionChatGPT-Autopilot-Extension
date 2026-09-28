@@ -11,6 +11,7 @@ const REQUEST_KEYS = new Set([
   'childAuthorityEnvelope',
   'childModelPolicyBinding',
   'routes',
+  'currentAgentModelPolicyRevision',
   'currentRoutePoolRevision',
   'taskModelCapabilityIds',
   'taskRequestedRouteIds',
@@ -112,7 +113,7 @@ function deny(scope, binding, reasonCode, details = {}) {
  * selector instead of accepting caller-shaped parent/owner policy authorities.
  *
  * This remains an advisory pure boundary. The runtime owner must supply the
- * current trusted route-pool revision and re-run the canonical Router against
+ * current trusted Agent model-policy revision + route-pool revision and re-run the canonical Router against
  * current route state immediately before provider I/O.
  */
 export function deriveSubagentModelRouteScopeFromAgentBindingV1(input = {}) {
@@ -127,6 +128,14 @@ export function deriveSubagentModelRouteScopeFromAgentBindingV1(input = {}) {
       'childModelPolicyBinding',
       'SubagentModelPolicyScopeBindingRequestV1',
     ),
+  );
+  const currentAgentModelPolicyRevision = revision(
+    own(
+      request,
+      'currentAgentModelPolicyRevision',
+      'SubagentModelPolicyScopeBindingRequestV1',
+    ),
+    'currentAgentModelPolicyRevision',
   );
   const currentRoutePoolRevision = revision(
     own(
@@ -172,6 +181,12 @@ export function deriveSubagentModelRouteScopeFromAgentBindingV1(input = {}) {
       || scope.childAgentId !== binding.agentId
       || scope.parentAgentId !== binding.parentAgentId) {
     return deny(scope, binding, 'MODEL_POLICY_BINDING_IDENTITY_MISMATCH');
+  }
+
+  if (currentAgentModelPolicyRevision !== binding.policyRevision) {
+    return deny(scope, binding, 'MODEL_POLICY_REVISION_STALE', {
+      currentAgentModelPolicyRevision,
+    });
   }
 
   if (currentRoutePoolRevision !== binding.routePoolRevision) {
