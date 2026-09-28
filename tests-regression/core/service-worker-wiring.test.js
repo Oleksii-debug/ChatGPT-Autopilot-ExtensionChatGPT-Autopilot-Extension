@@ -15,6 +15,19 @@ test('service worker owns a real runtime-cycle wiring behind the release gate', 
   assert.match(source, /executionAvailable: EXECUTION_AVAILABLE/);
 });
 
+test('production Router consumes durable route-quality evidence through the read-only Core bridge', () => {
+  assert.match(source, /import \{ createAiRouteQualityEvidenceResolverV1 \} from '\.\.\/core\/ai-route-quality-evidence-resolver\.js';/);
+  assert.match(source, /import \{ createAiRouteQualityCoreEvidenceReaderV1 \} from '\.\.\/core\/ai-route-quality-core-evidence-reader\.js';/);
+  assert.match(source, /const readAiRouteQualityBenchmarkRequests = createAiRouteQualityCoreEvidenceReaderV1\(\{ repository: repo \}\);/);
+  assert.match(source, /const aiRouteQualityEvidenceResolver = createAiRouteQualityEvidenceResolverV1\(\{\s*readBenchmarkRequests: readAiRouteQualityBenchmarkRequests,\s*\}\);/s);
+  assert.match(source, /const aiOrchestrator = new AiOrchestrator\(\{[\s\S]*?routeQualityEvidenceResolver: aiRouteQualityEvidenceResolver,/s);
+  assert.doesNotMatch(
+    source,
+    /putAiRouteQualityEvidenceRecordV1/,
+    'service worker must not acquire benchmark-evidence append authority',
+  );
+});
+
 test('cold worker load applies authorized bootstrap before recovery without executing a Session', () => {
   assert.match(source, /import \{ applyBundledBootstrapProfile \} from '\.\.\/core\/bootstrap\.js';/);
   assert.match(source, /import \{ BUNDLED_BOOTSTRAP_PROFILE \} from '\.\.\/config\/bootstrap-profile\.js';/);
