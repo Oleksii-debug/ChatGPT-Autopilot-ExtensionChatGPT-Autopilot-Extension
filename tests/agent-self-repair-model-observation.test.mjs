@@ -171,6 +171,24 @@ function invocationRequest(intent = selfRepairIntent(), overrides = {}) {
   };
 }
 
+function providerReservation(overrides = {}) {
+  return {
+    reservationId: 'actor.observe:model-budget:1',
+    controlEpoch: 8,
+    modelCalls: 1,
+    inputTokens: 64,
+    outputTokens: 512,
+    totalTokens: 576,
+    estimatedCostUsd: 0.001,
+    createdAt: 1_850,
+    routeId: 'route.observe',
+    provider: 'openai',
+    model: 'agent-model',
+    callNumber: 1,
+    ...overrides,
+  };
+}
+
 function modelResult(overrides = {}) {
   const text = overrides.text ?? 'Applied the bounded repair and produced evidence for independent verification.';
   const primary = Object.hasOwn(overrides, 'primary')
@@ -210,7 +228,7 @@ function modelResult(overrides = {}) {
 function request(overrides = {}) {
   return {
     invocationRequest: invocationRequest(),
-    trustedInvocationId: 'invocation.observe.1',
+    providerReservation: providerReservation(),
     observationId: 'observation.observe.1',
     modelResult: modelResult(),
     observedAt: '1970-01-01T00:00:01.900Z',
@@ -218,12 +236,12 @@ function request(overrides = {}) {
   };
 }
 
-test('successful self-repair model output becomes canonical untrusted ObservationV1 only', () => {
+test('durable provider reservation becomes the exact canonical ObservationV1 invocation identity', () => {
   const observation = projectAgentSelfRepairModelObservationV1(request());
 
   assert.equal(observation.schemaVersion, 1);
   assert.equal(observation.observationId, 'observation.observe.1');
-  assert.equal(observation.invocationId, 'invocation.observe.1');
+  assert.equal(observation.invocationId, 'actor.observe:model-budget:1');
   assert.equal(observation.status, 'OK');
   assert.match(observation.summary, /bounded repair/u);
   assert.deepEqual(observation.artifactRefs, []);
@@ -233,6 +251,11 @@ test('successful self-repair model output becomes canonical untrusted Observatio
   assert.equal(observation.data.rootJobId, 'root.job.observe');
   assert.equal(observation.data.jobId, 'actor.observe');
   assert.equal(observation.data.ownerId, 'actor.observe');
+  assert.deepEqual(observation.data.providerAdmission, {
+    controlEpoch: 8,
+    callNumber: 1,
+    createdAt: 1_850,
+  });
   assert.equal(observation.data.route.routeId, 'route.observe');
   assert.equal(observation.data.route.provider, 'openai');
   assert.equal(observation.data.route.model, 'agent-model');
@@ -250,7 +273,7 @@ test('successful self-repair model output becomes canonical untrusted Observatio
   assert.equal(Object.isFrozen(observation), true);
 });
 
-test('model result cannot mint or alias trusted invocation identity', () => {
+test('model result cannot mint invocation identity and caller cannot substitute another owner reservation', () => {
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
       modelResult: {
@@ -263,9 +286,63 @@ test('model result cannot mint or alias trusted invocation identity', () => {
 
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
-      trustedInvocationId: ' forged.runtime.invocation ',
+      providerReservation: providerReservation({
+        reservationId: 'other.owner:model-budget:1',
+      }),
+    })),
+    /does not belong to the current self-repair owner/u,
+  );
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      providerReservation: providerReservation({
+        reservationId: ' actor.observe:model-budget:1 ',
+      }),
     })),
     /must already be canonical text/u,
+  );
+});
+
+test('durable provider reservation must match current epoch, route and one-call admission', () => {
+  for (const reservation of [
+    providerReservation({ controlEpoch: 9 }),
+    providerReservation({ modelCalls: 2 }),
+    providerReservation({ callNumber: 2 }),
+    providerReservation({ routeId: 'route.other' }),
+    providerReservation({ provider: 'other-provider' }),
+    providerReservation({ model: 'other-model' }),
+    providerReservation({ reservationId: 'actor.observe:model-budget:0' }),
+  ]) {
+    assert.throws(
+      () => projectAgentSelfRepairModelObservationV1(request({
+        providerReservation: reservation,
+      })),
+      /controlEpoch drifted|exactly one model call|one-call invocation ceiling|route identity drifted|identity sequence is invalid/u,
+    );
+  }
+});
+
+test('reservation bounds and chronology are canonical before model result can become evidence', () => {
+  for (const reservation of [
+    providerReservation({ inputTokens: -0 }),
+    providerReservation({ outputTokens: 1.5 }),
+    providerReservation({ totalTokens: 10 }),
+    providerReservation({ estimatedCostUsd: Number.NaN }),
+    providerReservation({ estimatedCostUsd: -1 }),
+    providerReservation({ createdAt: 1_799 }),
+  ]) {
+    assert.throws(
+      () => projectAgentSelfRepairModelObservationV1(request({
+        providerReservation: reservation,
+      })),
+      /safe integer|totalTokens is inconsistent|estimatedCostUsd is invalid|predates invocation preparation/u,
+    );
+  }
+
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      observedAt: '1970-01-01T00:00:01.840Z',
+    })),
+    /predates durable provider admission/u,
   );
 });
 
@@ -323,13 +400,7 @@ test('observation admits exactly one bounded provider call and canonical token c
   }
 });
 
-test('observation chronology must be exact canonical and cannot predate invocation preparation', () => {
-  assert.throws(
-    () => projectAgentSelfRepairModelObservationV1(request({
-      observedAt: '1970-01-01T00:00:01.700Z',
-    })),
-    /predates invocation preparation/u,
-  );
+test('observation timestamp spelling must already be canonical UTC', () => {
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
       observedAt: '1970-01-01T00:00:01.900+00:00',
@@ -396,6 +467,15 @@ test('hostile accessors and authority-shaped aliases fail without executing gett
       modelResult: {
         ...modelResult(),
         completionAuthority: true,
+      },
+    })),
+    /contains unknown field/u,
+  );
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      providerReservation: {
+        ...providerReservation(),
+        verificationAuthorityId: 'forged',
       },
     })),
     /contains unknown field/u,
