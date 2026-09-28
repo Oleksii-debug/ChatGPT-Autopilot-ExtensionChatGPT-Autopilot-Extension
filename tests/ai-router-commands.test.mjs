@@ -898,6 +898,9 @@ function internalAgentEnvelope(overrides = {}) {
 
 test('internal Agent envelope reaches canonical AiOrchestrator as isolated one-route execution', async () => {
   const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
   const before = structuredClone(repo.state.profile.aiRouter);
   const beforeRuntime = structuredClone(repo.state.profile.aiRouterRuntime);
   const seen = [];
@@ -935,7 +938,7 @@ test('internal Agent envelope reaches canonical AiOrchestrator as isolated one-r
       maxModelCallsForRequest: 1,
     },
     {
-      agentModelOrchestratorEnvelope: internalAgentEnvelope(),
+      agentModelOrchestratorEnvelope: envelope,
       providerCallBudgetContext: { jobId: 'agent.job.1' },
     },
   );
@@ -1038,6 +1041,91 @@ test('internal Agent envelope rejects route-state leakage before model invocatio
       { agentModelOrchestratorEnvelope: envelope },
     ),
     /unknown route state|runtime leaks another route/u,
+  );
+  assert.equal(calls, 0);
+});
+
+
+test('internal Agent envelope rechecks live canonical Router deny before provider invocation', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouter.routePolicy.denyRouteIds = ['route.agent'];
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      { agentModelOrchestratorEnvelope: envelope },
+    ),
+    /no longer authorized by current canonical Router/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent envelope rechecks live route identity before provider invocation', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouter.routes[0].model = 'changed-model';
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      { agentModelOrchestratorEnvelope: envelope },
+    ),
+    /route identity drifted before provider invocation/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent envelope rechecks live route backoff before provider invocation', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  repo.state.profile.aiRouterRuntime.routeStates['route.agent'].backoffUntil = 3_000;
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      { agentModelOrchestratorEnvelope: envelope },
+    ),
+    /no longer authorized by current canonical Router/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent envelope fails closed when live canonical Router is disabled', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouter.enabled = false;
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      { agentModelOrchestratorEnvelope: envelope },
+    ),
+    /Current canonical AI Router is disabled/u,
   );
   assert.equal(calls, 0);
 });
