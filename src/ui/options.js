@@ -2489,7 +2489,29 @@ function agentDefinitionModelPolicySummary(definition) {
   if (policy.autoSwitch === false) parts.push('automatic failover off');
   if (policy.maxInputPricePerMillionUsd != null) parts.push('input price cap ' + policy.maxInputPricePerMillionUsd);
   if (policy.maxOutputPricePerMillionUsd != null) parts.push('output price cap ' + policy.maxOutputPricePerMillionUsd);
+  parts.push('retry backoff ' + (policy.retryBackoffSeconds ?? 60) + 's');
+  parts.push('circuit ' + (policy.circuitBreakerFailures ?? 2) + ' failures / ' + (policy.circuitBreakerSeconds ?? 300) + 's');
   return 'Model policy: ' + (parts.length ? parts.join('; ') : 'inherits global route eligibility.');
+}
+
+function syncAgentDefinitionModelRoutePolicyControls() {
+  const configured = $('agent-definition-model-route-policy-configured').checked;
+  for (const id of [
+    'agent-definition-model-route-auto-switch',
+    'agent-definition-model-route-pinned-id',
+    'agent-definition-model-route-ordered-ids',
+    'agent-definition-model-route-allow-ids',
+    'agent-definition-model-route-deny-ids',
+    'agent-definition-model-route-free-only',
+    'agent-definition-model-route-locality',
+    'agent-definition-model-route-max-input-price',
+    'agent-definition-model-route-max-output-price',
+    'agent-definition-model-route-backoff-seconds',
+    'agent-definition-model-route-circuit-failures',
+    'agent-definition-model-route-circuit-seconds',
+  ]) {
+    $(id).disabled = !configured;
+  }
 }
 
 function syncAgentDefinitionSpecialistDelegationControls() {
@@ -2538,6 +2560,21 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-ai-primary-model').value = Object.hasOwn(configDefaults, 'aiPrimaryModel') ? configDefaults.aiPrimaryModel : '';
   $('agent-definition-ai-strong-provider').value = Object.hasOwn(configDefaults, 'aiStrongProvider') ? configDefaults.aiStrongProvider : '';
   $('agent-definition-ai-strong-model').value = Object.hasOwn(configDefaults, 'aiStrongModel') ? configDefaults.aiStrongModel : '';
+  const modelRoutePolicy = definition?.modelRoutePolicy ?? null;
+  $('agent-definition-model-route-policy-configured').checked = Boolean(modelRoutePolicy);
+  $('agent-definition-model-route-auto-switch').checked = modelRoutePolicy?.autoSwitch !== false;
+  $('agent-definition-model-route-pinned-id').value = modelRoutePolicy?.pinnedRouteId || '';
+  $('agent-definition-model-route-ordered-ids').value = agentDefinitionLines(modelRoutePolicy?.orderedRouteIds);
+  $('agent-definition-model-route-allow-ids').value = agentDefinitionLines(modelRoutePolicy?.allowRouteIds);
+  $('agent-definition-model-route-deny-ids').value = agentDefinitionLines(modelRoutePolicy?.denyRouteIds);
+  $('agent-definition-model-route-free-only').checked = modelRoutePolicy?.freeOnly === true;
+  $('agent-definition-model-route-locality').value = modelRoutePolicy?.locality || 'any';
+  $('agent-definition-model-route-max-input-price').value = modelRoutePolicy?.maxInputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxInputPricePerMillionUsd);
+  $('agent-definition-model-route-max-output-price').value = modelRoutePolicy?.maxOutputPricePerMillionUsd == null ? '' : String(modelRoutePolicy.maxOutputPricePerMillionUsd);
+  $('agent-definition-model-route-backoff-seconds').value = String(modelRoutePolicy?.retryBackoffSeconds ?? 60);
+  $('agent-definition-model-route-circuit-failures').value = String(modelRoutePolicy?.circuitBreakerFailures ?? 2);
+  $('agent-definition-model-route-circuit-seconds').value = String(modelRoutePolicy?.circuitBreakerSeconds ?? 300);
+  syncAgentDefinitionModelRoutePolicyControls();
   const specialistDelegationProfile = definition && Object.hasOwn(definition, 'specialistDelegationProfile')
     ? definition.specialistDelegationProfile
     : undefined;
@@ -2812,6 +2849,19 @@ function agentDefinitionFormValue() {
     aiPrimaryModel: $('agent-definition-ai-primary-model').value,
     aiStrongProvider: $('agent-definition-ai-strong-provider').value,
     aiStrongModel: $('agent-definition-ai-strong-model').value,
+    modelRoutePolicyConfigured: $('agent-definition-model-route-policy-configured').checked,
+    modelRouteAutoSwitch: $('agent-definition-model-route-auto-switch').checked,
+    modelRoutePinnedRouteId: $('agent-definition-model-route-pinned-id').value,
+    modelRouteOrderedRouteIdsText: $('agent-definition-model-route-ordered-ids').value,
+    modelRouteAllowRouteIdsText: $('agent-definition-model-route-allow-ids').value,
+    modelRouteDenyRouteIdsText: $('agent-definition-model-route-deny-ids').value,
+    modelRouteFreeOnly: $('agent-definition-model-route-free-only').checked,
+    modelRouteLocality: $('agent-definition-model-route-locality').value,
+    modelRouteMaxInputPriceText: $('agent-definition-model-route-max-input-price').value,
+    modelRouteMaxOutputPriceText: $('agent-definition-model-route-max-output-price').value,
+    modelRouteRetryBackoffSeconds: $('agent-definition-model-route-backoff-seconds').value,
+    modelRouteCircuitBreakerFailures: $('agent-definition-model-route-circuit-failures').value,
+    modelRouteCircuitBreakerSeconds: $('agent-definition-model-route-circuit-seconds').value,
     specialistDelegationConfigured: $('agent-definition-specialist-delegation-configured').checked,
     specialistDelegationEnabled: $('agent-definition-specialist-delegation-enabled').checked,
     specialistRegistryId: $('agent-definition-specialist-registry-id').value,
@@ -5789,6 +5839,7 @@ $('agent-definition-create-registry-button').addEventListener('click', createAge
 $('agent-definition-list').addEventListener('change', selectAgentDefinition);
 $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
+$('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-specialist-delegation-configured').addEventListener('change', syncAgentDefinitionSpecialistDelegationControls);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
