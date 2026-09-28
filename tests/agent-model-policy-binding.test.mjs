@@ -485,7 +485,7 @@ test('routePolicy input is fail-closed rather than truthy/falsy/null-coerced', (
   for (const routePolicy of [false, null]) {
     assert.throws(
       () => createAgentModelPolicyBindingV1(request({ routePolicy })),
-      /AI route policy must be an object/,
+      /Agent AiRoutePolicy must be a plain object/,
     );
   }
 
