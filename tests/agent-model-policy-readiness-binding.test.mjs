@@ -438,6 +438,26 @@ test('same-revision authority route ordering drift fails closed', () => {
   );
 });
 
+test('bound readiness supports verifier-only work without requiring planner eligibility', () => {
+  const verifierOnlyRoutes = pool().map(item => (
+    item.routeId === 'route.a' || item.routeId === 'route.b'
+      ? { ...item, roles: ['verifier'] }
+      : item
+  ));
+  const result = inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+    routes: verifierOnlyRoutes,
+    requiresPlanner: false,
+    requiresVerifier: true,
+    verifierCapabilityIds: ['cap.reason'],
+  }));
+
+  assert.equal(result.readiness.state, AgentRouteReadinessState.READY);
+  assert.equal(result.readiness.requiresPlanner, false);
+  assert.equal(result.readiness.requiresVerifier, true);
+  assert.deepEqual(result.readiness.planner.availableRouteIds, []);
+  assert.deepEqual(result.readiness.verifier.availableRouteIds, ['route.a', 'route.b']);
+});
+
 test('routes outside durable effectiveRouteIds cannot make an otherwise unavailable Agent ready', () => {
   const limitedBinding = definitionBinding({
     ownerAllowedRouteIds: ['route.a', 'route.b'],
