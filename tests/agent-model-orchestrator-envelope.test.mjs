@@ -245,11 +245,33 @@ test('orchestrator revalidation time is explicit and monotonic from dispatch pre
   assert.equal(reads,0);
 });
 
-test('parent model-policy provenance survives orchestrator envelope', () => {
+test('parent model-policy provenance is revalidated at orchestrator boundary', () => {
+  const childIntent=intent({parentModelPolicyBindingKey:'parent.binding'});
   const result=createBoundAgentModelOrchestratorEnvelopeV1(request({
-    dispatchIntent:intent({parentModelPolicyBindingKey:'parent.binding'}),
+    dispatchIntent:childIntent,
+    currentParentModelPolicyBindingKey:'parent.binding',
   }));
   assert.equal(result.parentModelPolicyBindingKey,'parent.binding');
+
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({
+      dispatchIntent:childIntent,
+    })),
+    /currentParentModelPolicyBindingKey is invalid/u,
+  );
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({
+      dispatchIntent:childIntent,
+      currentParentModelPolicyBindingKey:'parent.other',
+    })),
+    /parent model-policy binding is stale/u,
+  );
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({
+      currentParentModelPolicyBindingKey:'forged.parent',
+    })),
+    /Root dispatch intent must not supply current parent model-policy provenance/u,
+  );
 });
 
 test('dispatch capability envelope rejects accessor and duplicate provenance', () => {
