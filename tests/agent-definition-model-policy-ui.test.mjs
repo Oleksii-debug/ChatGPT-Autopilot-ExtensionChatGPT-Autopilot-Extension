@@ -205,6 +205,44 @@ test('Agent definition model policy rejects relationships that canonical Agent b
   );
 });
 
+test('Agent definition save rejects legacy pinned routes that durable model policy would deny', () => {
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1({
+      ...baseForm({ aiPinnedRouteId:'route.legacy' }),
+      ...configuredPolicyForm({ modelRoutePinnedRouteId:'route.strong' }),
+    }),
+    /Legacy pinned route конфліктує/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1({
+      ...baseForm({ aiPinnedRouteId:'route.strong' }),
+      ...configuredPolicyForm({
+        modelRoutePinnedRouteId:'',
+        modelRouteAllowRouteIdsText:'route.fast',
+        modelRouteOrderedRouteIdsText:'route.fast',
+      }),
+    }),
+    /Legacy pinned route поза Model Router policy allow scope/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1({
+      ...baseForm({ aiPinnedRouteId:'route.strong' }),
+      ...configuredPolicyForm({
+        modelRoutePinnedRouteId:'',
+        modelRouteDenyRouteIdsText:'route.strong',
+      }),
+    }),
+    /Legacy pinned route заборонений Model Router policy deny scope/u,
+  );
+
+  const compatible = buildAgentDefinitionFromFormV1({
+    ...baseForm({ aiPinnedRouteId:'route.strong' }),
+    ...configuredPolicyForm({ modelRoutePinnedRouteId:'route.strong' }),
+  });
+  assert.equal(compatible.configDefaults.aiPinnedRouteId, 'route.strong');
+  assert.equal(compatible.modelRoutePolicy.pinnedRouteId, 'route.strong');
+});
+
 test('Agent definition model-policy form does not execute accessors', () => {
   let reads = 0;
   const hostile = configuredPolicyForm();
