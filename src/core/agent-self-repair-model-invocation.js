@@ -34,6 +34,7 @@ const INPUT_KEYS = new Set([
   'providerCallBudgetContext',
   'prompt',
   'systemPrompt',
+  'imageDataUrl',
   'maxOutputTokens',
   'currentNow',
 ]);
@@ -108,6 +109,18 @@ function boundedText(value, label, maxLength, { optional = false } = {}) {
     throw new Error(label + ' must not be empty');
   }
   return value;
+}
+
+function exactImageDataUrl(value, requiresVision) {
+  const imageDataUrl = value === undefined ? '' : value;
+  if (typeof imageDataUrl !== 'string' || imageDataUrl !== imageDataUrl.trim()) {
+    throw new Error('Agent self-repair invocation imageDataUrl must already be canonical text');
+  }
+  const hasImage = imageDataUrl.length > 0;
+  if (hasImage !== requiresVision) {
+    throw new Error('Agent self-repair image input does not match durable requiresVision intent');
+  }
+  return imageDataUrl;
 }
 
 function sameCanonicalIds(left, right) {
@@ -205,6 +218,7 @@ export function prepareBoundAgentSelfRepairModelInvocationV1(input) {
     50_000,
     { optional: true },
   );
+  const imageDataUrl = exactImageDataUrl(raw.imageDataUrl, envelope.requiresVision);
   const maxOutputTokens = exactPositiveInteger(
     raw.maxOutputTokens,
     'Agent self-repair invocation maxOutputTokens',
@@ -228,6 +242,7 @@ export function prepareBoundAgentSelfRepairModelInvocationV1(input) {
     payload: {
       prompt,
       systemPrompt,
+      ...(imageDataUrl ? { imageDataUrl } : {}),
       maxOutputTokens,
       maxModelCallsForRequest: 1,
     },
