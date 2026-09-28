@@ -114,7 +114,7 @@ function freezeDeep(value) {
   return Object.freeze(value);
 }
 
-function makeCandidateRequest(raw, now) {
+function makeCandidateRequest(raw, now, capabilityIds) {
   const out = {
     definitionModelPolicyBinding: own(raw, 'definitionModelPolicyBinding'),
     currentDefinitionModelPolicyBindingKey: own(raw, 'currentDefinitionModelPolicyBindingKey'),
@@ -208,7 +208,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
 
   const routes = normalizeAiRoutePool(own(raw, 'routes'));
   const routerPolicy = normalizeAiRoutePolicy(own(raw, 'currentRouterPolicy'));
-  const candidateRequest = makeCandidateRequest(raw, now);
+  const candidateRequest = makeCandidateRequest(raw, now, capabilityIds);
   const bound = rankBoundAgentModelRouteCandidatesV1(candidateRequest);
 
   const routerRanked = selectAiRouteCandidates({
