@@ -401,6 +401,69 @@ test('L1-B Resume consumes terminal barrier evidence recorded while paused exact
   assert.deepEqual(secondResume.actions, []);
 });
 
+test('L1-B Resume of one paused terminal child re-evaluates its running parent barrier', () => {
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'leaf-resume-manager-request', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'leaf-resume-manager',
+    purpose: OrchestrationActivationPurpose.DELEGATE,
+  }), 1).runtime;
+  let result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'leaf-resume-manager-terminal', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'leaf-resume-manager',
+    status: 'COMPLETED',
+  }), 2);
+  runtime = result.runtime;
+  const childActions = result.actions;
+  assert.equal(childActions.length, 2);
+
+  for (const [index, action] of childActions.entries()) {
+    runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, `leaf-resume-child-confirm-${index}`, {
+      nodeId: action.nodeId,
+      generation: action.generation,
+      activationId: action.activationId,
+    }), 3 + index).runtime;
+  }
+
+  const worker2 = childActions.find(action => action.nodeId === 'worker-2');
+  result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'leaf-resume-worker-2-terminal', {
+    nodeId: worker2.nodeId,
+    generation: worker2.generation,
+    activationId: worker2.activationId,
+    status: 'COMPLETED',
+  }), 5);
+  runtime = result.runtime;
+  assert.deepEqual(result.actions, []);
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.PAUSE_SCOPE, 'leaf-resume-pause-worker-1', {
+    nodeId: 'worker-1',
+  }), 6).runtime;
+
+  const worker1 = childActions.find(action => action.nodeId === 'worker-1');
+  result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'leaf-resume-worker-1-terminal', {
+    nodeId: worker1.nodeId,
+    generation: worker1.generation,
+    activationId: worker1.activationId,
+    status: 'NO_ACTION',
+  }), 7);
+  runtime = result.runtime;
+  assert.equal(result.reason, 'SCOPE_PAUSED');
+  assert.deepEqual(result.actions, []);
+
+  result = reduce(g, runtime, event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'leaf-resume-worker-1', {
+    nodeId: 'worker-1',
+  }), 8);
+  assert.equal(result.reason, 'RUNNING');
+  assert.equal(result.actions.length, 1);
+  assert.equal(result.actions[0].type, OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT);
+  assert.equal(result.actions[0].nodeId, 'manager');
+  assert.equal(result.actions[0].activationId, 'reconcile:manager:g1:r1');
+});
+
 test('L1-B Resume never forces reconciliation over an in-flight parent activation', () => {
   const g = graph();
   let runtime = createOrchestrationHierarchyRuntime(g, START);
