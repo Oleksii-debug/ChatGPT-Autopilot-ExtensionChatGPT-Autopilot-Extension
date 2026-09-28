@@ -664,6 +664,67 @@ test('Agent route policy narrows resilience controls without weakening global Ro
   assert.equal(seen[2].circuitBreakerSeconds, 300);
 });
 
+test('Agent resilience policy reaches real route failure state before provider fallback', async () => {
+  const calls = [];
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
+    aiOrchestrator: new AiOrchestrator({
+      now: () => 5000,
+      gatewayClient: {
+        async complete(request) {
+          calls.push(request);
+          const error = new Error('provider quota exhausted');
+          error.status = 429;
+          throw error;
+        },
+      },
+    }),
+  });
+  await dispatcher.execute('UPDATE_AI_ROUTER_SETTINGS', { settings: {
+    enabled:true,
+    mode:'primary',
+    routes:[{
+      routeId:'agent-route',
+      provider:'openai-compatible',
+      endpointId:'mistral',
+      model:'agent-model',
+      roles:['planner'],
+      costClass:'paid',
+      inputPricePerMillionUsd:1,
+      outputPricePerMillionUsd:2,
+    }],
+    routePolicy:{
+      retryBackoffSeconds:60,
+      circuitBreakerFailures:2,
+      circuitBreakerSeconds:300,
+    },
+  } });
+
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'agent task',
+      isolatedRuntime:true,
+      routerOverride:{
+        routePolicy:{
+          autoSwitch:false,
+          pinnedRouteId:'agent-route',
+          allowRouteIds:['agent-route'],
+          retryBackoffSeconds:120,
+          circuitBreakerFailures:1,
+          circuitBreakerSeconds:600,
+        },
+      },
+    }),
+    error => {
+      const state = error?.routerRuntime?.routeStates?.['agent-route'];
+      assert.equal(state?.backoffUntil, 125000);
+      assert.equal(state?.circuitOpenUntil, 605000);
+      assert.equal(error?.retryAt, 605000);
+      return true;
+    },
+  );
+  assert.equal(calls.length, 1, 'Agent resilience policy must fail closed without a hidden fallback call');
+});
+
 test('Agent route policy composes with legacy per-Agent route pin without mutating frozen policy', async () => {
   const calls = [];
   const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2000, {
@@ -767,7 +828,8 @@ test('Agent runtime route policy rejects coercive aliases before provider I/O', 
     { circuitBreakerFailures:-0 },
     { circuitBreakerSeconds:'600' },
     { circuitBreakerSeconds:-0 },
-    { allowRouteIds:[' local '] },  ]) {
+    { allowRouteIds:[' local '] },
+  ]) {
     await assert.rejects(
       () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
         prompt:'agent task',
