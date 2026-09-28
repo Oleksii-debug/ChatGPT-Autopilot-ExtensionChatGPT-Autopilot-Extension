@@ -2,6 +2,7 @@ import {
   AiRouteRole,
   normalizeAiRoutePolicy,
   normalizeAiRoutePool,
+  normalizeAiRouteStates,
   selectAiRouteCandidates,
 } from './ai-route-pool.js';
 import {
@@ -153,6 +154,7 @@ function authorizationKey({
   routerPolicy,
   routerEligibleRouteIds,
   routerAvailableRouteIds,
+  intersectionEligibleRouteIds,
   selectedRoute,
   capabilityIds,
   now,
@@ -176,6 +178,7 @@ function authorizationKey({
     routerPolicy,
     routerEligibleRouteIds,
     routerAvailableRouteIds,
+    intersectionEligibleRouteIds,
     selectedRoute,
     capabilityIds,
     now,
@@ -223,13 +226,22 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
 
   const routerAvailableRouteIds = routerRanked.candidates.map(route => route.routeId);
   const routerAvailable = new Set(routerAvailableRouteIds);
+  const routerEligible = new Set(routerRanked.eligibleRouteIds);
+  const intersectionEligibleRouteIds = bound.eligibleRouteIds.filter(routeId => routerEligible.has(routeId));
   const selectedRouteId = bound.availableRouteIds.find(routeId => routerAvailable.has(routeId)) ?? null;
   const selectedRoute = routeIdentity(
     selectedRouteId === null ? null : routes.find(route => route.routeId === selectedRouteId),
   );
 
-  const retryAt = selectedRoute === null
-    ? Math.max(bound.retryAt || 0, routerRanked.retryAt || 0)
+  const states = normalizeAiRouteStates(own(raw, 'routeStates') ?? {}, routes);
+  const retryCandidates = intersectionEligibleRouteIds
+    .map(routeId => {
+      const state = states[routeId];
+      return Math.max(state?.backoffUntil || 0, state?.circuitOpenUntil || 0);
+    })
+    .filter(value => value > now);
+  const retryAt = selectedRoute === null && retryCandidates.length
+    ? Math.min(...retryCandidates)
     : 0;
 
   const key = authorizationKey({
@@ -237,6 +249,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
     routerPolicy,
     routerEligibleRouteIds: [...routerRanked.eligibleRouteIds],
     routerAvailableRouteIds,
+    intersectionEligibleRouteIds,
     selectedRoute,
     capabilityIds,
     now,
@@ -264,6 +277,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
     boundAvailableRouteIds: [...bound.availableRouteIds],
     routerEligibleRouteIds: [...routerRanked.eligibleRouteIds],
     routerAvailableRouteIds,
+    intersectionEligibleRouteIds,
     selectedRoute,
     routeAttemptAuthorized: selectedRoute !== null,
     retryAt,
