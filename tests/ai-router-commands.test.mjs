@@ -896,6 +896,10 @@ function internalAgentEnvelope(overrides = {}) {
   };
 }
 
+function internalAgentBudgetContext(jobId = 'agent.job.1') {
+  return { kind: 'browser-agent', jobId, controlEpoch: 7 };
+}
+
 test('internal Agent envelope reaches canonical AiOrchestrator as isolated one-route execution', async () => {
   const repo = new MemoryRepo();
   const envelope = internalAgentEnvelope();
@@ -939,7 +943,7 @@ test('internal Agent envelope reaches canonical AiOrchestrator as isolated one-r
     },
     {
       agentModelOrchestratorEnvelope: envelope,
-      providerCallBudgetContext: { jobId: 'agent.job.1' },
+      providerCallBudgetContext: internalAgentBudgetContext(),
     },
   );
 
@@ -1037,8 +1041,11 @@ test('internal Agent envelope rejects route-state leakage before model invocatio
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent' },
-      { agentModelOrchestratorEnvelope: envelope },
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
     ),
     /unknown route state|runtime leaks another route/u,
   );
@@ -1059,8 +1066,11 @@ test('internal Agent envelope rechecks live canonical Router deny before provide
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent' },
-      { agentModelOrchestratorEnvelope: envelope },
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
     ),
     /no longer authorized by current canonical Router/u,
   );
@@ -1080,8 +1090,11 @@ test('internal Agent envelope rechecks live route identity before provider invoc
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent' },
-      { agentModelOrchestratorEnvelope: envelope },
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
     ),
     /route identity drifted before provider invocation/u,
   );
@@ -1101,8 +1114,11 @@ test('internal Agent envelope rechecks live route backoff before provider invoca
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent' },
-      { agentModelOrchestratorEnvelope: envelope },
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
     ),
     /no longer authorized by current canonical Router/u,
   );
@@ -1122,10 +1138,127 @@ test('internal Agent envelope fails closed when live canonical Router is disable
   await assert.rejects(
     dispatcher.execute(
       'RUN_AI_ROUTED_PROMPT',
-      { prompt: 'agent' },
-      { agentModelOrchestratorEnvelope: envelope },
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
     ),
     /Current canonical AI Router is disabled/u,
+  );
+  assert.equal(calls, 0);
+});
+
+
+test('internal Agent invocation requires the existing durable browser-agent budget lifecycle', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent', maxOutputTokens: 128 },
+      { agentModelOrchestratorEnvelope: envelope },
+    ),
+    /requires canonical provider budget context/u,
+  );
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: { kind:'self-repair', jobId:'agent.job.1', controlEpoch:7 },
+      },
+    ),
+    /requires an existing durable provider budget lifecycle/u,
+  );
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext('other.job'),
+      },
+    ),
+    /budget owner does not match envelope job identity/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent invocation requires a bounded output-token reservation', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /requires bounded maxOutputTokens/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent invocation time cannot precede envelope revalidation', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 1_499, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /invocation time is stale or invalid/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent invocation rejects live Gateway identity drift', async () => {
+  let calls = 0;
+  const repo = new MemoryRepo();
+  const envelope = internalAgentEnvelope();
+  repo.state.profile.aiRouter = structuredClone(envelope.settings);
+  repo.state.profile.aiRouter.gatewayUrl = 'http://127.0.0.1:9999';
+  repo.state.profile.aiRouterRuntime = structuredClone(envelope.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent', maxOutputTokens: 128 },
+      {
+        agentModelOrchestratorEnvelope: envelope,
+        providerCallBudgetContext: internalAgentBudgetContext(),
+      },
+    ),
+    /Gateway identity drifted before provider invocation/u,
   );
   assert.equal(calls, 0);
 });
