@@ -522,6 +522,52 @@ test('provider-call lifecycle must return a durable reservation before gateway I
   assert.equal(gateway.calls.length, 0);
 });
 
+test('provider budget admission rejection does not poison route health or fail over', async () => {
+  const gateway = new FakeGateway(['must never be consumed']);
+  let admissions = 0;
+  const lifecycle = {
+    async beforeProviderCall() {
+      admissions += 1;
+      const error = new Error('Browser Agent budget admission denied');
+      error.code = 'AI_MODEL_BUDGET_EXHAUSTED';
+      throw error;
+    },
+    async afterProviderCall() { throw new Error('must not settle an unadmitted call'); },
+  };
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    providerCallLifecycle:lifecycle,
+    now:() => 79_750,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings({
+        routes:[
+          { routeId:'a', provider:'openai', model:'route-a', roles:['planner'], priority:20, costClass:'paid', inputPricePerMillionUsd:1, outputPricePerMillionUsd:2 },
+          { routeId:'b', provider:'ollama', model:'route-b', roles:['planner'], priority:10 },
+        ],
+      }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      {
+        taskRole:'planner',
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-0', controlEpoch:1 },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_MODEL_BUDGET_EXHAUSTED');
+      assert.equal(error.modelCallsUsed, 0);
+      assert.deepEqual(error.routeAttempts, []);
+      assert.deepEqual(error.routerRuntime.routeStates, {});
+      return true;
+    },
+  );
+  assert.equal(admissions, 1);
+  assert.equal(gateway.calls.length, 0);
+});
+
 test('provider-call lifecycle durably admits before gateway I/O and settles after exact success', async () => {
   const events = [];
   const gateway = {
