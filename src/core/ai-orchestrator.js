@@ -31,6 +31,7 @@ const MODES = new Set(Object.values(AiRouterMode));
 const PROVIDERS = new Set(Object.values(AiProvider));
 const ESCALATION_MARKER = '[[ESCALATE]]';
 const MAX_HANDOFF_CHARS = 50_000;
+const DEFAULT_ROUTE_QUALITY_EVIDENCE_TIMEOUT_MS = 250;
 
 export const DEFAULT_AI_ROUTER_SETTINGS = Object.freeze({
   enabled: false,
@@ -152,6 +153,23 @@ function requireConfigured(slot, label) {
   if (!slot?.model) throw new Error(`${label} AI model is not selected`);
 }
 
+function resolveRouteQualityEvidenceWithDeadline(resolver, request, timeoutMs) {
+  return new Promise(resolve => {
+    let settled = false;
+    let timer = null;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      if (timer !== null) clearTimeout(timer);
+      resolve(value);
+    };
+    timer = setTimeout(() => finish(null), timeoutMs);
+    Promise.resolve()
+      .then(() => resolver(request))
+      .then(finish, () => finish(null));
+  });
+}
+
 function previousStrongContext(settings, runtime) {
   if (!settings.carryStrongResultToPrimary || !runtime.lastStrongResult) return '';
   return `\n\nCONTEXT FROM THE LAST STRONG-MODEL PASS:\n${runtime.lastStrongResult.slice(0, settings.handoffMaxChars)}`;
@@ -202,7 +220,13 @@ function buildStrongHandoff({ prompt, primaryText, runtime, settings, trigger })
 }
 
 export class AiOrchestrator {
-  constructor({ gatewayClient, now = () => Date.now(), providerCallLifecycle = null, routeQualityEvidenceResolver = null } = {}) {
+  constructor({
+    gatewayClient,
+    now = () => Date.now(),
+    providerCallLifecycle = null,
+    routeQualityEvidenceResolver = null,
+    routeQualityEvidenceTimeoutMs = DEFAULT_ROUTE_QUALITY_EVIDENCE_TIMEOUT_MS,
+  } = {}) {
     if (!gatewayClient) throw new Error('AI Gateway client is required');
     if (providerCallLifecycle != null && (
       typeof providerCallLifecycle !== 'object'
@@ -214,10 +238,17 @@ export class AiOrchestrator {
     if (routeQualityEvidenceResolver != null && typeof routeQualityEvidenceResolver !== 'function') {
       throw new Error('AI route quality evidence resolver must be a function');
     }
+    if (!Number.isSafeInteger(routeQualityEvidenceTimeoutMs)
+        || Object.is(routeQualityEvidenceTimeoutMs, -0)
+        || routeQualityEvidenceTimeoutMs < 1
+        || routeQualityEvidenceTimeoutMs > 5_000) {
+      throw new Error('AI route quality evidence timeout must be a whole number from 1 to 5000 milliseconds');
+    }
     this.gateway = gatewayClient;
     this.now = now;
     this.providerCallLifecycle = providerCallLifecycle;
     this.routeQualityEvidenceResolver = routeQualityEvidenceResolver;
+    this.routeQualityEvidenceTimeoutMs = routeQualityEvidenceTimeoutMs;
   }
 
   async run(rawSettings, rawRuntime, prompt, {
@@ -346,16 +377,15 @@ export class AiOrchestrator {
 
       let candidateRoutes = selected.candidates;
       if (this.routeQualityEvidenceResolver && candidateRoutes.length > 1) {
-        let benchmarkRequests = null;
-        try {
-          benchmarkRequests = await this.routeQualityEvidenceResolver(Object.freeze({
+        const benchmarkRequests = await resolveRouteQualityEvidenceWithDeadline(
+          this.routeQualityEvidenceResolver,
+          Object.freeze({
             routeIds:Object.freeze(candidateRoutes.map(route => route.routeId)),
             role:requestedRole,
             requiresVision,
-          }));
-        } catch (_) {
-          benchmarkRequests = null;
-        }
+          }),
+          this.routeQualityEvidenceTimeoutMs,
+        );
 
         // Evidence resolution may be asynchronous. Canonical Router authority must be
         // refreshed after that wait before an advisory ranking can influence ordering.
