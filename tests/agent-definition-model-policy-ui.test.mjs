@@ -98,6 +98,42 @@ test('Agent definition model policy supports explicit inherit/null and preserves
   assert.equal(cleared.modelRoutePolicy, null);
 });
 
+test('legacy partial Agent policy upgrades to the existing Router failover defaults without changing eligibility intent', () => {
+  const legacy = normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1(baseForm(), {
+    modelRoutePolicy: {
+      autoSwitch: false,
+      allowRouteIds: ['route.saved'],
+      denyRouteIds: [],
+      freeOnly: true,
+      locality: 'local',
+      maxInputPricePerMillionUsd: 0,
+      maxOutputPricePerMillionUsd: 0,
+    },
+  }));
+  assert.equal(legacy.modelRoutePolicy.autoSwitch, false);
+  assert.deepEqual(legacy.modelRoutePolicy.allowRouteIds, ['route.saved']);
+  assert.equal(legacy.modelRoutePolicy.retryBackoffSeconds, 60);
+  assert.equal(legacy.modelRoutePolicy.circuitBreakerFailures, 2);
+  assert.equal(legacy.modelRoutePolicy.circuitBreakerSeconds, 300);
+});
+
+test('explicit global-inherit model policy does not read disabled subordinate fields', () => {
+  let reads = 0;
+  const input = { modelRoutePolicyConfigured: false };
+  Object.defineProperty(input, 'modelRoutePinnedRouteId', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 'route.hidden';
+    },
+  });
+  const policy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
+    persistedPolicy: { autoSwitch: false },
+  });
+  assert.equal(policy, null);
+  assert.equal(reads, 0);
+});
+
 test('Agent definition model policy rejects aliases, duplicate route IDs and invalid Router bounds before mutation', () => {
   assert.throws(
     () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
