@@ -2,6 +2,10 @@ import {
   createAgentModelPolicyBindingV1,
   normalizeAgentModelPolicyBindingV1,
 } from './agent-model-policy-binding.js';
+import {
+  normalizeAgentDefinitionSelectionV1,
+  normalizeAgentModelRoutePolicyV1,
+} from './agent-definition-registry.js';
 
 export const AGENT_DEFINITION_MODEL_POLICY_BINDING_VERSION = 1;
 
@@ -9,6 +13,9 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 const INPUT_KEYS = new Set([
   'materializedAgent',
+  'currentDefinitionSelection',
+  'currentJobId',
+  'currentProjectId',
   'routePool',
   'routePoolRevision',
   'ownerAllowedRouteIds',
@@ -61,6 +68,7 @@ const DURABLE_KEYS = new Set([
   'schedulingAuthority',
   'recoveryAuthority',
   'currentRouterRevalidationRequired',
+  'currentDefinitionRevalidationRequired',
 ]);
 
 function strictRecord(value, allowed, label) {
@@ -177,6 +185,49 @@ function requireMaterializedZeroAuthority(input) {
   }
 }
 
+function sameDefinitionBinding(left, right) {
+  return left.registryId === right.registryId
+    && left.registryRevision === right.registryRevision
+    && left.agentDefinitionId === right.agentDefinitionId
+    && left.definitionRevision === right.definitionRevision;
+}
+
+function canonicalPolicySignature(policy) {
+  return JSON.stringify(policy === null ? null : policy);
+}
+
+function assertCurrentDefinitionProvenance(
+  definitionBinding,
+  routerOverride,
+  currentSelection,
+) {
+  const expectedBinding = {
+    registryId: currentSelection.registryId,
+    registryRevision: currentSelection.registryRevision,
+    agentDefinitionId: currentSelection.agentDefinitionId,
+    definitionRevision: currentSelection.definitionRevision,
+  };
+  if (!sameDefinitionBinding(definitionBinding, expectedBinding)) {
+    throw new Error('Materialized Agent definition binding drifted from current Agent definition selection');
+  }
+
+  const expectedPolicy = currentSelection.definition.modelRoutePolicy;
+  const hasOverride = Object.hasOwn(routerOverride, 'routePolicy');
+  if (expectedPolicy === null) {
+    if (hasOverride) {
+      throw new Error('Materialized Agent routerOverride drifted from current Agent definition modelRoutePolicy');
+    }
+    return;
+  }
+  if (!hasOverride) {
+    throw new Error('Materialized Agent routerOverride is missing current Agent definition modelRoutePolicy');
+  }
+  const actualPolicy = normalizeAgentModelRoutePolicyV1(routerOverride.routePolicy);
+  if (canonicalPolicySignature(actualPolicy) !== canonicalPolicySignature(expectedPolicy)) {
+    throw new Error('Materialized Agent routerOverride drifted from current Agent definition modelRoutePolicy');
+  }
+}
+
 function durableBindingKey(definitionBinding, modelPolicyBinding) {
   return JSON.stringify([
     AGENT_DEFINITION_MODEL_POLICY_BINDING_VERSION,
@@ -193,8 +244,8 @@ function durableBindingKey(definitionBinding, modelPolicyBinding) {
  * canonical per-Agent model policy binding.
  *
  * This envelope is configuration evidence only. Runtime callers must still
- * revalidate the current route-pool revision and route eligibility immediately
- * before provider I/O.
+ * revalidate both the current Agent definition selection and the current
+ * route-pool revision/route eligibility immediately before provider I/O.
  */
 export function normalizeAgentDefinitionModelPolicyBindingV1(input) {
   const raw = strictRecord(
@@ -246,17 +297,21 @@ export function normalizeAgentDefinitionModelPolicyBindingV1(input) {
       own(raw, 'currentRouterRevalidationRequired'),
       'currentRouterRevalidationRequired',
     ),
+    currentDefinitionRevalidationRequired: exactTrue(
+      own(raw, 'currentDefinitionRevalidationRequired'),
+      'currentDefinitionRevalidationRequired',
+    ),
   });
 }
 
 /**
  * Bind a materialized durable Agent definition to AgentModelPolicyBindingV1.
  *
- * Identity and policy provenance are not caller-selectable:
- * - Agent identity comes from materialized config.id;
- * - Project identity comes from materialized config.projectId;
- * - policyRevision is the exact durable definitionRevision;
- * - routePolicy comes only from materialized routerOverride.
+ * Identity and policy provenance are current-owner-bound:
+ * - materialized config.id/projectId must match the owner's current job/project;
+ * - definition identity/revision must match the current AgentDefinitionSelection;
+ * - routePolicy must semantically equal that exact current definition policy;
+ * - policyRevision is the exact current durable definitionRevision.
  *
  * Owner route authority and the current route pool remain explicit trusted
  * runtime inputs. A parent binding, when present, is revalidated by the
@@ -280,12 +335,23 @@ export function createAgentDefinitionModelPolicyBindingV1(input) {
   const definitionBinding = normalizeDefinitionBinding(
     own(materialized, 'definitionBinding'),
   );
+  const currentDefinitionSelection = normalizeAgentDefinitionSelectionV1(
+    own(raw, 'currentDefinitionSelection'),
+  );
   const config = dataRecord(own(materialized, 'config'), 'Materialized Agent config');
   const jobId = requiredId(own(config, 'id'), 'Materialized Agent config.id');
   const projectId = requiredId(
     own(config, 'projectId'),
     'Materialized Agent config.projectId',
   );
+  const currentJobId = requiredId(own(raw, 'currentJobId'), 'currentJobId');
+  const currentProjectId = requiredId(own(raw, 'currentProjectId'), 'currentProjectId');
+  if (jobId !== currentJobId) {
+    throw new Error('Materialized Agent config.id drifted from current job identity');
+  }
+  if (projectId !== currentProjectId) {
+    throw new Error('Materialized Agent config.projectId drifted from current Project identity');
+  }
 
   requireMaterializedZeroAuthority(own(materialized, 'authority'));
   // Scope is not model authority, but require it to cross the same data-only
@@ -296,6 +362,11 @@ export function createAgentDefinitionModelPolicyBindingV1(input) {
     own(materialized, 'routerOverride'),
     ROUTER_OVERRIDE_KEYS,
     'Materialized Agent routerOverride',
+  );
+  assertCurrentDefinitionProvenance(
+    definitionBinding,
+    routerOverride,
+    currentDefinitionSelection,
   );
 
   const modelRequest = {
@@ -331,5 +402,6 @@ export function createAgentDefinitionModelPolicyBindingV1(input) {
     schedulingAuthority: false,
     recoveryAuthority: false,
     currentRouterRevalidationRequired: true,
+    currentDefinitionRevalidationRequired: true,
   });
 }
