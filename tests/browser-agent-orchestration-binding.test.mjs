@@ -1468,10 +1468,10 @@ test('runtime persistence failure rolls back Core scope projection and Browser A
 });
 
 test('scope dispatcher rejects non-lifecycle hierarchy events without mutating canonical state', async () => {
-  const { core, orchestration } = await fixture();
+  const { chrome, orchestration } = await fixture();
   const controller = orchestration.controllerFor('orch-1');
   const runtimeBefore = await controller.runtimeRepository.load();
-  const coreBefore = await core.load();
+  const coreStorageBefore = structuredClone(chrome.data.autopilotState);
 
   await assert.rejects(
     () => controller.dispatchHierarchyScopeEvent({
@@ -1484,7 +1484,11 @@ test('scope dispatcher rejects non-lifecycle hierarchy events without mutating c
   );
 
   assert.deepEqual((await controller.runtimeRepository.load()).hierarchy.state, runtimeBefore.hierarchy.state);
-  assert.deepEqual(await core.load(), coreBefore);
+  assert.deepEqual(
+    chrome.data.autopilotState,
+    coreStorageBefore,
+    'Rejected scope input must not create or mutate durable Core state',
+  );
 });
 
 
