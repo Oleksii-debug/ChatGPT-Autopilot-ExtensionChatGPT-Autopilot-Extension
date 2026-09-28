@@ -287,6 +287,11 @@ export class AiOrchestrator {
         error.modelCallsUsed = callsUsed;
         throw attachFailureRuntime(error);
       }
+      if (providerCallBudgetContext && !this.providerCallLifecycle) {
+        const error = new Error('AI provider-call budget context requires the canonical provider-call lifecycle');
+        error.code = 'AI_PROVIDER_BUDGET_LIFECYCLE_UNAVAILABLE';
+        throw attachFailureRuntime(error);
+      }
       const lifecycle = providerCallBudgetContext ? this.providerCallLifecycle : null;
       const routeIdentity = Object.freeze({
         routeId: clean(route?.routeId),
