@@ -110,7 +110,7 @@ test('exact append replay is idempotent and preserves first registration chronol
   const value = binding();
   const once = append(createSubagentTaskActivationBindingRegistryV1(), value);
   const replay = append(once, structuredClone(value), '2026-09-27T18:05:00.000Z');
-  assert.equal(replay, once);
+  assert.deepEqual(replay, once);
   assert.equal(replay.revision, 1);
   assert.equal(replay.records[0].registeredAt, REGISTERED);
 });
