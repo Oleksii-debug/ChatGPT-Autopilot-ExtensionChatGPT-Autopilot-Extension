@@ -371,6 +371,61 @@ test('exact replay is registry-idempotent and does not duplicate trusted benchma
   assert.equal(saved.profile.aiRouteQualityEvidenceRegistry.records.length, 1);
 });
 
+test('trusted resolver bytes are snapshotted before waiting behind the serialized Core update queue', async () => {
+  const routeValue = route();
+  const binding = await trustedBinding(routeValue, 'snapshot');
+  const backing = await repositoryWithRoute(routeValue);
+  const repository = {
+    async update(mutator) {
+      binding.evaluationRequest.run.results[0].metrics.score = 0;
+      binding.evaluationRequest.trustedExecution.results[0].metrics.score = 0;
+      return backing.update(mutator);
+    },
+  };
+  const admit = createAiRouteQualityCoreEvidenceAdmissionV1({
+    repository,
+    resolveTrustedBenchmarkRequest: async () => binding,
+  });
+
+  const receipt = await admit({ routeId: 'route-a', runId: 'run-route-a-snapshot' });
+  assert.equal(receipt.status, 'PASS');
+  const saved = await backing.load();
+  assert.equal(saved.profile.aiRouteQualityEvidenceRegistry.records[0].status, 'PASS');
+  assert.equal(
+    saved.profile.aiRouteQualityEvidenceRegistry.records[0]
+      .evaluationRequest.run.results[0].metrics.score,
+    1,
+  );
+});
+
+test('concurrent trusted admissions reuse the canonical StorageRepository serialization queue', async () => {
+  const routeValue = route();
+  const repo = await repositoryWithRoute(routeValue);
+  const bindings = new Map([
+    ['run-route-a-one', await trustedBinding(routeValue, 'one')],
+    ['run-route-a-two', await trustedBinding(routeValue, 'two')],
+  ]);
+  const admit = createAiRouteQualityCoreEvidenceAdmissionV1({
+    repository: repo,
+    resolveTrustedBenchmarkRequest: async ({ runId }) => structuredClone(bindings.get(runId)),
+  });
+
+  const receipts = await Promise.all([
+    admit({ routeId: 'route-a', runId: 'run-route-a-one' }),
+    admit({ routeId: 'route-a', runId: 'run-route-a-two' }),
+  ]);
+  assert.deepEqual(
+    receipts.map(item => item.runId).sort(),
+    ['run-route-a-one', 'run-route-a-two'],
+  );
+  const saved = await repo.load();
+  assert.equal(saved.profile.aiRouteQualityEvidenceRegistry.revision, 2);
+  assert.deepEqual(
+    saved.profile.aiRouteQualityEvidenceRegistry.records.map(item => item.runId).sort(),
+    ['run-route-a-one', 'run-route-a-two'],
+  );
+});
+
 test('authority is explicit: one canonical append mutation, zero benchmark execution/router/provider/policy power', async () => {
   const repo = await repositoryWithRoute();
   const binding = await trustedBinding(route());
