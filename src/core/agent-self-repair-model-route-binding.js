@@ -229,6 +229,9 @@ export function createBoundAgentSelfRepairModelDispatchV1(input) {
     DISPATCH_INPUT_KEYS,
     'Bound Agent self-repair model dispatch request',
   );
+  if (!Object.hasOwn(raw, 'now')) {
+    throw new Error('Agent self-repair model dispatch requires explicit now');
+  }
 
   const candidateInput = Object.create(null);
   for (const key of INPUT_KEYS) {
@@ -267,8 +270,15 @@ export function createBoundAgentSelfRepairModelDispatchV1(input) {
   }
 
   const dispatchIntent = createBoundAgentModelRouteDispatchIntentV1(dispatchInput);
+  const capabilityIdsMatch = dispatchIntent.capabilityIds.length
+      === boundCandidates.routeIntent.capabilityIds.length
+    && dispatchIntent.capabilityIds.every(
+      (capabilityId, index) => capabilityId === boundCandidates.routeIntent.capabilityIds[index],
+    );
   if (dispatchIntent.role !== boundCandidates.routeIntent.role
-      || dispatchIntent.requiresVision !== boundCandidates.routeIntent.requiresVision) {
+      || dispatchIntent.requiresVision !== boundCandidates.routeIntent.requiresVision
+      || !capabilityIdsMatch
+      || dispatchIntent.preparedAt !== own(raw, 'now')) {
     throw new Error('Agent self-repair dispatch intent drifted from durable route intent');
   }
 
