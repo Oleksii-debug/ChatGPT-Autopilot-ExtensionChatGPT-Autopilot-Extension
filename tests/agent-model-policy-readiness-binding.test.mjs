@@ -206,6 +206,7 @@ function childReadinessRequest(overrides = {}) {
     definitionModelPolicyBinding: binding,
     currentDefinitionModelPolicyBindingKey: binding.bindingKey,
     currentParentModelPolicyBinding: parentBinding,
+    currentParentModelPolicyBindingKey: parentBinding.bindingKey,
     ...overrides,
   });
 }
@@ -244,7 +245,14 @@ test('child readiness requires current parent authority and rejects parent ident
   delete missing.currentParentModelPolicyBinding;
   assert.throws(
     () => inspectBoundAgentModelPolicyReadinessV1(missing),
-    /child binding requires the current parent model policy binding/u,
+    /requires current parent model-policy provenance/u,
+  );
+
+  const missingKey = { ...request };
+  delete missingKey.currentParentModelPolicyBindingKey;
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(missingKey),
+    /requires current parent model-policy provenance/u,
   );
 
   assert.throws(
@@ -252,16 +260,36 @@ test('child readiness requires current parent authority and rejects parent ident
       currentParentModelPolicyBinding: parentModelPolicyBinding({
         agentId: 'agent.other-parent',
       }),
+      currentParentModelPolicyBindingKey: parentModelPolicyBinding({
+        agentId: 'agent.other-parent',
+      }).bindingKey,
     })),
     /parent model policy identity is stale/u,
   );
 
+  const alternateParent = parentModelPolicyBinding({
+    routePolicy: {
+      allowRouteIds: ['route.a', 'route.b'],
+      locality: 'remote',
+    },
+  });
   assert.throws(
     () => inspectBoundAgentModelPolicyReadinessV1(childReadinessRequest({
-      currentParentModelPolicyBinding: parentModelPolicyBinding({
-        routePoolRevision: 10,
-      }),
+      currentParentModelPolicyBinding: alternateParent,
     })),
+    /parent binding is not the current owner binding/u,
+  );
+
+  assert.throws(
+    () => {
+      const staleParent = parentModelPolicyBinding({
+        routePoolRevision: 10,
+      });
+      return inspectBoundAgentModelPolicyReadinessV1(childReadinessRequest({
+        currentParentModelPolicyBinding: staleParent,
+        currentParentModelPolicyBindingKey: staleParent.bindingKey,
+      }));
+    },
     /parent route-pool revision is stale/u,
   );
 });
@@ -287,10 +315,14 @@ test('same-revision child definition policy drift cannot reuse a binding under t
 
 test('root readiness rejects a parent binding alias', () => {
   assert.throws(
-    () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
-      currentParentModelPolicyBinding: parentModelPolicyBinding(),
-    })),
-    /Root Agent model readiness must not supply a parent model policy binding/u,
+    () => {
+      const parentBinding = parentModelPolicyBinding();
+      return inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+        currentParentModelPolicyBinding: parentBinding,
+        currentParentModelPolicyBindingKey: parentBinding.bindingKey,
+      }));
+    },
+    /Root Agent model readiness must not supply parent model-policy provenance/u,
   );
 });
 
