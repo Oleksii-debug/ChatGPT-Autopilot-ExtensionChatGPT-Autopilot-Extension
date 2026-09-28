@@ -9,6 +9,9 @@ import {
   createAgentDefinitionModelPolicyBindingV1,
 } from '../src/core/agent-definition-model-policy-binding.js';
 import {
+  createAgentModelPolicyBindingV1,
+} from '../src/core/agent-model-policy-binding.js';
+import {
   AGENT_MODEL_POLICY_READINESS_BINDING_AUTHORITY,
   inspectBoundAgentModelPolicyReadinessV1,
 } from '../src/core/agent-model-policy-readiness-binding.js';
@@ -145,6 +148,37 @@ function definitionBinding(overrides = {}) {
   });
 }
 
+function parentModelPolicyBinding(overrides = {}) {
+  return createAgentModelPolicyBindingV1({
+    projectId: 'project.alpha',
+    agentId: 'agent.parent',
+    policyRevision: 3,
+    routePoolRevision: 9,
+    routePool: pool(),
+    ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    routePolicy: {
+      allowRouteIds: ['route.a', 'route.b', 'route.c'],
+      locality: 'remote',
+    },
+    ...overrides,
+  });
+}
+
+function childDefinitionBinding(parentBinding = parentModelPolicyBinding(), overrides = {}) {
+  const mat = materialized();
+  return createAgentDefinitionModelPolicyBindingV1({
+    materializedAgent: mat,
+    currentDefinitionSelection: selection(),
+    currentJobId: mat.config.id,
+    currentProjectId: mat.config.projectId,
+    routePool: pool(),
+    routePoolRevision: 9,
+    ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    parentBinding,
+    ...overrides,
+  });
+}
+
 function readinessRequest(overrides = {}) {
   const binding = definitionBinding();
   return {
@@ -163,6 +197,17 @@ function readinessRequest(overrides = {}) {
     now: 1_790_620_000_000,
     ...overrides,
   };
+}
+
+function childReadinessRequest(overrides = {}) {
+  const parentBinding = parentModelPolicyBinding();
+  const binding = childDefinitionBinding(parentBinding);
+  return readinessRequest({
+    definitionModelPolicyBinding: binding,
+    currentDefinitionModelPolicyBindingKey: binding.bindingKey,
+    currentParentModelPolicyBinding: parentBinding,
+    ...overrides,
+  });
 }
 
 test('readiness is evaluated only inside the exact current durable Agent model-policy scope', () => {
@@ -184,6 +229,69 @@ test('readiness is evaluated only inside the exact current durable Agent model-p
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.effectiveRouteIds), true);
   assert.equal(Object.isFrozen(result.readiness), true);
+});
+
+test('child readiness is reconstructed through the exact current parent model-policy binding', () => {
+  const result = inspectBoundAgentModelPolicyReadinessV1(childReadinessRequest());
+  assert.equal(result.readiness.state, AgentRouteReadinessState.READY);
+  assert.deepEqual(result.effectiveRouteIds, ['route.a', 'route.b']);
+  assert.equal(result.definitionRevision, 4);
+});
+
+test('child readiness requires current parent authority and rejects parent identity or revision drift', () => {
+  const request = childReadinessRequest();
+  const missing = { ...request };
+  delete missing.currentParentModelPolicyBinding;
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(missing),
+    /child binding requires the current parent model policy binding/u,
+  );
+
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(childReadinessRequest({
+      currentParentModelPolicyBinding: parentModelPolicyBinding({
+        agentId: 'agent.other-parent',
+      }),
+    })),
+    /parent model policy identity is stale/u,
+  );
+
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(childReadinessRequest({
+      currentParentModelPolicyBinding: parentModelPolicyBinding({
+        routePoolRevision: 10,
+      }),
+    })),
+    /parent route-pool revision is stale/u,
+  );
+});
+
+test('same-revision child definition policy drift cannot reuse a binding under the current parent', () => {
+  const current = selection();
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(childReadinessRequest({
+      currentDefinitionSelection: {
+        ...current,
+        definition: {
+          ...current.definition,
+          modelRoutePolicy: {
+            ...current.definition.modelRoutePolicy,
+            orderedRouteIds: ['route.a', 'route.b'],
+          },
+        },
+      },
+    })),
+    /child model policy drifted from the current parent\/definition authority/u,
+  );
+});
+
+test('root readiness rejects a parent binding alias', () => {
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+      currentParentModelPolicyBinding: parentModelPolicyBinding(),
+    })),
+    /Root Agent model readiness must not supply a parent model policy binding/u,
+  );
 });
 
 test('same-definition-revision alternate durable binding cannot replace the owner-current binding', () => {
