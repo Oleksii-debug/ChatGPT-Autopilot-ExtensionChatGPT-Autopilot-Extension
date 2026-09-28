@@ -3,6 +3,9 @@ import {
   normalizeObservationV1,
 } from './universal-agent-contracts.js';
 import {
+  prepareBoundAgentSelfRepairModelInvocationV1,
+} from './agent-self-repair-model-invocation.js';
+import {
   projectAgentSelfRepairProviderReceiptV1,
 } from './agent-self-repair-provider-receipt.js';
 
@@ -225,11 +228,13 @@ export function projectAgentSelfRepairModelObservationV1(input) {
     'Agent self-repair model observation request',
   );
 
+  const prepared = prepareBoundAgentSelfRepairModelInvocationV1(
+    raw.invocationRequest,
+  );
   const providerReceipt = projectAgentSelfRepairProviderReceiptV1({
     invocationRequest: raw.invocationRequest,
     trustedReservation: raw.trustedProviderReservation,
   });
-  const prepared = providerReceipt;
   const observationId = exactText(
     raw.observationId,
     'observationId',
