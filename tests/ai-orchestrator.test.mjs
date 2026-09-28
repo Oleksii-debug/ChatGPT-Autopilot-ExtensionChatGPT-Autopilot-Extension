@@ -490,6 +490,38 @@ test('provider-call budget context fails closed before gateway I/O when lifecycl
   assert.equal(gateway.calls.length, 0);
 });
 
+test('provider-call lifecycle must return a durable reservation before gateway I/O', async () => {
+  const gateway = new FakeGateway(['must never be consumed']);
+  const lifecycle = {
+    async beforeProviderCall() { return null; },
+    async afterProviderCall() { throw new Error('must not settle an unadmitted call'); },
+  };
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    providerCallLifecycle:lifecycle,
+    now:() => 79_500,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings({ primary:{ provider:'ollama', model:'qwen:8b' } }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-0', controlEpoch:1 },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_RESERVATION_MISSING');
+      assert.match(error.message, /did not admit a durable budget reservation/u);
+      assert.equal(error.modelCallsUsed, 0);
+      return true;
+    },
+  );
+  assert.equal(gateway.calls.length, 0);
+});
+
 test('provider-call lifecycle durably admits before gateway I/O and settles after exact success', async () => {
   const events = [];
   const gateway = {
