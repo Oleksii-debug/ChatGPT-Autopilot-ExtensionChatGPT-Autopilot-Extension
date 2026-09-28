@@ -11,6 +11,7 @@ const REQUEST_KEYS = new Set([
   'childAuthorityEnvelope',
   'childModelPolicyBinding',
   'routes',
+  'currentAgentModelPolicyBindingKey',
   'currentAgentModelPolicyRevision',
   'currentRoutePoolRevision',
   'taskModelCapabilityIds',
@@ -54,6 +55,16 @@ function revision(value, label) {
       || !Number.isSafeInteger(value)
       || Object.is(value, -0)
       || value < 1) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function exactBindingKey(value, label) {
+  if (typeof value !== 'string'
+      || !value
+      || value.length > 32_000
+      || value !== value.trim()) {
     throw new Error(label + ' is invalid');
   }
   return value;
@@ -113,7 +124,7 @@ function deny(scope, binding, reasonCode, details = {}) {
  * selector instead of accepting caller-shaped parent/owner policy authorities.
  *
  * This remains an advisory pure boundary. The runtime owner must supply the
- * current trusted Agent model-policy revision + route-pool revision and re-run the canonical Router against
+ * current trusted Agent model-policy binding key + revision + route-pool revision and re-run the canonical Router against
  * current route state immediately before provider I/O.
  */
 export function deriveSubagentModelRouteScopeFromAgentBindingV1(input = {}) {
@@ -128,6 +139,14 @@ export function deriveSubagentModelRouteScopeFromAgentBindingV1(input = {}) {
       'childModelPolicyBinding',
       'SubagentModelPolicyScopeBindingRequestV1',
     ),
+  );
+  const currentAgentModelPolicyBindingKey = exactBindingKey(
+    own(
+      request,
+      'currentAgentModelPolicyBindingKey',
+      'SubagentModelPolicyScopeBindingRequestV1',
+    ),
+    'currentAgentModelPolicyBindingKey',
   );
   const currentAgentModelPolicyRevision = revision(
     own(
@@ -181,6 +200,10 @@ export function deriveSubagentModelRouteScopeFromAgentBindingV1(input = {}) {
       || scope.childAgentId !== binding.agentId
       || scope.parentAgentId !== binding.parentAgentId) {
     return deny(scope, binding, 'MODEL_POLICY_BINDING_IDENTITY_MISMATCH');
+  }
+
+  if (currentAgentModelPolicyBindingKey !== binding.bindingKey) {
+    return deny(scope, binding, 'MODEL_POLICY_BINDING_KEY_MISMATCH');
   }
 
   if (currentAgentModelPolicyRevision !== binding.policyRevision) {

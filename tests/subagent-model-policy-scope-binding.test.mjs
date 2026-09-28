@@ -129,6 +129,7 @@ function request(overrides = {}) {
     childAuthorityEnvelope: childAuthority(),
     childModelPolicyBinding: child,
     routes,
+    currentAgentModelPolicyBindingKey: child.bindingKey,
     currentAgentModelPolicyRevision: child.policyRevision,
     currentRoutePoolRevision: 7,
     taskModelCapabilityIds: ['model.code'],
@@ -215,6 +216,44 @@ test('durable model policy binding must match exact child authority identity', (
   assert.equal(value.reasonCode, 'MODEL_POLICY_BINDING_IDENTITY_MISMATCH');
   assert.deepEqual(value.admittedRouteIds, []);
   assert.deepEqual(value.routeBindings, []);
+});
+
+test('current owner binding key rejects same-revision self-consistent policy substitution', () => {
+  const { routes, parent } = bindings();
+  const substituted = createAgentModelPolicyBindingV1({
+    projectId: 'project.alpha',
+    agentId: 'agent.child',
+    policyRevision: 2,
+    routePoolRevision: 7,
+    routePool: routes,
+    ownerAllowedRouteIds: routes.map(item => item.routeId),
+    parentBinding: parent,
+    routePolicy: {
+      allowRouteIds: ['route.remote.expensive', 'route.vision'],
+      locality: 'remote',
+    },
+  });
+
+  const value = deriveSubagentModelRouteScopeFromAgentBindingV1(request({
+    childModelPolicyBinding: substituted,
+    currentAgentModelPolicyRevision: substituted.policyRevision,
+  }));
+
+  assert.equal(value.decision, 'DENY');
+  assert.equal(value.reasonCode, 'MODEL_POLICY_BINDING_KEY_MISMATCH');
+  assert.deepEqual(value.admittedRouteIds, []);
+  assert.deepEqual(value.routeBindings, []);
+});
+
+test('current owner binding key is an exact required boundary value', () => {
+  for (const value of [null, false, '', ' stale-key ']) {
+    assert.throws(
+      () => deriveSubagentModelRouteScopeFromAgentBindingV1(request({
+        currentAgentModelPolicyBindingKey: value,
+      })),
+      /currentAgentModelPolicyBindingKey is invalid/u,
+    );
+  }
 });
 
 test('current owner Agent policy revision must exactly match durable child binding revision', () => {
