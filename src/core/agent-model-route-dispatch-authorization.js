@@ -72,6 +72,32 @@ function own(record, key) {
   return Object.hasOwn(record, key) ? record[key] : undefined;
 }
 
+function exactCapabilityIds(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 64) {
+    throw new Error('Agent model dispatch capabilityIds must be a bounded array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const expected = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
+  if (Reflect.ownKeys(descriptors).some(key => typeof key !== 'string' || !expected.has(key))) {
+    throw new Error('Agent model dispatch capabilityIds must be a dense data-only array');
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    const item = descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+    if (!descriptor || descriptor.enumerable !== true
+        || typeof item !== 'string' || item !== item.trim()
+        || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(item)) {
+      throw new Error('Agent model dispatch capabilityIds contains an invalid value');
+    }
+    out.push(item);
+  }
+  if (new Set(out).size !== out.length) {
+    throw new Error('Agent model dispatch capabilityIds contains duplicates');
+  }
+  return Object.freeze(out);
+}
+
 function exactNow(value) {
   if (typeof value !== 'number'
       || !Number.isSafeInteger(value)
@@ -99,7 +125,7 @@ function makeCandidateRequest(raw, now) {
     routes: own(raw, 'routes'),
     routeStates: own(raw, 'routeStates') ?? {},
     role: own(raw, 'role') ?? AiRouteRole.PLANNER,
-    capabilityIds: own(raw, 'capabilityIds') ?? [],
+    capabilityIds,
     requiresVision: own(raw, 'requiresVision') ?? false,
     now,
   };
@@ -128,6 +154,7 @@ function authorizationKey({
   routerEligibleRouteIds,
   routerAvailableRouteIds,
   selectedRoute,
+  capabilityIds,
   now,
 }) {
   return JSON.stringify([
@@ -150,6 +177,7 @@ function authorizationKey({
     routerEligibleRouteIds,
     routerAvailableRouteIds,
     selectedRoute,
+    capabilityIds,
     now,
   ]);
 }
@@ -176,6 +204,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
     throw new Error('Bound Agent model route dispatch requires explicit now');
   }
   const now = exactNow(own(raw, 'now'));
+  const capabilityIds = exactCapabilityIds(own(raw, 'capabilityIds') ?? []);
 
   const routes = normalizeAiRoutePool(own(raw, 'routes'));
   const routerPolicy = normalizeAiRoutePolicy(own(raw, 'currentRouterPolicy'));
@@ -187,7 +216,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
     policy: routerPolicy,
     routeStates: own(raw, 'routeStates') ?? {},
     role: bound.role,
-    capabilityIds: own(raw, 'capabilityIds') ?? [],
+    capabilityIds,
     requiresVision: bound.requiresVision,
     now,
   });
@@ -209,6 +238,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
     routerEligibleRouteIds: [...routerRanked.eligibleRouteIds],
     routerAvailableRouteIds,
     selectedRoute,
+    capabilityIds,
     now,
   });
 
@@ -228,6 +258,7 @@ export function authorizeBoundAgentModelRouteDispatchV1(input) {
     } : {}),
     routePoolRevision: bound.routePoolRevision,
     role: bound.role,
+    capabilityIds: [...capabilityIds],
     requiresVision: bound.requiresVision,
     boundEligibleRouteIds: [...bound.eligibleRouteIds],
     boundAvailableRouteIds: [...bound.availableRouteIds],
