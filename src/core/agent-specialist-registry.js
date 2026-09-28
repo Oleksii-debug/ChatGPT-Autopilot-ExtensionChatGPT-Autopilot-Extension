@@ -1,3 +1,5 @@
+import { assertSpecialistHandoffScopedV1 } from './universal-agent-contracts.js';
+
 const VERSION = 1;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_SPECIALISTS = 256;
@@ -22,6 +24,13 @@ const SELECT_KEYS = new Set([
   'registry',
   'taskKind',
   'requiredCapabilityIds',
+  'allowedSpecialistIds',
+  'allowedProviderIds',
+]);
+const HANDOFF_BIND_KEYS = new Set([
+  'registry',
+  'expectedRegistryRevision',
+  'handoff',
   'allowedSpecialistIds',
   'allowedProviderIds',
 ]);
@@ -222,6 +231,15 @@ function optionalIdFilter(value, label) {
   return canonicalIdList(value, label, MAX_SPECIALISTS);
 }
 
+function ensureAllowed(definition, allowedSpecialistIds, allowedProviderIds) {
+  if (allowedSpecialistIds && !allowedSpecialistIds.includes(definition.specialistId)) {
+    fail('SPECIALIST_NOT_ALLOWED');
+  }
+  if (allowedProviderIds && !allowedProviderIds.includes(definition.providerId)) {
+    fail('SPECIALIST_PROVIDER_NOT_ALLOWED');
+  }
+}
+
 export function selectSpecialistCandidatesV1(input) {
   const raw = plain(input, 'SPECIALIST_SELECTION');
   exactKeys(raw, SELECT_KEYS, 'SPECIALIST_SELECTION');
@@ -276,5 +294,58 @@ export function selectSpecialistCandidatesV1(input) {
     requiresCanonicalSpecialistHandoff: true,
     requiresCurrentPolicyRevalidation: true,
     requiresCurrentBudgetRevalidation: true,
+  });
+}
+
+export function bindSpecialistHandoffToRegistryV1(input) {
+  const raw = plain(input, 'SPECIALIST_HANDOFF_BINDING');
+  exactKeys(raw, HANDOFF_BIND_KEYS, 'SPECIALIST_HANDOFF_BINDING');
+  const registry = normalizeSpecialistRegistryV1(raw.registry);
+  const expectedRegistryRevision = boundedInteger(
+    raw.expectedRegistryRevision,
+    'SPECIALIST_HANDOFF_EXPECTED_REGISTRY_REVISION',
+    0,
+    Number.MAX_SAFE_INTEGER,
+  );
+  if (expectedRegistryRevision !== registry.revision) fail('SPECIALIST_HANDOFF_REGISTRY_REVISION_CONFLICT');
+
+  const handoffRaw = plain(raw.handoff, 'SPECIALIST_HANDOFF_INPUT');
+  const requestedSpecialistId = canonicalId(handoffRaw.specialistId, 'SPECIALIST_HANDOFF_SPECIALIST_ID');
+  const definition = registry.specialists.find((item) => item.specialistId === requestedSpecialistId);
+  if (!definition) fail('SPECIALIST_HANDOFF_SPECIALIST_NOT_FOUND');
+  if (!definition.enabled) fail('SPECIALIST_HANDOFF_SPECIALIST_DISABLED');
+
+  const allowedSpecialistIds = optionalIdFilter(raw.allowedSpecialistIds, 'SPECIALIST_HANDOFF_ALLOWED_SPECIALIST_IDS');
+  const allowedProviderIds = optionalIdFilter(raw.allowedProviderIds, 'SPECIALIST_HANDOFF_ALLOWED_PROVIDER_IDS');
+  ensureAllowed(definition, allowedSpecialistIds, allowedProviderIds);
+
+  const handoff = assertSpecialistHandoffScopedV1(raw.handoff, definition.capabilityIds);
+  if (handoff.specialistId !== definition.specialistId) fail('SPECIALIST_HANDOFF_SPECIALIST_ID_MISMATCH');
+
+  return freeze({
+    schemaVersion: VERSION,
+    registryRevision: registry.revision,
+    handoffId: handoff.handoffId,
+    specialistId: definition.specialistId,
+    providerId: definition.providerId,
+    requestedCapabilityIds: handoff.requestedCapabilityIds,
+    maxModelCalls: handoff.maxModelCalls,
+    maxRuntimeSeconds: handoff.maxRuntimeSeconds,
+    maxCostUsdMicros: handoff.maxCostUsdMicros,
+    advisoryOnly: true,
+    canonicalSpecialistHandoffValidated: true,
+    specialistSelectionAuthorized: false,
+    handoffAuthorized: false,
+    executionAuthorized: false,
+    providerCallAuthorized: false,
+    credentialUseAuthorized: false,
+    policyDecisionGranted: false,
+    persistenceAuthorized: false,
+    schedulingAuthorized: false,
+    completionAuthorized: false,
+    verificationAuthorized: false,
+    requiresCurrentPolicyRevalidation: true,
+    requiresCurrentBudgetRevalidation: true,
+    requiresCurrentCredentialScopeRevalidation: true,
   });
 }
