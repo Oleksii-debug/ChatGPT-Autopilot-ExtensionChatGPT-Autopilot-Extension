@@ -305,7 +305,7 @@
 
           <fieldset class="settings-group" id="agent-definition-model-route-policy-group">
             <legend>Model Router policy для цієї definition</legend>
-            <label><input id="agent-definition-model-route-policy-configured" type="checkbox">Зберігати окрему Router policy для цієї Agent definition</label>
+            <label><input id="agent-definition-model-route-policy-configured" type="checkbox" aria-describedby="agent-definition-model-route-policy-help">Зберігати окрему Router policy для цієї Agent definition</label>
             <p id="agent-definition-model-route-policy-help">Якщо вимкнено, Agent успадковує глобальну Router policy. Збереження policy не вибирає модель, не запускає provider і не запускає Agent; runtime повторно перевіряє поточний Router перед model I/O.</p>
             <label><input id="agent-definition-model-route-auto-switch" type="checkbox" checked>Дозволити автоматичний failover між допустимими routes</label>
             <label for="agent-definition-model-route-pinned-id">Pinned route ID — необов’язково</label>
