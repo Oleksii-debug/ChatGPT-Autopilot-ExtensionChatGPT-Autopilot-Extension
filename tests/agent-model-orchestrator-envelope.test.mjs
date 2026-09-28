@@ -275,3 +275,23 @@ test('dispatch capability envelope rejects accessor and duplicate provenance', (
   );
   assert.equal(reads,0);
 });
+
+
+test('single-route envelope projects manual worker policy without leaking other routes', () => {
+  const current=settings();
+  current.workerPolicy={
+    allocationMode:'manual',
+    minWorkers:1,
+    maxParallelWorkers:4,
+    manualRouteWorkers:{
+      'route.a':2,
+      'route.b':1,
+      'route.c':1,
+    },
+  };
+  const result=createBoundAgentModelOrchestratorEnvelopeV1(request({
+    currentRouterSettings:current,
+  }));
+  assert.equal(result.settings.workerPolicy.allocationMode,'manual');
+  assert.deepEqual(result.settings.workerPolicy.manualRouteWorkers,{'route.b':1});
+});
