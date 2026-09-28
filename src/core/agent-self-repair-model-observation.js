@@ -57,6 +57,12 @@ const LEG_KEYS = new Set([
   'usage',
 ]);
 
+const LEG_USAGE_KEYS = new Set([
+  'inputTokens',
+  'outputTokens',
+  'totalTokens',
+]);
+
 const USAGE_KEYS = new Set([
   'inputTokens',
   'outputTokens',
@@ -238,6 +244,17 @@ function normalizeUsage(value) {
   return Object.freeze({ inputTokens, outputTokens, totalTokens, modelCalls });
 }
 
+function normalizeLegUsage(value, label) {
+  const raw = strictRecord(value, LEG_USAGE_KEYS, label);
+  const inputTokens = safeCounter(raw.inputTokens, label + '.inputTokens');
+  const outputTokens = safeCounter(raw.outputTokens, label + '.outputTokens');
+  const totalTokens = safeCounter(raw.totalTokens, label + '.totalTokens');
+  if (totalTokens < inputTokens + outputTokens) {
+    throw new Error(label + ' totalTokens is inconsistent');
+  }
+  return Object.freeze({ inputTokens, outputTokens, totalTokens });
+}
+
 function normalizeResultLeg(value, label) {
   if (value === null) return null;
   const raw = strictRecord(value, LEG_KEYS, label);
@@ -246,6 +263,7 @@ function normalizeResultLeg(value, label) {
     model: exactText(raw.model, label + '.model', { maxLength: 500 }),
     routeId: exactText(raw.routeId, label + '.routeId', { maxLength: 180 }),
     text: modelOutputText(raw.text),
+    usage: raw.usage === null ? null : normalizeLegUsage(raw.usage, label + '.usage'),
   });
 }
 
@@ -296,6 +314,12 @@ function normalizeSuccessfulModelResult(value, envelope) {
   }
   if (selectedLeg.text !== text) {
     throw new Error('Agent self-repair model result text disagrees with the selected route result');
+  }
+  if (!selectedLeg.usage
+      || selectedLeg.usage.inputTokens !== usage.inputTokens
+      || selectedLeg.usage.outputTokens !== usage.outputTokens
+      || selectedLeg.usage.totalTokens !== usage.totalTokens) {
+    throw new Error('Agent self-repair model result usage disagrees with the selected route result');
   }
 
   return Object.freeze({
