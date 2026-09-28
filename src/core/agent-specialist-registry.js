@@ -7,7 +7,7 @@ const MAX_CAPABILITIES = 64;
 const MAX_TASK_KINDS = 64;
 const MAX_LABEL_LENGTH = 512;
 
-const REGISTRY_KEYS = new Set(['schemaVersion', 'revision', 'specialists']);
+const REGISTRY_KEYS = new Set(['schemaVersion', 'revision', 'bindingKey', 'specialists']);
 const DEFINITION_KEYS = new Set([
   'schemaVersion',
   'specialistId',
@@ -19,7 +19,7 @@ const DEFINITION_KEYS = new Set([
   'capabilityIds',
   'taskKinds',
 ]);
-const PUT_KEYS = new Set(['registry', 'expectedRevision', 'definition']);
+const PUT_KEYS = new Set(['registry', 'expectedRevision', 'expectedBindingKey', 'definition']);
 const SELECT_KEYS = new Set([
   'registry',
   'taskKind',
@@ -30,6 +30,7 @@ const SELECT_KEYS = new Set([
 const HANDOFF_BIND_KEYS = new Set([
   'registry',
   'expectedRegistryRevision',
+  'expectedRegistryBindingKey',
   'handoff',
   'allowedSpecialistIds',
   'allowedProviderIds',
@@ -70,6 +71,11 @@ function schemaVersion(value, label) {
 function canonicalId(value, label) {
   if (typeof value !== 'string') fail(`${label}_INVALID`);
   if (value !== value.trim() || !ID.test(value)) fail(`${label}_INVALID`);
+  return value;
+}
+
+function exactBindingKey(value, label) {
+  if (typeof value !== 'string' || !value.length) fail(`${label}_INVALID`);
   return value;
 }
 
@@ -169,12 +175,44 @@ function normalizeDefinition(value) {
   return freeze(definition);
 }
 
+function definitionProjection(definition) {
+  return [
+    definition.schemaVersion,
+    definition.specialistId,
+    definition.providerId,
+    definition.label,
+    definition.enabled,
+    definition.priority,
+    definition.maxConcurrentAssignments,
+    definition.capabilityIds,
+    definition.taskKinds,
+  ];
+}
+
+function registryBindingKey(revision, specialists) {
+  return JSON.stringify([
+    VERSION,
+    revision,
+    specialists.map(definitionProjection),
+  ]);
+}
+
+function registrySnapshot(revision, specialists) {
+  const bindingKey = registryBindingKey(revision, specialists);
+  return freeze({
+    schemaVersion: VERSION,
+    revision,
+    bindingKey,
+    specialists,
+  });
+}
+
 function sameDefinition(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return JSON.stringify(definitionProjection(left)) === JSON.stringify(definitionProjection(right));
 }
 
 export function createEmptySpecialistRegistryV1() {
-  return freeze({ schemaVersion: VERSION, revision: 0, specialists: [] });
+  return registrySnapshot(0, []);
 }
 
 export function normalizeSpecialistDefinitionV1(value) {
@@ -193,11 +231,12 @@ export function normalizeSpecialistRegistryV1(value) {
     seen.add(definition.specialistId);
   }
   specialists.sort((a, b) => compareText(a.specialistId, b.specialistId));
-  return freeze({
-    schemaVersion: schemaVersion(raw.schemaVersion, 'SPECIALIST_REGISTRY'),
-    revision,
-    specialists,
-  });
+  schemaVersion(raw.schemaVersion, 'SPECIALIST_REGISTRY');
+  const expectedBindingKey = registryBindingKey(revision, specialists);
+  if (exactBindingKey(raw.bindingKey, 'SPECIALIST_REGISTRY_BINDING_KEY') !== expectedBindingKey) {
+    fail('SPECIALIST_REGISTRY_BINDING_KEY_INCONSISTENT');
+  }
+  return registrySnapshot(revision, specialists);
 }
 
 export function putSpecialistDefinitionV1(input) {
@@ -211,6 +250,8 @@ export function putSpecialistDefinitionV1(input) {
     Number.MAX_SAFE_INTEGER,
   );
   if (expectedRevision !== registry.revision) fail('SPECIALIST_REGISTRY_REVISION_CONFLICT');
+  const expectedBindingKey = exactBindingKey(raw.expectedBindingKey, 'SPECIALIST_EXPECTED_BINDING_KEY');
+  if (expectedBindingKey !== registry.bindingKey) fail('SPECIALIST_REGISTRY_BINDING_KEY_CONFLICT');
   const definition = normalizeDefinition(raw.definition);
   const existing = registry.specialists.find((item) => item.specialistId === definition.specialistId);
   if (existing && sameDefinition(existing, definition)) return registry;
@@ -219,11 +260,7 @@ export function putSpecialistDefinitionV1(input) {
   const specialists = registry.specialists.filter((item) => item.specialistId !== definition.specialistId);
   specialists.push(definition);
   specialists.sort((a, b) => compareText(a.specialistId, b.specialistId));
-  return freeze({
-    schemaVersion: VERSION,
-    revision: registry.revision + 1,
-    specialists,
-  });
+  return registrySnapshot(registry.revision + 1, specialists);
 }
 
 function optionalIdFilter(value, label) {
@@ -276,6 +313,7 @@ export function selectSpecialistCandidatesV1(input) {
   return freeze({
     schemaVersion: VERSION,
     registryRevision: registry.revision,
+    registryBindingKey: registry.bindingKey,
     taskKind,
     requiredCapabilityIds,
     candidateSpecialistIds: candidates.map((candidate) => candidate.specialistId),
@@ -308,6 +346,11 @@ export function bindSpecialistHandoffToRegistryV1(input) {
     Number.MAX_SAFE_INTEGER,
   );
   if (expectedRegistryRevision !== registry.revision) fail('SPECIALIST_HANDOFF_REGISTRY_REVISION_CONFLICT');
+  const expectedRegistryBindingKey = exactBindingKey(
+    raw.expectedRegistryBindingKey,
+    'SPECIALIST_HANDOFF_EXPECTED_REGISTRY_BINDING_KEY',
+  );
+  if (expectedRegistryBindingKey !== registry.bindingKey) fail('SPECIALIST_HANDOFF_REGISTRY_BINDING_KEY_CONFLICT');
 
   const handoffRaw = plain(raw.handoff, 'SPECIALIST_HANDOFF_INPUT');
   const requestedSpecialistId = canonicalId(handoffRaw.specialistId, 'SPECIALIST_HANDOFF_SPECIALIST_ID');
@@ -325,6 +368,7 @@ export function bindSpecialistHandoffToRegistryV1(input) {
   return freeze({
     schemaVersion: VERSION,
     registryRevision: registry.revision,
+    registryBindingKey: registry.bindingKey,
     handoffId: handoff.handoffId,
     specialistId: definition.specialistId,
     providerId: definition.providerId,
