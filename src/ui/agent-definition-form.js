@@ -355,6 +355,21 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
   };
 }
 
+const AGENT_MODEL_ROUTE_POLICY_KEYS = new Set([
+  'autoSwitch',
+  'pinnedRouteId',
+  'orderedRouteIds',
+  'allowRouteIds',
+  'denyRouteIds',
+  'freeOnly',
+  'locality',
+  'maxInputPricePerMillionUsd',
+  'maxOutputPricePerMillionUsd',
+  'retryBackoffSeconds',
+  'circuitBreakerFailures',
+  'circuitBreakerSeconds',
+]);
+
 function copyModelRoutePolicy(value) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
@@ -363,7 +378,9 @@ function copyModelRoutePolicy(value) {
   const descriptors = Object.getOwnPropertyDescriptors(value);
   const out = {};
   for (const key of Reflect.ownKeys(descriptors)) {
-    if (typeof key !== 'string') throw new Error('modelRoutePolicy містить неканонічне поле.');
+    if (typeof key !== 'string' || !AGENT_MODEL_ROUTE_POLICY_KEYS.has(key)) {
+      throw new Error('modelRoutePolicy містить неканонічне поле: ' + String(key) + '.');
+    }
     const descriptor = descriptors[key];
     if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
       throw new Error('modelRoutePolicy.' + key + ' має бути enumerable data property.');
