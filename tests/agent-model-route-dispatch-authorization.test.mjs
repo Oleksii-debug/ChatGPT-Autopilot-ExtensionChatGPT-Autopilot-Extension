@@ -115,7 +115,10 @@ function ownerBudget() {
 
 function materialized() {
   const reg = registry();
-  const selected = selection();
+  const selected = selectAgentDefinitionV1({
+    registry: reg,
+    agentDefinitionId: 'agent.research',
+  });
   return materializeAgentDefinitionV1({
     registry: reg,
     selection: selected,
@@ -373,4 +376,53 @@ test('authorization is route-specific but still grants no provider or execution 
   assert.equal(result.authority.recoveryAuthority, false);
   assert.equal(result.authority.requiresImmediateProviderBoundaryRevalidation, true);
   assert.match(result.authorizationKey, /route\.b/u);
+});
+
+
+test('authorization key binds capability provenance and exact current Router policy', () => {
+  const baseline = authorizeBoundAgentModelRouteDispatchV1(request());
+  const repeated = authorizeBoundAgentModelRouteDispatchV1(request());
+  assert.equal(baseline.authorizationKey, repeated.authorizationKey);
+
+  const stricterCapabilities = authorizeBoundAgentModelRouteDispatchV1(request({
+    role: 'coder',
+    capabilityIds: ['cap.code'],
+  }));
+  assert.notEqual(baseline.authorizationKey, stricterCapabilities.authorizationKey);
+
+  const reorderedPolicy = authorizeBoundAgentModelRouteDispatchV1(request({
+    currentRouterPolicy: {
+      autoSwitch: true,
+      orderedRouteIds: ['route.a', 'route.c', 'route.b'],
+      allowRouteIds: ['route.a', 'route.b', 'route.c'],
+      denyRouteIds: [],
+      locality: 'remote',
+    },
+  }));
+  assert.notEqual(baseline.authorizationKey, reorderedPolicy.authorizationKey);
+});
+
+test('capability input is data-only and duplicate-free at dispatch boundary', () => {
+  assert.throws(
+    () => authorizeBoundAgentModelRouteDispatchV1(request({
+      capabilityIds: ['cap.reason', 'cap.reason'],
+    })),
+    /contains duplicates/u,
+  );
+
+  let reads = 0;
+  const capabilities = ['cap.reason'];
+  Object.defineProperty(capabilities, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'cap.reason';
+    },
+  });
+  assert.throws(
+    () => authorizeBoundAgentModelRouteDispatchV1(request({ capabilityIds: capabilities })),
+    /invalid value/u,
+  );
+  assert.equal(reads, 0);
 });
