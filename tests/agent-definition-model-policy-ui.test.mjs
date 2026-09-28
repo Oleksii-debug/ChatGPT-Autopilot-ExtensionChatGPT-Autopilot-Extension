@@ -255,6 +255,15 @@ test('Agent definition save rejects legacy pinned routes that durable model poli
   assert.equal(compatible.modelRoutePolicy.pinnedRouteId, 'route.strong');
 });
 
+test('persisted Agent model policy rejects hidden authority fields before registry mutation', () => {
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(baseForm(), {
+      modelRoutePolicy: { providerApiKey:'secret' },
+    }),
+    /неканонічне поле: providerApiKey/u,
+  );
+});
+
 test('Agent definition model-policy form does not execute accessors', () => {
   let reads = 0;
   const hostile = configuredPolicyForm();
