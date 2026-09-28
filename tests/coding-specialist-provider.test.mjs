@@ -229,10 +229,52 @@ test('fresh execution creates once and requires two terminal observations before
   assert.equal(result.verificationRequired, true);
   assert.equal(result.completionAuthorized, false);
   assert.equal(result.safeToRetry, false);
+  assert.equal(result.providerUpdatedAt, CREATED_AT);
+  assert.match(result.providerObservedAt, /^\d{4}-\d{2}-\d{2}T/u);
   assert.equal(calls.filter(call => call.method === 'POST').length, 1);
   assert.ok(terminalReads >= 2);
 });
 
+
+test('provider mutation response is not counted as fresh terminal readback evidence', async () => {
+  const calls = [];
+  let readbacksAfterPost = 0;
+  const client = clientFor(async (url, init) => {
+    calls.push({ url, method: init.method });
+    if (url.endsWith('/openapi.json')) return openapi();
+    if (url.endsWith(`/api/conversations/${CONVERSATION_ID}`)) {
+      if (!calls.some(call => call.method === 'POST')) return json({}, 404);
+      readbacksAfterPost += 1;
+      return json(info('finished'));
+    }
+    if (url.endsWith('/api/conversations') && init.method === 'POST') {
+      return json(info('finished'), 201);
+    }
+    throw new Error(`Unexpected request ${init.method} ${url}`);
+  });
+
+  const result = await client.execute(input());
+  assert.equal(result.providerStatus, 'finished');
+  assert.equal(readbacksAfterPost, 2);
+  assert.equal(result.providerUpdatedAt, CREATED_AT);
+  assert.ok(result.providerObservedAt);
+});
+
+test('missing or malformed OpenHands updated_at fails closed as provenance drift', async () => {
+  for (const updated_at of ['', 'not-a-timestamp']) {
+    const client = clientFor(async url => {
+      if (url.endsWith('/openapi.json')) return openapi();
+      return json(info('running', { updated_at }));
+    });
+    await assert.rejects(
+      () => client.execute(input()),
+      error => error instanceof OpenHandsCodingSpecialistError
+        && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+        && error.reconciliationRequired === true
+        && error.safeToRetry === false,
+    );
+  }
+});
 test('restart attach reuses matching conversation and never posts a duplicate start', async () => {
   const calls = [];
   let reads = 0;
@@ -268,7 +310,14 @@ test('workspace, profile revision and server version drift fail closed before re
     if (url.endsWith('/openapi.json')) return openapi();
     return json(info('running', { workspace: { working_dir: 'C:\\other' } }));
   });
-  await assert.rejects(() => wrongWorkspace.execute(input()), /workspace does not match/);
+  await assert.rejects(
+    () => wrongWorkspace.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
 
   const wrongProfile = clientFor(async url => {
     if (url.endsWith('/openapi.json')) return openapi();
@@ -276,7 +325,40 @@ test('workspace, profile revision and server version drift fail closed before re
       launched_agent_profile: { agent_profile_id: PROFILE_ID, revision: 8 },
     }));
   });
-  await assert.rejects(() => wrongProfile.execute(input()), /profile provenance/);
+  await assert.rejects(
+    () => wrongProfile.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
+});
+
+test('created conversation provenance mismatch is reconciliation-required after POST effect', async () => {
+  let phase = 0;
+  const client = clientFor(async (url, init) => {
+    if (url.endsWith('/openapi.json')) return openapi();
+    if (url.endsWith(`/api/conversations/${CONVERSATION_ID}`) && phase === 0) {
+      phase = 1;
+      return json({}, 404);
+    }
+    if (url.endsWith('/api/conversations') && init.method === 'POST') {
+      return json(info('running', {
+        launched_agent_profile: { agent_profile_id: PROFILE_ID, revision: 99 },
+      }));
+    }
+    throw new Error('unexpected request');
+  });
+
+  await assert.rejects(
+    () => client.execute(input()),
+    error => error instanceof OpenHandsCodingSpecialistError
+      && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+      && error.effectMayHaveOccurred === true
+      && error.reconciliationRequired === true
+      && error.safeToRetry === false,
+  );
 });
 
 test('transport loss after POST dispatch is ambiguous and cannot be blindly retried', async () => {

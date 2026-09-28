@@ -145,7 +145,7 @@ function liveFromCanonicalJob(job) {
   const runtime = ownData(job, 'runtime', 'Browser Agent parent job');
   const definitionScope = ownData(job, 'definitionScope', 'Browser Agent parent job');
   if (definitionScope == null) {
-    throw new Error('Browser Agent parent job requires durable definitionScope');
+    throw new Error('Browser Agent parent job requires a durable Agent definition capability/tool scope');
   }
   return normalizeLive({
     jobId: id,

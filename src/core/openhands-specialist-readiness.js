@@ -12,6 +12,7 @@ import {
 export const OPENHANDS_SPECIALIST_READINESS_VERSION = 1;
 
 const FACTORY_KEYS = new Set(['config', 'client', 'maxAgeMs', 'now']);
+const PROBE_KEYS = new Set(['config', 'client', 'now']);
 const REQUEST_KEYS = new Set([
   'schemaVersion',
   'registryId',
@@ -52,6 +53,12 @@ function record(value, allowed, label) {
     out[key] = descriptor.value;
   }
   return out;
+}
+
+function freeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value)) freeze(child);
+  return Object.freeze(value);
 }
 
 function denseArray(value, label, max) {
@@ -176,6 +183,56 @@ function readinessState({ health, installed, latencyMs, reasonCode }) {
     reasonCode,
   });
 }
+export async function probeOpenHandsSpecialistProviderConfigV1(input = {}) {
+  const raw = record(input, PROBE_KEYS, 'OpenHands specialist provider probe options');
+  const config = normalizeOpenHandsCodingSpecialistConfigV1(raw.config);
+  const client = raw.client;
+  if (!client || (typeof client !== 'object' && typeof client !== 'function')
+      || typeof client.probe !== 'function') {
+    throw new Error('OpenHands specialist readiness requires a client with probe()');
+  }
+  const now = raw.now === undefined ? () => Date.now() : raw.now;
+  if (typeof now !== 'function') throw new Error('now must be a function');
+
+  const startedAt = clockMs(now);
+  let classification = Object.freeze({
+    health: ProviderHealthStatus.READY,
+    reasonCode: 'OPENHANDS_PROBE_READY',
+    installed: true,
+  });
+  try {
+    await client.probe(Object.freeze({ config, conversationId: '' }));
+  } catch (error) {
+    classification = classifyProbeFailure(error);
+  }
+  const observedAtMs = clockMs(now);
+  if (observedAtMs < startedAt) throw new Error('OpenHands readiness clock moved backwards');
+  const latencyMs = observedAtMs - startedAt;
+  if (latencyMs > 10 * 60_000) throw new Error('OpenHands readiness probe exceeded latency bound');
+  const providerState = readinessState({
+    health: classification.health,
+    installed: classification.installed,
+    latencyMs,
+    reasonCode: classification.reasonCode,
+  });
+  return freeze({
+    schemaVersion: OPENHANDS_SPECIALIST_READINESS_VERSION,
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    observedAt: new Date(observedAtMs).toISOString(),
+    providerState,
+    authority: {
+      providerExecutionAuthorized: false,
+      toolExecutionAuthorized: false,
+      policyAuthorized: false,
+      schedulingAuthorized: false,
+      recoveryAuthorized: false,
+      credentialAuthorized: false,
+      completionAuthorized: false,
+      verificationAuthorized: false,
+      capacityReserved: false,
+    },
+  });
+}
 
 /**
  * Builds one immutable #454-compatible binding backed by the merged OpenHands
@@ -223,34 +280,10 @@ export function createOpenHandsSpecialistReadinessBindingV1(input = {}) {
     toolIds(request.requestedToolIds);
     timestamp(request.asOf, 'asOf');
 
-    const startedAt = clockMs(now);
-    let classification = Object.freeze({
-      health: ProviderHealthStatus.READY,
-      reasonCode: 'OPENHANDS_PROBE_READY',
-      installed: true,
-    });
-    try {
-      await client.probe(Object.freeze({
-        config,
-        conversationId: '',
-      }));
-    } catch (error) {
-      classification = classifyProbeFailure(error);
-    }
-    const observedAtMs = clockMs(now);
-    if (observedAtMs < startedAt) throw new Error('OpenHands readiness clock moved backwards');
-    const latencyMs = observedAtMs - startedAt;
-    if (latencyMs > 10 * 60_000) throw new Error('OpenHands readiness probe exceeded latency bound');
-
-    const state = readinessState({
-      health: classification.health,
-      installed: classification.installed,
-      latencyMs,
-      reasonCode: classification.reasonCode,
-    });
+    const probe = await probeOpenHandsSpecialistProviderConfigV1({ config, client, now });
     return Object.freeze({
-      observedAt: new Date(observedAtMs).toISOString(),
-      providerStates: Object.freeze([state]),
+      observedAt: probe.observedAt,
+      providerStates: Object.freeze([probe.providerState]),
     });
   };
 
