@@ -37,7 +37,8 @@ function intent(overrides={}) {
     registryId:'agents:project.alpha', registryRevision:6, agentDefinitionId:'agent.research',
     definitionRevision:4, definitionModelPolicyBindingKey:'binding.outer',
     modelPolicyBindingKey:'binding.inner', routePoolRevision:9, role:'planner',
-    requiresVision:false, routeId:'route.b',
+    capabilityIds:['cap.reason'], requiresVision:false, preparedAt:1790620000000,
+    routeId:'route.b',
     route:{routeId:'route.b',provider:'openai',model:'m-route.b',endpointId:''},
     eligibleRouteIds:['route.b','route.a'],availableRouteIds:['route.b','route.a'],
     retryAt:0,authority:AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY,...overrides,
@@ -51,6 +52,7 @@ function request(overrides={}) {
     currentProjectId:'project.alpha',
     currentRoutePoolRevision:9,
     currentRouterSettings:settings(),
+    currentNow:1790620000100,
     currentRouterRuntime:{
       requestCount:3,routeStates:{
         'route.a':{backoffUntil:100},
@@ -75,6 +77,9 @@ test('scopes canonical AiOrchestrator settings to exact bound route', () => {
   assert.deepEqual(result.settings.routePolicy.orderedRouteIds,['route.b']);
   assert.equal(result.settings.routePolicy.pinnedRouteId,'route.b');
   assert.equal(result.settings.routePolicy.autoSwitch,false);
+  assert.deepEqual(result.capabilityIds,['cap.reason']);
+  assert.equal(result.preparedAt,1790620000000);
+  assert.equal(result.revalidatedAt,1790620000100);
   assert.deepEqual(Object.keys(result.runtime.routeStates),['route.b']);
   assert.equal(result.runtime.lastRouteId,'');
   assert.deepEqual(result.runtime.lastFailoverChain.map(x=>x.routeId),['route.b']);
@@ -131,4 +136,162 @@ test('envelope grants no orchestrator invocation or provider-call authority', ()
   assert.equal(result.authority.requiresProviderCallLifecycleRevalidation,true);
   assert.equal(Object.isFrozen(result),true);
   assert.equal(Object.isFrozen(result.settings),true);
+});
+
+
+test('current global Router deny cannot be cleared by single-route scoping', () => {
+  const current=settings();
+  current.routePolicy={...current.routePolicy,denyRouteIds:['route.b']};
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:current})),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('current global Router pin outside Agent route cannot be bypassed', () => {
+  const current=settings();
+  current.routePolicy={...current.routePolicy,pinnedRouteId:'route.c'};
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:current})),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('current no-auto-switch ordering remains authoritative', () => {
+  const current=settings();
+  current.routePolicy={
+    ...current.routePolicy,
+    autoSwitch:false,
+    orderedRouteIds:['route.c','route.b','route.a'],
+  };
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:current})),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('current Router cost/locality policy cannot be widened by envelope', () => {
+  const freeOnly=settings();
+  freeOnly.routePolicy={...freeOnly.routePolicy,freeOnly:true};
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:freeOnly})),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+
+  const localOnly=settings();
+  localOnly.routePolicy={...localOnly.routePolicy,locality:'local'};
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:localOnly})),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('current durable backoff is re-observed before orchestrator scoping', () => {
+  const now=1790620000100;
+  const runtime=request().currentRouterRuntime;
+  runtime.routeStates['route.b']={backoffUntil:now+5000};
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({
+      currentRouterRuntime:runtime,
+      currentNow:now,
+    })),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('capability requirements from dispatch intent are rechecked against current route', () => {
+  const current=settings();
+  current.routes=current.routes.map(item=>item.routeId==='route.b'
+    ? {...item,capabilityIds:[]}
+    : item);
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:current})),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('disabled canonical Router cannot be re-enabled by Agent envelope', () => {
+  const current=settings();
+  current.enabled=false;
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentRouterSettings:current})),
+    /Canonical AI Router is disabled/u,
+  );
+});
+
+test('orchestrator revalidation time is explicit and monotonic from dispatch preparation', () => {
+  const missing=request();
+  delete missing.currentNow;
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(missing),
+    /currentNow is invalid/u,
+  );
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({currentNow:1790619999999})),
+    /cannot precede dispatch intent preparedAt/u,
+  );
+
+  let reads=0;
+  const hostile=request();
+  Object.defineProperty(hostile,'currentNow',{
+    enumerable:true,
+    configurable:true,
+    get(){reads+=1;return 1790620000100;},
+  });
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(hostile),
+    /must be an enumerable own data property/u,
+  );
+  assert.equal(reads,0);
+});
+
+test('parent model-policy provenance survives orchestrator envelope', () => {
+  const result=createBoundAgentModelOrchestratorEnvelopeV1(request({
+    dispatchIntent:intent({parentModelPolicyBindingKey:'parent.binding'}),
+  }));
+  assert.equal(result.parentModelPolicyBindingKey,'parent.binding');
+});
+
+test('dispatch capability envelope rejects accessor and duplicate provenance', () => {
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({
+      dispatchIntent:intent({capabilityIds:['cap.reason','cap.reason']}),
+    })),
+    /contains duplicates/u,
+  );
+
+  let reads=0;
+  const ids=['cap.reason'];
+  Object.defineProperty(ids,'0',{
+    enumerable:true,
+    configurable:true,
+    get(){reads+=1;return 'cap.reason';},
+  });
+  assert.throws(
+    ()=>createBoundAgentModelOrchestratorEnvelopeV1(request({
+      dispatchIntent:intent({capabilityIds:ids}),
+    })),
+    /contains an invalid value/u,
+  );
+  assert.equal(reads,0);
+});
+
+
+test('single-route envelope projects manual worker policy without leaking other routes', () => {
+  const current=settings();
+  current.workerPolicy={
+    allocationMode:'manual',
+    minWorkers:1,
+    maxParallelWorkers:4,
+    manualRouteWorkers:{
+      'route.a':2,
+      'route.b':1,
+      'route.c':1,
+    },
+  };
+  const result=createBoundAgentModelOrchestratorEnvelopeV1(request({
+    currentRouterSettings:current,
+  }));
+  assert.equal(result.settings.workerPolicy.allocationMode,'manual');
+  assert.deepEqual(result.settings.workerPolicy.manualRouteWorkers,{'route.b':1});
 });
