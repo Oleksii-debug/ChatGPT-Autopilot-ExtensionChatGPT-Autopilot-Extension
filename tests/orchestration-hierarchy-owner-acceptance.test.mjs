@@ -140,16 +140,18 @@ test('PAUSE retains in-flight worker evidence; STOP fences late terminal events 
   }), []);
   runtime = validateOrchestrationHierarchyRuntimeV1(graph, JSON.parse(JSON.stringify(runtime)));
   const resumed = dispatch(OrchestrationHierarchyEventType.RESUME_SCOPE, { nodeId: managerId });
-  assert.deepEqual(resumed, []);
+  assert.equal(resumed.filter(action => action.nodeId === worker.nodeId).length, 0);
+  assert.equal(resumed.filter(action => action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT).length, 1);
+  // RESUME_SCOPE now consumes preserved paused terminal evidence through the
+  // canonical barrier authority, so an explicit reevaluation is idempotent.
   const resumedBarrier = dispatch(OrchestrationHierarchyEventType.BARRIER_REEVALUATE, { nodeId: managerId, generation: 1 });
-  assert.equal(resumedBarrier.filter(action => action.nodeId === worker.nodeId).length, 0);
-  assert.equal(resumedBarrier.filter(action => action.type === OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT).length, 1);
+  assert.deepEqual(resumedBarrier, []);
 
   dispatch(OrchestrationHierarchyEventType.STOP_SCOPE, { nodeId: managerId });
   runtime = validateOrchestrationHierarchyRuntimeV1(graph, JSON.parse(JSON.stringify(runtime)));
   assert.deepEqual(dispatch(OrchestrationHierarchyEventType.NODE_TERMINAL, {
-    nodeId: resumedBarrier[0].nodeId, generation: resumedBarrier[0].generation,
-    activationId: resumedBarrier[0].activationId, status: 'COMPLETED',
+    nodeId: resumed[0].nodeId, generation: resumed[0].generation,
+    activationId: resumed[0].activationId, status: 'COMPLETED',
   }), []);
   assert.deepEqual(dispatch(OrchestrationHierarchyEventType.BARRIER_REEVALUATE, { nodeId: managerId, generation: 1 }), []);
   assert.equal(runtime.nodesById[managerId].scopeState, 'STOPPED');
