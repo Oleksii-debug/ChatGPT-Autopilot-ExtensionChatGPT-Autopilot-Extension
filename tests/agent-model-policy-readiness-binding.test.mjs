@@ -229,6 +229,25 @@ test('same-revision disabled Agent definition cannot retain readiness authority'
   );
 });
 
+test('same-revision root model policy drift cannot reuse the durable binding', () => {
+  const current = selection();
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+      currentDefinitionSelection: {
+        ...current,
+        definition: {
+          ...current.definition,
+          modelRoutePolicy: {
+            ...current.definition.modelRoutePolicy,
+            freeOnly: true,
+          },
+        },
+      },
+    })),
+    /root model policy drifted/u,
+  );
+});
+
 test('current job and Project identities are exact owner fences', () => {
   assert.throws(
     () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
