@@ -171,6 +171,24 @@ function invocationRequest(intent = selfRepairIntent(), overrides = {}) {
   };
 }
 
+function trustedProviderReservation(overrides = {}) {
+  return {
+    reservationId: 'actor.observe:model-budget:1',
+    controlEpoch: 8,
+    modelCalls: 1,
+    inputTokens: 64,
+    outputTokens: 512,
+    totalTokens: 576,
+    estimatedCostUsd: 0.000123,
+    createdAt: 1_850,
+    routeId: 'route.observe',
+    provider: 'openai',
+    model: 'agent-model',
+    callNumber: 1,
+    ...overrides,
+  };
+}
+
 function modelResult(overrides = {}) {
   const text = overrides.text ?? 'Applied the bounded repair and produced evidence for independent verification.';
   const primary = Object.hasOwn(overrides, 'primary')
@@ -210,7 +228,7 @@ function modelResult(overrides = {}) {
 function request(overrides = {}) {
   return {
     invocationRequest: invocationRequest(),
-    trustedInvocationId: 'invocation.observe.1',
+    trustedProviderReservation: trustedProviderReservation(),
     observationId: 'observation.observe.1',
     modelResult: modelResult(),
     observedAt: '1970-01-01T00:00:01.900Z',
@@ -223,7 +241,7 @@ test('successful self-repair model output becomes canonical untrusted Observatio
 
   assert.equal(observation.schemaVersion, 1);
   assert.equal(observation.observationId, 'observation.observe.1');
-  assert.equal(observation.invocationId, 'invocation.observe.1');
+  assert.equal(observation.invocationId, 'actor.observe:model-budget:1');
   assert.equal(observation.status, 'OK');
   assert.match(observation.summary, /bounded repair/u);
   assert.deepEqual(observation.artifactRefs, []);
@@ -250,7 +268,7 @@ test('successful self-repair model output becomes canonical untrusted Observatio
   assert.equal(Object.isFrozen(observation), true);
 });
 
-test('model result cannot mint or alias trusted invocation identity', () => {
+test('model result cannot mint invocation identity and reservation identity is lifecycle-bound', () => {
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
       modelResult: {
@@ -263,10 +281,41 @@ test('model result cannot mint or alias trusted invocation identity', () => {
 
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
-      trustedInvocationId: ' forged.runtime.invocation ',
+      trustedProviderReservation: trustedProviderReservation({
+        reservationId: 'other.owner:model-budget:1',
+      }),
     })),
-    /must already be canonical text/u,
+    /not owned by current self-repair work/u,
   );
+
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      trustedProviderReservation: trustedProviderReservation({
+        controlEpoch: 9,
+      }),
+    })),
+    /controlEpoch drifted/u,
+  );
+});
+
+test('trusted provider reservation must match admitted route and exact invocation budget', () => {
+  for (const trustedProviderReservationValue of [
+    trustedProviderReservation({ routeId: 'route.other' }),
+    trustedProviderReservation({ provider: 'other-provider' }),
+    trustedProviderReservation({ model: 'other-model' }),
+    trustedProviderReservation({ modelCalls: 2 }),
+    trustedProviderReservation({ callNumber: 2 }),
+    trustedProviderReservation({ outputTokens: 511, totalTokens: 575 }),
+    trustedProviderReservation({ totalTokens: 999 }),
+    trustedProviderReservation({ createdAt: 1_700 }),
+  ]) {
+    assert.throws(
+      () => projectAgentSelfRepairModelObservationV1(request({
+        trustedProviderReservation: trustedProviderReservationValue,
+      })),
+      /route identity drifted|exactly one admitted model call|output-token bound drifted|token counters are inconsistent|predates invocation preparation/u,
+    );
+  }
 });
 
 test('route, provider, model and selected text must match the admitted one-route envelope', () => {
