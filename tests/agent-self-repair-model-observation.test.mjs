@@ -325,6 +325,7 @@ test('reservation bounds and chronology are canonical before model result can be
   for (const reservation of [
     providerReservation({ inputTokens: -0 }),
     providerReservation({ outputTokens: 1.5 }),
+    providerReservation({ outputTokens: 511, totalTokens: 575 }),
     providerReservation({ totalTokens: 10 }),
     providerReservation({ estimatedCostUsd: Number.NaN }),
     providerReservation({ estimatedCostUsd: -1 }),
@@ -334,7 +335,7 @@ test('reservation bounds and chronology are canonical before model result can be
       () => projectAgentSelfRepairModelObservationV1(request({
         providerReservation: reservation,
       })),
-      /safe integer|totalTokens is inconsistent|estimatedCostUsd is invalid|predates invocation preparation/u,
+      /safe integer|output-token bound drifted|totalTokens is inconsistent|estimatedCostUsd is invalid|predates invocation preparation/u,
     );
   }
 
@@ -389,6 +390,7 @@ test('observation admits exactly one bounded provider call and canonical token c
     { inputTokens: 10, outputTokens: 20, totalTokens: 30, modelCalls: 2 },
     { inputTokens: -0, outputTokens: 20, totalTokens: 30, modelCalls: 1 },
     { inputTokens: 10.5, outputTokens: 20, totalTokens: 31, modelCalls: 1 },
+    { inputTokens: 10, outputTokens: 20, totalTokens: 25, modelCalls: 1 },
     { inputTokens: 10, outputTokens: 20, totalTokens: 5, modelCalls: 1 },
   ]) {
     assert.throws(
