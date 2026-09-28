@@ -9,6 +9,9 @@ import {
   createAgentDefinitionModelPolicyBindingV1,
 } from '../src/core/agent-definition-model-policy-binding.js';
 import {
+  createAgentModelPolicyBindingV1,
+} from '../src/core/agent-model-policy-binding.js';
+import {
   AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY,
   createBoundAgentModelRouteDispatchIntentV1,
 } from '../src/core/agent-model-route-dispatch-intent.js';
@@ -91,7 +94,10 @@ function selection() {
 
 function materialized() {
   const reg = registry();
-  const selected = selection();
+  const selected = selectAgentDefinitionV1({
+    registry: reg,
+    agentDefinitionId: 'agent.research',
+  });
   return materializeAgentDefinitionV1({
     registry: reg,
     selection: selected,
@@ -130,6 +136,32 @@ function binding() {
   });
 }
 
+function parentBinding() {
+  return createAgentModelPolicyBindingV1({
+    projectId: 'project.alpha',
+    agentId: 'agent.parent',
+    policyRevision: 3,
+    routePoolRevision: 9,
+    routePool: pool(),
+    ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    routePolicy: { allowRouteIds: ['route.a', 'route.b', 'route.c'], locality: 'remote' },
+  });
+}
+
+function childBinding(parent) {
+  const mat = materialized();
+  return createAgentDefinitionModelPolicyBindingV1({
+    materializedAgent: mat,
+    currentDefinitionSelection: selection(),
+    currentJobId: mat.config.id,
+    currentProjectId: mat.config.projectId,
+    routePool: pool(),
+    routePoolRevision: 9,
+    ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    parentBinding: parent,
+  });
+}
+
 function request(overrides = {}) {
   const current = binding();
   return {
@@ -159,6 +191,8 @@ test('prepares exact canonical provider identity only after fresh bound ranking'
     endpointId: '',
   });
   assert.deepEqual(result.availableRouteIds, ['route.b', 'route.a']);
+  assert.deepEqual(result.capabilityIds, ['cap.reason']);
+  assert.equal(result.preparedAt, 1790620000000);
   assert.equal(result.definitionRevision, 4);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.route), true);
@@ -257,4 +291,64 @@ test('dispatch intent grants no provider, execution, credential or route-selecti
   assert.equal(result.authority.executionAuthorized, false);
   assert.equal(result.authority.requiresCanonicalAiOrchestrator, true);
   assert.equal(result.authority.requiresProviderCallLifecycleRevalidation, true);
+});
+
+
+test('dispatch intent preserves exact current parent model-policy provenance', () => {
+  const parent = parentBinding();
+  const current = childBinding(parent);
+  const result = createBoundAgentModelRouteDispatchIntentV1(request({
+    definitionModelPolicyBinding: current,
+    currentDefinitionModelPolicyBindingKey: current.bindingKey,
+    currentParentModelPolicyBinding: parent,
+    currentParentModelPolicyBindingKey: parent.bindingKey,
+  }));
+  assert.equal(result.parentModelPolicyBindingKey, parent.bindingKey);
+
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({
+      definitionModelPolicyBinding: current,
+      currentDefinitionModelPolicyBindingKey: current.bindingKey,
+      currentParentModelPolicyBinding: parent,
+    })),
+    /requires current parent model-policy provenance/u,
+  );
+});
+
+test('dispatch capability provenance is dense data-only and duplicate-free', () => {
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({
+      capabilityIds: ['cap.reason', 'cap.reason'],
+    })),
+    /contains duplicates/u,
+  );
+
+  let reads = 0;
+  const capabilities = ['cap.reason'];
+  Object.defineProperty(capabilities, '0', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'cap.reason';
+    },
+  });
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({ capabilityIds: capabilities })),
+    /contains an invalid value/u,
+  );
+  assert.equal(reads, 0);
+});
+
+test('dispatch preparation requires canonical explicit time', () => {
+  const missing = request();
+  delete missing.now;
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(missing),
+    /dispatch now is required/u,
+  );
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({ now: -0 })),
+    /dispatch now is invalid/u,
+  );
 });
