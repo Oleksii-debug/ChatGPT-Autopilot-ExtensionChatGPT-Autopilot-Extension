@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AiOrchestrator, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings } from '../src/core/ai-orchestrator.js';
+import { deriveAiRouteQualitySubjectRevisionIdV1 } from '../src/core/ai-route-quality-governor.js';
+import { BenchmarkAssertionOperator, BenchmarkCaseOutcome } from '../src/core/benchmark-evaluation.js';
 
 class FakeGateway {
   constructor(responses = []) { this.responses = [...responses]; this.calls = []; }
@@ -25,6 +27,100 @@ function settings(overrides = {}) {
     handoffMaxChars: 12000,
     ...overrides,
   });
+}
+
+const QUALITY_START = '2026-09-27T12:00:00.000Z';
+const QUALITY_END = '2026-09-27T12:00:01.000Z';
+const QUALITY_NOW = Date.parse('2026-09-27T12:00:02.000Z');
+
+function qualityRoute(routeId, overrides = {}) {
+  return {
+    schemaVersion:1,
+    routeId,
+    provider:'ollama',
+    model:'model-' + routeId,
+    roles:['planner'],
+    capabilityIds:[],
+    priority:0,
+    enabled:true,
+    locality:'local',
+    costClass:'free',
+    supportsVision:false,
+    maxWorkers:0,
+    ...overrides,
+  };
+}
+
+async function qualityBenchmarkBinding(routeValue, { suffix = 'runtime', pass = true } = {}) {
+  const routeId = routeValue.routeId;
+  const suiteId = 'route-quality-' + suffix;
+  const suiteRevisionId = 'suite-' + suffix;
+  const runId = 'run-' + routeId + '-' + suffix;
+  const subjectRevisionId = await deriveAiRouteQualitySubjectRevisionIdV1(routeValue);
+  const invocationId = 'benchmark-' + routeId + '-' + suffix;
+  const artifactId = 'evidence-' + routeId + '-' + suffix;
+  const result = {
+    caseId:'quality',
+    outcome:BenchmarkCaseOutcome.MEASURED,
+    metrics:{ score:pass ? 1 : 0 },
+    evidenceArtifactIds:[artifactId],
+  };
+  return {
+    routeId,
+    maxAgeMs:60_000,
+    evaluationRequest:{
+      suite:{
+        schemaVersion:1,
+        suiteId,
+        suiteRevisionId,
+        title:'Route quality benchmark',
+        cases:[{
+          caseId:'quality',
+          title:'Quality threshold',
+          assertions:[{
+            metricId:'score',
+            operator:BenchmarkAssertionOperator.AT_LEAST,
+            threshold:1,
+          }],
+        }],
+      },
+      run:{
+        schemaVersion:1,
+        runId,
+        suiteId,
+        suiteRevisionId,
+        subjectId:routeId,
+        subjectRevisionId,
+        startedAt:QUALITY_START,
+        completedAt:QUALITY_END,
+        results:[structuredClone(result)],
+      },
+      expectedSubject:{ subjectId:routeId, subjectRevisionId },
+      trustedExecution:{
+        runId,
+        suiteId,
+        suiteRevisionId,
+        subjectId:routeId,
+        subjectRevisionId,
+        producerInvocationId:invocationId,
+        startedAt:QUALITY_START,
+        completedAt:QUALITY_END,
+        results:[structuredClone(result)],
+      },
+      trustedEvidenceArtifacts:[{
+        schemaVersion:1,
+        artifactId,
+        kind:'benchmark-evidence',
+        uri:'artifact://benchmark/' + artifactId,
+        mediaType:'application/json',
+        sha256:(pass ? '1' : '2').repeat(64),
+        sizeBytes:1,
+        createdAt:QUALITY_END,
+        producerInvocationId:invocationId,
+        sensitive:false,
+      }],
+    },
+  };
 }
 
 test('primary mode uses only the primary model', async () => {
@@ -469,4 +565,350 @@ test('model profile prompts are bounded and legacy routes remain compatible', ()
   const legacy = settings({ routes:[{ routeId:'a', provider:'ollama', model:'qwen' }] });
   assert.equal(legacy.routes[0].systemPrompt, '');
   assert.equal(legacy.routes[0].workerPrompt, '');
+});
+
+
+test('trusted route-quality evidence can reorder only equal-owner canonical candidates', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+  const gateway = new FakeGateway(['quality-selected']);
+  let resolverRequest = null;
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceResolver:async request => {
+      resolverRequest = request;
+      return [await qualityBenchmarkBinding(routes[1], { suffix:'prefer-b' })];
+    },
+  });
+
+  const result = await router.run(settings({ routes }), DEFAULT_AI_ROUTER_RUNTIME, 'task', { taskRole:'planner' });
+  assert.equal(result.routing.selectedRouteId, 'route-b');
+  assert.equal(gateway.calls[0].model, 'model-route-b');
+  assert.deepEqual(resolverRequest.routeIds, ['route-a', 'route-b']);
+  assert.equal(resolverRequest.role, 'planner');
+  assert.equal(resolverRequest.requiresVision, false);
+  assert.equal(Object.isFrozen(resolverRequest), true);
+  assert.equal(Object.isFrozen(resolverRequest.routeIds), true);
+});
+
+test('owner priority remains stronger than trusted route-quality evidence at runtime', async () => {
+  const routes = [
+    qualityRoute('owner-first', { priority:100 }),
+    qualityRoute('quality-pass', { priority:1 }),
+  ];
+  const gateway = new FakeGateway(['owner-selected']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceResolver:async () => [
+      await qualityBenchmarkBinding(routes[1], { suffix:'priority-pass' }),
+    ],
+  });
+
+  const result = await router.run(settings({ routes }), DEFAULT_AI_ROUTER_RUNTIME, 'task', { taskRole:'planner' });
+  assert.equal(result.routing.selectedRouteId, 'owner-first');
+  assert.equal(gateway.calls[0].model, 'model-owner-first');
+});
+
+test('malformed or unavailable quality evidence falls back to canonical baseline routing', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+
+  for (const resolver of [
+    async () => [{ unexpected:true }],
+    async () => { throw new Error('quality store unavailable'); },
+  ]) {
+    const gateway = new FakeGateway(['baseline']);
+    const router = new AiOrchestrator({
+      gatewayClient:gateway,
+      now:() => QUALITY_NOW,
+      routeQualityEvidenceResolver:resolver,
+    });
+    const result = await router.run(settings({ routes }), DEFAULT_AI_ROUTER_RUNTIME, 'task', { taskRole:'planner' });
+    assert.equal(result.routing.selectedRouteId, 'route-a');
+    assert.equal(gateway.calls.length, 1);
+    assert.equal(gateway.calls[0].model, 'model-route-a');
+  }
+});
+
+test('canonical route eligibility is refreshed after asynchronous quality evidence resolution', async () => {
+  const routes = [
+    qualityRoute('route-a', { priority:100 }),
+    qualityRoute('route-b', { priority:20 }),
+    qualityRoute('route-c', { priority:10 }),
+  ];
+  let clock = QUALITY_NOW;
+  let resolverRouteIds = null;
+  const gateway = new FakeGateway(['fresh-selection']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => clock,
+    routeQualityEvidenceResolver:async request => {
+      resolverRouteIds = [...request.routeIds];
+      clock += 100;
+      return [];
+    },
+  });
+  const runtime = {
+    ...DEFAULT_AI_ROUTER_RUNTIME,
+    routeStates:{
+      'route-a':{
+        consecutiveFailures:1,
+        successes:0,
+        failures:1,
+        backoffUntil:QUALITY_NOW + 50,
+        circuitOpenUntil:0,
+        lastErrorCode:'HTTP_429',
+        lastErrorCategory:'quota-or-rate',
+        lastErrorAt:QUALITY_NOW - 100,
+        lastSuccessAt:0,
+        lastLatencyMs:1,
+      },
+    },
+  };
+
+  const result = await router.run(settings({ routes }), runtime, 'task', { taskRole:'planner' });
+  assert.deepEqual(resolverRouteIds, ['route-b', 'route-c']);
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.equal(gateway.calls[0].model, 'model-route-a');
+});
+
+test('pinned canonical route bypasses advisory lookup and cannot be widened by quality', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+  let resolverCalls = 0;
+  const gateway = new FakeGateway(['pinned']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceResolver:async () => {
+      resolverCalls += 1;
+      return [await qualityBenchmarkBinding(routes[1], { suffix:'must-not-run' })];
+    },
+  });
+
+  const result = await router.run(
+    settings({ routes, routePolicy:{ pinnedRouteId:'route-a' } }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'task',
+    { taskRole:'planner' },
+  );
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.equal(resolverCalls, 0);
+});
+
+test('quality-first retryable failure preserves canonical failover and durable backoff', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+  const calls = [];
+  const gateway = {
+    async complete(req) {
+      calls.push(req.model);
+      if (req.model === 'model-route-b') {
+        throw Object.assign(
+          new Error('quality-selected provider unavailable'),
+          { code:'AI_PROVIDER_UNAVAILABLE', status:503 },
+        );
+      }
+      return { text:'canonical failover recovered' };
+    },
+  };
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceResolver:async () => [
+      await qualityBenchmarkBinding(routes[1], { suffix:'quality-first-failover' }),
+    ],
+  });
+
+  const result = await router.run(
+    settings({
+      routes,
+      routePolicy:{
+        retryBackoffSeconds:60,
+        circuitBreakerFailures:2,
+        circuitBreakerSeconds:300,
+      },
+    }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'same logical task',
+    { taskRole:'planner', maxModelCallsForRequest:2 },
+  );
+
+  assert.deepEqual(calls, ['model-route-b', 'model-route-a']);
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.deepEqual(
+    result.routing.failoverChain.map(item => `${item.routeId}:${item.outcome}`),
+    ['route-b:FAILED', 'route-a:SUCCESS'],
+  );
+  assert.equal(
+    result.runtime.routeStates['route-b'].backoffUntil,
+    QUALITY_NOW + 60_000,
+  );
+});
+
+test('owner autoSwitch false remains stronger than quality and stops after one retryable provider attempt', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+  const calls = [];
+  let resolverCalls = 0;
+  const gateway = {
+    async complete(req) {
+      calls.push(req.model);
+      throw Object.assign(
+        new Error('first owner-selected provider unavailable'),
+        { code:'AI_PROVIDER_UNAVAILABLE', status:503 },
+      );
+    },
+  };
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceResolver:async () => {
+      resolverCalls += 1;
+      return [await qualityBenchmarkBinding(routes[1], { suffix:'must-not-widen-owner-policy' })];
+    },
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings({
+        routes,
+        routePolicy:{
+          autoSwitch:false,
+          retryBackoffSeconds:60,
+          circuitBreakerFailures:2,
+          circuitBreakerSeconds:300,
+        },
+      }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'same logical task',
+      { taskRole:'planner', maxModelCallsForRequest:2 },
+    ),
+    error => {
+      assert.equal(error.modelCallsUsed, 1);
+      assert.equal(error.retryAt, QUALITY_NOW + 60_000);
+      assert.deepEqual(
+        error.routerRuntime.lastFailoverChain.map(
+          item => `${item.routeId}:${item.outcome}`,
+        ),
+        ['route-a:FAILED'],
+      );
+      assert.equal(
+        error.routerRuntime.routeStates['route-a'].backoffUntil,
+        QUALITY_NOW + 60_000,
+      );
+      return true;
+    },
+  );
+
+  assert.deepEqual(calls, ['model-route-a']);
+  assert.equal(resolverCalls, 0);
+});
+
+test('route-quality lookup timeout falls back to freshly reselected canonical candidates', async () => {
+  const routes = [
+    qualityRoute('route-a', { priority:100 }),
+    qualityRoute('route-b', { priority:20 }),
+    qualityRoute('route-c', { priority:10 }),
+  ];
+  let nowReads = 0;
+  let resolverRouteIds = null;
+  const gateway = new FakeGateway(['timeout-baseline']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => {
+      nowReads += 1;
+      return nowReads <= 2 ? QUALITY_NOW : QUALITY_NOW + 100;
+    },
+    routeQualityEvidenceTimeoutMs:5,
+    routeQualityEvidenceResolver:request => {
+      resolverRouteIds = [...request.routeIds];
+      return new Promise(() => {});
+    },
+  });
+  const runtime = {
+    ...DEFAULT_AI_ROUTER_RUNTIME,
+    routeStates:{
+      'route-a':{
+        consecutiveFailures:1,
+        successes:0,
+        failures:1,
+        backoffUntil:QUALITY_NOW + 50,
+        circuitOpenUntil:0,
+        lastErrorCode:'HTTP_429',
+        lastErrorCategory:'quota-or-rate',
+        lastErrorAt:QUALITY_NOW - 100,
+        lastSuccessAt:0,
+        lastLatencyMs:1,
+      },
+    },
+  };
+
+  const result = await router.run(settings({ routes }), runtime, 'task', { taskRole:'planner' });
+  assert.deepEqual(resolverRouteIds, ['route-b', 'route-c']);
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.equal(gateway.calls.length, 1);
+  assert.equal(gateway.calls[0].model, 'model-route-a');
+});
+
+test('late route-quality fulfillment after timeout has zero effect on baseline dispatch', async () => {
+  const routes = [qualityRoute('route-a'), qualityRoute('route-b')];
+  const lateEvidence = [
+    await qualityBenchmarkBinding(routes[1], { suffix:'late-after-timeout' }),
+  ];
+  let resolveEvidence;
+  const resolverPromise = new Promise(resolve => {
+    resolveEvidence = resolve;
+  });
+  const gateway = new FakeGateway(['baseline-before-late-evidence']);
+  const router = new AiOrchestrator({
+    gatewayClient:gateway,
+    now:() => QUALITY_NOW,
+    routeQualityEvidenceTimeoutMs:5,
+    routeQualityEvidenceResolver:() => resolverPromise,
+  });
+
+  const result = await router.run(
+    settings({ routes }),
+    DEFAULT_AI_ROUTER_RUNTIME,
+    'task',
+    { taskRole:'planner' },
+  );
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.deepEqual(gateway.calls.map(call => call.model), ['model-route-a']);
+
+  resolveEvidence(lateEvidence);
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(result.routing.selectedRouteId, 'route-a');
+  assert.deepEqual(gateway.calls.map(call => call.model), ['model-route-a']);
+});
+
+test('route-quality lookup deadline is exact and bounded', () => {
+  for (const value of [0, -0, 1.5, 5_001, Number.NaN]) {
+    assert.throws(
+      () => new AiOrchestrator({
+        gatewayClient:new FakeGateway(),
+        routeQualityEvidenceTimeoutMs:value,
+      }),
+      /quality evidence timeout must be a whole number from 1 to 5000 milliseconds/u,
+    );
+  }
+  assert.doesNotThrow(
+    () => new AiOrchestrator({
+      gatewayClient:new FakeGateway(),
+      routeQualityEvidenceTimeoutMs:1,
+    }),
+  );
+  assert.doesNotThrow(
+    () => new AiOrchestrator({
+      gatewayClient:new FakeGateway(),
+      routeQualityEvidenceTimeoutMs:5_000,
+    }),
+  );
+});
+
+test('route-quality resolver dependency must be an explicit function', () => {
+  assert.throws(
+    () => new AiOrchestrator({ gatewayClient:new FakeGateway(), routeQualityEvidenceResolver:{} }),
+    /quality evidence resolver must be a function/u,
+  );
 });
