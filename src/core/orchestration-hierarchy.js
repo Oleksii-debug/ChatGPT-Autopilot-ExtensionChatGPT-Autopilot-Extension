@@ -763,14 +763,36 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
       : event.type === OrchestrationHierarchyEventType.STOP_SCOPE
         ? 'STOPPED'
         : 'RUNNING';
+    const resumedBarrierNodeIds = [];
     for (const scopedId of descendantsInclusive(graph, nodeId)) {
       const nodeRuntime = runtime.nodesById[scopedId];
       if (nodeRuntime.scopeState === 'STOPPED' && nextScope !== 'STOPPED') continue;
+      const wasPaused = nodeRuntime.scopeState === 'PAUSED';
       nodeRuntime.scopeState = nextScope;
       if (nextScope === 'PAUSED') nodeRuntime.lifecycle = OrchestrationNodeLifecycle.PAUSED;
       if (nextScope === 'STOPPED') nodeRuntime.lifecycle = OrchestrationNodeLifecycle.STOPPED;
       if (nextScope === 'RUNNING' && [OrchestrationNodeLifecycle.PAUSED, OrchestrationNodeLifecycle.IDLE].includes(nodeRuntime.lifecycle)) {
         nodeRuntime.lifecycle = OrchestrationNodeLifecycle.IDLE;
+      }
+      if (nextScope === 'RUNNING' && wasPaused) resumedBarrierNodeIds.push(scopedId);
+    }
+
+    // Terminal child truth received while paused is durable. Once a scope is
+    // actually restored, consume any now-satisfied barrier through the same
+    // canonical reconciliation authority used by NODE_TERMINAL and explicit
+    // BARRIER_REEVALUATE. Never supersede an in-flight parent activation, and
+    // never use Resume to reactivate a STOPPED scope.
+    if (event.type === OrchestrationHierarchyEventType.RESUME_SCOPE) {
+      for (const resumedId of resumedBarrierNodeIds) {
+        const resumedRuntime = runtime.nodesById[resumedId];
+        const current = currentActivation(resumedRuntime);
+        if (!current
+            || current.phase !== OrchestrationActivationPhase.TERMINAL
+            || current.purpose === OrchestrationActivationPurpose.RECONCILE) {
+          continue;
+        }
+        const action = maybePrepareParentReconciliation(graph, runtime, resumedId, nowMs);
+        if (action) actions.push(action);
       }
     }
     return { runtime, actions, deduplicated: false, reason: nextScope };

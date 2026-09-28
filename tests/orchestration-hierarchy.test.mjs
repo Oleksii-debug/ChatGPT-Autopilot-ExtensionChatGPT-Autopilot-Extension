@@ -336,6 +336,138 @@ test('L1-B worker barrier produces exactly one Manager reconciliation action', (
   assert.deepEqual(recheck.actions, []);
 });
 
+test('L1-B Resume consumes terminal barrier evidence recorded while paused exactly once', () => {
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'resume-barrier-manager-request', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'resume-barrier-manager',
+    purpose: OrchestrationActivationPurpose.DELEGATE,
+  }), 1).runtime;
+  let result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'resume-barrier-manager-terminal', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'resume-barrier-manager',
+    status: 'COMPLETED',
+  }), 2);
+  runtime = result.runtime;
+  const childActions = result.actions;
+  assert.equal(childActions.length, 2);
+
+  for (const [index, action] of childActions.entries()) {
+    runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, `resume-barrier-child-confirm-${index}`, {
+      nodeId: action.nodeId,
+      generation: action.generation,
+      activationId: action.activationId,
+    }), 10 + index).runtime;
+  }
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.PAUSE_SCOPE, 'resume-barrier-pause', {
+    nodeId: 'manager',
+  }), 20).runtime;
+
+  for (const [index, action] of childActions.entries()) {
+    result = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, `resume-barrier-child-terminal-${index}`, {
+      nodeId: action.nodeId,
+      generation: action.generation,
+      activationId: action.activationId,
+      status: index === 0 ? 'NO_ACTION' : 'COMPLETED',
+    }), 21 + index);
+    runtime = result.runtime;
+    assert.equal(result.reason, 'SCOPE_PAUSED');
+    assert.deepEqual(result.actions, []);
+  }
+
+  const resumeEvent = event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'resume-barrier-resume', {
+    nodeId: 'manager',
+  });
+  result = reduce(g, runtime, resumeEvent, 30);
+  runtime = result.runtime;
+  assert.equal(result.reason, 'RUNNING');
+  assert.equal(result.actions.length, 1);
+  assert.equal(result.actions[0].type, OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT);
+  assert.equal(result.actions[0].nodeId, 'manager');
+  assert.equal(result.actions[0].purpose, OrchestrationActivationPurpose.RECONCILE);
+
+  const exactReplay = reduce(g, runtime, resumeEvent, 31);
+  assert.equal(exactReplay.deduplicated, true);
+  assert.deepEqual(exactReplay.actions, []);
+
+  const secondResume = reduce(g, exactReplay.runtime, event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'resume-barrier-resume-again', {
+    nodeId: 'manager',
+  }), 32);
+  assert.deepEqual(secondResume.actions, []);
+});
+
+test('L1-B Resume never forces reconciliation over an in-flight parent activation', () => {
+  const g = graph();
+  let runtime = createOrchestrationHierarchyRuntime(g, START);
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, 'resume-inflight-manager-request', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'resume-inflight-manager',
+    purpose: OrchestrationActivationPurpose.DELEGATE,
+  }), 1).runtime;
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, 'resume-inflight-manager-confirm', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'resume-inflight-manager',
+  }), 2).runtime;
+
+  const childActivations = [];
+  for (const [index, childId] of ['worker-1', 'worker-2'].entries()) {
+    let child = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED, `resume-inflight-child-request-${index}`, {
+      nodeId: childId,
+      generation: 1,
+      activationId: `resume-inflight-${childId}`,
+      purpose: OrchestrationActivationPurpose.WORK,
+    }), 3 + index);
+    runtime = child.runtime;
+    assert.equal(child.actions.length, 1);
+    childActivations.push(child.actions[0]);
+    runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_EFFECT_CONFIRMED, `resume-inflight-child-confirm-${index}`, {
+      nodeId: childId,
+      generation: 1,
+      activationId: `resume-inflight-${childId}`,
+    }), 5 + index).runtime;
+  }
+
+  runtime = reduce(g, runtime, event(OrchestrationHierarchyEventType.PAUSE_SCOPE, 'resume-inflight-pause', {
+    nodeId: 'manager',
+  }), 10).runtime;
+
+  for (const [index, action] of childActivations.entries()) {
+    const terminal = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, `resume-inflight-child-terminal-${index}`, {
+      nodeId: action.nodeId,
+      generation: action.generation,
+      activationId: action.activationId,
+      status: 'COMPLETED',
+    }), 11 + index);
+    runtime = terminal.runtime;
+    assert.deepEqual(terminal.actions, []);
+  }
+
+  let result = reduce(g, runtime, event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'resume-inflight-resume', {
+    nodeId: 'manager',
+  }), 20);
+  runtime = result.runtime;
+  assert.deepEqual(result.actions, []);
+  assert.equal(runtime.nodesById.manager.activationLedger['resume-inflight-manager'].phase, OrchestrationActivationPhase.EFFECT_CONFIRMED);
+
+  const parentTerminal = reduce(g, runtime, event(OrchestrationHierarchyEventType.NODE_TERMINAL, 'resume-inflight-manager-terminal', {
+    nodeId: 'manager',
+    generation: 1,
+    activationId: 'resume-inflight-manager',
+    status: 'COMPLETED',
+  }), 21);
+  assert.equal(parentTerminal.actions.length, 1);
+  assert.equal(parentTerminal.actions[0].type, OrchestrationHierarchyActionType.SEND_RECONCILIATION_PROMPT);
+  assert.equal(parentTerminal.actions[0].nodeId, 'manager');
+});
+
 test('L1-B pause subtree blocks child launch and resume restores eligibility', () => {
   const g = graph();
   let runtime = createOrchestrationHierarchyRuntime(g, START);
