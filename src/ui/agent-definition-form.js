@@ -409,6 +409,24 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     throw new Error('Definition revision має бути додатним цілим числом.');
   }
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Форма Agent definition недоступна.');
+  const effectiveConfigDefaults = mergeAgentDefinitionModelDefaultsV1(input, configDefaults);
+  const effectiveModelRoutePolicy = buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
+    persistedPolicy: modelRoutePolicy,
+  });
+  const legacyPinnedRouteId = effectiveConfigDefaults.aiPinnedRouteId || '';
+  if (effectiveModelRoutePolicy && legacyPinnedRouteId) {
+    if (effectiveModelRoutePolicy.pinnedRouteId
+        && effectiveModelRoutePolicy.pinnedRouteId !== legacyPinnedRouteId) {
+      throw new Error('Legacy pinned route конфліктує з Model Router policy pinned route.');
+    }
+    if (effectiveModelRoutePolicy.allowRouteIds.length
+        && !effectiveModelRoutePolicy.allowRouteIds.includes(legacyPinnedRouteId)) {
+      throw new Error('Legacy pinned route поза Model Router policy allow scope.');
+    }
+    if (effectiveModelRoutePolicy.denyRouteIds.includes(legacyPinnedRouteId)) {
+      throw new Error('Legacy pinned route заборонений Model Router policy deny scope.');
+    }
+  }
   return {
     schemaVersion: 1,
     agentDefinitionId: parseCanonicalAgentIdentity(input.agentDefinitionId, 'Agent definition ID'),
@@ -419,10 +437,8 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     toolIds: listFromLines(input.toolIdsText ?? '', 'Tool ID', { maxItems:128, itemMax:180, identity:true }),
     tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
-    configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
-    modelRoutePolicy: buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
-      persistedPolicy: modelRoutePolicy,
-    }),
+    configDefaults: effectiveConfigDefaults,
+    modelRoutePolicy: effectiveModelRoutePolicy,
     ...(() => {
       const effectiveProfile = Object.hasOwn(input, 'specialistDelegationConfigured')
         ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
