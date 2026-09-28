@@ -309,6 +309,15 @@ export class AiOrchestrator {
           maxOutputTokens: bounded,
           callNumber: callsUsed + 1,
         });
+        if (!reservation
+            || typeof reservation !== 'object'
+            || Array.isArray(reservation)
+            || typeof reservation.reservationId !== 'string'
+            || !reservation.reservationId.trim()) {
+          const error = new Error('AI provider-call lifecycle did not admit a durable budget reservation');
+          error.code = 'AI_PROVIDER_BUDGET_RESERVATION_MISSING';
+          throw attachFailureRuntime(error);
+        }
       }
       callsUsed += 1;
       let value;
