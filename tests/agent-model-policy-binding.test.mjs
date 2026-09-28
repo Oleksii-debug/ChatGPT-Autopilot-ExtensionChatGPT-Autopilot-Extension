@@ -485,7 +485,7 @@ test('routePolicy input is fail-closed rather than truthy/falsy/null-coerced', (
   for (const routePolicy of [false, null]) {
     assert.throws(
       () => createAgentModelPolicyBindingV1(request({ routePolicy })),
-      /AI route policy must be an object/,
+      /Agent AiRoutePolicy must be a plain object/,
     );
   }
 
@@ -500,6 +500,68 @@ test('routePolicy input is fail-closed rather than truthy/falsy/null-coerced', (
       /Child AiRoutePolicy must be a plain object/,
     );
   }
+});
+
+test('routePolicy fields reject coercive aliases before canonical Router normalization', () => {
+  const badTopLevelPolicies = [
+    { autoSwitch: 0 },
+    { freeOnly: 1 },
+    { orderedRouteIds: false },
+    { allowRouteIds: null },
+    { denyRouteIds: false },
+    { pinnedRouteId: null },
+    { locality: false },
+    { maxInputPricePerMillionUsd: '3' },
+    { maxOutputPricePerMillionUsd: '4' },
+    { retryBackoffSeconds: '30' },
+    { circuitBreakerFailures: '2' },
+    { circuitBreakerSeconds: '60' },
+    { allowRouteIds: [' route.a'] },
+  ];
+  for (const routePolicy of badTopLevelPolicies) {
+    assert.throws(
+      () => createAgentModelPolicyBindingV1(request({ routePolicy })),
+      /Agent AiRoutePolicy/,
+    );
+  }
+
+  const parent = createAgentModelPolicyBindingV1(request({ agentId: 'agent.parent' }));
+  assert.throws(
+    () => createAgentModelPolicyBindingV1(request({
+      agentId: 'agent.child',
+      policyRevision: 2,
+      parentBinding: parent,
+      routePolicy: { retryBackoffSeconds: '120' },
+    })),
+    /Child AiRoutePolicy\.retryBackoffSeconds must be an exact integer/,
+  );
+});
+
+test('durable routePolicy representation is complete and rejects normalization aliases', () => {
+  const binding = createAgentModelPolicyBindingV1(request());
+
+  for (const routePolicy of [
+    { ...binding.routePolicy, autoSwitch: 1 },
+    { ...binding.routePolicy, orderedRouteIds: false },
+    { ...binding.routePolicy, retryBackoffSeconds: String(binding.routePolicy.retryBackoffSeconds) },
+  ]) {
+    assert.throws(
+      () => normalizeAgentModelPolicyBindingV1({ ...binding, routePolicy }),
+      /Durable Agent AiRoutePolicy/,
+    );
+  }
+
+  const incomplete = { ...binding.routePolicy };
+  delete incomplete.freeOnly;
+  assert.throws(
+    () => normalizeAgentModelPolicyBindingV1({ ...binding, routePolicy: incomplete }),
+    /Durable Agent AiRoutePolicy\.freeOnly is required/,
+  );
+
+  assert.throws(
+    () => normalizeAgentModelPolicyBindingV1({ ...binding, parentAgentId: '' }),
+    /parentAgentId is invalid/,
+  );
 });
 
 test('canonical route-pool normalizer remains the only route metadata authority', () => {
