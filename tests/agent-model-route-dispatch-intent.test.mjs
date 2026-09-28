@@ -94,10 +94,7 @@ function selection() {
 
 function materialized() {
   const reg = registry();
-  const selected = selectAgentDefinitionV1({
-    registry: reg,
-    agentDefinitionId: 'agent.research',
-  });
+  const selected = selection();
   return materializeAgentDefinitionV1({
     registry: reg,
     selection: selected,
@@ -136,7 +133,7 @@ function binding() {
   });
 }
 
-function parentBinding() {
+function parentModelPolicyBinding(overrides = {}) {
   return createAgentModelPolicyBindingV1({
     projectId: 'project.alpha',
     agentId: 'agent.parent',
@@ -144,11 +141,15 @@ function parentBinding() {
     routePoolRevision: 9,
     routePool: pool(),
     ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
-    routePolicy: { allowRouteIds: ['route.a', 'route.b', 'route.c'], locality: 'remote' },
+    routePolicy: {
+      allowRouteIds: ['route.a', 'route.b', 'route.c'],
+      locality: 'remote',
+    },
+    ...overrides,
   });
 }
 
-function childBinding(parent) {
+function childBinding(parentBinding = parentModelPolicyBinding()) {
   const mat = materialized();
   return createAgentDefinitionModelPolicyBindingV1({
     materializedAgent: mat,
@@ -158,7 +159,7 @@ function childBinding(parent) {
     routePool: pool(),
     routePoolRevision: 9,
     ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
-    parentBinding: parent,
+    parentBinding,
   });
 }
 
@@ -196,6 +197,29 @@ test('prepares exact canonical provider identity only after fresh bound ranking'
   assert.equal(result.definitionRevision, 4);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.route), true);
+});
+
+test('child dispatch forwards exact owner-current parent policy provenance', () => {
+  const parentBinding = parentModelPolicyBinding();
+  const current = childBinding(parentBinding);
+  const result = createBoundAgentModelRouteDispatchIntentV1(request({
+    definitionModelPolicyBinding: current,
+    currentDefinitionModelPolicyBindingKey: current.bindingKey,
+    currentParentModelPolicyBinding: parentBinding,
+    currentParentModelPolicyBindingKey: parentBinding.bindingKey,
+  }));
+
+  assert.equal(result.routeId, 'route.b');
+  assert.equal(result.parentModelPolicyBindingKey, parentBinding.bindingKey);
+
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({
+      definitionModelPolicyBinding: current,
+      currentDefinitionModelPolicyBindingKey: current.bindingKey,
+      currentParentModelPolicyBinding: parentBinding,
+    })),
+    /requires current parent model-policy provenance/u,
+  );
 });
 
 test('expected prior preference detects route-state TOCTOU before dispatch preparation', () => {
@@ -293,27 +317,6 @@ test('dispatch intent grants no provider, execution, credential or route-selecti
   assert.equal(result.authority.requiresProviderCallLifecycleRevalidation, true);
 });
 
-
-test('dispatch intent preserves exact current parent model-policy provenance', () => {
-  const parent = parentBinding();
-  const current = childBinding(parent);
-  const result = createBoundAgentModelRouteDispatchIntentV1(request({
-    definitionModelPolicyBinding: current,
-    currentDefinitionModelPolicyBindingKey: current.bindingKey,
-    currentParentModelPolicyBinding: parent,
-    currentParentModelPolicyBindingKey: parent.bindingKey,
-  }));
-  assert.equal(result.parentModelPolicyBindingKey, parent.bindingKey);
-
-  assert.throws(
-    () => createBoundAgentModelRouteDispatchIntentV1(request({
-      definitionModelPolicyBinding: current,
-      currentDefinitionModelPolicyBindingKey: current.bindingKey,
-      currentParentModelPolicyBinding: parent,
-    })),
-    /requires current parent model-policy provenance/u,
-  );
-});
 
 test('dispatch capability provenance is dense data-only and duplicate-free', () => {
   assert.throws(
