@@ -611,7 +611,7 @@ The final product still requires:
 - website/CMS administration;
 - image/vision/media;
 - professional design loop;
-- calendar scheduling from #151;
+- calendar scheduling from #151, including text-first keyboard/NVDA date/time entry, non-AI Session occurrence schedules, and delayed whole-algorithm start for Scenario/Orchestration; binding detail: `docs/SCHEDULING_ACCESSIBILITY_AND_ALGORITHM_START.md`;
 - CredentialBroker;
 - owner authority ALLOW | ASK | DENY;
 - physical Windows 11 + Chrome + NVDA acceptance.

@@ -2,7 +2,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_REVISION_CURSORS = 32;
 const MAX_RECURRENCE_OCCURRENCES = 1_000_000;
 
-export const CalendarScheduleKind = Object.freeze({ ONE_TIME: 'ONE_TIME', DAILY: 'DAILY', WEEKLY: 'WEEKLY', EXPLICIT: 'EXPLICIT' });
+export const CalendarScheduleKind = Object.freeze({ ONE_TIME: 'ONE_TIME', DAILY: 'DAILY', WEEKLY: 'WEEKLY', INTERVAL: 'INTERVAL', EXPLICIT: 'EXPLICIT' });
 export const CalendarCatchUp = Object.freeze({ OFF: 'OFF', ON: 'ON' });
 
 function requireRecord(value, label) { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`Invalid ${label}`); }
@@ -56,6 +56,7 @@ function denseArrayValues(value, label, maxLength) {
 }
 function normalizeWeekdays(values) { const dense = denseArrayValues(values, 'weekdays', 7); const weekdays = [...new Set(dense.map(parseWeekday))].sort((a, b) => a - b); if (!weekdays.length) throw new Error('Calendar WEEKLY schedule requires 1-7 unique weekdays'); return weekdays; }
 function normalizeMaxOccurrences(value) { if (value == null || value === '') return null; if (!Number.isSafeInteger(value) || value < 1 || value > MAX_RECURRENCE_OCCURRENCES) throw new Error(`Calendar recurrence maxOccurrences must be 1-${MAX_RECURRENCE_OCCURRENCES}`); return value; }
+function normalizeIntervalSeconds(value) { if (!Number.isSafeInteger(value) || value < 1 || value > 31_536_000) throw new Error('Calendar INTERVAL intervalSeconds must be 1-31536000'); return value; }
 function normalizeRecurrenceBounds(input, startDate) { const bounds = {}; if (input.endDate != null && input.endDate !== '') { const endDate = parseDate(input.endDate, 'endDate').key; if (endDate < startDate) throw new Error('Calendar recurrence endDate precedes startDate'); bounds.endDate = endDate; } const maxOccurrences = normalizeMaxOccurrences(input.maxOccurrences); if (maxOccurrences != null) bounds.maxOccurrences = maxOccurrences; return bounds; }
 function isoWeekday(date) { const day = new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay(); return day === 0 ? 7 : day; }
 function daysBetween(start, end) { return Math.trunc((Date.UTC(end.year, end.month - 1, end.day) - Date.UTC(start.year, start.month - 1, start.day)) / DAY_MS); }
@@ -69,6 +70,13 @@ function normalizeExplicitOccurrence(item, timeZone) { requireRecord(item, 'cale
 export function normalizeCalendarSchedule(input) {
   requireRecord(input, 'calendar schedule'); const kind = String(input.kind || '').toUpperCase(); if (!Object.values(CalendarScheduleKind).includes(kind)) throw new Error('Invalid calendar schedule kind'); const timeZone = requireTimeZone(input.timeZone); const catchUp = String(input.catchUp || CalendarCatchUp.OFF).toUpperCase(); if (!Object.values(CalendarCatchUp).includes(catchUp)) throw new Error('Invalid calendar schedule catchUp'); const schedule = { kind, timeZone, catchUp };
   if (kind === CalendarScheduleKind.ONE_TIME) { const occurrence = normalizeExplicitOccurrence({ date: input.date, time: input.time }, timeZone); return { ...schedule, date: occurrence.date, time: occurrence.time }; }
+  if (kind === CalendarScheduleKind.INTERVAL) {
+    const start = normalizeExplicitOccurrence({ date: input.startDate, time: input.startTime }, timeZone);
+    const interval = { ...schedule, startDate: start.date, startTime: start.time, intervalSeconds: normalizeIntervalSeconds(input.intervalSeconds) };
+    const maxOccurrences = normalizeMaxOccurrences(input.maxOccurrences);
+    if (maxOccurrences != null) interval.maxOccurrences = maxOccurrences;
+    return interval;
+  }
   if (kind === CalendarScheduleKind.DAILY || kind === CalendarScheduleKind.WEEKLY) {
     const startDate = parseDate(input.startDate, 'startDate').key;
     const timeValues = denseArrayValues(input.times ?? [], 'times', 48);
@@ -159,11 +167,43 @@ function nextRecurring(sessionId, schedule, revision, runtime, now, finder) {
 }
 function nextDaily(sessionId, schedule, revision, runtime, now) { return nextRecurring(sessionId, schedule, revision, runtime, now, firstDailyCandidateOnOrAfter); }
 function nextWeekly(sessionId, schedule, revision, runtime, now) { return nextRecurring(sessionId, schedule, revision, runtime, now, firstWeeklyCandidateOnOrAfter); }
+function intervalCandidate(sessionId, schedule, revision, scheduledAt) {
+  const local = localPartsAt(scheduledAt, schedule.timeZone);
+  return {
+    id: occurrenceId(sessionId, scheduledAt, revision),
+    revision,
+    scheduledAt,
+    localDate: `${local.year}-${String(local.month).padStart(2, '0')}-${String(local.day).padStart(2, '0')}`,
+    localTime: `${String(local.hour).padStart(2, '0')}:${String(local.minute).padStart(2, '0')}:${String(local.second).padStart(2, '0')}`,
+  };
+}
+function nextInterval(sessionId, schedule, revision, runtime, now) {
+  const startAt = zonedDateTimeToEpochMs({ date: schedule.startDate, time: schedule.startTime, timeZone: schedule.timeZone });
+  const intervalMs = schedule.intervalSeconds * 1000;
+  const cursor = revisionCursor(runtime, revision, schedule);
+  let floor;
+  if (schedule.catchUp === CalendarCatchUp.OFF) {
+    floor = Math.max(now, cursor == null ? startAt : cursor + 1);
+  } else {
+    floor = cursor == null ? startAt : cursor + 1;
+  }
+  const delta = Math.max(0, floor - startAt);
+  const index = Math.ceil(delta / intervalMs);
+  if (schedule.maxOccurrences != null && index >= schedule.maxOccurrences) return null;
+  const scheduledAt = startAt + index * intervalMs;
+  const item = intervalCandidate(sessionId, schedule, revision, scheduledAt);
+  return {
+    ...item,
+    due: scheduledAt <= now,
+    catchUp: schedule.catchUp === CalendarCatchUp.ON && scheduledAt < now,
+  };
+}
 
 export function nextCalendarOccurrence({ sessionId, schedule: rawSchedule, runtime = {}, now = Date.now() }) {
   const schedule = normalizeCalendarSchedule(rawSchedule); const revision = calendarScheduleRevision(schedule);
   if (schedule.kind === CalendarScheduleKind.DAILY) return nextDaily(sessionId, schedule, revision, runtime, now);
   if (schedule.kind === CalendarScheduleKind.WEEKLY) return nextWeekly(sessionId, schedule, revision, runtime, now);
+  if (schedule.kind === CalendarScheduleKind.INTERVAL) return nextInterval(sessionId, schedule, revision, runtime, now);
   const committed = new Set(Array.isArray(runtime.committedOccurrenceIds) ? runtime.committedOccurrenceIds : []); const cursor = revisionCursor(runtime, revision, schedule);
   const candidates = (schedule.kind === CalendarScheduleKind.ONE_TIME ? [candidate(sessionId, schedule, revision, parseDate(schedule.date), parseTime(schedule.time))] : schedule.occurrences.map(item => candidate(sessionId, schedule, revision, parseDate(item.date), parseTime(item.time)))).filter(item => !committed.has(item.id) && (cursor == null || item.scheduledAt > cursor));
   if (!candidates.length) return null; if (schedule.catchUp === CalendarCatchUp.ON) { const due = candidates.filter(item => item.scheduledAt <= now); if (due.length) return { ...due[0], due: true, catchUp: due[0].scheduledAt < now }; } const future = candidates.find(item => item.scheduledAt >= now); if (!future) return null; return { ...future, due: future.scheduledAt <= now, catchUp: false };

@@ -17,6 +17,7 @@ export const ScenarioWorkMode = Object.freeze({
 export const ScenarioWorkRunState = Object.freeze({
   STOPPED: 'STOPPED',
   RUNNING: 'RUNNING',
+  WAITING_SCHEDULE: 'WAITING_SCHEDULE',
   PAUSED: 'PAUSED',
   COMPLETED: 'COMPLETED',
   ERROR: 'ERROR',
@@ -59,6 +60,11 @@ function int(value, fallback, min, max) {
   return Math.max(min, Math.min(max, number));
 }
 function bool(value, fallback = false) { return value === undefined ? fallback : value === true; }
+function epochMs(value) {
+  const number = Number(value || 0);
+  if (!Number.isSafeInteger(number) || number < 0) return 0;
+  return number;
+}
 
 function normalizeChatUrl(value) {
   const raw = trimmed(value) || 'https://chatgpt.com/';
@@ -105,6 +111,7 @@ export function normalizeScenarioWorkConfig(raw = {}) {
     busyCheckDelaySeconds: int(raw.busyCheckDelaySeconds, 3, 1, 30),
     retryBackoffSeconds: int(raw.retryBackoffSeconds, 30, 5, 3600),
     timeoutPolicy,
+    startNotBeforeAt: epochMs(raw.startNotBeforeAt),
   };
 
   if (mode === ScenarioWorkMode.CHAT_CYCLE) {
@@ -211,6 +218,7 @@ export function createScenarioWorkRuntime(configRaw, now = Date.now()) {
     lastActionAt: 0,
     lastLaunchAt: 0,
     nextLaunchAt: 0,
+    scheduledStartAt: 0,
     lastError: '',
     totalLaunches: 0,
     totalCompletedTurns: 0,
@@ -696,24 +704,45 @@ export function applyScenarioTimeout(configRaw, runtimeRaw, participantKey, { no
 
 export function startScenarioWork(configRaw, runtimeRaw, now = Date.now()) {
   const config = normalizeScenarioWorkConfig(configRaw);
-  const runtime = runtimeRaw ? clone(runtimeRaw) : createScenarioWorkRuntime(config, now);
-  if (runtime.runState === ScenarioWorkRunState.COMPLETED) return createScenarioWorkRuntime(config, now);
-  runtime.runState = ScenarioWorkRunState.RUNNING;
+  let runtime = runtimeRaw ? clone(runtimeRaw) : createScenarioWorkRuntime(config, now);
+  if (runtime.runState === ScenarioWorkRunState.COMPLETED) runtime = createScenarioWorkRuntime(config, now);
+  const startAt = Math.max(0, Number(config.startNotBeforeAt || 0));
+  runtime.scheduledStartAt = startAt > now ? startAt : 0;
+  runtime.runState = runtime.scheduledStartAt > now
+    ? ScenarioWorkRunState.WAITING_SCHEDULE
+    : ScenarioWorkRunState.RUNNING;
   runtime.updatedAt = now;
   runtime.lastError = '';
   return runtime;
 }
 
+export function activateScheduledScenarioWork(runtimeRaw, now = Date.now()) {
+  const runtime = clone(runtimeRaw);
+  if (runtime.runState !== ScenarioWorkRunState.WAITING_SCHEDULE) return runtime;
+  if (Number(runtime.scheduledStartAt || 0) > now) return runtime;
+  runtime.scheduledStartAt = 0;
+  runtime.runState = ScenarioWorkRunState.RUNNING;
+  runtime.updatedAt = now;
+  return runtime;
+}
+
 export function pauseScenarioWork(runtimeRaw, now = Date.now()) {
   const runtime = clone(runtimeRaw);
-  if (runtime.runState === ScenarioWorkRunState.RUNNING) runtime.runState = ScenarioWorkRunState.PAUSED;
+  if ([ScenarioWorkRunState.RUNNING, ScenarioWorkRunState.WAITING_SCHEDULE].includes(runtime.runState)) {
+    runtime.runState = ScenarioWorkRunState.PAUSED;
+  }
   runtime.updatedAt = now;
   return runtime;
 }
 
 export function resumeScenarioWork(runtimeRaw, now = Date.now()) {
   const runtime = clone(runtimeRaw);
-  if (runtime.runState === ScenarioWorkRunState.PAUSED) runtime.runState = ScenarioWorkRunState.RUNNING;
+  if (runtime.runState === ScenarioWorkRunState.PAUSED) {
+    runtime.runState = Number(runtime.scheduledStartAt || 0) > now
+      ? ScenarioWorkRunState.WAITING_SCHEDULE
+      : ScenarioWorkRunState.RUNNING;
+    if (runtime.runState === ScenarioWorkRunState.RUNNING) runtime.scheduledStartAt = 0;
+  }
   runtime.updatedAt = now;
   return runtime;
 }
@@ -721,6 +750,7 @@ export function resumeScenarioWork(runtimeRaw, now = Date.now()) {
 export function stopScenarioWork(runtimeRaw, now = Date.now()) {
   const runtime = clone(runtimeRaw);
   runtime.runState = ScenarioWorkRunState.STOPPED;
+  runtime.scheduledStartAt = 0;
   runtime.updatedAt = now;
   return runtime;
 }

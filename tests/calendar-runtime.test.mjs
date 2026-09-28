@@ -113,3 +113,23 @@ test('verified commit rejects occurrence from superseded schedule revision', () 
 test('unscheduled sessions remain backward compatible', () => {
   assert.deepEqual(calendarAdmissionForSession({ id: 'legacy' }, 0), { kind: 'UNSCHEDULED', occurrence: null });
 });
+
+
+test('catch-up OFF INTERVAL skips offline backlog and wakes at first future interval', () => {
+  const s = session({ kind: 'INTERVAL', timeZone: 'UTC', catchUp: 'OFF', startDate: '2026-09-25', startTime: '04:00', intervalSeconds: 3600 });
+  const now = utc('2026-09-25T06:30:00Z');
+  const skipped = calendarAdmissionForSession(s, now);
+  assert.equal(skipped.kind, CalendarOccurrenceState.MISSED_SKIPPED);
+  assert.equal(s.calendarRuntime.reconciledThrough, now - 1);
+  const next = calendarAdmissionForSession(s, now);
+  assert.equal(next.kind, CalendarOccurrenceState.WAITING);
+  assert.equal(next.occurrence.scheduledAt, utc('2026-09-25T07:00:00Z'));
+});
+
+test('catch-up ON INTERVAL exposes oldest missed occurrence without auto-commit', () => {
+  const s = session({ kind: 'INTERVAL', timeZone: 'UTC', catchUp: 'ON', startDate: '2026-09-25', startTime: '04:00', intervalSeconds: 3600 });
+  const result = calendarAdmissionForSession(s, utc('2026-09-25T06:30:00Z'));
+  assert.equal(result.kind, CalendarOccurrenceState.MISSED_WAITING_CATCHUP);
+  assert.equal(result.occurrence.scheduledAt, utc('2026-09-25T04:00:00Z'));
+  assert.deepEqual(s.calendarRuntime, {});
+});
