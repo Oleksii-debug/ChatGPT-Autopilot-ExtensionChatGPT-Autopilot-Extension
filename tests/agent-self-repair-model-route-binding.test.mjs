@@ -19,6 +19,8 @@ import {
   createBoundAgentSelfRepairModelOrchestratorEnvelopeV1,
   rankBoundAgentSelfRepairModelCandidatesV1,
 } from '../src/core/agent-self-repair-model-route-binding.js';
+import { CoreCommandDispatcher } from '../src/core/commands.js';
+import { createEmptyState, validateState } from '../src/core/schema.js';
 
 function route(routeId, overrides = {}) {
   return {
@@ -569,3 +571,110 @@ test('self-repair orchestrator composition requires current revalidation time', 
     /currentNow is invalid/u,
   );
 });
+
+
+class InvocationMemoryRepo {
+  constructor() {
+    this.state = createEmptyState(1_000);
+  }
+  async load() {
+    return structuredClone(this.state);
+  }
+  async update(mutator) {
+    const draft = structuredClone(this.state);
+    this.state = await mutator(draft) || draft;
+    this.state.revision += 1;
+    validateState(this.state);
+    return structuredClone(this.state);
+  }
+}
+
+for (const scenario of [
+  {
+    label: 'REPAIR',
+    intent: () => activeIntent({ role:'coder', capabilityIds:['cap.code'] }),
+    expectedOwner: 'actor-1',
+    expectedRole: 'coder',
+    expectedRoute: 'route.a',
+    expectedCapabilities: ['cap.code'],
+  },
+  {
+    label: 'RETEST',
+    intent: () => activeIntent({
+      workKind:'RETEST',
+      role:'verifier',
+      capabilityIds:['cap.reason'],
+    }),
+    expectedOwner: 'verifier-1',
+    expectedRole: 'verifier',
+    expectedRoute: 'route.b',
+    expectedCapabilities: ['cap.reason'],
+  },
+]) {
+  test(scenario.label + ' reaches canonical AiOrchestrator through the internal bounded envelope bridge', async () => {
+    const composed = createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(
+      orchestratorRequest(scenario.intent()),
+    );
+    const repo = new InvocationMemoryRepo();
+    const beforeSettings = structuredClone(repo.state.profile.aiRouter);
+    const beforeRuntime = structuredClone(repo.state.profile.aiRouterRuntime);
+    const calls = [];
+    const dispatcher = new CoreCommandDispatcher(repo, () => 1_790_620_000_200, {
+      aiOrchestrator: {
+        async run(settings, runtime, prompt, options) {
+          calls.push({
+            settings: structuredClone(settings),
+            runtime: structuredClone(runtime),
+            prompt,
+            options: structuredClone(options),
+          });
+          return {
+            text: scenario.label.toLowerCase() + ' result',
+            route: scenario.expectedRoute,
+            primary: {
+              provider: settings.routes[0].provider,
+              model: settings.routes[0].model,
+              routeId: settings.routes[0].routeId,
+            },
+            strong: null,
+            runtime: {
+              ...runtime,
+              requestCount: runtime.requestCount + 1,
+              lastRouteId: scenario.expectedRoute,
+            },
+          };
+        },
+      },
+    });
+
+    const result = await dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      {
+        prompt: scenario.label + ' bounded work',
+        maxOutputTokens: 256,
+        maxModelCallsForRequest: 1,
+      },
+      {
+        agentModelOrchestratorEnvelope: composed.orchestratorEnvelope,
+        providerCallBudgetContext: { jobId: scenario.expectedOwner },
+      },
+    );
+
+    assert.equal(result.result.text, scenario.label.toLowerCase() + ' result');
+    assert.equal(calls.length, 1);
+    assert.deepEqual(
+      calls[0].settings.routes.map(item => item.routeId),
+      [scenario.expectedRoute],
+    );
+    assert.equal(calls[0].settings.routePolicy.pinnedRouteId, scenario.expectedRoute);
+    assert.equal(calls[0].options.taskRole, scenario.expectedRole);
+    assert.equal(calls[0].options.strongTaskRole, scenario.expectedRole);
+    assert.deepEqual(calls[0].options.capabilityIds, scenario.expectedCapabilities);
+    assert.deepEqual(
+      calls[0].options.providerCallBudgetContext,
+      { jobId: scenario.expectedOwner },
+    );
+    assert.deepEqual(repo.state.profile.aiRouter, beforeSettings);
+    assert.deepEqual(repo.state.profile.aiRouterRuntime, beforeRuntime);
+  });
+}
