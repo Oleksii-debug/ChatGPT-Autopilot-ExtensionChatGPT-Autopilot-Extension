@@ -354,7 +354,7 @@ export function createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(input) {
   }
   const dispatchBinding = createBoundAgentSelfRepairModelDispatchV1(dispatchInput);
 
-  const orchestratorEnvelope = createBoundAgentModelOrchestratorEnvelopeV1({
+  const orchestratorRequest = {
     dispatchIntent: dispatchBinding.dispatchIntent,
     currentDefinitionModelPolicyBindingKey: own(raw, 'currentDefinitionModelPolicyBindingKey'),
     currentJobId: own(raw, 'currentJobId'),
@@ -363,7 +363,16 @@ export function createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(input) {
     currentRouterSettings: own(raw, 'currentRouterSettings'),
     currentRouterRuntime: own(raw, 'currentRouterRuntime'),
     currentNow: own(raw, 'currentNow'),
-  });
+  };
+  if (Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')) {
+    orchestratorRequest.currentParentModelPolicyBindingKey = own(
+      raw,
+      'currentParentModelPolicyBindingKey',
+    );
+  }
+  const orchestratorEnvelope = createBoundAgentModelOrchestratorEnvelopeV1(
+    orchestratorRequest,
+  );
 
   const capabilitiesMatch = orchestratorEnvelope.capabilityIds.length
       === dispatchBinding.routeIntent.capabilityIds.length
