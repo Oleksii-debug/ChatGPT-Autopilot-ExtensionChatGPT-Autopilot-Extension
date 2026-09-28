@@ -69,6 +69,40 @@ function cleanOptionalId(value, label) {
   return value;
 }
 
+function exactCapabilityIds(value) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype || value.length > 64) {
+    throw new Error('dispatch capabilityIds must be a bounded array');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const expected = new Set(['length', ...Array.from({ length: value.length }, (_, index) => String(index))]);
+  if (Reflect.ownKeys(descriptors).some(key => typeof key !== 'string' || !expected.has(key))) {
+    throw new Error('dispatch capabilityIds must be a dense data-only array');
+  }
+  const out = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    const item = descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+    if (!descriptor || descriptor.enumerable !== true
+        || typeof item !== 'string' || item !== item.trim()
+        || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u.test(item)) {
+      throw new Error('dispatch capabilityIds contains an invalid value');
+    }
+    out.push(item);
+  }
+  if (new Set(out).size !== out.length) throw new Error('dispatch capabilityIds contains duplicates');
+  return Object.freeze(out);
+}
+
+function exactNow(value) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0) {
+    throw new Error('dispatch now is invalid');
+  }
+  return value;
+}
+
 function freezeDeep(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freezeDeep(child);
@@ -81,12 +115,17 @@ export function createBoundAgentModelRouteDispatchIntentV1(input) {
     raw.expectedPreferredRouteId,
     'expectedPreferredRouteId',
   );
+  if (!Object.hasOwn(raw, 'now')) throw new Error('dispatch now is required');
+  const preparedAt = exactNow(raw.now);
+  const capabilityIds = exactCapabilityIds(raw.capabilityIds ?? []);
 
   const rankingInput = Object.create(null);
   for (const key of INPUT_KEYS) {
-    if (key === 'expectedPreferredRouteId') continue;
+    if (key === 'expectedPreferredRouteId' || key === 'capabilityIds' || key === 'now') continue;
     if (Object.hasOwn(raw, key)) rankingInput[key] = raw[key];
   }
+  rankingInput.capabilityIds = capabilityIds;
+  rankingInput.now = preparedAt;
 
   const ranking = rankBoundAgentModelRouteCandidatesV1(rankingInput);
   if (!ranking.preferredRouteId) {
@@ -121,9 +160,14 @@ export function createBoundAgentModelRouteDispatchIntentV1(input) {
     definitionRevision: ranking.definitionRevision,
     definitionModelPolicyBindingKey: ranking.definitionModelPolicyBindingKey,
     modelPolicyBindingKey: ranking.modelPolicyBindingKey,
+    ...(ranking.parentModelPolicyBindingKey ? {
+      parentModelPolicyBindingKey: ranking.parentModelPolicyBindingKey,
+    } : {}),
     routePoolRevision: ranking.routePoolRevision,
     role: ranking.role,
+    capabilityIds: [...capabilityIds],
     requiresVision: ranking.requiresVision,
+    preparedAt,
     routeId: route.routeId,
     route: {
       routeId: route.routeId,
