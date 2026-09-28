@@ -16,6 +16,9 @@ import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
 import { normalizeAiRoutePolicy } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
+import {
+  normalizeBoundAgentModelOrchestratorEnvelopeV1,
+} from './agent-model-orchestrator-envelope.js';
 
 const promptModeFromUi = value => String(value).toLowerCase() === 'unique' ? PromptMode.UNIQUE : PromptMode.SHARED;
 const runModeFromUi = value => String(value).toLowerCase() === 'one-pass' ? RunMode.ONE_PASS : RunMode.CONTINUOUS;
@@ -758,26 +761,55 @@ export class CoreCommandDispatcher {
     }
     if (command === CoreCommand.RUN_AI_ROUTED_PROMPT) {
       if (!this.aiOrchestrator) throw new Error('AI coordinator runtime is unavailable');
+      if (Object.hasOwn(payload, 'agentModelOrchestratorEnvelope')) {
+        throw new Error('Agent model orchestrator envelope is internal-only');
+      }
+      const internalEnvelope = internal?.agentModelOrchestratorEnvelope === undefined
+        ? null
+        : normalizeBoundAgentModelOrchestratorEnvelopeV1(
+          internal.agentModelOrchestratorEnvelope,
+        );
+      if (internalEnvelope) {
+        for (const alias of [
+          'settings','routerOverride','routerRuntime','isolatedRuntime',
+          'forceStrong','taskRole','strongTaskRole','capabilityIds',
+        ]) {
+          if (Object.hasOwn(payload, alias)) {
+            throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
+          }
+        }
+      }
+
       const state = await this.repo.load();
-      const baseSettings = normalizeAiRouterSettings(payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
-      const settings = payload.routerOverride
-        ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
-        : baseSettings;
-      const isolatedRuntime = payload.isolatedRuntime === true;
-      const runtime = isolatedRuntime
-        ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
-        : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
+      const baseSettings = internalEnvelope
+        ? internalEnvelope.settings
+        : normalizeAiRouterSettings(
+          payload.settings || state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
+      const settings = internalEnvelope
+        ? baseSettings
+        : payload.routerOverride
+          ? mergeAiRouterSettingsOverride(baseSettings, payload.routerOverride)
+          : baseSettings;
+      const isolatedRuntime = internalEnvelope ? true : payload.isolatedRuntime === true;
+      const runtime = internalEnvelope
+        ? internalEnvelope.runtime
+        : isolatedRuntime
+          ? normalizeAiRouterRuntime(payload.routerRuntime || DEFAULT_AI_ROUTER_RUNTIME)
+          : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
         result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
           systemPrompt: payload.systemPrompt || '',
-          forceStrong: payload.forceStrong === true,
+          forceStrong: internalEnvelope ? false : payload.forceStrong === true,
           maxOutputTokens: Number(payload.maxOutputTokens || 0),
           maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
           imageDataUrl: payload.imageDataUrl || '',
-          taskRole: payload.taskRole || 'planner',
-          strongTaskRole: payload.strongTaskRole || 'verifier',
-          capabilityIds: Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
+          taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
+          strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
+          capabilityIds: internalEnvelope
+            ? [...internalEnvelope.capabilityIds]
+            : Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [],
           providerCallBudgetContext: internal?.providerCallBudgetContext || null,
         });
       } catch (error) {
