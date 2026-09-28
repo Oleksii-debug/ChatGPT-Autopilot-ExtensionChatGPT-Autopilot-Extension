@@ -334,6 +334,10 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
     if (policy.pinnedRouteId && !allow.has(policy.pinnedRouteId)) {
       throw new Error('Pinned model route ID поза allow scope: ' + policy.pinnedRouteId);
     }
+    const denied = new Set(policy.denyRouteIds);
+    if (policy.allowRouteIds.every(routeId => denied.has(routeId))) {
+      throw new Error('Model Router policy deny scope перекриває весь явний allow scope.');
+    }
   }
   if (policy.pinnedRouteId && policy.denyRouteIds.includes(policy.pinnedRouteId)) {
     throw new Error('Pinned model route ID одночасно заборонений deny policy.');
