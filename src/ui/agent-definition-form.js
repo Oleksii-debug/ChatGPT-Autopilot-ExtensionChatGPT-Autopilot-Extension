@@ -265,7 +265,9 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
         ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
           persistedProfile: specialistDelegationProfile,
         })
-        : specialistDelegationProfile;
+        : specialistDelegationProfile === undefined || specialistDelegationProfile === null
+          ? specialistDelegationProfile
+          : normalizeAgentSpecialistDelegationProfileV1(specialistDelegationProfile);
       return effectiveProfile === undefined
         ? {}
         : { specialistDelegationProfile: effectiveProfile };
