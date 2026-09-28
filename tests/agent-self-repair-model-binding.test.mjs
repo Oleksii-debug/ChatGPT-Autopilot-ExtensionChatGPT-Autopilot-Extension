@@ -636,6 +636,13 @@ test('durable normalization round-trips terminal binding without inventing dispa
   assert.deepEqual(restarted, binding);
   assert.equal(restarted.routeIntent, null);
   assert.equal(restarted.workBudget, null);
+
+  const terminalRevisionSwap = JSON.parse(JSON.stringify(binding));
+  terminalRevisionSwap.verifierPlanRevisionId = 'verifier-plan-r2';
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(terminalRevisionSwap),
+    /bindingKey is inconsistent/u,
+  );
 });
 
 test('restart normalization fails closed on actor/verifier role or owner substitution', () => {
