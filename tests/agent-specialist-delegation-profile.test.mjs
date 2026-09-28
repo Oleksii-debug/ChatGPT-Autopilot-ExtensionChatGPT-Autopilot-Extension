@@ -190,7 +190,7 @@ test('launch binding snapshots mutable caller data and rejects accessor substitu
   });
   assert.throws(
     () => normalizeAgentSpecialistDelegationBindingV1(hostile),
-    /binding\.profile must be an enumerable own data property/u,
+    /AgentSpecialistDelegationBindingV1\.profile must be an enumerable own data property/u,
   );
   assert.equal(reads, 0);
 });
