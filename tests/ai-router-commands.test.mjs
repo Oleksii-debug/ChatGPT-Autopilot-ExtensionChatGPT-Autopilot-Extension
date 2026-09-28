@@ -799,6 +799,24 @@ test('Agent router override boundary rejects accessors without executing them', 
     /data-only fields/,
   );
   assert.equal(reads, 0);
+
+  const hostilePolicy = {};
+  Object.defineProperty(hostilePolicy, 'retryBackoffSeconds', {
+    enumerable:true,
+    get() {
+      reads += 1;
+      return 120;
+    },
+  });
+  await assert.rejects(
+    () => dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt:'x',
+      isolatedRuntime:true,
+      routerOverride:{ routePolicy: hostilePolicy },
+    }),
+    /data-only fields/,
+  );
+  assert.equal(reads, 0);
 });
 
 
