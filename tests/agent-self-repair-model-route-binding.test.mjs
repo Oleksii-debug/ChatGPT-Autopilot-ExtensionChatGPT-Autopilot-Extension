@@ -616,6 +616,12 @@ for (const scenario of [
       orchestratorRequest(scenario.intent()),
     );
     const repo = new InvocationMemoryRepo();
+    repo.state.profile.aiRouter = structuredClone(
+      orchestratorRequest(scenario.intent()).currentRouterSettings,
+    );
+    repo.state.profile.aiRouterRuntime = structuredClone(
+      orchestratorRequest(scenario.intent()).currentRouterRuntime,
+    );
     const beforeSettings = structuredClone(repo.state.profile.aiRouter);
     const beforeRuntime = structuredClone(repo.state.profile.aiRouterRuntime);
     const calls = [];
