@@ -216,7 +216,7 @@ test('ranks only candidates inside exact durable Agent model-policy scope', () =
   assert.deepEqual(result.effectiveRouteIds, ['route.a', 'route.b']);
   assert.deepEqual(result.eligibleRouteIds, ['route.b', 'route.a']);
   assert.deepEqual(result.availableRouteIds, ['route.b', 'route.a']);
-  assert.equal(result.selectedRouteId, 'route.b');
+  assert.equal(result.preferredRouteId, 'route.b');
   assert.equal(result.availableRouteIds.includes('route.c'), false);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.availableRouteIds), true);
@@ -230,7 +230,7 @@ test('canonical role and capability filtering are preserved inside bound scope',
 
   assert.deepEqual(result.eligibleRouteIds, ['route.a']);
   assert.deepEqual(result.availableRouteIds, ['route.a']);
-  assert.equal(result.selectedRouteId, 'route.a');
+  assert.equal(result.preferredRouteId, 'route.a');
 });
 
 test('temporary route state produces retry evidence without widening scope', () => {
@@ -246,7 +246,7 @@ test('temporary route state produces retry evidence without widening scope', () 
 
   assert.deepEqual(result.eligibleRouteIds, ['route.b', 'route.a']);
   assert.deepEqual(result.availableRouteIds, []);
-  assert.equal(result.selectedRouteId, null);
+  assert.equal(result.preferredRouteId, null);
   assert.equal(result.retryAt, now + 5_000);
 });
 
@@ -393,5 +393,5 @@ test('candidate result explicitly grants no provider or execution authority', ()
   assert.equal(result.authority.persistenceAuthorized, false);
   assert.equal(result.authority.schedulingAuthorized, false);
   assert.equal(result.authority.recoveryAuthorized, false);
-  assert.equal(result.authority.requiresCurrentRouteStateObservation, true);
+  assert.equal(result.authority.providerDispatchRevalidationRequired, true);
 });
