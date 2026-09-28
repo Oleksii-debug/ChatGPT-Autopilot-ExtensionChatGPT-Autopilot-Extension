@@ -415,15 +415,20 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   });
   const legacyPinnedRouteId = effectiveConfigDefaults.aiPinnedRouteId || '';
   if (effectiveModelRoutePolicy && legacyPinnedRouteId) {
-    if (effectiveModelRoutePolicy.pinnedRouteId
-        && effectiveModelRoutePolicy.pinnedRouteId !== legacyPinnedRouteId) {
+    const policyPinnedRouteId = effectiveModelRoutePolicy.pinnedRouteId || '';
+    const policyAllowRouteIds = Array.isArray(effectiveModelRoutePolicy.allowRouteIds)
+      ? effectiveModelRoutePolicy.allowRouteIds
+      : [];
+    const policyDenyRouteIds = Array.isArray(effectiveModelRoutePolicy.denyRouteIds)
+      ? effectiveModelRoutePolicy.denyRouteIds
+      : [];
+    if (policyPinnedRouteId && policyPinnedRouteId !== legacyPinnedRouteId) {
       throw new Error('Legacy pinned route конфліктує з Model Router policy pinned route.');
     }
-    if (effectiveModelRoutePolicy.allowRouteIds.length
-        && !effectiveModelRoutePolicy.allowRouteIds.includes(legacyPinnedRouteId)) {
+    if (policyAllowRouteIds.length && !policyAllowRouteIds.includes(legacyPinnedRouteId)) {
       throw new Error('Legacy pinned route поза Model Router policy allow scope.');
     }
-    if (effectiveModelRoutePolicy.denyRouteIds.includes(legacyPinnedRouteId)) {
+    if (policyDenyRouteIds.includes(legacyPinnedRouteId)) {
       throw new Error('Legacy pinned route заборонений Model Router policy deny scope.');
     }
   }
