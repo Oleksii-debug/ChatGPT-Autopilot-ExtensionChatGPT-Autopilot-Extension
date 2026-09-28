@@ -13,8 +13,10 @@ import {
 } from '../src/core/agent-self-repair-model-binding.js';
 import {
   AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY,
+  AGENT_SELF_REPAIR_MODEL_ORCHESTRATOR_BINDING_AUTHORITY,
   AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_AUTHORITY,
   createBoundAgentSelfRepairModelDispatchV1,
+  createBoundAgentSelfRepairModelOrchestratorEnvelopeV1,
   rankBoundAgentSelfRepairModelCandidatesV1,
 } from '../src/core/agent-self-repair-model-route-binding.js';
 
@@ -252,6 +254,30 @@ function terminalIntent() {
   return value;
 }
 
+function routerSettings(overrides = {}) {
+  return {
+    enabled: true,
+    gatewayUrl: 'http://127.0.0.1:3210',
+    timeoutSeconds: 180,
+    mode: 'primary',
+    primary: { provider: 'ollama', model: 'legacy' },
+    strong: { provider: 'openai', model: 'strong' },
+    routes: pool(),
+    routePolicy: {
+      autoSwitch: true,
+      pinnedRouteId: '',
+      orderedRouteIds: ['route.b', 'route.a', 'route.c'],
+      allowRouteIds: ['route.a', 'route.b', 'route.c'],
+      denyRouteIds: [],
+      freeOnly: false,
+      locality: 'remote',
+      maxInputPricePerMillionUsd: 4,
+      maxOutputPricePerMillionUsd: 5,
+    },
+    ...overrides,
+  };
+}
+
 function request(intent = activeIntent(), overrides = {}) {
   const binding = definitionBinding(intent.ownerId);
   return {
@@ -266,6 +292,16 @@ function request(intent = activeIntent(), overrides = {}) {
     routes: pool(),
     routeStates: {},
     now: 1_790_620_000_000,
+    ...overrides,
+  };
+}
+
+function orchestratorRequest(intent = activeIntent(), overrides = {}) {
+  return {
+    ...request(intent),
+    currentRouterSettings: routerSettings(),
+    currentRouterRuntime: { routeStates: {} },
+    currentNow: 1_790_620_000_100,
     ...overrides,
   };
 }
@@ -447,4 +483,89 @@ test('provider-bound self-repair dispatch requires explicit deterministic time',
 
   const candidates=rankBoundAgentSelfRepairModelCandidatesV1(input);
   assert.equal(candidates.workKind,'REPAIR');
+});
+
+
+test('REPAIR composes the current Router-authorized single-route orchestrator envelope', () => {
+  const intent=activeIntent({role:'coder',capabilityIds:['cap.code']});
+  const result=createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(
+    orchestratorRequest(intent),
+  );
+
+  assert.equal(result.workKind,'REPAIR');
+  assert.equal(result.ownerId,'actor-1');
+  assert.equal(result.orchestratorEnvelope.jobId,'actor-1');
+  assert.equal(result.orchestratorEnvelope.routeId,'route.a');
+  assert.deepEqual(result.orchestratorEnvelope.settings.routes.map(route=>route.routeId),['route.a']);
+  assert.deepEqual(result.orchestratorEnvelope.capabilityIds,['cap.code']);
+  assert.equal(result.orchestratorEnvelope.preparedAt,1_790_620_000_000);
+  assert.equal(result.orchestratorEnvelope.revalidatedAt,1_790_620_000_100);
+  assert.deepEqual(result.authority,AGENT_SELF_REPAIR_MODEL_ORCHESTRATOR_BINDING_AUTHORITY);
+  assert.equal(result.authority.orchestratorInvocationAuthorized,false);
+  assert.equal(result.authority.providerCallAuthorized,false);
+});
+
+test('RETEST composes verifier route without borrowing repair-worker authority', () => {
+  const intent=activeIntent({
+    workKind:'RETEST',
+    role:'verifier',
+    capabilityIds:['cap.reason'],
+  });
+  const result=createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(
+    orchestratorRequest(intent),
+  );
+
+  assert.equal(result.ownerId,'verifier-1');
+  assert.equal(result.orchestratorEnvelope.jobId,'verifier-1');
+  assert.equal(result.orchestratorEnvelope.role,'verifier');
+  assert.equal(result.orchestratorEnvelope.routeId,'route.b');
+  assert.deepEqual(result.orchestratorEnvelope.capabilityIds,['cap.reason']);
+});
+
+test('self-repair orchestrator composition cannot bypass current global Router deny or pin', () => {
+  const intent=activeIntent({role:'coder',capabilityIds:['cap.code']});
+
+  const denied=routerSettings();
+  denied.routePolicy={...denied.routePolicy,denyRouteIds:['route.a']};
+  assert.throws(
+    ()=>createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(
+      orchestratorRequest(intent,{currentRouterSettings:denied}),
+    ),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+
+  const pinned=routerSettings();
+  pinned.routePolicy={...pinned.routePolicy,pinnedRouteId:'route.c'};
+  assert.throws(
+    ()=>createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(
+      orchestratorRequest(intent,{currentRouterSettings:pinned}),
+    ),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('self-repair orchestrator composition re-observes current route backoff', () => {
+  const now=1_790_620_000_100;
+  assert.throws(
+    ()=>createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(
+      orchestratorRequest(undefined,{
+        currentNow:now,
+        currentRouterRuntime:{
+          routeStates:{
+            'route.a':{backoffUntil:now+5_000},
+          },
+        },
+      }),
+    ),
+    /not currently authorized by canonical Router policy\/state/u,
+  );
+});
+
+test('self-repair orchestrator composition requires current revalidation time', () => {
+  const input=orchestratorRequest();
+  delete input.currentNow;
+  assert.throws(
+    ()=>createBoundAgentSelfRepairModelOrchestratorEnvelopeV1(input),
+    /currentNow is invalid/u,
+  );
 });
