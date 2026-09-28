@@ -60,6 +60,9 @@ function definition(overrides = {}) {
       allowRouteIds: ['route.research'],
       freeOnly: true,
       locality: 'local',
+      retryBackoffSeconds: 120,
+      circuitBreakerFailures: 1,
+      circuitBreakerSeconds: 600,
     },
     enabled: true,
     definitionRevision: 1,
@@ -137,6 +140,9 @@ test('persisted Agent definition launches atomically into the canonical Browser 
   assert.deepEqual(created.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(created.job.definitionRouterOverride.routePolicy.autoSwitch, false);
   assert.equal(created.job.definitionRouterOverride.routePolicy.freeOnly, true);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.retryBackoffSeconds, 120);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.circuitBreakerFailures, 1);
+  assert.equal(created.job.definitionRouterOverride.routePolicy.circuitBreakerSeconds, 600);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1'], 'launch must reuse the one Browser Agent storage key');
 });
 
@@ -154,6 +160,9 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.deepEqual(loaded.job.definitionScope.toolIds, ['browser.read']);
   assert.deepEqual(loaded.job.definitionRouterOverride.routePolicy.allowRouteIds, ['route.research']);
   assert.equal(loaded.job.definitionRouterOverride.routePolicy.locality, 'local');
+  assert.equal(loaded.job.definitionRouterOverride.routePolicy.retryBackoffSeconds, 120);
+  assert.equal(loaded.job.definitionRouterOverride.routePolicy.circuitBreakerFailures, 1);
+  assert.equal(loaded.job.definitionRouterOverride.routePolicy.circuitBreakerSeconds, 600);
   assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
 });
 
