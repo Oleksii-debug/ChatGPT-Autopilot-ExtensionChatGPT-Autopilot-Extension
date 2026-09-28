@@ -720,10 +720,10 @@ test('exact retry produces the same event identity and canonical reducer dedupli
 
 test('result artifacts must be produced by the exact child invocation before trusted completion is even queried', async () => {
   const contract = outcomeContract();
-  const result = resultEnvelope({
-    contract,
-    resultProducerInvocationId: 'invocation-old-child',
-  });
+  const result = structuredClone(resultEnvelope({ contract }));
+  // Bypass the strict builder deliberately so this exercises the reconciliation
+  // admission boundary against hostile persisted/caller-shaped bytes.
+  result.resultArtifactRefs[0].producerInvocationId = 'invocation-old-child';
   const fixture = request({ contract, result });
   const calls = {};
   await assert.rejects(
@@ -731,7 +731,7 @@ test('result artifacts must be produced by the exact child invocation before tru
       fixture.input,
       deps({ contract, calls }),
     ),
-    /producerInvocationId is not bound to the exact result invocation/u,
+    /producerInvocationId must match child invocation|producerInvocationId is not bound to the exact result invocation/u,
   );
   assert.equal(calls.binding.length, 0);
   assert.equal(calls.contract.length, 0);
