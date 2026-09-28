@@ -185,10 +185,10 @@ test('readiness is evaluated only inside the exact current durable Agent model-p
   assert.equal(Object.isFrozen(result.readiness), true);
 });
 
-test('same-definition-revision alternate model binding cannot replace the owner-current binding', () => {
+test('same-definition-revision alternate durable binding cannot replace the owner-current binding', () => {
   const current = definitionBinding();
   const alternate = definitionBinding({
-    ownerAllowedRouteIds: ['route.b'],
+    routePoolRevision: 10,
   });
   assert.equal(alternate.definitionBinding.definitionRevision, current.definitionBinding.definitionRevision);
   assert.notEqual(alternate.bindingKey, current.bindingKey);
@@ -197,6 +197,7 @@ test('same-definition-revision alternate model binding cannot replace the owner-
     () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
       definitionModelPolicyBinding: alternate,
       currentDefinitionModelPolicyBindingKey: current.bindingKey,
+      currentRoutePoolRevision: 10,
     })),
     /not the current owner binding/u,
   );
