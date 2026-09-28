@@ -666,6 +666,51 @@ test('restart normalization fails closed on actor/verifier role or owner substit
   );
 });
 
+test('durable binding key rejects same-class route, node and revision substitution after restart', () => {
+  const original = JSON.parse(JSON.stringify(bindAgentSelfRepairModelIntentV1({
+    selfRepairRequest: repairSelfRepairRequest(),
+    routingRequest: routing(AiRouteRole.CODER),
+  })));
+
+  assert.equal(typeof original.bindingKey, 'string');
+  assert.ok(original.bindingKey.length > 0);
+
+  const roleSwap = structuredClone(original);
+  roleSwap.routeIntent.role = AiRouteRole.PLANNER;
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(roleSwap),
+    /bindingKey is inconsistent/u,
+  );
+
+  const capabilitySwap = structuredClone(original);
+  capabilitySwap.routeIntent.capabilityIds = ['cap.reason'];
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(capabilitySwap),
+    /bindingKey is inconsistent/u,
+  );
+
+  const nodeSwap = structuredClone(original);
+  nodeSwap.nodeId = 'repair-work-other';
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(nodeSwap),
+    /bindingKey is inconsistent/u,
+  );
+
+  const revisionSwap = structuredClone(original);
+  revisionSwap.failedNodeRevisionId = '2026-09-28T17:05:01.000Z';
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(revisionSwap),
+    /bindingKey is inconsistent/u,
+  );
+
+  const missingKey = structuredClone(original);
+  delete missingKey.bindingKey;
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(missingKey),
+    /requires bindingKey/u,
+  );
+});
+
 test('restart normalization preserves self-repair cycle state and unverified evidence provenance', () => {
   const binding = JSON.parse(JSON.stringify(bindAgentSelfRepairModelIntentV1({
     selfRepairRequest: repairSelfRepairRequest(),
