@@ -210,6 +210,25 @@ function modelRouteIdListFromLines(value, label) {
   return values;
 }
 
+function optionalOwnModelPolicyFormValue(input, key, label) {
+  const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  if (!descriptor) return { present: false, value: undefined };
+  if (descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+    throw new Error(label + ' має бути enumerable data property.');
+  }
+  return { present: true, value: descriptor.value };
+}
+
+function modelPolicyFormValue(input, key, label, fallback) {
+  const field = optionalOwnModelPolicyFormValue(input, key, label);
+  return field.present ? field.value : fallback;
+}
+
+function exactModelPolicyBoolean(value, label) {
+  if (typeof value !== 'boolean') throw new Error(label + ' має бути boolean.');
+  return value;
+}
+
 function optionalPolicyPriceText(value, label) {
   if (typeof value !== 'string' || value !== value.trim()) {
     throw new Error(label + ' має бути канонічним числом або порожнім.');
@@ -231,57 +250,74 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new Error('Форма Agent model policy недоступна.');
   }
-  if (!Object.hasOwn(input, 'modelRoutePolicyConfigured')) {
-    return copyModelRoutePolicy(persistedPolicy);
-  }
-  if (input.modelRoutePolicyConfigured !== true) return null;
+  const configuredField = optionalOwnModelPolicyFormValue(
+    input,
+    'modelRoutePolicyConfigured',
+    'Model route policy configured',
+  );
+  if (!configuredField.present) return copyModelRoutePolicy(persistedPolicy);
+  const configured = exactModelPolicyBoolean(
+    configuredField.value,
+    'Model route policy configured',
+  );
+  if (!configured) return null;
 
   const pinnedRouteId = exactText(
-    input.modelRoutePinnedRouteId ?? '',
+    modelPolicyFormValue(input, 'modelRoutePinnedRouteId', 'Pinned model route ID', ''),
     'Pinned model route ID',
     180,
     { optional: true },
   );
-  const locality = exactText(input.modelRouteLocality ?? 'any', 'Model route locality', 20);
+  const locality = exactText(
+    modelPolicyFormValue(input, 'modelRouteLocality', 'Model route locality', 'any'),
+    'Model route locality',
+    20,
+  );
   const policy = normalizeAiRoutePolicy({
-    autoSwitch: input.modelRouteAutoSwitch === true,
+    autoSwitch: exactModelPolicyBoolean(
+      modelPolicyFormValue(input, 'modelRouteAutoSwitch', 'Model route auto switch', true),
+      'Model route auto switch',
+    ),
     pinnedRouteId: pinnedRouteId
       ? parseCanonicalAgentIdentity(pinnedRouteId, 'Pinned model route ID')
       : '',
     orderedRouteIds: modelRouteIdListFromLines(
-      input.modelRouteOrderedRouteIdsText ?? '',
+      modelPolicyFormValue(input, 'modelRouteOrderedRouteIdsText', 'Ordered model route IDs', ''),
       'Ordered model route ID',
     ),
     allowRouteIds: modelRouteIdListFromLines(
-      input.modelRouteAllowRouteIdsText ?? '',
+      modelPolicyFormValue(input, 'modelRouteAllowRouteIdsText', 'Allowed model route IDs', ''),
       'Allowed model route ID',
     ),
     denyRouteIds: modelRouteIdListFromLines(
-      input.modelRouteDenyRouteIdsText ?? '',
+      modelPolicyFormValue(input, 'modelRouteDenyRouteIdsText', 'Denied model route IDs', ''),
       'Denied model route ID',
     ),
-    freeOnly: input.modelRouteFreeOnly === true,
+    freeOnly: exactModelPolicyBoolean(
+      modelPolicyFormValue(input, 'modelRouteFreeOnly', 'Model route free only', false),
+      'Model route free only',
+    ),
     locality,
     maxInputPricePerMillionUsd: optionalPolicyPriceText(
-      input.modelRouteMaxInputPriceText ?? '',
+      modelPolicyFormValue(input, 'modelRouteMaxInputPriceText', 'Максимальна input-ціна', ''),
       'Максимальна input-ціна',
     ),
     maxOutputPricePerMillionUsd: optionalPolicyPriceText(
-      input.modelRouteMaxOutputPriceText ?? '',
+      modelPolicyFormValue(input, 'modelRouteMaxOutputPriceText', 'Максимальна output-ціна', ''),
       'Максимальна output-ціна',
     ),
     retryBackoffSeconds: exactIntegerText(
-      input.modelRouteRetryBackoffSeconds ?? '',
+      modelPolicyFormValue(input, 'modelRouteRetryBackoffSeconds', 'Model route retry backoff', ''),
       'Model route retry backoff',
       { min: 1, max: 86_400 },
     ),
     circuitBreakerFailures: exactIntegerText(
-      input.modelRouteCircuitBreakerFailures ?? '',
+      modelPolicyFormValue(input, 'modelRouteCircuitBreakerFailures', 'Model route circuit breaker failures', ''),
       'Model route circuit breaker failures',
       { min: 1, max: 100 },
     ),
     circuitBreakerSeconds: exactIntegerText(
-      input.modelRouteCircuitBreakerSeconds ?? '',
+      modelPolicyFormValue(input, 'modelRouteCircuitBreakerSeconds', 'Model route circuit breaker duration', ''),
       'Model route circuit breaker duration',
       { min: 1, max: 86_400 },
     ),
