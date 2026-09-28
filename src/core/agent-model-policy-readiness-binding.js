@@ -6,6 +6,9 @@ import {
   normalizeAgentDefinitionModelPolicyBindingV1,
 } from './agent-definition-model-policy-binding.js';
 import {
+  createAgentModelPolicyBindingV1,
+} from './agent-model-policy-binding.js';
+import {
   inspectAgentRouteReadinessV1,
 } from './agent-route-readiness.js';
 
@@ -181,6 +184,22 @@ export function inspectBoundAgentModelPolicyReadinessV1(input) {
     .filter(routeId => authoritySet.has(routeId));
   if (currentAuthorityRouteIds.some((routeId, index) => routeId !== authorityRouteIds[index])) {
     throw new Error('Agent model readiness authority route order drifted inside current route pool revision');
+  }
+
+  if (binding.modelPolicyBinding.parentAgentId === null) {
+    const currentPolicy = selection.definition.modelRoutePolicy;
+    const reconstructed = createAgentModelPolicyBindingV1({
+      projectId: binding.projectId,
+      agentId: binding.jobId,
+      policyRevision: binding.definitionBinding.definitionRevision,
+      routePoolRevision: currentRoutePoolRevision,
+      routePool: routes,
+      ownerAllowedRouteIds: authorityRouteIds,
+      ...(currentPolicy === null ? {} : { routePolicy: currentPolicy }),
+    });
+    if (reconstructed.bindingKey !== binding.modelPolicyBinding.bindingKey) {
+      throw new Error('Agent model readiness root model policy drifted at the current definition revision');
+    }
   }
 
   const effectiveRouteIds = binding.modelPolicyBinding.effectiveRouteIds;
