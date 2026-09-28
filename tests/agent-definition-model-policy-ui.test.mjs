@@ -203,6 +203,14 @@ test('Agent definition model policy rejects relationships that canonical Agent b
     })),
     /одночасно заборонений deny policy/u,
   );
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
+      modelRouteAllowRouteIdsText: 'route.fast\nroute.strong',
+      modelRouteOrderedRouteIdsText: 'route.fast\nroute.strong',
+      modelRouteDenyRouteIdsText: 'route.fast\nroute.strong',
+    })),
+    /перекриває весь явний allow scope/u,
+  );
 });
 
 test('legacy partial persisted model policy remains editable with a legacy route pin', () => {
