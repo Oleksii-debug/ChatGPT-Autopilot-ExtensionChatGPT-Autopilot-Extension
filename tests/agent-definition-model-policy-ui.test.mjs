@@ -173,6 +173,38 @@ test('Agent definition model policy rejects aliases, duplicate route IDs and inv
   );
 });
 
+test('Agent definition model policy rejects relationships that canonical Agent binding would always deny', () => {
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
+      modelRouteAllowRouteIdsText: 'route.fast',
+      modelRouteOrderedRouteIdsText: 'route.strong',
+    })),
+    /Ordered model route ID поза allow scope: route\.strong/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
+      modelRouteAllowRouteIdsText: 'route.fast',
+      modelRouteDenyRouteIdsText: 'route.strong',
+    })),
+    /Denied model route ID поза allow scope: route\.strong/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
+      modelRouteAllowRouteIdsText: 'route.fast',
+      modelRoutePinnedRouteId: 'route.strong',
+    })),
+    /Pinned model route ID поза allow scope: route\.strong/u,
+  );
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(configuredPolicyForm({
+      modelRouteAllowRouteIdsText: '',
+      modelRoutePinnedRouteId: 'route.strong',
+      modelRouteDenyRouteIdsText: 'route.strong',
+    })),
+    /одночасно заборонений deny policy/u,
+  );
+});
+
 test('Agent definition model-policy form does not execute accessors', () => {
   let reads = 0;
   const hostile = configuredPolicyForm();
