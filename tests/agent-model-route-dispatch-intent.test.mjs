@@ -9,6 +9,9 @@ import {
   createAgentDefinitionModelPolicyBindingV1,
 } from '../src/core/agent-definition-model-policy-binding.js';
 import {
+  createAgentModelPolicyBindingV1,
+} from '../src/core/agent-model-policy-binding.js';
+import {
   AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY,
   createBoundAgentModelRouteDispatchIntentV1,
 } from '../src/core/agent-model-route-dispatch-intent.js';
@@ -130,6 +133,36 @@ function binding() {
   });
 }
 
+function parentModelPolicyBinding(overrides = {}) {
+  return createAgentModelPolicyBindingV1({
+    projectId: 'project.alpha',
+    agentId: 'agent.parent',
+    policyRevision: 3,
+    routePoolRevision: 9,
+    routePool: pool(),
+    ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    routePolicy: {
+      allowRouteIds: ['route.a', 'route.b', 'route.c'],
+      locality: 'remote',
+    },
+    ...overrides,
+  });
+}
+
+function childBinding(parentBinding = parentModelPolicyBinding()) {
+  const mat = materialized();
+  return createAgentDefinitionModelPolicyBindingV1({
+    materializedAgent: mat,
+    currentDefinitionSelection: selection(),
+    currentJobId: mat.config.id,
+    currentProjectId: mat.config.projectId,
+    routePool: pool(),
+    routePoolRevision: 9,
+    ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    parentBinding,
+  });
+}
+
 function request(overrides = {}) {
   const current = binding();
   return {
@@ -162,6 +195,28 @@ test('prepares exact canonical provider identity only after fresh bound ranking'
   assert.equal(result.definitionRevision, 4);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(result.route), true);
+});
+
+test('child dispatch forwards exact owner-current parent policy provenance', () => {
+  const parentBinding = parentModelPolicyBinding();
+  const current = childBinding(parentBinding);
+  const result = createBoundAgentModelRouteDispatchIntentV1(request({
+    definitionModelPolicyBinding: current,
+    currentDefinitionModelPolicyBindingKey: current.bindingKey,
+    currentParentModelPolicyBinding: parentBinding,
+    currentParentModelPolicyBindingKey: parentBinding.bindingKey,
+  }));
+
+  assert.equal(result.routeId, 'route.b');
+
+  assert.throws(
+    () => createBoundAgentModelRouteDispatchIntentV1(request({
+      definitionModelPolicyBinding: current,
+      currentDefinitionModelPolicyBindingKey: current.bindingKey,
+      currentParentModelPolicyBinding: parentBinding,
+    })),
+    /requires current parent model-policy provenance/u,
+  );
 });
 
 test('expected prior preference detects route-state TOCTOU before dispatch preparation', () => {
