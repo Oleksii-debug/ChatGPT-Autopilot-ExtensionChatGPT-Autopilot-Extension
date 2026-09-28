@@ -1,4 +1,5 @@
 import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
+import { normalizeAiRoutePolicy } from '../core/ai-route-pool.js';
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
@@ -194,6 +195,113 @@ export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
   return profile;
 }
 
+function modelRouteIdListFromLines(value, label) {
+  if (typeof value !== 'string') throw new Error(label + ' має бути текстом.');
+  const values = [];
+  const seen = new Set();
+  for (const raw of value.replace(/\r\n?/g, '\n').split('\n')) {
+    if (raw === '') continue;
+    const item = parseCanonicalAgentIdentity(raw, label);
+    if (seen.has(item)) throw new Error(label + ' містить дублікат: ' + item);
+    seen.add(item);
+    values.push(item);
+    if (values.length > 32) throw new Error(label + ' містить забагато значень.');
+  }
+  return values;
+}
+
+function optionalPolicyPriceText(value, label) {
+  if (typeof value !== 'string' || value !== value.trim()) {
+    throw new Error(label + ' має бути канонічним числом або порожнім.');
+  }
+  if (value === '') return null;
+  if (!/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u.test(value)) {
+    throw new Error(label + ' має бути канонічним невід’ємним числом.');
+  }
+  const number = Number(value);
+  if (!Number.isFinite(number) || Object.is(number, -0)) {
+    throw new Error(label + ' має бути скінченним невід’ємним числом.');
+  }
+  return number;
+}
+
+export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
+  persistedPolicy = null,
+} = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма Agent model policy недоступна.');
+  }
+  if (!Object.hasOwn(input, 'modelRoutePolicyConfigured')) {
+    return copyModelRoutePolicy(persistedPolicy);
+  }
+  if (input.modelRoutePolicyConfigured !== true) return null;
+
+  const pinnedRouteId = exactText(
+    input.modelRoutePinnedRouteId ?? '',
+    'Pinned model route ID',
+    180,
+    { optional: true },
+  );
+  const locality = exactText(input.modelRouteLocality ?? 'any', 'Model route locality', 20);
+  const policy = normalizeAiRoutePolicy({
+    autoSwitch: input.modelRouteAutoSwitch === true,
+    pinnedRouteId: pinnedRouteId
+      ? parseCanonicalAgentIdentity(pinnedRouteId, 'Pinned model route ID')
+      : '',
+    orderedRouteIds: modelRouteIdListFromLines(
+      input.modelRouteOrderedRouteIdsText ?? '',
+      'Ordered model route ID',
+    ),
+    allowRouteIds: modelRouteIdListFromLines(
+      input.modelRouteAllowRouteIdsText ?? '',
+      'Allowed model route ID',
+    ),
+    denyRouteIds: modelRouteIdListFromLines(
+      input.modelRouteDenyRouteIdsText ?? '',
+      'Denied model route ID',
+    ),
+    freeOnly: input.modelRouteFreeOnly === true,
+    locality,
+    maxInputPricePerMillionUsd: optionalPolicyPriceText(
+      input.modelRouteMaxInputPriceText ?? '',
+      'Максимальна input-ціна',
+    ),
+    maxOutputPricePerMillionUsd: optionalPolicyPriceText(
+      input.modelRouteMaxOutputPriceText ?? '',
+      'Максимальна output-ціна',
+    ),
+    retryBackoffSeconds: exactIntegerText(
+      input.modelRouteRetryBackoffSeconds ?? '',
+      'Model route retry backoff',
+      { min: 1, max: 86_400 },
+    ),
+    circuitBreakerFailures: exactIntegerText(
+      input.modelRouteCircuitBreakerFailures ?? '',
+      'Model route circuit breaker failures',
+      { min: 1, max: 100 },
+    ),
+    circuitBreakerSeconds: exactIntegerText(
+      input.modelRouteCircuitBreakerSeconds ?? '',
+      'Model route circuit breaker duration',
+      { min: 1, max: 86_400 },
+    ),
+  });
+  return {
+    autoSwitch: policy.autoSwitch,
+    pinnedRouteId: policy.pinnedRouteId,
+    orderedRouteIds: [...policy.orderedRouteIds],
+    allowRouteIds: [...policy.allowRouteIds],
+    denyRouteIds: [...policy.denyRouteIds],
+    freeOnly: policy.freeOnly,
+    locality: policy.locality,
+    maxInputPricePerMillionUsd: policy.maxInputPricePerMillionUsd,
+    maxOutputPricePerMillionUsd: policy.maxOutputPricePerMillionUsd,
+    retryBackoffSeconds: policy.retryBackoffSeconds,
+    circuitBreakerFailures: policy.circuitBreakerFailures,
+    circuitBreakerSeconds: policy.circuitBreakerSeconds,
+  };
+}
+
 function copyModelRoutePolicy(value) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
@@ -259,7 +367,9 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
-    modelRoutePolicy: copyModelRoutePolicy(modelRoutePolicy),
+    modelRoutePolicy: buildAgentDefinitionModelRoutePolicyFromFormV1(input, {
+      persistedPolicy: modelRoutePolicy,
+    }),
     ...(() => {
       const effectiveProfile = Object.hasOwn(input, 'specialistDelegationConfigured')
         ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
