@@ -783,6 +783,7 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
     // BARRIER_REEVALUATE. Never supersede an in-flight parent activation, and
     // never use Resume to reactivate a STOPPED scope.
     if (event.type === OrchestrationHierarchyEventType.RESUME_SCOPE) {
+      const barrierOwnerIds = new Set();
       for (const resumedId of resumedBarrierNodeIds) {
         const resumedRuntime = runtime.nodesById[resumedId];
         const current = currentActivation(resumedRuntime);
@@ -791,7 +792,15 @@ export function reduceOrchestrationHierarchyEvent(graphRaw, runtimeRaw, eventRaw
             || current.purpose === OrchestrationActivationPurpose.RECONCILE) {
           continue;
         }
-        const action = maybePrepareParentReconciliation(graph, runtime, resumedId, nowMs);
+        // A resumed node can own a child barrier itself, or it can be the
+        // terminal child that completes its still-running parent's barrier.
+        // Re-evaluate both identities through the same canonical helper.
+        barrierOwnerIds.add(resumedId);
+        const parentId = graph.nodesById[resumedId].parentId;
+        if (parentId) barrierOwnerIds.add(parentId);
+      }
+      for (const barrierOwnerId of barrierOwnerIds) {
+        const action = maybePrepareParentReconciliation(graph, runtime, barrierOwnerId, nowMs);
         if (action) actions.push(action);
       }
     }
