@@ -32,6 +32,7 @@ export const AGENT_MODEL_ROUTE_CANDIDATE_BINDING_AUTHORITY = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const ROUTE_ROLES = new Set(Object.values(AiRouteRole));
 const INPUT_KEYS = new Set([
   'definitionModelPolicyBinding',
   'currentDefinitionModelPolicyBindingKey',
@@ -230,6 +231,9 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
   const effectiveSet = new Set(effectiveRouteIds);
   const projectedRoutes = routes.filter(route => effectiveSet.has(route.routeId));
   const role = own(raw, 'role') ?? AiRouteRole.PLANNER;
+  if (typeof role !== 'string' || !ROUTE_ROLES.has(role)) {
+    throw new Error('Agent model route candidate role is invalid');
+  }
   const requiresVision = exactBoolean(
     own(raw, 'requiresVision'),
     'Agent model route candidate requiresVision',
@@ -261,7 +265,6 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
     modelPolicyBindingKey: binding.modelPolicyBinding.bindingKey,
     routePoolRevision: currentRoutePoolRevision,
     role,
-    capabilityIds: [...(own(raw, 'capabilityIds') ?? [])],
     requiresVision,
     authorityRouteIds: [...authorityRouteIds],
     effectiveRouteIds: [...effectiveRouteIds],
