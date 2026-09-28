@@ -205,6 +205,18 @@ test('Agent definition model policy rejects relationships that canonical Agent b
   );
 });
 
+test('legacy partial persisted model policy remains editable with a legacy route pin', () => {
+  const definition = buildAgentDefinitionFromFormV1(
+    baseForm(),
+    {
+      configDefaults: { aiPinnedRouteId:'route.legacy' },
+      modelRoutePolicy: { autoSwitch:false },
+    },
+  );
+  assert.equal(definition.configDefaults.aiPinnedRouteId, 'route.legacy');
+  assert.deepEqual(definition.modelRoutePolicy, { autoSwitch:false });
+});
+
 test('Agent definition save rejects legacy pinned routes that durable model policy would deny', () => {
   assert.throws(
     () => buildAgentDefinitionFromFormV1({
