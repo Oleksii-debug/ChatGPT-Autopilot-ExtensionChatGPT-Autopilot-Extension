@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  bindSpecialistHandoffToRegistryV1,
   createEmptySpecialistRegistryV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
@@ -20,6 +21,24 @@ function specialist(overrides = {}) {
     maxConcurrentAssignments:2,
     capabilityIds:['code.edit', 'code.test'],
     taskKinds:['CODING'],
+    ...overrides,
+  };
+}
+
+function handoff(overrides = {}) {
+  return {
+    schemaVersion:1,
+    handoffId:'handoff.1',
+    specialistId:'coding.primary',
+    goal:'Implement and verify the requested change.',
+    requestedCapabilityIds:['code.edit'],
+    artifactRefs:[],
+    credentialRefs:[],
+    maxModelCalls:10,
+    maxRuntimeSeconds:600,
+    maxCostUsdMicros:0,
+    createdAt:'2026-09-29T00:00:00.000Z',
+    parentInvocationId:null,
     ...overrides,
   };
 }
@@ -139,6 +158,57 @@ test('disabled or task/capability-incompatible specialists cannot be selected', 
   assert.deepEqual(selection.candidateSpecialistIds, ['valid']);
 });
 
+test('canonical SpecialistHandoffV1 binds to exact registry revision and capability scope', () => {
+  const registry = registryWith(specialist());
+  const binding = bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:registry.revision,
+    handoff:handoff({ requestedCapabilityIds:['code.test', 'code.edit'] }),
+    allowedSpecialistIds:['coding.primary'],
+    allowedProviderIds:['provider.local'],
+  });
+  assert.equal(binding.schemaVersion, 1);
+  assert.equal(binding.registryRevision, 1);
+  assert.equal(binding.handoffId, 'handoff.1');
+  assert.equal(binding.specialistId, 'coding.primary');
+  assert.equal(binding.providerId, 'provider.local');
+  assert.deepEqual(binding.requestedCapabilityIds, ['code.test', 'code.edit']);
+  assert.equal(binding.canonicalSpecialistHandoffValidated, true);
+  assert.equal(binding.advisoryOnly, true);
+  assert.equal(binding.handoffAuthorized, false);
+  assert.equal(binding.executionAuthorized, false);
+  assert.equal(binding.providerCallAuthorized, false);
+  assert.equal(binding.credentialUseAuthorized, false);
+  assert.equal(binding.requiresCurrentPolicyRevalidation, true);
+  assert.equal(binding.requiresCurrentBudgetRevalidation, true);
+  assert.equal(binding.requiresCurrentCredentialScopeRevalidation, true);
+});
+
+test('handoff binding fails closed on stale registry, disabled specialist, filter exclusion and capability widening', () => {
+  const registry = registryWith(specialist());
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:0,
+    handoff:handoff(),
+  }), /SPECIALIST_HANDOFF_REGISTRY_REVISION_CONFLICT/);
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry:registryWith(specialist({ enabled:false })),
+    expectedRegistryRevision:1,
+    handoff:handoff(),
+  }), /SPECIALIST_HANDOFF_SPECIALIST_DISABLED/);
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:1,
+    handoff:handoff(),
+    allowedProviderIds:['provider.other'],
+  }), /SPECIALIST_PROVIDER_NOT_ALLOWED/);
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:1,
+    handoff:handoff({ requestedCapabilityIds:['code.deploy'] }),
+  }), /Specialist handoff exceeds granted capabilities/);
+});
+
 test('registry identities compose with canonical SpecialistHandoffV1 ID rules', () => {
   assert.throws(
     () => normalizeSpecialistDefinitionV1(specialist({ specialistId:'bad id' })),
@@ -216,7 +286,7 @@ test('hostile accessors are rejected without getter execution', () => {
   assert.equal(getterRuns, 0);
 });
 
-test('selection rejects caller authority injection and noncanonical identity filters', () => {
+test('selection and handoff binding reject caller authority injection', () => {
   const registry = registryWith(specialist());
   assert.throws(() => selectSpecialistCandidatesV1({
     registry,
@@ -229,4 +299,10 @@ test('selection rejects caller authority injection and noncanonical identity fil
     taskKind:' CODING',
     requiredCapabilityIds:['code.edit'],
   }), /SPECIALIST_SELECTION_TASK_KIND_INVALID/);
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:1,
+    handoff:handoff(),
+    executionAuthorized:true,
+  }), /SPECIALIST_HANDOFF_BINDING_UNKNOWN_FIELD/);
 });
