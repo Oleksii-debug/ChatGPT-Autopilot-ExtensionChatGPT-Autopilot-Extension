@@ -155,6 +155,9 @@ export function inspectBoundAgentModelPolicyReadinessV1(input) {
   if (!sameDefinitionBinding(binding.definitionBinding, selection)) {
     throw new Error('Agent model readiness definition selection is stale');
   }
+  if (selection.definition.enabled !== true) {
+    throw new Error('Agent model readiness definition is disabled');
+  }
 
   const currentRoutePoolRevision = exactRevision(
     own(raw, 'currentRoutePoolRevision'),
@@ -166,12 +169,21 @@ export function inspectBoundAgentModelPolicyReadinessV1(input) {
 
   const routes = normalizeAiRoutePool(own(raw, 'routes'));
   const routesById = new Map(routes.map(route => [route.routeId, route]));
-  const effectiveRouteIds = binding.modelPolicyBinding.effectiveRouteIds;
-  for (const routeId of effectiveRouteIds) {
+  const authorityRouteIds = binding.modelPolicyBinding.authorityRouteIds;
+  for (const routeId of authorityRouteIds) {
     if (!routesById.has(routeId)) {
-      throw new Error('Agent model readiness bound route is missing from current route pool: ' + routeId);
+      throw new Error('Agent model readiness authority route is missing from current route pool: ' + routeId);
     }
   }
+  const authoritySet = new Set(authorityRouteIds);
+  const currentAuthorityRouteIds = routes
+    .map(route => route.routeId)
+    .filter(routeId => authoritySet.has(routeId));
+  if (currentAuthorityRouteIds.some((routeId, index) => routeId !== authorityRouteIds[index])) {
+    throw new Error('Agent model readiness authority route order drifted inside current route pool revision');
+  }
+
+  const effectiveRouteIds = binding.modelPolicyBinding.effectiveRouteIds;
   const effectiveSet = new Set(effectiveRouteIds);
   const projectedRoutes = routes.filter(route => effectiveSet.has(route.routeId));
   const policy = readinessPolicy(binding.modelPolicyBinding);
@@ -198,6 +210,7 @@ export function inspectBoundAgentModelPolicyReadinessV1(input) {
     definitionModelPolicyBindingKey: binding.bindingKey,
     modelPolicyBindingKey: binding.modelPolicyBinding.bindingKey,
     routePoolRevision: currentRoutePoolRevision,
+    authorityRouteIds: [...authorityRouteIds],
     effectiveRouteIds: [...effectiveRouteIds],
     readiness,
     authority: AGENT_MODEL_POLICY_READINESS_BINDING_AUTHORITY,
