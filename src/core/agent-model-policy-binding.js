@@ -531,16 +531,17 @@ export function createAgentModelPolicyBindingV1(input) {
 
   const routePolicyProvided = Object.hasOwn(raw, 'routePolicy');
   const routePolicyInput = own(raw, 'routePolicy');
-  const topLevelRoutePolicyInput = routePolicyProvided
-    ? exactRoutePolicyRecord(routePolicyInput, 'Agent AiRoutePolicy')
-    : {};
   const routePolicy = parentBinding
     ? inheritChildRoutePolicy(
       parentBinding,
       authorityRouteIds,
       routePolicyProvided ? routePolicyInput : undefined,
     )
-    : normalizeAiRoutePolicy(topLevelRoutePolicyInput);
+    : normalizeAiRoutePolicy(
+      routePolicyProvided
+        ? exactRoutePolicyRecord(routePolicyInput, 'Agent AiRoutePolicy')
+        : {},
+    );
   if (parentBinding) assertChildPolicyDoesNotWiden(parentBinding, routePolicy);
 
   const projected = routePolicyProjection(routePolicy, authorityRouteIds);
