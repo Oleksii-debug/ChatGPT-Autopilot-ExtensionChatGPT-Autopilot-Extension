@@ -174,6 +174,9 @@ function normalizeProviderReservation(value, prepared) {
   }
   const inputTokens = safeCounter(raw.inputTokens, 'provider reservation inputTokens');
   const outputTokens = safeCounter(raw.outputTokens, 'provider reservation outputTokens');
+  if (outputTokens !== prepared.payload.maxOutputTokens) {
+    throw new Error('Provider reservation output-token bound drifted from the prepared invocation');
+  }
   const totalTokens = safeCounter(raw.totalTokens, 'provider reservation totalTokens');
   if (totalTokens < inputTokens + outputTokens) {
     throw new Error('Provider reservation totalTokens is inconsistent');
@@ -229,7 +232,7 @@ function normalizeUsage(value) {
   if (modelCalls !== 1) {
     throw new Error('Agent self-repair observation requires exactly one admitted model call');
   }
-  if (totalTokens < inputTokens || totalTokens < outputTokens) {
+  if (totalTokens < inputTokens + outputTokens) {
     throw new Error('Agent self-repair model usage totalTokens is inconsistent');
   }
   return Object.freeze({ inputTokens, outputTokens, totalTokens, modelCalls });
@@ -346,6 +349,9 @@ export function projectAgentSelfRepairModelObservationV1(input) {
     raw.modelResult,
     prepared.internal.agentModelOrchestratorEnvelope,
   );
+  if (modelResult.usage.outputTokens > providerReservation.outputTokens) {
+    throw new Error('Agent self-repair model usage exceeds the durable provider output-token reservation');
+  }
   const summary = modelResult.text.slice(0, MAX_OBSERVATION_SUMMARY);
   const outputTruncated = modelResult.text.length > summary.length;
 
