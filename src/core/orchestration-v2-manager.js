@@ -15,7 +15,11 @@ import {
 import { buildThreeLevelHierarchyTemplate } from './orchestration-role-prompts.js';
 import { exportOrchestrationProfile, importOrchestrationProfileDocument, previewOrchestrationProfile } from './orchestration-v2-profile.js';
 import { evaluateSubagentStructureAdmissionV1, normalizeSubagentStructurePolicyV1 } from './subagent-structure-policy.js';
-import { createOrchestrationProjectAuthorityV1 } from './browser-agent-orchestration-binding.js';
+import {
+  createOrchestrationProjectAuthorityV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+  normalizeBrowserAgentOrchestrationNodeBindingV1,
+} from './browser-agent-orchestration-binding.js';
 
 export const ORCHESTRATION_V2_MANAGER_STORAGE_KEY = 'autopilotOrchestrationV2Manager';
 export const ORCHESTRATION_V2_ALARM_PREFIX = `${ORCHESTRATION_V2_ALARM}:`;
@@ -23,6 +27,7 @@ const MANAGER_SCHEMA_VERSION = 1;
 const SAFE_TERMINAL_PHASES = new Set([OperationPhase.SENT_VERIFIED, OperationPhase.FAILED_SAFE]);
 const LIVE_WORKER_STATES = new Set(['QUEUED', 'LAUNCHING', 'ACTIVE', 'BUSY', 'RATE_LIMITED', 'BLOCKED', 'STALE', 'MANUAL_REVIEW']);
 const SUBAGENT_ADMISSION_INTENT_KEYS = new Set(['initiator', 'parentNodeId', 'requestedChildren']);
+const BROWSER_AGENT_LIFECYCLE_OPTION_KEYS = new Set(['browserControlEpoch', 'nowMs']);
 
 export const OrchestrationProjectAuthorityErrorCode = Object.freeze({
   PROJECT_UNOWNED: 'PROJECT_UNOWNED',
@@ -57,6 +62,28 @@ function plainIntent(value, label) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
       throw new Error(`${label} fields must be enumerable own data properties`);
+    }
+    normalized[key] = descriptor.value;
+  }
+  return normalized;
+}
+
+function plainBrowserAgentLifecycleOptions(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Browser Agent lifecycle options must be a plain object');
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new Error('Browser Agent lifecycle options must be a plain object');
+  }
+  const normalized = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !BROWSER_AGENT_LIFECYCLE_OPTION_KEYS.has(key)) {
+      throw new Error(`Browser Agent lifecycle options contains unknown field: ${String(key)}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, 'value') || descriptor.enumerable !== true) {
+      throw new Error('Browser Agent lifecycle options fields must be enumerable own data properties');
     }
     normalized[key] = descriptor.value;
   }
@@ -208,6 +235,170 @@ export class OrchestrationV2Manager {
     return this.runProjectAuthorityExclusive(async () => {
       const authority = await this.resolveProjectHierarchyAuthority(projectId);
       return operation(authority);
+    });
+  }
+
+  /**
+   * Hold canonical Project/hierarchy authority while BrowserAgentManager runs
+   * its serialized owner-lifecycle mutation and the exact bound subtree event.
+   * The shared lock order is Project -> Browser, matching durable BIND, so
+   * lifecycle and binding cannot create a cross-authority lock inversion.
+   *
+   * This remains a thin adapter over the existing hierarchy reducer/runtime;
+   * it creates no lifecycle authority.
+   */
+  withBrowserAgentBoundLifecycleAuthority(bindingRaw, operation) {
+    const binding = normalizeBrowserAgentOrchestrationNodeBindingV1(bindingRaw);
+    if (typeof operation !== 'function') {
+      throw new Error('Browser Agent bound lifecycle authority callback is required');
+    }
+
+    return this.runProjectAuthorityExclusive(async () => {
+      const authority = await this.resolveProjectHierarchyAuthority(binding.projectId);
+      const inspection = inspectBrowserAgentOrchestrationNodeBindingV1({ binding, authority });
+      if (!inspection.current) {
+        throw new Error(`Browser Agent orchestration binding is stale: ${inspection.status}`);
+      }
+      const controller = this.controllerFor(authority.orchestraId);
+      let lifecycleAuthorityOpen = true;
+
+      const applyBoundLifecycle = async (transitionRaw, options = {}) => {
+        if (!lifecycleAuthorityOpen) {
+          throw new Error('Browser Agent bound lifecycle authority callback has expired');
+        }
+        const admittedOptions = plainBrowserAgentLifecycleOptions(options);
+        const browserControlEpoch = admittedOptions.browserControlEpoch;
+        const nowMs = admittedOptions.nowMs === undefined ? this.now() : admittedOptions.nowMs;
+        const transition = typeof transitionRaw === 'string' ? transitionRaw.trim().toUpperCase() : '';
+        const eventType = transition === 'PAUSE'
+          ? OrchestrationHierarchyEventType.PAUSE_SCOPE
+          : transition === 'RESUME'
+            ? OrchestrationHierarchyEventType.RESUME_SCOPE
+            : transition === 'STOP'
+              ? OrchestrationHierarchyEventType.STOP_SCOPE
+              : '';
+        if (!eventType) throw new Error('Invalid Browser Agent bound lifecycle transition');
+        if (typeof browserControlEpoch !== 'number'
+            || !Number.isSafeInteger(browserControlEpoch)
+            || Object.is(browserControlEpoch, -0)
+            || browserControlEpoch < 1) {
+          throw new Error('Invalid Browser Agent lifecycle control epoch');
+        }
+        if (typeof nowMs !== 'number'
+            || !Number.isSafeInteger(nowMs)
+            || Object.is(nowMs, -0)
+            || nowMs < 0) {
+          throw new Error('Invalid Browser Agent lifecycle timestamp');
+        }
+
+        // Re-check durable hierarchy provenance after the Browser Agent has
+        // queued behind its own update chain but while this Project fence is
+        // still held.
+        const runtimeBefore = await controller.runtimeRepository.load();
+        const graphBefore = runtimeBefore?.hierarchy?.graph;
+        const stateBefore = runtimeBefore?.hierarchy?.state;
+        if (!graphBefore
+            || !stateBefore
+            || graphBefore.graphId !== binding.graphId
+            || graphBefore.controlEpoch !== binding.controlEpoch
+            || stateBefore.graphId !== binding.graphId
+            || stateBefore.controlEpoch !== binding.controlEpoch
+            || !stateBefore.nodesById?.[binding.nodeId]) {
+          throw new Error('Browser Agent hierarchy authority changed before lifecycle transition');
+        }
+
+        if (transition === 'RESUME') {
+          const meta = await this.loadMeta();
+          const orchestra = meta.byId?.[binding.orchestraId];
+          if (!orchestra) {
+            throw new Error('Browser Agent orchestration owner authority disappeared before resume');
+          }
+          if (orchestra.ownerPaused === true) {
+            throw new Error('Browser Agent cannot resume while canonical orchestra owner pause is active');
+          }
+
+          let ancestorId = graphBefore.nodesById[binding.nodeId]?.parentId || null;
+          while (ancestorId) {
+            const ancestorNode = graphBefore.nodesById[ancestorId];
+            const ancestorRuntime = stateBefore.nodesById?.[ancestorId];
+            if (!ancestorNode || !ancestorRuntime) {
+              throw new Error('Browser Agent hierarchy ancestor authority changed before resume');
+            }
+            if (ancestorRuntime.scopeState !== 'RUNNING') {
+              throw new Error(
+                `Browser Agent cannot resume below ${ancestorRuntime.scopeState} ancestor ${ancestorId}`,
+              );
+            }
+            ancestorId = ancestorNode.parentId || null;
+          }
+        }
+
+        const eventId = compactOrchestrationEventId(
+          'browser-agent-lifecycle',
+          binding.jobId,
+          binding.projectId,
+          binding.orchestraId,
+          binding.graphId,
+          binding.controlEpoch,
+          binding.nodeId,
+          transition,
+          browserControlEpoch,
+        );
+        const result = await controller.dispatchHierarchyScopeEvent({
+          type: eventType,
+          eventId,
+          controlEpoch: binding.controlEpoch,
+          nodeId: binding.nodeId,
+        }, { nowMs });
+
+        const expectedReason = transition === 'PAUSE'
+          ? 'PAUSED'
+          : transition === 'STOP'
+            ? 'STOPPED'
+            : 'RUNNING';
+        const acceptedReason = result?.reason === expectedReason || result?.reason === 'DUPLICATE_EVENT';
+        if (result?.kind !== 'HIERARCHY_EVENT' || !acceptedReason) {
+          throw new Error(`Browser Agent hierarchy lifecycle transition was not accepted: ${String(result?.reason || result?.kind || 'UNKNOWN')}`);
+        }
+
+        // A retry can legitimately deduplicate after the hierarchy event was
+        // durably committed but the caller did not observe success. Authorization
+        // is therefore decided by the durable target state below, not by the
+        // summary reason alone.
+        // RESUME_SCOPE deliberately leaves terminal STOPPED nodes stopped. The
+        // aggregate reducer reason describes the requested scope, so bind
+        // authorization to the actual durable target state.
+        const latestRuntime = await controller.runtimeRepository.load();
+        const latestGraph = latestRuntime?.hierarchy?.graph;
+        const latestState = latestRuntime?.hierarchy?.state;
+        if (!latestGraph
+            || !latestState
+            || latestGraph.graphId !== binding.graphId
+            || latestState.graphId !== binding.graphId
+            || latestState.controlEpoch !== binding.controlEpoch) {
+          throw new Error('Browser Agent hierarchy authority changed during lifecycle transition');
+        }
+        const target = latestState.nodesById?.[binding.nodeId];
+        if (!target || target.scopeState !== expectedReason) {
+          throw new Error(
+            `Browser Agent hierarchy target did not enter requested lifecycle scope: ${String(target?.scopeState || 'MISSING')}`,
+          );
+        }
+
+        return Object.freeze({
+          binding,
+          transition,
+          eventId,
+          targetScopeState: target.scopeState,
+          result: structuredClone(result),
+        });
+      };
+
+      try {
+        return await operation(applyBoundLifecycle);
+      } finally {
+        lifecycleAuthorityOpen = false;
+      }
     });
   }
 

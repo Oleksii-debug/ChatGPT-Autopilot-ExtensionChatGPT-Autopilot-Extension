@@ -251,6 +251,10 @@ const browserAgent = new BrowserAgentManager({
 });
 browserAgentLifecycle.current = browserAgent;
 
+const browserAgentOrchestrationLifecycleDependencies = Object.freeze({
+  withBrowserAgentBoundLifecycleAuthority: (binding, operation) =>
+    orchestrationV2.withBrowserAgentBoundLifecycleAuthority(binding, operation),
+});
 const openHandsSpecialistClient = new OpenHandsCodingSpecialistClient({
   fetchFn: (...args) => fetch(...args),
 });
@@ -922,11 +926,21 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
-    result = await browserAgent.pause(message.payload?.id || '');
+    result = await browserAgent.pause(
+      message.payload?.id || '',
+      browserAgentOrchestrationLifecycleDependencies,
+    );
   } else if (message.command === 'RESUME_BROWSER_AGENT_JOB') {
-    result = await browserAgent.resume(message.payload?.id || '');
+    result = await browserAgent.resume(
+      message.payload?.id || '',
+      {},
+      browserAgentOrchestrationLifecycleDependencies,
+    );
   } else if (message.command === 'STOP_BROWSER_AGENT_JOB') {
-    result = await browserAgent.stop(message.payload?.id || '');
+    result = await browserAgent.stop(
+      message.payload?.id || '',
+      browserAgentOrchestrationLifecycleDependencies,
+    );
   } else if (message.command === 'STEP_BROWSER_AGENT_JOB') {
     result = await browserAgent.step(message.payload?.id || '');
   } else if (message.command === 'ADD_BROWSER_AGENT_INSTRUCTION') {

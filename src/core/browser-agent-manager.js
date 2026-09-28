@@ -146,6 +146,10 @@ const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
   'resolveProjectHierarchyAuthority',
   'withProjectHierarchyAuthority',
 ]);
+const ORCHESTRATION_LIFECYCLE_DEPENDENCY_KEYS = new Set([
+  'withBrowserAgentBoundLifecycleAuthority',
+]);
+const BROWSER_AGENT_BOUND_LIFECYCLE_RETRY = Object.freeze({});
 const AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS = new Set([
   'withProjectHierarchyAuthority',
   'specialistProviderReadinessResolver',
@@ -235,6 +239,31 @@ function trustedOrchestrationAuthorityFence(dependencies) {
     throw new Error('Canonical orchestration Project authority fence is required');
   }
   return raw.withProjectHierarchyAuthority;
+}
+
+function trustedOrchestrationLifecycleFence(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    ORCHESTRATION_LIFECYCLE_DEPENDENCY_KEYS,
+    'Browser Agent orchestration lifecycle dependencies',
+  );
+  if (typeof raw.withBrowserAgentBoundLifecycleAuthority !== 'function') {
+    throw new Error('Canonical Browser Agent orchestration lifecycle authority fence is required');
+  }
+  return raw.withBrowserAgentBoundLifecycleAuthority;
+}
+
+function sameOrchestrationNodeBinding(leftRaw, rightRaw) {
+  const left = normalizeBrowserAgentOrchestrationNodeBindingV1(leftRaw);
+  const right = normalizeBrowserAgentOrchestrationNodeBindingV1(rightRaw);
+  return left.schemaVersion === right.schemaVersion
+    && left.jobId === right.jobId
+    && left.projectId === right.projectId
+    && left.orchestraId === right.orchestraId
+    && left.graphId === right.graphId
+    && left.controlEpoch === right.controlEpoch
+    && left.nodeId === right.nodeId
+    && left.boundAt === right.boundAt;
 }
 
 function trustedAutomaticDelegationDependencies(dependencies) {
@@ -3780,11 +3809,103 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async pause(id) {
-    const now = this.now();
-    await this.update(store => {
-      const job = store.byId[id];
+  async #commitOwnerLifecycleMutation(
+    id,
+    transition,
+    mutator,
+    { expectedBinding = null, applyBoundLifecycle = null, rejectNewBinding = false } = {},
+  ) {
+    const operation = this.updateChain.then(async () => {
+      const before = await this.load();
+      const draft = clone(before);
+      const job = draft.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
+
+      const liveBinding = job.orchestrationNodeBinding
+        ? normalizeBrowserAgentOrchestrationNodeBindingV1(job.orchestrationNodeBinding)
+        : null;
+      if (rejectNewBinding && liveBinding) return BROWSER_AGENT_BOUND_LIFECYCLE_RETRY;
+      if (expectedBinding) {
+        if (!liveBinding || !sameOrchestrationNodeBinding(liveBinding, expectedBinding)) {
+          throw new Error('Browser Agent orchestration binding changed before lifecycle commit');
+        }
+        if (liveBinding.jobId !== job.id || liveBinding.projectId !== job.config?.projectId) {
+          throw new Error('Browser Agent orchestration binding no longer matches the durable job');
+        }
+        if (typeof applyBoundLifecycle !== 'function') {
+          throw new Error('Canonical Browser Agent bound lifecycle transition is required');
+        }
+      }
+
+      const next = await mutator(draft) || draft;
+      const saved = await this.save(next);
+      if (expectedBinding) {
+        try {
+          const live = saved.byId[id];
+          await applyBoundLifecycle(
+            transition,
+            {
+              browserControlEpoch: live.runtime.controlEpoch,
+              nowMs: live.runtime.updatedAt,
+            },
+          );
+        } catch (error) {
+          try {
+            await this.save(before);
+          } catch (rollbackError) {
+            throw new AggregateError(
+              [error, rollbackError],
+              'Browser Agent lifecycle propagation failed and Browser Agent rollback also failed.',
+            );
+          }
+          throw error;
+        }
+      }
+      return saved;
+    });
+    this.updateChain = operation.catch(() => undefined);
+    return operation;
+  }
+
+  async #updateOwnerLifecycleState(id, transition, mutator, dependencies = {}) {
+    if (typeof mutator !== 'function') throw new Error('Browser Agent lifecycle mutator is required');
+    const initial = await this.get(id);
+    if (!initial.job) throw new Error('Browser Agent job not found');
+
+    const initialBinding = initial.job.orchestrationNodeBinding
+      ? normalizeBrowserAgentOrchestrationNodeBindingV1(initial.job.orchestrationNodeBinding)
+      : null;
+    if (!initialBinding) {
+      const result = await this.#commitOwnerLifecycleMutation(
+        id,
+        transition,
+        mutator,
+        { rejectNewBinding: true },
+      );
+      if (result === BROWSER_AGENT_BOUND_LIFECYCLE_RETRY) {
+        return this.#updateOwnerLifecycleState(id, transition, mutator, dependencies);
+      }
+      return result;
+    }
+
+    const withLifecycleAuthority = trustedOrchestrationLifecycleFence(dependencies);
+    return withLifecycleAuthority(initialBinding, async applyBoundLifecycle => {
+      if (typeof applyBoundLifecycle !== 'function') {
+        throw new Error('Canonical Browser Agent bound lifecycle transition is required');
+      }
+      return this.#commitOwnerLifecycleMutation(
+        id,
+        transition,
+        mutator,
+        { expectedBinding: initialBinding, applyBoundLifecycle },
+      );
+    });
+  }
+
+  async pause(id, dependencies = {}) {
+    const now = this.now();
+    await this.#updateOwnerLifecycleState(id, 'PAUSE', store => {
+      const job = store.byId[id];
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING) throw new Error('Only a running Browser Agent can be paused');
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.PAUSED;
@@ -3792,12 +3913,12 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = now;
       appendHistory(job.runtime, { at: now, type: 'owner', message: 'Paused by owner' });
       return store;
-    });
+    }, dependencies);
     await this.reconcileAlarm();
     return this.get(id);
   }
 
-  async resume(id, { runInitial = true } = {}) {
+  async resume(id, { runInitial = true } = {}, dependencies = {}) {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return this.get(id);
@@ -3807,9 +3928,8 @@ export class BrowserAgentManager {
       return this.get(id);
     }
     const now = this.now();
-    await this.update(store => {
+    await this.#updateOwnerLifecycleState(id, 'RESUME', store => {
       const job = store.byId[id];
-      if (!job) throw new Error('Browser Agent job not found');
       if (![BrowserAgentRunState.PAUSED, BrowserAgentRunState.STOPPED, BrowserAgentRunState.WAITING_PERMISSION, BrowserAgentRunState.WAITING_CAPABILITY, BrowserAgentRunState.WAITING_SCHEDULE].includes(job.runtime.runState)) throw new Error('Browser Agent cannot be resumed from its current state');
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.RUNNING;
@@ -3819,7 +3939,7 @@ export class BrowserAgentManager {
       job.runtime.nextWakeAt = now;
       job.runtime.updatedAt = now;
       return store;
-    });
+    }, dependencies);
     if (!runInitial) {
       await this.reconcileAlarm();
       return this.get(id);
@@ -3829,12 +3949,11 @@ export class BrowserAgentManager {
     return { ...(await this.get(id)), burst };
   }
 
-  async stop(id) {
+  async stop(id, dependencies = {}) {
     const now = this.now();
     let closeTabs = false;
-    await this.update(store => {
+    await this.#updateOwnerLifecycleState(id, 'STOP', store => {
       const job = store.byId[id];
-      if (!job) throw new Error('Browser Agent job not found');
       job.runtime.controlEpoch += 1;
       job.runtime.runState = BrowserAgentRunState.STOPPED;
       job.runtime.pendingApproval = null;
@@ -3843,7 +3962,7 @@ export class BrowserAgentManager {
       closeTabs = job.config.closeOwnedTabsOnStop === true;
       appendHistory(job.runtime, { at: now, type: 'owner', message: 'Stopped by owner' });
       return store;
-    });
+    }, dependencies);
     if (closeTabs) await this.closeOwnedTabs(id, { throwOnPending: false });
     await this.reconcileAlarm();
     return this.get(id);
