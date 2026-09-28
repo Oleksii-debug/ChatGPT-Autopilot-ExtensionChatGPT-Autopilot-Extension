@@ -83,6 +83,7 @@ const BINDING_KEYS = new Set([
   'executionPlane',
   'workBudget',
   'routeIntent',
+  'bindingKey',
   ...Object.keys(AGENT_SELF_REPAIR_MODEL_BINDING_AUTHORITY),
 ]);
 
@@ -240,6 +241,59 @@ function routingRequestForWorkKind(raw, workKind) {
   return Object.freeze({ role, capabilityIds, requiresVision });
 }
 
+function modelIntentBindingKey({
+  planId,
+  jobId,
+  cycleId,
+  failedNodeId,
+  originPlanRevision,
+  currentPlanRevision,
+  proposedPlanRevision = null,
+  failedNodeRevisionId,
+  verifierPlanRevisionId,
+  cycleState,
+  workKind,
+  activeAttemptNumber,
+  currentSubjectRevisionId,
+  evidenceTrust,
+  actorId,
+  verifierId,
+  nodeId = null,
+  ownerId = null,
+  executionPlane = null,
+  workBudget = null,
+  routeIntent = null,
+}) {
+  return JSON.stringify([
+    AGENT_SELF_REPAIR_MODEL_BINDING_VERSION,
+    planId,
+    jobId,
+    cycleId,
+    failedNodeId,
+    originPlanRevision,
+    currentPlanRevision,
+    proposedPlanRevision,
+    failedNodeRevisionId,
+    verifierPlanRevisionId,
+    cycleState,
+    workKind,
+    activeAttemptNumber,
+    currentSubjectRevisionId,
+    evidenceTrust,
+    actorId,
+    verifierId,
+    nodeId,
+    ownerId,
+    executionPlane,
+    workBudget
+      ? [workBudget.maxModelCalls, workBudget.maxRuntimeSeconds, workBudget.maxCostUsdMicros]
+      : null,
+    routeIntent
+      ? [routeIntent.role, routeIntent.capabilityIds, routeIntent.requiresVision]
+      : null,
+  ]);
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) deepFreeze(child);
@@ -346,6 +400,26 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
         || required(raw, 'routeIntent', 'AgentSelfRepairModelBindingV1') !== null) {
       throw new Error('Terminal Agent self-repair model binding cannot contain active work');
     }
+    const expectedBindingKey = modelIntentBindingKey({
+      planId,
+      jobId,
+      cycleId,
+      failedNodeId,
+      originPlanRevision,
+      currentPlanRevision,
+      failedNodeRevisionId,
+      verifierPlanRevisionId,
+      cycleState,
+      workKind,
+      activeAttemptNumber,
+      currentSubjectRevisionId,
+      evidenceTrust,
+      actorId,
+      verifierId,
+    });
+    if (required(raw, 'bindingKey', 'AgentSelfRepairModelBindingV1') !== expectedBindingKey) {
+      throw new Error('Agent self-repair model bindingKey is inconsistent');
+    }
     return deepFreeze({
       schemaVersion: AGENT_SELF_REPAIR_MODEL_BINDING_VERSION,
       planId,
@@ -368,6 +442,7 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
       ownerId: null,
       workBudget: null,
       routeIntent: null,
+      bindingKey: expectedBindingKey,
       ...authority,
     });
   }
@@ -405,6 +480,32 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
     required(raw, 'routeIntent', 'AgentSelfRepairModelBindingV1'),
     workKind,
   );
+  const expectedBindingKey = modelIntentBindingKey({
+    planId,
+    jobId,
+    cycleId,
+    failedNodeId,
+    originPlanRevision,
+    currentPlanRevision,
+    proposedPlanRevision,
+    failedNodeRevisionId,
+    verifierPlanRevisionId,
+    cycleState,
+    workKind,
+    activeAttemptNumber,
+    currentSubjectRevisionId,
+    evidenceTrust,
+    actorId,
+    verifierId,
+    nodeId,
+    ownerId,
+    executionPlane,
+    workBudget,
+    routeIntent: routing,
+  });
+  if (required(raw, 'bindingKey', 'AgentSelfRepairModelBindingV1') !== expectedBindingKey) {
+    throw new Error('Agent self-repair model bindingKey is inconsistent');
+  }
 
   return deepFreeze({
     schemaVersion: AGENT_SELF_REPAIR_MODEL_BINDING_VERSION,
@@ -434,6 +535,7 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
       capabilityIds: [...routing.capabilityIds],
       requiresVision: routing.requiresVision,
     },
+    bindingKey: expectedBindingKey,
     ...authority,
   });
 }
@@ -460,7 +562,7 @@ export function bindAgentSelfRepairModelIntentV1(input) {
     if (proposal.extensionNode !== null || proposal.proposedPlan !== null) {
       throw new Error('Terminal Agent self-repair proposal unexpectedly contains active work');
     }
-    return normalizeAgentSelfRepairModelIntentV1({
+    const terminalBinding = {
       schemaVersion: AGENT_SELF_REPAIR_MODEL_BINDING_VERSION,
       planId: proposal.planId,
       jobId: proposal.jobId,
@@ -483,7 +585,9 @@ export function bindAgentSelfRepairModelIntentV1(input) {
       workBudget: null,
       routeIntent: null,
       ...AGENT_SELF_REPAIR_MODEL_BINDING_AUTHORITY,
-    });
+    };
+    terminalBinding.bindingKey = modelIntentBindingKey(terminalBinding);
+    return normalizeAgentSelfRepairModelIntentV1(terminalBinding);
   }
 
   const node = proposal.extensionNode;
@@ -502,7 +606,7 @@ export function bindAgentSelfRepairModelIntentV1(input) {
     throw new Error('Agent self-repair model binding requires independent actor and verifier identities');
   }
 
-  return normalizeAgentSelfRepairModelIntentV1({
+  const activeBinding = {
     schemaVersion: AGENT_SELF_REPAIR_MODEL_BINDING_VERSION,
     planId: proposal.planId,
     jobId: proposal.jobId,
@@ -535,5 +639,7 @@ export function bindAgentSelfRepairModelIntentV1(input) {
       requiresVision: routing.requiresVision,
     },
     ...AGENT_SELF_REPAIR_MODEL_BINDING_AUTHORITY,
-  });
+  };
+  activeBinding.bindingKey = modelIntentBindingKey(activeBinding);
+  return normalizeAgentSelfRepairModelIntentV1(activeBinding);
 }
