@@ -20,7 +20,7 @@ const ROUTE_KEYS = new Set(['routeId','provider','model','endpointId']);
 const AUTH_KEYS = new Set(Object.keys(AGENT_MODEL_ROUTE_DISPATCH_INTENT_AUTHORITY));
 const INPUT_KEYS = new Set([
   'dispatchIntent','currentDefinitionModelPolicyBindingKey','currentJobId',
-  'currentProjectId','currentRoutePoolRevision','currentRouterSettings',
+  'currentProjectId','currentParentModelPolicyBindingKey','currentRoutePoolRevision','currentRouterSettings',
   'currentRouterRuntime','currentNow',
 ]);
 
@@ -135,6 +135,18 @@ export function createBoundAgentModelOrchestratorEnvelopeV1(input) {
   if (intent.jobId !== currentJobId) throw new Error('Dispatch intent job identity is stale');
   if (intent.projectId !== currentProjectId) throw new Error('Dispatch intent Project identity is stale');
   if (intent.routePoolRevision !== currentRoutePoolRevision) throw new Error('Dispatch intent route-pool revision is stale');
+
+  if (intent.parentModelPolicyBindingKey) {
+    const currentParentBindingKey = exactString(
+      raw.currentParentModelPolicyBindingKey,
+      'currentParentModelPolicyBindingKey',
+    );
+    if (intent.parentModelPolicyBindingKey !== currentParentBindingKey) {
+      throw new Error('Dispatch intent parent model-policy binding is stale');
+    }
+  } else if (Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')) {
+    throw new Error('Root dispatch intent must not supply current parent model-policy provenance');
+  }
 
   const settings = normalizeAiRouterSettings(raw.currentRouterSettings);
   if (settings.enabled !== true) throw new Error('Canonical AI Router is disabled');
