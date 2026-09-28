@@ -88,7 +88,7 @@ function requiredId(value, label) {
 }
 
 function optionalId(value, label) {
-  if (value == null || value === '') return null;
+  if (value === null) return null;
   return requiredId(value, label);
 }
 
@@ -135,6 +135,52 @@ function idList(value, label, { allowEmpty = true } = {}) {
   if (!allowEmpty && out.length === 0) throw new Error(`${label} must not be empty`);
   if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicates`);
   return out;
+}
+
+function exactRoutePolicyRecord(value, label, { complete = false } = {}) {
+  const record = strictRecord(value, ROUTE_POLICY_KEYS, label);
+  if (complete) {
+    for (const key of ROUTE_POLICY_KEYS) {
+      if (!Object.hasOwn(record, key)) throw new Error(`${label}.${key} is required`);
+    }
+  }
+
+  for (const key of ['autoSwitch', 'freeOnly']) {
+    if (Object.hasOwn(record, key) && typeof record[key] !== 'boolean') {
+      throw new Error(`${label}.${key} must be boolean`);
+    }
+  }
+  for (const key of ['orderedRouteIds', 'allowRouteIds', 'denyRouteIds']) {
+    if (Object.hasOwn(record, key)) idList(record[key], `${label}.${key}`);
+  }
+  if (Object.hasOwn(record, 'pinnedRouteId')) {
+    const pinned = record.pinnedRouteId;
+    if (typeof pinned !== 'string' || pinned !== pinned.trim()) {
+      throw new Error(`${label}.pinnedRouteId must use exact canonical identity`);
+    }
+    if (pinned) requiredId(pinned, `${label}.pinnedRouteId`);
+  }
+  if (Object.hasOwn(record, 'locality')) {
+    const locality = record.locality;
+    if (typeof locality !== 'string' || !locality || locality !== locality.trim()) {
+      throw new Error(`${label}.locality must be exact canonical text`);
+    }
+  }
+  for (const key of ['maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
+    if (!Object.hasOwn(record, key) || record[key] === null) continue;
+    const value = record[key];
+    if (typeof value !== 'number' || !Number.isFinite(value) || Object.is(value, -0)) {
+      throw new Error(`${label}.${key} must be an exact number or null`);
+    }
+  }
+  for (const key of ['retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
+    if (!Object.hasOwn(record, key)) continue;
+    const value = record[key];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)) {
+      throw new Error(`${label}.${key} must be an exact integer`);
+    }
+  }
+  return record;
 }
 
 function deepFreeze(value) {
@@ -219,9 +265,8 @@ function routePolicyProjection(policy, authorityRouteIds) {
 }
 
 function inheritChildRoutePolicy(parent, authorityRouteIds, childInput) {
-  const overrides = strictRecord(
+  const overrides = exactRoutePolicyRecord(
     childInput === undefined ? {} : childInput,
-    ROUTE_POLICY_KEYS,
     'Child AiRoutePolicy',
   );
   const authority = new Set(authorityRouteIds);
@@ -355,7 +400,12 @@ export function normalizeAgentModelPolicyBindingV1(input) {
   if (!Object.hasOwn(raw, 'routePolicy')) {
     throw new Error('Durable Agent routePolicy is required');
   }
-  const routePolicy = normalizeAiRoutePolicy(own(raw, 'routePolicy'));
+  const durableRoutePolicy = exactRoutePolicyRecord(
+    own(raw, 'routePolicy'),
+    'Durable Agent AiRoutePolicy',
+    { complete: true },
+  );
+  const routePolicy = normalizeAiRoutePolicy(durableRoutePolicy);
   assertSubset(routePolicy.allowRouteIds, authorityRouteIds, 'routePolicy.allowRouteIds');
   assertSubset(routePolicy.denyRouteIds, authorityRouteIds, 'routePolicy.denyRouteIds');
   assertSubset(routePolicy.orderedRouteIds, authorityRouteIds, 'routePolicy.orderedRouteIds');
@@ -482,7 +532,7 @@ export function createAgentModelPolicyBindingV1(input) {
   const routePolicyProvided = Object.hasOwn(raw, 'routePolicy');
   const routePolicyInput = own(raw, 'routePolicy');
   const topLevelRoutePolicyInput = routePolicyProvided
-    ? strictRecord(routePolicyInput, ROUTE_POLICY_KEYS, 'Agent AiRoutePolicy')
+    ? exactRoutePolicyRecord(routePolicyInput, 'Agent AiRoutePolicy')
     : {};
   const routePolicy = parentBinding
     ? inheritChildRoutePolicy(
