@@ -173,6 +173,7 @@ test('readiness is evaluated only inside the exact current durable Agent model-p
   assert.equal(result.agentDefinitionId, 'agent.research');
   assert.equal(result.definitionRevision, 4);
   assert.equal(result.routePoolRevision, 9);
+  assert.deepEqual(result.authorityRouteIds, ['route.a', 'route.b', 'route.c']);
   assert.deepEqual(result.effectiveRouteIds, ['route.a', 'route.b']);
   assert.equal(result.readiness.state, AgentRouteReadinessState.READY);
   assert.equal(result.readiness.ready, true);
@@ -212,6 +213,22 @@ test('stale current Agent definition selection fails before readiness inspection
   );
 });
 
+test('same-revision disabled Agent definition cannot retain readiness authority', () => {
+  const current = selection();
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+      currentDefinitionSelection: {
+        ...current,
+        definition: {
+          ...current.definition,
+          enabled: false,
+        },
+      },
+    })),
+    /definition is disabled/u,
+  );
+});
+
 test('current job and Project identities are exact owner fences', () => {
   assert.throws(
     () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
@@ -236,12 +253,29 @@ test('stale route-pool revision fails even when route IDs are unchanged', () => 
   );
 });
 
-test('every bound effective route must still exist in the current canonical route pool', () => {
+test('every bound authority route must still exist in the same canonical route-pool revision', () => {
   assert.throws(
     () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
       routes: pool().filter(item => item.routeId !== 'route.a'),
     })),
-    /bound route is missing from current route pool: route\.a/u,
+    /authority route is missing from current route pool: route\.a/u,
+  );
+
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+      routes: pool().filter(item => item.routeId !== 'route.c'),
+    })),
+    /authority route is missing from current route pool: route\.c/u,
+  );
+});
+
+test('same-revision authority route ordering drift fails closed', () => {
+  const routes = pool();
+  assert.throws(
+    () => inspectBoundAgentModelPolicyReadinessV1(readinessRequest({
+      routes: [routes[1], routes[0], routes[2]],
+    })),
+    /authority route order drifted/u,
   );
 });
 
