@@ -8,10 +8,25 @@ import {
 
 const REQUEST_KEYS = new Set([
   'invocationRequest',
-  'trustedInvocationId',
+  'providerReservation',
   'observationId',
   'modelResult',
   'observedAt',
+]);
+
+const PROVIDER_RESERVATION_KEYS = new Set([
+  'reservationId',
+  'controlEpoch',
+  'modelCalls',
+  'inputTokens',
+  'outputTokens',
+  'totalTokens',
+  'estimatedCostUsd',
+  'createdAt',
+  'routeId',
+  'provider',
+  'model',
+  'callNumber',
 ]);
 
 const MODEL_RESULT_KEYS = new Set([
@@ -110,6 +125,12 @@ function safeCounter(value, label) {
   return value;
 }
 
+function positiveCounter(value, label) {
+  const normalized = safeCounter(value, label);
+  if (normalized < 1) throw new Error(label + ' must be positive');
+  return normalized;
+}
+
 function exactCanonicalTimestamp(value, label) {
   if (typeof value !== 'string' || !value) {
     throw new Error(label + ' must be an exact canonical timestamp');
@@ -120,6 +141,83 @@ function exactCanonicalTimestamp(value, label) {
     throw new Error(label + ' must be an exact canonical timestamp');
   }
   return { value, milliseconds };
+}
+
+function normalizeProviderReservation(value, prepared) {
+  const raw = strictRecord(
+    value,
+    PROVIDER_RESERVATION_KEYS,
+    'Agent self-repair provider reservation',
+  );
+  const reservationId = exactText(
+    raw.reservationId,
+    'provider reservationId',
+    { maxLength: 180 },
+  );
+  const expectedPrefix = prepared.jobId + ':model-budget:';
+  if (!reservationId.startsWith(expectedPrefix)) {
+    throw new Error('Provider reservation identity does not belong to the current self-repair owner');
+  }
+  const sequenceText = reservationId.slice(expectedPrefix.length);
+  if (!/^[1-9]\d*$/u.test(sequenceText)
+      || !Number.isSafeInteger(Number(sequenceText))) {
+    throw new Error('Provider reservation identity sequence is invalid');
+  }
+
+  const controlEpoch = positiveCounter(raw.controlEpoch, 'provider reservation controlEpoch');
+  if (controlEpoch !== prepared.internal.providerCallBudgetContext.controlEpoch) {
+    throw new Error('Provider reservation controlEpoch drifted from the admitted budget owner');
+  }
+  const modelCalls = positiveCounter(raw.modelCalls, 'provider reservation modelCalls');
+  if (modelCalls !== 1) {
+    throw new Error('Provider reservation must authorize exactly one model call');
+  }
+  const inputTokens = safeCounter(raw.inputTokens, 'provider reservation inputTokens');
+  const outputTokens = safeCounter(raw.outputTokens, 'provider reservation outputTokens');
+  const totalTokens = safeCounter(raw.totalTokens, 'provider reservation totalTokens');
+  if (totalTokens < inputTokens + outputTokens) {
+    throw new Error('Provider reservation totalTokens is inconsistent');
+  }
+  if (typeof raw.estimatedCostUsd !== 'number'
+      || !Number.isFinite(raw.estimatedCostUsd)
+      || Object.is(raw.estimatedCostUsd, -0)
+      || raw.estimatedCostUsd < 0) {
+    throw new Error('Provider reservation estimatedCostUsd is invalid');
+  }
+  const createdAt = safeCounter(raw.createdAt, 'provider reservation createdAt');
+  if (createdAt < prepared.preparedAt) {
+    throw new Error('Provider reservation predates invocation preparation');
+  }
+  const routeId = exactText(raw.routeId, 'provider reservation routeId', { maxLength: 180 });
+  const provider = exactText(raw.provider, 'provider reservation provider', { maxLength: 80 });
+  const model = exactText(raw.model, 'provider reservation model', { maxLength: 300 });
+  const callNumber = positiveCounter(raw.callNumber, 'provider reservation callNumber');
+  if (callNumber !== 1) {
+    throw new Error('Provider reservation callNumber exceeds the one-call invocation ceiling');
+  }
+
+  const envelope = prepared.internal.agentModelOrchestratorEnvelope;
+  const envelopeRoute = envelope.settings.routes[0];
+  if (routeId !== envelope.routeId
+      || provider !== envelopeRoute.provider
+      || model !== envelopeRoute.model) {
+    throw new Error('Provider reservation route identity drifted from the admitted envelope');
+  }
+
+  return Object.freeze({
+    reservationId,
+    controlEpoch,
+    modelCalls,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostUsd: raw.estimatedCostUsd,
+    createdAt,
+    routeId,
+    provider,
+    model,
+    callNumber,
+  });
 }
 
 function normalizeUsage(value) {
@@ -210,11 +308,12 @@ function normalizeSuccessfulModelResult(value, envelope) {
  * Project one successfully admitted self-repair model call into the existing
  * canonical ObservationV1 evidence contract.
  *
- * This function deliberately cannot mint an invocation identity, verify the
- * model output, complete work, persist evidence, or create artifacts. The
- * caller must supply the exact invocationId from an existing trusted runtime
- * authority. Large model output is not copied into ObservationV1; downstream
- * code must materialize it through the canonical ArtifactRef path if needed.
+ * The Observation invocationId is the exact durable BrowserAgent provider
+ * reservation identity returned by the existing pre-dispatch budget lifecycle.
+ * This function cannot mint another invocation identity, verify model output,
+ * complete work, persist evidence, or create artifacts. Large model output is
+ * not copied into ObservationV1; downstream code must materialize it through
+ * the canonical ArtifactRef path if needed.
  */
 export function projectAgentSelfRepairModelObservationV1(input) {
   const raw = strictRecord(
@@ -226,10 +325,9 @@ export function projectAgentSelfRepairModelObservationV1(input) {
   const prepared = prepareBoundAgentSelfRepairModelInvocationV1(
     raw.invocationRequest,
   );
-  const trustedInvocationId = exactText(
-    raw.trustedInvocationId,
-    'trustedInvocationId',
-    { maxLength: 180 },
+  const providerReservation = normalizeProviderReservation(
+    raw.providerReservation,
+    prepared,
   );
   const observationId = exactText(
     raw.observationId,
@@ -240,8 +338,8 @@ export function projectAgentSelfRepairModelObservationV1(input) {
     raw.observedAt,
     'observedAt',
   );
-  if (observedAt.milliseconds < prepared.preparedAt) {
-    throw new Error('Agent self-repair model observation predates invocation preparation');
+  if (observedAt.milliseconds < providerReservation.createdAt) {
+    throw new Error('Agent self-repair model observation predates durable provider admission');
   }
 
   const modelResult = normalizeSuccessfulModelResult(
@@ -254,7 +352,7 @@ export function projectAgentSelfRepairModelObservationV1(input) {
   return normalizeObservationV1({
     schemaVersion: 1,
     observationId,
-    invocationId: trustedInvocationId,
+    invocationId: providerReservation.reservationId,
     status: ObservationStatus.OK,
     summary,
     data: {
@@ -268,6 +366,11 @@ export function projectAgentSelfRepairModelObservationV1(input) {
       activeAttemptNumber: prepared.activeAttemptNumber,
       nodeId: prepared.nodeId,
       ownerId: prepared.ownerId,
+      providerAdmission: {
+        controlEpoch: providerReservation.controlEpoch,
+        callNumber: providerReservation.callNumber,
+        createdAt: providerReservation.createdAt,
+      },
       route: {
         routeId: modelResult.routeId,
         provider: modelResult.provider,
