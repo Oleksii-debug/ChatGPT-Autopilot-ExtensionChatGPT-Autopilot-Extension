@@ -466,6 +466,30 @@ test('non-retryable route rejection fails closed without calling another model',
 });
 
 
+test('provider-call budget context fails closed before gateway I/O when lifecycle is unavailable', async () => {
+  const gateway = new FakeGateway(['must never be consumed']);
+  const router = new AiOrchestrator({ gatewayClient:gateway, now:() => 79_000 });
+
+  await assert.rejects(
+    () => router.run(
+      settings({ primary:{ provider:'ollama', model:'qwen:8b' } }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'task',
+      {
+        maxOutputTokens:128,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-0', controlEpoch:1 },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_LIFECYCLE_UNAVAILABLE');
+      assert.match(error.message, /requires the canonical provider-call lifecycle/u);
+      assert.equal(error.modelCallsUsed, 0);
+      return true;
+    },
+  );
+  assert.equal(gateway.calls.length, 0);
+});
+
 test('provider-call lifecycle durably admits before gateway I/O and settles after exact success', async () => {
   const events = [];
   const gateway = {
