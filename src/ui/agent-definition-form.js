@@ -1,3 +1,5 @@
+import { normalizeAgentSpecialistDelegationProfileV1 } from '../core/agent-specialist-delegation-profile.js';
+
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 
 function exactText(value, label, max, { optional = false } = {}) {
@@ -126,6 +128,72 @@ export function mergeAgentDefinitionModelDefaultsV1(input = {}, configDefaults =
   return out;
 }
 
+function exactIntegerText(value, label, { min, max }) {
+  if (typeof value !== 'string' || value !== value.trim() || !/^(?:0|[1-9][0-9]*)$/u.test(value)) {
+    throw new Error(label + ' має бути цілим числом у канонічному форматі.');
+  }
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < min || number > max) {
+    throw new Error(label + ' поза допустимим діапазоном.');
+  }
+  return number;
+}
+
+export function buildAgentSpecialistDelegationProfileFromFormV1(input = {}, {
+  persistedProfile = undefined,
+} = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Форма Specialist delegation недоступна.');
+  }
+  const configured = input.specialistDelegationConfigured === true;
+  if (!configured) {
+    return persistedProfile === undefined ? undefined : null;
+  }
+  const profile = normalizeAgentSpecialistDelegationProfileV1({
+    schemaVersion: 1,
+    registryId: parseCanonicalAgentIdentity(
+      input.specialistRegistryId,
+      'Specialist registry ID',
+    ),
+    requiredCapabilityIds: listFromLines(
+      input.specialistCapabilityIdsText ?? '',
+      'Specialist capability ID',
+      { maxItems: 64, itemMax: 180, identity: true },
+    ),
+    requiredToolIds: listFromLines(
+      input.specialistToolIdsText ?? '',
+      'Specialist tool ID',
+      { maxItems: 128, itemMax: 180, identity: true },
+    ),
+    policyEnvelopeId: parseCanonicalAgentIdentity(
+      input.specialistPolicyEnvelopeId,
+      'Policy envelope ID',
+    ),
+    deadlineSeconds: exactIntegerText(
+      input.specialistDeadlineSeconds,
+      'Specialist deadline',
+      { min: 1, max: 31_536_000 },
+    ),
+    maxConcurrentHandoffs: exactIntegerText(
+      input.specialistMaxConcurrentHandoffs,
+      'Specialist concurrency',
+      { min: 0, max: 256 },
+    ),
+    leaseSeconds: exactIntegerText(
+      input.specialistLeaseSeconds,
+      'Specialist lease',
+      { min: 1, max: 86_400 },
+    ),
+    priority: exactIntegerText(
+      input.specialistPriority,
+      'Specialist priority',
+      { min: 0, max: 1_000_000 },
+    ),
+    enabled: input.specialistDelegationEnabled === true,
+  });
+  return profile;
+}
+
 function copyModelRoutePolicy(value) {
   if (value == null) return null;
   if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
@@ -174,6 +242,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   definitionRevision = 1,
   configDefaults = {},
   modelRoutePolicy = null,
+  specialistDelegationProfile = undefined,
 } = {}) {
   if (!Number.isSafeInteger(definitionRevision) || definitionRevision < 1 || Object.is(definitionRevision,-0)) {
     throw new Error('Definition revision має бути додатним цілим числом.');
@@ -191,6 +260,18 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: mergeAgentDefinitionModelDefaultsV1(input, configDefaults),
     modelRoutePolicy: copyModelRoutePolicy(modelRoutePolicy),
+    ...(() => {
+      const effectiveProfile = Object.hasOwn(input, 'specialistDelegationConfigured')
+        ? buildAgentSpecialistDelegationProfileFromFormV1(input, {
+          persistedProfile: specialistDelegationProfile,
+        })
+        : specialistDelegationProfile === undefined || specialistDelegationProfile === null
+          ? specialistDelegationProfile
+          : normalizeAgentSpecialistDelegationProfileV1(specialistDelegationProfile);
+      return effectiveProfile === undefined
+        ? {}
+        : { specialistDelegationProfile: effectiveProfile };
+    })(),
     enabled: input.enabled === true,
     definitionRevision,
   };

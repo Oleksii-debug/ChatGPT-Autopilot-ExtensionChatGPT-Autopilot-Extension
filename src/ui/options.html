@@ -303,6 +303,29 @@
             <input id="agent-definition-ai-strong-model" type="text" maxlength="300" autocomplete="off" spellcheck="false">
           </fieldset>
 
+          <fieldset class="settings-group" id="agent-definition-specialist-delegation-group">
+            <legend>Автоматичне делегування Specialist</legend>
+            <label><input id="agent-definition-specialist-delegation-configured" type="checkbox">Зберігати Specialist delegation profile для цієї Agent definition</label>
+            <label><input id="agent-definition-specialist-delegation-enabled" type="checkbox">Profile увімкнений для майбутнього автоматичного PREPARE</label>
+            <p id="agent-definition-specialist-delegation-help">Збереження profile нічого не запускає. Runtime все одно повторно перевіряє plan, registry, policy, provider readiness і product-wide capacity перед будь-якою дією.</p>
+            <label for="agent-definition-specialist-registry-id">Specialist registry ID</label>
+            <input id="agent-definition-specialist-registry-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-specialist-capabilities">Required capability IDs — по одному в рядку</label>
+            <textarea id="agent-definition-specialist-capabilities" rows="4" spellcheck="false"></textarea>
+            <label for="agent-definition-specialist-tools">Required tool IDs — по одному в рядку; можна залишити порожнім</label>
+            <textarea id="agent-definition-specialist-tools" rows="4" spellcheck="false"></textarea>
+            <label for="agent-definition-specialist-policy-envelope">Policy envelope ID</label>
+            <input id="agent-definition-specialist-policy-envelope" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-specialist-deadline-seconds">Deadline після PREPARE, секунд</label>
+            <input id="agent-definition-specialist-deadline-seconds" type="number" min="1" max="31536000" step="1" inputmode="numeric" value="900">
+            <label for="agent-definition-specialist-max-concurrent">Максимум одночасних Specialist handoffs у продукті для цього profile</label>
+            <input id="agent-definition-specialist-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric" value="4">
+            <label for="agent-definition-specialist-lease-seconds">Lease, секунд</label>
+            <input id="agent-definition-specialist-lease-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric" value="900">
+            <label for="agent-definition-specialist-priority">Priority</label>
+            <input id="agent-definition-specialist-priority" type="number" min="0" max="1000000" step="1" inputmode="numeric" value="0">
+          </fieldset>
+
           <label><input id="agent-definition-enabled" type="checkbox" checked>Definition увімкнена</label>
           <p id="agent-definition-revision" tabindex="0">Реєстр не вибрано.</p>
           <p>Інші збережені config defaults, яких немає в цій формі, під час оновлення зберігаються без змін.</p>
