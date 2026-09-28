@@ -14,7 +14,7 @@ import { buildRunTimelineV1 } from './run-timeline.js';
 import { releaseSendLease, DEFAULT_PROFILE_SEND_GAP_MS } from './arbiter.js';
 import { DEFAULT_LOCAL_AI_SETTINGS, normalizeLocalAiSettings } from './local-ai-provider.js';
 import { DEFAULT_AI_ROUTER_SETTINGS, DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterSettings, normalizeAiRouterRuntime, validateAiRouterReadiness } from './ai-orchestrator.js';
-import { normalizeAiRoutePolicy } from './ai-route-pool.js';
+import { normalizeAiRoutePolicy, selectAiRouteCandidates } from './ai-route-pool.js';
 import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiManagerSettings, normalizeAiManagerRuntime } from './ai-manager.js';
 import {
   normalizeBoundAgentModelOrchestratorEnvelopeV1,
@@ -781,6 +781,41 @@ export class CoreCommandDispatcher {
       }
 
       const state = await this.repo.load();
+      if (internalEnvelope) {
+        const currentSettings = normalizeAiRouterSettings(
+          state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
+        if (currentSettings.enabled !== true) {
+          throw new Error('Current canonical AI Router is disabled before Agent model invocation');
+        }
+        const currentRoute = currentSettings.routes.find(
+          route => route.routeId === internalEnvelope.routeId,
+        );
+        const envelopeRoute = internalEnvelope.settings.routes[0];
+        if (!currentRoute
+            || currentRoute.provider !== envelopeRoute.provider
+            || currentRoute.model !== envelopeRoute.model
+            || currentRoute.endpointId !== envelopeRoute.endpointId) {
+          throw new Error('Agent model route identity drifted before provider invocation');
+        }
+        const currentRuntime = normalizeAiRouterRuntime(
+          state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME,
+        );
+        const currentCandidates = selectAiRouteCandidates({
+          routes: currentSettings.routes,
+          policy: currentSettings.routePolicy,
+          routeStates: currentRuntime.routeStates,
+          role: internalEnvelope.role,
+          capabilityIds: internalEnvelope.capabilityIds,
+          requiresVision: internalEnvelope.requiresVision,
+          now: this.now(),
+        });
+        if (!currentCandidates.candidates.some(
+          route => route.routeId === internalEnvelope.routeId,
+        )) {
+          throw new Error('Agent model route is no longer authorized by current canonical Router');
+        }
+      }
       const baseSettings = internalEnvelope
         ? internalEnvelope.settings
         : normalizeAiRouterSettings(
