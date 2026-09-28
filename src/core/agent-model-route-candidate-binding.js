@@ -40,6 +40,7 @@ const INPUT_KEYS = new Set([
   'currentJobId',
   'currentProjectId',
   'currentParentModelPolicyBinding',
+  'currentParentModelPolicyBindingKey',
   'currentRoutePoolRevision',
   'routes',
   'routeStates',
@@ -83,12 +84,12 @@ function exactId(value, label) {
   return value;
 }
 
-function exactBindingKey(value) {
+function exactBindingKey(value, label = 'currentDefinitionModelPolicyBindingKey') {
   if (typeof value !== 'string'
       || value.length < 1
       || value.length > 100_000
       || value !== value.trim()) {
-    throw new Error('currentDefinitionModelPolicyBindingKey is invalid');
+    throw new Error(label + ' is invalid');
   }
   return value;
 }
@@ -190,12 +191,20 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
 
   let currentParentBinding = null;
   if (binding.modelPolicyBinding.parentAgentId !== null) {
-    if (!Object.hasOwn(raw, 'currentParentModelPolicyBinding')) {
-      throw new Error('Agent model route candidate child binding requires the current parent model policy binding');
+    if (!Object.hasOwn(raw, 'currentParentModelPolicyBinding')
+        || !Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')) {
+      throw new Error('Agent model route candidate child binding requires current parent model-policy provenance');
     }
     currentParentBinding = normalizeAgentModelPolicyBindingV1(
       own(raw, 'currentParentModelPolicyBinding'),
     );
+    const currentParentBindingKey = exactBindingKey(
+      own(raw, 'currentParentModelPolicyBindingKey'),
+      'currentParentModelPolicyBindingKey',
+    );
+    if (currentParentBinding.bindingKey !== currentParentBindingKey) {
+      throw new Error('Agent model route candidate parent binding is not the current owner binding');
+    }
     if (currentParentBinding.agentId !== binding.modelPolicyBinding.parentAgentId
         || currentParentBinding.projectId !== binding.projectId) {
       throw new Error('Agent model route candidate parent model policy identity is stale');
@@ -203,9 +212,12 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
     if (currentParentBinding.routePoolRevision !== currentRoutePoolRevision) {
       throw new Error('Agent model route candidate parent route-pool revision is stale');
     }
-  } else if (Object.hasOwn(raw, 'currentParentModelPolicyBinding')
-      && own(raw, 'currentParentModelPolicyBinding') != null) {
-    throw new Error('Root Agent model route candidate request must not supply a parent model policy binding');
+  } else if (
+    (Object.hasOwn(raw, 'currentParentModelPolicyBinding')
+      && own(raw, 'currentParentModelPolicyBinding') != null)
+    || Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')
+  ) {
+    throw new Error('Root Agent model route candidate request must not supply parent model-policy provenance');
   }
 
   const currentPolicy = selection.definition.modelRoutePolicy;
@@ -263,6 +275,9 @@ export function rankBoundAgentModelRouteCandidatesV1(input) {
     definitionRevision: binding.definitionBinding.definitionRevision,
     definitionModelPolicyBindingKey: binding.bindingKey,
     modelPolicyBindingKey: binding.modelPolicyBinding.bindingKey,
+    ...(currentParentBinding ? {
+      parentModelPolicyBindingKey: currentParentBinding.bindingKey,
+    } : {}),
     routePoolRevision: currentRoutePoolRevision,
     role,
     requiresVision,
