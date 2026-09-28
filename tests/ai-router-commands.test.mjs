@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { CoreCommandDispatcher } from '../src/core/commands.js';
 import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
 import { createEmptyState, validateState } from '../src/core/schema.js';
+import {
+  AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY,
+} from '../src/core/agent-model-orchestrator-envelope.js';
 
 class MemoryRepo {
   constructor(state = createEmptyState(1000)) { this.state = structuredClone(state); }
@@ -812,4 +815,229 @@ test('Agent price ceiling takes the stricter minimum of global and per-Agent cap
   });
   assert.equal(result.result.text, 'done');
   assert.deepEqual(calls.map(call => call.model), ['cheap']);
+});
+
+
+function internalAgentEnvelope(overrides = {}) {
+  const route = {
+    schemaVersion: 1,
+    routeId: 'route.agent',
+    provider: 'openai',
+    model: 'agent-model',
+    endpointId: '',
+    displayName: 'Agent model',
+    systemPrompt: '',
+    workerPrompt: '',
+    roles: ['coder'],
+    capabilityIds: ['cap.reason'],
+    priority: 20,
+    enabled: true,
+    locality: 'remote',
+    costClass: 'paid',
+    inputPricePerMillionUsd: 1,
+    outputPricePerMillionUsd: 2,
+    supportsVision: false,
+    maxWorkers: 1,
+  };
+  return {
+    schemaVersion: 1,
+    jobId: 'agent.job.1',
+    projectId: 'project.alpha',
+    definitionModelPolicyBindingKey: 'definition.binding',
+    modelPolicyBindingKey: 'model.binding',
+    routePoolRevision: 9,
+    role: 'coder',
+    capabilityIds: ['cap.reason'],
+    requiresVision: false,
+    preparedAt: 1_000,
+    revalidatedAt: 1_500,
+    routeId: 'route.agent',
+    settings: {
+      enabled: true,
+      gatewayUrl: 'http://127.0.0.1:3210',
+      timeoutSeconds: 180,
+      mode: 'primary',
+      primary: { provider: 'openai', model: 'agent-model' },
+      strong: { provider: 'openai', model: 'unused' },
+      routes: [route],
+      routePolicy: {
+        autoSwitch: false,
+        pinnedRouteId: 'route.agent',
+        orderedRouteIds: ['route.agent'],
+        allowRouteIds: ['route.agent'],
+        denyRouteIds: [],
+        freeOnly: false,
+        locality: 'remote',
+        maxInputPricePerMillionUsd: 4,
+        maxOutputPricePerMillionUsd: 5,
+      },
+    },
+    runtime: {
+      requestCount: 7,
+      routeStates: {
+        'route.agent': {
+          consecutiveFailures: 0,
+          successes: 2,
+          failures: 0,
+          backoffUntil: 0,
+          circuitOpenUntil: 0,
+          lastErrorCode: '',
+          lastErrorCategory: '',
+          lastErrorAt: 0,
+          lastSuccessAt: 1_400,
+          lastLatencyMs: 12,
+        },
+      },
+      lastRouteId: 'route.agent',
+      lastFailoverChain: [],
+    },
+    authority: AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY,
+    ...overrides,
+  };
+}
+
+test('internal Agent envelope reaches canonical AiOrchestrator as isolated one-route execution', async () => {
+  const repo = new MemoryRepo();
+  const before = structuredClone(repo.state.profile.aiRouter);
+  const beforeRuntime = structuredClone(repo.state.profile.aiRouterRuntime);
+  const seen = [];
+  const fakeOrchestrator = {
+    async run(settings, runtime, prompt, options) {
+      seen.push({
+        settings: structuredClone(settings),
+        runtime: structuredClone(runtime),
+        prompt,
+        options: structuredClone(options),
+      });
+      return {
+        text: 'agent result',
+        route: 'route.agent',
+        primary: { provider: 'openai', model: 'agent-model', routeId: 'route.agent' },
+        strong: null,
+        runtime: {
+          ...runtime,
+          requestCount: runtime.requestCount + 1,
+          lastRouteId: 'route.agent',
+        },
+      };
+    },
+  };
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: fakeOrchestrator,
+  });
+
+  const result = await dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    {
+      prompt: 'bounded Agent task',
+      systemPrompt: 'Stay inside the task.',
+      maxOutputTokens: 512,
+      maxModelCallsForRequest: 1,
+    },
+    {
+      agentModelOrchestratorEnvelope: internalAgentEnvelope(),
+      providerCallBudgetContext: { jobId: 'agent.job.1' },
+    },
+  );
+
+  assert.equal(result.result.text, 'agent result');
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].settings.routes.map(route => route.routeId), ['route.agent']);
+  assert.equal(seen[0].settings.routePolicy.pinnedRouteId, 'route.agent');
+  assert.equal(seen[0].runtime.requestCount, 7);
+  assert.equal(seen[0].options.taskRole, 'coder');
+  assert.equal(seen[0].options.strongTaskRole, 'coder');
+  assert.deepEqual(seen[0].options.capabilityIds, ['cap.reason']);
+  assert.equal(seen[0].options.forceStrong, false);
+  assert.deepEqual(seen[0].options.providerCallBudgetContext, { jobId: 'agent.job.1' });
+  assert.deepEqual(repo.state.profile.aiRouter, before);
+  assert.deepEqual(repo.state.profile.aiRouterRuntime, beforeRuntime);
+});
+
+test('Agent orchestrator envelope is internal-only and cannot be injected through UI payload', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2_000, {
+    aiOrchestrator: { async run() { throw new Error('must not run'); } },
+  });
+  await assert.rejects(
+    dispatcher.execute('RUN_AI_ROUTED_PROMPT', {
+      prompt: 'forged',
+      agentModelOrchestratorEnvelope: internalAgentEnvelope(),
+    }),
+    /internal-only/u,
+  );
+});
+
+test('internal Agent envelope cannot be mixed with caller Router or role aliases', async () => {
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2_000, {
+    aiOrchestrator: { async run() { throw new Error('must not run'); } },
+  });
+  for (const alias of [
+    { routerOverride: { mode: 'strong' } },
+    { routerRuntime: { requestCount: 999 } },
+    { isolatedRuntime: false },
+    { forceStrong: true },
+    { taskRole: 'planner' },
+    { strongTaskRole: 'verifier' },
+    { capabilityIds: ['forged'] },
+  ]) {
+    await assert.rejects(
+      dispatcher.execute(
+        'RUN_AI_ROUTED_PROMPT',
+        { prompt: 'agent', ...alias },
+        { agentModelOrchestratorEnvelope: internalAgentEnvelope() },
+      ),
+      /cannot be mixed with payload Router aliases/u,
+    );
+  }
+});
+
+test('internal Agent envelope authority widening fails before model invocation', async () => {
+  let calls = 0;
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  const widened = internalAgentEnvelope({
+    authority: {
+      ...AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY,
+      providerCallAuthorized: true,
+    },
+  });
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      { agentModelOrchestratorEnvelope: widened },
+    ),
+    /authority is invalid/u,
+  );
+  assert.equal(calls, 0);
+});
+
+test('internal Agent envelope rejects route-state leakage before model invocation', async () => {
+  let calls = 0;
+  const dispatcher = new CoreCommandDispatcher(new MemoryRepo(), () => 2_000, {
+    aiOrchestrator: { async run() { calls += 1; return {}; } },
+  });
+  const envelope = internalAgentEnvelope();
+  envelope.runtime.routeStates['route.other'] = {
+    consecutiveFailures: 0,
+    successes: 0,
+    failures: 0,
+    backoffUntil: 0,
+    circuitOpenUntil: 0,
+    lastErrorCode: '',
+    lastErrorCategory: '',
+    lastErrorAt: 0,
+    lastSuccessAt: 0,
+    lastLatencyMs: 0,
+  };
+  await assert.rejects(
+    dispatcher.execute(
+      'RUN_AI_ROUTED_PROMPT',
+      { prompt: 'agent' },
+      { agentModelOrchestratorEnvelope: envelope },
+    ),
+    /unknown route state|runtime leaks another route/u,
+  );
+  assert.equal(calls, 0);
 });
