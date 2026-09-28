@@ -287,13 +287,8 @@ function replayResult(
     && expectedChildIds.every(nodeId => family.includes(nodeId));
   const parent = graph.nodesById[parentNodeId];
   const barrierCoversSpawn = parent
-    && (
-      parent.barrier.mode === OrchestrationBarrierMode.ALL_DIRECT_CHILDREN
-      || (
-        parent.barrier.mode === OrchestrationBarrierMode.REQUIRED_DIRECT_CHILDREN
-        && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId))
-      )
-    );
+    && parent.barrier.mode !== OrchestrationBarrierMode.NONE
+    && expectedChildIds.every(nodeId => parent.barrier.childIds.includes(nodeId));
   const exactAuthority = exactFamily
     && parent
     && !parent.providerBinding
