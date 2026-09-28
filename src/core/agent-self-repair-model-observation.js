@@ -3,12 +3,12 @@ import {
   normalizeObservationV1,
 } from './universal-agent-contracts.js';
 import {
-  prepareBoundAgentSelfRepairModelInvocationV1,
-} from './agent-self-repair-model-invocation.js';
+  projectAgentSelfRepairProviderReceiptV1,
+} from './agent-self-repair-provider-receipt.js';
 
 const REQUEST_KEYS = new Set([
   'invocationRequest',
-  'trustedInvocationId',
+  'trustedProviderReservation',
   'observationId',
   'modelResult',
   'observedAt',
@@ -212,8 +212,10 @@ function normalizeSuccessfulModelResult(value, envelope) {
  *
  * This function deliberately cannot mint an invocation identity, verify the
  * model output, complete work, persist evidence, or create artifacts. The
- * caller must supply the exact invocationId from an existing trusted runtime
- * authority. Large model output is not copied into ObservationV1; downstream
+ * caller must supply the exact durable provider-budget reservation returned by
+ * the existing BrowserAgent lifecycle. Its reservationId becomes the
+ * non-authorizing invocation identity only after strict owner/epoch/route/budget
+ * binding. Large model output is not copied into ObservationV1; downstream
  * code must materialize it through the canonical ArtifactRef path if needed.
  */
 export function projectAgentSelfRepairModelObservationV1(input) {
@@ -223,14 +225,11 @@ export function projectAgentSelfRepairModelObservationV1(input) {
     'Agent self-repair model observation request',
   );
 
-  const prepared = prepareBoundAgentSelfRepairModelInvocationV1(
-    raw.invocationRequest,
-  );
-  const trustedInvocationId = exactText(
-    raw.trustedInvocationId,
-    'trustedInvocationId',
-    { maxLength: 180 },
-  );
+  const providerReceipt = projectAgentSelfRepairProviderReceiptV1({
+    invocationRequest: raw.invocationRequest,
+    trustedReservation: raw.trustedProviderReservation,
+  });
+  const prepared = providerReceipt;
   const observationId = exactText(
     raw.observationId,
     'observationId',
@@ -254,7 +253,7 @@ export function projectAgentSelfRepairModelObservationV1(input) {
   return normalizeObservationV1({
     schemaVersion: 1,
     observationId,
-    invocationId: trustedInvocationId,
+    invocationId: providerReceipt.invocationId,
     status: ObservationStatus.OK,
     summary,
     data: {
