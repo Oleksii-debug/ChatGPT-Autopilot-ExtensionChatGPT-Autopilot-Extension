@@ -49,50 +49,86 @@ function registryWith(...definitions) {
     registry = putSpecialistDefinitionV1({
       registry,
       expectedRevision:registry.revision,
+      expectedBindingKey:registry.bindingKey,
       definition,
     });
   }
   return registry;
 }
 
-test('specialist registry persists canonical immutable definitions', () => {
+function bind(registry, overrides = {}) {
+  return bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:registry.revision,
+    expectedRegistryBindingKey:registry.bindingKey,
+    handoff:handoff(),
+    ...overrides,
+  });
+}
+
+test('specialist registry persists canonical immutable definitions and deterministic binding key', () => {
   const registry = registryWith(specialist({ capabilityIds:['code.test', 'code.edit'] }));
   assert.equal(registry.schemaVersion, 1);
   assert.equal(registry.revision, 1);
+  assert.equal(typeof registry.bindingKey, 'string');
+  assert.ok(registry.bindingKey.length > 0);
   assert.deepEqual(registry.specialists[0].capabilityIds, ['code.edit', 'code.test']);
   assert.ok(Object.isFrozen(registry));
   assert.ok(Object.isFrozen(registry.specialists));
   assert.ok(Object.isFrozen(registry.specialists[0]));
 });
 
-test('exact replay is idempotent and does not consume a new revision', () => {
+test('exact replay is idempotent and does not consume a new revision or binding key', () => {
   const first = registryWith(specialist());
   const replay = putSpecialistDefinitionV1({
     registry:first,
     expectedRevision:first.revision,
+    expectedBindingKey:first.bindingKey,
     definition:specialist(),
   });
   assert.strictEqual(replay, first);
   assert.equal(replay.revision, 1);
+  assert.equal(replay.bindingKey, first.bindingKey);
 });
 
-test('divergent update requires current CAS revision and increments it exactly once', () => {
+test('divergent update requires current revision and binding key then changes both exactly once', () => {
   const first = registryWith(specialist());
   assert.throws(() => putSpecialistDefinitionV1({
     registry:first,
     expectedRevision:0,
+    expectedBindingKey:first.bindingKey,
     definition:specialist({ priority:200 }),
   }), /SPECIALIST_REGISTRY_REVISION_CONFLICT/);
+  assert.throws(() => putSpecialistDefinitionV1({
+    registry:first,
+    expectedRevision:first.revision,
+    expectedBindingKey:'forged',
+    definition:specialist({ priority:200 }),
+  }), /SPECIALIST_REGISTRY_BINDING_KEY_CONFLICT/);
   const second = putSpecialistDefinitionV1({
     registry:first,
     expectedRevision:1,
+    expectedBindingKey:first.bindingKey,
     definition:specialist({ priority:200 }),
   });
   assert.equal(second.revision, 2);
+  assert.notEqual(second.bindingKey, first.bindingKey);
   assert.equal(second.specialists[0].priority, 200);
 });
 
-test('selection is deterministic, capability-bound and advisory only', () => {
+test('registry normalization rejects same-revision content substitution', () => {
+  const registry = registryWith(specialist());
+  const forged = {
+    ...registry,
+    specialists:[specialist({ providerId:'provider.evil' })],
+  };
+  assert.throws(
+    () => normalizeSpecialistRegistryV1(forged),
+    /SPECIALIST_REGISTRY_BINDING_KEY_INCONSISTENT/,
+  );
+});
+
+test('selection is deterministic, capability-bound and exposes registry binding evidence', () => {
   const registry = registryWith(
     specialist({ specialistId:'coding.secondary', priority:100 }),
     specialist({ specialistId:'coding.primary', priority:200 }),
@@ -111,6 +147,7 @@ test('selection is deterministic, capability-bound and advisory only', () => {
     requiredCapabilityIds:['code.test'],
   });
   assert.equal(selection.schemaVersion, 1);
+  assert.equal(selection.registryBindingKey, registry.bindingKey);
   assert.deepEqual(selection.candidateSpecialistIds, ['coding.primary', 'coding.secondary']);
   assert.equal(selection.advisoryOnly, true);
   assert.equal(selection.specialistSelectionAuthorized, false);
@@ -158,17 +195,16 @@ test('disabled or task/capability-incompatible specialists cannot be selected', 
   assert.deepEqual(selection.candidateSpecialistIds, ['valid']);
 });
 
-test('canonical SpecialistHandoffV1 binds to exact registry revision and capability scope', () => {
+test('canonical SpecialistHandoffV1 binds to exact registry revision, bytes and capability scope', () => {
   const registry = registryWith(specialist());
-  const binding = bindSpecialistHandoffToRegistryV1({
-    registry,
-    expectedRegistryRevision:registry.revision,
+  const binding = bind(registry, {
     handoff:handoff({ requestedCapabilityIds:['code.test', 'code.edit'] }),
     allowedSpecialistIds:['coding.primary'],
     allowedProviderIds:['provider.local'],
   });
   assert.equal(binding.schemaVersion, 1);
   assert.equal(binding.registryRevision, 1);
+  assert.equal(binding.registryBindingKey, registry.bindingKey);
   assert.equal(binding.handoffId, 'handoff.1');
   assert.equal(binding.specialistId, 'coding.primary');
   assert.equal(binding.providerId, 'provider.local');
@@ -184,27 +220,29 @@ test('canonical SpecialistHandoffV1 binds to exact registry revision and capabil
   assert.equal(binding.requiresCurrentCredentialScopeRevalidation, true);
 });
 
+test('handoff binding rejects correct revision paired with wrong expected registry bytes', () => {
+  const registry = registryWith(specialist());
+  assert.throws(() => bindSpecialistHandoffToRegistryV1({
+    registry,
+    expectedRegistryRevision:registry.revision,
+    expectedRegistryBindingKey:'same-revision-wrong-bytes',
+    handoff:handoff(),
+  }), /SPECIALIST_HANDOFF_REGISTRY_BINDING_KEY_CONFLICT/);
+});
+
 test('handoff binding fails closed on stale registry, disabled specialist, filter exclusion and capability widening', () => {
   const registry = registryWith(specialist());
   assert.throws(() => bindSpecialistHandoffToRegistryV1({
     registry,
     expectedRegistryRevision:0,
+    expectedRegistryBindingKey:registry.bindingKey,
     handoff:handoff(),
   }), /SPECIALIST_HANDOFF_REGISTRY_REVISION_CONFLICT/);
-  assert.throws(() => bindSpecialistHandoffToRegistryV1({
-    registry:registryWith(specialist({ enabled:false })),
-    expectedRegistryRevision:1,
-    handoff:handoff(),
-  }), /SPECIALIST_HANDOFF_SPECIALIST_DISABLED/);
-  assert.throws(() => bindSpecialistHandoffToRegistryV1({
-    registry,
-    expectedRegistryRevision:1,
-    handoff:handoff(),
-    allowedProviderIds:['provider.other'],
-  }), /SPECIALIST_PROVIDER_NOT_ALLOWED/);
-  assert.throws(() => bindSpecialistHandoffToRegistryV1({
-    registry,
-    expectedRegistryRevision:1,
+
+  const disabled = registryWith(specialist({ enabled:false }));
+  assert.throws(() => bind(disabled), /SPECIALIST_HANDOFF_SPECIALIST_DISABLED/);
+  assert.throws(() => bind(registry, { allowedProviderIds:['provider.other'] }), /SPECIALIST_PROVIDER_NOT_ALLOWED/);
+  assert.throws(() => bind(registry, {
     handoff:handoff({ requestedCapabilityIds:['code.deploy'] }),
   }), /Specialist handoff exceeds granted capabilities/);
 });
@@ -252,8 +290,9 @@ test('duplicate and signed-zero canonical aliases fail closed', () => {
     () => normalizeSpecialistDefinitionV1(specialist({ priority:-0 })),
     /SPECIALIST_PRIORITY_INVALID/,
   );
+  const empty = createEmptySpecialistRegistryV1();
   assert.throws(
-    () => normalizeSpecialistRegistryV1({ schemaVersion:1, revision:-0, specialists:[] }),
+    () => normalizeSpecialistRegistryV1({ ...empty, revision:-0 }),
     /SPECIALIST_REGISTRY_REVISION_INVALID/,
   );
 });
@@ -301,7 +340,8 @@ test('selection and handoff binding reject caller authority injection', () => {
   }), /SPECIALIST_SELECTION_TASK_KIND_INVALID/);
   assert.throws(() => bindSpecialistHandoffToRegistryV1({
     registry,
-    expectedRegistryRevision:1,
+    expectedRegistryRevision:registry.revision,
+    expectedRegistryBindingKey:registry.bindingKey,
     handoff:handoff(),
     executionAuthorized:true,
   }), /SPECIALIST_HANDOFF_BINDING_UNKNOWN_FIELD/);
