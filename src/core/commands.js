@@ -808,19 +808,7 @@ export class CoreCommandDispatcher {
         : normalizeBoundAgentModelOrchestratorEnvelopeV1(
           internal.agentModelOrchestratorEnvelope,
         );
-      const providerCallBudgetContext = internalEnvelope
-        ? normalizeInternalAgentProviderBudgetContext(
-          internal?.providerCallBudgetContext,
-          internalEnvelope.jobId,
-        )
-        : internal?.providerCallBudgetContext || null;
       if (internalEnvelope) {
-        const boundedOutputTokens = Number(payload.maxOutputTokens || 0);
-        if (!Number.isSafeInteger(boundedOutputTokens)
-            || Object.is(boundedOutputTokens, -0)
-            || boundedOutputTokens < 1) {
-          throw new Error('Agent model invocation requires bounded maxOutputTokens');
-        }
         for (const alias of [
           'settings','routerOverride','routerRuntime','isolatedRuntime',
           'forceStrong','taskRole','strongTaskRole','capabilityIds',
@@ -829,7 +817,19 @@ export class CoreCommandDispatcher {
             throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
           }
         }
+        const boundedOutputTokens = Number(payload.maxOutputTokens || 0);
+        if (!Number.isSafeInteger(boundedOutputTokens)
+            || Object.is(boundedOutputTokens, -0)
+            || boundedOutputTokens < 1) {
+          throw new Error('Agent model invocation requires bounded maxOutputTokens');
+        }
       }
+      const providerCallBudgetContext = internalEnvelope
+        ? normalizeInternalAgentProviderBudgetContext(
+          internal?.providerCallBudgetContext,
+          internalEnvelope.jobId,
+        )
+        : internal?.providerCallBudgetContext || null;
 
       const state = await this.repo.load();
       if (internalEnvelope) {
