@@ -27,6 +27,7 @@ const INPUT_KEYS = new Set([
   'currentJobId',
   'currentProjectId',
   'currentParentModelPolicyBinding',
+  'currentParentModelPolicyBindingKey',
   'currentRoutePoolRevision',
   'routes',
   'routeStates',
