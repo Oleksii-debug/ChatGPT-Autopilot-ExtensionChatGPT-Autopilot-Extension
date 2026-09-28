@@ -7,6 +7,7 @@ import {
 } from './agent-definition-model-policy-binding.js';
 import {
   createAgentModelPolicyBindingV1,
+  normalizeAgentModelPolicyBindingV1,
 } from './agent-model-policy-binding.js';
 import {
   inspectAgentRouteReadinessV1,
@@ -36,6 +37,7 @@ const INPUT_KEYS = new Set([
   'currentDefinitionSelection',
   'currentJobId',
   'currentProjectId',
+  'currentParentModelPolicyBinding',
   'currentRoutePoolRevision',
   'routes',
   'routeStates',
@@ -186,20 +188,43 @@ export function inspectBoundAgentModelPolicyReadinessV1(input) {
     throw new Error('Agent model readiness authority route order drifted inside current route pool revision');
   }
 
-  if (binding.modelPolicyBinding.parentAgentId === null) {
-    const currentPolicy = selection.definition.modelRoutePolicy;
-    const reconstructed = createAgentModelPolicyBindingV1({
-      projectId: binding.projectId,
-      agentId: binding.jobId,
-      policyRevision: binding.definitionBinding.definitionRevision,
-      routePoolRevision: currentRoutePoolRevision,
-      routePool: routes,
-      ownerAllowedRouteIds: authorityRouteIds,
-      ...(currentPolicy === null ? {} : { routePolicy: currentPolicy }),
-    });
-    if (reconstructed.bindingKey !== binding.modelPolicyBinding.bindingKey) {
-      throw new Error('Agent model readiness root model policy drifted at the current definition revision');
+  const currentPolicy = selection.definition.modelRoutePolicy;
+  let currentParentBinding = null;
+  if (binding.modelPolicyBinding.parentAgentId !== null) {
+    if (!Object.hasOwn(raw, 'currentParentModelPolicyBinding')) {
+      throw new Error('Agent model readiness child binding requires the current parent model policy binding');
     }
+    currentParentBinding = normalizeAgentModelPolicyBindingV1(
+      own(raw, 'currentParentModelPolicyBinding'),
+    );
+    if (currentParentBinding.agentId !== binding.modelPolicyBinding.parentAgentId
+        || currentParentBinding.projectId !== binding.projectId) {
+      throw new Error('Agent model readiness parent model policy identity is stale');
+    }
+    if (currentParentBinding.routePoolRevision !== currentRoutePoolRevision) {
+      throw new Error('Agent model readiness parent route-pool revision is stale');
+    }
+  } else if (Object.hasOwn(raw, 'currentParentModelPolicyBinding')
+      && own(raw, 'currentParentModelPolicyBinding') != null) {
+    throw new Error('Root Agent model readiness must not supply a parent model policy binding');
+  }
+
+  const reconstructed = createAgentModelPolicyBindingV1({
+    projectId: binding.projectId,
+    agentId: binding.jobId,
+    policyRevision: binding.definitionBinding.definitionRevision,
+    routePoolRevision: currentRoutePoolRevision,
+    routePool: routes,
+    ownerAllowedRouteIds: authorityRouteIds,
+    ...(currentPolicy === null ? {} : { routePolicy: currentPolicy }),
+    ...(currentParentBinding ? { parentBinding: currentParentBinding } : {}),
+  });
+  if (reconstructed.bindingKey !== binding.modelPolicyBinding.bindingKey) {
+    throw new Error(
+      binding.modelPolicyBinding.parentAgentId === null
+        ? 'Agent model readiness root model policy drifted at the current definition revision'
+        : 'Agent model readiness child model policy drifted from the current parent/definition authority',
+    );
   }
 
   const effectiveRouteIds = binding.modelPolicyBinding.effectiveRouteIds;
