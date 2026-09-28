@@ -204,6 +204,7 @@ function childRequest(overrides = {}) {
     definitionModelPolicyBinding: binding,
     currentDefinitionModelPolicyBindingKey: binding.bindingKey,
     currentParentModelPolicyBinding: parentBinding,
+    currentParentModelPolicyBindingKey: parentBinding.bindingKey,
     ...overrides,
   });
 }
@@ -316,14 +317,47 @@ test('child candidate ranking requires exact current parent authority', () => {
   delete missing.currentParentModelPolicyBinding;
   assert.throws(
     () => rankBoundAgentModelRouteCandidatesV1(missing),
-    /child binding requires the current parent model policy binding/u,
+    /requires current parent model-policy provenance/u,
   );
 
+  const missingKey = childRequest();
+  delete missingKey.currentParentModelPolicyBindingKey;
+  assert.throws(
+    () => rankBoundAgentModelRouteCandidatesV1(missingKey),
+    /requires current parent model-policy provenance/u,
+  );
+
+  const wrongIdentity = parentModelPolicyBinding({ agentId: 'agent.other' });
   assert.throws(
     () => rankBoundAgentModelRouteCandidatesV1(childRequest({
-      currentParentModelPolicyBinding: parentModelPolicyBinding({ agentId: 'agent.other' }),
+      currentParentModelPolicyBinding: wrongIdentity,
+      currentParentModelPolicyBindingKey: wrongIdentity.bindingKey,
     })),
     /parent model policy identity is stale/u,
+  );
+
+  const alternateParent = parentModelPolicyBinding({
+    routePolicy: {
+      allowRouteIds: ['route.a', 'route.b'],
+      locality: 'remote',
+    },
+  });
+  assert.throws(
+    () => rankBoundAgentModelRouteCandidatesV1(childRequest({
+      currentParentModelPolicyBinding: alternateParent,
+    })),
+    /parent binding is not the current owner binding/u,
+  );
+});
+
+test('root candidate request rejects parent model-policy provenance aliases', () => {
+  const parentBinding = parentModelPolicyBinding();
+  assert.throws(
+    () => rankBoundAgentModelRouteCandidatesV1(request({
+      currentParentModelPolicyBinding: parentBinding,
+      currentParentModelPolicyBindingKey: parentBinding.bindingKey,
+    })),
+    /must not supply parent model-policy provenance/u,
   );
 });
 
