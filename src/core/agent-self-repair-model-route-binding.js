@@ -5,6 +5,9 @@ import {
 import {
   rankBoundAgentModelRouteCandidatesV1,
 } from './agent-model-route-candidate-binding.js';
+import {
+  createBoundAgentModelRouteDispatchIntentV1,
+} from './agent-model-route-dispatch-intent.js';
 
 export const AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_VERSION = 1;
 
@@ -27,6 +30,26 @@ export const AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_AUTHORITY = Object.freeze({
   providerDispatchRevalidationRequired: true,
 });
 
+export const AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY = Object.freeze({
+  advisoryOnly: true,
+  dispatchIntentOnly: true,
+  routeSelectionAuthorized: false,
+  providerCallAuthorized: false,
+  modelDispatchAuthorized: false,
+  executionAuthorized: false,
+  policyAuthorized: false,
+  persistenceAuthorized: false,
+  schedulingAuthorized: false,
+  recoveryAuthorized: false,
+  completionAuthorized: false,
+  verificationAuthorized: false,
+  requiresCurrentSelfRepairBinding: true,
+  requiresCurrentAgentPolicyBinding: true,
+  requiresCanonicalPlanCycleRevalidation: true,
+  requiresCanonicalAiOrchestrator: true,
+  requiresProviderCallLifecycleRevalidation: true,
+});
+
 const INPUT_KEYS = new Set([
   'selfRepairModelIntent',
   'currentSelfRepairModelBindingKey',
@@ -41,6 +64,11 @@ const INPUT_KEYS = new Set([
   'routes',
   'routeStates',
   'now',
+]);
+
+const DISPATCH_INPUT_KEYS = new Set([
+  ...INPUT_KEYS,
+  'expectedPreferredRouteId',
 ]);
 
 const ACTIVE_WORK_KINDS = new Set([
@@ -183,5 +211,84 @@ export function rankBoundAgentSelfRepairModelCandidatesV1(input) {
     routePoolRevision: candidates.routePoolRevision,
     candidates,
     authority: AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_AUTHORITY,
+  });
+}
+
+
+/**
+ * Prepare the canonical provider-boundary dispatch intent for current
+ * self-repair work without accepting caller-owned route-role aliases.
+ *
+ * Candidate ranking is re-observed first through the self-repair/Agent-policy
+ * composition and then re-run by the canonical dispatch primitive immediately
+ * before provider identity is exposed.
+ */
+export function createBoundAgentSelfRepairModelDispatchV1(input) {
+  const raw = strictRecord(
+    input,
+    DISPATCH_INPUT_KEYS,
+    'Bound Agent self-repair model dispatch request',
+  );
+
+  const candidateInput = Object.create(null);
+  for (const key of INPUT_KEYS) {
+    if (Object.hasOwn(raw, key)) candidateInput[key] = raw[key];
+  }
+  const boundCandidates = rankBoundAgentSelfRepairModelCandidatesV1(candidateInput);
+
+  const dispatchInput = {
+    definitionModelPolicyBinding: own(raw, 'definitionModelPolicyBinding'),
+    currentDefinitionModelPolicyBindingKey: own(raw, 'currentDefinitionModelPolicyBindingKey'),
+    currentDefinitionSelection: own(raw, 'currentDefinitionSelection'),
+    currentJobId: own(raw, 'currentJobId'),
+    currentProjectId: own(raw, 'currentProjectId'),
+    currentRoutePoolRevision: own(raw, 'currentRoutePoolRevision'),
+    routes: own(raw, 'routes'),
+    routeStates: own(raw, 'routeStates') ?? {},
+    role: boundCandidates.routeIntent.role,
+    capabilityIds: [...boundCandidates.routeIntent.capabilityIds],
+    requiresVision: boundCandidates.routeIntent.requiresVision,
+    expectedPreferredRouteId: Object.hasOwn(raw, 'expectedPreferredRouteId')
+      ? own(raw, 'expectedPreferredRouteId')
+      : boundCandidates.candidates.preferredRouteId,
+    ...(Object.hasOwn(raw, 'now') ? { now: own(raw, 'now') } : {}),
+  };
+  if (Object.hasOwn(raw, 'currentParentModelPolicyBinding')) {
+    dispatchInput.currentParentModelPolicyBinding = own(
+      raw,
+      'currentParentModelPolicyBinding',
+    );
+  }
+  if (Object.hasOwn(raw, 'currentParentModelPolicyBindingKey')) {
+    dispatchInput.currentParentModelPolicyBindingKey = own(
+      raw,
+      'currentParentModelPolicyBindingKey',
+    );
+  }
+
+  const dispatchIntent = createBoundAgentModelRouteDispatchIntentV1(dispatchInput);
+  if (dispatchIntent.role !== boundCandidates.routeIntent.role
+      || dispatchIntent.requiresVision !== boundCandidates.routeIntent.requiresVision) {
+    throw new Error('Agent self-repair dispatch intent drifted from durable route intent');
+  }
+
+  return freezeDeep({
+    schemaVersion: AGENT_SELF_REPAIR_MODEL_ROUTE_BINDING_VERSION,
+    selfRepairModelBindingKey: boundCandidates.selfRepairModelBindingKey,
+    planId: boundCandidates.planId,
+    jobId: boundCandidates.jobId,
+    cycleId: boundCandidates.cycleId,
+    workKind: boundCandidates.workKind,
+    activeAttemptNumber: boundCandidates.activeAttemptNumber,
+    nodeId: boundCandidates.nodeId,
+    ownerId: boundCandidates.ownerId,
+    executionPlane: boundCandidates.executionPlane,
+    workBudget: boundCandidates.workBudget,
+    routeIntent: boundCandidates.routeIntent,
+    definitionModelPolicyBindingKey: dispatchIntent.definitionModelPolicyBindingKey,
+    modelPolicyBindingKey: dispatchIntent.modelPolicyBindingKey,
+    routePoolRevision: dispatchIntent.routePoolRevision,
+    dispatchIntent,
+    authority: AGENT_SELF_REPAIR_MODEL_DISPATCH_BINDING_AUTHORITY,
   });
 }
