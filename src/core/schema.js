@@ -4,6 +4,10 @@ import { DEFAULT_AI_MANAGER_SETTINGS, DEFAULT_AI_MANAGER_RUNTIME, normalizeAiMan
 import { defaultSessionPromptCadence, normalizeSessionPromptCadence } from './session-prompt-cadence.js';
 import { defaultSessionDrivePromptSources, normalizeSessionDrivePromptSources } from './session-drive-prompt-source.js';
 import { normalizeCalendarSchedule } from './calendar-schedule.js';
+import {
+  createAiRouteQualityEvidenceRegistryV1,
+  normalizeAiRouteQualityEvidenceRegistryV1,
+} from './ai-route-quality-evidence-registry.js';
 export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'autopilotState';
 export const MAX_LOG_ENTRIES = 500;
@@ -61,7 +65,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiRouteQualityEvidenceRegistry: structuredClone(createAiRouteQualityEvidenceRegistryV1()), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -291,6 +295,10 @@ export function validateState(state) {
     requireRecord(runtime.routeStates, 'profile aiRouterRuntime routeStates');
     requireString(runtime.lastRouteId, 'profile aiRouterRuntime lastRouteId');
     if (!Array.isArray(runtime.lastFailoverChain)) throw new Error('Invalid profile aiRouterRuntime lastFailoverChain');
+  }
+  if (state.profile.aiRouteQualityEvidenceRegistry !== undefined) {
+    requireRecord(state.profile.aiRouteQualityEvidenceRegistry, 'profile aiRouteQualityEvidenceRegistry');
+    normalizeAiRouteQualityEvidenceRegistryV1(state.profile.aiRouteQualityEvidenceRegistry);
   }
   if (state.profile.aiManager !== undefined) {
     requireRecord(state.profile.aiManager, 'profile aiManager');
