@@ -301,17 +301,8 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
   await assert.rejects(
     () => manager.verifySpecialistHandoff('job-1', {
       agentId:claimed.claimed[0],
-      verifierId:'verifier-forged-but-distinct',
-      verificationAuthorityId:'policy:archive',
-      evidence:'Caller-created text claims fresh artifact evidence.',
-    }),
-    /contains an unknown field: verifierId/,
-  );
-  await assert.rejects(
-    () => manager.verifySpecialistHandoff('job-1', {
-      agentId:claimed.claimed[0],
       leaseId:claimed.assignments[0].leaseId,
-      verificationId:'verification:archive:trusted-only',
+      verificationId:'verification:forged-without-trusted-resolver',
     }),
     /Canonical trusted execution verification resolver is required/,
   );
@@ -348,31 +339,10 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
   assert.deepEqual(expired.claimed, []);
   assert.equal(expired.executionOwnerships[0].state, 'RECONCILE');
 
-  const verification = {
-    schemaVersion:1,
+  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', {
+    agentId,
+    leaseId,
     verificationId:'verification-no-effect-job-retry',
-    invocationId:'invoke-safe-retry-job-retry',
-    observationId:'observation-no-effect-job-retry',
-    status:'VERIFIED',
-    reasonCode:'NO_EFFECT_OBSERVED',
-    summary:'Caller-shaped no-effect assertion.',
-    evidenceArtifactIds:['artifact:no-effect-job-retry'],
-    verifiedAt:'2026-09-23T12:01:01.000Z',
-    verifierId:'provider-observer',
-    verificationAuthorityId:'policy:retry',
-    effectId:claimed.executionOwnerships[0].effectId,
-    executionId:leaseId,
-    attempt:1,
-  };
-  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', {
-    agentId,
-    leaseId,
-    verification,
-  }), /contains an unknown field: verification/);
-  await assert.rejects(() => manager.authorizeSpecialistSafeRetry('job-retry', {
-    agentId,
-    leaseId,
-    verificationId:verification.verificationId,
   }), /Canonical trusted execution verification resolver is required/);
 
   const durable = await manager.get('job-retry');

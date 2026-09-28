@@ -860,6 +860,7 @@ export async function dispatchUiMessage(message) {
         throw new Error('No executable Specialist provider adapter is installed for claimed execution');
       }
       let outcome;
+      let providerDispatched = false;
       try {
         const providerResult = await openHandsSpecialistClient.execute({
           handoff: prepared.handoff,
@@ -867,6 +868,7 @@ export async function dispatchUiMessage(message) {
           config: prepared.execution.providerConfig.config,
           conversationId: prepared.execution.conversationId,
         });
+        providerDispatched = providerResult.created === true || Boolean(providerResult.effectEvidence);
         outcome = {
           providerStatus: providerResult.providerStatus,
           providerSucceeded: providerResult.providerSucceeded === true,
@@ -880,6 +882,7 @@ export async function dispatchUiMessage(message) {
         };
       } catch (error) {
         if (error instanceof OpenHandsCodingSpecialistError) {
+          providerDispatched = error.effectMayHaveOccurred === true;
           outcome = {
             providerStatus: '',
             providerSucceeded: false,
@@ -910,7 +913,7 @@ export async function dispatchUiMessage(message) {
       result = {
         ...prepared,
         ...recorded,
-        providerDispatched: true,
+        providerDispatched,
         completionAuthorized: false,
       };
     }
