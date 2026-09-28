@@ -137,6 +137,37 @@ test('Agent definition model policy rejects aliases, duplicate route IDs and inv
   );
 });
 
+test('Agent definition model-policy form does not execute accessors', () => {
+  let reads = 0;
+  const hostile = configuredPolicyForm();
+  Object.defineProperty(hostile, 'modelRoutePinnedRouteId', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return 'route.fast';
+    },
+  });
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(hostile),
+    /enumerable data property/u,
+  );
+  assert.equal(reads, 0);
+
+  const hostileConfigured = {};
+  Object.defineProperty(hostileConfigured, 'modelRoutePolicyConfigured', {
+    enumerable: true,
+    get() {
+      reads += 1;
+      return true;
+    },
+  });
+  assert.throws(
+    () => buildAgentDefinitionModelRoutePolicyFromFormV1(hostileConfigured),
+    /enumerable data property/u,
+  );
+  assert.equal(reads, 0);
+});
+
 test('full Agent model policy preserves Router failover fields across durable normalization', () => {
   const definition = normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1({
     ...baseForm(),
