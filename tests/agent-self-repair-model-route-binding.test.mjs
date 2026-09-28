@@ -311,6 +311,8 @@ test('REPAIR dispatch reuses durable role intent and resolves exact provider ide
   assert.equal(result.ownerId, 'actor-1');
   assert.equal(result.routeIntent.role, 'coder');
   assert.equal(result.dispatchIntent.role, 'coder');
+  assert.deepEqual(result.dispatchIntent.capabilityIds, ['cap.code']);
+  assert.equal(result.dispatchIntent.preparedAt, 1_790_620_000_000);
   assert.equal(result.dispatchIntent.routeId, 'route.a');
   assert.deepEqual(result.dispatchIntent.route, {
     routeId: 'route.a',
@@ -333,6 +335,8 @@ test('RETEST dispatch stays bound to the independent verifier route role', () =>
   assert.equal(result.ownerId, 'verifier-1');
   assert.equal(result.dispatchIntent.jobId, 'verifier-1');
   assert.equal(result.dispatchIntent.role, 'verifier');
+  assert.deepEqual(result.dispatchIntent.capabilityIds, ['cap.reason']);
+  assert.equal(result.dispatchIntent.preparedAt, 1_790_620_000_000);
   assert.equal(result.dispatchIntent.routeId, 'route.b');
 });
 
@@ -430,4 +434,17 @@ test('top-level accessors are rejected without executing caller code', () => {
     /currentJobId must be an enumerable own data property/u,
   );
   assert.equal(reads, 0);
+});
+
+
+test('provider-bound self-repair dispatch requires explicit deterministic time', () => {
+  const input=request();
+  delete input.now;
+  assert.throws(
+    () => createBoundAgentSelfRepairModelDispatchV1(input),
+    /requires explicit now/u,
+  );
+
+  const candidates=rankBoundAgentSelfRepairModelCandidatesV1(input);
+  assert.equal(candidates.workKind,'REPAIR');
 });
