@@ -450,7 +450,7 @@ test('L1-B Resume never forces reconciliation over an in-flight parent activatio
     assert.deepEqual(terminal.actions, []);
   }
 
-  result = reduce(g, runtime, event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'resume-inflight-resume', {
+  let result = reduce(g, runtime, event(OrchestrationHierarchyEventType.RESUME_SCOPE, 'resume-inflight-resume', {
     nodeId: 'manager',
   }), 20);
   runtime = result.runtime;
