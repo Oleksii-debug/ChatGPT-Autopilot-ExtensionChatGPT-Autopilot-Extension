@@ -14,6 +14,7 @@ const REQUEST_KEYS = new Set([
   'plannerCapabilityIds',
   'verifierCapabilityIds',
   'requiresVision',
+  'requiresPlanner',
   'requiresVerifier',
   'now',
 ]);
@@ -91,18 +92,24 @@ export function inspectAgentRouteReadinessV1(input = {}) {
   const plannerCapabilityIds = raw.plannerCapabilityIds ?? [];
   const verifierCapabilityIds = raw.verifierCapabilityIds ?? [];
   const requiresVision = exactBoolean(raw.requiresVision, 'Agent route readiness requiresVision', false);
+  const requiresPlanner = exactBoolean(raw.requiresPlanner, 'Agent route readiness requiresPlanner', true);
   const requiresVerifier = exactBoolean(raw.requiresVerifier, 'Agent route readiness requiresVerifier', true);
+  if (!requiresPlanner && !requiresVerifier) {
+    throw new Error('Agent route readiness must require planner or verifier');
+  }
   const now = exactNow(raw.now);
 
-  const planner = roleProjection(selectAiRouteCandidates({
-    routes,
-    policy,
-    routeStates,
-    role: AiRouteRole.PLANNER,
-    capabilityIds: plannerCapabilityIds,
-    requiresVision,
-    now,
-  }));
+  const planner = requiresPlanner
+    ? roleProjection(selectAiRouteCandidates({
+      routes,
+      policy,
+      routeStates,
+      role: AiRouteRole.PLANNER,
+      capabilityIds: plannerCapabilityIds,
+      requiresVision,
+      now,
+    }))
+    : Object.freeze({ availableRouteIds: Object.freeze([]), eligibleRouteIds: Object.freeze([]), retryAt: 0 });
 
   const verifier = requiresVerifier
     ? roleProjection(selectAiRouteCandidates({
@@ -116,7 +123,10 @@ export function inspectAgentRouteReadinessV1(input = {}) {
     }))
     : Object.freeze({ availableRouteIds: Object.freeze([]), eligibleRouteIds: Object.freeze([]), retryAt: 0 });
 
-  const required = requiresVerifier ? [planner, verifier] : [planner];
+  const required = [
+    ...(requiresPlanner ? [planner] : []),
+    ...(requiresVerifier ? [verifier] : []),
+  ];
   const configUnavailable = required.some(item => item.eligibleRouteIds.length === 0);
   const temporarilyUnavailable = !configUnavailable && required.some(item => item.availableRouteIds.length === 0);
   const state = configUnavailable
@@ -129,6 +139,7 @@ export function inspectAgentRouteReadinessV1(input = {}) {
     schemaVersion: AGENT_ROUTE_READINESS_VERSION,
     state,
     ready: state === AgentRouteReadinessState.READY,
+    requiresPlanner,
     requiresVerifier,
     planner,
     verifier,
