@@ -82,13 +82,22 @@ function definition(overrides = {}) {
   };
 }
 
-function registry(definitionOverrides = {}) {
+function registry(definitionOverrides = {}, registryOverrides = {}) {
   return {
     schemaVersion: 1,
     registryId: 'agents:project.alpha',
     revision: 6,
     definitions: [definition(definitionOverrides)],
+    ...registryOverrides,
   };
+}
+
+function currentSelection(definitionOverrides = {}, registryOverrides = {}) {
+  const reg = registry(definitionOverrides, registryOverrides);
+  return selectAgentDefinitionV1({
+    registry: reg,
+    agentDefinitionId: 'agent.research',
+  });
 }
 
 function ownerBudget() {
@@ -106,8 +115,8 @@ function ownerBudget() {
   };
 }
 
-function materialized(definitionOverrides = {}, requestOverrides = {}) {
-  const reg = registry(definitionOverrides);
+function materialized(definitionOverrides = {}, requestOverrides = {}, registryOverrides = {}) {
+  const reg = registry(definitionOverrides, registryOverrides);
   return materializeAgentDefinitionV1({
     registry: reg,
     selection: selectAgentDefinitionV1({
@@ -127,8 +136,12 @@ function materialized(definitionOverrides = {}, requestOverrides = {}) {
 }
 
 function bindRequest(overrides = {}) {
+  const materializedAgent = materialized();
   return {
-    materializedAgent: materialized(),
+    materializedAgent,
+    currentDefinitionSelection: currentSelection(),
+    currentJobId: materializedAgent.config.id,
+    currentProjectId: materializedAgent.config.projectId,
     routePool: pool(),
     routePoolRevision: 9,
     ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
@@ -163,6 +176,7 @@ test('materialized reusable Agent becomes a durable per-Agent model-policy bindi
   assert.equal(binding.schedulingAuthority, false);
   assert.equal(binding.recoveryAuthority, false);
   assert.equal(binding.currentRouterRevalidationRequired, true);
+  assert.equal(binding.currentDefinitionRevalidationRequired, true);
   assert.equal(binding.modelPolicyBinding.currentRouterRevalidationRequired, true);
   assert.equal(Object.isFrozen(binding), true);
   assert.equal(Object.isFrozen(binding.definitionBinding), true);
@@ -173,6 +187,7 @@ test('definitionRevision is the model-policy revision and registry identity is b
   const first = createAgentDefinitionModelPolicyBindingV1(bindRequest());
   const changed = createAgentDefinitionModelPolicyBindingV1(bindRequest({
     materializedAgent: materialized({ definitionRevision: 5 }),
+    currentDefinitionSelection: currentSelection({ definitionRevision: 5 }),
   }));
 
   assert.equal(first.modelPolicyBinding.policyRevision, 4);
@@ -191,6 +206,7 @@ test('Agent definition without a model override receives canonical owner-bounded
 
   const binding = createAgentDefinitionModelPolicyBindingV1(bindRequest({
     materializedAgent: noPolicy,
+    currentDefinitionSelection: currentSelection({ modelRoutePolicy: null }),
     ownerAllowedRouteIds: ['route.b', 'route.c'],
   }));
 
@@ -217,7 +233,21 @@ test('materialized policy cannot escape current owner route authority', () => {
       materializedAgent: forged,
       ownerAllowedRouteIds: ['route.a', 'route.b'],
     })),
-    /exceeds route authority/u,
+    /routerOverride drifted from current Agent definition modelRoutePolicy/u,
+  );
+});
+
+test('same-revision policy substitution inside owner route authority fails provenance binding', () => {
+  const forged = structuredClone(materialized());
+  forged.routerOverride.routePolicy.pinnedRouteId = 'route.a';
+  forged.routerOverride.routePolicy.orderedRouteIds = ['route.a', 'route.b'];
+
+  assert.throws(
+    () => createAgentDefinitionModelPolicyBindingV1(bindRequest({
+      materializedAgent: forged,
+      ownerAllowedRouteIds: ['route.a', 'route.b', 'route.c'],
+    })),
+    /routerOverride drifted from current Agent definition modelRoutePolicy/u,
   );
 });
 
@@ -248,6 +278,13 @@ test('parent Agent binding remains canonical authority and child definition can 
   });
   const child = createAgentDefinitionModelPolicyBindingV1(bindRequest({
     materializedAgent: childMaterialized,
+    currentDefinitionSelection: currentSelection({
+      modelRoutePolicy: {
+        allowRouteIds: ['route.b'],
+        freeOnly: true,
+        locality: 'remote',
+      },
+    }),
     ownerAllowedRouteIds: ['route.b', 'route.c'],
     parentBinding: parent,
   }));
@@ -282,6 +319,13 @@ test('child definition cannot relax parent policy or use a stale parent route-po
   assert.throws(
     () => createAgentDefinitionModelPolicyBindingV1(bindRequest({
       materializedAgent: materialized({
+        modelRoutePolicy: {
+          allowRouteIds: ['route.b'],
+          freeOnly: false,
+          locality: 'remote',
+        },
+      }),
+      currentDefinitionSelection: currentSelection({
         modelRoutePolicy: {
           allowRouteIds: ['route.b'],
           freeOnly: false,
@@ -329,6 +373,33 @@ test('projectless reusable Agent cannot mint a durable per-Agent model policy bi
       materializedAgent: projectless,
     })),
     /Materialized Agent config\.projectId is invalid/u,
+  );
+});
+
+test('materialized job/project identity and current definition selection cannot be substituted', () => {
+  const wrongJob = structuredClone(materialized());
+  wrongJob.config.id = 'agent.runtime.forged';
+  assert.throws(
+    () => createAgentDefinitionModelPolicyBindingV1(bindRequest({
+      materializedAgent: wrongJob,
+    })),
+    /config\.id drifted from current job identity/u,
+  );
+
+  const wrongProject = structuredClone(materialized());
+  wrongProject.config.projectId = 'project.other';
+  assert.throws(
+    () => createAgentDefinitionModelPolicyBindingV1(bindRequest({
+      materializedAgent: wrongProject,
+    })),
+    /config\.projectId drifted from current Project identity/u,
+  );
+
+  assert.throws(
+    () => createAgentDefinitionModelPolicyBindingV1(bindRequest({
+      currentDefinitionSelection: currentSelection({ definitionRevision: 5 }),
+    })),
+    /definition binding drifted from current Agent definition selection/u,
   );
 });
 
@@ -416,15 +487,22 @@ test('durable normalization rejects definition/model identity, revision and bind
     () => normalizeAgentDefinitionModelPolicyBindingV1(authority),
     /currentRouterRevalidationRequired must be true/u,
   );
+
+  const staleDefinition = JSON.parse(JSON.stringify(binding));
+  staleDefinition.currentDefinitionRevalidationRequired = false;
+  assert.throws(
+    () => normalizeAgentDefinitionModelPolicyBindingV1(staleDefinition),
+    /currentDefinitionRevalidationRequired must be true/u,
+  );
 });
 
 test('durable bridge binds registry revision even when underlying model policy bytes are unchanged', () => {
   const first = createAgentDefinitionModelPolicyBindingV1(bindRequest());
 
-  const materializedCopy = structuredClone(materialized());
-  materializedCopy.definitionBinding.registryRevision = 7;
+  const materializedCopy = materialized({}, {}, { revision: 7 });
   const second = createAgentDefinitionModelPolicyBindingV1(bindRequest({
     materializedAgent: materializedCopy,
+    currentDefinitionSelection: currentSelection({}, { revision: 7 }),
   }));
 
   assert.equal(second.modelPolicyBinding.bindingKey, first.modelPolicyBinding.bindingKey);
