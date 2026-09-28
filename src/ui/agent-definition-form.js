@@ -322,6 +322,23 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, {
       { min: 1, max: 86_400 },
     ),
   });
+  if (policy.allowRouteIds.length) {
+    const allow = new Set(policy.allowRouteIds);
+    for (const [label, routeIds] of [
+      ['Ordered model route ID', policy.orderedRouteIds],
+      ['Denied model route ID', policy.denyRouteIds],
+    ]) {
+      const outside = routeIds.find(routeId => !allow.has(routeId));
+      if (outside) throw new Error(label + ' поза allow scope: ' + outside);
+    }
+    if (policy.pinnedRouteId && !allow.has(policy.pinnedRouteId)) {
+      throw new Error('Pinned model route ID поза allow scope: ' + policy.pinnedRouteId);
+    }
+  }
+  if (policy.pinnedRouteId && policy.denyRouteIds.includes(policy.pinnedRouteId)) {
+    throw new Error('Pinned model route ID одночасно заборонений deny policy.');
+  }
+
   return {
     autoSwitch: policy.autoSwitch,
     pinnedRouteId: policy.pinnedRouteId,
