@@ -41,6 +41,7 @@ const MODEL_RESULT_KEYS = new Set([
   'strongError',
   'routing',
   'runtime',
+  'providerReservation',
 ]);
 
 const ROUTING_KEYS = new Set([
@@ -266,7 +267,15 @@ function normalizeResultLeg(value, label) {
   });
 }
 
-function normalizeSuccessfulModelResult(value, envelope) {
+function sameProviderReservation(left, right) {
+  if (!left || !right) return false;
+  for (const key of PROVIDER_RESERVATION_KEYS) {
+    if (left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
+function normalizeSuccessfulModelResult(value, envelope, prepared) {
   const raw = strictRecord(
     value,
     MODEL_RESULT_KEYS,
@@ -278,6 +287,9 @@ function normalizeSuccessfulModelResult(value, envelope) {
 
   const text = modelOutputText(raw.text);
   const usage = normalizeUsage(raw.usage);
+  const providerReservation = Object.hasOwn(raw, 'providerReservation')
+    ? normalizeProviderReservation(raw.providerReservation, prepared)
+    : null;
   const routeClass = exactText(raw.route, 'model result route class', { maxLength: 32 });
   if (routeClass !== 'primary' && routeClass !== 'strong') {
     throw new Error('Agent self-repair model result route class is invalid');
@@ -327,6 +339,7 @@ function normalizeSuccessfulModelResult(value, envelope) {
     routeId: selectedRouteId,
     provider: selectedLeg.provider,
     model: selectedLeg.model,
+    providerReservation,
   });
 }
 
@@ -351,10 +364,9 @@ export function projectAgentSelfRepairModelObservationV1(input) {
   const prepared = prepareBoundAgentSelfRepairModelInvocationV1(
     raw.invocationRequest,
   );
-  const providerReservation = normalizeProviderReservation(
-    raw.providerReservation,
-    prepared,
-  );
+  const sidecarProviderReservation = Object.hasOwn(raw, 'providerReservation')
+    ? normalizeProviderReservation(raw.providerReservation, prepared)
+    : null;
   const observationId = exactText(
     raw.observationId,
     'observationId',
@@ -364,14 +376,23 @@ export function projectAgentSelfRepairModelObservationV1(input) {
     raw.observedAt,
     'observedAt',
   );
-  if (observedAt.milliseconds < providerReservation.createdAt) {
-    throw new Error('Agent self-repair model observation predates durable provider admission');
-  }
-
   const modelResult = normalizeSuccessfulModelResult(
     raw.modelResult,
     prepared.internal.agentModelOrchestratorEnvelope,
+    prepared,
   );
+  const embeddedProviderReservation = modelResult.providerReservation;
+  if (embeddedProviderReservation && sidecarProviderReservation
+      && !sameProviderReservation(embeddedProviderReservation, sidecarProviderReservation)) {
+    throw new Error('Agent self-repair provider reservation receipt disagrees with caller sidecar');
+  }
+  const providerReservation = embeddedProviderReservation || sidecarProviderReservation;
+  if (!providerReservation) {
+    throw new Error('Agent self-repair model observation requires durable provider reservation provenance');
+  }
+  if (observedAt.milliseconds < providerReservation.createdAt) {
+    throw new Error('Agent self-repair model observation predates durable provider admission');
+  }
   if (modelResult.usage.outputTokens > providerReservation.outputTokens) {
     throw new Error('Agent self-repair model usage exceeds the durable provider output-token reservation');
   }
