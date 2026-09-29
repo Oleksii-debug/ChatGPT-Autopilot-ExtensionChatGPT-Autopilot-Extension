@@ -769,7 +769,7 @@ test('matching committed exact-effect state from before handback verification ca
 
   assert.throws(
     () => authorize(gateInput(), staleCommitted),
-    /exact-effect resolution must not predate handback verification/,
+    /exact-effect observation must not predate handback verification/,
   );
 });
 
@@ -781,8 +781,8 @@ test('resume assessment cannot use future exact-effect state or predate handback
   assert.throws(() => authorize(gateInput({
     ...worldMaterial({
       snapshotObservedAt: '2026-09-25T00:04:01.000Z',
-      currentObservedAt: '2026-09-25T00:04:10.000Z',
-      preconditionCreatedAt: '2026-09-25T00:04:02.000Z',
+      currentObservedAt: '2026-09-25T00:04:13.000Z',
+      preconditionCreatedAt: '2026-09-25T00:04:12.000Z',
     }),
     at: '2026-09-25T00:04:15.000Z',
   })), /exact-effect state cannot postdate resume assessment/);
