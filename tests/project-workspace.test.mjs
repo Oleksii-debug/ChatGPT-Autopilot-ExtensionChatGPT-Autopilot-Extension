@@ -989,3 +989,60 @@ test('repository save snapshots caller workspace before asynchronous durable rea
   assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
   assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
 });
+
+
+test('exact durable save replay succeeds after lost acknowledgement while same-revision substitution fails', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  const current = await repository.load();
+  const next = structuredClone(current);
+  replaceProjectSnapshot(next, snapshot('project-r2', 'r2'), { nowMs: 3 });
+  next.revision = 2;
+  next.updatedAt = 3;
+
+  const committed = await repository.save(next, { expectedPreviousRevision: 1 });
+  assert.equal(committed.revision, 2);
+
+  const replayed = await repository.save(next, { expectedPreviousRevision: 1 });
+  assert.deepEqual(replayed, committed);
+
+  const substituted = structuredClone(next);
+  substituted.projectsById['project-a'].snapshot.title = 'Same revision, different content';
+  await assert.rejects(
+    repository.save(substituted, { expectedPreviousRevision: 1 }),
+    /durable revision changed before save|revision must advance exactly once|revisionId cannot be reused/,
+  );
+
+  const durable = await repository.load();
+  assert.deepEqual(durable, committed);
+});
+
+test('a rejected save does not poison the shared repository save queue', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  const invalid = await repository.load();
+  invalid.revision = 9;
+  invalid.updatedAt = 9;
+  await assert.rejects(
+    repository.save(invalid),
+    /revision must advance exactly once/,
+  );
+
+  const recovered = await repository.update(workspace => {
+    replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  assert.equal(recovered.revision, 2);
+  assert.equal(recovered.projectsById['project-a'].snapshot.revisionId, 'project-r2');
+});
