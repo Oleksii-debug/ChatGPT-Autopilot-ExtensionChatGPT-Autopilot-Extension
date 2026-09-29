@@ -5,6 +5,7 @@ import {
   buildAgentDefinitionFromFormV1,
   parseCanonicalAgentIdentity,
 } from '../src/ui/agent-definition-form.js';
+import { normalizeAgentDefinitionV1 } from '../src/core/agent-definition-registry.js';
 
 function form(overrides = {}) {
   return {
@@ -177,6 +178,13 @@ test('Specialist delegation form rejects non-canonical numeric aliases without w
   assert.throws(
     () => buildAgentDefinitionFromFormV1(form({ ...base, specialistMaxConcurrentHandoffs:'257' })),
     /діапазон/u,
+  );
+  assert.throws(
+    () => normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1(form({
+      ...base,
+      specialistCapabilityIdsText:'research.write',
+    }))),
+    /exceeds allowed authority/u,
   );
 });
 
