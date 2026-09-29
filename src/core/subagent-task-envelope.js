@@ -326,7 +326,7 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
       own(raw, 'conflictKeys', 'SubagentTaskEnvelopeV1'),
       'conflictKeys',
       128,
-    ),
+    ).sort(compareCodeUnit),
     budget: normalizeBudget(own(raw, 'budget', 'SubagentTaskEnvelopeV1')),
     inputSourceRefs: sourceRefList(
       own(raw, 'inputSourceRefs', 'SubagentTaskEnvelopeV1'),

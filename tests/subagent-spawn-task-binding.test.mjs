@@ -310,7 +310,7 @@ test('atomically binds canonical spawn identity, least authority and concrete ch
   assert.equal(Object.isFrozen(binding.taskEnvelope), true);
 });
 
-test('task dispatch identity changes on same-envelope semantic drift', () => {
+test('task dispatch identity changes on semantic drift but not set ordering', () => {
   const first = bindSubagentSpawnTaskAuthorityV1(request());
   assert.equal(first.decision, SubagentSpawnTaskBindingDecision.ALLOW);
   const canonical = first.taskBindings[0].taskEnvelope;
@@ -321,6 +321,19 @@ test('task dispatch identity changes on same-envelope semantic drift', () => {
   assert.notEqual(
     deriveSubagentTaskDispatchIdentityV1(canonical),
     deriveSubagentTaskDispatchIdentityV1(changed),
+  );
+
+  const conflictOrderA = {
+    ...structuredClone(canonical),
+    conflictKeys: ['lock.b', 'lock.a'],
+  };
+  const conflictOrderB = {
+    ...structuredClone(canonical),
+    conflictKeys: ['lock.a', 'lock.b'],
+  };
+  assert.equal(
+    deriveSubagentTaskDispatchIdentityV1(conflictOrderA),
+    deriveSubagentTaskDispatchIdentityV1(conflictOrderB),
   );
 });
 
