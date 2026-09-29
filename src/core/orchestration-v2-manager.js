@@ -44,6 +44,7 @@ const SUBAGENT_BINDING_REGISTRATION_REQUIRED_KEYS = new Set([
   'taskEnvelope',
   'activationAction',
   'invocationId',
+  'authorityEnvelope',
 ]);
 const SUBAGENT_CONTEXT_RESOLUTION_KEYS = new Set([
   'bindingId',
@@ -675,6 +676,12 @@ export class OrchestrationV2Manager {
     if (!taskEnvelope.authorityEnvelopeIdentity) {
       throw new Error('Subagent activation binding requires task-bound authority envelope identity');
     }
+    const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
+      request.authorityEnvelope,
+    );
+    if (authorityEnvelopeIdentity !== taskEnvelope.authorityEnvelopeIdentity) {
+      throw new Error('Subagent activation binding authority envelope does not match task identity');
+    }
     const ownerBoundAt = new Date(this.now()).toISOString();
 
     const meta = await this.loadMeta();
@@ -701,13 +708,13 @@ export class OrchestrationV2Manager {
       }
 
       const registry = storedSubagentTaskActivationBindingRegistry(current);
-      const putRequest = { binding: derived, registeredAt: ownerBoundAt };
-      if (Object.hasOwn(request, 'authorityEnvelope')) {
-        putRequest.authorityEnvelope = request.authorityEnvelope;
-      }
       current.subagentTaskActivationBindingRegistry = putSubagentTaskActivationBindingV1(
         registry,
-        putRequest,
+        {
+          binding: derived,
+          authorityEnvelope: request.authorityEnvelope,
+          registeredAt: ownerBoundAt,
+        },
       );
       const evidence = resolveSubagentTaskActivationEvidenceV1(
         current.subagentTaskActivationBindingRegistry,
@@ -767,12 +774,6 @@ export class OrchestrationV2Manager {
     if (!task.authorityEnvelopeIdentity) {
       throw new Error('Durable subagent context requires task-bound authority envelope identity');
     }
-    const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
-      request.authorityEnvelope,
-    );
-    if (authorityEnvelopeIdentity !== task.authorityEnvelopeIdentity) {
-      throw new Error('Subagent authority envelope does not match task activation identity');
-    }
     const taskDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(task);
     const bindingLookup = plainSubagentBindingLookup({
       bindingId: request.bindingId,
@@ -796,6 +797,12 @@ export class OrchestrationV2Manager {
     if (!binding) throw new Error('Durable subagent activation binding not found');
     if (!evidence.authorityEnvelope) {
       throw new Error('Durable subagent activation binding lacks authority provenance');
+    }
+    const authorityEnvelopeIdentity = deriveSubagentAuthorityEnvelopeIdentityV1(
+      evidence.authorityEnvelope,
+    );
+    if (authorityEnvelopeIdentity !== task.authorityEnvelopeIdentity) {
+      throw new Error('Durable subagent authority provenance does not match task identity');
     }
     if (binding.projectId !== runtime.projectId) {
       throw new Error('Durable subagent activation binding crosses orchestra project authority');
