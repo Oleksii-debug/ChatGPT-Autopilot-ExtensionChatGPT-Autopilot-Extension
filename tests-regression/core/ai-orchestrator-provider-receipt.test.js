@@ -158,6 +158,63 @@ test('hostile reservation accessors fail closed before gateway I/O without execu
   assert.equal(gatewayCalls, 0);
 });
 
+test('Browser Agent receipt identity must match the exact admitted job epoch call and route before gateway I/O', async () => {
+  const cases = [
+    ['cross-job', { reservationId: 'job.other:model-budget:1' }, /admitted Browser Agent job/u],
+    ['stale-epoch', { controlEpoch: 6 }, /controlEpoch does not match admission/u],
+    ['wrong-call', { callNumber: 2 }, /callNumber does not match admission/u],
+    ['cross-route', { routeId: 'route.other' }, /routeId does not match admitted route/u],
+    ['cross-provider', { provider: 'ollama' }, /provider does not match admitted route/u],
+    ['cross-model', { model: 'other-model' }, /model does not match admitted route/u],
+    ['multi-call', { modelCalls: 2 }, /exactly one model call/u],
+  ];
+
+  for (const [label, overrides, expected] of cases) {
+    let gatewayCalls = 0;
+    let settlementCalls = 0;
+    const router = new AiOrchestrator({
+      gatewayClient: {
+        async complete() {
+          gatewayCalls += 1;
+          return { text: 'must not run' };
+        },
+      },
+      providerCallLifecycle: {
+        async beforeProviderCall() {
+          return reservation(overrides);
+        },
+        async afterProviderCall() {
+          settlementCalls += 1;
+        },
+      },
+      now: () => 1000,
+    });
+
+    await assert.rejects(
+      () => router.run(
+        settings(),
+        DEFAULT_AI_ROUTER_RUNTIME,
+        'repair one node',
+        {
+          maxOutputTokens: 128,
+          maxModelCallsForRequest: 1,
+          providerCallBudgetContext: {
+            kind: 'browser-agent',
+            jobId: 'job.receipt',
+            controlEpoch: 7,
+          },
+        },
+      ),
+      error => {
+        assert.match(error.message, expected, label);
+        return true;
+      },
+    );
+    assert.equal(gatewayCalls, 0, label);
+    assert.equal(settlementCalls, 0, label);
+  }
+});
+
 test('retryable failed reservation is not leaked when canonical failover later succeeds', async () => {
   const routes = [
     {
