@@ -226,6 +226,26 @@ test('impossible readiness chronology and malformed source provenance fail close
     () => normalizeProviderReadinessV1(state('local/fs', { observedAt:'2026-09-29 04:00:00Z' })),
     /canonical UTC/,
   );
+  assert.throws(
+    () => normalizeProviderReadinessV1(state('local/fs', {
+      observedAt:'2026-09-29T04:00:00.000Z',
+      validThrough:'2026-09-30T04:00:00.001Z',
+    })),
+    /validity window exceeds 24 hours/,
+  );
+});
+
+test('discovery asOf must use exact canonical UTC representation', () => {
+  assert.throws(
+    () => discoverCapabilityPathsV1({
+      asOf:'2026-09-29 04:30:00Z',
+      capabilities:[capability('filesystem.read')],
+      tools:[tool('fs.inspect', 'local/fs', ['filesystem.read'], true)],
+      providerStates:[state('local/fs')],
+      requestedCapabilityIds:['filesystem.read'],
+    }),
+    /canonical UTC/,
+  );
 });
 
 test('missing provider state requires health evidence and never silently becomes ready', () => {
