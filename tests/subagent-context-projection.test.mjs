@@ -248,6 +248,13 @@ test('project identity mismatch and stale authorized prior bindings fail closed'
     /projectId does not match parent project snapshot/,
   );
 
+  assert.throws(
+    () => projectSubagentContextV1(request({
+      priorParentCapsule: capsule({ projectRevisionId: 'project-r1' }),
+    })),
+    /priorParentCapsule projectRevisionId mismatch/,
+  );
+
   const staleSource = capsule();
   staleSource.sourceBindings = staleSource.sourceBindings.map(item =>
     item.sourceId === 'source.allowed'
