@@ -341,23 +341,6 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   if (!Number.isFinite(millis)) throw new Error(`${label} must be a timestamp`);
   return new Date(millis).toISOString();
 }
-function sameSpecialistAssignmentAuthority(existing, expected) {
-  const fields = [
-    'schemaVersion', 'agentId', 'parentAgentId', 'jobId', 'purpose',
-    'specialistId', 'ownershipKey', 'depth', 'priority', 'deadlineAt',
-  ];
-  return fields.every(key => existing?.[key] === expected?.[key])
-    && JSON.stringify(existing?.requestedCapabilityIds || [])
-      === JSON.stringify(expected?.requestedCapabilityIds || []);
-}
-
-function sameSpecialistExecutionAuthority(existing, expected) {
-  const fields = [
-    'schemaVersion', 'taskId', 'planId', 'nodeId', 'effectId', 'policyEnvelopeId',
-  ];
-  return fields.every(key => existing?.[key] === expected?.[key]);
-}
-
 function boundSpecialistClaimRequestForJob(job, request, capacityObligations = 0) {
   const profile = job?.specialistDelegationBinding?.profile;
   if (!profile?.enabled) return request;
@@ -1087,7 +1070,47 @@ export class BrowserAgentManager {
         throw new Error('Specialist registry identity or revision drifted before durable delegation');
       }
       if (plan.revision !== intent.request.expectedPlanRevision) throw new Error('Browser Agent AgentPlan revision drifted before durable delegation');
-      if (!plan.nodes.some(node => node.nodeId === intent.request.nodeId)) throw new Error('Browser Agent AgentPlan node not found before durable delegation');
+      const node = plan.nodes.find(candidate => candidate.nodeId === intent.request.nodeId);
+      if (!node) throw new Error('Browser Agent AgentPlan node not found before durable delegation');
+
+      const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
+      const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const expectedAgentId = specialistAssignmentIdForPlanNodeV1(plan.planId, node.nodeId);
+      const existing = handoffs.find(item => item?.agentId === expectedAgentId);
+      if (existing) {
+        const definition = registry.definitions.find(item => item.specialistId === existing.specialistId);
+        const existingOwnership = ownerships.find(item => item?.planId === plan.planId && item?.nodeId === node.nodeId);
+        const requiredCapabilities = new Set(intent.request.requiredCapabilityIds);
+        const requiredTools = new Set(intent.request.requiredToolIds);
+        const definitionCapabilities = new Set(definition?.capabilityIds || []);
+        const definitionTools = new Set(definition?.toolIds || []);
+        const assignmentCapabilities = new Set(existing.requestedCapabilityIds || []);
+        const assignmentStillBound = existing.jobId === job.id
+          && existing.purpose === node.objective
+          && existing.priority === intent.request.priority
+          && existing.specialistId === definition?.specialistId
+          && existing.deadlineAt >= existing.updatedAt
+          && requiredCapabilities.size === assignmentCapabilities.size
+          && [...requiredCapabilities].every(item => assignmentCapabilities.has(item));
+        const definitionStillEligible = Boolean(definition?.enabled)
+          && definition.executionPlane === node.executionPlane
+          && [...requiredCapabilities].every(item => definitionCapabilities.has(item))
+          && [...requiredTools].every(item => definitionTools.has(item));
+        const ownershipStillBound = Boolean(existingOwnership)
+          && existingOwnership.taskId === `browser-agent-task:${plan.planId}`
+          && existingOwnership.policyEnvelopeId === intent.request.policyEnvelopeId;
+        if (!assignmentStillBound || !definitionStillEligible || !ownershipStillBound) {
+          throw new Error('Existing specialist handoff drifted from current owner-bound delegation authority');
+        }
+        result = {
+          proposal: null,
+          assignment: clone(existing),
+          executionOwnership: clone(existingOwnership),
+          reused: true,
+        };
+        return store;
+      }
+
       const proposal = prepareAutomaticAgentSpecialistDelegationV1({
         plan,
         expectedPlanRevision: intent.request.expectedPlanRevision,
@@ -1106,19 +1129,6 @@ export class BrowserAgentManager {
       });
       const assignment = proposal.preview.assignment;
       const executionOwnership = proposal.preview.executionOwnership;
-      const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
-      const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
-      const existing = handoffs.find(item => item?.agentId === assignment.agentId);
-      if (existing) {
-        const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
-        if (!existingOwnership) throw new Error('Existing specialist handoff lacks canonical execution ownership');
-        if (!sameSpecialistAssignmentAuthority(existing, assignment)
-            || !sameSpecialistExecutionAuthority(existingOwnership, executionOwnership)) {
-          throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
-        }
-        result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
-        return store;
-      }
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
       job.runtime.updatedAt = this.now();
