@@ -352,6 +352,46 @@ test('hybrid escalation cannot exceed an exact per-request model-call ceiling', 
   assert.match(result.strongError, /model-call budget exhausted/i);
 });
 
+test('optional strong review does not swallow provider-budget lifecycle admission failure', async () => {
+  const gateway = new FakeGateway(['[[ESCALATE]] need strong review', 'must never be consumed']);
+  let admissions = 0;
+  const lifecycle = {
+    async beforeProviderCall() {
+      admissions += 1;
+      if (admissions === 1) return { reservationId:'reservation-primary' };
+      const error = new Error('strong provider budget admission denied');
+      error.code = 'AI_MODEL_BUDGET_EXHAUSTED';
+      throw error;
+    },
+    async afterProviderCall() {},
+  };
+  const router = new AiOrchestrator({
+    gatewayClient: gateway,
+    providerCallLifecycle: lifecycle,
+    now: () => 40_500,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings({ mode:'hybrid-auto', keepPrimaryIfStrongFails:true }),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'hard task',
+      {
+        maxModelCallsForRequest:2,
+        providerCallBudgetContext:{ kind:'browser-agent', jobId:'job-review', controlEpoch:1 },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_MODEL_BUDGET_EXHAUSTED');
+      assert.match(error.message, /strong provider budget admission denied/u);
+      assert.equal(error.modelCallsUsed, 1);
+      return true;
+    },
+  );
+  assert.equal(admissions, 2);
+  assert.equal(gateway.calls.length, 1);
+});
+
 test('primary failure cannot spend a second fallback call when the exact call ceiling is one', async () => {
   const gateway = {
     calls: [],
