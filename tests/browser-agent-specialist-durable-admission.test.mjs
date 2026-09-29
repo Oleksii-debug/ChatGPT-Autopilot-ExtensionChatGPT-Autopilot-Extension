@@ -63,6 +63,18 @@ const specialistDefinition = {
 };
 
 async function setup(manager) {
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: {
+      maxConcurrentAgents: 4,
+      maxChildAgents: 16,
+      maxModelCalls: 100,
+      maxModelInputTokens: 100000,
+      maxModelOutputTokens: 100000,
+      maxRuntimeSeconds: 3600,
+      maxCostUsdMicros: 5000000,
+    },
+  });
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const mutatedAgents = await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
@@ -405,7 +417,11 @@ test('owner-bound claim requires trusted executable readiness on the product dep
 
 test('owner-bound claim fails closed when trusted readiness becomes stale before serialized claim', async () => {
   const storage = chromeStorage();
-  const manager = managerFor(storage.chrome);
+  const manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse('2026-09-29T03:06:00.000Z'),
+  });
   const registry = await setup(manager);
   await manager.prepareDefinitionSpecialistDelegation('job.research', {
     expectedRegistryRevision: registry.nextRegistryRevision,
