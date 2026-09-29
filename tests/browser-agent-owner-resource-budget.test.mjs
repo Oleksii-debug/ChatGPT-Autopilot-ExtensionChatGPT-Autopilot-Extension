@@ -170,6 +170,45 @@ test('corrupt persisted owner budget is quarantined, survives normalization and 
   assert.equal(data.autopilotBrowserAgentV1.ownerResourceBudgetRevision, 1);
 });
 
+test('partial persisted owner budget authority is quarantined instead of minting revision-zero capacity', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.setOwnerResourceBudget({ expectedRevision: 0, budget: budget(5) });
+
+  delete data.autopilotBrowserAgentV1.ownerResourceBudgetRevision;
+  const restarted = managerFor(chrome);
+  const state = await restarted.getOwnerResourceBudget();
+  assert.equal(state.revision, 0);
+  assert.equal(state.quarantined, true);
+
+  const claim = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs: 256 });
+  assert.equal(claim.ownerMaxConcurrentAgents, 0);
+  assert.equal(claim.maxConcurrentHandoffs, 0);
+  assert.equal(claim.ownerResourceBudgetQuarantined, true);
+
+  await assert.rejects(
+    () => restarted.setOwnerResourceBudget({ expectedRevision: 0, budget: budget(1) }),
+    /quarantined as corrupt/,
+  );
+});
+
+test('malformed persisted owner budget quarantine marker fails closed', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.setOwnerResourceBudget({ expectedRevision: 0, budget: budget(5) });
+
+  data.autopilotBrowserAgentV1.ownerResourceBudgetQuarantined = 'false';
+  const restarted = managerFor(chrome);
+  const state = await restarted.getOwnerResourceBudget();
+  assert.equal(state.revision, 1);
+  assert.equal(state.quarantined, true);
+
+  const claim = await restarted.claimSpecialistHandoffsAcrossJobs({ maxConcurrentHandoffs: 256 });
+  assert.equal(claim.ownerMaxConcurrentAgents, 0);
+  assert.equal(claim.maxConcurrentHandoffs, 0);
+  assert.equal(claim.ownerResourceBudgetQuarantined, true);
+});
+
 test('invalid caller concurrency cannot exploit coercion, signed zero or values above the Specialist cap', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
