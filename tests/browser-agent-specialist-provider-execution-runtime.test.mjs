@@ -493,3 +493,37 @@ test('stale caller timestamp cannot extend an expired Specialist provider lease'
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.providerExecutions.length, 0);
 });
+
+
+test('future caller timestamp is rejected before durable PREPARED or provider effect', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T1) };
+  let calls = 0;
+  const client = {
+    async execute() {
+      calls += 1;
+      throw new Error('future chronology must not dispatch');
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: '88888888-8888-4888-8888-888888888888',
+      expectedControlEpoch: 0,
+      at: T2,
+    }),
+    /execute at cannot be in the future/,
+  );
+  assert.equal(calls, 0);
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+});
