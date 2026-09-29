@@ -22,6 +22,10 @@ const BINDING_KEYS = new Set(['routeId', 'evaluationRequest', 'maxAgeMs']);
 const ROLES = new Set(Object.values(AiRouteRole));
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const MAX_ROUTES = 32;
+const MAX_JSON_DEPTH = 32;
+const MAX_JSON_NODES = 20_000;
+const MAX_JSON_STRING_CHARS = 2_000_000;
+const MAX_OBJECT_KEYS = 512;
 
 function record(value, allowed, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -90,6 +94,65 @@ function freeze(value) {
   return Object.freeze(value);
 }
 
+function snapshotJsonData(value, label) {
+  const state = { nodes:0, stringChars:0 };
+  const active = new WeakSet();
+
+  const visit = (item, path, depth) => {
+    state.nodes += 1;
+    if (state.nodes > MAX_JSON_NODES) throw new Error(label + ' exceeds JSON node limit');
+    if (depth > MAX_JSON_DEPTH) throw new Error(label + ' exceeds JSON depth limit');
+
+    if (item === null || typeof item === 'boolean') return item;
+    if (typeof item === 'string') {
+      state.stringChars += item.length;
+      if (state.stringChars > MAX_JSON_STRING_CHARS) {
+        throw new Error(label + ' exceeds JSON string-size limit');
+      }
+      return item;
+    }
+    if (typeof item === 'number') {
+      if (!Number.isFinite(item) || Object.is(item, -0)) {
+        throw new Error(path + ' must use exact finite non-negative-zero JSON number representation');
+      }
+      return item;
+    }
+    if (typeof item !== 'object') {
+      throw new Error(path + ' contains a non-JSON value');
+    }
+    if (active.has(item)) throw new Error(path + ' contains cyclic JSON data');
+    active.add(item);
+
+    let out;
+    if (Array.isArray(item)) {
+      const values = denseArray(item, path, MAX_JSON_NODES);
+      out = values.map((child, index) => visit(child, path + '[' + index + ']', depth + 1));
+    } else {
+      const prototype = Object.getPrototypeOf(item);
+      if (prototype !== Object.prototype && prototype !== null) {
+        throw new Error(path + ' must contain plain JSON objects only');
+      }
+      const descriptors = Object.getOwnPropertyDescriptors(item);
+      const keys = Reflect.ownKeys(descriptors);
+      if (keys.length > MAX_OBJECT_KEYS) throw new Error(path + ' has too many object fields');
+      if (keys.some(key => typeof key !== 'string')) throw new Error(path + ' contains symbol fields');
+      out = Object.create(null);
+      for (const key of keys.sort()) {
+        const descriptor = descriptors[key];
+        if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+          throw new Error(path + '.' + key + ' must be an enumerable own data property');
+        }
+        out[key] = visit(descriptor.value, path + '.' + key, depth + 1);
+      }
+    }
+
+    active.delete(item);
+    return out;
+  };
+
+  return freeze(visit(value, label, 0));
+}
+
 export function normalizeAiRouteQualityEvidenceLookupV1(input) {
   const raw = record(input, LOOKUP_KEYS, 'AiRouteQualityEvidenceLookupV1');
   const routeIds = denseArray(raw.routeIds, 'AiRouteQualityEvidenceLookupV1.routeIds')
@@ -142,7 +205,10 @@ function snapshotScopedBenchmarkRequests(value, requestedRouteIds) {
     seen.add(routeId);
     out.push(Object.freeze({
       routeId,
-      evaluationRequest: raw.evaluationRequest,
+      evaluationRequest:snapshotJsonData(
+        raw.evaluationRequest,
+        'AI route quality benchmark reader result[' + index + '].evaluationRequest',
+      ),
       maxAgeMs: raw.maxAgeMs,
     }));
   }
