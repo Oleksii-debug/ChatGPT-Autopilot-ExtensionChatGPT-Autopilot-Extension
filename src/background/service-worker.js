@@ -20,6 +20,9 @@ import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
 import { ScenarioWorkManager } from '../core/scenario-work-manager.js';
 import { BrowserAgentManager } from '../core/browser-agent-manager.js';
+import {
+  TrustedExecutionVerificationLedgerRepository,
+} from '../core/trusted-execution-verification-ledger.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
@@ -209,9 +212,13 @@ const aiManager = new AiAutonomyManager({
   routePrompt: payload => dispatchSerializedAiRoute(payload),
   collectWebReport: collectWebReportFromConversation,
 });
+const trustedExecutionVerificationLedger =
+  new TrustedExecutionVerificationLedgerRepository(chrome);
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
+  resolveTrustedExecutionVerificationRecord:
+    trustedExecutionVerificationLedger.resolver(),
 });
 browserAgentLifecycle.current = browserAgent;
 const runSafely = (operation) => {
