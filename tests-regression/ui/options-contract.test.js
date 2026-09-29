@@ -306,6 +306,7 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.match(js, /core\('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must create registries through canonical Core');
   assert.match(js, /core\('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must commit definition CRUD through canonical Core');
   assert.match(js, /expectedRegistryRevision: registry\.revision/, 'definition mutations must carry exact registry CAS');
+  assert.equal((js.match(/expectedRegistryBindingKey: registry\\.bindingKey/g) || []).length, 4, 'every definition mutation must carry the current content-bound registry CAS key');
   assert.match(js, /expectedDefinitionRevision: current\.definitionRevision/, 'definition update/delete must carry exact definition CAS');
   assert.match(js, /configDefaults: current\?\.configDefaults \|\| \{\}/, 'definition edits must preserve canonical config defaults');
   assert.match(js, /modelRoutePolicy: current\?\.modelRoutePolicy \?\? null/, 'definition edits must preserve per-Agent model route policy');
