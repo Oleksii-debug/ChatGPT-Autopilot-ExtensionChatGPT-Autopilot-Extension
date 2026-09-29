@@ -455,7 +455,10 @@ test('concurrent exact provider execution calls coalesce onto one external effec
 
   const first = manager.executeClaimedSpecialistProvider('job.coder', request);
   await enteredEffect;
-  const second = manager.executeClaimedSpecialistProvider('job.coder', request);
+  const second = manager.executeClaimedSpecialistProvider('job.coder', {
+    ...request,
+    conversationId: '77777777-7777-4777-8777-777777777777',
+  });
 
   assert.equal(first, second);
   assert.equal(calls, 1);
