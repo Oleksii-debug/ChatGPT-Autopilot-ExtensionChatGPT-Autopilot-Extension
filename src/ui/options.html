@@ -114,6 +114,23 @@
       <button id="agent-worker-policy-link" type="button">Налаштувати кількість і моделі Agent workers</button>
       <p class="field-help">Опишіть результат звичайною мовою. AI сам планує роботу та керує браузерними інструментами Autopilot. Налаштування нижче є лише політикою й лімітами; для звичайного запуску їх заповнювати не потрібно.</p>
 
+      <details id="agent-specialist-automation-details">
+        <summary>Автоматичні Specialist workers</summary>
+        <p id="agent-specialist-automation-help" class="field-help">Ця owner policy дозволяє Agent автоматично забирати готові Specialist handoffs у межах одного спільного ліміту. Значення 0 не запускає нові Specialist effects. Уже PREPARED execution може лише відновити attach/reconciliation без повторного створення зовнішньої роботи.</p>
+        <fieldset class="settings-group" aria-describedby="agent-specialist-automation-help agent-specialist-automation-status">
+          <legend>Product-wide Specialist automation</legend>
+          <label><input id="agent-specialist-automation-enabled" type="checkbox">Дозволити автоматичний Specialist claim і provider dispatch</label>
+          <label for="agent-specialist-automation-capacity">Максимум одночасних Specialist handoffs для всіх Agent jobs</label>
+          <input id="agent-specialist-automation-capacity" type="number" min="0" max="256" step="1" inputmode="numeric" value="0" aria-describedby="agent-specialist-automation-capacity-help">
+          <p id="agent-specialist-automation-capacity-help" class="field-help">0 означає: нові handoffs автоматично не claim-ити. Ліміт є product-wide і не замінює per-Agent caps.</p>
+          <div class="agent-actions" aria-label="Керування автоматичними Specialist workers">
+            <button id="agent-specialist-automation-save-button" type="button">Зберегти policy</button>
+            <button id="agent-specialist-automation-clear-button" type="button">Очистити policy</button>
+          </div>
+          <p id="agent-specialist-automation-status" role="status">Specialist automation policy ще не завантажено.</p>
+        </fieldset>
+      </details>
+
       <details id="agent-definition-details">
         <summary>Збережені reusable Agent definitions</summary>
         <p class="field-help">Definitions зберігають постійні інструкції, capabilities, tools і per-agent model routing. Вони не запускають Agent самі по собі.</p>
