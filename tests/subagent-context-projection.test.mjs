@@ -2,9 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  projectDurableSubagentTaskContextV1,
   projectSubagentContextV1,
   projectSubagentTaskContextV1,
 } from '../src/core/subagent-context-projection.js';
+import {
+  ProjectWorkspaceRepository,
+  addProjectSnapshot,
+  putProjectContextCapsule,
+} from '../src/core/project-workspace.js';
 import { compileDeltaContextPlanV1 } from '../src/core/context-compiler.js';
 import { createSha256FingerprintV1 } from '../src/core/fingerprint.js';
 
@@ -578,4 +584,229 @@ test('task-bound child context binds exact project parent child and task identit
     })),
     /task taskId binding mismatch/,
   );
+});
+
+
+function durableTaskContextRequest(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    authorityEnvelope: envelope({
+      sourceIds: ['source.allowed', 'source.secret'],
+      artifactIds: ['artifact.allowed', 'artifact.secret'],
+    }),
+    taskEnvelope: taskEnvelope(),
+    expectedParentAgentId: 'agent.parent',
+    expectedChildAgentId: 'agent.child',
+    expectedTaskId: 'task.child',
+    expectedProjectRevisionId: 'project-r2',
+    capsuleId: 'capsule.parent',
+    ...overrides,
+  };
+}
+
+function durableResolution(overrides = {}) {
+  return {
+    schemaVersion: 1,
+    workspaceRevision: 7,
+    projectId: 'project.alpha',
+    projectRevisionId: 'project-r2',
+    snapshot: snapshot(),
+    capsule: capsule(),
+    ownerStateSource: 'DURABLE_PROJECT_WORKSPACE',
+    sourceAuthorityAuthenticated: false,
+    retrievalAuthorized: false,
+    executionAuthorized: false,
+    mutationAuthorized: false,
+    policyAuthority: false,
+    ...overrides,
+  };
+}
+
+function durableFakeChrome(initial = {}) {
+  const data = structuredClone(initial);
+  return {
+    data,
+    storage: {
+      local: {
+        async get(key) {
+          return { [key]: structuredClone(data[key]) };
+        },
+        async set(value) {
+          Object.assign(data, structuredClone(value));
+        },
+      },
+    },
+  };
+}
+
+test('durable task context resolves exact owner state then preserves least-authority task projection', async () => {
+  let lookup = null;
+  const result = await projectDurableSubagentTaskContextV1(
+    durableTaskContextRequest(),
+    async requestValue => {
+      lookup = requestValue;
+      assert.equal(Object.isFrozen(requestValue), true);
+      return durableResolution();
+    },
+  );
+
+  assert.deepEqual(lookup, {
+    projectId: 'project.alpha',
+    expectedProjectRevisionId: 'project-r2',
+    capsuleId: 'capsule.parent',
+  });
+  assert.deepEqual(
+    result.projectedSnapshot.sourceRefs.map(item => item.sourceId),
+    ['source.allowed'],
+  );
+  assert.deepEqual(
+    result.projectedSnapshot.artifactRefs.map(item => item.artifactId),
+    ['artifact.allowed'],
+  );
+  assert.equal(JSON.stringify(result).includes('source.secret'), false);
+  assert.equal(JSON.stringify(result).includes('artifact.secret'), false);
+  assert.equal(JSON.stringify(result).includes('SECRET PARENT PROJECT TITLE'), false);
+  assert.equal(JSON.stringify(result).includes('Parent summary contains'), false);
+  assert.equal(result.workspaceRevision, 7);
+  assert.equal(result.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
+  assert.equal(result.sourceAuthorityAuthenticated, false);
+  assert.equal(
+    result.sourceTrust,
+    'DURABLE_OWNER_STATE_SOURCE_AUTHORITY_NOT_AUTHENTICATED',
+  );
+  assert.equal(result.retrievalAuthorized, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(result.mutationAuthorized, false);
+  assert.equal(result.credentialAuthority, false);
+  assert.equal(result.policyAuthority, false);
+  assert.equal(Object.isFrozen(result), true);
+});
+
+test('durable task context snapshots caller identities and task inputs before resolver await', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const input = durableTaskContextRequest();
+  const pending = projectDurableSubagentTaskContextV1(
+    input,
+    async lookup => {
+      await gate;
+      assert.deepEqual(lookup, {
+        projectId: 'project.alpha',
+        expectedProjectRevisionId: 'project-r2',
+        capsuleId: 'capsule.parent',
+      });
+      return durableResolution();
+    },
+  );
+
+  input.expectedParentAgentId = 'agent.attacker';
+  input.expectedProjectRevisionId = 'project-r999';
+  input.capsuleId = 'capsule.attacker';
+  input.authorityEnvelope.sourceIds = ['source.secret'];
+  input.taskEnvelope.inputSourceRefs[0].revisionId = 'r-attacker';
+  input.taskEnvelope.inputArtifactRefs[0].sha256 = 'f'.repeat(64);
+  release();
+
+  const result = await pending;
+  assert.equal(result.parentAgentId, 'agent.parent');
+  assert.equal(result.parentProjectRevisionId, 'project-r2');
+  assert.deepEqual(
+    result.projectedSnapshot.sourceRefs.map(item => item.sourceId),
+    ['source.allowed'],
+  );
+  assert.deepEqual(
+    result.projectedSnapshot.artifactRefs.map(item => item.artifactId),
+    ['artifact.allowed'],
+  );
+});
+
+test('durable task context rejects resolver authority upgrades and exact binding drift', async () => {
+  await assert.rejects(
+    projectDurableSubagentTaskContextV1(
+      durableTaskContextRequest(),
+      async () => durableResolution({ executionAuthorized: true }),
+    ),
+    /executionAuthorized must remain false/,
+  );
+  await assert.rejects(
+    projectDurableSubagentTaskContextV1(
+      durableTaskContextRequest(),
+      async () => durableResolution({ sourceAuthorityAuthenticated: true }),
+    ),
+    /sourceAuthorityAuthenticated must remain false/,
+  );
+  await assert.rejects(
+    projectDurableSubagentTaskContextV1(
+      durableTaskContextRequest(),
+      async () => durableResolution({ projectRevisionId: 'project-r999' }),
+    ),
+    /revision binding mismatch/,
+  );
+  await assert.rejects(
+    projectDurableSubagentTaskContextV1(
+      { ...durableTaskContextRequest(), capsuleId: undefined },
+      async () => durableResolution(),
+    ),
+    /capsuleId is invalid/,
+  );
+  const snapshotOnly = durableTaskContextRequest();
+  delete snapshotOnly.capsuleId;
+  await assert.rejects(
+    projectDurableSubagentTaskContextV1(
+      snapshotOnly,
+      async () => durableResolution(),
+    ),
+    /returned an unrequested capsule/,
+  );
+});
+
+test('durable task context rejects accessor-backed resolver output without executing getters', async () => {
+  let getterCalls = 0;
+  const hostile = durableResolution();
+  Object.defineProperty(hostile, 'snapshot', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      getterCalls += 1;
+      throw new Error('resolver getter must never execute');
+    },
+  });
+
+  await assert.rejects(
+    projectDurableSubagentTaskContextV1(
+      durableTaskContextRequest(),
+      async () => hostile,
+    ),
+    /enumerable own data property/,
+  );
+  assert.equal(getterCalls, 0);
+});
+
+test('canonical ProjectWorkspaceRepository resolves durable child context across restart', async () => {
+  const chrome = durableFakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  const first = await projectDurableSubagentTaskContextV1(
+    durableTaskContextRequest(),
+    requestValue => repository.resolveContext(requestValue),
+  );
+  assert.equal(first.workspaceRevision, 1);
+  assert.equal(first.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
+  assert.equal(first.sourceAuthorityAuthenticated, false);
+  assert.deepEqual(
+    first.projectedSnapshot.sourceRefs.map(item => item.sourceId),
+    ['source.allowed'],
+  );
+
+  const restarted = new ProjectWorkspaceRepository(chrome);
+  const afterRestart = await projectDurableSubagentTaskContextV1(
+    durableTaskContextRequest(),
+    requestValue => restarted.resolveContext(requestValue),
+  );
+  assert.deepEqual(afterRestart, first);
 });
