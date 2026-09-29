@@ -102,6 +102,7 @@ const MAX_OWNER_INSTRUCTIONS = 20;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 128;
+const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
 const SPECIALIST_PROVIDER_CONFIG_PUT_KEYS = new Set(['providerConfig', 'expectedRevision']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
@@ -670,7 +671,7 @@ function normalizeRuntime(raw, now) {
     })
     : [];
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
-    ? raw.specialistProviderExecutions.slice(0, 128).flatMap(item => {
+    ? raw.specialistProviderExecutions.slice(-MAX_SPECIALIST_PROVIDER_EXECUTIONS).flatMap(item => {
       try {
         const execution = normalizeSpecialistProviderExecutionV1(item);
         const assignment = specialistHandoffs.find(candidate => candidate?.agentId === execution.agentId);
@@ -1762,7 +1763,7 @@ export class BrowserAgentManager {
         providerConfig: normalizedProviderConfig,
         at: preparedAt,
       });
-      job.runtime.specialistProviderExecutions = [...executions, prepared];
+      job.runtime.specialistProviderExecutions = [...executions, prepared].slice(-MAX_SPECIALIST_PROVIDER_EXECUTIONS);
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
