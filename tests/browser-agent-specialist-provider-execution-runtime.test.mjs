@@ -840,3 +840,167 @@ test('semantically invalid plain provider outcome is fenced into canonical recon
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
 });
+
+
+test('ambiguous provider outcome observed after lease expiry still enters canonical reconciliation', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  const client = {
+    async execute() {
+      clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+      throw new OpenHandsCodingSpecialistError('late ambiguous timeout', {
+        code: 'OPENHANDS_REQUEST_TIMEOUT',
+        conversationId: '77777777-7777-4777-8777-777777777777',
+        effectMayHaveOccurred: true,
+        reconciliationRequired: true,
+        safeToRetry: false,
+      });
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '77777777-7777-4777-8777-777777777777',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_RECONCILE');
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, durable.handoffs[0].leaseId);
+});
+
+test('provider attempt guard is scoped to the current lease rather than agent identity', async () => {
+  const { chrome } = chromeStorage();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T1),
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() {
+        return {
+          providerStatus: 'finished',
+          providerSucceeded: true,
+          manualReviewRequired: false,
+          reconciliationRequired: false,
+          safeToRetry: false,
+          effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+          providerUpdatedAt: T1,
+          providerObservedAt: T1,
+        };
+      },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = [{
+      schemaVersion: 1,
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: 'lease:prior-attempt:1',
+      leaseUntil: '2026-09-29T04:10:00.000Z',
+      conversationId: '88888888-8888-4888-8888-888888888888',
+      providerConfig: providerConfig(),
+      status: 'RECONCILE',
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: true,
+      safeToRetry: false,
+      effectEvidence: '',
+      errorCode: 'OPENHANDS_REQUEST_TIMEOUT',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      preparedAt: T0,
+      updatedAt: T0,
+    }];
+    return store;
+  });
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '99999999-9999-4999-8999-999999999999',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 2);
+  assert.equal(durable.providerExecutions[0].leaseId, 'lease:prior-attempt:1');
+  assert.equal(durable.providerExecutions[1].leaseId, assignment.leaseId);
+});
+
+test('provider attempt history capacity fails closed before the 129th dispatch while exact PREPARED resume remains allowed', async () => {
+  const { chrome } = chromeStorage();
+  let calls = 0;
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T1),
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() {
+        calls += 1;
+        throw new Error('provider must not be called after history capacity is exhausted');
+      },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = Array.from({ length: 128 }, (_, index) => ({
+      schemaVersion: 1,
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: `lease:history:${index + 1}`,
+      leaseUntil: T2,
+      conversationId: `00000000-0000-4000-8000-${(index + 1).toString(16).padStart(12, '0')}`,
+      providerConfig: providerConfig(),
+      status: 'RECONCILE',
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: true,
+      safeToRetry: false,
+      effectEvidence: '',
+      errorCode: 'OPENHANDS_REQUEST_TIMEOUT',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      preparedAt: T0,
+      updatedAt: T0,
+    }));
+    return store;
+  });
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider('job.coder', {
+      agentId,
+      conversationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      expectedControlEpoch: 0,
+      at: T1,
+    }),
+    /history capacity exhausted/,
+  );
+  assert.equal(calls, 0);
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 128);
+  assert.equal(durable.handoffs[0].leaseId, assignment.leaseId);
+});
