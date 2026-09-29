@@ -1071,6 +1071,54 @@ test('internal Agent envelope preserves exact canonical vision input into AiOrch
   assert.equal(seen[0].imageDataUrl, imageDataUrl);
 });
 
+test('internal Agent dispatcher snapshots validated vision input across async Router revalidation', async () => {
+  let releaseLoad;
+  let markLoadStarted;
+  const loadGate = new Promise(resolve => { releaseLoad = resolve; });
+  const loadStarted = new Promise(resolve => { markLoadStarted = resolve; });
+  class DelayedRepo extends MemoryRepo {
+    async load() {
+      markLoadStarted();
+      await loadGate;
+      return super.load();
+    }
+  }
+
+  const seen = [];
+  const repo = new DelayedRepo();
+  const vision = internalAgentEnvelope({ requiresVision:true });
+  vision.settings.routes[0].supportsVision = true;
+  repo.state.profile.aiRouter = structuredClone(vision.settings);
+  repo.state.profile.aiRouterRuntime = structuredClone(vision.runtime);
+  const dispatcher = new CoreCommandDispatcher(repo, () => 2_000, {
+    aiOrchestrator: {
+      async run(settings, runtime, prompt, options) {
+        seen.push(options.imageDataUrl);
+        return { text:'ok', runtime };
+      },
+    },
+  });
+  const payload = {
+    prompt:'agent',
+    maxOutputTokens:128,
+    imageDataUrl:'data:image/png;base64,ORIGINAL',
+  };
+  const pending = dispatcher.execute(
+    'RUN_AI_ROUTED_PROMPT',
+    payload,
+    {
+      agentModelOrchestratorEnvelope: vision,
+      providerCallBudgetContext: internalAgentBudgetContext(),
+    },
+  );
+  await loadStarted;
+  payload.imageDataUrl = 'data:image/png;base64,MUTATED';
+  releaseLoad();
+  const result = await pending;
+  assert.equal(result.result.text, 'ok');
+  assert.deepEqual(seen, ['data:image/png;base64,ORIGINAL']);
+});
+
 test('internal Agent image boundary rejects coercive text and accessors without executing getters', async () => {
   let calls = 0;
   let reads = 0;
