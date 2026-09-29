@@ -157,6 +157,16 @@ function assertVerificationBinding(verification, state) {
   if (verification.attempt !== state.attempt) {
     throw new Error('Verification attempt does not match current exact-effect attempt');
   }
+  if (!verification.verifierId) {
+    throw new Error('Exact-effect verification requires independent verifierId');
+  }
+  if (verification.verifierId === state.invocation.providerId) {
+    throw new Error('Exact-effect verifier must be independent from effect provider');
+  }
+  if (!verification.verificationAuthorityId
+      || verification.verificationAuthorityId !== state.invocation.policyDecisionId) {
+    throw new Error('Exact-effect verification authority must match invocation policy decision');
+  }
 }
 
 function normalizedState(input) {
