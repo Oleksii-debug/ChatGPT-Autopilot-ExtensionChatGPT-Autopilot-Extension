@@ -149,6 +149,7 @@ test('handoff and mutation require the exact current registry bindingKey', () =>
 
 test('discovery grants only requested parent capabilities and explicitly requested tools', () => {
   const result = discoverSpecialistsV1(discovery());
+  assert.equal(result.registryBindingKey, request.registry.bindingKey);
   assert.equal(result.specialists.length, 1);
   const selected = result.specialists[0];
   assert.equal(selected.specialistId, OPENHANDS_CODING_SPECIALIST_ID);
@@ -217,14 +218,14 @@ test('disabled, removed or revision-drifted specialist definitions fail closed a
 
   assert.throws(() => bind(registry({
     definitions: [researchDefinition(), definition({ enabled: false })],
-  })), /missing or disabled/);
+  })), /registry identity, revision or bindingKey drifted/);
   assert.throws(() => bind(registry({
     definitions: [researchDefinition()],
-  })), /missing or disabled/);
+  })), /registry identity, revision or bindingKey drifted/);
   assert.throws(() => bind(registry({
     definitions: [researchDefinition(), definition({ definitionRevision: 8 })],
-  })), /drifted from current registry definition/);
-  assert.throws(() => bind(registry({ revision: 4 })), /registry identity or revision drifted/);
+  })), /registry identity, revision or bindingKey drifted/);
+  assert.throws(() => bind(registry({ revision: 4 })), /registry identity, revision or bindingKey drifted/);
 });
 
 test('parent capability or tool-scope drift requires rediscovery instead of widening or silently changing child authority', () => {
@@ -318,6 +319,7 @@ test('registry mutation proposals enforce exact CREATE/UPDATE/DELETE revisions w
     definition: definition({ definitionRevision: 1 }),
   });
   assert.equal(created.nextRegistryRevision, 2);
+  assert.notEqual(created.nextRegistry.bindingKey, empty.bindingKey);
   assert.equal(created.nextDefinitionRevision, 1);
   assert.equal(created.nextRegistry.definitions[0].definitionRevision, 1);
   assert.equal(created.authority.persistenceAuthorized, false);
