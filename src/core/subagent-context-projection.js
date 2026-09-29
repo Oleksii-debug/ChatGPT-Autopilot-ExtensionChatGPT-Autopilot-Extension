@@ -148,6 +148,7 @@ function normalizeAllowedEnvelope(input) {
   if (raw.decision !== 'ALLOW' || raw.reasonCode !== 'LEAST_AUTHORITY_DERIVED') {
     throw new Error('Subagent context projection requires an ALLOW least-authority envelope');
   }
+  dataArray(raw.toolDescriptors, 'authorityEnvelope.toolDescriptors');
   const normalized = {
     schemaVersion: 1,
     decision: 'ALLOW',
@@ -161,7 +162,6 @@ function normalizeAllowedEnvelope(input) {
     sourceIds: idList(raw.sourceIds, 'authorityEnvelope.sourceIds'),
     artifactIds: idList(raw.artifactIds, 'authorityEnvelope.artifactIds'),
     toolIds: idList(raw.toolIds, 'authorityEnvelope.toolIds'),
-    toolDescriptors: dataArray(raw.toolDescriptors, 'authorityEnvelope.toolDescriptors'),
     executionAuthority: exactFalse(raw.executionAuthority, 'authorityEnvelope.executionAuthority'),
     credentialAuthority: exactFalse(raw.credentialAuthority, 'authorityEnvelope.credentialAuthority'),
     policyAuthority: exactFalse(raw.policyAuthority, 'authorityEnvelope.policyAuthority'),
