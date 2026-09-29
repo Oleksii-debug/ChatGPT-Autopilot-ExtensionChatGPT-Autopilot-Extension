@@ -899,3 +899,93 @@ test('snapshot revision history rejects accessor-backed and decorated array shap
     /must be dense/,
   );
 });
+
+
+test('separate repository instances cannot lose an update after reading the same durable revision', async () => {
+  const chrome = fakeChrome();
+  const seed = new ProjectWorkspaceRepository(chrome);
+  await seed.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  const left = new ProjectWorkspaceRepository(chrome);
+  const right = new ProjectWorkspaceRepository(chrome);
+  let entered = 0;
+  let release;
+  const barrier = new Promise(resolve => { release = resolve; });
+  const waitForBoth = async () => {
+    entered += 1;
+    if (entered === 2) release();
+    await barrier;
+  };
+
+  const leftUpdate = left.update(async workspace => {
+    replaceProjectSnapshot(workspace, snapshot('project-r2-left', 'r2-left'), { nowMs: 3 });
+    await waitForBoth();
+    return workspace;
+  }, { nowMs: 3 });
+  const rightUpdate = right.update(async workspace => {
+    replaceProjectSnapshot(workspace, snapshot('project-r2-right', 'r2-right'), { nowMs: 3 });
+    await waitForBoth();
+    return workspace;
+  }, { nowMs: 3 });
+
+  const settled = await Promise.allSettled([leftUpdate, rightUpdate]);
+  assert.equal(settled.filter(result => result.status === 'fulfilled').length, 1);
+  assert.equal(settled.filter(result => result.status === 'rejected').length, 1);
+  assert.match(
+    settled.find(result => result.status === 'rejected').reason.message,
+    /durable revision changed before save/,
+  );
+
+  const durable = await seed.load();
+  assert.equal(durable.revision, 2);
+  assert.equal(
+    ['project-r2-left', 'project-r2-right'].includes(durable.projectsById['project-a'].snapshot.revisionId),
+    true,
+  );
+});
+
+test('empty-storage expectedPreviousRevision bootstrap cannot jump durable revisions', async () => {
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  const forged = createProjectWorkspace(1);
+  forged.revision = 7;
+  forged.updatedAt = 8;
+
+  await assert.rejects(
+    repository.save(forged, { expectedPreviousRevision: 0 }),
+    /update must advance revision exactly once/,
+  );
+});
+
+test('repository save snapshots caller workspace before asynchronous durable read', async () => {
+  const data = {};
+  let releaseGet;
+  const gate = new Promise(resolve => { releaseGet = resolve; });
+  const chrome = {
+    storage: {
+      local: {
+        async get(key) {
+          await gate;
+          return { [key]: data[key] };
+        },
+        async set(value) {
+          Object.assign(data, structuredClone(value));
+        },
+      },
+    },
+  };
+  const repository = new ProjectWorkspaceRepository(chrome);
+  const candidate = createProjectWorkspace(1);
+  const pending = repository.save(candidate);
+  candidate.revision = 99;
+  candidate.updatedAt = 99;
+  releaseGet();
+
+  const saved = await pending;
+  assert.equal(saved.revision, 0);
+  assert.equal(saved.updatedAt, 1);
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
+  assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
+});
