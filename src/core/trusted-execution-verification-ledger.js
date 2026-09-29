@@ -227,6 +227,7 @@ export function normalizeTrustedExecutionVerificationLedgerV1(input) {
 
 export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordInput) {
   const ledger = normalizeTrustedExecutionVerificationLedgerV1(ledgerInput);
+  const canonicalInputLedger = Object.isFrozen(ledgerInput) ? ledgerInput : null;
   const record = normalizeTrustedExecutionVerificationRecordV1(recordInput);
 
   const byRecordId = ledger.records.find(item => item.recordId === record.recordId);
@@ -234,7 +235,7 @@ export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordIn
     if (!sameCanonicalRecord(byRecordId, record)) {
       throw new Error('Trusted execution verification recordId is append-only and cannot be rewritten');
     }
-    return ledger;
+    return canonicalInputLedger || ledger;
   }
 
   const verificationId = record.verification.verificationId;
@@ -247,7 +248,7 @@ export function appendTrustedExecutionVerificationRecordV1(ledgerInput, recordIn
         'Trusted execution verification verificationId is append-only and cannot be rebound',
       );
     }
-    return ledger;
+    return canonicalInputLedger || ledger;
   }
 
   if (ledger.records.length >= MAX_TRUSTED_EXECUTION_VERIFICATION_RECORDS) {
