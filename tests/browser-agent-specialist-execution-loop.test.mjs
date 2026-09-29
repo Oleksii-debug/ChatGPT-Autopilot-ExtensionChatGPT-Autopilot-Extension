@@ -297,3 +297,73 @@ test('automatic Specialist selection provenance survives BrowserAgent restart wi
   assert.equal(persisted.selectionProvenance[0].selection.definitionRevision, 1);
   assert.equal(persisted.selectionProvenance[0].selection.resultContractId, 'result.research');
 });
+
+
+test('definition-bound admission key survives restart and fences child-budget or parent-invocation drift', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  const request = {
+    expectedRegistryRevision: 2,
+    expectedPlanRevision: 4,
+    expectedControlEpoch: 0,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+    childBudget: { maxModelCalls: 3, maxRuntimeSeconds: 300, maxCostUsdMicros: 250000 },
+    parentInvocationId: 'invoke:parent-1',
+  };
+
+  const first = await manager.prepareDefinitionSpecialistDelegation(id, request);
+  assert.equal(first.reused, false);
+
+  const restarted = managerFor(chrome);
+  const repeated = await restarted.prepareDefinitionSpecialistDelegation(id, request);
+  assert.equal(repeated.reused, true);
+  assert.equal(repeated.assignment.agentId, first.assignment.agentId);
+
+  await assert.rejects(
+    () => restarted.prepareDefinitionSpecialistDelegation(id, {
+      ...request,
+      childBudget: { maxModelCalls: 2, maxRuntimeSeconds: 300, maxCostUsdMicros: 250000 },
+    }),
+    /drifted from current owner-bound delegation proposal/,
+  );
+  await assert.rejects(
+    () => restarted.prepareDefinitionSpecialistDelegation(id, {
+      ...request,
+      parentInvocationId: 'invoke:parent-2',
+    }),
+    /drifted from current owner-bound delegation proposal/,
+  );
+
+  const durable = await restarted.load();
+  assert.equal(durable.byId[id].runtime.specialistDelegationAdmissions.length, 1);
+  assert.equal(durable.byId[id].runtime.specialistDelegationAdmissions[0].agentId, first.assignment.agentId);
+});
+
+test('definition-bound handoff without durable admission provenance cannot be reused after restart', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const id = await seed(manager);
+  const request = {
+    expectedRegistryRevision: 2,
+    expectedPlanRevision: 4,
+    expectedControlEpoch: 0,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  };
+  await manager.prepareDefinitionSpecialistDelegation(id, request);
+  await manager.update(store => {
+    delete store.byId[id].runtime.specialistDelegationAdmissions;
+    return store;
+  });
+
+  const restarted = managerFor(chrome);
+  await assert.rejects(
+    () => restarted.prepareDefinitionSpecialistDelegation(id, request),
+    /lacks canonical durable admission provenance/,
+  );
+  const persisted = await restarted.listSpecialistHandoffs(id);
+  assert.equal(persisted.handoffs.length, 1);
+  assert.equal(persisted.executionOwnerships.length, 1);
+});
