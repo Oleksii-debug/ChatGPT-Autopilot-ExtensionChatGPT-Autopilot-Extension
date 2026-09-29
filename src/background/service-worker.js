@@ -24,7 +24,11 @@ import {
   OPENHANDS_CODING_PROVIDER_ID,
   OpenHandsCodingSpecialistClient,
 } from '../core/coding-specialist-provider.js';
-import { probeOpenHandsSpecialistProviderConfigV1 } from '../core/openhands-specialist-readiness.js';
+import {
+  createOpenHandsSpecialistReadinessBindingV1,
+  probeOpenHandsSpecialistProviderConfigV1,
+} from '../core/openhands-specialist-readiness.js';
+import { SpecialistProviderReadinessResolverV1 } from '../core/specialist-provider-readiness-resolver.js';
 import { BROWSER_AGENT_ALARM } from '../core/browser-agent.js';
 import { sameChatConversationUrl } from '../core/tabs.js';
 import {
@@ -238,6 +242,48 @@ const browserAgent = new BrowserAgentManager({
   },
 });
 browserAgentLifecycle.current = browserAgent;
+const specialistReadinessConfigProvenance = new WeakMap();
+const specialistProviderReadinessResolver = Object.freeze({
+  async resolve(selection) {
+    const providerId = selection?.providerId || '';
+    if (providerId !== OPENHANDS_CODING_PROVIDER_ID) {
+      throw new Error('No executable Specialist provider readiness adapter is installed for selected provider');
+    }
+    const persisted = await browserAgent.getSpecialistProviderConfig(providerId);
+    if (persisted.quarantined) {
+      throw new Error('Selected Specialist provider config is quarantined as corrupt');
+    }
+    if (!persisted.config) {
+      throw new Error('Selected Specialist provider is not configured by the owner');
+    }
+    const resolver = new SpecialistProviderReadinessResolverV1({
+      bindings: [
+        createOpenHandsSpecialistReadinessBindingV1({
+          config: persisted.config.config,
+          client: openHandsSpecialistClient,
+        }),
+      ],
+    });
+    const readiness = await resolver.resolve(selection);
+    specialistReadinessConfigProvenance.set(readiness, Object.freeze({
+      providerId,
+      configSnapshot: JSON.stringify(persisted.config),
+    }));
+    return readiness;
+  },
+  async assertCurrent(readiness) {
+    const provenance = specialistReadinessConfigProvenance.get(readiness);
+    if (!provenance) {
+      throw new Error('Specialist provider readiness lacks durable config provenance');
+    }
+    const persisted = await browserAgent.getSpecialistProviderConfig(provenance.providerId);
+    if (persisted.quarantined || !persisted.config
+        || JSON.stringify(persisted.config) !== provenance.configSnapshot) {
+      throw new Error('Specialist provider config changed after readiness probe');
+    }
+    return true;
+  },
+});
 const runSafely = (operation) => {
   void operation.catch(() => console.error('ChatGPT Autopilot operation failed safely.'));
 };
@@ -714,7 +760,11 @@ export async function dispatchUiMessage(message) {
   } else if (message.command === 'PREPARE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
     result = await browserAgent.prepareSpecialistHandoff(message.payload?.id || '', message.payload?.handoff || {});
   } else if (message.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
-    result = await browserAgent.claimSpecialistHandoffs(message.payload?.id || '', message.payload?.claim || {});
+    result = await browserAgent.claimSpecialistHandoffs(
+      message.payload?.id || '',
+      message.payload?.claim || {},
+      { specialistProviderReadinessResolver },
+    );
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
