@@ -244,6 +244,18 @@ function normalizedState(input) {
   }
 
   const commitId = optionalId(raw.commitId, 'commitId');
+  if (phase === ExactEffectPhase.PREPARED
+      && (attempt !== 0 || observation || verification || commitId)) {
+    throw new Error('PREPARED exact-effect phase must be pristine and unattempted');
+  }
+  if (phase === ExactEffectPhase.SAFE_RETRY
+      && (attempt < 1
+        || !observation
+        || verification?.status !== VerificationStatus.FAILED
+        || reconciliation.outcome !== ReconciliationOutcome.SAFE_RETRY
+        || commitId)) {
+    throw new Error('SAFE_RETRY exact-effect phase requires failed no-effect verification');
+  }
   if ([ExactEffectPhase.VERIFIED, ExactEffectPhase.COMMITTED].includes(phase)
       && verification?.status !== VerificationStatus.VERIFIED) {
     throw new Error('Verified exact-effect phase requires positive VERIFIED evidence');
