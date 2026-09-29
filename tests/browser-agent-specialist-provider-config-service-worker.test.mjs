@@ -56,3 +56,16 @@ test('provider probe is harmless, owner-config-bound, and cannot dispatch Specia
     /claimSpecialistHandoffs|prepareClaimedSpecialistProviderExecution|openHandsSpecialistClient\.execute|completeSpecialistHandoff/,
   );
 });
+
+
+test('claim command injects trusted durable-config-backed readiness resolver', () => {
+  assert.match(source, /SpecialistProviderReadinessResolverV1/);
+  assert.match(source, /createOpenHandsSpecialistReadinessBindingV1/);
+  assert.match(source, /specialistReadinessConfigProvenance/);
+  assert.match(source, /specialistProviderReadinessResolver/);
+  assert.match(
+    source,
+    /message\.command === 'CLAIM_BROWSER_AGENT_SPECIALIST_HANDOFFS'[\s\S]*?browserAgent\.claimSpecialistHandoffs\([\s\S]*?specialistProviderReadinessResolver[\s\S]*?\);/,
+  );
+  assert.match(source, /Specialist provider config changed after readiness probe/);
+});
