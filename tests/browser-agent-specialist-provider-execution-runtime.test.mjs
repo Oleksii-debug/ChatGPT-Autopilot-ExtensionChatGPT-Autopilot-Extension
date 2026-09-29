@@ -1121,6 +1121,14 @@ test('canonical resolved ownership releases historical PREPARED provider config 
   await manager.update(store => {
     const job = store.byId['job.coder'];
     job.runtime.specialistProviderExecutions = [prepared];
+    job.runtime.specialistHandoffs = job.runtime.specialistHandoffs.map(item => ({
+      ...item,
+      state: 'READY',
+      leaseId: '',
+      leaseExpiresAt: '',
+      resultArtifactIds: [],
+      updatedAt: T1,
+    }));
     job.runtime.specialistExecutionOwnerships = job.runtime.specialistExecutionOwnerships.map(item => ({
       ...item,
       state: 'AVAILABLE',
