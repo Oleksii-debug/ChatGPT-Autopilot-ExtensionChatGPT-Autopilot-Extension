@@ -112,9 +112,23 @@ test('launch scope prefill cache is bound to exact registry and definition prove
 test('post-create verification failure preserves the durable job identity and forbids blind retry messaging', () => {
   const body = functionBody('createBrowserAgentFromDefinition');
   assert.match(body, /let createdId = ''/u);
+  assert.match(body, /let createAcknowledged = false/u);
+  assert.match(body, /createAcknowledged = true/u);
   assert.match(body, /createdId = created\?\.job\?\.id \|\| created\?\.selectedId \|\| ''/u);
-  assert.match(body, /if \(createdId\)/u);
+  assert.match(body, /if \(createAcknowledged\)/u);
   assert.match(body, /уже створено/u);
   assert.match(body, /Не створюйте повторно/u);
   assert.match(body, /оновіть список Agent jobs/u);
+});
+
+
+test('acknowledged definition create without returned identity is treated as ambiguous, not absent', () => {
+  const body = functionBody('createBrowserAgentFromDefinition');
+  assert.match(body, /Core підтвердив create, але не повернув id/u);
+  assert.match(body, /Create-виклик/u);
+  assert.match(body, /знайдіть нове завдання перед будь-якою повторною спробою/u);
+  assert.doesNotMatch(
+    body.slice(body.indexOf('if (createAcknowledged)'), body.indexOf('} else if (/revision drifted')),
+    /Завдання з definition не створено/u,
+  );
 });
