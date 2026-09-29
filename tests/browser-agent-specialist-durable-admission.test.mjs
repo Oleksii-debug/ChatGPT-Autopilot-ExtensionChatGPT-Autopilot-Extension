@@ -176,3 +176,51 @@ test('caller cannot inject a Specialist registry and durable registry revision d
   );
   assert.equal((await manager.listSpecialistHandoffs('job.research')).handoffs.length, 0);
 });
+
+
+test('idempotent admission rejects changed bounded delegation proposal and preserves the original handoff', async () => {
+  const { chrome } = chromeStorage();
+  const manager = managerFor(chrome);
+  const registry = await setup(manager);
+
+  const base = {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+    childBudget: {
+      maxModelCalls: 3,
+      maxRuntimeSeconds: 300,
+      maxCostUsdMicros: 250000,
+    },
+    parentInvocationId: 'invoke:parent-1',
+  };
+  const first = await manager.prepareDefinitionSpecialistDelegation('job.research', base);
+  assert.equal(first.reused, false);
+
+  await assert.rejects(
+    () => manager.prepareDefinitionSpecialistDelegation('job.research', {
+      ...base,
+      childBudget: {
+        maxModelCalls: 2,
+        maxRuntimeSeconds: 300,
+        maxCostUsdMicros: 250000,
+      },
+    }),
+    /drifted from current owner-bound delegation proposal/,
+  );
+
+  await assert.rejects(
+    () => manager.prepareDefinitionSpecialistDelegation('job.research', {
+      ...base,
+      parentInvocationId: 'invoke:parent-2',
+    }),
+    /drifted from current owner-bound delegation proposal/,
+  );
+
+  const persisted = await manager.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs.length, 1);
+  assert.equal(persisted.executionOwnerships.length, 1);
+  assert.deepEqual(persisted.handoffs[0], first.assignment);
+  assert.deepEqual(persisted.executionOwnerships[0], first.executionOwnership);
+});
