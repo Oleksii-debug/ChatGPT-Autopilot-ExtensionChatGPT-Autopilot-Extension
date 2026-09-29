@@ -825,17 +825,34 @@ export class CoreCommandDispatcher {
       const state = await this.repo.load();
       return {
         settings: normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS),
+        routePoolRevision: Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+          && state.profile.aiRoutePoolRevision > 0
+          ? state.profile.aiRoutePoolRevision
+          : 1,
         runtime: normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
       };
     }
     if (command === CoreCommand.UPDATE_AI_ROUTER_SETTINGS) {
       const settings = validateAiRouterReadiness(payload.settings || {});
+      let routePoolRevision = 1;
       await this.repo.update(draft => {
+        const previousSettings = normalizeAiRouterSettings(
+          draft.profile.aiRouter || DEFAULT_AI_ROUTER_SETTINGS,
+        );
+        const previousRoutePoolRevision = Number.isSafeInteger(draft.profile.aiRoutePoolRevision)
+          && draft.profile.aiRoutePoolRevision > 0
+          ? draft.profile.aiRoutePoolRevision
+          : 1;
+        const routePoolChanged = JSON.stringify(previousSettings.routes) !== JSON.stringify(settings.routes);
+        routePoolRevision = routePoolChanged
+          ? previousRoutePoolRevision + 1
+          : previousRoutePoolRevision;
         draft.profile.aiRouter = structuredClone(settings);
+        draft.profile.aiRoutePoolRevision = routePoolRevision;
         draft.profile.aiRouterRuntime = normalizeAiRouterRuntime(draft.profile.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
         return draft;
       });
-      return { settings };
+      return { settings, routePoolRevision };
     }
     if (command === CoreCommand.TEST_AI_GATEWAY) {
       if (!this.aiGatewayClient) throw new Error('AI Gateway runtime is unavailable');
