@@ -1591,7 +1591,7 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async executeClaimedSpecialistProvider(id, payload = {}) {
+  executeClaimedSpecialistProvider(id, payload = {}) {
     const request = snapshotExactOwnDataRequest(
       payload,
       SPECIALIST_PROVIDER_EXECUTE_KEYS,
@@ -1613,6 +1613,15 @@ export class BrowserAgentManager {
         || Object.is(request.expectedControlEpoch, -0)) {
       throw new Error('Browser Agent Specialist provider execute expectedControlEpoch must be a canonical non-negative safe integer');
     }
+    const inFlightKey = `specialist-provider:${id}:${request.agentId}:${request.conversationId}:${request.expectedControlEpoch}`;
+    if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
+    const operation = this.#executeClaimedSpecialistProvider(id, request)
+      .finally(() => this.inFlight.delete(inFlightKey));
+    this.inFlight.set(inFlightKey, operation);
+    return operation;
+  }
+
+  async #executeClaimedSpecialistProvider(id, request) {
     const preparedAt = specialistRequestTimestamp(
       request.at,
       new Date(this.now()).toISOString(),
