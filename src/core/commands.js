@@ -34,7 +34,6 @@ const AI_ROUTER_OVERRIDE_PROVIDERS = new Set(['ollama', 'openai', 'openai-compat
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 const AI_ROUTER_OVERRIDE_ROUTE_POLICY_ARRAY_KEYS = new Set([
   'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
@@ -159,8 +158,7 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
   }
   const requested = normalizeAiRoutePolicy(rawRequested);
   for (const key of ['autoSwitch', 'freeOnly', 'pinnedRouteId', 'locality',
-    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-    'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds']) {
+    'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd']) {
     if (Object.hasOwn(rawRequested, key)
         && (Object.is(rawRequested[key], -0) || !Object.is(rawRequested[key], requested[key]))) {
       throw new Error('Selected Agent AI route policy.' + key + ' must already be canonical');
@@ -207,15 +205,6 @@ function narrowAiRoutePolicy(baseSettings, rawRequested) {
     locality: base.locality === 'any' ? requested.locality : base.locality,
     maxInputPricePerMillionUsd: minimumNullable(base.maxInputPricePerMillionUsd, requested.maxInputPricePerMillionUsd),
     maxOutputPricePerMillionUsd: minimumNullable(base.maxOutputPricePerMillionUsd, requested.maxOutputPricePerMillionUsd),
-    retryBackoffSeconds: Object.hasOwn(rawRequested, 'retryBackoffSeconds')
-      ? Math.max(base.retryBackoffSeconds, requested.retryBackoffSeconds)
-      : base.retryBackoffSeconds,
-    circuitBreakerFailures: Object.hasOwn(rawRequested, 'circuitBreakerFailures')
-      ? Math.min(base.circuitBreakerFailures, requested.circuitBreakerFailures)
-      : base.circuitBreakerFailures,
-    circuitBreakerSeconds: Object.hasOwn(rawRequested, 'circuitBreakerSeconds')
-      ? Math.max(base.circuitBreakerSeconds, requested.circuitBreakerSeconds)
-      : base.circuitBreakerSeconds,
   };
   if (policy.pinnedRouteId) {
     if (policy.allowRouteIds.length && !policy.allowRouteIds.includes(policy.pinnedRouteId)) {
@@ -944,8 +933,10 @@ export class CoreCommandDispatcher {
         const budgetDescriptor = internal == null
           ? undefined
           : Object.getOwnPropertyDescriptor(Object(internal), 'providerCallBudgetContext');
-        if (!budgetDescriptor
-            || budgetDescriptor.enumerable !== true
+        if (!budgetDescriptor) {
+          throw new Error('Agent model invocation requires canonical provider budget context');
+        }
+        if (budgetDescriptor.enumerable !== true
             || !Object.hasOwn(budgetDescriptor, 'value')) {
           throw new Error('Agent model provider budget context must be an enumerable own data property');
         }
