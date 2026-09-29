@@ -43,6 +43,24 @@ const APPROVAL_MODES = new Set(['CONSEQUENTIAL', 'ALLOW_ALL']);
 const POLICY_DECISIONS = new Set(['ALLOW', 'ASK', 'DENY', 'INHERIT']);
 const AI_ROUTING_MODES = new Set(['inherit', 'primary', 'strong', 'hybrid-auto', 'hybrid-rules']);
 const AI_PROVIDERS = new Set(['inherit', 'ollama', 'openai', 'openai-compatible']);
+const SITE_RULE_KEYS = new Set(['pattern', 'defaultDecision', 'actionDecisions']);
+
+const INTEGER_POLICY_RANGES = Object.freeze({
+  maxSteps: [1, 10000],
+  stepDelayMs: [0, 60000],
+  intervalSeconds: [1, 604800],
+  maxModelCalls: [0, 1000000],
+  maxInputTokens: [0, 2000000000],
+  maxOutputTokens: [0, 2000000000],
+  maxTotalTokens: [0, 2000000000],
+  maxOutputTokensPerCall: [128, 200000],
+  maxRuntimeMinutes: [0, 525600],
+});
+const NUMBER_POLICY_RANGES = Object.freeze({
+  maxCostUsd: [0, 1000000],
+  inputPricePerMillionUsd: [0, 1000000],
+  outputPricePerMillionUsd: [0, 1000000],
+});
 
 function dataRecord(value, allowedKeys, label, unknownFieldMessage = '') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -163,13 +181,51 @@ function assertExactPolicyValueType(key, value) {
   if (key === 'aiPrimaryProvider' || key === 'aiStrongProvider') {
     assertCanonicalEnum(value, AI_PROVIDERS, `Політика Agent.${key}`);
   }
+
+  if (Object.hasOwn(INTEGER_POLICY_RANGES, key)) {
+    const [min, max] = INTEGER_POLICY_RANGES[key];
+    if (!Number.isSafeInteger(value) || value < min || value > max) {
+      throw new Error(`Політика Agent.${key} виходить за канонічні межі.`);
+    }
+  }
+  if (Object.hasOwn(NUMBER_POLICY_RANGES, key)) {
+    const [min, max] = NUMBER_POLICY_RANGES[key];
+    if (value < min || value > max) {
+      throw new Error(`Політика Agent.${key} виходить за канонічні межі.`);
+    }
+  }
+  if (key === 'scheduleStartAt' || key === 'scheduleEndAt') {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`Політика Agent.${key} має бути невід’ємним цілим timestamp.`);
+    }
+  }
+  if ((key === 'aiPrimaryModel' || key === 'aiStrongModel')
+      && (value !== value.trim() || value.length > 300)) {
+    throw new Error(`Політика Agent.${key} має бути канонічним model ID до 300 символів.`);
+  }
+  if (key === 'aiPinnedRouteId'
+      && (value !== value.trim() || value.length > 180)) {
+    throw new Error('Політика Agent.aiPinnedRouteId має бути канонічним route ID до 180 символів.');
+  }
+  if (key === 'startUrl' && value.length > 4096) {
+    throw new Error('Політика Agent.startUrl перевищує 4096 символів.');
+  }
 }
 
 function assertCanonicalSiteRules(siteRules) {
+  if (siteRules.length > 100) throw new Error('Політика Agent.siteRules перевищує 100 правил.');
   for (let ruleIndex = 0; ruleIndex < siteRules.length; ruleIndex += 1) {
     const rule = siteRules[ruleIndex];
     if (!rule || typeof rule !== 'object' || Array.isArray(rule)) {
       throw new Error(`Політика Agent.siteRules[${ruleIndex}] має бути JSON-об’єктом.`);
+    }
+    for (const key of Object.keys(rule)) {
+      if (!SITE_RULE_KEYS.has(key)) {
+        throw new Error(`Політика Agent.siteRules[${ruleIndex}] містить невідоме поле: ${key}`);
+      }
+    }
+    if (typeof rule.pattern !== 'string' || rule.pattern.length > 500) {
+      throw new Error(`Політика Agent.siteRules[${ruleIndex}].pattern має бути рядком до 500 символів.`);
     }
     if (Object.hasOwn(rule, 'defaultDecision')) {
       assertCanonicalEnum(
@@ -194,6 +250,16 @@ function assertCanonicalSiteRules(siteRules) {
   }
 }
 
+function assertCanonicalAcceptanceCriteria(criteria) {
+  if (criteria.length > 20) throw new Error('Політика Agent.acceptanceCriteria перевищує 20 критеріїв.');
+  for (let index = 0; index < criteria.length; index += 1) {
+    const criterion = criteria[index];
+    if (typeof criterion !== 'string' || !criterion.trim() || criterion.length > 1000) {
+      throw new Error(`Політика Agent.acceptanceCriteria[${index}] має бути непорожнім рядком до 1000 символів.`);
+    }
+  }
+}
+
 function snapshotPolicy(input) {
   const raw = dataRecord(
     input,
@@ -209,6 +275,16 @@ function snapshotPolicy(input) {
     out[key] = snapshotJsonValue(raw[key], `Політика Agent.${key}`, state);
   }
   if (Object.hasOwn(out, 'siteRules')) assertCanonicalSiteRules(out.siteRules);
+  if (Object.hasOwn(out, 'acceptanceCriteria')) {
+    assertCanonicalAcceptanceCriteria(out.acceptanceCriteria);
+  }
+  if (Object.hasOwn(out, 'scheduleStartAt')
+      && Object.hasOwn(out, 'scheduleEndAt')
+      && out.scheduleStartAt > 0
+      && out.scheduleEndAt > 0
+      && out.scheduleEndAt <= out.scheduleStartAt) {
+    throw new Error('Політика Agent.scheduleEndAt має бути пізніше scheduleStartAt.');
+  }
   return out;
 }
 
