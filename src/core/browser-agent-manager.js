@@ -2751,6 +2751,7 @@ export class BrowserAgentManager {
       for (const jobId of initial.order || []) {
         const job = initial.byId?.[jobId];
         if (!job?.runtime?.plan || !job.specialistDelegationBinding?.profile?.enabled) continue;
+        if (automationPolicyFence && job.runtime.runState !== BrowserAgentRunState.RUNNING) continue;
         const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);
         for (const assignment of (job.runtime.specialistHandoffs || []).filter(item => item?.state === 'READY')) {
           const admission = admissions.find(item => item.agentId === assignment.agentId);
@@ -2807,6 +2808,7 @@ export class BrowserAgentManager {
       for (const jobId of store.order) {
         const job = store.byId[jobId];
         if (!job?.runtime?.plan) continue;
+        if (automationPolicyFence && job.runtime.runState !== BrowserAgentRunState.RUNNING) continue;
         assertOwnerBoundSpecialistAdmissionProvenance(job);
         if (job.specialistDelegationBinding?.profile?.enabled) {
           const admissions = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions);

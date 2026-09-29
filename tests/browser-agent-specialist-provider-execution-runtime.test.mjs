@@ -516,7 +516,7 @@ test('stale caller timestamp cannot extend an expired Specialist provider lease'
 
 test('future caller timestamp is rejected before durable PREPARED or provider effect', async () => {
   const { chrome } = chromeStorage();
-  const clock = { value: Date.parse(T1) };
+  const clock = { value: Date.parse(T0) };
   let calls = 0;
   const client = {
     async execute() {
@@ -531,6 +531,7 @@ test('future caller timestamp is rejected before durable PREPARED or provider ef
     specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
   });
   const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
 
   await assert.rejects(
     () => manager.executeClaimedSpecialistProvider('job.coder', {
@@ -579,6 +580,7 @@ test('corrupt persisted provider execution is quarantined and cannot authorize r
   const state = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(state.providerExecutions.length, 0);
   assert.equal(state.providerExecutionQuarantined, true);
+  clock.value = Date.parse(T1);
   await assert.rejects(
     () => manager.executeClaimedSpecialistProvider('job.coder', {
       agentId,

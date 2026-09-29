@@ -337,7 +337,12 @@ test('product-wide claim fails closed when an owner-bound handoff lost admission
 
 test('owner-bound claim requires trusted executable readiness on the product dependency path', async () => {
   const storage = chromeStorage();
-  const manager = managerFor(storage.chrome);
+  const clock = { value: Date.parse('2026-09-29T03:05:00.000Z') };
+  const manager = new BrowserAgentManager({
+    chromeApi: storage.chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+  });
   const registry = await setup(manager);
   await manager.prepareDefinitionSpecialistDelegation('job.research', {
     expectedRegistryRevision: registry.nextRegistryRevision,
@@ -346,6 +351,7 @@ test('owner-bound claim requires trusted executable readiness on the product dep
     at: '2026-09-29T03:05:00.000Z',
   });
 
+  clock.value = Date.parse('2026-09-29T03:06:00.000Z');
   const claim = {
     availableSlots: 1,
     maxChildrenPerAgent: 1,
@@ -366,8 +372,8 @@ test('owner-bound claim requires trusted executable readiness on the product dep
         executable,
         trustedResolverInvoked: true,
         callerReadinessAccepted: false,
-        observedAt: new Date(Date.now()).toISOString(),
-        resolvedAt: new Date(Date.now()).toISOString(),
+        observedAt: new Date(clock.value).toISOString(),
+        resolvedAt: new Date(clock.value).toISOString(),
         maxAgeMs: 60_000,
       };
     },
