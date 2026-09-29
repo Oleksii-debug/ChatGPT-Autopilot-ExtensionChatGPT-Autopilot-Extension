@@ -13,6 +13,7 @@ import {
   replaceProjectSnapshot,
   validateProjectWorkspace,
 } from '../src/core/project-workspace.js';
+import { projectSubagentContextV1 } from '../src/core/subagent-context-projection.js';
 
 const hash = char => char.repeat(64);
 const source = (revisionId = 'r1') => ({
@@ -347,4 +348,64 @@ test('repository context resolver rejects accessor-backed requests before storag
   );
   assert.equal(getterCalls, 0);
   assert.equal(storageReads, 0);
+});
+
+
+test('durable workspace resolution composes with least-authority child projection without upgrading source trust', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    putProjectContextCapsule(workspace, capsule(), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  const durable = await repository.resolveContext({
+    projectId: 'project-a',
+    expectedProjectRevisionId: 'project-r1',
+    capsuleId: 'capsule-1',
+  });
+  assert.equal(durable.workspaceRevision, 1);
+  assert.equal(durable.ownerStateSource, 'DURABLE_PROJECT_WORKSPACE');
+  assert.equal(durable.sourceAuthorityAuthenticated, false);
+
+  const projected = projectSubagentContextV1({
+    schemaVersion: 1,
+    authorityEnvelope: {
+      schemaVersion: 1,
+      decision: 'ALLOW',
+      reasonCode: 'LEAST_AUTHORITY_DERIVED',
+      projectId: 'project-a',
+      parentAgentId: 'agent.parent',
+      childAgentId: 'agent.child',
+      taskId: 'task.child',
+      providerId: 'provider.main',
+      capabilityIds: ['cap.read'],
+      sourceIds: ['github-main'],
+      artifactIds: ['build'],
+      toolIds: ['tool.read'],
+      toolDescriptors: [],
+      executionAuthority: false,
+      credentialAuthority: false,
+      policyAuthority: false,
+    },
+    expectedParentAgentId: 'agent.parent',
+    expectedChildAgentId: 'agent.child',
+    expectedTaskId: 'task.child',
+    expectedProjectRevisionId: durable.projectRevisionId,
+    parentProjectSnapshot: durable.snapshot,
+    priorParentCapsule: durable.capsule,
+  });
+
+  assert.deepEqual(projected.projectedSnapshot.sourceRefs.map(item => item.sourceId), ['github-main']);
+  assert.deepEqual(projected.projectedSnapshot.artifactRefs.map(item => item.artifactId), ['build']);
+  assert.equal(projected.retrievalAuthorized, false);
+  assert.equal(projected.executionAuthorized, false);
+  assert.equal(projected.policyAuthority, false);
+  assert.equal(projected.sourceTrust, 'CALLER_BOUND_NOT_AUTHENTICATED');
+  assert.equal(
+    JSON.stringify(projected).includes(durable.snapshot.title),
+    false,
+    'parent project title must not cross the child context boundary',
+  );
 });
