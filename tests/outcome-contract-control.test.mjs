@@ -7,6 +7,7 @@ import {
   deleteStoredOutcomeContractV1,
   listStoredOutcomeContractsV1,
   normalizeOutcomeContractRegistryV1,
+  validateOutcomeContractRegistryStateV1,
   resolveStoredOutcomeContractV1,
   resolveCurrentStoredOutcomeContractV1,
   resolveCanonicalStoredOutcomeContractV1,
@@ -491,6 +492,39 @@ test('registry and lookup boundaries reject shaped accessors without executing g
     },
   });
   assert.throws(() => normalizeOutcomeContractRegistryV1(registry), /enumerable own data properties/);
+  assert.equal(getterCalls, 0);
+});
+
+test('state authority distinguishes an absent legacy registry from present undefined or accessor-shaped registry state', () => {
+  const legacy = createEmptyState(1);
+  delete legacy.outcomeContractsById;
+  assert.equal(validateOutcomeContractRegistryStateV1(legacy), legacy);
+  assert.equal(validateState(legacy), legacy);
+
+  const undefinedRegistry = createEmptyState(1);
+  undefinedRegistry.outcomeContractsById = undefined;
+  assert.throws(
+    () => validateOutcomeContractRegistryStateV1(undefinedRegistry),
+    /cannot be undefined when present/,
+  );
+  assert.throws(() => validateState(undefinedRegistry), /cannot be undefined when present/);
+
+  let getterCalls = 0;
+  const accessorState = createEmptyState(1);
+  delete accessorState.outcomeContractsById;
+  Object.defineProperty(accessorState, 'outcomeContractsById', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return {};
+    },
+  });
+  assert.throws(
+    () => validateOutcomeContractRegistryStateV1(accessorState),
+    /enumerable own data property/,
+  );
+  assert.equal(getterCalls, 0);
+  assert.throws(() => validateState(accessorState), /enumerable own data property/);
   assert.equal(getterCalls, 0);
 });
 
