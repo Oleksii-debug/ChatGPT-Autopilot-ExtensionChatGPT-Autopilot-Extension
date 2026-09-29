@@ -891,12 +891,18 @@ export class CoreCommandDispatcher {
             || typeof promptDescriptor.value !== 'string') {
           throw new Error('Agent model invocation prompt must be an enumerable own text data property');
         }
+        if (promptDescriptor.value.length > 100_000) {
+          throw new Error('Agent model invocation prompt exceeds the durable Browser Agent input-budget bound');
+        }
         const systemPromptDescriptor = Object.getOwnPropertyDescriptor(payload, 'systemPrompt');
         if (systemPromptDescriptor
             && (systemPromptDescriptor.enumerable !== true
               || !Object.hasOwn(systemPromptDescriptor, 'value')
               || typeof systemPromptDescriptor.value !== 'string')) {
           throw new Error('Agent model invocation systemPrompt must be an enumerable own text data property');
+        }
+        if ((systemPromptDescriptor?.value ?? '').length > 50_000) {
+          throw new Error('Agent model invocation systemPrompt exceeds the durable Browser Agent input-budget bound');
         }
         const maxOutputTokensDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxOutputTokens');
         const boundedOutputTokens = maxOutputTokensDescriptor?.value;
