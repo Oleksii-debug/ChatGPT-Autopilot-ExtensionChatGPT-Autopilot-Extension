@@ -65,7 +65,7 @@ export function createEmptyState(now = Date.now()) {
   return {
     schemaVersion: SCHEMA_VERSION,
     revision: 0,
-    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
+    profile: { masterPaused: false, createdAt: now, rateLimitCooldownMs: DEFAULT_RATE_LIMIT_COOLDOWN_MS, rateLimitReservePolicyVersion: 1, rateLimitUntil: 0, maxConcurrentSessionOperations: 10, localAi: structuredClone(DEFAULT_LOCAL_AI_SETTINGS), aiRouter: structuredClone(DEFAULT_AI_ROUTER_SETTINGS), aiRoutePoolRevision: 1, aiRouterRuntime: structuredClone(DEFAULT_AI_ROUTER_RUNTIME), aiManager: structuredClone(DEFAULT_AI_MANAGER_SETTINGS), aiManagerRuntime: structuredClone(DEFAULT_AI_MANAGER_RUNTIME) },
     sessionsById: {},
     sessionOrder: [],
     tabHintsByTaskId: {},
@@ -270,6 +270,10 @@ export function validateState(state) {
     requireString(normalizedLocalAi.baseUrl, 'profile localAi baseUrl');
     requireString(normalizedLocalAi.model, 'profile localAi model');
     requireNonNegativeNumber(normalizedLocalAi.timeoutSeconds, 'profile localAi timeoutSeconds');
+  }
+  if (state.profile.aiRoutePoolRevision !== undefined
+      && (!Number.isSafeInteger(state.profile.aiRoutePoolRevision) || state.profile.aiRoutePoolRevision < 1)) {
+    throw new Error('Invalid profile aiRoutePoolRevision');
   }
   if (state.profile.aiRouter !== undefined) {
     requireRecord(state.profile.aiRouter, 'profile aiRouter');

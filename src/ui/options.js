@@ -2153,6 +2153,32 @@ function setAgentDefinitionFormEnabled(enabled) {
   $('agent-definition-new-button').disabled = !ui.selectedAgentDefinitionRegistry;
 }
 
+function syncAgentDefinitionModelRoutePolicyControls() {
+  const configured = $('agent-definition-model-route-policy-configured').checked;
+  for (const id of [
+    'agent-definition-model-route-auto-switch','agent-definition-model-route-pinned-id',
+    'agent-definition-model-route-ordered-ids','agent-definition-model-route-allow-ids',
+    'agent-definition-model-route-deny-ids','agent-definition-model-route-free-only',
+    'agent-definition-model-route-locality','agent-definition-model-route-max-input-price',
+    'agent-definition-model-route-max-output-price',
+  ]) $(id).disabled = !configured;
+}
+
+function fillAgentDefinitionModelRoutePolicy(policy = null) {
+  const configured = Boolean(policy);
+  $('agent-definition-model-route-policy-configured').checked = configured;
+  $('agent-definition-model-route-auto-switch').checked = policy?.autoSwitch ?? true;
+  $('agent-definition-model-route-pinned-id').value = policy?.pinnedRouteId || '';
+  $('agent-definition-model-route-ordered-ids').value = agentDefinitionLines(policy?.orderedRouteIds);
+  $('agent-definition-model-route-allow-ids').value = agentDefinitionLines(policy?.allowRouteIds);
+  $('agent-definition-model-route-deny-ids').value = agentDefinitionLines(policy?.denyRouteIds);
+  $('agent-definition-model-route-free-only').checked = policy?.freeOnly === true;
+  $('agent-definition-model-route-locality').value = policy?.locality || 'any';
+  $('agent-definition-model-route-max-input-price').value = policy?.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
+  $('agent-definition-model-route-max-output-price').value = policy?.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
+  syncAgentDefinitionModelRoutePolicyControls();
+}
+
 function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   const hasRegistry = Boolean(ui.selectedAgentDefinitionRegistry);
   setAgentDefinitionFormEnabled(hasRegistry);
@@ -2167,6 +2193,7 @@ function fillAgentDefinitionForm(definition = null, { create = false } = {}) {
   $('agent-definition-tags').value = agentDefinitionLines(definition?.tags);
   $('agent-definition-acceptance').value = agentDefinitionLines(definition?.acceptanceCriteria);
   $('agent-definition-enabled').checked = definition ? definition.enabled === true : true;
+  fillAgentDefinitionModelRoutePolicy(definition?.modelRoutePolicy || null);
   $('agent-definition-revision').textContent = definition
     ? `Definition revision: ${definition.definitionRevision}. Registry revision: ${ui.selectedAgentDefinitionRegistry?.revision || '?'}.`
     : (hasRegistry ? `Нова definition. Registry revision: ${ui.selectedAgentDefinitionRegistry.revision}.` : 'Реєстр не вибрано.');
@@ -2194,7 +2221,7 @@ function fillAgentDefinitionLaunchForm(definition = null) {
     return;
   }
 
-  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}#${ui.selectedAgentDefinitionRegistry.bindingKey}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
   if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
     const scope = agentDefinitionLaunchScopeTextV1(definition);
     $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
@@ -2424,12 +2451,22 @@ function agentDefinitionFormValue() {
     toolIdsText: $('agent-definition-tools').value,
     tagsText: $('agent-definition-tags').value,
     acceptanceCriteriaText: $('agent-definition-acceptance').value,
+    modelRoutePolicyConfigured: $('agent-definition-model-route-policy-configured').checked,
+    modelRouteAutoSwitch: $('agent-definition-model-route-auto-switch').checked,
+    modelRoutePinnedRouteId: $('agent-definition-model-route-pinned-id').value,
+    modelRouteOrderedRouteIdsText: $('agent-definition-model-route-ordered-ids').value,
+    modelRouteAllowRouteIdsText: $('agent-definition-model-route-allow-ids').value,
+    modelRouteDenyRouteIdsText: $('agent-definition-model-route-deny-ids').value,
+    modelRouteFreeOnly: $('agent-definition-model-route-free-only').checked,
+    modelRouteLocality: $('agent-definition-model-route-locality').value,
+    modelRouteMaxInputPriceText: $('agent-definition-model-route-max-input-price').value,
+    modelRouteMaxOutputPriceText: $('agent-definition-model-route-max-output-price').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }
 
 async function reloadAfterAgentDefinitionDrift(error, { definitionId = '' } = {}) {
-  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
+  if (!/(?:revision|bindingKey) drifted/i.test(String(error?.message || ''))) return false;
   const registryId = ui.selectedAgentDefinitionRegistryId;
   await loadAgentDefinitionRegistries({ selectRegistryId: registryId, selectDefinitionId: definitionId });
   $('agent-definition-status').textContent = 'Реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
@@ -4398,6 +4435,7 @@ $('agent-definition-new-button').addEventListener('click', newAgentDefinition);
 $('agent-definition-save-button').addEventListener('click', saveAgentDefinition);
 $('agent-definition-toggle-enabled-button').addEventListener('click', toggleAgentDefinitionEnabled);
 $('agent-definition-delete-button').addEventListener('click', deleteAgentDefinition);
+$('agent-definition-model-route-policy-configured').addEventListener('change', syncAgentDefinitionModelRoutePolicyControls);
 $('agent-definition-launch-button').addEventListener('click', createBrowserAgentFromDefinition);
 $('agent-run-prompt-button').addEventListener('click', runBrowserAgentPrompt);
 $('agent-job-list').addEventListener('change', selectBrowserAgentJob);
