@@ -54,6 +54,7 @@ import {
   ExecutionOwnershipState,
   normalizeExecutionOwnershipV1,
   requireExecutionReconciliationV1,
+  recoverExpiredExecutionOwnershipV1,
 } from './execution-plane-ownership.js';
 import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
@@ -102,6 +103,7 @@ const MAX_OWNER_INSTRUCTIONS = 20;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
 const MAX_SPECIALIST_PROVIDER_CONFIGS = 128;
+const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
 const SPECIALIST_PROVIDER_CONFIG_PUT_KEYS = new Set(['providerConfig', 'expectedRevision']);
 const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
@@ -670,7 +672,7 @@ function normalizeRuntime(raw, now) {
     })
     : [];
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
-    ? raw.specialistProviderExecutions.slice(0, 128).flatMap(item => {
+    ? raw.specialistProviderExecutions.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS).flatMap(item => {
       try {
         const execution = normalizeSpecialistProviderExecutionV1(item);
         const assignment = specialistHandoffs.find(candidate => candidate?.agentId === execution.agentId);
@@ -1710,12 +1712,10 @@ export class BrowserAgentManager {
       const executions = Array.isArray(job.runtime.specialistProviderExecutions)
         ? job.runtime.specialistProviderExecutions
         : [];
-      const existing = executions.find(item => item?.agentId === request.agentId);
+      const existing = executions.find(item =>
+        item?.agentId === request.agentId && item?.leaseId === assignment.leaseId);
       if (existing) {
         const canonical = normalizeSpecialistProviderExecutionV1(existing);
-        if (canonical.leaseId !== assignment.leaseId) {
-          throw new Error('Specialist provider execution already exists for this assignment identity');
-        }
         const exactPreparedIdentity = canonical.status === 'PREPARED'
           && canonical.planId === plan.planId
           && canonical.nodeId === node.nodeId
@@ -1750,6 +1750,9 @@ export class BrowserAgentManager {
           message: 'Exact durable PREPARED Specialist execution resumed through provider attach semantics.',
         });
         return store;
+      }
+      if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
+        throw new Error('Specialist provider execution history capacity exhausted; preserve and reconcile durable attempt evidence before further dispatch');
       }
 
       prepared = createSpecialistProviderExecutionV1({
@@ -1945,17 +1948,27 @@ export class BrowserAgentManager {
       if (outcome.reconciliationRequired || outcome.manualReviewRequired) {
         const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
         const ownershipIndex = ownerships.findIndex(item =>
-          item.ownerId === prepared.agentId && item.leaseId === prepared.leaseId);
+          item.ownerId === prepared.agentId
+          && item.leaseId === prepared.leaseId
+          && item.nodeId === prepared.nodeId);
         if (ownershipIndex < 0) {
           throw new Error('Specialist provider ambiguous outcome lacks exact execution ownership');
         }
-        ownerships[ownershipIndex] = requireExecutionReconciliationV1(ownerships[ownershipIndex], {
-          leaseId: prepared.leaseId,
-          reason: outcome.reconciliationRequired
-            ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
-            : `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`,
-          at: observedAt,
-        });
+        const ownership = ownerships[ownershipIndex];
+        const reason = outcome.reconciliationRequired
+          ? `Specialist provider outcome requires reconciliation: ${outcome.errorCode || outcome.providerStatus || 'ambiguous external effect'}`
+          : `Specialist provider requires manual review: ${outcome.providerStatus || 'provider requested intervention'}`;
+        ownerships[ownershipIndex] = ownership.state === ExecutionOwnershipState.RECONCILE
+          || Date.parse(observedAt) <= Date.parse(ownership.leaseUntil)
+          ? requireExecutionReconciliationV1(ownership, {
+            leaseId: prepared.leaseId,
+            reason,
+            at: observedAt,
+          })
+          : recoverExpiredExecutionOwnershipV1(ownership, {
+            reason,
+            at: observedAt,
+          });
         job.runtime.specialistExecutionOwnerships = ownerships;
       }
       job.runtime.updatedAt = this.now();
