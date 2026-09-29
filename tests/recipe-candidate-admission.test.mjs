@@ -145,6 +145,11 @@ function options(overrides = {}) {
   return {
     recipeRegistry: emptyRegistry(),
     resolveTrustedRecipeTrace: async () => trace(),
+    resolveTrustedRecipeSourceBinding: async lookup => ({
+      sourceId: lookup.sourceId,
+      revisionId: lookup.revisionId,
+      contentSha256: lookup.contentSha256,
+    }),
     resolveTrustedEvidenceArtifact: async lookup => artifactForLookup(lookup),
     resolveTrustedSecretScan: async lookup => ({
       schemaVersion: 1,
@@ -160,11 +165,19 @@ function options(overrides = {}) {
 }
 
 test('admits an independently bound compiler candidate as one exact registry extension without execution authority', async () => {
-  const lookups = { trace: [], evidence: [], scan: [] };
+  const lookups = { trace: [], sources: [], evidence: [], scan: [] };
   const result = await admitTrustedRecipeCandidateV1(request(), options({
     resolveTrustedRecipeTrace: async lookup => {
       lookups.trace.push(lookup);
       return trace();
+    },
+    resolveTrustedRecipeSourceBinding: async lookup => {
+      lookups.sources.push(lookup);
+      return {
+        sourceId: lookup.sourceId,
+        revisionId: lookup.revisionId,
+        contentSha256: lookup.contentSha256,
+      };
     },
     resolveTrustedEvidenceArtifact: async lookup => {
       lookups.evidence.push(lookup);
@@ -195,6 +208,7 @@ test('admits an independently bound compiler candidate as one exact registry ext
   assert.match(result.traceBindingSha256, /^[a-f0-9]{64}$/u);
   assert.match(result.parameterSchemaSha256, /^[a-f0-9]{64}$/u);
   assert.equal(result.traceTrust, 'TRUSTED_RESOLVER');
+  assert.equal(result.sourceTrust, 'TRUSTED_RESOLVER');
   assert.equal(result.evidenceTrust, 'TRUSTED_ARTIFACT_REFS');
   assert.equal(result.secretScanTrust, 'TRUSTED_RESOLVER');
   assert.equal(result.registryAdmissionAuthorized, true);
@@ -215,6 +229,12 @@ test('admits an independently bound compiler candidate as one exact registry ext
   assert.equal(lookups.trace[0].jobId, 'job-1');
   assert.equal(lookups.trace[0].planId, 'plan-1');
   assert.match(lookups.trace[0].traceBindingSha256, /^[a-f0-9]{64}$/u);
+  assert.equal(lookups.sources.length, 2);
+  assert.deepEqual(
+    lookups.sources.map(item => item.sourceId),
+    ['source-a', 'source-b'],
+  );
+  assert.equal(result.resolvedSourceBindings.length, 2);
   assert.equal(lookups.evidence.length, 2);
   assert.equal(lookups.scan.length, 1);
   assert.deepEqual(lookups.scan[0].recipeDefinition, result.recipeDefinition);
@@ -310,6 +330,63 @@ test('trusted trace resolver output remains descriptor-safe and cannot smuggle a
     ),
     /unknown field: permissionGranted/u,
   );
+});
+
+test('original Recipe sources require exact canonical identity, revision and bytes before admission', async () => {
+  await assert.rejects(
+    () => admitTrustedRecipeCandidateV1(
+      request(),
+      options({
+        resolveTrustedRecipeSourceBinding: async lookup => ({
+          sourceId: lookup.sourceId,
+          revisionId: 'substituted-revision',
+          contentSha256: lookup.contentSha256,
+        }),
+      }),
+    ),
+    /source binding does not match compiler source/u,
+  );
+
+  await assert.rejects(
+    () => admitTrustedRecipeCandidateV1(
+      request(),
+      options({
+        resolveTrustedRecipeSourceBinding: async lookup => ({
+          sourceId: lookup.sourceId,
+          revisionId: lookup.revisionId,
+          contentSha256: SHA_D,
+        }),
+      }),
+    ),
+    /source binding does not match compiler source/u,
+  );
+
+  let reads = 0;
+  await assert.rejects(
+    () => admitTrustedRecipeCandidateV1(
+      request(),
+      options({
+        resolveTrustedRecipeSourceBinding: async lookup => {
+          const result = {
+            sourceId: lookup.sourceId,
+            revisionId: lookup.revisionId,
+            contentSha256: lookup.contentSha256,
+          };
+          Object.defineProperty(result, 'revisionId', {
+            enumerable: true,
+            configurable: true,
+            get() {
+              reads += 1;
+              return lookup.revisionId;
+            },
+          });
+          return result;
+        },
+      }),
+    ),
+    /enumerable own data property/u,
+  );
+  assert.equal(reads, 0);
 });
 
 test('every evidence ArtifactRef must exact-match trusted artifact identity, bytes and chronology', async () => {
