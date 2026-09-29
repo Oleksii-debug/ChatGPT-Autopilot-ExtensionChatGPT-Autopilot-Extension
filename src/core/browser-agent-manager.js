@@ -1429,12 +1429,16 @@ export class BrowserAgentManager {
       if (currentRevision >= Number.MAX_SAFE_INTEGER) {
         throw new Error('Specialist provider config revision cannot advance');
       }
+      const updatedAt = new Date(this.now()).toISOString();
+      if (current && Date.parse(updatedAt) <= Date.parse(current.updatedAt)) {
+        throw new Error('Specialist provider config updatedAt cannot move backwards or repeat');
+      }
       committed = createSpecialistProviderConfigV1({
         providerId,
         kind: prepared.kind,
         config: prepared.config,
         revision: currentRevision + 1,
-        updatedAt: new Date(this.now()).toISOString(),
+        updatedAt,
       });
       configs[providerId] = committed;
       revisions[providerId] = committed.revision;
