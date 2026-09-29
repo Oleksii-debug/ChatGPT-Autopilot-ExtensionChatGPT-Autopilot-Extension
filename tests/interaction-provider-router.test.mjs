@@ -23,6 +23,78 @@ test('router delegates current ChatGPT browser provider without changing request
   assert.deepEqual(calls, [{ tabId: 42, request }]);
 });
 
+test('router supports prototype-defined class transports and snapshots the registered executor', async () => {
+  const calls = [];
+  class PrototypeTransport {
+    async execute(tabId, request) {
+      calls.push({ source: 'ORIGINAL', tabId, request });
+      return { status: 'ORIGINAL' };
+    }
+  }
+
+  const transport = new PrototypeTransport();
+  const originalPrototypeExecute = PrototypeTransport.prototype.execute;
+  const router = new InteractionProviderRouter().register(
+    AgentProviderId.CHATGPT_BROWSER,
+    transport,
+  );
+
+  transport.execute = async (tabId, request) => {
+    calls.push({ source: 'INSTANCE_REPLACEMENT', tabId, request });
+    return { status: 'INSTANCE_REPLACEMENT' };
+  };
+  PrototypeTransport.prototype.execute = async (tabId, request) => {
+    calls.push({ source: 'PROTOTYPE_REPLACEMENT', tabId, request });
+    return { status: 'PROTOTYPE_REPLACEMENT' };
+  };
+
+  try {
+    const request = { providerId: AgentProviderId.CHATGPT_BROWSER, mode: 'CHECK_ONLY' };
+    assert.deepEqual(await router.execute(41, request), { status: 'ORIGINAL' });
+    assert.deepEqual(calls, [{ source: 'ORIGINAL', tabId: 41, request }]);
+  } finally {
+    PrototypeTransport.prototype.execute = originalPrototypeExecute;
+  }
+});
+
+test('router rejects accessor-shaped transport executors without invoking getters', () => {
+  let getterReads = 0;
+  const transport = {};
+  Object.defineProperty(transport, 'execute', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      getterReads += 1;
+      return async () => ({ status: 'ACCESSOR' });
+    },
+  });
+
+  assert.throws(
+    () => new InteractionProviderRouter().register(AgentProviderId.CHATGPT_BROWSER, transport),
+    /execute must be a data-property function/,
+  );
+  assert.equal(getterReads, 0);
+});
+
+test('router rejects inherited accessor-shaped transport executors without invoking getters', () => {
+  let getterReads = 0;
+  const prototype = {};
+  Object.defineProperty(prototype, 'execute', {
+    configurable: true,
+    get() {
+      getterReads += 1;
+      return async () => ({ status: 'ACCESSOR' });
+    },
+  });
+  const transport = Object.create(prototype);
+
+  assert.throws(
+    () => new InteractionProviderRouter().register(AgentProviderId.CHATGPT_BROWSER, transport),
+    /execute must be a data-property function/,
+  );
+  assert.equal(getterReads, 0);
+});
+
 test('router uses its validated default only when providerId is absent', async () => {
   const calls = [];
   const router = new InteractionProviderRouter().register(
