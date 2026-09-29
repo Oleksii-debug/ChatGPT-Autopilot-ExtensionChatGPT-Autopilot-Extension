@@ -324,7 +324,9 @@ export class AiOrchestrator {
       for (const route of selected.candidates) {
         const started = this.now();
         try {
-          const value = await invoke(route, callPrompt, callSystem, bounded);
+          const routeSystem = route.systemPrompt ? [callSystem, route.systemPrompt].filter(Boolean).join('\n\n') : callSystem;
+          const routePrompt = route.workerPrompt ? [route.workerPrompt, callPrompt].filter(Boolean).join('\n\n') : callPrompt;
+          const value = await invoke(route, routePrompt, routeSystem, bounded);
           routeStates = { ...routeStates, [route.routeId]:recordAiRouteOutcome(routeStates, route, settings.routePolicy, { ok:true, at:this.now(), latencyMs:Math.max(0, this.now() - started) }) };
           selectedRouteId = route.routeId;
           routeAttempts.push({ routeId:route.routeId, outcome:'SUCCESS', code:'', category:'' });
