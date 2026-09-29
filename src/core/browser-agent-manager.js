@@ -778,6 +778,7 @@ function normalizeRuntime(raw, now) {
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
   const specialistDelegationAdmissions = normalizeSpecialistDelegationAdmissions(raw.specialistDelegationAdmissions);
+  let specialistProviderExecutionQuarantined = raw.specialistProviderExecutionQuarantined === true;
   const specialistProviderExecutions = plan && Array.isArray(raw.specialistProviderExecutions)
     ? raw.specialistProviderExecutions.slice(0, 128).flatMap(item => {
       try {
@@ -787,9 +788,13 @@ function normalizeRuntime(raw, now) {
         if (!assignment || !admission
             || execution.planId !== plan.planId
             || execution.providerId !== admission.selection.providerId
-            || execution.handoffId !== admission.handoff.handoffId) return [];
+            || execution.handoffId !== admission.handoff.handoffId) {
+          specialistProviderExecutionQuarantined = true;
+          return [];
+        }
         return [execution];
       } catch {
+        specialistProviderExecutionQuarantined = true;
         return [];
       }
     })
@@ -801,6 +806,7 @@ function normalizeRuntime(raw, now) {
     specialistExecutionOwnerships,
     specialistDelegationAdmissions,
     specialistProviderExecutions,
+    specialistProviderExecutionQuarantined,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -1664,6 +1670,7 @@ export class BrowserAgentManager {
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
       providerExecutions: clone(current.job.runtime.specialistProviderExecutions || []),
+      providerExecutionQuarantined: current.job.runtime.specialistProviderExecutionQuarantined === true,
     };
   }
 
@@ -1748,6 +1755,9 @@ export class BrowserAgentManager {
         throw new Error('Browser Agent controlEpoch or run state drifted before Specialist provider preparation');
       }
       assertOwnerBoundSpecialistAdmissionProvenance(job);
+      if (job.runtime.specialistProviderExecutionQuarantined === true) {
+        throw new Error('Specialist provider execution provenance is quarantined as corrupt');
+      }
       const plan = normalizeAgentPlanV1(job.runtime.plan);
       const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === request.agentId);
       if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId || !assignment.leaseExpiresAt) {
