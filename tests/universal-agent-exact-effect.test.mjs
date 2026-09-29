@@ -590,6 +590,89 @@ test('state normalization rejects corrupted durable bindings and mismatched evid
   );
 });
 
+
+test('NOT_APPLICABLE verification cannot authorize exact-effect commit', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'not-applicable-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'not-applicable-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+
+  const result = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'not-applicable-verify',
+    '2026-09-19T12:00:04Z',
+    {
+      verification: verification({
+        status: 'NOT_APPLICABLE',
+        reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+      }),
+    },
+  ));
+
+  assert.equal(result.state.phase, ExactEffectPhase.MANUAL_REVIEW);
+  assert.equal(result.action, 'MANUAL_REVIEW');
+  assert.equal(result.state.verification.status, 'NOT_APPLICABLE');
+
+  const commit = reduceExactEffectV1(result.state, event(
+    ExactEffectEventType.COMMIT,
+    'not-applicable-commit',
+    '2026-09-19T12:00:05Z',
+    { commitId: 'must-not-commit' },
+  ));
+  assert.equal(commit.accepted, false);
+  assert.equal(commit.reason, 'COMMIT_REQUIRES_VERIFIED_EFFECT');
+  assert.equal(commit.state.phase, ExactEffectPhase.MANUAL_REVIEW);
+});
+
+test('VERIFIED reconciliation rejects NOT_APPLICABLE verification without mutating the ambiguous effect', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'not-applicable-reconcile-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'not-applicable-reconcile-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'not-applicable-reconcile-ambiguous',
+    '2026-09-19T12:00:03Z',
+    { reasonCode: 'ACK_LOST' },
+  )).state;
+
+  const before = JSON.parse(JSON.stringify(state));
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'not-applicable-reconcile-resolve',
+      '2026-09-19T12:00:04Z',
+      {
+        outcome: ReconciliationOutcome.VERIFIED,
+        reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+        verification: verification({
+          status: 'NOT_APPLICABLE',
+          reasonCode: 'VERIFICATION_NOT_APPLICABLE',
+        }),
+      },
+    )),
+    /VERIFIED reconciliation requires a verified verification/,
+  );
+  assert.deepEqual(state, before);
+  assert.equal(state.phase, ExactEffectPhase.RECONCILE);
+});
+
 test('commit is impossible without verified evidence', () => {
   let state = createExactEffectStateV1(invocation(), { createdAt: AT });
   state = reduceExactEffectV1(state, event(
