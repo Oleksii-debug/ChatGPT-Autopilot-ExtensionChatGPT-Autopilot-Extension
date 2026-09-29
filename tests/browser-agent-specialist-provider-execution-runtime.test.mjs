@@ -1101,3 +1101,79 @@ test('history capacity still permits exact PREPARED resume for the current lease
   assert.equal(durable.providerExecutions.length, 128);
   assert.equal(durable.providerExecutions.at(-1).status, 'PROVIDER_SUCCEEDED');
 });
+
+
+test('expired PREPARED recovery owner drift still enters reconciliation', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  const client = { async execute() { calls += 1; throw new Error('must not dispatch'); } };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  const current = await manager.get('job.coder');
+  const assignment = current.job.runtime.specialistHandoffs[0];
+  const provenance = current.job.runtime.specialistSelectionProvenance[0];
+  await manager.update(store => {
+    store.byId['job.coder'].runtime.specialistProviderExecutions = [{
+      schemaVersion: 1,
+      planId: 'plan:job.coder',
+      nodeId: 'local:code',
+      agentId,
+      handoffId: provenance.handoff.handoffId,
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      leaseId: assignment.leaseId,
+      leaseUntil: assignment.leaseExpiresAt,
+      conversationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      providerConfig: providerConfig(),
+      status: 'PREPARED',
+      providerStatus: '',
+      providerSucceeded: false,
+      manualReviewRequired: false,
+      reconciliationRequired: false,
+      safeToRetry: false,
+      effectEvidence: '',
+      errorCode: '',
+      providerUpdatedAt: '',
+      providerObservedAt: '',
+      preparedAt: T0,
+      updatedAt: T0,
+    }];
+    return store;
+  });
+  clock.value = Date.parse(T1);
+
+  const originalGet = manager.get.bind(manager);
+  let injected = false;
+  manager.get = async id => {
+    const value = await originalGet(id);
+    if (!injected) {
+      injected = true;
+      clock.value = Date.parse('2026-09-29T04:11:00.000Z');
+      await manager.update(store => {
+        store.byId[id].runtime.controlEpoch += 1;
+        store.byId[id].runtime.runState = 'PAUSED';
+        return store;
+      });
+    }
+    return value;
+  };
+
+  const result = await manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+
+  assert.equal(calls, 0);
+  assert.equal(result.kind, 'SPECIALIST_PROVIDER_RECONCILE');
+  assert.equal(result.execution.status, 'RECONCILE');
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, assignment.leaseId);
+});
