@@ -158,7 +158,7 @@ function normalizeProviderReservation(value, prepared) {
   const reservationId = exactText(
     raw.reservationId,
     'provider reservationId',
-    { maxLength: 180 },
+    { maxLength: 240 },
   );
   const expectedPrefix = prepared.jobId + ':model-budget:';
   if (!reservationId.startsWith(expectedPrefix)) {
@@ -326,8 +326,13 @@ function normalizeSuccessfulModelResult(value, envelope, prepared) {
   if (selectedLeg.text !== text) {
     throw new Error('Agent self-repair model result text disagrees with the selected route result');
   }
-  if (!selectedLeg.usage
-      || selectedLeg.usage.inputTokens !== usage.inputTokens
+  if (selectedLeg.usage === null) {
+    if (usage.inputTokens !== 0
+        || usage.outputTokens !== 0
+        || usage.totalTokens !== 0) {
+      throw new Error('Agent self-repair model result usage disagrees with the selected route result');
+    }
+  } else if (selectedLeg.usage.inputTokens !== usage.inputTokens
       || selectedLeg.usage.outputTokens !== usage.outputTokens
       || selectedLeg.usage.totalTokens !== usage.totalTokens) {
     throw new Error('Agent self-repair model result usage disagrees with the selected route result');

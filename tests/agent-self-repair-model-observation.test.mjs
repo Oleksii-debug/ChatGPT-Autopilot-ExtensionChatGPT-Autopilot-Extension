@@ -429,6 +429,22 @@ test('observation admits exactly one bounded provider call and canonical token c
   }
 });
 
+test('provider reservation identity accepts the canonical BrowserAgent 240-character envelope', () => {
+  const intent = selfRepairIntent();
+  const longOwnerId = 'a'.repeat(170);
+  intent.actorId = longOwnerId;
+  intent.ownerId = longOwnerId;
+  intent.bindingKey = modelBindingKey(intent);
+
+  const observation = projectAgentSelfRepairModelObservationV1(request({
+    invocationRequest: invocationRequest(intent),
+    providerReservation: providerReservation({
+      reservationId: longOwnerId + ':model-budget:1',
+    }),
+  }));
+  assert.equal(observation.invocationId, longOwnerId + ':model-budget:1');
+});
+
 test('durable provider reservation totalTokens must exactly match its canonical producer formula', () => {
   assert.throws(
     () => projectAgentSelfRepairModelObservationV1(request({
