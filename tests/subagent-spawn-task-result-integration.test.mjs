@@ -29,6 +29,7 @@ import {
 } from '../src/core/subagent-task-activation-binding-registry.js';
 import { bindSubagentSpawnTaskAuthorityV1 } from '../src/core/subagent-spawn-task-binding.js';
 import { SubagentSpawnInitiator } from '../src/core/subagent-structure-policy.js';
+import { deriveSubagentTaskDispatchIdentityV1 } from '../src/core/subagent-task-envelope.js';
 import {
   ObservationStatus,
   VerificationStatus,
@@ -443,6 +444,14 @@ test('trusted dynamic child result reaches canonical parent reconciliation end t
     item => item.type === OrchestrationHierarchyActionType.ACTIVATE_NODE,
   );
   assert.ok(activationAction);
+  const expectedDispatchIdentity = deriveSubagentTaskDispatchIdentityV1(taskEnvelope);
+  assert.equal(activationRequest.providerDispatchIdentity, expectedDispatchIdentity);
+  assert.equal(activationAction.providerDispatchIdentity, expectedDispatchIdentity);
+  assert.equal(
+    prepared.runtime.nodesById[CHILD_ID].activationLedger[activationRequest.activationId]
+      .providerDispatchIdentity,
+    expectedDispatchIdentity,
+  );
 
   const effectConfirmed = reduceOrchestrationHierarchyEvent(
     spawn.graph,

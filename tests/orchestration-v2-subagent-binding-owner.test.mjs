@@ -18,7 +18,10 @@ import {
   reduceOrchestrationHierarchyEvent,
   validateOrchestrationGraphV1,
 } from '../src/core/orchestration-hierarchy.js';
-import { createSubagentTaskEnvelopeV1 } from '../src/core/subagent-task-envelope.js';
+import {
+  createSubagentTaskEnvelopeV1,
+  deriveSubagentTaskDispatchIdentityV1,
+} from '../src/core/subagent-task-envelope.js';
 
 const T0='2026-09-29T04:00:00.000Z';
 const T1='2026-09-29T04:01:00.000Z';
@@ -117,25 +120,27 @@ async function fixture(){
   });
   await manager.create({name:'Bindings',config:config()});
   const g=graph();
+  const canonicalTaskEnvelope=taskEnvelope();
   const initial=createOrchestrationHierarchyRuntime(g,Date.parse(T0));
   const prepared=reduceOrchestrationHierarchyEvent(
     g,initial,{
       type:OrchestrationHierarchyEventType.NODE_ACTIVATION_REQUESTED,
       eventId:'activate-child',controlEpoch:7,nodeId:'child-1',generation:1,
       activationId:'child-activation-1',purpose:OrchestrationActivationPurpose.WORK,
+      providerDispatchIdentity:deriveSubagentTaskDispatchIdentityV1(canonicalTaskEnvelope),
     },Date.parse(T1),
   );
   await manager.controllerFor('orch-1').runtimeRepository.update(runtime=>{
     runtime.hierarchy={schemaVersion:1,graph:g,state:prepared.runtime};
     return runtime;
   });
-  return {chrome,core,manager,prepared,setNow:value=>{nowMs=value;}};
+  return {chrome,core,manager,prepared,canonicalTaskEnvelope,setNow:value=>{nowMs=value;}};
 }
 
 test('orchestration owner derives and persists activation binding from latest durable hierarchy',async()=>{
-  const {chrome,core,manager,prepared,setNow}=await fixture();
+  const {chrome,core,manager,prepared,canonicalTaskEnvelope,setNow}=await fixture();
   const request={
-    taskEnvelope:taskEnvelope(),activationAction:prepared.actions[0],invocationId:'invocation-child-1',
+    taskEnvelope:canonicalTaskEnvelope,activationAction:prepared.actions[0],invocationId:'invocation-child-1',
   };
   const first=await manager.registerSubagentTaskActivationBinding(request,'orch-1');
   assert.equal(first.revision,1);
@@ -180,7 +185,13 @@ test('binding owner rejects forged activation, cross-project task and caller aut
 
   await assert.rejects(
     ()=>manager.registerSubagentTaskActivationBinding({...base,taskEnvelope:taskEnvelope('other-project')},'orch-1'),
-    /project does not match orchestra owner project/u,
+    /dispatch identity does not match task envelope|project does not match orchestra owner project/u,
+  );
+  const substituted=structuredClone(taskEnvelope());
+  substituted.objective += ' Caller semantic substitution.';
+  await assert.rejects(
+    ()=>manager.registerSubagentTaskActivationBinding({...base,taskEnvelope:substituted},'orch-1'),
+    /dispatch identity does not match task envelope/u,
   );
   await assert.rejects(
     ()=>manager.registerSubagentTaskActivationBinding({...base,graph:graph()},'orch-1'),

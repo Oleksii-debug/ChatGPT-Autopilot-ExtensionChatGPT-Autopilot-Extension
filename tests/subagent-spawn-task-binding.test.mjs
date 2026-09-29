@@ -14,6 +14,7 @@ import {
 } from '../src/core/orchestration-hierarchy.js';
 import { createOutcomeContractV1 } from '../src/core/outcome-contract.js';
 import { SubagentSpawnInitiator } from '../src/core/subagent-structure-policy.js';
+import { deriveSubagentTaskDispatchIdentityV1 } from '../src/core/subagent-task-envelope.js';
 import {
   SubagentSpawnTaskBindingDecision,
   bindSubagentSpawnTaskAuthorityV1,
@@ -291,6 +292,12 @@ test('atomically binds canonical spawn identity, least authority and concrete ch
   assert.equal(binding.taskEnvelope.taskId, 'task.one');
   assert.deepEqual(binding.taskEnvelope.inputSourceRefs.map(item => item.sourceId), ['source.repo']);
   assert.deepEqual(binding.taskEnvelope.inputArtifactRefs.map(item => item.artifactId), ['artifact.input']);
+  assert.equal(result.activationRequests.length, 1);
+  assert.equal(
+    result.activationRequests[0].providerDispatchIdentity,
+    deriveSubagentTaskDispatchIdentityV1(binding.taskEnvelope),
+  );
+  assert.match(result.activationRequests[0].providerDispatchIdentity, /^subagent-task:[a-f0-9]{64}$/u);
   assert.equal(result.activationAuthority, false);
   assert.equal(result.executionAuthority, false);
   assert.equal(result.credentialAuthority, false);
@@ -301,6 +308,20 @@ test('atomically binds canonical spawn identity, least authority and concrete ch
   assert.equal(result.verificationAuthority, false);
   assert.equal(Object.isFrozen(result), true);
   assert.equal(Object.isFrozen(binding.taskEnvelope), true);
+});
+
+test('task dispatch identity changes on same-envelope semantic drift', () => {
+  const first = bindSubagentSpawnTaskAuthorityV1(request());
+  assert.equal(first.decision, SubagentSpawnTaskBindingDecision.ALLOW);
+  const canonical = first.taskBindings[0].taskEnvelope;
+  const changed = {
+    ...structuredClone(canonical),
+    objective: canonical.objective + ' Materially changed.',
+  };
+  assert.notEqual(
+    deriveSubagentTaskDispatchIdentityV1(canonical),
+    deriveSubagentTaskDispatchIdentityV1(changed),
+  );
 });
 
 test('task envelope specs cannot inject parent or child identity aliases', () => {

@@ -3,6 +3,7 @@ import {
   normalizeAgentPlanV1,
 } from './agent-plan.js';
 import { normalizeOutcomeContractV1 } from './outcome-contract.js';
+import { compactOrchestrationEventId } from './orchestration-hierarchy.js';
 import { normalizeArtifactRefV1 } from './universal-agent-contracts.js';
 
 export const SUBAGENT_TASK_ENVELOPE_VERSION = 1;
@@ -345,6 +346,29 @@ export function normalizeSubagentTaskEnvelopeV1(input) {
     credentialAuthority: false,
     completionAuthority: false,
   });
+}
+
+/**
+ * Deterministic content identity for the exact normalized task envelope that is
+ * handed to the canonical hierarchy activation path. This is an internal
+ * dispatch/replay fence, not verification authority and not a replacement for
+ * ArtifactRef SHA-256.
+ */
+export function deriveSubagentTaskDispatchIdentityV1(input) {
+  const canonical = JSON.stringify(normalizeSubagentTaskEnvelopeV1(input));
+  const prefix = 'subagent-task-dispatch';
+  const lanes = [];
+  for (let lane = 0; lane < 4; lane += 1) {
+    const compact = compactOrchestrationEventId(
+      prefix,
+      'SubagentTaskEnvelopeV1',
+      String(SUBAGENT_TASK_ENVELOPE_VERSION),
+      String(lane),
+      canonical,
+    );
+    lanes.push(compact.slice(prefix.length + 1));
+  }
+  return 'subagent-task:' + lanes.join('');
 }
 
 /**

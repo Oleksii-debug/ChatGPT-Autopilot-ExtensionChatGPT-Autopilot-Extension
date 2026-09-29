@@ -27,7 +27,10 @@ import {
   normalizeTrustedSubagentTaskActivationBindingV1,
   prepareSubagentResultReconciliationV1,
 } from '../src/core/subagent-result-reconciliation.js';
-import { createSubagentTaskEnvelopeV1 } from '../src/core/subagent-task-envelope.js';
+import {
+  createSubagentTaskEnvelopeV1,
+  deriveSubagentTaskDispatchIdentityV1,
+} from '../src/core/subagent-task-envelope.js';
 import {
   ObservationStatus,
   VerificationStatus,
@@ -1217,6 +1220,7 @@ test('derives task activation binding only from canonical task, reducer action a
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
+      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(task),
     },
     EPOCH_T1,
   );
@@ -1251,6 +1255,7 @@ test('binding derivation rejects forged or stale activation actions and never ac
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
+      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(task),
     },
     EPOCH_T1,
   );
@@ -1295,6 +1300,15 @@ test('binding derivation rejects forged or stale activation actions and never ac
     }),
     /purpose cannot terminalize a result/u,
   );
+
+  const substituted = { ...structuredClone(task), objective: task.objective + ' drift' };
+  assert.throws(
+    () => deriveSubagentTaskActivationBindingV1({
+      ...baseInput,
+      taskEnvelope: substituted,
+    }),
+    /dispatch identity does not match task envelope/u,
+  );
 });
 
 test('binding derivation rejects ambiguous/terminal activation state and pre-activation chronology', () => {
@@ -1313,6 +1327,7 @@ test('binding derivation rejects ambiguous/terminal activation state and pre-act
       generation: 1,
       activationId: 'child-activation-1',
       purpose: OrchestrationActivationPurpose.WORK,
+      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(task),
     },
     EPOCH_T1,
   );

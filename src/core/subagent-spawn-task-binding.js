@@ -4,6 +4,7 @@ import {
 } from './subagent-spawn-authority-binding.js';
 import {
   createSubagentTaskEnvelopeV1,
+  deriveSubagentTaskDispatchIdentityV1,
   normalizeSubagentTaskEnvelopeV1,
 } from './subagent-task-envelope.js';
 
@@ -324,6 +325,20 @@ export function bindSubagentSpawnTaskAuthorityV1(input = {}) {
     taskEnvelopeBindings.push(taskEnvelopeBinding(taskEnvelope));
   }
 
+  const taskEnvelopeByChild = new Map(
+    taskBindings.map(item => [item.childNodeId, item.taskEnvelope]),
+  );
+  const activationRequests = authority.activationRequests.map(activationRequest => {
+    const taskEnvelope = taskEnvelopeByChild.get(activationRequest.nodeId);
+    if (!taskEnvelope) {
+      throw new Error('Canonical subagent activation request is missing its task envelope');
+    }
+    return {
+      ...activationRequest,
+      providerDispatchIdentity: deriveSubagentTaskDispatchIdentityV1(taskEnvelope),
+    };
+  });
+
   const hasPriorTaskEnvelopeBindings = Object.hasOwn(
     request,
     'priorTaskEnvelopeBindings',
@@ -376,7 +391,7 @@ export function bindSubagentSpawnTaskAuthorityV1(input = {}) {
     taskEnvelopeBindings,
     graph: authority.graph,
     runtime: authority.runtime,
-    activationRequests: [...authority.activationRequests],
+    activationRequests,
     activationAuthority: false,
     executionAuthority: false,
     credentialAuthority: false,
