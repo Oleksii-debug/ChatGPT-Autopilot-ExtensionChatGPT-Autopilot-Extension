@@ -29,16 +29,16 @@ function managerFor(chrome, now = () => T0) {
   });
 }
 
-test('product-wide Specialist automation policy persists in the existing BrowserAgent store', async () => {
+test('Specialist automation policy persists only the execution gate in the existing BrowserAgent store', async () => {
   const { data, chrome } = chromeStorage();
   const manager = managerFor(chrome);
   const created = await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 3,
   });
   assert.equal(created.policy.revision, 1);
-  assert.equal(created.policy.maxConcurrentHandoffs, 3);
+  assert.equal(created.policy.enabled, true);
+  assert.equal(Object.hasOwn(created.policy, 'maxConcurrentHandoffs'), false);
   assert.deepEqual(Object.keys(data), ['autopilotBrowserAgentV1']);
 
   const restarted = managerFor(chrome);
@@ -46,29 +46,26 @@ test('product-wide Specialist automation policy persists in the existing Browser
   assert.equal(state.quarantined, false);
   assert.equal(state.revision, 1);
   assert.equal(state.policy.enabled, true);
-  assert.equal(state.policy.maxConcurrentHandoffs, 3);
+  assert.equal(Object.hasOwn(state.policy, 'maxConcurrentHandoffs'), false);
 });
 
-test('Specialist automation policy uses serialized CAS and durable clear tombstone', async () => {
+test('Specialist automation gate uses serialized CAS and durable clear tombstone', async () => {
   const { chrome } = chromeStorage();
   const clock = { value: T0 };
   const manager = managerFor(chrome, () => clock.value);
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 2,
   });
   clock.value += 1000;
 
   const first = manager.setSpecialistAutomationPolicy({
     expectedRevision: 1,
-    enabled: true,
-    maxConcurrentHandoffs: 4,
+    enabled: false,
   });
   const second = manager.setSpecialistAutomationPolicy({
     expectedRevision: 1,
     enabled: true,
-    maxConcurrentHandoffs: 5,
   });
   const settled = await Promise.allSettled([first, second]);
   assert.equal(settled.filter(item => item.status === 'fulfilled').length, 1);
@@ -85,57 +82,48 @@ test('Specialist automation policy uses serialized CAS and durable clear tombsto
     () => manager.setSpecialistAutomationPolicy({
       expectedRevision: 0,
       enabled: true,
-      maxConcurrentHandoffs: 1,
     }),
     /revision drifted/,
   );
   const recreated = await manager.setSpecialistAutomationPolicy({
     expectedRevision: 3,
     enabled: false,
-    maxConcurrentHandoffs: 0,
   });
   assert.equal(recreated.policy.revision, 4);
 });
 
-test('corrupt persisted Specialist automation policy is quarantined fail-closed', async () => {
+test('legacy numeric automation capacity migrates to gate-only policy without granting capacity authority', async () => {
   const { data, chrome } = chromeStorage();
   const manager = managerFor(chrome);
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 2,
   });
-  data.autopilotBrowserAgentV1.specialistAutomationPolicy.maxConcurrentHandoffs = 999;
+  data.autopilotBrowserAgentV1.specialistAutomationPolicy.maxConcurrentHandoffs = 2;
 
   const restarted = managerFor(chrome);
   const state = await restarted.getSpecialistAutomationPolicy();
-  assert.equal(state.policy, null);
-  assert.equal(state.quarantined, true);
+  assert.equal(state.quarantined, false);
   assert.equal(state.revision, 1);
-  await assert.rejects(
-    () => restarted.setSpecialistAutomationPolicy({
-      expectedRevision: 1,
-      enabled: true,
-      maxConcurrentHandoffs: 1,
-    }),
-    /quarantined as corrupt/,
-  );
+  assert.equal(state.policy.enabled, true);
+  assert.equal(Object.hasOwn(state.policy, 'maxConcurrentHandoffs'), false);
+
+  const claim = await restarted.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
+  assert.equal(claim.ownerMaxConcurrentAgents, 0);
+  assert.equal(claim.maxConcurrentHandoffs, 0);
+  assert.deepEqual(claim.claimed, []);
 });
 
-test('policy mutation input rejects accessors before asynchronous storage access', async () => {
+test('automation-gate mutation input rejects accessors before asynchronous storage access', async () => {
   const { chrome } = chromeStorage();
   const manager = managerFor(chrome);
   let reads = 0;
-  const request = {
-    expectedRevision: 0,
-    enabled: true,
-    maxConcurrentHandoffs: 1,
-  };
-  Object.defineProperty(request, 'maxConcurrentHandoffs', {
+  const request = { expectedRevision: 0 };
+  Object.defineProperty(request, 'enabled', {
     enumerable: true,
     get() {
       reads += 1;
-      return 256;
+      return true;
     },
   });
   await assert.rejects(
