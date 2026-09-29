@@ -164,3 +164,58 @@ test('AgentPlan budget rejects accessor-backed, hidden and symbol fields without
   symbolBudget[Symbol('authority')] = 1;
   assert.throws(() => normalizeAgentPlanBudgetCeilingV1(symbolBudget), /symbol field/);
 });
+
+
+test('Agent resource admission snapshots outer envelopes before authority reads', () => {
+  let reads = 0;
+  const input = {
+    ownerBudget,
+    agentPlanBudget,
+    currentUsage: {},
+    request: { modelCalls: 1 },
+  };
+  Object.defineProperty(input, 'ownerBudget', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return ownerBudget;
+    },
+  });
+  assert.throws(
+    () => evaluateAgentResourceAdmissionV1(input),
+    /Agent resource admission request fields must be own data properties/,
+  );
+  assert.equal(reads, 0);
+
+  const hidden = { ownerBudget, agentPlanBudget };
+  Object.defineProperty(hidden, 'hiddenAuthority', {
+    enumerable: false,
+    value: true,
+  });
+  assert.throws(
+    () => narrowResourceBudgetWithAgentPlanV1(hidden),
+    /own data properties/,
+  );
+});
+
+test('AgentPlan budget normalization snapshots descriptor values exactly once', () => {
+  let descriptorReads = 0;
+  const target = { maxModelCalls: 2 };
+  const proxy = new Proxy(target, {
+    getOwnPropertyDescriptor(object, key) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(object, key);
+      if (key === 'maxModelCalls' && descriptor) {
+        descriptorReads += 1;
+        return {
+          ...descriptor,
+          value: descriptorReads === 1 ? 2 : 999,
+        };
+      }
+      return descriptor;
+    },
+  });
+  const normalized = normalizeAgentPlanBudgetCeilingV1(proxy);
+  assert.equal(normalized.maxModelCalls, 2);
+  assert.equal(descriptorReads, 1);
+});
