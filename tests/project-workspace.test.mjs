@@ -475,3 +475,23 @@ test('canonical repository update cannot remove an existing durable project reco
   assert.equal(restored.updatedAt, 2);
   assert.equal(restored.projectsById['project-a'].snapshot.revisionId, 'project-r1');
 });
+
+
+test('repository context resolver supports an exact snapshot-only request with capsuleId physically absent', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  const resolved = await repository.resolveContext({
+    projectId: 'project-a',
+    expectedProjectRevisionId: 'project-r1',
+  });
+
+  assert.equal(resolved.projectId, 'project-a');
+  assert.equal(resolved.projectRevisionId, 'project-r1');
+  assert.equal(resolved.capsule, null);
+  assert.equal(resolved.workspaceRevision, 1);
+});
