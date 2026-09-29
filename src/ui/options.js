@@ -2194,7 +2194,7 @@ function fillAgentDefinitionLaunchForm(definition = null) {
     return;
   }
 
-  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
+  const definitionLaunchKey = `${ui.selectedAgentDefinitionRegistry.registryId}@${ui.selectedAgentDefinitionRegistry.revision}#${ui.selectedAgentDefinitionRegistry.bindingKey}:${definition.agentDefinitionId}@${definition.definitionRevision}`;
   if (ui.agentDefinitionLaunchDefinitionId !== definitionLaunchKey) {
     const scope = agentDefinitionLaunchScopeTextV1(definition);
     $('agent-definition-launch-owner-capabilities').value = scope.ownerCapabilityIdsText;
@@ -2421,7 +2421,7 @@ function agentDefinitionFormValue() {
 }
 
 async function reloadAfterAgentDefinitionDrift(error, { definitionId = '' } = {}) {
-  if (!/revision drifted/i.test(String(error?.message || ''))) return false;
+  if (!/(?:revision|bindingKey) drifted/i.test(String(error?.message || ''))) return false;
   const registryId = ui.selectedAgentDefinitionRegistryId;
   await loadAgentDefinitionRegistries({ selectRegistryId: registryId, selectDefinitionId: definitionId });
   $('agent-definition-status').textContent = 'Реєстр змінився в іншій операції. Актуальні дані перезавантажено; перевірте їх перед повторним збереженням.';
@@ -2447,6 +2447,7 @@ async function saveAgentDefinition() {
       ? {
           registryId: registry.registryId,
           expectedRegistryRevision: registry.revision,
+          expectedRegistryBindingKey: registry.bindingKey,
           kind: 'UPDATE',
           agentDefinitionId: current.agentDefinitionId,
           expectedDefinitionRevision: current.definitionRevision,
@@ -2455,6 +2456,7 @@ async function saveAgentDefinition() {
       : {
           registryId: registry.registryId,
           expectedRegistryRevision: registry.revision,
+          expectedRegistryBindingKey: registry.bindingKey,
           kind: 'CREATE',
           definition,
         };
@@ -2480,6 +2482,7 @@ async function toggleAgentDefinitionEnabled() {
     await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
       registryId: registry.registryId,
       expectedRegistryRevision: registry.revision,
+      expectedRegistryBindingKey: registry.bindingKey,
       kind: 'UPDATE',
       agentDefinitionId: current.agentDefinitionId,
       expectedDefinitionRevision: current.definitionRevision,
@@ -2503,6 +2506,7 @@ async function deleteAgentDefinition() {
     await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
       registryId: registry.registryId,
       expectedRegistryRevision: registry.revision,
+      expectedRegistryBindingKey: registry.bindingKey,
       kind: 'DELETE',
       agentDefinitionId: current.agentDefinitionId,
       expectedDefinitionRevision: current.definitionRevision,
