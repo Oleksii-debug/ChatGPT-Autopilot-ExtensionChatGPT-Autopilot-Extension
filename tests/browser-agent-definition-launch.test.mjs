@@ -84,10 +84,11 @@ function ownerBudget(overrides = {}) {
 }
 
 async function seedRegistry(manager, def = definition()) {
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: def,
   });
@@ -204,9 +205,11 @@ test('launch requires exact live registry and definition revisions at the serial
   const manager = managerFor(chrome);
   await seedRegistry(manager);
 
+  const beforeUpdate = await manager.getAgentDefinitionRegistry('agents:project-1');
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: beforeUpdate.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -242,9 +245,11 @@ test('a registry mutation queued before launch cannot be bypassed by stale launc
   const manager = managerFor(chrome);
   await seedRegistry(manager);
 
+  const beforeQueuedUpdate = await manager.getAgentDefinitionRegistry('agents:project-1');
   const mutation = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: beforeQueuedUpdate.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
