@@ -36,6 +36,41 @@ test('Agent definition form builds canonical portable data and preserves config/
   assert.notEqual(definition.modelRoutePolicy, routePolicy);
 });
 
+test('editing preserves specialist delegation profile and model route policy as durable data', () => {
+  const specialist = {
+    schemaVersion: 1,
+    registryId: 'specialists:project-1',
+    requiredCapabilityIds: ['project.context'],
+    requiredToolIds: ['browser.read'],
+    policyEnvelopeId: 'policy:agent',
+    deadlineSeconds: 900,
+    maxConcurrentHandoffs: 2,
+    leaseSeconds: 600,
+    priority: 3,
+    enabled: true,
+  };
+  const routePolicy = {
+    autoSwitch: false,
+    pinnedRouteId: 'route.research',
+    orderedRouteIds: [],
+    allowRouteIds: ['route.research'],
+    denyRouteIds: [],
+    freeOnly: true,
+    locality: 'any',
+    maxInputPricePerMillionUsd: 0,
+    maxOutputPricePerMillionUsd: 0,
+  };
+  const definition = buildAgentDefinitionFromFormV1(form(), {
+    definitionRevision: 4,
+    modelRoutePolicy: routePolicy,
+    specialistDelegationProfile: specialist,
+  });
+  assert.deepEqual(definition.modelRoutePolicy, routePolicy);
+  assert.deepEqual(definition.specialistDelegationProfile, specialist);
+  assert.notEqual(definition.modelRoutePolicy, routePolicy);
+  assert.notEqual(definition.specialistDelegationProfile, specialist);
+});
+
 test('create form uses revision one and empty defaults when no persisted definition exists', () => {
   const definition = buildAgentDefinitionFromFormV1(form());
   assert.equal(definition.definitionRevision, 1);
