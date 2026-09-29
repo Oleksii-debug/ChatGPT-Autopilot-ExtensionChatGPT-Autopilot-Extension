@@ -1300,6 +1300,10 @@ export class BrowserAgentManager {
         const existingAdmission = admissions.find(item => item.agentId === assignment.agentId);
         if (!existingOwnership || !existingAdmission) throw new Error('Existing specialist handoff lacks canonical durable admission provenance');
         if (existingAdmission.admissionKey !== admissionKey) throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
+        if (JSON.stringify(existing) !== JSON.stringify(assignment)
+            || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
+          throw new Error('Existing specialist handoff runtime state drifted from its canonical READY proposal');
+        }
         result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
         return store;
       }
