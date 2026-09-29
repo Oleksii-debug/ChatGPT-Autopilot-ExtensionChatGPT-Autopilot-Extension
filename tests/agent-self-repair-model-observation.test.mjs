@@ -520,3 +520,72 @@ test('hostile accessors and authority-shaped aliases fail without executing gett
     /contains unknown field/u,
   );
 });
+
+
+test('AiOrchestrator embedded reservation receipt removes the runtime sidecar requirement', () => {
+  const embeddedOnly = request({
+    modelResult: modelResult({
+      providerReservation: providerReservation(),
+    }),
+  });
+  delete embeddedOnly.providerReservation;
+
+  const observation = projectAgentSelfRepairModelObservationV1(embeddedOnly);
+  assert.equal(observation.invocationId, 'actor.observe:model-budget:1');
+  assert.deepEqual(observation.data.providerAdmission, {
+    controlEpoch: 8,
+    callNumber: 1,
+    createdAt: 1_850,
+  });
+});
+
+test('embedded and sidecar provider receipts must be exactly identical when both are present', () => {
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(request({
+      modelResult: modelResult({
+        providerReservation: providerReservation({
+          reservationId: 'actor.observe:model-budget:2',
+        }),
+      }),
+    })),
+    /receipt disagrees with caller sidecar/u,
+  );
+});
+
+test('embedded provider receipt is descriptor-safe and cannot smuggle reservation authority', () => {
+  let getterCalls = 0;
+  const hostileReservation = providerReservation();
+  Object.defineProperty(hostileReservation, 'reservationId', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return 'actor.observe:model-budget:1';
+    },
+  });
+  const embeddedOnly = request({
+    modelResult: modelResult({
+      providerReservation: hostileReservation,
+    }),
+  });
+  delete embeddedOnly.providerReservation;
+
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(embeddedOnly),
+    /enumerable own data property/u,
+  );
+  assert.equal(getterCalls, 0);
+
+  const forgedAuthority = request({
+    modelResult: modelResult({
+      providerReservation: {
+        ...providerReservation(),
+        completionAuthority: true,
+      },
+    }),
+  });
+  delete forgedAuthority.providerReservation;
+  assert.throws(
+    () => projectAgentSelfRepairModelObservationV1(forgedAuthority),
+    /contains unknown field: completionAuthority/u,
+  );
+});
