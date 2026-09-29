@@ -68,6 +68,8 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'GET_SCENARIO_WORK',
   'LIST_BROWSER_AGENT_JOBS',
   'GET_BROWSER_AGENT_JOB',
+  'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES',
+  'GET_BROWSER_AGENT_DEFINITION_REGISTRY',
   'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS',
 ]);
 const repo = new StorageRepository(chrome);
@@ -617,6 +619,14 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.list();
   } else if (message.command === 'GET_BROWSER_AGENT_JOB') {
     result = await browserAgent.get(message.payload?.id || '');
+  } else if (message.command === 'LIST_BROWSER_AGENT_DEFINITION_REGISTRIES') {
+    result = await browserAgent.listAgentDefinitionRegistries();
+  } else if (message.command === 'GET_BROWSER_AGENT_DEFINITION_REGISTRY') {
+    result = await browserAgent.getAgentDefinitionRegistry(message.payload?.registryId || '');
+  } else if (message.command === 'CREATE_BROWSER_AGENT_DEFINITION_REGISTRY') {
+    result = await browserAgent.createAgentDefinitionRegistry(message.payload || {});
+  } else if (message.command === 'MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY') {
+    result = await browserAgent.mutateAgentDefinitionRegistry(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
