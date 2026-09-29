@@ -14,7 +14,7 @@ import { BUNDLED_BOOTSTRAP_PROFILE } from '../config/bootstrap-profile.js';
 import { performNativeInput, activateOwnedSendTab, restoreOwnedSendTab, restorePendingSendTabs } from '../core/native-input.js';
 import { LocalAiClient } from '../core/local-ai-provider.js';
 import { AiGatewayClient } from '../core/ai-gateway-client.js';
-import { AiOrchestrator } from '../core/ai-orchestrator.js';
+import { AiOrchestrator, DEFAULT_AI_ROUTER_SETTINGS, normalizeAiRouterSettings } from '../core/ai-orchestrator.js';
 import { AiAutonomyManager } from '../core/ai-manager.js';
 import { RemoteDispatchController, REMOTE_DISPATCH_ALARM } from '../core/remote-dispatch-controller.js';
 import { OrchestrationV2Manager } from '../core/orchestration-v2-manager.js';
@@ -212,6 +212,19 @@ const aiManager = new AiAutonomyManager({
 const browserAgent = new BrowserAgentManager({
   chromeApi: chrome,
   routePrompt: (payload, budgetContext) => dispatchSerializedAiRoute(payload, budgetContext),
+  readModelRouteContext: async () => {
+    const state = await repo.load();
+    const settings = normalizeAiRouterSettings(state.profile?.aiRouter || DEFAULT_AI_ROUTER_SETTINGS);
+    const routePoolRevision = Number.isSafeInteger(state.profile?.aiRoutePoolRevision)
+      && state.profile.aiRoutePoolRevision > 0
+      ? state.profile.aiRoutePoolRevision
+      : 1;
+    return {
+      routePool: structuredClone(settings.routes),
+      routePoolRevision,
+      ownerAllowedRouteIds: settings.routes.map(route => route.routeId),
+    };
+  },
 });
 browserAgentLifecycle.current = browserAgent;
 const runSafely = (operation) => {
