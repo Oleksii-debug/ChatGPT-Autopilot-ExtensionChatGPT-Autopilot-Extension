@@ -57,6 +57,7 @@ import {
   createSpecialistRegistryV1,
   normalizeSpecialistDefinitionV1,
   normalizeSpecialistRegistryV1,
+  normalizeSpecialistSelectionV1,
   proposeSpecialistRegistryMutationV1,
 } from './specialist-registry.js';
 import {
@@ -608,11 +609,26 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const specialistSelectionProvenance = plan && Array.isArray(raw.specialistSelectionProvenance)
+    ? raw.specialistSelectionProvenance.slice(0, 128).flatMap(item => {
+      try {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+        const agentId = clean(item.agentId, 180);
+        const selection = normalizeSpecialistSelectionV1(item.selection);
+        const assignment = specialistHandoffs.find(candidate => candidate?.agentId === agentId);
+        if (!agentId || !assignment || assignment.specialistId !== selection.specialistId) return [];
+        return [{ agentId, selection }];
+      } catch {
+        return [];
+      }
+    })
+    : [];
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
+    specialistSelectionProvenance,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -1355,6 +1371,11 @@ export class BrowserAgentManager {
       const executionOwnership = proposal.preview.executionOwnership;
       const handoffs = Array.isArray(job.runtime.specialistHandoffs) ? job.runtime.specialistHandoffs : [];
       const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships) ? job.runtime.specialistExecutionOwnerships : [];
+      const provenance = Array.isArray(job.runtime.specialistSelectionProvenance) ? job.runtime.specialistSelectionProvenance : [];
+      const selectionProvenance = Object.freeze({
+        agentId: assignment.agentId,
+        selection: normalizeSpecialistSelectionV1(proposal.selection),
+      });
       const existing = handoffs.find(item => item?.agentId === assignment.agentId);
       if (existing) {
         const existingOwnership = ownerships.find(item => item?.effectId === executionOwnership.effectId);
@@ -1363,11 +1384,20 @@ export class BrowserAgentManager {
             || JSON.stringify(existingOwnership) !== JSON.stringify(executionOwnership)) {
           throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
         }
+        const existingProvenance = provenance.find(item => item?.agentId === assignment.agentId);
+        if (existingProvenance
+            && JSON.stringify(existingProvenance.selection) !== JSON.stringify(selectionProvenance.selection)) {
+          throw new Error('Existing specialist selection provenance drifted from current owner-bound delegation proposal');
+        }
+        if (!existingProvenance) {
+          job.runtime.specialistSelectionProvenance = [...provenance, selectionProvenance];
+        }
         result = { proposal: clone(proposal), assignment: clone(existing), executionOwnership: clone(existingOwnership), reused: true };
         return store;
       }
       job.runtime.specialistHandoffs = [...handoffs, assignment];
       job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+      job.runtime.specialistSelectionProvenance = [...provenance, selectionProvenance];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
         at: this.now(),
@@ -1394,6 +1424,7 @@ export class BrowserAgentManager {
       planId: current.job.runtime.plan?.planId || '',
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
+      selectionProvenance: clone(current.job.runtime.specialistSelectionProvenance || []),
     };
   }
 
