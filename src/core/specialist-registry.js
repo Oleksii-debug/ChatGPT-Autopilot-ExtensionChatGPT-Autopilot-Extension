@@ -15,12 +15,12 @@ export const SpecialistRegistryMutationKind = Object.freeze({
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const PLANES = new Set(Object.values(AgentExecutionPlane));
 const DEF_KEYS = new Set(['schemaVersion','specialistId','providerId','label','description','executionPlane','capabilityIds','toolIds','resultContractId','enabled','definitionRevision']);
-const REG_KEYS = new Set(['schemaVersion','registryId','revision','definitions']);
+const REG_KEYS = new Set(['schemaVersion','registryId','revision','bindingKey','definitions']);
 const DISC_KEYS = new Set(['registry','requiredCapabilityIds','requiredToolIds','parentCapabilityIds','parentToolIds','executionPlanes']);
-const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
-const BIND_KEYS = new Set(['registry','selection','handoff','parentCapabilityIds','parentToolIds']);
+const SEL_KEYS = new Set(['schemaVersion','registryId','registryRevision','registryBindingKey','specialistId','providerId','definitionRevision','executionPlane','requestedCapabilityIds','grantedToolIds','resultContractId']);
+const BIND_KEYS = new Set(['registry','expectedRegistryBindingKey','selection','handoff','parentCapabilityIds','parentToolIds']);
 const MUTATION_KEYS = new Set([
-  'registry', 'registryId', 'expectedRegistryRevision', 'kind',
+  'registry', 'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'specialistId', 'expectedDefinitionRevision',
 ]);
 const MUTATION_KINDS = new Set(Object.values(SpecialistRegistryMutationKind));
@@ -104,6 +104,26 @@ function subset(requested, allowed, label) {
 }
 function compareId(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function same(left, right) { return left.length === right.length && left.every((item, index) => item === right[index]); }
+function exactBindingKey(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 100_000) throw new Error(label + ' is invalid');
+  return value;
+}
+function definitionProjection(definition) {
+  return [
+    definition.schemaVersion, definition.specialistId, definition.providerId,
+    definition.label, definition.description, definition.executionPlane,
+    definition.capabilityIds, definition.toolIds, definition.resultContractId,
+    definition.enabled, definition.definitionRevision,
+  ];
+}
+function registryBindingKey(registryId, revision, definitions) {
+  return JSON.stringify([
+    SPECIALIST_REGISTRY_VERSION,
+    registryId,
+    revision,
+    definitions.map(definitionProjection),
+  ]);
+}
 function freeze(value) {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
   for (const child of Object.values(value)) freeze(child);
@@ -128,13 +148,34 @@ export function normalizeSpecialistDefinitionV1(input) {
   });
 }
 
-export function normalizeSpecialistRegistryV1(input) {
-  const raw = record(input, REG_KEYS, 'SpecialistRegistryV1');
+export function createSpecialistRegistryV1(input) {
+  const raw = record(input, new Set(['schemaVersion','registryId','revision','definitions']), 'SpecialistRegistryV1 creation');
   if (raw.schemaVersion !== SPECIALIST_REGISTRY_VERSION) throw new Error('SpecialistRegistryV1.schemaVersion must be numeric 1');
+  const registryId = id(raw.registryId, 'registryId');
+  const revision = integer(raw.revision, 'registry revision');
   const definitions = denseArray(raw.definitions, 'definitions', 128).map(normalizeSpecialistDefinitionV1)
     .sort((left, right) => compareId(left.specialistId, right.specialistId));
   if (new Set(definitions.map(item => item.specialistId)).size !== definitions.length) throw new Error('SpecialistRegistryV1 contains duplicate specialistId');
-  return freeze({schemaVersion:1, registryId:id(raw.registryId,'registryId'), revision:integer(raw.revision,'registry revision'), definitions});
+  return freeze({
+    schemaVersion: 1,
+    registryId,
+    revision,
+    bindingKey: registryBindingKey(registryId, revision, definitions),
+    definitions,
+  });
+}
+
+export function normalizeSpecialistRegistryV1(input) {
+  const raw = record(input, REG_KEYS, 'SpecialistRegistryV1');
+  const normalized = createSpecialistRegistryV1({
+    schemaVersion: raw.schemaVersion,
+    registryId: raw.registryId,
+    revision: raw.revision,
+    definitions: raw.definitions,
+  });
+  const suppliedBindingKey = exactBindingKey(raw.bindingKey, 'SpecialistRegistryV1.bindingKey');
+  if (suppliedBindingKey !== normalized.bindingKey) throw new Error('SpecialistRegistryV1 bindingKey is inconsistent with canonical registry content');
+  return normalized;
 }
 
 export function normalizeSpecialistSelectionV1(input) {
@@ -144,6 +185,7 @@ export function normalizeSpecialistSelectionV1(input) {
     schemaVersion:1,
     registryId:id(raw.registryId,'registryId'),
     registryRevision:integer(raw.registryRevision,'registryRevision'),
+    registryBindingKey:exactBindingKey(raw.registryBindingKey,'registryBindingKey'),
     specialistId:id(raw.specialistId,'specialistId'),
     providerId:id(raw.providerId,'providerId'),
     definitionRevision:integer(raw.definitionRevision,'definitionRevision'),
@@ -157,6 +199,7 @@ export function normalizeSpecialistSelectionV1(input) {
 function selection(registry, definition, requestedCapabilities, requestedTools) {
   return normalizeSpecialistSelectionV1({
     schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision,
+    registryBindingKey:registry.bindingKey,
     specialistId:definition.specialistId, providerId:definition.providerId,
     definitionRevision:definition.definitionRevision, executionPlane:definition.executionPlane,
     requestedCapabilityIds:requestedCapabilities, grantedToolIds:requestedTools,
@@ -185,12 +228,14 @@ export function discoverSpecialistsV1(input = {}) {
 export function bindSpecialistHandoffToRegistryV1(input = {}) {
   const raw = record(input, BIND_KEYS, 'Specialist handoff registry binding request');
   const registry = normalizeSpecialistRegistryV1(raw.registry);
+  const expectedRegistryBindingKey = exactBindingKey(raw.expectedRegistryBindingKey, 'expectedRegistryBindingKey');
+  if (expectedRegistryBindingKey !== registry.bindingKey) throw new Error('Specialist registry bindingKey drifted before handoff');
   const selected = normalizeSpecialistSelectionV1(raw.selection);
   const handoff = normalizeSpecialistHandoffV1(raw.handoff);
   const parentCapabilities = ids(raw.parentCapabilityIds, 'parentCapabilityIds', 64);
   const parentTools = ids(raw.parentToolIds, 'parentToolIds', 128);
   const definition = registry.definitions.find(item => item.specialistId === selected.specialistId);
-  if (selected.registryId !== registry.registryId || selected.registryRevision !== registry.revision) throw new Error('Specialist selection registry identity or revision drifted');
+  if (selected.registryId !== registry.registryId || selected.registryRevision !== registry.revision || selected.registryBindingKey !== registry.bindingKey) throw new Error('Specialist selection registry identity, revision or bindingKey drifted');
   if (!definition || !definition.enabled) throw new Error('Selected specialist is missing or disabled');
   if (selected.providerId !== definition.providerId || selected.definitionRevision !== definition.definitionRevision || selected.executionPlane !== definition.executionPlane || selected.resultContractId !== definition.resultContractId) {
     throw new Error('Specialist selection drifted from current registry definition');
@@ -202,7 +247,7 @@ export function bindSpecialistHandoffToRegistryV1(input = {}) {
   subset(handoff.requestedCapabilityIds, definition.capabilityIds, 'Specialist handoff capabilities');
   if (!same(Object.freeze([...handoff.requestedCapabilityIds].sort(compareId)), selected.requestedCapabilityIds)) throw new Error('Specialist handoff capability scope changed after selection');
   return freeze({
-    schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision,
+    schemaVersion:1, registryId:registry.registryId, registryRevision:registry.revision, registryBindingKey:registry.bindingKey,
     selection:selected, handoff,
     childContext:{goal:handoff.goal, artifactRefs:handoff.artifactRefs, credentialRefs:handoff.credentialRefs, parentInvocationId:handoff.parentInvocationId},
     childScope:{capabilityIds:selected.requestedCapabilityIds, toolIds:selected.grantedToolIds},
@@ -223,6 +268,8 @@ export function proposeSpecialistRegistryMutationV1(input = {}) {
   if (registryId !== registry.registryId) throw new Error('Specialist registry identity does not match mutation target');
   const expectedRegistryRevision = integer(raw.expectedRegistryRevision, 'expectedRegistryRevision');
   if (expectedRegistryRevision !== registry.revision) throw new Error('Specialist registry revision drifted before mutation');
+  const expectedRegistryBindingKey = exactBindingKey(raw.expectedRegistryBindingKey, 'expectedRegistryBindingKey');
+  if (expectedRegistryBindingKey !== registry.bindingKey) throw new Error('Specialist registry bindingKey drifted before mutation');
   if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
     throw new Error('Specialist registry mutation kind is invalid');
   }
@@ -285,7 +332,7 @@ export function proposeSpecialistRegistryMutationV1(input = {}) {
     nextDefinitions = registry.definitions.filter(item => item.specialistId !== specialistId);
   }
 
-  const nextRegistry = normalizeSpecialistRegistryV1({
+  const nextRegistry = createSpecialistRegistryV1({
     schemaVersion: SPECIALIST_REGISTRY_VERSION,
     registryId: registry.registryId,
     revision: nextRegistryRevision,
