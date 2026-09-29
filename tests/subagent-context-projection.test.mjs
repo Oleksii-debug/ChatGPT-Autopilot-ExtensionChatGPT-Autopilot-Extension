@@ -49,7 +49,7 @@ function snapshot() {
     schemaVersion: 1,
     projectId: 'project.alpha',
     revisionId: 'project-r2',
-    title: 'Parent project',
+    title: 'SECRET PARENT PROJECT TITLE',
     sourceRefs: [
       source('source.allowed'),
       source('source.secret', { sha: 'c'.repeat(64) }),
@@ -157,6 +157,8 @@ test('projects exactly the child-admitted source and artifact scope', () => {
   assert.equal(JSON.stringify(result).includes('Parent summary contains'), false);
   assert.equal(JSON.stringify(result).includes('source.secret'), false);
   assert.equal(JSON.stringify(result).includes('artifact.secret'), false);
+  assert.equal(JSON.stringify(result).includes('SECRET PARENT PROJECT TITLE'), false);
+  assert.equal(result.projectedSnapshot.title, 'Scoped context for project.alpha');
   assert.equal(result.retrievalAuthorized, false);
   assert.equal(result.executionAuthorized, false);
   assert.equal(result.mutationAuthorized, false);
