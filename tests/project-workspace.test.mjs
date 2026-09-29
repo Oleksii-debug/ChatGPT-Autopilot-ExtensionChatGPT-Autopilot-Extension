@@ -1322,3 +1322,95 @@ test('save return values cannot alias durable storage objects', async () => {
   assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].updatedAt, 1);
   assert.equal(data[PROJECT_WORKSPACE_STORAGE_KEY].revision, 0);
 });
+
+
+test('generic repository mutation rejects newly admitted capsule outside the current snapshot', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      const futureCapsule = {
+        ...capsule('project-r2', 'r2'),
+        capsuleId: 'capsule-future',
+      };
+      workspace.projectsById['project-a'].capsulesById['capsule-future'] = futureCapsule;
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /Context capsule does not bind current project snapshot/,
+  );
+
+  const durable = await repository.load();
+  assert.equal(durable.revision, 1);
+  assert.equal(
+    Object.hasOwn(durable.projectsById['project-a'].capsulesById, 'capsule-future'),
+    false,
+  );
+});
+
+test('generic repository mutation rejects newly admitted provenance outside the current snapshot', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      const mismatched = provenance();
+      mismatched.artifactRef = {
+        ...artifact(),
+        uri: 'drive://unbound-build',
+      };
+      workspace.projectsById['project-a'].provenanceByArtifactId.build = mismatched;
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /Artifact provenance artifact is not current: build/,
+  );
+
+  const durable = await repository.load();
+  assert.equal(durable.revision, 1);
+  assert.equal(
+    Object.hasOwn(durable.projectsById['project-a'].provenanceByArtifactId, 'build'),
+    false,
+  );
+});
+
+test('initial direct save cannot bootstrap future capsule evidence', async () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  workspace.projectsById['project-a'].capsulesById['capsule-future'] = {
+    ...capsule('project-r2', 'r2'),
+    capsuleId: 'capsule-future',
+  };
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(workspace),
+    /Context capsule does not bind current project snapshot/,
+  );
+});
+
+test('initial direct save cannot bootstrap mismatched artifact provenance', async () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  const mismatched = provenance();
+  mismatched.artifactRef = {
+    ...artifact(),
+    uri: 'drive://unbound-build',
+  };
+  workspace.projectsById['project-a'].provenanceByArtifactId.build = mismatched;
+
+  const repository = new ProjectWorkspaceRepository(fakeChrome());
+  await assert.rejects(
+    repository.save(workspace),
+    /Artifact provenance artifact is not current: build/,
+  );
+});
