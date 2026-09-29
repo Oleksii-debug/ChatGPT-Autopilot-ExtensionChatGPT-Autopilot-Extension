@@ -7,6 +7,7 @@ import {
 export const FILESYSTEM_PROVIDER_ID = 'native/filesystem';
 export const FilesystemToolId = Object.freeze({
   READ_TEXT: 'native/filesystem/readText',
+  READ_BINARY: 'native/filesystem/readBinary',
   SEARCH: 'native/filesystem/search',
   LIST: 'native/filesystem/list',
   STAT: 'native/filesystem/stat',
@@ -55,6 +56,17 @@ const TOOLS = Object.freeze([
   }),
   normalizeToolDescriptorV1({
     schemaVersion: 1,
+    toolId: FilesystemToolId.READ_BINARY,
+    providerId: FILESYSTEM_PROVIDER_ID,
+    label: 'Read owner-scoped binary file',
+    description: 'Reads one digest-bound binary chunk from a bounded owner-configured Native Companion file snapshot.',
+    capabilityIds: ['filesystem.readBinary'],
+    inputSchemaRef: 'filesystem-schema/readBinary/input',
+    outputSchemaRef: 'filesystem-schema/readBinary/output',
+    readOnly: true,
+  }),
+  normalizeToolDescriptorV1({
+    schemaVersion: 1,
     toolId: FilesystemToolId.SEARCH,
     providerId: FILESYSTEM_PROVIDER_ID,
     label: 'Search owner-scoped filesystem root',
@@ -95,6 +107,7 @@ const LEGACY_NATIVE_CAPABILITY_IDS = Object.freeze([
 
 const NATIVE_METHOD_BY_TOOL_ID = Object.freeze({
   [FilesystemToolId.READ_TEXT]: 'readText',
+  [FilesystemToolId.READ_BINARY]: 'readBinary',
   [FilesystemToolId.SEARCH]: 'searchFiles',
   [FilesystemToolId.LIST]: 'listFiles',
   [FilesystemToolId.STAT]: 'statPath',
@@ -213,6 +226,8 @@ export class FilesystemAgentProviderV1 {
       let result;
       if (tool.toolId === FilesystemToolId.READ_TEXT) {
         result = await this.nativeClient.readText(authorized.invocation.arguments);
+      } else if (tool.toolId === FilesystemToolId.READ_BINARY) {
+        result = await this.nativeClient.readBinary(authorized.invocation.arguments);
       } else if (tool.toolId === FilesystemToolId.SEARCH) {
         result = await this.nativeClient.searchFiles(authorized.invocation.arguments);
       } else if (tool.toolId === FilesystemToolId.LIST) {
