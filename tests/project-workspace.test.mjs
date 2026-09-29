@@ -1074,21 +1074,44 @@ test('capsule and provenance artifact bindings reject same-hash metadata or loca
   );
 });
 
-test('stored provenance becomes stale if a later project revision moves the artifact without changing hash or size', () => {
+test('project revisions cannot rebind one immutable artifactId to another ArtifactRef identity', () => {
   const workspace = createProjectWorkspace(1);
   addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
-  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
 
   const movedSnapshot = snapshot('project-r2', 'r1');
   movedSnapshot.artifactRefs = [{
     ...artifact(),
     uri: 'drive://moved-build',
   }];
-  replaceProjectSnapshot(workspace, movedSnapshot, { nowMs: 4 });
-
   assert.throws(
-    () => getProjectArtifactProvenance(workspace, 'project-a', 'build'),
-    /provenance artifact is not current: build/,
+    () => replaceProjectSnapshot(workspace, movedSnapshot, { nowMs: 4 }),
+    /artifactId cannot be reused for different immutable content: build/,
+  );
+
+  const unchangedArtifact = snapshot('project-r2', 'r1');
+  assert.doesNotThrow(
+    () => replaceProjectSnapshot(workspace, unchangedArtifact, { nowMs: 4 }),
+  );
+  assert.equal(workspace.projectsById['project-a'].snapshot.revisionId, 'project-r2');
+});
+
+test('durable provenance prevents later resurrection of a removed artifactId with different identity', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
+
+  const withoutBuild = snapshot('project-r2', 'r1');
+  withoutBuild.artifactRefs = [];
+  replaceProjectSnapshot(workspace, withoutBuild, { nowMs: 4 });
+
+  const resurrected = snapshot('project-r3', 'r1');
+  resurrected.artifactRefs = [{
+    ...artifact(),
+    uri: 'drive://different-build',
+  }];
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, resurrected, { nowMs: 5 }),
+    /artifactId cannot be rebound after durable provenance: build/,
   );
 });
 
