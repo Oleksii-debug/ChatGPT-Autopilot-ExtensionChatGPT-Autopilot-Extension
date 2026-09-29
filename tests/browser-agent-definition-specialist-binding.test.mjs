@@ -352,6 +352,38 @@ test('durable definition specialist intent fails closed on plan drift and snapsh
     /AgentPlan node not found/,
   );
 
+  await attachDelegationPlan(manager, delegationPlan({
+    nodes: [delegationPlan().nodes[0] && { ...delegationPlan().nodes[0], state: 'RUNNING' }],
+  }));
+  await assert.rejects(
+    () => manager.materializeDefinitionSpecialistDelegationIntent(
+      'job.research-binding',
+      {
+        expectedRegistryRevision: 12,
+        expectedPlanRevision: 4,
+        nodeId: 'local:research',
+      },
+    ),
+    /must be READY/,
+  );
+
+  await attachDelegationPlan(manager, delegationPlan({
+    nodes: [delegationPlan().nodes[0] && { ...delegationPlan().nodes[0], executionPlane: 'BROWSER' }],
+  }));
+  await assert.rejects(
+    () => manager.materializeDefinitionSpecialistDelegationIntent(
+      'job.research-binding',
+      {
+        expectedRegistryRevision: 12,
+        expectedPlanRevision: 4,
+        nodeId: 'local:research',
+      },
+    ),
+    /requires LOCAL, CLOUD or REMOTE/,
+  );
+
+  await attachDelegationPlan(manager);
+
   const request = {
     expectedRegistryRevision: 12,
     expectedPlanRevision: 4,
@@ -376,7 +408,6 @@ test('durable definition specialist intent fails closed on plan drift and snapsh
     maxCostUsdMicros: 100000,
   });
 });
-
 
 function specialistRegistry(revision = 12) {
   return createSpecialistRegistryV1({
