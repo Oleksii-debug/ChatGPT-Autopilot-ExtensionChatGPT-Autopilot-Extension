@@ -23,11 +23,11 @@ const DEF_KEYS = new Set([
   'specialistDelegationProfile', 'enabled',
   'definitionRevision',
 ]);
-const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'definitions']);
+const REGISTRY_KEYS = new Set(['schemaVersion', 'registryId', 'revision', 'bindingKey', 'definitions']);
 const SELECT_REQUEST_KEYS = new Set(['registry', 'agentDefinitionId']);
 const DISCOVER_KEYS = new Set(['registry', 'requiredTags', 'requiredCapabilityIds', 'requiredToolIds']);
 const SELECTION_KEYS = new Set([
-  'schemaVersion', 'registryId', 'registryRevision', 'agentDefinitionId',
+  'schemaVersion', 'registryId', 'registryRevision', 'registryBindingKey', 'agentDefinitionId',
   'definitionRevision', 'definition',
 ]);
 const MATERIALIZE_KEYS = new Set([
@@ -35,7 +35,7 @@ const MATERIALIZE_KEYS = new Set([
   'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
 ]);
 const MUTATION_KEYS = new Set([
-  'registry', 'registryId', 'expectedRegistryRevision', 'kind',
+  'registry', 'registryId', 'expectedRegistryRevision', 'expectedRegistryBindingKey', 'kind',
   'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
 ]);
 const MUTATION_KINDS = new Set(Object.values(AgentDefinitionRegistryMutationKind));
@@ -183,6 +183,44 @@ function freeze(value) {
   for (const child of Object.values(value)) freeze(child);
   return Object.freeze(value);
 }
+
+function exactBindingKey(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 200_000) {
+    throw new Error(label + ' is invalid');
+  }
+  return value;
+}
+
+function definitionBindingProjection(definition) {
+  return [
+    definition.schemaVersion,
+    definition.agentDefinitionId,
+    definition.label,
+    definition.description,
+    definition.instructions,
+    definition.capabilityIds,
+    definition.toolIds,
+    definition.tags,
+    definition.acceptanceCriteria,
+    definition.configDefaults,
+    definition.modelRoutePolicy,
+    Object.hasOwn(definition, 'specialistDelegationProfile')
+      ? definition.specialistDelegationProfile
+      : undefined,
+    definition.enabled,
+    definition.definitionRevision,
+  ];
+}
+
+function registryBindingKey(registryId, revision, definitions) {
+  return JSON.stringify([
+    AGENT_DEFINITION_REGISTRY_VERSION,
+    registryId,
+    revision,
+    definitions.map(definitionBindingProjection),
+  ]);
+}
+
 
 function normalizeConfigDefaults(input) {
   if (input === undefined) return freeze({});
@@ -346,11 +384,17 @@ export function normalizeAgentDefinitionV1(input) {
   });
 }
 
-export function normalizeAgentDefinitionRegistryV1(input) {
-  const raw = record(input, REGISTRY_KEYS, 'AgentDefinitionRegistryV1');
+export function createAgentDefinitionRegistryV1(input) {
+  const raw = record(
+    input,
+    new Set(['schemaVersion', 'registryId', 'revision', 'definitions']),
+    'AgentDefinitionRegistryV1 creation',
+  );
   if (raw.schemaVersion !== AGENT_DEFINITION_REGISTRY_VERSION) {
     throw new Error('AgentDefinitionRegistryV1.schemaVersion must be numeric 1');
   }
+  const registryId = id(raw.registryId, 'registryId');
+  const revision = positiveInteger(raw.revision, 'registry revision');
   const definitions = denseArray(raw.definitions, 'definitions', 128)
     .map(normalizeAgentDefinitionV1)
     .sort((left, right) => compareId(left.agentDefinitionId, right.agentDefinitionId));
@@ -359,10 +403,26 @@ export function normalizeAgentDefinitionRegistryV1(input) {
   }
   return freeze({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
-    registryId: id(raw.registryId, 'registryId'),
-    revision: positiveInteger(raw.revision, 'registry revision'),
+    registryId,
+    revision,
+    bindingKey: registryBindingKey(registryId, revision, definitions),
     definitions,
   });
+}
+
+export function normalizeAgentDefinitionRegistryV1(input) {
+  const raw = record(input, REGISTRY_KEYS, 'AgentDefinitionRegistryV1');
+  const normalized = createAgentDefinitionRegistryV1({
+    schemaVersion: raw.schemaVersion,
+    registryId: raw.registryId,
+    revision: raw.revision,
+    definitions: raw.definitions,
+  });
+  const suppliedBindingKey = exactBindingKey(raw.bindingKey, 'AgentDefinitionRegistryV1.bindingKey');
+  if (suppliedBindingKey !== normalized.bindingKey) {
+    throw new Error('AgentDefinitionRegistryV1 bindingKey is inconsistent with canonical registry content');
+  }
+  return normalized;
 }
 
 export function normalizeAgentDefinitionSelectionV1(input) {
@@ -375,6 +435,7 @@ export function normalizeAgentDefinitionSelectionV1(input) {
     schemaVersion: AGENT_DEFINITION_SELECTION_VERSION,
     registryId: id(raw.registryId, 'registryId'),
     registryRevision: positiveInteger(raw.registryRevision, 'registryRevision'),
+    registryBindingKey: exactBindingKey(raw.registryBindingKey, 'registryBindingKey'),
     agentDefinitionId: id(raw.agentDefinitionId, 'agentDefinitionId'),
     definitionRevision: positiveInteger(raw.definitionRevision, 'definitionRevision'),
     definition,
@@ -396,6 +457,7 @@ export function selectAgentDefinitionV1(input = {}) {
     schemaVersion: AGENT_DEFINITION_SELECTION_VERSION,
     registryId: registry.registryId,
     registryRevision: registry.revision,
+    registryBindingKey: registry.bindingKey,
     agentDefinitionId: definition.agentDefinitionId,
     definitionRevision: definition.definitionRevision,
     definition,
@@ -431,6 +493,7 @@ export function discoverAgentDefinitionsV1(input = {}) {
     schemaVersion: 1,
     registryId: registry.registryId,
     registryRevision: registry.revision,
+    registryBindingKey: registry.bindingKey,
     requiredTags,
     requiredCapabilityIds,
     requiredToolIds,
@@ -447,8 +510,10 @@ export function materializeAgentDefinitionV1(input = {}) {
   const registry = normalizeAgentDefinitionRegistryV1(raw.registry);
   const selection = normalizeAgentDefinitionSelectionV1(raw.selection);
   const current = registry.definitions.find(item => item.agentDefinitionId === selection.agentDefinitionId);
-  if (selection.registryId !== registry.registryId || selection.registryRevision !== registry.revision) {
-    throw new Error('Agent definition registry identity or revision drifted');
+  if (selection.registryId !== registry.registryId
+    || selection.registryRevision !== registry.revision
+    || selection.registryBindingKey !== registry.bindingKey) {
+    throw new Error('Agent definition registry identity, revision or bindingKey drifted');
   }
   if (!current || !current.enabled) throw new Error('Selected Agent definition is missing or disabled');
   if (selection.definitionRevision !== current.definitionRevision
@@ -588,6 +653,15 @@ export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
   if (expectedRegistryRevision !== registry.revision) {
     throw new Error('Agent definition registry revision drifted before mutation');
   }
+  if (Object.hasOwn(raw, 'expectedRegistryBindingKey')) {
+    const expectedRegistryBindingKey = exactBindingKey(
+      raw.expectedRegistryBindingKey,
+      'expectedRegistryBindingKey',
+    );
+    if (expectedRegistryBindingKey !== registry.bindingKey) {
+      throw new Error('Agent definition registry bindingKey drifted before mutation');
+    }
+  }
   if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
     throw new Error('Agent definition registry mutation kind is invalid');
   }
@@ -664,7 +738,7 @@ export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
     nextDefinitions = registry.definitions.filter(item => item.agentDefinitionId !== agentDefinitionId);
   }
 
-  const nextRegistry = normalizeAgentDefinitionRegistryV1({
+  const nextRegistry = createAgentDefinitionRegistryV1({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
     registryId: registry.registryId,
     revision: nextRegistryRevision,
