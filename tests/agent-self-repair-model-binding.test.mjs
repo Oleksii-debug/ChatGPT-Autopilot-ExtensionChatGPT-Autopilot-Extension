@@ -233,6 +233,10 @@ test('REPAIR binds actor work to an allowed non-verifier route role', () => {
   assert.equal(result.routeIntent.role, AiRouteRole.CODER);
   assert.deepEqual(result.routeIntent.capabilityIds, ['cap.files.read', 'cap.reason']);
   assert.equal(result.routeIntent.requiresVision, false);
+  assert.equal(result.workTitle, 'Repair failed output');
+  assert.equal(result.workObjective, 'Apply the bounded repair');
+  assert.deepEqual(result.workAcceptanceCriteria, ['Repair artifact materialized']);
+  assert.equal(Object.isFrozen(result.workAcceptanceCriteria), true);
   assert.deepEqual(result.workBudget, budget());
   assert.equal(Object.isFrozen(result.workBudget), true);
   assert.equal(result.routeSelectionAuthorized, false);
@@ -294,6 +298,33 @@ test('RETEST is identity-bound to independent verifier and verifier role only', 
       /RETEST model role must be verifier/u,
     );
   }
+});
+
+test('terminal normalization rejects hidden active-work task text', () => {
+  const terminalCycle = cycle({
+    updatedAt: '2026-09-28T17:05:40.000Z',
+    attempts: [{
+      attemptNumber: 1,
+      failure: failure(),
+      diagnosis: diagnosis(),
+      repair: repair(),
+      retest: retest('PASS'),
+    }],
+  });
+  const binding = JSON.parse(JSON.stringify(bindAgentSelfRepairModelIntentV1({
+    selfRepairRequest: {
+      originPlan: originPlan(),
+      currentPlan: originPlan(),
+      failedNodeId: 'target',
+      cycle: terminalCycle,
+      at: '2026-09-28T17:06:00.000Z',
+    },
+  })));
+  binding.workObjective = 'hidden work';
+  assert.throws(
+    () => normalizeAgentSelfRepairModelIntentV1(binding),
+    /cannot contain workObjective/u,
+  );
 });
 
 test('terminal VERIFIED cycle produces no route intent and rejects dispatch-shaped routing data', () => {
@@ -607,6 +638,7 @@ test('durable normalization round-trips active routing intent after JSON restart
   assert.equal(Object.isFrozen(restarted), true);
   assert.equal(Object.isFrozen(restarted.routeIntent), true);
   assert.equal(Object.isFrozen(restarted.routeIntent.capabilityIds), true);
+  assert.equal(Object.isFrozen(restarted.workAcceptanceCriteria), true);
   assert.equal(Object.isFrozen(restarted.workBudget), true);
 });
 
@@ -702,6 +734,19 @@ test('durable binding key rejects same-class route, node and revision substituti
     () => normalizeAgentSelfRepairModelIntentV1(nodeSwap),
     /bindingKey is inconsistent/u,
   );
+
+  for (const mutate of [
+    value => { value.workTitle = 'Unrelated task'; },
+    value => { value.workObjective = 'Do unrelated work'; },
+    value => { value.workAcceptanceCriteria = ['Unrelated result accepted']; },
+  ]) {
+    const taskSwap = structuredClone(original);
+    mutate(taskSwap);
+    assert.throws(
+      () => normalizeAgentSelfRepairModelIntentV1(taskSwap),
+      /bindingKey is inconsistent/u,
+    );
+  }
 
   const revisionSwap = structuredClone(original);
   revisionSwap.failedNodeRevisionId = '2026-09-28T17:05:01.000Z';
