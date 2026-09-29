@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
+import { TRUSTED_EXECUTION_VERIFICATION_LEDGER_STORAGE_KEY } from '../src/core/trusted-execution-verification-ledger.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
@@ -334,6 +335,66 @@ test('BrowserAgentManager leaves specialist state unchanged when trusted verific
       at: T3,
     }),
     /trusted.*verification.*record.*not found/i,
+  );
+
+  assert.equal(store.byId['job-1'].runtime.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
+  assert.equal(store.byId['job-1'].runtime.specialistHandoffs[0].state, 'COMPLETED');
+  assert.equal(store.byId['job-1'].runtime.specialistExecutionOwnerships[0].state, 'OWNED');
+  assert.equal(store.byId['job-1'].runtime.history.length, 0);
+  assert.equal(store.byId['job-1'].runtime.updatedAt, Date.parse(T1));
+});
+
+test('BrowserAgentManager fails closed on persisted trusted-ledger revision drift without mutating specialist state', async () => {
+  const { assignment, ownership } = initial();
+  const claimed = claimAgentPlanSpecialistHandoffsV1(
+    plan(),
+    [assignment],
+    { executionOwnerships: [ownership], availableSlots: 1, at: T0 },
+  );
+  const agentId = claimed.claimed[0];
+  const leaseId = claimed.assignments[0].leaseId;
+  const completed = completeAgentPlanSpecialistHandoffV1(
+    claimed.plan,
+    claimed.assignments,
+    {
+      executionOwnerships: claimed.executionOwnerships,
+      agentId,
+      leaseId,
+      resultArtifactIds: ['artifact:archive'],
+      at: T1,
+    },
+  );
+  const store = {
+    byId: {
+      'job-1': {
+        runtime: {
+          plan: completed.plan,
+          specialistHandoffs: completed.assignments,
+          specialistExecutionOwnerships: completed.executionOwnerships,
+          history: [],
+          updatedAt: Date.parse(T1),
+        },
+      },
+    },
+  };
+  const manager = managerWithStore(store, T3);
+  const record = trustedRecord({ executionId: leaseId });
+  await manager.chrome.storage.local.set({
+    [TRUSTED_EXECUTION_VERIFICATION_LEDGER_STORAGE_KEY]: {
+      schemaVersion: 1,
+      revision: 0,
+      records: [record],
+    },
+  });
+
+  await assert.rejects(
+    () => manager.verifySpecialistHandoff('job-1', {
+      agentId,
+      leaseId,
+      verificationId: 'verification-specialist-1',
+      at: T3,
+    }),
+    /revision must equal append-only record count/u,
   );
 
   assert.equal(store.byId['job-1'].runtime.plan.nodes.find(node => node.nodeId === 'local').state, 'RUNNING');
