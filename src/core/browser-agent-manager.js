@@ -1864,7 +1864,6 @@ export class BrowserAgentManager {
     let prepared = null;
     let providerRequest = null;
     await this.update(async store => {
-      const preparedAt = new Date(this.now()).toISOString();
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to execute');
       if (job.runtime.runState !== BrowserAgentRunState.RUNNING
@@ -1880,9 +1879,6 @@ export class BrowserAgentManager {
       if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId || !assignment.leaseExpiresAt) {
         throw new Error('Specialist provider execution requires the exact current leased handoff');
       }
-      if (Date.parse(assignment.leaseExpiresAt) <= Date.parse(preparedAt)) {
-        throw new Error('Specialist provider execution lease expired before provider preparation');
-      }
       const ownership = (job.runtime.specialistExecutionOwnerships || [])
         .map(normalizeExecutionOwnershipV1)
         .find(item => item.ownerId === request.agentId && item.leaseId === assignment.leaseId);
@@ -1896,6 +1892,12 @@ export class BrowserAgentManager {
       if (trustedReadiness) {
         assertTrustedSpecialistReadiness(executionReadiness, admission.selection, this.now());
         await trustedReadiness.assertCurrent(executionReadiness);
+      }
+      // Readiness can cross an async boundary. Re-establish live lease
+      // authority after the final await and immediately before PREPARED.
+      const preparedAt = new Date(this.now()).toISOString();
+      if (Date.parse(assignment.leaseExpiresAt) <= Date.parse(preparedAt)) {
+        throw new Error('Specialist provider execution lease expired before provider preparation');
       }
       const selection = normalizeSpecialistSelectionV1(admission.selection);
       const handoff = normalizeSpecialistHandoffV1(admission.handoff);
