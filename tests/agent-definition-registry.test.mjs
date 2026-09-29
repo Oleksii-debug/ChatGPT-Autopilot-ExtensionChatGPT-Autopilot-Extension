@@ -111,6 +111,25 @@ test('same-revision Agent registry content substitution is rejected by canonical
   assert.equal(selected.registryBindingKey, current.bindingKey);
 });
 
+test('registry creation enforces the same binding-key transport bound as normalization', () => {
+  const definitions = Array.from({ length: 18 }, (_, index) => definition({
+    agentDefinitionId: 'agent.large-' + String(index + 1),
+    label: 'Large Agent ' + String(index + 1),
+    instructions: 'x'.repeat(12_000),
+    definitionRevision: 1,
+  }));
+
+  assert.throws(
+    () => createAgentDefinitionRegistryV1({
+      schemaVersion: 1,
+      registryId: 'agents:oversized-project',
+      revision: 1,
+      definitions,
+    }),
+    /AgentDefinitionRegistryV1\.bindingKey is invalid/,
+  );
+});
+
 test('legacy Agent definitions remain shape-compatible when no specialist delegation profile exists', () => {
   const normalized = normalizeAgentDefinitionV1(definition());
   assert.equal(Object.hasOwn(normalized, 'specialistDelegationProfile'), false);
