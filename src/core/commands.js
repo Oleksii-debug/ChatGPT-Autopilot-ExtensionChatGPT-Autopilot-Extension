@@ -823,6 +823,19 @@ export class CoreCommandDispatcher {
             || boundedOutputTokens < 1) {
           throw new Error('Agent model invocation requires bounded maxOutputTokens');
         }
+        const imageDescriptor = Object.getOwnPropertyDescriptor(payload, 'imageDataUrl');
+        if (imageDescriptor
+            && (imageDescriptor.enumerable !== true
+              || !Object.hasOwn(imageDescriptor, 'value'))) {
+          throw new Error('Agent model invocation imageDataUrl must be an enumerable own data property');
+        }
+        const imageDataUrl = imageDescriptor?.value ?? '';
+        if (typeof imageDataUrl !== 'string' || imageDataUrl !== imageDataUrl.trim()) {
+          throw new Error('Agent model invocation imageDataUrl must already be canonical text');
+        }
+        if ((imageDataUrl.length > 0) !== internalEnvelope.requiresVision) {
+          throw new Error('Agent model image input does not match durable requiresVision intent');
+        }
       }
       const providerCallBudgetContext = internalEnvelope
         ? normalizeInternalAgentProviderBudgetContext(
@@ -900,7 +913,9 @@ export class CoreCommandDispatcher {
           forceStrong: internalEnvelope ? false : payload.forceStrong === true,
           maxOutputTokens: Number(payload.maxOutputTokens || 0),
           maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
-          imageDataUrl: payload.imageDataUrl || '',
+          imageDataUrl: internalEnvelope
+            ? (Object.getOwnPropertyDescriptor(payload, 'imageDataUrl')?.value ?? '')
+            : payload.imageDataUrl || '',
           taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
           strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
           capabilityIds: internalEnvelope
