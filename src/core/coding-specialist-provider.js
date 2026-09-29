@@ -653,9 +653,26 @@ export class OpenHandsCodingSpecialistClient {
     let stableTerminal = '';
     let stableTerminalProviderUpdatedAt = '';
     let stableTerminalCount = 0;
+    let lastObservedProviderUpdatedAt = '';
     let last = conversation;
 
     while (this.nowFn() <= deadline) {
+      if (last.observedAt) {
+        if (lastObservedProviderUpdatedAt
+            && Date.parse(last.providerUpdatedAt) < Date.parse(lastObservedProviderUpdatedAt)) {
+          throw new OpenHandsCodingSpecialistError(
+            'OpenHands provider chronology regressed between independent readbacks',
+            {
+              code: 'OPENHANDS_PROVIDER_CHRONOLOGY_REGRESSION',
+              conversationId: prepared.conversationId,
+              effectMayHaveOccurred: true,
+              reconciliationRequired: true,
+              safeToRetry: false,
+            },
+          );
+        }
+        lastObservedProviderUpdatedAt = last.providerUpdatedAt;
+      }
       const status = last.executionStatus;
       if (TERMINAL.has(status)) {
         if (!last.observedAt) {
