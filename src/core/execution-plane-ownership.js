@@ -147,6 +147,9 @@ async function resolveTrustedExecutionVerificationV1(current, rawOptions, depend
   const verificationId = id(request.verificationId, 'verificationId');
   const at = request.at === undefined ? new Date().toISOString() : ts(request.at, 'at');
   if (current.leaseId !== leaseId) throw new Error('trusted verification execution lease identity mismatch');
+  if (expectedOutcome === TrustedExecutionVerificationOutcome.EFFECT_VERIFIED) {
+    assertLeaseLive(current, at);
+  }
   const resolver = dependencies?.resolveTrustedExecutionVerificationRecord;
   if (typeof resolver !== 'function') throw new Error('canonical trusted execution verification resolver is required');
   const lookup = freeze({
