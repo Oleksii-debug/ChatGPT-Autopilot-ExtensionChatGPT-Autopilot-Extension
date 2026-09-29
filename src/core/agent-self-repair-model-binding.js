@@ -443,7 +443,13 @@ export function normalizeAgentSelfRepairModelIntentV1(input) {
     if (activeAttemptNumber !== 0) {
       throw new Error('Terminal Agent self-repair model binding activeAttemptNumber must be zero');
     }
-    for (const key of ['proposedPlanRevision', 'executionPlane']) {
+    for (const key of [
+      'proposedPlanRevision',
+      'executionPlane',
+      'workTitle',
+      'workObjective',
+      'workAcceptanceCriteria',
+    ]) {
       if (Object.prototype.hasOwnProperty.call(raw, key)) {
         throw new Error('Terminal Agent self-repair model binding cannot contain ' + key);
       }
