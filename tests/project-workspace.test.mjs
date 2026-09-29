@@ -774,3 +774,91 @@ test('repository save revalidates immutable owner identity against durable state
   assert.equal(restored.revision, 0);
   assert.equal(restored.createdAt, 1);
 });
+
+
+test('project snapshot revision ids are append-only and cannot be resurrected after supersession', () => {
+  const workspace = createProjectWorkspace(1);
+  const project = addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 3 });
+
+  assert.deepEqual(project.snapshotRevisionIds, ['project-r1', 'project-r2']);
+  assert.throws(
+    () => replaceProjectSnapshot(workspace, snapshot('project-r1', 'r1'), { nowMs: 4 }),
+    /cannot be reused after it was superseded/,
+  );
+  assert.equal(project.snapshot.revisionId, 'project-r2');
+  assert.deepEqual(project.snapshotRevisionIds, ['project-r1', 'project-r2']);
+});
+
+test('snapshot revision history survives repository restart and still blocks resurrection', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+  await repository.update(workspace => {
+    replaceProjectSnapshot(workspace, snapshot('project-r2', 'r2'), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  const restarted = new ProjectWorkspaceRepository(chrome);
+  const durable = await restarted.load();
+  assert.deepEqual(
+    durable.projectsById['project-a'].snapshotRevisionIds,
+    ['project-r1', 'project-r2'],
+  );
+
+  await assert.rejects(
+    restarted.update(workspace => {
+      replaceProjectSnapshot(workspace, snapshot('project-r1', 'r1'), { nowMs: 4 });
+      return workspace;
+    }, { nowMs: 4 }),
+    /cannot be reused after it was superseded/,
+  );
+
+  const after = await restarted.load();
+  assert.equal(after.revision, 2);
+  assert.equal(after.projectsById['project-a'].snapshot.revisionId, 'project-r2');
+});
+
+test('generic repository mutation cannot bypass append-only snapshot revision history', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    return workspace;
+  }, { nowMs: 2 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.projectsById['project-a'].snapshot = snapshot('project-r2', 'r2');
+      workspace.projectsById['project-a'].updatedAt = 3;
+      return workspace;
+    }, { nowMs: 3 }),
+    /revision history does not end at current snapshot/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.deepEqual(restored.projectsById['project-a'].snapshotRevisionIds, ['project-r1']);
+});
+
+test('workspace validation rejects duplicate or non-current snapshot revision history', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+
+  const duplicate = structuredClone(workspace);
+  duplicate.projectsById['project-a'].snapshotRevisionIds = ['project-r1', 'project-r1'];
+  assert.throws(
+    () => validateProjectWorkspace(duplicate),
+    /duplicate revisionId/,
+  );
+
+  const mismatched = structuredClone(workspace);
+  mismatched.projectsById['project-a'].snapshotRevisionIds = ['project-r0'];
+  assert.throws(
+    () => validateProjectWorkspace(mismatched),
+    /does not end at current snapshot/,
+  );
+});
