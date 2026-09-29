@@ -405,8 +405,36 @@ export class ProjectWorkspaceRepository {
     return validateProjectWorkspace(workspace);
   }
 
-  async save(workspace) {
+  async save(workspace, { expectedPreviousRevision = null } = {}) {
     validateProjectWorkspace(workspace);
+    if (expectedPreviousRevision !== null
+        && (!Number.isInteger(expectedPreviousRevision) || expectedPreviousRevision < 0)) {
+      throw new Error('Invalid expected project workspace revision');
+    }
+
+    const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
+    const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
+    if (durableRaw === undefined) {
+      if (expectedPreviousRevision !== null && expectedPreviousRevision !== 0) {
+        throw new Error('Project workspace durable revision changed before save');
+      }
+      if (expectedPreviousRevision === null && workspace.revision !== 0) {
+        throw new Error('Initial project workspace save must use revision 0');
+      }
+    } else {
+      const durable = validateProjectWorkspace(durableRaw);
+      if (expectedPreviousRevision !== null && durable.revision !== expectedPreviousRevision) {
+        throw new Error('Project workspace durable revision changed before save');
+      }
+      if (workspace.revision === durable.revision && sameCanonicalData(workspace, durable)) {
+        return durable;
+      }
+      if (workspace.revision !== durable.revision + 1) {
+        throw new Error('Project workspace revision must advance exactly once');
+      }
+      assertSnapshotRevisionContinuity(durable, workspace);
+    }
+
     await this.chrome.storage.local.set({ [PROJECT_WORKSPACE_STORAGE_KEY]: workspace });
     return workspace;
   }
@@ -433,7 +461,7 @@ export class ProjectWorkspaceRepository {
       next.updatedAt = nowMs;
       validateProjectWorkspace(next);
       assertSnapshotRevisionContinuity(current, next);
-      return this.save(next);
+      return this.save(next, { expectedPreviousRevision: current.revision });
     });
     this.updateQueue = task.catch(() => undefined);
     return task;
