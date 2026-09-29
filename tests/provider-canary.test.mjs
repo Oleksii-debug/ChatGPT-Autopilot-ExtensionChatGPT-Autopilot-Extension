@@ -401,3 +401,15 @@ test('fresh canaries cannot re-authorize stale or future base readiness facts', 
   assert.equal(future.recommendedProviderReadiness.reasonCode, 'PROVIDER_STATE_FUTURE');
   assert.equal(future.recommendations.blockConsequentialWorkSuggested, true);
 });
+
+test('zero latency uses one canonical numeric representation', () => {
+  const canonical = normalizeProviderCanaryObservationV1(
+    observation('zero.latency', 'github.read', 'github.read', 'PASS', { latencyMs:0 }),
+  );
+  assert.equal(canonical.latencyMs, 0);
+  assert.equal(Object.is(canonical.latencyMs, -0), false);
+
+  assert.throws(() => normalizeProviderCanaryObservationV1(
+    observation('negative.zero.latency', 'github.read', 'github.read', 'PASS', { latencyMs:-0 }),
+  ), /latencyMs is invalid/);
+});
