@@ -2455,6 +2455,7 @@ async function saveAgentDefinition() {
       ? {
           registryId: registry.registryId,
           expectedRegistryRevision: registry.revision,
+          expectedRegistryBindingKey: registry.bindingKey,
           kind: 'UPDATE',
           agentDefinitionId: current.agentDefinitionId,
           expectedDefinitionRevision: current.definitionRevision,
@@ -2463,6 +2464,7 @@ async function saveAgentDefinition() {
       : {
           registryId: registry.registryId,
           expectedRegistryRevision: registry.revision,
+          expectedRegistryBindingKey: registry.bindingKey,
           kind: 'CREATE',
           definition,
         };
@@ -2488,6 +2490,7 @@ async function toggleAgentDefinitionEnabled() {
     await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
       registryId: registry.registryId,
       expectedRegistryRevision: registry.revision,
+      expectedRegistryBindingKey: registry.bindingKey,
       kind: 'UPDATE',
       agentDefinitionId: current.agentDefinitionId,
       expectedDefinitionRevision: current.definitionRevision,
@@ -2511,6 +2514,7 @@ async function deleteAgentDefinition() {
     await core('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY', {
       registryId: registry.registryId,
       expectedRegistryRevision: registry.revision,
+      expectedRegistryBindingKey: registry.bindingKey,
       kind: 'DELETE',
       agentDefinitionId: current.agentDefinitionId,
       expectedDefinitionRevision: current.definitionRevision,
