@@ -290,7 +290,7 @@ export function projectSubagentContextV1(input = {}) {
       schemaVersion: parentSnapshot.schemaVersion,
       projectId: parentSnapshot.projectId,
       revisionId: parentSnapshot.revisionId,
-      title: parentSnapshot.title,
+      title: `Scoped context for ${parentSnapshot.projectId}`,
       sourceRefs: projectedSourceRefs,
       artifactRefs: projectedArtifactRefs,
       createdAt: parentSnapshot.createdAt,
