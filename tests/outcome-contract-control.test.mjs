@@ -626,3 +626,54 @@ test('Core commands persist canonical OutcomeContracts across restart and return
     [],
   );
 });
+
+
+test('concurrent Core revision CAS serializes writers so exactly one stale peer fails', async () => {
+  const chrome = fakeChrome();
+  const repository = new StorageRepository(chrome);
+  const dispatcher = new CoreCommandDispatcher(repository, () => 1000);
+  const initial = contractV1();
+  await dispatcher.execute(CoreCommand.CREATE_OUTCOME_CONTRACT, { contract: initial });
+
+  const candidateA = nextContract(initial, { desiredResult: 'Concurrent candidate A.' });
+  const candidateB = nextContract(initial, { desiredResult: 'Concurrent candidate B.' });
+  const settled = await Promise.allSettled([
+    dispatcher.execute(CoreCommand.UPDATE_OUTCOME_CONTRACT, {
+      projectId: 'project-1',
+      contractId: 'outcome-1',
+      expectedRevision: 1,
+      contract: candidateA,
+    }),
+    dispatcher.execute(CoreCommand.UPDATE_OUTCOME_CONTRACT, {
+      projectId: 'project-1',
+      contractId: 'outcome-1',
+      expectedRevision: 1,
+      contract: candidateB,
+    }),
+  ]);
+
+  assert.equal(settled.filter(item => item.status === 'fulfilled').length, 1);
+  assert.equal(settled.filter(item => item.status === 'rejected').length, 1);
+  assert.match(
+    String(settled.find(item => item.status === 'rejected').reason?.message || ''),
+    /revision binding mismatch/,
+  );
+
+  const state = await repository.load();
+  const durable = resolveCurrentStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId: 'outcome-1',
+  });
+  assert.equal(durable.revision, 2);
+  assert.ok(
+    ['Concurrent candidate A.', 'Concurrent candidate B.'].includes(durable.desiredResult),
+    'durable winner must be exactly one admitted revision-2 candidate',
+  );
+  assert.throws(
+    () => resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId: 'outcome-1',
+      contractRevision: 3,
+    }),
+    /revision binding mismatch/,
+  );
+});
