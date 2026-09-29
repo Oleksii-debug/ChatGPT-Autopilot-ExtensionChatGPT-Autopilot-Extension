@@ -92,7 +92,7 @@ function openapi(version = OPENHANDS_AGENT_SERVER_VERSION) {
   return json({ info: { title: 'OpenHands Agent Server', version } });
 }
 
-function clientFor(handler, { start = 0 } = {}) {
+function clientFor(handler, { start = Date.parse(CREATED_AT) + 1_000 } = {}) {
   let now = start;
   return new OpenHandsCodingSpecialistClient({
     fetchFn: handler,
@@ -275,6 +275,26 @@ test('missing or malformed OpenHands updated_at fails closed as provenance drift
     );
   }
 });
+test('provider chronology must stay inside the admitted handoff-to-observation interval', async () => {
+  const cases = [
+    '2026-09-25T07:59:59.999Z',
+    '2026-09-25T08:00:02.000Z',
+  ];
+  for (const updated_at of cases) {
+    const client = clientFor(async url => {
+      if (url.endsWith('/openapi.json')) return openapi();
+      return json(info('running', { updated_at }));
+    });
+    await assert.rejects(
+      () => client.execute(input()),
+      error => error instanceof OpenHandsCodingSpecialistError
+        && error.code === 'OPENHANDS_CONVERSATION_PROVENANCE_MISMATCH'
+        && error.reconciliationRequired === true
+        && error.safeToRetry === false,
+    );
+  }
+});
+
 test('restart attach reuses matching conversation and never posts a duplicate start', async () => {
   const calls = [];
   let reads = 0;
