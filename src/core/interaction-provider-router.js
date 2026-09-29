@@ -25,6 +25,35 @@ function providerIdFromRequest(request, defaultProviderId) {
   return descriptor.value;
 }
 
+function snapshotTransportExecutor(transport, providerId) {
+  if ((typeof transport !== 'object' || transport === null) && typeof transport !== 'function') {
+    throw new Error(`Interaction transport required for ${providerId}`);
+  }
+
+  let cursor = transport;
+  const visited = new Set();
+  while (cursor !== null) {
+    if (visited.has(cursor)) {
+      throw new Error(`Interaction transport prototype chain is invalid for ${providerId}`);
+    }
+    visited.add(cursor);
+
+    const descriptor = Object.getOwnPropertyDescriptor(cursor, 'execute');
+    if (descriptor) {
+      if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')
+          || typeof descriptor.value !== 'function') {
+        throw new Error(`Interaction transport execute must be a data-property function for ${providerId}`);
+      }
+      const execute = descriptor.value;
+      return (tabId, request) => Reflect.apply(execute, transport, [tabId, request]);
+    }
+
+    cursor = Object.getPrototypeOf(cursor);
+  }
+
+  throw new Error(`Interaction transport required for ${providerId}`);
+}
+
 export class InteractionProviderRouter {
   constructor({ defaultProviderId = AgentProviderId.CHATGPT_BROWSER } = {}) {
     const descriptor = orchestrationProviderContract(defaultProviderId);
@@ -34,8 +63,8 @@ export class InteractionProviderRouter {
 
   register(providerId, transport) {
     const descriptor = orchestrationProviderContract(providerId);
-    if (!transport || typeof transport.execute !== 'function') throw new Error(`Interaction transport required for ${providerId}`);
-    this.providers.set(descriptor.id, transport);
+    const execute = snapshotTransportExecutor(transport, descriptor.id);
+    this.providers.set(descriptor.id, execute);
     return this;
   }
 
@@ -51,8 +80,8 @@ export class InteractionProviderRouter {
   async execute(tabId, request = {}) {
     const providerId = providerIdFromRequest(request, this.defaultProviderId);
     const descriptor = orchestrationProviderContract(providerId);
-    const transport = this.providers.get(descriptor.id);
-    if (!transport) throw new Error(`No interaction transport registered for ${descriptor.id}`);
-    return transport.execute(tabId, request);
+    const execute = this.providers.get(descriptor.id);
+    if (!execute) throw new Error(`No interaction transport registered for ${descriptor.id}`);
+    return execute(tabId, request);
   }
 }
