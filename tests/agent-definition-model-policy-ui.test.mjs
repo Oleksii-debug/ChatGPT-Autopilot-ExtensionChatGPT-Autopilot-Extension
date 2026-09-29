@@ -350,6 +350,80 @@ test('Agent definition model-policy form does not execute accessors', () => {
   assert.equal(reads, 0);
 });
 
+test('Agent definition form rejects accessor-backed base and Specialist fields without executing them', () => {
+  let reads = 0;
+
+  const baseAccessor = baseForm();
+  Object.defineProperty(baseAccessor, 'agentDefinitionId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'agent.evil';
+    },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(baseAccessor),
+    /Agent definition ID має бути enumerable data property/u,
+  );
+  assert.equal(reads, 0);
+
+  const specialistConfiguredAccessor = baseForm();
+  Object.defineProperty(specialistConfiguredAccessor, 'specialistDelegationConfigured', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return true;
+    },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(specialistConfiguredAccessor),
+    /Specialist delegation configured має бути enumerable data property/u,
+  );
+  assert.equal(reads, 0);
+
+  const specialistFieldAccessor = baseForm({
+    specialistDelegationConfigured: true,
+    specialistRegistryId: 'registry.main',
+    specialistCapabilityIdsText: '',
+    specialistToolIdsText: '',
+    specialistPolicyEnvelopeId: 'policy.main',
+    specialistDeadlineSeconds: '60',
+    specialistMaxConcurrentHandoffs: '1',
+    specialistLeaseSeconds: '60',
+    specialistPriority: '0',
+    specialistDelegationEnabled: true,
+  });
+  Object.defineProperty(specialistFieldAccessor, 'specialistRegistryId', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      reads += 1;
+      return 'registry.evil';
+    },
+  });
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(specialistFieldAccessor),
+    /Specialist registry ID має бути enumerable data property/u,
+  );
+  assert.equal(reads, 0);
+});
+
+test('Agent definition form rejects boolean representation aliases instead of silently changing authority', () => {
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(baseForm({ enabled: 'true' })),
+    /Agent definition enabled має бути boolean/u,
+  );
+
+  assert.throws(
+    () => buildAgentDefinitionFromFormV1(baseForm({
+      specialistDelegationConfigured: 'true',
+    })),
+    /Specialist delegation configured має бути boolean/u,
+  );
+});
+
 test('full Agent model policy preserves Router failover fields across durable normalization', () => {
   const definition = normalizeAgentDefinitionV1(buildAgentDefinitionFromFormV1({
     ...baseForm(),
