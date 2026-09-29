@@ -45,12 +45,13 @@ import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
-  authorizeAgentPlanSpecialistSafeRetryV1,
+  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   completeAgentPlanSpecialistHandoffV1,
-  verifyAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import { TrustedExecutionVerificationLedgerRepository } from './trusted-execution-verification-ledger.js';
 import {
   AGENT_DEFINITION_REGISTRY_VERSION,
   createAgentDefinitionRegistryV1,
@@ -629,6 +630,7 @@ export class BrowserAgentManager {
     this.nativeCompanion = nativeCompanionClient === undefined
       ? (chromeApi?.runtime?.sendNativeMessage ? new NativeCompanionClient({ chromeApi }) : null)
       : nativeCompanionClient;
+    this.trustedExecutionVerificationLedger = new TrustedExecutionVerificationLedgerRepository(chromeApi);
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
   }
@@ -997,14 +999,21 @@ export class BrowserAgentManager {
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...request,
-        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at,
-      });
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        {
+          resolveTrustedExecutionVerificationRecord: this.trustedExecutionVerificationLedger.resolver(),
+        },
+      );
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
@@ -1013,13 +1022,12 @@ export class BrowserAgentManager {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryVerification.verifierId,
-        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
-        verificationId: retriable.safeRetryVerification.verificationId,
-        observationId: retriable.safeRetryVerification.observationId,
-        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
-        evidence: retriable.safeRetryVerification.summary,
-        message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+        verifierId: retriable.trustedVerification.verifierId,
+        verificationAuthorityId: retriable.trustedVerification.verificationAuthorityId,
+        verificationId: retriable.trustedVerification.verificationId,
+        evidenceArtifactIds: retriable.trustedVerification.evidenceArtifactIds,
+        evidence: `trusted-record=${retriable.trustedVerification.recordId}; outcome=${retriable.trustedVerification.outcome}; provenance=${retriable.trustedVerification.provenance}`,
+        message: 'Trusted canonical no-effect record authorized this handoff for normal bounded re-admission; no effect was dispatched.',
       });
       result = clone(retriable);
       return store;
@@ -1052,15 +1060,36 @@ export class BrowserAgentManager {
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        {
+          resolveTrustedExecutionVerificationRecord: this.trustedExecutionVerificationLedger.resolver(),
+        },
+      );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-verified',
+        agentId: verified.verifiedAgentId,
+        verifierId: verified.trustedVerification.verifierId,
+        verificationAuthorityId: verified.trustedVerification.verificationAuthorityId,
+        verificationId: verified.trustedVerification.verificationId,
+        evidenceArtifactIds: verified.trustedVerification.evidenceArtifactIds,
+        evidence: `trusted-record=${verified.trustedVerification.recordId}; outcome=${verified.trustedVerification.outcome}; provenance=${verified.trustedVerification.provenance}`,
+        message: 'Trusted canonical verifier record accepted specialist evidence and advanced the plan.',
+      });
       result = clone(verified);
       return store;
     });
