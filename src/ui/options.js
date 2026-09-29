@@ -2459,8 +2459,13 @@ function renderSpecialistProviderRuntime() {
   const selectedExecution = selected ? executionsByLease.get(`${selected.agentId}\n${selected.leaseId}`) : null;
   const terminal = new Set(['BLOCKED_FAILURE', 'PROVIDER_SUCCEEDED', 'PROVIDER_FAILED', 'RECONCILE', 'MANUAL_REVIEW']);
   const controlEpoch = ui.selectedBrowserAgent?.runtime?.controlEpoch;
+  const runState = ui.selectedBrowserAgent?.runtime?.runState;
+  const leaseExpiresMs = selected?.leaseExpiresAt ? Date.parse(selected.leaseExpiresAt) : NaN;
+  const leaseLive = Number.isFinite(leaseExpiresMs) && leaseExpiresMs > Date.now();
   $('specialist-provider-run-button').disabled = !selected
     || selected.state !== 'LEASED'
+    || runState !== 'RUNNING'
+    || !leaseLive
     || !Number.isSafeInteger(controlEpoch)
     || controlEpoch < 0
     || Object.is(controlEpoch, -0)
