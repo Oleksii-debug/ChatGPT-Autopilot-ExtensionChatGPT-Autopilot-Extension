@@ -303,6 +303,38 @@
             <input id="agent-definition-ai-strong-model" type="text" maxlength="300" autocomplete="off" spellcheck="false">
           </fieldset>
 
+          <fieldset class="settings-group" id="agent-definition-model-route-policy-group">
+            <legend>Model Router policy для цієї definition</legend>
+            <label><input id="agent-definition-model-route-policy-configured" type="checkbox">Зберігати окрему Router policy для цієї Agent definition</label>
+            <p id="agent-definition-model-route-policy-help">Якщо вимкнено, Agent успадковує глобальну Router policy. Збереження policy не вибирає модель, не запускає provider і не запускає Agent; runtime повторно перевіряє поточний Router перед model I/O.</p>
+            <label><input id="agent-definition-model-route-auto-switch" type="checkbox" checked>Дозволити автоматичний failover між допустимими routes</label>
+            <label for="agent-definition-model-route-pinned-id">Pinned route ID — необов’язково</label>
+            <input id="agent-definition-model-route-pinned-id" type="text" maxlength="180" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-model-route-ordered-ids">Пріоритет routes — по одному ID в рядку, у потрібному порядку</label>
+            <textarea id="agent-definition-model-route-ordered-ids" rows="4" spellcheck="false"></textarea>
+            <label for="agent-definition-model-route-allow-ids">Allow routes — по одному ID в рядку; порожньо означає весь owner-authorized pool</label>
+            <textarea id="agent-definition-model-route-allow-ids" rows="4" spellcheck="false"></textarea>
+            <label for="agent-definition-model-route-deny-ids">Deny routes — по одному ID в рядку</label>
+            <textarea id="agent-definition-model-route-deny-ids" rows="4" spellcheck="false"></textarea>
+            <label><input id="agent-definition-model-route-free-only" type="checkbox">Лише routes з нульовою відомою ціною</label>
+            <label for="agent-definition-model-route-locality">Locality</label>
+            <select id="agent-definition-model-route-locality">
+              <option value="any">Будь-яка</option>
+              <option value="local">Лише local</option>
+              <option value="remote">Лише remote</option>
+            </select>
+            <label for="agent-definition-model-route-max-input-price">Максимальна input-ціна USD за 1M tokens — порожньо без окремого cap</label>
+            <input id="agent-definition-model-route-max-input-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-model-route-max-output-price">Максимальна output-ціна USD за 1M tokens — порожньо без окремого cap</label>
+            <input id="agent-definition-model-route-max-output-price" type="text" inputmode="decimal" autocomplete="off" spellcheck="false">
+            <label for="agent-definition-model-route-backoff-seconds">Retry backoff, секунд</label>
+            <input id="agent-definition-model-route-backoff-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric" value="60">
+            <label for="agent-definition-model-route-circuit-failures">Circuit breaker: послідовних retryable failures до відкриття</label>
+            <input id="agent-definition-model-route-circuit-failures" type="number" min="1" max="100" step="1" inputmode="numeric" value="2">
+            <label for="agent-definition-model-route-circuit-seconds">Circuit breaker: тривалість, секунд</label>
+            <input id="agent-definition-model-route-circuit-seconds" type="number" min="1" max="86400" step="1" inputmode="numeric" value="300">
+          </fieldset>
+
           <fieldset class="settings-group" id="agent-definition-specialist-delegation-group">
             <legend>Автоматичне делегування Specialist</legend>
             <label><input id="agent-definition-specialist-delegation-configured" type="checkbox">Зберігати Specialist delegation profile для цієї Agent definition</label>

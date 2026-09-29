@@ -1030,10 +1030,20 @@ test('reusable Agent model route policy is canonical, immutable and materializes
   });
 });
 
-test('reusable Agent model route policy rejects hidden authority and hostile descriptors', () => {
+test('reusable Agent model route policy admits canonical failover state but rejects hidden authority and hostile descriptors', () => {
+  const failover = normalizeAgentDefinitionV1(definition({
+    modelRoutePolicy: {
+      retryBackoffSeconds: 1,
+      circuitBreakerFailures: 1,
+      circuitBreakerSeconds: 1,
+    },
+  })).modelRoutePolicy;
+  assert.equal(failover.retryBackoffSeconds, 1);
+  assert.equal(failover.circuitBreakerFailures, 1);
+  assert.equal(failover.circuitBreakerSeconds, 1);
   assert.throws(() => normalizeAgentDefinitionV1(definition({
-    modelRoutePolicy: { retryBackoffSeconds: 1 },
-  })), /unknown field: retryBackoffSeconds/);
+    modelRoutePolicy: { providerApiKey: 'secret' },
+  })), /unknown field: providerApiKey/);
 
   let reads = 0;
   const policy = {};
@@ -1055,6 +1065,9 @@ test('reusable Agent model route policy rejects coercive aliases so durable byte
     { freeOnly: 1 },
     { maxInputPricePerMillionUsd: '1' },
     { maxOutputPricePerMillionUsd: -0 },
+    { retryBackoffSeconds: '60' },
+    { circuitBreakerFailures: 0 },
+    { circuitBreakerSeconds: -0 },
   ]) {
     assert.throws(
       () => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })),
