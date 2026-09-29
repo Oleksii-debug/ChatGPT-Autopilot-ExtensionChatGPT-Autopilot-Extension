@@ -5,6 +5,7 @@ export const MAX_OUTCOME_CONTRACT_REVISIONS = 256;
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
 const RESOLVE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
+const CURRENT_RESOLVE_KEYS = new Set(['projectId', 'contractId']);
 const TRUSTED_RESOLVE_KEYS = new Set(['contractId', 'contractRevision']);
 const UPDATE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision', 'contract']);
 const DELETE_KEYS = new Set(['projectId', 'contractId', 'expectedRevision']);
@@ -177,6 +178,17 @@ export function resolveStoredOutcomeContractV1(state, input = {}) {
   if (entry.projectId !== projectId) throw new Error('OutcomeContract project binding mismatch');
   if (entry.deleted) throw new Error('OutcomeContract is deleted');
   if (entry.latestRevision !== expectedRevision) throw new Error('OutcomeContract revision binding mismatch');
+  return latestContract(entry);
+}
+
+export function resolveCurrentStoredOutcomeContractV1(state, input = {}) {
+  const raw = exactRequest(input, CURRENT_RESOLVE_KEYS, 'Current OutcomeContract resolve request');
+  const projectId = exactId(required(raw, 'projectId', 'Current OutcomeContract resolve request'), 'projectId');
+  const contractId = exactId(required(raw, 'contractId', 'Current OutcomeContract resolve request'), 'contractId');
+  const registry = normalizeOutcomeContractRegistryV1(registryInput(state));
+  const entry = requireRegistryEntry(registry, contractId);
+  if (entry.projectId !== projectId) throw new Error('OutcomeContract project binding mismatch');
+  if (entry.deleted) throw new Error('OutcomeContract is deleted');
   return latestContract(entry);
 }
 
