@@ -1161,13 +1161,19 @@ export class BrowserAgentManager {
   }
 
   async prepareDefinitionSpecialistDelegation(id, payload = {}) {
-    const allowed = new Set(['expectedRegistryRevision','expectedPlanRevision','nodeId','at','childBudget','parentInvocationId']);
+    const allowed = new Set(['expectedRegistryRevision','expectedPlanRevision','expectedControlEpoch','nodeId','at','childBudget','parentInvocationId']);
     const request = snapshotExactOwnDataRequest(payload, allowed, 'Browser Agent definition specialist delegation request');
     for (const key of ['expectedRegistryRevision','expectedPlanRevision','nodeId']) {
       if (!Object.hasOwn(request, key)) throw new Error(`Browser Agent definition specialist delegation request requires ${key}`);
     }
     if (Object.hasOwn(request, 'childBudget')) {
       request.childBudget = snapshotAgentDefinitionLaunchRecord(request.childBudget, 'Browser Agent definition specialist delegation childBudget', 3);
+    }
+    if (Object.hasOwn(request, 'expectedControlEpoch')
+        && (!Number.isSafeInteger(request.expectedControlEpoch)
+          || request.expectedControlEpoch < 0
+          || Object.is(request.expectedControlEpoch, -0))) {
+      throw new Error('Browser Agent definition specialist delegation expectedControlEpoch must be a canonical non-negative safe integer');
     }
     if (Object.hasOwn(request, 'parentInvocationId') && typeof request.parentInvocationId !== 'string') {
       throw new Error('Browser Agent definition specialist delegation parentInvocationId must be exact text');
@@ -1177,6 +1183,12 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
+      if (Object.hasOwn(request, 'expectedControlEpoch')) {
+        if (job.runtime?.controlEpoch !== request.expectedControlEpoch
+            || job.runtime?.runState !== BrowserAgentRunState.RUNNING) {
+          throw new Error('Browser Agent controlEpoch or run state drifted before durable specialist delegation');
+        }
+      }
       if (!job.definitionSelection || !job.specialistDelegationBinding || !job.definitionScope) {
         throw new Error('Browser Agent job has no durable Agent-definition specialist delegation authority');
       }
@@ -3334,6 +3346,7 @@ export class BrowserAgentManager {
         const prepared = await this.prepareDefinitionSpecialistDelegation(id, {
           expectedRegistryRevision: registryState.registry.revision,
           expectedPlanRevision: current.job.runtime.plan.revision,
+          expectedControlEpoch: current.job.runtime.controlEpoch,
           nodeId: externalNode.nodeId,
           at: new Date(now).toISOString(),
         });
