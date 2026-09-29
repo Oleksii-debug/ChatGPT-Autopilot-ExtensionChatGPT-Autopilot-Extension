@@ -344,6 +344,29 @@ test('nested launch authority rejects accessors without executing them', async (
   assert.equal(reads, 0);
 });
 
+test('definition-bound jobs reject generic config mutation that could bypass durable definition authority', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const created = await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.immutable-definition' }));
+
+  await assert.rejects(
+    () => manager.updateConfig('job.immutable-definition', {
+      goal: 'Bypass reusable definition instructions.',
+      maxModelCalls: 999,
+      aiPinnedRouteId: 'route.other',
+    }),
+    /definition-bound jobs are immutable/,
+  );
+
+  const reloaded = await manager.get('job.immutable-definition');
+  assert.equal(reloaded.job.config.goal, created.job.config.goal);
+  assert.equal(reloaded.job.config.maxModelCalls, created.job.config.maxModelCalls);
+  assert.equal(reloaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(reloaded.job.definitionSelection.definitionRevision, 1);
+  assert.deepEqual(reloaded.job.definitionScope.capabilityIds, ['research']);
+});
+
 test('standard Browser Agent creation carries no reusable-definition provenance', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
