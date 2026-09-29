@@ -39,7 +39,7 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentExecutionPlane, AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
@@ -588,13 +588,16 @@ function normalizeSpecialistDelegationAdmissions(raw) {
       ? item.admissionKey
       : '';
     let selection = null;
+    let handoff = null;
     try {
       selection = normalizeSpecialistSelectionV1(item.selection);
+      handoff = normalizeSpecialistHandoffV1(item.handoff);
     } catch {
       continue;
     }
-    if (!agentId || !admissionKey || out.some(entry => entry.agentId === agentId)) continue;
-    out.push({ agentId, admissionKey, selection });
+    if (!agentId || !admissionKey || handoff.specialistId !== selection.specialistId
+        || out.some(entry => entry.agentId === agentId)) continue;
+    out.push({ agentId, admissionKey, selection, handoff });
   }
   return out;
 }
@@ -1570,7 +1573,8 @@ export class BrowserAgentManager {
         const existingAdmission = admissions.find(item => item.agentId === assignment.agentId);
         if (!existingOwnership || !existingAdmission) throw new Error('Existing specialist handoff lacks canonical durable admission provenance');
         if (existingAdmission.admissionKey !== admissionKey
-            || JSON.stringify(existingAdmission.selection) !== JSON.stringify(proposal.selection)) {
+            || JSON.stringify(existingAdmission.selection) !== JSON.stringify(proposal.selection)
+            || JSON.stringify(existingAdmission.handoff) !== JSON.stringify(proposal.binding.handoff)) {
           throw new Error('Existing specialist handoff drifted from current owner-bound delegation proposal');
         }
         if (JSON.stringify(existing) !== JSON.stringify(assignment)
@@ -1589,6 +1593,7 @@ export class BrowserAgentManager {
         agentId: assignment.agentId,
         admissionKey,
         selection: clone(proposal.selection),
+        handoff: clone(proposal.binding.handoff),
       }];
       job.runtime.updatedAt = this.now();
       appendHistory(job.runtime, {
