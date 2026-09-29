@@ -854,3 +854,49 @@ test('readiness remains the tie-breaker for equal executable path classes', () =
   assert.deepEqual(result.candidates.map(item => item.toolId), ['api.ready', 'api.degraded']);
   assert.equal(result.plan[0].toolId, 'api.ready');
 });
+
+
+test('stale deterministic path cannot outrank fresh executable fallback, but fresh degraded deterministic path can', () => {
+  const staleApi = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.stale', 'api/provider', ['filesystem.read']),
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('api/provider', {
+        pathKind:'API',
+        health:'READY',
+        observedAt:'2026-09-29T03:00:00.000Z',
+        validThrough:'2026-09-29T04:00:00.000Z',
+      }),
+      state('ocr/provider', { pathKind:'OCR', health:'READY' }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(staleApi.candidates.map(item => [item.toolId, item.readiness]), [
+    ['ocr.ready', 'READY'],
+    ['api.stale', 'NEEDS_HEALTH_CHECK'],
+  ]);
+  assert.equal(staleApi.plan[0].toolId, 'ocr.ready');
+
+  const freshDegradedApi = discover({
+    capabilities:[capability('filesystem.read')],
+    tools:[
+      tool('api.degraded', 'api/provider', ['filesystem.read']),
+      tool('ocr.ready', 'ocr/provider', ['filesystem.read']),
+    ],
+    providerStates:[
+      state('api/provider', { pathKind:'API', health:'DEGRADED' }),
+      state('ocr/provider', { pathKind:'OCR', health:'READY' }),
+    ],
+    requestedCapabilityIds:['filesystem.read'],
+  });
+
+  assert.deepEqual(freshDegradedApi.candidates.map(item => [item.toolId, item.readiness]), [
+    ['api.degraded', 'DEGRADED'],
+    ['ocr.ready', 'READY'],
+  ]);
+  assert.equal(freshDegradedApi.plan[0].toolId, 'api.degraded');
+});
