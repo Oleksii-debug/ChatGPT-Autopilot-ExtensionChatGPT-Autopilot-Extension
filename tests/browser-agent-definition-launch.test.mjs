@@ -489,3 +489,19 @@ test('Core exposes definition launch only through the canonical BrowserAgentMana
   assert.match(source, /browserAgent\.createFromAgentDefinition\(message\.payload \|\| \{\}\)/);
   assert.doesNotMatch(source, /chrome\.storage\.local[^\n]+CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION/);
 });
+
+
+test('Core prepares definition-bound Browser Agent model calls through the bounded envelope chain', async () => {
+  const source = await readFile(new URL('../src/background/service-worker.js', import.meta.url), 'utf8');
+  assert.match(source, /createBoundAgentModelRouteDispatchIntentV1/);
+  assert.match(source, /createBoundAgentModelOrchestratorEnvelopeV1/);
+  assert.match(source, /prepareDefinitionBoundAgentInvocation/);
+  assert.match(source, /definitionModelPolicyBinding/);
+  assert.match(source, /agentModelOrchestratorEnvelope:bound\.envelope/);
+  assert.match(source, /delete sanitizedPayload\[key\]/);
+  assert.doesNotMatch(
+    source,
+    /agentModelOrchestratorEnvelope\s*:\s*message\.payload/u,
+    'UI payloads must never be promoted into internal model authority',
+  );
+});
