@@ -37,6 +37,7 @@ const MAX_TOOLS = 2048;
 const MAX_PROVIDER_STATES = 512;
 const MAX_REQUESTED_CAPABILITIES = 64;
 const MAX_LATENCY_MS = 10 * 60_000;
+const MAX_READINESS_VALIDITY_MS = 24 * 60 * 60_000;
 
 function plain(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${label} must be an object`);
@@ -182,8 +183,13 @@ export function normalizeProviderReadinessV1(input) {
   const health = exactEnum(raw.health, HEALTH, 'health');
   const observedAt = canonicalTimestamp(raw.observedAt, 'observedAt');
   const validThrough = canonicalTimestamp(raw.validThrough, 'validThrough');
-  if (Date.parse(validThrough) < Date.parse(observedAt)) {
+  const observedMs = Date.parse(observedAt);
+  const validThroughMs = Date.parse(validThrough);
+  if (validThroughMs < observedMs) {
     throw new Error('ProviderReadinessV1 validThrough cannot predate observedAt');
+  }
+  if (validThroughMs - observedMs > MAX_READINESS_VALIDITY_MS) {
+    throw new Error('ProviderReadinessV1 validity window exceeds 24 hours');
   }
   return frozen({
     schemaVersion: 1,
