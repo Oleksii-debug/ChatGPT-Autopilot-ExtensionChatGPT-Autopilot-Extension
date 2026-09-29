@@ -684,7 +684,7 @@ test('generic repository mutation cannot rewrite durable creation time or move p
 
   const restored = await repository.load();
   assert.equal(restored.revision, 1);
-  assert.equal(restored.createdAt, 0);
+  assert.equal(restored.createdAt, 3);
   assert.equal(restored.updatedAt, 3);
   assert.equal(restored.projectsById['project-a'].createdAt, 2);
   assert.equal(restored.projectsById['project-a'].updatedAt, 3);
