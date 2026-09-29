@@ -119,7 +119,7 @@ function snapshotContextResolutionRequest(input) {
   if (!hasOwn(raw, 'expectedProjectRevisionId')) {
     throw new Error('Project workspace context resolution request is missing expectedProjectRevisionId');
   }
-  const capsuleId = hasOwn(raw, 'capsuleId') && raw.capsuleId != null && raw.capsuleId !== ''
+  const capsuleId = hasOwn(raw, 'capsuleId')
     ? workspaceId(raw.capsuleId, 'capsuleId')
     : '';
   return Object.freeze({
