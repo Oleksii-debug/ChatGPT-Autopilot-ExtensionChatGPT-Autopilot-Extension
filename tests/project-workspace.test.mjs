@@ -550,3 +550,58 @@ test('canonical repository update cannot delete or substitute an existing durabl
   assert.equal(restored.revision, 1);
   assert.equal(restored.projectsById['project-a'].capsulesById['capsule-1'].summary, 'Current state.');
 });
+
+
+test('artifact provenance identity is immutable under its durable artifact key', () => {
+  const workspace = createProjectWorkspace(1);
+  addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+  const first = putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
+  const replay = putProjectArtifactProvenance(workspace, provenance(), { nowMs: 50 });
+  assert.equal(replay, first);
+  assert.equal(workspace.projectsById['project-a'].updatedAt, 3);
+
+  assert.throws(
+    () => putProjectArtifactProvenance(workspace, {
+      ...provenance(),
+      sourceBindings: [],
+    }, { nowMs: 51 }),
+    /provenance identity cannot be reused for different content/,
+  );
+  assert.equal(
+    workspace.projectsById['project-a'].provenanceByArtifactId.build.sourceBindings.length,
+    1,
+  );
+});
+
+test('canonical repository update cannot delete or substitute existing artifact provenance', async () => {
+  const chrome = fakeChrome();
+  const repository = new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace => {
+    addProjectSnapshot(workspace, snapshot(), { nowMs: 2 });
+    putProjectArtifactProvenance(workspace, provenance(), { nowMs: 3 });
+    return workspace;
+  }, { nowMs: 3 });
+
+  await assert.rejects(
+    repository.update(workspace => {
+      delete workspace.projectsById['project-a'].provenanceByArtifactId.build;
+      return workspace;
+    }, { nowMs: 4 }),
+    /cannot remove existing artifact provenance/,
+  );
+
+  await assert.rejects(
+    repository.update(workspace => {
+      workspace.projectsById['project-a'].provenanceByArtifactId.build = {
+        ...workspace.projectsById['project-a'].provenanceByArtifactId.build,
+        sourceBindings: [],
+      };
+      return workspace;
+    }, { nowMs: 5 }),
+    /provenance identity cannot be reused for different content/,
+  );
+
+  const restored = await repository.load();
+  assert.equal(restored.revision, 1);
+  assert.equal(restored.projectsById['project-a'].provenanceByArtifactId.build.sourceBindings.length, 1);
+});
