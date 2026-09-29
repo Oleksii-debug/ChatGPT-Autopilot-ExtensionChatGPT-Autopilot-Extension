@@ -555,6 +555,27 @@ function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawRevision
   }
   return { configs, revisions, quarantine };
 }
+function specialistProviderConfigHasEffectAuthority(store, providerId) {
+  for (const jobId of store.order || []) {
+    const job = store.byId?.[jobId];
+    const executions = job?.runtime?.specialistProviderExecutions || [];
+    const ownerships = (job?.runtime?.specialistExecutionOwnerships || []).flatMap(item => {
+      try { return [normalizeExecutionOwnershipV1(item)]; } catch { return []; }
+    });
+    for (const item of executions) {
+      let execution;
+      try { execution = normalizeSpecialistProviderExecutionV1(item); } catch { return true; }
+      if (execution.providerId !== providerId) continue;
+      if (execution.status === 'PREPARED') return true;
+      const ownership = ownerships.find(candidate =>
+        candidate.ownerId === execution.agentId
+        && candidate.leaseId === execution.leaseId
+        && candidate.nodeId === execution.nodeId);
+      if (ownership && SPECIALIST_CAPACITY_STATES.has(ownership.state)) return true;
+    }
+  }
+  return false;
+}
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
   const url = new URL(value);
@@ -1289,6 +1310,9 @@ export class BrowserAgentManager {
       const quarantine = store.specialistProviderConfigQuarantineById
         || (store.specialistProviderConfigQuarantineById = Object.create(null));
       const providerId = providerConfig.providerId;
+      if (specialistProviderConfigHasEffectAuthority(store, providerId)) {
+        throw new Error('Specialist provider config cannot change while provider execution owns effect authority');
+      }
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
       }
@@ -1338,6 +1362,9 @@ export class BrowserAgentManager {
       const revisions = store.specialistProviderConfigRevisionById
         || (store.specialistProviderConfigRevisionById = Object.create(null));
       const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+      if (specialistProviderConfigHasEffectAuthority(store, providerId)) {
+        throw new Error('Specialist provider config cannot change while provider execution owns effect authority');
+      }
       if (Object.hasOwn(quarantine, providerId)) {
         throw new Error('Specialist provider config is quarantined as corrupt and cannot be cleared');
       }
