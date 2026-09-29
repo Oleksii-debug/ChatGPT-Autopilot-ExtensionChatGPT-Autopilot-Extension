@@ -215,6 +215,51 @@ test('Agent definition model policy rejects relationships that canonical Agent b
   );
 });
 
+test('Options save preserves missing legacy failover fields instead of materializing display defaults', () => {
+  const persisted = {
+    autoSwitch: false,
+    pinnedRouteId: '',
+    orderedRouteIds: [],
+    allowRouteIds: ['route.saved'],
+    denyRouteIds: [],
+    freeOnly: true,
+    locality: 'local',
+    maxInputPricePerMillionUsd: 0,
+    maxOutputPricePerMillionUsd: 0,
+  };
+  const form = configuredPolicyForm({
+    modelRouteAutoSwitch: false,
+    modelRoutePinnedRouteId: '',
+    modelRouteOrderedRouteIdsText: '',
+    modelRouteAllowRouteIdsText: 'route.saved',
+    modelRouteDenyRouteIdsText: '',
+    modelRouteFreeOnly: true,
+    modelRouteLocality: 'local',
+    modelRouteMaxInputPriceText: '0',
+    modelRouteMaxOutputPriceText: '0',
+    modelRouteRetryBackoffSeconds: '60',
+    modelRouteCircuitBreakerFailures: '2',
+    modelRouteCircuitBreakerSeconds: '300',
+  });
+
+  const preserved = buildAgentDefinitionModelRoutePolicyFromFormV1(form, {
+    persistedPolicy: persisted,
+  });
+  assert.equal(Object.hasOwn(preserved, 'retryBackoffSeconds'), false);
+  assert.equal(Object.hasOwn(preserved, 'circuitBreakerFailures'), false);
+  assert.equal(Object.hasOwn(preserved, 'circuitBreakerSeconds'), false);
+
+  const explicit = buildAgentDefinitionModelRoutePolicyFromFormV1({
+    ...form,
+    modelRouteRetryBackoffSeconds: '90',
+  }, {
+    persistedPolicy: persisted,
+  });
+  assert.equal(explicit.retryBackoffSeconds, 90);
+  assert.equal(Object.hasOwn(explicit, 'circuitBreakerFailures'), false);
+  assert.equal(Object.hasOwn(explicit, 'circuitBreakerSeconds'), false);
+});
+
 test('legacy partial persisted model policy remains editable with a legacy route pin', () => {
   const definition = buildAgentDefinitionFromFormV1(
     baseForm(),
