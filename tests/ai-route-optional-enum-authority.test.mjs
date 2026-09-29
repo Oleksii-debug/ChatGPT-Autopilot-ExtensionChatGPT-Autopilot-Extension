@@ -42,6 +42,25 @@ for (const malformed of [false, 0, '', null]) {
   });
 }
 
+test('optional enum authorities reject padded canonical-value aliases', () => {
+  assert.throws(
+    () => normalizeAiRoutePool([{ ...baseRoute, locality:' local ' }]),
+    /AI route locality is invalid/u,
+  );
+  assert.throws(
+    () => normalizeAiRoutePool([{ ...baseRoute, costClass:' free ' }]),
+    /AI route costClass is invalid/u,
+  );
+  assert.throws(
+    () => normalizeAiRoutePolicy({ locality:' any ' }),
+    /AI route policy locality is invalid/u,
+  );
+  assert.throws(
+    () => normalizeAiWorkerPolicy({ allocationMode:' manual ' }, [baseRoute]),
+    /AI worker allocationMode is invalid/u,
+  );
+});
+
 test('absent and explicit-undefined optional enums preserve canonical defaults', () => {
   const [omittedRoute] = normalizeAiRoutePool([baseRoute]);
   const [undefinedRoute] = normalizeAiRoutePool([{
