@@ -1243,7 +1243,7 @@ test('restart normalization rejects partial or time-inconsistent recovery metada
   assert.throws(
     () => normalizeExactEffectStateV1({
       ...state,
-      ambiguity: { ...state.ambiguity, declaredAt: '2026-09-19T12:00:03.000Z' },
+      ambiguity: { ...state.ambiguity, declaredAt: '2026-09-19T12:01:03.000Z' },
     }),
     /ambiguity chronology is invalid/,
   );
@@ -1266,7 +1266,7 @@ test('restart normalization rejects partial or time-inconsistent recovery metada
         outcome: ReconciliationOutcome.MANUAL_REVIEW,
         reasonCode: 'UNRESOLVED',
         summary: '',
-        resolvedAt: '2026-09-19T12:00:03.000Z',
+        resolvedAt: '2026-09-19T12:01:03.000Z',
       },
     }),
     /reconciliation chronology is invalid/,
