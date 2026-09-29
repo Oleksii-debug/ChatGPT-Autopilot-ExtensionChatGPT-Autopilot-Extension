@@ -198,3 +198,67 @@ test('Specialist provider config input is snapshotted before asynchronous storag
   assert.equal(committed.providerConfig.config.workspacePath, 'C:\\Autopilot\\workspace');
   assert.equal(committed.providerConfig.revision, 1);
 });
+
+
+test('provider config clear preserves a durable revision tombstone and blocks ABA recreation', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await manager.putSpecialistProviderConfig({
+    providerConfig: providerConfig(),
+    expectedRevision: 0,
+  });
+
+  const cleared = await manager.clearSpecialistProviderConfig({
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    expectedRevision: 1,
+  });
+  assert.deepEqual(cleared, {
+    providerId: OPENHANDS_CODING_PROVIDER_ID,
+    cleared: true,
+    revision: 2,
+  });
+
+  const restarted = managerFor(chrome);
+  const empty = await restarted.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(empty.providerConfig, null);
+  assert.equal(empty.revision, 2);
+  assert.equal(empty.quarantined, false);
+
+  await assert.rejects(
+    () => restarted.putSpecialistProviderConfig({
+      providerConfig: providerConfig(1, T1),
+      expectedRevision: 0,
+    }),
+    /revision drifted/,
+  );
+
+  const recreated = providerConfig(3, T1);
+  const committed = await restarted.putSpecialistProviderConfig({
+    providerConfig: recreated,
+    expectedRevision: 2,
+  });
+  assert.equal(committed.revision, 3);
+  assert.deepEqual(committed.providerConfig, recreated);
+});
+
+test('provider config clear is exact-revision fenced and leaves active config unchanged on stale request', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  const current = providerConfig();
+  await manager.putSpecialistProviderConfig({
+    providerConfig: current,
+    expectedRevision: 0,
+  });
+
+  await assert.rejects(
+    () => manager.clearSpecialistProviderConfig({
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: 2,
+    }),
+    /revision drifted/,
+  );
+
+  const fetched = await manager.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.deepEqual(fetched.providerConfig, current);
+  assert.equal(fetched.revision, 1);
+});
