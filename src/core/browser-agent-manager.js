@@ -898,6 +898,7 @@ function assertTrustedSpecialistReadiness(readiness, selection, nowMs) {
   for (const [field, expected] of [
     ['registryId', canonical.registryId],
     ['registryRevision', canonical.registryRevision],
+    ['registryBindingKey', canonical.registryBindingKey],
     ['specialistId', canonical.specialistId],
     ['providerId', canonical.providerId],
     ['definitionRevision', canonical.definitionRevision],
@@ -910,13 +911,17 @@ function assertTrustedSpecialistReadiness(readiness, selection, nowMs) {
   if (readinessOwnData(readiness, 'executable') !== true) {
     throw new Error('Selected Specialist provider is not currently executable');
   }
+  const observedAt = readinessOwnData(readiness, 'observedAt');
   const resolvedAt = readinessOwnData(readiness, 'resolvedAt');
   const maxAgeMs = readinessOwnData(readiness, 'maxAgeMs');
+  const observedMs = typeof observedAt === 'string' ? Date.parse(observedAt) : NaN;
   const resolvedMs = typeof resolvedAt === 'string' ? Date.parse(resolvedAt) : NaN;
-  if (!Number.isFinite(resolvedMs) || new Date(resolvedMs).toISOString() !== resolvedAt
+  if (!Number.isFinite(observedMs) || new Date(observedMs).toISOString() !== observedAt
+      || !Number.isFinite(resolvedMs) || new Date(resolvedMs).toISOString() !== resolvedAt
       || !Number.isSafeInteger(maxAgeMs) || Object.is(maxAgeMs, -0)
       || maxAgeMs < 1 || maxAgeMs > 5 * 60_000
-      || !Number.isSafeInteger(nowMs) || nowMs < resolvedMs || nowMs - resolvedMs > maxAgeMs) {
+      || !Number.isSafeInteger(nowMs)
+      || observedMs > resolvedMs || resolvedMs > nowMs || nowMs - observedMs > maxAgeMs) {
     throw new Error('Trusted Specialist provider readiness expired before claim');
   }
   return readiness;
