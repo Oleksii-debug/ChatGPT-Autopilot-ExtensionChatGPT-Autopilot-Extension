@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
-import { AgentDefinitionRegistryMutationKind } from '../src/core/agent-definition-registry.js';
+import { AgentDefinitionRegistryMutationKind, createAgentDefinitionRegistryV1 } from '../src/core/agent-definition-registry.js';
 
 function makeChromeStorage() {
   const data = Object.create(null);
@@ -84,19 +84,30 @@ function ownerBudget(overrides = {}) {
 }
 
 async function seedRegistry(manager, def = definition()) {
-  await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
+  const created = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 1,
+    expectedRegistryBindingKey: created.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.CREATE,
     definition: def,
   });
+}
+
+function defaultRegistryBindingKey() {
+  return createAgentDefinitionRegistryV1({
+    schemaVersion: 1,
+    registryId: 'agents:project-1',
+    revision: 2,
+    definitions: [definition()],
+  }).bindingKey;
 }
 
 function launchRequest(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: defaultRegistryBindingKey(),
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
     jobId: 'job.research-1',
@@ -204,9 +215,11 @@ test('launch requires exact live registry and definition revisions at the serial
   const manager = managerFor(chrome);
   await seedRegistry(manager);
 
+  const beforeUpdate = await manager.getAgentDefinitionRegistry('agents:project-1');
   await manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: beforeUpdate.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
@@ -228,8 +241,10 @@ test('launch requires exact live registry and definition revisions at the serial
     /definition revision drifted before launch/,
   );
 
+  const updatedRegistry = await manager.getAgentDefinitionRegistry('agents:project-1');
   const current = await manager.createFromAgentDefinition(launchRequest({
     expectedRegistryRevision: 3,
+    expectedRegistryBindingKey: updatedRegistry.registry.bindingKey,
     expectedDefinitionRevision: 2,
     jobId: 'job.research-v2',
   }));
@@ -237,14 +252,32 @@ test('launch requires exact live registry and definition revisions at the serial
   assert.equal(current.job.definitionSelection.definitionRevision, 2);
 });
 
+test('definition launch rejects stale same-revision registry binding before materialization', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const live = await manager.getAgentDefinitionRegistry('agents:project-1');
+
+  await assert.rejects(
+    () => manager.createFromAgentDefinition(launchRequest({
+      jobId: 'job.stale-binding',
+      expectedRegistryBindingKey: live.registry.bindingKey + ':stale',
+    })),
+    /bindingKey drifted before launch/,
+  );
+  assert.equal((await manager.get('job.stale-binding')).job, null);
+});
+
 test('a registry mutation queued before launch cannot be bypassed by stale launch expectations', async () => {
   const { chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
   await seedRegistry(manager);
 
+  const beforeQueuedUpdate = await manager.getAgentDefinitionRegistry('agents:project-1');
   const mutation = manager.mutateAgentDefinitionRegistry({
     registryId: 'agents:project-1',
     expectedRegistryRevision: 2,
+    expectedRegistryBindingKey: beforeQueuedUpdate.registry.bindingKey,
     kind: AgentDefinitionRegistryMutationKind.UPDATE,
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 1,
