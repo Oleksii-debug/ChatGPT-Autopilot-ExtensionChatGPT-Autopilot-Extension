@@ -321,6 +321,10 @@ test('ambiguous provider transport failure is durably fenced for reconciliation'
   assert.equal(result.execution.reconciliationRequired, true);
   assert.equal(result.execution.safeToRetry, false);
   assert.equal(result.execution.errorCode, 'OPENHANDS_REQUEST_TIMEOUT');
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.executionOwnerships[0].state, 'RECONCILE');
+  assert.equal(durable.executionOwnerships[0].leaseId, result.execution.leaseId);
 });
 
 test('durable PREPARED record is never blindly redispatched after restart-shaped re-entry', async () => {
