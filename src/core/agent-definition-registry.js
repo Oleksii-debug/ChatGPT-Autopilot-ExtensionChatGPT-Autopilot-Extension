@@ -646,12 +646,14 @@ export function proposeAgentDefinitionRegistryMutationV1(input = {}) {
   if (expectedRegistryRevision !== registry.revision) {
     throw new Error('Agent definition registry revision drifted before mutation');
   }
-  const expectedRegistryBindingKey = exactBindingKey(
-    raw.expectedRegistryBindingKey,
-    'expectedRegistryBindingKey',
-  );
-  if (expectedRegistryBindingKey !== registry.bindingKey) {
-    throw new Error('Agent definition registry bindingKey drifted before mutation');
+  if (Object.hasOwn(raw, 'expectedRegistryBindingKey')) {
+    const expectedRegistryBindingKey = exactBindingKey(
+      raw.expectedRegistryBindingKey,
+      'expectedRegistryBindingKey',
+    );
+    if (expectedRegistryBindingKey !== registry.bindingKey) {
+      throw new Error('Agent definition registry bindingKey drifted before mutation');
+    }
   }
   if (typeof raw.kind !== 'string' || !MUTATION_KINDS.has(raw.kind)) {
     throw new Error('Agent definition registry mutation kind is invalid');
