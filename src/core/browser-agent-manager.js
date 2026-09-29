@@ -576,9 +576,20 @@ function normalizePersistedSpecialistAutomationPolicyState(rawPolicy, rawRevisio
 }
 
 function normalizePersistedOwnerResourceBudgetState(rawBudget, rawRevision, rawQuarantined) {
+  const hasBudget = rawBudget !== undefined;
+  const hasRevision = rawRevision !== undefined;
   let quarantined = rawQuarantined === true;
+  if (rawQuarantined !== undefined && typeof rawQuarantined !== 'boolean') {
+    quarantined = true;
+  }
+  // The budget and its CAS revision are one durable authority record.  Legacy
+  // stores may omit both, but a partially persisted pair must never mint
+  // revision-zero capacity after corruption or manual storage substitution.
+  if (hasBudget !== hasRevision) {
+    quarantined = true;
+  }
   let revision = 0;
-  if (rawRevision !== undefined) {
+  if (hasRevision) {
     try {
       revision = nonNegativeSafeInteger(rawRevision, 'Stored owner resource budget revision');
     } catch {
@@ -587,7 +598,7 @@ function normalizePersistedOwnerResourceBudgetState(rawBudget, rawRevision, rawQ
   }
   let budget;
   try {
-    budget = normalizeResourceBudgetV1(rawBudget === undefined ? {} : rawBudget);
+    budget = normalizeResourceBudgetV1(hasBudget ? rawBudget : {});
   } catch {
     budget = normalizeResourceBudgetV1({});
     quarantined = true;
