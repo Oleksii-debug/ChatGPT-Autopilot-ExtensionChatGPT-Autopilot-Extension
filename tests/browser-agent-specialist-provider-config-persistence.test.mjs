@@ -227,3 +227,22 @@ test('provider config revision tombstone survives a normalized save and blocks A
     /revision drifted/,
   );
 });
+
+
+test('provider config rejects clock rollback without advancing durable revision', async () => {
+  const { chrome } = makeChromeStorage();
+  const clock = { value: T0 };
+  const manager = managerFor(chrome, () => clock.value);
+  await manager.setSpecialistProviderConfig(setRequest(0));
+
+  clock.value = T0 - 1;
+  await assert.rejects(
+    () => manager.setSpecialistProviderConfig(setRequest(1, {
+      config: config({ agentProfileRevision: 2 }),
+    })),
+    /updatedAt cannot move backwards or repeat/,
+  );
+  const state = await manager.getSpecialistProviderConfig(OPENHANDS_CODING_PROVIDER_ID);
+  assert.equal(state.config.revision, 1);
+  assert.equal(state.revision, 1);
+});
