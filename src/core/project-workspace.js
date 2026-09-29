@@ -102,11 +102,23 @@ function sameCanonicalData(left, right) {
 }
 
 function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
+  if (nextWorkspace.createdAt !== previousWorkspace.createdAt) {
+    throw new Error('Project workspace createdAt is immutable');
+  }
+  if (nextWorkspace.updatedAt < previousWorkspace.updatedAt) {
+    throw new Error('Project workspace updatedAt cannot move backward');
+  }
   for (const [projectId, previousProject] of Object.entries(previousWorkspace.projectsById)) {
     if (!hasOwn(nextWorkspace.projectsById, projectId)) {
       throw new Error('Project workspace update cannot remove an existing project');
     }
     const nextProject = nextWorkspace.projectsById[projectId];
+    if (nextProject.createdAt !== previousProject.createdAt) {
+      throw new Error('Project workspace project createdAt is immutable');
+    }
+    if (nextProject.updatedAt < previousProject.updatedAt) {
+      throw new Error('Project workspace project updatedAt cannot move backward');
+    }
     const previousSnapshot = normalizeProjectSnapshotV1(previousProject.snapshot);
     const nextSnapshot = normalizeProjectSnapshotV1(nextProject.snapshot);
     if (previousSnapshot.revisionId === nextSnapshot.revisionId
@@ -156,8 +168,9 @@ function validateProjectRecord(project) {
   record(project, 'project workspace project');
   const snapshot = normalizeProjectSnapshotV1(project.snapshot);
   if (project.projectId !== snapshot.projectId) throw new Error('Project workspace projectId mismatch');
-  timestamp(project.createdAt, 'project workspace project createdAt');
-  timestamp(project.updatedAt, 'project workspace project updatedAt');
+  const createdAt = timestamp(project.createdAt, 'project workspace project createdAt');
+  const updatedAt = timestamp(project.updatedAt, 'project workspace project updatedAt');
+  if (updatedAt < createdAt) throw new Error('Project workspace project updatedAt cannot precede createdAt');
   record(project.capsulesById, 'project workspace capsulesById');
   record(project.provenanceByArtifactId, 'project workspace provenanceByArtifactId');
   const capsules = Object.entries(project.capsulesById);
@@ -183,8 +196,9 @@ export function validateProjectWorkspace(workspace) {
   record(workspace, 'project workspace');
   if (workspace.schemaVersion !== PROJECT_WORKSPACE_SCHEMA_VERSION) throw new Error('Unsupported project workspace schema');
   if (!Number.isInteger(workspace.revision) || workspace.revision < 0) throw new Error('Invalid project workspace revision');
-  timestamp(workspace.createdAt, 'project workspace createdAt');
-  timestamp(workspace.updatedAt, 'project workspace updatedAt');
+  const createdAt = timestamp(workspace.createdAt, 'project workspace createdAt');
+  const updatedAt = timestamp(workspace.updatedAt, 'project workspace updatedAt');
+  if (updatedAt < createdAt) throw new Error('Project workspace updatedAt cannot precede createdAt');
   record(workspace.projectsById, 'project workspace projectsById');
   const entries = Object.entries(workspace.projectsById);
   if (entries.length > MAX_PROJECTS) throw new Error('Project workspace project limit exceeded');
@@ -408,12 +422,16 @@ export class ProjectWorkspaceRepository {
   update(mutator, { nowMs = Date.now() } = {}) {
     const task = this.updateQueue.then(async () => {
       const current = await this.load();
+      timestamp(nowMs, 'project workspace update nowMs');
+      if (nowMs < current.updatedAt) {
+        throw new Error('Project workspace update nowMs cannot precede durable updatedAt');
+      }
       const draft = structuredClone(current);
       const next = await mutator(draft) || draft;
-      validateProjectWorkspace(next);
-      assertSnapshotRevisionContinuity(current, next);
       next.revision = current.revision + 1;
       next.updatedAt = nowMs;
+      validateProjectWorkspace(next);
+      assertSnapshotRevisionContinuity(current, next);
       return this.save(next);
     });
     this.updateQueue = task.catch(() => undefined);
