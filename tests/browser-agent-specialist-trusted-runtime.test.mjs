@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import { BrowserAgentManager } from '../src/core/browser-agent-manager.js';
 import { TRUSTED_EXECUTION_VERIFICATION_LEDGER_STORAGE_KEY } from '../src/core/trusted-execution-verification-ledger.js';
@@ -690,4 +691,52 @@ test('trusted NO_EFFECT safe retry releases historical PREPARED provider config 
   });
   assert.equal(updated.config.revision, 2);
   assert.equal(store.byId['job-1'].runtime.specialistProviderExecutions[0].status, 'PREPARED');
+});
+
+
+test('service-worker owns timestamps for Specialist completion and trusted verification transitions', async () => {
+  const source = await readFile(
+    new URL('../src/background/service-worker.js', import.meta.url),
+    'utf8',
+  );
+  const cases = [
+    {
+      command: 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY',
+      variable: 'reconciliation',
+      payload: 'reconciliation',
+      method: 'authorizeSpecialistSafeRetry',
+    },
+    {
+      command: 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF',
+      variable: 'completion',
+      payload: 'completion',
+      method: 'completeSpecialistHandoff',
+    },
+    {
+      command: 'VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF',
+      variable: 'verification',
+      payload: 'verification',
+      method: 'verifySpecialistHandoff',
+    },
+  ];
+
+  for (const item of cases) {
+    const start = source.indexOf(`message.command === '${item.command}'`);
+    assert.notEqual(start, -1, `${item.command} handler must exist`);
+    const end = source.indexOf("  } else if (message.command === '", start + 1);
+    assert.notEqual(end, -1, `${item.command} handler must have a bounded branch`);
+    const block = source.slice(start, end);
+    assert.ok(
+      block.includes(`const ${item.variable} = structuredClone(message.payload?.${item.payload} || {});`),
+      `${item.command} must snapshot caller payload before authority filtering`,
+    );
+    assert.ok(
+      block.includes(`delete ${item.variable}.at;`),
+      `${item.command} must discard caller-controlled transition time`,
+    );
+    assert.ok(
+      block.includes(`browserAgent.${item.method}(message.payload?.id || '', ${item.variable})`),
+      `${item.command} must invoke Core with the sanitized payload`,
+    );
+  }
 });

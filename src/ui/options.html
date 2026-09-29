@@ -116,13 +116,10 @@
 
       <details id="agent-specialist-automation-details">
         <summary>Автоматичні Specialist workers</summary>
-        <p id="agent-specialist-automation-help" class="field-help">Ця owner policy дозволяє Agent автоматично забирати готові Specialist handoffs у межах одного спільного ліміту. Значення 0 не запускає нові Specialist effects. Уже PREPARED execution може лише відновити attach/reconciliation без повторного створення зовнішньої роботи.</p>
+        <p id="agent-specialist-automation-help" class="field-help">Ця owner policy лише вмикає або вимикає автоматичний Specialist claim і provider dispatch. Product-wide числовий ліміт задається окремо через ResourceBudgetV1 нижче. Уже PREPARED execution може лише відновити attach/reconciliation без повторного створення зовнішньої роботи.</p>
         <fieldset class="settings-group" aria-describedby="agent-specialist-automation-help agent-specialist-automation-status">
           <legend>Product-wide Specialist automation</legend>
           <label><input id="agent-specialist-automation-enabled" type="checkbox">Дозволити автоматичний Specialist claim і provider dispatch</label>
-          <label for="agent-specialist-automation-capacity">Максимум одночасних Specialist handoffs для всіх Agent jobs</label>
-          <input id="agent-specialist-automation-capacity" type="number" min="0" max="256" step="1" inputmode="numeric" value="0" aria-describedby="agent-specialist-automation-capacity-help">
-          <p id="agent-specialist-automation-capacity-help" class="field-help">0 означає: нові handoffs автоматично не claim-ити. Ліміт є product-wide і не замінює per-Agent caps.</p>
           <div class="agent-actions" aria-label="Керування автоматичними Specialist workers">
             <button id="agent-specialist-automation-save-button" type="button">Зберегти policy</button>
             <button id="agent-specialist-automation-clear-button" type="button">Очистити policy</button>
@@ -178,6 +175,15 @@
           <p id="agent-specialist-provider-status" role="status">OpenHands provider config ще не завантажено.</p>
         </fieldset>
       </details>
+
+      <fieldset class="settings-group" id="agent-owner-resource-budget-group">
+        <legend>Глобальна capacity Specialist</legend>
+        <p id="agent-owner-max-concurrent-help" class="field-help">Це owner-authoritative maxConcurrentAgents із ResourceBudgetV1 для product-wide Specialist admission. 0 означає: не видавати нові Specialist leases. Інші виміри ResourceBudgetV1 під час цього збереження не змінюються.</p>
+        <label for="agent-owner-max-concurrent">Максимум одночасних Specialist leases</label>
+        <input id="agent-owner-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric" value="0" aria-describedby="agent-owner-max-concurrent-help">
+        <button id="agent-owner-resource-budget-save-button" type="button">Зберегти глобальну capacity</button>
+        <p id="agent-owner-resource-budget-status" role="status" tabindex="0">Глобальний ResourceBudgetV1 ще не завантажено.</p>
+      </fieldset>
 
       <details id="agent-definition-details">
         <summary>Збережені reusable Agent definitions</summary>

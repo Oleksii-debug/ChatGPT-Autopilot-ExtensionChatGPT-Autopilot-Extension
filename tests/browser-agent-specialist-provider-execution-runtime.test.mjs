@@ -109,6 +109,18 @@ function specialistDefinition() {
   };
 }
 
+function ownerResourceBudget(maxConcurrentAgents = 4) {
+  return {
+    maxConcurrentAgents,
+    maxChildAgents: 16,
+    maxModelCalls: 100,
+    maxModelInputTokens: 100000,
+    maxModelOutputTokens: 100000,
+    maxRuntimeSeconds: 3600,
+    maxCostUsdMicros: 5000000,
+  };
+}
+
 async function seed(manager, { claim = true } = {}) {
   const agents = await manager.createAgentDefinitionRegistry({ registryId: 'agents:project-1' });
   const agentMutation = await manager.mutateAgentDefinitionRegistry({
@@ -1343,10 +1355,13 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
     specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
   });
   const agentId = await seed(manager, { claim: false });
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: ownerResourceBudget(1),
+  });
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
   const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
   assert.equal(claimed.claimed.length, 1);
@@ -1362,7 +1377,6 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
         await manager.setSpecialistAutomationPolicy({
           expectedRevision: 1,
           enabled: false,
-          maxConcurrentHandoffs: 0,
         });
       }
       return {
@@ -1404,7 +1418,7 @@ test('owner policy drift during readiness blocks fresh automatic provider prepar
   assert.equal(durable.executionOwnerships[0].state, 'OWNED');
   const policy = await manager.getSpecialistAutomationPolicy();
   assert.equal(policy.policy.enabled, false);
-  assert.equal(policy.policy.maxConcurrentHandoffs, 0);
+  assert.equal(Object.hasOwn(policy.policy, 'maxConcurrentHandoffs'), false);
 });
 
 test('fresh automatic provider PREPARED atomically consumes transient claim provenance', async () => {
@@ -1442,10 +1456,13 @@ test('fresh automatic provider PREPARED atomically consumes transient claim prov
     specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
   });
   const agentId = await seed(manager, { claim: false });
+  await manager.setOwnerResourceBudget({
+    expectedRevision: 0,
+    budget: ownerResourceBudget(1),
+  });
   await manager.setSpecialistAutomationPolicy({
     expectedRevision: 0,
     enabled: true,
-    maxConcurrentHandoffs: 1,
   });
   const claimed = await manager.claimSpecialistHandoffsAcrossJobsFromAutomationPolicy();
   assert.equal(claimed.claimed.length, 1);

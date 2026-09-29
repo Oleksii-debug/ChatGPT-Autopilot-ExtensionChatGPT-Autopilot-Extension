@@ -82,6 +82,7 @@ const READ_ONLY_UI_COMMANDS = new Set([
   'LIST_BROWSER_AGENT_SPECIALIST_REGISTRIES',
   'GET_BROWSER_AGENT_SPECIALIST_REGISTRY',
   'GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY',
+  'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET',
   'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS',
   'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
   'PROBE_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG',
@@ -778,6 +779,10 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.setSpecialistAutomationPolicy(message.payload || {});
   } else if (message.command === 'CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY') {
     result = await browserAgent.clearSpecialistAutomationPolicy(message.payload || {});
+  } else if (message.command === 'GET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
+    result = await browserAgent.getOwnerResourceBudget();
+  } else if (message.command === 'SET_BROWSER_AGENT_OWNER_RESOURCE_BUDGET') {
+    result = await browserAgent.setOwnerResourceBudget(message.payload || {});
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIGS') {
     result = await browserAgent.listSpecialistProviderConfigs();
   } else if (message.command === 'GET_BROWSER_AGENT_SPECIALIST_PROVIDER_CONFIG') {
@@ -855,11 +860,17 @@ export async function dispatchUiMessage(message) {
       { specialistProviderReadinessResolver },
     );
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
-    result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
+    const reconciliation = structuredClone(message.payload?.reconciliation || {});
+    delete reconciliation.at;
+    result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', reconciliation);
   } else if (message.command === 'COMPLETE_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    result = await browserAgent.completeSpecialistHandoff(message.payload?.id || '', message.payload?.completion || {});
+    const completion = structuredClone(message.payload?.completion || {});
+    delete completion.at;
+    result = await browserAgent.completeSpecialistHandoff(message.payload?.id || '', completion);
   } else if (message.command === 'VERIFY_BROWSER_AGENT_SPECIALIST_HANDOFF') {
-    result = await browserAgent.verifySpecialistHandoff(message.payload?.id || '', message.payload?.verification || {});
+    const verification = structuredClone(message.payload?.verification || {});
+    delete verification.at;
+    result = await browserAgent.verifySpecialistHandoff(message.payload?.id || '', verification);
   } else if (message.command === 'START_BROWSER_AGENT_JOB') {
     result = await browserAgent.start(message.payload?.id || '');
   } else if (message.command === 'PAUSE_BROWSER_AGENT_JOB') {
