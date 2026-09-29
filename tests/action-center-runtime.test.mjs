@@ -458,6 +458,30 @@ test('Action Center public envelopes reject accessor-backed fields without execu
   assert.equal(resolverGetterCalls, 0);
 });
 
+test('Action Center public envelopes reject unknown, symbol and hidden side data', async () => {
+  await assert.rejects(
+    () => projectRuntimeActionCenter({ agentJobs: [], unexpected:true }),
+    /unknown field/u,
+  );
+
+  const symbolInput = { agentJobs: [] };
+  symbolInput[Symbol('side-data')] = true;
+  await assert.rejects(
+    () => projectRuntimeActionCenter(symbolInput),
+    /unknown field/u,
+  );
+
+  const hiddenInput = { agentJobs: [] };
+  Object.defineProperty(hiddenInput, 'cryptoApi', {
+    enumerable:false,
+    value:globalThis.crypto,
+  });
+  await assert.rejects(
+    () => projectRuntimeActionCenter(hiddenInput),
+    /enumerable own data properties/u,
+  );
+});
+
 test('Browser Agent approval authority fields reject accessors without executing getters', async () => {
   const makeJob = () => agentJob('descriptor-safe', {
     config: { name: 'Descriptor safe approval' },
