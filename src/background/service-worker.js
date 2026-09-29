@@ -240,6 +240,7 @@ const browserAgent = new BrowserAgentManager({
       ownerAllowedRouteIds: settings.routes.map(route => route.routeId),
     };
   },
+  specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, openHandsSpecialistClient]]),
 });
 browserAgentLifecycle.current = browserAgent;
 const specialistReadinessConfigProvenance = new WeakMap();
@@ -764,6 +765,19 @@ export async function dispatchUiMessage(message) {
       message.payload?.id || '',
       message.payload?.claim || {},
       { specialistProviderReadinessResolver },
+    );
+  } else if (message.command === 'RUN_BROWSER_AGENT_SPECIALIST_PROVIDER_EXECUTION') {
+    const randomUuid = globalThis.crypto?.randomUUID;
+    if (typeof randomUuid !== 'function') {
+      throw new Error('Secure UUID generation is unavailable for Specialist provider execution');
+    }
+    result = await browserAgent.executeClaimedSpecialistProvider(
+      message.payload?.id || '',
+      {
+        agentId: message.payload?.agentId || '',
+        conversationId: randomUuid.call(globalThis.crypto).toLowerCase(),
+        expectedControlEpoch: message.payload?.expectedControlEpoch,
+      },
     );
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
