@@ -48,6 +48,9 @@ test('LEASED-only provider run binds current exact Browser Agent control epoch',
 test('runtime run control is disabled without a canonical epoch or with terminal evidence', () => {
   const body = functionBody('renderSpecialistProviderRuntime');
   assert.match(body, /selected\.state !== 'LEASED'/u);
+  assert.match(body, /runState !== 'RUNNING'/u);
+  assert.match(body, /Date\.parse\(selected\.leaseExpiresAt\)/u);
+  assert.match(body, /leaseExpiresMs > Date\.now\(\)/u);
   assert.match(body, /Number\.isSafeInteger\(controlEpoch\)/u);
   assert.match(body, /PROVIDER_SUCCEEDED/u);
   assert.match(body, /RECONCILE/u);
