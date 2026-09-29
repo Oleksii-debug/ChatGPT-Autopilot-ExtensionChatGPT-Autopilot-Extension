@@ -652,6 +652,11 @@ export async function dispatchUiMessage(message) {
     result = await browserAgent.mutateSpecialistRegistry(message.payload || {});
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB_FROM_DEFINITION') {
     result = await browserAgent.createFromAgentDefinition(message.payload || {});
+  } else if (message.command === 'PREPARE_BROWSER_AGENT_DEFINITION_SPECIALIST_DELEGATION') {
+    result = await browserAgent.prepareDefinitionSpecialistDelegation(
+      message.payload?.id || '',
+      message.payload?.delegation || {},
+    );
   } else if (message.command === 'LIST_BROWSER_AGENT_SPECIALIST_HANDOFFS') {
     result = await browserAgent.listSpecialistHandoffs(message.payload?.id || '');
   } else if (message.command === 'CREATE_BROWSER_AGENT_JOB') {
