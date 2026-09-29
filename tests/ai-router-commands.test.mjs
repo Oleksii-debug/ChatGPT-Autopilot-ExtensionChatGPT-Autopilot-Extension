@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CoreCommandDispatcher } from '../src/core/commands.js';
+import { AiOrchestrator } from '../src/core/ai-orchestrator.js';
 import {
   AGENT_MODEL_ORCHESTRATOR_ENVELOPE_AUTHORITY,
 } from '../src/core/agent-model-orchestrator-envelope.js';

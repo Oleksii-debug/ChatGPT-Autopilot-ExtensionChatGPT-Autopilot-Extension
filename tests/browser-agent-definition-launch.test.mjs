@@ -53,7 +53,6 @@ function definition(overrides = {}) {
       maxTotalTokens: 9000,
       maxOutputTokensPerCall: 1000,
       maxRuntimeMinutes: 20,
-      aiPinnedRouteId: 'route.research',
     },
     modelRoutePolicy: {
       autoSwitch: false,
