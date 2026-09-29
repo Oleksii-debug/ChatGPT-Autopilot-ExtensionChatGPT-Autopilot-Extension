@@ -72,6 +72,12 @@ function timestamp(value, label) {
   if (canonical !== value) throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
   return value;
 }
+
+function assertMutationTimeNotBeforeCurrent(at, currentUpdatedAt) {
+  if (Date.parse(at) < Date.parse(currentUpdatedAt)) {
+    throw new Error('AgentPlan mutation timestamp cannot precede current updatedAt');
+  }
+}
 function strictInteger(value, label, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
     throw new Error(`${label} is invalid`);
@@ -183,6 +189,19 @@ export function normalizeAgentPlanV1(raw) {
   if (new Set(nodes.map(node => node.nodeId)).size !== nodes.length) throw new Error('AgentPlan contains duplicate nodeId');
   assertAcyclic(nodes);
   const revision = strictInteger(source.revision, 'AgentPlan revision', { min: 1 });
+  const createdAt = timestamp(source.createdAt, 'AgentPlan createdAt');
+  const updatedAt = timestamp(source.updatedAt, 'AgentPlan updatedAt');
+  if (Date.parse(updatedAt) < Date.parse(createdAt)) {
+    throw new Error('AgentPlan updatedAt cannot precede createdAt');
+  }
+  for (const node of nodes) {
+    if (Date.parse(node.updatedAt) < Date.parse(createdAt)) {
+      throw new Error(`AgentPlan node ${node.nodeId} updatedAt cannot precede plan createdAt`);
+    }
+    if (Date.parse(node.updatedAt) > Date.parse(updatedAt)) {
+      throw new Error(`AgentPlan node ${node.nodeId} updatedAt cannot exceed plan updatedAt`);
+    }
+  }
   return frozen({
     schemaVersion: AGENT_PLAN_VERSION,
     planId: id(source.planId, 'AgentPlan planId'),
@@ -190,8 +209,8 @@ export function normalizeAgentPlanV1(raw) {
     objective: text(source.objective, 'AgentPlan objective', { max: 8000 }),
     successCriteria: uniqueText(source.successCriteria === undefined ? [] : source.successCriteria, 'AgentPlan successCriteria'),
     nodes,
-    createdAt: timestamp(source.createdAt, 'AgentPlan createdAt'),
-    updatedAt: timestamp(source.updatedAt, 'AgentPlan updatedAt'),
+    createdAt,
+    updatedAt,
     revision,
   });
 }
@@ -200,8 +219,9 @@ export function normalizeAgentPlanV1(raw) {
 export function reconcileAgentPlanV1(raw, options = {}) {
   const source = object(options, 'AgentPlan reconcile options');
   exact(source, new Set(['at']), 'AgentPlan reconcile options');
-  const at = source.at === undefined ? new Date().toISOString() : source.at;
+  const at = timestamp(source.at === undefined ? new Date().toISOString() : source.at, 'at');
   const plan = structuredClone(normalizeAgentPlanV1(raw));
+  assertMutationTimeNotBeforeCurrent(at, plan.updatedAt);
   const byId = new Map(plan.nodes.map(node => [node.nodeId, node]));
   const runningKeys = new Set(plan.nodes.filter(node => node.state === AgentPlanNodeState.RUNNING).flatMap(node => node.conflictKeys));
   for (const node of plan.nodes) {
@@ -211,9 +231,9 @@ export function reconcileAgentPlanV1(raw, options = {}) {
     const dependenciesReady = dependencies.every(dependency => dependency.state === AgentPlanNodeState.VERIFIED);
     const conflict = node.conflictKeys.some(key => runningKeys.has(key));
     const nextState = dependencyFailed || conflict ? AgentPlanNodeState.BLOCKED : dependenciesReady ? AgentPlanNodeState.READY : AgentPlanNodeState.PENDING;
-    if (node.state !== nextState) { node.state = nextState; node.updatedAt = timestamp(at, 'at'); }
+    if (node.state !== nextState) { node.state = nextState; node.updatedAt = at; }
   }
-  plan.updatedAt = timestamp(at, 'at'); plan.revision += 1;
+  plan.updatedAt = at; plan.revision += 1;
   return normalizeAgentPlanV1(plan);
 }
 
@@ -232,8 +252,9 @@ export function extendAgentPlanV1(raw, options = {}) {
   const expectedRevision = source.expectedRevision;
   const nodes = source.nodes;
   const resourceEnvelope = source.resourceEnvelope;
-  const at = source.at === undefined ? new Date().toISOString() : source.at;
+  const at = timestamp(source.at === undefined ? new Date().toISOString() : source.at, 'at');
   const plan = structuredClone(normalizeAgentPlanV1(raw));
+  assertMutationTimeNotBeforeCurrent(at, plan.updatedAt);
   const expected = expectedRevision;
   if (typeof expected !== 'number' || !Number.isSafeInteger(expected) || expected < 1) {
     throw new Error('AgentPlan expectedRevision is invalid');
@@ -241,7 +262,7 @@ export function extendAgentPlanV1(raw, options = {}) {
   if (plan.revision !== expected) throw new Error('AgentPlan revision conflict');
   const extensionNodes = dataArray(nodes, 'AgentPlan extension nodes', { min: 1, max: 32 });
 
-  const updatedAt = timestamp(at, 'at');
+  const updatedAt = at;
   const existingIds = new Set(plan.nodes.map(node => node.nodeId));
   const addedIds = new Set();
   const additions = extensionNodes.map((rawNode, index) => {
@@ -289,8 +310,9 @@ export function evolveAgentPlanV1(raw, rawCandidate, options = {}) {
   const source = object(options, 'AgentPlan evolution options');
   exact(source, new Set(['resourceEnvelope', 'at']), 'AgentPlan evolution options');
   const resourceEnvelope = source.resourceEnvelope;
-  const at = source.at === undefined ? new Date().toISOString() : source.at;
+  const at = timestamp(source.at === undefined ? new Date().toISOString() : source.at, 'at');
   const current = normalizeAgentPlanV1(raw);
+  assertMutationTimeNotBeforeCurrent(at, current.updatedAt);
   const candidate = normalizeAgentPlanV1(rawCandidate);
   if (candidate.revision !== current.revision) throw new Error('AgentPlan revision conflict');
   if (candidate.planId !== current.planId || candidate.jobId !== current.jobId || candidate.objective !== current.objective || candidate.createdAt !== current.createdAt) {
@@ -315,8 +337,9 @@ export function transitionAgentPlanNodeV1(raw, options = {}) {
   const nodeId = source.nodeId;
   const state = source.state;
   const evidence = source.evidence === undefined ? '' : source.evidence;
-  const at = source.at === undefined ? new Date().toISOString() : source.at;
+  const at = timestamp(source.at === undefined ? new Date().toISOString() : source.at, 'at');
   const plan = structuredClone(normalizeAgentPlanV1(raw));
+  assertMutationTimeNotBeforeCurrent(at, plan.updatedAt);
   const node = plan.nodes.find(item => item.nodeId === nodeId);
   if (!node) throw new Error('AgentPlan node not found');
   const next = state;
@@ -324,7 +347,7 @@ export function transitionAgentPlanNodeV1(raw, options = {}) {
   if (TERMINAL.has(node.state)) throw new Error('AgentPlan terminal node cannot be changed');
   if (next === AgentPlanNodeState.RUNNING && node.state !== AgentPlanNodeState.READY) throw new Error('AgentPlan node must be READY before RUNNING');
   if (next === AgentPlanNodeState.VERIFIED && (!text(evidence, 'AgentPlan verified node evidence', { max: 8000 }) || node.state !== AgentPlanNodeState.RUNNING)) throw new Error('AgentPlan VERIFIED requires RUNNING node and evidence');
-  node.state = next; node.evidence = next === AgentPlanNodeState.VERIFIED ? text(evidence, 'AgentPlan verified node evidence', { max: 8000 }) : ''; node.updatedAt = timestamp(at, 'at');
+  node.state = next; node.evidence = next === AgentPlanNodeState.VERIFIED ? text(evidence, 'AgentPlan verified node evidence', { max: 8000 }) : ''; node.updatedAt = at;
   plan.updatedAt = node.updatedAt; plan.revision += 1;
   return reconcileAgentPlanV1(plan, { at: node.updatedAt });
 }
