@@ -370,3 +370,57 @@ test('persisted READY assignment drift is rejected independently of matching adm
     /runtime state drifted from its canonical READY proposal/,
   );
 });
+
+
+test('legacy claim fails closed when owner-bound admission provenance is lost', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  delete storage.data.autopilotBrowserAgentV1.byId['job.research'].runtime.specialistDelegationAdmissions;
+  const restarted = managerFor(storage.chrome);
+  await assert.rejects(
+    () => restarted.claimSpecialistHandoffs('job.research', {
+      availableSlots: 1,
+      maxChildrenPerAgent: 1,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }),
+    /lacks durable admission provenance/,
+  );
+  const persisted = await restarted.listSpecialistHandoffs('job.research');
+  assert.equal(persisted.handoffs[0].state, 'READY');
+  assert.equal(persisted.executionOwnerships[0].state, 'AVAILABLE');
+});
+
+test('product-wide claim fails closed when an owner-bound handoff lost admission provenance', async () => {
+  const storage = chromeStorage();
+  const manager = managerFor(storage.chrome);
+  const registry = await setup(manager);
+  await manager.prepareDefinitionSpecialistDelegation('job.research', {
+    expectedRegistryRevision: registry.nextRegistryRevision,
+    expectedPlanRevision: 4,
+    nodeId: 'local:research',
+    at: '2026-09-29T03:05:00.000Z',
+  });
+
+  delete storage.data.autopilotBrowserAgentV1.byId['job.research'].runtime.specialistDelegationAdmissions;
+  const restarted = managerFor(storage.chrome);
+  await assert.rejects(
+    () => restarted.claimSpecialistHandoffsAcrossJobs({
+      maxConcurrentHandoffs: 4,
+      maxChildrenPerAgent: 4,
+      maxDepth: 2,
+      leaseSeconds: 600,
+      at: '2026-09-29T03:06:00.000Z',
+    }),
+    /lacks durable admission provenance/,
+  );
+});
