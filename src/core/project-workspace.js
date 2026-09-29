@@ -195,6 +195,29 @@ function sameCanonicalData(left, right) {
   return true;
 }
 
+function assertNewProjectEvidenceAdmitted(previousWorkspace, nextWorkspace) {
+  for (const [projectId, nextProject] of Object.entries(nextWorkspace.projectsById)) {
+    const previousProject = hasOwn(previousWorkspace.projectsById, projectId)
+      ? previousWorkspace.projectsById[projectId]
+      : null;
+    const nextSnapshot = normalizeProjectSnapshotV1(nextProject.snapshot);
+
+    for (const [capsuleId, capsuleValue] of Object.entries(nextProject.capsulesById)) {
+      if (!previousProject || !hasOwn(previousProject.capsulesById, capsuleId)) {
+        const capsule = normalizeContextCapsuleV1(capsuleValue);
+        assertCapsuleMatchesSnapshot(capsule, nextSnapshot);
+      }
+    }
+
+    for (const [artifactId, provenanceValue] of Object.entries(nextProject.provenanceByArtifactId)) {
+      if (!previousProject || !hasOwn(previousProject.provenanceByArtifactId, artifactId)) {
+        const provenance = normalizeArtifactProvenanceV1(provenanceValue);
+        assertProvenanceMatchesSnapshot(provenance, nextSnapshot);
+      }
+    }
+  }
+}
+
 function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
   if (nextWorkspace.createdAt !== previousWorkspace.createdAt) {
     throw new Error('Project workspace createdAt is immutable');
@@ -278,6 +301,7 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
       }
     }
   }
+  assertNewProjectEvidenceAdmitted(previousWorkspace, nextWorkspace);
 }
 
 function snapshotContextResolutionRequest(input) {
@@ -587,6 +611,8 @@ export class ProjectWorkspaceRepository {
       const record = await this.chrome.storage.local.get(PROJECT_WORKSPACE_STORAGE_KEY);
       const durableRaw = record[PROJECT_WORKSPACE_STORAGE_KEY];
       if (durableRaw === undefined) {
+        const emptyBaseline = createProjectWorkspace(candidate.createdAt);
+        assertNewProjectEvidenceAdmitted(emptyBaseline, candidate);
         if (expectedRevision !== null && expectedRevision !== 0) {
           throw new Error('Project workspace durable revision changed before save');
         }
