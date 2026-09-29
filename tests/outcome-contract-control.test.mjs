@@ -451,47 +451,52 @@ test('existing independent Outcome verifier consumes the durable canonical resol
   assert.equal(result.verificationAuthorityMinted, false);
 });
 
-test('contract registry stores prototype-adjacent valid ids as data without inherited-property confusion across restart', async () => {
-  for (const contractId of ['constructor', '__proto__']) {
-    const state = createEmptyState(1);
-    const created = createStoredOutcomeContractV1(state, contractV1({ contractId }));
-    assert.equal(created.contractId, contractId);
-    assert.equal(Object.getPrototypeOf(state.outcomeContractsById), null);
-    assert.equal(Object.hasOwn(state.outcomeContractsById, contractId), true);
+test('contract registry stores valid prototype-adjacent ids as data and rejects non-canonical prototype keys', async () => {
+  const contractId = 'constructor';
+  const state = createEmptyState(1);
+  const created = createStoredOutcomeContractV1(state, contractV1({ contractId }));
+  assert.equal(created.contractId, contractId);
+  assert.equal(Object.getPrototypeOf(state.outcomeContractsById), null);
+  assert.equal(Object.hasOwn(state.outcomeContractsById, contractId), true);
 
-    const exact = resolveCurrentStoredOutcomeContractV1(state, {
+  const exact = resolveCurrentStoredOutcomeContractV1(state, {
+    projectId: 'project-1',
+    contractId,
+  });
+  assert.equal(exact.contractId, contractId);
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(state, {
+      contractId,
+      contractRevision: 1,
+    }).contractId,
+    contractId,
+  );
+  assert.equal(validateState(state), state);
+
+  const chrome = fakeChrome();
+  await new StorageRepository(chrome).save(state);
+  const restarted = await new StorageRepository(chrome).load();
+  assert.equal(Object.hasOwn(restarted.outcomeContractsById, contractId), true);
+  assert.equal(
+    resolveCurrentStoredOutcomeContractV1(restarted, {
       projectId: 'project-1',
       contractId,
-    });
-    assert.equal(exact.contractId, contractId);
-    assert.equal(
-      resolveCanonicalStoredOutcomeContractV1(state, {
-        contractId,
-        contractRevision: 1,
-      }).contractId,
+    }).contractId,
+    contractId,
+  );
+  assert.equal(
+    resolveCanonicalStoredOutcomeContractV1(restarted, {
       contractId,
-    );
-    assert.equal(validateState(state), state);
+      contractRevision: 1,
+    }).contractId,
+    contractId,
+  );
 
-    const chrome = fakeChrome();
-    await new StorageRepository(chrome).save(state);
-    const restarted = await new StorageRepository(chrome).load();
-    assert.equal(Object.hasOwn(restarted.outcomeContractsById, contractId), true);
-    assert.equal(
-      resolveCurrentStoredOutcomeContractV1(restarted, {
-        projectId: 'project-1',
-        contractId,
-      }).contractId,
-      contractId,
-    );
-    assert.equal(
-      resolveCanonicalStoredOutcomeContractV1(restarted, {
-        contractId,
-        contractRevision: 1,
-      }).contractId,
-      contractId,
-    );
-  }
+  assert.throws(
+    () => contractV1({ contractId: '__proto__' }),
+    /contractId must be an exact id/,
+    'canonical OutcomeContract IDs must begin with an alphanumeric code point',
+  );
 });
 
 test('contract identity, creation time and revision progression are immutable under update', () => {
