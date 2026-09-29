@@ -477,7 +477,7 @@ test('owner-bound profile atomically selects least-authority specialist and pers
   assert.equal(admitted.proposal.authority.executionAuthorized, false);
   assert.equal(admitted.proposal.requiresCanonicalRevalidation.productWideCapacityReservation, true);
   assert.equal(admitted.assignment.specialistId, 'specialist.research.tight');
-  assert.equal(admitted.executionOwnership.state, 'UNOWNED');
+  assert.equal(admitted.executionOwnership.state, 'AVAILABLE');
 
   const persisted = await manager.listSpecialistHandoffs('job.research-binding');
   assert.equal(persisted.handoffs.length, 1);
