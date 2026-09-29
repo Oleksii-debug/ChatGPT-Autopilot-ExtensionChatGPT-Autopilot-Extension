@@ -1621,10 +1621,28 @@ export class BrowserAgentManager {
           || Object.is(request.expectedControlEpoch, -0)) {
         throw new Error('Browser Agent Specialist provider execute expectedControlEpoch must be a canonical non-negative safe integer');
       }
+      const preparedAt = new Date(this.now()).toISOString();
+      const requestedAt = specialistRequestTimestamp(
+        request.at,
+        preparedAt,
+        'Browser Agent Specialist provider execute at',
+      );
+      if (requestedAt > preparedAt) {
+        throw new Error('Browser Agent Specialist provider execute at cannot be in the future');
+      }
+      request = Object.freeze({ ...request, preparedAt });
     } catch (error) {
       return Promise.reject(error);
     }
-    const inFlightKey = `specialist-provider:${id}:${request.agentId}:${request.conversationId}:${request.expectedControlEpoch}`;
+    // Use a structural tuple rather than delimiter concatenation because
+    // canonical job/agent IDs may themselves contain ':'.
+    const inFlightKey = JSON.stringify([
+      'specialist-provider',
+      id,
+      request.agentId,
+      request.conversationId,
+      request.expectedControlEpoch,
+    ]);
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
     const operation = this.#executeClaimedSpecialistProvider(id, request)
       .finally(() => this.inFlight.delete(inFlightKey));
@@ -1633,19 +1651,10 @@ export class BrowserAgentManager {
   }
 
   async #executeClaimedSpecialistProvider(id, request) {
-    const livePreparedAt = new Date(this.now()).toISOString();
-    const requestedAt = specialistRequestTimestamp(
-      request.at,
-      livePreparedAt,
-      'Browser Agent Specialist provider execute at',
-    );
-    if (requestedAt > livePreparedAt) {
-      throw new Error('Browser Agent Specialist provider execute at cannot be in the future');
-    }
     // External-effect authority is evaluated and recorded against the live
     // manager clock. Caller-supplied timestamps are audit input only and may
     // neither extend a lease nor place PREPARED chronology in the future.
-    const preparedAt = livePreparedAt;
+    const preparedAt = request.preparedAt;
 
     let prepared = null;
     let providerRequest = null;
