@@ -13,6 +13,10 @@ import {
 } from '../src/core/outcome-contract-control.js';
 import { createOutcomeContractV1, normalizeOutcomeContractV1 } from '../src/core/outcome-contract.js';
 import { adjudicateOutcomeVerificationV1 } from '../src/core/outcome-verification-bridge.js';
+import {
+  appendTrustedOutcomeVerificationRecordV1,
+  resolveTrustedOutcomeVerificationRecordV1,
+} from '../src/core/trusted-outcome-verification-ledger.js';
 import { createEmptyState, validateState, STORAGE_KEY } from '../src/core/schema.js';
 import { StorageRepository } from '../src/core/storage.js';
 import { CoreCommand } from '../src/shared/protocol.js';
@@ -289,6 +293,18 @@ test('existing independent Outcome verifier consumes the durable canonical resol
     validThrough: '2026-09-29T05:00:00.000Z',
   };
 
+  appendTrustedOutcomeVerificationRecordV1(state, trustedRecord);
+
+  const revision2 = nextContract(stored, {
+    desiredResult: 'Deliver a newer owner-controlled revision while revision one remains verifiable.',
+  });
+  updateStoredOutcomeContractV1(state, {
+    projectId: stored.projectId,
+    contractId: stored.contractId,
+    expectedRevision: stored.revision,
+    contract: revision2,
+  });
+
   const result = await adjudicateOutcomeVerificationV1({
     contract: stored,
     criterionVerifications: [{
@@ -299,13 +315,33 @@ test('existing independent Outcome verifier consumes the durable canonical resol
   }, {
     resolveTrustedOutcomeContract: async lookup => resolveCanonicalStoredOutcomeContractV1(state, lookup),
     resolveTrustedVerificationRecord: async lookup => (
-      lookup.verificationId === 'verification-1' ? trustedRecord : null
+      resolveTrustedOutcomeVerificationRecordV1(state, lookup)
     ),
   });
 
   assert.equal(result.verdict, 'VERIFIED');
   assert.equal(result.contractId, 'outcome-1');
   assert.equal(result.contractRevision, 1);
+  assert.equal(
+    resolveStoredOutcomeContractV1(state, {
+      projectId: stored.projectId,
+      contractId: stored.contractId,
+      expectedRevision: 2,
+    }).revision,
+    2,
+    'owner-visible current contract may advance independently of in-flight exact revision verification',
+  );
+  assert.equal(
+    resolveTrustedOutcomeVerificationRecordV1(state, {
+      contractId: stored.contractId,
+      contractRevision: 1,
+      verifierPlanId: stored.verifierPlan.planId,
+      criterionId: criterion.criterionId,
+      verificationId: 'verification-1',
+    }).contractRevision,
+    1,
+    'durable trusted verification remains pinned to the admitted historical contract revision',
+  );
   assert.equal(result.completionEvidenceReady, true);
   assert.equal(result.completionAuthorized, false);
   assert.equal(result.executionAuthorized, false);
