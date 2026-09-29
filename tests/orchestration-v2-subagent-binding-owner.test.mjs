@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { StorageRepository } from '../src/core/storage.js';
+import {
+  ProjectWorkspaceRepository,
+  addProjectSnapshot,
+} from '../src/core/project-workspace.js';
 import { OrchestrationV2Manager } from '../src/core/orchestration-v2-manager.js';
 import {
   AgentExecutionPlane,
@@ -111,6 +115,48 @@ function taskEnvelope(projectId='project-1'){
     outcomeContract:contract(projectId),createdAt:T1,
   });
 }
+
+function projectSnapshot(revisionId='project-revision-1'){
+  return {
+    schemaVersion:1,
+    projectId:'project-1',
+    revisionId,
+    title:'Parent project metadata must not cross child boundary.',
+    sourceRefs:[],
+    artifactRefs:[],
+    createdAt:T1,
+  };
+}
+function authorityEnvelope(overrides={}){
+  return {
+    schemaVersion:1,
+    decision:'ALLOW',
+    reasonCode:'LEAST_AUTHORITY_DERIVED',
+    projectId:'project-1',
+    parentAgentId:'parent-1',
+    childAgentId:'child-1',
+    taskId:'task-1',
+    providerId:'provider-main',
+    capabilityIds:[],
+    sourceIds:[],
+    artifactIds:[],
+    toolIds:[],
+    toolDescriptors:[],
+    executionAuthority:false,
+    credentialAuthority:false,
+    policyAuthority:false,
+    ...overrides,
+  };
+}
+async function seedProjectWorkspace(chrome){
+  const repository=new ProjectWorkspaceRepository(chrome);
+  await repository.update(workspace=>{
+    addProjectSnapshot(workspace,projectSnapshot(),{nowMs:Date.parse(T2)});
+    return workspace;
+  },{nowMs:Date.parse(T2)});
+  return repository;
+}
+
 async function fixture(){
   const chrome=chromeFake();
   const core=new StorageRepository(chrome);
@@ -290,4 +336,158 @@ test('binding owner rejects forged activation, cross-project task and caller aut
   );
   assert.equal(reads,0);
   assert.deepEqual(chrome.data['autopilotOrchestrationV2Runtime:orch-1'],before);
+});
+
+
+test('resolveBoundSubagentTaskContext returns only durable revision-fenced child context',async()=>{
+  const {chrome,core,manager,prepared,canonicalTaskEnvelope}=await fixture();
+  await seedProjectWorkspace(chrome);
+
+  const registered=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,
+    activationAction:prepared.actions[0],
+    invocationId:'invocation-context-1',
+  },'orch-1');
+
+  const resolved=await manager.resolveBoundSubagentTaskContext({
+    bindingId:registered.binding.bindingId,
+    authorityEnvelope:authorityEnvelope(),
+    taskEnvelope:canonicalTaskEnvelope,
+    expectedProjectRevisionId:'project-revision-1',
+  },'orch-1');
+
+  assert.equal(resolved.orchestraId,'orch-1');
+  assert.equal(resolved.bindingId,registered.binding.bindingId);
+  assert.equal(resolved.taskDispatchIdentity,registered.binding.taskDispatchIdentity);
+  assert.equal(resolved.context.ownerStateSource,'DURABLE_PROJECT_WORKSPACE');
+  assert.equal(resolved.context.parentProjectRevisionId,'project-revision-1');
+  assert.equal(resolved.context.sourceAuthorityAuthenticated,false);
+  assert.equal(
+    resolved.context.sourceTrust,
+    'DURABLE_OWNER_STATE_SOURCE_AUTHORITY_NOT_AUTHENTICATED',
+  );
+  assert.deepEqual(resolved.context.projectedSnapshot.sourceRefs,[]);
+  assert.deepEqual(resolved.context.projectedSnapshot.artifactRefs,[]);
+  assert.equal(
+    JSON.stringify(resolved).includes('Parent project metadata must not cross'),
+    false,
+  );
+  assert.equal(resolved.retrievalAuthorized,false);
+  assert.equal(resolved.executionAuthorized,false);
+  assert.equal(resolved.mutationAuthorized,false);
+  assert.equal(resolved.credentialAuthority,false);
+  assert.equal(resolved.policyAuthority,false);
+  assert.equal(resolved.schedulingAuthority,false);
+  assert.equal(resolved.verificationAuthority,false);
+  assert.equal(resolved.completionAuthority,false);
+
+  const restarted=new OrchestrationV2Manager({
+    coreRepository:core,
+    chromeApi:chrome,
+    createId:()=> 'unused',
+    now:()=>Date.parse(T2)+120_000,
+  });
+  const afterRestart=await restarted.resolveBoundSubagentTaskContext({
+    bindingId:registered.binding.bindingId,
+    authorityEnvelope:authorityEnvelope(),
+    taskEnvelope:structuredClone(canonicalTaskEnvelope),
+    expectedProjectRevisionId:'project-revision-1',
+  },'orch-1');
+  assert.deepEqual(afterRestart,resolved);
+});
+
+test('resolveBoundSubagentTaskContext rejects semantic task substitution despite matching public ids',async()=>{
+  const {chrome,manager,prepared,canonicalTaskEnvelope}=await fixture();
+  await seedProjectWorkspace(chrome);
+  const registered=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,
+    activationAction:prepared.actions[0],
+    invocationId:'invocation-context-2',
+  },'orch-1');
+
+  const substituted=structuredClone(canonicalTaskEnvelope);
+  substituted.objective += ' semantic substitution';
+
+  await assert.rejects(
+    manager.resolveBoundSubagentTaskContext({
+      bindingId:registered.binding.bindingId,
+      authorityEnvelope:authorityEnvelope(),
+      taskEnvelope:substituted,
+      expectedProjectRevisionId:'project-revision-1',
+    },'orch-1'),
+    /task does not match durable activation binding: taskDispatchIdentity/u,
+  );
+});
+
+test('resolveBoundSubagentTaskContext fails closed on authority identity or Project revision drift',async()=>{
+  const {chrome,manager,prepared,canonicalTaskEnvelope}=await fixture();
+  await seedProjectWorkspace(chrome);
+  const registered=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,
+    activationAction:prepared.actions[0],
+    invocationId:'invocation-context-3',
+  },'orch-1');
+
+  await assert.rejects(
+    manager.resolveBoundSubagentTaskContext({
+      bindingId:registered.binding.bindingId,
+      authorityEnvelope:authorityEnvelope({childAgentId:'child-forged'}),
+      taskEnvelope:canonicalTaskEnvelope,
+      expectedProjectRevisionId:'project-revision-1',
+    },'orch-1'),
+    /task childAgentId binding mismatch/u,
+  );
+
+  await assert.rejects(
+    manager.resolveBoundSubagentTaskContext({
+      bindingId:registered.binding.bindingId,
+      authorityEnvelope:authorityEnvelope(),
+      taskEnvelope:canonicalTaskEnvelope,
+      expectedProjectRevisionId:'project-revision-stale',
+    },'orch-1'),
+    /snapshot revision binding mismatch/u,
+  );
+});
+
+test('resolveBoundSubagentTaskContext snapshots data-only input before owner-state awaits',async()=>{
+  const {chrome,manager,prepared,canonicalTaskEnvelope}=await fixture();
+  await seedProjectWorkspace(chrome);
+  const registered=await manager.registerSubagentTaskActivationBinding({
+    taskEnvelope:canonicalTaskEnvelope,
+    activationAction:prepared.actions[0],
+    invocationId:'invocation-context-4',
+  },'orch-1');
+
+  let getterCalls=0;
+  const malicious={
+    bindingId:registered.binding.bindingId,
+    authorityEnvelope:authorityEnvelope(),
+    taskEnvelope:structuredClone(canonicalTaskEnvelope),
+    expectedProjectRevisionId:'project-revision-1',
+  };
+  Object.defineProperty(malicious.authorityEnvelope,'projectId',{
+    enumerable:true,
+    configurable:true,
+    get(){
+      getterCalls+=1;
+      return 'project-1';
+    },
+  });
+
+  await assert.rejects(
+    manager.resolveBoundSubagentTaskContext(malicious,'orch-1'),
+    /enumerable own data property/u,
+  );
+  assert.equal(getterCalls,0);
+
+  await assert.rejects(
+    manager.resolveBoundSubagentTaskContext({
+      bindingId:registered.binding.bindingId,
+      authorityEnvelope:authorityEnvelope(),
+      taskEnvelope:canonicalTaskEnvelope,
+      expectedProjectRevisionId:'project-revision-1',
+      executionAuthority:true,
+    },'orch-1'),
+    /unknown field: executionAuthority/u,
+  );
 });
