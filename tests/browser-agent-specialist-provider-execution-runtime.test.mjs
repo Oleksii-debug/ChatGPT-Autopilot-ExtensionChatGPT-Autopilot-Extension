@@ -527,3 +527,21 @@ test('future caller timestamp is rejected before durable PREPARED or provider ef
   const durable = await manager.listSpecialistHandoffs('job.coder');
   assert.equal(durable.providerExecutions.length, 0);
 });
+
+
+test('provider execution validation preserves the asynchronous rejected-Promise contract', async () => {
+  const { chrome } = chromeStorage();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T0),
+    specialistProviderClients: new Map(),
+  });
+
+  const rejection = manager.executeClaimedSpecialistProvider('job.missing', {});
+  assert.ok(rejection instanceof Promise);
+  await assert.rejects(
+    rejection,
+    /requires agentId/,
+  );
+});
