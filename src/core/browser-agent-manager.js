@@ -45,9 +45,9 @@ import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
-  authorizeAgentPlanSpecialistSafeRetryV1,
+  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   completeAgentPlanSpecialistHandoffV1,
-  verifyAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
 import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
@@ -61,6 +61,10 @@ import {
   normalizeAgentModelRoutePolicyV1,
   proposeAgentDefinitionRegistryMutationV1,
 } from './agent-definition-registry.js';
+import {
+  createAgentDefinitionModelPolicyBindingV1,
+  normalizeAgentDefinitionModelPolicyBindingV1,
+} from './agent-definition-model-policy-binding.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -260,7 +264,12 @@ function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
   }
   for (const [key, value] of storedAgentDefinitionMapDescriptors(rawRegistries)) {
     try {
-      const registry = normalizeAgentDefinitionRegistryV1(value);
+      const descriptors = value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.getOwnPropertyDescriptors(value)
+        : null;
+      const registry = descriptors && !Object.hasOwn(descriptors, 'bindingKey')
+        ? createAgentDefinitionRegistryV1(value)
+        : normalizeAgentDefinitionRegistryV1(value);
       if (registry.registryId !== key) throw new Error('Stored Agent definition registry identity drift');
       registries[key] = registry;
       delete quarantine[key];
@@ -381,6 +390,25 @@ function normalizePersistedDefinitionRouterOverride(raw, selection) {
     throw new Error('Browser Agent definition router override drifted from selected definition');
   }
   return Object.freeze({ routePolicy });
+}
+function normalizePersistedDefinitionModelPolicyBinding(raw, selection, config) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition model policy binding requires persisted selection provenance');
+  }
+  if (raw == null) throw new Error('Browser Agent reusable definition requires persisted model policy binding');
+  const binding = normalizeAgentDefinitionModelPolicyBindingV1(raw);
+  if (binding.jobId !== config.id || binding.projectId !== config.projectId) {
+    throw new Error('Browser Agent definition model policy binding identity drifted from persisted job');
+  }
+  const provenance = binding.definitionBinding;
+  if (provenance.registryId !== selection.registryId
+      || provenance.registryRevision !== selection.registryRevision
+      || provenance.agentDefinitionId !== selection.agentDefinitionId
+      || provenance.definitionRevision !== selection.definitionRevision) {
+    throw new Error('Browser Agent definition model policy binding drifted from persisted definition selection');
+  }
+  return binding;
 }
 function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
   const out = definitionRouterOverride?.routePolicy
@@ -587,6 +615,11 @@ function normalizeStore(raw, now) {
         definitionSelection,
         config,
       );
+      const definitionModelPolicyBinding = normalizePersistedDefinitionModelPolicyBinding(
+        raw.byId[id].definitionModelPolicyBinding,
+        definitionSelection,
+        config,
+      );
       out.byId[id] = {
         id,
         config,
@@ -595,6 +628,7 @@ function normalizeStore(raw, now) {
         definitionScope,
         definitionRouterOverride,
         definitionConfigBindingKey: definitionConfigBindingKeyValue,
+        definitionModelPolicyBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -614,7 +648,7 @@ function normalizeStore(raw, now) {
 }
 
 export class BrowserAgentManager {
-  constructor({ chromeApi, routePrompt, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
+  constructor({ chromeApi, routePrompt, readModelRouteContext = null, resolveTrustedExecutionVerificationRecord = null, now = () => Date.now(), createId = createIdFallback, nativeCompanionClient = undefined } = {}) {
     // Browser Agent is an optional capability of the extension. Do not make
     // service-worker startup depend on page scripting being available: Core,
     // Ordinary Sessions and orchestration must still load. Agent execution
@@ -624,6 +658,10 @@ export class BrowserAgentManager {
     if (typeof routePrompt !== 'function') throw new Error('Browser Agent routePrompt is required');
     this.chrome = chromeApi;
     this.routePrompt = routePrompt;
+    this.readModelRouteContext = typeof readModelRouteContext === 'function' ? readModelRouteContext : null;
+    this.resolveTrustedExecutionVerificationRecord = typeof resolveTrustedExecutionVerificationRecord === 'function'
+      ? resolveTrustedExecutionVerificationRecord
+      : null;
     this.now = now;
     this.createId = createId;
     this.nativeCompanion = nativeCompanionClient === undefined
@@ -996,15 +1034,23 @@ export class BrowserAgentManager {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    if (!this.resolveTrustedExecutionVerificationRecord) {
+      throw new Error('Canonical trusted execution verification resolver is unavailable');
+    }
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...request,
-        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at,
-      });
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        { resolveTrustedExecutionVerificationRecord: this.resolveTrustedExecutionVerificationRecord },
+      );
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
@@ -1013,13 +1059,11 @@ export class BrowserAgentManager {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryVerification.verifierId,
-        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
-        verificationId: retriable.safeRetryVerification.verificationId,
-        observationId: retriable.safeRetryVerification.observationId,
-        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
-        evidence: retriable.safeRetryVerification.summary,
-        message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
+        verifierId: retriable.trustedVerification.verifierId,
+        verificationAuthorityId: retriable.trustedVerification.verificationAuthorityId,
+        verificationId: retriable.trustedVerification.verificationId,
+        evidenceArtifactIds: retriable.trustedVerification.evidenceArtifactIds,
+        message: 'Trusted canonical no-effect record authorized this handoff for normal bounded re-admission; no retry was dispatched.',
       });
       result = clone(retriable);
       return store;
@@ -1051,16 +1095,37 @@ export class BrowserAgentManager {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
+    if (!this.resolveTrustedExecutionVerificationRecord) {
+      throw new Error('Canonical trusted execution verification resolver is unavailable');
+    }
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        { resolveTrustedExecutionVerificationRecord: this.resolveTrustedExecutionVerificationRecord },
+      );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-verified',
+        agentId: verified.verifiedAgentId,
+        verifierId: verified.trustedVerification.verifierId,
+        verificationAuthorityId: verified.trustedVerification.verificationAuthorityId,
+        verificationId: verified.trustedVerification.verificationId,
+        evidenceArtifactIds: verified.trustedVerification.evidenceArtifactIds,
+        message: 'Trusted canonical verification record advanced the specialist plan.',
+      });
       result = clone(verified);
       return store;
     });
@@ -1096,7 +1161,7 @@ export class BrowserAgentManager {
       throw new Error('Browser Agent definition launch jobId must be exact bounded text');
     }
 
-    await this.update(store => {
+    await this.update(async store => {
       const now = this.now();
       if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
       const registries = store.definitionRegistriesById || Object.create(null);
@@ -1132,6 +1197,22 @@ export class BrowserAgentManager {
       if (materialized.config.id !== jobId) {
         throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
       }
+      if (!this.readModelRouteContext) {
+        throw new Error('Reusable Agent launch requires canonical AI route-pool context');
+      }
+      const modelRouteContext = await this.readModelRouteContext();
+      if (!modelRouteContext || typeof modelRouteContext !== 'object' || Array.isArray(modelRouteContext)) {
+        throw new Error('Canonical AI route-pool context is unavailable');
+      }
+      const definitionModelPolicyBinding = createAgentDefinitionModelPolicyBindingV1({
+        materializedAgent: materialized,
+        currentDefinitionSelection: selection,
+        currentJobId: jobId,
+        currentProjectId: materialized.config.projectId,
+        routePool: modelRouteContext.routePool,
+        routePoolRevision: modelRouteContext.routePoolRevision,
+        ownerAllowedRouteIds: modelRouteContext.ownerAllowedRouteIds,
+      });
 
       store.byId[jobId] = {
         id: jobId,
@@ -1141,6 +1222,7 @@ export class BrowserAgentManager {
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
         definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
+        definitionModelPolicyBinding: clone(definitionModelPolicyBinding),
         createdAt: now,
         updatedAt: now,
       };
@@ -1203,6 +1285,7 @@ export class BrowserAgentManager {
         definitionScope: null,
         definitionRouterOverride: null,
         definitionConfigBindingKey: null,
+        definitionModelPolicyBinding: null,
         createdAt: now,
         updatedAt: now,
       };

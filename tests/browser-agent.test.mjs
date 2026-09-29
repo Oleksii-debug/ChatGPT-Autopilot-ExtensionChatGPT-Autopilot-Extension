@@ -305,7 +305,7 @@ test('Browser Agent persists a bounded external specialist handoff and requires 
       verificationAuthorityId:'policy:archive',
       evidence:'Caller-created text claims fresh artifact evidence.',
     }),
-    /trusted verifier provenance/,
+    /trusted execution verification resolver is unavailable/u,
   );
   const after = await manager.listSpecialistHandoffs('job-1');
   const durable = await manager.get('job-1');
@@ -360,7 +360,7 @@ test('Browser Agent keeps ambiguous specialist effect fenced across forged proof
     agentId,
     leaseId,
     verification,
-  }), /trusted verifier provenance/);
+  }), /trusted execution verification resolver is unavailable/u);
 
   const durable = await manager.get('job-retry');
   assert.equal(durable.job.runtime.specialistHandoffs[0].state, 'LEASED');

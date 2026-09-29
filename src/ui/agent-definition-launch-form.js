@@ -65,9 +65,24 @@ function canonicalDefinitionIds(value, label, max) {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
     throw new Error(`${label} must be a canonical array`);
   }
-  if (value.length > max) throw new Error(`${label} exceeds ${max} entries`);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > max) {
+    throw new Error(`${label} exceeds ${max} entries`);
+  }
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(`${label} contains non-canonical fields`);
+    }
+  }
   const out = [];
-  for (const item of value) {
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable own data property`);
+    }
+    const item = descriptor.value;
     if (typeof item !== 'string' || !ID.test(item)) throw new Error(`${label} contains an invalid identity`);
     if (out.includes(item)) throw new Error(`${label} contains duplicate identities`);
     out.push(item);
@@ -130,6 +145,12 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     'Agent definition registry revision',
   );
 
+  const expectedRegistryBindingKey = boundedText(
+    registryRaw.bindingKey,
+    'Agent definition registry bindingKey',
+    200000,
+  );
+
   const agentDefinitionId = boundedText(
     definitionRaw.agentDefinitionId,
     'Agent definition ID',
@@ -178,6 +199,7 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
   const request = {
     registryId,
     expectedRegistryRevision,
+    expectedRegistryBindingKey,
     agentDefinitionId,
     expectedDefinitionRevision,
     goal: boundedText(raw.goal, 'Owner task', 50000),

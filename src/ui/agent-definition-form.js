@@ -129,9 +129,6 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     locality,
     maxInputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxInputPriceText', ''), 'Максимальна input-ціна'),
     maxOutputPricePerMillionUsd: optionalPriceText(read('modelRouteMaxOutputPriceText', ''), 'Максимальна output-ціна'),
-    retryBackoffSeconds: exactIntegerText(read('modelRouteRetryBackoffSeconds', '60'), 'Retry backoff', { min:1, max:86400 }),
-    circuitBreakerFailures: exactIntegerText(read('modelRouteCircuitBreakerFailures', '2'), 'Circuit breaker failures', { min:1, max:100 }),
-    circuitBreakerSeconds: exactIntegerText(read('modelRouteCircuitBreakerSeconds', '300'), 'Circuit breaker seconds', { min:1, max:86400 }),
   });
   if (policy.allowRouteIds.length) {
     const allow = new Set(policy.allowRouteIds);
@@ -153,9 +150,6 @@ export function buildAgentDefinitionModelRoutePolicyFromFormV1(input = {}, { per
     locality:policy.locality,
     maxInputPricePerMillionUsd:policy.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd:policy.maxOutputPricePerMillionUsd,
-    retryBackoffSeconds:policy.retryBackoffSeconds,
-    circuitBreakerFailures:policy.circuitBreakerFailures,
-    circuitBreakerSeconds:policy.circuitBreakerSeconds,
   };
 }
 
