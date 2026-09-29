@@ -224,8 +224,54 @@ function renderOrchestrationV2Orchestras(data = {}) {
   syncOrchestrationV2ActionAvailability();
 }
 
+
+function clearOrchestrationV2AgentTree(message = 'Дерево Agent ще не завантажено.') {
+  $('orchestration-v2-agent-tree-summary').textContent = message;
+  $('orchestration-v2-agent-tree').textContent = message;
+}
+
+function renderOrchestrationV2AgentTree(data = {}) {
+  if (data.selectedId !== ui.selectedOrchestraId) return;
+  const projection = data.projection;
+  if (!projection) {
+    clearOrchestrationV2AgentTree('Для вибраного оркестру durable hierarchy ще не налаштовано.');
+    return;
+  }
+  const summary = projection.summary || {};
+  const attentionNodeIds = Array.isArray(summary.attentionNodeIds) ? summary.attentionNodeIds : [];
+  const telemetryTotals = summary.telemetryTotals || {};
+  $('orchestration-v2-agent-tree-summary').textContent =
+    `Дерево ${projection.graphId || 'без ID'}: вузлів ${summary.totalNodes || 0}; коренів ${summary.rootCount || 0}; уваги потребують ${attentionNodeIds.length}; telemetry nodes ${summary.telemetryNodeCount || 0}; model calls ${telemetryTotals.modelCalls || 0}; tool actions ${telemetryTotals.toolActions || 0}; cost micros ${telemetryTotals.costUsdMicros || 0}.`;
+  const lines = Array.isArray(projection.textLines) ? projection.textLines : [];
+  $('orchestration-v2-agent-tree').textContent = lines.length
+    ? lines.join('\n')
+    : 'Canonical hierarchy не містить вузлів для відображення.';
+}
+
+async function loadOrchestrationV2AgentTree({ epoch = orchestrationV2ActionEpoch } = {}) {
+  const orchestraId = ui.selectedOrchestraId;
+  if (!orchestraId) {
+    clearOrchestrationV2AgentTree('Оркестр не вибрано.');
+    return;
+  }
+  try {
+    const data = await core('GET_ORCHESTRATION_V2_AGENT_TREE', { id: orchestraId });
+    if (epoch !== orchestrationV2ActionEpoch || orchestraId !== ui.selectedOrchestraId) return;
+    renderOrchestrationV2AgentTree(data);
+  } catch (error) {
+    if (epoch !== orchestrationV2ActionEpoch || orchestraId !== ui.selectedOrchestraId) return;
+    clearOrchestrationV2AgentTree(`Дерево Agent не завантажено: ${error.message}`);
+  }
+}
+
 function renderOrchestrationV2Status(data = {}) {
+  const previousOrchestraId = ui.selectedOrchestraId;
   renderOrchestrationV2Orchestras(data);
+  if (previousOrchestraId !== ui.selectedOrchestraId) {
+    clearOrchestrationV2AgentTree(ui.selectedOrchestraId
+      ? 'Оберіть «Оновити дерево Agent», щоб завантажити стан вибраного оркестру.'
+      : 'Оркестр не вибрано.');
+  }
   const config = data.config || {};
   const runtime = data.runtime || {};
   const coordinator = runtime.coordinator || {};
@@ -300,6 +346,7 @@ async function loadOrchestrationV2Status() {
     const data = await core('GET_ORCHESTRATION_V2_STATUS');
     if (epoch !== orchestrationV2ActionEpoch) return;
     renderOrchestrationV2Status(data);
+    await loadOrchestrationV2AgentTree({ epoch });
   } catch (error) {
     if (epoch !== orchestrationV2ActionEpoch) return;
     $('orchestration-v2-status').textContent = `Не вдалося завантажити Orchestration V2: ${error.message}`;
@@ -322,7 +369,10 @@ async function selectOrchestrationV2Orchestra() {
   beginOrchestrationV2Action();
   const id = $('orchestration-v2-orchestra-list').value;
   if (!id) return;
-  try { renderOrchestrationV2Status(await core('SELECT_ORCHESTRATION_V2_ORCHESTRA', { id })); }
+  try {
+    renderOrchestrationV2Status(await core('SELECT_ORCHESTRATION_V2_ORCHESTRA', { id }));
+    await loadOrchestrationV2AgentTree({ epoch: orchestrationV2ActionEpoch });
+  }
   catch (error) { $('orchestration-v2-orchestra-summary').textContent = `Не вдалося вибрати оркестр: ${error.message}`; }
 }
 async function renameOrchestrationV2Orchestra() {
@@ -4413,6 +4463,7 @@ $('save-orchestration-v2-button').addEventListener('click', saveOrchestrationV2S
 $('save-start-orchestration-v2-button').addEventListener('click', saveAndStartOrchestrationV2Now);
 $('test-orchestration-v2-button').addEventListener('click', testOrchestrationV2Control);
 $('run-orchestration-v2-button').addEventListener('click', runOrchestrationV2Now);
+$('orchestration-v2-agent-tree-refresh-button').addEventListener('click', () => loadOrchestrationV2AgentTree());
 $('stop-orchestration-v2-button').addEventListener('click', emergencyStopOrchestrationV2);
 $('save-remote-dispatch-button').addEventListener('click', saveRemoteDispatchSettings);
 $('test-remote-dispatch-button').addEventListener('click', testRemoteDispatchFeed);
