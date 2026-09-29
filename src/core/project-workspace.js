@@ -101,6 +101,18 @@ function sameCanonicalData(left, right) {
   return true;
 }
 
+function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
+  for (const [projectId, previousProject] of Object.entries(previousWorkspace.projectsById)) {
+    if (!hasOwn(nextWorkspace.projectsById, projectId)) continue;
+    const previousSnapshot = normalizeProjectSnapshotV1(previousProject.snapshot);
+    const nextSnapshot = normalizeProjectSnapshotV1(nextWorkspace.projectsById[projectId].snapshot);
+    if (previousSnapshot.revisionId === nextSnapshot.revisionId
+        && !sameCanonicalData(previousSnapshot, nextSnapshot)) {
+      throw new Error('Project snapshot revisionId cannot be reused for different content');
+    }
+  }
+}
+
 function snapshotContextResolutionRequest(input) {
   const raw = strictDataRecord(input, CONTEXT_RESOLUTION_REQUEST_KEYS, 'Project workspace context resolution request');
   if (!hasOwn(raw, 'projectId')) throw new Error('Project workspace context resolution request is missing projectId');
@@ -361,6 +373,8 @@ export class ProjectWorkspaceRepository {
       const current = await this.load();
       const draft = structuredClone(current);
       const next = await mutator(draft) || draft;
+      validateProjectWorkspace(next);
+      assertSnapshotRevisionContinuity(current, next);
       next.revision = current.revision + 1;
       next.updatedAt = nowMs;
       return this.save(next);
