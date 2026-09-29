@@ -103,7 +103,9 @@ function sameCanonicalData(left, right) {
 
 function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
   for (const [projectId, previousProject] of Object.entries(previousWorkspace.projectsById)) {
-    if (!hasOwn(nextWorkspace.projectsById, projectId)) continue;
+    if (!hasOwn(nextWorkspace.projectsById, projectId)) {
+      throw new Error('Project workspace update cannot remove an existing project');
+    }
     const previousSnapshot = normalizeProjectSnapshotV1(previousProject.snapshot);
     const nextSnapshot = normalizeProjectSnapshotV1(nextWorkspace.projectsById[projectId].snapshot);
     if (previousSnapshot.revisionId === nextSnapshot.revisionId
