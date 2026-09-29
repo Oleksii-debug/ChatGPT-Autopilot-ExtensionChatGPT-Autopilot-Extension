@@ -173,12 +173,17 @@ test('SAFE_RETRY is the only ambiguous path that authorizes another physical exe
       outcome: ReconciliationOutcome.SAFE_RETRY,
       reasonCode: 'POSTCONDITION_PROVES_NO_EFFECT',
       summary: 'Verifier proved effect did not occur.',
-      observation: observation({ observationId: 'reconcile-obs-1', status: 'ERROR', summary: 'Expected effect is absent.' }),
+      observation: observation({
+        observationId: 'reconcile-obs-1',
+        status: 'ERROR',
+        summary: 'Expected effect is absent.',
+        data: { committed: false },
+      }),
       verification: verification({
         verificationId: 'reconcile-verify-1',
         observationId: 'reconcile-obs-1',
         status: 'FAILED',
-        reasonCode: 'POSTCONDITION_ABSENT',
+        reasonCode: 'NO_COMMITTED_EFFECT',
         summary: 'No committed effect exists; retry is safe.',
       }),
     },
@@ -197,6 +202,48 @@ test('SAFE_RETRY is the only ambiguous path that authorizes another physical exe
   assert.equal(state.phase, ExactEffectPhase.EXECUTING);
   assert.equal(state.attempt, 2);
   assert.equal(state.executionId, 'invoke-1:attempt:2');
+});
+
+test('SAFE_RETRY rejects generic FAILED verification without canonical no-effect semantics', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'generic-failed-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.DECLARE_AMBIGUITY,
+    'generic-failed-ambiguous',
+    '2026-09-19T12:00:02Z',
+    { reasonCode: 'UNKNOWN_EFFECT' },
+  )).state;
+
+  assert.throws(
+    () => reduceExactEffectV1(state, event(
+      ExactEffectEventType.RESOLVE_RECONCILIATION,
+      'generic-failed-safe-retry',
+      '2026-09-19T12:00:04Z',
+      {
+        outcome: ReconciliationOutcome.SAFE_RETRY,
+        reasonCode: 'CALLER_ASSERTED_SAFE',
+        observation: observation({
+          observationId: 'generic-failed-observation',
+          status: 'ERROR',
+          summary: 'Verification failed but absence is not proven.',
+          data: { committed: true },
+        }),
+        verification: verification({
+          verificationId: 'generic-failed-verification',
+          observationId: 'generic-failed-observation',
+          status: 'FAILED',
+          reasonCode: 'POSTCONDITION_FAILED',
+        }),
+      },
+    )),
+    /canonical no-effect verification/,
+  );
+  assert.equal(state.phase, ExactEffectPhase.RECONCILE);
+  assert.equal(exactEffectCanExecuteV1(state), false);
 });
 
 test('SAFE_RETRY without fresh reconciliation evidence fails closed', () => {
@@ -387,12 +434,17 @@ test('late evidence from an older execution attempt cannot satisfy a SAFE_RETRY 
     {
       outcome: ReconciliationOutcome.SAFE_RETRY,
       reasonCode: 'NO_EFFECT_PROVEN',
-      observation: observation({ observationId: 'reconcile-obs-late', status: 'ERROR', summary: 'Effect absent.' }),
+      observation: observation({
+        observationId: 'reconcile-obs-late',
+        status: 'ERROR',
+        summary: 'Effect absent.',
+        data: { committed: false },
+      }),
       verification: verification({
         verificationId: 'reconcile-verify-late',
         observationId: 'reconcile-obs-late',
         status: 'FAILED',
-        reasonCode: 'POSTCONDITION_ABSENT',
+        reasonCode: 'NO_COMMITTED_EFFECT',
       }),
     },
   )).state;
@@ -784,7 +836,7 @@ test('restart normalization rejects forged executable phases without canonical r
       ...reconcile,
       phase: ExactEffectPhase.SAFE_RETRY,
     }),
-    /SAFE_RETRY exact-effect phase requires failed no-effect verification/,
+    /SAFE_RETRY exact-effect phase requires canonical no-effect verification/,
   );
   assert.equal(exactEffectCanExecuteV1(reconcile), false);
 });
