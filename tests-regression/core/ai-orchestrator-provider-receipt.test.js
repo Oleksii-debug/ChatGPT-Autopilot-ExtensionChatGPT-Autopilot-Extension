@@ -260,3 +260,181 @@ test('ordinary calls without a durable provider lifecycle do not expose reservat
   assert.equal(result.text, 'ordinary result');
   assert.equal(Object.hasOwn(result, 'providerReservation'), false);
 });
+
+
+test('explicit durable settlement rejection fails closed after provider success', async () => {
+  let gatewayCalls = 0;
+  const router = new AiOrchestrator({
+    gatewayClient: {
+      async complete() {
+        gatewayCalls += 1;
+        return {
+          text: 'must not escape as success',
+          usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 },
+        };
+      },
+    },
+    providerCallLifecycle: {
+      async beforeProviderCall() {
+        return reservation();
+      },
+      async afterProviderCall({ ok }) {
+        assert.equal(ok, true);
+        return { settled: false };
+      },
+    },
+    now: () => 1000,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings(),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'repair one node',
+      {
+        maxOutputTokens: 128,
+        maxModelCallsForRequest: 1,
+        providerCallBudgetContext: {
+          kind: 'browser-agent',
+          jobId: 'job.receipt',
+          controlEpoch: 7,
+        },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED');
+      assert.match(error.message, /did not settle the durable budget reservation/u);
+      return true;
+    },
+  );
+
+  assert.equal(gatewayCalls, 1);
+});
+
+test('explicit failed-call settlement rejection remains local and cannot manufacture failover', async () => {
+  const routes = [
+    {
+      routeId: 'route.a',
+      provider: 'openai',
+      model: 'model-a',
+      roles: ['planner'],
+      priority: 20,
+      costClass: 'paid',
+      inputPricePerMillionUsd: 1,
+      outputPricePerMillionUsd: 2,
+    },
+    {
+      routeId: 'route.b',
+      provider: 'ollama',
+      model: 'model-b',
+      roles: ['planner'],
+      priority: 10,
+    },
+  ];
+  let gatewayCalls = 0;
+  const router = new AiOrchestrator({
+    gatewayClient: {
+      async complete() {
+        gatewayCalls += 1;
+        throw Object.assign(new Error('provider failed'), {
+          code: 'AI_PROVIDER_UNAVAILABLE',
+          status: 503,
+        });
+      },
+    },
+    providerCallLifecycle: {
+      async beforeProviderCall({ route, callNumber }) {
+        return reservation({
+          reservationId: `job.receipt:model-budget:${callNumber}`,
+          routeId: route.routeId,
+          provider: route.provider,
+          model: route.model,
+          callNumber,
+        });
+      },
+      async afterProviderCall({ ok }) {
+        assert.equal(ok, false);
+        return { settled: false };
+      },
+    },
+    now: () => 1000,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings(routes),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'repair one node',
+      {
+        maxOutputTokens: 128,
+        maxModelCallsForRequest: 2,
+        providerCallBudgetContext: {
+          kind: 'browser-agent',
+          jobId: 'job.receipt',
+          controlEpoch: 7,
+        },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED');
+      return true;
+    },
+  );
+
+  assert.equal(gatewayCalls, 1);
+});
+
+test('settlement status accessor fails closed without invoking the getter', async () => {
+  let getterCalls = 0;
+  const settlement = {};
+  Object.defineProperty(settlement, 'settled', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return true;
+    },
+  });
+  const router = new AiOrchestrator({
+    gatewayClient: {
+      async complete() {
+        return {
+          text: 'must not escape as success',
+          usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 },
+        };
+      },
+    },
+    providerCallLifecycle: {
+      async beforeProviderCall() {
+        return reservation();
+      },
+      async afterProviderCall() {
+        return settlement;
+      },
+    },
+    now: () => 1000,
+  });
+
+  await assert.rejects(
+    () => router.run(
+      settings(),
+      DEFAULT_AI_ROUTER_RUNTIME,
+      'repair one node',
+      {
+        maxOutputTokens: 128,
+        maxModelCallsForRequest: 1,
+        providerCallBudgetContext: {
+          kind: 'browser-agent',
+          jobId: 'job.receipt',
+          controlEpoch: 7,
+        },
+      },
+    ),
+    error => {
+      assert.equal(error.code, 'AI_PROVIDER_BUDGET_SETTLEMENT_REJECTED');
+      assert.match(error.message, /own data property/u);
+      return true;
+    },
+  );
+
+  assert.equal(getterCalls, 0);
+});
