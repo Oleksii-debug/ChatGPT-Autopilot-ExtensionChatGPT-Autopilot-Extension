@@ -396,3 +396,62 @@ test('durable PREPARED record is never blindly redispatched after restart-shaped
   );
   assert.equal(calls, 0);
 });
+
+
+test('concurrent exact provider execution calls coalesce onto one external effect', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let calls = 0;
+  let releaseEffect;
+  let signalEntered;
+  const effectGate = new Promise(resolve => { releaseEffect = resolve; });
+  const enteredEffect = new Promise(resolve => { signalEntered = resolve; });
+  const client = {
+    async execute() {
+      calls += 1;
+      signalEntered();
+      await effectGate;
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+  const request = {
+    agentId,
+    conversationId: '66666666-6666-4666-8666-666666666666',
+    expectedControlEpoch: 0,
+    at: T1,
+  };
+
+  const first = manager.executeClaimedSpecialistProvider('job.coder', request);
+  await enteredEffect;
+  const second = manager.executeClaimedSpecialistProvider('job.coder', request);
+
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+
+  releaseEffect();
+  const [firstResult, secondResult] = await Promise.all([first, second]);
+  assert.equal(firstResult.kind, 'SPECIALIST_PROVIDER_SUCCEEDED');
+  assert.deepEqual(secondResult, firstResult);
+  assert.equal(calls, 1);
+
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 1);
+  assert.equal(durable.providerExecutions[0].status, 'PROVIDER_SUCCEEDED');
+});
