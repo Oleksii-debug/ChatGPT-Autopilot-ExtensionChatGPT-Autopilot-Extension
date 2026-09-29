@@ -145,6 +145,12 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
     'Agent definition registry revision',
   );
 
+  const expectedRegistryBindingKey = boundedText(
+    registryRaw.bindingKey,
+    'Agent definition registry bindingKey',
+    200000,
+  );
+
   const agentDefinitionId = boundedText(
     definitionRaw.agentDefinitionId,
     'Agent definition ID',
@@ -193,6 +199,7 @@ export function buildAgentDefinitionLaunchRequestV1(form, {
   const request = {
     registryId,
     expectedRegistryRevision,
+    expectedRegistryBindingKey,
     agentDefinitionId,
     expectedDefinitionRevision,
     goal: boundedText(raw.goal, 'Owner task', 50000),

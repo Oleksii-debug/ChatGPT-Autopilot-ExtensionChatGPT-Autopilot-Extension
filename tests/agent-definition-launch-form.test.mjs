@@ -12,6 +12,7 @@ function registry(overrides = {}) {
   return {
     registryId: 'agents:project-1',
     revision: 7,
+    bindingKey: 'registry-binding-7',
     definitions: [],
     ...overrides,
   };
@@ -68,6 +69,7 @@ test('launch builder binds exact live definition revisions and explicit least-au
   assert.deepEqual({ ...request }, {
     registryId: 'agents:project-1',
     expectedRegistryRevision: 7,
+    expectedRegistryBindingKey: 'registry-binding-7',
     agentDefinitionId: 'agent.research',
     expectedDefinitionRevision: 3,
     goal: 'Compare evidence and return a verified result.',
@@ -96,6 +98,14 @@ test('optional explicit job identity is preserved and surrounding whitespace is 
   assert.equal(request.goal, 'Owner task');
   assert.equal(request.projectId, 'project-1');
   assert.equal(request.jobId, 'job.research-1');
+});
+
+test('launch requires the exact durable registry content binding', () => {
+  assert.throws(() => buildAgentDefinitionLaunchRequestV1(form(), {
+    registry: registry({ bindingKey: '' }),
+    definition: definition(),
+    ownerPolicy: ownerPolicy(),
+  }), /registry bindingKey is required/u);
 });
 
 test('Project and Job identity aliases fail locally before Core mutation', () => {
