@@ -377,10 +377,14 @@ export class AiOrchestrator {
 
       let candidateRoutes = selected.candidates;
       if (this.routeQualityEvidenceResolver && candidateRoutes.length > 1) {
+        const evidenceLookupRouteIds = Object.freeze(
+          candidateRoutes.map(route => route.routeId),
+        );
+        const evidenceLookupRouteIdSet = new Set(evidenceLookupRouteIds);
         const benchmarkRequests = await resolveRouteQualityEvidenceWithDeadline(
           this.routeQualityEvidenceResolver,
           Object.freeze({
-            routeIds:Object.freeze(candidateRoutes.map(route => route.routeId)),
+            routeIds:evidenceLookupRouteIds,
             role:requestedRole,
             requiresVision,
           }),
@@ -400,7 +404,16 @@ export class AiOrchestrator {
         }
         candidateRoutes = selected.candidates;
 
-        if (benchmarkRequests != null) {
+        // A route can become newly eligible while an async evidence lookup is pending
+        // (for example when durable backoff expires). That route was never included in
+        // the trusted resolver request, so treating it as MISSING would be a false
+        // comparison against the partial snapshot. Shrink-only eligibility changes are
+        // safe; any expansion discards advisory evidence and keeps fresh Router order.
+        const evidenceSnapshotCoversFreshCandidates = candidateRoutes.every(
+          route => evidenceLookupRouteIdSet.has(route.routeId),
+        );
+
+        if (benchmarkRequests != null && evidenceSnapshotCoversFreshCandidates) {
           try {
             const advisory = await rankAiRouteCandidatesByEvidenceV1({
               routes:settings.routes,
