@@ -2171,8 +2171,7 @@ function syncAgentDefinitionModelRoutePolicyControls() {
     'agent-definition-model-route-ordered-ids','agent-definition-model-route-allow-ids',
     'agent-definition-model-route-deny-ids','agent-definition-model-route-free-only',
     'agent-definition-model-route-locality','agent-definition-model-route-max-input-price',
-    'agent-definition-model-route-max-output-price','agent-definition-model-route-backoff-seconds',
-    'agent-definition-model-route-circuit-failures','agent-definition-model-route-circuit-seconds',
+    'agent-definition-model-route-max-output-price',
   ]) $(id).disabled = !configured;
 }
 
@@ -2188,9 +2187,6 @@ function fillAgentDefinitionModelRoutePolicy(policy = null) {
   $('agent-definition-model-route-locality').value = policy?.locality || 'any';
   $('agent-definition-model-route-max-input-price').value = policy?.maxInputPricePerMillionUsd == null ? '' : String(policy.maxInputPricePerMillionUsd);
   $('agent-definition-model-route-max-output-price').value = policy?.maxOutputPricePerMillionUsd == null ? '' : String(policy.maxOutputPricePerMillionUsd);
-  $('agent-definition-model-route-backoff-seconds').value = String(policy?.retryBackoffSeconds ?? 60);
-  $('agent-definition-model-route-circuit-failures').value = String(policy?.circuitBreakerFailures ?? 2);
-  $('agent-definition-model-route-circuit-seconds').value = String(policy?.circuitBreakerSeconds ?? 300);
   syncAgentDefinitionModelRoutePolicyControls();
 }
 
@@ -2472,9 +2468,6 @@ function agentDefinitionFormValue() {
     modelRouteLocality: $('agent-definition-model-route-locality').value,
     modelRouteMaxInputPriceText: $('agent-definition-model-route-max-input-price').value,
     modelRouteMaxOutputPriceText: $('agent-definition-model-route-max-output-price').value,
-    modelRouteRetryBackoffSeconds: $('agent-definition-model-route-backoff-seconds').value,
-    modelRouteCircuitBreakerFailures: $('agent-definition-model-route-circuit-failures').value,
-    modelRouteCircuitBreakerSeconds: $('agent-definition-model-route-circuit-seconds').value,
     enabled: $('agent-definition-enabled').checked,
   };
 }

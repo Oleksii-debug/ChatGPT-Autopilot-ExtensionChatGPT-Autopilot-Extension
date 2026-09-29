@@ -55,7 +55,6 @@ const DEFINITION_CEILING_KEYS = Object.freeze([
 const MODEL_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 const OWNER_BUDGET_KEYS = new Set([
   ...DEFINITION_CEILING_KEYS,
@@ -264,7 +263,6 @@ export function normalizeAgentModelRoutePolicyV1(input) {
   }
   for (const key of [
     'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-    'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
   ]) {
     if (Object.hasOwn(raw, key)
         && (Object.is(raw[key], -0) || !Object.is(raw[key], normalized[key]))) {
@@ -290,9 +288,6 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
-    retryBackoffSeconds: normalized.retryBackoffSeconds,
-    circuitBreakerFailures: normalized.circuitBreakerFailures,
-    circuitBreakerSeconds: normalized.circuitBreakerSeconds,
   });
 }
 

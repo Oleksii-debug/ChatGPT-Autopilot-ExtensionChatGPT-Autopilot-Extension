@@ -84,16 +84,13 @@ function definition(overrides = {}) {
 }
 
 function registry(definitionOverrides = {}, registryOverrides = {}) {
-  const canonical = createAgentDefinitionRegistryV1({
+  return createAgentDefinitionRegistryV1({
     schemaVersion: 1,
     registryId: 'agents:project.alpha',
     revision: 6,
     definitions: [definition(definitionOverrides)],
-  });
-  return {
-    ...canonical,
     ...registryOverrides,
-  };
+  });
 }
 
 function currentSelection(definitionOverrides = {}, registryOverrides = {}) {
