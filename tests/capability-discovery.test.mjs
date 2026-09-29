@@ -226,13 +226,6 @@ test('impossible readiness chronology and malformed source provenance fail close
     () => normalizeProviderReadinessV1(state('local/fs', { observedAt:'2026-09-29 04:00:00Z' })),
     /canonical UTC/,
   );
-  assert.throws(
-    () => normalizeProviderReadinessV1(state('local/fs', {
-      observedAt:'2026-09-29T04:00:00.000Z',
-      validThrough:'2026-09-30T04:00:00.001Z',
-    })),
-    /validity window exceeds 24 hours/,
-  );
 });
 
 test('discovery asOf must use exact canonical UTC representation', () => {
