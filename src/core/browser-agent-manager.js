@@ -1599,7 +1599,7 @@ export class BrowserAgentManager {
     }
     const at = specialistRequestTimestamp(request.at, new Date(this.now()).toISOString(), 'Browser Agent definition specialist delegation at');
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (Object.hasOwn(request, 'expectedControlEpoch')) {
@@ -1757,7 +1757,7 @@ export class BrowserAgentManager {
     return result;
   }
 
-  executeClaimedSpecialistProvider(id, payload = {}) {
+  executeClaimedSpecialistProvider(id, payload = {}, dependencies = null) {
     const request = snapshotExactOwnDataRequest(
       payload,
       SPECIALIST_PROVIDER_EXECUTE_KEYS,
@@ -1781,13 +1781,29 @@ export class BrowserAgentManager {
     }
     const inFlightKey = `specialist-provider:${id}:${request.agentId}:${request.conversationId}:${request.expectedControlEpoch}`;
     if (this.inFlight.has(inFlightKey)) return this.inFlight.get(inFlightKey);
-    const operation = this.#executeClaimedSpecialistProvider(id, request)
+    const operation = this.#executeClaimedSpecialistProvider(id, request, dependencies)
       .finally(() => this.inFlight.delete(inFlightKey));
     this.inFlight.set(inFlightKey, operation);
     return operation;
   }
 
-  async #executeClaimedSpecialistProvider(id, request) {
+  async #executeClaimedSpecialistProvider(id, request, dependencies) {
+    const trustedReadiness = trustedSpecialistReadinessDependencies(dependencies);
+    let executionReadiness = null;
+    if (trustedReadiness) {
+      const initial = await this.get(id);
+      const admission = normalizeSpecialistDelegationAdmissions(
+        initial.job?.runtime?.specialistDelegationAdmissions,
+      ).find(item => item.agentId === request.agentId);
+      if (!admission) {
+        throw new Error('Specialist provider execution lacks durable admission provenance');
+      }
+      executionReadiness = assertTrustedSpecialistReadiness(
+        await trustedReadiness.resolve(admission.selection),
+        admission.selection,
+        this.now(),
+      );
+    }
     const preparedAt = specialistRequestTimestamp(
       request.at,
       new Date(this.now()).toISOString(),
@@ -1824,6 +1840,10 @@ export class BrowserAgentManager {
       const admission = normalizeSpecialistDelegationAdmissions(job.runtime.specialistDelegationAdmissions)
         .find(item => item.agentId === request.agentId);
       if (!admission) throw new Error('Specialist provider execution lacks durable admission provenance');
+      if (trustedReadiness) {
+        assertTrustedSpecialistReadiness(executionReadiness, admission.selection, this.now());
+        await trustedReadiness.assertCurrent(executionReadiness);
+      }
       const selection = normalizeSpecialistSelectionV1(admission.selection);
       const handoff = normalizeSpecialistHandoffV1(admission.handoff);
       if (selection.specialistId !== assignment.specialistId
