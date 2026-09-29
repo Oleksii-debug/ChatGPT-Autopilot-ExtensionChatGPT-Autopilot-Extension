@@ -104,6 +104,20 @@ test('portable registry normalizes deterministically and interoperates with the 
 });
 
 
+test('registry creation rejects snapshots whose canonical bindingKey exceeds the existing transport bound', () => {
+  const definitions = Array.from({ length: 26 }, (_, index) => definition({
+    specialistId: `oversize-specialist-${index + 1}`,
+    description: 'x'.repeat(4000),
+    definitionRevision: 1,
+  }));
+  assert.throws(() => createSpecialistRegistryV1({
+    schemaVersion: 1,
+    registryId: 'specialists:oversize',
+    revision: 1,
+    definitions,
+  }), /SpecialistRegistryV1\.bindingKey is invalid/);
+});
+
 test('same-revision registry content substitution is rejected by canonical bindingKey', () => {
   const current = registry();
   const forged = {
