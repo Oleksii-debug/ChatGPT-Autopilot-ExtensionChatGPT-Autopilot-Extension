@@ -254,7 +254,7 @@ function normalizedState(input) {
     }
     if (ambiguity.declaredAt
         && (Date.parse(ambiguity.declaredAt) < Date.parse(createdAt)
-          || Date.parse(ambiguity.declaredAt) > Date.parse(updatedAt))) {
+          || Date.parse(ambiguity.declaredAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS)) {
       throw new Error('Exact-effect ambiguity chronology is invalid');
     }
   }
@@ -292,7 +292,7 @@ function normalizedState(input) {
     }
     if (reconciliation.resolvedAt
         && (Date.parse(reconciliation.resolvedAt) < Date.parse(createdAt)
-          || Date.parse(reconciliation.resolvedAt) > Date.parse(updatedAt))) {
+          || Date.parse(reconciliation.resolvedAt) > Date.parse(updatedAt) + MAX_CLOCK_SKEW_MS)) {
       throw new Error('Exact-effect reconciliation chronology is invalid');
     }
     if (reconciliation.resolvedAt
