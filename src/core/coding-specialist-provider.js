@@ -533,7 +533,7 @@ export class OpenHandsCodingSpecialistClient {
       throw new OpenHandsCodingSpecialistError(
         controller.signal.aborted
           ? `OpenHands request timed out after ${timeoutMs} ms`
-          : `Could not reach OpenHands Agent Server: ${error?.message || 'network error'}`,
+          : 'Could not reach OpenHands Agent Server',
         {
           code: controller.signal.aborted ? 'OPENHANDS_REQUEST_TIMEOUT' : 'OPENHANDS_TRANSPORT_FAILURE',
           conversationId: prepared.conversationId,
