@@ -56,9 +56,19 @@ function copyDataRecord(value, label) {
   return out;
 }
 
-function copyModelRoutePolicy(value) {
+function copyStructuredData(value, label) {
   if (value == null) return null;
-  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('modelRoutePolicy має бути data object.');
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error(label + ' має бути data object.');
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) throw new Error(label + ' має бути data object.');
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string') throw new Error(label + ' містить неканонічне поле.');
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(label + '.' + key + ' має бути enumerable data property.');
+    }
+  }
   return structuredClone(value);
 }
 
@@ -66,6 +76,7 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
   definitionRevision = 1,
   configDefaults = {},
   modelRoutePolicy = null,
+  specialistDelegationProfile,
 } = {}) {
   if (!Number.isSafeInteger(definitionRevision) || definitionRevision < 1 || Object.is(definitionRevision,-0)) {
     throw new Error('Definition revision має бути додатним цілим числом.');
@@ -82,7 +93,10 @@ export function buildAgentDefinitionFromFormV1(input = {}, {
     tags: listFromLines(input.tagsText ?? '', 'Тег', { maxItems:32, itemMax:180, identity:true }),
     acceptanceCriteria: listFromLines(input.acceptanceCriteriaText ?? '', 'Критерій завершення', { maxItems:20, itemMax:1000 }),
     configDefaults: copyDataRecord(configDefaults, 'configDefaults'),
-    modelRoutePolicy: copyModelRoutePolicy(modelRoutePolicy),
+    modelRoutePolicy: copyStructuredData(modelRoutePolicy, 'modelRoutePolicy'),
+    ...(specialistDelegationProfile === undefined
+      ? {}
+      : { specialistDelegationProfile: copyStructuredData(specialistDelegationProfile, 'specialistDelegationProfile') }),
     enabled: input.enabled === true,
     definitionRevision,
   };
