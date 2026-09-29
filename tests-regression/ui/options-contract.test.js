@@ -306,12 +306,13 @@ test('Browser Agent exposes prompt-first autonomous UX with optional policy and 
   assert.match(js, /core\('CREATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must create registries through canonical Core');
   assert.match(js, /core\('MUTATE_BROWSER_AGENT_DEFINITION_REGISTRY'/, 'reusable Agent UI must commit definition CRUD through canonical Core');
   assert.match(js, /expectedRegistryRevision: registry\.revision/, 'definition mutations must carry exact registry CAS');
+  assert.match(js, /expectedRegistryBindingKey: registry\.bindingKey/, 'definition mutations must carry exact registry content binding CAS');
   assert.match(js, /expectedDefinitionRevision: current\.definitionRevision/, 'definition update/delete must carry exact definition CAS');
   assert.match(js, /configDefaults: current\?\.configDefaults \|\| \{\}/, 'definition edits must preserve canonical config defaults');
   assert.match(js, /modelRoutePolicy: current\?\.modelRoutePolicy \?\? null/, 'definition edits must preserve per-Agent model route policy');
   assert.match(js, /specialistDelegationProfile: current && Object\.hasOwn\(current, 'specialistDelegationProfile'\)/, 'definition edits must preserve specialist delegation profile');
   assert.match(js, /ui\.agentDefinitionMode === 'edit'/, 'definition create and edit paths must remain explicit');
-  assert.match(js, /revision drifted/, 'stale definition writes must force a current-state reload');
+  assert.match(js, /(?:revision|bindingKey) drifted/, 'stale definition writes must force a current-state reload');
   assert.match(js, /agentDefinitionQuarantineCount/, 'quarantined registries must be visible as aggregate owner-attention state');
   assert.doesNotMatch(js, /quarantinedRegistryIds\[[^\]]+\]/, 'UI must not render raw quarantined registry identities');
   assert.match(html, /<label for="agent-definition-registry-list">/, 'definition registry selector needs a persistent native label');
