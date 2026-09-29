@@ -809,6 +809,10 @@ export class CoreCommandDispatcher {
           internal.agentModelOrchestratorEnvelope,
         );
       let internalImageDataUrl = '';
+      let internalPrompt = '';
+      let internalSystemPrompt = '';
+      let internalMaxOutputTokens = 0;
+      let internalMaxModelCallsForRequest = 0;
       if (internalEnvelope) {
         for (const alias of [
           'settings','routerOverride','routerRuntime','isolatedRuntime',
@@ -818,13 +822,46 @@ export class CoreCommandDispatcher {
             throw new Error('Agent model orchestrator envelope cannot be mixed with payload Router aliases');
           }
         }
-        const boundedOutputTokens = payload.maxOutputTokens;
-        if (typeof boundedOutputTokens !== 'number'
+        const promptDescriptor = Object.getOwnPropertyDescriptor(payload, 'prompt');
+        if (!promptDescriptor
+            || promptDescriptor.enumerable !== true
+            || !Object.hasOwn(promptDescriptor, 'value')
+            || typeof promptDescriptor.value !== 'string') {
+          throw new Error('Agent model invocation prompt must be an enumerable own text data property');
+        }
+        const systemPromptDescriptor = Object.getOwnPropertyDescriptor(payload, 'systemPrompt');
+        if (systemPromptDescriptor
+            && (systemPromptDescriptor.enumerable !== true
+              || !Object.hasOwn(systemPromptDescriptor, 'value')
+              || typeof systemPromptDescriptor.value !== 'string')) {
+          throw new Error('Agent model invocation systemPrompt must be an enumerable own text data property');
+        }
+        const maxOutputTokensDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxOutputTokens');
+        const boundedOutputTokens = maxOutputTokensDescriptor?.value;
+        if (!maxOutputTokensDescriptor
+            || maxOutputTokensDescriptor.enumerable !== true
+            || !Object.hasOwn(maxOutputTokensDescriptor, 'value')
+            || typeof boundedOutputTokens !== 'number'
             || !Number.isSafeInteger(boundedOutputTokens)
             || Object.is(boundedOutputTokens, -0)
             || boundedOutputTokens < 1) {
           throw new Error('Agent model invocation requires canonical bounded maxOutputTokens');
         }
+        const maxModelCallsDescriptor = Object.getOwnPropertyDescriptor(payload, 'maxModelCallsForRequest');
+        const maxModelCallsForRequest = maxModelCallsDescriptor?.value ?? 0;
+        if (maxModelCallsDescriptor
+            && (maxModelCallsDescriptor.enumerable !== true
+              || !Object.hasOwn(maxModelCallsDescriptor, 'value')
+              || typeof maxModelCallsForRequest !== 'number'
+              || !Number.isSafeInteger(maxModelCallsForRequest)
+              || Object.is(maxModelCallsForRequest, -0)
+              || maxModelCallsForRequest < 0)) {
+          throw new Error('Agent model invocation maxModelCallsForRequest must be canonical');
+        }
+        internalPrompt = promptDescriptor.value;
+        internalSystemPrompt = systemPromptDescriptor?.value ?? '';
+        internalMaxOutputTokens = boundedOutputTokens;
+        internalMaxModelCallsForRequest = maxModelCallsForRequest;
         const imageDescriptor = Object.getOwnPropertyDescriptor(payload, 'imageDataUrl');
         if (imageDescriptor
             && (imageDescriptor.enumerable !== true
@@ -911,11 +948,17 @@ export class CoreCommandDispatcher {
           : normalizeAiRouterRuntime(state.profile?.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME);
       let result;
       try {
-        result = await this.aiOrchestrator.run(settings, runtime, payload.prompt, {
-          systemPrompt: payload.systemPrompt || '',
+        result = await this.aiOrchestrator.run(
+          settings,
+          runtime,
+          internalEnvelope ? internalPrompt : payload.prompt,
+          {
+          systemPrompt: internalEnvelope ? internalSystemPrompt : payload.systemPrompt || '',
           forceStrong: internalEnvelope ? false : payload.forceStrong === true,
-          maxOutputTokens: Number(payload.maxOutputTokens || 0),
-          maxModelCallsForRequest: Number(payload.maxModelCallsForRequest || 0),
+          maxOutputTokens: internalEnvelope ? internalMaxOutputTokens : Number(payload.maxOutputTokens || 0),
+          maxModelCallsForRequest: internalEnvelope
+            ? internalMaxModelCallsForRequest
+            : Number(payload.maxModelCallsForRequest || 0),
           imageDataUrl: internalEnvelope ? internalImageDataUrl : payload.imageDataUrl || '',
           taskRole: internalEnvelope ? internalEnvelope.role : payload.taskRole || 'planner',
           strongTaskRole: internalEnvelope ? internalEnvelope.role : payload.strongTaskRole || 'verifier',
