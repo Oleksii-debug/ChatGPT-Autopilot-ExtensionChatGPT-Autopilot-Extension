@@ -958,6 +958,9 @@ export class BrowserAgentManager {
     if (plan.revision !== request.expectedPlanRevision) {
       throw new Error('Browser Agent AgentPlan revision drifted before specialist delegation intent materialization');
     }
+    if (!plan.nodes.some(node => node.nodeId === request.nodeId)) {
+      throw new Error('Browser Agent AgentPlan node not found for specialist delegation intent');
+    }
 
     const at = specialistRequestTimestamp(
       request.at,

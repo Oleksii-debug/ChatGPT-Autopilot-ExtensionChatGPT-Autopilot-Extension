@@ -339,6 +339,18 @@ test('durable definition specialist intent fails closed on plan drift and snapsh
     /AgentPlan revision drifted/,
   );
 
+  await assert.rejects(
+    () => manager.materializeDefinitionSpecialistDelegationIntent(
+      'job.research-binding',
+      {
+        expectedRegistryRevision: 12,
+        expectedPlanRevision: 4,
+        nodeId: 'local:missing',
+      },
+    ),
+    /AgentPlan node not found/,
+  );
+
   const request = {
     expectedRegistryRevision: 12,
     expectedPlanRevision: 4,
