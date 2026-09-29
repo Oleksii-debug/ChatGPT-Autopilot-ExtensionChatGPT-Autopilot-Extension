@@ -74,6 +74,10 @@ import {
   normalizeAgentSpecialistDelegationBindingV1,
 } from './agent-specialist-delegation-profile.js';
 import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
+import {
+  canonicalSpecialistProviderIdV1,
+  normalizeSpecialistProviderConfigV1,
+} from './specialist-provider-config.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
@@ -82,6 +86,8 @@ const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
 const MAX_AGENT_DEFINITION_REGISTRIES = 128;
 const MAX_SPECIALIST_REGISTRIES = 128;
+const MAX_SPECIALIST_PROVIDER_CONFIGS = 128;
+const SPECIALIST_PROVIDER_CONFIG_PUT_KEYS = new Set(['providerConfig', 'expectedRevision']);
 const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
 const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
@@ -410,7 +416,39 @@ function freshStore() {
     definitionRegistryQuarantineById: Object.create(null),
     specialistRegistriesById: Object.create(null),
     specialistRegistryQuarantineById: Object.create(null),
+    specialistProviderConfigsById: Object.create(null),
+    specialistProviderConfigQuarantineById: Object.create(null),
   };
+}
+
+function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
+  const configs = Object.create(null);
+  const quarantine = Object.create(null);
+  if (rawQuarantine && typeof rawQuarantine === 'object' && !Array.isArray(rawQuarantine)) {
+    for (const key of Object.keys(rawQuarantine).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+      try { quarantine[canonicalSpecialistProviderIdV1(key)] = true; } catch {}
+    }
+  }
+  if (!rawConfigs || typeof rawConfigs !== 'object' || Array.isArray(rawConfigs)) {
+    return { configs, quarantine };
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(rawConfigs);
+  for (const key of Object.keys(descriptors).sort().slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+    const descriptor = descriptors[key];
+    try {
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error('Specialist provider config entry must be an enumerable data property');
+      }
+      const providerId = canonicalSpecialistProviderIdV1(key);
+      const config = normalizeSpecialistProviderConfigV1(descriptor.value);
+      if (config.providerId !== providerId) throw new Error('Specialist provider config key drifted from providerId');
+      if (Object.hasOwn(quarantine, providerId)) continue;
+      configs[providerId] = config;
+    } catch {
+      try { quarantine[canonicalSpecialistProviderIdV1(key)] = true; } catch {}
+    }
+  }
+  return { configs, quarantine };
 }
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
@@ -734,6 +772,12 @@ function normalizeStore(raw, now) {
   );
   out.specialistRegistriesById = specialistState.registries;
   out.specialistRegistryQuarantineById = specialistState.quarantine;
+  const specialistProviderConfigState = normalizePersistedSpecialistProviderConfigState(
+    raw.specialistProviderConfigsById,
+    raw.specialistProviderConfigQuarantineById,
+  );
+  out.specialistProviderConfigsById = specialistProviderConfigState.configs;
+  out.specialistProviderConfigQuarantineById = specialistProviderConfigState.quarantine;
   return out;
 }
 
@@ -947,6 +991,74 @@ export class BrowserAgentManager {
       return store;
     });
     return clone(committed);
+  }
+
+  async listSpecialistProviderConfigs() {
+    const store = await this.load();
+    const configs = Object.keys(store.specialistProviderConfigsById || {})
+      .sort()
+      .map(providerId => clone(store.specialistProviderConfigsById[providerId]));
+    const quarantinedProviderIds = Object.keys(store.specialistProviderConfigQuarantineById || {}).sort();
+    return { configs, quarantinedProviderIds };
+  }
+
+  async getSpecialistProviderConfig(providerId) {
+    const canonicalId = canonicalSpecialistProviderIdV1(providerId);
+    const store = await this.load();
+    const configs = store.specialistProviderConfigsById || Object.create(null);
+    const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+    const providerConfig = Object.hasOwn(configs, canonicalId) ? configs[canonicalId] : null;
+    return {
+      providerConfig: providerConfig ? clone(providerConfig) : null,
+      quarantined: !providerConfig && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async putSpecialistProviderConfig(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_PROVIDER_CONFIG_PUT_KEYS,
+      'Browser Agent Specialist provider config put request',
+    );
+    if (!Object.hasOwn(request, 'providerConfig') || !Object.hasOwn(request, 'expectedRevision')) {
+      throw new Error('Browser Agent Specialist provider config put request requires providerConfig and expectedRevision');
+    }
+    const providerConfig = normalizeSpecialistProviderConfigV1(request.providerConfig);
+    const expectedRevision = request.expectedRevision;
+    if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision)
+        || Object.is(expectedRevision, -0) || expectedRevision < 0) {
+      throw new Error('Browser Agent Specialist provider config expectedRevision must be a non-negative safe integer');
+    }
+    let committed = null;
+    await this.update(store => {
+      const configs = store.specialistProviderConfigsById
+        || (store.specialistProviderConfigsById = Object.create(null));
+      const quarantine = store.specialistProviderConfigQuarantineById
+        || (store.specialistProviderConfigQuarantineById = Object.create(null));
+      const providerId = providerConfig.providerId;
+      if (Object.hasOwn(quarantine, providerId)) {
+        throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
+      }
+      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      const currentRevision = current?.revision || 0;
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Specialist provider config revision drifted before persistence');
+      }
+      const requiredRevision = currentRevision + 1;
+      if (!Number.isSafeInteger(requiredRevision) || providerConfig.revision !== requiredRevision) {
+        throw new Error('Specialist provider config must increment revision exactly once');
+      }
+      if (!current && Object.keys(configs).length >= MAX_SPECIALIST_PROVIDER_CONFIGS) {
+        throw new Error('Specialist provider config capacity is exhausted');
+      }
+      if (current && Date.parse(providerConfig.updatedAt) < Date.parse(current.updatedAt)) {
+        throw new Error('Specialist provider config updatedAt cannot move backwards');
+      }
+      configs[providerId] = providerConfig;
+      committed = providerConfig;
+      return store;
+    });
+    return { providerConfig: clone(committed) };
   }
 
   async listSpecialistRegistries() {
