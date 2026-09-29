@@ -778,6 +778,7 @@ export async function dispatchUiMessage(message) {
         conversationId: randomUuid.call(globalThis.crypto).toLowerCase(),
         expectedControlEpoch: message.payload?.expectedControlEpoch,
       },
+      { specialistProviderReadinessResolver },
     );
   } else if (message.command === 'AUTHORIZE_BROWSER_AGENT_SPECIALIST_SAFE_RETRY') {
     result = await browserAgent.authorizeSpecialistSafeRetry(message.payload?.id || '', message.payload?.reconciliation || {});
