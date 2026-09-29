@@ -72,14 +72,7 @@ function internalAgentEnvelope() {
       timeoutSeconds: 180,
       mode: 'primary',
       primary: { provider: route.provider, model: route.model },
-      strong: { provider: route.provider, model: route.model },
-      strongEveryNRequests: 0,
-      strongEveryMinutes: 0,
-      strongMinGapMinutes: 0,
-      strongMaxPerHour: 0,
-      carryStrongResultToPrimary: false,
-      fallbackToStrongOnPrimaryError: false,
-      keepPrimaryIfStrongFails: true,
+      strong: { provider: 'openai', model: 'unused' },
       routes: [route],
       routePolicy: {
         autoSwitch: false,
@@ -176,6 +169,7 @@ test('internal Agent dispatcher preserves the selected durable provider receipt 
           ok,
           result.usage.totalTokens,
         ]);
+        return { settled: true };
       },
     },
   });
