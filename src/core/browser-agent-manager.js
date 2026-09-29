@@ -347,6 +347,23 @@ function originPattern(value) {
   return `${url.origin}/*`;
 }
 
+function definitionConfigBindingKey(config) {
+  return JSON.stringify(config);
+}
+function normalizePersistedDefinitionConfigBindingKey(raw, selection, config) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition config binding requires persisted selection provenance');
+  }
+  if (typeof raw !== 'string' || raw !== raw.trim() || !raw || raw.length > 200_000) {
+    throw new Error('Browser Agent definition config binding key is invalid');
+  }
+  const expected = definitionConfigBindingKey(config);
+  if (raw !== expected) {
+    throw new Error('Browser Agent definition config drifted from persisted launch binding');
+  }
+  return raw;
+}
 function normalizePersistedDefinitionRouterOverride(raw, selection) {
   if (raw == null) {
     if (selection?.definition?.modelRoutePolicy) {
@@ -564,6 +581,11 @@ function normalizeStore(raw, now) {
         raw.byId[id].definitionRouterOverride,
         definitionSelection,
       );
+      const definitionConfigBindingKeyValue = normalizePersistedDefinitionConfigBindingKey(
+        raw.byId[id].definitionConfigBindingKey,
+        definitionSelection,
+        config,
+      );
       out.byId[id] = {
         id,
         config,
@@ -571,6 +593,7 @@ function normalizeStore(raw, now) {
         definitionSelection,
         definitionScope,
         definitionRouterOverride,
+        definitionConfigBindingKey: definitionConfigBindingKeyValue,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -1109,6 +1132,7 @@ export class BrowserAgentManager {
         definitionSelection: clone(selection),
         definitionScope: clone(materialized.scope),
         definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
+        definitionConfigBindingKey: definitionConfigBindingKey(materialized.config),
         createdAt: now,
         updatedAt: now,
       };
@@ -1170,6 +1194,7 @@ export class BrowserAgentManager {
         definitionSelection: null,
         definitionScope: null,
         definitionRouterOverride: null,
+        definitionConfigBindingKey: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -1195,6 +1220,9 @@ export class BrowserAgentManager {
       const job = store.byId[id];
       if (!job) throw new Error('Browser Agent job not found');
       if (job.runtime.runState === BrowserAgentRunState.RUNNING) throw new Error('Pause or stop Browser Agent before editing');
+      if (job.definitionSelection != null) {
+        throw new Error('Reusable Agent definition-bound jobs are immutable; create a new job from the current definition');
+      }
 
       let nextProjectId = job.config.projectId || '';
       if (rawConfig && typeof rawConfig === 'object' && Object.hasOwn(rawConfig, 'projectId')) {

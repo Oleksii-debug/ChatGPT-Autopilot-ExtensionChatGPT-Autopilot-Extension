@@ -157,6 +157,34 @@ test('definition launch provenance and narrowed scope survive service-worker res
   assert.equal(loaded.job.config.aiPinnedRouteId, 'route.research');
 });
 
+test('restart rejects definition-bound config drift against the exact persisted launch binding', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.config-binding' }));
+
+  const [storageKey] = Object.keys(data);
+  data[storageKey].byId['job.config-binding'].config.maxModelCalls = 999;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.config-binding');
+  assert.equal(loaded.job, null, 'persisted config drift must quarantine the definition-bound job on reload');
+});
+
+test('restart rejects a definition-bound job when its exact launch config binding disappears', async () => {
+  const { data, chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.binding-missing' }));
+
+  const [storageKey] = Object.keys(data);
+  delete data[storageKey].byId['job.binding-missing'].definitionConfigBindingKey;
+
+  const restarted = managerFor(chrome);
+  const loaded = await restarted.get('job.binding-missing');
+  assert.equal(loaded.job, null, 'definition launch config binding must survive restart');
+});
+
 test('restart rejects a selected definition when its persisted model route policy binding is missing', async () => {
   const { data, chrome } = makeChromeStorage();
   const manager = managerFor(chrome);
@@ -342,6 +370,29 @@ test('nested launch authority rejects accessors without executing them', async (
     /enumerable data property/,
   );
   assert.equal(reads, 0);
+});
+
+test('definition-bound jobs reject generic config mutation that could bypass durable definition authority', async () => {
+  const { chrome } = makeChromeStorage();
+  const manager = managerFor(chrome);
+  await seedRegistry(manager);
+  const created = await manager.createFromAgentDefinition(launchRequest({ jobId: 'job.immutable-definition' }));
+
+  await assert.rejects(
+    () => manager.updateConfig('job.immutable-definition', {
+      goal: 'Bypass reusable definition instructions.',
+      maxModelCalls: 999,
+      aiPinnedRouteId: 'route.other',
+    }),
+    /definition-bound jobs are immutable/,
+  );
+
+  const reloaded = await manager.get('job.immutable-definition');
+  assert.equal(reloaded.job.config.goal, created.job.config.goal);
+  assert.equal(reloaded.job.config.maxModelCalls, created.job.config.maxModelCalls);
+  assert.equal(reloaded.job.config.aiPinnedRouteId, 'route.research');
+  assert.equal(reloaded.job.definitionSelection.definitionRevision, 1);
+  assert.deepEqual(reloaded.job.definitionScope.capabilityIds, ['research']);
 });
 
 test('standard Browser Agent creation carries no reusable-definition provenance', async () => {
