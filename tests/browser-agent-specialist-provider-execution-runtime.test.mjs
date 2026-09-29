@@ -216,13 +216,13 @@ async function seed(manager, { claim = true } = {}) {
     kind: configured.kind,
     config: configured.config,
   });
+  const prepared = await manager.cycleOne('job.coder');
+  assert.equal(prepared.kind, 'SPECIALIST_PENDING');
+  if (!claim) return prepared.handoff.agentId;
   await manager.setOwnerResourceBudget({
     expectedRevision: 0,
     budget: ownerResourceBudget(),
   });
-  const prepared = await manager.cycleOne('job.coder');
-  assert.equal(prepared.kind, 'SPECIALIST_PENDING');
-  if (!claim) return prepared.handoff.agentId;
   const claimed = await manager.claimSpecialistHandoffs('job.coder', {
     availableSlots: 1,
     leaseSeconds: 600,
