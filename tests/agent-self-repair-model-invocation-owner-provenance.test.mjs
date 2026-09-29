@@ -164,10 +164,16 @@ function envelope(intent) {
 
 test('self-repair invocation exposes the exact provider-budget owner as jobId while preserving root job provenance', () => {
   const intent = repairIntent();
+  const orchestratorEnvelope = envelope(intent);
   const prepared = prepareBoundAgentSelfRepairModelInvocationV1({
     selfRepairModelIntent: intent,
     currentSelfRepairModelBindingKey: intent.bindingKey,
-    orchestratorEnvelope: envelope(intent),
+    currentProjectId: orchestratorEnvelope.projectId,
+    currentDefinitionModelPolicyBindingKey: orchestratorEnvelope.definitionModelPolicyBindingKey,
+    currentModelPolicyBindingKey: orchestratorEnvelope.modelPolicyBindingKey,
+    currentRoutePoolRevision: orchestratorEnvelope.routePoolRevision,
+    currentSelfRepairDispatchRouteId: orchestratorEnvelope.routeId,
+    orchestratorEnvelope,
     providerCallBudgetContext: {
       kind: 'browser-agent',
       jobId: intent.ownerId,
