@@ -77,27 +77,18 @@ test('Specialist provider config commands preserve one BrowserAgent control plan
 });
 
 
-test('Specialist provider execution command remains mutation-only and delegates exact execution payload', () => {
-  const start = source.indexOf('const READ_ONLY_UI_COMMANDS = new Set([');
-  const end = source.indexOf(']);', start);
-  const block = source.slice(start, end);
-
-  assert.doesNotMatch(block, /'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'/);
-  assert.match(
-    source,
-    /message\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'[\s\S]*?browserAgent\.executeClaimedSpecialistProvider\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.execution \|\| \{\}[\s\S]*?\)/,
-  );
-});
-
-
-test('Specialist provider execution command remains mutation-only and delegates exact payload', () => {
+test('Specialist provider execution command is registered exactly once and remains mutation-only', () => {
   const start = source.indexOf('const READ_ONLY_UI_COMMANDS = new Set([');
   const end = source.indexOf(']);', start);
   const block = source.slice(start, end);
   assert.doesNotMatch(block, /EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER/);
 
+  const commandMatches = source.match(/message\\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'/g) || [];
+  const delegateMatches = source.match(/browserAgent\\.executeClaimedSpecialistProvider\\(/g) || [];
+  assert.equal(commandMatches.length, 1);
+  assert.equal(delegateMatches.length, 1);
   assert.match(
     source,
-    /message\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'[\s\S]*?browserAgent\.executeClaimedSpecialistProvider\([\s\S]*?message\.payload\?\.id \|\| ''[\s\S]*?message\.payload\?\.execution \|\| \{\}[\s\S]*?\)/,
+    /message\\.command === 'EXECUTE_BROWSER_AGENT_SPECIALIST_PROVIDER'[\\s\\S]*?browserAgent\\.executeClaimedSpecialistProvider\\([\\s\\S]*?message\\.payload\\?\\.id \\|\\| ''[\\s\\S]*?message\\.payload\\?\\.execution \\|\\| \\{\\}[\\s\\S]*?\\)/,
   );
 });
