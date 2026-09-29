@@ -11,6 +11,7 @@ export const PROJECT_WORKSPACE_SCHEMA_VERSION = 1;
 export const MAX_PROJECTS = 64;
 export const MAX_CAPSULES_PER_PROJECT = 128;
 export const MAX_PROVENANCE_PER_PROJECT = 512;
+export const MAX_SNAPSHOT_REVISIONS_PER_PROJECT = 512;
 export const PROJECT_WORKSPACE_CONTEXT_RESOLUTION_VERSION = 1;
 
 const CONTEXT_RESOLUTION_REQUEST_KEYS = new Set(['projectId', 'expectedProjectRevisionId', 'capsuleId']);
@@ -77,6 +78,25 @@ function sourceIdentity(source) {
   return `${source.sourceId}\u001f${source.revisionId}\u001f${source.contentSha256 || ''}`;
 }
 
+function snapshotRevisionHistory(project, snapshot) {
+  const raw = project.snapshotRevisionIds;
+  if (raw === undefined) return [snapshot.revisionId];
+  if (!Array.isArray(raw)) throw new Error('Project workspace snapshotRevisionIds must be an array');
+  if (raw.length < 1 || raw.length > MAX_SNAPSHOT_REVISIONS_PER_PROJECT) {
+    throw new Error('Project workspace snapshot revision history limit exceeded');
+  }
+  const seen = new Set();
+  for (const value of raw) {
+    const revisionId = workspaceId(value, 'snapshotRevisionId');
+    if (seen.has(revisionId)) throw new Error('Project workspace snapshot revision history contains duplicate revisionId');
+    seen.add(revisionId);
+  }
+  if (raw[raw.length - 1] !== snapshot.revisionId) {
+    throw new Error('Project workspace snapshot revision history does not end at current snapshot');
+  }
+  return raw;
+}
+
 function sameCanonicalData(left, right) {
   if (Object.is(left, right)) return true;
   if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object') {
@@ -121,9 +141,23 @@ function assertSnapshotRevisionContinuity(previousWorkspace, nextWorkspace) {
     }
     const previousSnapshot = normalizeProjectSnapshotV1(previousProject.snapshot);
     const nextSnapshot = normalizeProjectSnapshotV1(nextProject.snapshot);
+    const previousRevisionIds = snapshotRevisionHistory(previousProject, previousSnapshot);
+    const nextRevisionIds = snapshotRevisionHistory(nextProject, nextSnapshot);
     if (previousSnapshot.revisionId === nextSnapshot.revisionId
         && !sameCanonicalData(previousSnapshot, nextSnapshot)) {
       throw new Error('Project snapshot revisionId cannot be reused for different content');
+    }
+    if (nextRevisionIds.length < previousRevisionIds.length
+        || previousRevisionIds.some((revisionId, index) => nextRevisionIds[index] !== revisionId)) {
+      throw new Error('Project snapshot revision history is append-only');
+    }
+    if (previousSnapshot.revisionId === nextSnapshot.revisionId) {
+      if (nextRevisionIds.length !== previousRevisionIds.length) {
+        throw new Error('Project snapshot revision history cannot advance without snapshot advance');
+      }
+    } else if (nextRevisionIds.length !== previousRevisionIds.length + 1
+        || nextRevisionIds[nextRevisionIds.length - 1] !== nextSnapshot.revisionId) {
+      throw new Error('Project snapshot advance must append exactly one revisionId');
     }
     for (const [capsuleId, previousCapsuleValue] of Object.entries(previousProject.capsulesById)) {
       if (!hasOwn(nextProject.capsulesById, capsuleId)) {
@@ -168,6 +202,7 @@ function validateProjectRecord(project) {
   record(project, 'project workspace project');
   const snapshot = normalizeProjectSnapshotV1(project.snapshot);
   if (project.projectId !== snapshot.projectId) throw new Error('Project workspace projectId mismatch');
+  snapshotRevisionHistory(project, snapshot);
   const createdAt = timestamp(project.createdAt, 'project workspace project createdAt');
   const updatedAt = timestamp(project.updatedAt, 'project workspace project updatedAt');
   if (updatedAt < createdAt) throw new Error('Project workspace project updatedAt cannot precede createdAt');
@@ -216,6 +251,7 @@ export function createProjectRecord(snapshot, { nowMs = Date.now() } = {}) {
     snapshot: normalized,
     createdAt: nowMs,
     updatedAt: nowMs,
+    snapshotRevisionIds: [normalized.revisionId],
     capsulesById: {},
     provenanceByArtifactId: {},
   };
@@ -275,12 +311,20 @@ export function replaceProjectSnapshot(workspace, snapshot, { nowMs = Date.now()
   const normalized = normalizeProjectSnapshotV1(snapshot);
   const project = requireProject(workspace, normalized.projectId);
   const current = normalizeProjectSnapshotV1(project.snapshot);
+  const revisionIds = snapshotRevisionHistory(project, current);
   if (normalized.revisionId === current.revisionId) {
     if (!sameCanonicalData(normalized, current)) {
       throw new Error('Project snapshot revisionId cannot be reused for different content');
     }
     return project;
   }
+  if (revisionIds.includes(normalized.revisionId)) {
+    throw new Error('Project snapshot revisionId cannot be reused after it was superseded');
+  }
+  if (revisionIds.length >= MAX_SNAPSHOT_REVISIONS_PER_PROJECT) {
+    throw new Error('Project workspace snapshot revision history limit exceeded');
+  }
+  project.snapshotRevisionIds = [...revisionIds, normalized.revisionId];
   project.snapshot = normalized;
   project.updatedAt = nowMs;
   // Existing capsules and provenance remain intentionally visible. Their
