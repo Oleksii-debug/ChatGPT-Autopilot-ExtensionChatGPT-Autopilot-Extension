@@ -414,3 +414,24 @@ test('Orchestration Drive scalar controls are keyboard-native, explicit, and do 
   assert.match(js, /Drive scalar: \$\{driveScalarText\}/, 'runtime status must expose provider revision/slot state in normal text');
   assert.doesNotMatch(js, /drive[-_ ]?(?:access[-_ ]?)?token|Bearer\s+\$\{/i, 'UI must never own or render Drive access tokens');
 });
+
+test('Specialist automation policy owner surface is native, bounded and Core-authoritative', () => {
+  for (const id of [
+    'agent-specialist-automation-details',
+    'agent-specialist-automation-enabled',
+    'agent-specialist-automation-save-button',
+    'agent-specialist-automation-clear-button',
+    'agent-specialist-automation-status',
+  ]) {
+    assert.ok(html.includes(`id="${id}"`), `missing ${id}`);
+  }
+  assert.doesNotMatch(html, /id="agent-specialist-automation-capacity"/, 'automation policy must not own numeric capacity');
+  has(/id="agent-owner-max-concurrent" type="number" min="0" max="256" step="1" inputmode="numeric"/);
+  has(/id="agent-specialist-automation-status" role="status"/);
+  assert.match(js, /GET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY/);
+  assert.match(js, /SET_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY/);
+  assert.match(js, /CLEAR_BROWSER_AGENT_SPECIALIST_AUTOMATION_POLICY/);
+  assert.match(js, /expectedRevision:\s*ui\.specialistAutomationPolicyRevision/);
+  assert.match(js, /enabled\.disabled = quarantined/);
+  assert.match(js, /save\.disabled = quarantined/);
+});

@@ -17,6 +17,7 @@ export const AgentDefinitionRegistryMutationKind = Object.freeze({
 });
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:@/+~-]{0,179}$/u;
+const MAX_REGISTRY_BINDING_KEY_LENGTH = 200_000;
 const DEF_KEYS = new Set([
   'schemaVersion', 'agentDefinitionId', 'label', 'description', 'instructions',
   'capabilityIds', 'toolIds', 'tags', 'acceptanceCriteria', 'configDefaults', 'modelRoutePolicy',
@@ -54,7 +55,6 @@ const DEFINITION_CEILING_KEYS = Object.freeze([
 const MODEL_ROUTE_POLICY_KEYS = new Set([
   'autoSwitch', 'pinnedRouteId', 'orderedRouteIds', 'allowRouteIds', 'denyRouteIds',
   'freeOnly', 'locality', 'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-  'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
 ]);
 const OWNER_BUDGET_KEYS = new Set([
   ...DEFINITION_CEILING_KEYS,
@@ -185,7 +185,10 @@ function freeze(value) {
 }
 
 function exactBindingKey(value, label) {
-  if (typeof value !== 'string' || value !== value.trim() || !value || value.length > 200_000) {
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > MAX_REGISTRY_BINDING_KEY_LENGTH) {
     throw new Error(label + ' is invalid');
   }
   return value;
@@ -260,7 +263,6 @@ export function normalizeAgentModelRoutePolicyV1(input) {
   }
   for (const key of [
     'maxInputPricePerMillionUsd', 'maxOutputPricePerMillionUsd',
-    'retryBackoffSeconds', 'circuitBreakerFailures', 'circuitBreakerSeconds',
   ]) {
     if (Object.hasOwn(raw, key)
         && (Object.is(raw[key], -0) || !Object.is(raw[key], normalized[key]))) {
@@ -286,9 +288,6 @@ export function normalizeAgentModelRoutePolicyV1(input) {
     locality: normalized.locality,
     maxInputPricePerMillionUsd: normalized.maxInputPricePerMillionUsd,
     maxOutputPricePerMillionUsd: normalized.maxOutputPricePerMillionUsd,
-    retryBackoffSeconds: normalized.retryBackoffSeconds,
-    circuitBreakerFailures: normalized.circuitBreakerFailures,
-    circuitBreakerSeconds: normalized.circuitBreakerSeconds,
   });
 }
 
@@ -401,11 +400,15 @@ export function createAgentDefinitionRegistryV1(input) {
   if (new Set(definitions.map(item => item.agentDefinitionId)).size !== definitions.length) {
     throw new Error('AgentDefinitionRegistryV1 contains duplicate agentDefinitionId');
   }
+  const bindingKey = exactBindingKey(
+    registryBindingKey(registryId, revision, definitions),
+    'AgentDefinitionRegistryV1.bindingKey',
+  );
   return freeze({
     schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
     registryId,
     revision,
-    bindingKey: registryBindingKey(registryId, revision, definitions),
+    bindingKey,
     definitions,
   });
 }

@@ -29,7 +29,6 @@ function definition(overrides = {}) {
       maxModelCalls: 20,
       maxRuntimeMinutes: 30,
       aiRoutingMode: 'primary',
-      aiPinnedRouteId: 'mistral-agent',
       aiPrimaryProvider: 'openai-compatible',
       aiPrimaryModel: 'mistral-small-latest',
       visionOnDemand: false,
@@ -41,7 +40,7 @@ function definition(overrides = {}) {
 }
 
 function registry(overrides = {}) {
-  return createAgentDefinitionRegistryV1({{
+  return createAgentDefinitionRegistryV1({
     schemaVersion: 1,
     registryId: 'agents:project-1',
     revision: 3,
@@ -110,6 +109,25 @@ test('same-revision Agent registry content substitution is rejected by canonical
   );
   const selected = selectAgentDefinitionV1({ registry: current, agentDefinitionId: 'agent.research' });
   assert.equal(selected.registryBindingKey, current.bindingKey);
+});
+
+test('registry creation enforces the same binding-key transport bound as normalization', () => {
+  const definitions = Array.from({ length: 18 }, (_, index) => definition({
+    agentDefinitionId: 'agent.large-' + String(index + 1),
+    label: 'Large Agent ' + String(index + 1),
+    instructions: 'x'.repeat(12_000),
+    definitionRevision: 1,
+  }));
+
+  assert.throws(
+    () => createAgentDefinitionRegistryV1({
+      schemaVersion: 1,
+      registryId: 'agents:oversized-project',
+      revision: 1,
+      definitions,
+    }),
+    /AgentDefinitionRegistryV1\.bindingKey is invalid/,
+  );
 });
 
 test('legacy Agent definitions remain shape-compatible when no specialist delegation profile exists', () => {
@@ -243,7 +261,7 @@ test('selection carries a full immutable definition snapshot so same-revision by
     ...materialization(),
     registry: drifted,
     selection: selected,
-  }), /drifted from current registry definition/);
+  }), /registry identity, revision or bindingKey drifted/);
 });
 
 test('materialization reuses Browser Agent config and binds model defaults under owner budget authority', () => {
@@ -257,7 +275,7 @@ test('materialization reuses Browser Agent config and binds model defaults under
   assert.equal(result.config.maxModelCalls, 20);
   assert.equal(result.config.maxRuntimeMinutes, 30);
   assert.equal(result.config.aiRoutingMode, 'primary');
-  assert.equal(result.config.aiPinnedRouteId, 'mistral-agent');
+  assert.equal(Object.hasOwn(result.config, 'aiPinnedRouteId'), false);
   assert.equal(result.config.aiPrimaryProvider, 'openai-compatible');
   assert.equal(result.config.aiPrimaryModel, 'mistral-small-latest');
   assert.equal(result.config.maxCostUsd, 5);
@@ -565,12 +583,12 @@ test('disabled, removed and registry-revision drift require fresh selection', ()
         definition({ enabled: false }),
       ],
     }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted|missing or disabled/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
     registry: registry({ definitions: [definition({ agentDefinitionId: 'agent.writer', label: 'Writer Agent', definitionRevision: 2 })] }),
-  }), /missing or disabled/);
+  }), /registry identity, revision or bindingKey drifted|missing or disabled/);
 
   assert.throws(() => materializeAgentDefinitionV1({
     ...base,
@@ -626,11 +644,10 @@ test('config defaults reject every legacy-normalizer alias instead of silently c
     configDefaults: {
       ...definition().configDefaults,
       startUrl: 'https://example.com/',
-      aiPinnedRouteId: 'mistral-agent',
     },
   }));
   assert.equal(canonical.configDefaults.startUrl, 'https://example.com/');
-  assert.equal(canonical.configDefaults.aiPinnedRouteId, 'mistral-agent');
+  assert.equal(Object.hasOwn(canonical.configDefaults, 'aiPinnedRouteId'), false);
 });
 
 test('definition and registry reject secrets, numeric aliases, duplicate identities and non-canonical text', () => {
@@ -1049,17 +1066,10 @@ test('reusable Agent model route policy is canonical, immutable and materializes
   });
 });
 
-test('reusable Agent model route policy admits canonical resilience controls but rejects hidden authority and hostile descriptors', () => {
-  const failover = normalizeAgentDefinitionV1(definition({
-    modelRoutePolicy: {
-      retryBackoffSeconds: 1,
-      circuitBreakerFailures: 1,
-      circuitBreakerSeconds: 1,
-    },
-  })).modelRoutePolicy;
-  assert.equal(failover.retryBackoffSeconds, 1);
-  assert.equal(failover.circuitBreakerFailures, 1);
-  assert.equal(failover.circuitBreakerSeconds, 1);
+test('reusable Agent model route policy rejects resilience authority, hidden authority and hostile descriptors', () => {
+  assert.throws(() => normalizeAgentDefinitionV1(definition({
+    modelRoutePolicy: { retryBackoffSeconds: 1 },
+  })), /unknown field: retryBackoffSeconds/);
 
   assert.throws(() => normalizeAgentDefinitionV1(definition({
     modelRoutePolicy: { providerApiKey: 'secret' },
@@ -1085,9 +1095,6 @@ test('reusable Agent model route policy rejects coercive aliases so durable byte
     { freeOnly: 1 },
     { maxInputPricePerMillionUsd: '1' },
     { maxOutputPricePerMillionUsd: -0 },
-    { retryBackoffSeconds: '60' },
-    { circuitBreakerFailures: 0 },
-    { circuitBreakerSeconds: -0 },
   ]) {
     assert.throws(
       () => normalizeAgentDefinitionV1(definition({ modelRoutePolicy: policy })),
