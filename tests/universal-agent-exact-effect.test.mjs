@@ -53,6 +53,8 @@ function verification(overrides = {}) {
     summary: 'Expected postcondition observed.',
     evidenceArtifactIds: [],
     verifiedAt: '2026-09-19T12:00:04Z',
+    verifierId: 'independent-verifier-1',
+    verificationAuthorityId: 'decision-1',
     effectId: 'invoke-1',
     executionId: 'invoke-1:attempt:1',
     attempt: 1,
@@ -582,6 +584,56 @@ test('verification used by exact effect requires exact effect execution and atte
   ));
   assert.equal(valid.state.phase, ExactEffectPhase.VERIFIED);
   assert.equal(valid.action, 'COMMIT');
+});
+
+test('verification authority is bound to an independent verifier and exact policy decision', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'authority-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'authority-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+
+  const cases = [
+    [{ verifierId: null }, /requires independent verifierId/],
+    [{ verifierId: 'native-companion' }, /independent from effect provider/],
+    [{ verificationAuthorityId: null }, /authority must match invocation policy decision/],
+    [{ verificationAuthorityId: 'decision-other' }, /authority must match invocation policy decision/],
+  ];
+  for (const [overrides, pattern] of cases) {
+    assert.throws(
+      () => reduceExactEffectV1(state, event(
+        ExactEffectEventType.RECORD_VERIFICATION,
+        'authority-' + String(Object.keys(overrides)[0]) + '-' + String(Object.values(overrides)[0]),
+        '2026-09-19T12:00:04Z',
+        { verification: verification(overrides) },
+      )),
+      pattern,
+    );
+  }
+
+  const valid = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'authority-valid',
+    '2026-09-19T12:00:04Z',
+    { verification: verification() },
+  ));
+  assert.equal(valid.state.phase, ExactEffectPhase.VERIFIED);
+  assert.equal(valid.action, 'COMMIT');
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...valid.state,
+      verification: { ...valid.state.verification, verificationAuthorityId: 'decision-other' },
+    }),
+    /authority must match invocation policy decision/,
+  );
 });
 
 test('effect event replay is idempotent across durable restart', () => {
