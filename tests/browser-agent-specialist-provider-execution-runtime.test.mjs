@@ -1501,3 +1501,154 @@ test('corrupt durable provider execution fails closed across restart and Start',
   assert.equal(final.job.runtime.specialistProviderExecutionIntegrityFault, true);
   assert.equal(final.job.runtime.runState, 'ERROR');
 });
+
+test('live PREPARED execution fences provider config mutation until external effect resolves', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  let release;
+  let entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const client = {
+    async execute() {
+      entered();
+      await gate;
+      return {
+        providerStatus: 'finished',
+        providerSucceeded: true,
+        manualReviewRequired: false,
+        reconciliationRequired: false,
+        safeToRetry: false,
+        effectEvidence: 'OPENHANDS_CONVERSATION_TERMINAL_OBSERVED_TWICE',
+        providerUpdatedAt: T1,
+        providerObservedAt: T1,
+      };
+    },
+  };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, client]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+  const pending = manager.executeClaimedSpecialistProvider('job.coder', {
+    agentId,
+    conversationId: '77777777-7777-4777-8777-777777777777',
+    expectedControlEpoch: 0,
+    at: T1,
+  });
+  await started;
+
+  // Lease expiry alone cannot release provider-config authority while the
+  // already-dispatched external effect remains unresolved.
+  const afterLease = '2026-09-29T04:11:00.000Z';
+  clock.value = Date.parse(afterLease);
+  await assert.rejects(
+    () => manager.putSpecialistProviderConfig({
+      providerConfig: providerConfig(2, afterLease),
+      expectedRevision: 1,
+    }),
+    /bound to a live provider execution/,
+  );
+  await assert.rejects(
+    () => manager.clearSpecialistProviderConfig({
+      providerId: OPENHANDS_CODING_PROVIDER_ID,
+      expectedRevision: 1,
+    }),
+    /bound to a live provider execution/,
+  );
+
+  release();
+  const outcome = await pending;
+  assert.equal(outcome.execution.status, 'PROVIDER_SUCCEEDED');
+});
+
+
+test('trusted readiness dependency rejects accessor methods without invoking getters', async () => {
+  const { chrome } = chromeStorage();
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => Date.parse(T1),
+  });
+  let getterCalls = 0;
+  const resolver = Object.create(null);
+  Object.defineProperty(resolver, 'resolve', {
+    enumerable: true,
+    get() {
+      getterCalls += 1;
+      return async () => ({});
+    },
+  });
+  Object.defineProperty(resolver, 'assertCurrent', {
+    enumerable: true,
+    value: async () => true,
+  });
+
+  await assert.rejects(
+    Promise.resolve().then(() => manager.executeClaimedSpecialistProvider(
+      'missing.job',
+      {
+        agentId: 'agent:test',
+        conversationId: '88888888-8888-4888-8888-888888888888',
+        expectedControlEpoch: 0,
+      },
+      { specialistProviderReadinessResolver: resolver },
+    )),
+    /readiness resolver\.resolve must be a data method/,
+  );
+  assert.equal(getterCalls, 0);
+});
+
+
+test('trusted readiness result rejects accessor-backed authority fields without invoking getters', async () => {
+  const { chrome } = chromeStorage();
+  const clock = { value: Date.parse(T0) };
+  const manager = new BrowserAgentManager({
+    chromeApi: chrome,
+    routePrompt: async () => ({ text: '{}' }),
+    now: () => clock.value,
+    specialistProviderClients: new Map([[OPENHANDS_CODING_PROVIDER_ID, {
+      async execute() { throw new Error('must not dispatch'); },
+    }]]),
+  });
+  const agentId = await seed(manager);
+  clock.value = Date.parse(T1);
+  let getterCalls = 0;
+  const resolver = {
+    async resolve() {
+      const readiness = Object.create(null);
+      Object.defineProperty(readiness, 'trustedResolverInvoked', {
+        enumerable: true,
+        get() {
+          getterCalls += 1;
+          return true;
+        },
+      });
+      return readiness;
+    },
+    async assertCurrent() {
+      throw new Error('must not reach readiness revalidation');
+    },
+  };
+
+  await assert.rejects(
+    () => manager.executeClaimedSpecialistProvider(
+      'job.coder',
+      {
+        agentId,
+        conversationId: '99999999-9999-4999-8999-999999999999',
+        expectedControlEpoch: 0,
+        at: T1,
+      },
+      { specialistProviderReadinessResolver: resolver },
+    ),
+    /not executable according to trusted readiness/,
+  );
+  assert.equal(getterCalls, 0);
+  const durable = await manager.listSpecialistHandoffs('job.coder');
+  assert.equal(durable.providerExecutions.length, 0);
+});
+
