@@ -157,7 +157,7 @@ function normalizeProviderReservation(value, prepared) {
   const reservationId = exactText(
     raw.reservationId,
     'provider reservationId',
-    { maxLength: 180 },
+    { maxLength: 240 },
   );
   const expectedPrefix = prepared.jobId + ':model-budget:';
   if (!reservationId.startsWith(expectedPrefix)) {
