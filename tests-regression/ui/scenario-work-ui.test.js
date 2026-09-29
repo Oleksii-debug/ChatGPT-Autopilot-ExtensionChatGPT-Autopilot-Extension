@@ -72,3 +72,33 @@ test('auditor pipeline UI exposes semantic barriers, correction controls and dia
   assert.match(js, /addScenarioStateLine\('Оренда аудитора'/);
   assert.match(js, /createScenarioWork\('AUDITOR_PIPELINE'\)/);
 });
+
+
+test('Scenario Work list represents chat pools once and exposes pool-wide lifecycle controls', () => {
+  assert.match(html, /id="scenario-work-list-help"[^>]*>Один пункт пулу означає весь запущений сценарій/u);
+  assert.match(html, /aria-label="Керування вибраним сценарієм"/u);
+  assert.match(js, /scenarioPoolListValue\(pool\.id\)/u);
+  assert.match(js, /const unpooled = scenarios\.filter/u);
+  assert.match(js, /GET_SCENARIO_CHAT_POOL/u);
+  assert.match(js, /UPDATE_SCENARIO_CHAT_POOL/u);
+  assert.match(js, /PAUSE_SCENARIO_CHAT_POOL/u);
+  assert.match(js, /RESUME_SCENARIO_CHAT_POOL/u);
+  assert.match(js, /STOP_SCENARIO_CHAT_POOL/u);
+  assert.match(js, /Призупинити весь сценарій/u);
+  assert.match(js, /Продовжити весь сценарій/u);
+});
+
+test('created pools lock structural prompt controls but allow runtime-knob editing after pause', () => {
+  assert.match(js, /function setScenarioPoolStructuralControlsDisabled\(disabled\)/u);
+  assert.match(js, /scenario-cycle-url/u);
+  assert.match(js, /scenario-cycle-parallel-count/u);
+  assert.match(js, /scenario-cycle-add-step/u);
+  assert.match(js, /runtime-параметри/u);
+  assert.match(js, /структура промптів не змінюється/u);
+});
+
+test('pool start selects aggregate pool controller rather than one physical chat', () => {
+  assert.match(js, /scenarioPoolListValue\(result\.pool\.id\)/u);
+  assert.match(js, /openScenarioWorkTarget\(scenarioPoolListValue\(result\.pool\.id\)/u);
+  assert.doesNotMatch(js, /\$\('scenario-work-list'\)\.value = ids\[0\]/u);
+});

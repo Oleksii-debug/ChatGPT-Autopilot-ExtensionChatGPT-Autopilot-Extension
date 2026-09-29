@@ -39,24 +39,133 @@ import {
 } from './browser-agent.js';
 import { DEFAULT_AI_ROUTER_RUNTIME, normalizeAiRouterRuntime } from './ai-orchestrator.js';
 import { NativeCompanionClient } from './native-companion.js';
-import { normalizeCredentialRefV1 } from './universal-agent-contracts.js';
+import { normalizeArtifactRefV1, normalizeCredentialRefV1, normalizeSpecialistHandoffV1 } from './universal-agent-contracts.js';
 import { AgentPlanNodeState, normalizeAgentPlanV1, reconcileAgentPlanV1, transitionAgentPlanNodeV1 } from './agent-plan.js';
 import {
   prepareAgentPlanSpecialistHandoffV1,
   prepareAgentPlanSpecialistExecutionOwnershipV1,
   claimAgentPlanSpecialistHandoffsV1,
-  authorizeAgentPlanSpecialistSafeRetryV1,
+  authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1,
   completeAgentPlanSpecialistHandoffV1,
-  verifyAgentPlanSpecialistHandoffV1,
+  verifyAgentPlanSpecialistHandoffFromTrustedRecordV1,
   specialistAssignmentIdForPlanNodeV1,
 } from './agent-specialist-bridge.js';
-import { ExecutionOwnershipState, normalizeExecutionOwnershipV1 } from './execution-plane-ownership.js';
+import {
+  ExecutionOwnershipState,
+  normalizeExecutionOwnershipV1,
+  requireExecutionReconciliationV1,
+  recoverExpiredExecutionOwnershipV1,
+  resolveExecutionReconciliationV1,
+} from './execution-plane-ownership.js';
+import { ResourceBudgetDecisionKind, evaluateResourceBudgetV1 } from './resource-budget-governor.js';
+import {
+  AGENT_DEFINITION_REGISTRY_VERSION,
+  normalizeAgentDefinitionRegistryV1,
+  normalizeAgentDefinitionSelectionV1,
+  selectAgentDefinitionV1,
+  materializeAgentDefinitionV1,
+  normalizeAgentModelRoutePolicyV1,
+  proposeAgentDefinitionRegistryMutationV1,
+} from './agent-definition-registry.js';
+import {
+  SPECIALIST_REGISTRY_VERSION,
+  normalizeSpecialistDefinitionV1,
+  normalizeSpecialistRegistryV1,
+  normalizeSpecialistSelectionV1,
+  bindSpecialistHandoffToRegistryV1,
+  proposeSpecialistRegistryMutationV1,
+} from './specialist-registry.js';
+import {
+  canonicalSpecialistProviderIdV1,
+  createSpecialistProviderConfigV1,
+  normalizeSpecialistProviderConfigV1,
+} from './specialist-provider-config.js';
+import {
+  SpecialistProviderExecutionStatus,
+  createSpecialistProviderExecutionV1,
+  normalizeSpecialistProviderExecutionV1,
+  recordSpecialistProviderExecutionOutcomeV1,
+} from './specialist-provider-execution.js';
+import {
+  BrowserAgentOrchestrationBindingStatus,
+  createBrowserAgentOrchestrationNodeBindingV1,
+  inspectBrowserAgentOrchestrationNodeBindingV1,
+  normalizeBrowserAgentOrchestrationBindingRequestV1,
+  normalizeBrowserAgentOrchestrationNodeBindingV1,
+} from './browser-agent-orchestration-binding.js';
+import { prepareAutomaticAgentSpecialistDelegationV1 } from './agent-specialist-delegation.js';
+import {
+  createBrowserAgentParentRuntimeFenceFromJobV1,
+  inspectBrowserAgentParentRuntimeFenceFromJobV1,
+} from './browser-agent-parent-runtime-fence.js';
+import {
+  evaluateSubagentStructureAdmissionV1,
+  SubagentSpawnInitiator,
+  SubagentStructureDecision,
+} from './subagent-structure-policy.js';
 
 export const BROWSER_AGENT_JOB_PROJECT_BINDING_VERSION = 1;
 const MAX_HISTORY = 200;
 const MIN_WAKE_MS = 250;
 const DEFAULT_AGENT_START_URL = 'https://www.google.com/';
 const MAX_OWNER_INSTRUCTIONS = 20;
+const DEFAULT_BROWSER_AGENT_MAX_CONCURRENT = 1;
+const MAX_BROWSER_AGENT_CONCURRENT = 32;
+const MAX_AGENT_DEFINITION_REGISTRIES = 128;
+const MAX_SPECIALIST_REGISTRIES = 128;
+const MAX_SPECIALIST_PROVIDER_CONFIGS = 32;
+const MAX_SPECIALIST_PROVIDER_EXECUTIONS = 128;
+const SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS = new Set(['agentId', 'conversationId']);
+const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS = new Set([
+  'agentId', 'leaseId', 'conversationId', 'providerStatus', 'providerSucceeded',
+  'manualReviewRequired', 'reconciliationRequired', 'safeToRetry',
+  'effectEvidence', 'errorCode', 'providerUpdatedAt', 'providerObservedAt',
+]);
+const SPECIALIST_PROVIDER_EXECUTION_OUTCOME_OPTIONAL_KEYS = new Set([
+  'providerUpdatedAt', 'providerObservedAt',
+]);
+const SPECIALIST_PROVIDER_CONFIG_SET_KEYS = new Set(['providerId', 'expectedRevision', 'kind', 'config']);
+const SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS = new Set(['providerId', 'expectedRevision']);
+const AGENT_DEFINITION_REGISTRY_CREATE_KEYS = new Set(['registryId']);
+const AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'agentDefinitionId', 'expectedDefinitionRevision',
+]);
+const AGENT_DEFINITION_LAUNCH_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+  'jobId', 'goal', 'projectId', 'ownerBudget',
+  'ownerCapabilityIds', 'ownerToolIds', 'requestedCapabilityIds', 'requestedToolIds',
+]);
+const AGENT_DEFINITION_SCOPE_KEYS = new Set(['capabilityIds', 'toolIds']);
+const SPECIALIST_REGISTRY_CREATE_KEYS = new Set(['registryId']);
+const SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'kind',
+  'definition', 'specialistId', 'expectedDefinitionRevision',
+]);
+const ORCHESTRATION_BINDING_DEPENDENCY_KEYS = new Set([
+  'resolveProjectHierarchyAuthority',
+  'withProjectHierarchyAuthority',
+]);
+const AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS = new Set([
+  'withProjectHierarchyAuthority',
+  'specialistProviderReadinessResolver',
+]);
+const TRUSTED_SPECIALIST_VERIFICATION_DEPENDENCY_KEYS = new Set([
+  'resolveTrustedExecutionVerificationRecord',
+]);
+const TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS = new Set([
+  'agentId', 'leaseId', 'verificationId',
+]);
+const AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS = new Set([
+  'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
+  'requiredCapabilityIds', 'requiredToolIds', 'policyEnvelopeId', 'deadlineAt',
+  'maxConcurrentHandoffs', 'leaseSeconds',
+  'priority', 'childBudget', 'artifactRefs', 'credentialRefs', 'parentInvocationId',
+]);
+const PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS = new Set([
+  'schemaVersion', 'planId', 'nodeId', 'planRevision', 'registryId',
+  'registryRevision', 'selection', 'handoff', 'boundAt',
+]);
 const SPECIALIST_CAPACITY_STATES = new Set([
   ExecutionOwnershipState.OWNED,
   ExecutionOwnershipState.HANDOFF_PENDING,
@@ -96,6 +205,679 @@ function snapshotOwnDataRequest(value, label) {
     snapshot[key] = descriptor.value;
   }
   return snapshot;
+}
+function snapshotExactOwnDataRequest(value, allowed, label) {
+  const snapshot = snapshotOwnDataRequest(value, label);
+  for (const key of Object.keys(snapshot)) {
+    if (!allowed.has(key)) throw new Error(`${label} contains an unknown field: ${key}`);
+  }
+  return snapshot;
+}
+function trustedOrchestrationAuthorityResolver(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
+    'Browser Agent orchestration binding dependencies',
+  );
+  if (typeof raw.resolveProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority resolver is required');
+  }
+  return raw.resolveProjectHierarchyAuthority;
+}
+
+function trustedOrchestrationAuthorityFence(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    ORCHESTRATION_BINDING_DEPENDENCY_KEYS,
+    'Browser Agent orchestration binding dependencies',
+  );
+  if (typeof raw.withProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority fence is required');
+  }
+  return raw.withProjectHierarchyAuthority;
+}
+
+function trustedAutomaticDelegationDependencies(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    AUTO_SPECIALIST_DELEGATION_DEPENDENCY_KEYS,
+    'Browser Agent automatic specialist delegation dependencies',
+  );
+  if (typeof raw.withProjectHierarchyAuthority !== 'function') {
+    throw new Error('Canonical orchestration Project authority fence is required');
+  }
+  const resolver = raw.specialistProviderReadinessResolver;
+  if (!resolver || (typeof resolver !== 'object' && typeof resolver !== 'function')) {
+    throw new Error('Trusted specialist provider readiness resolver is required');
+  }
+  const dataMethod = name => {
+    let cursor = resolver;
+    while (cursor && cursor !== Object.prototype) {
+      const descriptor = Object.getOwnPropertyDescriptor(cursor, name);
+      if (descriptor) {
+        if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') {
+          throw new Error(`Trusted specialist provider readiness resolver.${name} must be a data method`);
+        }
+        return descriptor.value;
+      }
+      cursor = Object.getPrototypeOf(cursor);
+    }
+    throw new Error(`Trusted specialist provider readiness resolver.${name} must be a data method`);
+  };
+  const resolveMethod = dataMethod('resolve');
+  const assertCurrentMethod = dataMethod('assertCurrent');
+  return Object.freeze({
+    withProjectHierarchyAuthority: raw.withProjectHierarchyAuthority,
+    resolveSpecialistReadiness: selection => resolveMethod.call(resolver, selection),
+    assertSpecialistReadinessCurrent: readiness => assertCurrentMethod.call(resolver, readiness),
+  });
+}
+
+function trustedSpecialistVerificationDependencies(dependencies) {
+  const raw = snapshotExactOwnDataRequest(
+    dependencies,
+    TRUSTED_SPECIALIST_VERIFICATION_DEPENDENCY_KEYS,
+    'Browser Agent trusted specialist verification dependencies',
+  );
+  if (typeof raw.resolveTrustedExecutionVerificationRecord !== 'function') {
+    throw new Error('Canonical trusted execution verification resolver is required');
+  }
+  return Object.freeze({
+    resolveTrustedExecutionVerificationRecord: raw.resolveTrustedExecutionVerificationRecord,
+  });
+}
+
+function sameSpecialistSelection(left, right) {
+  const a = normalizeSpecialistSelectionV1(left);
+  const b = normalizeSpecialistSelectionV1(right);
+  return a.registryId === b.registryId
+    && a.registryRevision === b.registryRevision
+    && a.specialistId === b.specialistId
+    && a.providerId === b.providerId
+    && a.definitionRevision === b.definitionRevision
+    && a.executionPlane === b.executionPlane
+    && sameCanonicalIdentityList(a.requestedCapabilityIds, b.requestedCapabilityIds)
+    && sameCanonicalIdentityList(a.grantedToolIds, b.grantedToolIds);
+}
+
+function assertTrustedProviderReadinessForSelection(providerReadiness, selection, nowMs) {
+  const canonical = normalizeSpecialistSelectionV1(selection);
+  if (ownDataPropertyValue(providerReadiness, 'trustedResolverInvoked') !== true
+      || ownDataPropertyValue(providerReadiness, 'callerReadinessAccepted') !== false) {
+    throw new Error('Trusted specialist provider readiness resolver returned non-canonical provenance');
+  }
+  for (const [field, expected] of [
+    ['registryId', canonical.registryId],
+    ['registryRevision', canonical.registryRevision],
+    ['specialistId', canonical.specialistId],
+    ['providerId', canonical.providerId],
+    ['definitionRevision', canonical.definitionRevision],
+    ['executionPlane', canonical.executionPlane],
+  ]) {
+    if (ownDataPropertyValue(providerReadiness, field) !== expected) {
+      throw new Error('Trusted specialist provider readiness provenance does not match selected specialist');
+    }
+  }
+  if (ownDataPropertyValue(providerReadiness, 'executable') !== true) {
+    throw new Error('Selected specialist provider is not currently executable');
+  }
+  const resolvedAt = ownDataPropertyValue(providerReadiness, 'resolvedAt');
+  const maxAgeMs = ownDataPropertyValue(providerReadiness, 'maxAgeMs');
+  const resolvedMs = Date.parse(exactAutomaticDelegationTimestamp(resolvedAt, 'provider readiness resolvedAt'));
+  if (typeof maxAgeMs !== 'number'
+      || !Number.isSafeInteger(maxAgeMs)
+      || Object.is(maxAgeMs, -0)
+      || maxAgeMs < 1
+      || maxAgeMs > 5 * 60_000) {
+    throw new Error('Trusted specialist provider readiness maxAgeMs is invalid');
+  }
+  if (typeof nowMs !== 'number'
+      || !Number.isSafeInteger(nowMs)
+      || Object.is(nowMs, -0)
+      || nowMs < resolvedMs
+      || nowMs - resolvedMs > maxAgeMs) {
+    throw new Error('Trusted specialist provider readiness expired before durable admission');
+  }
+  return providerReadiness;
+}
+
+const ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES = new Set([
+  'PROJECT_UNOWNED',
+  'PROJECT_NON_UNIQUE',
+  'HIERARCHY_UNAVAILABLE',
+  'HIERARCHY_INCONSISTENT',
+]);
+
+function ownDataPropertyValue(value, key) {
+  if (!value || (typeof value !== 'object' && typeof value !== 'function')) return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined;
+}
+
+function inspectUnavailableOrchestrationAuthority(binding, error) {
+  const code = ownDataPropertyValue(error, 'code');
+  if (typeof code !== 'string' || !ORCHESTRATION_PROJECT_AUTHORITY_FAILURE_CODES.has(code)) return null;
+  const canonicalBinding = normalizeBrowserAgentOrchestrationNodeBindingV1(binding);
+  const projectDrift = code === 'PROJECT_UNOWNED' || code === 'PROJECT_NON_UNIQUE';
+  return Object.freeze({
+    binding: canonicalBinding,
+    status: projectDrift
+      ? BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED
+      : BrowserAgentOrchestrationBindingStatus.GRAPH_DRIFTED,
+    current: false,
+    currentAuthority: null,
+    authorityErrorCode: code,
+  });
+}
+
+function canonicalAgentDefinitionRegistryId(value) {
+  return normalizeAgentDefinitionRegistryV1({
+    schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+    registryId: value,
+    revision: 1,
+    definitions: [],
+  }).registryId;
+}
+function canonicalSpecialistRegistryId(value) {
+  return normalizeSpecialistRegistryV1({
+    schemaVersion: SPECIALIST_REGISTRY_VERSION,
+    registryId: value,
+    revision: 1,
+    definitions: [],
+  }).registryId;
+}
+function storedDefinitionMapDescriptors(raw) {
+  if (raw === undefined) return [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) return [];
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.length > MAX_AGENT_DEFINITION_REGISTRIES || keys.some(key => typeof key !== 'string')) return [];
+  return keys.sort().flatMap(key => {
+    const descriptor = descriptors[key];
+    return descriptor && descriptor.enumerable === true && Object.hasOwn(descriptor, 'value')
+      ? [[key, descriptor.value]]
+      : [];
+  });
+}
+function snapshotAgentDefinitionLaunchRecord(value, label, maxFields = 32) {
+  const snapshot = snapshotOwnDataRequest(value, label);
+  if (Object.keys(snapshot).length > maxFields) throw new Error(`${label} contains too many fields`);
+  for (const [key, item] of Object.entries(snapshot)) {
+    if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+      throw new Error(`${label}.${key} must be scalar data`);
+    }
+  }
+  return snapshot;
+}
+function snapshotAgentDefinitionLaunchArray(value, label, max) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a canonical array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < 0 || length > max) throw new Error(`${label} has invalid length`);
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) throw new Error(`${label} contains non-canonical fields`);
+  }
+  const snapshot = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable data property`);
+    }
+    const item = descriptor.value;
+    if (item !== null && (typeof item === 'object' || typeof item === 'function')) {
+      throw new Error(`${label}[${index}] must be scalar data`);
+    }
+    snapshot[index] = item;
+  }
+  return snapshot;
+}
+function snapshotAgentDefinitionLaunchNestedInputs(request) {
+  request.ownerBudget = snapshotAgentDefinitionLaunchRecord(
+    request.ownerBudget,
+    'Browser Agent definition launch ownerBudget',
+  );
+  for (const [key, max] of [
+    ['ownerCapabilityIds', 64],
+    ['ownerToolIds', 128],
+    ['requestedCapabilityIds', 64],
+    ['requestedToolIds', 128],
+  ]) {
+    request[key] = snapshotAgentDefinitionLaunchArray(
+      request[key],
+      `Browser Agent definition launch ${key}`,
+      max,
+    );
+  }
+  return request;
+}
+
+function normalizePersistedAgentDefinitionScope(raw, selection) {
+  if (selection == null) {
+    if (raw == null) return null;
+    throw new Error('Browser Agent definition scope requires persisted selection provenance');
+  }
+  const record = snapshotExactOwnDataRequest(raw, AGENT_DEFINITION_SCOPE_KEYS, 'Browser Agent definition scope');
+  for (const key of AGENT_DEFINITION_SCOPE_KEYS) {
+    if (!Object.hasOwn(record, key)) throw new Error(`Browser Agent definition scope requires ${key}`);
+  }
+
+  const normalizeIds = (value, label, max, allowed) => {
+    if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+      throw new Error(`${label} must be a canonical array`);
+    }
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const length = descriptors.length?.value;
+    if (!Number.isSafeInteger(length) || length < 0 || length > max) {
+      throw new Error(`${label} has invalid length`);
+    }
+    const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if (typeof key !== 'string' || !expected.has(key)) throw new Error(`${label} contains non-canonical fields`);
+    }
+    const out = [];
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = descriptors[String(index)];
+      if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+        throw new Error(`${label}[${index}] must be an enumerable data property`);
+      }
+      const item = descriptor.value;
+      if (typeof item !== 'string' || !allowed.includes(item)) {
+        throw new Error(`${label} exceeds selected Agent definition authority`);
+      }
+      if (index > 0 && out[index - 1] >= item) throw new Error(`${label} must be sorted and duplicate-free`);
+      out.push(item);
+    }
+    return out;
+  };
+
+  return {
+    capabilityIds: normalizeIds(record.capabilityIds, 'Browser Agent definition scope capabilityIds', 64, selection.definition.capabilityIds),
+    toolIds: normalizeIds(record.toolIds, 'Browser Agent definition scope toolIds', 128, selection.definition.toolIds),
+  };
+}
+
+function canonicalDenseArray(value, label, max, min = 0) {
+  if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) {
+    throw new Error(`${label} must be a canonical array`);
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const length = descriptors.length?.value;
+  if (!Number.isSafeInteger(length) || length < min || length > max) {
+    throw new Error(`${label} has invalid length`);
+  }
+  const expected = new Set(['length', ...Array.from({ length }, (_, index) => String(index))]);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (typeof key !== 'string' || !expected.has(key)) {
+      throw new Error(`${label} contains non-canonical fields`);
+    }
+  }
+  const out = [];
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error(`${label}[${index}] must be an enumerable own data property`);
+    }
+    out.push(descriptor.value);
+  }
+  return out;
+}
+
+function canonicalDelegationIds(value, label, max, min = 0) {
+  const out = canonicalDenseArray(value, label, max, min)
+    .map((item, index) => exactIdentity(item, `${label}[${index}]`));
+  if (new Set(out).size !== out.length) throw new Error(`${label} contains duplicate identity`);
+  return Object.freeze([...out].sort());
+}
+
+function exactAutomaticDelegationTimestamp(value, label) {
+  if (typeof value !== 'string' || value !== value.trim() || !value) {
+    throw new Error(`${label} must be a canonical timestamp`);
+  }
+  const millis = Date.parse(value);
+  if (!Number.isFinite(millis) || new Date(millis).toISOString() !== value) {
+    throw new Error(`${label} must use canonical ISO-8601 UTC representation`);
+  }
+  return value;
+}
+
+function specialistCapacityLimit(value) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 0
+      || value > 256) {
+    throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
+  }
+  return value;
+}
+
+function specialistLeaseSeconds(value) {
+  const candidate = value === undefined ? 900 : value;
+  if (typeof candidate !== 'number'
+      || !Number.isSafeInteger(candidate)
+      || Object.is(candidate, -0)
+      || candidate < 1
+      || candidate > 86_400) {
+    throw new Error('leaseSeconds must be an integer from 1 to 86400');
+  }
+  return candidate;
+}
+
+function sameCanonicalIdentityList(left, right) {
+  return Array.isArray(left)
+    && Array.isArray(right)
+    && left.length === right.length
+    && left.every((value, index) => value === right[index]);
+}
+
+function inspectProductWideSpecialistCapacity(store, maxConcurrentHandoffs) {
+  const limit = specialistCapacityLimit(maxConcurrentHandoffs);
+  const specialistOwnerships = store.order
+    .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
+    .map(normalizeExecutionOwnershipV1);
+  const effectIds = new Set();
+  for (const ownership of specialistOwnerships) {
+    if (effectIds.has(ownership.effectId)) {
+      throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
+    }
+    effectIds.add(ownership.effectId);
+  }
+  const capacityOwnerships = specialistOwnerships.filter(item =>
+    SPECIALIST_CAPACITY_STATES.has(item.state));
+  return Object.freeze({
+    maxConcurrentHandoffs: limit,
+    capacityObligations: capacityOwnerships.length,
+    remainingSlots: Math.max(0, limit - capacityOwnerships.length),
+  });
+}
+
+function normalizeAutomaticDelegationIntent(request) {
+  const childBudget = Object.hasOwn(request, 'childBudget')
+    ? (() => {
+      const raw = snapshotExactOwnDataRequest(
+        request.childBudget,
+        new Set(['maxModelCalls', 'maxRuntimeSeconds', 'maxCostUsdMicros']),
+        'Browser Agent automatic specialist childBudget',
+      );
+      const out = Object.create(null);
+      for (const [key, value] of Object.entries(raw)) {
+        if (typeof value !== 'number'
+            || !Number.isSafeInteger(value)
+            || Object.is(value, -0)
+            || value < 0) {
+          throw new Error(`Browser Agent automatic specialist childBudget.${key} is invalid`);
+        }
+        out[key] = value;
+      }
+      return Object.freeze(out);
+    })()
+    : undefined;
+  const artifactRefs = Object.hasOwn(request, 'artifactRefs')
+    ? canonicalDenseArray(request.artifactRefs, 'Browser Agent automatic specialist artifactRefs', 128)
+      .map(normalizeArtifactRefV1)
+    : [];
+  const credentialRefs = Object.hasOwn(request, 'credentialRefs')
+    ? canonicalDenseArray(request.credentialRefs, 'Browser Agent automatic specialist credentialRefs', 64)
+      .map(normalizeCredentialRefV1)
+    : [];
+  const priority = Object.hasOwn(request, 'priority') ? request.priority : 0;
+  if (typeof priority !== 'number'
+      || !Number.isSafeInteger(priority)
+      || Object.is(priority, -0)
+      || priority < 0
+      || priority > 1_000_000) {
+    throw new Error('Browser Agent automatic specialist priority is invalid');
+  }
+  const parentInvocationId = Object.hasOwn(request, 'parentInvocationId') && request.parentInvocationId !== ''
+    ? exactIdentity(request.parentInvocationId, 'parentInvocationId')
+    : '';
+  return Object.freeze({
+    registryId: canonicalSpecialistRegistryId(request.registryId),
+    expectedRegistryRevision: positiveExactInteger(request.expectedRegistryRevision, 'expectedRegistryRevision'),
+    expectedPlanRevision: positiveExactInteger(request.expectedPlanRevision, 'expectedPlanRevision'),
+    nodeId: exactIdentity(request.nodeId, 'nodeId'),
+    requiredCapabilityIds: canonicalDelegationIds(
+      request.requiredCapabilityIds,
+      'requiredCapabilityIds',
+      64,
+      1,
+    ),
+    requiredToolIds: canonicalDelegationIds(request.requiredToolIds, 'requiredToolIds', 128),
+    policyEnvelopeId: exactIdentity(request.policyEnvelopeId, 'policyEnvelopeId'),
+    deadlineAt: exactAutomaticDelegationTimestamp(request.deadlineAt, 'deadlineAt'),
+    priority,
+    childBudget,
+    artifactRefs: Object.freeze(artifactRefs),
+    credentialRefs: Object.freeze(credentialRefs),
+    parentInvocationId,
+    maxConcurrentHandoffs: specialistCapacityLimit(request.maxConcurrentHandoffs),
+    leaseSeconds: specialistLeaseSeconds(request.leaseSeconds),
+  });
+}
+
+function positiveExactInteger(value, label) {
+  if (typeof value !== 'number'
+      || !Number.isSafeInteger(value)
+      || Object.is(value, -0)
+      || value < 1) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+  return value;
+}
+
+function exactIdentity(value, label, max = 180) {
+  if (typeof value !== 'string'
+      || value !== value.trim()
+      || !value
+      || value.length > max
+      || !/^[A-Za-z0-9][A-Za-z0-9._:@/+~-]*$/u.test(value)) {
+    throw new Error(`${label} is invalid`);
+  }
+  return value;
+}
+
+function normalizePersistedSpecialistDelegationBinding(raw) {
+  const record = snapshotExactOwnDataRequest(
+    raw,
+    PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS,
+    'Browser Agent specialist delegation binding',
+  );
+  for (const key of PERSISTED_SPECIALIST_DELEGATION_BINDING_KEYS) {
+    if (!Object.hasOwn(record, key)) {
+      throw new Error(`Browser Agent specialist delegation binding requires ${key}`);
+    }
+  }
+  if (record.schemaVersion !== 1) {
+    throw new Error('Unsupported Browser Agent specialist delegation binding schemaVersion');
+  }
+  const selection = normalizeSpecialistSelectionV1(record.selection);
+  const handoff = normalizeSpecialistHandoffV1(record.handoff);
+  const planId = exactIdentity(record.planId, 'specialist delegation planId');
+  const nodeId = exactIdentity(record.nodeId, 'specialist delegation nodeId');
+  const registryId = exactIdentity(record.registryId, 'specialist delegation registryId');
+  const planRevision = positiveExactInteger(record.planRevision, 'specialist delegation planRevision');
+  const registryRevision = positiveExactInteger(record.registryRevision, 'specialist delegation registryRevision');
+  const boundAt = specialistRequestTimestamp(record.boundAt, undefined, 'specialist delegation boundAt');
+  if (selection.registryId !== registryId || selection.registryRevision !== registryRevision) {
+    throw new Error('Specialist delegation selection registry provenance mismatch');
+  }
+  if (handoff.specialistId !== selection.specialistId) {
+    throw new Error('Specialist delegation handoff specialist provenance mismatch');
+  }
+  return Object.freeze({
+    schemaVersion: 1,
+    planId,
+    nodeId,
+    planRevision,
+    registryId,
+    registryRevision,
+    selection,
+    handoff,
+    boundAt,
+  });
+}
+
+function normalizePersistedSpecialistDelegationBindings(raw, plan) {
+  if (!plan || !Array.isArray(raw) || Object.getPrototypeOf(raw) !== Array.prototype) return [];
+  const out = [];
+  const seenNodes = new Set();
+  for (const item of raw.slice(0, 128)) {
+    try {
+      const binding = normalizePersistedSpecialistDelegationBinding(item);
+      if (binding.planId !== plan.planId) continue;
+      if (!plan.nodes.some(node => node.nodeId === binding.nodeId)) continue;
+      if (seenNodes.has(binding.nodeId)) continue;
+      seenNodes.add(binding.nodeId);
+      out.push(binding);
+    } catch {
+      // A corrupt delegation provenance record cannot grant authority. Drop it
+      // while preserving the assignment/ownership records for manual recovery.
+    }
+  }
+  return out;
+}
+
+function normalizePersistedSpecialistRegistryState(rawRegistries, rawQuarantine) {
+  const registries = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Chrome storage values are structured-cloneable. Ignore impossible
+      // in-memory exotic values without invoking caller behavior.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries).slice(0, MAX_SPECIALIST_REGISTRIES)) {
+    try {
+      const registry = normalizeSpecialistRegistryV1(value);
+      if (registry.registryId !== key) throw new Error('Stored Specialist registry identity drift');
+      registries[key] = registry;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { registries, quarantine };
+}
+
+function specialistProviderConfigHasLiveExecution(store, providerId, at) {
+  const nowMs = Date.parse(at);
+  for (const jobId of store.order || []) {
+    const runtime = store.byId?.[jobId]?.runtime;
+    if ((runtime?.specialistProviderExecutionQuarantine || []).length) {
+      throw new Error('Specialist provider execution provenance is quarantined; provider config mutation is unsafe');
+    }
+    for (const raw of runtime?.specialistProviderExecutions || []) {
+      const execution = normalizeSpecialistProviderExecutionV1(raw);
+      if (execution.providerId !== providerId) continue;
+      if ([
+        SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+        SpecialistProviderExecutionStatus.RECONCILE,
+      ].includes(execution.status)) {
+        return true;
+      }
+      if (Date.parse(execution.leaseUntil) <= nowMs) continue;
+      if ([
+        SpecialistProviderExecutionStatus.PREPARED,
+        SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
+      ].includes(execution.status)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function normalizePersistedSpecialistProviderConfigState(rawConfigs, rawQuarantine) {
+  const configs = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Ignore impossible non-cloneable values; malformed provider config can
+      // never become runtime authority through this recovery path.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawConfigs).slice(0, MAX_SPECIALIST_PROVIDER_CONFIGS)) {
+    try {
+      const config = normalizeSpecialistProviderConfigV1(value);
+      if (config.providerId !== key) throw new Error('Stored Specialist provider config identity drift');
+      configs[key] = config;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { configs, quarantine };
+}
+
+function normalizePersistedSpecialistProviderExecutions(rawExecutions, rawQuarantine, plan) {
+  const executions = [];
+  const quarantine = [];
+  const appendQuarantine = value => {
+    if (quarantine.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) return;
+    try { quarantine.push(clone(value)); } catch { /* preserve fail-closed signal below */ }
+  };
+  if (Array.isArray(rawQuarantine)) {
+    for (const value of rawQuarantine.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS)) {
+      appendQuarantine(value);
+    }
+  }
+  if (rawExecutions === undefined) return { executions, quarantine };
+  if (!Array.isArray(rawExecutions) || Object.getPrototypeOf(rawExecutions) !== Array.prototype) {
+    appendQuarantine({ reason: 'NON_CANONICAL_PROVIDER_EXECUTION_COLLECTION' });
+    return { executions, quarantine };
+  }
+  const seenLeases = new Set();
+  const seenConversations = new Set();
+  for (const raw of rawExecutions.slice(0, MAX_SPECIALIST_PROVIDER_EXECUTIONS)) {
+    try {
+      const execution = normalizeSpecialistProviderExecutionV1(raw);
+      if (!plan || execution.planId !== plan.planId) {
+        throw new Error('Specialist provider execution plan provenance drifted');
+      }
+      if (seenLeases.has(execution.leaseId) || seenConversations.has(execution.conversationId)) {
+        throw new Error('Specialist provider execution identity is duplicated');
+      }
+      seenLeases.add(execution.leaseId);
+      seenConversations.add(execution.conversationId);
+      executions.push(execution);
+    } catch {
+      appendQuarantine(raw);
+    }
+  }
+  return { executions, quarantine };
+}
+
+function normalizePersistedAgentDefinitionState(rawRegistries, rawQuarantine) {
+  const registries = Object.create(null);
+  const quarantine = Object.create(null);
+  for (const [key, value] of storedDefinitionMapDescriptors(rawQuarantine)) {
+    try {
+      quarantine[key] = clone(value);
+    } catch {
+      // Chrome storage values are structured-cloneable. Ignore an impossible
+      // in-memory exotic value rather than executing caller behavior.
+    }
+  }
+  for (const [key, value] of storedDefinitionMapDescriptors(rawRegistries)) {
+    try {
+      const registry = normalizeAgentDefinitionRegistryV1(value);
+      if (registry.registryId !== key) throw new Error('Stored Agent definition registry identity drift');
+      registries[key] = registry;
+      delete quarantine[key];
+    } catch {
+      try { quarantine[key] = clone(value); } catch { /* impossible Chrome-storage exotic */ }
+    }
+  }
+  return { registries, quarantine };
 }
 function nonNegativeSafeInteger(value, label) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative safe integer`);
@@ -158,7 +940,45 @@ function specialistRequestTimestamp(value, fallback, label = 'Specialist request
   return new Date(millis).toISOString();
 }
 function clean(value, max = 4000) { return typeof value === 'string' ? value.trim().slice(0, max) : ''; }
-function freshStore() { return { schemaVersion: BROWSER_AGENT_SCHEMA_VERSION, selectedId: '', order: [], byId: {} }; }
+function normalizeBrowserAgentExecutionPolicy(raw = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Browser Agent execution policy must be a plain object');
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) throw new Error('Browser Agent execution policy must be a plain object');
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const keys = Reflect.ownKeys(descriptors);
+  if (keys.some(key => typeof key !== 'string' || !['maxConcurrentAgents'].includes(key))) {
+    throw new Error('Browser Agent execution policy contains an unknown field');
+  }
+  for (const key of keys) {
+    const descriptor = descriptors[key];
+    if (!descriptor || descriptor.enumerable !== true || !Object.hasOwn(descriptor, 'value')) {
+      throw new Error('Browser Agent execution policy fields must be enumerable data properties');
+    }
+  }
+  const value = Object.hasOwn(descriptors, 'maxConcurrentAgents')
+    ? descriptors.maxConcurrentAgents.value
+    : DEFAULT_BROWSER_AGENT_MAX_CONCURRENT;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0)
+      || value < 1 || value > MAX_BROWSER_AGENT_CONCURRENT) {
+    throw new Error(`Browser Agent maxConcurrentAgents must be an integer from 1 to ${MAX_BROWSER_AGENT_CONCURRENT}`);
+  }
+  return Object.freeze({ maxConcurrentAgents: value });
+}
+function freshStore() {
+  return {
+    schemaVersion: BROWSER_AGENT_SCHEMA_VERSION,
+    selectedId: '',
+    order: [],
+    byId: {},
+    executionPolicy: normalizeBrowserAgentExecutionPolicy(),
+    definitionRegistriesById: Object.create(null),
+    definitionRegistryQuarantineById: Object.create(null),
+    specialistRegistriesById: Object.create(null),
+    specialistRegistryQuarantineById: Object.create(null),
+    specialistProviderConfigsById: Object.create(null),
+    specialistProviderConfigQuarantineById: Object.create(null),
+  };
+}
 function createIdFallback() { return `agent-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 function originPattern(value) {
   const url = new URL(value);
@@ -166,9 +986,29 @@ function originPattern(value) {
   return `${url.origin}/*`;
 }
 
-function browserAgentRouterOverride(config = {}) {
-  const out = {};
+function normalizePersistedDefinitionRouterOverride(raw, selection) {
+  if (raw == null) {
+    if (selection?.definition?.modelRoutePolicy) {
+      throw new Error('Browser Agent selected definition route policy requires persisted router override');
+    }
+    return null;
+  }
+  if (!selection) throw new Error('Browser Agent definition router override requires persisted selection provenance');
+  const record = snapshotExactOwnDataRequest(raw, new Set(['routePolicy']), 'Browser Agent definition router override');
+  if (!Object.hasOwn(record, 'routePolicy')) throw new Error('Browser Agent definition router override requires routePolicy');
+  const routePolicy = normalizeAgentModelRoutePolicyV1(record.routePolicy);
+  if (!routePolicy) throw new Error('Browser Agent definition router override routePolicy is required');
+  if (JSON.stringify(routePolicy) !== JSON.stringify(selection.definition.modelRoutePolicy)) {
+    throw new Error('Browser Agent definition router override drifted from selected definition');
+  }
+  return Object.freeze({ routePolicy });
+}
+function browserAgentRouterOverride(config = {}, definitionRouterOverride = null) {
+  const out = definitionRouterOverride?.routePolicy
+    ? { routePolicy: definitionRouterOverride.routePolicy }
+    : {};
   if (config.aiRoutingMode && config.aiRoutingMode !== BrowserAgentAiRoutingMode.INHERIT) out.mode = config.aiRoutingMode;
+  if (config.aiPinnedRouteId) out.routeId = config.aiPinnedRouteId;
   const primary = {};
   if (config.aiPrimaryProvider && config.aiPrimaryProvider !== BrowserAgentAiProvider.INHERIT) primary.provider = config.aiPrimaryProvider;
   if (clean(config.aiPrimaryModel, 300)) primary.model = clean(config.aiPrimaryModel, 300);
@@ -240,11 +1080,23 @@ function normalizeRuntime(raw, now) {
   const specialistExecutionOwnerships = plan && Array.isArray(raw.specialistExecutionOwnerships)
     ? raw.specialistExecutionOwnerships.filter(item => item && typeof item === 'object').slice(0, 128).map(clone)
     : [];
+  const specialistDelegationBindings = normalizePersistedSpecialistDelegationBindings(
+    raw.specialistDelegationBindings,
+    plan,
+  );
+  const providerExecutionState = normalizePersistedSpecialistProviderExecutions(
+    raw.specialistProviderExecutions,
+    raw.specialistProviderExecutionQuarantine,
+    plan,
+  );
   return {
     ...base,
     ...clone(raw),
     specialistHandoffs,
     specialistExecutionOwnerships,
+    specialistDelegationBindings,
+    specialistProviderExecutions: providerExecutionState.executions,
+    specialistProviderExecutionQuarantine: providerExecutionState.quarantine,
     runState,
     controlEpoch: Math.max(0, Number(raw.controlEpoch || 0)),
     stepCount: Math.max(0, Number(raw.stepCount || 0)),
@@ -355,10 +1207,32 @@ function normalizeStore(raw, now) {
     if (typeof id !== 'string' || !raw.byId[id] || out.byId[id]) continue;
     try {
       const config = normalizeBrowserAgentConfig({ ...raw.byId[id].config, id }, { id });
+      const definitionSelection = raw.byId[id].definitionSelection == null
+        ? null
+        : normalizeAgentDefinitionSelectionV1(raw.byId[id].definitionSelection);
+      const definitionScope = normalizePersistedAgentDefinitionScope(raw.byId[id].definitionScope, definitionSelection);
+      const definitionRouterOverride = normalizePersistedDefinitionRouterOverride(
+        raw.byId[id].definitionRouterOverride,
+        definitionSelection,
+      );
+      const orchestrationNodeBinding = raw.byId[id].orchestrationNodeBinding == null
+        ? null
+        : normalizeBrowserAgentOrchestrationNodeBindingV1(raw.byId[id].orchestrationNodeBinding);
+      if (orchestrationNodeBinding && orchestrationNodeBinding.jobId !== id) {
+        throw new Error('Browser Agent orchestration binding jobId mismatch');
+      }
+      if (orchestrationNodeBinding && orchestrationNodeBinding.projectId !== config.projectId) {
+        // Preserve a stale Project binding as drift evidence only when the job
+        // itself is otherwise canonical. It can never be consumed as CURRENT.
+      }
       out.byId[id] = {
         id,
         config,
         runtime: normalizeRuntime(raw.byId[id].runtime, now),
+        definitionSelection,
+        definitionScope,
+        definitionRouterOverride,
+        orchestrationNodeBinding,
         createdAt: Math.max(0, Number(raw.byId[id].createdAt || now)),
         updatedAt: Math.max(0, Number(raw.byId[id].updatedAt || now)),
       };
@@ -368,6 +1242,29 @@ function normalizeStore(raw, now) {
     }
   }
   out.selectedId = out.byId[raw.selectedId] ? raw.selectedId : (out.order[0] || '');
+  try {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy(raw.executionPolicy || {});
+  } catch {
+    out.executionPolicy = normalizeBrowserAgentExecutionPolicy();
+  }
+  const definitionState = normalizePersistedAgentDefinitionState(
+    raw.definitionRegistriesById,
+    raw.definitionRegistryQuarantineById,
+  );
+  out.definitionRegistriesById = definitionState.registries;
+  out.definitionRegistryQuarantineById = definitionState.quarantine;
+  const specialistState = normalizePersistedSpecialistRegistryState(
+    raw.specialistRegistriesById,
+    raw.specialistRegistryQuarantineById,
+  );
+  out.specialistRegistriesById = specialistState.registries;
+  out.specialistRegistryQuarantineById = specialistState.quarantine;
+  const providerConfigState = normalizePersistedSpecialistProviderConfigState(
+    raw.specialistProviderConfigsById,
+    raw.specialistProviderConfigQuarantineById,
+  );
+  out.specialistProviderConfigsById = providerConfigState.configs;
+  out.specialistProviderConfigQuarantineById = providerConfigState.quarantine;
   return out;
 }
 
@@ -389,6 +1286,12 @@ export class BrowserAgentManager {
       : nativeCompanionClient;
     this.updateChain = Promise.resolve();
     this.inFlight = new Map();
+    this.runBurstInFlight = new Map();
+    this.cycleAllInFlight = null;
+    this.executionSlotActive = new Set();
+    this.executionSlotQueue = [];
+    this.executionSlotPump = null;
+    this.executionSlotPumpRequested = false;
   }
 
   async load() {
@@ -435,12 +1338,34 @@ export class BrowserAgentManager {
         maxOutputTokens: verifierMaxOutputTokens,
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
-        routerOverride: browserAgentRouterOverride(job.config),
+        routerOverride: browserAgentRouterOverride(job.config, job.definitionRouterOverride),
         taskRole: 'verifier',
         ...(remainingCalls ? { maxModelCallsForRequest: remainingCalls } : {}),
       }, { kind: 'browser-agent', jobId: id, controlEpoch: epoch });
     } catch (error) {
       if (error?.safeBudgetReason) return { ok: false, pauseReason: error.safeBudgetReason };
+      const failedCalls = Math.max(0, Math.floor(Number(error?.modelCallsUsed || 0)));
+      const afterFailure = await this.get(id);
+      const lifecycleAccounted = Math.max(0, Number(afterFailure.job?.runtime?.modelCalls || 0)) > modelCallsBeforeRoute
+        || Boolean(afterFailure.job?.runtime?.modelBudgetReservation);
+      if (failedCalls && !lifecycleAccounted) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.modelCalls += failedCalls;
+          if (error?.routerRuntime) live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      } else if (error?.routerRuntime) {
+        await this.update(store => {
+          const live = store.byId[id];
+          if (!live || live.runtime.controlEpoch !== epoch) return store;
+          live.runtime.aiRouterRuntime = normalizeAiRouterRuntime(error.routerRuntime);
+          live.runtime.updatedAt = this.now();
+          return store;
+        });
+      }
       return { ok: false, error };
     }
     const verifier = verifierReply?.result || verifierReply;
@@ -472,6 +1397,802 @@ export class BrowserAgentManager {
     if (!independent.verified) return { ok: false, error: new Error('Independent Browser Agent verifier could not prove the outcome') };
     verification = { ...verification, checks: independent.checks, independentlyVerified: true };
     return { ok: true, verification };
+  }
+
+  async getExecutionPolicy() {
+    const store = await this.load();
+    return normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+  }
+
+  async updateExecutionPolicy(input = {}) {
+    const policy = normalizeBrowserAgentExecutionPolicy(input);
+    await this.update(store => {
+      store.executionPolicy = policy;
+      return store;
+    });
+    // Concurrency policy changes neither due times nor alarm ownership. Waking
+    // the in-memory admission queue is sufficient and avoids reporting a
+    // failed save after the durable policy already committed.
+    this.#requestExecutionSlotPump();
+    return policy;
+  }
+
+  async listAgentDefinitionRegistries() {
+    const store = await this.load();
+    const registries = Object.keys(store.definitionRegistriesById || {})
+      .sort()
+      .map(registryId => clone(store.definitionRegistriesById[registryId]));
+    const quarantinedRegistryIds = Object.keys(store.definitionRegistryQuarantineById || {}).sort();
+    return { registries, quarantinedRegistryIds };
+  }
+
+  async getAgentDefinitionRegistry(registryId) {
+    const canonicalId = canonicalAgentDefinitionRegistryId(registryId);
+    const store = await this.load();
+    const registries = store.definitionRegistriesById || Object.create(null);
+    const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
+    return {
+      registry: registry ? clone(registry) : null,
+      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async createAgentDefinitionRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_REGISTRY_CREATE_KEYS,
+      'Browser Agent definition registry create request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent definition registry create request requires registryId');
+    }
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    let created = null;
+    await this.update(store => {
+      const registries = store.definitionRegistriesById
+        || (store.definitionRegistriesById = Object.create(null));
+      const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(registries, registryId)) throw new Error('Agent definition registry already exists');
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Agent definition registry is quarantined as corrupt and cannot be overwritten');
+      }
+      if (Object.keys(registries).length >= MAX_AGENT_DEFINITION_REGISTRIES) {
+        throw new Error('Agent definition registry capacity is exhausted');
+      }
+      created = normalizeAgentDefinitionRegistryV1({
+        schemaVersion: AGENT_DEFINITION_REGISTRY_VERSION,
+        registryId,
+        revision: 1,
+        definitions: [],
+      });
+      registries[registryId] = created;
+      return store;
+    });
+    return { registry: clone(created) };
+  }
+
+  async mutateAgentDefinitionRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_REGISTRY_MUTATION_PERSIST_KEYS,
+      'Browser Agent definition registry mutation request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent definition registry mutation request requires registryId');
+    }
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    let committed = null;
+    await this.update(store => {
+      const registries = store.definitionRegistriesById || Object.create(null);
+      const quarantine = store.definitionRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Agent definition registry is quarantined as corrupt and cannot be mutated');
+      }
+      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!current) throw new Error('Agent definition registry not found');
+      const proposalInput = {
+        registry: current,
+        registryId,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        kind: request.kind,
+      };
+      for (const key of ['definition', 'agentDefinitionId', 'expectedDefinitionRevision']) {
+        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
+      }
+      committed = proposeAgentDefinitionRegistryMutationV1(proposalInput);
+      store.definitionRegistriesById[registryId] = committed.nextRegistry;
+      return store;
+    });
+    return clone(committed);
+  }
+
+  async listSpecialistRegistries() {
+    const store = await this.load();
+    const registries = Object.keys(store.specialistRegistriesById || {})
+      .sort()
+      .map(registryId => clone(store.specialistRegistriesById[registryId]));
+    const quarantinedRegistryIds = Object.keys(store.specialistRegistryQuarantineById || {}).sort();
+    return { registries, quarantinedRegistryIds };
+  }
+
+  async getSpecialistRegistry(registryId) {
+    const canonicalId = canonicalSpecialistRegistryId(registryId);
+    const store = await this.load();
+    const registries = store.specialistRegistriesById || Object.create(null);
+    const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+    const registry = Object.hasOwn(registries, canonicalId) ? registries[canonicalId] : null;
+    return {
+      registry: registry ? clone(registry) : null,
+      quarantined: !registry && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async createSpecialistRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_REGISTRY_CREATE_KEYS,
+      'Browser Agent Specialist registry create request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent Specialist registry create request requires registryId');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    let created = null;
+    await this.update(store => {
+      const registries = store.specialistRegistriesById
+        || (store.specialistRegistriesById = Object.create(null));
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(registries, registryId)) throw new Error('Specialist registry already exists');
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot be overwritten');
+      }
+      if (Object.keys(registries).length >= MAX_SPECIALIST_REGISTRIES) {
+        throw new Error('Specialist registry capacity is exhausted');
+      }
+      created = normalizeSpecialistRegistryV1({
+        schemaVersion: SPECIALIST_REGISTRY_VERSION,
+        registryId,
+        revision: 1,
+        definitions: [],
+      });
+      registries[registryId] = created;
+      return store;
+    });
+    return { registry: clone(created) };
+  }
+
+  async mutateSpecialistRegistry(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_REGISTRY_MUTATION_PERSIST_KEYS,
+      'Browser Agent Specialist registry mutation request',
+    );
+    if (!Object.hasOwn(request, 'registryId')) {
+      throw new Error('Browser Agent Specialist registry mutation request requires registryId');
+    }
+    const registryId = canonicalSpecialistRegistryId(request.registryId);
+    if (Object.hasOwn(request, 'definition')) {
+      request.definition = normalizeSpecialistDefinitionV1(request.definition);
+    }
+    let committed = null;
+    await this.update(store => {
+      const registries = store.specialistRegistriesById || Object.create(null);
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) {
+        throw new Error('Specialist registry is quarantined as corrupt and cannot be mutated');
+      }
+      const current = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!current) throw new Error('Specialist registry not found');
+      const proposalInput = {
+        registry: current,
+        registryId,
+        expectedRegistryRevision: request.expectedRegistryRevision,
+        kind: request.kind,
+      };
+      for (const key of ['definition', 'specialistId', 'expectedDefinitionRevision']) {
+        if (Object.hasOwn(request, key)) proposalInput[key] = request[key];
+      }
+      committed = proposeSpecialistRegistryMutationV1(proposalInput);
+      store.specialistRegistriesById[registryId] = committed.nextRegistry;
+      return store;
+    });
+    return clone(committed);
+  }
+
+  async listSpecialistProviderConfigs() {
+    const store = await this.load();
+    const configs = Object.keys(store.specialistProviderConfigsById || {})
+      .sort()
+      .map(providerId => clone(store.specialistProviderConfigsById[providerId]));
+    const quarantinedProviderIds = Object.keys(
+      store.specialistProviderConfigQuarantineById || {},
+    ).sort();
+    return { configs, quarantinedProviderIds };
+  }
+
+  async getSpecialistProviderConfig(providerId) {
+    const canonicalId = canonicalSpecialistProviderIdV1(providerId);
+    const store = await this.load();
+    const configs = store.specialistProviderConfigsById || Object.create(null);
+    const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+    const config = Object.hasOwn(configs, canonicalId) ? configs[canonicalId] : null;
+    return {
+      config: config ? clone(config) : null,
+      quarantined: !config && Object.hasOwn(quarantine, canonicalId),
+    };
+  }
+
+  async setSpecialistProviderConfig(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_PROVIDER_CONFIG_SET_KEYS,
+      'Browser Agent Specialist provider config set request',
+    );
+    for (const key of SPECIALIST_PROVIDER_CONFIG_SET_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider config set request requires ${key}`);
+      }
+    }
+    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Specialist provider config expectedRevision',
+    );
+    // Normalize and snapshot nested provider config before entering the
+    // serialized write queue. Caller mutation after this method is invoked
+    // cannot change the authority that will be committed.
+    const prepared = createSpecialistProviderConfigV1({
+      providerId,
+      kind: request.kind,
+      config: request.config,
+      revision: 1,
+      updatedAt: new Date(this.now()).toISOString(),
+    });
+    let committed = null;
+    await this.update(store => {
+      const configs = store.specialistProviderConfigsById
+        || (store.specialistProviderConfigsById = Object.create(null));
+      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, providerId)) {
+        throw new Error('Specialist provider config is quarantined as corrupt and cannot be overwritten');
+      }
+      if (specialistProviderConfigHasLiveExecution(
+        store,
+        providerId,
+        new Date(this.now()).toISOString(),
+      )) {
+        throw new Error('Specialist provider config is bound to a live provider execution lease');
+      }
+      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      const currentRevision = current?.revision || 0;
+      if (currentRevision !== expectedRevision) {
+        throw new Error('Specialist provider config revision drifted before update');
+      }
+      if (!current && Object.keys(configs).length >= MAX_SPECIALIST_PROVIDER_CONFIGS) {
+        throw new Error('Specialist provider config capacity is exhausted');
+      }
+      if (currentRevision >= Number.MAX_SAFE_INTEGER) {
+        throw new Error('Specialist provider config revision cannot advance');
+      }
+      committed = createSpecialistProviderConfigV1({
+        providerId,
+        kind: prepared.kind,
+        config: prepared.config,
+        revision: currentRevision + 1,
+        updatedAt: new Date(this.now()).toISOString(),
+      });
+      configs[providerId] = committed;
+      return store;
+    });
+    return { config: clone(committed) };
+  }
+
+  async clearSpecialistProviderConfig(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS,
+      'Browser Agent Specialist provider config clear request',
+    );
+    for (const key of SPECIALIST_PROVIDER_CONFIG_CLEAR_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider config clear request requires ${key}`);
+      }
+    }
+    const providerId = canonicalSpecialistProviderIdV1(request.providerId);
+    const expectedRevision = nonNegativeSafeInteger(
+      request.expectedRevision,
+      'Specialist provider config expectedRevision',
+    );
+    let cleared = false;
+    await this.update(store => {
+      const configs = store.specialistProviderConfigsById || Object.create(null);
+      const quarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, providerId)) {
+        throw new Error('Specialist provider config is quarantined as corrupt and requires explicit storage recovery');
+      }
+      if (specialistProviderConfigHasLiveExecution(
+        store,
+        providerId,
+        new Date(this.now()).toISOString(),
+      )) {
+        throw new Error('Specialist provider config is bound to a live provider execution lease');
+      }
+      const current = Object.hasOwn(configs, providerId) ? configs[providerId] : null;
+      if (!current) {
+        if (expectedRevision !== 0) {
+          throw new Error('Specialist provider config revision drifted before clear');
+        }
+        return store;
+      }
+      if (current.revision !== expectedRevision) {
+        throw new Error('Specialist provider config revision drifted before clear');
+      }
+      delete configs[providerId];
+      cleared = true;
+      return store;
+    });
+    return { providerId, cleared };
+  }
+
+  async listSpecialistProviderExecutions(id = '') {
+    const current = await this.get(id);
+    if (!current.job) {
+      return {
+        selectedId: current.selectedId,
+        jobId: '',
+        executions: [],
+        quarantinedCount: 0,
+      };
+    }
+    return {
+      selectedId: current.selectedId,
+      jobId: current.job.id,
+      executions: clone(current.job.runtime.specialistProviderExecutions || []),
+      quarantinedCount: (current.job.runtime.specialistProviderExecutionQuarantine || []).length,
+    };
+  }
+
+  async prepareClaimedSpecialistProviderExecution(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS,
+      'Browser Agent Specialist provider execution prepare request',
+    );
+    for (const key of SPECIALIST_PROVIDER_EXECUTION_PREPARE_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider execution prepare request requires ${key}`);
+      }
+    }
+    const agentId = exactIdentity(request.agentId, 'agentId', 180);
+    const conversationId = request.conversationId;
+    const {
+      withProjectHierarchyAuthority,
+      resolveSpecialistReadiness,
+      assertSpecialistReadinessCurrent,
+    } = trustedAutomaticDelegationDependencies(dependencies);
+
+    const initial = await this.get(id);
+    if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider execution');
+    const projectId = initial.job.config?.projectId || '';
+    if (!projectId) throw new Error('Specialist provider execution requires a durable Project binding');
+    const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
+    const initialPlan = normalizeAgentPlanV1(initial.job.runtime.plan);
+    const initialBinding = (initial.job.runtime.specialistDelegationBindings || []).find(binding =>
+      specialistAssignmentIdForPlanNodeV1(initialPlan.planId, binding.nodeId) === agentId);
+    if (!initialBinding) {
+      throw new Error('Claimed Specialist provider execution requires automatic delegation provenance');
+    }
+    const selection = normalizeSpecialistSelectionV1(initialBinding.selection);
+    const providerReadiness = assertTrustedProviderReadinessForSelection(
+      await resolveSpecialistReadiness(selection),
+      selection,
+      this.now(),
+    );
+
+    return withProjectHierarchyAuthority(projectId, async authority => {
+      let result = null;
+      await this.update(async store => {
+        await assertSpecialistReadinessCurrent(providerReadiness);
+        const job = store.byId[id];
+        if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider execution');
+        if ((job.config?.projectId || '') !== projectId) {
+          throw new Error('Browser Agent Project changed before Specialist provider execution');
+        }
+        const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+          fence: parentRuntimeFence,
+          job,
+        });
+        if (!parentFenceStatus.current) {
+          throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+        }
+        if (!job.definitionScope) {
+          throw new Error('Specialist provider execution requires durable Agent definition scope');
+        }
+        if (!job.orchestrationNodeBinding) {
+          throw new Error('Specialist provider execution requires a durable orchestration node binding');
+        }
+        const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+          binding: job.orchestrationNodeBinding,
+          authority,
+        });
+        if (!bindingStatus.current) {
+          throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+        }
+        const structureAdmission = evaluateSubagentStructureAdmissionV1({
+          policy: authority.subagentPolicy,
+          initiator: SubagentSpawnInitiator.AGENT,
+          graph: authority.graph,
+          parentNodeId: job.orchestrationNodeBinding.nodeId,
+          requestedChildren: 1,
+        });
+        if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+          throw new Error(`Specialist provider execution denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+        }
+
+        const plan = normalizeAgentPlanV1(job.runtime.plan);
+        const binding = (job.runtime.specialistDelegationBindings || []).find(candidate =>
+          specialistAssignmentIdForPlanNodeV1(plan.planId, candidate.nodeId) === agentId);
+        if (!binding || !sameSpecialistSelection(binding.selection, selection)) {
+          throw new Error('Specialist provider execution delegation provenance drifted');
+        }
+        const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === agentId);
+        const at = new Date(this.now()).toISOString();
+        if (!assignment || assignment.state !== 'LEASED' || !assignment.leaseId) {
+          throw new Error('Specialist provider execution requires the current claimed lease');
+        }
+        const ownership = (job.runtime.specialistExecutionOwnerships || [])
+          .map(normalizeExecutionOwnershipV1)
+          .find(item => item.planId === plan.planId && item.nodeId === binding.nodeId);
+
+        const configQuarantine = store.specialistProviderConfigQuarantineById || Object.create(null);
+        if (Object.hasOwn(configQuarantine, selection.providerId)) {
+          throw new Error('Selected Specialist provider config is quarantined as corrupt');
+        }
+        const providerConfig = store.specialistProviderConfigsById?.[selection.providerId];
+        if (!providerConfig) throw new Error('Selected Specialist provider is not configured by the owner');
+        const canonicalConfig = normalizeSpecialistProviderConfigV1(providerConfig);
+        if (canonicalConfig.providerId !== selection.providerId) {
+          throw new Error('Selected Specialist provider config identity drifted');
+        }
+
+        if ((job.runtime.specialistProviderExecutionQuarantine || []).length) {
+          throw new Error('Specialist provider execution provenance is quarantined as corrupt');
+        }
+        const executions = Array.isArray(job.runtime.specialistProviderExecutions)
+          ? job.runtime.specialistProviderExecutions
+          : [];
+        let execution = executions.find(item => item?.leaseId === assignment.leaseId) || null;
+        if (execution) {
+          execution = normalizeSpecialistProviderExecutionV1(execution);
+          if (execution.agentId !== agentId
+              || execution.nodeId !== binding.nodeId
+              || execution.handoffId !== binding.handoff.handoffId
+              || execution.providerId !== selection.providerId
+              || execution.leaseUntil !== assignment.leaseExpiresAt) {
+            throw new Error('Specialist provider execution identity drifted from current lease');
+          }
+          const dispatchable = [
+            SpecialistProviderExecutionStatus.PREPARED,
+            SpecialistProviderExecutionStatus.RETRYABLE_FAILURE,
+          ].includes(execution.status);
+          const expectedOwnershipState = execution.status === SpecialistProviderExecutionStatus.RECONCILE
+            ? ExecutionOwnershipState.RECONCILE
+            : execution.status === SpecialistProviderExecutionStatus.MANUAL_REVIEW
+              ? ExecutionOwnershipState.MANUAL_REVIEW
+              : ExecutionOwnershipState.OWNED;
+          if (!ownership || ownership.state !== expectedOwnershipState) {
+            throw new Error(
+              `Specialist provider execution requires matching canonical ${expectedOwnershipState} ownership`,
+            );
+          }
+          if (expectedOwnershipState !== ExecutionOwnershipState.MANUAL_REVIEW
+              && (ownership.ownerId !== agentId
+                || ownership.leaseId !== assignment.leaseId
+                || ownership.leaseUntil !== assignment.leaseExpiresAt)) {
+            throw new Error(
+              `Specialist provider execution requires matching canonical ${expectedOwnershipState} lease`,
+            );
+          }
+          if (dispatchable && assignment.leaseExpiresAt <= at) {
+            throw new Error('Specialist provider execution lease expired before dispatch');
+          }
+          if (dispatchable
+              && JSON.stringify(execution.providerConfig) !== JSON.stringify(canonicalConfig)) {
+            throw new Error('Specialist provider config changed after execution preparation');
+          }
+          result = {
+            execution: clone(execution),
+            handoff: clone(binding.handoff),
+            grantedCapabilityIds: clone(selection.requestedCapabilityIds),
+            dispatchable,
+            reused: true,
+          };
+          return store;
+        }
+
+        if (assignment.leaseExpiresAt <= at) {
+          throw new Error('Specialist provider execution lease expired before dispatch');
+        }
+        if (!ownership
+            || ownership.state !== ExecutionOwnershipState.OWNED
+            || ownership.ownerId !== agentId
+            || ownership.leaseId !== assignment.leaseId
+            || ownership.leaseUntil !== assignment.leaseExpiresAt) {
+          throw new Error('Specialist provider execution requires matching canonical OWNED lease');
+        }
+        if (executions.length >= MAX_SPECIALIST_PROVIDER_EXECUTIONS) {
+          throw new Error('Specialist provider execution provenance capacity is exhausted');
+        }
+        execution = createSpecialistProviderExecutionV1({
+          planId: plan.planId,
+          nodeId: binding.nodeId,
+          agentId,
+          handoffId: binding.handoff.handoffId,
+          providerId: selection.providerId,
+          leaseId: assignment.leaseId,
+          leaseUntil: assignment.leaseExpiresAt,
+          conversationId,
+          providerConfig: canonicalConfig,
+          at,
+        });
+        job.runtime.specialistProviderExecutions = [...executions, execution];
+        job.runtime.updatedAt = this.now();
+        appendHistory(job.runtime, {
+          at: this.now(),
+          type: 'specialist-provider-execution-prepared',
+          agentId,
+          leaseId: assignment.leaseId,
+          providerId: selection.providerId,
+          conversationId: execution.conversationId,
+          message: 'Stable provider execution identity persisted before any external provider effect.',
+        });
+        result = {
+          execution: clone(execution),
+          handoff: clone(binding.handoff),
+          grantedCapabilityIds: clone(selection.requestedCapabilityIds),
+          dispatchable: true,
+          reused: false,
+        };
+        return store;
+      });
+      return Object.freeze(result);
+    });
+  }
+
+  async recordSpecialistProviderExecutionOutcome(id, payload = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS,
+      'Browser Agent Specialist provider execution outcome request',
+    );
+    for (const key of SPECIALIST_PROVIDER_EXECUTION_OUTCOME_KEYS) {
+      if (!SPECIALIST_PROVIDER_EXECUTION_OUTCOME_OPTIONAL_KEYS.has(key) && !Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent Specialist provider execution outcome request requires ${key}`);
+      }
+    }
+    const agentId = exactIdentity(request.agentId, 'agentId', 180);
+    const leaseId = exactIdentity(request.leaseId, 'leaseId', 180);
+    const conversationId = request.conversationId;
+    let result = null;
+    await this.update(store => {
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan for provider outcome');
+      if ((job.runtime.specialistProviderExecutionQuarantine || []).length) {
+        throw new Error('Specialist provider execution provenance is quarantined as corrupt');
+      }
+      const executions = Array.isArray(job.runtime.specialistProviderExecutions)
+        ? job.runtime.specialistProviderExecutions
+        : [];
+      const index = executions.findIndex(item =>
+        item?.agentId === agentId
+        && item?.leaseId === leaseId
+        && item?.conversationId === conversationId);
+      if (index < 0) throw new Error('Specialist provider execution provenance not found');
+      const current = normalizeSpecialistProviderExecutionV1(executions[index]);
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      const assignment = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === agentId);
+      if (!assignment || assignment.leaseId !== leaseId) {
+        throw new Error('Specialist provider outcome does not match current durable handoff lease');
+      }
+      const ownerships = (job.runtime.specialistExecutionOwnerships || []).map(normalizeExecutionOwnershipV1);
+      const ownershipIndex = ownerships.findIndex(item =>
+        item.planId === plan.planId && item.nodeId === current.nodeId);
+      if (ownershipIndex < 0) throw new Error('Specialist provider outcome lacks canonical execution ownership');
+      let ownership = ownerships[ownershipIndex];
+      const at = new Date(this.now()).toISOString();
+      let outcome = {
+        providerStatus: request.providerStatus,
+        providerSucceeded: request.providerSucceeded,
+        manualReviewRequired: request.manualReviewRequired,
+        reconciliationRequired: request.reconciliationRequired,
+        safeToRetry: request.safeToRetry,
+        effectEvidence: request.effectEvidence,
+        errorCode: request.errorCode,
+        providerUpdatedAt: request.providerUpdatedAt || '',
+        providerObservedAt: request.providerObservedAt || '',
+        at,
+      };
+
+      if (Date.parse(at) > Date.parse(current.leaseUntil)
+          && [ExecutionOwnershipState.OWNED, ExecutionOwnershipState.HANDOFF_PENDING].includes(ownership.state)) {
+        ownership = recoverExpiredExecutionOwnershipV1(ownership, {
+          at,
+          reason: 'provider result arrived after execution lease expiry',
+        });
+        outcome = {
+          ...outcome,
+          providerSucceeded: false,
+          manualReviewRequired: false,
+          reconciliationRequired: true,
+          safeToRetry: false,
+          errorCode: 'SPECIALIST_PROVIDER_RESULT_AFTER_LEASE',
+        };
+      } else if (request.manualReviewRequired === true) {
+        ownership = requireExecutionReconciliationV1(ownership, {
+          leaseId,
+          reason: `provider requires human intervention: ${request.providerStatus}`,
+          at,
+        });
+        ownership = resolveExecutionReconciliationV1(ownership, {
+          leaseId,
+          outcome: 'MANUAL_REVIEW',
+          at,
+        });
+      } else if (request.reconciliationRequired === true) {
+        ownership = requireExecutionReconciliationV1(ownership, {
+          leaseId,
+          reason: request.errorCode || 'provider effect may have occurred without verified completion',
+          at,
+        });
+      } else if (ownership.state === ExecutionOwnershipState.RECONCILE) {
+        outcome = {
+          ...outcome,
+          providerSucceeded: false,
+          manualReviewRequired: false,
+          reconciliationRequired: true,
+          safeToRetry: false,
+          errorCode: request.errorCode || 'SPECIALIST_PROVIDER_RECONCILIATION_REQUIRED',
+        };
+      } else if (ownership.state !== ExecutionOwnershipState.OWNED
+          || ownership.ownerId !== agentId
+          || ownership.leaseId !== leaseId) {
+        throw new Error('Specialist provider outcome requires matching canonical execution owner lease');
+      }
+
+      const recorded = recordSpecialistProviderExecutionOutcomeV1(current, outcome);
+      const nextExecutions = [...executions];
+      nextExecutions[index] = recorded;
+      ownerships[ownershipIndex] = ownership;
+      job.runtime.specialistProviderExecutions = nextExecutions;
+      job.runtime.specialistExecutionOwnerships = ownerships;
+      job.runtime.updatedAt = this.now();
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-provider-execution-observed',
+        agentId,
+        leaseId,
+        providerId: recorded.providerId,
+        conversationId: recorded.conversationId,
+        providerStatus: recorded.providerStatus,
+        providerSucceeded: recorded.providerSucceeded,
+        reconciliationRequired: recorded.reconciliationRequired,
+        manualReviewRequired: recorded.manualReviewRequired,
+        providerUpdatedAt: recorded.providerUpdatedAt,
+        providerObservedAt: recorded.providerObservedAt,
+        errorCode: recorded.errorCode,
+        message: recorded.providerSucceeded
+          ? 'Provider terminal success observed; product completion remains blocked on result artifacts and independent verification.'
+          : 'Provider execution evidence recorded without granting completion authority.',
+      });
+      result = {
+        execution: clone(recorded),
+        executionOwnership: clone(ownership),
+        completionAuthorized: false,
+        verificationRequired: [
+          SpecialistProviderExecutionStatus.PROVIDER_SUCCEEDED,
+          SpecialistProviderExecutionStatus.PROVIDER_FAILED,
+          SpecialistProviderExecutionStatus.MANUAL_REVIEW,
+        ].includes(recorded.status),
+      };
+      return store;
+    });
+    return Object.freeze(result);
+  }
+
+  #rejectExecutionSlotQueue(error) {
+    const pending = this.executionSlotQueue.splice(0);
+    for (const next of pending) next.reject(error);
+  }
+
+  #hasExecutionTargetConflict(store, id) {
+    const requestedTabId = store.byId[id]?.runtime?.tabId;
+    if (!Number.isInteger(requestedTabId)) return false;
+    for (const activeId of this.executionSlotActive) {
+      if (activeId === id) continue;
+      if (store.byId[activeId]?.runtime?.tabId === requestedTabId) return true;
+    }
+    return false;
+  }
+
+  #requestExecutionSlotPump() {
+    if (this.executionSlotPump) {
+      this.executionSlotPumpRequested = true;
+      return;
+    }
+    void this.#pumpExecutionSlots();
+  }
+
+  async #pumpExecutionSlots() {
+    if (this.executionSlotPump) return this.executionSlotPump;
+    this.executionSlotPumpRequested = false;
+    const operation = (async () => {
+      try {
+        while (this.executionSlotQueue.length) {
+          const store = await this.load();
+          const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+          if (this.executionSlotActive.size >= policy.maxConcurrentAgents) return;
+
+          let eligibleIndex = -1;
+          for (let index = 0; index < this.executionSlotQueue.length; index += 1) {
+            const candidate = this.executionSlotQueue[index];
+            if (!this.executionSlotActive.has(candidate.id) && !this.#hasExecutionTargetConflict(store, candidate.id)) {
+              eligibleIndex = index;
+              break;
+            }
+          }
+          if (eligibleIndex < 0) return;
+
+          const [next] = this.executionSlotQueue.splice(eligibleIndex, 1);
+          if (!next) return;
+          if (this.executionSlotActive.has(next.id)) {
+            next.resolve();
+            continue;
+          }
+          this.executionSlotActive.add(next.id);
+          next.resolve();
+        }
+      } catch (error) {
+        this.#rejectExecutionSlotQueue(error);
+      }
+    })();
+    this.executionSlotPump = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.executionSlotPump === operation) this.executionSlotPump = null;
+      if (this.executionSlotPumpRequested) {
+        this.executionSlotPumpRequested = false;
+        this.#requestExecutionSlotPump();
+      }
+    }
+  }
+
+  async #acquireExecutionSlot(id) {
+    const store = await this.load();
+    const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+    const admission = evaluateResourceBudgetV1({
+      budget: { maxConcurrentAgents: policy.maxConcurrentAgents },
+      usage: { concurrentAgents: this.executionSlotActive.size },
+      request: { concurrentAgents: 1 },
+    });
+    if (admission.decision === ResourceBudgetDecisionKind.ALLOW
+        && this.executionSlotQueue.length === 0
+        && !this.executionSlotActive.has(id)
+        && !this.#hasExecutionTargetConflict(store, id)) {
+      this.executionSlotActive.add(id);
+      return true;
+    }
+    await new Promise((resolve, reject) => {
+      this.executionSlotQueue.push({ id, resolve, reject });
+      this.#requestExecutionSlotPump();
+    });
+    return true;
+  }
+
+  #releaseExecutionSlot(id) {
+    if (!this.executionSlotActive.delete(id)) return;
+    this.#requestExecutionSlotPump();
   }
 
   async list() {
@@ -516,6 +2237,92 @@ export class BrowserAgentManager {
     });
   }
 
+  /**
+   * Persist one exact Browser Agent -> canonical OrchestrationHierarchy node
+   * binding through the existing Browser Agent serialized storage authority.
+   * Canonical OrchestrationV2 authority remains fenced until this manager's
+   * durable Browser Agent update has committed; no caller snapshot can mint
+   * structural authority outside that shared serialization boundary.
+   */
+  async bindOrchestrationNode(id, rawRequest = {}, dependencies = {}) {
+    const request = normalizeBrowserAgentOrchestrationBindingRequestV1(rawRequest);
+    const withProjectHierarchyAuthority = trustedOrchestrationAuthorityFence(dependencies);
+
+    const initial = await this.get(id);
+    if (!initial.job) throw new Error('Browser Agent job not found');
+    const projectId = initial.job.config?.projectId || '';
+    if (!projectId) throw new Error('Browser Agent job is not bound to a Project');
+
+    return withProjectHierarchyAuthority(projectId, async authority => {
+      let binding = null;
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job) throw new Error('Browser Agent job not found');
+        const liveProjectId = job.config?.projectId || '';
+        if (liveProjectId !== projectId) {
+          throw new Error('Browser Agent Project changed during orchestration binding');
+        }
+
+        const currentBinding = job.orchestrationNodeBinding;
+        binding = createBrowserAgentOrchestrationNodeBindingV1({
+          jobId: job.id,
+          projectId,
+          request,
+          authority,
+          currentBinding,
+          boundAt: this.now(),
+        });
+        if (currentBinding) return store;
+
+        job.orchestrationNodeBinding = clone(binding);
+        job.updatedAt = this.now();
+        return store;
+      });
+      return Object.freeze({ binding });
+    });
+  }
+
+  /**
+   * Read the durable node binding and compare it with current canonical
+   * OrchestrationV2 authority. Drift is surfaced; it is never silently healed.
+   */
+  async inspectOrchestrationNodeBinding(id = '', dependencies = {}) {
+    const resolveProjectHierarchyAuthority = trustedOrchestrationAuthorityResolver(dependencies);
+    const current = await this.get(id);
+    if (!current.job) throw new Error('Browser Agent job not found');
+    if (!current.job.orchestrationNodeBinding) {
+      return Object.freeze({
+        binding: null,
+        status: 'UNBOUND',
+        current: false,
+        currentAuthority: null,
+      });
+    }
+    const projectId = current.job.config?.projectId || '';
+    if (!projectId) {
+      return Object.freeze({
+        binding: current.job.orchestrationNodeBinding,
+        status: BrowserAgentOrchestrationBindingStatus.PROJECT_AUTHORITY_DRIFTED,
+        current: false,
+        currentAuthority: null,
+      });
+    }
+    try {
+      const authority = await resolveProjectHierarchyAuthority(projectId);
+      return inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: current.job.orchestrationNodeBinding,
+        authority,
+      });
+    } catch (error) {
+      const unavailable = inspectUnavailableOrchestrationAuthority(
+        current.job.orchestrationNodeBinding,
+        error,
+      );
+      if (unavailable) return unavailable;
+      throw error;
+    }
+  }
+
   async listSpecialistHandoffs(id = '') {
     const current = await this.get(id);
     if (!current.job) return { selectedId: current.selectedId, handoffs: [] };
@@ -525,7 +2332,389 @@ export class BrowserAgentManager {
       planId: current.job.runtime.plan?.planId || '',
       handoffs: clone(current.job.runtime.specialistHandoffs || []),
       executionOwnerships: clone(current.job.runtime.specialistExecutionOwnerships || []),
+      delegationBindings: clone(current.job.runtime.specialistDelegationBindings || []),
     };
+  }
+
+  /**
+   * Automatically selects the least-authority specialist from the durable
+   * canonical registry and persists its existing handoff/ownership contracts.
+   * This prepares no provider effect and grants no execution authority.
+   */
+  async autoPrepareSpecialistHandoff(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      AUTO_SPECIALIST_DELEGATION_REQUEST_KEYS,
+      'Browser Agent automatic specialist delegation request',
+    );
+    for (const key of [
+      'registryId', 'expectedRegistryRevision', 'expectedPlanRevision', 'nodeId',
+      'requiredCapabilityIds', 'requiredToolIds', 'policyEnvelopeId', 'deadlineAt',
+      'maxConcurrentHandoffs',
+    ]) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent automatic specialist delegation request requires ${key}`);
+      }
+    }
+    const intent = normalizeAutomaticDelegationIntent(request);
+    const registryId = intent.registryId;
+    const expectedRegistryRevision = intent.expectedRegistryRevision;
+    const expectedPlanRevision = intent.expectedPlanRevision;
+    const {
+      withProjectHierarchyAuthority,
+      resolveSpecialistReadiness,
+      assertSpecialistReadinessCurrent,
+    } = trustedAutomaticDelegationDependencies(dependencies);
+
+    const initial = await this.get(id);
+    if (!initial.job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
+    const projectId = initial.job.config?.projectId || '';
+    if (!projectId) throw new Error('Automatic delegation requires a durable Project binding');
+    const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(initial.job);
+    const preflightAt = new Date(this.now()).toISOString();
+
+    const preflightSelection = await withProjectHierarchyAuthority(projectId, async authority => {
+      const store = await this.load();
+      const job = store.byId[id];
+      if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
+      if ((job.config?.projectId || '') !== projectId) {
+        throw new Error('Browser Agent Project changed before automatic delegation readiness probe');
+      }
+      const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({ fence: parentRuntimeFence, job });
+      if (!parentFenceStatus.current) {
+        throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+      }
+      if (job.runtime.plan.revision !== expectedPlanRevision) {
+        throw new Error('AgentPlan revision drifted before automatic delegation');
+      }
+      if (!job.definitionScope) {
+        throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
+      }
+      const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+      if (Object.hasOwn(quarantine, registryId)) throw new Error('Specialist registry is quarantined as corrupt');
+      const registry = store.specialistRegistriesById?.[registryId];
+      if (!registry) throw new Error('Specialist registry not found');
+      if (registry.revision !== expectedRegistryRevision) {
+        throw new Error('Specialist registry revision drifted before automatic delegation');
+      }
+      if (!job.orchestrationNodeBinding) {
+        throw new Error('Automatic delegation requires a durable orchestration node binding');
+      }
+      const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+        binding: job.orchestrationNodeBinding,
+        authority,
+      });
+      if (!bindingStatus.current) {
+        throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+      }
+      const structureAdmission = evaluateSubagentStructureAdmissionV1({
+        policy: authority.subagentPolicy,
+        initiator: SubagentSpawnInitiator.AGENT,
+        graph: authority.graph,
+        parentNodeId: job.orchestrationNodeBinding.nodeId,
+        requestedChildren: 1,
+      });
+      if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+        throw new Error(`Automatic delegation denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+      }
+
+      const planId = normalizeAgentPlanV1(job.runtime.plan).planId;
+      const expectedAgentId = specialistAssignmentIdForPlanNodeV1(planId, intent.nodeId);
+      const existing = (job.runtime.specialistHandoffs || []).find(item => item?.agentId === expectedAgentId);
+      if (existing) {
+        const existingBinding = (job.runtime.specialistDelegationBindings || [])
+          .find(item => item?.planId === planId && item?.nodeId === intent.nodeId);
+        if (!existingBinding) {
+          throw new Error('Existing specialist handoff lacks canonical automatic-delegation provenance');
+        }
+        bindSpecialistHandoffToRegistryV1({
+          registry,
+          selection: existingBinding.selection,
+          handoff: existingBinding.handoff,
+          parentCapabilityIds: job.definitionScope.capabilityIds,
+          parentToolIds: job.definitionScope.toolIds,
+        });
+        if (existingBinding.registryRevision !== registry.revision) {
+          throw new Error('Existing specialist delegation provenance drifted from current registry');
+        }
+        if (!sameCanonicalIdentityList(existingBinding.selection.requestedCapabilityIds, intent.requiredCapabilityIds)
+            || !sameCanonicalIdentityList(existingBinding.selection.grantedToolIds, intent.requiredToolIds)) {
+          throw new Error('Existing specialist delegation scope differs from current request');
+        }
+        return normalizeSpecialistSelectionV1(existingBinding.selection);
+      }
+
+      const reconciledPlan = reconcileAgentPlanV1(job.runtime.plan, { at: preflightAt });
+      const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+        plan: reconciledPlan,
+        expectedPlanRevision: reconciledPlan.revision,
+        nodeId: intent.nodeId,
+        registry,
+        parentCapabilityIds: job.definitionScope.capabilityIds,
+        parentToolIds: job.definitionScope.toolIds,
+        requiredCapabilityIds: intent.requiredCapabilityIds,
+        requiredToolIds: intent.requiredToolIds,
+        policyEnvelopeId: intent.policyEnvelopeId,
+        deadlineAt: intent.deadlineAt,
+        priority: intent.priority,
+        childBudget: intent.childBudget,
+        artifactRefs: intent.artifactRefs,
+        credentialRefs: intent.credentialRefs,
+        parentInvocationId: intent.parentInvocationId,
+        at: preflightAt,
+      });
+      return normalizeSpecialistSelectionV1(proposal.selection);
+    });
+
+    const providerReadiness = assertTrustedProviderReadinessForSelection(
+      await resolveSpecialistReadiness(preflightSelection),
+      preflightSelection,
+      this.now(),
+    );
+
+    return withProjectHierarchyAuthority(projectId, async authority => {
+      const at = new Date(this.now()).toISOString();
+      let result = null;
+      await this.update(async store => {
+        await assertSpecialistReadinessCurrent(providerReadiness);
+        const job = store.byId[id];
+        if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to delegate');
+        if ((job.config?.projectId || '') !== projectId) {
+          throw new Error('Browser Agent Project changed during automatic delegation');
+        }
+        const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+          fence: parentRuntimeFence,
+          job,
+        });
+        if (!parentFenceStatus.current) {
+          throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+        }
+        if (job.runtime.plan.revision !== expectedPlanRevision) {
+          throw new Error('AgentPlan revision drifted before automatic delegation');
+        }
+        if (!job.definitionScope) {
+          throw new Error('Automatic delegation requires a durable Agent definition capability/tool scope');
+        }
+
+        const quarantine = store.specialistRegistryQuarantineById || Object.create(null);
+        if (Object.hasOwn(quarantine, registryId)) {
+          throw new Error('Specialist registry is quarantined as corrupt');
+        }
+        const registry = store.specialistRegistriesById?.[registryId];
+        if (!registry) throw new Error('Specialist registry not found');
+        if (registry.revision !== expectedRegistryRevision) {
+          throw new Error('Specialist registry revision drifted before automatic delegation');
+        }
+
+        if (!job.orchestrationNodeBinding) {
+          throw new Error('Automatic delegation requires a durable orchestration node binding');
+        }
+        const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+          binding: job.orchestrationNodeBinding,
+          authority,
+        });
+        if (!bindingStatus.current) {
+          throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+        }
+
+        const structureAdmission = evaluateSubagentStructureAdmissionV1({
+          policy: authority.subagentPolicy,
+          initiator: SubagentSpawnInitiator.AGENT,
+          graph: authority.graph,
+          parentNodeId: job.orchestrationNodeBinding.nodeId,
+          requestedChildren: 1,
+        });
+        if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+          throw new Error(`Automatic delegation denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+        }
+
+        const handoffs = Array.isArray(job.runtime.specialistHandoffs)
+          ? job.runtime.specialistHandoffs
+          : [];
+        const ownerships = Array.isArray(job.runtime.specialistExecutionOwnerships)
+          ? job.runtime.specialistExecutionOwnerships
+          : [];
+        const bindings = Array.isArray(job.runtime.specialistDelegationBindings)
+          ? job.runtime.specialistDelegationBindings
+          : [];
+        const planId = normalizeAgentPlanV1(job.runtime.plan).planId;
+        const expectedAgentId = specialistAssignmentIdForPlanNodeV1(planId, intent.nodeId);
+        const existing = handoffs.find(item => item?.agentId === expectedAgentId);
+
+        if (existing) {
+          const existingOwnership = ownerships
+            .map(normalizeExecutionOwnershipV1)
+            .find(item => item.planId === planId && item.nodeId === intent.nodeId);
+          const existingBinding = bindings.find(item =>
+            item?.planId === planId && item?.nodeId === intent.nodeId);
+          if (!existingOwnership || !existingBinding) {
+            throw new Error('Existing specialist handoff lacks canonical automatic-delegation provenance');
+          }
+          bindSpecialistHandoffToRegistryV1({
+            registry,
+            selection: existingBinding.selection,
+            handoff: existingBinding.handoff,
+            parentCapabilityIds: job.definitionScope.capabilityIds,
+            parentToolIds: job.definitionScope.toolIds,
+          });
+          if (existingBinding.registryRevision !== registry.revision) {
+            throw new Error('Existing specialist delegation provenance drifted from current registry');
+          }
+          if (!sameSpecialistSelection(existingBinding.selection, preflightSelection)) {
+            throw new Error('Selected specialist changed after provider readiness probe');
+          }
+          if (!sameCanonicalIdentityList(
+            existingBinding.selection.requestedCapabilityIds,
+            intent.requiredCapabilityIds,
+          ) || !sameCanonicalIdentityList(
+            existingBinding.selection.grantedToolIds,
+            intent.requiredToolIds,
+          )) {
+            throw new Error('Existing specialist delegation scope differs from current request');
+          }
+          if (existingOwnership.policyEnvelopeId !== intent.policyEnvelopeId
+              || existing.priority !== intent.priority
+              || existing.deadlineAt !== intent.deadlineAt) {
+            throw new Error('Existing specialist delegation authority differs from current request');
+          }
+
+          const node = normalizeAgentPlanV1(job.runtime.plan).nodes
+            .find(item => item.nodeId === intent.nodeId);
+          const prepared = existing.state === 'READY'
+            && existingOwnership.state === ExecutionOwnershipState.AVAILABLE
+            && existing.leaseId === ''
+            && existing.leaseExpiresAt === ''
+            && existingOwnership.leaseId === ''
+            && existingOwnership.leaseUntil === ''
+            && node?.state === AgentPlanNodeState.READY;
+          const claimed = existing.state === 'LEASED'
+            && existingOwnership.state === ExecutionOwnershipState.OWNED
+            && Boolean(existing.leaseId)
+            && existing.leaseId === existingOwnership.leaseId
+            && existing.leaseExpiresAt === existingOwnership.leaseUntil
+            && existing.leaseExpiresAt > at
+            && node?.state === AgentPlanNodeState.RUNNING;
+          if (!prepared && !claimed) {
+            throw new Error('Existing automatic specialist delegation requires reconciliation before reuse');
+          }
+
+          const capacity = inspectProductWideSpecialistCapacity(
+            store,
+            intent.maxConcurrentHandoffs,
+          );
+          result = {
+            proposal: null,
+            assignment: clone(existing),
+            executionOwnership: clone(existingOwnership),
+            delegationBinding: clone(existingBinding),
+            structureAdmission: clone(structureAdmission),
+            capacityReservation: {
+              ...capacity,
+              reserved: claimed,
+              reused: true,
+            },
+            reused: true,
+            executionAuthorized: false,
+            providerDispatched: false,
+          };
+          return store;
+        }
+
+        const reconciledPlan = reconcileAgentPlanV1(job.runtime.plan, { at });
+        const proposal = prepareAutomaticAgentSpecialistDelegationV1({
+          plan: reconciledPlan,
+          expectedPlanRevision: reconciledPlan.revision,
+          nodeId: intent.nodeId,
+          registry,
+          parentCapabilityIds: job.definitionScope.capabilityIds,
+          parentToolIds: job.definitionScope.toolIds,
+          requiredCapabilityIds: intent.requiredCapabilityIds,
+          requiredToolIds: intent.requiredToolIds,
+          policyEnvelopeId: intent.policyEnvelopeId,
+          deadlineAt: intent.deadlineAt,
+          priority: intent.priority,
+          childBudget: intent.childBudget,
+          artifactRefs: intent.artifactRefs,
+          credentialRefs: intent.credentialRefs,
+          parentInvocationId: intent.parentInvocationId,
+          at,
+        });
+
+        if (!sameSpecialistSelection(proposal.selection, preflightSelection)) {
+          throw new Error('Selected specialist changed after provider readiness probe');
+        }
+        const assignment = proposal.preview.assignment;
+        const executionOwnership = proposal.preview.executionOwnership;
+        if (assignment.state !== 'READY'
+            || assignment.leaseId !== ''
+            || assignment.leaseExpiresAt !== ''
+            || executionOwnership.state !== ExecutionOwnershipState.AVAILABLE
+            || executionOwnership.leaseId !== ''
+            || executionOwnership.leaseUntil !== '') {
+          throw new Error('Automatic delegation proposal unexpectedly granted execution ownership');
+        }
+        if (ownerships.some(item =>
+          normalizeExecutionOwnershipV1(item).effectId === executionOwnership.effectId)) {
+          throw new Error('Automatic delegation found execution ownership without matching handoff');
+        }
+        if (bindings.some(item =>
+          item?.planId === proposal.planId && item?.nodeId === proposal.nodeId)) {
+          throw new Error('Automatic delegation found provenance binding without matching handoff');
+        }
+
+        // PREPARE observes current product-wide capacity but never reserves it.
+        // The existing canonical claim path is the only authority that may
+        // create a lease, OWNED execution ownership, or RUNNING plan state.
+        const capacityBefore = inspectProductWideSpecialistCapacity(
+          store,
+          intent.maxConcurrentHandoffs,
+        );
+
+        const delegationBinding = normalizePersistedSpecialistDelegationBinding({
+          schemaVersion: 1,
+          planId: proposal.planId,
+          nodeId: proposal.nodeId,
+          planRevision: proposal.planRevision,
+          registryId: proposal.registryId,
+          registryRevision: proposal.registryRevision,
+          selection: proposal.selection,
+          handoff: proposal.binding.handoff,
+          boundAt: at,
+        });
+        job.runtime.plan = reconciledPlan;
+        job.runtime.specialistHandoffs = [...handoffs, assignment];
+        job.runtime.specialistExecutionOwnerships = [...ownerships, executionOwnership];
+        job.runtime.specialistDelegationBindings = [...bindings, delegationBinding];
+        job.runtime.updatedAt = this.now();
+        appendHistory(job.runtime, {
+          at: this.now(),
+          type: 'specialist-auto-delegation-prepared',
+          nodeId: proposal.nodeId,
+          agentId: assignment.agentId,
+          specialistId: proposal.selection.specialistId,
+          registryId: proposal.registryId,
+          registryRevision: proposal.registryRevision,
+          message: 'Least-authority specialist selected and durably prepared; canonical claim still owns capacity, lease and execution admission. No provider effect was dispatched.',
+        });
+        result = {
+          proposal: clone(proposal),
+          assignment: clone(assignment),
+          executionOwnership: clone(executionOwnership),
+          delegationBinding: clone(delegationBinding),
+          structureAdmission: clone(structureAdmission),
+          capacityReservation: {
+            ...capacityBefore,
+            reserved: false,
+            reused: false,
+          },
+          reused: false,
+          executionAuthorized: false,
+          providerDispatched: false,
+        };
+        return store;
+      });
+      return result;
+    });
   }
 
   async prepareSpecialistHandoff(id, payload = {}) {
@@ -570,7 +2759,17 @@ export class BrowserAgentManager {
     await this.update(store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
-      const claimed = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const plan = normalizeAgentPlanV1(job.runtime.plan);
+      const automaticAgentIds = new Set(
+        (job.runtime.specialistDelegationBindings || []).map(binding =>
+          specialistAssignmentIdForPlanNodeV1(plan.planId, binding.nodeId)),
+      );
+      const automaticReady = (job.runtime.specialistHandoffs || []).some(item =>
+        item?.state === 'READY' && automaticAgentIds.has(item?.agentId));
+      if (automaticReady) {
+        throw new Error('Automatic specialist delegation must use canonical cross-job claim admission');
+      }
+      const claimed = claimAgentPlanSpecialistHandoffsV1(plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
       job.runtime.plan = claimed.plan;
       job.runtime.specialistHandoffs = claimed.assignments;
       job.runtime.specialistExecutionOwnerships = claimed.executionOwnerships;
@@ -589,100 +2788,338 @@ export class BrowserAgentManager {
    * method only distributes one product-wide capacity budget, so service
    * worker restart cannot briefly over-admit independent jobs.
    */
-  async claimSpecialistHandoffsAcrossJobs(payload = {}) {
+  async claimSpecialistHandoffsAcrossJobs(payload = {}, dependencies = {}) {
     const request = snapshotOwnDataRequest(payload, 'Browser Agent cross-job specialist claim request');
-    const limit = request.maxConcurrentHandoffs;
-    if (typeof limit !== 'number' || !Number.isSafeInteger(limit) || limit < 0 || limit > 256) {
-      throw new Error('maxConcurrentHandoffs must be an integer from 0 to 256');
-    }
+    const limit = specialistCapacityLimit(request.maxConcurrentHandoffs);
+    const targetJobId = Object.hasOwn(request, 'targetJobId')
+      ? exactIdentity(request.targetJobId, 'targetJobId', 128)
+      : '';
     const now = new Date(this.now()).toISOString();
     const at = specialistRequestTimestamp(request.at, now);
     const claimRequest = Object.create(null);
     for (const [key, value] of Object.entries(request)) {
-      if (key !== 'maxConcurrentHandoffs') claimRequest[key] = value;
+      if (key !== 'maxConcurrentHandoffs' && key !== 'targetJobId') claimRequest[key] = value;
     }
     claimRequest.at = at;
-    let result = null;
-    await this.update(store => {
-      const liveLeases = store.order.flatMap(jobId => store.byId[jobId]?.runtime?.specialistHandoffs || [])
-        .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at));
-      const specialistOwnerships = store.order
-        .flatMap(jobId => store.byId[jobId]?.runtime?.specialistExecutionOwnerships || [])
-        .map(normalizeExecutionOwnershipV1);
-      const effectIds = new Set();
-      for (const ownership of specialistOwnerships) {
-        if (effectIds.has(ownership.effectId)) {
-          throw new Error(`Duplicate product-wide specialist effect identity: ${ownership.effectId}`);
-        }
-        effectIds.add(ownership.effectId);
+
+    const initialStore = await this.load();
+    const candidateJobIds = targetJobId
+      ? (initialStore.byId[targetJobId] ? [targetJobId] : [])
+      : [...initialStore.order];
+    if (targetJobId && candidateJobIds.length === 0) {
+      throw new Error('Browser Agent job not found');
+    }
+
+    let trustedDependencies = null;
+    const automaticAdmissions = new Map();
+    for (const jobId of candidateJobIds) {
+      const snapshotJob = initialStore.byId[jobId];
+      if (!snapshotJob?.runtime?.plan) continue;
+      const plan = normalizeAgentPlanV1(snapshotJob.runtime.plan);
+      const readyBindings = (snapshotJob.runtime.specialistDelegationBindings || []).filter(binding => {
+        const agentId = specialistAssignmentIdForPlanNodeV1(plan.planId, binding.nodeId);
+        return (snapshotJob.runtime.specialistHandoffs || [])
+          .some(item => item?.agentId === agentId && item?.state === 'READY');
+      });
+      if (!readyBindings.length) continue;
+
+      if (!trustedDependencies) {
+        trustedDependencies = trustedAutomaticDelegationDependencies(dependencies);
       }
-      const capacityOwnerships = specialistOwnerships.filter(item => SPECIALIST_CAPACITY_STATES.has(item.state));
-      let remaining = Math.max(0, limit - capacityOwnerships.length);
-      const claimed = [];
-      const reconciliationRequired = [];
-      for (const jobId of store.order) {
-        const job = store.byId[jobId];
-        if (!job?.runtime?.plan) continue;
-        const outcome = claimAgentPlanSpecialistHandoffsV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-          ...claimRequest,
-          availableSlots: remaining,
-          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-          at,
+      const projectId = snapshotJob.config?.projectId || '';
+      if (!projectId) {
+        throw new Error('Automatic specialist claim requires a durable Project binding');
+      }
+      const parentRuntimeFence = createBrowserAgentParentRuntimeFenceFromJobV1(snapshotJob);
+
+      const selections = await trustedDependencies.withProjectHierarchyAuthority(
+        projectId,
+        async authority => {
+          const store = await this.load();
+          const job = store.byId[jobId];
+          if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to claim');
+          if ((job.config?.projectId || '') !== projectId) {
+            throw new Error('Browser Agent Project changed before specialist claim readiness probe');
+          }
+          const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+            fence: parentRuntimeFence,
+            job,
+          });
+          if (!parentFenceStatus.current) {
+            throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+          }
+          if (!job.definitionScope) {
+            throw new Error('Automatic specialist claim requires durable Agent definition scope');
+          }
+          if (!job.orchestrationNodeBinding) {
+            throw new Error('Automatic specialist claim requires a durable orchestration node binding');
+          }
+          const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+            binding: job.orchestrationNodeBinding,
+            authority,
+          });
+          if (!bindingStatus.current) {
+            throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+          }
+          const structureAdmission = evaluateSubagentStructureAdmissionV1({
+            policy: authority.subagentPolicy,
+            initiator: SubagentSpawnInitiator.AGENT,
+            graph: authority.graph,
+            parentNodeId: job.orchestrationNodeBinding.nodeId,
+            requestedChildren: 1,
+          });
+          if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+            throw new Error(`Automatic specialist claim denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+          }
+
+          const livePlan = normalizeAgentPlanV1(job.runtime.plan);
+          const currentReady = (job.runtime.specialistDelegationBindings || []).filter(binding => {
+            const agentId = specialistAssignmentIdForPlanNodeV1(livePlan.planId, binding.nodeId);
+            return (job.runtime.specialistHandoffs || [])
+              .some(item => item?.agentId === agentId && item?.state === 'READY');
+          });
+          if (currentReady.length !== readyBindings.length
+              || currentReady.some(binding =>
+                !readyBindings.some(expected => expected.nodeId === binding.nodeId))) {
+            throw new Error('Automatic specialist claim set drifted before readiness probe');
+          }
+
+          return currentReady.map(binding => {
+            const registry = store.specialistRegistriesById?.[binding.registryId];
+            if (!registry || registry.revision !== binding.registryRevision) {
+              throw new Error('Automatic specialist claim registry provenance drifted');
+            }
+            bindSpecialistHandoffToRegistryV1({
+              registry,
+              selection: binding.selection,
+              handoff: binding.handoff,
+              parentCapabilityIds: job.definitionScope.capabilityIds,
+              parentToolIds: job.definitionScope.toolIds,
+            });
+            return Object.freeze({
+              nodeId: binding.nodeId,
+              selection: normalizeSpecialistSelectionV1(binding.selection),
+            });
+          });
+        },
+      );
+
+      const readinessByNode = new Map();
+      for (const item of selections) {
+        const readiness = assertTrustedProviderReadinessForSelection(
+          await trustedDependencies.resolveSpecialistReadiness(item.selection),
+          item.selection,
+          this.now(),
+        );
+        readinessByNode.set(item.nodeId, readiness);
+      }
+      automaticAdmissions.set(jobId, Object.freeze({
+        projectId,
+        parentRuntimeFence,
+        selections,
+        readinessByNode,
+      }));
+    }
+
+    const claimed = [];
+    const reconciliationRequired = [];
+    for (const jobId of candidateJobIds) {
+      const admission = automaticAdmissions.get(jobId) || null;
+      const claimOne = async authority => {
+        await this.update(async store => {
+          const job = store.byId[jobId];
+          if (!job?.runtime?.plan) return store;
+
+          let effectiveMaxChildren = claimRequest.maxChildrenPerAgent;
+          let effectiveMaxDepth = claimRequest.maxDepth;
+          if (admission) {
+            if ((job.config?.projectId || '') !== admission.projectId) {
+              throw new Error('Browser Agent Project changed during automatic specialist claim');
+            }
+            const parentFenceStatus = inspectBrowserAgentParentRuntimeFenceFromJobV1({
+              fence: admission.parentRuntimeFence,
+              job,
+            });
+            if (!parentFenceStatus.current) {
+              throw new Error(`Browser Agent parent runtime fence is stale: ${parentFenceStatus.status}`);
+            }
+            if (!job.definitionScope) {
+              throw new Error('Automatic specialist claim requires durable Agent definition scope');
+            }
+            if (!job.orchestrationNodeBinding) {
+              throw new Error('Automatic specialist claim requires a durable orchestration node binding');
+            }
+            const bindingStatus = inspectBrowserAgentOrchestrationNodeBindingV1({
+              binding: job.orchestrationNodeBinding,
+              authority,
+            });
+            if (!bindingStatus.current) {
+              throw new Error(`Orchestration node binding is stale: ${bindingStatus.status}`);
+            }
+            const structureAdmission = evaluateSubagentStructureAdmissionV1({
+              policy: authority.subagentPolicy,
+              initiator: SubagentSpawnInitiator.AGENT,
+              graph: authority.graph,
+              parentNodeId: job.orchestrationNodeBinding.nodeId,
+              requestedChildren: 1,
+            });
+            if (structureAdmission.decision !== SubagentStructureDecision.ALLOW) {
+              throw new Error(`Automatic specialist claim denied by owner subagent policy: ${structureAdmission.reasonCode}`);
+            }
+
+            const livePlan = normalizeAgentPlanV1(job.runtime.plan);
+            const currentReady = (job.runtime.specialistDelegationBindings || []).filter(binding => {
+              const agentId = specialistAssignmentIdForPlanNodeV1(livePlan.planId, binding.nodeId);
+              return (job.runtime.specialistHandoffs || [])
+                .some(item => item?.agentId === agentId && item?.state === 'READY');
+            });
+            if (currentReady.length !== admission.selections.length
+                || currentReady.some(binding =>
+                  !admission.selections.some(expected => expected.nodeId === binding.nodeId))) {
+              throw new Error('Automatic specialist claim set drifted after readiness probe');
+            }
+            for (const binding of currentReady) {
+              const expected = admission.selections.find(item => item.nodeId === binding.nodeId);
+              if (!expected || !sameSpecialistSelection(binding.selection, expected.selection)) {
+                throw new Error('Selected specialist changed after claim readiness probe');
+              }
+              const registry = store.specialistRegistriesById?.[binding.registryId];
+              if (!registry || registry.revision !== binding.registryRevision) {
+                throw new Error('Automatic specialist claim registry provenance drifted');
+              }
+              bindSpecialistHandoffToRegistryV1({
+                registry,
+                selection: binding.selection,
+                handoff: binding.handoff,
+                parentCapabilityIds: job.definitionScope.capabilityIds,
+                parentToolIds: job.definitionScope.toolIds,
+              });
+              const providerReadiness = assertTrustedProviderReadinessForSelection(
+                admission.readinessByNode.get(binding.nodeId),
+                binding.selection,
+                this.now(),
+              );
+              await trustedDependencies.assertSpecialistReadinessCurrent(providerReadiness);
+            }
+            const policy = authority.subagentPolicy;
+            const requestedMaxChildren = claimRequest.maxChildrenPerAgent === undefined
+              ? 4
+              : claimRequest.maxChildrenPerAgent;
+            const requestedMaxDepth = claimRequest.maxDepth === undefined
+              ? 2
+              : claimRequest.maxDepth;
+            effectiveMaxChildren = Math.min(requestedMaxChildren, policy.maxChildrenPerAgent);
+            effectiveMaxDepth = Math.min(requestedMaxDepth, policy.maxDepth);
+          }
+
+          const capacity = inspectProductWideSpecialistCapacity(store, limit);
+          const outcome = claimAgentPlanSpecialistHandoffsV1(
+            job.runtime.plan,
+            job.runtime.specialistHandoffs || [],
+            {
+              ...claimRequest,
+              availableSlots: capacity.remainingSlots,
+              maxChildrenPerAgent: effectiveMaxChildren,
+              maxDepth: effectiveMaxDepth,
+              executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+              at,
+            },
+          );
+          job.runtime.plan = outcome.plan;
+          job.runtime.specialistHandoffs = outcome.assignments;
+          job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
+          job.runtime.updatedAt = this.now();
+          for (const agentId of outcome.claimed) {
+            claimed.push({ jobId, agentId });
+            appendHistory(job.runtime, {
+              at: this.now(),
+              type: 'specialist-handoff-claimed',
+              agentId,
+              message: 'Specialist lease admitted within live parent, provider and product-wide capacity authority.',
+            });
+          }
+          for (const agentId of outcome.reconciliationRequired) {
+            reconciliationRequired.push({ jobId, agentId });
+            appendHistory(job.runtime, {
+              at: this.now(),
+              type: 'specialist-handoff-reconcile',
+              agentId,
+              message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.',
+            });
+          }
+          return store;
         });
-        job.runtime.plan = outcome.plan;
-        job.runtime.specialistHandoffs = outcome.assignments;
-        job.runtime.specialistExecutionOwnerships = outcome.executionOwnerships;
-        job.runtime.updatedAt = this.now();
-        remaining -= outcome.claimed.length;
-        for (const agentId of outcome.claimed) {
-          claimed.push({ jobId, agentId });
-          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-claimed', agentId, message: 'Specialist lease admitted within the product-wide handoff capacity.' });
-        }
-        for (const agentId of outcome.reconciliationRequired) {
-          reconciliationRequired.push({ jobId, agentId });
-          appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-reconcile', agentId, message: 'Expired specialist lease requires canonical effect reconciliation; it was not retried.' });
-        }
-      }
-      result = {
-        maxConcurrentHandoffs: limit,
-        activeLeases: liveLeases.length,
-        capacityObligations: capacityOwnerships.length,
-        remainingSlots: remaining,
-        claimed,
-        reconciliationRequired,
       };
-      return store;
-    });
-    return result;
+
+      if (admission) {
+        await trustedDependencies.withProjectHierarchyAuthority(
+          admission.projectId,
+          authority => claimOne(authority),
+        );
+      } else {
+        await claimOne(null);
+      }
+    }
+
+    const finalStore = await this.load();
+    const finalCapacity = inspectProductWideSpecialistCapacity(finalStore, limit);
+    const activeLeases = finalStore.order
+      .flatMap(jobId => finalStore.byId[jobId]?.runtime?.specialistHandoffs || [])
+      .filter(item => item?.state === 'LEASED' && Date.parse(item.leaseExpiresAt || '') > Date.parse(at))
+      .length;
+    return {
+      maxConcurrentHandoffs: limit,
+      activeLeases,
+      capacityObligations: finalCapacity.capacityObligations,
+      remainingSlots: finalCapacity.remainingSlots,
+      claimed,
+      reconciliationRequired,
+    };
   }
 
-  async authorizeSpecialistSafeRetry(id, payload = {}) {
-    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist reconciliation request');
-    const now = new Date(this.now()).toISOString();
-    const at = specialistRequestTimestamp(request.at, now);
+  async authorizeSpecialistSafeRetry(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS,
+      'Browser Agent specialist reconciliation request',
+    );
+    for (const key of TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent specialist reconciliation request requires ${key}`);
+      }
+    }
+    const trustedDependencies = trustedSpecialistVerificationDependencies(dependencies);
+    const at = new Date(this.now()).toISOString();
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to reconcile');
-      const retriable = authorizeAgentPlanSpecialistSafeRetryV1(job.runtime.plan, job.runtime.specialistHandoffs || [], {
-        ...request,
-        executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
-        at,
-      });
+      const retriable = await authorizeAgentPlanSpecialistSafeRetryFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        trustedDependencies,
+      );
       job.runtime.plan = retriable.plan;
       job.runtime.specialistHandoffs = retriable.assignments;
       job.runtime.specialistExecutionOwnerships = retriable.executionOwnerships;
       job.runtime.updatedAt = this.now();
+      const trusted = retriable.trustedVerification;
       appendHistory(job.runtime, {
         at: this.now(),
         type: 'specialist-handoff-safe-retry-authorized',
         agentId: retriable.retriableAgentId,
-        verifierId: retriable.safeRetryVerification.verifierId,
-        verificationAuthorityId: retriable.safeRetryVerification.verificationAuthorityId,
-        verificationId: retriable.safeRetryVerification.verificationId,
-        observationId: retriable.safeRetryVerification.observationId,
-        evidenceArtifactIds: retriable.safeRetryVerification.evidenceArtifactIds,
-        evidence: retriable.safeRetryVerification.summary,
+        trustedRecordId: trusted.recordId,
+        verifierId: trusted.verifierId,
+        verificationAuthorityId: trusted.verificationAuthorityId,
+        verificationId: trusted.verificationId,
+        evidenceArtifactIds: trusted.evidenceArtifactIds,
+        verificationOutcome: trusted.outcome,
+        verificationProvenance: trusted.provenance,
         message: 'Independent canonical no-effect verification authorized this handoff for normal bounded re-admission; no effect was dispatched.',
       });
       result = clone(retriable);
@@ -711,24 +3148,136 @@ export class BrowserAgentManager {
     return result;
   }
 
-  async verifySpecialistHandoff(id, payload = {}) {
-    const request = snapshotOwnDataRequest(payload, 'Browser Agent specialist verification request');
-    const now = new Date(this.now()).toISOString();
-    const at = specialistRequestTimestamp(request.at, now);
+  async verifySpecialistHandoff(id, payload = {}, dependencies = {}) {
+    const request = snapshotExactOwnDataRequest(
+      payload,
+      TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS,
+      'Browser Agent specialist verification request',
+    );
+    for (const key of TRUSTED_SPECIALIST_VERIFICATION_REQUEST_KEYS) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent specialist verification request requires ${key}`);
+      }
+    }
+    const trustedDependencies = trustedSpecialistVerificationDependencies(dependencies);
+    const at = new Date(this.now()).toISOString();
     let result = null;
-    await this.update(store => {
+    await this.update(async store => {
       const job = store.byId[id];
       if (!job?.runtime?.plan) throw new Error('Browser Agent has no durable plan to verify');
-      const verified = verifyAgentPlanSpecialistHandoffV1(job.runtime.plan, job.runtime.specialistHandoffs || [], { ...request, executionOwnerships:job.runtime.specialistExecutionOwnerships || [], at });
+      const verified = await verifyAgentPlanSpecialistHandoffFromTrustedRecordV1(
+        job.runtime.plan,
+        job.runtime.specialistHandoffs || [],
+        {
+          ...request,
+          executionOwnerships: job.runtime.specialistExecutionOwnerships || [],
+          at,
+        },
+        trustedDependencies,
+      );
       job.runtime.plan = verified.plan;
       job.runtime.specialistHandoffs = verified.assignments;
       job.runtime.specialistExecutionOwnerships = verified.executionOwnerships;
       job.runtime.updatedAt = this.now();
-      appendHistory(job.runtime, { at: this.now(), type: 'specialist-handoff-verified', agentId: verified.verifiedAgentId, message: 'Independent verifier accepted specialist evidence and advanced the plan.' });
+      const trusted = verified.trustedVerification;
+      appendHistory(job.runtime, {
+        at: this.now(),
+        type: 'specialist-handoff-verified',
+        agentId: verified.verifiedAgentId,
+        trustedRecordId: trusted.recordId,
+        verifierId: trusted.verifierId,
+        verificationAuthorityId: trusted.verificationAuthorityId,
+        verificationId: trusted.verificationId,
+        evidenceArtifactIds: trusted.evidenceArtifactIds,
+        verificationOutcome: trusted.outcome,
+        verificationProvenance: trusted.provenance,
+        message: 'Independent canonical trusted verifier accepted specialist evidence and advanced the plan.',
+      });
       result = clone(verified);
       return store;
     });
     return result;
+  }
+
+  async createFromAgentDefinition(input = {}) {
+    const request = snapshotExactOwnDataRequest(
+      input,
+      AGENT_DEFINITION_LAUNCH_KEYS,
+      'Browser Agent definition launch request',
+    );
+    for (const key of [
+      'registryId', 'expectedRegistryRevision', 'agentDefinitionId', 'expectedDefinitionRevision',
+      'goal', 'ownerBudget', 'ownerCapabilityIds', 'ownerToolIds',
+      'requestedCapabilityIds', 'requestedToolIds',
+    ]) {
+      if (!Object.hasOwn(request, key)) {
+        throw new Error(`Browser Agent definition launch request requires ${key}`);
+      }
+    }
+    snapshotAgentDefinitionLaunchNestedInputs(request);
+    for (const key of ['expectedRegistryRevision', 'expectedDefinitionRevision']) {
+      const value = request[key];
+      if (typeof value !== 'number' || !Number.isSafeInteger(value) || Object.is(value, -0) || value < 1) {
+        throw new Error(`Browser Agent definition launch request ${key} must be a positive safe integer`);
+      }
+    }
+
+    const registryId = canonicalAgentDefinitionRegistryId(request.registryId);
+    const jobId = Object.hasOwn(request, 'jobId') ? request.jobId : this.createId();
+    if (typeof jobId !== 'string' || jobId.length < 1 || jobId.length > 128) {
+      throw new Error('Browser Agent definition launch jobId must be exact bounded text');
+    }
+
+    await this.update(store => {
+      const now = this.now();
+      if (store.byId[jobId]) throw new Error('Browser Agent job already exists');
+      const registries = store.definitionRegistriesById || Object.create(null);
+      const registry = Object.hasOwn(registries, registryId) ? registries[registryId] : null;
+      if (!registry) throw new Error('Agent definition registry not found');
+      if (registry.revision !== request.expectedRegistryRevision) {
+        throw new Error('Agent definition registry revision drifted before launch');
+      }
+
+      const selection = selectAgentDefinitionV1({
+        registry,
+        agentDefinitionId: request.agentDefinitionId,
+      });
+      if (selection.definitionRevision !== request.expectedDefinitionRevision) {
+        throw new Error('Agent definition revision drifted before launch');
+      }
+
+      const materialized = materializeAgentDefinitionV1({
+        registry,
+        selection,
+        jobId,
+        goal: request.goal,
+        projectId: Object.hasOwn(request, 'projectId') ? request.projectId : '',
+        ownerBudget: request.ownerBudget,
+        ownerCapabilityIds: request.ownerCapabilityIds,
+        ownerToolIds: request.ownerToolIds,
+        requestedCapabilityIds: request.requestedCapabilityIds,
+        requestedToolIds: request.requestedToolIds,
+      });
+      if (materialized.config.id !== jobId) {
+        throw new Error('Materialized Agent job identity changed during Browser Agent normalization');
+      }
+
+      store.byId[jobId] = {
+        id: jobId,
+        config: clone(materialized.config),
+        runtime: createBrowserAgentRuntime(now),
+        definitionSelection: clone(selection),
+        definitionScope: clone(materialized.scope),
+        definitionRouterOverride: Object.keys(materialized.routerOverride).length ? clone(materialized.routerOverride) : null,
+        orchestrationNodeBinding: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.order.push(jobId);
+      store.selectedId = jobId;
+      return store;
+    });
+    return this.get(jobId);
   }
 
   async create(raw = {}) {
@@ -761,6 +3310,7 @@ export class BrowserAgentManager {
       inputPricePerMillionUsd: raw.inputPricePerMillionUsd ?? 0,
       outputPricePerMillionUsd: raw.outputPricePerMillionUsd ?? 0,
       aiRoutingMode: raw.aiRoutingMode || BrowserAgentAiRoutingMode.INHERIT,
+      aiPinnedRouteId: raw.aiPinnedRouteId || '',
       aiPrimaryProvider: raw.aiPrimaryProvider || BrowserAgentAiProvider.INHERIT,
       aiPrimaryModel: raw.aiPrimaryModel || '',
       aiStrongProvider: raw.aiStrongProvider || BrowserAgentAiProvider.INHERIT,
@@ -774,7 +3324,17 @@ export class BrowserAgentManager {
     }, { id });
     await this.update(store => {
       if (store.byId[id]) throw new Error('Browser Agent job already exists');
-      store.byId[id] = { id, config, runtime: createBrowserAgentRuntime(now), createdAt: now, updatedAt: now };
+      store.byId[id] = {
+        id,
+        config,
+        runtime: createBrowserAgentRuntime(now),
+        definitionSelection: null,
+        definitionScope: null,
+        definitionRouterOverride: null,
+        orchestrationNodeBinding: null,
+        createdAt: now,
+        updatedAt: now,
+      };
       store.order.push(id);
       store.selectedId = id;
       return store;
@@ -1078,9 +3638,10 @@ export class BrowserAgentManager {
     return { kind: 'BUDGET_PAUSED', reason };
   }
 
-  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, maxConsecutive = 5 } = {}) {
+  async recordRecoverableFailure(id, epoch, { type, error, action = null, countStep = false, retryMs = 1000, retryAt = 0, maxConsecutive = 5 } = {}) {
     const now = this.now();
     const message = clean(error?.message || error || 'Unknown Browser Agent failure', 1200);
+    const absoluteRetryAt = typeof retryAt === 'number' && Number.isSafeInteger(retryAt) && retryAt > now ? retryAt : 0;
     let terminal = false;
     let consecutive = 0;
     await this.update(store => {
@@ -1101,6 +3662,10 @@ export class BrowserAgentManager {
         job.runtime.runState = BrowserAgentRunState.ERROR;
         job.runtime.nextWakeAt = 0;
         appendHistory(job.runtime, { at: now, type: 'error', message: `Agent stopped after ${consecutive} consecutive ${type || 'runtime'} failures: ${message}` });
+      } else if (absoluteRetryAt) {
+        // Canonical router backoff/circuit state is already durable. Do not wake
+        // the Agent early and convert one provider cooldown into repeated model errors.
+        job.runtime.nextWakeAt = Math.max(now + MIN_WAKE_MS, absoluteRetryAt);
       } else {
         // Bounded exponential backoff: transient browser/provider failures recover,
         // but a broken loop does not spin at full CPU/network speed.
@@ -1377,18 +3942,29 @@ export class BrowserAgentManager {
     }
     const context = await this.resolveStartContext(job);
     if (context.tab?.id != null && context.adopt) {
+      let adopted = false;
       await this.update(store => {
         const live = store.byId[job.id];
         if (!live) return store;
+        const claimedByOtherAgent = store.order.some(otherId =>
+          otherId !== job.id && store.byId[otherId]?.runtime?.tabId === context.tab.id);
+        if (claimedByOtherAgent) return store;
         live.runtime.tabId = context.tab.id;
         if (!live.runtime.knownTabIds.includes(context.tab.id)) live.runtime.knownTabIds.push(context.tab.id);
         // Adopted owner tabs are intentionally NOT placed in ownedTabIds.
         live.runtime.currentUrl = context.tab.url || context.url;
         live.runtime.updatedAt = this.now();
         appendHistory(live.runtime, { at: this.now(), type: 'tab', message: 'Adopted existing browser tab without taking ownership' });
+        adopted = true;
         return store;
       });
-      return context.tab;
+      if (adopted) {
+        this.#requestExecutionSlotPump();
+        return context.tab;
+      }
+      // Another durable Browser Agent already binds this owner tab. Do not
+      // create a competing target-ownership authority; isolate this job onto a
+      // fresh owned tab at the same URL instead.
     }
     const tab = await this.chrome.tabs.create({ url: context.url || DEFAULT_AGENT_START_URL, active: false });
     if (!Number.isInteger(tab?.id)) throw new Error('Browser Agent could not create a browser tab');
@@ -1402,6 +3978,7 @@ export class BrowserAgentManager {
       live.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return tab;
   }
 
@@ -1789,6 +4366,7 @@ export class BrowserAgentManager {
       job.runtime.updatedAt = this.now();
       return store;
     });
+    this.#requestExecutionSlotPump();
     return child;
   }
 
@@ -1866,7 +4444,12 @@ export class BrowserAgentManager {
       await this.reconcileAlarm();
       return this.get(id);
     };
-    const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      // Acquire before re-proving the approved target. If this approval waited
+      // behind another Agent on the same tab, all stale-target checks must run
+      // only after exclusive Browser-Agent execution admission is obtained.
+      const liveTab = Number.isInteger(pending.tabId) ? await this.chrome.tabs.get(pending.tabId).catch(() => null) : null;
     const liveUrl = clean(liveTab?.pendingUrl || liveTab?.url, 4096);
     if (!liveTab || !isHttpUrl(liveUrl) || (pending.url && liveUrl !== pending.url)) {
       return pauseStaleApproval('Approved action could not run because its browser tab is no longer available.');
@@ -1984,7 +4567,10 @@ export class BrowserAgentManager {
         return store;
       });
     }
-    await this.reconcileAlarm();
+      await this.reconcileAlarm();
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
     if (runInitial) await this.runBurst(id, { maxCycles: 25, maxWallMs: 25_000 });
     await this.reconcileAlarm();
     return this.get(id);
@@ -2188,6 +4774,7 @@ export class BrowserAgentManager {
         live.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: created.url || action.url };
     }
     if (action.type === BrowserAgentActionType.SWITCH_TAB) {
@@ -2214,11 +4801,19 @@ export class BrowserAgentManager {
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
+        const activeTargetOwner = [...this.executionSlotActive].find(activeId =>
+          activeId !== job.id && store.byId[activeId]?.runtime?.tabId === action.tabId);
+        if (activeTargetOwner) {
+          const error = new Error('Browser Agent target tab is already in use by another active Agent');
+          error.code = 'AGENT_TAB_TARGET_IN_USE';
+          throw error;
+        }
         current.runtime.tabId = action.tabId;
         current.runtime.currentUrl = targetUrl;
         current.runtime.updatedAt = this.now();
         return store;
       });
+      this.#requestExecutionSlotPump();
       return { kind: 'ACTION', action, currentUrl: targetUrl };
     }
     if (action.type === BrowserAgentActionType.CLOSE_TAB) {
@@ -2249,6 +4844,7 @@ export class BrowserAgentManager {
           if (candidate && isHttpUrl(candidate.pendingUrl || candidate.url)) { fallback = candidate; break; }
         } catch { /* skip stale tab */ }
       }
+      let appliedFallback = fallback;
       await this.update(store => {
         const current = store.byId[job.id];
         if (!current || current.runtime.controlEpoch !== epoch || current.runtime.runState !== BrowserAgentRunState.RUNNING) return store;
@@ -2256,13 +4852,18 @@ export class BrowserAgentManager {
         current.runtime.retirePendingTabIds = current.runtime.retirePendingTabIds.filter(id => id !== action.tabId);
         current.runtime.knownTabIds = current.runtime.knownTabIds.filter(id => id !== action.tabId);
         if (current.runtime.tabId === action.tabId) {
-          current.runtime.tabId = fallback?.id ?? null;
-          current.runtime.currentUrl = fallback?.pendingUrl || fallback?.url || '';
+          const fallbackClaimedByActiveAgent = Number.isInteger(fallback?.id)
+            && [...this.executionSlotActive].some(activeId =>
+              activeId !== job.id && store.byId[activeId]?.runtime?.tabId === fallback.id);
+          if (fallbackClaimedByActiveAgent) appliedFallback = null;
+          current.runtime.tabId = appliedFallback?.id ?? null;
+          current.runtime.currentUrl = appliedFallback?.pendingUrl || appliedFallback?.url || '';
         }
         current.runtime.updatedAt = this.now();
         return store;
       });
-      return { kind: 'ACTION', action, currentUrl: fallback?.pendingUrl || fallback?.url || '' };
+      this.#requestExecutionSlotPump();
+      return { kind: 'ACTION', action, currentUrl: appliedFallback?.pendingUrl || appliedFallback?.url || '' };
     }
     if (action.type === BrowserAgentActionType.DOWNLOAD) {
       if (!(await this.hasChromePermission('downloads'))) {
@@ -2724,7 +5325,7 @@ export class BrowserAgentManager {
         maxOutputTokens,
         isolatedRuntime: true,
         routerRuntime: normalizeAiRouterRuntime(current.job.runtime.aiRouterRuntime || DEFAULT_AI_ROUTER_RUNTIME),
-        routerOverride: browserAgentRouterOverride(current.job.config),
+        routerOverride: browserAgentRouterOverride(current.job.config, current.job.definitionRouterOverride),
         taskRole: imageDataUrl ? 'vision' : 'planner',
         ...(maxModelCallsForRequest ? { maxModelCallsForRequest } : {}),
         ...(imageDataUrl ? { imageDataUrl } : {}),
@@ -2753,7 +5354,13 @@ export class BrowserAgentManager {
           return store;
         });
       }
-      return this.recordRecoverableFailure(id, epoch, { type: 'model', error, retryMs: 1500, maxConsecutive: 5 });
+      return this.recordRecoverableFailure(id, epoch, {
+        type: 'model',
+        error,
+        retryMs: 1500,
+        retryAt: error?.retryAt,
+        maxConsecutive: 5,
+      });
     }
     const planner = routed?.result || routed;
     const reportedUsage = planner?.usage || routed?.usage || {};
@@ -2876,7 +5483,15 @@ export class BrowserAgentManager {
       const nodeConfig = { ...current.job.config, acceptanceCriteria: node.acceptanceCriteria };
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, nodeConfig, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
+        type: 'verification',
+        error: outcome.error,
+        action,
+        countStep: false,
+        retryMs: 500,
+        retryAt: outcome.error?.retryAt,
+        maxConsecutive: 4,
+      });
       let nextPlan;
       try {
         const running = node.state === AgentPlanNodeState.READY
@@ -2928,7 +5543,15 @@ export class BrowserAgentManager {
       }
       const outcome = await this.independentlyVerifyOutcome(id, epoch, current.job, current.job.config, snapshot, action);
       if (outcome.pauseReason) return this.pauseForBudget(id, epoch, outcome.pauseReason);
-      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, { type: 'verification', error: outcome.error, action, countStep: false, retryMs: 500, maxConsecutive: 4 });
+      if (!outcome.ok) return this.recordRecoverableFailure(id, epoch, {
+        type: 'verification',
+        error: outcome.error,
+        action,
+        countStep: false,
+        retryMs: 500,
+        retryAt: outcome.error?.retryAt,
+        maxConsecutive: 4,
+      });
       const verification = outcome.verification;
       const repeating = current.job.config.repeatMode !== BrowserAgentRepeatMode.ONCE;
       await this.update(store => {
@@ -3067,20 +5690,29 @@ export class BrowserAgentManager {
     const current = await this.get(id);
     if (!current.job) throw new Error('Browser Agent job not found');
     if (current.job.runtime.runState === BrowserAgentRunState.WAITING_APPROVAL) throw new Error('Approve or reject the pending Browser Agent action before manual Step');
-    if (current.job.runtime.runState === BrowserAgentRunState.RUNNING) return this.cycleOne(id);
-    if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
-    const now = this.now();
-    await this.update(store => {
-      const job = store.byId[id];
-      if (!job) return store;
-      job.runtime.controlEpoch += 1;
-      job.runtime.runState = BrowserAgentRunState.RUNNING;
-      job.runtime.lastError = '';
-      job.runtime.nextWakeAt = now;
-      job.runtime.updatedAt = now;
-      return store;
-    });
-    return this.cycleOne(id, { pauseAfter: true });
+    let pauseAfter = false;
+    if (current.job.runtime.runState !== BrowserAgentRunState.RUNNING) {
+      if (!(await this.requireGoalAndPermission(current.job, current.job.runtime.currentUrl || current.job.config.startUrl))) return { kind: 'WAITING_PERMISSION' };
+      const now = this.now();
+      await this.update(store => {
+        const job = store.byId[id];
+        if (!job) return store;
+        job.runtime.controlEpoch += 1;
+        job.runtime.runState = BrowserAgentRunState.RUNNING;
+        job.runtime.lastError = '';
+        job.runtime.nextWakeAt = now;
+        job.runtime.updatedAt = now;
+        return store;
+      });
+      pauseAfter = true;
+    }
+
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      return await this.cycleOne(id, { pauseAfter });
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
+    }
   }
 
   async addInstruction(id, text) {
@@ -3121,40 +5753,58 @@ export class BrowserAgentManager {
     return this.get(id);
   }
 
-  async runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
-    const startedWall = Date.now();
-    const results = [];
-    for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
-      if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
-      const before = await this.get(id);
-      if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
-      const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
-      if (waitMs > 0) {
-        if (waitMs > maxInlineWaitMs) break;
-        await sleep(waitMs);
+  runBurst(id, options = {}) {
+    if (this.runBurstInFlight.has(id)) return this.runBurstInFlight.get(id);
+    const operation = this.#runBurst(id, options).finally(() => {
+      if (this.runBurstInFlight.get(id) === operation) this.runBurstInFlight.delete(id);
+    });
+    this.runBurstInFlight.set(id, operation);
+    return operation;
+  }
+
+  async #runBurst(id, { maxCycles = 25, maxWallMs = 25_000, maxInlineWaitMs = 1500 } = {}) {
+    const ownsSlot = await this.#acquireExecutionSlot(id);
+    try {
+      const startedWall = Date.now();
+      const results = [];
+      for (let index = 0; index < Math.max(1, Math.min(100, Number(maxCycles) || 25)); index += 1) {
+        if (Date.now() - startedWall >= Math.max(1000, Number(maxWallMs) || 25_000)) break;
+        const before = await this.get(id);
+        if (!before.job || before.job.runtime.runState !== BrowserAgentRunState.RUNNING) break;
+        const waitMs = Math.max(0, Number(before.job.runtime.nextWakeAt || 0) - this.now());
+        if (waitMs > 0) {
+          if (waitMs > maxInlineWaitMs) break;
+          await sleep(waitMs);
+        }
+        const result = await this.cycleOne(id);
+        results.push(result);
+        if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
+        if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
+          const live = await this.get(id);
+          const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
+          if (delay > maxInlineWaitMs) break;
+        }
       }
-      const result = await this.cycleOne(id);
-      results.push(result);
-      if (['COMPLETED', 'CYCLE_COMPLETED', 'WAITING_PERMISSION', 'WAITING_CAPABILITY', 'WAITING_APPROVAL', 'WAITING_SCHEDULE', 'WAITING_PAGE_CHANGE', 'SCHEDULE_ENDED', 'BUDGET_PAUSED', 'MAX_STEPS', 'CANCELLED_BY_OWNER', 'NOT_FOUND', 'IDLE'].includes(result?.kind)) break;
-      if (result?.kind === 'PAGE_LOADING' || result?.kind === 'SNAPSHOT_RETRY') {
-        const live = await this.get(id);
-        const delay = Math.max(0, Number(live.job?.runtime?.nextWakeAt || 0) - this.now());
-        if (delay > maxInlineWaitMs) break;
-      }
+      await this.reconcileAlarm();
+      return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
+    } finally {
+      if (ownsSlot) this.#releaseExecutionSlot(id);
     }
-    await this.reconcileAlarm();
-    return { kind: results.length ? 'BURST' : 'IDLE', cycles: results.length, results };
   }
 
   cycleAll() {
+    if (this.cycleAllInFlight) return this.cycleAllInFlight;
     const operation = (async () => {
       const store = await this.load();
       const now = this.now();
-      const results = [];
+      const policy = normalizeBrowserAgentExecutionPolicy(store.executionPolicy || {});
+      const preflightResults = [];
+      const due = [];
+
       for (const id of store.order) {
         let job = store.byId[id];
         if ((job?.runtime?.retirePendingTabIds || []).length) {
-          results.push({ id, result: await this.retryPendingRetirement(id) });
+          preflightResults.push({ id, result: await this.retryPendingRetirement(id) });
           const live = await this.get(id);
           job = live.job;
           if (!job) continue;
@@ -3162,17 +5812,44 @@ export class BrowserAgentManager {
         if (job?.runtime?.runState === BrowserAgentRunState.WAITING_SCHEDULE) {
           if (Number(job.runtime.nextWakeAt || 0) > now) continue;
           const activation = await this.activateScheduledJob(id);
-          results.push({ id, result: activation });
+          preflightResults.push({ id, result: activation });
           const live = await this.get(id);
           job = live.job;
         }
         if (job?.runtime?.runState !== BrowserAgentRunState.RUNNING) continue;
         if (Number(job.runtime.nextWakeAt || 0) > now) continue;
-        results.push({ id, result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }) });
+        due.push(id);
       }
+
+      const runResults = new Array(due.length);
+      let cursor = 0;
+      const workerCount = Math.min(policy.maxConcurrentAgents, due.length);
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (true) {
+          const index = cursor;
+          cursor += 1;
+          if (index >= due.length) return;
+          const id = due[index];
+          runResults[index] = {
+            id,
+            result: await this.runBurst(id, { maxCycles: 8, maxWallMs: 12_000 }),
+          };
+        }
+      });
+      await Promise.all(workers);
+
       await this.reconcileAlarm();
-      return { kind: results.length ? 'CYCLED' : 'IDLE', results };
+      const results = [...preflightResults, ...runResults.filter(Boolean)];
+      return {
+        kind: results.length ? 'CYCLED' : 'IDLE',
+        results,
+        maxConcurrentAgents: policy.maxConcurrentAgents,
+      };
     })();
+    this.cycleAllInFlight = operation;
+    operation.finally(() => {
+      if (this.cycleAllInFlight === operation) this.cycleAllInFlight = null;
+    }).catch(() => undefined);
     return operation;
   }
 

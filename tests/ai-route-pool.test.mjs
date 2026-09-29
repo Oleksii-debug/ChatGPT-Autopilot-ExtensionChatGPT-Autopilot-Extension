@@ -707,7 +707,6 @@ test('route outcome emission preserves exact integer durable state and rejects o
   );
 });
 
-
 test('route profile prompts preserve exact owner text and reject representation aliases', () => {
   const systemPrompt = '  preserve leading space\nline two\n';
   const workerPrompt = '\nImplement exactly.  ';

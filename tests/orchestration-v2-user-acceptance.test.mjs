@@ -85,7 +85,7 @@ test('owner UI exposes explicit immediate start actions instead of relying on wa
   const js = fs.readFileSync(new URL('../src/ui/options.js', import.meta.url), 'utf8');
   assert.match(html, /id="start-orchestration-v2-orchestra-button"[^>]*>Запустити оркестр</);
   assert.match(html, /id="save-start-orchestration-v2-button"[^>]*>Зберегти й запустити зараз</);
-  assert.match(html, /Watchdog не використовується як затримка першого старту/);
+  assert.doesNotMatch(html, /Watchdog не використовується як затримка першого старту/);
   assert.match(js, /START_ORCHESTRATION_V2_ORCHESTRA/);
   assert.match(js, /SAVE_AND_START_ORCHESTRATION_V2/);
 });

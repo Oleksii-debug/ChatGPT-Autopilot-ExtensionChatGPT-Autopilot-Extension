@@ -294,6 +294,10 @@ function launchAction(item, prompt, stage, launchUrl, now, config, reason = '') 
 }
 
 function canLaunch(runtime, config, now) {
+  // Pool members are started together by the owner UI. Their first launch
+  // schedule lives in durable Scenario runtime, so closing that UI cannot
+  // strand or prematurely fan out the remaining physical chats.
+  if (!runtime.totalLaunches && Number(runtime.initialStartAt || 0) > now) return false;
   if (!config.minimumLaunchGapSeconds) return true;
   const launchSpacingAt = runtime.lastLaunchAt
     ? runtime.lastLaunchAt + config.minimumLaunchGapSeconds * 1000
@@ -328,8 +332,10 @@ export function planScenarioWorkActions(configRaw, runtimeRaw, now = Date.now())
     }
     if (!canLaunch(runtime, config, now)) return { runtime, actions };
     if (runtime.chat.state === ScenarioParticipantState.NEW || runtime.chat.state === ScenarioParticipantState.READY) {
-      const step = config.steps[runtime.stepIndex];
-      actions.push(launchAction(runtime.chat, step.prompt, `STEP:${runtime.round}:${runtime.stepIndex}:${runtime.repeatIndex}`, config.launchUrl, now, config));
+      const cursor = alignChatCycleCursor(runtime, config);
+      if (cursor.complete) return { runtime, actions };
+      const step = config.steps[cursor.stepIndex];
+      actions.push(launchAction(runtime.chat, step.prompt, cursor.stage, config.launchUrl, now, config));
     }
     return { runtime, actions };
   }
@@ -414,6 +420,58 @@ export function planScenarioWorkActions(configRaw, runtimeRaw, now = Date.now())
   return { runtime, actions };
 }
 
+function chatCycleCursor(config, runtime) {
+  const steps = Array.isArray(config.steps) ? config.steps : [];
+  const generationSize = steps.reduce((sum, step) => sum + Math.max(1, Number(step?.repeat) || 1), 0);
+  const rounds = Math.max(1, Number(config.roundsPerGeneration) || 1);
+  const turnsPerGeneration = generationSize * rounds;
+  if (!generationSize || !turnsPerGeneration) return { complete: true, round: 0, stepIndex: 0, repeatIndex: 0, stage: '' };
+  const completedInGeneration = Math.max(
+    0,
+    Math.min(
+      turnsPerGeneration,
+      Number(runtime.totalCompletedTurns || 0) - (Math.max(1, Number(runtime.generation || 1)) - 1) * turnsPerGeneration,
+    ),
+  );
+  if (completedInGeneration >= turnsPerGeneration) {
+    return { complete: true, round: rounds - 1, stepIndex: steps.length - 1, repeatIndex: Math.max(0, Number(steps.at(-1)?.repeat || 1) - 1), stage: '' };
+  }
+  const round = Math.floor(completedInGeneration / generationSize);
+  let offset = completedInGeneration % generationSize;
+  let stepIndex = 0;
+  let repeatIndex = 0;
+  for (let index = 0; index < steps.length; index += 1) {
+    const repeat = Math.max(1, Number(steps[index]?.repeat) || 1);
+    if (offset < repeat) {
+      stepIndex = index;
+      repeatIndex = offset;
+      break;
+    }
+    offset -= repeat;
+  }
+  return {
+    complete: false,
+    round,
+    stepIndex,
+    repeatIndex,
+    stage: `STEP:${round}:${stepIndex}:${repeatIndex}`,
+  };
+}
+
+function alignChatCycleCursor(runtime, config) {
+  const cursor = chatCycleCursor(config, runtime);
+  runtime.round = cursor.round;
+  runtime.stepIndex = cursor.stepIndex;
+  runtime.repeatIndex = cursor.repeatIndex;
+  return cursor;
+}
+
+export function expectedChatCycleStage(configRaw, runtimeRaw) {
+  const config = normalizeScenarioWorkConfig(configRaw);
+  if (config.mode !== ScenarioWorkMode.CHAT_CYCLE) return '';
+  return chatCycleCursor(config, runtimeRaw || createScenarioWorkRuntime(config)).stage;
+}
+
 function findParticipant(runtime, key) {
   if (runtime.mode === ScenarioWorkMode.CHAT_CYCLE) return runtime.chat?.key === key ? runtime.chat : null;
   if (runtime.mode === ScenarioWorkMode.PAIRS) {
@@ -443,6 +501,7 @@ export function applyScenarioLaunch(runtimeRaw, action, { sessionId, taskId, now
   item.deadlineAt = Number(action.deadlineAt || 0);
   item.completedAt = 0;
   item.lastError = '';
+  if (!runtime.totalLaunches) runtime.firstLaunchAt = now;
   runtime.lastLaunchAt = now;
   runtime.lastActionAt = now;
   runtime.totalLaunches += 1;
@@ -461,7 +520,17 @@ function markReady(item, { chatUrl = '', now = Date.now() } = {}) {
 }
 
 function completeChatTurn(runtime, config, item, now) {
+  const expected = chatCycleCursor(config, runtime);
+  const observedStage = trimmed(item.stage);
   markReady(item, { now });
+  // A historical timeout bug could resend an earlier stage after rewinding the
+  // cursor. A response to that duplicate physical Send is real, but it is not a
+  // new logical completion in the configured sequence. Never advance truth.
+  if (observedStage && expected.stage && observedStage !== expected.stage) {
+    alignChatCycleCursor(runtime, config);
+    return;
+  }
+  alignChatCycleCursor(runtime, config);
   runtime.totalCompletedTurns += 1;
   const step = config.steps[runtime.stepIndex];
   if (runtime.repeatIndex + 1 < step.repeat) {
@@ -652,10 +721,12 @@ export function applyScenarioTimeout(configRaw, runtimeRaw, participantKey, { no
     item.state = ScenarioParticipantState.RETIRED;
     resetParticipantForGeneration(item, runtime.generation);
     item.replacementCount += 1;
-    if (config.restartCurrentRoundOnTimeout) {
-      runtime.stepIndex = 0;
-      runtime.repeatIndex = 0;
-    }
+    // Timeout/replacement may retry the current logical message in a new
+    // physical chat, but it must NEVER rewind already completed sequence
+    // progress to prompt 1. restartCurrentRoundOnTimeout is retained only for
+    // portable-profile compatibility and is intentionally non-authoritative
+    // for CHAT_CYCLE sequence progress.
+    alignChatCycleCursor(runtime, config);
     return runtime;
   }
 
