@@ -4,7 +4,6 @@ const POLICY_KEYS = new Set([
   'schemaVersion',
   'revision',
   'enabled',
-  'maxConcurrentHandoffs',
   'updatedAt',
 ]);
 
@@ -70,12 +69,6 @@ export function normalizeSpecialistAutomationPolicyV1(input) {
     schemaVersion: SPECIALIST_AUTOMATION_POLICY_VERSION,
     revision: integer(raw.revision, 'Specialist automation policy revision', 1, Number.MAX_SAFE_INTEGER),
     enabled: raw.enabled,
-    maxConcurrentHandoffs: integer(
-      raw.maxConcurrentHandoffs,
-      'Specialist automation policy maxConcurrentHandoffs',
-      0,
-      256,
-    ),
     updatedAt: timestamp(raw.updatedAt, 'Specialist automation policy updatedAt'),
   });
 }
@@ -83,14 +76,12 @@ export function normalizeSpecialistAutomationPolicyV1(input) {
 export function createSpecialistAutomationPolicyV1({
   revision,
   enabled,
-  maxConcurrentHandoffs,
   updatedAt,
 } = {}) {
   return normalizeSpecialistAutomationPolicyV1({
     schemaVersion: SPECIALIST_AUTOMATION_POLICY_VERSION,
     revision,
     enabled,
-    maxConcurrentHandoffs,
     updatedAt,
   });
 }
