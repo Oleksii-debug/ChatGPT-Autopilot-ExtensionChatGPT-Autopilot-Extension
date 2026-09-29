@@ -998,6 +998,63 @@ test('state, nested metadata and create options reject accessors before getter e
   assert.equal(reads, 0);
 });
 
+test('restart normalization rejects evidence outside durable exact-effect chronology', () => {
+  let state = createExactEffectStateV1(invocation(), { createdAt: AT });
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.BEGIN_EXECUTION,
+    'chronology-binding-start',
+    '2026-09-19T12:00:01Z',
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_OBSERVATION,
+    'chronology-binding-observe',
+    '2026-09-19T12:00:03Z',
+    { observation: observation() },
+  )).state;
+  state = reduceExactEffectV1(state, event(
+    ExactEffectEventType.RECORD_VERIFICATION,
+    'chronology-binding-verify',
+    '2026-09-19T12:00:04Z',
+    { verification: verification() },
+  )).state;
+
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      createdAt: '2026-09-19T12:00:05.000Z',
+    }),
+    /durable time cannot predate creation|observation chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      observation: { ...state.observation, observedAt: '2026-09-19T11:59:59.000Z' },
+    }),
+    /observation chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      observation: { ...state.observation, observedAt: '2026-09-19T12:00:05.000Z' },
+    }),
+    /observation chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      verification: { ...state.verification, verifiedAt: '2026-09-19T12:00:02.000Z' },
+    }),
+    /verification chronology is invalid/,
+  );
+  assert.throws(
+    () => normalizeExactEffectStateV1({
+      ...state,
+      verification: { ...state.verification, verifiedAt: '2026-09-19T12:00:05.000Z' },
+    }),
+    /verification chronology is invalid/,
+  );
+});
+
 test('state envelope rejects hidden, symbol and inherited authority aliases', () => {
   const state = createExactEffectStateV1(invocation(), { createdAt: AT });
 
